@@ -13,6 +13,11 @@
 #include <arpa/inet.h>
 #endif
 
+#ifdef SC_HAS_TLS
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#endif
+
 #define SC_WS_MAGIC "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 #define SC_WS_MAX_FRAME_PAYLOAD (4 * 1024 * 1024)
 #define SC_WS_MAX_MSG (64 * 1024)
@@ -28,10 +33,13 @@
 #define SC_WS_INVALID_SOCK (-1)
 
 struct sc_ws_client {
-    void *tls_ctx;       /* placeholder for TLS; NULL for ws:// */
     sc_allocator_t *alloc;
 #if defined(SC_GATEWAY_POSIX) && !SC_IS_TEST
     int sockfd;
+#ifdef SC_HAS_TLS
+    SSL *ssl;
+    SSL_CTX *ssl_ctx;
+#endif
 #endif
 };
 
@@ -140,12 +148,25 @@ static void ws_b64_encode_16(const unsigned char *in, char *out) {
     *out++ = '=';
 }
 
-/* Parse ws://host[:port][/path] into host, port, path. Returns 0 on success. */
+/* Parse ws:// or wss://host[:port][/path] into host, port, path.
+ * Sets *use_tls to 1 for wss://, 0 for ws://. Returns 0 on success. */
 static int ws_parse_url(const char *url, char *host, size_t host_size,
-    uint16_t *port, char *path, size_t path_size)
+    uint16_t *port, char *path, size_t path_size, int *use_tls)
 {
-    if (strncmp(url, "ws://", 5) != 0) return -1;
-    const char *p = url + 5;
+    int is_wss = 0;
+    const char *p;
+    if (strncmp(url, "wss://", 6) == 0) {
+        is_wss = 1;
+        p = url + 6;
+        *port = 443;
+    } else if (strncmp(url, "ws://", 5) == 0) {
+        p = url + 5;
+        *port = 80;
+    } else {
+        return -1;
+    }
+    if (use_tls) *use_tls = is_wss;
+
     const char *host_start = p;
     while (*p && *p != ':' && *p != '/') p++;
     size_t host_len = (size_t)(p - host_start);
@@ -153,7 +174,6 @@ static int ws_parse_url(const char *url, char *host, size_t host_size,
     memcpy(host, host_start, host_len);
     host[host_len] = '\0';
 
-    *port = 80;
     if (*p == ':') {
         p++;
         unsigned pt = 0;
@@ -183,12 +203,15 @@ sc_error_t sc_ws_connect(sc_allocator_t *alloc,
     (void)alloc;
     return SC_ERR_NOT_SUPPORTED;
 #elif defined(SC_GATEWAY_POSIX)
+    int use_tls = 0;
+#if !defined(SC_HAS_TLS)
     if (strncmp(url, "wss://", 6) == 0)
-        return SC_ERR_NOT_SUPPORTED; /* TLS requires OpenSSL; add later */
+        return SC_ERR_NOT_SUPPORTED; /* TLS requires OpenSSL */
+#endif
 
     char host[256], path[512];
     uint16_t port;
-    if (ws_parse_url(url, host, sizeof(host), &port, path, sizeof(path)) != 0)
+    if (ws_parse_url(url, host, sizeof(host), &port, path, sizeof(path), &use_tls) != 0)
         return SC_ERR_INVALID_ARGUMENT;
 
     char port_str[8];
@@ -210,6 +233,35 @@ sc_error_t sc_ws_connect(sc_allocator_t *alloc,
         return SC_ERR_IO;
     }
     freeaddrinfo(res);
+
+#ifdef SC_HAS_TLS
+    SSL *ssl = NULL;
+    SSL_CTX *ssl_ctx = NULL;
+    if (use_tls) {
+        ssl_ctx = SSL_CTX_new(TLS_client_method());
+        if (!ssl_ctx) {
+            close(sockfd);
+            return SC_ERR_IO;
+        }
+        SSL_CTX_set_default_verify_paths(ssl_ctx);
+        SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, NULL);
+
+        ssl = SSL_new(ssl_ctx);
+        if (!ssl) {
+            SSL_CTX_free(ssl_ctx);
+            close(sockfd);
+            return SC_ERR_IO;
+        }
+        SSL_set_fd(ssl, sockfd);
+        SSL_set_tlsext_host_name(ssl, host);
+        if (SSL_connect(ssl) != 1) {
+            SSL_free(ssl);
+            SSL_CTX_free(ssl_ctx);
+            close(sockfd);
+            return SC_ERR_IO;
+        }
+    }
+#endif
 
     /* Random 16-byte key for Sec-WebSocket-Key */
     unsigned char key_raw[16];
@@ -241,6 +293,9 @@ sc_error_t sc_ws_connect(sc_allocator_t *alloc,
         path, host, key_b64) + 1;
     char *req = (char *)alloc->alloc(alloc->ctx, req_len);
     if (!req) {
+#ifdef SC_HAS_TLS
+        if (ssl) { SSL_free(ssl); SSL_CTX_free(ssl_ctx); }
+#endif
         close(sockfd);
         return SC_ERR_OUT_OF_MEMORY;
     }
@@ -256,9 +311,16 @@ sc_error_t sc_ws_connect(sc_allocator_t *alloc,
     size_t sent = 0;
     size_t to_send = strlen(req);
     while (sent < to_send) {
+#ifdef SC_HAS_TLS
+        ssize_t n = ssl ? (ssize_t)SSL_write(ssl, req + sent, (int)(to_send - sent)) : send(sockfd, req + sent, to_send - sent, 0);
+#else
         ssize_t n = send(sockfd, req + sent, to_send - sent, 0);
+#endif
         if (n <= 0) {
             alloc->free(alloc->ctx, req, req_len);
+#ifdef SC_HAS_TLS
+            if (ssl) { SSL_free(ssl); SSL_CTX_free(ssl_ctx); }
+#endif
             close(sockfd);
             return SC_ERR_IO;
         }
@@ -270,8 +332,15 @@ sc_error_t sc_ws_connect(sc_allocator_t *alloc,
     char resp[4096];
     size_t resp_len = 0;
     while (resp_len < sizeof(resp) - 1) {
+#ifdef SC_HAS_TLS
+        ssize_t n = ssl ? (ssize_t)SSL_read(ssl, resp + resp_len, (int)(sizeof(resp) - 1 - resp_len)) : recv(sockfd, resp + resp_len, sizeof(resp) - 1 - resp_len, 0);
+#else
         ssize_t n = recv(sockfd, resp + resp_len, sizeof(resp) - 1 - resp_len, 0);
+#endif
         if (n <= 0) {
+#ifdef SC_HAS_TLS
+            if (ssl) { SSL_free(ssl); SSL_CTX_free(ssl_ctx); }
+#endif
             close(sockfd);
             return SC_ERR_IO;
         }
@@ -281,26 +350,42 @@ sc_error_t sc_ws_connect(sc_allocator_t *alloc,
             break;
     }
     if (strstr(resp, "\r\n\r\n") == NULL) {
+#ifdef SC_HAS_TLS
+        if (ssl) { SSL_free(ssl); SSL_CTX_free(ssl_ctx); }
+#endif
         close(sockfd);
         return SC_ERR_IO;
     }
     if (!strstr(resp, "101")) {
+#ifdef SC_HAS_TLS
+        if (ssl) { SSL_free(ssl); SSL_CTX_free(ssl_ctx); }
+#endif
         close(sockfd);
         return SC_ERR_IO; /* Expected 101 Switching Protocols */
     }
     if (!strstr(resp, "Upgrade:") || !strstr(resp, "websocket")) {
+#ifdef SC_HAS_TLS
+        if (ssl) { SSL_free(ssl); SSL_CTX_free(ssl_ctx); }
+#endif
         close(sockfd);
         return SC_ERR_IO;
     }
 
     sc_ws_client_t *ws = (sc_ws_client_t *)alloc->alloc(alloc->ctx, sizeof(sc_ws_client_t));
     if (!ws) {
+#ifdef SC_HAS_TLS
+        if (ssl) { SSL_free(ssl); SSL_CTX_free(ssl_ctx); }
+#endif
         close(sockfd);
         return SC_ERR_OUT_OF_MEMORY;
     }
     memset(ws, 0, sizeof(*ws));
     ws->alloc = alloc;
     ws->sockfd = sockfd;
+#ifdef SC_HAS_TLS
+    ws->ssl = ssl;
+    ws->ssl_ctx = ssl_ctx;
+#endif
     *out = ws;
     return SC_OK;
 #else
@@ -342,7 +427,11 @@ sc_error_t sc_ws_send(sc_ws_client_t *ws,
 
     size_t sent = 0;
     while (sent < frame_len) {
+#ifdef SC_HAS_TLS
+        ssize_t n = ws->ssl ? (ssize_t)SSL_write(ws->ssl, buf + sent, (int)(frame_len - sent)) : send(ws->sockfd, buf + sent, frame_len - sent, 0);
+#else
         ssize_t n = send(ws->sockfd, buf + sent, frame_len - sent, 0);
+#endif
         if (n <= 0) return SC_ERR_IO;
         sent += (size_t)n;
     }
@@ -371,7 +460,11 @@ sc_error_t sc_ws_recv(sc_ws_client_t *ws,
         char hdr_buf[14];
         size_t hdr_read = 0;
         while (hdr_read < 2) {
+#ifdef SC_HAS_TLS
+            ssize_t n = ws->ssl ? (ssize_t)SSL_read(ws->ssl, hdr_buf + hdr_read, 2 - hdr_read) : recv(ws->sockfd, hdr_buf + hdr_read, 2 - hdr_read, 0);
+#else
             ssize_t n = recv(ws->sockfd, hdr_buf + hdr_read, 2 - hdr_read, 0);
+#endif
             if (n <= 0) return SC_ERR_IO;
             hdr_read += (size_t)n;
         }
@@ -384,7 +477,11 @@ sc_error_t sc_ws_recv(sc_ws_client_t *ws,
             if (b1 & 0x80) need += 4;
         }
         while (hdr_read < need) {
+#ifdef SC_HAS_TLS
+            ssize_t n = ws->ssl ? (ssize_t)SSL_read(ws->ssl, hdr_buf + hdr_read, need - hdr_read) : recv(ws->sockfd, hdr_buf + hdr_read, need - hdr_read, 0);
+#else
             ssize_t n = recv(ws->sockfd, hdr_buf + hdr_read, need - hdr_read, 0);
+#endif
             if (n <= 0) return SC_ERR_IO;
             hdr_read += (size_t)n;
         }
@@ -402,7 +499,11 @@ sc_error_t sc_ws_recv(sc_ws_client_t *ws,
             if (!payload) return SC_ERR_OUT_OF_MEMORY;
             size_t pl_read = 0;
             while (pl_read < hdr.payload_len) {
+#ifdef SC_HAS_TLS
+                ssize_t n = ws->ssl ? (ssize_t)SSL_read(ws->ssl, payload + pl_read, (int)(hdr.payload_len - pl_read)) : recv(ws->sockfd, payload + pl_read, hdr.payload_len - pl_read, 0);
+#else
                 ssize_t n = recv(ws->sockfd, payload + pl_read, hdr.payload_len - pl_read, 0);
+#endif
                 if (n <= 0) {
                     alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
                     return SC_ERR_IO;
@@ -427,7 +528,11 @@ sc_error_t sc_ws_recv(sc_ws_client_t *ws,
                 if (pl > 0) {
                     size_t sent = 0;
                     while (sent < pl) {
+#ifdef SC_HAS_TLS
+                        ssize_t nn = ws->ssl ? (ssize_t)SSL_write(ws->ssl, pong_buf + sent, (int)(pl - sent)) : send(ws->sockfd, pong_buf + sent, pl - sent, 0);
+#else
                         ssize_t nn = send(ws->sockfd, pong_buf + sent, pl - sent, 0);
+#endif
                         if (nn <= 0) break;
                         sent += (size_t)nn;
                     }
@@ -474,11 +579,26 @@ void sc_ws_close(sc_ws_client_t *ws, sc_allocator_t *alloc)
         if (n > 0) {
             size_t sent = 0;
             while (sent < n) {
+#ifdef SC_HAS_TLS
+                ssize_t r = ws->ssl ? (ssize_t)SSL_write(ws->ssl, close_buf + sent, (int)(n - sent)) : send(ws->sockfd, close_buf + sent, n - sent, 0);
+#else
                 ssize_t r = send(ws->sockfd, close_buf + sent, n - sent, 0);
+#endif
                 if (r <= 0) break;
                 sent += (size_t)r;
             }
         }
+#ifdef SC_HAS_TLS
+        if (ws->ssl) {
+            SSL_shutdown(ws->ssl);
+            SSL_free(ws->ssl);
+            ws->ssl = NULL;
+        }
+        if (ws->ssl_ctx) {
+            SSL_CTX_free(ws->ssl_ctx);
+            ws->ssl_ctx = NULL;
+        }
+#endif
         close(ws->sockfd);
         ws->sockfd = SC_WS_INVALID_SOCK;
     }
