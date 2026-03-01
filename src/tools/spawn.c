@@ -18,7 +18,7 @@
 
 #define SC_SPAWN_NAME "spawn"
 #define SC_SPAWN_DESC "Spawn child process"
-#define SC_SPAWN_PARAMS "{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"},\"args\":{\"type\":\"array\"}},\"required\":[\"command\"]}"
+#define SC_SPAWN_PARAMS "{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"required\":[\"command\"]}"
 #define SC_SPAWN_MAX_ARGS 64
 #define SC_SPAWN_MAX_OUTPUT 65536
 

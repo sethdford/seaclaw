@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 #define SC_GEMINI_BASE "https://generativelanguage.googleapis.com/v1beta/models"
-#define SC_GEMINI_BASE_LEN 51
+#define SC_GEMINI_BASE_LEN (sizeof(SC_GEMINI_BASE) - 1)
 #define SC_GEMINI_DEFAULT_MAX_TOKENS 8192
 
 typedef struct sc_gemini_ctx {
@@ -20,6 +20,7 @@ typedef struct sc_gemini_ctx {
     size_t oauth_token_len;
 } sc_gemini_ctx_t;
 
+#if !SC_IS_TEST
 /* Extract text from Gemini SSE JSON: candidates[0].content.parts[0].text */
 static char *gemini_extract_sse_delta(sc_allocator_t *alloc, const char *json_str, size_t json_len) {
     sc_json_value_t *parsed = NULL;
@@ -57,6 +58,7 @@ static char *gemini_extract_sse_delta(sc_allocator_t *alloc, const char *json_st
     sc_json_free(alloc, parsed);
     return out;
 }
+#endif
 
 typedef struct gemini_stream_ctx {
     sc_allocator_t *alloc;
@@ -69,6 +71,7 @@ typedef struct gemini_stream_ctx {
     sc_error_t last_error;
 } gemini_stream_ctx_t;
 
+#if !SC_IS_TEST
 static void gemini_sse_event_cb(const char *event_type, size_t event_type_len,
     const char *data, size_t data_len, void *userdata)
 {
@@ -122,6 +125,7 @@ static size_t gemini_stream_write_cb(const char *chunk, size_t chunk_len, void *
     if (err != SC_OK) s->last_error = err;
     return chunk_len;
 }
+#endif
 
 static sc_error_t gemini_chat(void *ctx, sc_allocator_t *alloc,
     const sc_chat_request_t *request,

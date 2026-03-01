@@ -140,11 +140,15 @@ static sc_error_t cmd_doctor(sc_allocator_t *alloc, int argc, char **argv) {
         cfg.config_path && cfg.config_path[0] ? cfg.config_path : "defaults");
 
     const char *prov = cfg.default_provider ? cfg.default_provider : "openai";
-    const char *key = sc_config_default_provider_key(&cfg);
-    if (key && key[0]) {
-        printf("[doctor] provider (%s): ok (API key configured)\n", prov);
+    if (sc_config_provider_requires_api_key(prov)) {
+        const char *key = sc_config_default_provider_key(&cfg);
+        if (key && key[0]) {
+            printf("[doctor] provider (%s): ok (API key configured)\n", prov);
+        } else {
+            printf("[doctor] provider (%s): warning — no API key\n", prov);
+        }
     } else {
-        printf("[doctor] provider (%s): warning — no API key\n", prov);
+        printf("[doctor] provider (%s): ok (local — no API key required)\n", prov);
     }
 
     const char *backend = cfg.memory_backend ? cfg.memory_backend : "none";

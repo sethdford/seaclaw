@@ -77,6 +77,7 @@ static void test_http_get_ex_mock(void) {
 }
 #endif /* #if 0 */
 
+#if 0
 static void test_http_request_get_mock(void) {
 #if SC_IS_TEST
     sc_allocator_t alloc = sc_system_allocator();
@@ -88,6 +89,7 @@ static void test_http_request_get_mock(void) {
     }
 #endif
 }
+#endif
 
 #if SC_IS_TEST
 static void test_http_post_json_mock(void) {

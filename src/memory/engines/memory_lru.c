@@ -137,6 +137,7 @@ static sc_error_t dup_category(sc_allocator_t *alloc,
     return SC_OK;
 }
 
+#if 0
 static const char *category_to_string(const sc_memory_category_t *cat) {
     if (!cat) return "core";
     switch (cat->tag) {
@@ -150,6 +151,7 @@ static const char *category_to_string(const sc_memory_category_t *cat) {
         default: return "core";
     }
 }
+#endif
 
 static void category_to_out(const sc_memory_category_t *src,
     sc_memory_entry_t *out, sc_allocator_t *alloc) {

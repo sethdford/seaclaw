@@ -681,7 +681,6 @@ static void test_skillforge_create_null_alloc(void) {
 }
 
 static void test_skillforge_discover_null_sf(void) {
-    sc_allocator_t alloc = sc_system_allocator();
     sc_error_t err = sc_skillforge_discover(NULL, "/tmp");
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
@@ -734,7 +733,9 @@ static void test_migration_run_dry_run(void) {
     SC_ASSERT_EQ(stats.imported, 0u);
 }
 
+#if 0
 static size_t g_migration_progress_invoked_cur, g_migration_progress_invoked_tot;
+#endif
 static void migration_progress_invoked_cb(void *ctx, size_t cur, size_t tot) {
     size_t *p = (size_t *)ctx;
     p[0] = cur;

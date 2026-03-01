@@ -42,6 +42,7 @@ static sc_error_t skill_add(sc_skillforge_t *sf, const char *name,
     return SC_OK;
 }
 
+#if !defined(SC_IS_TEST)
 static sc_error_t parse_skill_json(sc_allocator_t *alloc, const char *json, size_t json_len,
     char **out_name, char **out_desc, char **out_params, bool *out_enabled) {
     sc_json_value_t *root = NULL;
@@ -87,6 +88,7 @@ static sc_error_t parse_skill_json(sc_allocator_t *alloc, const char *json, size
     }
     return SC_OK;
 }
+#endif
 
 #if !defined(SC_IS_TEST)
 static sc_error_t discover_from_dir(sc_skillforge_t *sf, const char *dir_path) {

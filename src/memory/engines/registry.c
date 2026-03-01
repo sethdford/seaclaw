@@ -8,7 +8,9 @@
 /* Static descriptors for enabled backends. Build options control which exist.
  * Returns pointer to array of descriptor pointers. */
 static const sc_backend_descriptor_t *const *get_descriptors(size_t *out_count);
+#if 0
 static size_t descriptor_count(void);
+#endif
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Descriptor definitions (one per enabled backend)
@@ -70,6 +72,7 @@ static const sc_backend_descriptor_t desc_sqlite = {
     .needs_workspace = false,
 };
 
+#ifdef SC_ENABLE_POSTGRES
 static const sc_backend_descriptor_t desc_postgres = {
     .name = "postgres",
     .label = "PostgreSQL — remote/shared memory store",
@@ -83,6 +86,7 @@ static const sc_backend_descriptor_t desc_postgres = {
     .needs_db_path = false,
     .needs_workspace = false,
 };
+#endif
 
 static const sc_backend_descriptor_t desc_api = {
     .name = "api",
@@ -98,6 +102,7 @@ static const sc_backend_descriptor_t desc_api = {
     .needs_workspace = false,
 };
 
+#ifdef SC_ENABLE_REDIS_ENGINE
 static const sc_backend_descriptor_t desc_redis = {
     .name = "redis",
     .label = "Redis — in-memory key-value store",
@@ -111,6 +116,7 @@ static const sc_backend_descriptor_t desc_redis = {
     .needs_db_path = false,
     .needs_workspace = false,
 };
+#endif
 
 static const sc_backend_descriptor_t desc_lucid = {
     .name = "lucid",
@@ -178,11 +184,13 @@ static const sc_backend_descriptor_t *const *get_descriptors(size_t *out_count) 
     return (n > 0) ? list : NULL;
 }
 
+#if 0
 static size_t descriptor_count(void) {
     size_t c;
     get_descriptors(&c);
     return c;
 }
+#endif
 
 const sc_backend_descriptor_t *sc_registry_find_backend(const char *name, size_t name_len) {
     if (!name) return NULL;

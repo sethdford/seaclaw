@@ -26,6 +26,7 @@ static const char *ALLOWED_PREFIX[] = {
 
 #define CONFIG_MAX_SIZE (1024 * 1024)
 
+#if !defined(SC_IS_TEST) || !SC_IS_TEST
 /* Split "a.b.c" into tokens. *out_tokens and *out_buf must be freed by caller. */
 static sc_error_t split_path(sc_allocator_t *alloc, const char *path,
     char ***out_tokens, size_t *out_count, char **out_buf, size_t *out_buf_len) {
@@ -175,6 +176,7 @@ static sc_error_t read_config_file(sc_allocator_t *alloc, const char *path,
     *out_len = n;
     return SC_OK;
 }
+#endif
 
 static bool is_allowed_path(const char *path) {
     if (!path || !path[0]) return false;

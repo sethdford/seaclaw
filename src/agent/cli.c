@@ -116,7 +116,7 @@ sc_error_t sc_agent_cli_run(sc_allocator_t *alloc, const char *const *argv, size
         return err;
     }
 
-    const char *model = cfg.default_model ? cfg.default_model : "gpt-4o";
+    const char *model = cfg.default_model ? cfg.default_model : "";
     const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
     double temp = cfg.temperature > 0.0 ? cfg.temperature : 0.7;
     uint32_t max_iters = cfg.agent.max_tool_iterations > 0 ? cfg.agent.max_tool_iterations : 25;
@@ -189,7 +189,8 @@ sc_error_t sc_agent_cli_run(sc_allocator_t *alloc, const char *const *argv, size
     }
 
     printf("%s v%s — Interactive Agent\n", SC_CODENAME, sc_version_string());
-    printf("Provider: %s | Model: %s | Tools: %zu\n", prov_name, model, tools_count);
+    printf("Provider: %s | Model: %s | Tools: %zu\n",
+        prov_name, (model[0] ? model : "(default)"), tools_count);
     printf("Type your message, or 'exit'/'quit' to leave.\n\n");
 
     while (1) {

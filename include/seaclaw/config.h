@@ -206,6 +206,7 @@ sc_error_t sc_config_save(const sc_config_t *cfg);
 sc_error_t sc_config_validate(const sc_config_t *cfg);
 const char *sc_config_get_provider_key(const sc_config_t *cfg, const char *name);
 const char *sc_config_default_provider_key(const sc_config_t *cfg);
+bool sc_config_provider_requires_api_key(const char *provider);
 const char *sc_config_get_provider_base_url(const sc_config_t *cfg, const char *name);
 bool sc_config_get_provider_native_tools(const sc_config_t *cfg, const char *name);
 const char *sc_config_get_web_search_provider(const sc_config_t *cfg);

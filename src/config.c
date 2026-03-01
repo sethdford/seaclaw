@@ -27,7 +27,7 @@ static void set_defaults(sc_config_t *cfg, sc_allocator_t *a) {
     cfg->providers_len = 0;
     cfg->api_key = NULL;
     cfg->default_provider = sc_strdup(a, "openai");
-    cfg->default_model = sc_strdup(a, "gpt-4");
+    cfg->default_model = sc_strdup(a, "claude-sonnet-4-20250514");
     cfg->default_temperature = 0.7;
     cfg->temperature = 0.7;
     cfg->max_tokens = 0;
@@ -241,6 +241,7 @@ static sc_sandbox_backend_t parse_sandbox_backend(const char *s) {
 
 static sc_error_t parse_cron(sc_allocator_t *a, sc_config_t *cfg,
                              const sc_json_value_t *obj) {
+    (void)a;
     if (!obj || obj->type != SC_JSON_OBJECT) return SC_OK;
     cfg->cron.enabled = sc_json_get_bool(obj, "enabled", cfg->cron.enabled);
     double im = sc_json_get_number(obj, "interval_minutes", cfg->cron.interval_minutes);
@@ -252,6 +253,7 @@ static sc_error_t parse_cron(sc_allocator_t *a, sc_config_t *cfg,
 
 static sc_error_t parse_scheduler(sc_allocator_t *a, sc_config_t *cfg,
                                   const sc_json_value_t *obj) {
+    (void)a;
     if (!obj || obj->type != SC_JSON_OBJECT) return SC_OK;
     double mc = sc_json_get_number(obj, "max_concurrent", cfg->scheduler.max_concurrent);
     if (mc >= 0 && mc <= 256) cfg->scheduler.max_concurrent = (uint32_t)mc;
@@ -450,6 +452,7 @@ static sc_error_t parse_agent(sc_allocator_t *a, sc_config_t *cfg,
 
 static sc_error_t parse_heartbeat(sc_allocator_t *a, sc_config_t *cfg,
                                   const sc_json_value_t *obj) {
+    (void)a;
     if (!obj || obj->type != SC_JSON_OBJECT) return SC_OK;
     cfg->heartbeat.enabled = sc_json_get_bool(obj, "enabled", cfg->heartbeat.enabled);
     double im = sc_json_get_number(obj, "interval_minutes", cfg->heartbeat.interval_minutes);
@@ -487,6 +490,7 @@ static sc_error_t parse_reliability(sc_allocator_t *a, sc_config_t *cfg,
 
 static sc_error_t parse_session(sc_allocator_t *a, sc_config_t *cfg,
                                  const sc_json_value_t *obj) {
+    (void)a;
     if (!obj || obj->type != SC_JSON_OBJECT) return SC_OK;
     double im = sc_json_get_number(obj, "idle_minutes", cfg->session.idle_minutes);
     if (im >= 0 && im <= 1440) cfg->session.idle_minutes = (uint32_t)im;
@@ -539,6 +543,7 @@ static sc_error_t parse_hardware(sc_allocator_t *a, sc_config_t *cfg,
 
 static sc_error_t parse_browser(sc_allocator_t *a, sc_config_t *cfg,
                                 const sc_json_value_t *obj) {
+    (void)a;
     if (!obj || obj->type != SC_JSON_OBJECT) return SC_OK;
     cfg->browser.enabled = sc_json_get_bool(obj, "enabled", cfg->browser.enabled);
     return SC_OK;
@@ -546,6 +551,7 @@ static sc_error_t parse_browser(sc_allocator_t *a, sc_config_t *cfg,
 
 static sc_error_t parse_cost(sc_allocator_t *a, sc_config_t *cfg,
                              const sc_json_value_t *obj) {
+    (void)a;
     if (!obj || obj->type != SC_JSON_OBJECT) return SC_OK;
     cfg->cost.enabled = sc_json_get_bool(obj, "enabled", cfg->cost.enabled);
     double dl = sc_json_get_number(obj, "daily_limit_usd", cfg->cost.daily_limit_usd);
@@ -975,13 +981,17 @@ sc_error_t sc_config_save(const sc_config_t *cfg) {
     return SC_OK;
 }
 
-static bool provider_requires_api_key(const char *provider) {
+bool sc_config_provider_requires_api_key(const char *provider) {
     if (!provider) return true;
     if (strcmp(provider, "ollama") == 0) return false;
     if (strcmp(provider, "lmstudio") == 0) return false;
     if (strcmp(provider, "lm-studio") == 0) return false;
     if (strcmp(provider, "claude_cli") == 0) return false;
     if (strcmp(provider, "codex_cli") == 0) return false;
+    if (strcmp(provider, "llamacpp") == 0) return false;
+    if (strcmp(provider, "llama.cpp") == 0) return false;
+    if (strcmp(provider, "vllm") == 0) return false;
+    if (strcmp(provider, "sglang") == 0) return false;
     return true;
 }
 
@@ -991,7 +1001,7 @@ sc_error_t sc_config_validate(const sc_config_t *cfg) {
     if (!cfg->default_model || !cfg->default_model[0]) return SC_ERR_CONFIG_INVALID;
     if (cfg->security.autonomy_level > 4) return SC_ERR_CONFIG_INVALID;
     if (cfg->gateway.port < 1 || cfg->gateway.port > 65535) return SC_ERR_CONFIG_INVALID;
-    if (provider_requires_api_key(cfg->default_provider)) {
+    if (sc_config_provider_requires_api_key(cfg->default_provider)) {
         const char *key = sc_config_default_provider_key(cfg);
         if (!key || !key[0])
             fprintf(stderr, "Warning: provider %s requires an API key but none is configured\n",

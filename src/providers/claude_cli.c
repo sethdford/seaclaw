@@ -29,18 +29,32 @@ static sc_error_t run_claude_cli(sc_allocator_t *alloc,
     char **out, size_t *out_len)
 {
     const char *cli = SC_CLAUDE_CLI_NAME;
-    char model_buf[128];
-    if (model_len >= sizeof(model_buf)) model_len = sizeof(model_buf) - 1;
-    memcpy(model_buf, model, model_len);
-    model_buf[model_len] = '\0';
 
-    char *argv[] = {
+    char *argv_with_model[] = {
         (char *)cli,
         "-p",
         "--output-format", "json",
-        "--model", model_buf,
+        "--model", NULL,
         NULL
     };
+    char *argv_default[] = {
+        (char *)cli,
+        "-p",
+        "--output-format", "json",
+        NULL
+    };
+
+    char model_buf[128];
+    char **argv;
+    if (model && model_len > 0) {
+        if (model_len >= sizeof(model_buf)) model_len = sizeof(model_buf) - 1;
+        memcpy(model_buf, model, model_len);
+        model_buf[model_len] = '\0';
+        argv_with_model[5] = model_buf;
+        argv = argv_with_model;
+    } else {
+        argv = argv_default;
+    }
 
     int stdout_fds[2];
     int stdin_fds[2];
@@ -151,9 +165,6 @@ static sc_error_t claude_cli_chat_with_system(void *ctx, sc_allocator_t *alloc,
 #else
 #ifdef SC_GATEWAY_POSIX
     {
-        size_t eff_model_len = model_len > 0 ? model_len : (sizeof(SC_CLAUDE_DEFAULT_MODEL) - 1);
-        const char *eff_model = model_len > 0 ? model : SC_CLAUDE_DEFAULT_MODEL;
-
         char combined[65536];
         size_t combined_len;
         if (system_prompt && system_prompt_len > 0) {
@@ -169,7 +180,7 @@ static sc_error_t claude_cli_chat_with_system(void *ctx, sc_allocator_t *alloc,
             memcpy(combined, message, message_len);
             combined_len = message_len;
         }
-        return run_claude_cli(alloc, combined, combined_len, eff_model, eff_model_len, out, out_len);
+        return run_claude_cli(alloc, combined, combined_len, model, model_len, out, out_len);
     }
 #else
     (void)alloc;
@@ -224,19 +235,18 @@ static sc_error_t claude_cli_chat(void *ctx, sc_allocator_t *alloc,
         const char *prompt = extract_last_user_message(request->messages, request->messages_count, &prompt_len);
         if (!prompt) return SC_ERR_INVALID_ARGUMENT;
 
-        size_t eff_model_len = model_len > 0 ? model_len : (sizeof(SC_CLAUDE_DEFAULT_MODEL) - 1);
-        const char *eff_model = model_len > 0 ? model : SC_CLAUDE_DEFAULT_MODEL;
-
         char *text = NULL;
         size_t text_len = 0;
-        sc_error_t err = run_claude_cli(alloc, prompt, prompt_len, eff_model, eff_model_len, &text, &text_len);
+        sc_error_t err = run_claude_cli(alloc, prompt, prompt_len, model, model_len, &text, &text_len);
         if (err != SC_OK) return err;
 
         memset(out, 0, sizeof(*out));
         out->content = text;
         out->content_len = text_len;
-        out->model = sc_strndup(alloc, eff_model, eff_model_len);
-        out->model_len = eff_model_len;
+        const char *rmodel = (model_len > 0) ? model : SC_CLAUDE_DEFAULT_MODEL;
+        size_t rmodel_len = (model_len > 0) ? model_len : (sizeof(SC_CLAUDE_DEFAULT_MODEL) - 1);
+        out->model = sc_strndup(alloc, rmodel, rmodel_len);
+        out->model_len = rmodel_len;
         return SC_OK;
     }
 #else

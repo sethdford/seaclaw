@@ -6,6 +6,7 @@
 
 #if SC_IS_TEST
 /* In test mode, skip real HTTP and return mock response */
+#if 0
 static sc_error_t sc_http_get_ex_impl(sc_allocator_t *alloc,
     const char *url,
     const char *extra_headers,
@@ -25,6 +26,7 @@ static sc_error_t sc_http_get_ex_impl(sc_allocator_t *alloc,
     out->owned = true;
     return SC_OK;
 }
+#endif
 
 static sc_error_t sc_http_get_impl(sc_allocator_t *alloc,
     const char *url,
@@ -78,6 +80,7 @@ static sc_error_t sc_http_post_json_impl(sc_allocator_t *alloc,
     return SC_OK;
 }
 
+#if 0
 static sc_error_t sc_http_post_json_stream_impl(sc_allocator_t *alloc,
     const char *url,
     const char *auth_header,
@@ -103,6 +106,7 @@ static sc_error_t sc_http_post_json_stream_impl(sc_allocator_t *alloc,
     if (ret != sse_len) return SC_ERR_IO;
     return SC_OK;
 }
+#endif
 #else
 #if defined(SC_HTTP_CURL)
 #include <curl/curl.h>

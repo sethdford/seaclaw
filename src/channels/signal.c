@@ -486,6 +486,7 @@ sc_error_t sc_signal_create_ex(sc_allocator_t *alloc,
     return SC_OK;
 }
 
+#if !SC_IS_TEST
 /* Parse SSE data lines, extract "data: {json}" events. */
 static size_t parse_sse_events(const char *buf, size_t buf_len,
     sc_channel_loop_msg_t *msgs, size_t max_msgs,
@@ -536,6 +537,7 @@ static size_t parse_sse_events(const char *buf, size_t buf_len,
     }
     return count;
 }
+#endif
 
 sc_error_t sc_signal_poll(void *channel_ctx,
     sc_allocator_t *alloc,
@@ -545,6 +547,7 @@ sc_error_t sc_signal_poll(void *channel_ctx,
 {
     sc_signal_ctx_t *c = (sc_signal_ctx_t *)channel_ctx;
     if (!c || !alloc || !msgs || !out_count) return SC_ERR_INVALID_ARGUMENT;
+    (void)max_msgs;
     *out_count = 0;
 
 #if SC_IS_TEST

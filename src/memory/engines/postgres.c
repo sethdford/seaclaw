@@ -39,6 +39,7 @@ typedef struct sc_postgres_memory {
 #endif
 } sc_postgres_memory_t;
 
+__attribute__((unused))
 static const char *category_to_string(const sc_memory_category_t *cat) {
     if (!cat) return "core";
     switch (cat->tag) {

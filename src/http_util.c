@@ -10,6 +10,7 @@ sc_error_t sc_http_util_post(sc_allocator_t *alloc,
     const char *const *headers, size_t header_count,
     char **out_body, size_t *out_len) {
     if (!alloc || !url || !out_body || !out_len) return SC_ERR_INVALID_ARGUMENT;
+    (void)url_len;
     (void)headers;
     (void)header_count;
     sc_http_response_t resp = {0};

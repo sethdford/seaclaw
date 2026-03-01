@@ -60,6 +60,7 @@ static int build_api_url(char *buf, size_t cap,
         (int)token_len, token,
         method);
 }
+#endif
 
 /* Escape text for Telegram MarkdownV2: _*[]()~>#+-=|{}.! */
 char *sc_telegram_escape_markdown_v2(sc_allocator_t *alloc,
@@ -93,6 +94,7 @@ char *sc_telegram_escape_markdown_v2(sc_allocator_t *alloc,
     return out;
 }
 
+#if !SC_IS_TEST
 /* Smart split: prefer newline, then space; max TELEGRAM_MAX_MSG per chunk */
 static size_t smart_split_next(const char *buf, size_t len,
     size_t cursor, size_t *out_end)
@@ -125,7 +127,9 @@ done:
     *out_end = split_at;
     return split_at - cursor;
 }
+#endif
 
+#if !SC_IS_TEST
 /* Check if user is allowed: allow_from NULL/empty = allow all; "*" = allow all */
 static bool is_user_allowed(sc_telegram_ctx_t *c,
     const char *username, size_t username_len,
@@ -147,7 +151,9 @@ static bool is_user_allowed(sc_telegram_ctx_t *c,
     }
     return false;
 }
+#endif
 
+#if !SC_IS_TEST
 /* ─── JSON body builders ───────────────────────────────────────────────── */
 
 static sc_error_t build_send_body(sc_allocator_t *alloc,
@@ -205,7 +211,9 @@ fail:
     sc_json_buf_free(&jbuf);
     return err;
 }
+#endif
 
+#if !SC_IS_TEST
 /* ─── Typing indicator ─────────────────────────────────────────────────── */
 
 static void send_typing_action(sc_telegram_ctx_t *c,
@@ -234,11 +242,13 @@ static void send_typing_action(sc_telegram_ctx_t *c,
     (void)err;
 #endif
 }
+#endif
 
 /* ─── Media send via curl ───────────────────────────────────────────────── */
 
 typedef enum { TG_MEDIA_PHOTO, TG_MEDIA_DOCUMENT, TG_MEDIA_AUDIO, TG_MEDIA_VIDEO } tg_media_kind_t;
 
+#if !SC_IS_TEST
 static const char *media_method(tg_media_kind_t k) {
     switch (k) {
         case TG_MEDIA_PHOTO:   return "sendPhoto";

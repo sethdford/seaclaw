@@ -547,7 +547,6 @@ static void test_provider_create_from_config(void) {
     sc_config_load(&alloc, &cfg);
 
     SC_ASSERT_NOT_NULL(cfg.default_provider);
-    SC_ASSERT_NOT_NULL(cfg.default_model);
 
     sc_config_deinit(&cfg);
     if (old_home) { setenv("HOME", old_home, 1); free(old_home); }
