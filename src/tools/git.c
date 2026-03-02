@@ -94,6 +94,20 @@ static char *run_git(sc_allocator_t *alloc, const char *cwd, const char **argv, 
                 _exit(125);
         }
 
+        /* Wrap command with sandbox if available (firejail, seatbelt, etc.) */
+        if (policy && policy->sandbox &&
+            sc_sandbox_is_available(policy->sandbox)) {
+            const char *wrapped[32];
+            size_t wrapped_count = 0;
+            if (sc_sandbox_wrap_command(policy->sandbox,
+                    argv, (size_t)argc, wrapped, 31, &wrapped_count) == SC_OK &&
+                    wrapped_count > 0) {
+                wrapped[wrapped_count] = NULL;
+                execvp(wrapped[0], (char *const *)wrapped);
+                _exit(127);
+            }
+        }
+
         char **exec_argv = (char **)malloc((size_t)(argc + 1) * sizeof(char *));
         if (!exec_argv) _exit(127);
         for (int i = 0; i < argc; i++) exec_argv[i] = (char *)argv[i];

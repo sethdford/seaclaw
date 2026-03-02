@@ -7,7 +7,7 @@ Scope: entire repository.
 
 seaclaw is a C11 autonomous AI assistant runtime optimized for:
 
-- minimal binary size (267 KB MinSizeRel)
+- minimal binary size (282 KB core MinSizeRel)
 - minimal memory footprint (target: < 5 MB peak RSS)
 - zero dependencies beyond libc, optional SQLite and libcurl
 - Zig reference implementation archived in `archive/zig-reference/`
@@ -25,7 +25,7 @@ Key extension points:
 - `src/runtime/` (`sc_runtime_t`) — execution environments
 - `src/peripherals/` (`sc_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 
-Current scale: **~415 source + header files, ~52K lines of C, ~22K lines of tests, 1,834 tests**.
+Current scale: **432 source + header files, ~64K lines of C, ~26K lines of tests, 1,946 tests**.
 
 Build and test:
 
@@ -49,7 +49,7 @@ These codebase realities should drive every design decision:
 2. **Binary size and memory are hard product constraints**
    - `cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON` is the release target. Every dependency and abstraction has a size cost.
    - Avoid adding unnecessary runtime allocations or large data tables without justification.
-   - Current release binary: 267 KB.
+   - Current release binary: 282 KB (core) / 380 KB (full).
 
 3. **Security-critical surfaces are first-class**
    - `src/gateway/gateway.c`, `src/security/`, `src/tools/`, `src/runtime/` carry high blast radius.
@@ -62,7 +62,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `SC_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 1,834+ tests must pass at zero ASan errors**
+5. **All 1,946+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `SC_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -128,7 +128,7 @@ src/
   agent/                agent loop, context, planner, compaction, dispatcher
   channels/             20 channel implementations (cli, telegram, discord, slack, ...)
   providers/            50+ AI provider implementations (9 core + 41 compatible services)
-  tools/                30+ tool implementations
+  tools/                47 tool implementations
   memory/               SQLite + markdown + LRU backends, embeddings, vector search
   security/             policy, pairing, secrets, sandbox backends (landlock, firejail, bwrap)
   runtime/              runtime adapters (native, docker, wasm, cloudflare)
@@ -143,7 +143,7 @@ src/
 
 include/seaclaw/       public C headers
 
-tests/                 68 test files, 1,834+ tests
+tests/                 71 test files, 1,946 tests
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 
