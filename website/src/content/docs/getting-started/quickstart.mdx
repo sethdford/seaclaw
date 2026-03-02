@@ -3,26 +3,68 @@ title: Quick Start
 description: Get SeaClaw running in your first 5 minutes.
 ---
 
-This guide gets you from a fresh build to your first chat.
+This guide gets you from a fresh build to your first chat. Ensure you've completed [Installation](/getting-started/installation/). Use `./build/seaclaw` if running from the project directory, or `seaclaw` if the binary is on your PATH.
 
-## 1. Run the onboard wizard
+## 1. Create your config
 
-If you have no config yet, run the interactive setup:
+SeaClaw reads config from `~/.seaclaw/config.json`. Create the directory and file:
 
 ```bash
-./build/seaclaw onboard
+mkdir -p ~/.seaclaw
+```
+
+### Option A: Interactive wizard
+
+Run the onboard wizard to generate a config interactively:
+
+```bash
+seaclaw onboard
 ```
 
 The wizard will:
 
 - Ask you to choose a provider (OpenAI, Anthropic, Ollama, OpenRouter)
 - Prompt for an API key (or you can set it via environment variable)
-- Ask for a default model (e.g. `gpt-4o`, `claude-sonnet-4-20250514`)
+- Ask for a default model (e.g. `gpt-4o`, `claude-sonnet-4-20250514`, `llama3`)
 - Create `~/.seaclaw/config.json` and workspace templates
 
-## 2. Quick manual setup
+### Option B: Manual config
 
-Alternatively, create the config manually. Create `~/.seaclaw/config.json`:
+Create `~/.seaclaw/config.json` with your chosen provider.
+
+**OpenAI (cloud, requires API key):**
+
+```json
+{
+  "default_provider": "openai",
+  "default_model": "gpt-4o",
+  "providers": [
+    {
+      "name": "openai",
+      "api_key": "sk-proj-your-key-here"
+    }
+  ]
+}
+```
+
+**Ollama (local, no API key):**
+
+```json
+{
+  "default_provider": "ollama",
+  "default_model": "llama3",
+  "providers": [
+    {
+      "name": "ollama",
+      "base_url": "http://localhost:11434"
+    }
+  ]
+}
+```
+
+Ensure Ollama is running (`ollama serve`) and you've pulled a model (`ollama pull llama3`).
+
+**OpenRouter (single API for many models):**
 
 ```json
 {
@@ -33,61 +75,79 @@ Alternatively, create the config manually. Create `~/.seaclaw/config.json`:
       "name": "openrouter",
       "api_key": "sk-or-v1-your-key-here"
     }
-  ],
-  "gateway": { "port": 3000, "host": "127.0.0.1" }
+  ]
 }
 ```
 
-Or use environment variables for a minimal setup:
+## 2. Verify with doctor
+
+Run diagnostics to confirm your setup:
 
 ```bash
-export OPENAI_API_KEY="sk-your-key"
-./build/seaclaw agent -m "Hello, world!"
+seaclaw doctor
 ```
 
-## 3. Interactive chat
+Example output (local provider):
 
-Start an interactive agent session:
+```
+[doctor] config: ok (loaded from /Users/you/.seaclaw/config.json)
+[doctor] provider (ollama): ok (local — no API key required)
+[doctor] memory engine: markdown
+```
+
+Example output (cloud provider with API key):
+
+```
+[doctor] config: ok (loaded from /Users/you/.seaclaw/config.json)
+[doctor] provider (openai): ok (API key configured)
+[doctor] memory engine: sqlite
+```
+
+If you see `warning — no API key`, add the key to your provider config or set the appropriate environment variable (e.g. `OPENAI_API_KEY`).
+
+## 3. Send your first message
+
+Run a one-off message:
 
 ```bash
-./build/seaclaw agent
+seaclaw agent -m "hello"
 ```
 
-You can chat in a loop. Use `Ctrl+C` to exit.
+Example output:
 
-## 4. Single message
+```
+> hello
 
-Run a one-off message without interactive mode:
+Hello! How can I help you today?
+```
+
+Or start an interactive chat:
 
 ```bash
-./build/seaclaw agent -m "What is 2 + 2?"
+seaclaw agent
 ```
 
-## 5. System check
+Type messages and press Enter. Use `Ctrl+C` to exit.
 
-Verify your setup:
+## 4. Override provider or model
+
+Use `--provider` and `--model` to switch without editing config:
 
 ```bash
-./build/seaclaw doctor
+seaclaw agent -m "What is 2 + 2?" --provider ollama --model mistral
 ```
 
-This reports:
-
-- Config load status
-- Provider API key presence (or "local — no API key required" for Ollama, llama.cpp, etc.)
-- Memory engine type
-
-## 6. Start the gateway
+## 5. Start the gateway (optional)
 
 If you want to receive webhooks (e.g. Telegram, Slack, Discord):
 
 ```bash
-./build/seaclaw gateway
+seaclaw gateway
 ```
 
 By default it listens on `127.0.0.1:3000`. Pair with a 6-digit code to get a bearer token for authenticated requests.
 
-## CLI options
+## CLI reference
 
 | Command                                          | Description              |
 | ------------------------------------------------ | ------------------------ |

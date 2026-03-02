@@ -3,9 +3,11 @@ title: Cloud Providers
 description: Configure cloud AI providers (OpenAI, Anthropic, Gemini, etc.).
 ---
 
-SeaClaw supports major cloud AI providers. Configure each with an API key in `~/.seaclaw/config.json` or via environment variables.
+SeaClaw supports major cloud AI providers. Configure each with an API key in `~/.seaclaw/config.json` or via environment variables. Get API keys from each provider's dashboard.
 
 ## OpenAI
+
+Add to `~/.seaclaw/config.json`:
 
 ```json
 {
@@ -14,22 +16,32 @@ SeaClaw supports major cloud AI providers. Configure each with an API key in `~/
   "providers": [
     {
       "name": "openai",
-      "api_key": "sk-proj-..."
+      "api_key": "sk-proj-your-key-here"
     }
   ]
 }
 ```
 
-Or use the environment variable:
+Or use the environment variable (no config needed):
 
 ```bash
-export OPENAI_API_KEY="sk-proj-..."
-./seaclaw agent
+export OPENAI_API_KEY="sk-proj-your-key-here"
+seaclaw agent -m "hello"
 ```
 
-Models: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, etc.
+Verify with `seaclaw doctor`:
+
+```
+[doctor] config: ok (loaded from /Users/you/.seaclaw/config.json)
+[doctor] provider (openai): ok (API key configured)
+[doctor] memory engine: sqlite
+```
+
+Models: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-4`, `o1`, etc.
 
 ## Anthropic
+
+Add to `~/.seaclaw/config.json`:
 
 ```json
 {
@@ -38,21 +50,24 @@ Models: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, etc.
   "providers": [
     {
       "name": "anthropic",
-      "api_key": "sk-ant-..."
+      "api_key": "sk-ant-your-key-here"
     }
   ]
 }
 ```
 
-Environment variable:
+Environment variable (overrides config):
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
+export ANTHROPIC_API_KEY="sk-ant-your-key-here"
+seaclaw agent -m "Explain recursion briefly"
 ```
 
-Models: `claude-sonnet-4-20250514`, `claude-opus-4`, `claude-3-5-haiku`, etc.
+Models: `claude-sonnet-4-20250514`, `claude-opus-4`, `claude-3-5-haiku`, `claude-3-5-sonnet`, etc.
 
 ## Google Gemini
+
+Add to `~/.seaclaw/config.json`:
 
 ```json
 {
@@ -61,19 +76,24 @@ Models: `claude-sonnet-4-20250514`, `claude-opus-4`, `claude-3-5-haiku`, etc.
   "providers": [
     {
       "name": "gemini",
-      "api_key": "AIza..."
+      "api_key": "AIzaSy-your-key-here"
     }
   ]
 }
 ```
 
-Environment variable: `GEMINI_API_KEY`
+Environment variable:
 
-Models: `gemini-2.0-flash`, `gemini-1.5-pro`, `gemini-1.5-flash`.
+```bash
+export GEMINI_API_KEY="AIzaSy-your-key-here"
+seaclaw agent -m "What is 2 + 2?"
+```
+
+Models: `gemini-2.0-flash`, `gemini-2.0-flash-lite`, `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-1.5-flash-8b`.
 
 ## OpenRouter
 
-OpenRouter provides a single API for many models:
+OpenRouter provides a single API for many models. One key, many providers:
 
 ```json
 {
@@ -82,7 +102,7 @@ OpenRouter provides a single API for many models:
   "providers": [
     {
       "name": "openrouter",
-      "api_key": "sk-or-v1-..."
+      "api_key": "sk-or-v1-your-key-here"
     }
   ]
 }
@@ -90,7 +110,14 @@ OpenRouter provides a single API for many models:
 
 Environment variable: `OPENROUTER_API_KEY`
 
-Models use the format `provider/model`, e.g. `anthropic/claude-sonnet-4`, `openai/gpt-4o`, `meta-llama/llama-3.1-70b-instruct`.
+Models use the format `provider/model`:
+
+| Model ID                            | Provider  |
+| ----------------------------------- | --------- |
+| `anthropic/claude-sonnet-4`         | Anthropic |
+| `openai/gpt-4o`                     | OpenAI    |
+| `meta-llama/llama-3.1-70b-instruct` | Meta      |
+| `google/gemini-2.0-flash`           | Google    |
 
 ## Groq
 

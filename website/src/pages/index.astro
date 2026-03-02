@@ -32,6 +32,9 @@ const providers = [
     <meta property="og:title" content="SeaClaw — Intelligence infrastructure that disappears." />
     <meta property="og:description" content="An autonomous AI assistant runtime in C11. 239 KB. Zero dependencies. 50+ providers. Runs on anything." />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://sethdford.github.io/seaclaw/og-image.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://sethdford.github.io/seaclaw/og-image.svg" />
   </head>
   <body class="bg-[#FAFAF9] text-[#1D1D1F] antialiased overflow-x-hidden">
     <Nav />
@@ -111,9 +114,9 @@ const providers = [
     {/* ═══ ACT 3: THE PROOF ═══ */}
 
     {/* Scene 4 — The Numbers */}
-    <section class="py-32 px-6">
+    <section class="py-16 md:py-32 px-6">
       <div class="max-w-5xl mx-auto">
-        <div class="numbers-grid glass px-8 py-10 grid grid-cols-2 md:grid-cols-4 gap-0">
+        <div class="numbers-grid glass px-4 md:px-8 py-8 md:py-10 grid grid-cols-2 md:grid-cols-4 gap-0">
           <div class="number-item text-center py-6 md:py-0 md:border-r border-[rgba(0,0,0,0.06)]">
             <div class="font-serif text-[clamp(2.5rem,5vw,4rem)] text-[#1D1D1F] leading-none" data-count="239" data-suffix=" KB">
               <span class="count-value">0</span><span class="count-suffix"> KB</span>
@@ -143,7 +146,7 @@ const providers = [
     </section>
 
     {/* Scene 5 — See It Work (Terminal) */}
-    <section class="py-32 px-6">
+    <section class="py-16 md:py-32 px-6">
       <div class="max-w-3xl mx-auto">
         <h2 class="terminal-title font-serif text-[clamp(2rem,5vw,3.5rem)] text-[#1D1D1F] mb-4 text-center opacity-0">
           Clone. Build. Run.
@@ -156,14 +159,14 @@ const providers = [
             <span class="w-3 h-3 rounded-full bg-[#28C840]"></span>
             <span class="text-[11px] text-[rgba(255,255,255,0.3)] ml-2 font-mono">terminal</span>
           </div>
-          <div id="terminal-output" class="p-6 font-mono text-[13px] md:text-sm leading-[1.8] min-h-[280px]">
+          <div id="terminal-output" class="p-4 md:p-6 font-mono text-[12px] md:text-sm leading-[1.8] min-h-[240px] md:min-h-[280px] overflow-x-auto">
           </div>
         </div>
       </div>
     </section>
 
     {/* Scene 6 — Where It Runs (Use Cases) */}
-    <section class="py-32 px-6">
+    <section id="use-cases" class="py-16 md:py-32 px-6">
       <div class="max-w-4xl mx-auto">
         <h2 class="usecase-title font-serif text-[clamp(2rem,5vw,3.5rem)] text-[#1D1D1F] mb-16 text-center opacity-0">
           From your laptop to the edge.
@@ -189,7 +192,7 @@ const providers = [
     </section>
 
     {/* Scene 7 — How It Works (Architecture) */}
-    <section id="architecture" class="relative py-32 px-6">
+    <section id="architecture" class="relative py-16 md:py-32 px-6">
       <div class="ambient-coral" style="top: 20%; left: 10%;"></div>
       <div class="ambient-blue" style="bottom: 10%; right: 15%;"></div>
       <div class="max-w-4xl mx-auto text-center">
@@ -257,7 +260,7 @@ const providers = [
     </section>
 
     {/* Scene 8 — The Ecosystem */}
-    <section class="py-32 px-6">
+    <section class="py-16 md:py-32 px-6">
       <div class="max-w-4xl mx-auto">
         <h2 class="providers-title font-serif text-[clamp(2rem,5vw,3.5rem)] text-[#1D1D1F] mb-4 opacity-0">
           50+ providers. 20 channels. 30+ tools.
@@ -279,7 +282,7 @@ const providers = [
     {/* ═══ ACT 4: THE INVITATION ═══ */}
 
     {/* Scene 9 — Get Started */}
-    <section class="relative py-40 px-6">
+    <section class="relative py-20 md:py-40 px-6">
       <div class="ambient-coral" style="top: 30%; left: 30%;"></div>
       <div class="ambient-blue" style="top: 40%; right: 20%;"></div>
       <div class="max-w-3xl mx-auto text-center">

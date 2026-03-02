@@ -3,7 +3,7 @@ title: Local Models
 description: Run AI models locally with llama.cpp, Ollama, LM Studio, vLLM, and sglang.
 ---
 
-SeaClaw supports multiple local inference servers. **No API key is required** for any local provider.
+SeaClaw supports multiple local inference servers. **No API key is required** for any local provider. Add your provider to `~/.seaclaw/config.json` and set `default_provider` and `default_model`.
 
 ## llama.cpp
 
@@ -45,6 +45,8 @@ Or with `llama.cpp` binary:
 
 ### SeaClaw config
 
+Add to `~/.seaclaw/config.json`:
+
 ```json
 {
   "default_provider": "llamacpp",
@@ -58,7 +60,7 @@ Or with `llama.cpp` binary:
 }
 ```
 
-Use `"llama.cpp"` as the provider name if you prefer (same backend).
+Use `"llama.cpp"` as the provider name if you prefer (same backend). The `default_model` should match the name you pass to `llama-server` (or a friendly alias; the server may accept partial matches).
 
 ---
 
@@ -93,6 +95,8 @@ Default URL: `http://localhost:11434`
 
 ### SeaClaw config
 
+Add to `~/.seaclaw/config.json`:
+
 ```json
 {
   "default_provider": "ollama",
@@ -106,7 +110,19 @@ Default URL: `http://localhost:11434`
 }
 ```
 
-Models: `llama3`, `mistral`, `codellama`, `qwen2`, `phi3`, `gemma2`, etc. Use the exact name from `ollama list`.
+Models: `llama3`, `mistral`, `codellama`, `qwen2`, `phi3`, `gemma2`, etc. Use the exact name from `ollama list`:
+
+```bash
+ollama list
+```
+
+Example output:
+
+```
+NAME            ID              SIZE    MODIFIED
+llama3:latest   abc123...       4.7 GB  2 days ago
+mistral:7b      def456...       4.1 GB  1 week ago
+```
 
 ---
 
@@ -123,6 +139,8 @@ Models: `llama3`, `mistral`, `codellama`, `qwen2`, `phi3`, `gemma2`, etc. Use th
 
 ### SeaClaw config
 
+Add to `~/.seaclaw/config.json`:
+
 ```json
 {
   "default_provider": "lmstudio",
@@ -136,7 +154,7 @@ Models: `llama3`, `mistral`, `codellama`, `qwen2`, `phi3`, `gemma2`, etc. Use th
 }
 ```
 
-Use `"lm-studio"` as the provider name (same backend). The model name should match what LM Studio reports.
+Use `"lm-studio"` as the provider name (same backend). The model name must match what LM Studio shows in the Server tab when the local server is running. Check the "Loaded model" display for the exact identifier.
 
 ---
 
@@ -156,7 +174,16 @@ pip install vllm
 python -m vllm.entrypoints.openai.api_server --model meta-llama/Llama-3.2-3B-Instruct --port 8000
 ```
 
+Example output:
+
+```
+INFO:     Started server process
+INFO:     Uvicorn running on http://0.0.0.0:8000
+```
+
 ### SeaClaw config
+
+Add to `~/.seaclaw/config.json`:
 
 ```json
 {
@@ -170,6 +197,8 @@ python -m vllm.entrypoints.openai.api_server --model meta-llama/Llama-3.2-3B-Ins
   ]
 }
 ```
+
+The `default_model` must match the `--model` passed to the vLLM server.
 
 ---
 
@@ -185,6 +214,8 @@ python -m sglang.launch_server --model-path meta-llama/Llama-3.2-3B-Instruct --p
 ```
 
 ### SeaClaw config
+
+Add to `~/.seaclaw/config.json`:
 
 ```json
 {

@@ -7,10 +7,12 @@ SeaClaw is built from source. There are no pre-built binaries; you compile it wi
 
 ## Prerequisites
 
+Before building, ensure you have:
+
 - **C compiler** — GCC or Clang (C11)
 - **CMake** 3.16 or later
-- **SQLite3** (optional) — for SQLite memory backend; omit to use markdown-only
-- **libcurl** (optional) — for HTTP/HTTPS; omit for minimal builds without cloud providers
+- **SQLite3** — for the SQLite memory backend; omit to use markdown-only (`-DSC_ENABLE_SQLITE=OFF`)
+- **libcurl** — for HTTP/HTTPS and cloud providers; omit for minimal builds (`-DSC_ENABLE_CURL=OFF`)
 
 ## macOS
 
@@ -32,7 +34,22 @@ sudo apt-get install -y build-essential cmake libsqlite3-dev libcurl4-openssl-de
 sudo dnf install -y cmake sqlite-devel libcurl-devel
 ```
 
-## Build
+## Clone and build
+
+Clone the repository, then build:
+
+```bash
+git clone https://github.com/seaclaw/seaclaw.git
+cd seaclaw
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON -DSC_ENABLE_ALL_CHANNELS=ON -DSC_ENABLE_CURL=ON
+cmake --build . -j$(nproc)
+```
+
+The binaries are produced in `build/`:
+
+- `build/seaclaw` — main CLI
+- `build/seaclaw_tests` — test suite
 
 ### Release build (minimal size)
 
@@ -76,11 +93,41 @@ Per-channel options (`SC_ENABLE_TELEGRAM`, `SC_ENABLE_DISCORD`, etc.) are availa
 
 ## Verify installation
 
+Confirm the binary runs:
+
+```bash
+./build/seaclaw --help
+```
+
+Example output:
+
+```
+seaclaw v0.1.0 — Autonomous AI Assistant Runtime (C/ASM/WASM)
+
+Usage: seaclaw [command] [options]
+
+Commands:
+  agent          Run the agent loop
+  doctor         Run diagnostics
+  onboard        First-run setup wizard
+  ...
+```
+
+Run diagnostics to check config and provider setup:
+
 ```bash
 ./build/seaclaw doctor
 ```
 
-You should see config status, provider checks, and memory engine info. If config is missing, run the onboard wizard first (see [Quick Start](/getting-started/quickstart/)).
+Example output (with valid config):
+
+```
+[doctor] config: ok (loaded from /home/user/.seaclaw/config.json)
+[doctor] provider (ollama): ok (local — no API key required)
+[doctor] memory engine: sqlite
+```
+
+If config is missing, run the onboard wizard first (see [Quick Start](/getting-started/quickstart/)).
 
 ## Run tests
 

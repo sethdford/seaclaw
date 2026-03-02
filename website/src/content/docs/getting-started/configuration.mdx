@@ -31,6 +31,33 @@ SeaClaw reads configuration from `~/.seaclaw/config.json`. Environment variables
 | `tunnel`              | Tunnel provider (e.g. ngrok)                               |
 | `runtime`             | Execution environment (native, docker, wasm)               |
 
+## Autonomy levels
+
+Control how much the agent can do without approval via `autonomy.level` or `security.autonomy_level` (0–4):
+
+| Level | `autonomy.level` | Behavior                                                 |
+| ----- | ---------------- | -------------------------------------------------------- |
+| 0     | `readonly`       | No shell or file writes; read-only tools only            |
+| 1     | `supervised`     | Ask before destructive or high-impact commands (default) |
+| 2+    | `full`           | Autonomous execution; use with caution                   |
+
+Config example:
+
+```json
+{
+  "autonomy": {
+    "level": "supervised",
+    "workspace_only": true,
+    "max_actions_per_hour": 20
+  },
+  "security": {
+    "autonomy_level": 1
+  }
+}
+```
+
+Use `SEACLAW_AUTONOMY=0` (readonly) through `4` (full) to override via environment.
+
 ## Environment variable overrides
 
 These override config values when set:
@@ -150,12 +177,16 @@ Provider-specific keys (used when no `SEACLAW_API_KEY` or provider-specific key 
 
 ## Provider config
 
-Each provider entry can have:
+Each entry in the `providers` array can have:
 
-- `name` — Provider identifier (openai, anthropic, ollama, openrouter, compatible, etc.)
-- `api_key` — API key (optional for local providers)
-- `base_url` — Override base URL (optional)
-- `native_tools` — Use provider-native tool format (default: true)
+| Field          | Type    | Description                                                                                                        |
+| -------------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| `name`         | string  | Provider identifier: `openai`, `anthropic`, `ollama`, `llamacpp`, `lmstudio`, `vllm`, `sglang`, `openrouter`, etc. |
+| `api_key`      | string  | API key (optional for local providers)                                                                             |
+| `base_url`     | string  | Override base URL (e.g. `http://localhost:11434` for Ollama)                                                       |
+| `native_tools` | boolean | Use provider-native tool format (default: true)                                                                    |
+
+**Local providers** (no API key required): `ollama`, `llamacpp`, `llama.cpp`, `lmstudio`, `lm-studio`, `vllm`, `sglang`, `osaurus`
 
 ## Memory backends
 
