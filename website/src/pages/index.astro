@@ -24,28 +24,30 @@ const providers = [
     <meta property="og:description" content="Intelligence infrastructure that disappears. 239 KB. Under 5 MB RAM. 50+ providers." />
     <meta property="og:type" content="website" />
   </head>
-  <body class="bg-[#09090b] text-zinc-50 antialiased overflow-x-hidden">
+  <body class="bg-[#FAFAF9] text-[#1D1D1F] antialiased overflow-x-hidden">
     <Nav />
 
     {/* ── Hero ── */}
     <section class="relative min-h-screen flex flex-col items-center justify-center px-6">
+      <div class="ambient-coral" style="top: 10%; left: 50%; transform: translateX(-50%);"></div>
+      <div class="ambient-blue" style="top: 25%; right: 5%;"></div>
       <div class="hero-content text-center max-w-3xl mx-auto">
         <img
           src={`${base}seaclaw.svg`}
           alt="SeaClaw"
           class="hero-logo w-16 h-16 md:w-20 md:h-20 mx-auto mb-8 opacity-0"
-          style="filter: drop-shadow(0 0 20px rgba(239,68,68,0.3))"
+          style="filter: drop-shadow(0 0 40px rgba(249,112,102,0.25))"
         />
-        <h1 class="hero-title text-[clamp(3rem,8vw,6rem)] font-bold tracking-[-0.03em] leading-[0.95] text-white mb-6 opacity-0">
+        <h1 class="hero-title font-serif text-[clamp(3.5rem,10vw,6rem)] leading-[1.05] text-[#1D1D1F] mb-6 opacity-0">
           SeaClaw
         </h1>
-        <p class="hero-sub text-[clamp(1.125rem,2.5vw,1.5rem)] text-zinc-400 font-normal leading-relaxed mb-12 opacity-0">
+        <p class="hero-sub text-[clamp(1.125rem,2.5vw,1.375rem)] text-[#6E6E73] font-normal leading-relaxed mb-12 opacity-0">
           Intelligence infrastructure that disappears.
         </p>
         <div class="hero-buttons flex flex-col sm:flex-row gap-4 justify-center opacity-0">
           <a
             href={`${base}getting-started/installation/`}
-            class="inline-flex items-center justify-center px-8 py-3.5 rounded-full text-[15px] font-medium bg-red-500 hover:bg-red-400 text-white transition-all duration-200 hover:shadow-[0_0_30px_rgba(239,68,68,0.3)]"
+            class="inline-flex items-center justify-center px-8 py-3.5 rounded-full text-[15px] font-medium bg-[#F97066] hover:bg-[#EF5350] text-white transition-all duration-200 hover:shadow-[0_0_30px_rgba(249,112,102,0.25)]"
           >
             Get Started
           </a>
@@ -53,7 +55,7 @@ const providers = [
             href="https://github.com/sethdford/seaclaw"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex items-center justify-center px-8 py-3.5 rounded-full text-[15px] font-medium text-zinc-300 border border-zinc-700/60 hover:border-zinc-500 transition-all duration-200 hover:text-white"
+            class="inline-flex items-center justify-center px-8 py-3.5 rounded-full text-[15px] font-medium text-[#6E6E73] border border-[rgba(0,0,0,0.12)] hover:border-[rgba(0,0,0,0.25)] transition-all duration-200 hover:text-[#1D1D1F]"
           >
             View Source
           </a>
@@ -64,30 +66,30 @@ const providers = [
     {/* ── Numbers ── */}
     <section class="py-32 px-6">
       <div class="max-w-5xl mx-auto">
-        <div class="numbers-grid grid grid-cols-2 md:grid-cols-4 gap-0">
-          <div class="number-item text-center py-8 md:py-0 md:border-r border-zinc-800/40">
-            <div class="text-[clamp(2.5rem,5vw,4.5rem)] font-bold tracking-tight text-white leading-none" data-count="239" data-suffix=" KB">
+        <div class="numbers-grid glass px-8 py-10 grid grid-cols-2 md:grid-cols-4 gap-0">
+          <div class="number-item text-center py-6 md:py-0 md:border-r border-[rgba(0,0,0,0.06)]">
+            <div class="font-serif text-[clamp(2.5rem,5vw,4rem)] text-[#1D1D1F] leading-none" data-count="239" data-suffix=" KB">
               <span class="count-value">0</span><span class="count-suffix"> KB</span>
             </div>
-            <div class="text-[13px] text-zinc-500 mt-3 uppercase tracking-[0.1em]">Binary</div>
+            <div class="text-[13px] font-medium text-[#A1A1A6] mt-3 uppercase tracking-[0.1em]">Binary</div>
           </div>
-          <div class="number-item text-center py-8 md:py-0 md:border-r border-zinc-800/40">
-            <div class="text-[clamp(2.5rem,5vw,4.5rem)] font-bold tracking-tight text-white leading-none" data-count="2" data-prefix="<" data-suffix=" ms">
+          <div class="number-item text-center py-6 md:py-0 md:border-r border-[rgba(0,0,0,0.06)]">
+            <div class="font-serif text-[clamp(2.5rem,5vw,4rem)] text-[#1D1D1F] leading-none" data-count="2" data-prefix="<" data-suffix=" ms">
               <span class="count-prefix">&lt;</span><span class="count-value">0</span><span class="count-suffix"> ms</span>
             </div>
-            <div class="text-[13px] text-zinc-500 mt-3 uppercase tracking-[0.1em]">Startup</div>
+            <div class="text-[13px] font-medium text-[#A1A1A6] mt-3 uppercase tracking-[0.1em]">Startup</div>
           </div>
-          <div class="number-item text-center py-8 md:py-0 md:border-r border-zinc-800/40">
-            <div class="text-[clamp(2.5rem,5vw,4.5rem)] font-bold tracking-tight text-white leading-none" data-count="1791">
+          <div class="number-item text-center py-6 md:py-0 md:border-r border-[rgba(0,0,0,0.06)]">
+            <div class="font-serif text-[clamp(2.5rem,5vw,4rem)] text-[#1D1D1F] leading-none" data-count="1791">
               <span class="count-value">0</span>
             </div>
-            <div class="text-[13px] text-zinc-500 mt-3 uppercase tracking-[0.1em]">Tests</div>
+            <div class="text-[13px] font-medium text-[#A1A1A6] mt-3 uppercase tracking-[0.1em]">Tests</div>
           </div>
-          <div class="number-item text-center py-8 md:py-0">
-            <div class="text-[clamp(2.5rem,5vw,4.5rem)] font-bold tracking-tight text-white leading-none" data-count="50" data-suffix="+">
+          <div class="number-item text-center py-6 md:py-0">
+            <div class="font-serif text-[clamp(2.5rem,5vw,4rem)] text-[#1D1D1F] leading-none" data-count="50" data-suffix="+">
               <span class="count-value">0</span><span class="count-suffix">+</span>
             </div>
-            <div class="text-[13px] text-zinc-500 mt-3 uppercase tracking-[0.1em]">Providers</div>
+            <div class="text-[13px] font-medium text-[#A1A1A6] mt-3 uppercase tracking-[0.1em]">Providers</div>
           </div>
         </div>
       </div>
@@ -96,111 +98,119 @@ const providers = [
     {/* ── Features ── */}
     <section id="features" class="py-32 px-6">
       <div class="max-w-4xl mx-auto">
-        <h2 class="feature-title text-[clamp(2rem,5vw,3.5rem)] font-bold tracking-[-0.02em] text-white mb-20 opacity-0">
+        <h2 class="feature-title font-serif text-[clamp(2rem,5vw,3.5rem)] text-[#1D1D1F] mb-20 opacity-0">
           Built for the edge.
         </h2>
-        <div class="grid md:grid-cols-2 gap-x-16 gap-y-14">
-          <div class="feature-card group opacity-0 border-l-2 border-transparent hover:border-red-500/60 pl-6 transition-all duration-300">
+        <div class="grid md:grid-cols-2 gap-x-12 gap-y-6">
+          <div class="feature-card group opacity-0 glass px-6 py-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
             <div class="flex items-center gap-3 mb-3">
-              <Cpu class="w-5 h-5 text-zinc-500 group-hover:text-red-500 transition-colors" strokeWidth={1.5} />
-              <h3 class="text-lg font-semibold text-white">239 KB</h3>
+              <Cpu class="w-5 h-5 text-[#A1A1A6] group-hover:text-[#F97066] transition-colors" strokeWidth={1.5} />
+              <h3 class="text-lg font-semibold text-[#1D1D1F]">239 KB</h3>
             </div>
-            <p class="text-[15px] text-zinc-400 leading-relaxed">Static binary. No runtime, no VM, no framework. Just your code and libc.</p>
+            <p class="text-[15px] text-[#6E6E73] leading-relaxed">Static binary. No runtime, no VM, no framework. Just your code and libc.</p>
           </div>
-          <div class="feature-card group opacity-0 border-l-2 border-transparent hover:border-red-500/60 pl-6 transition-all duration-300">
+          <div class="feature-card group opacity-0 glass px-6 py-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
             <div class="flex items-center gap-3 mb-3">
-              <Zap class="w-5 h-5 text-zinc-500 group-hover:text-red-500 transition-colors" strokeWidth={1.5} />
-              <h3 class="text-lg font-semibold text-white">Instant</h3>
+              <Zap class="w-5 h-5 text-[#A1A1A6] group-hover:text-[#F97066] transition-colors" strokeWidth={1.5} />
+              <h3 class="text-lg font-semibold text-[#1D1D1F]">Instant</h3>
             </div>
-            <p class="text-[15px] text-zinc-400 leading-relaxed">Under 2 ms startup on Apple Silicon. Under 8 ms at 0.8 GHz edge hardware.</p>
+            <p class="text-[15px] text-[#6E6E73] leading-relaxed">Under 2 ms startup on Apple Silicon. Under 8 ms at 0.8 GHz edge hardware.</p>
           </div>
-          <div class="feature-card group opacity-0 border-l-2 border-transparent hover:border-red-500/60 pl-6 transition-all duration-300">
+          <div class="feature-card group opacity-0 glass px-6 py-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
             <div class="flex items-center gap-3 mb-3">
-              <Globe class="w-5 h-5 text-zinc-500 group-hover:text-red-500 transition-colors" strokeWidth={1.5} />
-              <h3 class="text-lg font-semibold text-white">Portable</h3>
+              <Globe class="w-5 h-5 text-[#A1A1A6] group-hover:text-[#F97066] transition-colors" strokeWidth={1.5} />
+              <h3 class="text-lg font-semibold text-[#1D1D1F]">Portable</h3>
             </div>
-            <p class="text-[15px] text-zinc-400 leading-relaxed">One binary. ARM, x86, RISC-V. Drop it on any hardware and it runs.</p>
+            <p class="text-[15px] text-[#6E6E73] leading-relaxed">One binary. ARM, x86, RISC-V. Drop it on any hardware and it runs.</p>
           </div>
-          <div class="feature-card group opacity-0 border-l-2 border-transparent hover:border-red-500/60 pl-6 transition-all duration-300">
+          <div class="feature-card group opacity-0 glass px-6 py-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
             <div class="flex items-center gap-3 mb-3">
-              <Shield class="w-5 h-5 text-zinc-500 group-hover:text-red-500 transition-colors" strokeWidth={1.5} />
-              <h3 class="text-lg font-semibold text-white">Secure</h3>
+              <Shield class="w-5 h-5 text-[#A1A1A6] group-hover:text-[#F97066] transition-colors" strokeWidth={1.5} />
+              <h3 class="text-lg font-semibold text-[#1D1D1F]">Secure</h3>
             </div>
-            <p class="text-[15px] text-zinc-400 leading-relaxed">Pairing, sandboxing, encrypted secrets, workspace scoping. Deny-by-default.</p>
+            <p class="text-[15px] text-[#6E6E73] leading-relaxed">Pairing, sandboxing, encrypted secrets, workspace scoping. Deny-by-default.</p>
           </div>
-          <div class="feature-card group opacity-0 border-l-2 border-transparent hover:border-red-500/60 pl-6 transition-all duration-300">
+          <div class="feature-card group opacity-0 glass px-6 py-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
             <div class="flex items-center gap-3 mb-3">
-              <Blocks class="w-5 h-5 text-zinc-500 group-hover:text-red-500 transition-colors" strokeWidth={1.5} />
-              <h3 class="text-lg font-semibold text-white">Modular</h3>
+              <Blocks class="w-5 h-5 text-[#A1A1A6] group-hover:text-[#F97066] transition-colors" strokeWidth={1.5} />
+              <h3 class="text-lg font-semibold text-[#1D1D1F]">Modular</h3>
             </div>
-            <p class="text-[15px] text-zinc-400 leading-relaxed">Every subsystem is a vtable interface. Swap providers, channels, memory, tools via config.</p>
+            <p class="text-[15px] text-[#6E6E73] leading-relaxed">Every subsystem is a vtable interface. Swap providers, channels, memory, tools via config.</p>
           </div>
-          <div class="feature-card group opacity-0 border-l-2 border-transparent hover:border-red-500/60 pl-6 transition-all duration-300">
+          <div class="feature-card group opacity-0 glass px-6 py-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
             <div class="flex items-center gap-3 mb-3">
-              <Wifi class="w-5 h-5 text-zinc-500 group-hover:text-red-500 transition-colors" strokeWidth={1.5} />
-              <h3 class="text-lg font-semibold text-white">Offline</h3>
+              <Wifi class="w-5 h-5 text-[#A1A1A6] group-hover:text-[#F97066] transition-colors" strokeWidth={1.5} />
+              <h3 class="text-lg font-semibold text-[#1D1D1F]">Offline</h3>
             </div>
-            <p class="text-[15px] text-zinc-400 leading-relaxed">llama.cpp, Ollama, LM Studio, vLLM. Run fully local with no cloud dependency.</p>
+            <p class="text-[15px] text-[#6E6E73] leading-relaxed">llama.cpp, Ollama, LM Studio, vLLM. Run fully local with no cloud dependency.</p>
           </div>
         </div>
       </div>
     </section>
 
     {/* ── Architecture ── */}
-    <section id="architecture" class="py-32 px-6">
+    <section id="architecture" class="relative py-32 px-6">
+      <div class="ambient-coral" style="top: 20%; left: 10%;"></div>
+      <div class="ambient-blue" style="bottom: 10%; right: 15%;"></div>
       <div class="max-w-4xl mx-auto text-center">
-        <h2 class="arch-title text-[clamp(2rem,5vw,3.5rem)] font-bold tracking-[-0.02em] text-white mb-4 opacity-0">
+        <h2 class="arch-title font-serif text-[clamp(2rem,5vw,3.5rem)] text-[#1D1D1F] mb-4 opacity-0">
           Swap anything.
         </h2>
-        <p class="arch-sub text-lg text-zinc-400 mb-20 opacity-0">Every subsystem is a vtable interface.</p>
+        <p class="arch-sub text-lg text-[#6E6E73] mb-20 opacity-0">Every subsystem is a vtable interface.</p>
 
         <svg id="arch-diagram" viewBox="0 0 600 600" class="w-full max-w-lg mx-auto" xmlns="http://www.w3.org/2000/svg">
-          <line class="arch-line" x1="300" y1="300" x2="300" y2="100" stroke="#27272a" stroke-width="1" />
-          <line class="arch-line" x1="300" y1="300" x2="441" y2="159" stroke="#27272a" stroke-width="1" />
-          <line class="arch-line" x1="300" y1="300" x2="500" y2="300" stroke="#27272a" stroke-width="1" />
-          <line class="arch-line" x1="300" y1="300" x2="441" y2="441" stroke="#27272a" stroke-width="1" />
-          <line class="arch-line" x1="300" y1="300" x2="300" y2="500" stroke="#27272a" stroke-width="1" />
-          <line class="arch-line" x1="300" y1="300" x2="159" y2="441" stroke="#27272a" stroke-width="1" />
-          <line class="arch-line" x1="300" y1="300" x2="100" y2="300" stroke="#27272a" stroke-width="1" />
-          <line class="arch-line" x1="300" y1="300" x2="159" y2="159" stroke="#27272a" stroke-width="1" />
+          <defs>
+            <filter id="node-shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="rgba(0,0,0,0.06)" />
+            </filter>
+          </defs>
+
+          <line class="arch-line" x1="300" y1="300" x2="300" y2="100" stroke="#D4D4D8" stroke-width="1" />
+          <line class="arch-line" x1="300" y1="300" x2="441" y2="159" stroke="#D4D4D8" stroke-width="1" />
+          <line class="arch-line" x1="300" y1="300" x2="500" y2="300" stroke="#D4D4D8" stroke-width="1" />
+          <line class="arch-line" x1="300" y1="300" x2="441" y2="441" stroke="#D4D4D8" stroke-width="1" />
+          <line class="arch-line" x1="300" y1="300" x2="300" y2="500" stroke="#D4D4D8" stroke-width="1" />
+          <line class="arch-line" x1="300" y1="300" x2="159" y2="441" stroke="#D4D4D8" stroke-width="1" />
+          <line class="arch-line" x1="300" y1="300" x2="100" y2="300" stroke="#D4D4D8" stroke-width="1" />
+          <line class="arch-line" x1="300" y1="300" x2="159" y2="159" stroke="#D4D4D8" stroke-width="1" />
 
           <g id="arch-core" class="opacity-0">
-            <circle cx="300" cy="300" r="44" fill="#18181b" stroke="#ef4444" stroke-width="1.5" />
-            <text x="300" y="296" text-anchor="middle" fill="#fafafa" font-size="11" font-weight="600" font-family="var(--font-sans)">SeaClaw</text>
-            <text x="300" y="312" text-anchor="middle" fill="#a1a1aa" font-size="9" font-family="var(--font-sans)">Core</text>
+            <circle cx="300" cy="300" r="44" fill="rgba(255,255,255,0.8)" stroke="#F97066" stroke-width="1.5" filter="url(#node-shadow)" />
+            <text x="300" y="296" text-anchor="middle" fill="#1D1D1F" font-size="11" font-weight="600" font-family="var(--font-sans)">SeaClaw</text>
+            <text x="300" y="312" text-anchor="middle" fill="#6E6E73" font-size="9" font-family="var(--font-sans)">Core</text>
           </g>
 
           <g class="arch-node opacity-0" data-label="50+ AI model backends">
-            <circle cx="300" cy="100" r="30" fill="#18181b" stroke="#27272a" stroke-width="1" />
-            <text x="300" y="104" text-anchor="middle" fill="#a1a1aa" font-size="10" font-family="var(--font-sans)">Providers</text>
+            <circle cx="300" cy="100" r="30" fill="rgba(255,255,255,0.8)" stroke="rgba(0,0,0,0.08)" stroke-width="1" filter="url(#node-shadow)" />
+            <text x="300" y="104" text-anchor="middle" fill="#6E6E73" font-size="10" font-family="var(--font-sans)">Providers</text>
           </g>
           <g class="arch-node opacity-0" data-label="20 messaging integrations">
-            <circle cx="441" cy="159" r="30" fill="#18181b" stroke="#27272a" stroke-width="1" />
-            <text x="441" y="163" text-anchor="middle" fill="#a1a1aa" font-size="10" font-family="var(--font-sans)">Channels</text>
+            <circle cx="441" cy="159" r="30" fill="rgba(255,255,255,0.8)" stroke="rgba(0,0,0,0.08)" stroke-width="1" filter="url(#node-shadow)" />
+            <text x="441" y="163" text-anchor="middle" fill="#6E6E73" font-size="10" font-family="var(--font-sans)">Channels</text>
           </g>
           <g class="arch-node opacity-0" data-label="SQLite + vector + FTS5">
-            <circle cx="500" cy="300" r="30" fill="#18181b" stroke="#27272a" stroke-width="1" />
-            <text x="500" y="304" text-anchor="middle" fill="#a1a1aa" font-size="10" font-family="var(--font-sans)">Memory</text>
+            <circle cx="500" cy="300" r="30" fill="rgba(255,255,255,0.8)" stroke="rgba(0,0,0,0.08)" stroke-width="1" filter="url(#node-shadow)" />
+            <text x="500" y="304" text-anchor="middle" fill="#6E6E73" font-size="10" font-family="var(--font-sans)">Memory</text>
           </g>
           <g class="arch-node opacity-0" data-label="30+ built-in capabilities">
-            <circle cx="441" cy="441" r="30" fill="#18181b" stroke="#27272a" stroke-width="1" />
-            <text x="441" y="445" text-anchor="middle" fill="#a1a1aa" font-size="10" font-family="var(--font-sans)">Tools</text>
+            <circle cx="441" cy="441" r="30" fill="rgba(255,255,255,0.8)" stroke="rgba(0,0,0,0.08)" stroke-width="1" filter="url(#node-shadow)" />
+            <text x="441" y="445" text-anchor="middle" fill="#6E6E73" font-size="10" font-family="var(--font-sans)">Tools</text>
           </g>
           <g class="arch-node opacity-0" data-label="Sandbox + secrets + audit">
-            <circle cx="300" cy="500" r="30" fill="#18181b" stroke="#27272a" stroke-width="1" />
-            <text x="300" y="504" text-anchor="middle" fill="#a1a1aa" font-size="10" font-family="var(--font-sans)">Security</text>
+            <circle cx="300" cy="500" r="30" fill="rgba(255,255,255,0.8)" stroke="rgba(0,0,0,0.08)" stroke-width="1" filter="url(#node-shadow)" />
+            <text x="300" y="504" text-anchor="middle" fill="#6E6E73" font-size="10" font-family="var(--font-sans)">Security</text>
           </g>
           <g class="arch-node opacity-0" data-label="Native, Docker, WASM">
-            <circle cx="159" cy="441" r="30" fill="#18181b" stroke="#27272a" stroke-width="1" />
-            <text x="159" y="445" text-anchor="middle" fill="#a1a1aa" font-size="10" font-family="var(--font-sans)">Runtime</text>
+            <circle cx="159" cy="441" r="30" fill="rgba(255,255,255,0.8)" stroke="rgba(0,0,0,0.08)" stroke-width="1" filter="url(#node-shadow)" />
+            <text x="159" y="445" text-anchor="middle" fill="#6E6E73" font-size="10" font-family="var(--font-sans)">Runtime</text>
           </g>
           <g class="arch-node opacity-0" data-label="Cloudflare, Tailscale, ngrok">
-            <circle cx="100" cy="300" r="30" fill="#18181b" stroke="#27272a" stroke-width="1" />
-            <text x="100" y="304" text-anchor="middle" fill="#a1a1aa" font-size="10" font-family="var(--font-sans)">Tunnels</text>
+            <circle cx="100" cy="300" r="30" fill="rgba(255,255,255,0.8)" stroke="rgba(0,0,0,0.08)" stroke-width="1" filter="url(#node-shadow)" />
+            <text x="100" y="304" text-anchor="middle" fill="#6E6E73" font-size="10" font-family="var(--font-sans)">Tunnels</text>
           </g>
           <g class="arch-node opacity-0" data-label="Arduino, STM32, RPi GPIO">
-            <circle cx="159" cy="159" r="30" fill="#18181b" stroke="#27272a" stroke-width="1" />
-            <text x="159" y="163" text-anchor="middle" fill="#a1a1aa" font-size="10" font-family="var(--font-sans)">Hardware</text>
+            <circle cx="159" cy="159" r="30" fill="rgba(255,255,255,0.8)" stroke="rgba(0,0,0,0.08)" stroke-width="1" filter="url(#node-shadow)" />
+            <text x="159" y="163" text-anchor="middle" fill="#6E6E73" font-size="10" font-family="var(--font-sans)">Hardware</text>
           </g>
         </svg>
       </div>
@@ -209,16 +219,16 @@ const providers = [
     {/* ── Terminal ── */}
     <section class="py-32 px-6">
       <div class="max-w-3xl mx-auto">
-        <h2 class="terminal-title text-[clamp(2rem,5vw,3.5rem)] font-bold tracking-[-0.02em] text-white mb-4 text-center opacity-0">
+        <h2 class="terminal-title font-serif text-[clamp(2rem,5vw,3.5rem)] text-[#1D1D1F] mb-4 text-center opacity-0">
           Clone. Build. Run.
         </h2>
-        <p class="terminal-sub text-lg text-zinc-400 mb-12 text-center opacity-0">No containers. No interpreters. No dependencies.</p>
-        <div id="terminal" class="rounded-2xl overflow-hidden border border-zinc-800/60 bg-[#0c0c0e] opacity-0">
-          <div class="flex items-center gap-2 px-5 py-3.5 bg-zinc-900/80 border-b border-zinc-800/60">
-            <span class="w-3 h-3 rounded-full bg-zinc-700"></span>
-            <span class="w-3 h-3 rounded-full bg-zinc-700"></span>
-            <span class="w-3 h-3 rounded-full bg-zinc-700"></span>
-            <span class="text-[11px] text-zinc-600 ml-2 font-mono">terminal</span>
+        <p class="terminal-sub text-lg text-[#6E6E73] mb-12 text-center opacity-0">No containers. No interpreters. No dependencies.</p>
+        <div id="terminal" class="rounded-2xl overflow-hidden bg-[#1D1D1F] shadow-[0_16px_48px_rgba(0,0,0,0.12)] opacity-0">
+          <div class="flex items-center gap-2 px-5 py-3.5 bg-[#2C2C2E] border-b border-[rgba(255,255,255,0.06)]">
+            <span class="w-3 h-3 rounded-full bg-[#FF5F57]"></span>
+            <span class="w-3 h-3 rounded-full bg-[#FEBC2E]"></span>
+            <span class="w-3 h-3 rounded-full bg-[#28C840]"></span>
+            <span class="text-[11px] text-[rgba(255,255,255,0.3)] ml-2 font-mono">terminal</span>
           </div>
           <div id="terminal-output" class="p-6 font-mono text-[13px] md:text-sm leading-[1.8] min-h-[280px]">
           </div>
@@ -229,16 +239,16 @@ const providers = [
     {/* ── Providers ── */}
     <section class="py-32 px-6">
       <div class="max-w-4xl mx-auto">
-        <h2 class="providers-title text-[clamp(2rem,5vw,3.5rem)] font-bold tracking-[-0.02em] text-white mb-16 opacity-0">
+        <h2 class="providers-title font-serif text-[clamp(2rem,5vw,3.5rem)] text-[#1D1D1F] mb-16 opacity-0">
           50+ providers. Your choice.
         </h2>
         <div class="flex flex-wrap gap-3" id="provider-grid">
           {providers.map((name) => (
-            <span class="provider-pill opacity-0 px-4 py-2 rounded-full text-[13px] text-zinc-400 bg-zinc-900 border border-zinc-800/50 hover:border-zinc-600 hover:text-zinc-200 transition-all duration-200 cursor-default">
+            <span class="provider-pill opacity-0 px-4 py-2 rounded-full text-[13px] text-[#6E6E73] bg-[rgba(255,255,255,0.5)] border border-[rgba(0,0,0,0.06)] hover:border-[#F97066] hover:text-[#1D1D1F] transition-all duration-200 cursor-default backdrop-blur-sm">
               {name}
             </span>
           ))}
-          <span class="provider-pill opacity-0 px-4 py-2 rounded-full text-[13px] text-zinc-500 bg-zinc-900/50 border border-zinc-800/30 italic">
+          <span class="provider-pill opacity-0 px-4 py-2 rounded-full text-[13px] text-[#A1A1A6] bg-[rgba(255,255,255,0.3)] border border-[rgba(0,0,0,0.04)] italic backdrop-blur-sm">
             and 30+ more...
           </span>
         </div>
@@ -246,18 +256,20 @@ const providers = [
     </section>
 
     {/* ── Final CTA ── */}
-    <section class="py-40 px-6">
+    <section class="relative py-40 px-6">
+      <div class="ambient-coral" style="top: 30%; left: 30%;"></div>
+      <div class="ambient-blue" style="top: 40%; right: 20%;"></div>
       <div class="max-w-3xl mx-auto text-center">
-        <h2 class="cta-title text-[clamp(2.5rem,6vw,4.5rem)] font-bold tracking-[-0.03em] text-white leading-[0.95] mb-4 opacity-0">
+        <h2 class="cta-title font-serif text-[clamp(2.5rem,6vw,4.5rem)] text-[#1D1D1F] leading-[1.05] mb-4 opacity-0">
           Deploy anywhere.
         </h2>
-        <p class="cta-sub text-[clamp(1.5rem,4vw,3rem)] font-bold tracking-[-0.02em] text-zinc-500 mb-14 opacity-0">
+        <p class="cta-sub text-[clamp(1.5rem,4vw,2.5rem)] text-[#A1A1A6] mb-14 opacity-0">
           Swap anything.
         </p>
         <div class="cta-buttons flex flex-col sm:flex-row gap-4 justify-center opacity-0">
           <a
             href={`${base}getting-started/installation/`}
-            class="inline-flex items-center justify-center px-8 py-3.5 rounded-full text-[15px] font-medium bg-red-500 hover:bg-red-400 text-white transition-all duration-200 hover:shadow-[0_0_30px_rgba(239,68,68,0.3)]"
+            class="inline-flex items-center justify-center px-8 py-3.5 rounded-full text-[15px] font-medium bg-[#F97066] hover:bg-[#EF5350] text-white transition-all duration-200 hover:shadow-[0_0_30px_rgba(249,112,102,0.25)]"
           >
             Read the Docs
           </a>
@@ -265,7 +277,7 @@ const providers = [
             href="https://github.com/sethdford/seaclaw"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex items-center justify-center px-8 py-3.5 rounded-full text-[15px] font-medium text-zinc-300 border border-zinc-700/60 hover:border-zinc-500 transition-all duration-200 hover:text-white"
+            class="inline-flex items-center justify-center px-8 py-3.5 rounded-full text-[15px] font-medium text-[#6E6E73] border border-[rgba(0,0,0,0.12)] hover:border-[rgba(0,0,0,0.25)] transition-all duration-200 hover:text-[#1D1D1F]"
           >
             View on GitHub
           </a>
@@ -274,16 +286,16 @@ const providers = [
     </section>
 
     {/* ── Footer ── */}
-    <footer class="py-12 px-6 border-t border-zinc-800/40">
+    <footer class="py-12 px-6 border-t border-[rgba(0,0,0,0.06)]">
       <div class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         <div class="flex items-center gap-3">
           <img src={`${base}seaclaw.svg`} alt="" class="w-5 h-5" />
-          <span class="text-[13px] text-zinc-500">SeaClaw</span>
+          <span class="text-[13px] text-[#A1A1A6]">SeaClaw</span>
         </div>
-        <div class="flex items-center gap-6 text-[13px] text-zinc-600">
+        <div class="flex items-center gap-6 text-[13px] text-[#A1A1A6]">
           <span>MIT License</span>
           <span>Made with C11</span>
-          <a href="https://github.com/sethdford/seaclaw" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-400 transition-colors">GitHub</a>
+          <a href="https://github.com/sethdford/seaclaw" target="_blank" rel="noopener noreferrer" class="hover:text-[#6E6E73] transition-colors">GitHub</a>
         </div>
       </div>
     </footer>
@@ -297,36 +309,26 @@ const providers = [
 
       const ctx = gsap.context(() => {
 
-        // ── Nav: backdrop on scroll
+        // ── Nav: liquid glass on scroll
         ScrollTrigger.create({
           start: "top -80",
           onEnter: () => {
             const nav = document.getElementById("site-nav");
-            if (nav) {
-              nav.style.backgroundColor = "rgba(9,9,11,0.8)";
-              nav.style.backdropFilter = "blur(24px)";
-              nav.style.webkitBackdropFilter = "blur(24px)";
-              nav.style.borderBottom = "1px solid rgba(39,39,42,0.4)";
-            }
+            if (nav) nav.classList.add("glass-nav");
           },
           onLeaveBack: () => {
             const nav = document.getElementById("site-nav");
-            if (nav) {
-              nav.style.backgroundColor = "";
-              nav.style.backdropFilter = "";
-              nav.style.webkitBackdropFilter = "";
-              nav.style.borderBottom = "";
-            }
+            if (nav) nav.classList.remove("glass-nav");
           },
         });
 
-        // ── Hero sequence
-        const heroTl = gsap.timeline({ defaults: { ease: "power2.out" } });
+        // ── Hero sequence (organic easing, longer duration)
+        const heroTl = gsap.timeline({ defaults: { ease: "power3.out" } });
         heroTl
-          .to(".hero-logo", { opacity: 1, scale: 1, duration: 0.8 }, 0.3)
-          .fromTo(".hero-title", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.8 }, 0.5)
-          .fromTo(".hero-sub", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.8 }, 0.7)
-          .fromTo(".hero-buttons", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.8 }, 0.9);
+          .to(".hero-logo", { opacity: 1, scale: 1, duration: 0.9 }, 0.3)
+          .fromTo(".hero-title", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.9 }, 0.5)
+          .fromTo(".hero-sub", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.9 }, 0.7)
+          .fromTo(".hero-buttons", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.9 }, 0.9);
 
         // ── Numbers: counter animation
         const numberItems = document.querySelectorAll(".number-item");
@@ -338,14 +340,14 @@ const providers = [
           if (!valSpan) return;
 
           const obj = { val: 0 };
-          gsap.fromTo(item, { opacity: 0, y: 30 }, {
-            opacity: 1, y: 0, duration: 0.6, delay: i * 0.12,
+          gsap.fromTo(item, { opacity: 0, y: 30, scale: 0.98 }, {
+            opacity: 1, y: 0, scale: 1, duration: 0.7, delay: i * 0.12, ease: "power3.out",
             scrollTrigger: { trigger: ".numbers-grid", start: "top 80%" },
           });
           gsap.to(obj, {
             val: target,
             duration: 1.5,
-            ease: "power2.out",
+            ease: "power3.out",
             delay: i * 0.12,
             scrollTrigger: { trigger: ".numbers-grid", start: "top 80%" },
             onUpdate: () => {
@@ -356,54 +358,55 @@ const providers = [
           });
         });
 
-        // ── Features: stagger reveal
+        // ── Features: stagger reveal with scale
         gsap.fromTo(".feature-title", { opacity: 0, y: 30 }, {
-          opacity: 1, y: 0, duration: 0.8,
+          opacity: 1, y: 0, duration: 0.9, ease: "power3.out",
           scrollTrigger: { trigger: ".feature-title", start: "top 85%" },
         });
-        gsap.fromTo(".feature-card", { opacity: 0, y: 40 }, {
-          opacity: 1, y: 0, duration: 0.6, stagger: 0.1,
+        gsap.fromTo(".feature-card", { opacity: 0, y: 40, scale: 0.98 }, {
+          opacity: 1, y: 0, scale: 1, duration: 0.7, stagger: 0.1, ease: "power3.out",
           scrollTrigger: { trigger: ".feature-card", start: "top 80%" },
         });
 
         // ── Architecture: diagram animation
-        const archTl = gsap.timeline({
-          scrollTrigger: { trigger: "#arch-diagram", start: "top 75%" },
-          defaults: { ease: "power2.out" },
-        });
         gsap.fromTo(".arch-title", { opacity: 0, y: 30 }, {
-          opacity: 1, y: 0, duration: 0.8,
+          opacity: 1, y: 0, duration: 0.9, ease: "power3.out",
           scrollTrigger: { trigger: ".arch-title", start: "top 85%" },
         });
         gsap.fromTo(".arch-sub", { opacity: 0, y: 20 }, {
-          opacity: 1, y: 0, duration: 0.8,
+          opacity: 1, y: 0, duration: 0.9, ease: "power3.out",
           scrollTrigger: { trigger: ".arch-sub", start: "top 85%" },
         });
 
+        const archTl = gsap.timeline({
+          scrollTrigger: { trigger: "#arch-diagram", start: "top 75%" },
+          defaults: { ease: "power3.out" },
+        });
         archTl
-          .to("#arch-core", { opacity: 1, duration: 0.5 })
-          .fromTo(".arch-line", { attr: { "stroke-dasharray": "200", "stroke-dashoffset": "200" } },
-            { attr: { "stroke-dashoffset": "0" }, duration: 0.6, stagger: 0.06 }, 0.3)
-          .to(".arch-node", { opacity: 1, duration: 0.4, stagger: 0.08 }, 0.6);
+          .to("#arch-core", { opacity: 1, duration: 0.6 })
+          .fromTo(".arch-line",
+            { attr: { "stroke-dasharray": "200", "stroke-dashoffset": "200" } },
+            { attr: { "stroke-dashoffset": "0", stroke: "#F97066" }, duration: 0.7, stagger: 0.06 }, 0.3)
+          .to(".arch-node", { opacity: 1, duration: 0.5, stagger: 0.08 }, 0.6);
 
         document.querySelectorAll(".arch-node").forEach((node) => {
           node.addEventListener("mouseenter", () => {
             const circle = node.querySelector("circle");
-            if (circle) gsap.to(circle, { attr: { stroke: "#ef4444" }, duration: 0.2 });
+            if (circle) gsap.to(circle, { attr: { stroke: "#F97066" }, duration: 0.2 });
           });
           node.addEventListener("mouseleave", () => {
             const circle = node.querySelector("circle");
-            if (circle) gsap.to(circle, { attr: { stroke: "#27272a" }, duration: 0.2 });
+            if (circle) gsap.to(circle, { attr: { stroke: "rgba(0,0,0,0.08)" }, duration: 0.2 });
           });
         });
 
         // ── Terminal: typing animation
         gsap.fromTo(".terminal-title", { opacity: 0, y: 30 }, {
-          opacity: 1, y: 0, duration: 0.8,
+          opacity: 1, y: 0, duration: 0.9, ease: "power3.out",
           scrollTrigger: { trigger: ".terminal-title", start: "top 85%" },
         });
         gsap.fromTo(".terminal-sub", { opacity: 0, y: 20 }, {
-          opacity: 1, y: 0, duration: 0.8,
+          opacity: 1, y: 0, duration: 0.9, ease: "power3.out",
           scrollTrigger: { trigger: ".terminal-sub", start: "top 85%" },
         });
 
@@ -417,7 +420,7 @@ const providers = [
             onEnter: () => {
               if (terminalPlayed) return;
               terminalPlayed = true;
-              gsap.to(terminalEl, { opacity: 1, duration: 0.5 });
+              gsap.to(terminalEl, { opacity: 1, duration: 0.6 });
               typeTerminal(outputEl);
             },
           });
@@ -436,9 +439,9 @@ const providers = [
             { prompt: true, text: "cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel" },
             { prompt: true, text: "cmake --build ." },
             { prompt: true, text: "ls -lh seaclaw" },
-            { prompt: false, text: "-rwxr-xr-x  1 user  staff  239K  seaclaw", highlights: [{ text: "239K", className: "text-red-400" }] },
+            { prompt: false, text: "-rwxr-xr-x  1 user  staff  239K  seaclaw", highlights: [{ text: "239K", className: "text-[#F97066]" }] },
             { prompt: true, text: "./seaclaw doctor" },
-            { prompt: false, text: "[doctor] provider (llamacpp): ok", highlights: [{ text: "ok", className: "text-red-400" }] },
+            { prompt: false, text: "[doctor] provider (llamacpp): ok", highlights: [{ text: "ok", className: "text-[#F97066]" }] },
             { prompt: false, text: "[doctor] memory engine: sqlite" },
           ];
 
@@ -451,11 +454,11 @@ const providers = [
 
             if (line.prompt) {
               const promptSpan = document.createElement("span");
-              promptSpan.className = "text-zinc-600";
+              promptSpan.className = "text-[rgba(255,255,255,0.3)]";
               promptSpan.textContent = "$ ";
               div.appendChild(promptSpan);
               const textSpan = document.createElement("span");
-              textSpan.className = "text-zinc-300";
+              textSpan.className = "text-[rgba(255,255,255,0.8)]";
               div.appendChild(textSpan);
               container.appendChild(div);
 
@@ -473,7 +476,7 @@ const providers = [
               typeChar();
             } else {
               const wrapper = document.createElement("span");
-              wrapper.className = "text-zinc-500";
+              wrapper.className = "text-[rgba(255,255,255,0.45)]";
 
               if (line.highlights && line.highlights.length > 0) {
                 let remaining = line.text;
@@ -510,26 +513,26 @@ const providers = [
 
         // ── Providers: scatter in
         gsap.fromTo(".providers-title", { opacity: 0, y: 30 }, {
-          opacity: 1, y: 0, duration: 0.8,
+          opacity: 1, y: 0, duration: 0.9, ease: "power3.out",
           scrollTrigger: { trigger: ".providers-title", start: "top 85%" },
         });
         gsap.fromTo(".provider-pill", { opacity: 0, scale: 0.8 }, {
-          opacity: 1, scale: 1, duration: 0.4,
+          opacity: 1, scale: 1, duration: 0.5, ease: "power3.out",
           stagger: { each: 0.03, from: "random" },
           scrollTrigger: { trigger: "#provider-grid", start: "top 80%" },
         });
 
         // ── Final CTA
-        gsap.fromTo(".cta-title", { opacity: 0, y: 40 }, {
-          opacity: 1, y: 0, duration: 0.8,
+        gsap.fromTo(".cta-title", { opacity: 0, y: 40, scale: 0.98 }, {
+          opacity: 1, y: 0, scale: 1, duration: 0.9, ease: "power3.out",
           scrollTrigger: { trigger: ".cta-title", start: "top 80%" },
         });
         gsap.fromTo(".cta-sub", { opacity: 0, y: 30 }, {
-          opacity: 1, y: 0, duration: 0.8,
+          opacity: 1, y: 0, duration: 0.9, ease: "power3.out",
           scrollTrigger: { trigger: ".cta-sub", start: "top 85%" },
         });
         gsap.fromTo(".cta-buttons", { opacity: 0, y: 20 }, {
-          opacity: 1, y: 0, duration: 0.8,
+          opacity: 1, y: 0, duration: 0.9, ease: "power3.out",
           scrollTrigger: { trigger: ".cta-buttons", start: "top 85%" },
         });
 

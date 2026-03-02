@@ -23,6 +23,8 @@ SeaClaw reads configuration from `~/.seaclaw/config.json`. Environment variables
 | `channels`            | Channel enablement (cli, telegram, discord, etc.)          |
 | `tools`               | Tool config (enabled_tools, disabled_tools, timeouts)      |
 | `memory`              | Memory backend (sqlite, markdown, none)                    |
+| `mcp_servers`         | External MCP server connections (command, args per server) |
+| `cron`                | Cron job scheduling (enabled, interval)                    |
 | `security`            | Sandbox, autonomy level, resource limits                   |
 | `autonomy`            | Action limits, workspace scoping                           |
 | `gateway`             | Host, port, pairing, webhook HMAC                          |
@@ -80,7 +82,19 @@ Provider-specific keys (used when no `SEACLAW_API_KEY` or provider-specific key 
   ],
   "channels": {
     "cli": true,
-    "default_channel": "cli"
+    "default_channel": "cli",
+    "email": {
+      "smtp_host": "smtp.gmail.com",
+      "smtp_port": 587,
+      "from_address": "bot@example.com",
+      "smtp_user": "bot@example.com",
+      "smtp_pass": "app-password",
+      "imap_host": "imap.gmail.com",
+      "imap_port": 993
+    },
+    "imessage": {
+      "default_target": "+15551234567"
+    }
   },
   "memory": {
     "backend": "sqlite",
@@ -120,6 +134,16 @@ Provider-specific keys (used when no `SEACLAW_API_KEY` or provider-specific key 
     "web_fetch_max_chars": 100000,
     "enabled_tools": [],
     "disabled_tools": []
+  },
+  "mcp_servers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem"]
+    }
+  },
+  "cron": {
+    "enabled": true,
+    "interval_minutes": 1
   }
 }
 ```
@@ -153,3 +177,42 @@ Use `enabled_tools` and `disabled_tools` to control which tools are available:
 ```
 
 Empty `enabled_tools` means all tools are enabled unless listed in `disabled_tools`.
+
+## MCP Servers
+
+Connect to external MCP (Model Context Protocol) servers. SeaClaw can act as both client and server:
+
+**As client** — connect to external tool servers at startup:
+
+```json
+{
+  "mcp_servers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem"]
+    }
+  }
+}
+```
+
+MCP tools are automatically loaded and available to the agent as `mcp_0_<tool_name>`.
+
+**As server** — expose all SeaClaw tools over MCP:
+
+```bash
+seaclaw mcp
+```
+
+This runs the JSON-RPC 2.0 server on stdin/stdout, compatible with Claude Code and other MCP clients.
+
+## Service Mode
+
+Run SeaClaw as an always-on service:
+
+```bash
+seaclaw service          # Daemonize (background)
+seaclaw service-loop     # Foreground (for containers)
+seaclaw status           # Check if running
+```
+
+The service loop executes cron jobs and will poll configured channels in future releases.

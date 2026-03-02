@@ -15,7 +15,7 @@ Tools give the AI agent the ability to act: run commands, read/write files, sear
 | `parameters_json` | JSON Schema for the tool's parameters                  |
 | `deinit`          | Optional cleanup                                       |
 
-## Available tools (35)
+## Available tools (36)
 
 | Tool            | Description                                                  |
 | --------------- | ------------------------------------------------------------ |
@@ -37,7 +37,7 @@ Tools give the AI agent the ability to act: run commands, read/write files, sear
 | memory_list     | List stored memories                                         |
 | memory_forget   | Remove a memory by ID                                        |
 | message         | Send a message (e.g. to a channel)                           |
-| delegate        | Delegate to another agent or sub-task                        |
+| delegate        | Delegate tasks to sub-agents (routes to claude_code)         |
 | spawn           | Spawn child processes                                        |
 | cron_add        | Add a cron job                                               |
 | cron_list       | List cron jobs                                               |
@@ -45,6 +45,7 @@ Tools give the AI agent the ability to act: run commands, read/write files, sear
 | cron_run        | Run a cron job immediately                                   |
 | cron_runs       | List recent cron execution history                           |
 | cron_update     | Update a cron job                                            |
+| claude_code     | Delegate coding tasks to Claude Code CLI (sub-agent)         |
 | composio        | Composio integration (list tools, execute actions)           |
 | hardware_memory | Read/write hardware memory via probe-rs or serial            |
 | schedule        | Scheduled tasks (create, list, cancel, pause)                |

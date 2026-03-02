@@ -57,13 +57,47 @@ QQ (腾讯QQ) bot integration. Configure via official QQ bot platform.
 
 Build: `-DSC_ENABLE_EMAIL=ON`
 
-Send and receive email. Configure SMTP/IMAP or equivalent. Useful for asynchronous, non-real-time workflows.
+Bidirectional email: send via SMTP and receive via IMAP polling.
+
+### Config
+
+```json
+{
+  "channels": {
+    "email": {
+      "smtp_host": "smtp.gmail.com",
+      "smtp_port": 587,
+      "from_address": "bot@gmail.com",
+      "smtp_user": "bot@gmail.com",
+      "smtp_pass": "your-app-password",
+      "imap_host": "imap.gmail.com",
+      "imap_port": 993
+    }
+  }
+}
+```
+
+Inbound: polls IMAP for unseen messages every 30 seconds. Outbound: sends via SMTP with TLS.
 
 ## iMessage
 
 Build: `-DSC_ENABLE_IMESSAGE=ON`
 
-Apple iMessage. Requires platform support (macOS) and appropriate permissions.
+Bidirectional Apple iMessage on macOS. Sends via AppleScript, receives by polling `~/Library/Messages/chat.db` (requires Full Disk Access).
+
+### Config
+
+```json
+{
+  "channels": {
+    "imessage": {
+      "default_target": "+15551234567"
+    }
+  }
+}
+```
+
+Inbound: polls the Messages database every 3 seconds. Outbound: sends via osascript.
 
 ## Mattermost
 
