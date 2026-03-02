@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Custom utilities and base overrides for SeaClaw */
+@layer base {
+  body {
+    @apply text-slate-100;
+  }
+}

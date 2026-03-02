@@ -1,0 +1,155 @@
+---
+title: Configuration
+description: Full configuration reference for SeaClaw.
+---
+
+SeaClaw reads configuration from `~/.seaclaw/config.json`. Environment variables override config values.
+
+## Config location
+
+| Platform   | Path                                 |
+| ---------- | ------------------------------------ |
+| Unix/macOS | `~/.seaclaw/config.json`             |
+| Windows    | `%USERPROFILE%\.seaclaw\config.json` |
+
+## Key sections
+
+| Section               | Description                                                |
+| --------------------- | ---------------------------------------------------------- |
+| `default_provider`    | Default AI provider (e.g. `openai`, `anthropic`, `ollama`) |
+| `default_model`       | Default model name                                         |
+| `default_temperature` | Sampling temperature (0.0–2.0, default 0.7)                |
+| `providers`           | Array of provider entries with name, api_key, base_url     |
+| `channels`            | Channel enablement (cli, telegram, discord, etc.)          |
+| `tools`               | Tool config (enabled_tools, disabled_tools, timeouts)      |
+| `memory`              | Memory backend (sqlite, markdown, none)                    |
+| `security`            | Sandbox, autonomy level, resource limits                   |
+| `autonomy`            | Action limits, workspace scoping                           |
+| `gateway`             | Host, port, pairing, webhook HMAC                          |
+| `tunnel`              | Tunnel provider (e.g. ngrok)                               |
+| `runtime`             | Execution environment (native, docker, wasm)               |
+
+## Environment variable overrides
+
+These override config values when set:
+
+| Variable                      | Overrides                   |
+| ----------------------------- | --------------------------- |
+| `SEACLAW_PROVIDER`            | `default_provider`          |
+| `SEACLAW_MODEL`               | `default_model`             |
+| `SEACLAW_API_KEY`             | Default API key             |
+| `SEACLAW_TEMPERATURE`         | `default_temperature`       |
+| `SEACLAW_GATEWAY_PORT`        | `gateway.port`              |
+| `SEACLAW_GATEWAY_HOST`        | `gateway.host`              |
+| `SEACLAW_WORKSPACE`           | Workspace directory         |
+| `SEACLAW_ALLOW_PUBLIC_BIND`   | `gateway.allow_public_bind` |
+| `SEACLAW_WEBHOOK_HMAC_SECRET` | Webhook HMAC secret         |
+| `SEACLAW_AUTONOMY`            | Autonomy level (0–4)        |
+
+Provider-specific keys (used when no `SEACLAW_API_KEY` or provider-specific key in config):
+
+- `OPENAI_API_KEY` — OpenAI
+- `ANTHROPIC_API_KEY` — Anthropic
+- `GEMINI_API_KEY` — Google Gemini
+- `OLLAMA_HOST` — Ollama base URL (e.g. `http://localhost:11434`)
+
+## Complete example config
+
+```json
+{
+  "workspace": "~/.seaclaw/workspace",
+  "default_provider": "openai",
+  "default_model": "gpt-4o",
+  "default_temperature": 0.7,
+  "providers": [
+    {
+      "name": "openai",
+      "api_key": "sk-your-openai-key",
+      "base_url": null,
+      "native_tools": true
+    },
+    {
+      "name": "anthropic",
+      "api_key": "sk-ant-your-anthropic-key"
+    },
+    {
+      "name": "ollama",
+      "api_key": null,
+      "base_url": "http://localhost:11434"
+    }
+  ],
+  "channels": {
+    "cli": true,
+    "default_channel": "cli"
+  },
+  "memory": {
+    "backend": "sqlite",
+    "auto_save": true,
+    "sqlite_path": null,
+    "max_entries": 0
+  },
+  "security": {
+    "sandbox": "auto",
+    "autonomy_level": 1
+  },
+  "autonomy": {
+    "level": "supervised",
+    "workspace_only": true,
+    "max_actions_per_hour": 20
+  },
+  "gateway": {
+    "enabled": true,
+    "port": 3000,
+    "host": "127.0.0.1",
+    "require_pairing": true,
+    "allow_public_bind": false,
+    "pair_rate_limit_per_minute": 10,
+    "webhook_hmac_secret": null
+  },
+  "tunnel": {
+    "provider": "none",
+    "domain": null
+  },
+  "runtime": {
+    "kind": "native",
+    "docker_image": null
+  },
+  "tools": {
+    "shell_timeout_secs": 60,
+    "shell_max_output_bytes": 1048576,
+    "web_fetch_max_chars": 100000,
+    "enabled_tools": [],
+    "disabled_tools": []
+  }
+}
+```
+
+## Provider config
+
+Each provider entry can have:
+
+- `name` — Provider identifier (openai, anthropic, ollama, openrouter, compatible, etc.)
+- `api_key` — API key (optional for local providers)
+- `base_url` — Override base URL (optional)
+- `native_tools` — Use provider-native tool format (default: true)
+
+## Memory backends
+
+- `sqlite` — SQLite with FTS5 and vector search (requires `SC_ENABLE_SQLITE`)
+- `markdown` — File-based markdown files
+- `none` — No memory
+
+## Tool filtering
+
+Use `enabled_tools` and `disabled_tools` to control which tools are available:
+
+```json
+{
+  "tools": {
+    "enabled_tools": ["shell", "file_read", "memory_store"],
+    "disabled_tools": ["browser_open"]
+  }
+}
+```
+
+Empty `enabled_tools` means all tools are enabled unless listed in `disabled_tools`.

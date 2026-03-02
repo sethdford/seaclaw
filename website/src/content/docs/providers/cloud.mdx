@@ -1,0 +1,191 @@
+---
+title: Cloud Providers
+description: Configure cloud AI providers (OpenAI, Anthropic, Gemini, etc.).
+---
+
+SeaClaw supports major cloud AI providers. Configure each with an API key in `~/.seaclaw/config.json` or via environment variables.
+
+## OpenAI
+
+```json
+{
+  "default_provider": "openai",
+  "default_model": "gpt-4o",
+  "providers": [
+    {
+      "name": "openai",
+      "api_key": "sk-proj-..."
+    }
+  ]
+}
+```
+
+Or use the environment variable:
+
+```bash
+export OPENAI_API_KEY="sk-proj-..."
+./seaclaw agent
+```
+
+Models: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, etc.
+
+## Anthropic
+
+```json
+{
+  "default_provider": "anthropic",
+  "default_model": "claude-sonnet-4-20250514",
+  "providers": [
+    {
+      "name": "anthropic",
+      "api_key": "sk-ant-..."
+    }
+  ]
+}
+```
+
+Environment variable:
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+Models: `claude-sonnet-4-20250514`, `claude-opus-4`, `claude-3-5-haiku`, etc.
+
+## Google Gemini
+
+```json
+{
+  "default_provider": "gemini",
+  "default_model": "gemini-2.0-flash",
+  "providers": [
+    {
+      "name": "gemini",
+      "api_key": "AIza..."
+    }
+  ]
+}
+```
+
+Environment variable: `GEMINI_API_KEY`
+
+Models: `gemini-2.0-flash`, `gemini-1.5-pro`, `gemini-1.5-flash`.
+
+## OpenRouter
+
+OpenRouter provides a single API for many models:
+
+```json
+{
+  "default_provider": "openrouter",
+  "default_model": "anthropic/claude-sonnet-4",
+  "providers": [
+    {
+      "name": "openrouter",
+      "api_key": "sk-or-v1-..."
+    }
+  ]
+}
+```
+
+Environment variable: `OPENROUTER_API_KEY`
+
+Models use the format `provider/model`, e.g. `anthropic/claude-sonnet-4`, `openai/gpt-4o`, `meta-llama/llama-3.1-70b-instruct`.
+
+## Groq
+
+```json
+{
+  "providers": [{ "name": "groq", "api_key": "gsk_..." }],
+  "default_provider": "groq",
+  "default_model": "llama-3.1-70b-versatile"
+}
+```
+
+## Mistral
+
+```json
+{
+  "providers": [{ "name": "mistral", "api_key": "..." }],
+  "default_provider": "mistral",
+  "default_model": "mistral-large-latest"
+}
+```
+
+## xAI (Grok)
+
+```json
+{
+  "providers": [{ "name": "xai", "api_key": "xai-..." }],
+  "default_provider": "xai",
+  "default_model": "grok-2"
+}
+```
+
+## DeepSeek
+
+```json
+{
+  "providers": [{ "name": "deepseek", "api_key": "sk-..." }],
+  "default_provider": "deepseek",
+  "default_model": "deepseek-chat"
+}
+```
+
+## Together AI
+
+```json
+{
+  "providers": [{ "name": "together", "api_key": "..." }],
+  "default_provider": "together",
+  "default_model": "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
+}
+```
+
+## Fireworks
+
+```json
+{
+  "providers": [{ "name": "fireworks", "api_key": "..." }],
+  "default_provider": "fireworks",
+  "default_model": "accounts/fireworks/models/llama-v3p1-70b-instruct"
+}
+```
+
+## Perplexity
+
+```json
+{
+  "providers": [{ "name": "perplexity", "api_key": "pplx-..." }],
+  "default_provider": "perplexity",
+  "default_model": "sonar"
+}
+```
+
+## Cohere
+
+```json
+{
+  "providers": [{ "name": "cohere", "api_key": "..." }],
+  "default_provider": "cohere",
+  "default_model": "command-r-plus"
+}
+```
+
+## Base URL override
+
+Any provider can use a custom base URL:
+
+```json
+{
+  "providers": [
+    {
+      "name": "openai",
+      "api_key": "sk-...",
+      "base_url": "https://your-proxy.example.com/v1"
+    }
+  ]
+}
+```
+
+Useful for proxies, Azure OpenAI, or self-hosted endpoints.

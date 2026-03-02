@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="seaclaw.png" alt="seaclaw" width="200" />
+  <img src="seaclaw.svg" alt="seaclaw" width="200" />
 </p>
 
 <h1 align="center">SeaClaw</h1>
@@ -10,15 +10,15 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/seaclaw/seaclaw/actions/workflows/seaclaw-ci.yml"><img src="https://github.com/seaclaw/seaclaw/actions/workflows/seaclaw-ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://seaclaw.github.io"><img src="https://img.shields.io/badge/docs-seaclaw.github.io-informational" alt="Documentation" /></a>
+  <a href="https://github.com/sethdford/seaclaw/actions/workflows/seaclaw-ci.yml"><img src="https://github.com/sethdford/seaclaw/actions/workflows/seaclaw-ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://sethdford.github.io/seaclaw"><img src="https://img.shields.io/badge/docs-sethdford.github.io/seaclaw-informational" alt="Documentation" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
 </p>
 
 The smallest fully autonomous AI assistant infrastructure — a static C binary that fits on any $5 board, boots in milliseconds, and requires nothing but libc.
 
 ```
-239 KB binary · <2 ms startup · 1,697 tests · 22+ providers · 18 channels · Pluggable everything
+239 KB binary · <2 ms startup · 1,791 tests · 50+ providers · 20 channels · Pluggable everything
 ```
 
 ### Features
@@ -27,7 +27,7 @@ The smallest fully autonomous AI assistant infrastructure — a static C binary 
 - **Near-Zero Memory:** < 5 MB peak RSS. Runs comfortably on the cheapest ARM SBCs and microcontrollers.
 - **Instant Startup:** <2 ms on Apple Silicon, <8 ms on a 0.8 GHz edge core.
 - **True Portability:** Single self-contained binary across ARM, x86, and RISC-V. Drop it anywhere, it just runs.
-- **Feature-Complete:** 22+ providers, 18 channels, 18+ tools, hybrid vector+FTS5 memory, multi-layer sandbox, tunnels, hardware peripherals, MCP, subagents, streaming, voice — the full stack.
+- **Feature-Complete:** 50+ providers, 20 channels, 30+ tools, hybrid vector+FTS5 memory, multi-layer sandbox, tunnels, hardware peripherals, MCP, subagents, streaming, voice — the full stack.
 
 ### Why seaclaw
 
@@ -46,7 +46,7 @@ Local machine benchmark (macOS arm64, Feb 2026), normalized for 0.8 GHz edge har
 | **RAM**               | > 1 GB                                           | > 100 MB                                    | < 10 MB                                        | < 5 MB                                                | **< 5 MB**                                           |
 | **Startup (0.8 GHz)** | > 500 s                                          | > 30 s                                      | < 1 s                                          | < 10 ms                                               | **< 8 ms**                                           |
 | **Binary Size**       | ~28 MB (dist)                                    | N/A (Scripts)                               | ~8 MB                                          | 3.4 MB                                                | **239 KB**                                           |
-| **Tests**             | —                                                | —                                           | —                                              | 1,017                                                 | **1,697**                                            |
+| **Tests**             | —                                                | —                                           | —                                              | 1,017                                                 | **1,791**                                            |
 | **Source Files**      | ~400+                                            | —                                           | —                                              | ~120                                                  | **~415**                                             |
 | **Cost**              | Mac Mini $599                                    | Linux SBC ~$50                              | Linux Board $10                                | Any $10 hardware                                      | **Any $5 hardware**                                  |
 
@@ -57,7 +57,7 @@ Reproduce locally:
 ```bash
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON
-make -j
+cmake --build .
 ls -lh seaclaw
 
 /usr/bin/time -l ./seaclaw --help
@@ -71,11 +71,11 @@ ls -lh seaclaw
 > Linux: `sudo apt-get install cmake libsqlite3-dev libcurl4-openssl-dev`
 
 ```bash
-git clone https://github.com/seaclaw/seaclaw.git
+git clone https://github.com/sethdford/seaclaw.git
 cd seaclaw
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON -DSC_ENABLE_ALL_CHANNELS=ON
-make -j
+cmake --build .
 cd ..
 
 # Quick setup
@@ -133,7 +133,7 @@ Every subsystem is a **vtable interface** — swap implementations with a config
 
 | Subsystem         | Interface        | Ships with                                                                                                                                                                      | Extend                                                    |
 | ----------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| **AI Models**     | `Provider`       | 22+ providers (OpenRouter, Anthropic, OpenAI, Ollama, Venice, Groq, Mistral, xAI, DeepSeek, Together, Fireworks, Perplexity, Cohere, Bedrock, etc.)                             | `custom:https://your-api.com` — any OpenAI-compatible API |
+| **AI Models**     | `Provider`       | 50+ providers (OpenRouter, Anthropic, OpenAI, Gemini, Ollama, llama.cpp, Groq, Mistral, xAI, DeepSeek, Together, Fireworks, Perplexity, Cohere, Bedrock, etc.)                  | `custom:https://your-api.com` — any OpenAI-compatible API |
 | **Channels**      | `Channel`        | CLI, Telegram, Signal, Discord, Slack, iMessage, Matrix, WhatsApp, Webhook, IRC, Lark/Feishu, OneBot, Line, DingTalk, Email, Nostr, QQ, MaixCam, Mattermost                     | Any messaging API                                         |
 | **Memory**        | `Memory`         | SQLite with hybrid search (FTS5 + vector cosine similarity), Markdown                                                                                                           | Any persistence backend                                   |
 | **Tools**         | `Tool`           | shell, file_read, file_write, file_edit, memory_store, memory_recall, memory_forget, browser_open, screenshot, composio, http_request, hardware_info, hardware_memory, and more | Any capability                                            |
@@ -142,7 +142,7 @@ Every subsystem is a **vtable interface** — swap implementations with a config
 | **Security**      | `Sandbox`        | Landlock, Firejail, Bubblewrap, Docker, auto-detect                                                                                                                             | Any sandbox backend                                       |
 | **Identity**      | `IdentityConfig` | OpenClaw (markdown), AIEOS v1.1 (JSON)                                                                                                                                          | Any identity format                                       |
 | **Tunnel**        | `Tunnel`         | None, Cloudflare, Tailscale, ngrok, Custom                                                                                                                                      | Any tunnel binary                                         |
-| **Heartbeat**     | Engine           | HEARTBEAT.md periodic tasks                                                                                                                                                     | —                                                         |
+| **Heartbeat**     | Engine           | [`src/heartbeat.c`](src/heartbeat.c) periodic tasks                                                                                                                             | —                                                         |
 | **Skills**        | Loader           | TOML manifests + SKILL.md instructions                                                                                                                                          | Community skill packs                                     |
 | **Peripherals**   | `Peripheral`     | Serial, Arduino, Raspberry Pi GPIO, STM32/Nucleo                                                                                                                                | Any hardware interface                                    |
 | **Cron**          | Scheduler        | Cron expressions + one-shot timers with JSON persistence                                                                                                                        | —                                                         |
@@ -500,8 +500,8 @@ Build and tests require a C11 compiler and CMake 3.16+.
 ```bash
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Debug -DSC_ENABLE_ALL_CHANNELS=ON
-make -j                                    # Dev build
-./seaclaw_tests                            # 1,697 tests
+cmake --build .                            # Dev build
+./seaclaw_tests                            # 1,791 tests
 cd ..
 ```
 
@@ -518,7 +518,7 @@ Release build (239 KB):
 ```bash
 mkdir -p build-release && cd build-release
 cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON
-make -j
+cmake --build .
 ```
 
 ### Channel Flow Coverage
@@ -538,7 +538,7 @@ Channel CJM coverage (ingress parsing/filtering, session key routing, account pr
 Language: C11 + ASM (aarch64, x86_64)
 Source files: ~415
 Lines of code: ~52,000
-Tests: 1,697
+Tests: 1,791
 Binary: 239 KB (MinSizeRel + LTO)
 Peak RSS: < 5 MB
 Startup: <2 ms (Apple Silicon)
@@ -554,7 +554,7 @@ src/
 main.c CLI entry point + command routing
 agent/ Agent loop, context, planner, compaction, dispatcher
 channels/ 20 channel implementations (cli, telegram, discord, ...)
-providers/ 22+ AI provider implementations
+providers/ 50+ AI provider implementations
 memory/ SQLite + markdown + LRU backends, embeddings, vector search
 tools/ 30+ tool implementations
 security/ Policy, pairing, secrets, sandbox backends
@@ -566,7 +566,7 @@ config.c Config loading/merging (~/.seaclaw/config.json)
 ...
 
 include/seaclaw/ Public C headers
-tests/ 66 test files, 1,697 tests
+tests/ 66 test files, 1,791 tests
 asm/ Platform-specific assembly (aarch64, x86_64, generic C)
 
 ```

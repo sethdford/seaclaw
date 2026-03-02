@@ -1,0 +1,99 @@
+---
+title: Quick Start
+description: Get SeaClaw running in your first 5 minutes.
+---
+
+This guide gets you from a fresh build to your first chat.
+
+## 1. Run the onboard wizard
+
+If you have no config yet, run the interactive setup:
+
+```bash
+./build/seaclaw onboard
+```
+
+The wizard will:
+
+- Ask you to choose a provider (OpenAI, Anthropic, Ollama, OpenRouter)
+- Prompt for an API key (or you can set it via environment variable)
+- Ask for a default model (e.g. `gpt-4o`, `claude-sonnet-4-20250514`)
+- Create `~/.seaclaw/config.json` and workspace templates
+
+## 2. Quick manual setup
+
+Alternatively, create the config manually. Create `~/.seaclaw/config.json`:
+
+```json
+{
+  "default_provider": "openrouter",
+  "default_model": "anthropic/claude-sonnet-4",
+  "providers": [
+    {
+      "name": "openrouter",
+      "api_key": "sk-or-v1-your-key-here"
+    }
+  ],
+  "gateway": { "port": 3000, "host": "127.0.0.1" }
+}
+```
+
+Or use environment variables for a minimal setup:
+
+```bash
+export OPENAI_API_KEY="sk-your-key"
+./build/seaclaw agent -m "Hello, world!"
+```
+
+## 3. Interactive chat
+
+Start an interactive agent session:
+
+```bash
+./build/seaclaw agent
+```
+
+You can chat in a loop. Use `Ctrl+C` to exit.
+
+## 4. Single message
+
+Run a one-off message without interactive mode:
+
+```bash
+./build/seaclaw agent -m "What is 2 + 2?"
+```
+
+## 5. System check
+
+Verify your setup:
+
+```bash
+./build/seaclaw doctor
+```
+
+This reports:
+
+- Config load status
+- Provider API key presence (or "local — no API key required" for Ollama, llama.cpp, etc.)
+- Memory engine type
+
+## 6. Start the gateway
+
+If you want to receive webhooks (e.g. Telegram, Slack, Discord):
+
+```bash
+./build/seaclaw gateway
+```
+
+By default it listens on `127.0.0.1:3000`. Pair with a 6-digit code to get a bearer token for authenticated requests.
+
+## CLI options
+
+| Command                                          | Description              |
+| ------------------------------------------------ | ------------------------ |
+| `seaclaw agent`                                  | Interactive chat session |
+| `seaclaw agent -m "message"`                     | Single message           |
+| `seaclaw agent --provider ollama --model llama3` | Override provider/model  |
+| `seaclaw onboard`                                | First-run setup wizard   |
+| `seaclaw doctor`                                 | Diagnostics              |
+| `seaclaw gateway`                                | Start webhook server     |

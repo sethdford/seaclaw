@@ -176,7 +176,7 @@ static sc_error_t sc_http_get_impl(sc_allocator_t *alloc,
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &w);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);
 
     CURLcode res = curl_easy_perform(curl);
     long status = 0;
@@ -244,7 +244,7 @@ static sc_error_t sc_http_get_ex_impl(sc_allocator_t *alloc,
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &w);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);
 
     CURLcode res = curl_easy_perform(curl);
     long status = 0;
@@ -323,7 +323,7 @@ static sc_error_t sc_http_post_json_impl(sc_allocator_t *alloc,
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &w);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);
 
     CURLcode res = curl_easy_perform(curl);
     long status = 0;
@@ -404,7 +404,7 @@ static sc_error_t sc_http_post_json_stream_impl(sc_allocator_t *alloc,
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb_stream);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ctx);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);
 
     CURLcode res = curl_easy_perform(curl);
     curl_slist_free_all(headers);
@@ -562,7 +562,7 @@ sc_error_t sc_http_request(sc_allocator_t *alloc,
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &w);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);
 
     CURLcode res = curl_easy_perform(curl);
     long status = 0;
