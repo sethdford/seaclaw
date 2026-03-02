@@ -216,6 +216,8 @@ set(SC_CORE_SOURCES
     src/security/docker.c
     src/security/seatbelt.c
     src/security/seccomp.c
+    src/security/landlock_seccomp.c
+    src/security/appcontainer.c
     src/security/wasi_sandbox.c
     src/security/firecracker.c
     src/security/detect.c

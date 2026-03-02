@@ -10,10 +10,18 @@
 
 #define SC_SNAPSHOT_BUF_INIT 4096
 
+static bool path_has_traversal(const char *path, size_t path_len) {
+    for (size_t i = 0; i + 1 < path_len; i++)
+        if (path[i] == '.' && path[i + 1] == '.') return true;
+    return false;
+}
+
 sc_error_t sc_memory_snapshot_export(sc_allocator_t *alloc, sc_memory_t *memory,
     const char *path, size_t path_len) {
     if (!alloc || !memory || !memory->vtable || !path || path_len == 0)
         return SC_ERR_INVALID_ARGUMENT;
+    /* Reject path traversal */
+    if (path_has_traversal(path, path_len)) return SC_ERR_INVALID_ARGUMENT;
 
     sc_memory_entry_t *entries = NULL;
     size_t count = 0;
@@ -102,6 +110,8 @@ sc_error_t sc_memory_snapshot_import(sc_allocator_t *alloc, sc_memory_t *memory,
     const char *path, size_t path_len) {
     if (!alloc || !memory || !memory->vtable || !path || path_len == 0)
         return SC_ERR_INVALID_ARGUMENT;
+    /* Reject path traversal */
+    if (path_has_traversal(path, path_len)) return SC_ERR_INVALID_ARGUMENT;
 
     char *path0 = (char *)alloc->alloc(alloc->ctx, path_len + 1);
     if (!path0) return SC_ERR_OUT_OF_MEMORY;

@@ -732,8 +732,8 @@ sc_memory_t sc_postgres_memory_create(sc_allocator_t *alloc,
         return (sc_memory_t){ .ctx = NULL, .vtable = NULL };
     }
 
-    self->schema_q = schema ? sc_strdup(alloc, schema) : sc_strdup(alloc, "public");
-    self->table_q = table ? sc_strdup(alloc, table) : sc_strdup(alloc, "memories");
+    self->schema_q = sc_strdup(alloc, schema_val);
+    self->table_q = sc_strdup(alloc, table_val);
     if (!self->schema_q || !self->table_q) {
         if (self->schema_q) alloc->free(alloc->ctx, self->schema_q, strlen(self->schema_q) + 1);
         if (self->table_q) alloc->free(alloc->ctx, self->table_q, strlen(self->table_q) + 1);

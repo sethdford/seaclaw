@@ -21,6 +21,7 @@ struct sc_arena {
 
 static arena_block_t *block_new(sc_allocator_t *backing, size_t min_size) {
     size_t block_size = min_size > SC_ARENA_BLOCK_SIZE ? min_size : SC_ARENA_BLOCK_SIZE;
+    if (block_size > SIZE_MAX - sizeof(arena_block_t)) return NULL;
     arena_block_t *blk = (arena_block_t *)backing->alloc(backing->ctx,
                                                           sizeof(arena_block_t) + block_size);
     if (!blk) return NULL;
@@ -34,9 +35,11 @@ static arena_block_t *block_new(sc_allocator_t *backing, size_t min_size) {
 static void *arena_alloc(void *ctx, size_t size) {
     sc_arena_t *arena = (sc_arena_t *)ctx;
 
+    if (size > SIZE_MAX - 7) return NULL;
     size_t aligned = (size + 7) & ~(size_t)7;
 
-    if (!arena->current || arena->current->used + aligned > arena->current->size) {
+    if (!arena->current || arena->current->used > SIZE_MAX - aligned ||
+        arena->current->used + aligned > arena->current->size) {
         arena_block_t *blk = block_new(&arena->backing, aligned);
         if (!blk) return NULL;
         if (arena->current)

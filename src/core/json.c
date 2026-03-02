@@ -1,4 +1,5 @@
 #include "seaclaw/core/json.h"
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -103,6 +104,7 @@ static sc_error_t parse_string_raw(parser_t *p, char **out, size_t *out_len) {
                     } else if (cp < 0x10000) {
                         if (len + 3 > cap) {
                             size_t old_cap = cap;
+                            if (cap > SIZE_MAX / 2) { p->alloc->free(p->alloc->ctx, buf, cap); return SC_ERR_OUT_OF_MEMORY; }
                             cap *= 2;
                             buf = (char *)p->alloc->realloc(p->alloc->ctx, buf, old_cap, cap);
                             if (!buf) return SC_ERR_OUT_OF_MEMORY;
@@ -126,6 +128,7 @@ static sc_error_t parse_string_raw(parser_t *p, char **out, size_t *out_len) {
         }
         if (len + 1 >= cap) {
             size_t old = cap;
+            if (cap > SIZE_MAX / 2) { p->alloc->free(p->alloc->ctx, buf, cap); return SC_ERR_OUT_OF_MEMORY; }
             cap *= 2;
             buf = (char *)p->alloc->realloc(p->alloc->ctx, buf, old, cap);
             if (!buf) return SC_ERR_OUT_OF_MEMORY;
@@ -194,6 +197,7 @@ static sc_error_t parse_array(parser_t *p, sc_json_value_t **out) {
 
         if (arr->data.array.len >= arr->data.array.cap) {
             size_t new_cap = arr->data.array.cap ? arr->data.array.cap * 2 : 4;
+            if (new_cap > SIZE_MAX / sizeof(sc_json_value_t *)) { sc_json_free(p->alloc, arr); return SC_ERR_OUT_OF_MEMORY; }
             size_t old_sz = arr->data.array.cap * sizeof(sc_json_value_t *);
             size_t new_sz = new_cap * sizeof(sc_json_value_t *);
             sc_json_value_t **items = (sc_json_value_t **)p->alloc->realloc(
@@ -271,6 +275,12 @@ static sc_error_t parse_object(parser_t *p, sc_json_value_t **out) {
         if (key) {
             if (obj->data.object.len >= obj->data.object.cap) {
                 size_t new_cap = obj->data.object.cap ? obj->data.object.cap * 2 : 4;
+                if (new_cap > SIZE_MAX / sizeof(sc_json_pair_t)) {
+                    p->alloc->free(p->alloc->ctx, key, key_len + 1);
+                    sc_json_free(p->alloc, val);
+                    sc_json_free(p->alloc, obj);
+                    return SC_ERR_OUT_OF_MEMORY;
+                }
                 size_t old_sz = obj->data.object.cap * sizeof(sc_json_pair_t);
                 size_t new_sz = new_cap * sizeof(sc_json_pair_t);
                 sc_json_pair_t *pairs = (sc_json_pair_t *)p->alloc->realloc(
@@ -388,6 +398,7 @@ sc_json_value_t *sc_json_number_new(sc_allocator_t *alloc, double val) {
 }
 
 sc_json_value_t *sc_json_string_new(sc_allocator_t *alloc, const char *s, size_t len) {
+    if (!alloc || (len > 0 && !s)) return NULL;
     sc_json_value_t *v = alloc_value(alloc, SC_JSON_STRING);
     if (!v) return NULL;
     char *dup = (char *)alloc->alloc(alloc->ctx, len + 1);
@@ -411,6 +422,7 @@ sc_error_t sc_json_array_push(sc_allocator_t *alloc, sc_json_value_t *arr, sc_js
     if (!arr || arr->type != SC_JSON_ARRAY || !val) return SC_ERR_INVALID_ARGUMENT;
     if (arr->data.array.len >= arr->data.array.cap) {
         size_t new_cap = arr->data.array.cap ? arr->data.array.cap * 2 : 4;
+        if (new_cap > SIZE_MAX / sizeof(sc_json_value_t *)) return SC_ERR_OUT_OF_MEMORY;
         size_t old_sz = arr->data.array.cap * sizeof(sc_json_value_t *);
         size_t new_sz = new_cap * sizeof(sc_json_value_t *);
         sc_json_value_t **items = (sc_json_value_t **)alloc->realloc(
@@ -440,6 +452,7 @@ sc_error_t sc_json_object_set(sc_allocator_t *alloc, sc_json_value_t *obj,
 
     if (obj->data.object.len >= obj->data.object.cap) {
         size_t new_cap = obj->data.object.cap ? obj->data.object.cap * 2 : 4;
+        if (new_cap > SIZE_MAX / sizeof(sc_json_pair_t)) return SC_ERR_OUT_OF_MEMORY;
         size_t old_sz = obj->data.object.cap * sizeof(sc_json_pair_t);
         size_t new_sz = new_cap * sizeof(sc_json_pair_t);
         sc_json_pair_t *pairs = (sc_json_pair_t *)alloc->realloc(
@@ -518,7 +531,9 @@ static sc_error_t stringify_value(sc_allocator_t *alloc, const sc_json_value_t *
 
 static sc_error_t buf_append(sc_allocator_t *alloc, char **buf, size_t *len, size_t *cap,
                              const char *s, size_t slen) {
+    if (slen > SIZE_MAX - *len - 1) return SC_ERR_OUT_OF_MEMORY;
     while (*len + slen + 1 > *cap) {
+        if (*cap > SIZE_MAX / 2) return SC_ERR_OUT_OF_MEMORY;
         size_t new_cap = *cap ? *cap * 2 : 256;
         char *nb = (char *)alloc->realloc(alloc->ctx, *buf, *cap, new_cap);
         if (!nb) return SC_ERR_OUT_OF_MEMORY;
@@ -635,7 +650,9 @@ sc_error_t sc_json_stringify(sc_allocator_t *alloc, const sc_json_value_t *val,
 }
 
 static sc_error_t json_buf_append(sc_json_buf_t *buf, const char *s, size_t slen) {
+    if (slen > SIZE_MAX - buf->len - 1) return SC_ERR_OUT_OF_MEMORY;
     while (buf->len + slen + 1 > buf->cap) {
+        if (buf->cap > SIZE_MAX / 2) return SC_ERR_OUT_OF_MEMORY;
         size_t new_cap = buf->cap ? buf->cap * 2 : 256;
         char *nb = (char *)buf->alloc->realloc(buf->alloc->ctx, buf->ptr, buf->cap, new_cap);
         if (!nb) return SC_ERR_OUT_OF_MEMORY;
@@ -715,6 +732,7 @@ sc_error_t sc_json_append_string(sc_json_buf_t *buf, const char *str, size_t str
 
 sc_error_t sc_json_append_key(sc_json_buf_t *buf, const char *key, size_t key_len) {
     if (!buf || !buf->alloc) return SC_ERR_INVALID_ARGUMENT;
+    if (!key && key_len > 0) return SC_ERR_INVALID_ARGUMENT;
     sc_error_t err = json_buf_append_escaped(buf, key ? key : "", key_len);
     if (err) return err;
     return json_buf_append(buf, ":", 1);

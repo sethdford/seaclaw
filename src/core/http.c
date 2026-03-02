@@ -1,8 +1,9 @@
 #include "seaclaw/core/http.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
-#include <string.h>
+#include <limits.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if SC_IS_TEST
 /* In test mode, skip real HTTP and return mock response */
@@ -166,7 +167,12 @@ static void curl_pool_release(CURL *h) {
 }
 
 static void curl_setup_common(CURL *curl) {
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);
+    /* Default 120s; should be configurable via config. */
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 120L);
+    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);
+    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 30L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
     curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);
     curl_easy_setopt(curl, CURLOPT_TCP_KEEPIDLE, 60L);
     curl_easy_setopt(curl, CURLOPT_TCP_KEEPINTVL, 30L);
@@ -349,6 +355,11 @@ static sc_error_t sc_http_post_json_impl(sc_allocator_t *alloc,
     w.cap = 4096;
     w.buf[0] = '\0';
 
+    if (json_body_len > (size_t)LONG_MAX) {
+        curl_slist_free_all(headers);
+        curl_pool_release(curl);
+        return SC_ERR_INVALID_ARGUMENT;
+    }
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_body);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)json_body_len);
@@ -429,6 +440,11 @@ static sc_error_t sc_http_post_json_stream_impl(sc_allocator_t *alloc,
         }
     }
 
+    if (json_body_len > (size_t)LONG_MAX) {
+        curl_slist_free_all(headers);
+        curl_pool_release(curl);
+        return SC_ERR_INVALID_ARGUMENT;
+    }
     stream_ctx_t ctx = { .callback = callback, .userdata = userdata };
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_body);
@@ -585,6 +601,12 @@ sc_error_t sc_http_request(sc_allocator_t *alloc,
     w.cap = 4096;
     w.buf[0] = '\0';
 
+    if (body && body_len > 0 && body_len > (size_t)LONG_MAX) {
+        curl_slist_free_all(headers);
+        alloc->free(alloc->ctx, w.buf, w.cap);
+        curl_pool_release(curl);
+        return SC_ERR_INVALID_ARGUMENT;
+    }
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, method);
     if (body && body_len > 0) {

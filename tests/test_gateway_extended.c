@@ -1,9 +1,13 @@
-/* Gateway edge cases (~20 tests). Uses SC_GATEWAY_TEST_MODE - no real binding. */
+/* Gateway edge cases + control protocol + event bridge tests. */
 #include "test_framework.h"
 #include "seaclaw/gateway.h"
 #include "seaclaw/gateway/ws_server.h"
+#include "seaclaw/gateway/control_protocol.h"
+#include "seaclaw/gateway/event_bridge.h"
+#include "seaclaw/bus.h"
 #include "seaclaw/health.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/core/json.h"
 #include <string.h>
 
 static void test_gateway_webhook_paths(void) {
@@ -317,6 +321,248 @@ static void test_ws_server_broadcast_empty(void) {
     sc_ws_server_deinit(&srv);
 }
 
+/* ── Control Protocol Tests ──────────────────────────────────────────── */
+
+static void test_control_protocol_init_deinit(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_ws_server_init(&ws, &alloc, NULL, NULL, NULL);
+    sc_control_protocol_t proto;
+    sc_control_protocol_init(&proto, &alloc, &ws);
+    SC_ASSERT_EQ(proto.event_seq, 0u);
+    SC_ASSERT_TRUE(proto.app_ctx == NULL);
+    sc_control_protocol_deinit(&proto);
+    sc_ws_server_deinit(&ws);
+}
+
+static void test_control_set_app_ctx(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_ws_server_init(&ws, &alloc, NULL, NULL, NULL);
+    sc_control_protocol_t proto;
+    sc_control_protocol_init(&proto, &alloc, &ws);
+    SC_ASSERT_TRUE(proto.app_ctx == NULL);
+
+    sc_app_context_t ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    sc_control_set_app_ctx(&proto, &ctx);
+    SC_ASSERT_TRUE(proto.app_ctx == &ctx);
+
+    sc_control_protocol_deinit(&proto);
+    sc_ws_server_deinit(&ws);
+}
+
+static void test_control_set_app_ctx_null(void) {
+    sc_control_set_app_ctx(NULL, NULL);
+}
+
+static void test_control_on_message_null(void) {
+    sc_control_on_message(NULL, NULL, 0, NULL);
+}
+
+static void test_control_on_message_invalid_json(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_ws_server_init(&ws, &alloc, NULL, NULL, NULL);
+    sc_control_protocol_t proto;
+    sc_control_protocol_init(&proto, &alloc, &ws);
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    sc_control_on_message(&conn, "not json", 8, &proto);
+    sc_control_protocol_deinit(&proto);
+    sc_ws_server_deinit(&ws);
+}
+
+static void test_control_on_message_non_req(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_ws_server_init(&ws, &alloc, NULL, NULL, NULL);
+    sc_control_protocol_t proto;
+    sc_control_protocol_init(&proto, &alloc, &ws);
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"event\",\"id\":\"1\",\"method\":\"health\"}";
+    sc_control_on_message(&conn, msg, strlen(msg), &proto);
+    sc_control_protocol_deinit(&proto);
+    sc_ws_server_deinit(&ws);
+}
+
+static void test_control_on_message_no_method(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_ws_server_init(&ws, &alloc, NULL, NULL, NULL);
+    sc_control_protocol_t proto;
+    sc_control_protocol_init(&proto, &alloc, &ws);
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"1\"}";
+    sc_control_on_message(&conn, msg, strlen(msg), &proto);
+    sc_control_protocol_deinit(&proto);
+    sc_ws_server_deinit(&ws);
+}
+
+static void test_control_send_event_null(void) {
+    sc_control_send_event(NULL, "test", "{}");
+}
+
+static void test_control_send_event_no_ws(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_control_protocol_t proto;
+    sc_control_protocol_init(&proto, &alloc, NULL);
+    sc_control_send_event(&proto, "test", "{}");
+    sc_control_protocol_deinit(&proto);
+}
+
+static void test_control_send_response_null(void) {
+    sc_error_t err = sc_control_send_response(NULL, "id", true, "{}");
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void test_control_on_close(void) {
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    sc_control_on_close(&conn, NULL);
+}
+
+/* ── Event Bridge Tests ─────────────────────────────────────────────── */
+
+static void test_event_bridge_init_deinit(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_ws_server_init(&ws, &alloc, NULL, NULL, NULL);
+    sc_control_protocol_t proto;
+    sc_control_protocol_init(&proto, &alloc, &ws);
+    sc_bus_t bus;
+    sc_bus_init(&bus);
+
+    sc_event_bridge_t bridge;
+    sc_event_bridge_init(&bridge, &proto, &bus);
+    SC_ASSERT_TRUE(bridge.proto == &proto);
+    SC_ASSERT_TRUE(bridge.bus == &bus);
+    sc_event_bridge_deinit(&bridge);
+
+    sc_control_protocol_deinit(&proto);
+    sc_ws_server_deinit(&ws);
+}
+
+static void test_event_bridge_init_null(void) {
+    sc_event_bridge_init(NULL, NULL, NULL);
+}
+
+static void test_event_bridge_deinit_null(void) {
+    sc_event_bridge_deinit(NULL);
+}
+
+static void test_event_bridge_bus_subscription(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_ws_server_init(&ws, &alloc, NULL, NULL, NULL);
+    sc_control_protocol_t proto;
+    sc_control_protocol_init(&proto, &alloc, &ws);
+    sc_bus_t bus;
+    sc_bus_init(&bus);
+    SC_ASSERT_EQ(bus.count, 0u);
+
+    sc_event_bridge_t bridge;
+    sc_event_bridge_init(&bridge, &proto, &bus);
+    SC_ASSERT_TRUE(bus.count > 0);
+
+    sc_event_bridge_deinit(&bridge);
+    SC_ASSERT_EQ(bus.count, 0u);
+
+    sc_control_protocol_deinit(&proto);
+    sc_ws_server_deinit(&ws);
+}
+
+static void test_event_bridge_publish_no_crash(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_ws_server_init(&ws, &alloc, NULL, NULL, NULL);
+    sc_control_protocol_t proto;
+    sc_control_protocol_init(&proto, &alloc, &ws);
+    sc_bus_t bus;
+    sc_bus_init(&bus);
+
+    sc_event_bridge_t bridge;
+    sc_event_bridge_init(&bridge, &proto, &bus);
+
+    sc_bus_publish_simple(&bus, SC_BUS_MESSAGE_RECEIVED, "cli", "s1", "hello");
+    sc_bus_publish_simple(&bus, SC_BUS_TOOL_CALL, "cli", "t1", "shell");
+    sc_bus_publish_simple(&bus, SC_BUS_ERROR, "cli", "e1", "oops");
+    sc_bus_publish_simple(&bus, SC_BUS_HEALTH_CHANGE, "gw", "", "ok");
+
+    sc_event_bridge_deinit(&bridge);
+    sc_control_protocol_deinit(&proto);
+    sc_ws_server_deinit(&ws);
+}
+
+/* ── WS Server Extended Tests ───────────────────────────────────────── */
+
+static void test_ws_server_process_null(void) {
+    sc_error_t err = sc_ws_server_process(NULL, NULL);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void test_ws_server_read_and_process_null(void) {
+    sc_error_t err = sc_ws_server_read_and_process(NULL, NULL);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void test_ws_server_close_conn_inactive(void) {
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    conn.active = false;
+    sc_ws_server_close_conn(NULL, &conn);
+}
+
+static void test_ws_server_is_upgrade_short(void) {
+    bool ok = sc_ws_server_is_upgrade("GET", 3);
+    SC_ASSERT_FALSE(ok);
+}
+
+static void test_ws_server_is_upgrade_null(void) {
+    bool ok = sc_ws_server_is_upgrade(NULL, 0);
+    SC_ASSERT_FALSE(ok);
+}
+
+static void test_ws_server_send_inactive_conn(void) {
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    conn.active = false;
+    conn.fd = 999;
+    sc_error_t err = sc_ws_server_send(&conn, "test", 4);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void test_ws_server_broadcast_null_data(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t srv;
+    sc_ws_server_init(&srv, &alloc, NULL, NULL, NULL);
+    sc_ws_server_broadcast(&srv, NULL, 0);
+    sc_ws_server_deinit(&srv);
+}
+
+static void test_ws_server_conn_pool_full(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t srv;
+    sc_ws_server_init(&srv, &alloc, NULL, NULL, NULL);
+    for (int i = 0; i < SC_WS_SERVER_MAX_CONNS; i++) {
+        srv.conns[i].active = true;
+        srv.conns[i].fd = 100 + i;
+    }
+    srv.conn_count = SC_WS_SERVER_MAX_CONNS;
+    sc_ws_conn_t *out = NULL;
+    const char *req = "GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n";
+    sc_error_t err = sc_ws_server_upgrade(&srv, 99, req, strlen(req), &out);
+    SC_ASSERT_EQ(err, SC_ERR_ALREADY_EXISTS);
+    SC_ASSERT_TRUE(out == NULL);
+    for (int i = 0; i < SC_WS_SERVER_MAX_CONNS; i++) {
+        srv.conns[i].active = false;
+        srv.conns[i].fd = -1;
+    }
+    sc_ws_server_deinit(&srv);
+}
+
 void run_gateway_extended_tests(void) {
     SC_TEST_SUITE("Gateway Extended");
     SC_RUN_TEST(test_gateway_webhook_paths);
@@ -361,4 +607,34 @@ void run_gateway_extended_tests(void) {
     SC_RUN_TEST(test_ws_server_is_upgrade_invalid);
     SC_RUN_TEST(test_ws_server_send_null_conn);
     SC_RUN_TEST(test_ws_server_broadcast_empty);
+
+    SC_TEST_SUITE("Control Protocol");
+    SC_RUN_TEST(test_control_protocol_init_deinit);
+    SC_RUN_TEST(test_control_set_app_ctx);
+    SC_RUN_TEST(test_control_set_app_ctx_null);
+    SC_RUN_TEST(test_control_on_message_null);
+    SC_RUN_TEST(test_control_on_message_invalid_json);
+    SC_RUN_TEST(test_control_on_message_non_req);
+    SC_RUN_TEST(test_control_on_message_no_method);
+    SC_RUN_TEST(test_control_send_event_null);
+    SC_RUN_TEST(test_control_send_event_no_ws);
+    SC_RUN_TEST(test_control_send_response_null);
+    SC_RUN_TEST(test_control_on_close);
+
+    SC_TEST_SUITE("Event Bridge");
+    SC_RUN_TEST(test_event_bridge_init_deinit);
+    SC_RUN_TEST(test_event_bridge_init_null);
+    SC_RUN_TEST(test_event_bridge_deinit_null);
+    SC_RUN_TEST(test_event_bridge_bus_subscription);
+    SC_RUN_TEST(test_event_bridge_publish_no_crash);
+
+    SC_TEST_SUITE("WS Server Extended");
+    SC_RUN_TEST(test_ws_server_process_null);
+    SC_RUN_TEST(test_ws_server_read_and_process_null);
+    SC_RUN_TEST(test_ws_server_close_conn_inactive);
+    SC_RUN_TEST(test_ws_server_is_upgrade_short);
+    SC_RUN_TEST(test_ws_server_is_upgrade_null);
+    SC_RUN_TEST(test_ws_server_send_inactive_conn);
+    SC_RUN_TEST(test_ws_server_broadcast_null_data);
+    SC_RUN_TEST(test_ws_server_conn_pool_full);
 }

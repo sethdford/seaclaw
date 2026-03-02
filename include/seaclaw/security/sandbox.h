@@ -4,6 +4,7 @@
 #include "seaclaw/core/error.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 
 /* Sandbox vtable interface for OS-level isolation. */
 
@@ -80,8 +81,10 @@ typedef enum sc_sandbox_backend {
     SC_SANDBOX_DOCKER,
     SC_SANDBOX_SEATBELT,
     SC_SANDBOX_SECCOMP,
+    SC_SANDBOX_LANDLOCK_SECCOMP,
     SC_SANDBOX_WASI,
     SC_SANDBOX_FIRECRACKER,
+    SC_SANDBOX_APPCONTAINER,
 } sc_sandbox_backend_t;
 
 /* Allocator interface for docker sandbox */
@@ -111,8 +114,10 @@ typedef struct sc_available_backends {
     bool docker;
     bool seatbelt;
     bool seccomp;
+    bool landlock_seccomp;
     bool wasi;
     bool firecracker;
+    bool appcontainer;
 } sc_available_backends_t;
 
 sc_available_backends_t sc_sandbox_detect_available(const char *workspace_dir,
@@ -120,5 +125,68 @@ sc_available_backends_t sc_sandbox_detect_available(const char *workspace_dir,
 
 /** Create a noop sandbox (no isolation). Zig parity: createNoopSandbox. */
 sc_sandbox_t sc_sandbox_create_noop(void);
+
+/* ── Network isolation proxy ──────────────────────────────────────── */
+
+/**
+ * Network isolation configuration for sandboxed processes.
+ * Composable with any sandbox backend. When attached, child processes
+ * route traffic through a filtering proxy that blocks unapproved domains.
+ *
+ * Usage: set on the sandbox or security policy; the spawn path reads
+ * these fields and sets HTTP_PROXY/HTTPS_PROXY environment variables
+ * for the child process, pointing to the filtering proxy.
+ */
+#define SC_NET_PROXY_MAX_DOMAINS 64
+
+typedef struct sc_net_proxy {
+    bool enabled;
+    bool deny_all;
+    const char *proxy_addr;
+    const char *allowed_domains[SC_NET_PROXY_MAX_DOMAINS];
+    size_t allowed_domains_count;
+} sc_net_proxy_t;
+
+/** Check if a domain is allowed by the proxy configuration. */
+static inline bool sc_net_proxy_domain_allowed(const sc_net_proxy_t *proxy,
+    const char *domain) {
+    if (!proxy || !proxy->enabled) return true;
+    if (proxy->deny_all && proxy->allowed_domains_count == 0) return false;
+    if (!domain) return false;
+    for (size_t i = 0; i < proxy->allowed_domains_count; i++) {
+        if (proxy->allowed_domains[i] &&
+            strcmp(proxy->allowed_domains[i], domain) == 0)
+            return true;
+        /* Wildcard subdomain matching: *.example.com matches sub.example.com */
+        if (proxy->allowed_domains[i] &&
+            proxy->allowed_domains[i][0] == '*' &&
+            proxy->allowed_domains[i][1] == '.') {
+            const char *suffix = proxy->allowed_domains[i] + 1;
+            size_t slen = strlen(suffix);
+            size_t dlen = strlen(domain);
+            if (dlen >= slen &&
+                strcmp(domain + dlen - slen, suffix) == 0)
+                return true;
+        }
+    }
+    return !proxy->deny_all;
+}
+
+/** Initialize a deny-all network proxy config. */
+static inline void sc_net_proxy_init_deny_all(sc_net_proxy_t *proxy) {
+    if (!proxy) return;
+    memset(proxy, 0, sizeof(*proxy));
+    proxy->enabled = true;
+    proxy->deny_all = true;
+}
+
+/** Add an allowed domain to the proxy config. Returns false if full. */
+static inline bool sc_net_proxy_allow_domain(sc_net_proxy_t *proxy,
+    const char *domain) {
+    if (!proxy || !domain) return false;
+    if (proxy->allowed_domains_count >= SC_NET_PROXY_MAX_DOMAINS) return false;
+    proxy->allowed_domains[proxy->allowed_domains_count++] = domain;
+    return true;
+}
 
 #endif /* SC_SANDBOX_H */

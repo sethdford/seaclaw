@@ -151,7 +151,7 @@ static const char *webhook_path_to_channel(const char *path, char *buf, size_t b
 
 static bool verify_hmac(const char *body, size_t body_len,
     const char *sig_header, const char *secret, size_t secret_len) {
-    if (!secret || secret_len == 0) return true;
+    if (!secret || secret_len == 0) return false;
     if (!sig_header) return false;
     uint8_t computed[32];
     sc_hmac_sha256((const uint8_t *)secret, secret_len,
@@ -175,6 +175,8 @@ static void send_response(int fd, int status, const char *content_type,
     else if (status == 304) status_str = "304 Not Modified";
 
     char hdr[512];
+    /* TODO: CORS wildcard (*) is a security risk. Add config.allowed_origins
+       and echo Origin header only when it matches. See security audit. */
     int n = snprintf(hdr, sizeof(hdr),
         "HTTP/1.1 %s\r\n"
         "Content-Type: %s\r\n"
@@ -361,6 +363,7 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc,
     sc_control_protocol_init(ctrl, alloc, &gw->ws);
     sc_ws_server_init(&gw->ws, alloc, sc_control_on_message, sc_control_on_close,
         ctrl);
+    gw->ws.auth_token = cfg.auth_token;
 
     if (cfg.app_ctx) {
         sc_control_set_app_ctx(ctrl, cfg.app_ctx);
@@ -490,14 +493,24 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc,
 
             size_t body_len = 0;
             char *sig_header = NULL;
+            bool rejected = false;
             while ((line = strtok(NULL, "\n")) != NULL) {
                 trim_crlf(line);
                 if (line[0] == '\0') break;
                 if (strncasecmp(line, "Content-Length:", 15) == 0) {
-                    body_len = (size_t)atoi(line + 15);
+                    char *cl_end;
+                    long v = strtol(line + 15, &cl_end, 10);
+                    if (v < 0 || cl_end == line + 15) {
+                        send_json(client, 400, "{\"error\":\"bad request\"}");
+                        close(client);
+                        rejected = true;
+                        break;
+                    }
+                    body_len = (size_t)v;
                     if (body_len > cfg.max_body_size) {
                         send_json(client, 413, "{\"error\":\"body too large\"}");
                         close(client);
+                        rejected = true;
                         body_len = 0;
                         break;
                     }
@@ -509,19 +522,21 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc,
                 }
             }
 
-            if (body_len > 0 && body_len <= cfg.max_body_size) {
-                size_t got = 0;
-                while (got < body_len) {
-                    ssize_t r = recv(client, body_buf + got, body_len - got, 0);
-                    if (r <= 0) break;
-                    got += (size_t)r;
+            if (!rejected) {
+                if (body_len > 0 && body_len <= cfg.max_body_size) {
+                    size_t got = 0;
+                    while (got < body_len) {
+                        ssize_t r = recv(client, body_buf + got, body_len - got, 0);
+                        if (r <= 0) break;
+                        got += (size_t)r;
+                    }
+                    body_buf[body_len] = '\0';
                 }
-                body_buf[body_len] = '\0';
-            }
 
-            handle_http_request(gw, client, method, path, body_buf, body_len,
-                client_ip, sig_header);
-            close(client);
+                handle_http_request(gw, client, method, path, body_buf, body_len,
+                    client_ip, sig_header);
+                close(client);
+            }
         }
     }
 

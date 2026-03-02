@@ -104,6 +104,7 @@ bool sc_str_contains(sc_str_t haystack, sc_str_t needle) {
 }
 
 int sc_str_index_of(sc_str_t haystack, sc_str_t needle) {
+    if (!haystack.ptr || !needle.ptr) return -1;
     if (needle.len == 0) return 0;
     if (needle.len > haystack.len) return -1;
 

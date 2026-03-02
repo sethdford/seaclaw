@@ -34,6 +34,8 @@ typedef struct sc_ws_server {
     sc_ws_server_on_message_fn on_message;
     sc_ws_server_on_close_fn on_close;
     void *cb_ctx;
+    /* Optional: when set, WebSocket upgrade requires Authorization: Bearer <token> */
+    const char *auth_token;
 } sc_ws_server_t;
 
 void sc_ws_server_init(sc_ws_server_t *srv, sc_allocator_t *alloc,

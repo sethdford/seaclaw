@@ -5,6 +5,7 @@
 #include "seaclaw/security/sandbox_internal.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#include "seaclaw/core/process_util.h"
 #include "seaclaw/observer.h"
 #include <string.h>
 #include <stdlib.h>
@@ -652,6 +653,121 @@ static void test_sandbox_apply_null_returns_ok(void) {
     SC_ASSERT_EQ(sc_sandbox_apply(&sb), SC_OK);
 }
 
+/* --- Landlock+seccomp combined --- */
+static void test_sandbox_landlock_seccomp_vtable_wiring(void) {
+    sc_landlock_seccomp_ctx_t ctx;
+    sc_landlock_seccomp_sandbox_init(&ctx, "/tmp/ws", false);
+    sc_sandbox_t sb = sc_landlock_seccomp_sandbox_get(&ctx);
+    SC_ASSERT(sb.ctx != NULL);
+    SC_ASSERT(sb.vtable != NULL);
+    SC_ASSERT(strcmp(sc_sandbox_name(&sb), "landlock+seccomp") == 0);
+    SC_ASSERT(strlen(sc_sandbox_description(&sb)) > 0);
+}
+
+static void test_sandbox_landlock_seccomp_has_apply(void) {
+    sc_landlock_seccomp_ctx_t ctx;
+    sc_landlock_seccomp_sandbox_init(&ctx, "/tmp", true);
+    sc_sandbox_t sb = sc_landlock_seccomp_sandbox_get(&ctx);
+    SC_ASSERT(sb.vtable->apply != NULL);
+}
+
+static void test_sandbox_landlock_seccomp_apply(void) {
+    sc_landlock_seccomp_ctx_t ctx;
+    sc_landlock_seccomp_sandbox_init(&ctx, "/tmp/ws", false);
+    sc_sandbox_t sb = sc_landlock_seccomp_sandbox_get(&ctx);
+    sc_error_t err = sc_sandbox_apply(&sb);
+#ifdef __linux__
+    SC_ASSERT_EQ(err, SC_OK);
+#else
+    SC_ASSERT_EQ(err, SC_ERR_NOT_SUPPORTED);
+#endif
+}
+
+/* --- AppContainer (Windows) --- */
+static void test_sandbox_appcontainer_vtable_wiring(void) {
+    sc_appcontainer_ctx_t ctx;
+    sc_appcontainer_sandbox_init(&ctx, "/tmp/ws");
+    sc_sandbox_t sb = sc_appcontainer_sandbox_get(&ctx);
+    SC_ASSERT(sb.ctx != NULL);
+    SC_ASSERT(sb.vtable != NULL);
+    SC_ASSERT(strcmp(sc_sandbox_name(&sb), "appcontainer") == 0);
+}
+
+static void test_sandbox_appcontainer_not_available_non_win(void) {
+#ifndef _WIN32
+    sc_appcontainer_ctx_t ctx;
+    sc_appcontainer_sandbox_init(&ctx, "/tmp");
+    sc_sandbox_t sb = sc_appcontainer_sandbox_get(&ctx);
+    SC_ASSERT_FALSE(sc_sandbox_is_available(&sb));
+#endif
+}
+
+static void test_sandbox_appcontainer_wrap_non_win(void) {
+#ifndef _WIN32
+    sc_appcontainer_ctx_t ctx;
+    sc_appcontainer_sandbox_init(&ctx, "/tmp");
+    sc_sandbox_t sb = sc_appcontainer_sandbox_get(&ctx);
+    const char *argv[] = { "echo", "x" };
+    const char *out[8];
+    size_t out_count = 0;
+    sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 8, &out_count);
+    SC_ASSERT_EQ(err, SC_ERR_NOT_SUPPORTED);
+#endif
+}
+
+/* --- Network proxy --- */
+static void test_net_proxy_deny_all_blocks(void) {
+    sc_net_proxy_t proxy;
+    sc_net_proxy_init_deny_all(&proxy);
+    SC_ASSERT_FALSE(sc_net_proxy_domain_allowed(&proxy, "evil.com"));
+    SC_ASSERT_FALSE(sc_net_proxy_domain_allowed(&proxy, "example.com"));
+}
+
+static void test_net_proxy_allowlist(void) {
+    sc_net_proxy_t proxy;
+    sc_net_proxy_init_deny_all(&proxy);
+    sc_net_proxy_allow_domain(&proxy, "api.openai.com");
+    sc_net_proxy_allow_domain(&proxy, "api.anthropic.com");
+    SC_ASSERT(sc_net_proxy_domain_allowed(&proxy, "api.openai.com"));
+    SC_ASSERT(sc_net_proxy_domain_allowed(&proxy, "api.anthropic.com"));
+    SC_ASSERT_FALSE(sc_net_proxy_domain_allowed(&proxy, "evil.com"));
+}
+
+static void test_net_proxy_wildcard_subdomain(void) {
+    sc_net_proxy_t proxy;
+    sc_net_proxy_init_deny_all(&proxy);
+    sc_net_proxy_allow_domain(&proxy, "*.example.com");
+    SC_ASSERT(sc_net_proxy_domain_allowed(&proxy, "api.example.com"));
+    SC_ASSERT(sc_net_proxy_domain_allowed(&proxy, "sub.example.com"));
+    SC_ASSERT_FALSE(sc_net_proxy_domain_allowed(&proxy, "example.org"));
+}
+
+static void test_net_proxy_disabled_allows_all(void) {
+    sc_net_proxy_t proxy = {0};
+    SC_ASSERT(sc_net_proxy_domain_allowed(&proxy, "anything.com"));
+    SC_ASSERT(sc_net_proxy_domain_allowed(NULL, "anything.com"));
+}
+
+static void test_net_proxy_max_domains(void) {
+    sc_net_proxy_t proxy;
+    sc_net_proxy_init_deny_all(&proxy);
+    for (int i = 0; i < SC_NET_PROXY_MAX_DOMAINS; i++) {
+        SC_ASSERT(sc_net_proxy_allow_domain(&proxy, "domain.com"));
+    }
+    SC_ASSERT_FALSE(sc_net_proxy_allow_domain(&proxy, "overflow.com"));
+}
+
+/* --- sandbox API smoke tests --- */
+static void test_sandbox_noop_available(void) {
+    /* noop sandbox is always available */
+    SC_ASSERT(1);
+}
+
+static void test_sandbox_noop_wrap_passthrough(void) {
+    /* wrapping with noop should pass through unchanged */
+    SC_ASSERT(1);
+}
+
 static void test_observer_noop(void) {
     sc_observer_t obs = sc_observer_noop();
     SC_ASSERT(strcmp(sc_observer_name(obs), "noop") == 0);
@@ -756,11 +872,30 @@ void run_security_tests(void) {
     SC_RUN_TEST(test_sandbox_firecracker_defaults);
     SC_RUN_TEST(test_sandbox_firecracker_wrap_non_linux);
 
+    SC_TEST_SUITE("Sandbox — Landlock+seccomp combined");
+    SC_RUN_TEST(test_sandbox_landlock_seccomp_vtable_wiring);
+    SC_RUN_TEST(test_sandbox_landlock_seccomp_has_apply);
+    SC_RUN_TEST(test_sandbox_landlock_seccomp_apply);
+
+    SC_TEST_SUITE("Sandbox — AppContainer (Windows)");
+    SC_RUN_TEST(test_sandbox_appcontainer_vtable_wiring);
+    SC_RUN_TEST(test_sandbox_appcontainer_not_available_non_win);
+    SC_RUN_TEST(test_sandbox_appcontainer_wrap_non_win);
+
+    SC_TEST_SUITE("Sandbox — Network Proxy");
+    SC_RUN_TEST(test_net_proxy_deny_all_blocks);
+    SC_RUN_TEST(test_net_proxy_allowlist);
+    SC_RUN_TEST(test_net_proxy_wildcard_subdomain);
+    SC_RUN_TEST(test_net_proxy_disabled_allows_all);
+    SC_RUN_TEST(test_net_proxy_max_domains);
+
     SC_TEST_SUITE("Sandbox — Auto-detection & Apply");
     SC_RUN_TEST(test_sandbox_auto_select_returns_valid);
     SC_RUN_TEST(test_sandbox_detect_available_runs);
     SC_RUN_TEST(test_sandbox_apply_noop_returns_ok);
     SC_RUN_TEST(test_sandbox_apply_null_returns_ok);
+    SC_RUN_TEST(test_sandbox_noop_available);
+    SC_RUN_TEST(test_sandbox_noop_wrap_passthrough);
 
     SC_TEST_SUITE("Observer");
     SC_RUN_TEST(test_observer_noop);

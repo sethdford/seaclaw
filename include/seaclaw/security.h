@@ -7,6 +7,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+typedef struct sc_sandbox sc_sandbox_t;
+typedef struct sc_net_proxy sc_net_proxy_t;
+
 /* ── Autonomy level ─────────────────────────────────────────────── */
 
 typedef enum sc_autonomy_level {
@@ -55,6 +58,7 @@ typedef struct sc_security_policy {
     const char *const *allowed_paths;
     size_t allowed_paths_count;
     sc_sandbox_t *sandbox;
+    sc_net_proxy_t *net_proxy;
     bool pre_approved;          /* set by agent before re-executing an approved tool */
 } sc_security_policy_t;
 

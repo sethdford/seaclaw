@@ -14,7 +14,7 @@ char *sc_api_key_resolve(sc_allocator_t *alloc,
 /* Validate API key format - returns true if non-empty after trim */
 bool sc_api_key_valid(const char *key, size_t key_len);
 
-/* Mask key for logs - show first 4 chars + "..." */
+/* Mask key for logs - show only last 4 chars */
 char *sc_api_key_mask(sc_allocator_t *alloc, const char *key, size_t key_len);
 
 #endif /* SC_API_KEY_H */

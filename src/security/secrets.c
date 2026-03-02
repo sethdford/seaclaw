@@ -133,7 +133,7 @@ static sc_error_t load_or_create_key(sc_secret_store_t *store, uint8_t key[SC_KE
     sc_hex_encode(key, SC_KEY_LEN, hex_out);
     fwrite(hex_out, 1, SC_KEY_LEN * 2, f);
     fclose(f);
-    sc_secure_zero(key, SC_KEY_LEN);
+    /* Key left for caller to use; caller must sc_secure_zero when done */
     return SC_OK;
 }
 

@@ -46,12 +46,16 @@ struct sc_tracking_allocator {
     size_t active_count;
 };
 
+static void track_free(void *ctx, void *ptr, size_t size);
+
 static track_entry_t *track_find(sc_tracking_allocator_t *ta, void *ptr) {
     for (track_entry_t *e = ta->entries; e; e = e->next) {
         if (e->ptr == ptr) return e;
     }
     return NULL;
 }
+
+static void track_free(void *ctx, void *ptr, size_t size);
 
 static void *track_alloc(void *ctx, size_t size) {
     sc_tracking_allocator_t *ta = (sc_tracking_allocator_t *)ctx;
@@ -75,6 +79,10 @@ static void *track_realloc(void *ctx, void *ptr, size_t old_size, size_t new_siz
     sc_tracking_allocator_t *ta = (sc_tracking_allocator_t *)ctx;
 
     if (!ptr) return track_alloc(ctx, new_size);
+    if (new_size == 0) {
+        track_free(ctx, ptr, 0);
+        return NULL;
+    }
 
     track_entry_t *entry = track_find(ta, ptr);
     if (!entry) {

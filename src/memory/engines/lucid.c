@@ -407,7 +407,7 @@ static sc_error_t impl_store_prod(void *ctx,
         sc_str_free(self->alloc, id);
         return SC_ERR_MEMORY_STORE;
     }
-    sqlite3_bind_text(stmt, 1, id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 1, id, -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, key, (int)key_len, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 3, content, (int)content_len, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 4, cat_str, -1, SQLITE_STATIC);
@@ -446,7 +446,7 @@ static sc_error_t impl_recall_prod(void *ctx, sc_allocator_t *alloc,
         alloc->free(alloc->ctx, like_pattern, query_len + 3);
         return SC_ERR_MEMORY_RECALL;
     }
-    sqlite3_bind_text(stmt, 1, like_pattern, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 1, like_pattern, -1, SQLITE_STATIC);
     sqlite3_bind_int64(stmt, 2, (sqlite3_int64)limit);
     sc_memory_entry_t *entries = (sc_memory_entry_t *)alloc->alloc(alloc->ctx,
         limit * sizeof(sc_memory_entry_t));
@@ -599,6 +599,9 @@ sc_memory_t sc_lucid_memory_create(sc_allocator_t *alloc,
         return (sc_memory_t){ .ctx = NULL, .vtable = NULL };
     }
     sqlite3_busy_timeout(db, SC_SQLITE_BUSY_TIMEOUT_MS);
+    sqlite3_exec(db, "PRAGMA secure_delete=ON;", NULL, NULL, NULL);
+    sqlite3_exec(db, "PRAGMA journal_mode=WAL;", NULL, NULL, NULL);
+    sqlite3_exec(db, "PRAGMA foreign_keys=ON;", NULL, NULL, NULL);
     char *err = NULL;
     rc = sqlite3_exec(db, schema_sql, NULL, NULL, &err);
     if (rc != SQLITE_OK) {

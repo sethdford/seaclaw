@@ -104,8 +104,8 @@ static void test_pairing_code_format(void) {
     SC_ASSERT_NOT_NULL(g);
     const char *code = sc_pairing_guard_pairing_code(g);
     SC_ASSERT_NOT_NULL(code);
-    SC_ASSERT_EQ(strlen(code), 6u);
-    for (int i = 0; i < 6; i++)
+    SC_ASSERT_EQ(strlen(code), 8u);
+    for (int i = 0; i < 8; i++)
         SC_ASSERT(code[i] >= '0' && code[i] <= '9');
     sc_pairing_guard_destroy(g);
 }
@@ -665,9 +665,10 @@ static void test_path_traversal_mixed(void) {
     SC_ASSERT_FALSE(sc_path_is_safe(".//../secret"));
 }
 
-static void test_security_path_allowed_empty_allowlist_allows(void) {
+static void test_security_path_allowed_empty_allowlist_denies(void) {
     sc_security_policy_t p = { .allowed_paths = NULL, .allowed_paths_count = 0 };
-    SC_ASSERT_TRUE(sc_security_path_allowed(&p, "/any/path", 9));
+    /* Default-deny: empty allowlist means no path is allowed */
+    SC_ASSERT_FALSE(sc_security_path_allowed(&p, "/any/path", 9));
 }
 
 void run_security_extended_tests(void) {
@@ -734,7 +735,7 @@ void run_security_extended_tests(void) {
     SC_RUN_TEST(test_policy_risk_wget_medium);
     SC_RUN_TEST(test_path_is_safe_symlink_traversal);
     SC_RUN_TEST(test_policy_validate_command_full_returns_risk_level);
-    SC_RUN_TEST(test_security_path_allowed_empty_allowlist_allows);
+    SC_RUN_TEST(test_security_path_allowed_empty_allowlist_denies);
     SC_RUN_TEST(test_pairing_wrong_code_fails);
     SC_RUN_TEST(test_policy_autonomy_read_only);
     SC_RUN_TEST(test_policy_autonomy_supervised);

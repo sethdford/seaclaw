@@ -42,6 +42,13 @@ static int method_valid(const char *method)
 }
 
 #if !SC_IS_TEST
+static bool header_value_safe(const char *s, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        if (s[i] == '\r' || s[i] == '\n' || s[i] == '\0') return false;
+    }
+    return true;
+}
+
 /* Build extra_headers string from JSON object. Caller frees. */
 static sc_error_t parse_headers(sc_allocator_t *alloc, const sc_json_value_t *headers_val,
     char **out, size_t *out_len)
@@ -62,6 +69,8 @@ static sc_error_t parse_headers(sc_allocator_t *alloc, const sc_json_value_t *he
         size_t klen = pair->key_len;
         const char *v = pair->value->data.string.ptr;
         size_t vlen = pair->value->data.string.len;
+        if (!header_value_safe(k, klen) || !header_value_safe(v, vlen))
+            continue;
         if (len + klen + vlen + 4 > cap) {
             size_t nc = cap * 2;
             char *nb = (char *)alloc->realloc(alloc->ctx, buf, cap, nc);

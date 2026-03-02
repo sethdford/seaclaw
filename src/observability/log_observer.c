@@ -1,6 +1,7 @@
 #include "seaclaw/observability/log_observer.h"
 #include "seaclaw/observer.h"
 #include "seaclaw/core/error.h"
+#include "seaclaw/providers/scrub.h"
 #include <string.h>
 #include <time.h>
 
@@ -62,7 +63,7 @@ static void log_record_event(void *ctx, const sc_observer_event_t *event) {
             json_escape_fp(f, event->data.llm_request.model);
             fprintf(f, ",\"messages_count\":%zu}\n", event->data.llm_request.messages_count);
             break;
-        case SC_OBSERVER_EVENT_LLM_RESPONSE:
+        case SC_OBSERVER_EVENT_LLM_RESPONSE: {
             fprintf(f, "llm_response\",\"provider\":");
             json_escape_fp(f, event->data.llm_response.provider);
             fprintf(f, ",\"model\":");
@@ -71,11 +72,24 @@ static void log_record_event(void *ctx, const sc_observer_event_t *event) {
                 (unsigned long long)event->data.llm_response.duration_ms,
                 event->data.llm_response.success ? "true" : "false");
             if (event->data.llm_response.error_message && event->data.llm_response.error_message[0]) {
+                const char *err = event->data.llm_response.error_message;
+                size_t elen = strlen(err);
+                char *scrubbed = sc_scrub_sanitize_api_error(c->alloc, err, elen);
                 fprintf(f, ",\"error\":");
-                json_escape_fp(f, event->data.llm_response.error_message);
+                if (scrubbed) {
+                    json_escape_fp(f, scrubbed);
+                    c->alloc->free(c->alloc->ctx, scrubbed, strlen(scrubbed) + 1);
+                } else {
+                    char safe_error[201];
+                    if (elen > 200) elen = 200;
+                    memcpy(safe_error, err, elen);
+                    safe_error[elen] = '\0';
+                    json_escape_fp(f, safe_error);
+                }
             }
             fprintf(f, "}\n");
             break;
+        }
         case SC_OBSERVER_EVENT_AGENT_END:
             fprintf(f, "agent_end\",\"duration_ms\":%llu,\"tokens_used\":%llu}\n",
                 (unsigned long long)event->data.agent_end.duration_ms,
@@ -93,8 +107,20 @@ static void log_record_event(void *ctx, const sc_observer_event_t *event) {
                 (unsigned long long)event->data.tool_call.duration_ms,
                 event->data.tool_call.success ? "true" : "false");
             if (event->data.tool_call.detail && event->data.tool_call.detail[0]) {
+                const char *det = event->data.tool_call.detail;
+                size_t dlen = strlen(det);
+                char *scrubbed = sc_scrub_sanitize_api_error(c->alloc, det, dlen);
                 fprintf(f, ",\"detail\":");
-                json_escape_fp(f, event->data.tool_call.detail);
+                if (scrubbed) {
+                    json_escape_fp(f, scrubbed);
+                    c->alloc->free(c->alloc->ctx, scrubbed, strlen(scrubbed) + 1);
+                } else {
+                    char safe_detail[201];
+                    if (dlen > 200) dlen = 200;
+                    memcpy(safe_detail, det, dlen);
+                    safe_detail[dlen] = '\0';
+                    json_escape_fp(f, safe_detail);
+                }
             }
             fprintf(f, "}\n");
             break;

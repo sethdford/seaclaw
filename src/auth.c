@@ -4,9 +4,11 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/core/http.h"
-#include <string.h>
+#include <fcntl.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
+#include <unistd.h>
 #if defined(SC_HTTP_CURL) && !SC_IS_TEST
 #ifdef _WIN32
 #include <windows.h>
@@ -76,10 +78,16 @@ sc_error_t sc_auth_save_credential(sc_allocator_t *alloc,
     if (!alloc || !provider || !token) return SC_ERR_INVALID_ARGUMENT;
     char *path = auth_file_path(alloc);
     if (!path) return SC_ERR_IO;
+    /* TODO: Encrypt credentials using sc_secret_store before writing to disk */
     /* Simplified: overwrite with single provider. Full impl would merge. */
-    FILE *f = fopen(path, "wb");
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
     alloc->free(alloc->ctx, path, strlen(path) + 1);
-    if (!f) return SC_ERR_IO;
+    if (fd < 0) return SC_ERR_IO;
+    FILE *f = fdopen(fd, "w");
+    if (!f) {
+        close(fd);
+        return SC_ERR_IO;
+    }
     fprintf(f, "{\"%s\":{", provider);
     fprintf(f, "\"access_token\":\"");
     for (const char *p = token->access_token; p && *p; p++) {

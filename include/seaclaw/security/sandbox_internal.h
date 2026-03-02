@@ -56,10 +56,29 @@ void sc_seccomp_sandbox_init(sc_seccomp_ctx_t *ctx, const char *workspace_dir,
     bool allow_network);
 sc_sandbox_t sc_seccomp_sandbox_get(sc_seccomp_ctx_t *ctx);
 
+/* --- Landlock + seccomp combined (Linux) --- */
+typedef struct {
+    sc_landlock_ctx_t landlock;
+    sc_seccomp_ctx_t seccomp;
+} sc_landlock_seccomp_ctx_t;
+void sc_landlock_seccomp_sandbox_init(sc_landlock_seccomp_ctx_t *ctx,
+    const char *workspace_dir, bool allow_network);
+sc_sandbox_t sc_landlock_seccomp_sandbox_get(sc_landlock_seccomp_ctx_t *ctx);
+
+/* --- AppContainer (Windows) --- */
+typedef struct {
+    char workspace_dir[1024];
+    char app_name[128];
+} sc_appcontainer_ctx_t;
+void sc_appcontainer_sandbox_init(sc_appcontainer_ctx_t *ctx,
+    const char *workspace_dir);
+sc_sandbox_t sc_appcontainer_sandbox_get(sc_appcontainer_ctx_t *ctx);
+
 /* --- WASI (cross-platform) --- */
 typedef struct {
     char workspace_dir[1024];
     char runtime_path[256];
+    char dir_arg[1040];
 } sc_wasi_sandbox_ctx_t;
 void sc_wasi_sandbox_init(sc_wasi_sandbox_ctx_t *ctx, const char *workspace_dir);
 sc_sandbox_t sc_wasi_sandbox_get(sc_wasi_sandbox_ctx_t *ctx);

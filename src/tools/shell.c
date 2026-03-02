@@ -28,6 +28,12 @@ typedef struct sc_shell_ctx {
     sc_security_policy_t *policy;
 } sc_shell_ctx_t;
 
+/*
+ * SECURITY WARNING: This tool passes commands directly to /bin/sh -c.
+ * Shell metacharacters in cmd are interpreted by the shell.
+ * This tool should be restricted or disabled in high-assurance deployments.
+ * Use sc_policy_validate_command and sandbox wrapping for mitigation.
+ */
 static sc_error_t shell_execute(void *ctx, sc_allocator_t *alloc,
     const sc_json_value_t *args,
     sc_tool_result_t *out)

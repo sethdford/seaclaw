@@ -152,8 +152,14 @@ size_t sc_audit_event_write_json(const sc_audit_event_t *ev,
         if (n >= 0 && (size_t)n < buf_size - pos) pos += (size_t)n;
         bool need_comma = false;
         if (ev->action.command) {
+            /* Before writing command to audit log, truncate long commands */
+            char safe_cmd[512];
+            size_t cmd_len = strlen(ev->action.command);
+            if (cmd_len > 500) cmd_len = 500;
+            memcpy(safe_cmd, ev->action.command, cmd_len);
+            safe_cmd[cmd_len] = '\0';
             char esc[512];
-            size_t elen = escape_json_string(ev->action.command, esc, sizeof(esc));
+            size_t elen = escape_json_string(safe_cmd, esc, sizeof(esc));
             if (elen >= sizeof(esc)) elen = sizeof(esc) - 1;
             esc[elen] = '\0';
             n = snprintf(buf + pos, buf_size - pos, "\"command\":\"%s\"", esc);

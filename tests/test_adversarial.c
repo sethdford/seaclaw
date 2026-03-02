@@ -149,7 +149,8 @@ static void test_path_allowed_no_allowlist(void) {
         .allowed_paths = NULL,
         .allowed_paths_count = 0,
     };
-    SC_ASSERT_TRUE(sc_security_path_allowed(&policy, "/any/path", 9));
+    /* Default-deny: empty allowlist means no path is allowed */
+    SC_ASSERT_FALSE(sc_security_path_allowed(&policy, "/any/path", 9));
 }
 
 void run_adversarial_tests(void) {

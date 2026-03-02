@@ -355,8 +355,10 @@ sc_error_t sc_ws_server_read_and_process(sc_ws_server_t *srv,
 #else
     size_t space = SC_WS_SERVER_RECV_BUF - conn->recv_len;
     if (space == 0) {
-        conn->recv_len = 0;
-        space = SC_WS_SERVER_RECV_BUF;
+        /* Buffer full with no complete frame — likely a malformed or oversized
+           message.  Close the connection instead of silently discarding data. */
+        sc_ws_server_close_conn(srv, conn);
+        return SC_ERR_IO;
     }
     ssize_t n = recv(conn->fd, conn->recv_buf + conn->recv_len, space, 0);
     if (n <= 0) {
@@ -396,13 +398,14 @@ sc_error_t sc_ws_server_process(sc_ws_server_t *srv, sc_ws_conn_t *conn) {
             break;
         case SC_WS_OP_PING: {
 #ifdef SC_GATEWAY_POSIX
-            char pong[128 + 4];
+            /* RFC 6455 s5.5: control frame payload max is 125 bytes.
+               Always reply with PONG echoing the payload. */
+            if (plen > 125) plen = 125;
+            char pong[2 + 125];
             pong[0] = (char)(0x80 | SC_WS_OP_PONG);
-            if (plen <= 125) {
-                pong[1] = (char)(plen & 0x7F);
-                if (plen > 0) memcpy(pong + 2, payload, plen);
-                (void)send(conn->fd, pong, 2 + plen, MSG_NOSIGNAL);
-            }
+            pong[1] = (char)(plen & 0x7F);
+            if (plen > 0) memcpy(pong + 2, payload, plen);
+            (void)send(conn->fd, pong, 2 + plen, MSG_NOSIGNAL);
 #endif
             break;
         }

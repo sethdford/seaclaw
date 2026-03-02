@@ -200,9 +200,23 @@ static sc_error_t impl_recall(void *ctx, sc_allocator_t *alloc,
         const char *word_start = p;
         while (p < end && *p != ' ' && *p != '\t' && *p != '\n' && *p != '\r') p++;
         if (p > word_start) {
+            /* Escape double quotes in words for FTS5 MATCH query */
+            char escaped_word[256];
+            size_t ew_len = 0;
+            for (const char *c = word_start; c < p && ew_len < sizeof(escaped_word) - 2; c++) {
+                if (*c == '"') {
+                    if (ew_len < sizeof(escaped_word) - 3) {
+                        escaped_word[ew_len++] = '"';
+                        escaped_word[ew_len++] = '"';
+                    }
+                } else {
+                    escaped_word[ew_len++] = *c;
+                }
+            }
+            escaped_word[ew_len] = '\0';
             if (!first) { fts_len += (size_t)snprintf(fts_buf + fts_len, sizeof(fts_buf) - fts_len, " OR "); }
-            fts_len += (size_t)snprintf(fts_buf + fts_len, sizeof(fts_buf) - fts_len, "\"%.*s\"",
-                (int)(p - word_start), word_start);
+            fts_len += (size_t)snprintf(fts_buf + fts_len, sizeof(fts_buf) - fts_len, "\"%s\"",
+                escaped_word);
             first = false;
         }
     }
@@ -520,6 +534,9 @@ sc_memory_t sc_sqlite_memory_create(sc_allocator_t *alloc, const char *db_path) 
         return (sc_memory_t){ .ctx = NULL, .vtable = NULL };
     }
     sqlite3_busy_timeout(db, SC_SQLITE_BUSY_TIMEOUT_MS);
+    sqlite3_exec(db, "PRAGMA secure_delete=ON;", NULL, NULL, NULL);
+    sqlite3_exec(db, "PRAGMA journal_mode=WAL;", NULL, NULL, NULL);
+    sqlite3_exec(db, "PRAGMA foreign_keys=ON;", NULL, NULL, NULL);
 
     char *err = NULL;
     rc = sqlite3_exec(db, schema_sql, NULL, NULL, &err);

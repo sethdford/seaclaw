@@ -14,22 +14,26 @@
 void sc_run_result_free(sc_allocator_t *alloc, sc_run_result_t *r) {
     if (!alloc || !r) return;
     if (r->stdout_buf) {
-        alloc->free(alloc->ctx, r->stdout_buf, r->stdout_len + 1);
+        alloc->free(alloc->ctx, r->stdout_buf, r->stdout_cap);
         r->stdout_buf = NULL;
     }
     if (r->stderr_buf) {
-        alloc->free(alloc->ctx, r->stderr_buf, r->stderr_len + 1);
+        alloc->free(alloc->ctx, r->stderr_buf, r->stderr_cap);
         r->stderr_buf = NULL;
     }
     r->stdout_len = 0;
+    r->stdout_cap = 0;
     r->stderr_len = 0;
+    r->stderr_cap = 0;
 }
 
 #if defined(SC_GATEWAY_POSIX) && !defined(SC_IS_TEST)
-sc_error_t sc_process_run(sc_allocator_t *alloc,
+sc_error_t sc_process_run_sandboxed(sc_allocator_t *alloc,
     const char *const *argv,
     const char *cwd,
     size_t max_output_bytes,
+    sc_child_setup_fn child_setup,
+    void *child_setup_ctx,
     sc_run_result_t *out)
 {
     if (!alloc || !argv || !argv[0] || !out) return SC_ERR_INVALID_ARGUMENT;
@@ -61,6 +65,14 @@ sc_error_t sc_process_run(sc_allocator_t *alloc,
         if (cwd && cwd[0]) {
             if (chdir(cwd) != 0) {
                 _exit(126);
+            }
+        }
+
+        /* Apply sandbox restrictions before running the command */
+        if (child_setup) {
+            sc_error_t serr = child_setup(child_setup_ctx);
+            if (serr != SC_OK) {
+                _exit(125);
             }
         }
 
@@ -144,30 +156,56 @@ sc_error_t sc_process_run(sc_allocator_t *alloc,
 
     return SC_OK;
 }
-#else
-/* Non-POSIX or SC_IS_TEST: stub that returns empty success */
+
 sc_error_t sc_process_run(sc_allocator_t *alloc,
     const char *const *argv,
     const char *cwd,
     size_t max_output_bytes,
     sc_run_result_t *out)
 {
+    return sc_process_run_sandboxed(alloc, argv, cwd, max_output_bytes,
+        NULL, NULL, out);
+}
+#else
+/* Non-POSIX or SC_IS_TEST: stub that returns empty success */
+sc_error_t sc_process_run_sandboxed(sc_allocator_t *alloc,
+    const char *const *argv,
+    const char *cwd,
+    size_t max_output_bytes,
+    sc_child_setup_fn child_setup,
+    void *child_setup_ctx,
+    sc_run_result_t *out)
+{
     (void)cwd;
     (void)max_output_bytes;
+    (void)child_setup;
+    (void)child_setup_ctx;
     if (!alloc || !out) return SC_ERR_INVALID_ARGUMENT;
     if (!argv || !argv[0]) return SC_ERR_INVALID_ARGUMENT;
     memset(out, 0, sizeof(*out));
     out->stdout_buf = (char *)alloc->alloc(alloc->ctx, 1);
     if (!out->stdout_buf) return SC_ERR_OUT_OF_MEMORY;
     out->stdout_buf[0] = '\0';
+    out->stdout_cap = 1;
     out->stderr_buf = (char *)alloc->alloc(alloc->ctx, 1);
     if (!out->stderr_buf) {
         alloc->free(alloc->ctx, out->stdout_buf, 1);
         return SC_ERR_OUT_OF_MEMORY;
     }
     out->stderr_buf[0] = '\0';
+    out->stderr_cap = 1;
     out->success = true;
     out->exit_code = 0;
     return SC_OK;
+}
+
+sc_error_t sc_process_run(sc_allocator_t *alloc,
+    const char *const *argv,
+    const char *cwd,
+    size_t max_output_bytes,
+    sc_run_result_t *out)
+{
+    return sc_process_run_sandboxed(alloc, argv, cwd, max_output_bytes,
+        NULL, NULL, out);
 }
 #endif

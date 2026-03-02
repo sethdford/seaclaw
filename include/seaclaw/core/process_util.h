@@ -9,8 +9,10 @@
 typedef struct sc_run_result {
     char *stdout_buf;
     size_t stdout_len;
+    size_t stdout_cap;  /* allocated capacity for free() */
     char *stderr_buf;
     size_t stderr_len;
+    size_t stderr_cap;  /* allocated capacity for free() */
     bool success;
     int exit_code;  /* -1 if terminated by signal */
 } sc_run_result_t;

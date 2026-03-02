@@ -7,6 +7,7 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/security.h"
+#include "seaclaw/tools/validation.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -152,7 +153,16 @@ static sc_error_t git_execute(void *ctx, sc_allocator_t *alloc,
         if (sc_json_get_bool(args, "cached", false)) argv[argc++] = "--cached";
         {
             const char *files = sc_json_get_string(args, "files");
-            argv[argc++] = "--"; argv[argc++] = files ? files : ".";
+            const char *files_arg = files && files[0] ? files : ".";
+            if (files_arg != ".") {
+                sc_error_t err = sc_tool_validate_path(files_arg,
+                    c->workspace_dir, c->workspace_dir ? c->workspace_dir_len : 0);
+                if (err != SC_OK) {
+                    *out = sc_tool_result_fail("path traversal or invalid path", 30);
+                    return SC_OK;
+                }
+            }
+            argv[argc++] = "--"; argv[argc++] = files_arg;
         }
     } else if (strcmp(op, "log") == 0) {
         int lim = (int)sc_json_get_number(args, "limit", 10);
@@ -175,6 +185,10 @@ static sc_error_t git_execute(void *ctx, sc_allocator_t *alloc,
         if (!b || !b[0]) { *out = sc_tool_result_fail("Missing 'branch' for checkout", 30); return SC_OK; }
         if (strchr(b,';')||strchr(b,'|')||strchr(b,'`')||strstr(b,"$(")) {
             *out = sc_tool_result_fail("Branch name contains invalid characters", 36);
+            return SC_OK;
+        }
+        if (strstr(b, "..")) {
+            *out = sc_tool_result_fail("invalid branch name", 19);
             return SC_OK;
         }
         argv[argc++] = "checkout"; argv[argc++] = b;

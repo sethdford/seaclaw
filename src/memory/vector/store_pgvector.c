@@ -6,6 +6,15 @@
 #if defined(SC_ENABLE_POSTGRES)
 #include <libpq-fe.h>
 
+static bool is_safe_identifier(const char *id) {
+    if (!id || !id[0]) return false;
+    for (const char *p = id; *p; p++) {
+        if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+              (*p >= '0' && *p <= '9') || *p == '_')) return false;
+    }
+    return true;
+}
+
 typedef struct pgvector_ctx {
     sc_allocator_t *alloc;
     PGconn *conn;
@@ -235,13 +244,18 @@ sc_vector_store_t sc_vector_store_pgvector_create(sc_allocator_t *alloc,
     sc_vector_store_t s = { .ctx = NULL, .vtable = &pgvector_vtable };
     if (!alloc || !config) return s;
 
+    const char *table_val = (config->table_name && config->table_name[0])
+        ? config->table_name : "memory_vectors";
+#if defined(SC_ENABLE_POSTGRES)
+    if (!is_safe_identifier(table_val)) return s;
+#endif
+
     pgvector_ctx_t *p = (pgvector_ctx_t *)alloc->alloc(alloc->ctx, sizeof(pgvector_ctx_t));
     if (!p) return s;
     memset(p, 0, sizeof(*p));
     p->alloc = alloc;
     p->connection_url = config->connection_url ? sc_strdup(alloc, config->connection_url) : NULL;
-    p->table_name = sc_strdup(alloc, config->table_name && config->table_name[0] ?
-        config->table_name : "memory_vectors");
+    p->table_name = sc_strdup(alloc, table_val);
     p->dimensions = config->dimensions;
 
 #if defined(SC_ENABLE_POSTGRES)

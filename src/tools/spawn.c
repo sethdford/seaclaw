@@ -113,6 +113,9 @@ static sc_error_t spawn_execute(void *ctx, sc_allocator_t *alloc,
     /* Wrap argv with sandbox if available */
     const char *sandbox_argv[SC_SPAWN_MAX_ARGS + 16];
     const char *const *run_argv = argv_buf;
+    sc_child_setup_fn child_setup = NULL;
+    void *child_setup_ctx = NULL;
+
     if (c->policy && c->policy->sandbox &&
         sc_sandbox_is_available(c->policy->sandbox)) {
         size_t wrapped_count = 0;
@@ -123,10 +126,17 @@ static sc_error_t spawn_execute(void *ctx, sc_allocator_t *alloc,
             sandbox_argv[wrapped_count] = NULL;
             run_argv = sandbox_argv;
         }
+        /* Kernel-level sandboxes (Landlock, seccomp) use apply callback */
+        if (c->policy->sandbox->vtable &&
+            c->policy->sandbox->vtable->apply) {
+            child_setup = c->policy->sandbox->vtable->apply;
+            child_setup_ctx = c->policy->sandbox->ctx;
+        }
     }
 
     sc_run_result_t run = {0};
-    sc_error_t err = sc_process_run(alloc, run_argv, cwd, SC_SPAWN_MAX_OUTPUT, &run);
+    sc_error_t err = sc_process_run_sandboxed(alloc, run_argv, cwd,
+        SC_SPAWN_MAX_OUTPUT, child_setup, child_setup_ctx, &run);
 
     /* Free any number-arg copies we allocated */
     if (args_arr && args_arr->type == SC_JSON_ARRAY) {

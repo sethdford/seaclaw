@@ -236,6 +236,12 @@ static sc_sandbox_backend_t parse_sandbox_backend(const char *s) {
     if (strcmp(s, "firejail") == 0) return SC_SANDBOX_FIREJAIL;
     if (strcmp(s, "bubblewrap") == 0) return SC_SANDBOX_BUBBLEWRAP;
     if (strcmp(s, "docker") == 0) return SC_SANDBOX_DOCKER;
+    if (strcmp(s, "seatbelt") == 0) return SC_SANDBOX_SEATBELT;
+    if (strcmp(s, "seccomp") == 0) return SC_SANDBOX_SECCOMP;
+    if (strcmp(s, "landlock+seccomp") == 0) return SC_SANDBOX_LANDLOCK_SECCOMP;
+    if (strcmp(s, "wasi") == 0) return SC_SANDBOX_WASI;
+    if (strcmp(s, "firecracker") == 0) return SC_SANDBOX_FIRECRACKER;
+    if (strcmp(s, "appcontainer") == 0) return SC_SANDBOX_APPCONTAINER;
     if (strcmp(s, "none") == 0) return SC_SANDBOX_NONE;
     return SC_SANDBOX_AUTO;
 }
@@ -658,6 +664,11 @@ static sc_error_t parse_diagnostics(sc_allocator_t *a, sc_config_t *cfg,
     cfg->diagnostics.log_message_receipts = sc_json_get_bool(obj, "log_message_receipts", cfg->diagnostics.log_message_receipts);
     cfg->diagnostics.log_message_payloads = sc_json_get_bool(obj, "log_message_payloads", cfg->diagnostics.log_message_payloads);
     cfg->diagnostics.log_llm_io = sc_json_get_bool(obj, "log_llm_io", cfg->diagnostics.log_llm_io);
+    if (cfg->diagnostics.log_llm_io || cfg->diagnostics.log_message_payloads) {
+        fprintf(stderr, "[SECURITY WARNING] Diagnostic logging of payloads is enabled. "
+                        "Logs may contain sensitive data (PII, API keys). "
+                        "Do not use in production.\n");
+    }
     return SC_OK;
 }
 
@@ -789,6 +800,9 @@ sc_error_t sc_config_parse_json(sc_config_t *cfg, const char *content, size_t le
     }
 
     const char *workspace = sc_json_get_string(root, "workspace");
+    if (workspace && strstr(workspace, "..")) {
+        workspace = NULL; /* Reject path traversal */
+    }
     if (workspace && cfg->workspace_dir_override) {
         a->free(a->ctx, cfg->workspace_dir_override, strlen(cfg->workspace_dir_override) + 1);
     }
@@ -971,7 +985,7 @@ void sc_config_apply_env_overrides(sc_config_t *cfg) {
     if (v) apply_env_str(a, &cfg->gateway.host, v);
 
     v = env_get("SEACLAW_WORKSPACE");
-    if (v) apply_env_str(a, &cfg->workspace_dir, v);
+    if (v && !strstr(v, "..")) apply_env_str(a, &cfg->workspace_dir, v);
 
     v = env_get("SEACLAW_ALLOW_PUBLIC_BIND");
     if (v) cfg->gateway.allow_public_bind = (strcmp(v, "1") == 0 || strcmp(v, "true") == 0);
@@ -1010,7 +1024,7 @@ sc_error_t sc_config_save(const sc_config_t *cfg) {
     if (home) {
         int n = snprintf(dir_buf, sizeof(dir_buf), "%s/%s", home, SC_CONFIG_DIR);
         if (n > 0 && (size_t)n < sizeof(dir_buf))
-            (void)mkdir(dir_buf, 0755);
+            (void)mkdir(dir_buf, 0700);
     }
 
     sc_json_value_t *root = sc_json_object_new(&a);
