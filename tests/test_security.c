@@ -325,7 +325,8 @@ static void test_audit_chain_verify_valid(void) {
 
     char log_path[512];
     snprintf(log_path, sizeof(log_path), "%s/chain.log", dir);
-    SC_ASSERT(sc_audit_verify_chain(log_path, key) == SC_OK);
+    sc_error_t verr = sc_audit_verify_chain(log_path, key);
+    SC_ASSERT_EQ(verr, SC_OK);
 
     unlink(log_path);
     char key_path[512];
@@ -362,7 +363,8 @@ static void test_audit_chain_tamper_detected(void) {
 
     unsigned char key[32];
     SC_ASSERT(sc_audit_load_key(dir, key) == SC_OK);
-    SC_ASSERT(sc_audit_verify_chain(log_path, key) == SC_ERR_CRYPTO_DECRYPT);
+    sc_error_t tamper_verr = sc_audit_verify_chain(log_path, key);
+    SC_ASSERT_EQ(tamper_verr, SC_ERR_CRYPTO_DECRYPT);
 
     unlink(log_path);
     char key_path[512];
@@ -414,7 +416,8 @@ static void test_audit_chain_delete_detected(void) {
 
     unsigned char key[32];
     SC_ASSERT(sc_audit_load_key(dir, key) == SC_OK);
-    SC_ASSERT(sc_audit_verify_chain(log_path, key) == SC_ERR_CRYPTO_DECRYPT);
+    sc_error_t del_verr = sc_audit_verify_chain(log_path, key);
+    SC_ASSERT_EQ(del_verr, SC_ERR_CRYPTO_DECRYPT);
 
     unlink(log_path);
     char key_path[512];
@@ -960,6 +963,9 @@ void run_security_tests(void) {
     SC_RUN_TEST(test_audit_event_init);
     SC_RUN_TEST(test_audit_event_write_json);
     SC_RUN_TEST(test_audit_logger_disabled);
+    SC_RUN_TEST(test_audit_chain_verify_valid);
+    SC_RUN_TEST(test_audit_chain_tamper_detected);
+    SC_RUN_TEST(test_audit_chain_delete_detected);
 
     SC_TEST_SUITE("Sandbox");
     SC_RUN_TEST(test_sandbox_noop);

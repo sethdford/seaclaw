@@ -252,7 +252,7 @@ char *sc_auth_get_api_key(sc_allocator_t *alloc, const char *provider) {
     tok.access_token = NULL;
     sc_oauth_token_deinit(&tok, alloc);
     if (key && sc_secret_store_is_encrypted(key)) {
-        char *home = sc_platform_home_dir(alloc);
+        char *home = sc_platform_get_home_dir(alloc);
         if (home) {
             char config_dir[512];
             snprintf(config_dir, sizeof(config_dir), "%s/.seaclaw", home);

@@ -434,18 +434,19 @@ sc_error_t sc_audit_logger_log(sc_audit_logger_t *logger,
     sc_hmac_sha256(logger->audit_key, SC_AUDIT_HMAC_LEN,
         hmac_input, SC_AUDIT_HMAC_LEN + json_len, logger->prev_hmac);
 
-    /* Insert ,"hmac":"<hex>"} before final } - replace "}}" with "},\"hmac\":\"hex\"}" */
+    /* Replace trailing }} with },"hmac":"<64hex>"} */
     char hmac_hex[65];
     sc_hex_encode(logger->prev_hmac, SC_AUDIT_HMAC_LEN, hmac_hex);
     if (json_len < 2) return SC_ERR_INVALID_ARGUMENT;
-    size_t insert_len = 10 + 64 + 2;  /* ,"hmac":" + 64 hex + "} */
-    if (json_len - 2 + insert_len > sizeof(json_buf)) return SC_ERR_INVALID_ARGUMENT;
-    memmove(json_buf + json_len - 2 + insert_len, json_buf + json_len - 2, 2);
-    memcpy(json_buf + json_len - 2, "},\"hmac\":\"", 10);
-    memcpy(json_buf + json_len - 2 + 9, hmac_hex, 64);
-    json_buf[json_len - 2 + 9 + 64] = '"';
-    json_buf[json_len - 2 + 9 + 64 + 1] = '}';
-    json_len = json_len - 2 + insert_len;
+    size_t base = json_len - 1;  /* position of final } */
+    size_t needed = 9 + 64 + 2;  /* ,"hmac":" + hex + "} */
+    if (base + needed >= sizeof(json_buf)) return SC_ERR_INVALID_ARGUMENT;
+    memcpy(json_buf + base, ",\"hmac\":\"", 9);
+    memcpy(json_buf + base + 9, hmac_hex, 64);
+    json_buf[base + 9 + 64] = '"';
+    json_buf[base + 9 + 64 + 1] = '}';
+    json_buf[base + 9 + 64 + 2] = '\0';
+    json_len = base + 9 + 64 + 2;
 
     FILE *f = fopen(logger->log_path, "a");
     if (!f) return SC_ERR_IO;
@@ -530,13 +531,12 @@ sc_error_t sc_audit_verify_chain(const char *audit_file_path,
             continue;  /* Malformed, skip (would fail decode) */
 
         /* Build entry without hmac: everything before ,"hmac":" plus } */
-        const char *comma = hmac_start;
-        while (comma > line && comma[-1] != ',') comma--;
-        if (comma <= line) {
+        /* Format is ...},"hmac":"<hex>"} - comma is at hmac_start-1 */
+        if (hmac_start <= line + 1) {
             fclose(f);
             return SC_ERR_PARSE;
         }
-        size_t prefix_len = (size_t)(comma - line - 1);  /* exclude comma */
+        size_t prefix_len = (size_t)(hmac_start - line - 1);  /* exclude , before "hmac" */
         if (prefix_len == 0) {
             fclose(f);
             return SC_ERR_PARSE;
