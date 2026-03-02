@@ -1047,7 +1047,12 @@ void sc_control_on_message(sc_ws_conn_t *conn, const char *data, size_t data_len
                 pos += (size_t)snprintf(res_buf + pos, res_cap - pos, "%s\"", id_esc);
                 proto->alloc->free(proto->alloc->ctx, id_esc, esc_len);
             } else {
-                pos += (size_t)snprintf(res_buf + pos, res_cap - pos, "%s\"", id);
+                for (size_t i = 0; i < id_len && pos + 4 < res_cap; i++) {
+                    char c = id[i];
+                    if (c == '"' || c == '\\') res_buf[pos++] = '\\';
+                    res_buf[pos++] = c;
+                }
+                if (pos < res_cap) res_buf[pos++] = '"';
             }
             pos += (size_t)snprintf(res_buf + pos, res_cap - pos,
                 ",\"ok\":%s,\"payload\":", ok ? "true" : "false");

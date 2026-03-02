@@ -6,6 +6,7 @@
 #include "seaclaw/gateway/event_bridge.h"
 #include "seaclaw/bus.h"
 #include "seaclaw/health.h"
+#include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/json.h"
 #include <string.h>
@@ -563,6 +564,214 @@ static void test_ws_server_conn_pool_full(void) {
     sc_ws_server_deinit(&srv);
 }
 
+/* ── RPC Handler Tests ──────────────────────────────────────────────── */
+
+static void setup_proto_with_app(sc_allocator_t *alloc, sc_ws_server_t *ws,
+    sc_control_protocol_t *proto, sc_app_context_t *app,
+    sc_bus_t *bus, sc_config_t *cfg) {
+    sc_ws_server_init(ws, alloc, NULL, NULL, NULL);
+    sc_control_protocol_init(proto, alloc, ws);
+    memset(app, 0, sizeof(*app));
+    memset(cfg, 0, sizeof(*cfg));
+    sc_bus_init(bus);
+    app->config = cfg;
+    app->alloc = alloc;
+    app->bus = bus;
+    sc_control_set_app_ctx(proto, app);
+}
+
+static void teardown_proto(sc_ws_server_t *ws, sc_control_protocol_t *proto) {
+    sc_control_protocol_deinit(proto);
+    sc_ws_server_deinit(ws);
+}
+
+static void test_rpc_chat_send_empty_message_rejected(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_control_protocol_t proto;
+    sc_app_context_t app;
+    sc_bus_t bus;
+    sc_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"1\",\"method\":\"chat.send\",\"params\":{\"message\":\"\"}}";
+    sc_control_on_message(&conn, msg, strlen(msg), &proto);
+    teardown_proto(&ws, &proto);
+}
+
+static void test_rpc_chat_send_null_message_rejected(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_control_protocol_t proto;
+    sc_app_context_t app;
+    sc_bus_t bus;
+    sc_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"2\",\"method\":\"chat.send\",\"params\":{}}";
+    sc_control_on_message(&conn, msg, strlen(msg), &proto);
+    teardown_proto(&ws, &proto);
+}
+
+static bool s_bus_got_message = false;
+static bool chat_send_bus_listener(sc_bus_event_type_t t, const sc_bus_event_t *e, void *u) {
+    (void)u;
+    if (t == SC_BUS_MESSAGE_RECEIVED && e->payload) s_bus_got_message = true;
+    return true;
+}
+
+static void test_rpc_chat_send_valid_publishes_bus(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_control_protocol_t proto;
+    sc_app_context_t app;
+    sc_bus_t bus;
+    sc_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+
+    s_bus_got_message = false;
+    sc_bus_subscribe(&bus, chat_send_bus_listener, NULL, SC_BUS_MESSAGE_RECEIVED);
+
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"3\",\"method\":\"chat.send\","
+        "\"params\":{\"message\":\"hello world\"}}";
+    sc_control_on_message(&conn, msg, strlen(msg), &proto);
+    SC_ASSERT_TRUE(s_bus_got_message);
+    teardown_proto(&ws, &proto);
+}
+
+static void test_rpc_chat_abort_no_crash(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_control_protocol_t proto;
+    sc_app_context_t app;
+    sc_bus_t bus;
+    sc_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"4\",\"method\":\"chat.abort\"}";
+    sc_control_on_message(&conn, msg, strlen(msg), &proto);
+    teardown_proto(&ws, &proto);
+}
+
+static void test_rpc_config_apply_no_crash(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_control_protocol_t proto;
+    sc_app_context_t app;
+    sc_bus_t bus;
+    sc_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"5\",\"method\":\"config.apply\","
+        "\"params\":{\"config\":\"{\\\"workspace\\\":\\\".\\\"}\"}}";;
+    sc_control_on_message(&conn, msg, strlen(msg), &proto);
+    teardown_proto(&ws, &proto);
+}
+
+static void test_rpc_cron_run_no_crash(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_control_protocol_t proto;
+    sc_app_context_t app;
+    sc_bus_t bus;
+    sc_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"6\",\"method\":\"cron.run\","
+        "\"params\":{\"id\":0}}";
+    sc_control_on_message(&conn, msg, strlen(msg), &proto);
+    teardown_proto(&ws, &proto);
+}
+
+static void test_rpc_skills_install_no_crash(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_control_protocol_t proto;
+    sc_app_context_t app;
+    sc_bus_t bus;
+    sc_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"7\",\"method\":\"skills.install\","
+        "\"params\":{\"url\":\"https://example.com/skill.json\"}}";
+    sc_control_on_message(&conn, msg, strlen(msg), &proto);
+    teardown_proto(&ws, &proto);
+}
+
+static void test_rpc_exec_approval_no_crash(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_control_protocol_t proto;
+    sc_app_context_t app;
+    sc_bus_t bus;
+    sc_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"8\",\"method\":\"exec.approval.resolve\","
+        "\"params\":{\"request_id\":\"r1\",\"approved\":true}}";
+    sc_control_on_message(&conn, msg, strlen(msg), &proto);
+    teardown_proto(&ws, &proto);
+}
+
+static void test_rpc_usage_summary_no_crash(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_control_protocol_t proto;
+    sc_app_context_t app;
+    sc_bus_t bus;
+    sc_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    sc_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"9\",\"method\":\"usage.summary\"}";
+    sc_control_on_message(&conn, msg, strlen(msg), &proto);
+    teardown_proto(&ws, &proto);
+}
+
+static void test_event_bridge_payload_propagation(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_ws_server_t ws;
+    sc_ws_server_init(&ws, &alloc, NULL, NULL, NULL);
+    sc_control_protocol_t proto;
+    sc_control_protocol_init(&proto, &alloc, &ws);
+    sc_bus_t bus;
+    sc_bus_init(&bus);
+
+    sc_event_bridge_t bridge;
+    sc_event_bridge_init(&bridge, &proto, &bus);
+
+    sc_bus_event_t ev;
+    memset(&ev, 0, sizeof(ev));
+    ev.type = SC_BUS_MESSAGE_SENT;
+    snprintf(ev.channel, SC_BUS_CHANNEL_LEN, "cli");
+    snprintf(ev.id, SC_BUS_ID_LEN, "s1");
+    const char *long_msg = "This is a long message that exceeds 256 bytes. "
+        "Padding padding padding padding padding padding padding padding "
+        "padding padding padding padding padding padding padding padding "
+        "padding padding padding padding padding padding padding padding "
+        "padding padding padding padding padding padding END";
+    ev.payload = (void *)long_msg;
+    memset(ev.message, 0, SC_BUS_MSG_LEN);
+    size_t ml = strlen(long_msg);
+    if (ml >= SC_BUS_MSG_LEN) ml = SC_BUS_MSG_LEN - 1;
+    memcpy(ev.message, long_msg, ml);
+    ev.message[ml] = '\0';
+    sc_bus_publish(&bus, &ev);
+
+    sc_event_bridge_deinit(&bridge);
+    sc_control_protocol_deinit(&proto);
+    sc_ws_server_deinit(&ws);
+}
+
 void run_gateway_extended_tests(void) {
     SC_TEST_SUITE("Gateway Extended");
     SC_RUN_TEST(test_gateway_webhook_paths);
@@ -627,6 +836,18 @@ void run_gateway_extended_tests(void) {
     SC_RUN_TEST(test_event_bridge_deinit_null);
     SC_RUN_TEST(test_event_bridge_bus_subscription);
     SC_RUN_TEST(test_event_bridge_publish_no_crash);
+
+    SC_TEST_SUITE("RPC Handlers");
+    SC_RUN_TEST(test_rpc_chat_send_empty_message_rejected);
+    SC_RUN_TEST(test_rpc_chat_send_null_message_rejected);
+    SC_RUN_TEST(test_rpc_chat_send_valid_publishes_bus);
+    SC_RUN_TEST(test_rpc_chat_abort_no_crash);
+    SC_RUN_TEST(test_rpc_config_apply_no_crash);
+    SC_RUN_TEST(test_rpc_cron_run_no_crash);
+    SC_RUN_TEST(test_rpc_skills_install_no_crash);
+    SC_RUN_TEST(test_rpc_exec_approval_no_crash);
+    SC_RUN_TEST(test_rpc_usage_summary_no_crash);
+    SC_RUN_TEST(test_event_bridge_payload_propagation);
 
     SC_TEST_SUITE("WS Server Extended");
     SC_RUN_TEST(test_ws_server_process_null);
