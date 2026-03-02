@@ -36,21 +36,27 @@ The smallest fully autonomous AI assistant infrastructure — a static C binary 
 - **Fully swappable:** core systems are vtable interfaces (providers, channels, tools, memory, tunnels, peripherals, observers, runtimes).
 - **No lock-in:** OpenAI-compatible provider support + pluggable custom endpoints.
 
-## Benchmark Snapshot
+## Landscape
 
-Local machine benchmark (macOS arm64, Feb 2026), normalized for 0.8 GHz edge hardware.
+Similar projects in the autonomous AI assistant space (data sourced from each project's own documentation):
 
-|                       | [OpenClaw](https://github.com/openclaw/openclaw) | [NanoBot](https://github.com/HKUDS/nanobot) | [PicoClaw](https://github.com/sipeed/picoclaw) | [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) | **[🦀 SeaClaw](https://github.com/seaclaw/seaclaw)** |
-| --------------------- | ------------------------------------------------ | ------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------- |
-| **Language**          | TypeScript                                       | Python                                      | Go                                             | Rust                                                  | **C**                                                |
-| **RAM**               | > 1 GB                                           | > 100 MB                                    | < 10 MB                                        | < 5 MB                                                | **< 5 MB**                                           |
-| **Startup (0.8 GHz)** | > 500 s                                          | > 30 s                                      | < 1 s                                          | < 10 ms                                               | **< 8 ms**                                           |
-| **Binary Size**       | ~28 MB (dist)                                    | N/A (Scripts)                               | ~8 MB                                          | 3.4 MB                                                | **239 KB**                                           |
-| **Tests**             | —                                                | —                                           | —                                              | 1,017                                                 | **1,791**                                            |
-| **Source Files**      | ~400+                                            | —                                           | —                                              | ~120                                                  | **~415**                                             |
-| **Cost**              | Mac Mini $599                                    | Linux SBC ~$50                              | Linux Board $10                                | Any $10 hardware                                      | **Any $5 hardware**                                  |
+|                   | [OpenClaw](https://github.com/openclaw/openclaw) | [NanoBot](https://github.com/HKUDS/nanobot) | [PicoClaw](https://github.com/sipeed/picoclaw) | [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) | **SeaClaw**       |
+| ----------------- | ------------------------------------------------ | ------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------- | ----------------- |
+| **Language**      | TypeScript                                       | Python                                      | Go                                             | Rust                                                  | **C**             |
+| **RAM** ¹         | —                                                | —                                           | < 10 MB                                        | < 5 MB                                                | **< 5 MB**        |
+| **Binary Size** ¹ | ~28 MB (npm dist)                                | N/A (Python)                                | ~8 MB                                          | ~8.8 MB                                               | **239 KB**        |
+| **Runtime Deps**  | Node.js ≥22                                      | Python ≥3.11                                | None (static)                                  | None (static)                                         | **None (static)** |
 
-> Measured with `/usr/bin/time -l` on MinSizeRel builds. seaclaw is a static binary with zero runtime dependencies.
+> ¹ RAM and binary size figures for other projects are self-reported from their respective READMEs. SeaClaw's numbers are measured locally with `/usr/bin/time -l` on a MinSizeRel + LTO build.
+
+SeaClaw's verified numbers (measured on macOS arm64, March 2026):
+
+```
+Binary size:   239 KB (MinSizeRel + LTO)
+Peak RSS:      < 5 MB
+Startup:       <2 ms (Apple Silicon M4 Max)
+Tests:         1,791 passing, 0 ASan errors
+```
 
 Reproduce locally:
 
@@ -606,7 +612,7 @@ MIT — see [LICENSE](LICENSE)
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=seaclaw/seaclaw&type=date&legend=top-left)](https://www.star-history.com/#seaclaw/seaclaw&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/svg?repos=sethdford/seaclaw&type=date&legend=top-left)](https://www.star-history.com/#sethdford/seaclaw&type=date&legend=top-left)
 
 ```
 
