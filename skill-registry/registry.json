@@ -1,0 +1,26 @@
+[
+  {
+    "name": "code-review",
+    "description": "Automated code review with style checks and security scanning",
+    "version": "1.0.0",
+    "author": "seaclaw",
+    "url": "https://github.com/seaclaw/skill-registry/tree/main/skills/code-review",
+    "tags": ["development", "review"]
+  },
+  {
+    "name": "email-digest",
+    "description": "Daily email digest with priority sorting and action items",
+    "version": "1.0.0",
+    "author": "seaclaw",
+    "url": "https://github.com/seaclaw/skill-registry/tree/main/skills/email-digest",
+    "tags": ["email", "productivity"]
+  },
+  {
+    "name": "meeting-prep",
+    "description": "Prepare meeting agendas and brief notes from calendar events",
+    "version": "1.0.0",
+    "author": "seaclaw",
+    "url": "https://github.com/seaclaw/skill-registry/tree/main/skills/meeting-prep",
+    "tags": ["productivity", "calendar"]
+  }
+]

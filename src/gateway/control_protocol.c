@@ -1,10 +1,13 @@
 #include "seaclaw/gateway/control_protocol.h"
+#include "seaclaw/gateway/push.h"
 #include <stdint.h>
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/json.h"
 #include "seaclaw/config.h"
 #include "seaclaw/session.h"
 #include "seaclaw/cron.h"
+#include "seaclaw/crontab.h"
+#include "seaclaw/core/process_util.h"
 #include "seaclaw/skillforge.h"
 #include "seaclaw/cost.h"
 #include "seaclaw/bus.h"
@@ -50,7 +53,8 @@ static sc_error_t build_connect_response(sc_allocator_t *alloc,
         "cron.add", "cron.remove", "cron.run", "skills.list", "skills.install",
         "skills.enable", "skills.disable",
         "update.check", "update.run", "exec.approval.resolve",
-        "usage.summary", "models.list", "nodes.list"
+        "usage.summary", "models.list", "nodes.list",
+        "push.register", "push.unregister"
     };
     for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
         sc_json_value_t *m = sc_json_string_new(alloc, methods[i],
@@ -596,6 +600,18 @@ static sc_error_t handle_cron_add(sc_allocator_t *alloc,
                 sc_error_t e = sc_cron_add_job(app->cron, app->alloc,
                     expr, cmd, name ? name : cmd, &new_id);
                 added = (e == SC_OK);
+                if (added) {
+                    char *cron_path = NULL;
+                    size_t cron_path_len = 0;
+                    if (sc_crontab_get_path(app->alloc, &cron_path, &cron_path_len) == SC_OK) {
+                        char *unused_id = NULL;
+                        sc_crontab_add(app->alloc, cron_path, expr, strlen(expr),
+                            cmd, strlen(cmd), &unused_id);
+                        if (unused_id) app->alloc->free(app->alloc->ctx, unused_id,
+                            strlen(unused_id) + 1);
+                        app->alloc->free(app->alloc->ctx, cron_path, cron_path_len + 1);
+                    }
+                }
             }
         }
     }
@@ -654,10 +670,24 @@ static sc_error_t handle_cron_run(sc_allocator_t *alloc,
                 uint64_t job_id = (uint64_t)id_num;
                 const sc_cron_job_t *job = sc_cron_get_job(app->cron, job_id);
                 if (job && job->command) {
-                    sc_error_t e = sc_cron_add_run(app->cron, app->alloc,
+                    sc_cron_add_run(app->cron, app->alloc,
                         job_id, (int64_t)time(NULL), "running", NULL);
-                    started = (e == SC_OK);
-                    status_msg = started ? "started" : "failed to start";
+#if !SC_IS_TEST
+                    const char *argv[] = { "/bin/sh", "-c", job->command, NULL };
+                    sc_run_result_t run_result = {0};
+                    sc_error_t run_err = sc_process_run(app->alloc, argv, NULL,
+                        65536, &run_result);
+                    started = (run_err == SC_OK);
+                    const char *run_output = run_result.stdout_buf;
+                    sc_cron_add_run(app->cron, app->alloc, job_id,
+                        (int64_t)time(NULL),
+                        started ? "completed" : "failed",
+                        run_output);
+                    sc_run_result_free(app->alloc, &run_result);
+#else
+                    started = true;
+#endif
+                    status_msg = started ? "completed" : "failed";
                 } else {
                     status_msg = "job not found";
                 }
@@ -932,6 +962,86 @@ static sc_error_t handle_usage_summary(sc_allocator_t *alloc,
     return err;
 }
 
+/* ── push.register ──────────────────────────────────────────────────── */
+
+static sc_error_t handle_push_register(sc_allocator_t *alloc,
+    sc_app_context_t *app, const sc_json_value_t *root,
+    char **out, size_t *out_len) {
+    bool registered = false;
+    const char *error_msg = NULL;
+
+    if (root && app && app->push) {
+        sc_json_value_t *params = sc_json_object_get(root, "params");
+        if (params) {
+            const char *token = sc_json_get_string(params, "token");
+            const char *provider_str = sc_json_get_string(params, "provider");
+            if (token && token[0]) {
+                sc_push_provider_t provider = SC_PUSH_NONE;
+                if (provider_str) {
+                    if (strcmp(provider_str, "fcm") == 0)
+                        provider = SC_PUSH_FCM;
+                    else if (strcmp(provider_str, "apns") == 0)
+                        provider = SC_PUSH_APNS;
+                }
+                if (provider != SC_PUSH_NONE) {
+                    sc_error_t e = sc_push_register_token(app->push, token, provider);
+                    registered = (e == SC_OK);
+                    if (!registered) error_msg = sc_error_string(e);
+                } else {
+                    error_msg = "provider must be 'fcm' or 'apns'";
+                }
+            } else {
+                error_msg = "token is required";
+            }
+        }
+    } else if (!app || !app->push) {
+        error_msg = "push not configured";
+    }
+
+    sc_json_value_t *obj = sc_json_object_new(alloc);
+    if (!obj) return SC_ERR_OUT_OF_MEMORY;
+    sc_json_object_set(alloc, obj, "registered",
+        sc_json_bool_new(alloc, registered));
+    if (error_msg) json_set_str(alloc, obj, "error", error_msg);
+    sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+    sc_json_free(alloc, obj);
+    return err;
+}
+
+/* ── push.unregister ────────────────────────────────────────────────── */
+
+static sc_error_t handle_push_unregister(sc_allocator_t *alloc,
+    sc_app_context_t *app, const sc_json_value_t *root,
+    char **out, size_t *out_len) {
+    bool unregistered = false;
+    const char *error_msg = NULL;
+
+    if (root && app && app->push) {
+        sc_json_value_t *params = sc_json_object_get(root, "params");
+        if (params) {
+            const char *token = sc_json_get_string(params, "token");
+            if (token && token[0]) {
+                sc_error_t e = sc_push_unregister_token(app->push, token);
+                unregistered = (e == SC_OK);
+                if (!unregistered) error_msg = sc_error_string(e);
+            } else {
+                error_msg = "token is required";
+            }
+        }
+    } else if (!app || !app->push) {
+        error_msg = "push not configured";
+    }
+
+    sc_json_value_t *obj = sc_json_object_new(alloc);
+    if (!obj) return SC_ERR_OUT_OF_MEMORY;
+    sc_json_object_set(alloc, obj, "unregistered",
+        sc_json_bool_new(alloc, unregistered));
+    if (error_msg) json_set_str(alloc, obj, "error", error_msg);
+    sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+    sc_json_free(alloc, obj);
+    return err;
+}
+
 /* ── Method dispatcher ───────────────────────────────────────────────── */
 
 static sc_error_t build_method_response(sc_allocator_t *alloc,
@@ -998,6 +1108,10 @@ static sc_error_t build_method_response(sc_allocator_t *alloc,
         return handle_models_list(alloc, app, payload_out, payload_len_out);
     if (strcmp(method, "nodes.list") == 0)
         return handle_nodes_list(alloc, app, payload_out, payload_len_out);
+    if (strcmp(method, "push.register") == 0)
+        return handle_push_register(alloc, app, root, payload_out, payload_len_out);
+    if (strcmp(method, "push.unregister") == 0)
+        return handle_push_unregister(alloc, app, root, payload_out, payload_len_out);
 
     return SC_ERR_NOT_FOUND;
 }

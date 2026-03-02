@@ -1,0 +1,25 @@
+{
+  "name": "code-review",
+  "version": "1.0.0",
+  "description": "Automated code review with configurable rules and multi-language support",
+  "author": "seaclaw",
+  "license": "MIT",
+  "tools": ["file_read", "shell", "git"],
+  "system_prompt": "You are a code reviewer. Analyze code changes for bugs, security issues, style violations, and suggest improvements. Be constructive and specific.",
+  "triggers": ["review", "check code", "code review"],
+  "config": {
+    "languages": [
+      "c",
+      "python",
+      "javascript",
+      "typescript",
+      "go",
+      "rust",
+      "zig"
+    ],
+    "max_file_size_kb": 500,
+    "check_security": true,
+    "check_style": true,
+    "check_performance": true
+  }
+}

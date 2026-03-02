@@ -1,0 +1,497 @@
+import { LitElement, html, css, nothing } from "lit";
+import { customElement, state } from "lit/decorators.js";
+import type { GatewayClient } from "../gateway.js";
+
+type SaveStatus = "saved" | "error" | "unsaved" | "idle";
+
+interface SchemaProperty {
+  type?: string;
+  description?: string;
+}
+
+interface ConfigSchema {
+  type?: string;
+  properties?: Record<string, SchemaProperty>;
+}
+
+interface ConfigData {
+  exists?: boolean;
+  workspace_dir?: string;
+  default_provider?: string;
+  default_model?: string;
+  max_tokens?: number;
+  temperature?: number;
+}
+
+function unwrapPayload(res: unknown): unknown {
+  const r = res as { payload?: unknown };
+  return r?.payload ?? res;
+}
+
+function toRawConfig(edited: ConfigData): Record<string, unknown> {
+  return {
+    workspace: edited.workspace_dir ?? ".",
+    default_provider: edited.default_provider ?? "openai",
+    default_model: edited.default_model ?? "",
+    default_temperature: edited.temperature ?? 0.7,
+    max_tokens: edited.max_tokens ?? 0,
+  };
+}
+
+@customElement("sc-config-view")
+export class ScConfigView extends LitElement {
+  static override styles = css`
+    :host {
+      display: block;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .status {
+      font-size: 0.875rem;
+      color: var(--sc-text-muted);
+    }
+    .status.saved {
+      color: #22c55e;
+    }
+    .status.error {
+      color: #ef4444;
+    }
+    .status.unsaved {
+      color: var(--sc-accent);
+    }
+    .header-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .toggle-btn {
+      padding: 0.5rem 0.75rem;
+      background: var(--sc-bg-elevated);
+      color: var(--sc-text);
+      border: 1px solid var(--sc-border);
+      border-radius: var(--sc-radius);
+      font-size: 0.8125rem;
+      cursor: pointer;
+    }
+    .toggle-btn:hover {
+      background: var(--sc-border);
+    }
+    .save-btn {
+      padding: 0.5rem 1rem;
+      background: var(--sc-accent);
+      color: var(--sc-bg);
+      border: none;
+      border-radius: var(--sc-radius);
+      font-weight: 500;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .save-btn:hover:not(:disabled) {
+      background: var(--sc-accent-hover);
+    }
+    .save-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--sc-bg-surface);
+      border: 1px solid var(--sc-border);
+      border-radius: var(--sc-radius);
+    }
+    .section {
+      border: 1px solid var(--sc-border);
+      border-radius: var(--sc-radius);
+      overflow: hidden;
+    }
+    .section-header {
+      padding: 0.5rem 0.75rem;
+      background: var(--sc-bg-elevated);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+    .section-header:hover {
+      background: var(--sc-border);
+    }
+    .section-header .chevron {
+      transition: transform 0.2s;
+      font-size: 0.75rem;
+      color: var(--sc-text-muted);
+    }
+    .section-header.collapsed .chevron {
+      transform: rotate(-90deg);
+    }
+    .section-content {
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .section.collapsed .section-content {
+      display: none;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .field label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--sc-text);
+    }
+    .field .description {
+      font-size: 0.75rem;
+      color: var(--sc-text-muted);
+      margin-top: 0.125rem;
+    }
+    .field input {
+      padding: 0.5rem 0.75rem;
+      background: var(--sc-bg);
+      border: 1px solid var(--sc-border);
+      border-radius: var(--sc-radius);
+      color: var(--sc-text);
+      font-size: 0.875rem;
+    }
+    .field input:focus {
+      outline: none;
+      border-color: var(--sc-accent);
+    }
+    .field input[type="number"] {
+      width: 8rem;
+    }
+    .raw-area {
+      min-height: 280px;
+      padding: 0.75rem 1rem;
+      background: var(--sc-bg);
+      border: 1px solid var(--sc-border);
+      border-radius: var(--sc-radius);
+      color: var(--sc-text);
+      font-family: var(--sc-font-mono);
+      font-size: 0.8125rem;
+      resize: vertical;
+    }
+    .raw-area:focus {
+      outline: none;
+      border-color: var(--sc-accent);
+    }
+  `;
+
+  @state() private config: ConfigData = {};
+  @state() private edited: ConfigData = {};
+  @state() private schema: ConfigSchema = {};
+  @state() private rawMode = false;
+  @state() private rawText = "";
+  @state() private sectionCollapsed = false;
+  @state() private saveStatus: SaveStatus = "idle";
+  @state() private errorMessage = "";
+
+  private gateway: GatewayClient | null = null;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.gateway =
+      (document.querySelector("sc-app") as { gateway?: GatewayClient })
+        ?.gateway ?? null;
+    this.loadConfig();
+    this.loadSchema();
+  }
+
+  private async loadConfig(): Promise<void> {
+    if (!this.gateway) return;
+    try {
+      const res = await this.gateway.request("config.get", {});
+      const cfg = unwrapPayload(res) as Partial<ConfigData>;
+      this.config = {
+        exists: cfg?.exists ?? false,
+        workspace_dir: cfg?.workspace_dir ?? "",
+        default_provider: cfg?.default_provider ?? "",
+        default_model: cfg?.default_model ?? "",
+        max_tokens: cfg?.max_tokens ?? 0,
+        temperature: cfg?.temperature ?? 0.7,
+      };
+      this.edited = { ...this.config };
+      this.rawText = JSON.stringify(toRawConfig(this.config), null, 2);
+      this.saveStatus = "idle";
+    } catch (e) {
+      this.saveStatus = "error";
+      this.errorMessage = e instanceof Error ? e.message : "Load failed";
+    }
+  }
+
+  private async loadSchema(): Promise<void> {
+    if (!this.gateway) return;
+    try {
+      const res = (await this.gateway.request("config.schema", {})) as {
+        schema?: ConfigSchema;
+      };
+      const s =
+        (unwrapPayload(res) as { schema?: ConfigSchema })?.schema ??
+        res?.schema;
+      this.schema = s ?? { type: "object", properties: {} };
+    } catch {
+      this.schema = {
+        type: "object",
+        properties: {
+          workspace_dir: { type: "string", description: "Workspace directory" },
+          default_provider: {
+            type: "string",
+            description: "Default AI provider",
+          },
+          default_model: { type: "string", description: "Default model" },
+          max_tokens: {
+            type: "integer",
+            description: "Max tokens per response",
+          },
+          temperature: {
+            type: "number",
+            description: "Temperature (0.0 - 2.0)",
+          },
+        },
+      };
+    }
+  }
+
+  private hasChanges(): boolean {
+    if (this.rawMode) {
+      try {
+        const parsed = JSON.parse(this.rawText) as Record<string, unknown>;
+        const current = toRawConfig(this.config);
+        return JSON.stringify(parsed) !== JSON.stringify(current);
+      } catch {
+        return this.rawText.trim().length > 0;
+      }
+    }
+    return (
+      (this.edited.workspace_dir ?? "") !== (this.config.workspace_dir ?? "") ||
+      (this.edited.default_provider ?? "") !==
+        (this.config.default_provider ?? "") ||
+      (this.edited.default_model ?? "") !== (this.config.default_model ?? "") ||
+      (this.edited.max_tokens ?? 0) !== (this.config.max_tokens ?? 0) ||
+      Math.abs(
+        (this.edited.temperature ?? 0.7) - (this.config.temperature ?? 0.7),
+      ) > 0.001
+    );
+  }
+
+  private async save(): Promise<void> {
+    if (!this.gateway) return;
+    this.saveStatus = "idle";
+    this.errorMessage = "";
+    try {
+      let raw: string;
+      if (this.rawMode) {
+        raw = this.rawText;
+        try {
+          JSON.parse(raw);
+        } catch {
+          this.saveStatus = "error";
+          this.errorMessage = "Invalid JSON";
+          return;
+        }
+      } else {
+        raw = JSON.stringify(toRawConfig(this.edited));
+      }
+      const res = await this.gateway.request("config.set", { raw });
+      const payload = unwrapPayload(res) as { saved?: boolean };
+      if (payload?.saved !== false) {
+        if (this.rawMode) {
+          try {
+            const parsed = JSON.parse(raw) as Record<string, unknown>;
+            this.config = {
+              exists: true,
+              workspace_dir: String(parsed.workspace ?? "."),
+              default_provider: String(parsed.default_provider ?? "openai"),
+              default_model: String(parsed.default_model ?? ""),
+              max_tokens: Number(parsed.max_tokens ?? 0),
+              temperature: Number(
+                parsed.default_temperature ?? parsed.temperature ?? 0.7,
+              ),
+            };
+            this.edited = { ...this.config };
+          } catch {
+            /* keep config as-is */
+          }
+        } else {
+          this.config = { ...this.edited };
+        }
+        this.rawText = JSON.stringify(toRawConfig(this.config), null, 2);
+        this.saveStatus = "saved";
+        setTimeout(() => {
+          if (this.saveStatus === "saved") this.saveStatus = "idle";
+        }, 2000);
+      } else {
+        this.saveStatus = "error";
+        this.errorMessage = "Save rejected";
+      }
+    } catch (e) {
+      this.saveStatus = "error";
+      this.errorMessage = e instanceof Error ? e.message : "Save failed";
+    }
+  }
+
+  private toggleRawMode(): void {
+    if (this.rawMode) {
+      try {
+        const parsed = JSON.parse(this.rawText) as Record<string, unknown>;
+        this.edited = {
+          exists: true,
+          workspace_dir: String(parsed.workspace ?? "."),
+          default_provider: String(parsed.default_provider ?? "openai"),
+          default_model: String(parsed.default_model ?? ""),
+          max_tokens: Number(parsed.max_tokens ?? 0),
+          temperature: Number(
+            parsed.default_temperature ?? parsed.temperature ?? 0.7,
+          ),
+        };
+      } catch {
+        /* invalid JSON, keep edited */
+      }
+    } else {
+      this.rawText = JSON.stringify(toRawConfig(this.edited), null, 2);
+    }
+    this.rawMode = !this.rawMode;
+  }
+
+  override render() {
+    const statusText =
+      this.saveStatus === "saved"
+        ? "Saved"
+        : this.saveStatus === "error"
+          ? this.errorMessage || "Error"
+          : this.hasChanges()
+            ? "Unsaved changes"
+            : "";
+
+    const props = this.schema?.properties ?? {};
+    const order = [
+      "workspace_dir",
+      "default_provider",
+      "default_model",
+      "max_tokens",
+      "temperature",
+    ];
+    const orderedKeys = order.filter((k) => k in props);
+    const extraKeys = Object.keys(props).filter((k) => !order.includes(k));
+    const fieldKeys = [...orderedKeys, ...extraKeys];
+
+    return html`
+      <div class="header">
+        <span class="status ${this.saveStatus}">${statusText}</span>
+        <div class="header-actions">
+          <button class="toggle-btn" @click=${this.toggleRawMode}>
+            ${this.rawMode ? "Form" : "Raw JSON"}
+          </button>
+          <button
+            class="save-btn"
+            ?disabled=${!this.hasChanges()}
+            @click=${() => this.save()}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+      ${this.rawMode
+        ? html`
+            <div class="form">
+              <textarea
+                class="raw-area"
+                .value=${this.rawText}
+                @input=${(e: Event) => {
+                  this.rawText = (e.target as HTMLTextAreaElement).value;
+                  if (this.saveStatus === "saved") this.saveStatus = "idle";
+                }}
+                spellcheck="false"
+              ></textarea>
+            </div>
+          `
+        : html`
+            <div class="form">
+              <div class="section ${this.sectionCollapsed ? "collapsed" : ""}">
+                <div
+                  class="section-header ${this.sectionCollapsed
+                    ? "collapsed"
+                    : ""}"
+                  @click=${() =>
+                    (this.sectionCollapsed = !this.sectionCollapsed)}
+                >
+                  <span>General</span>
+                  <span class="chevron">▼</span>
+                </div>
+                <div class="section-content">
+                  ${fieldKeys.map((key) => {
+                    const prop = props[key] as SchemaProperty | undefined;
+                    const desc = prop?.description ?? "";
+                    const val = this.edited[key as keyof ConfigData];
+                    const inputType =
+                      prop?.type === "integer" || prop?.type === "number"
+                        ? "number"
+                        : "text";
+
+                    return html`
+                      <div class="field">
+                        <label for="${key}">${key.replace(/_/g, " ")}</label>
+                        ${desc
+                          ? html`<div class="description">${desc}</div>`
+                          : nothing}
+                        <input
+                          id="${key}"
+                          type="${inputType}"
+                          min=${inputType === "number" ? 0 : undefined}
+                          max=${key === "temperature" ? 2 : undefined}
+                          step=${key === "temperature"
+                            ? 0.1
+                            : inputType === "number"
+                              ? 1
+                              : undefined}
+                          .value=${String(val ?? "")}
+                          @input=${(e: Event) => {
+                            const t = e.target as HTMLInputElement;
+                            const v =
+                              inputType === "number"
+                                ? key === "temperature"
+                                  ? parseFloat(t.value)
+                                  : parseInt(t.value, 10)
+                                : t.value;
+                            const parsed =
+                              inputType === "number"
+                                ? isNaN(v as number)
+                                  ? key === "temperature"
+                                    ? 0.7
+                                    : 0
+                                  : key === "temperature"
+                                    ? Math.max(0, Math.min(2, v as number))
+                                    : v
+                                : v;
+                            this.edited = {
+                              ...this.edited,
+                              [key]: parsed,
+                            };
+                            if (this.saveStatus === "saved")
+                              this.saveStatus = "idle";
+                          }}
+                        />
+                      </div>
+                    `;
+                  })}
+                </div>
+              </div>
+            </div>
+          `}
+    `;
+  }
+}

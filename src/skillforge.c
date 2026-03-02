@@ -303,6 +303,15 @@ sc_error_t sc_skillforge_uninstall(sc_skillforge_t *sf, const char *name) {
                     (sf->skills_len - i - 1) * sizeof(sc_skill_t));
             }
             sf->skills_len--;
+
+            const char *home = getenv("HOME");
+            if (home) {
+                char path[1024];
+                int n = snprintf(path, sizeof(path),
+                    "%s/.seaclaw/skills/%.256s.skill.json", home, name);
+                if (n > 0 && (size_t)n < sizeof(path))
+                    remove(path);
+            }
             return SC_OK;
         }
     }

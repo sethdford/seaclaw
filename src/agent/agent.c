@@ -1,4 +1,5 @@
 #include "seaclaw/agent.h"
+#include "seaclaw/voice.h"
 #include <stdint.h>
 #include "seaclaw/agent/dispatcher.h"
 #include "seaclaw/agent/compaction.h"
@@ -20,6 +21,19 @@
 
 static uint64_t clock_diff_ms(clock_t start, clock_t end) {
     return (uint64_t)((end - start) * 1000 / CLOCKS_PER_SEC);
+}
+
+static void agent_record_cost(sc_agent_t *agent, const sc_token_usage_t *usage) {
+    if (!agent->cost_tracker || !agent->cost_tracker->enabled) return;
+    sc_cost_entry_t entry;
+    memset(&entry, 0, sizeof(entry));
+    entry.model = agent->model_name;
+    entry.input_tokens = usage->prompt_tokens;
+    entry.output_tokens = usage->completion_tokens;
+    entry.total_tokens = usage->total_tokens;
+    entry.cost_usd = 0.0;
+    entry.timestamp_secs = (int64_t)time(NULL);
+    sc_cost_record_usage(agent->cost_tracker, &entry);
 }
 
 #define SC_AGENT_HISTORY_INIT_CAP 16
@@ -603,8 +617,24 @@ sc_error_t sc_agent_run_single(sc_agent_t *agent,
         if (response_len_out) *response_len_out = resp.content_len;
     }
     agent->total_tokens += resp.usage.total_tokens;
+    agent_record_cost(agent, &resp.usage);
     sc_chat_response_free(agent->alloc, &resp);
     return SC_OK;
+}
+
+static void agent_maybe_tts(sc_agent_t *agent, const char *text, size_t text_len) {
+    if (!agent->tts_enabled || !agent->voice_config || !text || text_len == 0) return;
+#ifndef SC_IS_TEST
+    void *audio = NULL;
+    size_t audio_len = 0;
+    sc_error_t err = sc_voice_tts(agent->alloc, agent->voice_config, text, text_len, &audio, &audio_len);
+    if (err == SC_OK && audio && audio_len > 0) {
+        sc_voice_play(agent->alloc, audio, audio_len);
+        agent->alloc->free(agent->alloc->ctx, audio, audio_len);
+    }
+#else
+    (void)agent; (void)text; (void)text_len;
+#endif
 }
 
 sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len,
@@ -789,6 +819,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len,
         }
 
         agent->total_tokens += resp.usage.total_tokens;
+        agent_record_cost(agent, &resp.usage);
         turn_tokens += resp.usage.total_tokens;
 
         if (resp.tool_calls_count == 0) {
@@ -813,6 +844,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len,
                     return SC_ERR_OUT_OF_MEMORY;
                 }
                 if (response_len_out) *response_len_out = resp.content_len;
+                agent_maybe_tts(agent, resp.content, resp.content_len);
             }
             sc_chat_response_free(agent->alloc, &resp);
             if (system_prompt) agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
@@ -1140,11 +1172,13 @@ sc_error_t sc_agent_turn_stream(sc_agent_t *agent, const char *msg, size_t msg_l
         if (system_prompt) agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
         if (err != SC_OK) return err;
         agent->total_tokens += sresp.usage.total_tokens;
+        agent_record_cost(agent, &sresp.usage);
         if (sresp.content && sresp.content_len > 0) {
             (void)append_history(agent, SC_ROLE_ASSISTANT, sresp.content, sresp.content_len, NULL, 0, NULL, 0);
             *response_out = sc_strndup(agent->alloc, sresp.content, sresp.content_len);
             if (!*response_out) return SC_ERR_OUT_OF_MEMORY;
             if (response_len_out) *response_len_out = sresp.content_len;
+            agent_maybe_tts(agent, sresp.content, sresp.content_len);
         }
         return SC_OK;
     }

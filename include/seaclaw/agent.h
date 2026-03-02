@@ -11,6 +11,8 @@
 #include "seaclaw/memory.h"
 #include "seaclaw/observer.h"
 #include "seaclaw/security.h"
+#include "seaclaw/cost.h"
+#include "seaclaw/voice.h"
 #include <signal.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -52,6 +54,7 @@ struct sc_agent {
     sc_session_store_t *session_store;  /* optional, may be NULL */
     sc_observer_t *observer;       /* optional, may be NULL */
     sc_security_policy_t *policy;  /* optional, may be NULL */
+    sc_cost_tracker_t *cost_tracker; /* optional, may be NULL */
 
     char *model_name;             /* owned */
     size_t model_name_len;
@@ -81,6 +84,10 @@ struct sc_agent {
 
     sc_agent_approval_cb approval_cb;  /* optional; if NULL, approval-required = denied */
     void *approval_ctx;
+
+    /* TTS (text-to-speech) auto-playback */
+    bool tts_enabled;              /* if true, play responses as audio */
+    sc_voice_config_t *voice_config; /* optional; if NULL, TTS is skipped even if enabled */
 
     sc_arena_t *turn_arena;  /* per-turn bump allocator for ephemeral allocations */
 };

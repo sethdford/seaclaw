@@ -74,6 +74,7 @@ typedef struct sc_cost_summary {
 
 typedef struct sc_cost_record {
     sc_cost_entry_t usage;
+    char model_buf[64];
     char session_id[64];
 } sc_cost_record_t;
 

@@ -1,0 +1,39 @@
+name: Validate Registry
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate registry.json JSON
+        run: python3 -c "import json; json.load(open('registry.json'))"
+
+      - name: Validate entries and skills
+        run: |
+          python3 -c "
+          import json
+          import os
+          with open('registry.json') as f:
+            registry = json.load(f)
+          for entry in registry:
+            name = entry.get('name')
+            if not name:
+              raise SystemExit(1)
+            for field in ['description', 'version', 'author', 'url']:
+              if not entry.get(field):
+                raise SystemExit(1)
+            skill_json = 'skills/' + name + '/' + name + '.skill.json'
+            if not os.path.isfile(skill_json):
+              raise SystemExit(1)
+            with open(skill_json) as f:
+              meta = json.load(f)
+            if not meta.get('name') or not meta.get('description'):
+              raise SystemExit(1)
+          "

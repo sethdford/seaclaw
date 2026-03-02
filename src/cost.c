@@ -129,9 +129,17 @@ sc_error_t sc_cost_record_usage(sc_cost_tracker_t *t, const sc_cost_entry_t *usa
         t->record_cap = new_cap;
     }
 
-    t->records[t->record_count].usage = *usage;
-    strncpy(t->records[t->record_count].session_id, "current", sizeof(t->records[t->record_count].session_id) - 1);
-    t->records[t->record_count].session_id[sizeof(t->records[t->record_count].session_id) - 1] = '\0';
+    sc_cost_record_t *rec = &t->records[t->record_count];
+    rec->usage = *usage;
+    if (usage->model) {
+        strncpy(rec->model_buf, usage->model, sizeof(rec->model_buf) - 1);
+        rec->model_buf[sizeof(rec->model_buf) - 1] = '\0';
+    } else {
+        rec->model_buf[0] = '\0';
+    }
+    rec->usage.model = rec->model_buf;
+    strncpy(rec->session_id, "current", sizeof(rec->session_id) - 1);
+    rec->session_id[sizeof(rec->session_id) - 1] = '\0';
     t->record_count++;
 
 #ifndef SC_IS_TEST
