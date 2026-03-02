@@ -5,6 +5,7 @@
 #include "seaclaw/core/string.h"
 #include "seaclaw/security.h"
 #include "seaclaw/security/sandbox.h"
+#include "seaclaw/core/process_util.h"
 #include "seaclaw/config.h"
 #include <string.h>
 #include <stdlib.h>
@@ -119,7 +120,44 @@ static sc_error_t shell_execute(void *ctx, sc_allocator_t *alloc,
 
         setenv("PATH", "/usr/bin:/bin", 1);
 
-        /* Wrap command with sandbox if available */
+        /* Apply network proxy env vars if configured */
+        if (s->policy && s->policy->net_proxy &&
+            s->policy->net_proxy->enabled) {
+            const char *addr = s->policy->net_proxy->proxy_addr;
+            if (!addr) addr = "http://127.0.0.1:0";
+            setenv("HTTP_PROXY", addr, 1);
+            setenv("HTTPS_PROXY", addr, 1);
+            setenv("http_proxy", addr, 1);
+            setenv("https_proxy", addr, 1);
+            if (s->policy->net_proxy->allowed_domains_count > 0) {
+                char no_proxy[4096];
+                size_t off = 0;
+                for (size_t i = 0; i < s->policy->net_proxy->allowed_domains_count; i++) {
+                    const char *d = s->policy->net_proxy->allowed_domains[i];
+                    if (!d) continue;
+                    size_t dlen = strlen(d);
+                    if (off + dlen + 2 >= sizeof(no_proxy)) break;
+                    if (off > 0) no_proxy[off++] = ',';
+                    memcpy(no_proxy + off, d, dlen);
+                    off += dlen;
+                }
+                no_proxy[off] = '\0';
+                setenv("NO_PROXY", no_proxy, 1);
+                setenv("no_proxy", no_proxy, 1);
+            }
+        }
+
+        /* Apply kernel-level sandbox (Landlock, seccomp) */
+        if (s->policy && s->policy->sandbox &&
+            s->policy->sandbox->vtable &&
+            s->policy->sandbox->vtable->apply) {
+            sc_error_t serr = s->policy->sandbox->vtable->apply(
+                s->policy->sandbox->ctx);
+            if (serr != SC_OK && serr != SC_ERR_NOT_SUPPORTED)
+                _exit(125);
+        }
+
+        /* Wrap command with sandbox if available (argv-wrapping backends) */
         if (s->policy && s->policy->sandbox &&
             sc_sandbox_is_available(s->policy->sandbox)) {
             const char *orig_argv[] = { "/bin/sh", "-c", cmd, NULL };

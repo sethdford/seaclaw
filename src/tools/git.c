@@ -7,6 +7,7 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/security.h"
+#include "seaclaw/security/sandbox.h"
 #include "seaclaw/tools/validation.h"
 #include <string.h>
 #include <stdlib.h>
@@ -41,7 +42,7 @@ static bool sanitize_git_args(const char *args)
 
 #if !SC_IS_TEST
 static char *run_git(sc_allocator_t *alloc, const char *cwd, const char **argv, int argc,
-    sc_tool_result_t *out)
+    sc_security_policy_t *policy, sc_tool_result_t *out)
 {
 #ifndef _WIN32
     int fds[2];
@@ -59,6 +60,40 @@ static char *run_git(sc_allocator_t *alloc, const char *cwd, const char **argv, 
         close(fds[1]);
         if (cwd && cwd[0]) chdir(cwd);
         setenv("PATH", "/usr/bin:/bin", 1);
+
+        if (policy && policy->net_proxy && policy->net_proxy->enabled) {
+            const char *addr = policy->net_proxy->proxy_addr;
+            if (!addr) addr = "http://127.0.0.1:0";
+            setenv("HTTP_PROXY", addr, 1);
+            setenv("HTTPS_PROXY", addr, 1);
+            setenv("http_proxy", addr, 1);
+            setenv("https_proxy", addr, 1);
+            if (policy->net_proxy->allowed_domains_count > 0) {
+                char no_proxy[4096];
+                size_t off = 0;
+                for (size_t i = 0; i < policy->net_proxy->allowed_domains_count; i++) {
+                    const char *d = policy->net_proxy->allowed_domains[i];
+                    if (!d) continue;
+                    size_t dlen = strlen(d);
+                    if (off + dlen + 2 >= sizeof(no_proxy)) break;
+                    if (off > 0) no_proxy[off++] = ',';
+                    memcpy(no_proxy + off, d, dlen);
+                    off += dlen;
+                }
+                no_proxy[off] = '\0';
+                setenv("NO_PROXY", no_proxy, 1);
+                setenv("no_proxy", no_proxy, 1);
+            }
+        }
+
+        if (policy && policy->sandbox && policy->sandbox->vtable &&
+            policy->sandbox->vtable->apply) {
+            sc_error_t serr = policy->sandbox->vtable->apply(
+                policy->sandbox->ctx);
+            if (serr != SC_OK && serr != SC_ERR_NOT_SUPPORTED)
+                _exit(125);
+        }
+
         char **exec_argv = (char **)malloc((size_t)(argc + 1) * sizeof(char *));
         if (!exec_argv) _exit(127);
         for (int i = 0; i < argc; i++) exec_argv[i] = (char *)argv[i];
@@ -204,7 +239,7 @@ static sc_error_t git_execute(void *ctx, sc_allocator_t *alloc,
         *out = sc_tool_result_fail("Unknown operation", 17);
         return SC_OK;
     }
-    char *result = run_git(alloc, cwd, argv, argc, out);
+    char *result = run_git(alloc, cwd, argv, argc, c->policy, out);
     if (!result) return SC_OK;
     *out = sc_tool_result_ok_owned(result, strlen(result));
     return SC_OK;

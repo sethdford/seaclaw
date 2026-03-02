@@ -20,19 +20,22 @@ static sc_error_t firejail_wrap(void *ctx, const char *const *argv, size_t argc,
     return SC_ERR_NOT_SUPPORTED;
 #else
     sc_firejail_ctx_t *fj = (sc_firejail_ctx_t *)ctx;
-    /* firejail --private=WORKSPACE --net=none --quiet --noprofile <argv> */
-    const size_t prefix_len = 5;
+    const size_t base_prefix = 5;
+    size_t extra = fj->extra_args_len;
+    size_t total_prefix = base_prefix + extra;
     if (!buf || !out_count) return SC_ERR_INVALID_ARGUMENT;
-    if (buf_count < prefix_len + argc) return SC_ERR_INVALID_ARGUMENT;
+    if (buf_count < total_prefix + argc) return SC_ERR_INVALID_ARGUMENT;
 
     buf[0] = "firejail";
     buf[1] = fj->private_arg;
     buf[2] = "--net=none";
     buf[3] = "--quiet";
     buf[4] = "--noprofile";
+    for (size_t i = 0; i < extra; i++)
+        buf[base_prefix + i] = fj->extra_args[i];
     for (size_t i = 0; i < argc; i++)
-        buf[prefix_len + i] = argv[i];
-    *out_count = prefix_len + argc;
+        buf[total_prefix + i] = argv[i];
+    *out_count = total_prefix + argc;
     return SC_OK;
 #endif
 }
@@ -88,4 +91,11 @@ void sc_firejail_sandbox_init(sc_firejail_ctx_t *ctx, const char *workspace_dir)
             ctx->private_len = 9;
         }
     }
+}
+
+void sc_firejail_sandbox_set_extra_args(sc_firejail_ctx_t *ctx,
+    const char *const *args, size_t args_len) {
+    if (!ctx) return;
+    ctx->extra_args = args;
+    ctx->extra_args_len = args_len;
 }

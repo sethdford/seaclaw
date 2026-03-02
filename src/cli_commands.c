@@ -347,8 +347,8 @@ sc_error_t cmd_sandbox(sc_allocator_t *alloc, int argc, char **argv) {
     printf("Sandbox Configuration\n");
     printf("  backend:       %s\n",
         cfg.security.sandbox ? cfg.security.sandbox : "auto");
-    printf("  enabled:       %s\n",
-        cfg.security.sandbox_config.enabled ? "yes" : "no");
+    printf("  configured:    %s\n",
+        cfg.security.sandbox_config.enabled ? "yes (explicit)" : "auto-detect");
 
     /* Detect available backends */
     sc_sandbox_alloc_t sa = {

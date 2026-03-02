@@ -10,6 +10,7 @@
 #include "seaclaw/tools/factory.h"
 #include "seaclaw/security.h"
 #include "seaclaw/security/sandbox.h"
+#include "seaclaw/security/sandbox_internal.h"
 #include "seaclaw/observability/log_observer.h"
 #include "seaclaw/channels/cli.h"
 #include "seaclaw/memory.h"
@@ -336,8 +337,16 @@ sc_error_t sc_agent_cli_run(sc_allocator_t *alloc, const char *const *argv, size
         if (sb_storage) {
             sandbox = sc_sandbox_create(cfg.security.sandbox_config.backend,
                 ws, sb_storage, &sb_alloc);
-            if (sandbox.vtable)
+            if (sandbox.vtable) {
                 policy.sandbox = &sandbox;
+                if (strcmp(sc_sandbox_name(&sandbox), "firejail") == 0 &&
+                    cfg.security.sandbox_config.firejail_args_len > 0) {
+                    sc_firejail_sandbox_set_extra_args(
+                        (sc_firejail_ctx_t *)sandbox.ctx,
+                        (const char *const *)cfg.security.sandbox_config.firejail_args,
+                        cfg.security.sandbox_config.firejail_args_len);
+                }
+            }
         }
     }
 

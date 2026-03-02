@@ -53,10 +53,10 @@ static sc_error_t seatbelt_wrap(void *ctx, const char *const *argv, size_t argc,
     return SC_ERR_NOT_SUPPORTED;
 #else
     sc_seatbelt_ctx_t *sb = (sc_seatbelt_ctx_t *)ctx;
-    /* sandbox-exec -p '<profile>' <argv...> */
     const size_t prefix_len = 3;
     if (!buf || !out_count) return SC_ERR_INVALID_ARGUMENT;
     if (buf_count < prefix_len + argc) return SC_ERR_INVALID_ARGUMENT;
+    if (sb->profile_len == 0) return SC_ERR_INTERNAL;
 
     buf[0] = "sandbox-exec";
     buf[1] = "-p";

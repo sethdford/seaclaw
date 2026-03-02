@@ -18,6 +18,7 @@
 #include "seaclaw/memory/engines.h"
 #include "seaclaw/security.h"
 #include "seaclaw/security/sandbox.h"
+#include "seaclaw/security/sandbox_internal.h"
 #include "seaclaw/health.h"
 #include "seaclaw/providers/factory.h"
 #include "seaclaw/tools/factory.h"
@@ -475,8 +476,16 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
         if (sb_storage) {
             sandbox = sc_sandbox_create(cfg.security.sandbox_config.backend,
                 ws, sb_storage, &sb_alloc);
-            if (sandbox.vtable)
+            if (sandbox.vtable) {
                 policy.sandbox = &sandbox;
+                if (strcmp(sc_sandbox_name(&sandbox), "firejail") == 0 &&
+                    cfg.security.sandbox_config.firejail_args_len > 0) {
+                    sc_firejail_sandbox_set_extra_args(
+                        (sc_firejail_ctx_t *)sandbox.ctx,
+                        (const char *const *)cfg.security.sandbox_config.firejail_args,
+                        cfg.security.sandbox_config.firejail_args_len);
+                }
+            }
         }
     }
 
@@ -884,8 +893,16 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
         if (gw_sb_storage) {
             gw_sandbox = sc_sandbox_create(cfg.security.sandbox_config.backend,
                 ws, gw_sb_storage, &gw_sb_alloc);
-            if (gw_sandbox.vtable)
+            if (gw_sandbox.vtable) {
                 policy.sandbox = &gw_sandbox;
+                if (strcmp(sc_sandbox_name(&gw_sandbox), "firejail") == 0 &&
+                    cfg.security.sandbox_config.firejail_args_len > 0) {
+                    sc_firejail_sandbox_set_extra_args(
+                        (sc_firejail_ctx_t *)gw_sandbox.ctx,
+                        (const char *const *)cfg.security.sandbox_config.firejail_args,
+                        cfg.security.sandbox_config.firejail_args_len);
+                }
+            }
         }
     }
 

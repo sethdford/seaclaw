@@ -16,8 +16,12 @@ sc_sandbox_t sc_landlock_sandbox_get(sc_landlock_ctx_t *ctx);
 typedef struct {
     char private_arg[256];
     size_t private_len;
+    const char *const *extra_args;
+    size_t extra_args_len;
 } sc_firejail_ctx_t;
 void sc_firejail_sandbox_init(sc_firejail_ctx_t *ctx, const char *workspace_dir);
+void sc_firejail_sandbox_set_extra_args(sc_firejail_ctx_t *ctx,
+    const char *const *args, size_t args_len);
 sc_sandbox_t sc_firejail_sandbox_get(sc_firejail_ctx_t *ctx);
 
 typedef struct { char workspace_dir[2048]; } sc_bubblewrap_ctx_t;
