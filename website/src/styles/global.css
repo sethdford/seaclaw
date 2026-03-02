@@ -1,8 +1,42 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/geist-mono";
 
-/* Custom utilities and base overrides for SeaClaw */
 @layer base {
+  :root {
+    --color-bg: #09090b;
+    --color-surface: #18181b;
+    --color-border: #27272a;
+    --color-text: #fafafa;
+    --color-text-secondary: #a1a1aa;
+    --color-text-muted: #71717a;
+    --color-accent: #ef4444;
+    --color-accent-glow: rgba(239, 68, 68, 0.15);
+    --font-sans:
+      "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+    --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
-    @apply text-slate-100;
+    font-family: var(--font-sans);
+    color: var(--color-text);
+    background: var(--color-bg);
+  }
+
+  ::selection {
+    background: rgba(239, 68, 68, 0.3);
+    color: #fff;
+  }
+
+  code,
+  pre,
+  kbd {
+    font-family: var(--font-mono);
   }
 }
