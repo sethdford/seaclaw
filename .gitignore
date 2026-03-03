@@ -70,6 +70,8 @@ ui/test-results/
 ui/playwright-report/
 ui/blob-report/
 ui/visual-regression/
+ui/coverage/
+ui/e2e-screenshots/
 
 # E2E test artifacts (screenshots, ad-hoc scripts)
 ui/e2e-*.png
