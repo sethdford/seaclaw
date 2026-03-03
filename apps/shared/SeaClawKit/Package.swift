@@ -27,5 +27,15 @@ let package = Package(
             dependencies: ["SeaClawProtocol"],
             path: "Sources/SeaClawChatUI"
         ),
+        .testTarget(
+            name: "SeaClawProtocolTests",
+            dependencies: ["SeaClawProtocol"],
+            path: "Tests/SeaClawProtocolTests"
+        ),
+        .testTarget(
+            name: "SeaClawClientTests",
+            dependencies: ["SeaClawClient"],
+            path: "Tests/SeaClawClientTests"
+        ),
     ]
 )
