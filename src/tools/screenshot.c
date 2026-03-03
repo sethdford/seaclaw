@@ -25,6 +25,7 @@ static sc_error_t screenshot_execute(void *ctx, sc_allocator_t *alloc,
     sc_tool_result_t *out)
 {
     sc_screenshot_ctx_t *sc = (sc_screenshot_ctx_t *)ctx;
+    (void)sc;
     if (!out) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;

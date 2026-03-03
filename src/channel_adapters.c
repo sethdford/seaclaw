@@ -1,7 +1,7 @@
 #include "seaclaw/channel_adapters.h"
 #include <string.h>
 
-/* Minimal stub: parse peer kind for agent_routing compatibility. */
+/* Parse peer kind for agent_routing compatibility. */
 int sc_channel_adapters_parse_peer_kind(const char *raw, size_t len) {
     if (!raw) return -1;
     if (len >= 6 && strncmp(raw, "direct", 6) == 0) return (int)SC_CHAT_DIRECT;

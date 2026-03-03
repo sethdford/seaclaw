@@ -1,10 +1,12 @@
 import { LitElement, html, css } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient } from "../gateway.js";
+import { getGateway } from "../gateway-provider.js";
 
 interface CronJob {
-  id?: string;
+  id?: number;
   expression: string;
+  command?: string;
   description?: string;
   lastRun?: string;
   status?: string;
@@ -145,6 +147,47 @@ export class ScCronView extends LitElement {
       font-size: 0.875rem;
       margin-top: 0.5rem;
     }
+    .skeleton {
+      background: linear-gradient(
+        90deg,
+        var(--sc-bg-elevated) 25%,
+        var(--sc-bg-surface) 50%,
+        var(--sc-bg-elevated) 75%
+      );
+      background-size: 200% 100%;
+      animation: sc-shimmer 1.5s ease-in-out infinite;
+      border-radius: var(--sc-radius);
+    }
+    .skeleton-line {
+      height: 1rem;
+      margin-bottom: 0.75rem;
+      border-radius: 4px;
+    }
+    .skeleton-card {
+      height: 5rem;
+      margin-bottom: 0.75rem;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--sc-text-muted);
+    }
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    .empty-title {
+      font-size: var(--sc-text-lg);
+      font-weight: 600;
+      color: var(--sc-text);
+      margin: 0 0 0.5rem;
+    }
+    .empty-desc {
+      font-size: var(--sc-text-sm);
+      margin: 0;
+      max-width: 24rem;
+      margin-inline: auto;
+    }
   `;
 
   @state() private jobs: CronJob[] = [];
@@ -152,13 +195,11 @@ export class ScCronView extends LitElement {
   @state() private error = "";
   @state() private showForm = false;
   @state() private formExpression = "";
+  @state() private formCommand = "";
   @state() private formDescription = "";
 
   private get gateway(): GatewayClient | null {
-    return (
-      (document.querySelector("sc-app") as { gateway?: GatewayClient })
-        ?.gateway ?? null
-    );
+    return getGateway();
   }
 
   override connectedCallback(): void {
@@ -190,6 +231,7 @@ export class ScCronView extends LitElement {
 
   private openAddForm(): void {
     this.formExpression = "";
+    this.formCommand = "";
     this.formDescription = "";
     this.showForm = true;
   }
@@ -200,12 +242,13 @@ export class ScCronView extends LitElement {
 
   private async submitAdd(): Promise<void> {
     const gw = this.gateway;
-    if (!gw || !this.formExpression.trim()) return;
+    if (!gw || !this.formExpression.trim() || !this.formCommand.trim()) return;
     this.error = "";
     try {
       await gw.request("cron.add", {
         expression: this.formExpression.trim(),
-        description: this.formDescription.trim() || undefined,
+        command: this.formCommand.trim(),
+        name: this.formDescription.trim() || undefined,
       });
       this.closeForm();
       await this.loadJobs();
@@ -216,9 +259,12 @@ export class ScCronView extends LitElement {
 
   private async runJob(job: CronJob): Promise<void> {
     const gw = this.gateway;
-    if (!gw) return;
+    if (!gw || job.id == null) {
+      this.error = "Cannot run job without a numeric ID";
+      return;
+    }
     try {
-      await gw.request("cron.run", { id: job.id ?? job.expression });
+      await gw.request("cron.run", { id: job.id });
       await this.loadJobs();
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Failed to run job";
@@ -227,9 +273,12 @@ export class ScCronView extends LitElement {
 
   private async deleteJob(job: CronJob): Promise<void> {
     const gw = this.gateway;
-    if (!gw) return;
+    if (!gw || job.id == null) {
+      this.error = "Cannot delete job without a numeric ID";
+      return;
+    }
     try {
-      await gw.request("cron.remove", { id: job.id ?? job.expression });
+      await gw.request("cron.remove", { id: job.id });
       await this.loadJobs();
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Failed to delete job";
@@ -244,9 +293,22 @@ export class ScCronView extends LitElement {
       </div>
       ${this.error ? html`<p class="error">${this.error}</p>` : ""}
       ${this.loading
-        ? html`<p style="color: var(--sc-text-muted)">Loading...</p>`
+        ? html`
+            <div class="job-list">
+              <div class="job-card skeleton skeleton-card"></div>
+              <div class="job-card skeleton skeleton-card"></div>
+            </div>
+          `
         : this.jobs.length === 0
-          ? html`<p style="color: var(--sc-text-muted)">No cron jobs.</p>`
+          ? html`
+              <div class="empty-state">
+                <div class="empty-icon">⏰</div>
+                <p class="empty-title">No scheduled jobs</p>
+                <p class="empty-desc">
+                  Add a cron job to run commands on a schedule.
+                </p>
+              </div>
+            `
           : html`
               <div class="job-list">
                 ${this.jobs.map(
@@ -254,6 +316,11 @@ export class ScCronView extends LitElement {
                     <div class="job-card">
                       <div class="job-info">
                         <div class="job-expression">${job.expression}</div>
+                        ${job.command
+                          ? html`<div class="job-description">
+                              <code>${job.command}</code>
+                            </div>`
+                          : ""}
                         ${job.description
                           ? html`<div class="job-description">
                               ${job.description}
@@ -267,12 +334,14 @@ export class ScCronView extends LitElement {
                       <div class="job-actions">
                         <button
                           class="btn btn-secondary"
+                          ?disabled=${job.id == null}
                           @click=${() => this.runJob(job)}
                         >
                           Run Now
                         </button>
                         <button
                           class="btn btn-danger"
+                          ?disabled=${job.id == null}
                           @click=${() => this.deleteJob(job)}
                         >
                           Delete
@@ -304,7 +373,17 @@ export class ScCronView extends LitElement {
                   />
                 </div>
                 <div class="form-group">
-                  <label>Description</label>
+                  <label>Command (shell command to run)</label>
+                  <input
+                    type="text"
+                    placeholder="echo 'hello world'"
+                    .value=${this.formCommand}
+                    @input=${(e: Event) =>
+                      (this.formCommand = (e.target as HTMLInputElement).value)}
+                  />
+                </div>
+                <div class="form-group">
+                  <label>Description (optional)</label>
                   <input
                     type="text"
                     placeholder="Optional"

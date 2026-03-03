@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient } from "../gateway.js";
+import { getGateway } from "../gateway-provider.js";
 
 interface ProviderItem {
   name?: string;
@@ -109,9 +110,49 @@ export class ScModelsView extends LitElement {
     .key-status.missing {
       color: #ef4444;
     }
-    .loading {
+    .skeleton {
+      background: linear-gradient(
+        90deg,
+        var(--sc-bg-elevated) 25%,
+        var(--sc-bg-surface) 50%,
+        var(--sc-bg-elevated) 75%
+      );
+      background-size: 200% 100%;
+      animation: sc-shimmer 1.5s ease-in-out infinite;
+      border-radius: var(--sc-radius);
+    }
+    .skeleton-line {
+      height: 1rem;
+      margin-bottom: 0.75rem;
+      border-radius: 4px;
+    }
+    .skeleton-card {
+      height: 5rem;
+      margin-bottom: 0.75rem;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
       color: var(--sc-text-muted);
-      font-size: 0.875rem;
+    }
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    .empty-title {
+      font-size: var(--sc-text-lg);
+      font-weight: 600;
+      color: var(--sc-text);
+      margin: 0 0 0.5rem;
+    }
+    .empty-desc {
+      font-size: var(--sc-text-sm);
+      margin: 0;
+      max-width: 24rem;
+      margin-inline: auto;
+    }
+    .grid .empty-state {
+      grid-column: 1 / -1;
     }
   `;
 
@@ -121,10 +162,7 @@ export class ScModelsView extends LitElement {
   @state() private loading = true;
 
   private get gateway(): GatewayClient | null {
-    return (
-      (document.querySelector("sc-app") as { gateway?: GatewayClient })
-        ?.gateway ?? null
-    );
+    return getGateway();
   }
 
   override connectedCallback(): void {
@@ -169,7 +207,11 @@ export class ScModelsView extends LitElement {
     if (this.loading) {
       return html`
         <h2>Models & Providers</h2>
-        <p class="loading">Loading...</p>
+        <div class="grid">
+          <div class="card skeleton skeleton-card"></div>
+          <div class="card skeleton skeleton-card"></div>
+          <div class="card skeleton skeleton-card"></div>
+        </div>
       `;
     }
 
@@ -186,7 +228,15 @@ export class ScModelsView extends LitElement {
       </div>
       <div class="grid">
         ${this.providers.length === 0
-          ? html`<p class="loading">No providers configured</p>`
+          ? html`
+              <div class="empty-state">
+                <div class="empty-icon">🤖</div>
+                <p class="empty-title">No providers configured</p>
+                <p class="empty-desc">
+                  Configure an AI provider in your config to get started.
+                </p>
+              </div>
+            `
           : this.providers.map(
               (p) => html`
                 <div class="card">

@@ -1,6 +1,8 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient } from "../gateway.js";
+import { getGateway } from "../gateway-provider.js";
+import { formatDate } from "../utils.js";
 
 interface HealthRes {
   status?: string;
@@ -93,10 +95,10 @@ export class ScOverviewView extends LitElement {
       flex-shrink: 0;
     }
     .status-dot.operational {
-      background: #22c55e;
+      background: var(--sc-success);
     }
     .status-dot.offline {
-      background: #ef4444;
+      background: var(--sc-error);
     }
     .section-title {
       font-size: 0.875rem;
@@ -129,7 +131,7 @@ export class ScOverviewView extends LitElement {
       flex-shrink: 0;
     }
     .channel-dot.configured {
-      background: #22c55e;
+      background: var(--sc-success);
     }
     .channel-dot.unconfigured {
       background: var(--sc-text-muted);
@@ -167,12 +169,49 @@ export class ScOverviewView extends LitElement {
       font-size: 0.75rem;
       color: var(--sc-text-muted);
     }
-    .loading {
+    .skeleton {
+      background: linear-gradient(
+        90deg,
+        var(--sc-bg-elevated) 25%,
+        var(--sc-bg-surface) 50%,
+        var(--sc-bg-elevated) 75%
+      );
+      background-size: 200% 100%;
+      animation: sc-shimmer 1.5s ease-in-out infinite;
+      border-radius: var(--sc-radius);
+    }
+    .skeleton-line {
+      height: 1rem;
+      margin-bottom: 0.75rem;
+      border-radius: 4px;
+    }
+    .skeleton-card {
+      height: 5rem;
+      margin-bottom: 0.75rem;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
       color: var(--sc-text-muted);
-      font-size: 0.875rem;
+    }
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    .empty-title {
+      font-size: var(--sc-text-lg);
+      font-weight: 600;
+      color: var(--sc-text);
+      margin: 0 0 0.5rem;
+    }
+    .empty-desc {
+      font-size: var(--sc-text-sm);
+      margin: 0;
+      max-width: 24rem;
+      margin-inline: auto;
     }
     .error {
-      color: #ef4444;
+      color: var(--sc-error);
       font-size: 0.875rem;
       margin-bottom: 1rem;
     }
@@ -186,10 +225,7 @@ export class ScOverviewView extends LitElement {
   @state() private error = "";
 
   private get gateway(): GatewayClient | null {
-    return (
-      (document.querySelector("sc-app") as { gateway?: GatewayClient })
-        ?.gateway ?? null
-    );
+    return getGateway();
   }
 
   override connectedCallback(): void {
@@ -248,26 +284,26 @@ export class ScOverviewView extends LitElement {
     return sorted.slice(0, 5);
   }
 
-  private formatDate(v?: number | string): string {
-    if (v == null) return "—";
-    try {
-      const ts = typeof v === "number" ? (v < 1e12 ? v * 1000 : v) : v;
-      return new Intl.DateTimeFormat(undefined, {
-        dateStyle: "short",
-        timeStyle: "short",
-      }).format(new Date(ts));
-    } catch {
-      return String(v);
-    }
-  }
-
   override render() {
     if (this.loading) {
       return html`
         <div class="header">
           <h2>Overview</h2>
         </div>
-        <p class="loading">Loading...</p>
+        <div class="status-cards">
+          <div class="status-card skeleton skeleton-card"></div>
+          <div class="status-card skeleton skeleton-card"></div>
+          <div class="status-card skeleton skeleton-card"></div>
+        </div>
+        <div class="section-title skeleton skeleton-line"></div>
+        <div class="sessions-list">
+          <div class="session-row">
+            <div class="skeleton skeleton-line"></div>
+          </div>
+          <div class="session-row">
+            <div class="skeleton skeleton-line"></div>
+          </div>
+        </div>
       `;
     }
 
@@ -332,9 +368,15 @@ export class ScOverviewView extends LitElement {
       <div class="section-title">Recent Sessions</div>
       <div class="sessions-list">
         ${this.recentSessions.length === 0
-          ? html`<div class="session-row">
-              <span class="session-meta">No sessions</span>
-            </div>`
+          ? html`
+              <div class="empty-state">
+                <div class="empty-icon">🗨️</div>
+                <p class="empty-title">No sessions yet</p>
+                <p class="empty-desc">
+                  Start a conversation to see your sessions here.
+                </p>
+              </div>
+            `
           : this.recentSessions.map(
               (s) => html`
                 <div class="session-row">
@@ -343,7 +385,7 @@ export class ScOverviewView extends LitElement {
                   >
                   <span class="session-meta"
                     >${s.turn_count ?? 0} turns ·
-                    ${this.formatDate(s.last_active)}</span
+                    ${formatDate(s.last_active)}</span
                   >
                 </div>
               `,

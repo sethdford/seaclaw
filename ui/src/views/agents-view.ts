@@ -1,6 +1,8 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient } from "../gateway.js";
+import { getGateway } from "../gateway-provider.js";
+import { formatDate } from "../utils.js";
 
 interface ConfigData {
   default_provider?: string;
@@ -13,8 +15,8 @@ interface Session {
   key?: string;
   label?: string;
   turn_count?: number;
-  last_active?: string;
-  created_at?: string;
+  last_active?: number;
+  created_at?: number;
 }
 
 interface Capabilities {
@@ -149,12 +151,28 @@ export class ScAgentsView extends LitElement {
       color: var(--sc-text);
       font-variant-numeric: tabular-nums;
     }
-    .loading {
-      color: var(--sc-text-muted);
-      font-size: 0.875rem;
+    .skeleton {
+      background: linear-gradient(
+        90deg,
+        var(--sc-bg-elevated) 25%,
+        var(--sc-bg-surface) 50%,
+        var(--sc-bg-elevated) 75%
+      );
+      background-size: 200% 100%;
+      animation: sc-shimmer 1.5s ease-in-out infinite;
+      border-radius: var(--sc-radius);
+    }
+    .skeleton-line {
+      height: 1rem;
+      margin-bottom: 0.75rem;
+      border-radius: 4px;
+    }
+    .skeleton-card {
+      height: 5rem;
+      margin-bottom: 0.75rem;
     }
     .error {
-      color: #ef4444;
+      color: var(--sc-error);
       font-size: 0.875rem;
     }
   `;
@@ -166,10 +184,7 @@ export class ScAgentsView extends LitElement {
   @state() private error = "";
 
   private get gateway(): GatewayClient | null {
-    return (
-      (document.querySelector("sc-app") as { gateway?: GatewayClient })
-        ?.gateway ?? null
-    );
+    return getGateway();
   }
 
   override connectedCallback(): void {
@@ -221,20 +236,12 @@ export class ScAgentsView extends LitElement {
     return this.sessions.reduce((s, x) => s + (x.turn_count ?? 0), 0);
   }
 
-  private formatDate(s: string | undefined): string {
-    if (!s) return "—";
-    try {
-      const d = new Date(s);
-      return isNaN(d.getTime()) ? s : d.toLocaleString();
-    } catch {
-      return s ?? "—";
-    }
-  }
-
   override render() {
     if (this.loading) {
-      return html`<div class="header"><h2>Agents</h2></div>
-        <p class="loading">Loading...</p>`;
+      return html`
+        <div class="header"><h2>Agents</h2></div>
+        <div class="profile-card skeleton skeleton-card"></div>
+      `;
     }
 
     const toolCount = this.capabilities.tools?.length ?? 0;
@@ -286,12 +293,13 @@ export class ScAgentsView extends LitElement {
                     <div class="session-key">${s.label ?? s.key ?? "—"}</div>
                     <div class="session-meta">
                       ${s.turn_count ?? 0} turns · Last:
-                      ${this.formatDate(s.last_active)}
+                      ${formatDate(s.last_active)}
                     </div>
                   </div>
                   <button
                     class="resume-btn"
-                    @click=${() => this.dispatchNavigate("chat")}
+                    @click=${() =>
+                      this.dispatchNavigate("chat:" + (s.key ?? "default"))}
                   >
                     Resume
                   </button>

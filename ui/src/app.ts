@@ -2,6 +2,7 @@ import { LitElement, html, css } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient, GatewayStatus } from "./gateway.js";
 import { GatewayClient as GatewayClientClass } from "./gateway.js";
+import { setGateway } from "./gateway-provider.js";
 import "./components/floating-mic.js";
 import "./views/overview-view.js";
 import "./views/chat-view.js";
@@ -108,10 +109,10 @@ export class ScApp extends LitElement {
       border-radius: 50%;
     }
     .status-dot.connected {
-      background: #22c55e;
+      background: var(--sc-success);
     }
     .status-dot.connecting {
-      background: #eab308;
+      background: var(--sc-warning);
       animation: pulse 1s ease-in-out infinite;
     }
     .status-dot.disconnected {
@@ -135,12 +136,14 @@ export class ScApp extends LitElement {
   `;
 
   @state() private tab: TabId = "overview";
+  @state() private chatSessionKey = "default";
   @state() private connectionStatus: GatewayStatus = "disconnected";
 
   gateway: GatewayClient | null = null;
 
   override firstUpdated(): void {
     this.gateway = new GatewayClientClass();
+    setGateway(this.gateway);
     this.gateway.addEventListener("status", ((
       e: CustomEvent<GatewayStatus>,
     ) => {
@@ -159,9 +162,16 @@ export class ScApp extends LitElement {
     this.gateway.connect(wsUrl);
 
     this.addEventListener("navigate", ((e: CustomEvent<string>) => {
-      const target = e.detail as TabId;
+      const raw = e.detail as string;
+      const [tabPart, sessionPart] = raw.includes(":")
+        ? (raw.split(":") as [string, string])
+        : [raw, undefined];
+      const target = tabPart as TabId;
       if (TABS.some((t) => t.id === target)) {
         this.tab = target;
+        if (target === "chat") {
+          this.chatSessionKey = sessionPart ?? "default";
+        }
       }
     }) as EventListener);
   }
@@ -171,15 +181,51 @@ export class ScApp extends LitElement {
     this.gateway?.disconnect();
   }
 
+  private handleTabKeydown(e: KeyboardEvent): void {
+    const tabs = TABS.map((t) => t.id);
+    const currentIdx = tabs.indexOf(this.tab);
+    let newIdx = currentIdx;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      newIdx = (currentIdx + 1) % tabs.length;
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      newIdx = (currentIdx - 1 + tabs.length) % tabs.length;
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      newIdx = 0;
+    } else if (e.key === "End") {
+      e.preventDefault();
+      newIdx = tabs.length - 1;
+    } else {
+      return;
+    }
+    this.tab = tabs[newIdx];
+    this.updateComplete.then(() => {
+      const btn = this.shadowRoot?.querySelector(
+        `.nav-tab[aria-selected="true"]`,
+      ) as HTMLElement | null;
+      btn?.focus();
+    });
+  }
+
   override render() {
     return html`
       <div class="layout">
         <nav class="nav">
-          <div class="nav-tabs">
+          <div
+            class="nav-tabs"
+            role="tablist"
+            aria-label="Navigation"
+            @keydown=${this.handleTabKeydown}
+          >
             ${TABS.map(
               (t) => html`
                 <button
                   class="nav-tab ${this.tab === t.id ? "active" : ""}"
+                  role="tab"
+                  aria-selected="${this.tab === t.id}"
+                  tabindex="${this.tab === t.id ? 0 : -1}"
                   @click=${() => (this.tab = t.id)}
                 >
                   ${t.label}
@@ -196,7 +242,11 @@ export class ScApp extends LitElement {
           ${this.tab === "overview"
             ? html`<sc-overview-view></sc-overview-view>`
             : ""}
-          ${this.tab === "chat" ? html`<sc-chat-view></sc-chat-view>` : ""}
+          ${this.tab === "chat"
+            ? html`<sc-chat-view
+                .sessionKey=${this.chatSessionKey}
+              ></sc-chat-view>`
+            : ""}
           ${this.tab === "agents"
             ? html`<sc-agents-view></sc-agents-view>`
             : ""}

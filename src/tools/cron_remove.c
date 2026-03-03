@@ -19,6 +19,7 @@ static sc_error_t cron_remove_execute(void *ctx, sc_allocator_t *alloc,
     sc_tool_result_t *out)
 {
     sc_cron_tool_ctx_t *tctx = (sc_cron_tool_ctx_t *)ctx;
+    (void)tctx;
     if (!args || !out) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;

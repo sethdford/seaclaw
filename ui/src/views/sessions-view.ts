@@ -1,6 +1,8 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient } from "../gateway.js";
+import { getGateway } from "../gateway-provider.js";
+import { formatDate } from "../utils.js";
 
 interface SessionItem {
   key?: string;
@@ -13,18 +15,6 @@ interface SessionItem {
 interface HistoryMessage {
   role: string;
   content: string;
-}
-
-const dateFmt = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-function fmtTs(v: number | undefined): string {
-  if (!v || v <= 0) return "—";
-  return dateFmt.format(v < 1e12 ? v * 1000 : v);
 }
 
 @customElement("sc-sessions-view")
@@ -66,12 +56,12 @@ export class ScSessionsView extends LitElement {
       background: var(--sc-accent-hover);
     }
     .btn-danger {
-      background: #991b1b;
+      background: var(--sc-error);
       color: white;
       border: none;
     }
     .btn-danger:hover {
-      background: #b91c1c;
+      background: var(--sc-error);
     }
     .layout {
       display: flex;
@@ -162,11 +152,46 @@ export class ScSessionsView extends LitElement {
       border: 1px solid var(--sc-border);
       color: var(--sc-text);
     }
-    .empty {
-      color: var(--sc-text-muted);
-      font-size: 0.875rem;
+    .skeleton {
+      background: linear-gradient(
+        90deg,
+        var(--sc-bg-elevated) 25%,
+        var(--sc-bg-surface) 50%,
+        var(--sc-bg-elevated) 75%
+      );
+      background-size: 200% 100%;
+      animation: sc-shimmer 1.5s ease-in-out infinite;
+      border-radius: var(--sc-radius);
+    }
+    .skeleton-line {
+      height: 1rem;
+      margin-bottom: 0.75rem;
+      border-radius: 4px;
+    }
+    .skeleton-card {
+      height: 5rem;
+      margin-bottom: 0.75rem;
+    }
+    .empty-state {
       text-align: center;
-      padding: 2rem;
+      padding: 3rem 1rem;
+      color: var(--sc-text-muted);
+    }
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    .empty-title {
+      font-size: var(--sc-text-lg);
+      font-weight: 600;
+      color: var(--sc-text);
+      margin: 0 0 0.5rem;
+    }
+    .empty-desc {
+      font-size: var(--sc-text-sm);
+      margin: 0;
+      max-width: 24rem;
+      margin-inline: auto;
     }
     .rename-row {
       display: flex;
@@ -183,7 +208,7 @@ export class ScSessionsView extends LitElement {
       flex: 1;
     }
     .error {
-      color: #f87171;
+      color: var(--sc-error);
       font-size: 0.875rem;
     }
     @media (max-width: 768px) {
@@ -208,10 +233,7 @@ export class ScSessionsView extends LitElement {
   @state() private confirmDelete = false;
 
   private get gateway(): GatewayClient | null {
-    return (
-      (document.querySelector("sc-app") as { gateway?: GatewayClient })
-        ?.gateway ?? null
-    );
+    return getGateway();
   }
 
   override connectedCallback(): void {
@@ -294,6 +316,16 @@ export class ScSessionsView extends LitElement {
     return this.sessions.find((s) => s.key === this.selectedKey);
   }
 
+  private dispatchNavigate(tab: string): void {
+    this.dispatchEvent(
+      new CustomEvent("navigate", {
+        detail: tab,
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
   override render() {
     const sel = this.selectedSession();
 
@@ -304,12 +336,34 @@ export class ScSessionsView extends LitElement {
       </div>
       ${this.error ? html`<p class="error">${this.error}</p>` : nothing}
       ${this.loading
-        ? html`<p style="color: var(--sc-text-muted)">Loading...</p>`
+        ? html`
+            <div class="layout">
+              <div class="session-list">
+                <div class="session-item skeleton skeleton-card"></div>
+                <div class="session-item skeleton skeleton-card"></div>
+                <div class="session-item skeleton skeleton-card"></div>
+                <div class="session-item skeleton skeleton-card"></div>
+              </div>
+              <div class="detail">
+                <div class="history">
+                  <div class="skeleton skeleton-line"></div>
+                </div>
+              </div>
+            </div>
+          `
         : html`
             <div class="layout">
               <div class="session-list">
                 ${this.sessions.length === 0
-                  ? html`<div class="empty">No sessions</div>`
+                  ? html`
+                      <div class="empty-state">
+                        <div class="empty-icon">💬</div>
+                        <p class="empty-title">No conversations yet</p>
+                        <p class="empty-desc">
+                          Start a chat to see your conversation history here.
+                        </p>
+                      </div>
+                    `
                   : this.sessions.map(
                       (s) => html`
                         <div
@@ -322,7 +376,8 @@ export class ScSessionsView extends LitElement {
                             ${s.label || s.key || "unnamed"}
                           </div>
                           <div class="session-meta">
-                            ${s.turn_count ?? 0} turns · ${fmtTs(s.last_active)}
+                            ${s.turn_count ?? 0} turns ·
+                            ${formatDate(s.last_active)}
                           </div>
                         </div>
                       `,
@@ -359,6 +414,15 @@ export class ScSessionsView extends LitElement {
                             `
                           : html`
                               <h3>${sel.label || sel.key}</h3>
+                              <button
+                                class="btn btn-accent"
+                                @click=${() =>
+                                  this.dispatchNavigate(
+                                    "chat:" + (this.selectedKey || "default"),
+                                  )}
+                              >
+                                Resume
+                              </button>
                               <button
                                 class="btn"
                                 @click=${() => this.startRename()}

@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient } from "../gateway.js";
+import { getGateway } from "../gateway-provider.js";
 
 type SaveStatus = "saved" | "error" | "unsaved" | "idle";
 
@@ -199,9 +200,7 @@ export class ScConfigView extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.gateway =
-      (document.querySelector("sc-app") as { gateway?: GatewayClient })
-        ?.gateway ?? null;
+    this.gateway = getGateway();
     this.loadConfig();
     this.loadSchema();
   }

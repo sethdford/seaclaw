@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient } from "../gateway.js";
+import { getGateway } from "../gateway-provider.js";
 
 interface NodeItem {
   id?: string;
@@ -121,18 +122,46 @@ export class ScNodesView extends LitElement {
     .health-status.ok {
       color: #22c55e;
     }
-    .loading {
-      color: var(--sc-text-muted);
-      font-size: 0.875rem;
-    }
-    .empty {
-      color: var(--sc-text-muted);
-      font-size: 0.875rem;
-      padding: 2rem;
-      text-align: center;
-      background: var(--sc-bg-surface);
-      border: 1px dashed var(--sc-border);
+    .skeleton {
+      background: linear-gradient(
+        90deg,
+        var(--sc-bg-elevated) 25%,
+        var(--sc-bg-surface) 50%,
+        var(--sc-bg-elevated) 75%
+      );
+      background-size: 200% 100%;
+      animation: sc-shimmer 1.5s ease-in-out infinite;
       border-radius: var(--sc-radius);
+    }
+    .skeleton-line {
+      height: 1rem;
+      margin-bottom: 0.75rem;
+      border-radius: 4px;
+    }
+    .skeleton-card {
+      height: 5rem;
+      margin-bottom: 0.75rem;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--sc-text-muted);
+    }
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    .empty-title {
+      font-size: var(--sc-text-lg);
+      font-weight: 600;
+      color: var(--sc-text);
+      margin: 0 0 0.5rem;
+    }
+    .empty-desc {
+      font-size: var(--sc-text-sm);
+      margin: 0;
+      max-width: 24rem;
+      margin-inline: auto;
     }
     .error {
       color: #ef4444;
@@ -147,10 +176,7 @@ export class ScNodesView extends LitElement {
   @state() private error = "";
 
   private get gateway(): GatewayClient | null {
-    return (
-      (document.querySelector("sc-app") as { gateway?: GatewayClient })
-        ?.gateway ?? null
-    );
+    return getGateway();
   }
 
   override connectedCallback(): void {
@@ -208,9 +234,21 @@ export class ScNodesView extends LitElement {
 
       ${this.error ? html`<p class="error">${this.error}</p>` : ""}
       ${this.loading && this.nodes.length === 0
-        ? html`<p class="loading">Loading...</p>`
+        ? html`
+            <div class="nodes-grid">
+              <div class="node-card skeleton skeleton-card"></div>
+            </div>
+          `
         : this.nodes.length === 0
-          ? html`<div class="empty">No nodes found</div>`
+          ? html`
+              <div class="empty-state">
+                <div class="empty-icon">🖥️</div>
+                <p class="empty-title">No nodes connected</p>
+                <p class="empty-desc">
+                  Connected devices and gateways will appear here.
+                </p>
+              </div>
+            `
           : html`
               <div class="nodes-grid">
                 ${this.nodes.map(

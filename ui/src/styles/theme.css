@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
 /* Design tokens — dark (default) */
 :root {
   --sc-bg: #0a0a0a;
@@ -11,6 +13,33 @@
   --sc-radius: 8px;
   --sc-font: "Inter", system-ui, sans-serif;
   --sc-font-mono: "Geist Mono", monospace;
+
+  /* Semantic colors */
+  --sc-success: #22c55e;
+  --sc-success-dim: rgba(34, 197, 94, 0.15);
+  --sc-warning: #eab308;
+  --sc-warning-dim: rgba(234, 179, 8, 0.15);
+  --sc-error: #ef4444;
+  --sc-error-dim: rgba(239, 68, 68, 0.15);
+  --sc-info: #3b82f6;
+  --sc-info-dim: rgba(59, 130, 246, 0.15);
+
+  /* Spacing scale */
+  --sc-space-xs: 0.25rem;
+  --sc-space-sm: 0.5rem;
+  --sc-space-md: 1rem;
+  --sc-space-lg: 1.5rem;
+  --sc-space-xl: 2rem;
+
+  /* Typography */
+  --sc-text-xs: 0.75rem;
+  --sc-text-sm: 0.8125rem;
+  --sc-text-base: 0.875rem;
+  --sc-text-lg: 1rem;
+  --sc-text-xl: 1.25rem;
+
+  /* Transitions */
+  --sc-transition: 150ms ease;
 }
 
 @media (prefers-color-scheme: light) {
@@ -23,6 +52,16 @@
     --sc-accent: #e11d48;
     --sc-accent-hover: #be123c;
     --sc-border: #e4e4e7;
+
+    /* Semantic colors — light mode */
+    --sc-success: #16a34a;
+    --sc-success-dim: rgba(22, 163, 74, 0.1);
+    --sc-warning: #ca8a04;
+    --sc-warning-dim: rgba(202, 138, 4, 0.1);
+    --sc-error: #dc2626;
+    --sc-error-dim: rgba(220, 38, 38, 0.1);
+    --sc-info: #2563eb;
+    --sc-info-dim: rgba(37, 99, 235, 0.1);
   }
 }
 
@@ -30,6 +69,23 @@
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  transition: all var(--sc-transition);
+}
+
+@keyframes sc-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 body {

@@ -1,6 +1,7 @@
 import { LitElement, html, css } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient } from "../gateway.js";
+import { getGateway } from "../gateway-provider.js";
 
 interface UsageSummary {
   session_cost_usd?: number;
@@ -93,6 +94,47 @@ export class ScUsageView extends LitElement {
       color: #f87171;
       font-size: 0.875rem;
     }
+    .skeleton {
+      background: linear-gradient(
+        90deg,
+        var(--sc-bg-elevated) 25%,
+        var(--sc-bg-surface) 50%,
+        var(--sc-bg-elevated) 75%
+      );
+      background-size: 200% 100%;
+      animation: sc-shimmer 1.5s ease-in-out infinite;
+      border-radius: var(--sc-radius);
+    }
+    .skeleton-line {
+      height: 1rem;
+      margin-bottom: 0.75rem;
+      border-radius: 4px;
+    }
+    .skeleton-card {
+      height: 5rem;
+      margin-bottom: 0.75rem;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--sc-text-muted);
+    }
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    .empty-title {
+      font-size: var(--sc-text-lg);
+      font-weight: 600;
+      color: var(--sc-text);
+      margin: 0 0 0.5rem;
+    }
+    .empty-desc {
+      font-size: var(--sc-text-sm);
+      margin: 0;
+      max-width: 24rem;
+      margin-inline: auto;
+    }
   `;
 
   @state() private summary: UsageSummary = {};
@@ -100,10 +142,7 @@ export class ScUsageView extends LitElement {
   @state() private error = "";
 
   private get gateway(): GatewayClient | null {
-    return (
-      (document.querySelector("sc-app") as { gateway?: GatewayClient })
-        ?.gateway ?? null
-    );
+    return getGateway();
   }
 
   override connectedCallback(): void {
@@ -164,77 +203,103 @@ export class ScUsageView extends LitElement {
       <h2>Usage</h2>
       ${this.error ? html`<p class="error">${this.error}</p>` : ""}
       ${this.loading
-        ? html`<p style="color: var(--sc-text-muted)">Loading...</p>`
-        : html`
+        ? html`
             <div class="cards">
-              <div class="card">
-                <div class="card-label">Session Cost</div>
-                <div class="card-value">
-                  ${this.formatCurrency(sessionCost)}
-                </div>
-              </div>
-              <div class="card">
-                <div class="card-label">Daily Cost</div>
-                <div class="card-value">${this.formatCurrency(dailyCost)}</div>
-              </div>
-              <div class="card">
-                <div class="card-label">Monthly Cost</div>
-                <div class="card-value">
-                  ${this.formatCurrency(monthlyCost)}
-                </div>
-              </div>
-              <div class="card">
-                <div class="card-label">Total Tokens</div>
-                <div class="card-value">${this.formatNumber(totalTokens)}</div>
-              </div>
-              <div class="card">
-                <div class="card-label">Request Count</div>
-                <div class="card-value">${this.formatNumber(requestCount)}</div>
-              </div>
+              <div class="card skeleton skeleton-card"></div>
+              <div class="card skeleton skeleton-card"></div>
+              <div class="card skeleton skeleton-card"></div>
             </div>
+          `
+        : sessionCost === 0 &&
+            dailyCost === 0 &&
+            monthlyCost === 0 &&
+            totalTokens === 0 &&
+            requestCount === 0
+          ? html`
+              <div class="empty-state">
+                <div class="empty-icon">📊</div>
+                <p class="empty-title">No usage data</p>
+                <p class="empty-desc">
+                  Usage metrics will appear here once you start making requests.
+                </p>
+              </div>
+            `
+          : html`
+              <div class="cards">
+                <div class="card">
+                  <div class="card-label">Session Cost</div>
+                  <div class="card-value">
+                    ${this.formatCurrency(sessionCost)}
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-label">Daily Cost</div>
+                  <div class="card-value">
+                    ${this.formatCurrency(dailyCost)}
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-label">Monthly Cost</div>
+                  <div class="card-value">
+                    ${this.formatCurrency(monthlyCost)}
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-label">Total Tokens</div>
+                  <div class="card-value">
+                    ${this.formatNumber(totalTokens)}
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-label">Request Count</div>
+                  <div class="card-value">
+                    ${this.formatNumber(requestCount)}
+                  </div>
+                </div>
+              </div>
 
-            <div class="chart-section">
-              <div class="chart-title">Cost comparison (bar chart)</div>
-              <div class="bar-chart">
-                <div class="bar-row">
-                  <span class="bar-label">Session</span>
-                  <div class="bar-track">
-                    <div
-                      class="bar-fill"
-                      style="width: ${this.barPct(sessionCost, maxCost)}%"
-                    ></div>
+              <div class="chart-section">
+                <div class="chart-title">Cost comparison (bar chart)</div>
+                <div class="bar-chart">
+                  <div class="bar-row">
+                    <span class="bar-label">Session</span>
+                    <div class="bar-track">
+                      <div
+                        class="bar-fill"
+                        style="width: ${this.barPct(sessionCost, maxCost)}%"
+                      ></div>
+                    </div>
+                    <span class="bar-value"
+                      >${this.formatCurrency(sessionCost)}</span
+                    >
                   </div>
-                  <span class="bar-value"
-                    >${this.formatCurrency(sessionCost)}</span
-                  >
-                </div>
-                <div class="bar-row">
-                  <span class="bar-label">Daily</span>
-                  <div class="bar-track">
-                    <div
-                      class="bar-fill"
-                      style="width: ${this.barPct(dailyCost, maxCost)}%"
-                    ></div>
+                  <div class="bar-row">
+                    <span class="bar-label">Daily</span>
+                    <div class="bar-track">
+                      <div
+                        class="bar-fill"
+                        style="width: ${this.barPct(dailyCost, maxCost)}%"
+                      ></div>
+                    </div>
+                    <span class="bar-value"
+                      >${this.formatCurrency(dailyCost)}</span
+                    >
                   </div>
-                  <span class="bar-value"
-                    >${this.formatCurrency(dailyCost)}</span
-                  >
-                </div>
-                <div class="bar-row">
-                  <span class="bar-label">Monthly</span>
-                  <div class="bar-track">
-                    <div
-                      class="bar-fill"
-                      style="width: ${this.barPct(monthlyCost, maxCost)}%"
-                    ></div>
+                  <div class="bar-row">
+                    <span class="bar-label">Monthly</span>
+                    <div class="bar-track">
+                      <div
+                        class="bar-fill"
+                        style="width: ${this.barPct(monthlyCost, maxCost)}%"
+                      ></div>
+                    </div>
+                    <span class="bar-value"
+                      >${this.formatCurrency(monthlyCost)}</span
+                    >
                   </div>
-                  <span class="bar-value"
-                    >${this.formatCurrency(monthlyCost)}</span
-                  >
                 </div>
               </div>
-            </div>
-          `}
+            `}
     `;
   }
 }

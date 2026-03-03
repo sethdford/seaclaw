@@ -1,5 +1,8 @@
 {
   "name": "seaclaw-control-ui",
+  "version": "0.1.0",
+  "description": "SeaClaw Control — real-time AI assistant dashboard",
+  "author": "SeaClaw Contributors",
   "private": true,
   "type": "module",
   "scripts": {

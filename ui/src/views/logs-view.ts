@@ -1,6 +1,8 @@
 import { LitElement, html, css } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayClient } from "../gateway.js";
+import { getGateway } from "../gateway-provider.js";
+import { EVENT_NAMES } from "../utils.js";
 
 interface LogEntry {
   ts: string;
@@ -56,7 +58,7 @@ export class ScLogsView extends LitElement {
       background: var(--sc-border);
     }
     .log-area {
-      background: #0d1117;
+      background: var(--sc-bg-surface);
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius);
       padding: 1rem;
@@ -65,14 +67,14 @@ export class ScLogsView extends LitElement {
       font-family: var(--sc-font-mono);
       font-size: 0.75rem;
       line-height: 1.5;
-      color: #c9d1d9;
+      color: var(--sc-text);
     }
     .log-line {
       margin-bottom: 0.25rem;
       word-break: break-all;
     }
     .log-ts {
-      color: #6e7681;
+      color: var(--sc-text-muted);
       margin-right: 0.5rem;
     }
     .event {
@@ -86,10 +88,7 @@ export class ScLogsView extends LitElement {
   @state() private logAreaRef: HTMLDivElement | null = null;
 
   private get gateway(): GatewayClient | null {
-    return (
-      (document.querySelector("sc-app") as { gateway?: GatewayClient })
-        ?.gateway ?? null
-    );
+    return getGateway();
   }
 
   override connectedCallback(): void {
@@ -138,16 +137,16 @@ export class ScLogsView extends LitElement {
 
   private eventColor(event: string): string {
     switch (event) {
-      case "chat":
-        return "#58a6ff";
-      case "agent.tool":
-        return "#d2a8ff";
-      case "error":
-        return "#f85149";
-      case "health":
-        return "#7ee787";
+      case EVENT_NAMES.CHAT:
+        return "var(--sc-success)";
+      case EVENT_NAMES.TOOL_CALL:
+        return "var(--sc-info)";
+      case EVENT_NAMES.ERROR:
+        return "var(--sc-error)";
+      case EVENT_NAMES.HEALTH:
+        return "var(--sc-warning)";
       default:
-        return "#c9d1d9";
+        return "var(--sc-text)";
     }
   }
 

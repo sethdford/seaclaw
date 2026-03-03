@@ -133,8 +133,8 @@ static void *subagent_thread_fn(void *arg) {
 #endif
 
 static uint32_t get_max_concurrent(const sc_config_t *cfg) {
-    (void)cfg;
-    /* Config does not yet have subagent max_concurrent; use default */
+    if (cfg && cfg->scheduler.max_concurrent > 0)
+        return cfg->scheduler.max_concurrent;
     return SC_DEFAULT_MAX_CONCURRENT;
 }
 

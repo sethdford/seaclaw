@@ -2,6 +2,7 @@ import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient } from "../gateway.js";
 import { GatewayClient as GatewayClientClass } from "../gateway.js";
+import { getGateway } from "../gateway-provider.js";
 
 type VoiceStatus = "idle" | "listening" | "processing" | "unsupported";
 
@@ -148,10 +149,7 @@ export class ScVoiceView extends LitElement {
   @state() private recognition: SpeechRecognition | null = null;
 
   private get gateway(): GatewayClient | null {
-    return (
-      (document.querySelector("sc-app") as { gateway?: GatewayClient })
-        ?.gateway ?? null
-    );
+    return getGateway();
   }
 
   private gatewayHandler = (e: Event): void => this.onGatewayEvent(e);

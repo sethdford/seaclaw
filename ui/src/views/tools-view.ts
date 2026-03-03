@@ -1,6 +1,7 @@
 import { LitElement, html, css } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient } from "../gateway.js";
+import { getGateway } from "../gateway-provider.js";
 
 interface ToolDef {
   name?: string;
@@ -75,9 +76,54 @@ export class ScToolsView extends LitElement {
       font-size: 0.75rem;
       padding: 0.25rem 0;
     }
+    .skeleton {
+      background: linear-gradient(
+        90deg,
+        var(--sc-bg-elevated) 25%,
+        var(--sc-bg-surface) 50%,
+        var(--sc-bg-elevated) 75%
+      );
+      background-size: 200% 100%;
+      animation: sc-shimmer 1.5s ease-in-out infinite;
+      border-radius: var(--sc-radius);
+    }
+    .skeleton-line {
+      height: 1rem;
+      margin-bottom: 0.75rem;
+      border-radius: 4px;
+    }
+    .skeleton-card {
+      height: 5rem;
+      margin-bottom: 0.75rem;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--sc-text-muted);
+    }
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    .empty-title {
+      font-size: var(--sc-text-lg);
+      font-weight: 600;
+      color: var(--sc-text);
+      margin: 0 0 0.5rem;
+    }
+    .empty-desc {
+      font-size: var(--sc-text-sm);
+      margin: 0;
+      max-width: 24rem;
+      margin-inline: auto;
+    }
+    .grid .empty-state {
+      grid-column: 1 / -1;
+    }
   `;
 
   @state() private tools: ToolDef[] = [];
+  @state() private loading = true;
   @state() private filter = "";
   @state() private expandedCards = new Set<string>();
 
@@ -85,14 +131,16 @@ export class ScToolsView extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.gateway =
-      (document.querySelector("sc-app") as { gateway?: GatewayClient })
-        ?.gateway ?? null;
+    this.gateway = getGateway();
     this.loadTools();
   }
 
   private async loadTools(): Promise<void> {
-    if (!this.gateway) return;
+    if (!this.gateway) {
+      this.loading = false;
+      return;
+    }
+    this.loading = true;
     try {
       const payload = await this.gateway.request<{ tools?: ToolDef[] }>(
         "tools.catalog",
@@ -101,6 +149,8 @@ export class ScToolsView extends LitElement {
       this.tools = payload?.tools ?? [];
     } catch {
       this.tools = [];
+    } finally {
+      this.loading = false;
     }
   }
 
@@ -124,6 +174,25 @@ export class ScToolsView extends LitElement {
   override render() {
     const filtered = this.filteredTools;
 
+    if (this.loading) {
+      return html`
+        <div class="search">
+          <input
+            type="text"
+            placeholder="Search tools..."
+            disabled
+            style="opacity: 0.6"
+          />
+        </div>
+        <div class="grid">
+          <div class="card skeleton skeleton-card"></div>
+          <div class="card skeleton skeleton-card"></div>
+          <div class="card skeleton skeleton-card"></div>
+          <div class="card skeleton skeleton-card"></div>
+        </div>
+      `;
+    }
+
     return html`
       <div class="search">
         <input
@@ -136,33 +205,43 @@ export class ScToolsView extends LitElement {
         />
       </div>
       <div class="grid">
-        ${filtered.map(
-          (t) => html`
-            <div class="card">
-              <div class="card-name">${t.name ?? "unnamed"}</div>
-              <div class="card-desc">${t.description ?? ""}</div>
-              ${t.parameters != null
-                ? html`
-                    <button
-                      class="schema-toggle"
-                      @click=${() => this.toggleSchema(t.name ?? "")}
-                    >
-                      ${this.expandedCards.has(t.name ?? "")
-                        ? "Hide params"
-                        : "Show params"}
-                    </button>
-                    ${this.expandedCards.has(t.name ?? "")
-                      ? html`
-                          <pre class="card-schema">
+        ${filtered.length === 0
+          ? html`
+              <div class="empty-state">
+                <div class="empty-icon">🔧</div>
+                <p class="empty-title">No tools available</p>
+                <p class="empty-desc">
+                  Tools will appear here when the gateway provides them.
+                </p>
+              </div>
+            `
+          : filtered.map(
+              (t) => html`
+                <div class="card">
+                  <div class="card-name">${t.name ?? "unnamed"}</div>
+                  <div class="card-desc">${t.description ?? ""}</div>
+                  ${t.parameters != null
+                    ? html`
+                        <button
+                          class="schema-toggle"
+                          @click=${() => this.toggleSchema(t.name ?? "")}
+                        >
+                          ${this.expandedCards.has(t.name ?? "")
+                            ? "Hide params"
+                            : "Show params"}
+                        </button>
+                        ${this.expandedCards.has(t.name ?? "")
+                          ? html`
+                              <pre class="card-schema">
 ${JSON.stringify(t.parameters, null, 2)}</pre
-                          >
-                        `
-                      : ""}
-                  `
-                : ""}
-            </div>
-          `,
-        )}
+                              >
+                            `
+                          : ""}
+                      `
+                    : ""}
+                </div>
+              `,
+            )}
       </div>
     `;
   }

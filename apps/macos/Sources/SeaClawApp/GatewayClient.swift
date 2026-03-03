@@ -7,9 +7,10 @@ class GatewayClient: ObservableObject {
     private var url: URL
     private var reconnectWorkItem: DispatchWorkItem?
     private let queue = DispatchQueue(label: "com.seaclaw.gateway")
+    private var pendingRequests: [String: (Result<[String: Any], Error>) -> Void] = [:]
 
-    init(url: String = "ws://localhost:8080/ws") {
-        self.url = URL(string: url) ?? URL(string: "ws://localhost:8080/ws")!
+    init(url: String = "ws://localhost:3000/ws") {
+        self.url = URL(string: url) ?? URL(string: "ws://localhost:3000/ws")!
     }
 
     func connect() {
@@ -35,6 +36,33 @@ class GatewayClient: ObservableObject {
             self?.task = nil
             DispatchQueue.main.async { [weak self] in
                 self?.isConnected = false
+            }
+        }
+    }
+
+    func request(method: String, params: [String: Any] = [:], completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        let reqId = "req-\(UUID().uuidString)"
+        let msg: [String: Any] = [
+            "type": "req",
+            "id": reqId,
+            "method": method,
+            "params": params
+        ]
+        queue.async { [weak self] in
+            guard let self = self else { return }
+            self.pendingRequests[reqId] = completion
+            guard let data = try? JSONSerialization.data(withJSONObject: msg) else {
+                self.pendingRequests.removeValue(forKey: reqId)
+                completion(.failure(NSError(domain: "GatewayClient", code: -1, userInfo: [NSLocalizedDescriptionKey: "JSON serialization failed"])))
+                return
+            }
+            self.task?.send(.data(data)) { error in
+                if let error = error {
+                    self.queue.async {
+                        self.pendingRequests.removeValue(forKey: reqId)
+                    }
+                    completion(.failure(error))
+                }
             }
         }
     }
@@ -68,11 +96,28 @@ class GatewayClient: ObservableObject {
               let type = json["type"] as? String else { return }
 
         switch type {
+        case "hello-ok":
+            DispatchQueue.main.async { [weak self] in
+                self?.isConnected = true
+            }
         case "res":
             if let payload = json["payload"] as? [String: Any],
                payload["type"] as? String == "hello-ok" {
                 DispatchQueue.main.async { [weak self] in
                     self?.isConnected = true
+                }
+            }
+            if let reqId = json["id"] as? String {
+                queue.async { [weak self] in
+                    guard let self = self else { return }
+                    if let callback = self.pendingRequests.removeValue(forKey: reqId) {
+                        let payload = json["payload"] as? [String: Any] ?? [:]
+                        if let errorMsg = payload["error"] as? String {
+                            callback(.failure(NSError(domain: "GatewayClient", code: -2, userInfo: [NSLocalizedDescriptionKey: errorMsg])))
+                        } else {
+                            callback(.success(payload))
+                        }
+                    }
                 }
             }
         case "event":

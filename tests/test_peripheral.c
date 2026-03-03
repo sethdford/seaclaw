@@ -134,7 +134,7 @@ static void test_arduino_health_check(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_peripheral_t p = sc_arduino_peripheral_create(&alloc, "/dev/ttyUSB0", 11);
     bool ok = p.vtable->health_check(p.ctx);
-    SC_ASSERT_TRUE(ok || !ok);
+    (void)ok;
     p.vtable->destroy(p.ctx, &alloc);
 }
 
@@ -142,7 +142,7 @@ static void test_rpi_health_check(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_peripheral_t p = sc_rpi_peripheral_create(&alloc);
     bool ok = p.vtable->health_check(p.ctx);
-    SC_ASSERT_TRUE(ok || !ok);
+    (void)ok;
     p.vtable->destroy(p.ctx, &alloc);
 }
 
@@ -246,7 +246,7 @@ static void test_hardware_discover_serial_port_in_test(void) {
     sc_error_t err = sc_hardware_discover(&alloc, results, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_TRUE(count >= 1);
-    SC_ASSERT_TRUE(strlen(results[0].serial_port) >= 0);
+    SC_ASSERT_NOT_NULL(results[0].serial_port);
 }
 
 static void test_hardware_discover_reduces_count(void) {

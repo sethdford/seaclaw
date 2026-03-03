@@ -3,6 +3,7 @@
 #include "seaclaw/memory.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/security/sandbox.h"
+#include "seaclaw/update.h"
 #include "seaclaw/version.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -437,10 +438,27 @@ sc_error_t cmd_update(sc_allocator_t *alloc, int argc, char **argv) {
     }
     const char *ver = sc_version_string();
     printf("SeaClaw v%s\n", ver ? ver : "0.1.0");
-    if (check_only) {
-        printf("No updates available.\n");
-    } else {
-        printf("Self-update not yet available. Check https://github.com/seaclaw/seaclaw/releases\n");
+
+    char latest[64];
+    sc_error_t err = sc_update_check(latest, sizeof(latest));
+    if (err != SC_OK) {
+        printf("Could not check for updates. Check https://github.com/seaclaw/seaclaw/releases\n");
+        return SC_OK;
     }
+
+    const char *current = ver ? ver : "0.0.0";
+    const char *remote = latest;
+    if (remote[0] == 'v') remote++;
+    if (strcmp(current, remote) == 0) {
+        printf("Already up to date.\n");
+        return SC_OK;
+    }
+    printf("Update available: %s -> %s\n", current, latest);
+    if (check_only) return SC_OK;
+
+    printf("Downloading update...\n");
+    err = sc_update_apply();
+    if (err != SC_OK)
+        printf("Update failed. Download manually from https://github.com/seaclaw/seaclaw/releases\n");
     return SC_OK;
 }

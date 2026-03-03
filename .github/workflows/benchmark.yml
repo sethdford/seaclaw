@@ -64,7 +64,7 @@ jobs:
         run: |
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Comparison Target" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | nullclaw | OpenClaw |" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | SeaClaw | OpenClaw |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|----------|----------|" >> $GITHUB_STEP_SUMMARY
           echo "| Binary | ${BINARY_SIZE_KB} KB | ~75 MB (node_modules) |" >> $GITHUB_STEP_SUMMARY
           echo "| Dependencies | 0 (libc only) | 1,200+ npm packages |" >> $GITHUB_STEP_SUMMARY

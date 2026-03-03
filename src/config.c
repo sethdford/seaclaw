@@ -1376,6 +1376,162 @@ sc_error_t sc_config_save(const sc_config_t *cfg) {
         }
     }
 
+    /* diagnostics */
+    sc_json_value_t *diag = sc_json_object_new(&a);
+    if (diag) {
+        if (cfg->diagnostics.backend)
+            sc_json_object_set(&a, diag, "backend",
+                sc_json_string_new(&a, cfg->diagnostics.backend, strlen(cfg->diagnostics.backend)));
+        if (cfg->diagnostics.otel_endpoint)
+            sc_json_object_set(&a, diag, "otel_endpoint",
+                sc_json_string_new(&a, cfg->diagnostics.otel_endpoint, strlen(cfg->diagnostics.otel_endpoint)));
+        sc_json_object_set(&a, diag, "log_tool_calls", sc_json_bool_new(&a, cfg->diagnostics.log_tool_calls));
+        sc_json_object_set(&a, diag, "log_llm_io", sc_json_bool_new(&a, cfg->diagnostics.log_llm_io));
+        sc_json_object_set(&a, root, "diagnostics", diag);
+    }
+
+    /* autonomy */
+    sc_json_value_t *auton = sc_json_object_new(&a);
+    if (auton) {
+        if (cfg->autonomy.level)
+            sc_json_object_set(&a, auton, "level",
+                sc_json_string_new(&a, cfg->autonomy.level, strlen(cfg->autonomy.level)));
+        sc_json_object_set(&a, auton, "workspace_only", sc_json_bool_new(&a, cfg->autonomy.workspace_only));
+        if (cfg->autonomy.max_actions_per_hour > 0)
+            sc_json_object_set(&a, auton, "max_actions_per_hour",
+                sc_json_number_new(&a, (double)cfg->autonomy.max_actions_per_hour));
+        sc_json_object_set(&a, root, "autonomy", auton);
+    }
+
+    /* reliability */
+    sc_json_value_t *rel = sc_json_object_new(&a);
+    if (rel) {
+        if (cfg->reliability.provider_retries > 0)
+            sc_json_object_set(&a, rel, "provider_retries",
+                sc_json_number_new(&a, (double)cfg->reliability.provider_retries));
+        if (cfg->reliability.provider_backoff_ms > 0)
+            sc_json_object_set(&a, rel, "provider_backoff_ms",
+                sc_json_number_new(&a, (double)cfg->reliability.provider_backoff_ms));
+        sc_json_object_set(&a, root, "reliability", rel);
+    }
+
+    /* channels */
+    if (cfg->channels.default_channel || cfg->channels.cli) {
+        sc_json_value_t *ch = sc_json_object_new(&a);
+        if (ch) {
+            sc_json_object_set(&a, ch, "cli", sc_json_bool_new(&a, cfg->channels.cli));
+            if (cfg->channels.default_channel)
+                sc_json_object_set(&a, ch, "default",
+                    sc_json_string_new(&a, cfg->channels.default_channel, strlen(cfg->channels.default_channel)));
+            sc_json_object_set(&a, root, "channels", ch);
+        }
+    }
+
+    /* tunnel */
+    if (cfg->tunnel.provider) {
+        sc_json_value_t *tun = sc_json_object_new(&a);
+        if (tun) {
+            sc_json_object_set(&a, tun, "provider",
+                sc_json_string_new(&a, cfg->tunnel.provider, strlen(cfg->tunnel.provider)));
+            if (cfg->tunnel.domain)
+                sc_json_object_set(&a, tun, "domain",
+                    sc_json_string_new(&a, cfg->tunnel.domain, strlen(cfg->tunnel.domain)));
+            sc_json_object_set(&a, root, "tunnel", tun);
+        }
+    }
+
+    /* cron */
+    sc_json_value_t *cron_obj = sc_json_object_new(&a);
+    if (cron_obj) {
+        sc_json_object_set(&a, cron_obj, "enabled", sc_json_bool_new(&a, cfg->cron.enabled));
+        if (cfg->cron.interval_minutes > 0)
+            sc_json_object_set(&a, cron_obj, "interval_minutes",
+                sc_json_number_new(&a, (double)cfg->cron.interval_minutes));
+        sc_json_object_set(&a, root, "cron", cron_obj);
+    }
+
+    /* scheduler */
+    if (cfg->scheduler.max_concurrent > 0) {
+        sc_json_value_t *sched = sc_json_object_new(&a);
+        if (sched) {
+            sc_json_object_set(&a, sched, "max_concurrent",
+                sc_json_number_new(&a, (double)cfg->scheduler.max_concurrent));
+            sc_json_object_set(&a, root, "scheduler", sched);
+        }
+    }
+
+    /* session */
+    if (cfg->session.idle_minutes > 0) {
+        sc_json_value_t *sess = sc_json_object_new(&a);
+        if (sess) {
+            sc_json_object_set(&a, sess, "idle_minutes",
+                sc_json_number_new(&a, (double)cfg->session.idle_minutes));
+            sc_json_object_set(&a, root, "session", sess);
+        }
+    }
+
+    /* peripherals */
+    sc_json_value_t *periph = sc_json_object_new(&a);
+    if (periph) {
+        sc_json_object_set(&a, periph, "enabled", sc_json_bool_new(&a, cfg->peripherals.enabled));
+        if (cfg->peripherals.datasheet_dir)
+            sc_json_object_set(&a, periph, "datasheet_dir",
+                sc_json_string_new(&a, cfg->peripherals.datasheet_dir, strlen(cfg->peripherals.datasheet_dir)));
+        sc_json_object_set(&a, root, "peripherals", periph);
+    }
+
+    /* hardware */
+    if (cfg->hardware.enabled) {
+        sc_json_value_t *hw = sc_json_object_new(&a);
+        if (hw) {
+            sc_json_object_set(&a, hw, "enabled", sc_json_bool_new(&a, cfg->hardware.enabled));
+            if (cfg->hardware.transport)
+                sc_json_object_set(&a, hw, "transport",
+                    sc_json_string_new(&a, cfg->hardware.transport, strlen(cfg->hardware.transport)));
+            if (cfg->hardware.serial_port)
+                sc_json_object_set(&a, hw, "serial_port",
+                    sc_json_string_new(&a, cfg->hardware.serial_port, strlen(cfg->hardware.serial_port)));
+            if (cfg->hardware.baud_rate > 0)
+                sc_json_object_set(&a, hw, "baud_rate",
+                    sc_json_number_new(&a, (double)cfg->hardware.baud_rate));
+            sc_json_object_set(&a, root, "hardware", hw);
+        }
+    }
+
+    /* browser */
+    sc_json_object_set(&a, root, "browser",
+        sc_json_bool_new(&a, cfg->browser.enabled));
+
+    /* mcp_servers */
+    if (cfg->mcp_servers_len > 0) {
+        sc_json_value_t *mcp_arr = sc_json_array_new(&a);
+        if (mcp_arr) {
+            for (size_t i = 0; i < cfg->mcp_servers_len; i++) {
+                sc_json_value_t *me = sc_json_object_new(&a);
+                if (!me) continue;
+                if (cfg->mcp_servers[i].name)
+                    sc_json_object_set(&a, me, "name",
+                        sc_json_string_new(&a, cfg->mcp_servers[i].name, strlen(cfg->mcp_servers[i].name)));
+                if (cfg->mcp_servers[i].command)
+                    sc_json_object_set(&a, me, "command",
+                        sc_json_string_new(&a, cfg->mcp_servers[i].command, strlen(cfg->mcp_servers[i].command)));
+                if (cfg->mcp_servers[i].args_count > 0) {
+                    sc_json_value_t *args_arr = sc_json_array_new(&a);
+                    if (args_arr) {
+                        for (size_t j = 0; j < cfg->mcp_servers[i].args_count; j++) {
+                            if (cfg->mcp_servers[i].args[j])
+                                sc_json_array_push(&a, args_arr,
+                                    sc_json_string_new(&a, cfg->mcp_servers[i].args[j], strlen(cfg->mcp_servers[i].args[j])));
+                        }
+                        sc_json_object_set(&a, me, "args", args_arr);
+                    }
+                }
+                sc_json_array_push(&a, mcp_arr, me);
+            }
+            sc_json_object_set(&a, root, "mcp_servers", mcp_arr);
+        }
+    }
+
     /* providers array */
     if (cfg->providers_len > 0) {
         sc_json_value_t *parr = sc_json_array_new(&a);

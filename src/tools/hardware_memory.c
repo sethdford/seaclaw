@@ -47,7 +47,16 @@ static sc_error_t hardware_memory_execute(void *ctx, sc_allocator_t *alloc,
     if (length > HARDWARE_MEMORY_LEN_MAX) length = HARDWARE_MEMORY_LEN_MAX;
 #if SC_IS_TEST
     (void)value;
-    (void)board;
+    if (board && board[0]) {
+        bool found = false;
+        for (size_t i = 0; i < c->boards_count; i++) {
+            if (c->boards[i] && strcmp(c->boards[i], board) == 0) { found = true; break; }
+        }
+        if (!found) {
+            *out = sc_tool_result_fail("Board not configured in peripherals list", 40);
+            return SC_OK;
+        }
+    }
     if (strcmp(action, "read") == 0) {
         char *msg = sc_strndup(alloc, "00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF", 41);
         if (!msg) { *out = sc_tool_result_fail("out of memory", 12); return SC_ERR_OUT_OF_MEMORY; }

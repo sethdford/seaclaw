@@ -1,8 +1,10 @@
 import { LitElement, html, css, nothing } from "lit";
-import { customElement, state, query } from "lit/decorators.js";
+import { customElement, property, state, query } from "lit/decorators.js";
 import type { TemplateResult } from "lit";
 import type { GatewayClient, GatewayStatus } from "../gateway.js";
 import { GatewayClient as GatewayClientClass } from "../gateway.js";
+import { getGateway } from "../gateway-provider.js";
+import { EVENT_NAMES } from "../utils.js";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -104,10 +106,10 @@ export class ScChatView extends LitElement {
       border-radius: 50%;
     }
     .status-dot.connected {
-      background: #22c55e;
+      background: var(--sc-success);
     }
     .status-dot.connecting {
-      background: #eab308;
+      background: var(--sc-warning);
       animation: pulse 1s ease-in-out infinite;
     }
     .status-dot.disconnected {
@@ -314,16 +316,17 @@ export class ScChatView extends LitElement {
     .abort-btn {
       margin-left: 0.75rem;
       padding: 0.25rem 0.75rem;
-      background: rgba(239, 68, 68, 0.15);
-      color: #ef4444;
-      border: 1px solid rgba(239, 68, 68, 0.3);
+      background: var(--sc-error-dim);
+      color: var(--sc-error);
+      border: 1px solid var(--sc-error);
       border-radius: var(--sc-radius);
       cursor: pointer;
       font-size: 0.75rem;
       font-style: normal;
     }
     .abort-btn:hover {
-      background: rgba(239, 68, 68, 0.25);
+      background: var(--sc-error-dim);
+      border-color: var(--sc-error);
     }
     .thinking::after {
       content: "";
@@ -347,10 +350,10 @@ export class ScChatView extends LitElement {
       align-items: center;
       justify-content: space-between;
       padding: 0.75rem 1rem;
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.3);
+      background: var(--sc-error-dim);
+      border: 1px solid var(--sc-error);
       border-radius: var(--sc-radius);
-      color: #ef4444;
+      color: var(--sc-error);
       font-size: 0.875rem;
     }
     .error-banner button {
@@ -376,6 +379,8 @@ export class ScChatView extends LitElement {
     }
   `;
 
+  @property() sessionKey = "default";
+
   @state() private messages: ChatMessage[] = [];
   @state() private toolCalls: ToolCall[] = [];
   @state() private expandedTools = new Set<string>();
@@ -394,8 +399,7 @@ export class ScChatView extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    const app = document.querySelector("sc-app") as { gateway?: GatewayClient };
-    this.gateway = app?.gateway ?? null;
+    this.gateway = getGateway();
     if (!this.gateway) return;
     this.connectionStatus = this.gateway.status;
     this.gateway.addEventListener(
@@ -414,7 +418,7 @@ export class ScChatView extends LitElement {
     try {
       const res = await this.gateway.request<{
         messages?: { role: string; content: string }[];
-      }>("chat.history", { sessionKey: "default" });
+      }>("chat.history", { sessionKey: this.sessionKey });
       if (
         res?.messages &&
         Array.isArray(res.messages) &&
@@ -461,7 +465,7 @@ export class ScChatView extends LitElement {
     };
     if (!detail?.event) return;
     const payload = detail.payload ?? {};
-    if (detail.event === "error") {
+    if (detail.event === EVENT_NAMES.ERROR) {
       const msg =
         (payload.message as string) ??
         (payload.error as string) ??
@@ -469,10 +473,10 @@ export class ScChatView extends LitElement {
       this.errorBanner = msg;
       this.requestUpdate();
     }
-    if (detail.event === "health") {
+    if (detail.event === EVENT_NAMES.HEALTH) {
       this.requestUpdate();
     }
-    if (detail.event === "chat") {
+    if (detail.event === EVENT_NAMES.CHAT) {
       const state = payload.state as string;
       const content = (payload.message as string) ?? "";
       if (state === "received" && content) {
@@ -526,7 +530,7 @@ export class ScChatView extends LitElement {
       this.requestUpdate();
       this.scrollToBottom();
     }
-    if (detail.event === "agent.tool") {
+    if (detail.event === EVENT_NAMES.TOOL_CALL) {
       const id = (payload.id as string) ?? `tool-${Date.now()}`;
       const name = (payload.message as string) ?? "tool";
       const input =
@@ -604,7 +608,7 @@ export class ScChatView extends LitElement {
     try {
       await this.gateway.request("chat.send", {
         message: text,
-        sessionKey: "default",
+        sessionKey: this.sessionKey,
       });
     } catch (err) {
       this.isWaiting = false;

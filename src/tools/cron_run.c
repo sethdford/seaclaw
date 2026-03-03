@@ -16,6 +16,7 @@ typedef struct { sc_cron_scheduler_t *sched; } sc_cron_tool_ctx_t;
 static sc_error_t cron_run_execute(void *ctx, sc_allocator_t *alloc,
     const sc_json_value_t *args, sc_tool_result_t *out) {
     sc_cron_tool_ctx_t *tctx = (sc_cron_tool_ctx_t *)ctx;
+    (void)tctx;
     if (!args || !out) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;

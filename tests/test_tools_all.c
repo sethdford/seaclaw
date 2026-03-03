@@ -268,6 +268,205 @@ static void test_browser_open_blocks_localhost(void) {
     if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
 }
 
+/* ─── Browser: click action works ────────────────────────────────────────── */
+static void test_browser_click_action(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_error_t err = sc_browser_create(&alloc, true, NULL, &tool);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "click", 5));
+    sc_json_object_set(&alloc, args, "selector", sc_json_string_new(&alloc, "#submit", 7));
+    sc_tool_result_t result;
+    err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(result.success);
+    SC_ASSERT_NOT_NULL(result.output);
+    SC_ASSERT_NOT_NULL(strstr(result.output, "#submit"));
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+static void test_browser_click_missing_selector(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_browser_create(&alloc, true, NULL, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "click", 5));
+    sc_tool_result_t result;
+    tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_FALSE(result.success);
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+/* ─── Browser: type action works ─────────────────────────────────────────── */
+static void test_browser_type_action(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_browser_create(&alloc, true, NULL, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "type", 4));
+    sc_json_object_set(&alloc, args, "selector", sc_json_string_new(&alloc, "#input", 6));
+    sc_json_object_set(&alloc, args, "text", sc_json_string_new(&alloc, "hello", 5));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(result.success);
+    SC_ASSERT_NOT_NULL(strstr(result.output, "hello"));
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+static void test_browser_type_missing_text(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_browser_create(&alloc, true, NULL, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "type", 4));
+    sc_tool_result_t result;
+    tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_FALSE(result.success);
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+/* ─── Browser: scroll action works ───────────────────────────────────────── */
+static void test_browser_scroll_action(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_browser_create(&alloc, true, NULL, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "scroll", 6));
+    sc_json_object_set(&alloc, args, "deltaY", sc_json_number_new(&alloc, 500));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(result.success);
+    SC_ASSERT_NOT_NULL(strstr(result.output, "500"));
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+/* ─── SPI: list/transfer/read actions ────────────────────────────────────── */
+static void test_spi_list_action(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_spi_create(&alloc, NULL, 0, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "list", 4));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(result.success);
+    SC_ASSERT_NOT_NULL(strstr(result.output, "devices"));
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+static void test_spi_transfer_action(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_spi_create(&alloc, NULL, 0, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "transfer", 8));
+    sc_json_object_set(&alloc, args, "data", sc_json_string_new(&alloc, "FF 00", 5));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(result.success);
+    SC_ASSERT_NOT_NULL(strstr(result.output, "rx_data"));
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+static void test_spi_read_action(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_spi_create(&alloc, NULL, 0, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "read", 4));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(result.success);
+    SC_ASSERT_NOT_NULL(strstr(result.output, "rx_data"));
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+/* ─── hardware_memory: read/write with boards ────────────────────────────── */
+static void test_hardware_memory_read_action(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    const char *boards[] = {"nucleo-f401re"};
+    sc_hardware_memory_create(&alloc, boards, 1, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "read", 4));
+    sc_json_object_set(&alloc, args, "board", sc_json_string_new(&alloc, "nucleo-f401re", 13));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(result.success);
+    SC_ASSERT_NOT_NULL(result.output);
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+static void test_hardware_memory_write_action(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    const char *boards[] = {"nucleo-f401re"};
+    sc_hardware_memory_create(&alloc, boards, 1, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "write", 5));
+    sc_json_object_set(&alloc, args, "board", sc_json_string_new(&alloc, "nucleo-f401re", 13));
+    sc_json_object_set(&alloc, args, "value", sc_json_string_new(&alloc, "DEADBEEF", 8));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(result.success);
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+static void test_hardware_memory_unconfigured_board(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    const char *boards[] = {"nucleo-f401re"};
+    sc_hardware_memory_create(&alloc, boards, 1, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "read", 4));
+    sc_json_object_set(&alloc, args, "board", sc_json_string_new(&alloc, "unknown-board", 13));
+    sc_tool_result_t result;
+    tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_FALSE(result.success);
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+}
+
 /* ─── file_edit: schema has path, old_text, new_text ───────────────────────── */
 static void test_file_edit_schema_has_params(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -814,6 +1013,11 @@ void run_tools_all_tests(void) {
     SC_RUN_TEST(test_browser_name);
     SC_RUN_TEST(test_browser_execute_empty);
     SC_RUN_TEST(test_browser_open_rejects_invalid_scheme);
+    SC_RUN_TEST(test_browser_click_action);
+    SC_RUN_TEST(test_browser_click_missing_selector);
+    SC_RUN_TEST(test_browser_type_action);
+    SC_RUN_TEST(test_browser_type_missing_text);
+    SC_RUN_TEST(test_browser_scroll_action);
     SC_RUN_TEST(test_image_create);
     SC_RUN_TEST(test_image_name);
     SC_RUN_TEST(test_image_execute_empty);
@@ -878,6 +1082,9 @@ void run_tools_all_tests(void) {
     SC_RUN_TEST(test_hardware_memory_create);
     SC_RUN_TEST(test_hardware_memory_name);
     SC_RUN_TEST(test_hardware_memory_execute_empty);
+    SC_RUN_TEST(test_hardware_memory_read_action);
+    SC_RUN_TEST(test_hardware_memory_write_action);
+    SC_RUN_TEST(test_hardware_memory_unconfigured_board);
     SC_RUN_TEST(test_schedule_create);
     SC_RUN_TEST(test_schedule_name);
     SC_RUN_TEST(test_schedule_execute_empty);
@@ -906,6 +1113,9 @@ void run_tools_all_tests(void) {
     SC_RUN_TEST(test_spi_create);
     SC_RUN_TEST(test_spi_name);
     SC_RUN_TEST(test_spi_execute_empty);
+    SC_RUN_TEST(test_spi_list_action);
+    SC_RUN_TEST(test_spi_transfer_action);
+    SC_RUN_TEST(test_spi_read_action);
     SC_RUN_TEST(test_claude_code_create);
     SC_RUN_TEST(test_claude_code_name);
     SC_RUN_TEST(test_claude_code_description);
