@@ -46,6 +46,11 @@ typedef struct sc_telegram_ctx {
     /* Policy: NULL or count 0 = allow all; otherwise check allowlist */
     const char *const *allow_from;
     size_t allow_from_count;
+    /* Streaming: message under edit, accumulated text */
+    int64_t stream_message_id;
+    char *stream_text;
+    size_t stream_text_len;
+    size_t stream_text_cap;
 } sc_telegram_ctx_t;
 
 /* ─── Helpers ───────────────────────────────────────────────────────────── */
@@ -391,6 +396,221 @@ static tg_media_kind_t infer_media_kind(const char *path, size_t len) {
 }
 #endif
 
+#if !SC_IS_TEST
+static sc_error_t build_edit_body(sc_allocator_t *alloc, const char *chat_id, size_t chat_id_len,
+                                   int64_t message_id, const char *text, size_t text_len, char **out,
+                                   size_t *out_len) {
+    sc_json_buf_t jbuf;
+    sc_error_t err = sc_json_buf_init(&jbuf, alloc);
+    if (err)
+        return err;
+    err = sc_json_buf_append_raw(&jbuf, "{", 1);
+    if (err)
+        goto fail;
+    err = sc_json_append_key_value(&jbuf, "chat_id", 8, chat_id, chat_id_len);
+    if (err)
+        goto fail;
+    err = sc_json_buf_append_raw(&jbuf, ",", 1);
+    if (err)
+        goto fail;
+    err = sc_json_append_key_int(&jbuf, "message_id", 10, (long long)message_id);
+    if (err)
+        goto fail;
+    err = sc_json_buf_append_raw(&jbuf, ",", 1);
+    if (err)
+        goto fail;
+    err = sc_json_append_key_value(&jbuf, "text", 4, text, text_len);
+    if (err)
+        goto fail;
+    err = sc_json_buf_append_raw(&jbuf, "}", 1);
+    if (err)
+        goto fail;
+    *out_len = jbuf.len;
+    *out = (char *)alloc->alloc(alloc->ctx, jbuf.len + 1);
+    if (!*out) {
+        err = SC_ERR_OUT_OF_MEMORY;
+        goto fail;
+    }
+    memcpy(*out, jbuf.ptr, jbuf.len + 1);
+    sc_json_buf_free(&jbuf);
+    return SC_OK;
+fail:
+    sc_json_buf_free(&jbuf);
+    return err;
+}
+
+static sc_error_t stream_append(sc_telegram_ctx_t *c, const char *delta, size_t delta_len) {
+    size_t need = c->stream_text_len + delta_len + 1;
+    if (need > c->stream_text_cap) {
+        size_t new_cap = c->stream_text_cap ? c->stream_text_cap * 2 : 256;
+        while (new_cap < need)
+            new_cap *= 2;
+        char *p = (char *)c->alloc->realloc(c->alloc->ctx, c->stream_text,
+                                            c->stream_text_cap ? c->stream_text_cap + 1 : 0,
+                                            new_cap + 1);
+        if (!p)
+            return SC_ERR_OUT_OF_MEMORY;
+        c->stream_text = p;
+        c->stream_text_cap = new_cap;
+    }
+    memcpy(c->stream_text + c->stream_text_len, delta, delta_len);
+    c->stream_text_len += delta_len;
+    c->stream_text[c->stream_text_len] = '\0';
+    return SC_OK;
+}
+
+static void stream_clear(sc_telegram_ctx_t *c) {
+    if (c->stream_text) {
+        c->alloc->free(c->alloc->ctx, c->stream_text, c->stream_text_cap + 1);
+        c->stream_text = NULL;
+    }
+    c->stream_text_len = 0;
+    c->stream_text_cap = 0;
+    c->stream_message_id = 0;
+}
+#endif
+
+static sc_error_t telegram_send_event(void *ctx, const char *target, size_t target_len,
+                                      const char *message, size_t message_len,
+                                      const char *const *media, size_t media_count,
+                                      sc_outbound_stage_t stage) {
+    (void)media;
+    (void)media_count;
+    sc_telegram_ctx_t *c = (sc_telegram_ctx_t *)ctx;
+    if (!c || !c->alloc)
+        return SC_ERR_INVALID_ARGUMENT;
+    if (!c->token || c->token_len == 0)
+        return SC_ERR_CHANNEL_NOT_CONFIGURED;
+    if (!target || target_len == 0)
+        return SC_ERR_INVALID_ARGUMENT;
+
+#if SC_IS_TEST
+    (void)message;
+    (void)message_len;
+    (void)stage;
+    return SC_OK;
+#else
+    if (stage == SC_OUTBOUND_STAGE_CHUNK) {
+        if (message_len > 0 && stream_append(c, message, message_len) != SC_OK)
+            return SC_ERR_OUT_OF_MEMORY;
+        const char *text = c->stream_text ? c->stream_text : "";
+        size_t text_len = c->stream_text ? c->stream_text_len : 0;
+        if (c->stream_message_id == 0) {
+            char url_buf[512];
+            int n = build_api_url(url_buf, sizeof(url_buf), c->token, c->token_len, "sendMessage");
+            if (n < 0 || (size_t)n >= sizeof(url_buf))
+                return SC_ERR_INTERNAL;
+            char *body = NULL;
+            size_t body_len = 0;
+            sc_error_t err = build_send_body(c->alloc, target, target_len, text, text_len, &body,
+                                             &body_len);
+            if (err)
+                return err;
+            sc_http_response_t resp = {0};
+            err = sc_http_post_json(c->alloc, url_buf, NULL, body, body_len, &resp);
+            if (body)
+                c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            if (err != SC_OK) {
+                if (resp.owned && resp.body)
+                    sc_http_response_free(c->alloc, &resp);
+                return SC_ERR_CHANNEL_SEND;
+            }
+            if (resp.status_code == 200 && resp.body) {
+                sc_json_value_t *parsed = NULL;
+                if (sc_json_parse(c->alloc, resp.body, resp.body_len, &parsed) == SC_OK &&
+                    parsed) {
+                    sc_json_value_t *result = sc_json_object_get(parsed, "result");
+                    if (result && result->type == SC_JSON_OBJECT) {
+                        double mid = sc_json_get_number(result, "message_id", 0);
+                        c->stream_message_id = (int64_t)mid;
+                    }
+                    sc_json_free(c->alloc, parsed);
+                }
+            }
+            if (resp.owned && resp.body)
+                sc_http_response_free(c->alloc, &resp);
+        } else {
+            char url_buf[512];
+            int n = build_api_url(url_buf, sizeof(url_buf), c->token, c->token_len,
+                                  "editMessageText");
+            if (n < 0 || (size_t)n >= sizeof(url_buf))
+                return SC_ERR_INTERNAL;
+            char *body = NULL;
+            size_t body_len = 0;
+            sc_error_t err =
+                build_edit_body(c->alloc, target, target_len, c->stream_message_id, text, text_len,
+                                &body, &body_len);
+            if (err)
+                return err;
+            sc_http_response_t resp = {0};
+            err = sc_http_post_json(c->alloc, url_buf, NULL, body, body_len, &resp);
+            if (body)
+                c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            if (resp.owned && resp.body)
+                sc_http_response_free(c->alloc, &resp);
+            if (err != SC_OK || (resp.status_code != 200 && resp.status_code != 0))
+                return SC_ERR_CHANNEL_SEND;
+        }
+    } else {
+        /* FINAL */
+        const char *text = message_len > 0 ? message : (c->stream_text ? c->stream_text : "");
+        size_t text_len = message_len > 0 ? message_len : (c->stream_text ? c->stream_text_len : 0);
+        if (c->stream_message_id != 0) {
+            char url_buf[512];
+            int n = build_api_url(url_buf, sizeof(url_buf), c->token, c->token_len,
+                                  "editMessageText");
+            if (n < 0 || (size_t)n >= sizeof(url_buf)) {
+                stream_clear(c);
+                return SC_ERR_INTERNAL;
+            }
+            char *body = NULL;
+            size_t body_len = 0;
+            sc_error_t err =
+                build_edit_body(c->alloc, target, target_len, c->stream_message_id, text, text_len,
+                                &body, &body_len);
+            if (err) {
+                stream_clear(c);
+                return err;
+            }
+            sc_http_response_t resp = {0};
+            err = sc_http_post_json(c->alloc, url_buf, NULL, body, body_len, &resp);
+            if (body)
+                c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            stream_clear(c);
+            if (resp.owned && resp.body)
+                sc_http_response_free(c->alloc, &resp);
+            if (err != SC_OK || (resp.status_code != 200 && resp.status_code != 0))
+                return SC_ERR_CHANNEL_SEND;
+        } else {
+            char url_buf[512];
+            int n = build_api_url(url_buf, sizeof(url_buf), c->token, c->token_len, "sendMessage");
+            if (n < 0 || (size_t)n >= sizeof(url_buf)) {
+                stream_clear(c);
+                return SC_ERR_INTERNAL;
+            }
+            char *body = NULL;
+            size_t body_len = 0;
+            sc_error_t err = build_send_body(c->alloc, target, target_len, text, text_len, &body,
+                                             &body_len);
+            if (err) {
+                stream_clear(c);
+                return err;
+            }
+            sc_http_response_t resp = {0};
+            err = sc_http_post_json(c->alloc, url_buf, NULL, body, body_len, &resp);
+            if (body)
+                c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            stream_clear(c);
+            if (resp.owned && resp.body)
+                sc_http_response_free(c->alloc, &resp);
+            if (err != SC_OK || resp.status_code != 200)
+                return SC_ERR_CHANNEL_SEND;
+        }
+    }
+    return SC_OK;
+#endif
+}
+
 /* ─── Vtable: start, stop, send ─────────────────────────────────────────── */
 
 static sc_error_t telegram_start(void *ctx) {
@@ -534,7 +754,7 @@ static const sc_channel_vtable_t telegram_vtable = {
     .send = telegram_send,
     .name = telegram_name,
     .health_check = telegram_health_check,
-    .send_event = NULL,
+    .send_event = telegram_send_event,
     .start_typing = telegram_start_typing,
     .stop_typing = telegram_stop_typing,
 };
@@ -580,6 +800,8 @@ sc_error_t sc_telegram_create_ex(sc_allocator_t *alloc, const char *token, size_
 void sc_telegram_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_telegram_ctx_t *c = (sc_telegram_ctx_t *)ch->ctx;
+        if (c->stream_text && c->alloc)
+            c->alloc->free(c->alloc->ctx, c->stream_text, c->stream_text_cap + 1);
         if (c->token)
             free(c->token);
         free(c);

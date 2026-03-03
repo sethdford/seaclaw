@@ -47,6 +47,7 @@
 #endif
 #include "seaclaw/tool.h"
 #include "seaclaw/tools/factory.h"
+#include "seaclaw/plugin_loader.h"
 #if SC_HAS_EMAIL
 #include "seaclaw/channels/email.h"
 #endif
@@ -352,6 +353,24 @@ static sc_error_t cmd_service(sc_allocator_t *alloc, int argc, char **argv) {
 
 /* Memory from config — delegates to shared factory in src/memory/factory.c */
 
+static sc_error_t plugin_register_tool_stub(void *ctx, const char *name, void *tool_vtable) {
+    (void)ctx;
+    (void)name;
+    (void)tool_vtable;
+    return SC_OK;
+}
+static sc_error_t plugin_register_provider_stub(void *ctx, const char *name, void *provider_vtable) {
+    (void)ctx;
+    (void)name;
+    (void)provider_vtable;
+    return SC_OK;
+}
+static sc_error_t plugin_register_channel_stub(void *ctx, const sc_channel_t *channel) {
+    (void)ctx;
+    (void)channel;
+    return SC_OK;
+}
+
 static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv) {
     (void)argc;
     (void)argv;
@@ -362,6 +381,26 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
     if (err != SC_OK) {
         fprintf(stderr, "[%s] Config error: %s\n", SC_CODENAME, sc_error_string(err));
         return err;
+    }
+
+    /* ── Load plugins ─────────────────────────────────────────────────── */
+    sc_plugin_host_t plugin_host = {
+        .alloc = alloc,
+        .register_tool = plugin_register_tool_stub,
+        .register_provider = plugin_register_provider_stub,
+        .register_channel = plugin_register_channel_stub,
+        .host_ctx = NULL,
+    };
+    for (size_t i = 0; i < cfg.plugins.plugin_paths_len; i++) {
+        if (cfg.plugins.plugin_paths[i]) {
+            sc_plugin_info_t info = {0};
+            sc_plugin_handle_t *handle = NULL;
+            err = sc_plugin_load(alloc, cfg.plugins.plugin_paths[i], &plugin_host, &info, &handle);
+            if (err != SC_OK) {
+                fprintf(stderr, "[%s] warning: failed to load plugin: %s\n", SC_CODENAME,
+                        cfg.plugins.plugin_paths[i]);
+            }
+        }
     }
 
     /* ── Create provider ──────────────────────────────────────────────── */
@@ -730,6 +769,7 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
         sc_rate_tracker_destroy(policy.tracker);
     if (sb_storage)
         sc_sandbox_storage_destroy(sb_storage, &sb_alloc);
+    sc_plugin_unload_all();
     sc_config_deinit(&cfg);
     return err;
 }
@@ -975,6 +1015,27 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
     if (err != SC_OK) {
         fprintf(stderr, "[%s] Config error: %s\n", SC_CODENAME, sc_error_string(err));
         return err;
+    }
+
+    /* ── Load plugins ─────────────────────────────────────────────────── */
+    sc_plugin_host_t gw_plugin_host = {
+        .alloc = alloc,
+        .register_tool = plugin_register_tool_stub,
+        .register_provider = plugin_register_provider_stub,
+        .register_channel = plugin_register_channel_stub,
+        .host_ctx = NULL,
+    };
+    for (size_t i = 0; i < cfg.plugins.plugin_paths_len; i++) {
+        if (cfg.plugins.plugin_paths[i]) {
+            sc_plugin_info_t info = {0};
+            sc_plugin_handle_t *handle = NULL;
+            sc_error_t pl_err =
+                sc_plugin_load(alloc, cfg.plugins.plugin_paths[i], &gw_plugin_host, &info, &handle);
+            if (pl_err != SC_OK) {
+                fprintf(stderr, "[%s] warning: failed to load plugin: %s\n", SC_CODENAME,
+                        cfg.plugins.plugin_paths[i]);
+            }
+        }
     }
 
     /* ── Build all backend subsystems ──────────────────────────────────── */
@@ -1227,6 +1288,7 @@ cleanup:
 #ifdef SC_HAS_SKILLS
     sc_skillforge_destroy(&skills);
 #endif
+    sc_plugin_unload_all();
     sc_config_deinit(&cfg);
     return err;
 }

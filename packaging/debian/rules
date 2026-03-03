@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_configure:
+	cmake -B build \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DSC_ENABLE_ALL_CHANNELS=ON \
+		-DSC_ENABLE_LTO=ON
+
+override_dh_auto_build:
+	cmake --build build -j$$(nproc)
+
+override_dh_auto_install:
+	DESTDIR=debian/seaclaw cmake --install build
+
+override_dh_auto_test:
+	cd build && ./seaclaw_tests

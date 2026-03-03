@@ -2,6 +2,7 @@ import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
+import { ScToast } from "../components/sc-toast.js";
 import "../components/sc-card.js";
 import "../components/sc-input.js";
 import "../components/sc-skeleton.js";
@@ -199,9 +200,11 @@ export class ScCronView extends GatewayAwareLitElement {
         name: this.formDescription.trim() || undefined,
       });
       this.closeForm();
+      ScToast.show({ message: "Job added", variant: "success" });
       await this.loadJobs();
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Failed to add job";
+      ScToast.show({ message: this.error, variant: "error" });
     }
   }
 
@@ -213,9 +216,11 @@ export class ScCronView extends GatewayAwareLitElement {
     }
     try {
       await gw.request("cron.run", { id: job.id });
+      ScToast.show({ message: "Job triggered", variant: "success" });
       await this.loadJobs();
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Failed to run job";
+      ScToast.show({ message: this.error, variant: "error" });
     }
   }
 
@@ -227,9 +232,11 @@ export class ScCronView extends GatewayAwareLitElement {
     }
     try {
       await gw.request("cron.remove", { id: job.id });
+      ScToast.show({ message: "Job deleted", variant: "success" });
       await this.loadJobs();
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Failed to delete job";
+      ScToast.show({ message: this.error, variant: "error" });
     }
   }
 

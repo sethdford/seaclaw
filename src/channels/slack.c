@@ -17,6 +17,7 @@
 #define SLACK_API_BASE         "https://slack.com/api"
 #define SLACK_AUTH_TEST        "/auth.test"
 #define SLACK_CHAT_POST        "/chat.postMessage"
+#define SLACK_CHAT_UPDATE      "/chat.update"
 #define SLACK_ASSISTANT_STATUS "/assistant.threads.setStatus"
 
 #define SLACK_CONVERSATIONS_HISTORY "/conversations.history"
@@ -33,6 +34,11 @@ typedef struct sc_slack_ctx {
     char **channel_ids;
     size_t channel_ids_count;
     char **last_ts;
+    /* Streaming: message under edit */
+    char *stream_ts;
+    char *stream_text;
+    size_t stream_text_len;
+    size_t stream_text_cap;
 } sc_slack_ctx_t;
 
 /* Parse target: "channel_id:thread_ts" → channel_id and optional thread_ts. */
@@ -292,6 +298,49 @@ fail:
     sc_json_buf_free(&jbuf);
     return err;
 }
+
+static sc_error_t build_chat_update_body(sc_allocator_t *alloc, const char *channel,
+                                         size_t channel_len, const char *ts, size_t ts_len,
+                                         const char *text, size_t text_len, char **out,
+                                         size_t *out_len) {
+    sc_json_buf_t jbuf;
+    sc_error_t err = sc_json_buf_init(&jbuf, alloc);
+    if (err)
+        return err;
+    err = sc_json_buf_append_raw(&jbuf, "{\"channel\":", 11);
+    if (err)
+        goto fail;
+    err = sc_json_append_string(&jbuf, channel, channel_len);
+    if (err)
+        goto fail;
+    err = sc_json_buf_append_raw(&jbuf, ",\"ts\":", 7);
+    if (err)
+        goto fail;
+    err = sc_json_append_string(&jbuf, ts, ts_len);
+    if (err)
+        goto fail;
+    err = sc_json_buf_append_raw(&jbuf, ",\"text\":", 8);
+    if (err)
+        goto fail;
+    err = sc_json_append_string(&jbuf, text, text_len);
+    if (err)
+        goto fail;
+    err = sc_json_buf_append_raw(&jbuf, "}", 1);
+    if (err)
+        goto fail;
+    *out_len = jbuf.len;
+    *out = (char *)alloc->alloc(alloc->ctx, jbuf.len + 1);
+    if (!*out) {
+        err = SC_ERR_OUT_OF_MEMORY;
+        goto fail;
+    }
+    memcpy(*out, jbuf.ptr, jbuf.len + 1);
+    sc_json_buf_free(&jbuf);
+    return SC_OK;
+fail:
+    sc_json_buf_free(&jbuf);
+    return err;
+}
 #endif /* !SC_IS_TEST */
 
 /* Call auth.test to fetch bot_user_id. */
@@ -520,13 +569,198 @@ static bool slack_health_check(void *ctx) {
 #endif
 }
 
+#if !SC_IS_TEST
+static sc_error_t slack_stream_append(sc_slack_ctx_t *c, const char *delta, size_t delta_len) {
+    size_t need = c->stream_text_len + delta_len + 1;
+    if (need > c->stream_text_cap) {
+        size_t new_cap = c->stream_text_cap ? c->stream_text_cap * 2 : 256;
+        while (new_cap < need)
+            new_cap *= 2;
+        char *p = (char *)c->alloc->realloc(c->alloc->ctx, c->stream_text,
+                                            c->stream_text_cap ? c->stream_text_cap + 1 : 0,
+                                            new_cap + 1);
+        if (!p)
+            return SC_ERR_OUT_OF_MEMORY;
+        c->stream_text = p;
+        c->stream_text_cap = new_cap;
+    }
+    memcpy(c->stream_text + c->stream_text_len, delta, delta_len);
+    c->stream_text_len += delta_len;
+    c->stream_text[c->stream_text_len] = '\0';
+    return SC_OK;
+}
+
+static void slack_stream_clear(sc_slack_ctx_t *c) {
+    if (c->stream_ts) {
+        c->alloc->free(c->alloc->ctx, c->stream_ts, strlen(c->stream_ts) + 1);
+        c->stream_ts = NULL;
+    }
+    if (c->stream_text) {
+        c->alloc->free(c->alloc->ctx, c->stream_text, c->stream_text_cap + 1);
+        c->stream_text = NULL;
+    }
+    c->stream_text_len = 0;
+    c->stream_text_cap = 0;
+}
+#endif
+
+static sc_error_t slack_send_event(void *ctx, const char *target, size_t target_len,
+                                   const char *message, size_t message_len,
+                                   const char *const *media, size_t media_count,
+                                   sc_outbound_stage_t stage) {
+    (void)media;
+    (void)media_count;
+    sc_slack_ctx_t *c = (sc_slack_ctx_t *)ctx;
+    if (!c || !c->alloc)
+        return SC_ERR_INVALID_ARGUMENT;
+    if (!c->token || c->token_len == 0)
+        return SC_ERR_CHANNEL_NOT_CONFIGURED;
+    if (!target || target_len == 0)
+        return SC_ERR_INVALID_ARGUMENT;
+
+#if SC_IS_TEST
+    (void)message;
+    (void)message_len;
+    (void)stage;
+    return SC_OK;
+#else
+    const char *channel = NULL;
+    size_t channel_len = 0;
+    const char *thread_ts = NULL;
+    size_t thread_ts_len = 0;
+    parse_target(target, target_len, &channel, &channel_len, &thread_ts, &thread_ts_len);
+
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Authorization: Bearer %.*s", (int)c->token_len,
+                      c->token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return SC_ERR_INTERNAL;
+
+    if (stage == SC_OUTBOUND_STAGE_CHUNK) {
+        if (message_len > 0 && slack_stream_append(c, message, message_len) != SC_OK)
+            return SC_ERR_OUT_OF_MEMORY;
+        const char *text = c->stream_text ? c->stream_text : "";
+        size_t text_len = c->stream_text ? c->stream_text_len : 0;
+        if (!c->stream_ts) {
+            char *body = NULL;
+            size_t body_len = 0;
+            sc_error_t err = build_chat_body(c->alloc, channel, channel_len, thread_ts,
+                                              thread_ts_len, text, text_len, &body, &body_len);
+            if (err)
+                return err;
+            char url_buf[256];
+            snprintf(url_buf, sizeof(url_buf), "%s%s", SLACK_API_BASE, SLACK_CHAT_POST);
+            sc_http_response_t resp = {0};
+            err = sc_http_post_json(c->alloc, url_buf, auth_buf, body, body_len, &resp);
+            if (body)
+                c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            if (err != SC_OK) {
+                if (resp.owned && resp.body)
+                    sc_http_response_free(c->alloc, &resp);
+                return SC_ERR_CHANNEL_SEND;
+            }
+            if (resp.status_code >= 200 && resp.status_code < 300 && resp.body) {
+                sc_json_value_t *parsed = NULL;
+                if (sc_json_parse(c->alloc, resp.body, resp.body_len, &parsed) == SC_OK &&
+                    parsed) {
+                    const char *ts = sc_json_get_string(parsed, "ts");
+                    if (ts) {
+                        size_t ts_len = strlen(ts);
+                        c->stream_ts = (char *)c->alloc->alloc(c->alloc->ctx, ts_len + 1);
+                        if (c->stream_ts) {
+                            memcpy(c->stream_ts, ts, ts_len + 1);
+                        }
+                    }
+                    sc_json_free(c->alloc, parsed);
+                }
+            }
+            if (resp.owned && resp.body)
+                sc_http_response_free(c->alloc, &resp);
+        } else {
+            char *body = NULL;
+            size_t body_len = 0;
+            sc_error_t err = build_chat_update_body(c->alloc, channel, channel_len,
+                                                     c->stream_ts, strlen(c->stream_ts), text,
+                                                     text_len, &body, &body_len);
+            if (err)
+                return err;
+            char url_buf[256];
+            snprintf(url_buf, sizeof(url_buf), "%s%s", SLACK_API_BASE, SLACK_CHAT_UPDATE);
+            sc_http_response_t resp = {0};
+            err = sc_http_post_json(c->alloc, url_buf, auth_buf, body, body_len, &resp);
+            if (body)
+                c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            if (resp.owned && resp.body)
+                sc_http_response_free(c->alloc, &resp);
+            if (err != SC_OK)
+                return SC_ERR_CHANNEL_SEND;
+        }
+    } else {
+        /* FINAL */
+        const char *text = message_len > 0 ? message : (c->stream_text ? c->stream_text : "");
+        size_t text_len = message_len > 0 ? message_len : (c->stream_text ? c->stream_text_len : 0);
+        if (message_len > 0) {
+            size_t conv_len = 0;
+            char *mrkdwn = sc_slack_markdown_to_mrkdwn(c->alloc, text, text_len, &conv_len);
+            if (mrkdwn) {
+                text = mrkdwn;
+                text_len = conv_len;
+            }
+        }
+        if (c->stream_ts) {
+            char *body = NULL;
+            size_t body_len = 0;
+            sc_error_t err = build_chat_update_body(c->alloc, channel, channel_len,
+                                                     c->stream_ts, strlen(c->stream_ts), text,
+                                                     text_len, &body, &body_len);
+            if (err) {
+                slack_stream_clear(c);
+                return err;
+            }
+            char url_buf[256];
+            snprintf(url_buf, sizeof(url_buf), "%s%s", SLACK_API_BASE, SLACK_CHAT_UPDATE);
+            sc_http_response_t resp = {0};
+            err = sc_http_post_json(c->alloc, url_buf, auth_buf, body, body_len, &resp);
+            if (body)
+                c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            slack_stream_clear(c);
+            if (resp.owned && resp.body)
+                sc_http_response_free(c->alloc, &resp);
+            if (err != SC_OK || resp.status_code < 200 || resp.status_code >= 300)
+                return SC_ERR_CHANNEL_SEND;
+        } else {
+            char *body = NULL;
+            size_t body_len = 0;
+            sc_error_t err = build_chat_body(c->alloc, channel, channel_len, thread_ts,
+                                              thread_ts_len, text, text_len, &body, &body_len);
+            if (err) {
+                slack_stream_clear(c);
+                return err;
+            }
+            char url_buf[256];
+            snprintf(url_buf, sizeof(url_buf), "%s%s", SLACK_API_BASE, SLACK_CHAT_POST);
+            sc_http_response_t resp = {0};
+            err = sc_http_post_json(c->alloc, url_buf, auth_buf, body, body_len, &resp);
+            if (body)
+                c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            slack_stream_clear(c);
+            if (resp.owned && resp.body)
+                sc_http_response_free(c->alloc, &resp);
+            if (err != SC_OK || resp.status_code < 200 || resp.status_code >= 300)
+                return SC_ERR_CHANNEL_SEND;
+        }
+    }
+    return SC_OK;
+#endif
+}
+
 static const sc_channel_vtable_t slack_vtable = {
     .start = slack_start,
     .stop = slack_stop,
     .send = slack_send,
     .name = slack_name,
     .health_check = slack_health_check,
-    .send_event = NULL,
+    .send_event = slack_send_event,
     .start_typing = slack_start_typing,
     .stop_typing = slack_stop_typing,
 };

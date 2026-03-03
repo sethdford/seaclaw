@@ -13,4 +13,6 @@ sc_error_t sc_plugin_load(sc_allocator_t *alloc, const char *path, sc_plugin_hos
 
 void sc_plugin_unload(sc_plugin_handle_t *handle);
 
+void sc_plugin_unload_all(void);
+
 #endif /* SC_PLUGIN_LOADER_H */

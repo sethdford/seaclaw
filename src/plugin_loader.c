@@ -1,6 +1,11 @@
 #include "seaclaw/plugin_loader.h"
 #include "seaclaw/core/string.h"
+#include <stddef.h>
 #include <string.h>
+
+#define SC_PLUGIN_LOADED_MAX 32
+static sc_plugin_handle_t *s_loaded[SC_PLUGIN_LOADED_MAX];
+static size_t s_loaded_count = 0;
 
 #if defined(_WIN32)
 /* Windows: dlopen not available, return SC_ERR_NOT_SUPPORTED */
@@ -16,6 +21,10 @@ sc_error_t sc_plugin_load(sc_allocator_t *alloc, const char *path, sc_plugin_hos
 
 void sc_plugin_unload(sc_plugin_handle_t *handle) {
     (void)handle;
+}
+
+void sc_plugin_unload_all(void) {
+    (void)0;
 }
 
 #elif defined(SC_IS_TEST) && SC_IS_TEST != 0
@@ -60,14 +69,32 @@ sc_error_t sc_plugin_load(sc_allocator_t *alloc, const char *path, sc_plugin_hos
     info_out->api_version = SC_PLUGIN_API_VERSION;
 
     *out_handle = h;
+    if (s_loaded_count < SC_PLUGIN_LOADED_MAX)
+        s_loaded[s_loaded_count++] = h;
     return SC_OK;
 }
 
 void sc_plugin_unload(sc_plugin_handle_t *handle) {
     if (!handle)
         return;
+    for (size_t i = 0; i < s_loaded_count; i++) {
+        if (s_loaded[i] == handle) {
+            s_loaded_count--;
+            if (i < s_loaded_count)
+                s_loaded[i] = s_loaded[s_loaded_count];
+            s_loaded[s_loaded_count] = NULL;
+            break;
+        }
+    }
     if (handle->alloc)
         handle->alloc->free(handle->alloc->ctx, handle, sizeof(*handle));
+}
+
+void sc_plugin_unload_all(void) {
+    while (s_loaded_count > 0) {
+        sc_plugin_handle_t *h = s_loaded[s_loaded_count - 1];
+        sc_plugin_unload(h);
+    }
 }
 
 #else
@@ -123,12 +150,23 @@ sc_error_t sc_plugin_load(sc_allocator_t *alloc, const char *path, sc_plugin_hos
 
     *info_out = info;
     *out_handle = h;
+    if (s_loaded_count < SC_PLUGIN_LOADED_MAX)
+        s_loaded[s_loaded_count++] = h;
     return SC_OK;
 }
 
 void sc_plugin_unload(sc_plugin_handle_t *handle) {
     if (!handle)
         return;
+    for (size_t i = 0; i < s_loaded_count; i++) {
+        if (s_loaded[i] == handle) {
+            s_loaded_count--;
+            if (i < s_loaded_count)
+                s_loaded[i] = s_loaded[s_loaded_count];
+            s_loaded[s_loaded_count] = NULL;
+            break;
+        }
+    }
     void *h = handle->dl_handle;
     if (h) {
         sc_plugin_deinit_fn deinit = (sc_plugin_deinit_fn)dlsym(h, "sc_plugin_deinit");
@@ -139,6 +177,13 @@ void sc_plugin_unload(sc_plugin_handle_t *handle) {
     sc_allocator_t *alloc = handle->alloc;
     if (alloc)
         alloc->free(alloc->ctx, handle, sizeof(*handle));
+}
+
+void sc_plugin_unload_all(void) {
+    while (s_loaded_count > 0) {
+        sc_plugin_handle_t *h = s_loaded[s_loaded_count - 1];
+        sc_plugin_unload(h);
+    }
 }
 
 #endif /* _WIN32 / SC_IS_TEST / POSIX */

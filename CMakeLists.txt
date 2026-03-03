@@ -54,6 +54,7 @@ option(SC_ENABLE_DISPATCH "Build Dispatch channel" OFF)
 option(SC_ENABLE_TEAMS "Build Microsoft Teams channel" OFF)
 option(SC_ENABLE_TWILIO "Build Twilio SMS channel" OFF)
 option(SC_ENABLE_GOOGLE_CHAT "Build Google Chat channel" OFF)
+option(SC_ENABLE_VOICE "Build Voice channel (Sonata)" OFF)
 option(SC_ENABLE_ALL_CHANNELS "Build all channels" OFF)
 
 # --- Per-engine build options ---
@@ -65,6 +66,27 @@ option(SC_ENABLE_LUCID_ENGINE "Build Lucid memory engine" ON)
 option(SC_ENABLE_LANCEDB_ENGINE "Build LanceDB memory engine" ON)
 option(SC_ENABLE_REDIS_ENGINE "Build Redis memory engine" OFF)
 # SC_ENABLE_SQLITE and SC_ENABLE_POSTGRES defined above
+
+# --- Sonata Voice Pipeline (optional) ─────────────────────────────
+option(SC_ENABLE_SONATA "Enable native Sonata voice pipeline (Rust)" OFF)
+
+if(SC_ENABLE_SONATA)
+    set(SONATA_DIR "${CMAKE_SOURCE_DIR}/../pocket-voice" CACHE PATH "Path to pocket-voice repo")
+
+    add_custom_command(
+        OUTPUT ${CMAKE_BINARY_DIR}/libsonata_pipeline.a
+        COMMAND cargo build --release --manifest-path ${SONATA_DIR}/Cargo.toml
+                -p sonata-pipeline
+        COMMENT "Building Sonata voice pipeline (Rust)"
+        VERBATIM
+    )
+    add_custom_target(sonata_build DEPENDS ${CMAKE_BINARY_DIR}/libsonata_pipeline.a)
+
+    add_compile_definitions(SC_HAS_SONATA=1)
+    message(STATUS "Sonata voice pipeline: ENABLED (${SONATA_DIR})")
+else()
+    message(STATUS "Sonata voice pipeline: disabled")
+endif()
 
 # Apply SC_ENABLE_ALL_CHANNELS: if ON, enable all channel options
 if(SC_ENABLE_ALL_CHANNELS)
@@ -90,6 +112,7 @@ if(SC_ENABLE_ALL_CHANNELS)
     set(SC_ENABLE_TEAMS ON)
     set(SC_ENABLE_TWILIO ON)
     set(SC_ENABLE_GOOGLE_CHAT ON)
+    set(SC_ENABLE_VOICE ON)
 endif()
 
 # --- Channel sources (conditionally added) ---
@@ -147,6 +170,9 @@ if(SC_ENABLE_TWILIO)
 endif()
 if(SC_ENABLE_GOOGLE_CHAT)
     list(APPEND CHANNEL_SOURCES src/channels/google_chat.c)
+endif()
+if(SC_ENABLE_VOICE)
+    list(APPEND CHANNEL_SOURCES src/channels/voice_channel.c)
 endif()
 # signal, nostr, qq, maixcam, dispatch: only when all-channels build (saves ~60KB in default)
 if(SC_ENABLE_ALL_CHANNELS)
@@ -644,6 +670,9 @@ endif()
 if(SC_ENABLE_DISPATCH)
     target_compile_definitions(seaclaw_core PRIVATE SC_HAS_DISPATCH=1)
 endif()
+if(SC_ENABLE_VOICE)
+    target_compile_definitions(seaclaw_core PRIVATE SC_HAS_SONATA=1)
+endif()
 
 # --- Compile definitions for memory engines ---
 # none + markdown are always compiled (migration depends on them), so always define.
@@ -999,6 +1028,13 @@ endif()
 if(SC_ENABLE_GOOGLE_CHAT)
     target_compile_definitions(seaclaw_core_test PRIVATE SC_HAS_GOOGLE_CHAT=1)
 endif()
+if(SC_ENABLE_VOICE)
+    target_compile_definitions(seaclaw_core_test PRIVATE SC_HAS_SONATA=1)
+endif()
+target_compile_definitions(seaclaw_core_test PRIVATE SC_HAS_SIGNAL=1 SC_HAS_NOSTR=1 SC_HAS_QQ=1 SC_HAS_MAIXCAM=1 SC_HAS_DISPATCH=1)
+if(SC_ENABLE_NONE_ENGINE)
+    target_compile_definitions(seaclaw_core_test PRIVATE SC_HAS_NONE_ENGINE=1)
+endif()
 target_compile_definitions(seaclaw_core_test PRIVATE SC_HAS_SIGNAL=1 SC_HAS_NOSTR=1 SC_HAS_QQ=1 SC_HAS_MAIXCAM=1 SC_HAS_DISPATCH=1 SC_HAS_THREAD_BINDING=1)
 target_compile_definitions(seaclaw_core_test PRIVATE SC_HAS_NONE_ENGINE=1 SC_HAS_MARKDOWN_ENGINE=1)
 if(SC_ENABLE_MEMORY_LRU_ENGINE)
@@ -1141,6 +1177,7 @@ set(SC_TEST_SOURCES
     tests/test_roadmap.c
     tests/test_new_features.c
     tests/test_ollama_integration.c
+    tests/test_plugin.c
 )
 
 add_executable(seaclaw_tests ${SC_TEST_SOURCES} wasm/wasm_alloc.c)
@@ -1203,6 +1240,9 @@ if(SC_ENABLE_TWILIO)
 endif()
 if(SC_ENABLE_GOOGLE_CHAT)
     target_compile_definitions(seaclaw_tests PRIVATE SC_HAS_GOOGLE_CHAT=1)
+endif()
+if(SC_ENABLE_VOICE)
+    target_compile_definitions(seaclaw_tests PRIVATE SC_HAS_SONATA=1)
 endif()
 if(SC_ENABLE_LUCID_ENGINE)
     target_compile_definitions(seaclaw_tests PRIVATE SC_HAS_LUCID_ENGINE=1)

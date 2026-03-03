@@ -3,6 +3,7 @@ import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { formatRelative } from "../utils.js";
 import { icons } from "../icons.js";
+import { ScToast } from "../components/sc-toast.js";
 import "../components/sc-input.js";
 import "../components/sc-card.js";
 import "../components/sc-skeleton.js";
@@ -221,9 +222,11 @@ export class ScSessionsView extends GatewayAwareLitElement {
         label: this.renameValue.trim(),
       });
       this.renaming = false;
+      ScToast.show({ message: "Session renamed", variant: "success" });
       await this.loadSessions();
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Rename failed";
+      ScToast.show({ message: this.error, variant: "error" });
     }
   }
 
@@ -235,9 +238,11 @@ export class ScSessionsView extends GatewayAwareLitElement {
       this.selectedKey = "";
       this.messages = [];
       this.confirmDelete = false;
+      ScToast.show({ message: "Session deleted", variant: "success" });
       await this.loadSessions();
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Delete failed";
+      ScToast.show({ message: this.error, variant: "error" });
     }
   }
 

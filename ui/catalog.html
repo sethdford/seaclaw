@@ -96,6 +96,10 @@
       <a href="#sc-segmented-control">sc-segmented-control</a>
       <a href="#sc-data-table">sc-data-table</a>
       <a href="#sc-date-picker">sc-date-picker</a>
+      <a href="#sc-sparkline">sc-sparkline</a>
+      <a href="#sc-animated-number">sc-animated-number</a>
+      <a href="#sc-animated-icon">sc-animated-icon</a>
+      <a href="#sc-activity-feed">sc-activity-feed</a>
     </nav>
     <main class="catalog-main">
       <header class="catalog-header">
@@ -692,6 +696,91 @@
         <div class="code-snippet"><pre><code>&lt;sc-date-picker label="Date" value="2025-01-15"&gt;&lt;/sc-date-picker&gt;</code></pre></div>
       </section>
 
+      <section class="component-section" id="sc-sparkline">
+        <h2>sc-sparkline</h2>
+        <div class="playground">
+          <div class="preview" style="gap: var(--sc-space-xl); display: flex; align-items: center;">
+            <div style="text-align: center">
+              <sc-sparkline id="spark-up" color="var(--sc-success)"></sc-sparkline>
+              <div style="font-size: var(--sc-text-xs); color: var(--sc-text-muted); margin-top: 4px;">Uptrend</div>
+            </div>
+            <div style="text-align: center">
+              <sc-sparkline id="spark-down" color="var(--sc-error)"></sc-sparkline>
+              <div style="font-size: var(--sc-text-xs); color: var(--sc-text-muted); margin-top: 4px;">Downtrend</div>
+            </div>
+            <div style="text-align: center">
+              <sc-sparkline id="spark-flat" color="var(--sc-text-muted)"></sc-sparkline>
+              <div style="font-size: var(--sc-text-xs); color: var(--sc-text-muted); margin-top: 4px;">Stable</div>
+            </div>
+            <div style="text-align: center">
+              <sc-sparkline id="spark-volatile" color="var(--sc-accent)" width="120" height="36"></sc-sparkline>
+              <div style="font-size: var(--sc-text-xs); color: var(--sc-text-muted); margin-top: 4px;">Volatile (wide)</div>
+            </div>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-sparkline .data=${'{[3, 5, 4, 7, 6, 8, 10]}'} color="var(--sc-success)"&gt;&lt;/sc-sparkline&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-animated-number">
+        <h2>sc-animated-number</h2>
+        <div class="playground">
+          <div class="preview" style="gap: var(--sc-space-xl); display: flex; align-items: baseline;">
+            <div style="text-align: center">
+              <div style="font-size: var(--sc-text-3xl); font-weight: bold;">
+                <sc-animated-number id="anum-preview" value="0"></sc-animated-number>
+              </div>
+              <sc-button variant="secondary" id="anum-trigger" style="margin-top: var(--sc-space-sm);">Animate to 50</sc-button>
+            </div>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-animated-number .value=${'{42}'} suffix="%"&gt;&lt;/sc-animated-number&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-animated-icon">
+        <h2>sc-animated-icon</h2>
+        <div class="playground">
+          <div class="preview" style="gap: var(--sc-space-xl); display: flex; align-items: center;">
+            <div style="text-align: center;">
+              <sc-animated-icon icon="check" state="idle" size="2rem"></sc-animated-icon>
+              <div style="font-size: var(--sc-text-xs); color: var(--sc-text-muted); margin-top: 4px;">Idle</div>
+            </div>
+            <div style="text-align: center;">
+              <sc-animated-icon icon="refresh" state="loading" size="2rem"></sc-animated-icon>
+              <div style="font-size: var(--sc-text-xs); color: var(--sc-text-muted); margin-top: 4px;">Loading</div>
+            </div>
+            <div style="text-align: center;">
+              <sc-animated-icon icon="check" state="success" size="2rem"></sc-animated-icon>
+              <div style="font-size: var(--sc-text-xs); color: var(--sc-text-muted); margin-top: 4px;">Success</div>
+            </div>
+            <div style="text-align: center;">
+              <sc-animated-icon icon="warning" state="error" size="2rem"></sc-animated-icon>
+              <div style="font-size: var(--sc-text-xs); color: var(--sc-text-muted); margin-top: 4px;">Error</div>
+            </div>
+          </div>
+          <div class="controls">
+            <label>state
+              <select id="icon-state-control">
+                <option value="idle">idle</option>
+                <option value="loading">loading</option>
+                <option value="success">success</option>
+                <option value="error">error</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-animated-icon icon="check" state="success" size="2rem"&gt;&lt;/sc-animated-icon&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-activity-feed">
+        <h2>sc-activity-feed</h2>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 480px;">
+            <sc-activity-feed id="feed-preview"></sc-activity-feed>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-activity-feed .events=${'{[{type:"message",channel:"Telegram",user:"Alice",preview:"Hello!",time:Date.now()}]}'}&gt;&lt;/sc-activity-feed&gt;</code></pre></div>
+      </section>
+
     <sc-toast></sc-toast>
 
     <script type="module">
@@ -722,6 +811,10 @@
       import "/src/components/sc-segmented-control.js";
       import "/src/components/sc-data-table.js";
       import "/src/components/sc-date-picker.js";
+      import "/src/components/sc-sparkline.js";
+      import "/src/components/sc-animated-number.js";
+      import "/src/components/sc-animated-icon.js";
+      import "/src/components/sc-activity-feed.js";
 
       // Theme toggle
       function setTheme(theme) {
@@ -995,6 +1088,38 @@
       const breadcrumbDemo = document.getElementById("breadcrumb-demo");
       if (breadcrumbPreview) breadcrumbPreview.items = breadcrumbItems;
       if (breadcrumbDemo) breadcrumbDemo.items = breadcrumbItems;
+
+      // Sparklines
+      const sparkUp = document.getElementById("spark-up");
+      const sparkDown = document.getElementById("spark-down");
+      const sparkFlat = document.getElementById("spark-flat");
+      const sparkVolatile = document.getElementById("spark-volatile");
+      if (sparkUp) sparkUp.data = [3, 5, 4, 7, 6, 8, 10];
+      if (sparkDown) sparkDown.data = [10, 8, 9, 6, 5, 3, 2];
+      if (sparkFlat) sparkFlat.data = [5, 5, 6, 5, 5, 6, 5];
+      if (sparkVolatile) sparkVolatile.data = [2, 8, 3, 9, 4, 7, 6, 10, 3, 8];
+
+      // Animated number
+      let anumVal = 0;
+      document.getElementById("anum-trigger")?.addEventListener("click", () => {
+        anumVal = anumVal === 0 ? 50 : anumVal === 50 ? 100 : 0;
+        const el = document.getElementById("anum-preview");
+        if (el) el.value = anumVal;
+        const btn = document.getElementById("anum-trigger");
+        if (btn) btn.textContent = anumVal === 50 ? "Animate to 100" : anumVal === 100 ? "Reset to 0" : "Animate to 50";
+      });
+
+      // Activity feed
+      const feedPreview = document.getElementById("feed-preview");
+      if (feedPreview) {
+        feedPreview.events = [
+          { type: "message", channel: "Telegram", user: "Alice", preview: "Can you review the PR?", time: Date.now() - 30000 },
+          { type: "tool_exec", tool: "shell", command: "git status", time: Date.now() - 120000 },
+          { type: "message", channel: "Discord", user: "Bob", preview: "Deploy looks good", time: Date.now() - 300000 },
+          { type: "session_start", session: "Code Review", time: Date.now() - 600000 },
+          { type: "message", channel: "Slack", user: "Charlie", preview: "Tests passing on CI", time: Date.now() - 1800000 },
+        ];
+      }
     </script>
   </body>
 </html>

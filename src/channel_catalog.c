@@ -73,6 +73,9 @@ static const sc_channel_meta_t catalog[] = {
     {SC_CHANNEL_GOOGLE_CHAT, "google_chat", "Google Chat", "", SC_LISTENER_POLLING},
 #endif
     {SC_CHANNEL_DISPATCH, "dispatch", "Dispatch", "", SC_LISTENER_NONE},
+#ifdef SC_HAS_SONATA
+    {SC_CHANNEL_VOICE, "voice", "Voice (Sonata)", "", SC_LISTENER_SEND_ONLY},
+#endif
 };
 static const size_t catalog_len = sizeof(catalog) / sizeof(catalog[0]);
 
@@ -173,6 +176,10 @@ bool sc_channel_catalog_is_build_enabled(sc_channel_id_t id) {
 #endif
     case SC_CHANNEL_DISPATCH:
         return true;
+#ifdef SC_HAS_SONATA
+    case SC_CHANNEL_VOICE:
+        return true;
+#endif
     default:
         return false;
     }

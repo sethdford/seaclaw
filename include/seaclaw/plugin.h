@@ -1,6 +1,7 @@
 #ifndef SC_PLUGIN_H
 #define SC_PLUGIN_H
 
+#include "seaclaw/channel.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/tool.h"
@@ -21,6 +22,7 @@ typedef struct sc_plugin_host {
     sc_allocator_t *alloc;
     sc_error_t (*register_tool)(void *host_ctx, const char *name, void *tool_vtable);
     sc_error_t (*register_provider)(void *host_ctx, const char *name, void *provider_vtable);
+    sc_error_t (*register_channel)(void *host_ctx, const sc_channel_t *channel);
     void *host_ctx;
 } sc_plugin_host_t;
 

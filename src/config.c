@@ -951,12 +951,40 @@ static sc_error_t parse_policy_cfg(sc_allocator_t *a, sc_config_t *cfg,
     cfg->policy.enabled = sc_json_get_bool(obj, "enabled", cfg->policy.enabled);
     return SC_OK;
 }
+static sc_error_t parse_plugin_paths_array(sc_allocator_t *a, sc_config_t *cfg,
+                                           const sc_json_value_t *arr) {
+    if (!arr || arr->type != SC_JSON_ARRAY || arr->data.array.len == 0)
+        return SC_OK;
+    size_t n = arr->data.array.len;
+    char **paths = (char **)a->alloc(a->ctx, n * sizeof(char *));
+    if (!paths)
+        return SC_ERR_INTERNAL;
+    size_t count = 0;
+    for (size_t i = 0; i < n; i++) {
+        sc_json_value_t *item = arr->data.array.items[i];
+        if (item && item->type == SC_JSON_STRING && item->data.string.ptr) {
+            paths[count] = sc_strdup(a, item->data.string.ptr);
+            if (paths[count])
+                count++;
+        }
+    }
+    cfg->plugins.plugin_paths = paths;
+    cfg->plugins.plugin_paths_len = count;
+    return SC_OK;
+}
+
 static sc_error_t parse_plugins_cfg(sc_allocator_t *a, sc_config_t *cfg,
                                     const sc_json_value_t *obj) {
-    (void)a;
-    if (!obj || obj->type != SC_JSON_OBJECT)
+    if (!obj)
+        return SC_OK;
+    if (obj->type == SC_JSON_ARRAY)
+        return parse_plugin_paths_array(a, cfg, obj);
+    if (obj->type != SC_JSON_OBJECT)
         return SC_OK;
     cfg->plugins.enabled = sc_json_get_bool(obj, "enabled", cfg->plugins.enabled);
+    const sc_json_value_t *paths = sc_json_object_get(obj, "paths");
+    if (paths)
+        parse_plugin_paths_array(a, cfg, paths);
     return SC_OK;
 }
 static sc_error_t parse_heartbeat(sc_allocator_t *a, sc_config_t *cfg, const sc_json_value_t *obj) {

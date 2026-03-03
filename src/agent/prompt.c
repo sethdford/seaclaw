@@ -141,7 +141,10 @@ sc_error_t sc_prompt_build_system(sc_allocator_t *alloc, const sc_prompt_config_
             goto fail;
     } else if (config->autonomy_level == 2) {
         err = append(alloc, &buf, &len, &cap,
-                     "## Rules\n\nYou are in full autonomy mode. Execute tools as needed.\n\n", 61);
+                     "## Rules\n\nYou are in full autonomy mode. Execute tools directly "
+                     "without asking permission. When the user asks you to write files, "
+                     "run commands, or perform actions, use your tools immediately.\n\n",
+                     186);
         if (err != SC_OK)
             goto fail;
     }

@@ -2,6 +2,7 @@ import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
+import { ScToast } from "../components/sc-toast.js";
 import "../components/sc-card.js";
 import "../components/sc-input.js";
 import "../components/sc-skeleton.js";
@@ -164,8 +165,10 @@ export class ScSkillsView extends GatewayAwareLitElement {
       });
       skill.enabled = enable;
       this.requestUpdate();
+      ScToast.show({ message: enable ? "Skill enabled" : "Skill disabled", variant: "success" });
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Failed to update skill";
+      ScToast.show({ message: this.error, variant: "error" });
     }
   }
 
@@ -182,9 +185,11 @@ export class ScSkillsView extends GatewayAwareLitElement {
     try {
       await gw.request("skills.install", { name, url: raw });
       this.installUrl = "";
+      ScToast.show({ message: "Skill installed", variant: "success" });
       await this.loadSkills();
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Install failed";
+      ScToast.show({ message: this.error, variant: "error" });
     }
   }
 

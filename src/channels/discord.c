@@ -27,6 +27,11 @@ typedef struct sc_discord_ctx {
     size_t bot_id_len;
     /* last_message_id per channel (parallel to channel_ids) */
     char **last_message_ids;
+    /* Streaming: message under edit */
+    char *stream_message_id;
+    char *stream_text;
+    size_t stream_text_len;
+    size_t stream_text_cap;
 } sc_discord_ctx_t;
 
 #if !SC_IS_TEST
@@ -143,13 +148,204 @@ static bool discord_health_check(void *ctx) {
     return true;
 }
 
+#if !SC_IS_TEST
+static sc_error_t discord_stream_append(sc_discord_ctx_t *c, const char *delta, size_t delta_len) {
+    size_t need = c->stream_text_len + delta_len + 1;
+    if (need > c->stream_text_cap) {
+        size_t new_cap = c->stream_text_cap ? c->stream_text_cap * 2 : 256;
+        while (new_cap < need)
+            new_cap *= 2;
+        char *p = (char *)c->alloc->realloc(c->alloc->ctx, c->stream_text,
+                                            c->stream_text_cap ? c->stream_text_cap + 1 : 0,
+                                            new_cap + 1);
+        if (!p)
+            return SC_ERR_OUT_OF_MEMORY;
+        c->stream_text = p;
+        c->stream_text_cap = new_cap;
+    }
+    memcpy(c->stream_text + c->stream_text_len, delta, delta_len);
+    c->stream_text_len += delta_len;
+    c->stream_text[c->stream_text_len] = '\0';
+    return SC_OK;
+}
+
+static void discord_stream_clear(sc_discord_ctx_t *c) {
+    if (c->stream_message_id) {
+        c->alloc->free(c->alloc->ctx, c->stream_message_id, strlen(c->stream_message_id) + 1);
+        c->stream_message_id = NULL;
+    }
+    if (c->stream_text) {
+        c->alloc->free(c->alloc->ctx, c->stream_text, c->stream_text_cap + 1);
+        c->stream_text = NULL;
+    }
+    c->stream_text_len = 0;
+    c->stream_text_cap = 0;
+}
+#endif
+
+static sc_error_t discord_send_event(void *ctx, const char *target, size_t target_len,
+                                     const char *message, size_t message_len,
+                                     const char *const *media, size_t media_count,
+                                     sc_outbound_stage_t stage) {
+    (void)media;
+    (void)media_count;
+    sc_discord_ctx_t *c = (sc_discord_ctx_t *)ctx;
+    if (!c || !c->alloc)
+        return SC_ERR_INVALID_ARGUMENT;
+    if (!c->token || c->token_len == 0)
+        return SC_ERR_CHANNEL_NOT_CONFIGURED;
+    if (!target || target_len == 0)
+        return SC_ERR_INVALID_ARGUMENT;
+
+#if SC_IS_TEST
+    (void)message;
+    (void)message_len;
+    (void)stage;
+    return SC_OK;
+#else
+    char auth_buf[256];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Authorization: Bot %.*s", (int)c->token_len,
+                      c->token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return SC_ERR_INTERNAL;
+
+    if (stage == SC_OUTBOUND_STAGE_CHUNK) {
+        if (message_len > 0 && discord_stream_append(c, message, message_len) != SC_OK)
+            return SC_ERR_OUT_OF_MEMORY;
+        const char *text = c->stream_text ? c->stream_text : "";
+        size_t text_len = c->stream_text ? c->stream_text_len : 0;
+        if (!c->stream_message_id) {
+            char url_buf[512];
+            int n = snprintf(url_buf, sizeof(url_buf), "%s/%.*s/messages", DISCORD_API_BASE,
+                             (int)target_len, target);
+            if (n < 0 || (size_t)n >= sizeof(url_buf))
+                return SC_ERR_INTERNAL;
+            char *body = NULL;
+            size_t body_len = 0;
+            sc_error_t err = build_discord_body(c->alloc, text, text_len, &body, &body_len);
+            if (err)
+                return err;
+            sc_http_response_t resp = {0};
+            err = sc_http_post_json(c->alloc, url_buf, auth_buf, body, body_len, &resp);
+            if (body)
+                c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            if (err != SC_OK) {
+                if (resp.owned && resp.body)
+                    sc_http_response_free(c->alloc, &resp);
+                return SC_ERR_CHANNEL_SEND;
+            }
+            if (resp.status_code >= 200 && resp.status_code < 300 && resp.body) {
+                sc_json_value_t *parsed = NULL;
+                if (sc_json_parse(c->alloc, resp.body, resp.body_len, &parsed) == SC_OK &&
+                    parsed) {
+                    const char *msg_id = sc_json_get_string(parsed, "id");
+                    if (msg_id) {
+                        size_t id_len = strlen(msg_id);
+                        c->stream_message_id =
+                            (char *)c->alloc->alloc(c->alloc->ctx, id_len + 1);
+                        if (c->stream_message_id) {
+                            memcpy(c->stream_message_id, msg_id, id_len + 1);
+                        }
+                    }
+                    sc_json_free(c->alloc, parsed);
+                }
+            }
+            if (resp.owned && resp.body)
+                sc_http_response_free(c->alloc, &resp);
+        } else {
+            char url_buf[512];
+            int n = snprintf(url_buf, sizeof(url_buf), "%s/%.*s/messages/%s", DISCORD_API_BASE,
+                             (int)target_len, target, c->stream_message_id);
+            if (n < 0 || (size_t)n >= sizeof(url_buf))
+                return SC_ERR_INTERNAL;
+            char *body = NULL;
+            size_t body_len = 0;
+            sc_error_t err = build_discord_body(c->alloc, text, text_len, &body, &body_len);
+            if (err)
+                return err;
+            sc_http_response_t resp = {0};
+            err = sc_http_patch_json(c->alloc, url_buf, auth_buf, body, body_len, &resp);
+            if (body)
+                c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            if (resp.owned && resp.body)
+                sc_http_response_free(c->alloc, &resp);
+            if (err != SC_OK)
+                return SC_ERR_CHANNEL_SEND;
+        }
+    } else {
+        /* FINAL */
+        const char *text = message_len > 0 ? message : (c->stream_text ? c->stream_text : "");
+        size_t text_len = message_len > 0 ? message_len : (c->stream_text ? c->stream_text_len : 0);
+        if (c->stream_message_id) {
+            char url_buf[512];
+            int n = snprintf(url_buf, sizeof(url_buf), "%s/%.*s/messages/%s", DISCORD_API_BASE,
+                             (int)target_len, target, c->stream_message_id);
+            if (n < 0 || (size_t)n >= sizeof(url_buf)) {
+                discord_stream_clear(c);
+                return SC_ERR_INTERNAL;
+            }
+            char *body = NULL;
+            size_t body_len = 0;
+            sc_error_t err = build_discord_body(c->alloc, text, text_len, &body, &body_len);
+            if (err) {
+                discord_stream_clear(c);
+                return err;
+            }
+            char headers_buf[320];
+            int nh = snprintf(headers_buf, sizeof(headers_buf),
+                              "Content-Type: application/json\r\n%s", auth_buf);
+            if (nh <= 0 || (size_t)nh >= sizeof(headers_buf)) {
+                if (body)
+                    c->alloc->free(c->alloc->ctx, body, body_len + 1);
+                discord_stream_clear(c);
+                return SC_ERR_INTERNAL;
+            }
+            sc_http_response_t resp = {0};
+            err = sc_http_request(c->alloc, url_buf, "PATCH", headers_buf, body, body_len, &resp);
+            if (body)
+                c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            discord_stream_clear(c);
+            if (resp.owned && resp.body)
+                sc_http_response_free(c->alloc, &resp);
+            if (err != SC_OK)
+                return SC_ERR_CHANNEL_SEND;
+        } else {
+            char url_buf[512];
+            int n = snprintf(url_buf, sizeof(url_buf), "%s/%.*s/messages", DISCORD_API_BASE,
+                             (int)target_len, target);
+            if (n < 0 || (size_t)n >= sizeof(url_buf)) {
+                discord_stream_clear(c);
+                return SC_ERR_INTERNAL;
+            }
+            char *body = NULL;
+            size_t body_len = 0;
+            sc_error_t err = build_discord_body(c->alloc, text, text_len, &body, &body_len);
+            if (err) {
+                discord_stream_clear(c);
+                return err;
+            }
+            sc_http_response_t resp = {0};
+            err = sc_http_post_json(c->alloc, url_buf, auth_buf, body, body_len, &resp);
+            if (body)
+                c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            discord_stream_clear(c);
+            if (resp.owned && resp.body)
+                sc_http_response_free(c->alloc, &resp);
+            if (err != SC_OK || resp.status_code < 200 || resp.status_code >= 300)
+                return SC_ERR_CHANNEL_SEND;
+        }
+    }
+    return SC_OK;
+#endif
+}
+
 static const sc_channel_vtable_t discord_vtable = {
     .start = discord_start,
     .stop = discord_stop,
     .send = discord_send,
     .name = discord_name,
     .health_check = discord_health_check,
-    .send_event = NULL,
+    .send_event = discord_send_event,
     .start_typing = NULL,
     .stop_typing = NULL,
 };
@@ -361,6 +557,9 @@ sc_error_t sc_discord_create_ex(sc_allocator_t *alloc, const char *token, size_t
 void sc_discord_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_discord_ctx_t *c = (sc_discord_ctx_t *)ch->ctx;
+#if !SC_IS_TEST
+        discord_stream_clear(c);
+#endif
         if (c->token)
             free(c->token);
         if (c->bot_id)

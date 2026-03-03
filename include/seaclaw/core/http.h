@@ -47,4 +47,9 @@ sc_error_t sc_http_request(sc_allocator_t *alloc, const char *url, const char *m
                            const char *extra_headers, /* NULL or "Key: val\n..." */
                            const char *body, size_t body_len, sc_http_response_t *out);
 
+/* PATCH with JSON body — convenience wrapper around sc_http_request */
+sc_error_t sc_http_patch_json(sc_allocator_t *alloc, const char *url, const char *auth_header,
+                              const char *json_body, size_t json_body_len,
+                              sc_http_response_t *out);
+
 #endif

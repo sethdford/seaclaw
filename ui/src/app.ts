@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient, GatewayStatus } from "./gateway.js";
 import { GatewayClient as GatewayClientClass } from "./gateway.js";
@@ -121,6 +121,41 @@ export class ScApp extends LitElement {
       .view-enter {
         animation: none;
       }
+    }
+
+    .disconnect-banner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--sc-space-sm);
+      padding: var(--sc-space-xs) var(--sc-space-md);
+      background: var(--sc-error);
+      color: #fff;
+      font-size: var(--sc-text-sm);
+      font-weight: 500;
+      animation: sc-slide-down var(--sc-duration-normal) var(--sc-ease-out);
+    }
+    @keyframes sc-slide-down {
+      from {
+        transform: translateY(-100%);
+      }
+      to {
+        transform: translateY(0);
+      }
+    }
+    .disconnect-banner button {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      color: #fff;
+      padding: var(--sc-space-2xs) var(--sc-space-sm);
+      border-radius: var(--sc-radius-sm);
+      font-size: var(--sc-text-xs);
+      font-family: var(--sc-font);
+      cursor: pointer;
+      transition: background var(--sc-duration-fast);
+    }
+    .disconnect-banner button:hover {
+      background: rgba(255, 255, 255, 0.35);
     }
 
     .mobile-nav {
@@ -322,6 +357,12 @@ export class ScApp extends LitElement {
 
   override render() {
     return html`
+      ${this.connectionStatus === "disconnected"
+        ? html`<div class="disconnect-banner" role="alert">
+            Disconnected from server
+            <button @click=${this._reconnect}>Reconnect</button>
+          </div>`
+        : nothing}
       <div class="layout ${this.sidebarCollapsed ? "collapsed" : ""}">
         <sc-sidebar
           .activeTab=${this.tab}
@@ -359,6 +400,13 @@ export class ScApp extends LitElement {
 
       <sc-floating-mic></sc-floating-mic>
     `;
+  }
+
+  private _reconnect(): void {
+    if (!this.gateway) return;
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${proto}//${window.location.host}/ws`;
+    this.gateway.connect(wsUrl);
   }
 
   private _renderView() {

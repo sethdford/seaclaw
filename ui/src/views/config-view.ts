@@ -1,6 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
+import { ScToast } from "../components/sc-toast.js";
 import "../components/sc-input.js";
 
 type SaveStatus = "saved" | "error" | "unsaved" | "idle";
@@ -353,6 +354,7 @@ export class ScConfigView extends GatewayAwareLitElement {
         } catch {
           this.saveStatus = "error";
           this.errorMessage = "Invalid JSON";
+          ScToast.show({ message: "Invalid JSON", variant: "error" });
           return;
         }
       } else {
@@ -380,16 +382,19 @@ export class ScConfigView extends GatewayAwareLitElement {
         }
         this.rawText = JSON.stringify(toRawConfig(this.config), null, 2);
         this.saveStatus = "saved";
+        ScToast.show({ message: "Config saved", variant: "success" });
         setTimeout(() => {
           if (this.saveStatus === "saved") this.saveStatus = "idle";
         }, 2000);
       } else {
         this.saveStatus = "error";
         this.errorMessage = "Save rejected";
+        ScToast.show({ message: "Save rejected by server", variant: "error" });
       }
     } catch (e) {
       this.saveStatus = "error";
       this.errorMessage = e instanceof Error ? e.message : "Save failed";
+      ScToast.show({ message: this.errorMessage, variant: "error" });
     }
   }
 
