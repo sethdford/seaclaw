@@ -15,6 +15,10 @@
  * to the cloud-based sc_voice_stt/tts API.
  */
 
+/** Callback invoked when TTS audio is ready for playback. */
+typedef void (*sc_voice_audio_callback_t)(const float *audio, size_t samples,
+                                          void *user_data);
+
 typedef struct sc_channel_voice_config {
     const char *codec_model_path;       /* Path to codec weights */
     const char *stt_model_path;         /* Path to STT weights */
@@ -23,9 +27,12 @@ typedef struct sc_channel_voice_config {
     const char *cfm_model_path;         /* Path to CFM weights */
     const char *speaker_id;             /* Speaker identity for TTS */
     float emotion_exaggeration;         /* 0.0 - 2.0, default 1.0 */
+    bool emotion_exaggeration_set;      /* true if explicitly configured */
     uint32_t sample_rate;               /* Default: 24000 */
     bool enable_full_duplex;            /* Enable overlapping speech */
     bool enable_backchanneling;         /* Enable hmm/right/oh responses */
+    sc_voice_audio_callback_t on_audio_ready;  /* Callback for generated audio */
+    void *callback_user_data;                   /* User data for callback */
 } sc_channel_voice_config_t;
 
 /**

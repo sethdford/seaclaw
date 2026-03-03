@@ -1,19 +1,24 @@
 #include "seaclaw/channels/voice_channel.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #ifdef SC_HAS_SONATA
-/* FFI declarations for Sonata Rust pipeline */
-extern int32_t sonata_pipeline_init(const char *config_json, size_t config_len);
+/* FFI declarations for Sonata Rust pipeline.
+ * Rust FFI uses *const u8 / *mut u8 for byte buffers, which maps to uint8_t
+ * in C (not char, which may be signed on some platforms). */
+extern int32_t sonata_pipeline_init(const uint8_t *config_json, size_t config_len);
 extern int32_t sonata_stt(const float *audio, size_t samples,
-                          char *text, size_t *text_len);
-extern int32_t sonata_tts(const char *text, size_t text_len,
-                          const char *speaker_id, float emotion_exag,
+                          uint8_t *text, size_t *text_len);
+extern int32_t sonata_tts(const uint8_t *text, size_t text_len,
+                          const uint8_t *speaker_id, float emotion_exag,
                           float *audio, size_t *audio_len);
 extern int32_t sonata_speaker_encode(const float *audio, size_t samples,
                                      float *embedding);
 extern void sonata_pipeline_deinit(void);
 #endif
+
+#define VOICE_MAX_SAMPLES (24000u * 10u) /* 10s at 24kHz */
 
 typedef struct sc_voice_ctx {
     sc_allocator_t *alloc;
@@ -71,17 +76,34 @@ static sc_error_t voice_send(void *ctx,
     (void)media_count;
 
 #ifdef SC_HAS_SONATA
-    /* Convert text to speech via Sonata TTS */
-    float audio_buf[24000 * 30]; /* up to 30s at 24kHz */
-    size_t audio_len = sizeof(audio_buf) / sizeof(float);
+    const size_t buf_samples = VOICE_MAX_SAMPLES;
+    const size_t buf_bytes = buf_samples * sizeof(float);
+    float *audio_buf = (float *)v->alloc->alloc(v->alloc->ctx, buf_bytes);
+    if (!audio_buf) {
+        fprintf(stderr, "voice_channel: failed to allocate audio buffer (%zu bytes)\n",
+                buf_bytes);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
 
-    int32_t err = sonata_tts(message, message_len,
-        v->config.speaker_id, v->config.emotion_exaggeration,
+    size_t audio_len = buf_samples;
+    float exag = v->config.emotion_exaggeration_set
+        ? v->config.emotion_exaggeration : 1.0f;
+
+    int32_t err = sonata_tts((const uint8_t *)message, message_len,
+        (const uint8_t *)v->config.speaker_id, exag,
         audio_buf, &audio_len);
-    if (err != 0)
+    if (err != 0) {
+        fprintf(stderr, "voice_channel: sonata_tts failed (err=%d)\n", err);
+        v->alloc->free(v->alloc->ctx, audio_buf, buf_bytes);
         return SC_ERR_CHANNEL_SEND;
+    }
 
-    /* In production: play audio via platform audio API */
+    if (v->config.on_audio_ready) {
+        v->config.on_audio_ready(audio_buf, audio_len,
+                                  v->config.callback_user_data);
+    }
+
+    v->alloc->free(v->alloc->ctx, audio_buf, buf_bytes);
 #endif
 
     return SC_OK;
@@ -117,13 +139,12 @@ sc_error_t sc_channel_voice_create(sc_allocator_t *alloc,
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
 
-    sc_voice_ctx_t *v = (sc_voice_ctx_t *)calloc(1, sizeof(*v));
+    sc_voice_ctx_t *v = (sc_voice_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*v));
     if (!v)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(v, 0, sizeof(*v));
 
     v->alloc = alloc;
-    v->initialized = false;
-    v->running = false;
 
     if (config) {
         v->config = *config;
@@ -132,8 +153,6 @@ sc_error_t sc_channel_voice_create(sc_allocator_t *alloc,
     /* Apply defaults */
     if (v->config.sample_rate == 0)
         v->config.sample_rate = 24000;
-    if (v->config.emotion_exaggeration == 0.0f)
-        v->config.emotion_exaggeration = 1.0f;
 
     out->ctx = v;
     out->vtable = &voice_vtable;
@@ -144,9 +163,10 @@ void sc_channel_voice_destroy(sc_channel_t *ch)
 {
     if (ch && ch->ctx) {
         sc_voice_ctx_t *v = (sc_voice_ctx_t *)ch->ctx;
+        sc_allocator_t *a = v->alloc;
         if (v->running)
             voice_stop(v);
-        free(v);
+        a->free(a->ctx, v, sizeof(*v));
         ch->ctx = NULL;
         ch->vtable = NULL;
     }
