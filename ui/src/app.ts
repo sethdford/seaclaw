@@ -151,7 +151,7 @@ export class ScApp extends LitElement {
       }
       .mobile-tab:hover,
       .mobile-tab.active {
-        color: var(--sc-accent);
+        color: var(--sc-accent-text, var(--sc-accent));
       }
       .mobile-tab .icon {
         width: 1.25rem;

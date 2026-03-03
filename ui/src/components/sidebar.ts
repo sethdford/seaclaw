@@ -86,7 +86,7 @@ export class ScSidebar extends LitElement {
       flex-shrink: 0;
       width: 24px;
       height: 24px;
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
     }
 
     .logo svg {
@@ -184,7 +184,7 @@ export class ScSidebar extends LitElement {
     .nav-item.active {
       background: var(--sc-accent-subtle);
       border-left: 3px solid var(--sc-accent);
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
     }
 
     :host([collapsed]) .nav-item {

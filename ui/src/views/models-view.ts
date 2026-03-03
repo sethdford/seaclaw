@@ -70,7 +70,7 @@ export class ScModelsView extends GatewayAwareLitElement {
       color: var(--sc-text);
     }
     .card-name.default {
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
     }
     .card-url {
       font-size: var(--sc-text-xs);

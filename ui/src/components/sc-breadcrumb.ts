@@ -49,7 +49,7 @@ export class ScBreadcrumb extends LitElement {
     }
 
     .link:hover {
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
     }
 
     .link:focus-visible {

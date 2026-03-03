@@ -65,9 +65,11 @@ export class ScSelect extends LitElement {
       border-color: var(--sc-border);
     }
 
-    select:focus {
+    select:focus-visible {
       border-color: var(--sc-accent);
       box-shadow: 0 0 0 var(--sc-focus-ring-width) var(--sc-focus-ring);
+      outline: var(--sc-focus-ring-width) solid var(--sc-focus-ring);
+      outline-offset: var(--sc-focus-ring-offset);
     }
 
     select.error {

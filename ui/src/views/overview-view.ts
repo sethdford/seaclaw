@@ -326,7 +326,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
                 <div class="stat-label">Update Available</div>
                 <div
                   class="stat-value"
-                  style="font-size: var(--sc-text-base); color: var(--sc-accent);"
+                  style="font-size: var(--sc-text-base); color: var(--sc-accent-text, var(--sc-accent));"
                 >
                   ${this.updateInfo.current_version ?? "—"} →
                   ${this.updateInfo.latest_version ?? "—"}

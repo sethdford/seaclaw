@@ -175,7 +175,7 @@ export class ScChatView extends GatewayAwareLitElement {
       padding: 0;
     }
     .message a {
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
       text-decoration: underline;
     }
     .message a:hover {
@@ -203,7 +203,7 @@ export class ScChatView extends GatewayAwareLitElement {
     }
     .tool-header .tool-name {
       font-weight: var(--sc-weight-semibold);
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
     }
     .tool-expand {
       margin-left: auto;

@@ -58,7 +58,7 @@ export class ScCronView extends GatewayAwareLitElement {
     .job-expression {
       font-family: var(--sc-font-mono);
       font-size: var(--sc-text-base);
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
       margin-bottom: var(--sc-space-xs);
     }
     .job-description {

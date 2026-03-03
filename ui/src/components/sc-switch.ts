@@ -30,7 +30,7 @@ export class ScSwitch extends LitElement {
       background: var(--sc-accent);
     }
 
-    .switch:focus-within {
+    .switch:focus-visible {
       outline: var(--sc-focus-ring-width) solid var(--sc-focus-ring);
       outline-offset: var(--sc-focus-ring-offset);
     }

@@ -54,7 +54,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
     .mic-btn:hover {
       background: var(--sc-bg-elevated);
       border-color: var(--sc-accent);
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
     }
     .mic-btn.active {
       background: var(--sc-accent);
@@ -158,10 +158,10 @@ export class ScVoiceView extends GatewayAwareLitElement {
       color: var(--sc-text-muted);
     }
     .status-line.listening {
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
     }
     .status-line.processing {
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
     }
     @media (max-width: 768px) {
       .send-row {

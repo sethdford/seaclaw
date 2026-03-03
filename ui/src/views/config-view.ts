@@ -60,7 +60,7 @@ export class ScConfigView extends GatewayAwareLitElement {
       color: var(--sc-error);
     }
     .status.unsaved {
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
     }
     .status.unsaved::before {
       content: "";

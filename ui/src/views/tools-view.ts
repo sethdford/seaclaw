@@ -50,7 +50,7 @@ export class ScToolsView extends GatewayAwareLitElement {
     .card-name {
       font-weight: var(--sc-weight-semibold);
       font-size: var(--sc-text-lg);
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
       margin-bottom: var(--sc-space-sm);
     }
     .card-desc {
@@ -72,7 +72,7 @@ export class ScToolsView extends GatewayAwareLitElement {
     .schema-toggle {
       background: none;
       border: none;
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
       cursor: pointer;
       font-size: var(--sc-text-xs);
       padding: var(--sc-space-xs) 0;

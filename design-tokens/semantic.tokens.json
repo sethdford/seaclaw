@@ -13,6 +13,11 @@
     "text-faint": { "$value": "{color.neutral.400}", "$type": "color" },
 
     "accent": { "$value": "{color.teal.500}", "$type": "color" },
+    "accent-text": {
+      "$value": "{color.teal.400}",
+      "$type": "color",
+      "$description": "Accent color for text on dark backgrounds"
+    },
     "accent-hover": { "$value": "{color.teal.400}", "$type": "color" },
     "accent-subtle": { "$value": "{color.teal.dark-subtle}", "$type": "color" },
     "accent-strong": { "$value": "{color.teal.300}", "$type": "color" },
@@ -119,6 +124,11 @@
     "text-faint": { "$value": "{color.neutral.600}", "$type": "color" },
 
     "accent": { "$value": "#14b8a6", "$type": "color" },
+    "accent-text": {
+      "$value": "#0d9488",
+      "$type": "color",
+      "$description": "WCAG AA: accent color for text on light backgrounds (4.5:1 contrast)"
+    },
     "accent-hover": { "$value": "{color.teal.light-600}", "$type": "color" },
     "accent-subtle": {
       "$value": "{color.teal.light-subtle}",
@@ -219,6 +229,7 @@
     "text-faint": { "$value": "{color.neutral.600}", "$type": "color" },
 
     "accent": { "$value": "#2dd4bf", "$type": "color" },
+    "accent-text": { "$value": "#0f766e", "$type": "color" },
     "accent-hover": { "$value": "#5eead4", "$type": "color" },
     "accent-subtle": { "$value": "rgba(45, 212, 191, 0.2)", "$type": "color" },
     "accent-strong": { "$value": "#14b8a6", "$type": "color" },

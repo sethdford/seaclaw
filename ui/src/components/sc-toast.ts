@@ -102,7 +102,7 @@ export class ScToast extends LitElement {
       background: transparent;
       border: none;
       border-radius: var(--sc-radius-sm);
-      color: var(--sc-accent);
+      color: var(--sc-accent-text, var(--sc-accent));
       font-family: var(--sc-font);
       font-size: var(--sc-text-xs);
       font-weight: var(--sc-weight-medium);
@@ -111,7 +111,7 @@ export class ScToast extends LitElement {
     }
 
     .action-btn:hover {
-      color: var(--sc-accent-hover);
+      color: var(--sc-accent-hover, var(--sc-accent));
     }
 
     .dismiss-btn {
