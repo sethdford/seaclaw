@@ -27,9 +27,41 @@ typedef struct sc_reliable_ctx {
     size_t model_fallbacks_count;
     uint32_t max_retries;
     uint64_t base_backoff_ms;
+    uint64_t max_backoff_ms;
     char last_error_msg[SC_LAST_ERROR_MAX];
     size_t last_error_len;
+    /* Circuit breaker (0 = disabled) */
+    int cb_failure_threshold;
+    int cb_recovery_seconds;
+    int cb_failures;
+    time_t cb_open_until;
 } sc_reliable_ctx_t;
+
+/* Circuit breaker: true if primary should be skipped (circuit open) */
+static bool circuit_skip_primary(sc_reliable_ctx_t *r) {
+    if (r->cb_failure_threshold <= 0)
+        return false;
+    if (r->cb_failures < r->cb_failure_threshold)
+        return false;
+    time_t now = time(NULL);
+    if (now >= r->cb_open_until)
+        return false; /* half-open: try primary */
+    return true;
+}
+
+static void circuit_record_failure(sc_reliable_ctx_t *r) {
+    if (r->cb_failure_threshold <= 0)
+        return;
+    r->cb_failures++;
+    if (r->cb_failures >= r->cb_failure_threshold)
+        r->cb_open_until = time(NULL) + (time_t)r->cb_recovery_seconds;
+}
+
+static void circuit_record_success(sc_reliable_ctx_t *r) {
+    if (r->cb_failure_threshold <= 0)
+        return;
+    r->cb_failures = 0;
+}
 
 /* Store error for retry-after / classification */
 static void store_error(sc_reliable_ctx_t *r, sc_error_t err) {
@@ -163,8 +195,11 @@ static sc_error_t try_chat_with_system(sc_reliable_ctx_t *r, sc_allocator_t *all
 #else
             (void)wait;
 #endif
-            if (backoff_ms * 2 <= 10000)
-                backoff_ms *= 2;
+            backoff_ms *= 2;
+            if (r->max_backoff_ms > 0 && backoff_ms > r->max_backoff_ms)
+                backoff_ms = r->max_backoff_ms;
+            else if (r->max_backoff_ms == 0 && backoff_ms > 10000)
+                backoff_ms = 10000;
         }
     }
     return final_failure(r);
@@ -210,8 +245,11 @@ static sc_error_t try_chat(sc_reliable_ctx_t *r, sc_allocator_t *alloc, sc_provi
 #else
             (void)wait;
 #endif
-            if (backoff_ms * 2 <= 10000)
-                backoff_ms *= 2;
+            backoff_ms *= 2;
+            if (r->max_backoff_ms > 0 && backoff_ms > r->max_backoff_ms)
+                backoff_ms = r->max_backoff_ms;
+            else if (r->max_backoff_ms == 0 && backoff_ms > 10000)
+                backoff_ms = 10000;
         }
     }
     return final_failure(r);
@@ -236,12 +274,17 @@ static sc_error_t reliable_chat_with_system(void *ctx, sc_allocator_t *alloc,
         const char *cur_model = chain[m].model;
         size_t cur_len = chain[m].model_len;
 
-        /* Try primary provider */
-        err = try_chat_with_system(r, alloc, &r->inner, system_prompt, system_prompt_len, message,
-                                   message_len, cur_model, cur_len, temperature, out, out_len);
-        if (err == SC_OK) {
-            alloc->free(alloc->ctx, chain, chain_count * sizeof(sc_model_ref_t));
-            return SC_OK;
+        /* Try primary provider (skip if circuit open) */
+        if (!circuit_skip_primary(r)) {
+            err = try_chat_with_system(r, alloc, &r->inner, system_prompt, system_prompt_len,
+                                       message, message_len, cur_model, cur_len, temperature, out,
+                                       out_len);
+            if (err == SC_OK) {
+                circuit_record_success(r);
+                alloc->free(alloc->ctx, chain, chain_count * sizeof(sc_model_ref_t));
+                return SC_OK;
+            }
+            circuit_record_failure(r);
         }
 
         /* Try extras */
@@ -276,10 +319,14 @@ static sc_error_t reliable_chat(void *ctx, sc_allocator_t *alloc, const sc_chat_
         const char *cur_model = chain[m].model;
         size_t cur_len = chain[m].model_len;
 
-        err = try_chat(r, alloc, &r->inner, request, cur_model, cur_len, temperature, out);
-        if (err == SC_OK) {
-            alloc->free(alloc->ctx, chain, chain_count * sizeof(sc_model_ref_t));
-            return SC_OK;
+        if (!circuit_skip_primary(r)) {
+            err = try_chat(r, alloc, &r->inner, request, cur_model, cur_len, temperature, out);
+            if (err == SC_OK) {
+                circuit_record_success(r);
+                alloc->free(alloc->ctx, chain, chain_count * sizeof(sc_model_ref_t));
+                return SC_OK;
+            }
+            circuit_record_failure(r);
         }
 
         for (size_t e = 0; e < r->extras_count; e++) {
@@ -373,6 +420,39 @@ static const sc_provider_vtable_t reliable_vtable = {
     .supports_vision_for_model = reliable_supports_vision_for_model,
     .stream_chat = NULL,
 };
+
+sc_error_t sc_reliable_provider_create(sc_allocator_t *alloc,
+                                       const sc_reliable_config_t *config,
+                                       sc_provider_t *out) {
+    if (!alloc || !config || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    if (!config->primary.vtable)
+        return SC_ERR_INVALID_ARGUMENT;
+
+    sc_reliable_provider_entry_t extra;
+    size_t extras_count = 0;
+    if (config->fallback.vtable) {
+        extra.name = "fallback";
+        extra.name_len = 8;
+        extra.provider = config->fallback;
+        extras_count = 1;
+    }
+
+    sc_error_t err = sc_reliable_create_ex(alloc, config->primary,
+                                           (uint32_t)(config->max_retries > 0 ? config->max_retries
+                                                                              : 3),
+                                           (uint64_t)(config->base_delay_ms > 0 ? config->base_delay_ms
+                                                                                : 1000),
+                                           extras_count ? &extra : NULL, extras_count, NULL, 0, out);
+    if (err != SC_OK)
+        return err;
+
+    sc_reliable_ctx_t *r = (sc_reliable_ctx_t *)out->ctx;
+    r->max_backoff_ms = (uint64_t)(config->max_delay_ms > 0 ? config->max_delay_ms : 30000);
+    r->cb_failure_threshold = config->failure_threshold > 0 ? config->failure_threshold : 5;
+    r->cb_recovery_seconds = config->recovery_timeout_seconds > 0 ? config->recovery_timeout_seconds : 60;
+    return SC_OK;
+}
 
 sc_error_t sc_reliable_create(sc_allocator_t *alloc, sc_provider_t inner, uint32_t max_retries,
                               uint64_t backoff_ms, sc_provider_t *out) {

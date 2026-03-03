@@ -2046,6 +2046,30 @@ static void test_openai_codex_chat_empty_messages_graceful(void) {
 }
 
 /* ─── Reliable ────────────────────────────────────────────────────────────── */
+static void test_reliable_provider_create_from_config(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t primary;
+    sc_openai_create(&alloc, "key", 3, NULL, 0, &primary);
+    sc_provider_t fallback;
+    sc_ollama_create(&alloc, NULL, 0, NULL, 0, &fallback);
+    sc_reliable_config_t config = {
+        .primary = primary,
+        .fallback = fallback,
+        .max_retries = 3,
+        .base_delay_ms = 1000,
+        .max_delay_ms = 30000,
+        .failure_threshold = 5,
+        .recovery_timeout_seconds = 60,
+    };
+    sc_provider_t prov;
+    sc_error_t err = sc_reliable_provider_create(&alloc, &config, &prov);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(prov.ctx);
+    SC_ASSERT_STR_EQ(prov.vtable->get_name(prov.ctx), "openai");
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
+}
+
 static void test_reliable_create_simple(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t inner;
@@ -2706,6 +2730,7 @@ void run_provider_all_tests(void) {
     SC_RUN_TEST(test_openai_codex_chat_null_request_returns_error);
     SC_RUN_TEST(test_openai_codex_chat_empty_messages_graceful);
 
+    SC_RUN_TEST(test_reliable_provider_create_from_config);
     SC_RUN_TEST(test_reliable_create_simple);
     SC_RUN_TEST(test_reliable_supports_native_tools_aggregates);
     SC_RUN_TEST(test_reliable_supports_vision_aggregates);

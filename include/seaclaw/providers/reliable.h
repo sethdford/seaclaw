@@ -27,6 +27,21 @@ typedef struct sc_reliable_model_fallback_entry {
     size_t fallbacks_count;
 } sc_reliable_model_fallback_entry_t;
 
+typedef struct sc_reliable_config {
+    sc_provider_t primary;
+    sc_provider_t fallback;       /* optional, zeroed if none */
+    int max_retries;              /* default 3 */
+    int base_delay_ms;            /* default 1000 */
+    int max_delay_ms;             /* default 30000 */
+    int failure_threshold;        /* default 5 */
+    int recovery_timeout_seconds;  /* default 60 */
+} sc_reliable_config_t;
+
+/* Create a reliable provider from config (retry, fallback, circuit breaker). */
+sc_error_t sc_reliable_provider_create(sc_allocator_t *alloc,
+                                       const sc_reliable_config_t *config,
+                                       sc_provider_t *out);
+
 /* Create a reliable provider that wraps an inner provider with retry and exponential backoff.
  * max_retries: number of retries (0 = no retries, 1 = 2 total attempts)
  * backoff_ms: initial backoff in ms (min 50), doubles each retry up to 10000ms.

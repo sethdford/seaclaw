@@ -137,6 +137,8 @@ typedef struct sc_chat_request {
     uint64_t timeout_secs;        /* 0 = no limit */
     const char *reasoning_effort; /* optional, NULL = don't send */
     size_t reasoning_effort_len;
+    const char *response_format;    /* optional: "json_object", "json_schema", NULL = default */
+    size_t response_format_len;
 } sc_chat_request_t;
 
 /* ──────────────────────────────────────────────────────────────────────────

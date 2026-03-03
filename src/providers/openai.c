@@ -311,6 +311,16 @@ static sc_error_t openai_chat(void *ctx, sc_allocator_t *alloc, const sc_chat_re
     sc_json_value_t *temp_val = sc_json_number_new(alloc, temperature);
     sc_json_object_set(alloc, root, "temperature", temp_val);
 
+    if (request->response_format && request->response_format_len > 0) {
+        sc_json_value_t *rf_obj = sc_json_object_new(alloc);
+        if (rf_obj) {
+            sc_json_value_t *rf_type = sc_json_string_new(alloc, request->response_format,
+                                                           request->response_format_len);
+            sc_json_object_set(alloc, rf_obj, "type", rf_type);
+            sc_json_object_set(alloc, root, "response_format", rf_obj);
+        }
+    }
+
     char *body = NULL;
     size_t body_len = 0;
     sc_error_t err = sc_json_stringify(alloc, root, &body, &body_len);
@@ -724,6 +734,16 @@ static sc_error_t openai_stream_chat(void *ctx, sc_allocator_t *alloc,
     sc_json_object_set(alloc, root, "model", sc_json_string_new(alloc, model, model_len));
     sc_json_object_set(alloc, root, "temperature", sc_json_number_new(alloc, temperature));
     sc_json_object_set(alloc, root, "stream", sc_json_bool_new(alloc, true));
+
+    if (request->response_format && request->response_format_len > 0) {
+        sc_json_value_t *rf_obj = sc_json_object_new(alloc);
+        if (rf_obj) {
+            sc_json_value_t *rf_type = sc_json_string_new(alloc, request->response_format,
+                                                           request->response_format_len);
+            sc_json_object_set(alloc, rf_obj, "type", rf_type);
+            sc_json_object_set(alloc, root, "response_format", rf_obj);
+        }
+    }
 
     char *body = NULL;
     size_t body_len = 0;
