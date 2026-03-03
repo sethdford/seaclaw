@@ -52,7 +52,7 @@ export class ScEmptyState extends LitElement {
 
   override render() {
     return html`
-      ${this.icon ? html`<div class="icon">${this.icon}</div>` : nothing}
+      ${this.icon ? html`<div class="icon" aria-hidden="true">${this.icon}</div>` : nothing}
       ${this.heading ? html`<h2 class="heading">${this.heading}</h2>` : nothing}
       ${this.description ? html`<p class="description">${this.description}</p>` : nothing}
       <div class="slot"><slot></slot></div>

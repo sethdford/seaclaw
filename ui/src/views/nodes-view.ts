@@ -216,7 +216,10 @@ export class ScNodesView extends GatewayAwareLitElement {
                   (n) => html`
                     <div class="node-card">
                       <div class="node-header">
-                        <span class="status-dot ${this.statusDotClass(n.status)}"></span>
+                        <span
+                          class="status-dot ${this.statusDotClass(n.status)}"
+                          aria-hidden="true"
+                        ></span>
                         <span class="node-id">${n.id ?? "—"}</span>
                       </div>
                       <div class="node-type">${this.typeLabel(n.type)}</div>

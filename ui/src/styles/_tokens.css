@@ -200,6 +200,7 @@
   --sc-accent-hover: #2dd4bf;
   --sc-accent-strong: #5eead4;
   --sc-accent-subtle: rgba(20, 184, 166, 0.14);
+  --sc-accent-text: #2dd4bf;
   --sc-backdrop-overlay: rgba(0, 0, 0, 0.6);
   --sc-bg: #071018;
   --sc-bg-elevated: #152d45;
@@ -315,6 +316,7 @@
     --sc-accent-light: #99f6e4;
     --sc-accent-strong: #14b8a6;
     --sc-accent-subtle: rgba(13, 148, 136, 0.10);
+    --sc-accent-text: #0d9488;
     --sc-backdrop-overlay: rgba(0, 0, 0, 0.3);
     --sc-bg: #f6f9fc;
     --sc-bg-elevated: #f0f4f8;
@@ -367,6 +369,7 @@
   --sc-accent-hover: #2dd4bf;
   --sc-accent-strong: #5eead4;
   --sc-accent-subtle: rgba(20, 184, 166, 0.14);
+  --sc-accent-text: #2dd4bf;
   --sc-backdrop-overlay: rgba(0, 0, 0, 0.6);
   --sc-bg: #071018;
   --sc-bg-elevated: #152d45;
@@ -418,6 +421,7 @@
   --sc-accent-light: #99f6e4;
   --sc-accent-strong: #14b8a6;
   --sc-accent-subtle: rgba(13, 148, 136, 0.10);
+  --sc-accent-text: #0d9488;
   --sc-backdrop-overlay: rgba(0, 0, 0, 0.3);
   --sc-bg: #f6f9fc;
   --sc-bg-elevated: #f0f4f8;
@@ -469,6 +473,7 @@
     --sc-accent-hover: #5eead4;
     --sc-accent-strong: #14b8a6;
     --sc-accent-subtle: rgba(45, 212, 191, 0.2);
+    --sc-accent-text: #0f766e;
     --sc-bg: #000000;
     --sc-bg-elevated: #0f2236;
     --sc-bg-inset: #000000;

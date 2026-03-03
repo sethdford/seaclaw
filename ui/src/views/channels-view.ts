@@ -146,7 +146,7 @@ export class ScChannelsView extends GatewayAwareLitElement {
               (ch) => html`
                 <sc-card>
                   <div class="card-header">
-                    <span class="status-dot ${this.dotClass(ch)}"></span>
+                    <span class="status-dot ${this.dotClass(ch)}" aria-hidden="true"></span>
                     <span class="card-name">${ch.label || ch.key || ch.name || "unnamed"}</span>
                   </div>
                   <div class="card-info">

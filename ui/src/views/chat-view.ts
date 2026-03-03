@@ -622,7 +622,7 @@ export class ScChatView extends GatewayAwareLitElement {
     return html`
       <div class="container">
         <div class="status-bar">
-          <span class="status-dot ${this.connectionStatus}"></span>
+          <span class="status-dot ${this.connectionStatus}" aria-hidden="true"></span>
           <span>${statusLabel}</span>
         </div>
         ${this.errorBanner
