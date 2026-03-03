@@ -47,6 +47,7 @@ typedef struct sc_runtime_config {
 } sc_runtime_config_t;
 
 typedef struct sc_reliability_config {
+    char *primary_provider; /* used when default_provider is "reliable" */
     uint32_t provider_retries;
     uint64_t provider_backoff_ms;
     uint64_t channel_initial_backoff_secs;
@@ -81,6 +82,8 @@ typedef struct sc_policy_config {
 typedef struct sc_plugins_config {
     bool enabled;
     char *plugin_dir;
+    char **plugin_paths;
+    size_t plugin_paths_len;
 } sc_plugins_config_t;
 
 typedef struct sc_heartbeat_config {
@@ -194,6 +197,8 @@ typedef struct sc_config_gateway {
     bool require_pairing;
     bool allow_public_bind;
     uint32_t pair_rate_limit_per_minute;
+    int rate_limit_requests;  /* 0 = use pair_rate_limit_per_minute */
+    int rate_limit_window;   /* seconds, 0 = 60 */
     char *webhook_hmac_secret; /* optional, for X-Signature verification */
     char *control_ui_dir;      /* path to built Control UI static files */
     char **cors_origins;
@@ -251,7 +256,10 @@ typedef struct sc_hardware_config {
     char *probe_target;
 } sc_hardware_config_t;
 
+#define SC_CONFIG_VERSION_CURRENT 2
+
 typedef struct sc_config {
+    int config_version; /* schema version for migration; default 1 */
     char *workspace_dir;
     char *config_path;
     char *workspace_dir_override;
@@ -303,6 +311,7 @@ typedef struct sc_config {
 } sc_config_t;
 
 sc_error_t sc_config_load(sc_allocator_t *backing, sc_config_t *out);
+sc_error_t sc_config_migrate(sc_allocator_t *alloc, sc_json_value_t *root);
 void sc_config_deinit(sc_config_t *cfg);
 sc_error_t sc_config_parse_json(sc_config_t *cfg, const char *content, size_t len);
 void sc_config_apply_env_overrides(sc_config_t *cfg);

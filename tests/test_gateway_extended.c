@@ -1,6 +1,7 @@
 /* Gateway edge cases + control protocol + event bridge tests. */
 #include "test_framework.h"
 #include "seaclaw/gateway.h"
+#include "seaclaw/gateway/rate_limit.h"
 #include "seaclaw/gateway/ws_server.h"
 #include "seaclaw/gateway/control_protocol.h"
 #include "seaclaw/gateway/event_bridge.h"
@@ -10,6 +11,7 @@
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/json.h"
 #include <string.h>
+#include <time.h>
 
 static void test_gateway_webhook_paths(void) {
     SC_ASSERT_EQ(SC_GATEWAY_MAX_BODY_SIZE, 65536u);
@@ -38,6 +40,40 @@ static void test_gateway_rate_limit_sliding_window(void) {
     sc_gateway_config_t cfg = {0};
     cfg.rate_limit_per_minute = 120;
     SC_ASSERT_EQ(cfg.rate_limit_per_minute, 120);
+}
+
+static void test_rate_limiter_allow_under_limit(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_rate_limiter_t *lim = sc_rate_limiter_create(&alloc, 3, 60);
+    SC_ASSERT_NOT_NULL(lim);
+    SC_ASSERT_TRUE(sc_rate_limiter_allow(lim, "192.168.1.1"));
+    SC_ASSERT_TRUE(sc_rate_limiter_allow(lim, "192.168.1.1"));
+    SC_ASSERT_TRUE(sc_rate_limiter_allow(lim, "192.168.1.1"));
+    sc_rate_limiter_destroy(lim);
+}
+
+static void test_rate_limiter_deny_over_limit(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_rate_limiter_t *lim = sc_rate_limiter_create(&alloc, 2, 60);
+    SC_ASSERT_NOT_NULL(lim);
+    SC_ASSERT_TRUE(sc_rate_limiter_allow(lim, "10.0.0.1"));
+    SC_ASSERT_TRUE(sc_rate_limiter_allow(lim, "10.0.0.1"));
+    SC_ASSERT_FALSE(sc_rate_limiter_allow(lim, "10.0.0.1"));
+    sc_rate_limiter_destroy(lim);
+}
+
+static void test_rate_limiter_window_expiry_resets(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_rate_limiter_t *lim = sc_rate_limiter_create(&alloc, 1, 1);
+    SC_ASSERT_NOT_NULL(lim);
+    SC_ASSERT_TRUE(sc_rate_limiter_allow(lim, "172.16.0.1"));
+    SC_ASSERT_FALSE(sc_rate_limiter_allow(lim, "172.16.0.1"));
+    time_t start = time(NULL);
+    while (time(NULL) - start < 2) {
+        /* Busy-wait for window to expire */
+    }
+    SC_ASSERT_TRUE(sc_rate_limiter_allow(lim, "172.16.0.1"));
+    sc_rate_limiter_destroy(lim);
 }
 
 static void test_gateway_max_body_size(void) {
@@ -826,6 +862,9 @@ void run_gateway_extended_tests(void) {
     SC_RUN_TEST(test_gateway_health_endpoint);
     SC_RUN_TEST(test_gateway_ready_endpoint);
     SC_RUN_TEST(test_gateway_rate_limit_sliding_window);
+    SC_RUN_TEST(test_rate_limiter_allow_under_limit);
+    SC_RUN_TEST(test_rate_limiter_deny_over_limit);
+    SC_RUN_TEST(test_rate_limiter_window_expiry_resets);
     SC_RUN_TEST(test_gateway_max_body_size);
     SC_RUN_TEST(test_gateway_auth_required);
     SC_RUN_TEST(test_gateway_run_test_mode);

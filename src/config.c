@@ -74,6 +74,9 @@ static void set_defaults(sc_config_t *cfg, sc_allocator_t *a) {
     cfg->policy.rules_json = NULL;
     cfg->plugins.enabled = false;
     cfg->plugins.plugin_dir = NULL;
+    cfg->plugins.plugin_paths = NULL;
+    cfg->plugins.plugin_paths_len = 0;
+    cfg->reliability.primary_provider = NULL;
     cfg->reliability.provider_retries = 2;
     cfg->reliability.provider_backoff_ms = 500;
     cfg->reliability.channel_initial_backoff_secs = 2;
@@ -101,6 +104,8 @@ static void set_defaults(sc_config_t *cfg, sc_allocator_t *a) {
     cfg->gateway.require_pairing = true;
     cfg->gateway.allow_public_bind = false;
     cfg->gateway.pair_rate_limit_per_minute = 10;
+    cfg->gateway.rate_limit_requests = 0;
+    cfg->gateway.rate_limit_window = 0;
     cfg->gateway.webhook_hmac_secret = NULL;
     cfg->secrets.encrypt = true;
     cfg->security.sandbox = sc_strdup(a, "auto");
@@ -400,6 +405,12 @@ static sc_error_t parse_gateway(sc_allocator_t *a, sc_config_t *cfg, const sc_js
                                     cfg->gateway.pair_rate_limit_per_minute);
     if (prl >= 0 && prl <= 1000)
         cfg->gateway.pair_rate_limit_per_minute = (uint32_t)prl;
+    double rlr = sc_json_get_number(obj, "rate_limit_requests", cfg->gateway.rate_limit_requests);
+    if (rlr >= 0 && rlr <= 10000)
+        cfg->gateway.rate_limit_requests = (int)rlr;
+    double rlw = sc_json_get_number(obj, "rate_limit_window", cfg->gateway.rate_limit_window);
+    if (rlw >= 0 && rlw <= 86400)
+        cfg->gateway.rate_limit_window = (int)rlw;
     const char *whs = sc_json_get_string(obj, "webhook_hmac_secret");
     if (whs) {
         if (cfg->gateway.webhook_hmac_secret)
@@ -965,6 +976,13 @@ static sc_error_t parse_reliability(sc_allocator_t *a, sc_config_t *cfg,
                                     const sc_json_value_t *obj) {
     if (!obj || obj->type != SC_JSON_OBJECT)
         return SC_OK;
+    const char *pp = sc_json_get_string(obj, "primary_provider");
+    if (pp) {
+        if (cfg->reliability.primary_provider)
+            a->free(a->ctx, cfg->reliability.primary_provider,
+                    strlen(cfg->reliability.primary_provider) + 1);
+        cfg->reliability.primary_provider = sc_strdup(a, pp);
+    }
     double pr = sc_json_get_number(obj, "provider_retries", cfg->reliability.provider_retries);
     if (pr >= 0 && pr <= 20)
         cfg->reliability.provider_retries = (uint32_t)pr;

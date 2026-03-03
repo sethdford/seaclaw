@@ -6,6 +6,7 @@
 #include "seaclaw/crypto.h"
 #include "seaclaw/gateway/control_protocol.h"
 #include "seaclaw/gateway/event_bridge.h"
+#include "seaclaw/gateway/rate_limit.h"
 #include "seaclaw/gateway/ws_server.h"
 #include "seaclaw/health.h"
 #include <stdint.h>
@@ -38,6 +39,8 @@ void sc_gateway_config_from_cfg(const sc_config_gateway_t *cfg_gw, sc_gateway_co
     out->rate_limit_per_minute = cfg_gw->pair_rate_limit_per_minute > 0
                                      ? cfg_gw->pair_rate_limit_per_minute
                                      : SC_GATEWAY_RATE_LIMIT_PER_MIN;
+    out->rate_limit_requests = cfg_gw->rate_limit_requests > 0 ? cfg_gw->rate_limit_requests : 60;
+    out->rate_limit_window = cfg_gw->rate_limit_window > 0 ? cfg_gw->rate_limit_window : 60;
     out->hmac_secret = cfg_gw->webhook_hmac_secret && cfg_gw->webhook_hmac_secret[0]
                            ? cfg_gw->webhook_hmac_secret
                            : NULL;
@@ -74,6 +77,7 @@ typedef struct sc_gateway_state {
     bool running;
     rate_entry_t rate_entries[256];
     size_t rate_count;
+    sc_rate_limiter_t *rate_limiter;
     sc_ws_server_t ws;
 } sc_gateway_state_t;
 
@@ -81,32 +85,6 @@ static void trim_crlf(char *s) {
     size_t len = strlen(s);
     while (len > 0 && (s[len - 1] == '\r' || s[len - 1] == '\n'))
         s[--len] = '\0';
-}
-
-static bool rate_limit_allow(sc_gateway_state_t *gw, const char *ip) {
-    if (!gw)
-        return true;
-    time_t now = time(NULL);
-    uint32_t limit = gw->config.rate_limit_per_minute ? gw->config.rate_limit_per_minute : 60;
-
-    for (size_t i = 0; i < gw->rate_count; i++) {
-        if (strcmp(gw->rate_entries[i].ip, ip) == 0) {
-            if (now - gw->rate_entries[i].window_start >= 60) {
-                gw->rate_entries[i].count = 0;
-                gw->rate_entries[i].window_start = now;
-            }
-            gw->rate_entries[i].count++;
-            return gw->rate_entries[i].count <= limit;
-        }
-    }
-    if (gw->rate_count < 256) {
-        strncpy(gw->rate_entries[gw->rate_count].ip, ip, 63);
-        gw->rate_entries[gw->rate_count].ip[63] = '\0';
-        gw->rate_entries[gw->rate_count].count = 1;
-        gw->rate_entries[gw->rate_count].window_start = now;
-        gw->rate_count++;
-    }
-    return true;
 }
 
 /* ── Path matching ──────────────────────────────────────────────────────── */
@@ -211,7 +189,7 @@ static void send_all(int fd, const char *buf, size_t len) {
 }
 
 static void send_response(int fd, int status, const char *content_type, const char *body,
-                          size_t body_len) {
+                          size_t body_len, int retry_after_secs) {
     const char *status_str = "200 OK";
     if (status == 404)
         status_str = "404 Not Found";
@@ -224,28 +202,36 @@ static void send_response(int fd, int status, const char *content_type, const ch
     else if (status == 304)
         status_str = "304 Not Modified";
 
-    char hdr[512];
+    char hdr[640];
     const char *cors_origin = "";
     char cors_line[256] = "";
+    char retry_line[64] = "";
     if (s_request_origin && is_allowed_origin(s_request_origin)) {
         cors_origin = s_request_origin;
         snprintf(cors_line, sizeof(cors_line), "Access-Control-Allow-Origin: %s\r\n", cors_origin);
     }
+    if (status == 429 && retry_after_secs > 0)
+        snprintf(retry_line, sizeof(retry_line), "Retry-After: %d\r\n", retry_after_secs);
     int n = snprintf(hdr, sizeof(hdr),
                      "HTTP/1.1 %s\r\n"
                      "Content-Type: %s\r\n"
                      "Connection: close\r\n"
                      "Content-Length: %zu\r\n"
                      "%s"
+                     "%s"
                      "\r\n",
-                     status_str, content_type, body_len, cors_line);
+                     status_str, content_type, body_len, cors_line, retry_line);
     send_all(fd, hdr, (size_t)n);
     if (body && body_len > 0)
         send_all(fd, body, body_len);
 }
 
 static void send_json(int fd, int status, const char *body) {
-    send_response(fd, status, "application/json", body, body ? strlen(body) : 0);
+    send_response(fd, status, "application/json", body, body ? strlen(body) : 0, 0);
+}
+
+static void send_json_rate_limited(int fd, const char *body, int retry_after_secs) {
+    send_response(fd, 429, "application/json", body, body ? strlen(body) : 0, retry_after_secs);
 }
 
 /* ── Static file serving ────────────────────────────────────────────────── */
@@ -330,7 +316,7 @@ static bool serve_static_file(int fd, const char *base_dir, const char *url_path
     fclose(f);
 
     const char *mime = mime_for_ext(filepath);
-    send_response(fd, 200, mime, buf, rd);
+    send_response(fd, 200, mime, buf, rd, 0);
     free(buf);
     return true;
 }
@@ -346,8 +332,9 @@ static void handle_http_request(sc_gateway_state_t *gw, int fd, const char *meth
     fprintf(stderr, "[gateway] %s %s %s body=%zu\n", method ? method : "?", path ? path : "/",
             client_ip ? client_ip : "unknown", body_len);
 
-    if (!rate_limit_allow(gw, client_ip)) {
-        send_json(fd, 429, "{\"error\":\"rate limited\"}");
+    if (gw->rate_limiter && !sc_rate_limiter_allow(gw->rate_limiter, client_ip)) {
+        send_json_rate_limited(fd, "{\"error\":\"rate limited\"}",
+                              gw->config.rate_limit_window > 0 ? gw->config.rate_limit_window : 60);
         return;
     }
 
@@ -511,6 +498,9 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc, const char *host, uint16_t port
 
     gw->listen_fd = fd;
     gw->running = true;
+    gw->rate_limiter =
+        sc_rate_limiter_create(alloc, cfg.rate_limit_requests > 0 ? cfg.rate_limit_requests : 60,
+                               cfg.rate_limit_window > 0 ? cfg.rate_limit_window : 60);
     sc_health_mark_ok("gateway");
 
     body_buf = (char *)alloc->alloc(alloc->ctx, cfg.max_body_size + 1);
@@ -697,6 +687,10 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc, const char *host, uint16_t port
 cleanup:
     if (bridge_active)
         sc_event_bridge_deinit(&event_bridge);
+    if (gw && gw->rate_limiter) {
+        sc_rate_limiter_destroy(gw->rate_limiter);
+        gw->rate_limiter = NULL;
+    }
     sc_ws_server_deinit(&gw->ws);
     if (ctrl == &proto_local)
         sc_control_protocol_deinit(ctrl);

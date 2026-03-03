@@ -24,6 +24,8 @@ typedef struct sc_gateway_config {
     uint16_t port;
     size_t max_body_size;
     uint32_t rate_limit_per_minute;
+    int rate_limit_requests; /* 0 = use rate_limit_per_minute semantics */
+    int rate_limit_window;   /* seconds, 0 = 60 */
     const char *hmac_secret;
     size_t hmac_secret_len;
     bool test_mode;
