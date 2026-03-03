@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 #define DINGTALK_QUEUE_MAX       32
 #define DINGTALK_SESSION_KEY_MAX 127
 #define DINGTALK_CONTENT_MAX     4095
@@ -120,10 +119,10 @@ static const sc_channel_vtable_t dingtalk_vtable = {
     .stop_typing = NULL,
 };
 
-
 static void dingtalk_queue_push(sc_dingtalk_ctx_t *c, const char *from, size_t from_len,
-                             const char *body, size_t body_len) {
-    if (c->queue_count >= DINGTALK_QUEUE_MAX) return;
+                                const char *body, size_t body_len) {
+    if (c->queue_count >= DINGTALK_QUEUE_MAX)
+        return;
     sc_dingtalk_queued_msg_t *slot = &c->queue[c->queue_tail];
     size_t sk = from_len < DINGTALK_SESSION_KEY_MAX ? from_len : DINGTALK_SESSION_KEY_MAX;
     memcpy(slot->session_key, from, sk);
@@ -136,9 +135,10 @@ static void dingtalk_queue_push(sc_dingtalk_ctx_t *c, const char *from, size_t f
 }
 
 sc_error_t sc_dingtalk_on_webhook(void *channel_ctx, sc_allocator_t *alloc, const char *body,
-                               size_t body_len) {
+                                  size_t body_len) {
     sc_dingtalk_ctx_t *c = (sc_dingtalk_ctx_t *)channel_ctx;
-    if (!c || !body || body_len == 0) return SC_ERR_INVALID_ARGUMENT;
+    if (!c || !body || body_len == 0)
+        return SC_ERR_INVALID_ARGUMENT;
 #if SC_IS_TEST
     (void)alloc;
     dingtalk_queue_push(c, "test-sender", 11, body, body_len);
@@ -146,10 +146,12 @@ sc_error_t sc_dingtalk_on_webhook(void *channel_ctx, sc_allocator_t *alloc, cons
 #else
     sc_json_value_t *parsed = NULL;
     sc_error_t err = sc_json_parse(alloc, body, body_len, &parsed);
-    if (err != SC_OK || !parsed) return SC_OK;
-        sc_json_value_t *text_obj = sc_json_object_get(parsed, "text");
+    if (err != SC_OK || !parsed)
+        return SC_OK;
+    sc_json_value_t *text_obj = sc_json_object_get(parsed, "text");
     const char *sender = sc_json_get_string(parsed, "senderNick");
-    if (!sender) sender = sc_json_get_string(parsed, "senderId");
+    if (!sender)
+        sender = sc_json_get_string(parsed, "senderId");
     if (text_obj && sender) {
         const char *content = sc_json_get_string(text_obj, "content");
         if (content && strlen(content) > 0)
@@ -161,10 +163,11 @@ sc_error_t sc_dingtalk_on_webhook(void *channel_ctx, sc_allocator_t *alloc, cons
 }
 
 sc_error_t sc_dingtalk_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_loop_msg_t *msgs,
-                         size_t max_msgs, size_t *out_count) {
+                            size_t max_msgs, size_t *out_count) {
     (void)alloc;
     sc_dingtalk_ctx_t *c = (sc_dingtalk_ctx_t *)channel_ctx;
-    if (!c || !msgs || !out_count) return SC_ERR_INVALID_ARGUMENT;
+    if (!c || !msgs || !out_count)
+        return SC_ERR_INVALID_ARGUMENT;
     *out_count = 0;
     size_t cnt = 0;
     while (c->queue_count > 0 && cnt < max_msgs) {

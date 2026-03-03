@@ -145,7 +145,7 @@ static const sc_channel_vtable_t nostr_vtable = {
 };
 
 sc_error_t sc_nostr_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_loop_msg_t *msgs,
-                        size_t max_msgs, size_t *out_count) {
+                         size_t max_msgs, size_t *out_count) {
     sc_nostr_ctx_t *ctx = (sc_nostr_ctx_t *)channel_ctx;
     if (!ctx || !msgs || !out_count)
         return SC_ERR_INVALID_ARGUMENT;
@@ -165,8 +165,8 @@ sc_error_t sc_nostr_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_lo
 
     /* nak req -k 1 -k 4 -r <relay> fetches kind 1 (notes) and kind 4 (DMs) */
     char cmd[2048];
-    int nc = snprintf(cmd, sizeof(cmd), "%s req -k 1 -k 4 -r %s 2>/dev/null",
-                      ctx->nak_path, ctx->relay_url);
+    int nc = snprintf(cmd, sizeof(cmd), "%s req -k 1 -k 4 -r %s 2>/dev/null", ctx->nak_path,
+                      ctx->relay_url);
     if (nc < 0 || nc >= (int)sizeof(cmd))
         return SC_OK;
 

@@ -10,7 +10,6 @@
 
 #define LINE_PUSH_URL "https://api.line.me/v2/bot/message/push"
 
-
 #define LINE_QUEUE_MAX       32
 #define LINE_SESSION_KEY_MAX 127
 #define LINE_CONTENT_MAX     4095
@@ -131,10 +130,10 @@ static const sc_channel_vtable_t line_vtable = {
     .stop_typing = NULL,
 };
 
-
-static void line_queue_push(sc_line_ctx_t *c, const char *from, size_t from_len,
-                             const char *body, size_t body_len) {
-    if (c->queue_count >= LINE_QUEUE_MAX) return;
+static void line_queue_push(sc_line_ctx_t *c, const char *from, size_t from_len, const char *body,
+                            size_t body_len) {
+    if (c->queue_count >= LINE_QUEUE_MAX)
+        return;
     sc_line_queued_msg_t *slot = &c->queue[c->queue_tail];
     size_t sk = from_len < LINE_SESSION_KEY_MAX ? from_len : LINE_SESSION_KEY_MAX;
     memcpy(slot->session_key, from, sk);
@@ -147,9 +146,10 @@ static void line_queue_push(sc_line_ctx_t *c, const char *from, size_t from_len,
 }
 
 sc_error_t sc_line_on_webhook(void *channel_ctx, sc_allocator_t *alloc, const char *body,
-                               size_t body_len) {
+                              size_t body_len) {
     sc_line_ctx_t *c = (sc_line_ctx_t *)channel_ctx;
-    if (!c || !body || body_len == 0) return SC_ERR_INVALID_ARGUMENT;
+    if (!c || !body || body_len == 0)
+        return SC_ERR_INVALID_ARGUMENT;
 #if SC_IS_TEST
     (void)alloc;
     line_queue_push(c, "test-sender", 11, body, body_len);
@@ -157,21 +157,27 @@ sc_error_t sc_line_on_webhook(void *channel_ctx, sc_allocator_t *alloc, const ch
 #else
     sc_json_value_t *parsed = NULL;
     sc_error_t err = sc_json_parse(alloc, body, body_len, &parsed);
-    if (err != SC_OK || !parsed) return SC_OK;
-        sc_json_value_t *events = sc_json_object_get(parsed, "events");
+    if (err != SC_OK || !parsed)
+        return SC_OK;
+    sc_json_value_t *events = sc_json_object_get(parsed, "events");
     if (events && events->type == SC_JSON_ARRAY) {
         for (size_t i = 0; i < events->data.array.len; i++) {
             sc_json_value_t *ev = events->data.array.items[i];
-            if (!ev || ev->type != SC_JSON_OBJECT) continue;
+            if (!ev || ev->type != SC_JSON_OBJECT)
+                continue;
             const char *ev_type = sc_json_get_string(ev, "type");
-            if (!ev_type || strcmp(ev_type, "message") != 0) continue;
+            if (!ev_type || strcmp(ev_type, "message") != 0)
+                continue;
             sc_json_value_t *source = sc_json_object_get(ev, "source");
             const char *user_id = source ? sc_json_get_string(source, "userId") : NULL;
-            if (!user_id) continue;
+            if (!user_id)
+                continue;
             sc_json_value_t *msg = sc_json_object_get(ev, "message");
-            if (!msg || msg->type != SC_JSON_OBJECT) continue;
+            if (!msg || msg->type != SC_JSON_OBJECT)
+                continue;
             const char *msg_type = sc_json_get_string(msg, "type");
-            if (!msg_type || strcmp(msg_type, "text") != 0) continue;
+            if (!msg_type || strcmp(msg_type, "text") != 0)
+                continue;
             const char *text = sc_json_get_string(msg, "text");
             if (text && strlen(text) > 0)
                 line_queue_push(c, user_id, strlen(user_id), text, strlen(text));
@@ -183,10 +189,11 @@ sc_error_t sc_line_on_webhook(void *channel_ctx, sc_allocator_t *alloc, const ch
 }
 
 sc_error_t sc_line_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_loop_msg_t *msgs,
-                         size_t max_msgs, size_t *out_count) {
+                        size_t max_msgs, size_t *out_count) {
     (void)alloc;
     sc_line_ctx_t *c = (sc_line_ctx_t *)channel_ctx;
-    if (!c || !msgs || !out_count) return SC_ERR_INVALID_ARGUMENT;
+    if (!c || !msgs || !out_count)
+        return SC_ERR_INVALID_ARGUMENT;
     *out_count = 0;
     size_t cnt = 0;
     while (c->queue_count > 0 && cnt < max_msgs) {

@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 #define ONEBOT_QUEUE_MAX       32
 #define ONEBOT_SESSION_KEY_MAX 127
 #define ONEBOT_CONTENT_MAX     4095
@@ -147,10 +146,10 @@ static const sc_channel_vtable_t onebot_vtable = {
     .stop_typing = NULL,
 };
 
-
 static void onebot_queue_push(sc_onebot_ctx_t *c, const char *from, size_t from_len,
-                             const char *body, size_t body_len) {
-    if (c->queue_count >= ONEBOT_QUEUE_MAX) return;
+                              const char *body, size_t body_len) {
+    if (c->queue_count >= ONEBOT_QUEUE_MAX)
+        return;
     sc_onebot_queued_msg_t *slot = &c->queue[c->queue_tail];
     size_t sk = from_len < ONEBOT_SESSION_KEY_MAX ? from_len : ONEBOT_SESSION_KEY_MAX;
     memcpy(slot->session_key, from, sk);
@@ -163,9 +162,10 @@ static void onebot_queue_push(sc_onebot_ctx_t *c, const char *from, size_t from_
 }
 
 sc_error_t sc_onebot_on_webhook(void *channel_ctx, sc_allocator_t *alloc, const char *body,
-                               size_t body_len) {
+                                size_t body_len) {
     sc_onebot_ctx_t *c = (sc_onebot_ctx_t *)channel_ctx;
-    if (!c || !body || body_len == 0) return SC_ERR_INVALID_ARGUMENT;
+    if (!c || !body || body_len == 0)
+        return SC_ERR_INVALID_ARGUMENT;
 #if SC_IS_TEST
     (void)alloc;
     onebot_queue_push(c, "test-sender", 11, body, body_len);
@@ -173,11 +173,13 @@ sc_error_t sc_onebot_on_webhook(void *channel_ctx, sc_allocator_t *alloc, const 
 #else
     sc_json_value_t *parsed = NULL;
     sc_error_t err = sc_json_parse(alloc, body, body_len, &parsed);
-    if (err != SC_OK || !parsed) return SC_OK;
-        const char *msg_type = sc_json_get_string(parsed, "post_type");
+    if (err != SC_OK || !parsed)
+        return SC_OK;
+    const char *msg_type = sc_json_get_string(parsed, "post_type");
     if (msg_type && strcmp(msg_type, "message") == 0) {
         const char *message = sc_json_get_string(parsed, "raw_message");
-        if (!message) message = sc_json_get_string(parsed, "message");
+        if (!message)
+            message = sc_json_get_string(parsed, "message");
         const char *user_id = sc_json_get_string(parsed, "user_id");
         if (!user_id) {
             sc_json_value_t *sender = sc_json_object_get(parsed, "sender");
@@ -192,10 +194,11 @@ sc_error_t sc_onebot_on_webhook(void *channel_ctx, sc_allocator_t *alloc, const 
 }
 
 sc_error_t sc_onebot_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_loop_msg_t *msgs,
-                         size_t max_msgs, size_t *out_count) {
+                          size_t max_msgs, size_t *out_count) {
     (void)alloc;
     sc_onebot_ctx_t *c = (sc_onebot_ctx_t *)channel_ctx;
-    if (!c || !msgs || !out_count) return SC_ERR_INVALID_ARGUMENT;
+    if (!c || !msgs || !out_count)
+        return SC_ERR_INVALID_ARGUMENT;
     *out_count = 0;
     size_t cnt = 0;
     while (c->queue_count > 0 && cnt < max_msgs) {

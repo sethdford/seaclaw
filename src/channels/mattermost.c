@@ -129,57 +129,78 @@ static const sc_channel_vtable_t mattermost_vtable = {
     .stop_typing = NULL,
 };
 
-
 sc_error_t sc_mattermost_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_loop_msg_t *msgs,
-                               size_t max_msgs, size_t *out_count) {
+                              size_t max_msgs, size_t *out_count) {
     sc_mattermost_ctx_t *ctx = (sc_mattermost_ctx_t *)channel_ctx;
-    if (!ctx || !msgs || !out_count) return SC_ERR_INVALID_ARGUMENT;
+    if (!ctx || !msgs || !out_count)
+        return SC_ERR_INVALID_ARGUMENT;
     *out_count = 0;
 #if SC_IS_TEST
-    (void)alloc; (void)max_msgs;
+    (void)alloc;
+    (void)max_msgs;
     return SC_OK;
 #else
-    if (!ctx->url || ctx->url_len == 0 || !ctx->token || ctx->token_len == 0) return SC_OK;
-    if (!ctx->channel_id || !ctx->running) return SC_OK;
+    if (!ctx->url || ctx->url_len == 0 || !ctx->token || ctx->token_len == 0)
+        return SC_OK;
+    if (!ctx->channel_id || !ctx->running)
+        return SC_OK;
     char url_buf[1024];
     int nu;
     if (ctx->last_post_id)
-        nu = snprintf(url_buf, sizeof(url_buf), "%.*s/api/v4/channels/%s/posts?after=%s&per_page=10",
-                      (int)ctx->url_len, ctx->url, ctx->channel_id, ctx->last_post_id);
+        nu =
+            snprintf(url_buf, sizeof(url_buf), "%.*s/api/v4/channels/%s/posts?after=%s&per_page=10",
+                     (int)ctx->url_len, ctx->url, ctx->channel_id, ctx->last_post_id);
     else
         nu = snprintf(url_buf, sizeof(url_buf), "%.*s/api/v4/channels/%s/posts?per_page=10",
                       (int)ctx->url_len, ctx->url, ctx->channel_id);
-    if (nu < 0 || (size_t)nu >= sizeof(url_buf)) return SC_ERR_INTERNAL;
+    if (nu < 0 || (size_t)nu >= sizeof(url_buf))
+        return SC_ERR_INTERNAL;
     char auth_buf[512];
     int na = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)ctx->token_len, ctx->token);
-    if (na <= 0 || (size_t)na >= sizeof(auth_buf)) return SC_ERR_INTERNAL;
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return SC_ERR_INTERNAL;
     sc_http_response_t resp = {0};
     sc_error_t err = sc_http_get(alloc, url_buf, auth_buf, &resp);
-    if (err != SC_OK) { if (resp.owned && resp.body) sc_http_response_free(alloc, &resp); return SC_OK; }
-    if (resp.status_code != 200 || !resp.body) { if (resp.owned && resp.body) sc_http_response_free(alloc, &resp); return SC_OK; }
+    if (err != SC_OK) {
+        if (resp.owned && resp.body)
+            sc_http_response_free(alloc, &resp);
+        return SC_OK;
+    }
+    if (resp.status_code != 200 || !resp.body) {
+        if (resp.owned && resp.body)
+            sc_http_response_free(alloc, &resp);
+        return SC_OK;
+    }
     sc_json_value_t *parsed = NULL;
     err = sc_json_parse(alloc, resp.body, resp.body_len, &parsed);
-    if (resp.owned && resp.body) sc_http_response_free(alloc, &resp);
-    if (err != SC_OK || !parsed) return SC_OK;
+    if (resp.owned && resp.body)
+        sc_http_response_free(alloc, &resp);
+    if (err != SC_OK || !parsed)
+        return SC_OK;
     sc_json_value_t *order = sc_json_object_get(parsed, "order");
     sc_json_value_t *posts = sc_json_object_get(parsed, "posts");
     size_t cnt = 0;
     if (order && order->type == SC_JSON_ARRAY && posts && posts->type == SC_JSON_OBJECT) {
         for (size_t i = 0; i < order->data.array.len && cnt < max_msgs; i++) {
             sc_json_value_t *pid_val = order->data.array.items[i];
-            if (!pid_val || pid_val->type != SC_JSON_STRING) continue;
+            if (!pid_val || pid_val->type != SC_JSON_STRING)
+                continue;
             const char *pid = pid_val->data.string.ptr;
             sc_json_value_t *post = sc_json_object_get(posts, pid);
-            if (!post || post->type != SC_JSON_OBJECT) continue;
+            if (!post || post->type != SC_JSON_OBJECT)
+                continue;
             const char *msg = sc_json_get_string(post, "message");
             const char *user_id = sc_json_get_string(post, "user_id");
-            if (!msg || !user_id || strlen(msg) == 0) continue;
+            if (!msg || !user_id || strlen(msg) == 0)
+                continue;
             size_t sk = strlen(user_id);
-            if (sk > MM_SESSION_KEY_MAX) sk = MM_SESSION_KEY_MAX;
+            if (sk > MM_SESSION_KEY_MAX)
+                sk = MM_SESSION_KEY_MAX;
             memcpy(msgs[cnt].session_key, user_id, sk);
             msgs[cnt].session_key[sk] = '\0';
             size_t ct = strlen(msg);
-            if (ct > MM_CONTENT_MAX) ct = MM_CONTENT_MAX;
+            if (ct > MM_CONTENT_MAX)
+                ct = MM_CONTENT_MAX;
             memcpy(msgs[cnt].content, msg, ct);
             msgs[cnt].content[ct] = '\0';
             cnt++;
@@ -190,7 +211,10 @@ sc_error_t sc_mattermost_poll(void *channel_ctx, sc_allocator_t *alloc, sc_chann
             if (i == 0) {
                 size_t plen = strlen(pid);
                 ctx->last_post_id = (char *)ctx->alloc->alloc(ctx->alloc->ctx, plen + 1);
-                if (ctx->last_post_id) { memcpy(ctx->last_post_id, pid, plen); ctx->last_post_id[plen] = '\0'; }
+                if (ctx->last_post_id) {
+                    memcpy(ctx->last_post_id, pid, plen);
+                    ctx->last_post_id[plen] = '\0';
+                }
             }
         }
     }
@@ -209,10 +233,11 @@ sc_error_t sc_mattermost_create(sc_allocator_t *alloc, const char *url, size_t u
     if (url && url_len > 0) {
         c->url = (char *)malloc(url_len + 1);
         if (!c->url) {
-            if (c->channel_id) free(c->channel_id);
-        if (c->last_post_id && c->alloc)
-            c->alloc->free(c->alloc->ctx, c->last_post_id, strlen(c->last_post_id) + 1);
-        free(c);
+            if (c->channel_id)
+                free(c->channel_id);
+            if (c->last_post_id && c->alloc)
+                c->alloc->free(c->alloc->ctx, c->last_post_id, strlen(c->last_post_id) + 1);
+            free(c);
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->url, url, url_len);

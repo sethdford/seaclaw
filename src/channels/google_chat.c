@@ -1,14 +1,15 @@
 #include "seaclaw/channel.h"
 #include "seaclaw/channel_loop.h"
+#include "seaclaw/channels/google_chat.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/http.h"
 #include "seaclaw/core/json.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define GCHAT_API_BASE       "https://chat.googleapis.com/v1/"
 #define GCHAT_QUEUE_MAX       32
 #define GCHAT_SESSION_KEY_MAX 127
 #define GCHAT_CONTENT_MAX     4095
@@ -20,10 +21,8 @@ typedef struct sc_google_chat_queued_msg {
 
 typedef struct sc_google_chat_ctx {
     sc_allocator_t *alloc;
-    char *bearer_token;
-    size_t bearer_token_len;
-    char *space_id;
-    size_t space_id_len;
+    char *webhook_url;
+    size_t webhook_url_len;
     bool running;
     sc_google_chat_queued_msg_t queue[GCHAT_QUEUE_MAX];
     size_t queue_head;
@@ -48,60 +47,43 @@ static void google_chat_stop(void *ctx) {
 static sc_error_t google_chat_send(void *ctx, const char *target, size_t target_len,
                                    const char *message, size_t message_len,
                                    const char *const *media, size_t media_count) {
+    (void)target;
+    (void)target_len;
     (void)media;
     (void)media_count;
     sc_google_chat_ctx_t *c = (sc_google_chat_ctx_t *)ctx;
 
 #if SC_IS_TEST
-    (void)c;
-    (void)target;
-    (void)target_len;
-    (void)message;
     (void)message_len;
+    if (!c || !message)
+        return SC_ERR_INVALID_ARGUMENT;
     return SC_OK;
 #else
     if (!c || !c->alloc)
         return SC_ERR_INVALID_ARGUMENT;
-    if (!c->bearer_token || c->bearer_token_len == 0)
+    if (!c->webhook_url || c->webhook_url_len == 0)
         return SC_ERR_CHANNEL_NOT_CONFIGURED;
     if (!message)
         return SC_ERR_INVALID_ARGUMENT;
-
-    const char *space = (target && target_len > 0) ? target : c->space_id;
-    size_t space_len = (target && target_len > 0) ? target_len : c->space_id_len;
-    if (!space || space_len == 0)
+    if (c->webhook_url_len < 9 || strncmp(c->webhook_url, "https://", 8) != 0)
         return SC_ERR_CHANNEL_NOT_CONFIGURED;
-
-    char url_buf[512];
-    int n = snprintf(url_buf, sizeof(url_buf), "%s%.*s/messages", GCHAT_API_BASE, (int)space_len,
-                     space);
-    if (n < 0 || (size_t)n >= sizeof(url_buf))
-        return SC_ERR_INTERNAL;
 
     sc_json_buf_t jbuf;
     sc_error_t err = sc_json_buf_init(&jbuf, c->alloc);
     if (err)
         return err;
-    err = sc_json_buf_append_raw(&jbuf, "{", 1);
+    err = sc_json_buf_append_raw(&jbuf, "{\"text\":", 8);
     if (err)
         goto jfail;
-    err = sc_json_append_key_value(&jbuf, "text", 4, message, message_len);
+    err = sc_json_append_string(&jbuf, message, message_len);
     if (err)
         goto jfail;
     err = sc_json_buf_append_raw(&jbuf, "}", 1);
     if (err)
         goto jfail;
 
-    char auth_buf[512];
-    int na = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)c->bearer_token_len,
-                      c->bearer_token);
-    if (na <= 0 || (size_t)na >= sizeof(auth_buf)) {
-        sc_json_buf_free(&jbuf);
-        return SC_ERR_INTERNAL;
-    }
-
     sc_http_response_t resp = {0};
-    err = sc_http_post_json(c->alloc, url_buf, auth_buf, jbuf.ptr, jbuf.len, &resp);
+    err = sc_http_post_json(c->alloc, c->webhook_url, NULL, jbuf.ptr, jbuf.len, &resp);
     sc_json_buf_free(&jbuf);
     if (err != SC_OK) {
         if (resp.owned && resp.body)
@@ -123,21 +105,11 @@ static const char *google_chat_name(void *ctx) {
     (void)ctx;
     return "google_chat";
 }
+
 static bool google_chat_health_check(void *ctx) {
     (void)ctx;
     return true;
 }
-
-static const sc_channel_vtable_t google_chat_vtable = {
-    .start = google_chat_start,
-    .stop = google_chat_stop,
-    .send = google_chat_send,
-    .name = google_chat_name,
-    .health_check = google_chat_health_check,
-    .send_event = NULL,
-    .start_typing = NULL,
-    .stop_typing = NULL,
-};
 
 static void google_chat_queue_push(sc_google_chat_ctx_t *c, const char *from, size_t from_len,
                                    const char *body, size_t body_len) {
@@ -153,6 +125,17 @@ static void google_chat_queue_push(sc_google_chat_ctx_t *c, const char *from, si
     c->queue_tail = (c->queue_tail + 1) % GCHAT_QUEUE_MAX;
     c->queue_count++;
 }
+
+static const sc_channel_vtable_t google_chat_vtable = {
+    .start = google_chat_start,
+    .stop = google_chat_stop,
+    .send = google_chat_send,
+    .name = google_chat_name,
+    .health_check = google_chat_health_check,
+    .send_event = NULL,
+    .start_typing = NULL,
+    .stop_typing = NULL,
+};
 
 sc_error_t sc_google_chat_on_webhook(void *channel_ctx, sc_allocator_t *alloc, const char *body,
                                      size_t body_len) {
@@ -201,36 +184,30 @@ sc_error_t sc_google_chat_poll(void *channel_ctx, sc_allocator_t *alloc,
     return SC_OK;
 }
 
-sc_error_t sc_google_chat_create(sc_allocator_t *alloc, const char *bearer_token,
-                                 size_t bearer_token_len, const char *space_id,
-                                 size_t space_id_len, sc_channel_t *out) {
+bool sc_google_chat_is_configured(sc_channel_t *ch) {
+    if (!ch || !ch->ctx)
+        return false;
+    sc_google_chat_ctx_t *c = (sc_google_chat_ctx_t *)ch->ctx;
+    return c->webhook_url != NULL && c->webhook_url_len > 0;
+}
+
+sc_error_t sc_google_chat_create(sc_allocator_t *alloc, const char *webhook_url,
+                                 size_t webhook_url_len, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
     sc_google_chat_ctx_t *c = (sc_google_chat_ctx_t *)calloc(1, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
     c->alloc = alloc;
-    if (bearer_token && bearer_token_len > 0) {
-        c->bearer_token = (char *)malloc(bearer_token_len + 1);
-        if (!c->bearer_token) {
+    if (webhook_url && webhook_url_len > 0) {
+        c->webhook_url = (char *)malloc(webhook_url_len + 1);
+        if (!c->webhook_url) {
             free(c);
             return SC_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->bearer_token, bearer_token, bearer_token_len);
-        c->bearer_token[bearer_token_len] = '\0';
-        c->bearer_token_len = bearer_token_len;
-    }
-    if (space_id && space_id_len > 0) {
-        c->space_id = (char *)malloc(space_id_len + 1);
-        if (!c->space_id) {
-            if (c->bearer_token)
-                free(c->bearer_token);
-            free(c);
-            return SC_ERR_OUT_OF_MEMORY;
-        }
-        memcpy(c->space_id, space_id, space_id_len);
-        c->space_id[space_id_len] = '\0';
-        c->space_id_len = space_id_len;
+        memcpy(c->webhook_url, webhook_url, webhook_url_len);
+        c->webhook_url[webhook_url_len] = '\0';
+        c->webhook_url_len = webhook_url_len;
     }
     out->ctx = c;
     out->vtable = &google_chat_vtable;
@@ -240,10 +217,8 @@ sc_error_t sc_google_chat_create(sc_allocator_t *alloc, const char *bearer_token
 void sc_google_chat_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_google_chat_ctx_t *c = (sc_google_chat_ctx_t *)ch->ctx;
-        if (c->bearer_token)
-            free(c->bearer_token);
-        if (c->space_id)
-            free(c->space_id);
+        if (c->webhook_url)
+            free(c->webhook_url);
         free(c);
         ch->ctx = NULL;
         ch->vtable = NULL;

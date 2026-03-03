@@ -11,7 +11,7 @@ sc_error_t sc_mattermost_create(sc_allocator_t *alloc, const char *url, size_t u
                                 const char *token, size_t token_len, sc_channel_t *out);
 
 sc_error_t sc_mattermost_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_loop_msg_t *msgs,
-                               size_t max_msgs, size_t *out_count);
+                              size_t max_msgs, size_t *out_count);
 
 void sc_mattermost_destroy(sc_channel_t *ch);
 

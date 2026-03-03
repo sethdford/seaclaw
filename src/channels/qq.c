@@ -9,7 +9,6 @@
 #define QQ_SANDBOX_BASE "https://sandbox.api.sgroup.qq.com"
 #define QQ_MAX_MSG      4096
 
-
 #define QQ_QUEUE_MAX       32
 #define QQ_SESSION_KEY_MAX 127
 #define QQ_CONTENT_MAX     4095
@@ -136,10 +135,10 @@ static const sc_channel_vtable_t qq_vtable = {
     .stop_typing = NULL,
 };
 
-
-static void qq_queue_push(sc_qq_ctx_t *c, const char *from, size_t from_len,
-                             const char *body, size_t body_len) {
-    if (c->queue_count >= QQ_QUEUE_MAX) return;
+static void qq_queue_push(sc_qq_ctx_t *c, const char *from, size_t from_len, const char *body,
+                          size_t body_len) {
+    if (c->queue_count >= QQ_QUEUE_MAX)
+        return;
     sc_qq_queued_msg_t *slot = &c->queue[c->queue_tail];
     size_t sk = from_len < QQ_SESSION_KEY_MAX ? from_len : QQ_SESSION_KEY_MAX;
     memcpy(slot->session_key, from, sk);
@@ -152,9 +151,10 @@ static void qq_queue_push(sc_qq_ctx_t *c, const char *from, size_t from_len,
 }
 
 sc_error_t sc_qq_on_webhook(void *channel_ctx, sc_allocator_t *alloc, const char *body,
-                               size_t body_len) {
+                            size_t body_len) {
     sc_qq_ctx_t *c = (sc_qq_ctx_t *)channel_ctx;
-    if (!c || !body || body_len == 0) return SC_ERR_INVALID_ARGUMENT;
+    if (!c || !body || body_len == 0)
+        return SC_ERR_INVALID_ARGUMENT;
 #if SC_IS_TEST
     (void)alloc;
     qq_queue_push(c, "test-sender", 11, body, body_len);
@@ -162,8 +162,9 @@ sc_error_t sc_qq_on_webhook(void *channel_ctx, sc_allocator_t *alloc, const char
 #else
     sc_json_value_t *parsed = NULL;
     sc_error_t err = sc_json_parse(alloc, body, body_len, &parsed);
-    if (err != SC_OK || !parsed) return SC_OK;
-        sc_json_value_t *d = sc_json_object_get(parsed, "d");
+    if (err != SC_OK || !parsed)
+        return SC_OK;
+    sc_json_value_t *d = sc_json_object_get(parsed, "d");
     if (d && d->type == SC_JSON_OBJECT) {
         const char *content = sc_json_get_string(d, "content");
         sc_json_value_t *author = sc_json_object_get(d, "author");
@@ -177,10 +178,11 @@ sc_error_t sc_qq_on_webhook(void *channel_ctx, sc_allocator_t *alloc, const char
 }
 
 sc_error_t sc_qq_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_loop_msg_t *msgs,
-                         size_t max_msgs, size_t *out_count) {
+                      size_t max_msgs, size_t *out_count) {
     (void)alloc;
     sc_qq_ctx_t *c = (sc_qq_ctx_t *)channel_ctx;
-    if (!c || !msgs || !out_count) return SC_ERR_INVALID_ARGUMENT;
+    if (!c || !msgs || !out_count)
+        return SC_ERR_INVALID_ARGUMENT;
     *out_count = 0;
     size_t cnt = 0;
     while (c->queue_count > 0 && cnt < max_msgs) {
