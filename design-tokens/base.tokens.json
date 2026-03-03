@@ -16,8 +16,10 @@
       "700": { "$value": "#d4dfe9", "$type": "color" },
       "750": { "$value": "#e4ecf4", "$type": "color" },
       "800": { "$value": "#eaf0f6", "$type": "color" },
+      "825": { "$value": "#eef3f8", "$type": "color" },
       "850": { "$value": "#f0f4f8", "$type": "color" },
       "900": { "$value": "#f6f9fc", "$type": "color" },
+      "925": { "$value": "#f8fafc", "$type": "color" },
       "1000": { "$value": "#ffffff", "$type": "color" }
     },
     "teal": {

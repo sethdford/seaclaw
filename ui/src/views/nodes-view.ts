@@ -1,6 +1,7 @@
 import { html, css } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
+import { icons } from "../icons.js";
 import "../components/sc-card.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
@@ -24,7 +25,7 @@ export class ScNodesView extends GatewayAwareLitElement {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: var(--sc-space-md);
+      margin-bottom: var(--sc-space-xl);
       flex-wrap: wrap;
       gap: var(--sc-space-sm);
     }
@@ -36,12 +37,12 @@ export class ScNodesView extends GatewayAwareLitElement {
     }
     .nodes-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1.5rem;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--sc-space-xl);
+      margin-bottom: var(--sc-space-2xl);
     }
     .node-card {
-      padding: 1rem;
+      padding: var(--sc-space-md);
       background: var(--sc-bg-surface);
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius);
@@ -105,6 +106,45 @@ export class ScNodesView extends GatewayAwareLitElement {
     .health-status.ok {
       color: var(--sc-success);
     }
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: var(--sc-space-2xl) var(--sc-space-lg);
+    }
+    .empty-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      color: var(--sc-text-muted);
+      margin-bottom: var(--sc-space-md);
+    }
+    .empty-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .empty-title {
+      font-size: var(--sc-text-lg);
+      font-weight: var(--sc-weight-semibold);
+      color: var(--sc-text);
+      margin: 0 0 var(--sc-space-xs);
+    }
+    .empty-desc {
+      font-size: var(--sc-text-sm);
+      color: var(--sc-text-muted);
+      margin: 0;
+    }
+    @media (max-width: 768px) {
+      .nodes-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 480px) {
+      .nodes-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   `;
 
   @state() private nodes: NodeItem[] = [];
@@ -165,7 +205,7 @@ export class ScNodesView extends GatewayAwareLitElement {
         : this.nodes.length === 0
           ? html`
               <div class="empty-state">
-                <div class="empty-icon">🖥️</div>
+                <div class="empty-icon">${icons.monitor}</div>
                 <p class="empty-title">No nodes connected</p>
                 <p class="empty-desc">Connected devices and gateways will appear here.</p>
               </div>

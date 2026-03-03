@@ -39,5 +39,10 @@ describe("icons", () => {
     expect(icons).toHaveProperty("search");
     expect(icons).toHaveProperty("refresh");
     expect(icons).toHaveProperty("chevron");
+    expect(icons).toHaveProperty("warning");
+    expect(icons).toHaveProperty("file-text");
+    expect(icons).toHaveProperty("arrow-right");
+    expect(icons).toHaveProperty("chat-circle");
+    expect(icons).toHaveProperty("monitor");
   });
 });

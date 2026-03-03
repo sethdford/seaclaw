@@ -11,6 +11,7 @@ declare global {
 import type { GatewayClient, GatewayStatus } from "./gateway.js";
 import { GatewayClient as GatewayClientClass } from "./gateway.js";
 import { setGateway } from "./gateway-provider.js";
+import { icons } from "./icons.js";
 import "./components/floating-mic.js";
 import "./components/sidebar.js";
 import "./components/command-palette.js";
@@ -73,12 +74,12 @@ const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
 
 const loadedViews = new Set<TabId>(["overview"]);
 
-const MOBILE_TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: "overview", label: "Home", icon: "⊞" },
-  { id: "chat", label: "Chat", icon: "💬" },
-  { id: "agents", label: "Agents", icon: "⚡" },
-  { id: "config", label: "Config", icon: "⚙" },
-  { id: "tools", label: "Tools", icon: "🔧" },
+const MOBILE_TABS: { id: TabId; label: string; icon: ReturnType<typeof html> }[] = [
+  { id: "overview", label: "Home", icon: icons.grid },
+  { id: "chat", label: "Chat", icon: icons["message-square"] },
+  { id: "agents", label: "Agents", icon: icons.zap },
+  { id: "config", label: "Config", icon: icons.settings },
+  { id: "tools", label: "Tools", icon: icons.wrench },
 ];
 
 @customElement("sc-app")
@@ -103,7 +104,7 @@ export class ScApp extends LitElement {
 
     main {
       overflow: auto;
-      padding: var(--sc-space-lg);
+      padding: var(--sc-space-2xl);
       background: var(--sc-bg);
       view-transition-name: main-content;
       content-visibility: auto;
@@ -159,8 +160,13 @@ export class ScApp extends LitElement {
         color: var(--sc-accent);
       }
       .mobile-tab .icon {
-        font-size: 1.25rem;
+        width: 1.25rem;
+        height: 1.25rem;
         line-height: 1;
+      }
+      .mobile-tab .icon svg {
+        width: 100%;
+        height: 100%;
       }
     }
   `;
@@ -286,6 +292,11 @@ export class ScApp extends LitElement {
       this._switchTab(id as TabId);
     } else if (action === "toggle-sidebar") {
       this._toggleSidebar();
+    } else if (action === "refresh") {
+      const view = this.shadowRoot?.querySelector("main")?.firstElementChild;
+      if (view && "load" in view && typeof (view as { load: () => void }).load === "function") {
+        (view as { load: () => void }).load();
+      }
     }
   }
 
@@ -300,7 +311,7 @@ export class ScApp extends LitElement {
           @toggle-collapse=${() => this._toggleSidebar()}
         ></sc-sidebar>
 
-        <main>${this._renderView()}</main>
+        <main><div class="view-enter">${this._renderView()}</div></main>
 
         <nav class="mobile-nav" aria-label="Mobile navigation">
           ${MOBILE_TABS.map(

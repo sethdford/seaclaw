@@ -16,12 +16,13 @@ export class ScLogsView extends GatewayAwareLitElement {
     :host {
       display: block;
       color: var(--sc-text);
+      max-width: 960px;
     }
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: var(--sc-space-md);
+      margin-bottom: var(--sc-space-xl);
       flex-wrap: wrap;
       gap: var(--sc-space-sm);
     }
@@ -42,12 +43,12 @@ export class ScLogsView extends GatewayAwareLitElement {
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius);
       color: var(--sc-text);
-      font-size: 0.875rem;
+      font-size: var(--sc-text-sm);
       font-family: var(--sc-font-mono);
       width: 220px;
       transition:
-        border-color 0.2s var(--sc-ease-out),
-        box-shadow 0.2s var(--sc-ease-out);
+        border-color var(--sc-duration-fast) var(--sc-ease-out),
+        box-shadow var(--sc-duration-fast) var(--sc-ease-out);
     }
     .filter-input:focus {
       outline: none;
@@ -64,9 +65,9 @@ export class ScLogsView extends GatewayAwareLitElement {
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius);
       cursor: pointer;
-      font-size: 0.875rem;
+      font-size: var(--sc-text-sm);
       font-weight: var(--sc-weight-medium);
-      transition: background 0.2s var(--sc-ease-out);
+      transition: background var(--sc-duration-fast) var(--sc-ease-out);
     }
     .btn:hover {
       background: var(--sc-border);
@@ -96,7 +97,7 @@ export class ScLogsView extends GatewayAwareLitElement {
       font-size: var(--sc-text-sm);
       line-height: 1.6;
       color: var(--sc-text);
-      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+      box-shadow: var(--sc-shadow-sm);
     }
     .log-area::-webkit-scrollbar {
       width: 8px;
@@ -116,16 +117,35 @@ export class ScLogsView extends GatewayAwareLitElement {
       margin-bottom: var(--sc-space-sm);
       padding: var(--sc-space-xs) var(--sc-space-sm);
       border-radius: var(--sc-radius-sm);
-      background: rgba(0, 0, 0, 0.2);
       word-break: break-all;
+    }
+    .log-line:nth-child(odd) {
+      background: var(--sc-bg-surface);
+    }
+    .log-line:nth-child(even) {
+      background: var(--sc-bg-inset);
     }
     .log-ts {
       color: var(--sc-text-muted);
       margin-right: var(--sc-space-sm);
+      font-variant-numeric: tabular-nums;
     }
     .event {
       font-weight: var(--sc-weight-semibold);
       margin-right: var(--sc-space-sm);
+    }
+    @media (max-width: 768px) {
+      .header {
+        flex-wrap: wrap;
+      }
+      .controls {
+        flex-wrap: wrap;
+      }
+    }
+    @media (max-width: 480px) {
+      .filter-input {
+        width: 100%;
+      }
     }
   `;
 
@@ -214,13 +234,14 @@ export class ScLogsView extends GatewayAwareLitElement {
             type="text"
             class="filter-input"
             placeholder="Filter..."
+            aria-label="Filter log events"
             .value=${this.filter}
             @input=${(e: Event) => (this.filter = (e.target as HTMLInputElement).value)}
           />
-          <button class="btn" @click=${this.clearLogs}>Clear</button>
+          <button class="btn" aria-label="Clear all logs" @click=${this.clearLogs}>Clear</button>
         </div>
       </div>
-      <div class="log-area" role="log">
+      <div class="log-area sc-stagger" role="log">
         ${entries.length === 0
           ? html`<span style="color: var(--sc-text-muted)">Listening for gateway events...</span>`
           : entries.map(

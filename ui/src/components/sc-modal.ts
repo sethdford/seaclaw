@@ -8,7 +8,7 @@ export class ScModal extends LitElement {
       position: fixed;
       inset: 0;
       z-index: 9999;
-      background: rgba(0, 0, 0, 0.5);
+      background: color-mix(in srgb, var(--sc-bg) 50%, transparent);
       backdrop-filter: blur(4px);
       -webkit-backdrop-filter: blur(4px);
       display: flex;

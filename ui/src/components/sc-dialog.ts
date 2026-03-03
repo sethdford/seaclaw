@@ -31,7 +31,7 @@ export class ScDialog extends LitElement {
       justify-content: center;
       padding: var(--sc-space-lg);
       box-sizing: border-box;
-      animation: sc-fade-in var(--sc-duration-fast) var(--sc-ease-out);
+      animation: sc-fade-in var(--sc-duration-normal) ease;
     }
 
     .backdrop.closing {
@@ -54,7 +54,7 @@ export class ScDialog extends LitElement {
       border-radius: var(--sc-radius-xl);
       box-shadow: var(--sc-shadow-lg);
       padding: var(--sc-space-lg);
-      animation: sc-scale-in var(--sc-duration-fast) var(--sc-spring-out);
+      animation: sc-scale-in var(--sc-duration-normal) var(--sc-ease-out);
     }
 
     .panel.closing {

@@ -54,7 +54,7 @@ export class ScSwitch extends LitElement {
       background: var(--sc-bg-overlay);
       border-radius: var(--sc-radius-full);
       box-shadow: var(--sc-shadow-sm);
-      transition: transform var(--sc-duration-fast) var(--sc-ease-out);
+      transition: transform var(--sc-duration-fast) var(--sc-spring-out);
     }
 
     .switch.checked .thumb {

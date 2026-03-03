@@ -38,14 +38,14 @@ export class ScConfigView extends GatewayAwareLitElement {
   static override styles = css`
     :host {
       display: block;
-      max-width: 900px;
+      max-width: 640px;
       margin: 0 auto;
     }
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: var(--sc-space-md);
+      margin-bottom: var(--sc-space-xl);
       gap: var(--sc-space-md);
       flex-wrap: wrap;
     }
@@ -109,7 +109,7 @@ export class ScConfigView extends GatewayAwareLitElement {
     .form {
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
+      gap: var(--sc-space-xl);
       padding: 1.5rem;
       background: var(--sc-bg-surface);
       border: 1px solid var(--sc-border);
@@ -221,6 +221,19 @@ export class ScConfigView extends GatewayAwareLitElement {
       outline: none;
       border-color: var(--sc-accent);
       box-shadow: 0 0 0 3px var(--sc-accent-subtle, rgba(249, 112, 102, 0.12));
+    }
+    @media (max-width: 768px) {
+      .header {
+        flex-wrap: wrap;
+      }
+    }
+    @media (max-width: 480px) {
+      :host {
+        max-width: 100%;
+      }
+      .field input[type="number"] {
+        width: 100%;
+      }
     }
   `;
 

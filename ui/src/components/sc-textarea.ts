@@ -43,7 +43,7 @@ export class ScTextarea extends LitElement {
       box-sizing: border-box;
       font-family: var(--sc-font);
       background: var(--sc-bg-elevated);
-      border: 1px solid var(--sc-border);
+      border: 1px solid var(--sc-border-subtle);
       border-radius: var(--sc-radius);
       color: var(--sc-text);
       outline: none;
@@ -69,12 +69,14 @@ export class ScTextarea extends LitElement {
     }
 
     textarea:hover:not(:disabled):not(:focus) {
-      border-color: var(--sc-border);
+      border-color: var(--sc-text-faint);
     }
 
     textarea:focus-within {
       border-color: var(--sc-accent);
-      box-shadow: 0 0 0 var(--sc-focus-ring-width) var(--sc-focus-ring);
+      box-shadow:
+        0 0 0 var(--sc-focus-ring-width) var(--sc-focus-ring),
+        0 0 0 3px var(--sc-accent-subtle);
     }
 
     textarea.error {

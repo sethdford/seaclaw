@@ -1,6 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
+import { icons } from "../icons.js";
 import "../components/sc-card.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
@@ -16,9 +17,10 @@ export class ScToolsView extends GatewayAwareLitElement {
   static override styles = css`
     :host {
       display: block;
+      max-width: 1200px;
     }
     .search {
-      margin-bottom: var(--sc-space-md);
+      margin-bottom: var(--sc-space-xl);
       max-width: 400px;
     }
     .search input {
@@ -40,7 +42,7 @@ export class ScToolsView extends GatewayAwareLitElement {
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: var(--sc-space-md);
+      gap: var(--sc-space-xl);
     }
     .grid-full {
       grid-column: 1 / -1;
@@ -74,6 +76,19 @@ export class ScToolsView extends GatewayAwareLitElement {
       cursor: pointer;
       font-size: var(--sc-text-xs);
       padding: var(--sc-space-xs) 0;
+    }
+    @media (max-width: 768px) {
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .search {
+        max-width: 100%;
+      }
+    }
+    @media (max-width: 480px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
     }
   `;
 
@@ -128,7 +143,7 @@ export class ScToolsView extends GatewayAwareLitElement {
         <div class="search">
           <input type="text" placeholder="Search tools..." disabled style="opacity: 0.6" />
         </div>
-        <div class="grid">
+        <div class="grid sc-stagger">
           <sc-skeleton variant="card" height="80px"></sc-skeleton>
           <sc-skeleton variant="card" height="80px"></sc-skeleton>
           <sc-skeleton variant="card" height="80px"></sc-skeleton>
@@ -140,7 +155,7 @@ export class ScToolsView extends GatewayAwareLitElement {
     return html`
       ${this.error
         ? html`<sc-empty-state
-            icon="⚠️"
+            .icon=${icons.warning}
             heading="Error"
             description=${this.error}
           ></sc-empty-state>`
@@ -155,12 +170,12 @@ export class ScToolsView extends GatewayAwareLitElement {
           }}
         />
       </div>
-      <div class="grid">
+      <div class="grid sc-stagger">
         ${filtered.length === 0
           ? html`
               <div class="grid-full">
                 <sc-empty-state
-                  icon="🔧"
+                  .icon=${icons.wrench}
                   heading="No tools available"
                   description="Tools will appear here when the gateway provides them."
                 ></sc-empty-state>

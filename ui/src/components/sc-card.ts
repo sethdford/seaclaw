@@ -15,7 +15,22 @@ export class ScCard extends LitElement {
       background: var(--sc-bg-surface);
       border: 1px solid var(--sc-border-subtle);
       border-radius: var(--sc-radius-lg);
-      padding: var(--sc-space-lg);
+      padding: var(--sc-space-xl);
+      box-shadow: var(--sc-shadow-card);
+      border-top: 3px solid transparent;
+    }
+    .card.accent {
+      border-top-color: var(--sc-accent);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .card {
+        border: none;
+      }
+    }
+
+    [data-theme="dark"] .card {
+      border: none;
     }
 
     .card.hoverable {
@@ -24,7 +39,11 @@ export class ScCard extends LitElement {
         box-shadow var(--sc-duration-fast) var(--sc-ease-out);
     }
     .card.hoverable:hover {
-      transform: translateY(-1px);
+      transform: translateY(-2px);
+      box-shadow: var(--sc-shadow-md);
+    }
+    .card.hoverable:active {
+      transform: translateY(0);
       box-shadow: var(--sc-shadow-sm);
     }
 

@@ -9,6 +9,37 @@ export class ScSkeleton extends LitElement {
   static override styles = css`
     :host {
       display: inline-block;
+      animation: sc-fade-in var(--sc-duration-normal) var(--sc-ease-out) backwards;
+    }
+    :host(:nth-child(1)) {
+      animation-delay: 0ms;
+    }
+    :host(:nth-child(2)) {
+      animation-delay: 40ms;
+    }
+    :host(:nth-child(3)) {
+      animation-delay: 80ms;
+    }
+    :host(:nth-child(4)) {
+      animation-delay: 120ms;
+    }
+    :host(:nth-child(5)) {
+      animation-delay: 160ms;
+    }
+    :host(:nth-child(6)) {
+      animation-delay: 200ms;
+    }
+    :host(:nth-child(7)) {
+      animation-delay: 240ms;
+    }
+    :host(:nth-child(8)) {
+      animation-delay: 280ms;
+    }
+    :host(:nth-child(9)) {
+      animation-delay: 320ms;
+    }
+    :host(:nth-child(10)) {
+      animation-delay: 360ms;
     }
 
     .skeleton {
@@ -31,6 +62,9 @@ export class ScSkeleton extends LitElement {
     }
 
     @media (prefers-reduced-motion: reduce) {
+      :host {
+        animation: none;
+      }
       .skeleton.animation-shimmer,
       .skeleton.animation-pulse {
         animation: none;

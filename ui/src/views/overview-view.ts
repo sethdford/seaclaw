@@ -2,6 +2,7 @@ import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { formatDate } from "../utils.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
+import { icons } from "../icons.js";
 import "../components/sc-card.js";
 import "../components/sc-badge.js";
 import "../components/sc-skeleton.js";
@@ -40,12 +41,13 @@ export class ScOverviewView extends GatewayAwareLitElement {
   static override styles = css`
     :host {
       display: block;
+      max-width: 1200px;
     }
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: var(--sc-space-lg);
+      margin-bottom: var(--sc-space-xl);
       flex-wrap: wrap;
       gap: var(--sc-space-md);
     }
@@ -58,37 +60,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
     .bento {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: var(--sc-space-md);
-    }
-    .bento-card {
-      animation: sc-slide-up var(--sc-duration-normal) var(--sc-ease-out) both;
-    }
-    .bento-card:nth-child(1) {
-      animation-delay: 0ms;
-    }
-    .bento-card:nth-child(2) {
-      animation-delay: 50ms;
-    }
-    .bento-card:nth-child(3) {
-      animation-delay: 100ms;
-    }
-    .bento-card:nth-child(4) {
-      animation-delay: 150ms;
-    }
-    .bento-card:nth-child(5) {
-      animation-delay: 200ms;
-    }
-    .bento-card:nth-child(6) {
-      animation-delay: 250ms;
-    }
-    .bento-card:nth-child(7) {
-      animation-delay: 300ms;
-    }
-    .bento-card:nth-child(8) {
-      animation-delay: 350ms;
-    }
-    .bento-card:nth-child(9) {
-      animation-delay: 400ms;
+      gap: var(--sc-space-xl);
     }
     .gateway-card {
       grid-column: span 2;
@@ -133,7 +105,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
     }
     .channels-inner {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: var(--sc-space-sm);
     }
     .channel-item {
@@ -174,7 +146,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
     .skeleton-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: var(--sc-space-md);
+      gap: var(--sc-space-xl);
     }
     .skeleton-gateway {
       grid-column: span 2;
@@ -298,9 +270,9 @@ export class ScOverviewView extends GatewayAwareLitElement {
         <sc-button variant="secondary" @click=${() => this.load()}>Refresh</sc-button>
       </div>
       ${this.error ? html`<p class="error">${this.error}</p>` : nothing}
-      <div class="bento">
+      <div class="bento sc-stagger">
         <!-- 1. Gateway Status (2 cols) -->
-        <sc-card hoverable class="bento-card gateway-card">
+        <sc-card hoverable class="gateway-card">
           <div class="stat-label">Gateway Status</div>
           <div class="gateway-content">
             <span class="status-dot ${gwOk ? "operational" : "offline"}" aria-hidden="true"></span>
@@ -310,36 +282,36 @@ export class ScOverviewView extends GatewayAwareLitElement {
         </sc-card>
 
         <!-- 2. Providers -->
-        <sc-card hoverable class="bento-card">
+        <sc-card hoverable>
           <div class="stat-label">Providers</div>
           <div class="stat-value">${cap.providers ?? 0}</div>
         </sc-card>
 
         <!-- 3. Channels -->
-        <sc-card hoverable class="bento-card">
+        <sc-card hoverable>
           <div class="stat-label">Channels</div>
           <div class="stat-value">${cap.channels ?? 0}</div>
         </sc-card>
 
         <!-- 4. Tools -->
-        <sc-card hoverable class="bento-card">
+        <sc-card hoverable>
           <div class="stat-label">Tools</div>
           <div class="stat-value">${cap.tools ?? 0}</div>
         </sc-card>
 
         <!-- 5. Active Sessions -->
-        <sc-card hoverable class="bento-card">
+        <sc-card hoverable>
           <div class="stat-label">Active Sessions</div>
           <div class="stat-value">${this.sessions.length}</div>
         </sc-card>
 
         <!-- 6. Channels Overview (full width) -->
-        <sc-card hoverable class="bento-card channels-overview">
+        <sc-card hoverable class="channels-overview">
           <div class="stat-label" style="margin-bottom: var(--sc-space-sm);">Channels Overview</div>
           ${this.channels.length === 0
             ? html`
                 <sc-empty-state
-                  icon="📡"
+                  .icon=${icons.radio}
                   heading="No channels"
                   description="Configure channels in the Channels view."
                 ></sc-empty-state>
@@ -361,12 +333,12 @@ export class ScOverviewView extends GatewayAwareLitElement {
         </sc-card>
 
         <!-- 7. Recent Sessions (full width) -->
-        <sc-card hoverable class="bento-card recent-sessions">
+        <sc-card hoverable class="recent-sessions">
           <div class="stat-label" style="margin-bottom: var(--sc-space-sm);">Recent Sessions</div>
           ${this.recentSessions.length === 0
             ? html`
                 <sc-empty-state
-                  icon="🗨️"
+                  .icon=${icons["chat-circle"]}
                   heading="No sessions yet"
                   description="Start a conversation to see your sessions here."
                 ></sc-empty-state>

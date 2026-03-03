@@ -1,6 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
+import { icons } from "../icons.js";
 import "../components/sc-card.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
@@ -19,18 +20,19 @@ export class ScUsageView extends GatewayAwareLitElement {
     :host {
       display: block;
       color: var(--sc-text);
+      max-width: 960px;
     }
     h2 {
-      margin: 0 0 var(--sc-space-md);
+      margin: 0 0 var(--sc-space-xl);
       font-size: var(--sc-text-xl);
       font-weight: var(--sc-weight-semibold);
       color: var(--sc-text);
     }
     .cards {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: var(--sc-space-md);
-      margin-bottom: var(--sc-space-lg);
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--sc-space-xl);
+      margin-bottom: var(--sc-space-2xl);
     }
     .card-label {
       font-size: var(--sc-text-xs);
@@ -44,7 +46,7 @@ export class ScUsageView extends GatewayAwareLitElement {
       font-variant-numeric: tabular-nums;
     }
     .chart-section {
-      margin-top: var(--sc-space-lg);
+      margin-top: var(--sc-space-2xl);
     }
     .chart-title {
       font-size: var(--sc-text-base);
@@ -78,7 +80,23 @@ export class ScUsageView extends GatewayAwareLitElement {
       height: 100%;
       background: var(--sc-accent);
       border-radius: var(--sc-radius-sm);
-      transition: width 0.3s ease;
+      transition: width var(--sc-duration-normal) var(--sc-ease-out);
+    }
+    @media (max-width: 768px) {
+      .cards {
+        grid-template-columns: 1fr 1fr;
+      }
+      .bar-row {
+        flex-wrap: wrap;
+      }
+      .bar-label {
+        width: 100%;
+      }
+    }
+    @media (max-width: 480px) {
+      .cards {
+        grid-template-columns: 1fr;
+      }
     }
   `;
 
@@ -143,14 +161,14 @@ export class ScUsageView extends GatewayAwareLitElement {
       <h2>Usage</h2>
       ${this.error
         ? html`<sc-empty-state
-            icon="⚠️"
+            .icon=${icons.warning}
             heading="Error"
             description=${this.error}
           ></sc-empty-state>`
         : nothing}
       ${this.loading
         ? html`
-            <div class="cards">
+            <div class="cards sc-stagger">
               <sc-skeleton variant="card" height="80px"></sc-skeleton>
               <sc-skeleton variant="card" height="80px"></sc-skeleton>
               <sc-skeleton variant="card" height="80px"></sc-skeleton>
@@ -163,13 +181,13 @@ export class ScUsageView extends GatewayAwareLitElement {
             requestCount === 0
           ? html`
               <sc-empty-state
-                icon="📊"
+                .icon=${icons["bar-chart"]}
                 heading="No usage data"
                 description="Usage metrics will appear here once you start making requests."
               ></sc-empty-state>
             `
           : html`
-              <div class="cards">
+              <div class="cards sc-stagger">
                 <sc-card>
                   <div class="card-label">Session Cost</div>
                   <div class="card-value">${this.formatCurrency(sessionCost)}</div>

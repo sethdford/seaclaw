@@ -1,13 +1,14 @@
 import { LitElement, html, css } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { icons } from "../icons.js";
 
 @customElement("sc-floating-mic")
 export class ScFloatingMic extends LitElement {
   static override styles = css`
     :host {
       position: fixed;
-      right: 1.5rem;
-      bottom: 1.5rem;
+      right: var(--sc-space-lg);
+      bottom: var(--sc-space-lg);
       z-index: 9999;
     }
     .btn {
@@ -22,13 +23,13 @@ export class ScFloatingMic extends LitElement {
       align-items: center;
       justify-content: center;
       padding: 0;
-      transition: background 0.2s;
+      transition: background var(--sc-duration-normal);
     }
     .btn:hover {
       background: var(--sc-accent-hover);
     }
     .btn:disabled {
-      opacity: 0.6;
+      opacity: var(--sc-opacity-disabled);
       cursor: not-allowed;
     }
     .btn.listening {
@@ -38,10 +39,10 @@ export class ScFloatingMic extends LitElement {
     @keyframes pulse-red {
       0%,
       100% {
-        box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.5);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--sc-error) 50%, transparent);
       }
       50% {
-        box-shadow: 0 0 0 12px rgba(248, 81, 73, 0);
+        box-shadow: 0 0 0 12px color-mix(in srgb, var(--sc-error) 0%, transparent);
       }
     }
     .btn svg {
@@ -50,15 +51,15 @@ export class ScFloatingMic extends LitElement {
     }
     .overlay {
       position: absolute;
-      bottom: calc(100% + 0.5rem);
+      bottom: calc(100% + var(--sc-space-sm));
       right: 0;
       min-width: 200px;
       max-width: 300px;
-      padding: 0.5rem 0.75rem;
+      padding: var(--sc-space-sm) var(--sc-space-md);
       background: var(--sc-bg-elevated);
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius);
-      font-size: 0.8125rem;
+      font-size: var(--sc-text-sm);
       font-family: var(--sc-font-mono);
       color: var(--sc-text);
       max-height: 120px;
@@ -251,19 +252,7 @@ export class ScFloatingMic extends LitElement {
           @click=${this.toggleRecording}
           aria-label="Toggle voice input"
         >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="23" />
-            <line x1="8" y1="23" x2="16" y2="23" />
-          </svg>
+          ${icons.mic}
         </button>
       </div>
     `;

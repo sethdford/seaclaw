@@ -43,11 +43,15 @@ export class ScPopover extends LitElement {
       opacity: 1;
       visibility: visible;
       transform: scale(1);
+      animation: sc-fade-in var(--sc-duration-fast) var(--sc-ease-out);
     }
 
     @media (prefers-reduced-motion: reduce) {
       .popover {
         transition: none;
+      }
+      .popover.open {
+        animation: none;
       }
     }
 

@@ -16,10 +16,10 @@ export class ScBadge extends LitElement {
     .badge {
       display: inline-flex;
       align-items: center;
-      gap: 0.375rem;
+      gap: var(--sc-space-xs);
       font-size: var(--sc-text-xs);
       font-weight: var(--sc-weight-medium);
-      padding: 0.125rem 0.5rem;
+      padding: var(--sc-space-2xs) var(--sc-space-sm);
       border-radius: 9999px;
       font-family: var(--sc-font);
     }

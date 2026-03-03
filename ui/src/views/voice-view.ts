@@ -3,6 +3,7 @@ import { customElement, state } from "lit/decorators.js";
 import type { GatewayClient } from "../gateway.js";
 import { GatewayClient as GatewayClientClass } from "../gateway.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
+import { icons } from "../icons.js";
 
 type VoiceStatus = "idle" | "listening" | "processing" | "unsupported";
 
@@ -12,11 +13,11 @@ export class ScVoiceView extends GatewayAwareLitElement {
     :host {
       display: block;
       color: var(--sc-text);
-      max-width: 480px;
+      max-width: 640px;
       margin: 0 auto;
     }
     .header {
-      margin-bottom: var(--sc-space-lg);
+      margin-bottom: var(--sc-space-xl);
     }
     h2 {
       margin: 0;
@@ -34,19 +35,21 @@ export class ScVoiceView extends GatewayAwareLitElement {
       width: 80px;
       height: 80px;
       border-radius: 50%;
-      border: none;
-      background: var(--sc-bg-surface);
       border: 2px solid var(--sc-border);
+      background: var(--sc-bg-surface);
       color: var(--sc-text-muted);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2rem;
       transition:
         background 0.2s,
         border-color 0.2s,
         transform 0.2s;
+    }
+    .mic-btn svg {
+      width: 2rem;
+      height: 2rem;
     }
     .mic-btn:hover {
       background: var(--sc-bg-elevated);
@@ -159,6 +162,22 @@ export class ScVoiceView extends GatewayAwareLitElement {
     }
     .status-line.processing {
       color: var(--sc-accent);
+    }
+    @media (max-width: 768px) {
+      .send-row {
+        flex-wrap: wrap;
+      }
+    }
+    @media (max-width: 480px) {
+      :host {
+        max-width: 100%;
+      }
+      .response-area {
+        margin-left: 0;
+      }
+      .response-area::before {
+        display: none;
+      }
     }
   `;
 
@@ -317,7 +336,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
           @click=${this.toggleMic}
           aria-label=${this.voiceStatus === "listening" ? "Stop listening" : "Start listening"}
         >
-          🎤
+          ${icons.mic}
         </button>
       </div>
 

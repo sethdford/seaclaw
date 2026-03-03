@@ -1,5 +1,6 @@
-import { LitElement, html, css, nothing } from "lit";
+import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { icons } from "../icons.js";
 
 interface Command {
   action: string;
@@ -7,127 +8,68 @@ interface Command {
   label: string;
   section: "navigation" | "actions";
   shortcut?: string;
-  icon: string;
+  icon: TemplateResult;
 }
 
-const NAV_ICON = "→";
-const ACTION_ICON = "⚙";
+const NAV_ICON_MAP: Record<string, TemplateResult> = {
+  overview: icons.grid,
+  chat: icons["message-square"],
+  sessions: icons.clock,
+  agents: icons.zap,
+  models: icons.cpu,
+  voice: icons.mic,
+  tools: icons.wrench,
+  channels: icons.radio,
+  skills: icons.puzzle,
+  cron: icons.timer,
+  config: icons.settings,
+  security: icons.shield,
+  nodes: icons.server,
+  usage: icons["bar-chart"],
+  logs: icons["file-text"],
+};
+const ACTION_ICON = icons.settings;
+
+const NAV_ITEMS: { id: string; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "chat", label: "Chat" },
+  { id: "sessions", label: "Sessions" },
+  { id: "agents", label: "Agents" },
+  { id: "models", label: "Models" },
+  { id: "voice", label: "Voice" },
+  { id: "tools", label: "Tools" },
+  { id: "channels", label: "Channels" },
+  { id: "skills", label: "Skills" },
+  { id: "cron", label: "Cron" },
+  { id: "config", label: "Config" },
+  { id: "security", label: "Security" },
+  { id: "nodes", label: "Nodes" },
+  { id: "usage", label: "Usage" },
+  { id: "logs", label: "Logs" },
+];
 
 const COMMANDS: Command[] = [
-  // Navigation
-  {
+  ...NAV_ITEMS.map((n) => ({
     action: "navigate",
-    id: "overview",
-    label: "Overview",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "chat",
-    label: "Chat",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "sessions",
-    label: "Sessions",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "agents",
-    label: "Agents",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "models",
-    label: "Models",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "voice",
-    label: "Voice",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "tools",
-    label: "Tools",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "channels",
-    label: "Channels",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "skills",
-    label: "Skills",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "cron",
-    label: "Cron",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "config",
-    label: "Config",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "nodes",
-    label: "Nodes",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "usage",
-    label: "Usage",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  {
-    action: "navigate",
-    id: "logs",
-    label: "Logs",
-    section: "navigation",
-    icon: NAV_ICON,
-  },
-  // Quick actions
+    id: n.id,
+    label: n.label,
+    section: "navigation" as const,
+    icon: NAV_ICON_MAP[n.id] ?? icons["arrow-right"],
+  })),
   {
     action: "refresh",
     id: "refresh",
     label: "Refresh current view",
     section: "actions",
-    icon: ACTION_ICON,
+    icon: icons.refresh,
   },
   {
     action: "toggle-sidebar",
     id: "toggle-sidebar",
     label: "Toggle sidebar",
     section: "actions",
-    shortcut: "⌘B",
-    icon: ACTION_ICON,
+    shortcut: "\u2318B",
+    icon: icons["sidebar-toggle"],
   },
 ];
 
@@ -233,12 +175,17 @@ export class ScCommandPalette extends LitElement {
 
     .icon {
       width: 1.25rem;
+      height: 1.25rem;
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: var(--sc-text-sm);
       color: var(--sc-text-muted);
+    }
+
+    .icon svg {
+      width: 100%;
+      height: 100%;
     }
 
     .label {
@@ -383,6 +330,7 @@ export class ScCommandPalette extends LitElement {
                       class="item ${i === this.selectedIndex ? "selected" : ""}"
                       role="option"
                       aria-selected=${i === this.selectedIndex}
+                      tabindex=${i === this.selectedIndex ? 0 : -1}
                       @click=${() => this._execute(cmd)}
                       @mouseenter=${() => (this.selectedIndex = i)}
                     >

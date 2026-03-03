@@ -36,17 +36,15 @@ export class ScButton extends LitElement {
       transition:
         background-color var(--sc-duration-fast) var(--sc-ease-out),
         color var(--sc-duration-fast) var(--sc-ease-out),
-        box-shadow var(--sc-duration-fast) var(--sc-ease-out);
+        box-shadow var(--sc-duration-fast) var(--sc-ease-out),
+        transform var(--sc-duration-fast) var(--sc-ease-out),
+        filter var(--sc-duration-fast) var(--sc-ease-out);
       border-radius: var(--sc-radius);
     }
 
     button:focus-visible {
       outline: var(--sc-focus-ring-width) solid var(--sc-focus-ring);
       outline-offset: var(--sc-focus-ring-offset);
-    }
-
-    button:active {
-      animation: sc-spring-scale var(--sc-duration-fast) var(--sc-spring-out, ease) forwards;
     }
 
     /* Variants */
@@ -57,6 +55,11 @@ export class ScButton extends LitElement {
     }
     button.variant-primary:hover:not(:disabled) {
       background: var(--sc-accent-hover);
+      box-shadow: var(--sc-shadow-md);
+      filter: brightness(1.05);
+    }
+    button.variant-primary:active:not(:disabled) {
+      animation: sc-spring-scale var(--sc-duration-normal) var(--sc-ease-out);
       box-shadow: var(--sc-shadow-sm);
     }
 
@@ -82,7 +85,7 @@ export class ScButton extends LitElement {
       color: var(--sc-text-muted);
     }
     button.variant-ghost:hover:not(:disabled) {
-      background: var(--sc-bg-elevated);
+      background: var(--sc-hover-overlay);
       color: var(--sc-text);
     }
 

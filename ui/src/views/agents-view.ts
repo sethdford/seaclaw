@@ -2,6 +2,7 @@ import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { formatDate } from "../utils.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
+import { icons } from "../icons.js";
 import "../components/sc-card.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
@@ -34,9 +35,10 @@ export class ScAgentsView extends GatewayAwareLitElement {
     :host {
       display: block;
       color: var(--sc-text);
+      max-width: 1200px;
     }
     .header {
-      margin-bottom: var(--sc-space-md);
+      margin-bottom: var(--sc-space-xl);
     }
     h2 {
       margin: 0;
@@ -119,6 +121,16 @@ export class ScAgentsView extends GatewayAwareLitElement {
       color: var(--sc-text);
       font-variant-numeric: tabular-nums;
     }
+    @media (max-width: 768px) {
+      .profile-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 480px) {
+      .profile-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   `;
 
   @state() private config: ConfigData = {};
@@ -194,12 +206,12 @@ export class ScAgentsView extends GatewayAwareLitElement {
       </div>
       ${this.error
         ? html`<sc-empty-state
-            icon="⚠️"
+            .icon=${icons.warning}
             heading="Error"
             description=${this.error}
           ></sc-empty-state>`
         : nothing}
-      <sc-card style="margin-bottom: var(--sc-space-lg);">
+      <sc-card style="margin-bottom: var(--sc-space-2xl);">
         <div class="profile-header">
           <span class="profile-title">Agent profile</span>
           <sc-button variant="primary" size="sm" @click=${() => this.dispatchNavigate("config")}>
@@ -225,11 +237,11 @@ export class ScAgentsView extends GatewayAwareLitElement {
       </sc-card>
 
       <div class="section-title">Active Sessions</div>
-      <div class="sessions-list">
+      <div class="sessions-list sc-stagger">
         ${this.sessions.length === 0
           ? html`
               <sc-empty-state
-                icon="🗨️"
+                .icon=${icons["chat-circle"]}
                 heading="No active sessions"
                 description="Start a conversation to see sessions here."
               ></sc-empty-state>

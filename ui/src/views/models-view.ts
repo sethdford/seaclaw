@@ -1,6 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
+import { icons } from "../icons.js";
 import "../components/sc-card.js";
 import "../components/sc-badge.js";
 import "../components/sc-skeleton.js";
@@ -29,9 +30,10 @@ export class ScModelsView extends GatewayAwareLitElement {
   static override styles = css`
     :host {
       display: block;
+      max-width: 1200px;
     }
     h2 {
-      margin: 0 0 var(--sc-space-md);
+      margin: 0 0 var(--sc-space-xl);
       font-size: var(--sc-text-xl);
       font-weight: var(--sc-weight-semibold);
       color: var(--sc-text);
@@ -40,7 +42,7 @@ export class ScModelsView extends GatewayAwareLitElement {
       display: flex;
       flex-wrap: wrap;
       gap: var(--sc-space-md);
-      margin-bottom: var(--sc-space-lg);
+      margin-bottom: var(--sc-space-2xl);
       font-size: var(--sc-text-base);
     }
     .info-item {
@@ -53,7 +55,7 @@ export class ScModelsView extends GatewayAwareLitElement {
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: var(--sc-space-md);
+      gap: var(--sc-space-xl);
     }
     .card-header {
       display: flex;
@@ -91,6 +93,20 @@ export class ScModelsView extends GatewayAwareLitElement {
     }
     .key-status.missing {
       color: var(--sc-error);
+    }
+    .key-status svg {
+      width: 14px;
+      height: 14px;
+    }
+    @media (max-width: 768px) {
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 480px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
     }
   `;
 
@@ -135,7 +151,7 @@ export class ScModelsView extends GatewayAwareLitElement {
     if (this.loading) {
       return html`
         <h2>Models & Providers</h2>
-        <div class="grid">
+        <div class="grid sc-stagger">
           <sc-skeleton variant="card" height="80px"></sc-skeleton>
           <sc-skeleton variant="card" height="80px"></sc-skeleton>
           <sc-skeleton variant="card" height="80px"></sc-skeleton>
@@ -148,13 +164,13 @@ export class ScModelsView extends GatewayAwareLitElement {
       ${
         this.error
           ? html`<sc-empty-state
-              icon="⚠️"
+              .icon=${icons.warning}
               heading="Error"
               description=${this.error}
             ></sc-empty-state>`
           : nothing
       }
-      <sc-card style="margin-bottom: var(--sc-space-lg);">
+      <sc-card style="margin-bottom: var(--sc-space-2xl);">
         <div class="info-bar">
           <span class="info-item"
             ><strong>Default provider:</strong> ${this.defaultProvider || "—"}</span
@@ -162,12 +178,12 @@ export class ScModelsView extends GatewayAwareLitElement {
           <span class="info-item"><strong>Default model:</strong> ${this.defaultModel || "—"}</span>
         </div>
       </sc-card>
-      <div class="grid">
+      <div class="grid sc-stagger">
         ${
           this.providers.length === 0
             ? html`
                 <sc-empty-state
-                  icon="🤖"
+                  .icon=${icons.cpu}
                   heading="No providers configured"
                   description="Configure an AI provider in your config to get started."
                 ></sc-empty-state>
@@ -185,7 +201,11 @@ export class ScModelsView extends GatewayAwareLitElement {
                         : nothing}
                     </div>
                     <div class="key-status ${p.has_key ? "has" : "missing"}">
-                      ${p.has_key ? "✓ API key" : "✗ No API key"}
+                      <span
+                        style="width:14px;height:14px;display:inline-block;vertical-align:middle"
+                        >${p.has_key ? icons.check : icons["x-circle"]}</span
+                      >
+                      ${p.has_key ? " API key" : " No API key"}
                     </div>
                     <div class="card-url" title=${p.base_url ?? ""}>
                       ${this.truncateUrl(p.base_url)}

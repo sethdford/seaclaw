@@ -2,6 +2,7 @@ import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { formatRelative } from "../utils.js";
+import { icons } from "../icons.js";
 import "../components/sc-card.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
@@ -26,12 +27,13 @@ export class ScSessionsView extends GatewayAwareLitElement {
     :host {
       display: block;
       color: var(--sc-text);
+      max-width: 960px;
     }
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: var(--sc-space-md);
+      margin-bottom: var(--sc-space-xl);
     }
     h2 {
       margin: 0;
@@ -40,7 +42,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
     }
     .layout {
       display: flex;
-      gap: var(--sc-space-md);
+      gap: var(--sc-space-xl);
       height: calc(100vh - 200px);
     }
     .session-list {
@@ -256,7 +258,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
       </div>
       ${this.error
         ? html`<sc-empty-state
-            icon="⚠️"
+            .icon=${icons.warning}
             heading="Error"
             description=${this.error}
           ></sc-empty-state>`
@@ -264,7 +266,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
       ${this.loading
         ? html`
             <div class="layout">
-              <div class="session-list">
+              <div class="session-list sc-stagger">
                 <sc-skeleton variant="card" height="72px"></sc-skeleton>
                 <sc-skeleton variant="card" height="72px"></sc-skeleton>
                 <sc-skeleton variant="card" height="72px"></sc-skeleton>
@@ -279,11 +281,11 @@ export class ScSessionsView extends GatewayAwareLitElement {
           `
         : html`
             <div class="layout">
-              <div class="session-list">
+              <div class="session-list sc-stagger">
                 ${this.sessions.length === 0
                   ? html`
                       <sc-empty-state
-                        icon="💬"
+                        .icon=${icons["message-square"]}
                         heading="No conversations yet"
                         description="Start a chat to see your conversation history here."
                       ></sc-empty-state>

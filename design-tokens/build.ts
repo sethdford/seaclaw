@@ -551,6 +551,28 @@ function generateCSS(tokens: TokenMap): string {
   lines.push("}");
   lines.push("");
 
+  // data-theme selectors for catalog theme toggle (same tokens as :root / @media)
+  lines.push('[data-theme="dark"] {');
+  lines.push("  /* Dark theme — explicit override for theme switcher */");
+  for (const k of darkKeys.sort()) {
+    const v = tokens[k];
+    if (v == null) continue;
+    const name = k.replace("dark.", "").replace(/-/g, "-");
+    lines.push(`  --sc-${name}: ${v};`);
+  }
+  lines.push("}");
+  lines.push("");
+  lines.push('[data-theme="light"] {');
+  lines.push("  /* Light theme — explicit override for theme switcher */");
+  for (const k of lightKeys.sort()) {
+    const v = tokens[k];
+    if (v == null) continue;
+    const name = k.replace("light.", "").replace(/-/g, "-");
+    lines.push(`  --sc-${name}: ${v};`);
+  }
+  lines.push("}");
+  lines.push("");
+
   // High-contrast theme
   const highContrastKeys = Object.keys(tokens).filter((k) =>
     k.startsWith("high-contrast."),

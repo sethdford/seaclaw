@@ -1,6 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
+import { icons } from "../icons.js";
 import "../components/sc-card.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
@@ -21,11 +22,12 @@ export class ScChannelsView extends GatewayAwareLitElement {
   static override styles = css`
     :host {
       display: block;
+      max-width: 1200px;
     }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: var(--sc-space-md);
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--sc-space-xl);
     }
     .grid-full {
       grid-column: 1 / -1;
@@ -42,9 +44,11 @@ export class ScChannelsView extends GatewayAwareLitElement {
       color: var(--sc-text);
     }
     .status-dot {
+      display: inline-block;
       width: 8px;
       height: 8px;
       border-radius: 50%;
+      margin-right: var(--sc-space-xs);
     }
     .status-dot.healthy {
       background: var(--sc-success);
@@ -53,7 +57,7 @@ export class ScChannelsView extends GatewayAwareLitElement {
       background: var(--sc-error);
     }
     .status-dot.unconfigured {
-      background: var(--sc-text-muted);
+      background: var(--sc-text-faint);
     }
     .card-info {
       font-size: var(--sc-text-sm);
@@ -61,6 +65,16 @@ export class ScChannelsView extends GatewayAwareLitElement {
     }
     .card-info .error {
       color: var(--sc-error);
+    }
+    @media (max-width: 768px) {
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 480px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
     }
   `;
 
@@ -92,7 +106,8 @@ export class ScChannelsView extends GatewayAwareLitElement {
   }
 
   private dotClass(ch: ChannelStatus): string {
-    if (ch.healthy === true) return "healthy";
+    if (ch.healthy === true || ch.configured === true) return "healthy";
+    if (ch.build_enabled === false) return "unconfigured";
     if (ch.configured === false || ch.status === "unconfigured") return "unconfigured";
     return "error";
   }
@@ -100,7 +115,7 @@ export class ScChannelsView extends GatewayAwareLitElement {
   override render() {
     if (this.loading) {
       return html`
-        <div class="grid">
+        <div class="grid sc-stagger">
           <sc-skeleton variant="card" height="80px"></sc-skeleton>
           <sc-skeleton variant="card" height="80px"></sc-skeleton>
           <sc-skeleton variant="card" height="80px"></sc-skeleton>
@@ -111,17 +126,17 @@ export class ScChannelsView extends GatewayAwareLitElement {
     return html`
       ${this.error
         ? html`<sc-empty-state
-            icon="⚠️"
+            .icon=${icons.warning}
             heading="Error"
             description=${this.error}
           ></sc-empty-state>`
         : nothing}
-      <div class="grid">
+      <div class="grid sc-stagger">
         ${this.channels.length === 0
           ? html`
               <div class="grid-full">
                 <sc-empty-state
-                  icon="📡"
+                  .icon=${icons.radio}
                   heading="No channels configured"
                   description="Configure messaging channels to receive and send messages."
                 ></sc-empty-state>

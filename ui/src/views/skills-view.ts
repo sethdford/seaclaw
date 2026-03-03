@@ -1,6 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
+import { icons } from "../icons.js";
 import "../components/sc-card.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
@@ -18,12 +19,13 @@ export class ScSkillsView extends GatewayAwareLitElement {
     :host {
       display: block;
       color: var(--sc-text);
+      max-width: 1200px;
     }
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: var(--sc-space-md);
+      margin-bottom: var(--sc-space-xl);
       flex-wrap: wrap;
       gap: var(--sc-space-md);
     }
@@ -44,13 +46,13 @@ export class ScSkillsView extends GatewayAwareLitElement {
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius);
       color: var(--sc-text);
-      font-size: 0.875rem;
+      font-size: var(--sc-text-sm);
       width: 200px;
     }
     .skills-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: var(--sc-space-md);
+      gap: var(--sc-space-xl);
     }
     .skill-card-inner {
       display: flex;
@@ -78,7 +80,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
       background: var(--sc-border);
       border-radius: 12px;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background var(--sc-duration-fast);
     }
     .toggle.enabled {
       background: var(--sc-accent);
@@ -92,7 +94,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
       height: 20px;
       background: white;
       border-radius: 50%;
-      transition: transform 0.2s;
+      transition: transform var(--sc-duration-fast);
     }
     .toggle.enabled::after {
       transform: translateX(20px);
@@ -103,6 +105,19 @@ export class ScSkillsView extends GatewayAwareLitElement {
     }
     .grid-full {
       grid-column: 1 / -1;
+    }
+    @media (max-width: 768px) {
+      .skills-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 480px) {
+      .skills-grid {
+        grid-template-columns: 1fr;
+      }
+      .install-row input {
+        width: 100%;
+      }
     }
   `;
 
@@ -188,14 +203,14 @@ export class ScSkillsView extends GatewayAwareLitElement {
       </div>
       ${this.error
         ? html`<sc-empty-state
-            icon="⚠️"
+            .icon=${icons.warning}
             heading="Error"
             description=${this.error}
           ></sc-empty-state>`
         : nothing}
       ${this.loading
         ? html`
-            <div class="skills-grid">
+            <div class="skills-grid sc-stagger">
               <sc-skeleton variant="card" height="100px"></sc-skeleton>
               <sc-skeleton variant="card" height="100px"></sc-skeleton>
               <sc-skeleton variant="card" height="100px"></sc-skeleton>
@@ -203,10 +218,10 @@ export class ScSkillsView extends GatewayAwareLitElement {
           `
         : this.skills.length === 0
           ? html`
-              <div class="skills-grid">
+              <div class="skills-grid sc-stagger">
                 <div class="grid-full">
                   <sc-empty-state
-                    icon="🧩"
+                    .icon=${icons.puzzle}
                     heading="No skills installed"
                     description="Install skills to extend your agent's capabilities."
                   ></sc-empty-state>
@@ -214,7 +229,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
               </div>
             `
           : html`
-              <div class="skills-grid">
+              <div class="skills-grid sc-stagger">
                 ${this.skills.map(
                   (skill) => html`
                     <sc-card>

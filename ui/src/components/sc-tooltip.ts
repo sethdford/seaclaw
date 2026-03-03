@@ -22,7 +22,7 @@ export class ScTooltip extends LitElement {
       background: var(--sc-bg-overlay);
       color: var(--sc-text);
       font-size: var(--sc-text-xs);
-      padding: 0.25rem 0.5rem;
+      padding: var(--sc-space-xs) var(--sc-space-sm);
       border-radius: var(--sc-radius-sm);
       box-shadow: var(--sc-shadow-md);
       pointer-events: none;
@@ -43,28 +43,28 @@ export class ScTooltip extends LitElement {
       bottom: 100%;
       left: 50%;
       transform: translateX(-50%);
-      margin-bottom: 4px;
+      margin-bottom: var(--sc-space-xs);
     }
 
     .tip.bottom {
       top: 100%;
       left: 50%;
       transform: translateX(-50%);
-      margin-top: 4px;
+      margin-top: var(--sc-space-xs);
     }
 
     .tip.left {
       right: 100%;
       top: 50%;
       transform: translateY(-50%);
-      margin-right: 4px;
+      margin-right: var(--sc-space-xs);
     }
 
     .tip.right {
       left: 100%;
       top: 50%;
       transform: translateY(-50%);
-      margin-left: 4px;
+      margin-left: var(--sc-space-xs);
     }
   `;
 

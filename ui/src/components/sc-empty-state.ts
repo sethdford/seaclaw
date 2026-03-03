@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 @customElement("sc-empty-state")
@@ -10,12 +10,22 @@ export class ScEmptyState extends LitElement {
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: var(--sc-space-2xl) var(--sc-space-lg);
+      padding: var(--sc-space-2xl) var(--sc-space-xl);
     }
 
     .icon {
-      font-size: 2.5rem;
+      width: 3.5rem;
+      height: 3.5rem;
       margin-bottom: var(--sc-space-md);
+      color: var(--sc-text-faint);
+      animation:
+        sc-fade-in var(--sc-duration-normal) var(--sc-ease-out) both,
+        sc-slide-up var(--sc-duration-normal) var(--sc-ease-out) both;
+    }
+
+    .icon svg {
+      width: 100%;
+      height: 100%;
     }
 
     .heading {
@@ -37,15 +47,15 @@ export class ScEmptyState extends LitElement {
     }
   `;
 
-  @property({ type: String }) icon = "";
+  @property({ attribute: false }) icon: TemplateResult | null = null;
   @property({ type: String }) heading = "";
   @property({ type: String }) description = "";
 
   override render() {
     return html`
-      ${this.icon ? html`<div class="icon">${this.icon}</div>` : ""}
-      ${this.heading ? html`<h2 class="heading">${this.heading}</h2>` : ""}
-      ${this.description ? html`<p class="description">${this.description}</p>` : ""}
+      ${this.icon ? html`<div class="icon">${this.icon}</div>` : nothing}
+      ${this.heading ? html`<h2 class="heading">${this.heading}</h2>` : nothing}
+      ${this.description ? html`<p class="description">${this.description}</p>` : nothing}
       <div class="slot"><slot></slot></div>
     `;
   }
