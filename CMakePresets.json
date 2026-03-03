@@ -1,0 +1,126 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default (CLI only)",
+      "description": "Default build — CLI channel, core tools, SQLite memory. ~398 KB release binary.",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "SC_ENABLE_CLI": "ON",
+        "SC_ENABLE_SQLITE": "ON",
+        "SC_ENABLE_CURL": "ON",
+        "SC_ENABLE_TLS": "ON"
+      }
+    },
+    {
+      "name": "minimal",
+      "displayName": "Minimal (smallest binary)",
+      "description": "Bare minimum — CLI channel, no optional tools, no tunnels, no peripherals.",
+      "binaryDir": "${sourceDir}/build-minimal",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "SC_ENABLE_LTO": "ON",
+        "SC_ENABLE_CLI": "ON",
+        "SC_ENABLE_SQLITE": "ON",
+        "SC_ENABLE_CURL": "ON",
+        "SC_ENABLE_TLS": "ON",
+        "SC_ENABLE_PERIPHERALS": "OFF",
+        "SC_ENABLE_TUNNELS": "OFF",
+        "SC_ENABLE_RUNTIME_EXOTIC": "OFF",
+        "SC_ENABLE_TOOLS_BROWSER": "OFF",
+        "SC_ENABLE_TOOLS_ADVANCED": "OFF",
+        "SC_ENABLE_OTEL": "OFF",
+        "SC_ENABLE_NONE_ENGINE": "OFF",
+        "SC_ENABLE_MARKDOWN_ENGINE": "OFF",
+        "SC_ENABLE_LUCID_ENGINE": "OFF",
+        "SC_ENABLE_LANCEDB_ENGINE": "OFF"
+      }
+    },
+    {
+      "name": "full",
+      "displayName": "Full (all features)",
+      "description": "Everything enabled — all channels, all tools, all engines, peripherals, tunnels.",
+      "binaryDir": "${sourceDir}/build-full",
+      "cacheVariables": {
+        "SC_ENABLE_ALL_CHANNELS": "ON",
+        "SC_ENABLE_SQLITE": "ON",
+        "SC_ENABLE_CURL": "ON",
+        "SC_ENABLE_TLS": "ON",
+        "SC_ENABLE_PERIPHERALS": "ON",
+        "SC_ENABLE_TUNNELS": "ON",
+        "SC_ENABLE_RUNTIME_EXOTIC": "ON",
+        "SC_ENABLE_TOOLS_BROWSER": "ON",
+        "SC_ENABLE_TOOLS_ADVANCED": "ON",
+        "SC_ENABLE_OTEL": "ON",
+        "SC_ENABLE_NONE_ENGINE": "ON",
+        "SC_ENABLE_MARKDOWN_ENGINE": "ON",
+        "SC_ENABLE_MEMORY_LRU_ENGINE": "ON",
+        "SC_ENABLE_LUCID_ENGINE": "ON",
+        "SC_ENABLE_LANCEDB_ENGINE": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release (optimized default)",
+      "description": "Default features with MinSizeRel + LTO for production deployment.",
+      "binaryDir": "${sourceDir}/build-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "SC_ENABLE_LTO": "ON",
+        "SC_ENABLE_CLI": "ON",
+        "SC_ENABLE_SQLITE": "ON",
+        "SC_ENABLE_CURL": "ON",
+        "SC_ENABLE_TLS": "ON"
+      }
+    },
+    {
+      "name": "dev",
+      "displayName": "Dev (ASan + all channels)",
+      "description": "Development build with AddressSanitizer and all channels for testing.",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "SC_ENABLE_ASAN": "ON",
+        "SC_ENABLE_ALL_CHANNELS": "ON",
+        "SC_ENABLE_SQLITE": "ON",
+        "SC_ENABLE_CURL": "ON",
+        "SC_ENABLE_TLS": "ON",
+        "SC_ENABLE_PERIPHERALS": "ON",
+        "SC_ENABLE_TUNNELS": "ON",
+        "SC_ENABLE_RUNTIME_EXOTIC": "ON",
+        "SC_ENABLE_TOOLS_BROWSER": "ON",
+        "SC_ENABLE_TOOLS_ADVANCED": "ON",
+        "SC_ENABLE_OTEL": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    },
+    {
+      "name": "minimal",
+      "configurePreset": "minimal"
+    },
+    {
+      "name": "full",
+      "configurePreset": "full"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}

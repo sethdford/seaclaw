@@ -196,6 +196,8 @@ set(SC_CORE_SOURCES
     src/websocket/websocket.c
     src/net_security.c
     src/config.c
+    src/config_serialize.c
+    src/config_getters.c
     src/config_types.c
     src/config_mutator.c
     src/config_parse.c
