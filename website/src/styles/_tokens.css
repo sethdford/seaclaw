@@ -1,19 +1,57 @@
 /* Auto-generated from design-tokens/ — do not edit manually */
 :root {
   /* Base: Spacing */
-  --sc-space-xs: 0.25rem;
-  --sc-space-sm: 0.5rem;
-  --sc-space-md: 1rem;
-  --sc-space-lg: 1.5rem;
-  --sc-space-xl: 2rem;
   --sc-space-2xl: 3rem;
+  --sc-space-2xs: 0.125rem;
+  --sc-space-3xl: 4rem;
+  --sc-space-4xl: 5rem;
+  --sc-space-5xl: 6rem;
+  --sc-space-6xl: 8rem;
+  --sc-space-lg: 1.5rem;
+  --sc-space-md: 1rem;
+  --sc-space-sm: 0.5rem;
+  --sc-space-xl: 2rem;
+  --sc-space-xs: 0.25rem;
   /* Base: Radius */
   --sc-radius: 8px;
-  --sc-radius-sm: 4px;
-  --sc-radius-md: 8px;
-  --sc-radius-lg: 12px;
-  --sc-radius-xl: 16px;
+  --sc-radius-2xl: 24px;
   --sc-radius-full: 9999px;
+  --sc-radius-lg: 12px;
+  --sc-radius-md: 8px;
+  --sc-radius-none: 0;
+  --sc-radius-sm: 4px;
+  --sc-radius-xl: 16px;
+  /* Z-index */
+  --sc-z-base: 0;
+  --sc-z-dropdown: 1000;
+  --sc-z-modal: 1300;
+  --sc-z-modal-backdrop: 1200;
+  --sc-z-popover: 1400;
+  --sc-z-sticky: 1100;
+  --sc-z-toast: 1600;
+  --sc-z-tooltip: 1500;
+  /* Opacity */
+  --sc-opacity-disabled: 0.38;
+  --sc-opacity-dragged: 0.16;
+  --sc-opacity-focus: 0.12;
+  --sc-opacity-hover: 0.08;
+  --sc-opacity-overlay-heavy: 0.64;
+  --sc-opacity-overlay-light: 0.08;
+  --sc-opacity-overlay-medium: 0.32;
+  --sc-opacity-pressed: 0.12;
+  /* Elevation */
+  --sc-elevation-0: none;
+  --sc-elevation-1: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15);
+  --sc-elevation-2: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
+  --sc-elevation-3: 0 4px 8px 3px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.3);
+  --sc-elevation-4: 0 6px 10px 4px rgba(0,0,0,0.15), 0 2px 3px rgba(0,0,0,0.3);
+  --sc-elevation-5: 0 8px 12px 6px rgba(0,0,0,0.15), 0 4px 4px rgba(0,0,0,0.3);
+  /* Breakpoints */
+  --sc-breakpoint-2xl: 1536px;
+  --sc-breakpoint-lg: 1024px;
+  --sc-breakpoint-md: 768px;
+  --sc-breakpoint-sm: 640px;
+  --sc-breakpoint-xl: 1280px;
   /* Typography */
   --sc-font: 'Avenir', 'Avenir Next', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --sc-font-mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
@@ -23,6 +61,7 @@
   --sc-text-lg: 1rem;
   --sc-text-xl: 1.25rem;
   --sc-text-2xl: clamp(1.25rem, 3vw, 1.75rem);
+  --sc-text-3xl: clamp(1.5rem, 4vw, 2.25rem);
   --sc-text-hero: clamp(2rem, 5vw, 3.5rem);
   --sc-weight-light: 300;
   --sc-weight-normal: 400;
@@ -30,7 +69,9 @@
   --sc-weight-semibold: 600;
   --sc-weight-bold: 700;
   --sc-weight-black: 900;
+  --sc-leading-none: 1;
   --sc-leading-tight: 1.25;
+  --sc-leading-snug: 1.375;
   --sc-leading-normal: 1.5;
   --sc-leading-relaxed: 1.75;
   --sc-tracking-xs: 0.02em;
@@ -38,19 +79,107 @@
   --sc-tracking-base: 0em;
   --sc-tracking-lg: 0em;
   --sc-tracking-xl: -0.01em;
-  --sc-tracking-2xl: -0.01em;
-  --sc-tracking-hero: -0.02em;
+  --sc-tracking-2xl: -0.02em;
+  --sc-tracking-hero: -0.04em;
+  /* Type roles */
+  --sc-type-body-lg-size: 1rem;
+  --sc-type-body-lg-weight: 400;
+  --sc-type-body-lg-letter-spacing: 0em;
+  --sc-type-body-lg-line-height: 1.75;
+  --sc-type-body-md-size: 0.875rem;
+  --sc-type-body-md-weight: 400;
+  --sc-type-body-md-letter-spacing: 0em;
+  --sc-type-body-md-line-height: 1.5;
+  --sc-type-body-sm-size: 0.8125rem;
+  --sc-type-body-sm-weight: 400;
+  --sc-type-body-sm-letter-spacing: 0.01em;
+  --sc-type-body-sm-line-height: 1.5;
+  --sc-type-caption-size: 0.6875rem;
+  --sc-type-caption-weight: 400;
+  --sc-type-caption-letter-spacing: 0.02em;
+  --sc-type-caption-line-height: 1.5;
+  --sc-type-display-lg-size: clamp(2rem, 5vw, 3.5rem);
+  --sc-type-display-lg-weight: 900;
+  --sc-type-display-lg-letter-spacing: -0.04em;
+  --sc-type-display-lg-line-height: 1.25;
+  --sc-type-display-md-size: clamp(1.5rem, 4vw, 2.25rem);
+  --sc-type-display-md-weight: 700;
+  --sc-type-display-md-letter-spacing: -0.02em;
+  --sc-type-display-md-line-height: 1.25;
+  --sc-type-headline-lg-size: clamp(1.25rem, 3vw, 1.75rem);
+  --sc-type-headline-lg-weight: 700;
+  --sc-type-headline-lg-letter-spacing: -0.02em;
+  --sc-type-headline-lg-line-height: 1.375;
+  --sc-type-headline-md-size: 1.25rem;
+  --sc-type-headline-md-weight: 600;
+  --sc-type-headline-md-letter-spacing: -0.01em;
+  --sc-type-headline-md-line-height: 1.375;
+  --sc-type-headline-sm-size: 1rem;
+  --sc-type-headline-sm-weight: 600;
+  --sc-type-headline-sm-letter-spacing: 0em;
+  --sc-type-headline-sm-line-height: 1.375;
+  --sc-type-label-lg-size: 0.875rem;
+  --sc-type-label-lg-weight: 500;
+  --sc-type-label-lg-letter-spacing: 0em;
+  --sc-type-label-lg-line-height: 1.25;
+  --sc-type-label-md-size: 0.8125rem;
+  --sc-type-label-md-weight: 500;
+  --sc-type-label-md-letter-spacing: 0.01em;
+  --sc-type-label-md-line-height: 1.25;
+  --sc-type-label-sm-size: 0.6875rem;
+  --sc-type-label-sm-weight: 500;
+  --sc-type-label-sm-letter-spacing: 0.02em;
+  --sc-type-label-sm-line-height: 1.25;
+  --sc-type-title-lg-size: 1rem;
+  --sc-type-title-lg-weight: 500;
+  --sc-type-title-lg-letter-spacing: 0em;
+  --sc-type-title-lg-line-height: 1.5;
+  --sc-type-title-md-size: 0.875rem;
+  --sc-type-title-md-weight: 500;
+  --sc-type-title-md-letter-spacing: 0em;
+  --sc-type-title-md-line-height: 1.5;
+  --sc-type-title-sm-size: 0.8125rem;
+  --sc-type-title-sm-weight: 500;
+  --sc-type-title-sm-letter-spacing: 0.01em;
+  --sc-type-title-sm-line-height: 1.5;
+  /* Focus ring */
+  --sc-focus-ring: #f97066;
+  --sc-focus-ring-width: 2px;
+  --sc-focus-ring-offset: 2px;
+  /* Choreography */
+  --sc-stagger-delay: 50ms;
+  --sc-stagger-max: 300ms;
+  --sc-cascade-delay: 30ms;
+  --sc-cascade-max: 200ms;
+  /* Purpose-based motion */
+  --sc-emphasize-duration: 350ms;
+  --sc-emphasize-easing: cubic-bezier(0.2, 0, 0, 1);
+  --sc-enter-duration: 200ms;
+  --sc-enter-easing: cubic-bezier(0.16, 1, 0.3, 1);
+  --sc-exit-duration: 100ms;
+  --sc-exit-easing: cubic-bezier(0.55, 0, 1, 0.45);
+  --sc-move-duration: 200ms;
+  --sc-move-easing: cubic-bezier(0.65, 0, 0.35, 1);
+  --sc-page-enter-duration: 350ms;
+  --sc-page-enter-easing: cubic-bezier(0.16, 1, 0.3, 1);
+  --sc-page-exit-duration: 100ms;
+  --sc-page-exit-easing: cubic-bezier(0.55, 0, 1, 0.45);
+  --sc-shared-element-duration: 350ms;
+  --sc-shared-element-easing: linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001 85.9%, 1);
   /* Motion */
-  --sc-duration-instant: 50ms;
+  --sc-duration-instant: 0ms;
   --sc-duration-fast: 100ms;
   --sc-duration-normal: 200ms;
   --sc-duration-slow: 350ms;
   --sc-duration-slower: 500ms;
+  --sc-duration-slowest: 700ms;
   --sc-linear: linear;
   --sc-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --sc-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --sc-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
   --sc-spring-out: linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001 85.9%, 1);
+  --sc-spring-bounce: linear(0, 0.004, 0.016, 0.035 4%, 0.147 8%, 0.51 17.2%, 0.726 23.1%, 0.884 28.9%, 0.976 34%, 1.019 38.3%, 1.045 42.5%, 1.054 47.7%, 1.04 56.7%, 1.017 64.3%, 1.003 76%, 1);
+  --sc-emphasize: cubic-bezier(0.2, 0, 0, 1);
   --sc-transition: 150ms ease;
   --sc-spring-micro-stiffness: 400;
   --sc-spring-micro-damping: 30;
@@ -72,10 +201,21 @@
   --sc-bg-surface: #161616;
   --sc-border: #262626;
   --sc-border-subtle: #1e1e1e;
+  --sc-disabled-overlay: rgba(255, 255, 255, 0.04);
   --sc-error: #ef4444;
   --sc-error-dim: rgba(239, 68, 68, 0.15);
+  --sc-focus-ring: #f97066;
+  --sc-focus-ring-offset: 2px;
+  --sc-focus-ring-width: 2px;
+  --sc-hover-overlay: rgba(255, 255, 255, 0.08);
   --sc-info: #3b82f6;
   --sc-info-dim: rgba(59, 130, 246, 0.15);
+  --sc-link: #f97066;
+  --sc-link-active: #ff5c50;
+  --sc-link-hover: #fb8a82;
+  --sc-link-visited: #fb8a82;
+  --sc-on-accent: #18181b;
+  --sc-pressed-overlay: rgba(255, 255, 255, 0.12);
   --sc-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.08);
   --sc-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
   --sc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
@@ -84,16 +224,77 @@
   --sc-success-dim: rgba(34, 197, 94, 0.15);
   --sc-text: #ebebeb;
   --sc-text-faint: #525252;
-  --sc-text-muted: #737373;
+  --sc-text-muted: #8a8a8a;
   --sc-warning: #eab308;
   --sc-warning-dim: rgba(234, 179, 8, 0.15);
   /* Component tokens */
-  --sc-sidebar-width: 240px;
   --sc-sidebar-collapsed: 52px;
+  --sc-sidebar-width: 240px;
+  --sc-button-font-size: 0.8125rem;
+  --sc-button-font-weight: 500;
+  --sc-button-min-height: 36px;
+  --sc-button-padding-x: 1rem;
+  --sc-button-padding-y: 0.5rem;
+  --sc-button-radius: 8px;
+  --sc-card-padding: 1.5rem;
+  --sc-card-radius: 12px;
+  --sc-modal-max-width: 480px;
+  --sc-modal-padding: 2rem;
+  --sc-modal-radius: 16px;
+  --sc-badge-font-size: 0.6875rem;
+  --sc-badge-font-weight: 500;
+  --sc-badge-padding-x: 0.5rem;
+  --sc-badge-padding-y: 0.25rem;
+  --sc-badge-radius: 9999px;
+  --sc-toast-max-width: 400px;
+  --sc-toast-padding: 1rem;
+  --sc-toast-radius: 12px;
+  --sc-input-font-size: 0.875rem;
+  --sc-input-min-height: 40px;
+  --sc-input-padding-x: 0.5rem;
+  --sc-input-padding-y: 0.5rem;
+  --sc-input-radius: 8px;
+  --sc-tooltip-font-size: 0.6875rem;
+  --sc-tooltip-max-width: 280px;
+  --sc-tooltip-padding-x: 0.5rem;
+  --sc-tooltip-padding-y: 0.25rem;
+  --sc-tooltip-radius: 4px;
+  --sc-dropdown-item-padding-x: 0.5rem;
+  --sc-dropdown-item-padding-y: 0.25rem;
+  --sc-dropdown-item-radius: 4px;
+  --sc-dropdown-min-width: 180px;
+  --sc-dropdown-padding: 0.25rem;
+  --sc-dropdown-radius: 12px;
+  --sc-tabs-font-size: 0.8125rem;
+  --sc-tabs-font-weight: 500;
+  --sc-tabs-indicator-height: 2px;
+  --sc-tabs-padding-x: 1rem;
+  --sc-tabs-padding-y: 0.5rem;
+  --sc-avatar-font-size: 0.6875rem;
+  --sc-avatar-font-weight: 500;
+  --sc-avatar-size-lg: 48px;
+  --sc-avatar-size-md: 36px;
+  --sc-avatar-size-sm: 28px;
+  --sc-progress-height: 4px;
+  --sc-progress-radius: 9999px;
+  --sc-sheet-handle-height: 4px;
+  --sc-sheet-handle-width: 36px;
+  --sc-sheet-padding: 1.5rem;
+  --sc-sheet-radius: 16px;
+  --sc-command-palette-item-padding-x: 1rem;
+  --sc-command-palette-item-padding-y: 0.5rem;
+  --sc-command-palette-item-radius: 8px;
+  --sc-command-palette-max-width: 560px;
+  --sc-command-palette-padding: 0.5rem;
+  --sc-command-palette-radius: 16px;
+  --sc-floating-action-button-icon-size: 24px;
+  --sc-floating-action-button-radius: 16px;
+  --sc-floating-action-button-size: 56px;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
+    /* Light theme — state/interactive tokens */
     --sc-accent: #e11d48;
     --sc-accent-hover: #be123c;
     --sc-accent-strong: #f43f5e;
@@ -105,10 +306,21 @@
     --sc-bg-surface: #ffffff;
     --sc-border: #e4e4e7;
     --sc-border-subtle: #f4f4f5;
+    --sc-disabled-overlay: rgba(0, 0, 0, 0.04);
     --sc-error: #dc2626;
     --sc-error-dim: rgba(220, 38, 38, 0.1);
+    --sc-focus-ring: #e11d48;
+    --sc-focus-ring-offset: 2px;
+    --sc-focus-ring-width: 2px;
+    --sc-hover-overlay: rgba(0, 0, 0, 0.04);
     --sc-info: #2563eb;
     --sc-info-dim: rgba(37, 99, 235, 0.1);
+    --sc-link: #e11d48;
+    --sc-link-active: #f43f5e;
+    --sc-link-hover: #be123c;
+    --sc-link-visited: #be123c;
+    --sc-on-accent: #ffffff;
+    --sc-pressed-overlay: rgba(0, 0, 0, 0.08);
     --sc-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.03), 0 4px 16px rgba(0, 0, 0, 0.06);
     --sc-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
     --sc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -120,5 +332,47 @@
     --sc-text-muted: #71717a;
     --sc-warning: #ca8a04;
     --sc-warning-dim: rgba(202, 138, 4, 0.1);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --sc-accent: #ff6b6b;
+    --sc-accent-hover: #ff8787;
+    --sc-accent-strong: #ff4040;
+    --sc-accent-subtle: rgba(255, 107, 107, 0.2);
+    --sc-bg: #000000;
+    --sc-bg-elevated: #161616;
+    --sc-bg-inset: #000000;
+    --sc-bg-overlay: #1e1e1e;
+    --sc-bg-surface: #111111;
+    --sc-border: #a1a1aa;
+    --sc-border-subtle: #525252;
+    --sc-error: #f87171;
+    --sc-error-dim: rgba(248, 113, 113, 0.2);
+    --sc-focus-ring: #ffffff;
+    --sc-focus-ring-offset: 2px;
+    --sc-focus-ring-width: 3px;
+    --sc-info: #60a5fa;
+    --sc-info-dim: rgba(96, 165, 250, 0.2);
+    --sc-on-accent: #000000;
+    --sc-success: #4ade80;
+    --sc-success-dim: rgba(74, 222, 128, 0.2);
+    --sc-text: #ffffff;
+    --sc-text-faint: #a1a1aa;
+    --sc-text-muted: #e4e4e7;
+    --sc-warning: #fde047;
+    --sc-warning-dim: rgba(253, 224, 71, 0.2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --sc-duration-instant: 0ms;
+    --sc-duration-fast: 0ms;
+    --sc-duration-normal: 0ms;
+    --sc-duration-slow: 0ms;
+    --sc-duration-slower: 0ms;
+    --sc-duration-slowest: 0ms;
   }
 }

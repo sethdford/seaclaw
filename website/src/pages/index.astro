@@ -73,6 +73,7 @@ const tools = [
     })} />
   </head>
   <body style="background: var(--color-bg); color: var(--color-text);" class="antialiased overflow-x-hidden">
+    <div class="scroll-progress" id="scroll-progress"></div>
     <a href="#main-content" class="skip-link">Skip to content</a>
     <Nav />
 
@@ -80,17 +81,18 @@ const tools = [
 
     {/* ═══ HERO ═══ */}
 
-    <section class="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24">
+    <section class="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 overflow-hidden">
+      <div class="hero-gradient noise-overlay"></div>
       <div class="ambient-coral" style="top: 15%; left: 50%; transform: translateX(-50%);"></div>
       <div class="ambient-blue" style="top: 30%; right: 10%;"></div>
-      <div class="hero-content text-center max-w-3xl mx-auto">
+      <div class="hero-content text-center max-w-3xl mx-auto relative z-10">
         <img
           src={`${base}seaclaw.svg`}
           alt="SeaClaw logo"
           class="hero-logo w-20 h-20 md:w-24 md:h-24 mx-auto mb-10 opacity-0"
           style={`filter: drop-shadow(0 0 40px var(--color-accent-glow)); animation: float 6s ease-in-out infinite;`}
         />
-        <h1 class="hero-headline font-sans font-black text-[clamp(2.5rem,7vw,4.5rem)] leading-[1.05] mb-6 opacity-0" style="color: var(--color-text); letter-spacing: -0.04em;">
+        <h1 class="hero-headline font-sans font-black text-[clamp(2.5rem,7vw,4.5rem)] leading-[1.05] mb-6 opacity-0" style="color: var(--color-text); letter-spacing: -0.04em; font-weight: 900;">
           Bring AI to every device on&nbsp;Earth.
         </h1>
         <p class="hero-desc text-[clamp(1.05rem,2.2vw,1.3rem)] leading-relaxed mb-10 opacity-0 max-w-2xl mx-auto" style="color: var(--color-text-secondary)">
@@ -168,7 +170,7 @@ const tools = [
             { icon: iconCircuitBoard, title: "Edge", desc: "Raspberry Pi, ARM SBCs. Under 5 MB RAM. Under 2 ms startup. Runs headless on boot." },
             { icon: iconCpu, title: "Embedded", desc: "Arduino, STM32, Nucleo. Serial JSON protocol. Hardware peripherals via vtable interface." },
           ].map(({ icon, title, desc }) => (
-            <div class="spectrum-card opacity-0 glass px-6 py-8 text-center transition-all duration-300 hover:-translate-y-1" style={`--tw-shadow: var(--shadow-md);`}>
+            <div class="spectrum-card card-glow opacity-0 glass px-6 py-8 text-center transition-all duration-300 hover:-translate-y-1" style={`--tw-shadow: var(--shadow-md);`}>
               <span class="w-8 h-8 mx-auto mb-4 flex items-center justify-center [&>svg]:flex-shrink-0" style="color: var(--color-text-tertiary)" set:html={icon} />
               <h3 class="text-lg font-semibold mb-3" style="color: var(--color-text)">{title}</h3>
               <p class="text-[14px] leading-relaxed" style="color: var(--color-text-secondary)">{desc}</p>
@@ -295,6 +297,34 @@ const tools = [
         <div class="cta-buttons flex flex-col sm:flex-row gap-4 justify-center opacity-0">
           <a href={`${base}getting-started/installation/`} class="btn-primary">Get Started</a>
           <a href="https://github.com/sethdford/seaclaw" target="_blank" rel="noopener noreferrer" class="btn-outline">View on GitHub</a>
+        </div>
+      </div>
+    </section>
+
+    {/* ═══ COMPARISON ═══ */}
+
+    <section class="py-16 md:py-24 relative">
+      <div class="max-w-5xl mx-auto px-4">
+        <h2 class="text-2xl md:text-3xl font-bold text-center mb-12" style="font-weight: 900;">How SeaClaw Compares</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm comparison-table" style="border-collapse: separate; border-spacing: 0;">
+            <thead>
+              <tr>
+                <th class="text-left p-3">Feature</th>
+                <th class="p-3" style="color: var(--color-accent, #f97066);">SeaClaw</th>
+                <th class="p-3 opacity-60">Claude Code</th>
+                <th class="p-3 opacity-60">OpenAI Codex</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="p-3">Language</td><td class="p-3 text-center font-medium" style="color: var(--color-accent, #f97066);">C</td><td class="p-3 text-center opacity-60">TypeScript</td><td class="p-3 text-center opacity-60">Rust</td></tr>
+              <tr><td class="p-3">Binary Size</td><td class="p-3 text-center font-medium" style="color: var(--color-accent, #f97066);">366 KB</td><td class="p-3 text-center opacity-60">~200 MB</td><td class="p-3 text-center opacity-60">~50 MB</td></tr>
+              <tr><td class="p-3">Peak RAM</td><td class="p-3 text-center font-medium" style="color: var(--color-accent, #f97066);">&lt;6 MB</td><td class="p-3 text-center opacity-60">~300 MB</td><td class="p-3 text-center opacity-60">~100 MB</td></tr>
+              <tr><td class="p-3">Dependencies</td><td class="p-3 text-center font-medium" style="color: var(--color-accent, #f97066);">0</td><td class="p-3 text-center opacity-60">900+</td><td class="p-3 text-center opacity-60">200+</td></tr>
+              <tr><td class="p-3">Providers</td><td class="p-3 text-center font-medium" style="color: var(--color-accent, #f97066);">50+</td><td class="p-3 text-center opacity-60">1</td><td class="p-3 text-center opacity-60">1</td></tr>
+              <tr><td class="p-3">Channels</td><td class="p-3 text-center font-medium" style="color: var(--color-accent, #f97066);">17</td><td class="p-3 text-center opacity-60">1</td><td class="p-3 text-center opacity-60">1</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -536,6 +566,17 @@ const tools = [
           gsap.fromTo(".cta-buttons", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.9, ease: "power3.out", scrollTrigger: { trigger: ".cta-buttons", start: "top 85%" } });
 
         });
+      }
+    </script>
+    <script>
+      const bar = document.getElementById("scroll-progress");
+      if (bar) {
+        const update = () => {
+          const h = document.documentElement.scrollHeight - window.innerHeight;
+          bar.style.transform = `scaleX(${h > 0 ? window.scrollY / h : 0})`;
+        };
+        update();
+        window.addEventListener("scroll", update, { passive: true });
       }
     </script>
   </body>

@@ -14,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import ai.seaclaw.app.GatewayManager
 
 @Composable
@@ -24,7 +23,7 @@ fun SettingsScreen(gatewayManager: GatewayManager) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
+            .padding(SCTokens.spaceMd)
     ) {
         OutlinedTextField(
             value = url,
@@ -36,13 +35,13 @@ fun SettingsScreen(gatewayManager: GatewayManager) {
         )
         Text(
             text = "WebSocket URL, e.g. wss://10.0.2.2:3000/ws",
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = SCTokens.spaceSm),
             style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
             color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
         )
         Button(
             onClick = { gatewayManager.reconnect() },
-            modifier = Modifier.padding(top = 16.dp)
+            modifier = Modifier.padding(top = SCTokens.spaceMd)
         ) {
             Text("Reconnect")
         }

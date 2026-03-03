@@ -3,89 +3,137 @@ import SeaClawChatUI
 import SeaClawProtocol
 
 struct ChatView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var connectionManager: ConnectionManager
     @State private var messages: [ChatMessage] = []
     @State private var inputText = ""
     @State private var toolCalls: [ToolCallInfo] = []
     @State private var errorBanner: String?
+    @State private var sendTrigger: Int = 0
+
+    private var tokens: (bgSurface: Color, error: Color, errorDim: Color, success: Color) {
+        if colorScheme == .dark {
+            return (SCTokens.Dark.bgSurface, SCTokens.Dark.error, SCTokens.Dark.errorDim, SCTokens.Dark.success)
+        } else {
+            return (SCTokens.Light.bgSurface, SCTokens.Light.error, SCTokens.Light.errorDim, SCTokens.Light.success)
+        }
+    }
+
+    private let messageTransition = AnyTransition.asymmetric(
+        insertion: .move(edge: .bottom).combined(with: .opacity),
+        removal: .opacity
+    )
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: SCTokens.spaceMd) {
-                            ForEach(messages) { msg in
-                                ChatBubble(text: msg.text, role: msg.role)
-                                    .id(msg.id)
-                            }
-                            ForEach(toolCalls) { tc in
-                                ToolCallCard(
-                                    name: tc.name,
-                                    arguments: tc.arguments,
-                                    status: tc.status,
-                                    result: tc.result
-                                )
-                                .id(tc.id)
-                            }
-                        }
-                        .padding()
+            mainContent
+                .navigationTitle("Chat")
+                .toolbar { toolbarContent }
+                .onAppear {
+                    connectionManager.setEventHandler { event, payload in
+                        handleEvent(event, payload: payload)
                     }
-                    .onChange(of: messages.count) { _, _ in
-                        if let last = messages.last {
-                            withAnimation(SCTokens.springExpressive) { proxy.scrollTo(last.id, anchor: .bottom) }
-                        }
-                    }
+                    connectionManager.connect()
                 }
+        }
+    }
 
-                if let err = errorBanner {
-                    HStack {
-                        Text(err)
-                            .font(.caption)
-                            .foregroundStyle(SCTokens.Dark.error)
-                        Spacer()
-                        Button("Dismiss") { errorBanner = nil }
-                            .font(.caption)
+    @ViewBuilder
+    private var mainContent: some View {
+        VStack(spacing: 0) {
+            messageList
+            if let err = errorBanner { errorBannerView(err) }
+            ChatInputBar(text: $inputText, onSend: { sendMessage() }, sendTrigger: sendTrigger)
+                .background(tokens.bgSurface)
+        }
+    }
+
+    @ViewBuilder
+    private var messageList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: SCTokens.spaceMd) {
+                    ForEach(messages) { msg in
+                        ChatBubble(text: msg.text, role: msg.role)
+                            .id(msg.id)
+                            .transition(messageTransition)
+                            .accessibilityLabel(msg.text)
                     }
-                    .padding(SCTokens.spaceSm)
-                    .background(SCTokens.Dark.errorDim)
-                    .cornerRadius(SCTokens.radiusMd)
-                }
-                ChatInputBar(text: $inputText) {
-                    sendMessage()
-                }
-                .background(Color(white: 1))
-            }
-            .navigationTitle("Chat")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                        HStack(spacing: SCTokens.spaceSm) {
-                        Circle()
-                            .fill(connectionManager.isConnected ? SCTokens.Dark.success : SCTokens.Dark.error)
-                            .frame(width: 8, height: 8)
-                        if connectionManager.isConnected {
-                            Text("Connected")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                    ForEach(toolCalls) { tc in
+                        ToolCallCard(name: tc.name, arguments: tc.arguments, status: tc.status, result: tc.result)
+                            .id(tc.id)
+                            .transition(messageTransition)
                     }
                 }
+                .animation(.spring(response: 0.35, dampingFraction: 0.7), value: messages.count + toolCalls.count)
+                .padding()
             }
-            .onAppear {
-                connectionManager.setEventHandler { event, payload in
-                    handleEvent(event, payload: payload)
+            .onChange(of: messages.count) { _, _ in
+                if let last = messages.last {
+                    withAnimation(SCTokens.springExpressive) { proxy.scrollTo(last.id, anchor: .bottom) }
                 }
-                connectionManager.connect()
             }
+        }
+    }
+
+    @ViewBuilder
+    private func errorBannerView(_ err: String) -> some View {
+        HStack {
+            Text(err)
+                .font(.custom("Avenir-Book", size: SCTokens.textXs, relativeTo: .caption))
+                .foregroundStyle(tokens.error)
+            Spacer()
+            Button("Dismiss") { errorBanner = nil }
+                .font(.custom("Avenir-Book", size: SCTokens.textXs, relativeTo: .caption))
+        }
+        .padding(SCTokens.spaceSm)
+        .background(tokens.errorDim)
+        .cornerRadius(SCTokens.radiusMd)
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            HStack(spacing: SCTokens.spaceSm) {
+                connectionIndicator
+                if connectionManager.isConnected {
+                    Text("Connected")
+                        .font(.custom("Avenir-Book", size: SCTokens.textXs, relativeTo: .caption))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var connectionIndicator: some View {
+        if #available(iOS 17, *) {
+            Image(systemName: connectionManager.isConnected ? "antenna.radiowaves.left.and.right" : "wifi.slash")
+                .font(.caption)
+                .foregroundStyle(connectionManager.isConnected ? tokens.success : tokens.error)
+                .contentTransition(.symbolEffect(.replace))
+        } else {
+            Circle()
+                .fill(connectionManager.isConnected ? tokens.success : tokens.error)
+                .frame(width: 8, height: 8)
         }
     }
 
     private func sendMessage() {
         let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        inputText = ""
 
-        messages.append(ChatMessage(id: UUID(), text: trimmed, role: .user))
+#if os(iOS)
+        let impact = UIImpactFeedbackGenerator(style: .light)
+        impact.impactOccurred()
+#endif
+
+        inputText = ""
+        sendTrigger += 1
+
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+            messages.append(ChatMessage(id: UUID(), text: trimmed, role: .user))
+        }
 
         Task {
             do {
@@ -95,11 +143,13 @@ struct ChatView: View {
                 )
             } catch {
                 await MainActor.run {
-                    messages.append(ChatMessage(
-                        id: UUID(),
-                        text: "Failed to send: \(error.localizedDescription)",
-                        role: .assistant
-                    ))
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                        messages.append(ChatMessage(
+                            id: UUID(),
+                            text: "Failed to send: \(error.localizedDescription)",
+                            role: .assistant
+                        ))
+                    }
                 }
             }
         }
@@ -117,21 +167,23 @@ struct ChatView: View {
                 let state = payload?["state"]?.value as? String
                 let content = payload?["message"]?.value as? String
                 if let content = content, !content.isEmpty {
-                    switch state {
-                    case "received":
-                        messages.append(ChatMessage(id: UUID(), text: content, role: .user))
-                    case "sent":
-                        messages.append(ChatMessage(id: UUID(), text: content, role: .assistant))
-                    case "chunk":
-                        if let last = messages.last, last.role == .assistant {
-                            messages[messages.count - 1] = ChatMessage(
-                                id: last.id, text: last.text + content, role: .assistant
-                            )
-                        } else {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                        switch state {
+                        case "received":
+                            messages.append(ChatMessage(id: UUID(), text: content, role: .user))
+                        case "sent":
                             messages.append(ChatMessage(id: UUID(), text: content, role: .assistant))
+                        case "chunk":
+                            if let last = messages.last, last.role == .assistant {
+                                messages[messages.count - 1] = ChatMessage(
+                                    id: last.id, text: last.text + content, role: .assistant
+                                )
+                            } else {
+                                messages.append(ChatMessage(id: UUID(), text: content, role: .assistant))
+                            }
+                        default:
+                            break
                         }
-                    default:
-                        break
                     }
                 }
             case "agent.tool":
@@ -139,23 +191,25 @@ struct ChatView: View {
                 let args = (payload?["arguments"]?.value as? [String: Any])
                     .flatMap { try? JSONSerialization.data(withJSONObject: $0) }
                     .flatMap { String(data: $0, encoding: .utf8) }
-                if let ok = payload?["success"]?.value as? Bool, !toolCalls.isEmpty {
-                    let idx = toolCalls.count - 1
-                    let result = (payload?["detail"]?.value ?? payload?["message"]?.value).map { "\($0)" }
-                    toolCalls[idx] = ToolCallInfo(
-                        id: toolCalls[idx].id,
-                        name: toolCalls[idx].name,
-                        arguments: toolCalls[idx].arguments,
-                        status: ok ? .completed : .failed,
-                        result: result
-                    )
-                } else {
-                    toolCalls.append(ToolCallInfo(
-                        id: UUID(),
-                        name: name,
-                        arguments: args,
-                        status: .running
-                    ))
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                    if let ok = payload?["success"]?.value as? Bool, !toolCalls.isEmpty {
+                        let idx = toolCalls.count - 1
+                        let result = (payload?["detail"]?.value ?? payload?["message"]?.value).map { "\($0)" }
+                        toolCalls[idx] = ToolCallInfo(
+                            id: toolCalls[idx].id,
+                            name: toolCalls[idx].name,
+                            arguments: toolCalls[idx].arguments,
+                            status: ok ? .completed : .failed,
+                            result: result
+                        )
+                    } else {
+                        toolCalls.append(ToolCallInfo(
+                            id: UUID(),
+                            name: name,
+                            arguments: args,
+                            status: .running
+                        ))
+                    }
                 }
             default:
                 break

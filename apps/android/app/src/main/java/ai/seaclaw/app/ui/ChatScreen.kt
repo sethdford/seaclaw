@@ -1,5 +1,12 @@
 package ai.seaclaw.app.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.lazy.animateItemPlacement
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -35,7 +41,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import ai.seaclaw.app.ui.SCTokens
 import ai.seaclaw.app.GatewayClient
 import ai.seaclaw.app.GatewayManager
@@ -56,6 +61,12 @@ fun ChatScreen(gatewayManager: GatewayManager) {
 
     DisposableEffect(Unit) {
         onDispose { gatewayManager.disconnect() }
+    }
+
+    LaunchedEffect(messages.size, toolCalls.size) {
+        if (messages.isNotEmpty() || toolCalls.isNotEmpty()) {
+            listState.animateScrollToItem((messages.size + toolCalls.size - 1).coerceAtLeast(0))
+        }
     }
 
     LaunchedEffect(gatewayManager) {
@@ -147,15 +158,27 @@ fun ChatScreen(gatewayManager: GatewayManager) {
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(SCTokens.spaceSm)
         ) {
-            items(messages) { msg ->
-                ChatBubble(text = msg.text, role = msg.role)
+            itemsIndexed(messages, key = { index, _ -> "msg_$index" }) { _, msg ->
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(animationSpec = tween(SCTokens.durationNormal.toInt())) +
+                        slideInVertically(animationSpec = tween(SCTokens.durationNormal.toInt()), initialOffsetY = { it }),
+                    exit = fadeOut(animationSpec = tween(SCTokens.durationFast.toInt()))
+                ) {
+                    ChatBubble(
+                        text = msg.text,
+                        role = msg.role,
+                        modifier = Modifier.animateItemPlacement()
+                    )
+                }
             }
-            items(toolCalls) { tc ->
+            itemsIndexed(toolCalls, key = { index, _ -> "tc_$index" }) { _, tc ->
                 ToolCallCard(
                     name = tc.name,
                     arguments = tc.arguments,
                     status = tc.status,
-                    result = tc.result
+                    result = tc.result,
+                    modifier = Modifier.animateItemPlacement()
                 )
             }
         }
@@ -172,12 +195,12 @@ fun ChatScreen(gatewayManager: GatewayManager) {
                 modifier = Modifier
                     .weight(1f)
                     .padding(SCTokens.spaceMd)
-                    .height(48.dp),
+                    .height(SCTokens.space2xl),
                 decorationBox = { inner ->
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(4.dp),
+                            .padding(SCTokens.spaceXs),
                         contentAlignment = Alignment.CenterStart
                     ) {
                         if (inputText.isEmpty()) {
@@ -210,20 +233,24 @@ fun ChatScreen(gatewayManager: GatewayManager) {
 }
 
 @Composable
-private fun ChatBubble(text: String, role: Role) {
+private fun ChatBubble(
+    text: String,
+    role: Role,
+    modifier: Modifier = Modifier
+) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = if (role == Role.USER) Arrangement.End else Arrangement.Start
     ) {
         Card(
             colors = CardDefaults.cardColors(
-                containerColor = if (role == Role.USER) SCTokens.Dark.accent else MaterialTheme.colorScheme.surfaceVariant
+                containerColor = if (role == Role.USER) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
             ),
             shape = RoundedCornerShape(SCTokens.radiusXl)
         ) {
             Text(
                 text = text,
-                modifier = Modifier.padding(14.dp)
+                modifier = Modifier.padding(SCTokens.spaceMd)
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (role == Role.USER) Color.White else MaterialTheme.colorScheme.onSurface
             )
@@ -236,9 +263,11 @@ private fun ToolCallCard(
     name: String,
     arguments: String?,
     status: ToolStatus,
-    result: String?
+    result: String?,
+    modifier: Modifier = Modifier
 ) {
     Card(
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(SCTokens.radiusLg)
     ) {
@@ -247,16 +276,19 @@ private fun ToolCallCard(
                 Text(name, style = MaterialTheme.typography.titleSmall)
                 Spacer(modifier = Modifier.weight(1f))
                 if (status == ToolStatus.RUNNING) {
-                    CircularProgressIndicator(modifier = Modifier.height(20.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(
+                        modifier = Modifier.height(SCTokens.spaceMd),
+                        strokeWidth = SCTokens.radiusSm
+                    )
                 }
             }
             if (!arguments.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(SCTokens.spaceXs))
-                Text(arguments, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text(arguments, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (!result.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(SCTokens.spaceXs))
-                Text(result, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text(result, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
