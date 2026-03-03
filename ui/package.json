@@ -17,12 +17,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test"
   },
   "dependencies": {
     "lit": "^3.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.0.2",
     "happy-dom": "^20.8.3",
