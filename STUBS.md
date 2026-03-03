@@ -4,30 +4,28 @@ Last updated: 2026-03-03
 
 ## Summary
 
-| Metric                         | Value                  |
-| ------------------------------ | ---------------------- |
-| Source files (src/ + include/) | **463**                |
-| Lines of C/H code              | **76,314**             |
-| Test files                     | **72**                 |
-| Tests passing                  | **2,168/2,168 (100%)** |
-| Binary size (MinSizeRel + LTO) | **366 KB**             |
-| Cold-start time                | **6–27 ms avg**        |
-| Peak RSS (--version)           | **~5.7 MB**            |
-| Test throughput                | **1,050+ tests/sec**   |
+| Metric                         | Value              |
+| ------------------------------ | ------------------ |
+| Source files (src/ + include/) | **463**            |
+| Lines of C/H code              | **~56K**           |
+| Test files                     | 72                 |
+| Tests passing                  | **2168/2168 (100%)** |
+| Binary size (MinSizeRel+LTO)  | **381 KB**         |
+| SeaClaw module parity          | **100%**           |
 
 ## Module Parity with SeaClaw
 
-| Subsystem        | Zig Ref | SeaClaw | Status                       |
-| ---------------- | ------- | ------- | ---------------------------- |
-| Providers        | 18      | 18      | **Full parity**              |
-| Channels         | 20      | 20      | **Full parity**              |
-| Tools            | 36      | 54      | **Full parity** (+18 extras) |
-| Security         | 11      | 13      | **Full parity** (+2 extras)  |
-| Agent            | 8       | 11      | **Full parity** (+3 extras)  |
-| Memory Engines   | 10      | 10      | **Full parity**              |
-| Memory Lifecycle | 8       | 8       | **Full parity**              |
-| Memory Retrieval | 8       | 10      | **Full parity** (+2 extras)  |
-| Memory Vector    | 12      | 15      | **Full parity** (+3 extras)  |
+| Subsystem        | Zig Ref | SeaClaw | Status                      |
+| ---------------- | ------- | ------- | --------------------------- |
+| Providers        | 18      | 18      | **Full parity**             |
+| Channels         | 20      | 21      | **Full parity** (+1 extras) |
+| Tools            | 36      | 46      | **Full parity** (+10 extras)|
+| Security         | 11      | 20      | **Full parity** (+9 extras) |
+| Agent            | 8       | 15      | **Full parity** (+7 extras) |
+| Memory Engines   | 10      | 10      | **Full parity**             |
+| Memory Lifecycle | 8       | 8       | **Full parity**             |
+| Memory Retrieval | 8       | 10      | **Full parity** (+2 extras) |
+| Memory Vector    | 12      | 15      | **Full parity** (+3 extras) |
 
 **All SeaClaw modules have been ported. Zero gaps remain.**
 
@@ -37,10 +35,25 @@ Last updated: 2026-03-03
 
 - **Full agent loop**: `seaclaw agent` — interactive turn-based conversation
 - **Config loading**: JSON config parsing, env var overrides, validation
-- **54 tools registered**: All execute with proper vtable dispatch
-- **20 channels**: CLI fully functional, others have send() via HTTP client
+- **46 tools registered**: All execute with proper vtable dispatch
+- **21 channels**: CLI fully functional, others have send() via HTTP client
 - **18 providers**: OpenAI, Anthropic, Gemini, Ollama, OpenRouter, Compatible, Claude CLI, Codex CLI, OpenAI Codex + reliable/router wrappers
 - **HTTP client**: libcurl-based, with SSE streaming support
+
+### Tools (Real)
+
+- **apply_patch**: Real unified diff line-by-line patch application engine
+- **canvas**: Collaborative document store with file-backed persistence (~/.seaclaw/canvas/)
+- **shell**: Command execution with security policy enforcement
+- **file_read / file_write / file_edit / file_append**: File operations with path validation
+- **web_search / web_fetch / http_request**: HTTP-based tools
+- **git**: Git operations via shell delegation
+- **memory_store / memory_recall / memory_list / memory_forget**: Memory tool wrappers
+- **agent_spawn / agent_query**: Sub-agent pool management
+- **cron_add / cron_list / cron_remove / cron_run / cron_update / cron_runs**: Cron scheduling
+- **database / notebook / diff / image / screenshot / message**: Utility tools
+- **hardware_info / hardware_memory / i2c / spi**: Peripheral access tools
+- **delegate / spawn / pushover / composio / schedule / validation / schema / schema_clean**: Extended tools
 
 ### Memory
 
@@ -60,57 +73,47 @@ Last updated: 2026-03-03
 ### Security
 
 - **Policy enforcement**: Autonomy levels, command risk assessment, blocklists
-- **Policy engine**: Rule-based deny/allow/approval with cost tracking
 - **Pairing**: Code + token authentication with lockout
 - **Secrets**: ChaCha20 + HMAC-SHA256 encryption
-- **Audit logging**: Event-based security audit trail with chain verification
-- **Sandbox**: Abstraction for seatbelt, bubblewrap, firejail, landlock, docker
+- **Audit logging**: Event-based security audit trail
+- **Sandbox**: Abstraction for bubblewrap, firejail, landlock, docker, appcontainer, seccomp, seatbelt, firecracker
 - **Rate tracking**: Per-key/per-window rate limiting
 
-### Agent Subsystems
+### Session Management
 
-- **Agent pool**: Multi-agent spawn/query/cancel with one-shot and persistent modes
-- **Mailbox**: Inter-agent message passing (task, result, error, cancel, ping/pong)
-- **Thread binding**: Channel-to-agent thread affinity with expiry
-- **Dispatcher**: Parallel tool execution (pthread)
-- **Compaction**: History compaction with recent-message preservation
-- **Planner**: Step-based plan creation and progression
-- **Agent profiles**: Coding, ops, messaging, minimal presets
-- **Plugin system**: Version-checked plugin registry
+- **Session CRUD**: Create, get, delete, patch, list, evict idle sessions
+- **File persistence**: Save/load all sessions to ~/.seaclaw/sessions.json on startup/shutdown
+- **Message history**: Per-session message append with role/content + turn tracking
 
 ### Infrastructure
 
-- **Gateway**: POSIX HTTP server with routing, rate limiting, HMAC verification, control protocol
-- **Tunnels**: None, Cloudflare, Ngrok, Tailscale, Custom
+- **Gateway**: POSIX HTTP server with routing, rate limiting, HMAC verification
+- **Tunnels**: None, Cloudflare, Ngrok, Custom
 - **Peripherals**: Arduino, STM32, RPi factory + vtable
+- **Agent subsystems**: Dispatcher (pthread), compaction, planner, context tokens, max tokens, prompt builder, commands, CLI, TUI, mailbox, profile, spawn
+- **Agent pool**: Multi-agent orchestration with spawn/query/cancel/status
 - **Cron**: Cron expression parsing, job scheduling, execution
 - **Heartbeat**: Periodic task engine
 - **Cost tracking**: Per-model pricing, budget enforcement
-- **Session management**: Create, get, expire, idle eviction, save/load
 - **Event bus**: Pub/sub for cross-module communication
 - **Identity**: Bot identity, permission resolution
 - **WASM**: Build target, WASI bindings, bump allocator, wasm provider/channel
-- **WebSocket client**: Basic ws:// support (connect, send, recv, close)
-- **Channel adapters**: Polling descriptors for 5 channels (telegram, matrix, irc, signal, nostr)
-- **OTel observability**: Observer + span tracing
-- **Action replay**: Record/replay for debugging
-
-### Power Tools
-
-- **Canvas**: Persistent scratchpad (file-backed in ~/.seaclaw/canvas/)
-- **Apply patch**: Unified diff parser and line-by-line patch application
-- **Notebook**: Structured cell-based document editing
-- **Database**: SQL query tool with connection management
-- **Diff**: File comparison tool
+- **WebSocket client**: Basic ws:// support (connect, send, recv, close). WSS (TLS) not yet supported.
+- **Channel adapters**: Polling descriptors for 5 channels (telegram, matrix, irc, signal, nostr). Partially implemented.
+- **Web UI**: Lit-based dashboard served by gateway
+- **TLS docs**: Production reverse proxy guide (Caddy, nginx, Cloudflare Tunnel)
 
 ## What's Stubbed (Interface Defined, Returns SC_ERR_NOT_SUPPORTED)
 
-- **postgres.c, redis.c, lancedb.c, lucid.c, api.c**: Memory engines (need external libs; see header comments)
+- **postgres.c, redis.c, lancedb.c, lucid.c**: Memory engines (need external libs)
 - **store_pgvector.c**: Vector store (needs libpq + pgvector)
-- **MCP client**: Protocol defined, transport not implemented
-- **Voice I/O, multimodal**: Interfaces defined, no TTS/STT integration yet
 - **WebSocket WSS (TLS)**: ws:// works; wss:// connections not supported
 - **Browser tool CDP**: click, type, scroll require Chrome DevTools Protocol; currently only open/read via shell/HTTP
+- **claude_cli, codex_cli providers**: Shell delegation stubs
+- **iMessage, email, nostr channels**: Interface defined, transport not connected
+- **landlock, seccomp, appcontainer, seatbelt sandboxes**: Linux/Windows-specific, stub on other platforms
+- **Voice I/O, multimodal**: Interfaces defined, no TTS/STT integration yet
+- **Auth, update, migration, daemon**: Framework-level stubs
 
 ## External Dependencies
 
@@ -119,6 +122,6 @@ Last updated: 2026-03-03
 | libc               | Linked         | Everything                        |
 | SQLite3 (vendored) | Linked         | Memory engine                     |
 | libcurl            | Linked         | HTTP client, provider API calls   |
-| pthread            | Linked         | Agent dispatcher                  |
+| pthread            | Linked         | Agent dispatcher, agent pool      |
 | libpq              | Optional (OFF) | PostgreSQL memory engine          |
 | math (-lm)         | Linked         | Vector math, retrieval algorithms |

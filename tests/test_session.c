@@ -306,6 +306,126 @@ static void test_session_patch_not_found(void) {
     sc_session_manager_deinit(&mgr);
 }
 
+
+static void test_session_save_load_roundtrip(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_session_manager_t mgr;
+    sc_session_manager_init(&mgr, &alloc);
+
+    sc_session_t *s = sc_session_get_or_create(&mgr, "persist_test");
+    SC_ASSERT_NOT_NULL(s);
+    sc_session_patch(&mgr, "persist_test", "my-label");
+    sc_session_append_message(s, &alloc, "user", "hello world");
+    sc_session_append_message(s, &alloc, "assistant", "hi there");
+
+    sc_session_t *s2 = sc_session_get_or_create(&mgr, "persist_test_2");
+    SC_ASSERT_NOT_NULL(s2);
+    sc_session_append_message(s2, &alloc, "user", "second session");
+
+    const char *path = "/tmp/seaclaw_test_sessions.json";
+    sc_error_t err = sc_session_save(&mgr, path);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_session_manager_deinit(&mgr);
+
+    sc_session_manager_t mgr2;
+    sc_session_manager_init(&mgr2, &alloc);
+    err = sc_session_load(&mgr2, path);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(sc_session_count(&mgr2), 2u);
+
+    sc_session_t *loaded = sc_session_get_or_create(&mgr2, "persist_test");
+    SC_ASSERT_NOT_NULL(loaded);
+    SC_ASSERT_STR_EQ(loaded->label, "my-label");
+    SC_ASSERT_EQ(loaded->message_count, 2u);
+    SC_ASSERT_STR_EQ(loaded->messages[0].role, "user");
+    SC_ASSERT_STR_EQ(loaded->messages[0].content, "hello world");
+    SC_ASSERT_STR_EQ(loaded->messages[1].role, "assistant");
+    SC_ASSERT_STR_EQ(loaded->messages[1].content, "hi there");
+
+    sc_session_t *loaded2 = sc_session_get_or_create(&mgr2, "persist_test_2");
+    SC_ASSERT_NOT_NULL(loaded2);
+    SC_ASSERT_EQ(loaded2->message_count, 1u);
+    SC_ASSERT_STR_EQ(loaded2->messages[0].content, "second session");
+
+    sc_session_manager_deinit(&mgr2);
+    remove(path);
+}
+
+static void test_session_save_null_args(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_session_manager_t mgr;
+    sc_session_manager_init(&mgr, &alloc);
+    SC_ASSERT_NEQ(sc_session_save(NULL, "/tmp/x.json"), SC_OK);
+    SC_ASSERT_NEQ(sc_session_save(&mgr, NULL), SC_OK);
+    sc_session_manager_deinit(&mgr);
+}
+
+static void test_session_load_null_args(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_session_manager_t mgr;
+    sc_session_manager_init(&mgr, &alloc);
+    SC_ASSERT_NEQ(sc_session_load(NULL, "/tmp/x.json"), SC_OK);
+    SC_ASSERT_NEQ(sc_session_load(&mgr, NULL), SC_OK);
+    sc_session_manager_deinit(&mgr);
+}
+
+static void test_session_load_missing_file(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_session_manager_t mgr;
+    sc_session_manager_init(&mgr, &alloc);
+    sc_error_t err = sc_session_load(&mgr, "/tmp/nonexistent_seaclaw_sessions_xyz.json");
+    SC_ASSERT_EQ(err, SC_ERR_NOT_FOUND);
+    sc_session_manager_deinit(&mgr);
+}
+
+static void test_session_save_empty_manager(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_session_manager_t mgr;
+    sc_session_manager_init(&mgr, &alloc);
+
+    const char *path = "/tmp/seaclaw_test_empty.json";
+    sc_error_t err = sc_session_save(&mgr, path);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    sc_session_manager_t mgr2;
+    sc_session_manager_init(&mgr2, &alloc);
+    err = sc_session_load(&mgr2, path);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(sc_session_count(&mgr2), 0u);
+
+    sc_session_manager_deinit(&mgr2);
+    sc_session_manager_deinit(&mgr);
+    remove(path);
+}
+
+static void test_session_save_special_chars(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_session_manager_t mgr;
+    sc_session_manager_init(&mgr, &alloc);
+
+    sc_session_t *s = sc_session_get_or_create(&mgr, "special");
+    SC_ASSERT_NOT_NULL(s);
+    sc_session_append_message(s, &alloc, "user", "line1\nline2\ttab\"quote\"");
+
+    const char *path = "/tmp/seaclaw_test_special.json";
+    sc_error_t err = sc_session_save(&mgr, path);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_session_manager_deinit(&mgr);
+
+    sc_session_manager_t mgr2;
+    sc_session_manager_init(&mgr2, &alloc);
+    err = sc_session_load(&mgr2, path);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(sc_session_count(&mgr2), 1u);
+
+    sc_session_t *loaded = sc_session_get_or_create(&mgr2, "special");
+    SC_ASSERT_NOT_NULL(loaded);
+    SC_ASSERT_EQ(loaded->message_count, 1u);
+
+    sc_session_manager_deinit(&mgr2);
+    remove(path);
+}
+
 void run_session_tests(void) {
     SC_TEST_SUITE("Session");
     SC_RUN_TEST(test_session_manager_init_deinit);
@@ -331,4 +451,10 @@ void run_session_tests(void) {
     SC_RUN_TEST(test_session_delete_not_found);
     SC_RUN_TEST(test_session_patch);
     SC_RUN_TEST(test_session_patch_not_found);
+    SC_RUN_TEST(test_session_save_load_roundtrip);
+    SC_RUN_TEST(test_session_save_null_args);
+    SC_RUN_TEST(test_session_load_null_args);
+    SC_RUN_TEST(test_session_load_missing_file);
+    SC_RUN_TEST(test_session_save_empty_manager);
+    SC_RUN_TEST(test_session_save_special_chars);
 }
