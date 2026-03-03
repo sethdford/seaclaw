@@ -21,37 +21,21 @@ SEACLAW_BIN=""
 TESTS_BIN=""
 
 # Parse args
-for arg in "$@"; do
-    case "$arg" in
+while [ $# -gt 0 ]; do
+    case "$1" in
         --compare)
-            COMPARE_FILE="$2"
+            COMPARE_FILE="${2:-}"
             shift 2
-            break
             ;;
         --compare=*)
-            COMPARE_FILE="${arg#--compare=}"
+            COMPARE_FILE="${1#--compare=}"
             shift
-            break
             ;;
         *)
             if [ -z "$SEACLAW_BIN" ]; then
-                SEACLAW_BIN="$arg"
+                SEACLAW_BIN="$1"
             fi
             shift
-            ;;
-    esac
-done
-
-# Handle --compare appearing later (simplified parsing)
-for arg in "$@"; do
-    case "$arg" in
-        --compare)
-            [ -n "$2" ] && COMPARE_FILE="$2"
-            break
-            ;;
-        --compare=*)
-            COMPARE_FILE="${arg#--compare=}"
-            break
             ;;
     esac
 done
@@ -61,13 +45,11 @@ if [ -z "$SEACLAW_BIN" ]; then
     SEACLAW_BIN="$DEFAULT_SEACLAW"
 fi
 
-# Resolve relative paths
-if [ -z "${SEACLAW_BIN##*/*}" ]; then
-    case "$SEACLAW_BIN" in
-        /*) ;;
-        *) SEACLAW_BIN="${ROOT_DIR}/${SEACLAW_BIN}"
-    esac
-fi
+# Resolve relative paths to absolute
+case "$SEACLAW_BIN" in
+    /*) ;;
+    *) SEACLAW_BIN="${ROOT_DIR}/${SEACLAW_BIN}"
+esac
 
 # Tests: same dir as seaclaw first, else default
 BIN_DIR=$(dirname "$SEACLAW_BIN")
@@ -97,14 +79,16 @@ case "$(uname -s)" in
         ;;
 esac
 
-# Nanosecond timestamp: gdate (macOS), date (Linux), perl fallback
+# Nanosecond timestamp: date (Linux), gdate (macOS), perl fallback
 get_nanos() {
-    if date +%s%N 2>/dev/null | grep -q '^[0-9][0-9]*$'; then
+    if command -v gdate >/dev/null 2>&1; then
+        gdate +%s%N 2>/dev/null || true
+    elif date +%s%N 2>/dev/null | grep -q '^[0-9][0-9]*$'; then
         date +%s%N
-    elif command -v gdate >/dev/null 2>&1; then
-        gdate +%s%N
+    elif command -v perl >/dev/null 2>&1; then
+        perl -MTime::HiRes -e 'print int(Time::HiRes::time() * 1e9)' 2>/dev/null
     else
-        perl -MTime::HiRes -e 'print int(Time::HiRes::time() * 1e9)' 2>/dev/null || date +%s
+        date +%s
     fi
 }
 
@@ -112,13 +96,12 @@ get_nanos() {
 # macOS: "  1234567  maximum resident set size" (bytes)
 # Linux: "Maximum resident set size (kbytes): 1234"
 parse_rss() {
-    local out="$1"
-    local rss=0
+    out="$1"
+    rss=0
     if [ "$TIME_RSS_UNIT" = "bytes" ]; then
-        rss=$(echo "$out" | awk '/maximum resident set size/ {gsub(/,/,""); print $1; exit}')
+        rss=$(echo "$out" | awk '/maximum resident set size/ {gsub(/,/,""); print $1+0; exit}')
     else
-        rss=$(echo "$out" | awk -F: '/Maximum resident set size \(kbytes\)/ {gsub(/[^0-9]/,""); print $2; exit}')
-        [ -n "$rss" ] && rss=$((rss * 1024))
+        rss=$(echo "$out" | awk '/Maximum resident set size.*kbytes/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+$/) {print $i*1024; exit}}')
     fi
     echo "${rss:-0}"
 }
@@ -208,12 +191,17 @@ if [ -x "$TESTS_BIN" ]; then
     tests_dir=$(dirname "$TESTS_BIN")
     time_out=$("$TIME_CMD" $TIME_ARGS "$TESTS_BIN" 2>&1 || true)
     TESTS_RSS=$(parse_rss "$time_out")
-    # Duration from time "real" line
-    if echo "$time_out" | grep -q 'real'; then
-        real_line=$(echo "$time_out" | grep 'real' | head -1)
-        # Format: "0.45 real" or "        0.45 real"
-        real_sec=$(echo "$real_line" | awk '{print $1}' | tr -d ' ')
-        TESTS_DURATION=$(echo "$real_sec" | awk '{printf "%.2f", $1}')
+    # Duration from time "real" line (last occurrence, time appends at end)
+    real_line=$(echo "$time_out" | grep ' real ' | tail -1)
+    if [ -n "$real_line" ]; then
+        real_sec=$(echo "$real_line" | awk '{for(i=1;i<=NF;i++) if($i~/^[0-9]+\.?[0-9]*$/) {print $i; exit}}')
+        if [ -n "$real_sec" ]; then
+            if command -v bc >/dev/null 2>&1; then
+                TESTS_DURATION=$(echo "scale=2; $real_sec" | bc)
+            else
+                TESTS_DURATION="$real_sec"
+            fi
+        fi
     fi
 else
     TESTS_RSS=0
@@ -245,13 +233,22 @@ if [ -x "$TESTS_BIN" ] && [ "$TESTS_DURATION" = "0" ]; then
     else
         elaps=$(((t1 - t0) * 1000000000))
     fi
-    TESTS_DURATION=$(echo "scale=2; $elaps / 1000000000" | bc 2>/dev/null || echo "0")
+    if command -v bc >/dev/null 2>&1; then
+        TESTS_DURATION=$(echo "scale=2; $elaps / 1000000000" | bc)
+    else
+        TESTS_DURATION=$((elaps / 1000000000))
+    fi
 fi
 
 # Tests rate
 RATE=0
-if [ "$TEST_COUNT" -gt 0 ] && [ "$TESTS_DURATION" != "0" ]; then
-    RATE=$(echo "scale=0; $TEST_COUNT / $TESTS_DURATION" | bc 2>/dev/null || echo "0")
+if [ "$TEST_COUNT" -gt 0 ] && [ "$TESTS_DURATION" != "0" ] && [ "${TESTS_DURATION}" != "0.00" ]; then
+    if command -v bc >/dev/null 2>&1; then
+        RATE=$(echo "scale=0; $TEST_COUNT / $TESTS_DURATION" | bc)
+    else
+        denom="${TESTS_DURATION%.*}"; [ -z "$denom" ] && denom=1
+        RATE=$((TEST_COUNT / denom))
+    fi
 fi
 
 TEST_COUNT_HR=$(printf "%'d" "$TEST_COUNT")
@@ -295,7 +292,7 @@ print_row() {
 print_section() {
     echo ""
     echo "  $1"
-    echo "  $(printf '%*s' 40 '' | tr ' ' '\255' | tr '\255' '\055')"
+    echo "  ─────────────────"
 }
 
 echo ""

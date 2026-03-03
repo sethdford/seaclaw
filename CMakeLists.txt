@@ -1051,6 +1051,14 @@ if(SC_ENABLE_FUZZING)
     target_link_options(fuzz_url_validation PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
 endif()
 
+# Benchmark target
+add_custom_target(benchmark
+    COMMAND ${CMAKE_SOURCE_DIR}/scripts/benchmark.sh $<TARGET_FILE:seaclaw>
+    DEPENDS seaclaw seaclaw_tests
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Running benchmarks..."
+)
+
 # Print build info
 message(STATUS "SeaClaw v0.1.0")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")

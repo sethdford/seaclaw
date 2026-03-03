@@ -25,7 +25,7 @@ Key extension points:
 - `src/runtime/` (`sc_runtime_t`) — execution environments
 - `src/peripherals/` (`sc_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 
-Current scale: **449 source + header files, ~70K lines of C, ~28K lines of tests, 2,002 tests**.
+Current scale: **449 source + header files, ~70K lines of C, ~28K lines of tests, 2,024 tests**.
 
 Build and test:
 
@@ -62,7 +62,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `SC_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 2,002+ tests must pass at zero ASan errors**
+5. **All 2,024+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `SC_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -143,7 +143,7 @@ src/
 
 include/seaclaw/       public C headers
 
-tests/                 68 test files, 2,002 tests
+tests/                 68 test files, 2,024 tests
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 
