@@ -224,6 +224,121 @@ describe("sc-dropdown", () => {
   });
 });
 
+describe("sc-switch", () => {
+  it("should be defined as a custom element", async () => {
+    await import("./sc-switch.js");
+    expect(customElements.get("sc-switch")).toBeDefined();
+  });
+
+  it("should reflect default properties", async () => {
+    const { ScSwitch } = await import("./sc-switch.js");
+    const el = new ScSwitch();
+    expect(el.checked).toBe(false);
+    expect(el.disabled).toBe(false);
+    expect(el.label).toBe("");
+  });
+
+  it("should fire sc-change with checked when toggled", async () => {
+    const { ScSwitch } = await import("./sc-switch.js");
+    const el = new ScSwitch();
+    document.body.appendChild(el);
+    await el.updateComplete;
+    let detail: { checked: boolean } | null = null;
+    el.addEventListener("sc-change", ((e: CustomEvent) => {
+      detail = e.detail;
+    }) as EventListener);
+    const switchEl = el.shadowRoot?.querySelector("[role='switch']") as HTMLElement;
+    switchEl?.click();
+    await el.updateComplete;
+    expect(detail).toEqual({ checked: true });
+    document.body.removeChild(el);
+  });
+});
+
+describe("sc-radio", () => {
+  it("should be defined as a custom element", async () => {
+    await import("./sc-radio.js");
+    expect(customElements.get("sc-radio")).toBeDefined();
+  });
+
+  it("should reflect default properties", async () => {
+    const { ScRadio } = await import("./sc-radio.js");
+    const el = new ScRadio();
+    expect(el.value).toBe("");
+    expect(el.options).toEqual([]);
+    expect(el.name).toBe("");
+    expect(el.disabled).toBe(false);
+  });
+
+  it("should fire sc-change when option selected", async () => {
+    const { ScRadio } = await import("./sc-radio.js");
+    const el = new ScRadio();
+    el.options = [
+      { value: "a", label: "Option A" },
+      { value: "b", label: "Option B" },
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+    let detail: { value: string } | null = null;
+    el.addEventListener("sc-change", ((e: CustomEvent) => {
+      detail = e.detail;
+    }) as EventListener);
+    const input = el.shadowRoot?.querySelector('input[value="b"]') as HTMLInputElement;
+    input?.click();
+    await el.updateComplete;
+    expect(detail).toEqual({ value: "b" });
+    document.body.removeChild(el);
+  });
+});
+
+describe("sc-textarea", () => {
+  it("should be defined as a custom element", async () => {
+    await import("./sc-textarea.js");
+    expect(customElements.get("sc-textarea")).toBeDefined();
+  });
+
+  it("should reflect default properties", async () => {
+    const { ScTextarea } = await import("./sc-textarea.js");
+    const el = new ScTextarea();
+    expect(el.value).toBe("");
+    expect(el.rows).toBe(4);
+    expect(el.resize).toBe("vertical");
+  });
+});
+
+describe("sc-popover", () => {
+  it("should be defined as a custom element", async () => {
+    await import("./sc-popover.js");
+    expect(customElements.get("sc-popover")).toBeDefined();
+  });
+
+  it("should default to closed", async () => {
+    const { ScPopover } = await import("./sc-popover.js");
+    const el = new ScPopover();
+    expect(el.open).toBe(false);
+    expect(el.position).toBe("bottom");
+    expect(el.arrow).toBe(true);
+  });
+});
+
+describe("sc-breadcrumb", () => {
+  it("should be defined as a custom element", async () => {
+    await import("./sc-breadcrumb.js");
+    expect(customElements.get("sc-breadcrumb")).toBeDefined();
+  });
+
+  it("should accept items array", async () => {
+    const { ScBreadcrumb } = await import("./sc-breadcrumb.js");
+    const el = new ScBreadcrumb();
+    el.items = [
+      { label: "Home", href: "/" },
+      { label: "Settings", href: "/settings" },
+      { label: "Profile" },
+    ];
+    expect(el.items).toHaveLength(3);
+  });
+});
+
 describe("sc-dialog", () => {
   it("should be defined as a custom element", async () => {
     await import("./sc-dialog.js");

@@ -245,18 +245,14 @@ export class ScCronView extends GatewayAwareLitElement {
                       <div class="job-card-inner">
                         <div class="job-info">
                           <div class="job-expression">${job.expression}</div>
-                          ${
-                            job.command
-                              ? html`<div class="job-description">
-                                  <code>${job.command}</code>
-                                </div>`
-                              : ""
-                          }
-                          ${
-                            job.description
-                              ? html`<div class="job-description">${job.description}</div>`
-                              : ""
-                          }
+                          ${job.command
+                            ? html`<div class="job-description">
+                                <code>${job.command}</code>
+                              </div>`
+                            : ""}
+                          ${job.description
+                            ? html`<div class="job-description">${job.description}</div>`
+                            : ""}
                           <div class="job-meta">
                             ${job.lastRun ? `Last run: ${job.lastRun}` : ""}
                             ${job.status ? ` · ${job.status}` : ""}
@@ -279,7 +275,6 @@ export class ScCronView extends GatewayAwareLitElement {
                           </sc-button>
                         </div>
                       </div>
-                    </sc-card>
                     </sc-card>
                   `,
                 )}

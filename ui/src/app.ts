@@ -30,6 +30,7 @@ type TabId =
   | "voice"
   | "nodes"
   | "usage"
+  | "security"
   | "logs";
 
 const VALID_TABS: TabId[] = [
@@ -46,6 +47,7 @@ const VALID_TABS: TabId[] = [
   "voice",
   "nodes",
   "usage",
+  "security",
   "logs",
 ];
 
@@ -65,6 +67,7 @@ const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   voice: () => import("./views/voice-view.js"),
   nodes: () => import("./views/nodes-view.js"),
   usage: () => import("./views/usage-view.js"),
+  security: () => import("./views/security-view.js"),
   logs: () => import("./views/logs-view.js"),
 };
 
@@ -355,6 +358,8 @@ export class ScApp extends LitElement {
         return html`<sc-nodes-view></sc-nodes-view>`;
       case "usage":
         return html`<sc-usage-view></sc-usage-view>`;
+      case "security":
+        return html`<sc-security-view></sc-security-view>`;
       case "logs":
         return html`<sc-logs-view></sc-logs-view>`;
       default:

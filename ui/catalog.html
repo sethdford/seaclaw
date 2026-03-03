@@ -86,6 +86,11 @@
       <a href="#sc-select">sc-select</a>
       <a href="#sc-dropdown">sc-dropdown</a>
       <a href="#sc-dialog">sc-dialog</a>
+      <a href="#sc-switch">sc-switch</a>
+      <a href="#sc-radio">sc-radio</a>
+      <a href="#sc-textarea">sc-textarea</a>
+      <a href="#sc-popover">sc-popover</a>
+      <a href="#sc-breadcrumb">sc-breadcrumb</a>
     </nav>
     <main class="catalog-main">
       <header class="catalog-header">
@@ -300,6 +305,120 @@
         </div></div>
       </section>
 
+      <section class="component-section" id="sc-switch">
+        <h2>sc-switch</h2>
+        <div class="playground">
+          <div class="preview">
+            <sc-switch id="switch-preview" label="Enable notifications"></sc-switch>
+          </div>
+          <div class="controls">
+            <label>checked
+              <input type="checkbox" data-target="switch-preview" data-prop="checked">
+            </label>
+            <label>disabled
+              <input type="checkbox" data-target="switch-preview" data-prop="disabled">
+            </label>
+            <label>label
+              <input type="text" data-target="switch-preview" data-prop="label" value="Enable notifications">
+            </label>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-switch label="Enable" checked&gt;&lt;/sc-switch&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-radio">
+        <h2>sc-radio</h2>
+        <div class="playground">
+          <div class="preview">
+            <sc-radio id="radio-preview" name="demo"></sc-radio>
+          </div>
+          <div class="controls">
+            <label>disabled
+              <input type="checkbox" data-target="radio-preview" data-prop="disabled">
+            </label>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-radio name="choice" value="a" .options=${'[{value:"a",label:"A"}]'} &gt;&lt;/sc-radio&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-textarea">
+        <h2>sc-textarea</h2>
+        <div class="playground">
+          <div class="preview" style="width: 100%; min-width: 240px;">
+            <sc-textarea id="textarea-preview" label="Description" placeholder="Enter text..." rows="4" style="min-width: 240px"></sc-textarea>
+          </div>
+          <div class="controls">
+            <label>label
+              <input type="text" data-target="textarea-preview" data-prop="label" value="Description">
+            </label>
+            <label>placeholder
+              <input type="text" data-target="textarea-preview" data-prop="placeholder" value="Enter text...">
+            </label>
+            <label>rows
+              <input type="number" data-target="textarea-preview" data-prop="rows" value="4">
+            </label>
+            <label>disabled
+              <input type="checkbox" data-target="textarea-preview" data-prop="disabled">
+            </label>
+            <label>error
+              <input type="text" data-target="textarea-preview" data-prop="error" placeholder="Leave empty for no error">
+            </label>
+            <label>maxlength
+              <input type="number" data-target="textarea-preview" data-prop="maxlength" value="0" placeholder="0 = no limit">
+            </label>
+            <label>resize
+              <select data-target="textarea-preview" data-prop="resize">
+                <option value="vertical" selected>vertical</option>
+                <option value="both">both</option>
+                <option value="none">none</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-textarea label="Description" placeholder="Enter text..." rows="4"&gt;&lt;/sc-textarea&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-popover">
+        <h2>sc-popover</h2>
+        <div class="playground">
+          <div class="preview">
+            <sc-popover id="popover-preview" position="bottom" arrow>
+              <sc-button id="popover-trigger">Open popover</sc-button>
+              <div slot="content">
+                <p style="margin: 0; font-size: var(--sc-text-sm);">Popover content goes here.</p>
+              </div>
+            </sc-popover>
+          </div>
+          <div class="controls">
+            <label>position
+              <select data-target="popover-preview" data-prop="position">
+                <option value="bottom" selected>bottom</option>
+                <option value="top">top</option>
+                <option value="left">left</option>
+                <option value="right">right</option>
+              </select>
+            </label>
+            <label>arrow
+              <input type="checkbox" data-target="popover-preview" data-prop="arrow" checked>
+            </label>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-popover&gt;&lt;sc-button&gt;Open&lt;/sc-button&gt;&lt;div slot="content"&gt;Content&lt;/div&gt;&lt;/sc-popover&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-breadcrumb">
+        <h2>sc-breadcrumb</h2>
+        <div class="playground">
+          <div class="preview" style="width: 100%;">
+            <sc-breadcrumb id="breadcrumb-preview"></sc-breadcrumb>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-breadcrumb .items=${'[{"label":"Home","href":"/"},{"label":"Profile"}]'} &gt;&lt;/sc-breadcrumb&gt;</code></pre></div>
+        <div class="variants"><h3>Demo</h3><div class="row">
+          <sc-breadcrumb id="breadcrumb-demo"></sc-breadcrumb>
+        </div></div>
+      </section>
+
       <section class="component-section" id="sc-dialog">
         <h2>sc-dialog</h2>
         <div class="playground">
@@ -336,6 +455,11 @@
       import "/src/components/sc-select.js";
       import "/src/components/sc-dropdown.js";
       import "/src/components/sc-dialog.js";
+      import "/src/components/sc-switch.js";
+      import "/src/components/sc-radio.js";
+      import "/src/components/sc-textarea.js";
+      import "/src/components/sc-popover.js";
+      import "/src/components/sc-breadcrumb.js";
 
       // Theme toggle
       function setTheme(theme) {
@@ -363,8 +487,12 @@
             target[prop] = control.checked;
           } else if (prop === "textContent") {
             target.textContent = e.target.value;
-          } else if (control.type === "number" && prop === "value") {
-            target[prop] = parseFloat(e.target.value) || 0;
+          } else if (control.type === "number") {
+            target[prop] = parseInt(e.target.value, 10) || 0;
+          } else if (prop === "items" && typeof control.value === "string") {
+            try {
+              target[prop] = JSON.parse(control.value || "[]");
+            } catch (_) {}
           } else {
             target[prop] = e.target.value;
           }
@@ -512,6 +640,48 @@
       }));
       catalogDialog?.addEventListener("sc-confirm", () => { catalogDialog.open = false; });
       catalogDialog?.addEventListener("sc-cancel", () => { catalogDialog.open = false; });
+
+      // Switch
+      const switchPreview = document.getElementById("switch-preview");
+      if (switchPreview) {
+        switchPreview.addEventListener("sc-change", (e) => {
+          switchPreview.checked = e.detail.checked;
+        });
+      }
+
+      // Radio
+      const radioOpts = [
+        { value: "a", label: "Option A" },
+        { value: "b", label: "Option B" },
+        { value: "c", label: "Option C", disabled: true },
+      ];
+      const radioPreview = document.getElementById("radio-preview");
+      if (radioPreview) {
+        radioPreview.options = radioOpts;
+        radioPreview.value = "a";
+      }
+
+      // Popover
+      document.getElementById("popover-trigger")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const popover = document.getElementById("popover-preview");
+        if (popover) popover.open = !popover.open;
+      });
+      document.getElementById("popover-preview")?.addEventListener("sc-close", () => {
+        const popover = document.getElementById("popover-preview");
+        if (popover) popover.open = false;
+      });
+
+      // Breadcrumb
+      const breadcrumbItems = [
+        { label: "Home", href: "/" },
+        { label: "Settings", href: "/settings" },
+        { label: "Profile" },
+      ];
+      const breadcrumbPreview = document.getElementById("breadcrumb-preview");
+      const breadcrumbDemo = document.getElementById("breadcrumb-demo");
+      if (breadcrumbPreview) breadcrumbPreview.items = breadcrumbItems;
+      if (breadcrumbDemo) breadcrumbDemo.items = breadcrumbItems;
     </script>
   </body>
 </html>

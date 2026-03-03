@@ -70,10 +70,25 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
-      - run: npm run test
+      - name: Test with coverage
+        run: npm run test:coverage
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
-      - run: npx playwright test
+
+  ui-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install
+        run: cd ui && npm ci
+      - name: Install Playwright browsers
+        run: cd ui && npx playwright install --with-deps chromium
+      - name: Build
+        run: cd ui && npm run build
+      - name: E2E tests
+        run: cd ui && npx playwright test
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
