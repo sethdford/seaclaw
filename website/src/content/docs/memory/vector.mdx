@@ -1,94 +1,67 @@
 ---
-title: FTS5 & Vector Memory
-description: Full-text search and vector-based semantic memory for intelligent context retrieval.
+title: Vector Memory & Embeddings
+description: Vector-based semantic memory and embedding generation for context retrieval.
 ---
 
-SeaClaw supports two advanced memory retrieval mechanisms: SQLite FTS5 for full-text search and vector embeddings for semantic similarity.
+SeaClaw supports vector embeddings for semantic similarity search. Text is embedded into vectors, stored, and queried by similarity (e.g. cosine) to find relevant context even when wording differs.
 
-## FTS5 (Full-Text Search)
+## Architecture
 
-FTS5 is built into SQLite and requires no external dependencies. It enables fast keyword-based search across all stored memories.
+The vector stack consists of:
 
-### How it works
+- **Embedder**: Converts text to a fixed-dimension vector
+- **Vector store**: Stores embeddings and supports similarity search
+- **Retrieval engine**: Combines keyword (FTS5) and vector search when both are available
 
-1. When the agent stores a memory, the text is indexed by FTS5
-2. Search queries use SQLite's `MATCH` syntax with BM25 ranking
-3. Results are ordered by relevance score
+## Built-in embedders
 
-### Configuration
+| Embedder       | Dimensions | Description                             |
+| -------------- | ---------- | --------------------------------------- |
+| Local (TF-IDF) | 384        | In-process, no network; hash projection |
+| Ollama         | varies     | Uses local Ollama embedding API         |
+| Voyage         | varies     | Voyage AI API                           |
+| Gemini         | varies     | Google Gemini embedding API             |
+
+The default local embedder (`sc_embedder_local_create`) produces 384-dimensional vectors. No API key is required.
+
+## Vector stores
+
+| Store     | Description                                                |
+| --------- | ---------------------------------------------------------- |
+| In-memory | `sc_vector_store_mem_create` — ephemeral, process lifetime |
+| (Future)  | Persistent backends (SQLite, LanceDB, etc.) as configured  |
+
+## Memory engines with vector support
+
+Some memory engines integrate vector search:
+
+- **LanceDB**: SQLite-based with optional vector indexing
+- **Lucid**: SQLite-based with Lucid CLI for cross-project sync
+
+These engines may use their own vector storage; see their documentation for configuration.
+
+## Retrieval
+
+The retrieval pipeline can use:
+
+- **Keyword only**: FTS5 / substring match when no vector store is configured
+- **Keyword + vector**: Hybrid retrieval with Reciprocal Rank Fusion (RRF) when both are available
+
+Hybrid search combines keyword ranks and vector similarity ranks via RRF for final ordering.
+
+## Configuration
+
+Vector and embedding behavior is configured through the memory and retrieval setup. The agent and gateway create a retrieval engine from config; the default uses an in-memory vector store and local embedder.
+
+Example (conceptual; actual keys depend on config schema):
 
 ```json
 {
   "memory": {
     "backend": "sqlite",
-    "fts5": {
-      "enabled": true,
-      "tokenizer": "porter unicode61"
-    }
+    "sqlite_path": "~/.seaclaw/memory.db"
   }
 }
 ```
 
-### Searching
-
-```bash
-seaclaw memory search "deployment configuration"
-```
-
-The agent automatically uses FTS5 when recalling context for conversations.
-
-## Vector Memory
-
-Vector memory uses embeddings to find semantically similar content, even when the exact words differ.
-
-### Supported embedding providers
-
-| Provider | Model                    | Dimensions |
-| -------- | ------------------------ | ---------- |
-| OpenAI   | `text-embedding-3-small` | 1536       |
-| Ollama   | `nomic-embed-text`       | 768        |
-| Local    | Built-in TF-IDF          | Variable   |
-
-### Configuration
-
-```json
-{
-  "memory": {
-    "backend": "sqlite",
-    "embeddings": {
-      "enabled": true,
-      "provider": "openai",
-      "model": "text-embedding-3-small",
-      "dimensions": 1536
-    }
-  }
-}
-```
-
-### How it works
-
-1. Text is converted to a vector embedding via the configured provider
-2. Embeddings are stored alongside the memory entry in SQLite
-3. Queries are also embedded, and cosine similarity finds the best matches
-4. Results combine FTS5 keyword scores with vector similarity for hybrid ranking
-
-### Hybrid search
-
-When both FTS5 and vector search are enabled, SeaClaw uses reciprocal rank fusion (RRF) to combine results:
-
-```
-final_score = (1 / (k + fts5_rank)) + (1 / (k + vector_rank))
-```
-
-This ensures both keyword matches and semantic matches contribute to the final ranking.
-
-## Storage
-
-All memory data is stored in `~/.nullclaw/memory.db`. The database includes:
-
-| Table          | Purpose                       |
-| -------------- | ----------------------------- |
-| `memories`     | Core memory entries           |
-| `memories_fts` | FTS5 virtual table            |
-| `embeddings`   | Vector embeddings (BLOB)      |
-| `metadata`     | Tags, timestamps, source info |
+For external embedding APIs (Ollama, Voyage, Gemini), configure the appropriate provider and API key in the usual provider config.

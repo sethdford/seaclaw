@@ -3,58 +3,46 @@ title: TUI Mode
 description: Run SeaClaw with an interactive terminal UI for local development and monitoring.
 ---
 
-SeaClaw includes a built-in terminal user interface (TUI) that provides a rich, interactive experience directly in your terminal.
+SeaClaw includes a full-screen terminal user interface (TUI) for interactive agent sessions. It provides split panes, streaming output, tool approval prompts, and multi-session tabs.
 
-## Starting TUI mode
+## Enabling TUI mode
 
 ```bash
 seaclaw agent --tui
 ```
 
+TUI mode requires the build flag `SC_ENABLE_TUI`. If TUI support is not compiled in, the command reports that TUI is unavailable.
+
 ## Features
 
-| Feature            | Description                                    |
-| ------------------ | ---------------------------------------------- |
-| Live chat          | Send messages and see responses in real time   |
-| Tool execution     | Watch tool calls execute with inline results   |
-| Session history    | Browse and resume previous conversations       |
-| Status bar         | Connection status, model info, and token usage |
-| Keyboard shortcuts | Vim-style navigation and command mode          |
+| Feature            | Description                                      |
+| ------------------ | ------------------------------------------------ |
+| Split panes        | Input area and output/response area              |
+| Streaming output   | Token-by-token display as the model responds     |
+| Tool execution     | Tool calls shown in a tool log with status       |
+| Tool approval      | Prompt to allow/deny medium-risk tools (y/n)     |
+| Multi-session tabs | Switch between conversations with Ctrl+T         |
+| Input history      | Navigate previous inputs with arrow keys         |
+| Observer bridge    | TUI observer records tool events for live status |
 
-## Keyboard shortcuts
+## Build requirement
 
-| Key           | Action                         |
-| ------------- | ------------------------------ |
-| `Enter`       | Send message                   |
-| `Shift+Enter` | New line                       |
-| `Ctrl+C`      | Cancel current generation      |
-| `Ctrl+D`      | Exit TUI                       |
-| `/`           | Enter command mode             |
-| `↑` / `↓`     | Scroll through message history |
+The TUI is implemented with termbox2 and is guarded by `SC_ENABLE_TUI`. It also requires `SC_GATEWAY_POSIX` (POSIX platform). On Windows or when the flag is off, `--tui` falls back to an error message.
 
-## Command mode
+## Layout
 
-Type `/` followed by a command:
+- **Title bar**: Provider and model
+- **Output area**: Agent responses, possibly streaming
+- **Tool log**: List of tool calls with duration and success/failure
+- **Status bar**: Approval prompt or last tool status
+- **Input area**: User message input
 
-| Command         | Description               |
-| --------------- | ------------------------- |
-| `/model <name>` | Switch the active model   |
-| `/clear`        | Clear the conversation    |
-| `/session <id>` | Resume a previous session |
-| `/tools`        | List available tools      |
-| `/help`         | Show available commands   |
+## Tool approval
 
-## Configuration
+When the agent requests a tool that requires approval, the TUI shows a prompt such as:
 
-TUI behavior can be customized in `~/.seaclaw/config.json`:
-
-```json
-{
-  "tui": {
-    "theme": "dark",
-    "show_tool_calls": true,
-    "show_token_usage": true,
-    "max_history": 100
-  }
-}
 ```
+Allow <tool_name>? [y/n] args: <args>
+```
+
+Type `y` to allow or `n` to deny. The agent continues with the result.

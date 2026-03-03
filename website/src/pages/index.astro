@@ -44,14 +44,14 @@ const tools = [
     <link rel="preload" href="/fonts/avenir/Avenir-Book.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/avenir/Avenir-Heavy.woff2" as="font" type="font/woff2" crossorigin />
     <title>SeaClaw — Bring AI to every device on Earth</title>
-    <meta name="description" content="A complete autonomous AI agent runtime in 414 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers. Runs on anything with a CPU." />
+    <meta name="description" content="A complete autonomous AI agent runtime in 430 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers. Runs on anything with a CPU." />
     <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
     <link rel="icon" type="image/png" sizes="32x32" href={`${base}favicon-32.png`} />
     <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
     <link rel="manifest" href={`${base}site.webmanifest`} />
     <meta name="theme-color" content="#f97066" />
     <meta property="og:title" content="SeaClaw — Bring AI to every device on Earth" />
-    <meta property="og:description" content="414 KB binary. 50+ AI providers. 20 channels. 46 tools. Zero dependencies. Pure C." />
+    <meta property="og:description" content="430 KB binary. 50+ AI providers. 20 channels. 53 tools. Zero dependencies. Pure C." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://seaclaw.ai/" />
     <meta property="og:image" content="https://seaclaw.ai/og-image.png" />
@@ -62,14 +62,14 @@ const tools = [
     <meta property="og:site_name" content="SeaClaw" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="SeaClaw — Bring AI to every device on Earth" />
-    <meta name="twitter:description" content="414 KB binary. 50+ AI providers. 20 channels. 46 tools. Zero dependencies. Pure C." />
+    <meta name="twitter:description" content="430 KB binary. 50+ AI providers. 20 channels. 53 tools. Zero dependencies. Pure C." />
     <meta name="twitter:image" content="https://seaclaw.ai/og-image.png" />
 
     <script type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "SeaClaw",
-      "description": "A complete autonomous AI agent runtime in 414 kilobytes of pure C.",
+      "description": "A complete autonomous AI agent runtime in 430 kilobytes of pure C.",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Cross-platform",
       "url": "https://seaclaw.ai/",
@@ -104,7 +104,7 @@ const tools = [
           Bring AI to every device on&nbsp;Earth.
         </h1>
         <p class="hero-desc text-[clamp(1.05rem,2.2vw,1.3rem)] leading-relaxed mb-10 opacity-0 max-w-2xl mx-auto" style="color: var(--color-text-secondary)">
-          A complete autonomous AI agent runtime in <strong style="color: var(--color-text)">414&nbsp;kilobytes</strong> of pure&nbsp;C.<br />
+          A complete autonomous AI agent runtime in <strong style="color: var(--color-text)">430&nbsp;kilobytes</strong> of pure&nbsp;C.<br />
           One static binary. Zero dependencies. Boots in under 2&nbsp;milliseconds.
         </p>
         <div class="hero-buttons flex flex-col sm:flex-row gap-4 justify-center opacity-0">
@@ -120,12 +120,12 @@ const tools = [
       <div class="max-w-5xl mx-auto">
         <div class="numbers-grid glass px-4 md:px-8 py-8 md:py-10 grid grid-cols-3 md:grid-cols-6 gap-0">
           {[
-            { count: 414, suffix: " KB", label: "Binary" },
+            { count: 430, suffix: " KB", label: "Binary" },
             { count: 2, prefix: "<", suffix: " ms", label: "Startup" },
             { count: 2258, label: "Tests" },
             { count: 50, suffix: "+", label: "Providers" },
             { count: 20, label: "Channels" },
-            { count: 46, label: "Tools" },
+            { count: 53, label: "Tools" },
           ].map((stat, i, arr) => (
             <div class={`number-item text-center py-6 md:py-0 ${i < arr.length - 1 ? "md:border-r" : ""}`} style="border-color: var(--color-border)">
               <div class="font-sans font-black text-[clamp(2rem,4vw,3rem)] leading-none" style="color: var(--color-text)" data-count={stat.count} data-prefix={stat.prefix || ""} data-suffix={stat.suffix || ""}>
@@ -243,7 +243,7 @@ const tools = [
     <section class="py-16 md:py-32 px-6">
       <div class="max-w-4xl mx-auto text-center">
         <h2 class="providers-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4 opacity-0" style="color: var(--color-text); letter-spacing: -0.03em;">
-          50+ providers. 20 channels. 46 tools.
+          50+ providers. 20 channels. 53 tools.
         </h2>
         <p class="providers-sub text-lg mb-16 opacity-0" style="color: var(--color-text-secondary)">Connect to any AI model. Reach users on any platform.</p>
         <div class="flex flex-wrap gap-3 justify-center" id="provider-grid">
@@ -300,7 +300,7 @@ const tools = [
           Bring AI to every device on&nbsp;Earth.
         </h2>
         <p class="cta-sub text-[clamp(1.1rem,2.5vw,1.4rem)] mb-14 opacity-0 max-w-xl mx-auto leading-relaxed" style="color: var(--color-text-secondary)">
-          Open source. MIT licensed. 414 KB. Runs anywhere.
+          Open source. MIT licensed. 430 KB. Runs anywhere.
         </p>
         <div class="cta-buttons flex flex-col sm:flex-row gap-4 justify-center opacity-0">
           <a href={`${base}getting-started/installation/`} class="btn-primary">Get Started</a>
@@ -326,7 +326,7 @@ const tools = [
             </thead>
             <tbody>
               <tr><td class="p-3">Language</td><td class="p-3 text-center font-medium" style="color: var(--color-accent, #f97066);">C</td><td class="p-3 text-center opacity-60">TypeScript</td><td class="p-3 text-center opacity-60">Rust</td></tr>
-              <tr><td class="p-3">Binary Size</td><td class="p-3 text-center font-medium" style="color: var(--color-accent, #f97066);">414 KB</td><td class="p-3 text-center opacity-60">~200 MB</td><td class="p-3 text-center opacity-60">~50 MB</td></tr>
+              <tr><td class="p-3">Binary Size</td><td class="p-3 text-center font-medium" style="color: var(--color-accent, #f97066);">430 KB</td><td class="p-3 text-center opacity-60">~200 MB</td><td class="p-3 text-center opacity-60">~50 MB</td></tr>
               <tr><td class="p-3">Peak RAM</td><td class="p-3 text-center font-medium" style="color: var(--color-accent, #f97066);">&lt;6 MB</td><td class="p-3 text-center opacity-60">~300 MB</td><td class="p-3 text-center opacity-60">~100 MB</td></tr>
               <tr><td class="p-3">Dependencies</td><td class="p-3 text-center font-medium" style="color: var(--color-accent, #f97066);">0</td><td class="p-3 text-center opacity-60">900+</td><td class="p-3 text-center opacity-60">200+</td></tr>
               <tr><td class="p-3">Providers</td><td class="p-3 text-center font-medium" style="color: var(--color-accent, #f97066);">50+</td><td class="p-3 text-center opacity-60">1</td><td class="p-3 text-center opacity-60">1</td></tr>
@@ -377,7 +377,7 @@ const tools = [
             '<div><span style="color:rgba(255,255,255,0.3)">$ </span><span style="color:rgba(255,255,255,0.8)">cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON && cmake --build .</span></div>',
             '<div><span style="color:rgba(255,255,255,0.45)">[100%] Built target seaclaw</span></div>',
             '<div><span style="color:rgba(255,255,255,0.3)">$ </span><span style="color:rgba(255,255,255,0.8)">ls -lh seaclaw</span></div>',
-            '<div><span style="color:rgba(255,255,255,0.45)">-rwxr-xr-x  1 user  staff  </span><span style="color:var(--color-accent)">414K</span><span style="color:rgba(255,255,255,0.45)">  seaclaw</span></div>',
+            '<div><span style="color:rgba(255,255,255,0.45)">-rwxr-xr-x  1 user  staff  </span><span style="color:var(--color-accent)">430K</span><span style="color:rgba(255,255,255,0.45)">  seaclaw</span></div>',
           ].join("");
         }
 
@@ -504,10 +504,10 @@ const tools = [
               { prompt: true, text: "cmake --build ." },
               { prompt: false, text: "[100%] Built target seaclaw" },
               { prompt: true, text: "ls -lh seaclaw" },
-              { prompt: false, text: "-rwxr-xr-x  1 user  staff  414K  seaclaw", highlights: [{ text: "414K", cls: accentColor }] },
-              { prompt: true, text: "./seaclaw agent -m \"Hello from a 414 KB binary.\"" },
+              { prompt: false, text: "-rwxr-xr-x  1 user  staff  430K  seaclaw", highlights: [{ text: "430K", cls: accentColor }] },
+              { prompt: true, text: "./seaclaw agent -m \"Hello from a 430 KB binary.\"" },
               { prompt: false, text: "Hello! I'm SeaClaw — a fully autonomous AI assistant", highlights: [{ text: "SeaClaw", cls: accentColor }] },
-              { prompt: false, text: "running in 414 kilobytes. How can I help?" },
+              { prompt: false, text: "running in 430 kilobytes. How can I help?" },
             ];
 
             let lineIdx = 0;

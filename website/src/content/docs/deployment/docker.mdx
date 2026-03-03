@@ -1,21 +1,23 @@
 ---
-title: Docker & Nix Deployment
-description: Deploy SeaClaw using Docker containers or Nix packages.
+title: Docker Deployment
+description: Deploy SeaClaw using Docker containers.
 ---
 
-## Docker
+SeaClaw can run in Docker for isolated, reproducible deployments. The official Dockerfile produces a minimal image with the gateway as the default command.
 
-### Quick start
+## Quick start
 
 ```bash
 docker run -it --rm \
-  -v ~/.nullclaw:/root/.nullclaw \
+  -v ~/.seaclaw:/seaclaw-data/.seaclaw \
   -p 3000:3000 \
   ghcr.io/seaclaw/seaclaw:latest \
   gateway
 ```
 
-### Docker Compose
+Mount your config directory so the container uses your existing config and data.
+
+## Docker Compose
 
 ```yaml
 version: "3.8"
@@ -25,64 +27,79 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./config:/root/.nullclaw
-      - seaclaw-data:/data
+      - ./config:/seaclaw-data/.seaclaw
+      - ./workspace:/seaclaw-data/workspace
     environment:
+      - HOME=/seaclaw-data
+      - SEACLAW_WORKSPACE=/seaclaw-data/workspace
+      - SEACLAW_GATEWAY_PORT=3000
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     restart: unless-stopped
-
-volumes:
-  seaclaw-data:
 ```
 
-### Building from source
+## Building from source
+
+The Dockerfile uses a multi-stage build:
 
 ```dockerfile
-FROM alpine:latest AS build
-RUN apk add --no-cache zig sqlite-dev
-COPY . /src
-WORKDIR /src
-RUN zig build -Doptimize=ReleaseSmall
+# Stage 1: Build
+FROM alpine:3.23 AS builder
+RUN apk add --no-cache build-base cmake sqlite-dev curl-dev
+WORKDIR /app
+COPY CMakeLists.txt src/ include/ asm/ vendor/ cmake/ ./
+RUN mkdir build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON -DSC_ENABLE_CURL=ON && \
+    make -j$(nproc)
 
-FROM alpine:latest
-RUN apk add --no-cache sqlite-libs
-COPY --from=build /src/zig-out/bin/seaclaw /usr/local/bin/
+# Stage 2: Runtime
+FROM alpine:3.23 AS release-base
+RUN apk add --no-cache ca-certificates curl tzdata libsqlite3
+COPY --from=builder /app/build/seaclaw /usr/local/bin/seaclaw
+ENV SEACLAW_WORKSPACE=/seaclaw-data/workspace
+ENV HOME=/seaclaw-data
+ENV SEACLAW_GATEWAY_PORT=3000
+WORKDIR /seaclaw-data
+EXPOSE 3000
 ENTRYPOINT ["seaclaw"]
+CMD ["gateway", "--port", "3000", "--host", "::"]
 ```
 
-### Environment variables
-
-All configuration can be set via environment variables:
-
-| Variable            | Description                  |
-| ------------------- | ---------------------------- |
-| `SEACLAW_CONFIG`    | Path to config file          |
-| `OPENAI_API_KEY`    | OpenAI API key               |
-| `ANTHROPIC_API_KEY` | Anthropic API key            |
-| `SEACLAW_PORT`      | Gateway port (default: 3000) |
-
-## Nix
-
-### Flake usage
-
-```nix
-{
-  inputs.seaclaw.url = "github:seaclaw/seaclaw";
-
-  outputs = { self, nixpkgs, seaclaw }: {
-    # Add to your system packages
-    environment.systemPackages = [
-      seaclaw.packages.${system}.default
-    ];
-  };
-}
-```
-
-### Development shell
+Build:
 
 ```bash
-nix develop github:seaclaw/seaclaw
+docker build -t seaclaw:local .
 ```
 
-This provides `zig`, `sqlite`, and all build dependencies.
+## Environment variables
+
+| Variable                      | Description                       | Default                   |
+| ----------------------------- | --------------------------------- | ------------------------- |
+| `HOME`                        | Home directory (config path base) | `/seaclaw-data`           |
+| `SEACLAW_WORKSPACE`           | Workspace directory               | `/seaclaw-data/workspace` |
+| `SEACLAW_GATEWAY_PORT`        | Gateway port                      | `3000`                    |
+| `SEACLAW_WEBHOOK_HMAC_SECRET` | Webhook HMAC secret (optional)    | -                         |
+| `OPENAI_API_KEY`              | OpenAI API key (if using)         | -                         |
+| `ANTHROPIC_API_KEY`           | Anthropic API key (if using)      | -                         |
+
+API keys and secrets can be passed via environment variables or a mounted config file.
+
+## Image variants
+
+- **release-base** (default): Non-root user (65534:65534), safe for production
+- **release-root**: Runs as root; use only when necessary (e.g. privileged operations)
+
+Build root image:
+
+```bash
+docker build --target release-root -t seaclaw:root .
+```
+
+## Volumes
+
+| Mount                     | Purpose                            |
+| ------------------------- | ---------------------------------- |
+| `/seaclaw-data/.seaclaw`  | Config, crontab, skills, memory DB |
+| `/seaclaw-data/workspace` | Agent workspace files              |
+
+Ensure these directories exist and have correct permissions for the container user.

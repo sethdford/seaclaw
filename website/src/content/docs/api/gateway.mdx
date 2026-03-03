@@ -3,91 +3,132 @@ title: Gateway API
 description: HTTP and WebSocket API reference for the SeaClaw gateway server.
 ---
 
-The gateway is SeaClaw's HTTP server that handles webhooks, the web UI, and API requests.
+The gateway is SeaClaw's HTTP server. It serves the Control UI, handles webhooks from messaging channels, and provides a WebSocket control protocol for real-time control.
 
 ## Starting the gateway
 
 ```bash
-seaclaw gateway                      # Default port 3000
+seaclaw gateway                      # Default: 0.0.0.0:3000
 seaclaw gateway --port 8080          # Custom port
-seaclaw gateway --tunnel cloudflared # With tunnel
+seaclaw gateway --host 127.0.0.1     # Bind to localhost only
+```
+
+## Configuration
+
+Gateway settings in `~/.seaclaw/config.json`:
+
+```json
+{
+  "gateway": {
+    "enabled": true,
+    "port": 3000,
+    "host": "::",
+    "require_pairing": false,
+    "allow_public_bind": false,
+    "pair_rate_limit_per_minute": 60,
+    "webhook_hmac_secret": null,
+    "control_ui_dir": null,
+    "cors_origins": []
+  }
+}
 ```
 
 ## Authentication
 
-All API requests require a pairing token (except the pairing endpoint itself).
+### WebSocket control connections
 
-```
-Authorization: Bearer <pairing-token>
-```
+- If `auth_token` is configured, WebSocket clients must send `Authorization: Bearer <token>` on upgrade.
+- If no auth token is set, localhost connections are typically accepted without a token.
 
-### Pairing flow
+### Webhook HMAC
 
-1. Start the gateway — it prints a 6-digit pairing code
-2. Send the code to the pairing endpoint:
+Webhooks can verify request integrity with HMAC-SHA256:
 
-```bash
-curl -X POST http://localhost:3000/api/pair \
-  -H "Content-Type: application/json" \
-  -d '{"code": "123456"}'
-```
+- Set `webhook_hmac_secret` in config or `SEACLAW_WEBHOOK_HMAC_SECRET`
+- Incoming webhook requests are checked against the `X-Signature` header (or similar) using the secret and request body
+- Invalid signatures receive `401 Unauthorized`
 
-3. The response includes a long-lived token for subsequent requests
+## WebSocket control protocol
 
-## JSON-RPC API
+Connect to `ws://<host>:<port>/ws` for the control protocol. Messages are JSON-RPC 2.0.
 
-All API calls use JSON-RPC 2.0 over HTTP POST to `/api/rpc`:
+### Connect response
 
-```bash
-curl -X POST http://localhost:3000/api/rpc \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"chat.send","params":{"message":"Hello"}}'
-```
+After connecting, the server sends a `hello-ok` message with:
+
+- `server.version`: e.g. `"0.1.0"`
+- `protocol`: version number
+- `features.methods`: list of supported RPC methods
+- `features.sessions`, `features.cron`, `features.skills`, `features.cost_tracking`: booleans
 
 ### Available methods
 
-| Method          | Description                         |
-| --------------- | ----------------------------------- |
-| `chat.send`     | Send a message to the agent         |
-| `chat.history`  | Get conversation history            |
-| `sessions.list` | List all sessions                   |
-| `sessions.get`  | Get a specific session              |
-| `config.get`    | Get current configuration           |
-| `config.set`    | Update configuration                |
-| `models.list`   | List available models and providers |
-| `tools.list`    | List available tools                |
-| `channels.list` | List configured channels            |
-| `health.check`  | Get component health status         |
-| `cron.list`     | List scheduled jobs                 |
-| `skills.list`   | List installed skills               |
-| `memory.search` | Search agent memory                 |
+| Method                  | Description                     |
+| ----------------------- | ------------------------------- |
+| `connect`               | Initial handshake (implicit)    |
+| `health`                | Health check                    |
+| `config.get`            | Get current configuration       |
+| `config.schema`         | Get config schema               |
+| `config.set`            | Update configuration            |
+| `config.apply`          | Apply and persist config        |
+| `capabilities`          | List channels, tools, providers |
+| `chat.send`             | Send message to agent           |
+| `chat.history`          | Get conversation history        |
+| `chat.abort`            | Abort current generation        |
+| `sessions.list`         | List sessions                   |
+| `sessions.patch`        | Update session                  |
+| `sessions.delete`       | Delete session                  |
+| `tools.catalog`         | List available tools            |
+| `channels.status`       | Channel health                  |
+| `cron.list`             | List scheduled jobs             |
+| `cron.add`              | Add cron job                    |
+| `cron.remove`           | Remove cron job                 |
+| `cron.run`              | Manually trigger a job          |
+| `skills.list`           | List installed skills           |
+| `skills.install`        | Install a skill                 |
+| `skills.enable`         | Enable a skill                  |
+| `skills.disable`        | Disable a skill                 |
+| `update.check`          | Check for updates               |
+| `update.run`            | Apply update                    |
+| `exec.approval.resolve` | Resolve tool approval           |
+| `usage.summary`         | Usage/cost summary              |
+| `models.list`           | List models                     |
+| `nodes.list`            | List nodes                      |
+| `push.register`         | Register for push               |
+| `push.unregister`       | Unregister from push            |
 
-## WebSocket
+### Request format
 
-Connect to `ws://localhost:3000/ws` for real-time streaming:
-
-```javascript
-const ws = new WebSocket("ws://localhost:3000/ws");
-ws.send(
-  JSON.stringify({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "chat.send",
-    params: { message: "Hello", stream: true },
-  }),
-);
+```json
+{
+  "type": "req",
+  "id": "1",
+  "method": "chat.send",
+  "params": { "message": "Hello" }
+}
 ```
 
-Streaming responses arrive as individual JSON-RPC notifications with `method: "chat.chunk"`.
+### Streaming
+
+For `chat.send` with `stream: true`, responses arrive as notifications with `method: "chat.chunk"` and incremental content.
 
 ## Webhook endpoints
 
-Channels register webhook handlers at `/webhook/<channel>`:
+Channels register webhooks under `/webhook/<channel>` or legacy paths:
 
-| Endpoint            | Channel              |
-| ------------------- | -------------------- |
-| `/webhook/telegram` | Telegram Bot API     |
-| `/webhook/discord`  | Discord Interactions |
-| `/webhook/slack`    | Slack Events API     |
-| `/webhook/generic`  | Generic JSON webhook |
+| Path                | Channel           |
+| ------------------- | ----------------- |
+| `/webhook/telegram` | Telegram          |
+| `/webhook/discord`  | Discord           |
+| `/webhook/slack`    | Slack             |
+| `/webhook/whatsapp` | WhatsApp          |
+| `/webhook/line`     | Line              |
+| `/webhook/lark`     | Lark              |
+| `/telegram`         | Telegram (legacy) |
+| `/slack/events`     | Slack (legacy)    |
+
+Webhook payloads are channel-specific (Telegram Update, Slack event envelope, etc.). The gateway routes them to the appropriate channel handler.
+
+## Static files and Control UI
+
+When `control_ui_dir` is set, the gateway serves static files from that directory. This is used for the built-in Control UI (SPA) for managing the agent, cron, skills, and config.

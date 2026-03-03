@@ -3,89 +3,96 @@ title: Hardware Peripherals
 description: Connect Arduino, STM32, and Raspberry Pi boards to SeaClaw for physical-world interaction.
 ---
 
-SeaClaw can interface with hardware peripherals, letting the agent read sensors, control actuators, and interact with the physical world.
+SeaClaw can interface with hardware peripherals via a vtable-based API. Supported boards include Arduino (serial), STM32/Nucleo (probe-rs), and Raspberry Pi (GPIO).
 
-## Supported platforms
+## Supported boards
 
-| Platform                  | Interface            | Status       |
-| ------------------------- | -------------------- | ------------ |
-| Arduino (Uno, Mega, Nano) | Serial JSON protocol | Stable       |
-| STM32 / Nucleo            | probe-rs CLI         | Stable       |
-| Raspberry Pi              | GPIO via sysfs/gpiod | Stable       |
-| ESP32                     | Serial JSON protocol | Experimental |
+| Type    | Factory function               | Config                      |
+| ------- | ------------------------------ | --------------------------- |
+| Arduino | `sc_arduino_peripheral_create` | `serial_port`               |
+| STM32   | `sc_stm32_peripheral_create`   | `chip` (e.g. STM32F401RETx) |
+| RPi     | `sc_rpi_peripheral_create`     | (none)                      |
+
+## CLI commands
+
+```bash
+seaclaw hardware list                 # List detected hardware and supported boards
+seaclaw hardware info <board>         # Show info for a specific board type
+```
 
 ## Configuration
 
+Hardware is configured in `~/.seaclaw/config.json`:
+
 ```json
 {
-  "peripherals": [
-    {
-      "name": "sensor-hub",
-      "type": "arduino",
-      "port": "/dev/ttyUSB0",
-      "baud_rate": 115200
-    },
-    {
-      "name": "motor-controller",
-      "type": "stm32",
-      "target": "STM32F401RE"
-    },
-    {
-      "name": "gpio-board",
-      "type": "raspberry_pi"
-    }
-  ]
+  "hardware": {
+    "enabled": true,
+    "transport": "auto",
+    "serial_port": "/dev/ttyUSB0",
+    "baud_rate": 115200,
+    "probe_target": "STM32F401RE"
+  },
+  "peripherals": {
+    "enabled": true,
+    "datasheet_dir": null
+  }
 }
 ```
 
-## Arduino
+| Field                   | Description                  |
+| ----------------------- | ---------------------------- |
+| `hardware.enabled`      | Enable hardware support      |
+| `hardware.transport`    | Transport mode (e.g. `auto`) |
+| `hardware.serial_port`  | Serial port for Arduino      |
+| `hardware.baud_rate`    | Baud rate for serial         |
+| `hardware.probe_target` | STM32 target for probe-rs    |
+| `peripherals.enabled`   | Enable peripheral subsystem  |
 
-Communication uses a serial JSON protocol:
+## Connection methods
 
-```json
-// Read request
-{"cmd": "read", "pin": "A0"}
-// Read response
-{"pin": "A0", "value": 512, "type": "analog"}
+### Arduino
 
-// Write request
-{"cmd": "write", "pin": 13, "value": 1}
-// Write response
-{"pin": 13, "status": "ok"}
-```
+- **Interface**: Serial (UART)
+- **Config**: `serial_port`, `baud_rate`
+- Uses a JSON-based protocol over serial for read/write and similar operations.
 
-Upload the SeaClaw firmware sketch to your Arduino to enable this protocol.
+### STM32 / Nucleo
 
-## STM32 / Nucleo
+- **Interface**: probe-rs (SWD) or similar
+- **Config**: `chip` / `probe_target` (e.g. `STM32F401RETx`)
+- Supports flash programming and register access via probe-rs.
 
-Uses `probe-rs` for flash programming and debugging:
+### Raspberry Pi
 
-```bash
-# Flash firmware
-seaclaw peripheral flash sensor-hub firmware.elf
+- **Interface**: GPIO via sysfs or gpiod
+- **Config**: No extra config; uses system GPIO
+- Provides GPIO read/write for connected devices.
 
-# Read memory
-seaclaw peripheral read sensor-hub 0x20000000 64
-```
+## Peripheral API
 
-## Raspberry Pi
+Peripherals implement `sc_peripheral_t` with:
 
-GPIO access via the `gpiod` library:
+- `name`, `board_type`
+- `init_peripheral`
+- `read(addr, out_value)`, `write(addr, data)`
+- `flash(firmware_path)` (where supported)
+- `capabilities` (board name, features)
+- `destroy`
 
-```bash
-# Read GPIO pin
-seaclaw peripheral read gpio-board --pin 17
+Create a peripheral with:
 
-# Write GPIO pin
-seaclaw peripheral write gpio-board --pin 18 --value 1
+```c
+sc_peripheral_t p;
+sc_peripheral_config_t cfg = {
+    .serial_port = "/dev/ttyUSB0",
+    .serial_port_len = 14,
+    .chip = NULL,
+    .chip_len = 0
+};
+sc_peripheral_create(alloc, "arduino", 7, &cfg, &p);
 ```
 
 ## Agent integration
 
-The agent can interact with peripherals via the `peripheral_read` and `peripheral_write` tools:
-
-```
-Agent: Reading temperature from sensor-hub pin A0...
-Tool call: peripheral_read(device="sensor-hub", pin="A0")
-Result: {"pin": "A0", "value": 23.5, "unit": "celsius"}
-```
+The agent can interact with peripherals through tools that wrap the peripheral API (e.g. `peripheral_read`, `peripheral_write`). These tools are registered when peripherals are enabled and configured.

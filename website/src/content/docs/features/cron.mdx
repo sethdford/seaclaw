@@ -3,17 +3,40 @@ title: Cron System
 description: Schedule recurring agent tasks with the built-in cron scheduler.
 ---
 
-SeaClaw includes a cron-like scheduler that lets the agent run tasks on a schedule without external tooling.
+SeaClaw includes a cron-like scheduler that lets scheduled commands run on a recurring basis. Jobs are stored in a JSON crontab file and executed by the service loop when the gateway is running.
 
 ## CLI commands
 
+The cron CLI manages the crontab file at `~/.seaclaw/crontab.json`:
+
 ```bash
-seaclaw cron list                    # List all scheduled jobs
+seaclaw cron list                      # List all scheduled jobs
+seaclaw cron add "<schedule>" <command>  # Add a job
+seaclaw cron remove <id>               # Remove a job by ID
+```
+
+Example:
+
+```bash
 seaclaw cron add "0 9 * * *" "Check email and summarize"
-seaclaw cron remove <id>             # Remove a job by ID
-seaclaw cron pause <id>              # Pause a job
-seaclaw cron resume <id>             # Resume a paused job
-seaclaw cron run <id>                # Manually trigger a job
+seaclaw cron add "*/15 * * * *" echo "Heartbeat"
+seaclaw cron list
+seaclaw cron remove 1
+```
+
+## Crontab file format
+
+Jobs are persisted in `~/.seaclaw/crontab.json` as a JSON array:
+
+```json
+[
+  {
+    "id": "1",
+    "schedule": "0 9 * * *",
+    "command": "Check email and summarize",
+    "enabled": true
+  }
+]
 ```
 
 ## Cron expression format
@@ -30,7 +53,7 @@ Standard 5-field cron syntax:
 * * * * *
 ```
 
-## Examples
+## Example schedules
 
 | Expression       | Schedule                  |
 | ---------------- | ------------------------- |
@@ -41,14 +64,37 @@ Standard 5-field cron syntax:
 
 ## Configuration
 
+Cron behavior is configured in `~/.seaclaw/config.json` under the `cron` key:
+
 ```json
 {
   "cron": {
     "enabled": true,
-    "max_concurrent": 3,
-    "timezone": "America/New_York"
+    "interval_minutes": 30,
+    "max_run_history": 50
   }
 }
 ```
 
-Jobs are persisted in the SQLite memory database and survive restarts.
+| Field              | Description                            | Default |
+| ------------------ | -------------------------------------- | ------- |
+| `enabled`          | Enable cron job execution              | `false` |
+| `interval_minutes` | How often the scheduler ticks (1–1440) | 30      |
+| `max_run_history`  | Max run records kept per job (0–10000) | 50      |
+
+## Gateway control protocol
+
+When running the gateway (`seaclaw gateway` or `seaclaw service-loop`), the WebSocket control protocol exposes additional cron methods:
+
+| Method        | Description            |
+| ------------- | ---------------------- |
+| `cron.list`   | List scheduled jobs    |
+| `cron.add`    | Add a job              |
+| `cron.remove` | Remove a job           |
+| `cron.run`    | Manually trigger a job |
+
+Use these from the Control UI or any client that connects to the gateway WebSocket.
+
+## Build requirement
+
+Cron support requires `SC_HAS_CRON` (enabled by default). Without it, the `cron` command and control methods are unavailable.

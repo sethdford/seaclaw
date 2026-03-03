@@ -1,50 +1,70 @@
 ---
-title: Migration from OpenClaw
-description: Migrate your OpenClaw installation and data to SeaClaw.
+title: Memory Migration
+description: Migrate memory entries between SQLite and Markdown backends.
 ---
 
-SeaClaw provides a built-in migration tool to transfer your OpenClaw configuration, memory, and sessions.
+SeaClaw provides a migration tool to transfer memory entries between backends. Use it when switching storage (e.g. SQLite → Markdown) or consolidating data.
 
-## Quick migration
-
-```bash
-seaclaw migrate openclaw
-```
-
-This automatically:
-
-1. Detects your OpenClaw installation directory
-2. Converts the configuration to SeaClaw format
-3. Migrates memory databases (SQLite, Markdown)
-4. Transfers session history
-5. Maps provider and channel configurations
-
-## Options
+## CLI usage
 
 ```bash
-seaclaw migrate openclaw --source ~/.openclaw     # Custom source path
-seaclaw migrate openclaw --dry-run                 # Preview without changes
-seaclaw migrate openclaw --skip-memory             # Skip memory migration
-seaclaw migrate openclaw --skip-sessions           # Skip session history
+seaclaw migrate [options] [target_path]
+seaclaw migrate sqlite <source_db_path> [target_path]
+seaclaw migrate markdown <source_directory> [target_path]
 ```
 
-## What gets migrated
+### Examples
 
-| Component         | Status  | Notes                                              |
-| ----------------- | ------- | -------------------------------------------------- |
-| Config            | Full    | All settings mapped to SeaClaw equivalents         |
-| Providers         | Full    | API keys and endpoints preserved                   |
-| Channels          | Full    | Token/webhook configs preserved                    |
-| Memory (SQLite)   | Full    | Schema-compatible                                  |
-| Memory (Markdown) | Full    | Direct copy                                        |
-| Sessions          | Full    | Conversation history preserved                     |
-| Custom tools      | Partial | Vtable interface differs; manual adaptation needed |
-
-## Post-migration
-
-After migration, verify your setup:
+**Migrate from SQLite to Markdown (dry run):**
 
 ```bash
-seaclaw health              # Check all components
-seaclaw agent "Hello"       # Test a simple interaction
+seaclaw migrate sqlite ~/.seaclaw/memory.db ./memories
 ```
+
+**Migrate from Markdown to SQLite:**
+
+```bash
+seaclaw migrate markdown ./old-memories ~/.seaclaw/new-memory.db
+```
+
+**Target path only** (migrate from empty source to target; useful for dry run):
+
+```bash
+seaclaw migrate ./output-dir
+```
+
+## Supported paths
+
+| Source   | Target   | Description                   |
+| -------- | -------- | ----------------------------- |
+| SQLite   | Markdown | Export DB to Markdown files   |
+| Markdown | SQLite   | Import Markdown files into DB |
+| None     | Markdown | Empty run (0 entries)         |
+
+## How it works
+
+1. Opens the source backend (SQLite DB or Markdown directory)
+2. Lists all entries via the memory vtable `list`
+3. For each entry, calls `store` on the target backend
+4. Tracks imported, skipped, and error counts
+
+## Migration stats
+
+After migration, the CLI prints:
+
+```
+Migration: N from sqlite, M from markdown, K imported
+```
+
+- `from_sqlite` / `from_markdown`: Entries read from source
+- `imported`: Successfully written to target
+- `skipped`: Entries with missing key or content
+- `errors`: Store failures
+
+## Dry run
+
+The current implementation defaults to `dry_run: true` when source is `SC_MIGRATION_SOURCE_NONE`. For actual migrations with a real source, entries are written to the target. Check the implementation for exact dry-run behavior.
+
+## SQLite requirement
+
+When SQLite is disabled (`SC_ENABLE_SQLITE` off), only Markdown ↔ Markdown and None → Markdown migrations are supported. SQLite as source or target returns `SC_ERR_NOT_SUPPORTED`.
