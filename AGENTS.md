@@ -25,7 +25,7 @@ Key extension points:
 - `src/runtime/` (`sc_runtime_t`) — execution environments
 - `src/peripherals/` (`sc_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 
-Current scale: **400+ source + header files, ~70K+ lines of C, ~28K+ lines of tests, 2,150+ tests**.
+Current scale: **463 source + header files, ~91K lines of C, ~28K+ lines of tests, 2,177+ tests**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -75,7 +75,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `SC_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 2,000+ tests must pass at zero ASan errors**
+5. **All 2,177+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `SC_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -156,7 +156,7 @@ src/
 
 include/seaclaw/       public C headers
 
-tests/                 65+ test files, 2,000+ tests
+tests/                 72 test files, 2,177+ tests
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 
@@ -299,7 +299,67 @@ When handing off work, include:
 4. Remaining risks / unknowns
 5. Next recommended action
 
-## 12) Vibe Coding Guardrails
+## 12) UI & Design System Contract
+
+All UI surfaces (web dashboard, website, native apps, CLI/TUI) must follow these rules.
+
+### 12.1 Typography
+
+Required:
+
+- **Avenir** is the canonical typeface across all platforms.
+- Web: always use `var(--sc-font)` token. Never set `font-family` directly. Never import Google Fonts.
+- Apple native: `Font.custom("Avenir-Book", size:)` / `"Avenir-Medium"` / `"Avenir-Heavy"` / `"Avenir-Black"`.
+- Android: `AvenirFontFamily` from `Theme.kt`.
+- CLI/TUI: terminal font (no control), but use token-derived ANSI colors from `design_tokens.h`.
+
+### 12.2 Icons
+
+Required:
+
+- **Phosphor Regular** is the canonical icon library.
+- Web dashboard: import from `ui/src/icons.ts`. Add new icons there using Phosphor Regular SVG paths.
+- Website: inline Phosphor SVGs with `viewBox="0 0 256 256" fill="currentColor"`.
+- Never use emoji characters as UI icons (no ⚠️, 💬, 🔧, ⚡, ⚙, etc.).
+- Never create one-off SVGs when a Phosphor equivalent exists.
+
+### 12.3 Design Tokens
+
+Required:
+
+- Single source of truth: `design-tokens/` directory (W3C Design Tokens v2025.10 format).
+- All platforms consume generated output, not hand-maintained values.
+- CSS: `--sc-*` namespace. Never use raw hex colors, pixel spacing, or pixel radii.
+- Token categories: color (base + semantic), spacing, radius, shadow, typography, motion.
+- Generated outputs: CSS custom properties, Kotlin constants, Swift constants, C `#define` macros.
+
+### 12.4 Motion & Animation
+
+Required:
+
+- Use `--sc-duration-*` and `--sc-ease-*` tokens for all transitions.
+- Use spring tokens (`--sc-spring-micro`, `--sc-spring-standard`, `--sc-spring-expressive`) for physics motion.
+- Every animation must respect `prefers-reduced-motion: reduce`.
+- Keyframe names use `sc-` prefix.
+
+### 12.5 Accessibility
+
+Required:
+
+- WCAG 2.1 AA minimum (4.5:1 text contrast, 3:1 UI contrast).
+- All interactive elements: visible focus ring, keyboard operable.
+- Modals: focus trap, Escape to close, `aria-modal`.
+- `prefers-color-scheme` and `prefers-reduced-motion` both supported.
+
+### 12.6 Change Playbook: Adding a UI Component
+
+- Add `ui/src/components/sc-<name>.ts` as a LitElement web component.
+- Use `--sc-*` tokens exclusively in `static styles`.
+- Add test file for render, accessibility, and keyboard navigation.
+- Register in component catalog (`ui/src/catalog/`).
+- Update `ui/src/icons.ts` if the component needs a new icon.
+
+## 13) Vibe Coding Guardrails
 
 When working in fast iterative mode:
 
