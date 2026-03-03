@@ -142,8 +142,11 @@ jobs:
           build-type: MinSizeRel
           enable-lto: "true"
           enable-all-channels: "true"
+          extra-cmake-flags: -DSC_ENABLE_BENCH=ON
       - name: Run benchmark
         run: scripts/benchmark.sh build/seaclaw --save-history
+      - name: Run core benchmarks
+        run: ./build/seaclaw_bench 2>&1 | tee benchmark-core.txt
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
@@ -151,6 +154,7 @@ jobs:
           path: |
             benchmark-results.json
             benchmark-history.json
+            benchmark-core.txt
           retention-days: 90
 
   static-analysis:

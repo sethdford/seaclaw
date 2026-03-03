@@ -2578,6 +2578,7 @@ void run_provider_all_tests(void) {
     SC_RUN_TEST(test_claude_cli_chat_mock);
     SC_RUN_TEST(test_claude_cli_deinit_no_crash);
     SC_RUN_TEST(test_claude_cli_create_empty_key);
+    SC_RUN_TEST(test_claude_cli_chat_empty_messages_graceful);
 
     SC_RUN_TEST(test_compatible_url_lookup_groq);
     SC_RUN_TEST(test_compatible_url_lookup_mistral);
@@ -2652,12 +2653,15 @@ void run_provider_all_tests(void) {
     SC_RUN_TEST(test_codex_cli_chat_mock);
     SC_RUN_TEST(test_codex_cli_create_null_alloc_fails);
     SC_RUN_TEST(test_codex_cli_deinit_no_crash);
+    SC_RUN_TEST(test_codex_cli_chat_empty_messages_graceful);
     SC_RUN_TEST(test_openai_codex_create_succeeds);
     SC_RUN_TEST(test_openai_codex_get_name);
     SC_RUN_TEST(test_openai_codex_supports_native_tools);
     SC_RUN_TEST(test_openai_codex_chat_mock);
     SC_RUN_TEST(test_openai_codex_create_null_alloc_fails);
     SC_RUN_TEST(test_openai_codex_deinit_no_crash);
+    SC_RUN_TEST(test_openai_codex_chat_null_request_returns_error);
+    SC_RUN_TEST(test_openai_codex_chat_empty_messages_graceful);
 
     SC_RUN_TEST(test_reliable_create_simple);
     SC_RUN_TEST(test_reliable_supports_native_tools_aggregates);
