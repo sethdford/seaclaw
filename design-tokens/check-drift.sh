@@ -31,6 +31,13 @@ if ! diff -q "$TMPDIR/_tokens.css" "$REPO_ROOT/website/src/styles/_tokens.css" >
   DRIFT=1
 fi
 
+# Format generated C header to match committed (clang-format aligned) version
+CLANG_FMT=$(command -v clang-format 2>/dev/null || echo "/opt/homebrew/opt/llvm/bin/clang-format")
+if [ -x "$CLANG_FMT" ] && [ -f "$TMPDIR/design_tokens.h" ]; then
+  cp "$REPO_ROOT/.clang-format" "$TMPDIR/.clang-format" 2>/dev/null || true
+  (cd "$TMPDIR" && "$CLANG_FMT" -i design_tokens.h) 2>/dev/null || true
+fi
+
 # Check C header output
 if ! diff -q "$TMPDIR/design_tokens.h" "$REPO_ROOT/include/seaclaw/design_tokens.h" >/dev/null 2>&1; then
   echo "DRIFT: include/seaclaw/design_tokens.h differs from generated output"

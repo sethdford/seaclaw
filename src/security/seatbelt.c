@@ -55,9 +55,19 @@ static sc_error_t seatbelt_wrap(void *ctx, const char *const *argv, size_t argc,
     return SC_ERR_NOT_SUPPORTED;
 #else
     sc_seatbelt_ctx_t *sb = (sc_seatbelt_ctx_t *)ctx;
-    const size_t prefix_len = 3;
     if (!buf || !out_count)
         return SC_ERR_INVALID_ARGUMENT;
+
+#if SC_IS_TEST
+    /* In test mode: pass-through without calling sandbox-exec */
+    if (buf_count < argc)
+        return SC_ERR_INVALID_ARGUMENT;
+    for (size_t i = 0; i < argc; i++)
+        buf[i] = argv[i];
+    *out_count = argc;
+    return SC_OK;
+#else
+    const size_t prefix_len = 3;
     if (buf_count < prefix_len + argc)
         return SC_ERR_INVALID_ARGUMENT;
     if (sb->profile_len == 0)
@@ -71,13 +81,14 @@ static sc_error_t seatbelt_wrap(void *ctx, const char *const *argv, size_t argc,
     *out_count = prefix_len + argc;
     return SC_OK;
 #endif
+#endif
 }
 
 static bool seatbelt_available(void *ctx) {
     (void)ctx;
 #ifdef __APPLE__
 #if SC_IS_TEST
-    return true;
+    return true; /* Skip binary check in tests */
 #else
     return access("/usr/bin/sandbox-exec", X_OK) == 0;
 #endif

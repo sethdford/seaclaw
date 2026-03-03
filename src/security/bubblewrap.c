@@ -52,9 +52,9 @@ static sc_error_t bubblewrap_wrap(void *ctx, const char *const *argv, size_t arg
 
 static bool bubblewrap_available(void *ctx) {
     (void)ctx;
-#ifdef __linux__
+#if defined(__linux__) && defined(SC_GATEWAY_POSIX)
 #if SC_IS_TEST
-    return false; /* Skip binary check in tests; avoids CI dependency */
+    return true; /* Skip binary check in tests */
 #else
     return bwrap_binary_exists();
 #endif
