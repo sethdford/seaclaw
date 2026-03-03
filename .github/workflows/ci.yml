@@ -204,6 +204,18 @@ jobs:
       - run: cd website && npm ci && npm run build
       - run: test -d website/dist
 
+  design-tokens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: design-tokens/package-lock.json
+      - run: cd design-tokens && npm ci && npm run build -- --outdir /tmp/dt-check
+      - run: bash design-tokens/check-drift.sh
+
   nix:
     runs-on: ubuntu-latest
     steps:
