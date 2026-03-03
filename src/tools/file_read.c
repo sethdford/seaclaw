@@ -10,11 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "seaclaw/tools/schema_common.h"
 #define SC_FILE_READ_NAME "file_read"
 #define SC_FILE_READ_DESC "Read file contents from path"
-#define SC_FILE_READ_PARAMS                                                                        \
-    "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"]" \
-    "}"
+#define SC_FILE_READ_PARAMS SC_SCHEMA_PATH_ONLY
 
 typedef struct sc_file_read_ctx {
     const char *workspace_dir;

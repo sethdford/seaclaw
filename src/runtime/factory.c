@@ -22,6 +22,7 @@ sc_error_t sc_runtime_from_config(const struct sc_config *cfg, sc_runtime_t *out
         return SC_OK;
     }
 
+#ifdef SC_HAS_RUNTIME_EXOTIC
     if (strcmp(kind, "wasm") == 0) {
         *out = sc_runtime_wasm(0);
         return SC_OK;
@@ -31,6 +32,7 @@ sc_error_t sc_runtime_from_config(const struct sc_config *cfg, sc_runtime_t *out
         *out = sc_runtime_cloudflare();
         return SC_OK;
     }
+#endif
 
     return SC_ERR_NOT_SUPPORTED;
 }

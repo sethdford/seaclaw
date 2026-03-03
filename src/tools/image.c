@@ -9,11 +9,10 @@
 
 #define SC_IMAGE_MAX_SIZE (5 * 1024 * 1024)
 
+#include "seaclaw/tools/schema_common.h"
 #define SC_IMAGE_NAME "image"
 #define SC_IMAGE_DESC "Analyze an image file: detect format, size, and dimensions."
-#define SC_IMAGE_PARAMS                                                                            \
-    "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"]" \
-    "}"
+#define SC_IMAGE_PARAMS SC_SCHEMA_PATH_ONLY
 
 typedef struct sc_image_ctx {
     char *api_key;

@@ -11,6 +11,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "seaclaw/memory/sql_common.h"
+
 #define SC_SQLITE_BUSY_TIMEOUT_MS 5000
 
 typedef struct sc_sqlite_memory {
@@ -578,9 +580,7 @@ sc_memory_t sc_sqlite_memory_create(sc_allocator_t *alloc, const char *db_path) 
         return (sc_memory_t){.ctx = NULL, .vtable = NULL};
     }
     sqlite3_busy_timeout(db, SC_SQLITE_BUSY_TIMEOUT_MS);
-    sqlite3_exec(db, "PRAGMA secure_delete=ON;", NULL, NULL, NULL);
-    sqlite3_exec(db, "PRAGMA journal_mode=WAL;", NULL, NULL, NULL);
-    sqlite3_exec(db, "PRAGMA foreign_keys=ON;", NULL, NULL, NULL);
+    sqlite3_exec(db, SC_SQL_PRAGMA_INIT, NULL, NULL, NULL);
 
     for (const char *const *part = schema_parts; *part; part++) {
         char *err = NULL;

@@ -27,10 +27,13 @@
 #include "seaclaw/tools/file_read.h"
 #include "seaclaw/tools/file_write.h"
 #include "seaclaw/tools/git.h"
+#ifdef SC_HAS_PERIPHERALS
 #include "seaclaw/tools/hardware_info.h"
 #include "seaclaw/tools/hardware_memory.h"
-#include "seaclaw/tools/http_request.h"
 #include "seaclaw/tools/i2c.h"
+#include "seaclaw/tools/spi.h"
+#endif
+#include "seaclaw/tools/http_request.h"
 #include "seaclaw/tools/image.h"
 #include "seaclaw/tools/memory_forget.h"
 #include "seaclaw/tools/memory_list.h"
@@ -45,13 +48,17 @@
 #include "seaclaw/tools/screenshot.h"
 #include "seaclaw/tools/shell.h"
 #include "seaclaw/tools/spawn.h"
-#include "seaclaw/tools/spi.h"
 #include "seaclaw/tools/web_fetch.h"
 #include "seaclaw/tools/web_search.h"
 #include <stdlib.h>
 #include <string.h>
 
-#define SC_TOOLS_COUNT 44
+#define SC_TOOLS_COUNT_BASE 40
+#ifdef SC_HAS_PERIPHERALS
+#define SC_TOOLS_COUNT (SC_TOOLS_COUNT_BASE + 4)
+#else
+#define SC_TOOLS_COUNT SC_TOOLS_COUNT_BASE
+#endif
 
 static sc_error_t add_tool_ws(sc_allocator_t *alloc, sc_tool_t *tools, size_t *idx, const char *ws,
                               size_t ws_len, sc_security_policy_t *policy,
@@ -218,10 +225,12 @@ sc_error_t sc_tools_create_default(sc_allocator_t *alloc, const char *workspace_
         goto fail;
     idx++;
 
+#ifdef SC_HAS_PERIPHERALS
     err = sc_hardware_memory_create(alloc, NULL, 0, &tools[idx]);
     if (err != SC_OK)
         goto fail;
     idx++;
+#endif
 
     err = sc_schedule_create(alloc, cron, &tools[idx]);
     if (err != SC_OK)
@@ -238,6 +247,7 @@ sc_error_t sc_tools_create_default(sc_allocator_t *alloc, const char *workspace_
         goto fail;
     idx++;
 
+#ifdef SC_HAS_PERIPHERALS
     err = sc_hardware_info_create(alloc, false, &tools[idx]);
     if (err != SC_OK)
         goto fail;
@@ -252,6 +262,7 @@ sc_error_t sc_tools_create_default(sc_allocator_t *alloc, const char *workspace_
     if (err != SC_OK)
         goto fail;
     idx++;
+#endif
 
     err = sc_claude_code_create(alloc, policy, &tools[idx]);
     if (err != SC_OK)

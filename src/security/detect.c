@@ -6,16 +6,22 @@
 
 struct sc_sandbox_storage {
     sc_noop_sandbox_ctx_t noop;
+    sc_docker_ctx_t docker;
+    sc_wasi_sandbox_ctx_t wasi;
+#ifdef __APPLE__
+    sc_seatbelt_ctx_t seatbelt;
+#endif
+#if defined(__linux__)
     sc_landlock_ctx_t landlock;
     sc_firejail_ctx_t firejail;
     sc_bubblewrap_ctx_t bubblewrap;
-    sc_docker_ctx_t docker;
-    sc_seatbelt_ctx_t seatbelt;
     sc_seccomp_ctx_t seccomp;
     sc_landlock_seccomp_ctx_t landlock_seccomp;
-    sc_wasi_sandbox_ctx_t wasi;
     sc_firecracker_ctx_t firecracker;
+#endif
+#ifdef _WIN32
     sc_appcontainer_ctx_t appcontainer;
+#endif
 };
 
 sc_sandbox_storage_t *sc_sandbox_storage_create(const sc_sandbox_alloc_t *alloc) {
@@ -47,6 +53,7 @@ sc_sandbox_t sc_sandbox_create(sc_sandbox_backend_t backend, const char *workspa
         result = sc_noop_sandbox_get(&st->noop);
         break;
     }
+#if defined(__linux__)
     case SC_SANDBOX_LANDLOCK: {
         sc_landlock_sandbox_init(&st->landlock, ws);
         result = sc_landlock_sandbox_get(&st->landlock);
@@ -68,6 +75,7 @@ sc_sandbox_t sc_sandbox_create(sc_sandbox_backend_t backend, const char *workspa
             result = sc_noop_sandbox_get(&st->noop);
         break;
     }
+#endif
     case SC_SANDBOX_DOCKER: {
         if (!alloc || !alloc->alloc || !alloc->free)
             break;
@@ -76,6 +84,7 @@ sc_sandbox_t sc_sandbox_create(sc_sandbox_backend_t backend, const char *workspa
         result = sc_docker_sandbox_get(&st->docker);
         break;
     }
+#ifdef __APPLE__
     case SC_SANDBOX_SEATBELT: {
         sc_seatbelt_sandbox_init(&st->seatbelt, ws);
         result = sc_seatbelt_sandbox_get(&st->seatbelt);
@@ -83,6 +92,8 @@ sc_sandbox_t sc_sandbox_create(sc_sandbox_backend_t backend, const char *workspa
             result = sc_noop_sandbox_get(&st->noop);
         break;
     }
+#endif
+#if defined(__linux__)
     case SC_SANDBOX_SECCOMP: {
         sc_seccomp_sandbox_init(&st->seccomp, ws, false);
         result = sc_seccomp_sandbox_get(&st->seccomp);
@@ -90,6 +101,7 @@ sc_sandbox_t sc_sandbox_create(sc_sandbox_backend_t backend, const char *workspa
             result = sc_noop_sandbox_get(&st->noop);
         break;
     }
+#endif
     case SC_SANDBOX_WASI: {
         sc_wasi_sandbox_init(&st->wasi, ws);
         result = sc_wasi_sandbox_get(&st->wasi);
@@ -97,6 +109,7 @@ sc_sandbox_t sc_sandbox_create(sc_sandbox_backend_t backend, const char *workspa
             result = sc_noop_sandbox_get(&st->noop);
         break;
     }
+#if defined(__linux__)
     case SC_SANDBOX_LANDLOCK_SECCOMP: {
         sc_landlock_seccomp_sandbox_init(&st->landlock_seccomp, ws, false);
         result = sc_landlock_seccomp_sandbox_get(&st->landlock_seccomp);
@@ -111,6 +124,8 @@ sc_sandbox_t sc_sandbox_create(sc_sandbox_backend_t backend, const char *workspa
             result = sc_noop_sandbox_get(&st->noop);
         break;
     }
+#endif
+#ifdef _WIN32
     case SC_SANDBOX_APPCONTAINER: {
         sc_appcontainer_sandbox_init(&st->appcontainer, ws);
         result = sc_appcontainer_sandbox_get(&st->appcontainer);
@@ -118,6 +133,7 @@ sc_sandbox_t sc_sandbox_create(sc_sandbox_backend_t backend, const char *workspa
             result = sc_noop_sandbox_get(&st->noop);
         break;
     }
+#endif
     case SC_SANDBOX_AUTO: {
         /*
          * Tiered auto-detection:
@@ -183,6 +199,9 @@ sc_sandbox_t sc_sandbox_create(sc_sandbox_backend_t backend, const char *workspa
         result = sc_noop_sandbox_get(&st->noop);
         break;
     }
+    default:
+        result = sc_noop_sandbox_get(&st->noop);
+        break;
     }
     return result;
 }

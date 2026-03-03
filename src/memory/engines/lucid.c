@@ -344,6 +344,7 @@ sc_memory_t sc_lucid_memory_create(sc_allocator_t *alloc, const char *db_path,
 #ifdef SC_ENABLE_SQLITE
 
 #include <sqlite3.h>
+#include "seaclaw/memory/sql_common.h"
 
 typedef struct sc_lucid_memory_prod {
     sc_allocator_t *alloc;
@@ -667,9 +668,7 @@ sc_memory_t sc_lucid_memory_create(sc_allocator_t *alloc, const char *db_path,
         return (sc_memory_t){.ctx = NULL, .vtable = NULL};
     }
     sqlite3_busy_timeout(db, SC_SQLITE_BUSY_TIMEOUT_MS);
-    sqlite3_exec(db, "PRAGMA secure_delete=ON;", NULL, NULL, NULL);
-    sqlite3_exec(db, "PRAGMA journal_mode=WAL;", NULL, NULL, NULL);
-    sqlite3_exec(db, "PRAGMA foreign_keys=ON;", NULL, NULL, NULL);
+    sqlite3_exec(db, SC_SQL_PRAGMA_INIT, NULL, NULL, NULL);
     char *err = NULL;
     rc = sqlite3_exec(db, schema_sql, NULL, NULL, &err);
     if (rc != SQLITE_OK) {

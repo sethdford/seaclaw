@@ -8,10 +8,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "seaclaw/tools/schema_common.h"
 #define SC_CRON_REMOVE_NAME "cron_remove"
 #define SC_CRON_REMOVE_DESC "Remove cron job"
-#define SC_CRON_REMOVE_PARAMS \
-    "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},\"required\":[\"id\"]}"
+#define SC_CRON_REMOVE_PARAMS SC_SCHEMA_ID_ONLY
 
 typedef struct {
     sc_cron_scheduler_t *sched;

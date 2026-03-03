@@ -9,9 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "seaclaw/tools/schema_common.h"
 #define SC_CRON_LIST_NAME   "cron_list"
 #define SC_CRON_LIST_DESC   "List cron jobs"
-#define SC_CRON_LIST_PARAMS "{\"type\":\"object\",\"properties\":{},\"required\":[]}"
+#define SC_CRON_LIST_PARAMS SC_SCHEMA_EMPTY
 
 typedef struct {
     sc_cron_scheduler_t *sched;

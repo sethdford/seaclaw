@@ -365,6 +365,7 @@ sc_error_t sc_agent_cli_run(sc_allocator_t *alloc, const char *const *argv, size
                 sc_sandbox_create(cfg.security.sandbox_config.backend, ws, sb_storage, &sb_alloc);
             if (sandbox.vtable) {
                 policy.sandbox = &sandbox;
+#if defined(__linux__)
                 if (strcmp(sc_sandbox_name(&sandbox), "firejail") == 0 &&
                     cfg.security.sandbox_config.firejail_args_len > 0) {
                     sc_firejail_sandbox_set_extra_args(
@@ -372,6 +373,7 @@ sc_error_t sc_agent_cli_run(sc_allocator_t *alloc, const char *const *argv, size
                         (const char *const *)cfg.security.sandbox_config.firejail_args,
                         cfg.security.sandbox_config.firejail_args_len);
                 }
+#endif
             }
         }
     }

@@ -27,6 +27,7 @@ sc_tunnel_t sc_tunnel_create(sc_allocator_t *alloc, const sc_tunnel_config_t *co
     switch (config->provider) {
     case SC_TUNNEL_NONE:
         return sc_none_tunnel_create(alloc);
+#ifdef SC_HAS_TUNNELS
     case SC_TUNNEL_CLOUDFLARE:
         return sc_cloudflare_tunnel_create(alloc, config->cloudflare_token,
                                            config->cloudflare_token_len);
@@ -38,6 +39,7 @@ sc_tunnel_t sc_tunnel_create(sc_allocator_t *alloc, const sc_tunnel_config_t *co
     case SC_TUNNEL_CUSTOM:
         return sc_custom_tunnel_create(alloc, config->custom_start_cmd,
                                        config->custom_start_cmd_len);
+#endif
     default:
         return sc_none_tunnel_create(alloc);
     }

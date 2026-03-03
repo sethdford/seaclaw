@@ -510,6 +510,8 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
                 sc_sandbox_create(cfg.security.sandbox_config.backend, ws, sb_storage, &sb_alloc);
             if (sandbox.vtable) {
                 policy.sandbox = &sandbox;
+
+#if defined(__linux__)
                 if (strcmp(sc_sandbox_name(&sandbox), "firejail") == 0 &&
                     cfg.security.sandbox_config.firejail_args_len > 0) {
                     sc_firejail_sandbox_set_extra_args(
@@ -517,6 +519,7 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
                         (const char *const *)cfg.security.sandbox_config.firejail_args,
                         cfg.security.sandbox_config.firejail_args_len);
                 }
+#endif
             }
         }
     }
@@ -1084,6 +1087,7 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
                                            &gw_sb_alloc);
             if (gw_sandbox.vtable) {
                 policy.sandbox = &gw_sandbox;
+#if defined(__linux__)
                 if (strcmp(sc_sandbox_name(&gw_sandbox), "firejail") == 0 &&
                     cfg.security.sandbox_config.firejail_args_len > 0) {
                     sc_firejail_sandbox_set_extra_args(
@@ -1091,6 +1095,7 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
                         (const char *const *)cfg.security.sandbox_config.firejail_args,
                         cfg.security.sandbox_config.firejail_args_len);
                 }
+#endif
             }
         }
     }

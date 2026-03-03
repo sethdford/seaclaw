@@ -7,9 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "seaclaw/tools/schema_common.h"
 #define SC_MEMORY_LIST_NAME   "memory_list"
 #define SC_MEMORY_LIST_DESC   "List memories"
-#define SC_MEMORY_LIST_PARAMS "{\"type\":\"object\",\"properties\":{},\"required\":[]}"
+#define SC_MEMORY_LIST_PARAMS SC_SCHEMA_EMPTY
 
 typedef struct sc_memory_list_ctx {
     sc_memory_t *memory;

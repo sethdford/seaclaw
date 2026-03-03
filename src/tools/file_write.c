@@ -10,11 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "seaclaw/tools/schema_common.h"
 #define SC_FILE_WRITE_NAME "file_write"
 #define SC_FILE_WRITE_DESC "Write content to file"
-#define SC_FILE_WRITE_PARAMS                                                                     \
-    "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"content\":{\"type\":" \
-    "\"string\"}},\"required\":[\"path\",\"content\"]}"
+#define SC_FILE_WRITE_PARAMS SC_SCHEMA_PATH_CONTENT
 
 typedef struct sc_file_write_ctx {
     const char *workspace_dir;

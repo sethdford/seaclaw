@@ -16,6 +16,11 @@ option(SC_ENABLE_READLINE "Enable readline/libedit for CLI line editing" OFF)
 option(SC_ENABLE_LINENOISE "Enable linenoise for lightweight CLI line editing (vendor/linenoise)" OFF)
 option(SC_ENABLE_TUI "Enable rich TUI mode with split-pane terminal UI (vendor/termbox2)" OFF)
 
+# --- Optional module groups (OFF by default to minimize binary size) ---
+option(SC_ENABLE_PERIPHERALS "Build hardware peripheral support (Arduino, STM32, RPi, SPI, I2C)" OFF)
+option(SC_ENABLE_TUNNELS "Build tunnel providers (ngrok, cloudflare, tailscale)" OFF)
+option(SC_ENABLE_RUNTIME_EXOTIC "Build exotic runtime adapters (WASM, Cloudflare Workers)" OFF)
+
 # WASM build: cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..
 
 # --- Per-channel build options (CLI ON by default, others OFF) ---
@@ -215,16 +220,7 @@ set(SC_CORE_SOURCES
     src/security/secrets.c
     src/security/audit.c
     src/security/noop_sandbox.c
-    src/security/landlock.c
-    src/security/firejail.c
-    src/security/bubblewrap.c
     src/security/docker.c
-    src/security/seatbelt.c
-    src/security/seccomp.c
-    src/security/landlock_seccomp.c
-    src/security/appcontainer.c
-    src/security/wasi_sandbox.c
-    src/security/firecracker.c
     src/security/detect.c
     src/security/sandbox.c
     src/observability.c
@@ -232,10 +228,6 @@ set(SC_CORE_SOURCES
     src/observability/metrics_observer.c
     src/observability/multi_observer.c
     src/tunnel/none.c
-    src/tunnel/cloudflare.c
-    src/tunnel/ngrok.c
-    src/tunnel/tailscale.c
-    src/tunnel/custom.c
     src/tunnel/root.c
     src/gateway/gateway.c
     src/gateway/ws_server.c
@@ -244,8 +236,6 @@ set(SC_CORE_SOURCES
     src/gateway/push.c
     src/runtime/native.c
     src/runtime/docker.c
-    src/runtime/wasm_rt.c
-    src/runtime/cloudflare.c
     src/runtime/factory.c
     src/agent/agent.c
     src/agent/context.c
@@ -339,14 +329,10 @@ set(SC_CORE_SOURCES
     src/tools/cron_update.c
     src/tools/browser_open.c
     src/tools/composio.c
-    src/tools/hardware_memory.c
     src/tools/schedule.c
     src/tools/schema.c
     src/tools/schema_clean.c
     src/tools/pushover.c
-    src/tools/hardware_info.c
-    src/tools/i2c.c
-    src/tools/spi.c
     src/tools/image.c
     src/tools/screenshot.c
     src/tools/claude_code.c
@@ -359,11 +345,6 @@ set(SC_CORE_SOURCES
     src/tools/diff.c
     src/tools/factory.c
     src/mcp_server.c
-    src/peripherals/arduino.c
-    src/peripherals/stm32.c
-    src/peripherals/rpi.c
-    src/peripherals/factory.c
-    src/hardware.c
     src/channels/thread_binding.c
     src/security/policy_engine.c
     src/security/replay.c
@@ -395,6 +376,61 @@ set(SC_CORE_SOURCES
     src/memory/vector/store_qdrant.c
     src/memory/lifecycle/semantic_cache.c
 )
+
+# --- Conditional module groups (feature-gated for binary size) ---
+
+# Peripherals: Arduino, STM32, RPi + hardware tools
+if(SC_ENABLE_PERIPHERALS)
+    list(APPEND SC_CORE_SOURCES
+        src/peripherals/arduino.c
+        src/peripherals/stm32.c
+        src/peripherals/rpi.c
+        src/peripherals/factory.c
+        src/hardware.c
+        src/tools/hardware_info.c
+        src/tools/hardware_memory.c
+        src/tools/i2c.c
+        src/tools/spi.c
+    )
+endif()
+
+# Tunnels: ngrok, cloudflare, tailscale, custom
+if(SC_ENABLE_TUNNELS)
+    list(APPEND SC_CORE_SOURCES
+        src/tunnel/cloudflare.c
+        src/tunnel/ngrok.c
+        src/tunnel/tailscale.c
+        src/tunnel/custom.c
+    )
+endif()
+
+# Exotic runtimes: WASM, Cloudflare Workers (stubs — only needed if configuring these runtimes)
+if(SC_ENABLE_RUNTIME_EXOTIC)
+    list(APPEND SC_CORE_SOURCES
+        src/runtime/wasm_rt.c
+        src/runtime/cloudflare.c
+    )
+endif()
+
+# Platform-specific security sandboxes (auto-detected, no manual option needed)
+if(APPLE)
+    list(APPEND SC_CORE_SOURCES src/security/seatbelt.c)
+endif()
+if(UNIX AND NOT APPLE)
+    list(APPEND SC_CORE_SOURCES
+        src/security/landlock.c
+        src/security/firejail.c
+        src/security/bubblewrap.c
+        src/security/seccomp.c
+        src/security/landlock_seccomp.c
+        src/security/firecracker.c
+    )
+endif()
+if(WIN32)
+    list(APPEND SC_CORE_SOURCES src/security/appcontainer.c)
+endif()
+# WASI sandbox is cross-platform
+list(APPEND SC_CORE_SOURCES src/security/wasi_sandbox.c)
 
 # Crypto sources (generic C fallbacks + dispatch)
 set(SC_CRYPTO_SOURCES
@@ -435,6 +471,17 @@ endif()
 target_include_directories(seaclaw_core PRIVATE ${SC_ROOT}/asm/generic)
 ## SC_IS_TEST is intentionally NOT set here — seaclaw_core is the production library.
 ## Tests link against seaclaw_core_test (below) which defines SC_IS_TEST=1.
+
+# --- Compile definitions for module groups ---
+if(SC_ENABLE_PERIPHERALS)
+    target_compile_definitions(seaclaw_core PRIVATE SC_HAS_PERIPHERALS=1)
+endif()
+if(SC_ENABLE_TUNNELS)
+    target_compile_definitions(seaclaw_core PRIVATE SC_HAS_TUNNELS=1)
+endif()
+if(SC_ENABLE_RUNTIME_EXOTIC)
+    target_compile_definitions(seaclaw_core PRIVATE SC_HAS_RUNTIME_EXOTIC=1)
+endif()
 
 # --- Compile definitions for enabled channels (for conditional compilation in source) ---
 if(SC_ENABLE_CLI)
@@ -720,10 +767,42 @@ if(NOT SC_ENABLE_ALL_CHANNELS)
         src/channels/signal.c src/channels/nostr.c src/channels/qq.c
         src/channels/maixcam.c src/channels/dispatch.c)
 endif()
-add_library(seaclaw_core_test STATIC ${SC_CORE_SOURCES} ${SC_TEST_EXTRA_CHANNELS} ${SC_CRYPTO_SOURCES} ${SC_ASM_SOURCES})
+# Tests always compile all optional modules so test suites don't break
+set(SC_TEST_EXTRA_MODULES)
+if(NOT SC_ENABLE_PERIPHERALS)
+    list(APPEND SC_TEST_EXTRA_MODULES
+        src/peripherals/arduino.c src/peripherals/stm32.c src/peripherals/rpi.c
+        src/peripherals/factory.c src/hardware.c
+        src/tools/hardware_info.c src/tools/hardware_memory.c
+        src/tools/i2c.c src/tools/spi.c)
+endif()
+if(NOT SC_ENABLE_TUNNELS)
+    list(APPEND SC_TEST_EXTRA_MODULES
+        src/tunnel/cloudflare.c src/tunnel/ngrok.c
+        src/tunnel/tailscale.c src/tunnel/custom.c)
+endif()
+if(NOT SC_ENABLE_RUNTIME_EXOTIC)
+    list(APPEND SC_TEST_EXTRA_MODULES
+        src/runtime/wasm_rt.c src/runtime/cloudflare.c)
+endif()
+# Tests need all sandbox backends (they compile cross-platform with guards)
+if(NOT APPLE)
+    list(APPEND SC_TEST_EXTRA_MODULES src/security/seatbelt.c)
+endif()
+if(NOT UNIX OR APPLE)
+    list(APPEND SC_TEST_EXTRA_MODULES
+        src/security/landlock.c src/security/firejail.c src/security/bubblewrap.c
+        src/security/seccomp.c src/security/landlock_seccomp.c src/security/firecracker.c)
+endif()
+if(NOT WIN32)
+    list(APPEND SC_TEST_EXTRA_MODULES src/security/appcontainer.c)
+endif()
+add_library(seaclaw_core_test STATIC ${SC_CORE_SOURCES} ${SC_TEST_EXTRA_CHANNELS} ${SC_TEST_EXTRA_MODULES} ${SC_CRYPTO_SOURCES} ${SC_ASM_SOURCES})
 target_include_directories(seaclaw_core_test PUBLIC ${SC_ROOT}/include)
 target_include_directories(seaclaw_core_test PRIVATE ${SC_ROOT}/asm/generic)
 target_compile_definitions(seaclaw_core_test PRIVATE SC_IS_TEST=1)
+# Tests always have all module groups available
+target_compile_definitions(seaclaw_core_test PRIVATE SC_HAS_PERIPHERALS=1 SC_HAS_TUNNELS=1 SC_HAS_RUNTIME_EXOTIC=1)
 if(Threads_FOUND)
     target_link_libraries(seaclaw_core_test PUBLIC Threads::Threads)
 endif()
