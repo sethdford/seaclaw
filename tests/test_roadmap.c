@@ -17,6 +17,8 @@
 #include "seaclaw/observability/otel.h"
 #include "seaclaw/security/replay.h"
 #include "seaclaw/plugin.h"
+#include "seaclaw/plugin_loader.h"
+#include "seaclaw/mcp_registry.h"
 #include "seaclaw/agent/profile.h"
 #include "seaclaw/tools/factory.h"
 #include "seaclaw/config.h"
@@ -360,6 +362,68 @@ static void test_plugin_bad_version(void) {
     sc_plugin_info_t info = { .name = "bad", .version = "0.0.1", .description = NULL, .api_version = 999 };
     SC_ASSERT_EQ(sc_plugin_register(reg, &info, NULL, 0), SC_ERR_INVALID_ARGUMENT);
     sc_plugin_registry_destroy(reg);
+}
+
+static void test_plugin_load_nonexistent(void) {
+    sc_allocator_t a = sc_system_allocator();
+    sc_plugin_host_t host = {.alloc = &a, .register_tool = NULL, .register_provider = NULL, .host_ctx = NULL};
+    sc_plugin_info_t info = {0};
+    sc_plugin_handle_t *handle = NULL;
+    sc_error_t err = sc_plugin_load(&a, "/nonexistent/plugin.so", &host, &info, &handle);
+    SC_ASSERT_EQ(err, SC_ERR_NOT_FOUND);
+    SC_ASSERT_NULL(handle);
+}
+
+static void test_plugin_load_api_mismatch(void) {
+    sc_allocator_t a = sc_system_allocator();
+    sc_plugin_host_t host = {.alloc = &a};
+    sc_plugin_info_t info = {0};
+    sc_plugin_handle_t *handle = NULL;
+    sc_error_t err = sc_plugin_load(&a, "/bad_api/plugin.so", &host, &info, &handle);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_NULL(handle);
+}
+
+static void test_mcp_registry_add_remove_list(void) {
+    sc_allocator_t a = sc_system_allocator();
+    sc_mcp_registry_t *reg = sc_mcp_registry_create(&a);
+    SC_ASSERT_NOT_NULL(reg);
+    SC_ASSERT_EQ(sc_mcp_registry_add(reg, "srv1", "echo", "hello"), SC_OK);
+    SC_ASSERT_EQ(sc_mcp_registry_add(reg, "srv2", "cat", NULL), SC_OK);
+    sc_mcp_registry_entry_t out[4];
+    int count = 0;
+    SC_ASSERT_EQ(sc_mcp_registry_list(reg, out, 4, &count), SC_OK);
+    SC_ASSERT_EQ(count, 2);
+    SC_ASSERT_STR_EQ(out[0].name, "srv1");
+    SC_ASSERT_EQ(sc_mcp_registry_remove(reg, "srv1"), SC_OK);
+    SC_ASSERT_EQ(sc_mcp_registry_list(reg, out, 4, &count), SC_OK);
+    SC_ASSERT_EQ(count, 1);
+    sc_mcp_registry_destroy(reg);
+}
+
+static void test_mcp_registry_start_stop_toggles_running(void) {
+    sc_allocator_t a = sc_system_allocator();
+    sc_mcp_registry_t *reg = sc_mcp_registry_create(&a);
+    SC_ASSERT_NOT_NULL(reg);
+    SC_ASSERT_EQ(sc_mcp_registry_add(reg, "srv", "echo", "x"), SC_OK);
+    SC_ASSERT_EQ(sc_mcp_registry_start(reg, "srv"), SC_OK);
+    sc_mcp_registry_entry_t out[1];
+    int count = 0;
+    SC_ASSERT_EQ(sc_mcp_registry_list(reg, out, 1, &count), SC_OK);
+    SC_ASSERT_TRUE(out[0].running);
+    SC_ASSERT_EQ(sc_mcp_registry_stop(reg, "srv"), SC_OK);
+    SC_ASSERT_EQ(sc_mcp_registry_list(reg, out, 1, &count), SC_OK);
+    SC_ASSERT_FALSE(out[0].running);
+    sc_mcp_registry_destroy(reg);
+}
+
+static void test_mcp_registry_remove_nonexistent(void) {
+    sc_allocator_t a = sc_system_allocator();
+    sc_mcp_registry_t *reg = sc_mcp_registry_create(&a);
+    SC_ASSERT_NOT_NULL(reg);
+    sc_error_t err = sc_mcp_registry_remove(reg, "nonexistent");
+    SC_ASSERT_EQ(err, SC_ERR_NOT_FOUND);
+    sc_mcp_registry_destroy(reg);
 }
 
 static void test_profile_get_coding(void) {
@@ -767,6 +831,13 @@ void run_roadmap_tests(void) {
     SC_TEST_SUITE("Roadmap: Plugin System (5B)");
     SC_RUN_TEST(test_plugin_registry);
     SC_RUN_TEST(test_plugin_bad_version);
+    SC_RUN_TEST(test_plugin_load_nonexistent);
+    SC_RUN_TEST(test_plugin_load_api_mismatch);
+
+    SC_TEST_SUITE("Roadmap: MCP Registry");
+    SC_RUN_TEST(test_mcp_registry_add_remove_list);
+    SC_RUN_TEST(test_mcp_registry_start_stop_toggles_running);
+    SC_RUN_TEST(test_mcp_registry_remove_nonexistent);
 
     SC_TEST_SUITE("Roadmap: Stub Boundaries (6)");
     SC_RUN_TEST(test_daemon_start_returns_valid);

@@ -14,8 +14,18 @@ typedef struct sc_plugin_info {
     const char *name;
     const char *version;
     const char *description;
-    uint32_t api_version;
+    int api_version;
 } sc_plugin_info_t;
+
+typedef struct sc_plugin_host {
+    sc_allocator_t *alloc;
+    sc_error_t (*register_tool)(void *host_ctx, const char *name, void *tool_vtable);
+    sc_error_t (*register_provider)(void *host_ctx, const char *name, void *provider_vtable);
+    void *host_ctx;
+} sc_plugin_host_t;
+
+typedef sc_error_t (*sc_plugin_init_fn)(sc_plugin_host_t *host, sc_plugin_info_t *info_out);
+typedef void (*sc_plugin_deinit_fn)(void);
 
 typedef struct sc_plugin_registry sc_plugin_registry_t;
 
