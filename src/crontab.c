@@ -262,6 +262,7 @@ sc_error_t sc_crontab_remove(sc_allocator_t *alloc, const char *path, const char
     for (size_t i = 0; i < count; i++) {
         if (strcmp(entries[i].id, id) == 0) {
             free_entry(alloc, &entries[i]);
+            memset(&entries[i], 0, sizeof(entries[i]));
             continue;
         }
         if (j != i) entries[j] = entries[i];
@@ -269,6 +270,7 @@ sc_error_t sc_crontab_remove(sc_allocator_t *alloc, const char *path, const char
     }
 
     err = sc_crontab_save(alloc, path, entries, j);
-    sc_crontab_entries_free(alloc, entries, count);
+    for (size_t i = 0; i < j; i++) free_entry(alloc, &entries[i]);
+    alloc->free(alloc->ctx, entries, count * sizeof(sc_crontab_entry_t));
     return err;
 }

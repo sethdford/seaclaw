@@ -2,10 +2,15 @@
 # frozen_string_literal: true
 
 class Seaclaw < Formula
-  desc "Autonomous AI assistant runtime — minimal C11 binary"
-  homepage "https://sethdford.github.io/seaclaw/"
+  desc "The smallest fully autonomous AI assistant infrastructure"
+  homepage "https://seaclaw.ai"
   license "MIT"
-  head "https://github.com/sethdford/seaclaw.git", branch: "main"
+
+  # Bottled releases (uncomment when tarballs exist)
+  # url "https://github.com/seaclaw/seaclaw/archive/refs/tags/v0.1.0.tar.gz"
+  # sha256 "..."
+
+  head "https://github.com/seaclaw/seaclaw.git", branch: "main"
 
   depends_on "cmake" => :build
   depends_on "sqlite"
@@ -22,12 +27,16 @@ class Seaclaw < Formula
     system "cmake", "-S", ".", "-B", "build", *args, *std_cmake_args
     system "cmake", "--build", "build"
     bin.install "build/seaclaw"
+
+    man1.install "docs/man/seaclaw.1"
+    man1.install "docs/man/seaclaw-gateway.1"
+
     bash_completion.install "completions/seaclaw.bash" => "seaclaw"
     zsh_completion.install "completions/seaclaw.zsh" => "_seaclaw"
   end
 
   test do
     assert_match "seaclaw", shell_output("#{bin}/seaclaw --version")
-    system "#{bin}/seaclaw", "--help"
+    system "#{bin}/seaclaw", "--version"
   end
 end

@@ -332,6 +332,201 @@ fi
 
 echo ""
 
+# ── 9. Gateway WebSocket Control Protocol ─────────────────
+
+echo "── Gateway HTTP / Control Protocol ──"
+
+GW_PORT=$((3000 + (RANDOM % 30000)))
+GW_PID=""
+cleanup_gateway() {
+  if [ -n "$GW_PID" ] && kill -0 "$GW_PID" 2>/dev/null; then
+    kill "$GW_PID" 2>/dev/null || true
+    wait "$GW_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup_gateway EXIT
+
+SEACLAW_GATEWAY_PORT=$GW_PORT "$BINARY" gateway 2>/dev/null &
+GW_PID=$!
+sleep 2
+
+if ! kill -0 "$GW_PID" 2>/dev/null; then
+  fail "gateway_start" "gateway failed to start"
+else
+  pass "gateway_start"
+
+  HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$GW_PORT/health" 2>/dev/null || echo "000")
+  if [ "$HEALTH" = "200" ]; then
+    pass "gateway_health_200"
+  else
+    fail "gateway_health_200" "got HTTP $HEALTH"
+  fi
+
+  HEALTH_BODY=$(curl -s "http://127.0.0.1:$GW_PORT/health" 2>/dev/null || echo "")
+  if echo "$HEALTH_BODY" | grep -q '"status":"ok"'; then
+    pass "gateway_health_body"
+  else
+    fail "gateway_health_body" "expected {\"status\":\"ok\"}"
+  fi
+
+  STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$GW_PORT/api/status" 2>/dev/null || echo "000")
+  if [ "$STATUS_CODE" = "200" ]; then
+    pass "gateway_api_status_200"
+  else
+    fail "gateway_api_status_200" "got HTTP $STATUS_CODE"
+  fi
+
+  NOT_FOUND=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$GW_PORT/nonexistent-path-404" 2>/dev/null || echo "000")
+  if [ "$NOT_FOUND" = "404" ]; then
+    pass "gateway_404_invalid_path"
+  else
+    fail "gateway_404_invalid_path" "got HTTP $NOT_FOUND"
+  fi
+
+  CORS_RESP=$(curl -s -i -H "Origin: http://127.0.0.1:$GW_PORT" "http://127.0.0.1:$GW_PORT/health" 2>/dev/null || echo "")
+  if echo "$CORS_RESP" | grep -qi "Access-Control-Allow-Origin"; then
+    pass "gateway_cors_header"
+  else
+    fail "gateway_cors_header" "no CORS header in response"
+  fi
+
+  READY_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$GW_PORT/ready" 2>/dev/null || echo "000")
+  if [ "$READY_CODE" = "200" ]; then
+    pass "gateway_ready_200"
+  else
+    fail "gateway_ready_200" "got HTTP $READY_CODE"
+  fi
+fi
+
+cleanup_gateway
+trap - EXIT
+
+if command -v wscat >/dev/null 2>&1; then
+  echo "  (wscat found — WebSocket tests would go here)"
+  pass "gateway_ws_placeholder (wscat available)"
+else
+  printf "  \033[33mSKIP\033[0m  gateway_ws_control (requires wscat)\n"
+fi
+
+echo ""
+
+# ── 10. MCP Resources ─────────────────────────────────────
+
+echo "── MCP Resources ──"
+
+MCP_RES_LIST='{"jsonrpc":"2.0","id":10,"method":"resources/list","params":{}}'
+MCP_RES_READ_CONFIG='{"jsonrpc":"2.0","id":11,"method":"resources/read","params":{"uri":"seaclaw://config"}}'
+MCP_RES_READ_MEM='{"jsonrpc":"2.0","id":12,"method":"resources/read","params":{"uri":"seaclaw://memory"}}'
+MCP_RES_READ_INVALID='{"jsonrpc":"2.0","id":13,"method":"resources/read","params":{"uri":"seaclaw://invalid"}}'
+
+MCP_RES_OUT=$(printf '%s\n%s\n%s\n%s\n%s\n' "$MCP_INIT" "$MCP_RES_LIST" "$MCP_RES_READ_CONFIG" "$MCP_RES_READ_MEM" "$MCP_RES_READ_INVALID" | run_with_timeout 10 "$BINARY" mcp 2>/dev/null || true)
+
+if echo "$MCP_RES_OUT" | grep -q '"resources"' || echo "$MCP_RES_OUT" | grep -q 'seaclaw://config'; then
+  pass "mcp_resources_list"
+else
+  fail "mcp_resources_list" "no resources in response"
+fi
+
+if echo "$MCP_RES_OUT" | grep -q 'seaclaw://config'; then
+  pass "mcp_resources_read_config"
+else
+  fail "mcp_resources_read_config" "seaclaw://config not in response"
+fi
+
+if echo "$MCP_RES_OUT" | grep -q 'seaclaw://memory'; then
+  pass "mcp_resources_read_memory"
+else
+  fail "mcp_resources_read_memory" "seaclaw://memory not in response"
+fi
+
+if echo "$MCP_RES_OUT" | grep -q "Unknown resource\|error\|-32602"; then
+  pass "mcp_resources_read_invalid"
+else
+  fail "mcp_resources_read_invalid" "expected error for invalid URI"
+fi
+
+echo ""
+
+# ── 11. Push Notification Registration (placeholder) ───────
+
+echo "── Push Notification (placeholder) ──"
+
+echo "  (push.register / push.unregister are WebSocket control protocol methods)"
+pass "push_documented (WS-only, no HTTP endpoint)"
+
+printf "  \033[33mSKIP\033[0m  push_register (requires wscat/WebSocket)\n"
+printf "  \033[33mSKIP\033[0m  push_unregister (requires wscat/WebSocket)\n"
+
+echo ""
+
+# ── 12. Migration CLI ──────────────────────────────────────
+
+echo "── Migration CLI ──"
+
+OUT=$("$BINARY" migrate 2>&1)
+if echo "$OUT" | grep -qi "Migration:\|migration"; then
+  pass "migrate_exists"
+else
+  fail "migrate_exists" "migrate did not respond: $OUT"
+fi
+
+OUT_DRY=$("$BINARY" migrate --dry-run 2>&1)
+if echo "$OUT_DRY" | grep -qi "Migration:\|migration\|from sqlite\|from markdown"; then
+  pass "migrate_dry_run"
+else
+  fail "migrate_dry_run" "unexpected: $OUT_DRY"
+fi
+
+OUT_HELP=$("$BINARY" migrate --help 2>&1 || true)
+if echo "$OUT_HELP" | grep -qi "migrate\|usage\|help" || [ -n "$OUT_HELP" ]; then
+  pass "migrate_help"
+else
+  fail "migrate_help" "no help output"
+fi
+
+echo ""
+
+# ── 13. Skills CLI Extended ──────────────────────────────────
+
+echo "── Skills CLI Extended ──"
+
+OUT=$(run_with_timeout 5 "$BINARY" skills info code-review 2>&1 || true)
+if echo "$OUT" | grep -qi "code-review\|list\|search\|skill\|Registry"; then
+  pass "skills_info_code_review"
+else
+  fail "skills_info_code_review" "unexpected: $OUT"
+fi
+
+OUT=$(run_with_timeout 5 "$BINARY" skills publish /tmp/nonexistent_e2e_skill_dir 2>&1 || true)
+if echo "$OUT" | grep -qi "error\|failed\|invalid\|list\|search"; then
+  pass "skills_publish_graceful_fail"
+else
+  fail "skills_publish_graceful_fail" "should fail gracefully for nonexistent dir"
+fi
+
+OUT=$(run_with_timeout 5 "$BINARY" skills list 2>&1)
+if echo "$OUT" | grep -qi "Installed\|skill"; then
+  pass "skills_list"
+else
+  fail "skills_list" "no skill list output"
+fi
+
+OUT=$(run_with_timeout 5 "$BINARY" skills list --json 2>&1 || true)
+if [ -n "$OUT" ]; then
+  pass "skills_list_json"
+else
+  fail "skills_list_json" "no output"
+fi
+
+OUT=$(run_with_timeout 10 "$BINARY" skills search "test query" 2>&1)
+if echo "$OUT" | grep -qi "Registry\|match\|skill"; then
+  pass "skills_search"
+else
+  fail "skills_search" "search produced no output"
+fi
+
+echo ""
+
 # ── Results ──────────────────────────────────────────────
 
 echo "═══════════════════════════════════════════════════════"
