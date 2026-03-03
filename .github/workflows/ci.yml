@@ -94,12 +94,14 @@ jobs:
             grep -q "$cmd" completions/_seaclaw || { echo "MISSING in zsh: $cmd"; exit 1; }
           done
 
-  format:
+  local-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check C formatting
-        run: find src include -name '*.c' -o -name '*.h' | xargs clang-format --dry-run -Werror
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang-format libcurl4-openssl-dev libsqlite3-dev
+      - name: Run scripts/check.sh
+        run: scripts/check.sh
 
   static-analysis:
     runs-on: ubuntu-latest
