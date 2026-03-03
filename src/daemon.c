@@ -3,7 +3,9 @@
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/process_util.h"
 #include "seaclaw/core/string.h"
+#ifdef SC_HAS_CRON
 #include "seaclaw/crontab.h"
+#endif
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -29,7 +31,8 @@ static int get_pid_path(char *buf, size_t buf_size) {
     return snprintf(buf, buf_size, "%s/%s/%s", home, SC_DAEMON_PID_DIR, SC_DAEMON_PID_FILE);
 }
 
-/* ── Cron field parsing ──────────────────────────────────────────────── */
+/* ── Cron field parsing and tick (only when SC_HAS_CRON) ────────────── */
+#ifdef SC_HAS_CRON
 
 static bool parse_cron_int(const char *s, int *out) {
     if (!s || !*s)
@@ -175,6 +178,8 @@ static void run_cron_tick(sc_allocator_t *alloc) {
     alloc->free(alloc->ctx, cron_path, cron_path_len + 1);
 }
 
+#endif /* SC_HAS_CRON */
+
 /* ── Signal handling (non-test only) ─────────────────────────────────── */
 
 #if !defined(SC_IS_TEST) && !defined(_WIN32) && !defined(__CYGWIN__)
@@ -200,7 +205,9 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
     (void)channels;
     (void)channel_count;
     (void)agent;
+#ifdef SC_HAS_CRON
     run_cron_tick(alloc);
+#endif
     return SC_OK;
 #else
 
@@ -210,7 +217,9 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
     signal(SIGINT, service_signal_handler);
 #endif
 
+#ifdef SC_HAS_CRON
     time_t last_cron_minute = 0;
+#endif
 
     {
         struct timespec ts_now;
@@ -228,13 +237,16 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
     while (!SC_STOP_FLAG) {
-        time_t t = time(NULL);
-        time_t current_minute = t / 60;
-
-        if (current_minute > last_cron_minute) {
-            run_cron_tick(alloc);
-            last_cron_minute = current_minute;
+#ifdef SC_HAS_CRON
+        {
+            time_t t = time(NULL);
+            time_t current_minute = t / 60;
+            if (current_minute > last_cron_minute) {
+                run_cron_tick(alloc);
+                last_cron_minute = current_minute;
+            }
         }
+#endif
 
         struct timespec ts_now;
         clock_gettime(CLOCK_MONOTONIC, &ts_now);

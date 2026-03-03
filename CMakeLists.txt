@@ -229,10 +229,8 @@ set(SC_CORE_SOURCES
     src/multimodal.c
     src/rag.c
     src/service.c
-    src/skills.c
     src/skill_registry.c
     src/subagent.c
-    src/update.c
     src/voice.c
     src/portable_atomic.c
     src/agent_routing.c
@@ -256,7 +254,6 @@ set(SC_CORE_SOURCES
     src/gateway/ws_server.c
     src/gateway/control_protocol.c
     src/gateway/event_bridge.c
-    src/gateway/push.c
     src/runtime/native.c
     src/runtime/docker.c
     src/runtime/factory.c
@@ -343,13 +340,6 @@ set(SC_CORE_SOURCES
     src/tools/message.c
     src/tools/delegate.c
     src/tools/spawn.c
-    src/tools/cron_add.c
-    src/tools/cron_list.c
-    src/tools/cron_remove.c
-    src/tools/cron_run.c
-    src/tools/cron_runs.c
-    src/tools/cron_update.c
-    src/tools/schedule.c
     src/tools/schema.c
     src/tools/schema_clean.c
     src/tools/pushover.c
@@ -365,7 +355,6 @@ set(SC_CORE_SOURCES
     src/security/policy_engine.c
     src/security/replay.c
     src/plugins/registry.c
-    src/skillforge.c
     src/onboard.c
     src/interactions/choices.c
     src/daemon.c
@@ -472,6 +461,30 @@ if(SC_ENABLE_OTEL)
     list(APPEND SC_CORE_SOURCES
         src/observability/otel.c
     )
+endif()
+
+# Skillforge
+if(SC_ENABLE_SKILLS)
+    list(APPEND SC_CORE_SOURCES src/skillforge.c src/skills.c)
+endif()
+
+# Cron scheduler
+if(SC_ENABLE_CRON)
+    list(APPEND SC_CORE_SOURCES
+        src/cron.c src/crontab.c
+        src/tools/cron_add.c src/tools/cron_list.c src/tools/cron_remove.c
+        src/tools/cron_run.c src/tools/cron_runs.c src/tools/cron_update.c
+        src/tools/schedule.c)
+endif()
+
+# Push notifications
+if(SC_ENABLE_PUSH)
+    list(APPEND SC_CORE_SOURCES src/gateway/push.c)
+endif()
+
+# Update check/apply
+if(SC_ENABLE_UPDATE)
+    list(APPEND SC_CORE_SOURCES src/update.c)
 endif()
 
 # Crypto sources (generic C fallbacks + dispatch)
@@ -782,6 +795,18 @@ endif()
 # --- Main executable ---
 add_executable(seaclaw src/main.c)
 target_link_libraries(seaclaw seaclaw_core)
+if(SC_ENABLE_SKILLS)
+    target_compile_definitions(seaclaw PRIVATE SC_HAS_SKILLS=1)
+endif()
+if(SC_ENABLE_CRON)
+    target_compile_definitions(seaclaw PRIVATE SC_HAS_CRON=1)
+endif()
+if(SC_ENABLE_PUSH)
+    target_compile_definitions(seaclaw PRIVATE SC_HAS_PUSH=1)
+endif()
+if(SC_ENABLE_UPDATE)
+    target_compile_definitions(seaclaw PRIVATE SC_HAS_UPDATE=1)
+endif()
 
 if(SC_ENABLE_ASAN)
     target_compile_options(seaclaw PRIVATE -fsanitize=address -fno-omit-frame-pointer)
@@ -876,6 +901,22 @@ if(NOT SC_ENABLE_TOOLS_ADVANCED)
 endif()
 if(NOT SC_ENABLE_OTEL)
     list(APPEND SC_TEST_EXTRA_MODULES src/observability/otel.c)
+endif()
+if(NOT SC_ENABLE_SKILLS)
+    list(APPEND SC_TEST_EXTRA_MODULES src/skillforge.c src/skills.c)
+endif()
+if(NOT SC_ENABLE_PUSH)
+    list(APPEND SC_TEST_EXTRA_MODULES src/gateway/push.c)
+endif()
+if(NOT SC_ENABLE_UPDATE)
+    list(APPEND SC_TEST_EXTRA_MODULES src/update.c)
+endif()
+if(NOT SC_ENABLE_CRON)
+    list(APPEND SC_TEST_EXTRA_MODULES
+        src/cron.c src/crontab.c
+        src/tools/cron_add.c src/tools/cron_list.c src/tools/cron_remove.c
+        src/tools/cron_run.c src/tools/cron_runs.c src/tools/cron_update.c
+        src/tools/schedule.c)
 endif()
 add_library(seaclaw_core_test STATIC ${SC_CORE_SOURCES} ${SC_TEST_EXTRA_CHANNELS} ${SC_TEST_EXTRA_MODULES} ${SC_CRYPTO_SOURCES} ${SC_ASM_SOURCES})
 target_include_directories(seaclaw_core_test PUBLIC ${SC_ROOT}/include)
@@ -1085,7 +1126,7 @@ set(SC_TEST_SOURCES
 add_executable(seaclaw_tests ${SC_TEST_SOURCES} wasm/wasm_alloc.c)
 target_link_libraries(seaclaw_tests seaclaw_core_test)
 target_include_directories(seaclaw_tests PRIVATE ${SC_ROOT}/tests)
-target_compile_definitions(seaclaw_tests PRIVATE SC_IS_TEST=1 SC_GATEWAY_TEST_MODE=1 SC_HAS_NONE_ENGINE=1)
+target_compile_definitions(seaclaw_tests PRIVATE SC_IS_TEST=1 SC_GATEWAY_TEST_MODE=1 SC_HAS_NONE_ENGINE=1 SC_HAS_CRON=1 SC_HAS_PUSH=1 SC_HAS_UPDATE=1 SC_HAS_SKILLS=1)
 if(SC_ENABLE_TUI)
     target_compile_definitions(seaclaw_tests PRIVATE SC_ENABLE_TUI=1)
 endif()

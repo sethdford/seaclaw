@@ -2,7 +2,9 @@
 #include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#ifdef SC_HAS_CRON
 #include "seaclaw/cron.h"
+#endif
 #include "seaclaw/mcp.h"
 #include "seaclaw/security.h"
 #include "seaclaw/tools/agent_query.h"
@@ -20,12 +22,14 @@
 #include "seaclaw/tools/database.h"
 #include "seaclaw/tools/notebook.h"
 #endif
+#ifdef SC_HAS_CRON
 #include "seaclaw/tools/cron_add.h"
 #include "seaclaw/tools/cron_list.h"
 #include "seaclaw/tools/cron_remove.h"
 #include "seaclaw/tools/cron_run.h"
 #include "seaclaw/tools/cron_runs.h"
 #include "seaclaw/tools/cron_update.h"
+#endif
 #include "seaclaw/tools/delegate.h"
 #include "seaclaw/tools/diff.h"
 #include "seaclaw/tools/file_append.h"
@@ -48,7 +52,9 @@
 #include "seaclaw/tools/message.h"
 #include "seaclaw/tools/pdf.h"
 #include "seaclaw/tools/pushover.h"
+#ifdef SC_HAS_CRON
 #include "seaclaw/tools/schedule.h"
+#endif
 #include "seaclaw/tools/schema.h"
 #include "seaclaw/tools/shell.h"
 #include "seaclaw/tools/spawn.h"
@@ -57,7 +63,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SC_TOOLS_COUNT_BASE 32
+#ifdef SC_HAS_CRON
+#define SC_TOOLS_CRON_COUNT 7
+#else
+#define SC_TOOLS_CRON_COUNT 0
+#endif
+#define SC_TOOLS_COUNT_BASE (25 + SC_TOOLS_CRON_COUNT) /* 25 base + 7 cron when enabled */
 #ifdef SC_HAS_TOOLS_BROWSER
 #define SC_TOOLS_BROWSER_COUNT 3
 #else
@@ -94,6 +105,9 @@ sc_error_t sc_tools_create_default(sc_allocator_t *alloc, const char *workspace_
                                    sc_tool_t **out_tools, size_t *out_count) {
     if (!alloc || !out_tools || !out_count)
         return SC_ERR_INVALID_ARGUMENT;
+#ifndef SC_HAS_CRON
+    (void)cron; /* accepted but ignored when cron is disabled */
+#endif
 
     size_t tools_alloc = SC_TOOLS_COUNT * sizeof(sc_tool_t);
     sc_tool_t *tools = (sc_tool_t *)alloc->alloc(alloc->ctx, tools_alloc);
@@ -200,6 +214,7 @@ sc_error_t sc_tools_create_default(sc_allocator_t *alloc, const char *workspace_
     if (err != SC_OK)
         goto fail;
 
+#ifdef SC_HAS_CRON
     err = sc_cron_add_create(alloc, cron, &tools[idx]);
     if (err != SC_OK)
         goto fail;
@@ -229,6 +244,7 @@ sc_error_t sc_tools_create_default(sc_allocator_t *alloc, const char *workspace_
     if (err != SC_OK)
         goto fail;
     idx++;
+#endif
 
 #ifdef SC_HAS_TOOLS_BROWSER
     {
@@ -254,10 +270,12 @@ sc_error_t sc_tools_create_default(sc_allocator_t *alloc, const char *workspace_
     idx++;
 #endif
 
+#ifdef SC_HAS_CRON
     err = sc_schedule_create(alloc, cron, &tools[idx]);
     if (err != SC_OK)
         goto fail;
     idx++;
+#endif
 
     err = sc_schema_create(alloc, &tools[idx]);
     if (err != SC_OK)

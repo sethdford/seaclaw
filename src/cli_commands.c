@@ -4,7 +4,9 @@
 #include "seaclaw/memory.h"
 #include "seaclaw/memory/factory.h"
 #include "seaclaw/security/sandbox.h"
+#ifdef SC_HAS_UPDATE
 #include "seaclaw/update.h"
+#endif
 #include "seaclaw/version.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -440,6 +442,7 @@ sc_error_t cmd_sandbox(sc_allocator_t *alloc, int argc, char **argv) {
 
 /* ── update ─────────────────────────────────────────────────────────────── */
 sc_error_t cmd_update(sc_allocator_t *alloc, int argc, char **argv) {
+#ifdef SC_HAS_UPDATE
     (void)alloc;
     bool check_only = false;
     for (int i = 2; i < argc; i++) {
@@ -474,4 +477,11 @@ sc_error_t cmd_update(sc_allocator_t *alloc, int argc, char **argv) {
         printf(
             "Update failed. Download manually from https://github.com/seaclaw/seaclaw/releases\n");
     return SC_OK;
+#else
+    (void)alloc;
+    (void)argc;
+    (void)argv;
+    fprintf(stderr, "[seaclaw] update support not built (compile with SC_ENABLE_UPDATE=ON)\n");
+    return SC_ERR_NOT_SUPPORTED;
+#endif
 }

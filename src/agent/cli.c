@@ -6,7 +6,9 @@
 #include "seaclaw/config.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"
+#ifdef SC_HAS_CRON
 #include "seaclaw/cron.h"
+#endif
 #include "seaclaw/design_tokens.h"
 #include "seaclaw/memory.h"
 #include "seaclaw/memory/engines.h"
@@ -322,7 +324,11 @@ sc_error_t sc_agent_cli_run(sc_allocator_t *alloc, const char *const *argv, size
     sc_retrieval_engine_t retrieval_engine =
         sc_retrieval_create_with_vector(alloc, &memory, &embedder, &vector_store);
 
+#ifdef SC_HAS_CRON
     sc_cron_scheduler_t *cron = sc_cron_create(alloc, 64, true);
+#else
+    sc_cron_scheduler_t *cron = NULL;
+#endif
 
     sc_agent_pool_t *cli_agent_pool = sc_agent_pool_create(alloc, cfg.agent.pool_max_concurrent);
     sc_mailbox_t *cli_mailbox = sc_mailbox_create(alloc, 64);

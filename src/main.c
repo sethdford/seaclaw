@@ -42,7 +42,9 @@
 #include "seaclaw/security/sandbox_internal.h"
 #include "seaclaw/session.h"
 #include "seaclaw/skill_registry.h"
+#ifdef SC_HAS_SKILLS
 #include "seaclaw/skillforge.h"
+#endif
 #include "seaclaw/tool.h"
 #include "seaclaw/tools/factory.h"
 #if SC_HAS_EMAIL
@@ -80,7 +82,9 @@ static sc_error_t cmd_version(sc_allocator_t *alloc, int argc, char **argv);
 static sc_error_t cmd_help(sc_allocator_t *alloc, int argc, char **argv);
 static sc_error_t cmd_status(sc_allocator_t *alloc, int argc, char **argv);
 static sc_error_t cmd_doctor(sc_allocator_t *alloc, int argc, char **argv);
+#ifdef SC_HAS_CRON
 static sc_error_t cmd_cron(sc_allocator_t *alloc, int argc, char **argv);
+#endif
 static sc_error_t cmd_onboard(sc_allocator_t *alloc, int argc, char **argv);
 static sc_error_t cmd_service(sc_allocator_t *alloc, int argc, char **argv);
 static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv);
@@ -96,7 +100,9 @@ static const sc_command_t commands[] = {
     {"status", "Show runtime status", cmd_status},
     {"onboard", "Interactive setup wizard", cmd_onboard},
     {"doctor", "Run system diagnostics", cmd_doctor},
+#ifdef SC_HAS_CRON
     {"cron", "Manage scheduled tasks", cmd_cron},
+#endif
     {"channel", "Channel management", cmd_channel},
     {"skills", "Skill discovery and integration", cmd_skills},
     {"hardware", "Hardware peripheral management", cmd_hardware},
@@ -223,6 +229,7 @@ static sc_error_t cmd_doctor(sc_allocator_t *alloc, int argc, char **argv) {
     return SC_OK;
 }
 
+#ifdef SC_HAS_CRON
 static sc_error_t cmd_cron(sc_allocator_t *alloc, int argc, char **argv) {
     const char *sub = (argc >= 3 && argv[2]) ? argv[2] : "";
 
@@ -322,6 +329,7 @@ static sc_error_t cmd_cron(sc_allocator_t *alloc, int argc, char **argv) {
     fprintf(stderr, "  seaclaw cron remove <id>\n");
     return SC_ERR_INVALID_ARGUMENT;
 }
+#endif /* SC_HAS_CRON */
 
 static sc_error_t cmd_onboard(sc_allocator_t *alloc, int argc, char **argv) {
     (void)argc;
@@ -458,7 +466,11 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
     sc_retrieval_engine_t retrieval_engine =
         sc_retrieval_create_with_vector(alloc, &memory, &embedder, &vector_store);
 
+#ifdef SC_HAS_CRON
     sc_cron_scheduler_t *cron = sc_cron_create(alloc, 64, true);
+#else
+    sc_cron_scheduler_t *cron = NULL;
+#endif
 
     sc_agent_pool_t *agent_pool = sc_agent_pool_create(alloc, cfg.agent.pool_max_concurrent);
     sc_mailbox_t *svc_mailbox = sc_mailbox_create(alloc, 64);
@@ -669,7 +681,11 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
     }
 #endif
 
+#ifdef SC_HAS_CRON
     fprintf(stderr, "[%s] %zu channel(s) active, cron enabled\n", SC_CODENAME, ch_count);
+#else
+    fprintf(stderr, "[%s] %zu channel(s) active\n", SC_CODENAME, ch_count);
+#endif
     err = sc_service_run(alloc, 1000, ch_count > 0 ? channels : NULL, ch_count, &agent);
 
     /* ── Cleanup ──────────────────────────────────────────────────────── */
@@ -714,6 +730,7 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
     return err;
 }
 
+#ifdef SC_HAS_SKILLS
 static sc_error_t cmd_skills(sc_allocator_t *alloc, int argc, char **argv) {
     const char *sub = (argc >= 3 && argv[2]) ? argv[2] : "list";
 
@@ -807,6 +824,15 @@ static sc_error_t cmd_skills(sc_allocator_t *alloc, int argc, char **argv) {
     fprintf(stderr, "  seaclaw skills publish [directory]\n");
     return SC_ERR_INVALID_ARGUMENT;
 }
+#else
+static sc_error_t cmd_skills(sc_allocator_t *alloc, int argc, char **argv) {
+    (void)alloc;
+    (void)argc;
+    (void)argv;
+    fprintf(stderr, "[%s] skills support not built (compile with SC_ENABLE_SKILLS=ON)\n", SC_CODENAME);
+    return SC_ERR_NOT_SUPPORTED;
+}
+#endif
 
 static sc_error_t cmd_migrate(sc_allocator_t *alloc, int argc, char **argv) {
     sc_migration_config_t mc = {
@@ -950,14 +976,20 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
     sc_session_manager_t sessions;
     sc_session_manager_init(&sessions, alloc);
 
+#ifdef SC_HAS_CRON
     sc_cron_scheduler_t *cron = sc_cron_create(alloc, 64, true);
+#else
+    sc_cron_scheduler_t *cron = NULL;
+#endif
 
+#ifdef SC_HAS_SKILLS
     sc_skillforge_t skills;
     memset(&skills, 0, sizeof(skills));
     err = sc_skillforge_create(alloc, &skills);
     if (err != SC_OK) {
         fprintf(stderr, "[%s] Skillforge init failed: %s\n", SC_CODENAME, sc_error_string(err));
     }
+#endif
 
     const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
     sc_cost_tracker_t costs;
@@ -1057,7 +1089,9 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
         sc_session_manager_deinit(&sessions);
         if (cron)
             sc_cron_destroy(cron, alloc);
+#ifdef SC_HAS_SKILLS
         sc_skillforge_destroy(&skills);
+#endif
         if (policy.tracker)
             sc_rate_tracker_destroy(policy.tracker);
         if (gw_sb_storage)
@@ -1072,7 +1106,11 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
         .alloc = alloc,
         .sessions = &sessions,
         .cron = cron,
+#ifdef SC_HAS_SKILLS
         .skills = &skills,
+#else
+        .skills = NULL,
+#endif
         .costs = &costs,
         .bus = &bus,
         .tools = tools,
@@ -1178,7 +1216,9 @@ cleanup:
     sc_session_manager_deinit(&sessions);
     if (cron)
         sc_cron_destroy(cron, alloc);
+#ifdef SC_HAS_SKILLS
     sc_skillforge_destroy(&skills);
+#endif
     sc_config_deinit(&cfg);
     return err;
 }

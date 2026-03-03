@@ -20,7 +20,9 @@
 #include "daemon.h"
 #include "migration.h"
 #include "onboard.h"
+#ifdef SC_HAS_SKILLS
 #include "skillforge.h"
+#endif
 
 /* Vtable interfaces (Phase 2) */
 #include "channel.h"

@@ -1,7 +1,9 @@
 #include "seaclaw/gateway/event_bridge.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/json.h"
+#ifdef SC_HAS_PUSH
 #include "seaclaw/gateway/push.h"
+#endif
 #include <stddef.h>
 #include <string.h>
 
@@ -66,11 +68,13 @@ static bool bus_callback(sc_bus_event_type_t type, const sc_bus_event_t *ev, voi
 
     if (err == SC_OK && payload_str && event_name) {
         sc_control_send_event(bridge->proto, event_name, payload_str);
+#ifdef SC_HAS_PUSH
         if (bridge->push && (type == SC_BUS_MESSAGE_SENT || type == SC_BUS_ERROR)) {
             const char *title = (type == SC_BUS_MESSAGE_SENT) ? "New Message" : "Error";
             const char *body = msg_text ? msg_text : event_name;
             sc_push_send(bridge->push, title, body, payload_str);
         }
+#endif
         bridge->proto->alloc->free(bridge->proto->alloc->ctx, payload_str, payload_len + 1);
     }
 
@@ -85,7 +89,9 @@ void sc_event_bridge_init(sc_event_bridge_t *bridge, sc_control_protocol_t *prot
 
     bridge->proto = proto;
     bridge->bus = bus;
+#ifdef SC_HAS_PUSH
     bridge->push = NULL;
+#endif
 
 #ifdef SC_GATEWAY_POSIX
     bridge->bus_cb = bus_callback;
@@ -102,7 +108,9 @@ void sc_event_bridge_deinit(sc_event_bridge_t *bridge) {
 #endif
 }
 
+#ifdef SC_HAS_PUSH
 void sc_event_bridge_set_push(sc_event_bridge_t *bridge, sc_push_manager_t *push) {
     if (bridge)
         bridge->push = push;
 }
+#endif
