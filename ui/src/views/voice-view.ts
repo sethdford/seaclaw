@@ -56,18 +56,18 @@ export class ScVoiceView extends GatewayAwareLitElement {
     .mic-btn.active {
       background: var(--sc-accent);
       border-color: var(--sc-accent);
-      color: var(--sc-bg);
+      color: white;
       animation: pulse-mic 1.5s ease-in-out infinite;
     }
     @keyframes pulse-mic {
       0%,
       100% {
         transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(249, 112, 102, 0.4);
+        box-shadow: 0 0 0 0 var(--sc-accent-subtle);
       }
       50% {
         transform: scale(1.05);
-        box-shadow: 0 0 0 12px rgba(249, 112, 102, 0);
+        box-shadow: 0 0 0 16px transparent;
       }
     }
     .transcript-area {
@@ -85,10 +85,14 @@ export class ScVoiceView extends GatewayAwareLitElement {
       font-size: 0.875rem;
       resize: vertical;
       box-sizing: border-box;
+      transition:
+        border-color 0.2s var(--sc-ease-out),
+        box-shadow 0.2s var(--sc-ease-out);
     }
     .transcript-area textarea:focus {
       outline: none;
       border-color: var(--sc-accent);
+      box-shadow: 0 0 0 3px var(--sc-accent-subtle);
     }
     .transcript-area textarea::placeholder {
       color: var(--sc-text-muted);
@@ -116,18 +120,34 @@ export class ScVoiceView extends GatewayAwareLitElement {
       cursor: not-allowed;
     }
     .response-area {
-      padding: 1rem;
-      background: var(--sc-bg-surface);
+      padding: 1rem 1.25rem;
+      background: var(--sc-bg-elevated);
       border: 1px solid var(--sc-border);
-      border-radius: var(--sc-radius);
+      border-radius: var(--sc-radius-lg);
+      border-top-left-radius: 4px;
       min-height: 80px;
       font-size: 0.875rem;
-      line-height: 1.5;
+      line-height: 1.6;
       white-space: pre-wrap;
       word-break: break-word;
+      position: relative;
+      margin-left: 1rem;
+      box-shadow: var(--sc-shadow-sm);
+    }
+    .response-area::before {
+      content: "";
+      position: absolute;
+      left: -8px;
+      top: 12px;
+      width: 0;
+      height: 0;
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+      border-right: 8px solid var(--sc-bg-elevated);
     }
     .response-area.empty {
       color: var(--sc-text-muted);
+      border-style: dashed;
     }
     .status-line {
       margin-top: 1rem;
@@ -152,34 +172,24 @@ export class ScVoiceView extends GatewayAwareLitElement {
   private _boundGateway: GatewayClient | null = null;
 
   override firstUpdated(): void {
-    this.speechSupported =
-      "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
+    this.speechSupported = "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
     if (!this.speechSupported) this.voiceStatus = "unsupported";
     const gw = this.gateway;
     if (gw) {
       this._boundGateway = gw;
-      gw.addEventListener(
-        GatewayClientClass.EVENT_GATEWAY,
-        this.gatewayHandler,
-      );
+      gw.addEventListener(GatewayClientClass.EVENT_GATEWAY, this.gatewayHandler);
     }
   }
 
   protected override async load(): Promise<void> {
     if (!this._boundGateway && this.gateway) {
       this._boundGateway = this.gateway;
-      this.gateway.addEventListener(
-        GatewayClientClass.EVENT_GATEWAY,
-        this.gatewayHandler,
-      );
+      this.gateway.addEventListener(GatewayClientClass.EVENT_GATEWAY, this.gatewayHandler);
     }
   }
 
   override disconnectedCallback(): void {
-    this._boundGateway?.removeEventListener(
-      GatewayClientClass.EVENT_GATEWAY,
-      this.gatewayHandler,
-    );
+    this._boundGateway?.removeEventListener(GatewayClientClass.EVENT_GATEWAY, this.gatewayHandler);
     this._boundGateway = null;
     this.stopRecognition();
     super.disconnectedCallback();
@@ -193,8 +203,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
     const detail = ev.detail;
     if (!detail?.event || detail.event !== "chat") return;
     const payload = detail.payload ?? {};
-    const sessionKey =
-      (payload.session_key as string) ?? (payload.sessionKey as string);
+    const sessionKey = (payload.session_key as string) ?? (payload.sessionKey as string);
     if (sessionKey !== "voice") return;
     const state = payload.state as string;
     const content = (payload.message as string) ?? "";
@@ -220,8 +229,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
           webkitSpeechRecognition?: new () => SpeechRecognition;
         }
       ).webkitSpeechRecognition ??
-      (window as unknown as { SpeechRecognition?: new () => SpeechRecognition })
-        .SpeechRecognition;
+      (window as unknown as { SpeechRecognition?: new () => SpeechRecognition }).SpeechRecognition;
     if (!Ctor) return;
     const rec = new Ctor();
     rec.continuous = false;
@@ -307,9 +315,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
           class="mic-btn ${this.voiceStatus === "listening" ? "active" : ""}"
           ?disabled=${!this.speechSupported}
           @click=${this.toggleMic}
-          aria-label=${this.voiceStatus === "listening"
-            ? "Stop listening"
-            : "Start listening"}
+          aria-label=${this.voiceStatus === "listening" ? "Stop listening" : "Start listening"}
         >
           🎤
         </button>
@@ -328,8 +334,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
       <div class="send-row">
         <button
           class="send-btn"
-          ?disabled=${!this.transcript.trim() ||
-          this.voiceStatus === "processing"}
+          ?disabled=${!this.transcript.trim() || this.voiceStatus === "processing"}
           @click=${() => this.send()}
         >
           Send

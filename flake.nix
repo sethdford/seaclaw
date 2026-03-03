@@ -31,7 +31,7 @@
 
           meta = with pkgs.lib; {
             description = "Smallest fully autonomous AI assistant infrastructure";
-            homepage = "https://github.com/seaclaw/seaclaw";
+            homepage = "https://github.com/sethdford/seaclaw";
             license = licenses.mit;
             platforms = platforms.unix;
           };

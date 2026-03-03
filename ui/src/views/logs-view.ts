@@ -38,12 +38,24 @@ export class ScLogsView extends GatewayAwareLitElement {
     }
     .filter-input {
       padding: 0.5rem 0.75rem;
-      background: var(--sc-bg);
+      background: var(--sc-bg-surface);
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius);
       color: var(--sc-text);
       font-size: 0.875rem;
-      width: 200px;
+      font-family: var(--sc-font-mono);
+      width: 220px;
+      transition:
+        border-color 0.2s var(--sc-ease-out),
+        box-shadow 0.2s var(--sc-ease-out);
+    }
+    .filter-input:focus {
+      outline: none;
+      border-color: var(--sc-accent);
+      box-shadow: 0 0 0 3px var(--sc-accent-subtle);
+    }
+    .filter-input::placeholder {
+      color: var(--sc-text-muted);
     }
     .btn {
       padding: 0.5rem 1rem;
@@ -53,24 +65,58 @@ export class ScLogsView extends GatewayAwareLitElement {
       border-radius: var(--sc-radius);
       cursor: pointer;
       font-size: 0.875rem;
+      font-weight: 500;
+      transition: background 0.2s var(--sc-ease-out);
     }
     .btn:hover {
       background: var(--sc-border);
     }
+    .log-area-wrapper {
+      position: relative;
+    }
+    .log-area-wrapper::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2rem;
+      background: linear-gradient(to top, var(--sc-bg-inset) 20%, transparent);
+      pointer-events: none;
+      border-radius: 0 0 var(--sc-radius) var(--sc-radius);
+    }
     .log-area {
-      background: var(--sc-bg-surface);
+      background: var(--sc-bg-inset);
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius);
       padding: 1rem;
       height: 400px;
       overflow-y: auto;
       font-family: var(--sc-font-mono);
-      font-size: 0.75rem;
-      line-height: 1.5;
+      font-size: 0.8125rem;
+      line-height: 1.6;
       color: var(--sc-text);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+    }
+    .log-area::-webkit-scrollbar {
+      width: 8px;
+    }
+    .log-area::-webkit-scrollbar-track {
+      background: var(--sc-bg-elevated);
+      border-radius: 4px;
+    }
+    .log-area::-webkit-scrollbar-thumb {
+      background: var(--sc-border);
+      border-radius: 4px;
+    }
+    .log-area::-webkit-scrollbar-thumb:hover {
+      background: var(--sc-text-muted);
     }
     .log-line {
-      margin-bottom: 0.25rem;
+      margin-bottom: 0.5rem;
+      padding: 0.35rem 0.5rem;
+      border-radius: var(--sc-radius-sm);
+      background: rgba(0, 0, 0, 0.2);
       word-break: break-all;
     }
     .log-ts {
@@ -99,25 +145,17 @@ export class ScLogsView extends GatewayAwareLitElement {
   private setupListener(): void {
     const gw = this.gateway;
     if (!gw) return;
-    gw.addEventListener(
-      GatewayClient.EVENT_GATEWAY,
-      this.handleGatewayEvent as EventListener,
-    );
+    gw.addEventListener(GatewayClient.EVENT_GATEWAY, this.handleGatewayEvent as EventListener);
   }
 
   private removeListener(): void {
     const gw = this.gateway;
     if (!gw) return;
-    gw.removeEventListener(
-      GatewayClient.EVENT_GATEWAY,
-      this.handleGatewayEvent as EventListener,
-    );
+    gw.removeEventListener(GatewayClient.EVENT_GATEWAY, this.handleGatewayEvent as EventListener);
   }
 
   private handleGatewayEvent = (e: Event): void => {
-    const ev = (
-      e as CustomEvent<{ event: string; payload: Record<string, unknown> }>
-    ).detail;
+    const ev = (e as CustomEvent<{ event: string; payload: Record<string, unknown> }>).detail;
     this.logs = [
       ...this.logs,
       {
@@ -161,8 +199,7 @@ export class ScLogsView extends GatewayAwareLitElement {
     const q = this.filter.toLowerCase();
     return this.logs.filter(
       (l) =>
-        l.event.toLowerCase().includes(q) ||
-        JSON.stringify(l.payload).toLowerCase().includes(q),
+        l.event.toLowerCase().includes(q) || JSON.stringify(l.payload).toLowerCase().includes(q),
     );
   }
 
@@ -178,24 +215,19 @@ export class ScLogsView extends GatewayAwareLitElement {
             class="filter-input"
             placeholder="Filter..."
             .value=${this.filter}
-            @input=${(e: Event) =>
-              (this.filter = (e.target as HTMLInputElement).value)}
+            @input=${(e: Event) => (this.filter = (e.target as HTMLInputElement).value)}
           />
           <button class="btn" @click=${this.clearLogs}>Clear</button>
         </div>
       </div>
       <div class="log-area" role="log">
         ${entries.length === 0
-          ? html`<span style="color: var(--sc-text-muted)"
-              >Listening for gateway events...</span
-            >`
+          ? html`<span style="color: var(--sc-text-muted)">Listening for gateway events...</span>`
           : entries.map(
               (l) => html`
                 <div class="log-line">
                   <span class="log-ts">${l.ts}</span>
-                  <span class="event" style="color: ${this.eventColor(l.event)}"
-                    >[${l.event}]</span
-                  >
+                  <span class="event" style="color: ${this.eventColor(l.event)}">[${l.event}]</span>
                   ${JSON.stringify(l.payload)}
                 </div>
               `,

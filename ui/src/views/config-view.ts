@@ -109,31 +109,36 @@ export class ScConfigView extends GatewayAwareLitElement {
     .form {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
-      padding: 1rem;
+      gap: 1.5rem;
+      padding: 1.5rem;
       background: var(--sc-bg-surface);
       border: 1px solid var(--sc-border);
-      border-radius: var(--sc-radius);
+      border-radius: var(--sc-radius-lg);
     }
     .section {
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius);
       overflow: hidden;
+      background: var(--sc-bg-elevated);
+    }
+    .section + .section {
+      margin-top: 0.5rem;
     }
     .section-header {
-      padding: 0.5rem 0.75rem;
+      padding: 0.75rem 1rem;
       background: var(--sc-bg-elevated);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: space-between;
       user-select: none;
+      transition: background var(--sc-duration-fast);
     }
     .section-header:hover {
-      background: var(--sc-border);
+      background: var(--sc-bg-overlay);
     }
     .section-header .chevron {
-      transition: transform 0.2s;
+      transition: transform var(--sc-duration-normal) var(--sc-ease-out);
       font-size: 0.75rem;
       color: var(--sc-text-muted);
     }
@@ -141,13 +146,22 @@ export class ScConfigView extends GatewayAwareLitElement {
       transform: rotate(-90deg);
     }
     .section-content {
-      padding: 1rem;
+      padding: 1rem 1.25rem;
       display: flex;
       flex-direction: column;
       gap: 1rem;
+      max-height: 600px;
+      overflow: hidden;
+      transition:
+        max-height var(--sc-duration-slow) var(--sc-ease-out),
+        padding var(--sc-duration-normal),
+        opacity var(--sc-duration-normal);
     }
     .section.collapsed .section-content {
-      display: none;
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      opacity: 0;
     }
     .field {
       display: flex;
@@ -165,12 +179,18 @@ export class ScConfigView extends GatewayAwareLitElement {
       margin-top: 0.125rem;
     }
     .field input {
-      padding: 0.5rem 0.75rem;
+      padding: 0.5rem 0.875rem;
       background: var(--sc-bg);
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius);
       color: var(--sc-text);
       font-size: 0.875rem;
+      transition:
+        border-color var(--sc-duration-fast),
+        box-shadow var(--sc-duration-fast);
+    }
+    .field input:hover:not(:focus) {
+      border-color: var(--sc-text-muted);
     }
     .field input:focus {
       outline: none;
@@ -190,10 +210,17 @@ export class ScConfigView extends GatewayAwareLitElement {
       font-family: var(--sc-font-mono);
       font-size: 0.8125rem;
       resize: vertical;
+      transition:
+        border-color var(--sc-duration-fast),
+        box-shadow var(--sc-duration-fast);
+    }
+    .raw-area:hover:not(:focus) {
+      border-color: var(--sc-text-muted);
     }
     .raw-area:focus {
       outline: none;
       border-color: var(--sc-accent);
+      box-shadow: 0 0 0 3px var(--sc-accent-subtle, rgba(249, 112, 102, 0.12));
     }
   `;
 
@@ -231,10 +258,7 @@ export class ScConfigView extends GatewayAwareLitElement {
   private async loadConfig(): Promise<void> {
     if (!this.gateway) return;
     try {
-      const cfg = await this.gateway.request<Partial<ConfigData>>(
-        "config.get",
-        {},
-      );
+      const cfg = await this.gateway.request<Partial<ConfigData>>("config.get", {});
       this.config = {
         exists: cfg?.exists ?? false,
         workspace_dir: cfg?.workspace_dir ?? "",
@@ -295,13 +319,10 @@ export class ScConfigView extends GatewayAwareLitElement {
     }
     return (
       (this.edited.workspace_dir ?? "") !== (this.config.workspace_dir ?? "") ||
-      (this.edited.default_provider ?? "") !==
-        (this.config.default_provider ?? "") ||
+      (this.edited.default_provider ?? "") !== (this.config.default_provider ?? "") ||
       (this.edited.default_model ?? "") !== (this.config.default_model ?? "") ||
       (this.edited.max_tokens ?? 0) !== (this.config.max_tokens ?? 0) ||
-      Math.abs(
-        (this.edited.temperature ?? 0.7) - (this.config.temperature ?? 0.7),
-      ) > 0.001
+      Math.abs((this.edited.temperature ?? 0.7) - (this.config.temperature ?? 0.7)) > 0.001
     );
   }
 
@@ -323,10 +344,7 @@ export class ScConfigView extends GatewayAwareLitElement {
       } else {
         raw = JSON.stringify(toRawConfig(this.edited));
       }
-      const payload = await this.gateway.request<{ saved?: boolean }>(
-        "config.set",
-        { raw },
-      );
+      const payload = await this.gateway.request<{ saved?: boolean }>("config.set", { raw });
       if (payload?.saved !== false) {
         if (this.rawMode) {
           try {
@@ -337,9 +355,7 @@ export class ScConfigView extends GatewayAwareLitElement {
               default_provider: String(parsed.default_provider ?? "openai"),
               default_model: String(parsed.default_model ?? ""),
               max_tokens: Number(parsed.max_tokens ?? 0),
-              temperature: Number(
-                parsed.default_temperature ?? parsed.temperature ?? 0.7,
-              ),
+              temperature: Number(parsed.default_temperature ?? parsed.temperature ?? 0.7),
             };
             this.edited = { ...this.config };
           } catch {
@@ -373,9 +389,7 @@ export class ScConfigView extends GatewayAwareLitElement {
           default_provider: String(parsed.default_provider ?? "openai"),
           default_model: String(parsed.default_model ?? ""),
           max_tokens: Number(parsed.max_tokens ?? 0),
-          temperature: Number(
-            parsed.default_temperature ?? parsed.temperature ?? 0.7,
-          ),
+          temperature: Number(parsed.default_temperature ?? parsed.temperature ?? 0.7),
         };
       } catch {
         /* invalid JSON, keep edited */
@@ -415,11 +429,7 @@ export class ScConfigView extends GatewayAwareLitElement {
           <button class="toggle-btn" @click=${this.toggleRawMode}>
             ${this.rawMode ? "Form" : "Raw JSON"}
           </button>
-          <button
-            class="save-btn"
-            ?disabled=${!this.hasChanges()}
-            @click=${() => this.save()}
-          >
+          <button class="save-btn" ?disabled=${!this.hasChanges()} @click=${() => this.save()}>
             Save
           </button>
         </div>
@@ -442,11 +452,8 @@ export class ScConfigView extends GatewayAwareLitElement {
             <div class="form">
               <div class="section ${this.sectionCollapsed ? "collapsed" : ""}">
                 <div
-                  class="section-header ${this.sectionCollapsed
-                    ? "collapsed"
-                    : ""}"
-                  @click=${() =>
-                    (this.sectionCollapsed = !this.sectionCollapsed)}
+                  class="section-header ${this.sectionCollapsed ? "collapsed" : ""}"
+                  @click=${() => (this.sectionCollapsed = !this.sectionCollapsed)}
                 >
                   <span>General</span>
                   <span class="chevron">▼</span>
@@ -457,16 +464,12 @@ export class ScConfigView extends GatewayAwareLitElement {
                     const desc = prop?.description ?? "";
                     const val = this.edited[key as keyof ConfigData];
                     const inputType =
-                      prop?.type === "integer" || prop?.type === "number"
-                        ? "number"
-                        : "text";
+                      prop?.type === "integer" || prop?.type === "number" ? "number" : "text";
 
                     return html`
                       <div class="field">
                         <label for="${key}">${key.replace(/_/g, " ")}</label>
-                        ${desc
-                          ? html`<div class="description">${desc}</div>`
-                          : nothing}
+                        ${desc ? html`<div class="description">${desc}</div>` : nothing}
                         <input
                           id="${key}"
                           type="${inputType}"
@@ -500,8 +503,7 @@ export class ScConfigView extends GatewayAwareLitElement {
                               ...this.edited,
                               [key]: parsed,
                             };
-                            if (this.saveStatus === "saved")
-                              this.saveStatus = "idle";
+                            if (this.saveStatus === "saved") this.saveStatus = "idle";
                           }}
                         />
                       </div>

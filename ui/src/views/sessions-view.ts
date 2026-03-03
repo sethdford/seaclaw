@@ -1,7 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
-import { formatDate } from "../utils.js";
+import { formatRelative } from "../utils.js";
 
 interface SessionItem {
   key?: string;
@@ -241,10 +241,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
     this.loading = true;
     this.error = "";
     try {
-      const res = await gw.request<{ sessions?: SessionItem[] }>(
-        "sessions.list",
-        {},
-      );
+      const res = await gw.request<{ sessions?: SessionItem[] }>("sessions.list", {});
       this.sessions = res?.sessions ?? [];
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Failed to load sessions";
@@ -261,10 +258,9 @@ export class ScSessionsView extends GatewayAwareLitElement {
     const gw = this.gateway;
     if (!gw) return;
     try {
-      const res = await gw.request<{ messages?: HistoryMessage[] }>(
-        "chat.history",
-        { sessionKey: key },
-      );
+      const res = await gw.request<{ messages?: HistoryMessage[] }>("chat.history", {
+        sessionKey: key,
+      });
       this.messages = res?.messages ?? [];
     } catch {
       this.messages = [];
@@ -361,17 +357,12 @@ export class ScSessionsView extends GatewayAwareLitElement {
                   : this.sessions.map(
                       (s) => html`
                         <div
-                          class="session-item ${this.selectedKey === s.key
-                            ? "active"
-                            : ""}"
+                          class="session-item ${this.selectedKey === s.key ? "active" : ""}"
                           @click=${() => this.selectSession(s.key ?? "")}
                         >
-                          <div class="session-key">
-                            ${s.label || s.key || "unnamed"}
-                          </div>
+                          <div class="session-key">${s.label || s.key || "unnamed"}</div>
                           <div class="session-meta">
-                            ${s.turn_count ?? 0} turns ·
-                            ${formatDate(s.last_active)}
+                            ${s.turn_count ?? 0} turns · ${formatRelative(s.last_active)}
                           </div>
                         </div>
                       `,
@@ -388,20 +379,12 @@ export class ScSessionsView extends GatewayAwareLitElement {
                                   type="text"
                                   .value=${this.renameValue}
                                   @input=${(e: Event) =>
-                                    (this.renameValue = (
-                                      e.target as HTMLInputElement
-                                    ).value)}
+                                    (this.renameValue = (e.target as HTMLInputElement).value)}
                                 />
-                                <button
-                                  class="btn btn-accent"
-                                  @click=${() => this.saveRename()}
-                                >
+                                <button class="btn btn-accent" @click=${() => this.saveRename()}>
                                   Save
                                 </button>
-                                <button
-                                  class="btn"
-                                  @click=${() => (this.renaming = false)}
-                                >
+                                <button class="btn" @click=${() => (this.renaming = false)}>
                                   Cancel
                                 </button>
                               </div>
@@ -411,18 +394,11 @@ export class ScSessionsView extends GatewayAwareLitElement {
                               <button
                                 class="btn btn-accent"
                                 @click=${() =>
-                                  this.dispatchNavigate(
-                                    "chat:" + (this.selectedKey || "default"),
-                                  )}
+                                  this.dispatchNavigate("chat:" + (this.selectedKey || "default"))}
                               >
                                 Resume
                               </button>
-                              <button
-                                class="btn"
-                                @click=${() => this.startRename()}
-                              >
-                                Rename
-                              </button>
+                              <button class="btn" @click=${() => this.startRename()}>Rename</button>
                               ${this.confirmDelete
                                 ? html`
                                     <button
@@ -433,8 +409,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
                                     </button>
                                     <button
                                       class="btn"
-                                      @click=${() =>
-                                        (this.confirmDelete = false)}
+                                      @click=${() => (this.confirmDelete = false)}
                                     >
                                       Cancel
                                     </button>
@@ -442,8 +417,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
                                 : html`
                                     <button
                                       class="btn-danger btn"
-                                      @click=${() =>
-                                        (this.confirmDelete = true)}
+                                      @click=${() => (this.confirmDelete = true)}
                                     >
                                       Delete
                                     </button>
@@ -454,15 +428,11 @@ export class ScSessionsView extends GatewayAwareLitElement {
                         ${this.messages.length === 0
                           ? html`<div class="empty">No messages</div>`
                           : this.messages.map(
-                              (m) => html`
-                                <div class="msg ${m.role}">${m.content}</div>
-                              `,
+                              (m) => html` <div class="msg ${m.role}">${m.content}</div> `,
                             )}
                       </div>
                     `
-                  : html`<div class="empty">
-                      Select a session to view history
-                    </div>`}
+                  : html`<div class="empty">Select a session to view history</div>`}
               </div>
             </div>
           `}
