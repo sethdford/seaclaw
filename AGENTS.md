@@ -7,7 +7,7 @@ Scope: entire repository.
 
 seaclaw is a C11 autonomous AI assistant runtime optimized for:
 
-- minimal binary size (398 KB release with LTO, 175 exported symbols)
+- minimal binary size (414 KB release with LTO, 175 exported symbols)
 - minimal memory footprint (5–6 MB peak RSS measured)
 - zero dependencies beyond libc, optional SQLite and libcurl
 - Zig reference implementation archived in `archive/zig-reference/`
@@ -25,13 +25,13 @@ Key extension points:
 - `src/runtime/` (`sc_runtime_t`) — execution environments
 - `src/peripherals/` (`sc_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 
-Current scale: **463 source + header files, ~91K lines of C, ~28K+ lines of tests, 2,177+ tests**.
+Current scale: **~466 source + header files, ~70K+ lines of C, ~28K+ lines of tests, 2,258 tests**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
 | Metric                   | Measured               |
 | ------------------------ | ---------------------- |
-| Binary size              | 398 KB (407,464 bytes) |
+| Binary size              | 414 KB (407,464 bytes) |
 | Text section             | 280 KB                 |
 | Exported symbols         | 175                    |
 | Cold-start (`--version`) | 6–27 ms avg            |
@@ -61,7 +61,7 @@ These codebase realities should drive every design decision:
 2. **Binary size and memory are hard product constraints**
    - `cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON` is the release target. Every dependency and abstraction has a size cost.
    - Avoid adding unnecessary runtime allocations or large data tables without justification.
-   - Current release binary: 398 KB (with LTO). Top modules by object size:
+   - Current release binary: 414 KB (with LTO). Top modules by object size:
      config (74 KB), agent (52 KB), control_protocol (45 KB), cli (36 KB).
 
 3. **Security-critical surfaces are first-class**
@@ -75,7 +75,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `SC_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 2,177+ tests must pass at zero ASan errors**
+5. **All 2,258 tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `SC_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -139,9 +139,9 @@ Required:
 src/
   main.c                CLI entrypoint and command routing
   agent/                agent loop, context, planner, compaction, dispatcher
-  channels/             21 channel implementations (cli, telegram, discord, slack, ...)
+  channels/             20 channel implementations (cli, telegram, discord, slack, ...)
   providers/            50+ AI provider implementations (9 core + 41 compatible services)
-  tools/                43 tool implementations
+  tools/                46 tool implementations
   memory/               SQLite + markdown + LRU backends, embeddings, vector search
   security/             policy, pairing, secrets, sandbox backends (landlock, firejail, bwrap)
   runtime/              runtime adapters (native, docker, wasm, cloudflare)
@@ -156,7 +156,7 @@ src/
 
 include/seaclaw/       public C headers
 
-tests/                 72 test files, 2,177+ tests
+tests/                 73 test files, 2,258 tests
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 
