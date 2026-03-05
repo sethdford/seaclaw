@@ -23,8 +23,8 @@
 /* Starter config JSON for seaclaw init */
 static const char SC_INIT_DEFAULT_JSON[] =
     "{\n"
-    "  \"default_provider\": \"openai\",\n"
-    "  \"default_model\": \"gpt-4o\",\n"
+    "  \"default_provider\": \"gemini\",\n"
+    "  \"default_model\": \"gemini-3.1-flash-lite-preview\",\n"
     "  \"max_tokens\": 4096,\n"
     "  \"memory\": {\n"
     "    \"backend\": \"sqlite\"\n"
@@ -326,7 +326,7 @@ sc_error_t cmd_capabilities(sc_allocator_t *alloc, int argc, char **argv) {
         if (strcmp(argv[i], "--json") == 0 || strcmp(argv[i], "json") == 0)
             json_mode = true;
     }
-    const char *prov = (err == SC_OK && cfg.default_provider) ? cfg.default_provider : "openai";
+    const char *prov = (err == SC_OK && cfg.default_provider) ? cfg.default_provider : "gemini";
     const char *backend = (err == SC_OK && cfg.memory.backend) ? cfg.memory.backend : "none";
     if (json_mode) {
         printf("{\"channels\":[\"cli\"],\"tools\":[\"shell\",\"file_read\",\"file_write\",\"file_"
@@ -356,7 +356,7 @@ sc_error_t cmd_models(sc_allocator_t *alloc, int argc, char **argv) {
 
     if (argc < 3 || strcmp(argv[2], "list") == 0) {
         if (err == SC_OK) {
-            const char *prov = cfg.default_provider ? cfg.default_provider : "openai";
+            const char *prov = cfg.default_provider ? cfg.default_provider : "gemini";
             const char *model = cfg.default_model ? cfg.default_model : "(provider default)";
             printf("Active: provider=%s model=%s\n\n", prov, model);
             if (cfg.providers_len > 0) {

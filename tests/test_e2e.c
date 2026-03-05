@@ -299,7 +299,7 @@ static void test_config_defaults(void) {
 
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(cfg.default_provider);
-    SC_ASSERT_STR_EQ(cfg.default_provider, "openai");
+    SC_ASSERT_STR_EQ(cfg.default_provider, "gemini");
     SC_ASSERT_FLOAT_EQ(cfg.default_temperature, 0.7, 0.001);
     SC_ASSERT_NOT_NULL(cfg.gateway_host);
     SC_ASSERT_EQ(cfg.gateway_port, 3000);

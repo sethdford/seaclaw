@@ -23,8 +23,8 @@ static void set_defaults(sc_config_t *cfg, sc_allocator_t *a) {
     cfg->providers = NULL;
     cfg->providers_len = 0;
     cfg->api_key = NULL;
-    cfg->default_provider = sc_strdup(a, "openai");
-    cfg->default_model = sc_strdup(a, "gpt-4o");
+    cfg->default_provider = sc_strdup(a, "gemini");
+    cfg->default_model = sc_strdup(a, "gemini-3.1-flash-lite-preview");
     cfg->default_temperature = 0.7;
     cfg->temperature = 0.7;
     cfg->max_tokens = 0;
