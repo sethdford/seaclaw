@@ -60,13 +60,13 @@ static sc_error_t build_event_json(sc_allocator_t *alloc, const char *target, si
     if (err)
         return err;
 
-    err = sc_json_buf_append_raw(&jbuf, "{\"v\":1,\"type\":", 15);
+    err = sc_json_buf_append_raw(&jbuf, "{\"v\":1,\"type\":", 14);
     if (err)
         goto fail;
     err = sc_json_append_string(&jbuf, event_type, strlen(event_type));
     if (err)
         goto fail;
-    err = sc_json_buf_append_raw(&jbuf, ",\"session_id\":", 15);
+    err = sc_json_buf_append_raw(&jbuf, ",\"session_id\":", 14);
     if (err)
         goto fail;
     err = sc_json_append_string(&jbuf, target, target_len);
@@ -79,7 +79,7 @@ static sc_error_t build_event_json(sc_allocator_t *alloc, const char *target, si
         sc_json_append_string(&jbuf, SC_WEB_ACCOUNT_ID_DEFAULT, strlen(SC_WEB_ACCOUNT_ID_DEFAULT));
     if (err)
         goto fail;
-    err = sc_json_buf_append_raw(&jbuf, ",\"payload\":{\"content\":", 21);
+    err = sc_json_buf_append_raw(&jbuf, ",\"payload\":{\"content\":", 22);
     if (err)
         goto fail;
     err = sc_json_append_string(&jbuf, message, message_len);

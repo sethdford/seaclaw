@@ -131,13 +131,13 @@ static sc_error_t build_rpc_body(sc_allocator_t *alloc, const char *method, int 
     if (err)
         return err;
 
-    err = sc_json_buf_append_raw(&jbuf, "{\"jsonrpc\":\"2.0\",\"method\":", 28);
+    err = sc_json_buf_append_raw(&jbuf, "{\"jsonrpc\":\"2.0\",\"method\":", 26);
     if (err)
         goto fail;
     err = sc_json_append_string(&jbuf, method, strlen(method));
     if (err)
         goto fail;
-    err = sc_json_buf_append_raw(&jbuf, ",\"params\":{", 10);
+    err = sc_json_buf_append_raw(&jbuf, ",\"params\":{", 11);
     if (err)
         goto fail;
 
@@ -174,7 +174,7 @@ static sc_error_t build_rpc_body(sc_allocator_t *alloc, const char *method, int 
             goto fail;
     }
 
-    err = sc_json_buf_append_raw(&jbuf, "},\"id\":\"1\"}", 10);
+    err = sc_json_buf_append_raw(&jbuf, "},\"id\":\"1\"}", 11);
     if (err)
         goto fail;
 

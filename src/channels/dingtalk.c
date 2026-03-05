@@ -102,7 +102,7 @@ static sc_error_t dingtalk_send(void *ctx, const char *target, size_t target_len
     err = sc_json_buf_init(&jbuf, c->alloc);
     if (err)
         goto inner_fail;
-    err = sc_json_buf_append_raw(&jbuf, "{\"msgtype\":\"text\",\"text\":", 24);
+    err = sc_json_buf_append_raw(&jbuf, "{\"msgtype\":\"text\",\"text\":", 25);
     if (err)
         goto jfail;
     err = sc_json_buf_append_raw(&jbuf, inner.ptr, inner.len);

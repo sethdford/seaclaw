@@ -87,7 +87,7 @@ static sc_error_t whatsapp_send(void *ctx, const char *target, size_t target_len
     err = sc_json_append_key_value(&jbuf, "to", 2, target, target_len);
     if (err)
         goto jfail;
-    err = sc_json_buf_append_raw(&jbuf, ",\"type\":\"text\",\"text\":{", 24);
+    err = sc_json_buf_append_raw(&jbuf, ",\"type\":\"text\",\"text\":{", 23);
     if (err)
         goto jfail;
     err = sc_json_append_key_value(&jbuf, "body", 4, message, message_len);

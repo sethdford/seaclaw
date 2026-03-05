@@ -192,8 +192,18 @@ sc_error_t sc_router_create(sc_allocator_t *alloc, const char *const *provider_n
         for (size_t i = 0; i < route_count; i++) {
             size_t hint_len = routes[i].hint_len;
             ri[i].hint = sc_strndup(alloc, routes[i].hint, hint_len);
+            if (!ri[i].hint) {
+                for (size_t k = 0; k < i; k++) {
+                    if (ri[k].hint)
+                        alloc->free(alloc->ctx, (void *)ri[k].hint, ri[k].hint_len + 1);
+                    if (ri[k].model)
+                        alloc->free(alloc->ctx, (void *)ri[k].model, ri[k].model_len + 1);
+                }
+                alloc->free(alloc->ctx, ri, route_count * sizeof(*ri));
+                alloc->free(alloc->ctx, r, sizeof(*r));
+                return SC_ERR_OUT_OF_MEMORY;
+            }
             ri[i].hint_len = hint_len;
-            /* Resolve provider_name -> index */
             for (size_t j = 0; j < provider_count; j++) {
                 if (provider_name_lens[j] == routes[i].route.provider_name_len &&
                     memcmp(provider_names[j], routes[i].route.provider_name,
@@ -203,6 +213,18 @@ sc_error_t sc_router_create(sc_allocator_t *alloc, const char *const *provider_n
                 }
             }
             ri[i].model = sc_strndup(alloc, routes[i].route.model, routes[i].route.model_len);
+            if (!ri[i].model) {
+                alloc->free(alloc->ctx, (void *)ri[i].hint, hint_len + 1);
+                for (size_t k = 0; k < i; k++) {
+                    if (ri[k].hint)
+                        alloc->free(alloc->ctx, (void *)ri[k].hint, ri[k].hint_len + 1);
+                    if (ri[k].model)
+                        alloc->free(alloc->ctx, (void *)ri[k].model, ri[k].model_len + 1);
+                }
+                alloc->free(alloc->ctx, ri, route_count * sizeof(*ri));
+                alloc->free(alloc->ctx, r, sizeof(*r));
+                return SC_ERR_OUT_OF_MEMORY;
+            }
             ri[i].model_len = routes[i].route.model_len;
         }
     }

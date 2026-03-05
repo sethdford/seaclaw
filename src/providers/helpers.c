@@ -41,7 +41,7 @@ bool sc_helpers_is_reasoning_model(const char *model, size_t model_len) {
         return true;
     if (model_len >= 7 && memcmp(model, "o4-mini", 7) == 0)
         return true;
-    if (model_len >= 4 && memcmp(model, "gpt-5", 5) == 0)
+    if (model_len >= 5 && memcmp(model, "gpt-5", 5) == 0)
         return true;
     if (model_len >= 10 && memcmp(model, "codex-mini", 10) == 0)
         return true;

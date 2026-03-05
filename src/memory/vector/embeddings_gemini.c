@@ -105,11 +105,11 @@ static sc_error_t gemini_embed(void *ctx, sc_allocator_t *alloc, const char *tex
         goto fail;
     if (sc_json_append_key_value(&buf, "model", 5, model_prefix, (size_t)mlen) != SC_OK)
         goto fail;
-    if (sc_json_buf_append_raw(&buf, ",\"content\":{\"parts\":[{\"text\":", 32) != SC_OK)
+    if (sc_json_buf_append_raw(&buf, ",\"content\":{\"parts\":[{\"text\":", 29) != SC_OK)
         goto fail;
     if (sc_json_append_string(&buf, text, text_len) != SC_OK)
         goto fail;
-    if (sc_json_buf_append_raw(&buf, "}]}}", 5) != SC_OK)
+    if (sc_json_buf_append_raw(&buf, "}]}}", 4) != SC_OK)
         goto fail;
 
     char *body = buf.ptr;

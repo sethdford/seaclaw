@@ -283,7 +283,7 @@ sc_error_t sc_voice_tts(sc_allocator_t *alloc, const sc_voice_config_t *config, 
     sc_json_buf_t body_buf = {0};
     if (sc_json_buf_init(&body_buf, alloc) != SC_OK)
         return SC_ERR_OUT_OF_MEMORY;
-    if (sc_json_buf_append_raw(&body_buf, "{\"model\":\"", 9) != SC_OK)
+    if (sc_json_buf_append_raw(&body_buf, "{\"model\":\"", 10) != SC_OK)
         goto tts_fail;
     if (sc_json_append_string(&body_buf, model, strlen(model)) != SC_OK)
         goto tts_fail;
@@ -291,7 +291,7 @@ sc_error_t sc_voice_tts(sc_allocator_t *alloc, const sc_voice_config_t *config, 
         goto tts_fail;
     if (sc_json_append_string(&body_buf, text ? text : "", text_len) != SC_OK)
         goto tts_fail;
-    if (sc_json_buf_append_raw(&body_buf, "\",\"voice\":\"", 10) != SC_OK)
+    if (sc_json_buf_append_raw(&body_buf, "\",\"voice\":\"", 11) != SC_OK)
         goto tts_fail;
     if (sc_json_append_string(&body_buf, voice, strlen(voice)) != SC_OK)
         goto tts_fail;

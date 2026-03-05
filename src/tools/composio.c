@@ -152,11 +152,11 @@ static sc_error_t composio_execute(void *ctx, sc_allocator_t *alloc, const sc_js
             *out = sc_tool_result_fail("out of memory", 12);
             return SC_ERR_OUT_OF_MEMORY;
         }
-        if (sc_json_buf_append_raw(&body_buf, "{\"arguments\":", 12) != SC_OK)
+        if (sc_json_buf_append_raw(&body_buf, "{\"arguments\":", 13) != SC_OK)
             goto exec_fail;
         if (sc_json_buf_append_raw(&body_buf, arguments, arguments_len) != SC_OK)
             goto exec_fail;
-        if (sc_json_buf_append_raw(&body_buf, ",\"user_id\":", 10) != SC_OK)
+        if (sc_json_buf_append_raw(&body_buf, ",\"user_id\":", 11) != SC_OK)
             goto exec_fail;
         if (sc_json_append_string(&body_buf, eid, strlen(eid)) != SC_OK)
             goto exec_fail;
@@ -205,7 +205,7 @@ static sc_error_t composio_execute(void *ctx, sc_allocator_t *alloc, const sc_js
             *out = sc_tool_result_fail("out of memory", 12);
             return SC_ERR_OUT_OF_MEMORY;
         }
-        if (sc_json_buf_append_raw(&body_buf, "{\"user_id\":", 10) != SC_OK)
+        if (sc_json_buf_append_raw(&body_buf, "{\"user_id\":", 11) != SC_OK)
             goto conn_fail;
         if (sc_json_append_string(&body_buf, eid, strlen(eid)) != SC_OK)
             goto conn_fail;

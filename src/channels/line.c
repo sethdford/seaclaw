@@ -96,7 +96,7 @@ static sc_error_t line_send(void *ctx, const char *target, size_t target_len, co
     err = sc_json_append_key_value(&jbuf, "to", 2, to, to_len);
     if (err)
         goto jfail;
-    err = sc_json_buf_append_raw(&jbuf, ",\"messages\":[{\"type\":\"text\",", 30);
+    err = sc_json_buf_append_raw(&jbuf, ",\"messages\":[{\"type\":\"text\",", 28);
     if (err)
         goto jfail;
     err = sc_json_append_key_value(&jbuf, "text", 4, message, message_len);

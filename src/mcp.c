@@ -84,15 +84,15 @@ static sc_error_t send_request(sc_mcp_server_t *srv, sc_allocator_t *alloc, cons
 
     sc_error_t err;
     if (is_notification) {
-        err = sc_json_buf_append_raw(&req_buf, "{\"jsonrpc\":\"2.0\",\"method\":\"", 28);
+        err = sc_json_buf_append_raw(&req_buf, "{\"jsonrpc\":\"2.0\",\"method\":\"", 27);
     } else {
         char id_buf[16];
         int id_len = snprintf(id_buf, sizeof(id_buf), "%u", (unsigned)srv->next_id);
-        err = sc_json_buf_append_raw(&req_buf, "{\"jsonrpc\":\"2.0\",\"id\":", 23);
+        err = sc_json_buf_append_raw(&req_buf, "{\"jsonrpc\":\"2.0\",\"id\":", 22);
         if (err == SC_OK)
             err = sc_json_buf_append_raw(&req_buf, id_buf, (size_t)id_len);
         if (err == SC_OK)
-            err = sc_json_buf_append_raw(&req_buf, ",\"method\":\"", 10);
+            err = sc_json_buf_append_raw(&req_buf, ",\"method\":\"", 11);
     }
     if (err != SC_OK)
         goto fail;
@@ -402,7 +402,7 @@ sc_error_t sc_mcp_server_call_tool(sc_mcp_server_t *srv, sc_allocator_t *alloc,
     if (err == SC_OK)
         err = sc_json_append_string(&params_buf, tool_name, strlen(tool_name));
     if (err == SC_OK)
-        err = sc_json_buf_append_raw(&params_buf, ",\"arguments\":", 14);
+        err = sc_json_buf_append_raw(&params_buf, ",\"arguments\":", 13);
     if (err == SC_OK)
         err = sc_json_buf_append_raw(&params_buf, args_json ? args_json : "{}",
                                      args_json ? strlen(args_json) : 2);

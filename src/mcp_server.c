@@ -265,7 +265,7 @@ static sc_error_t handle_resources_list(sc_mcp_host_t *srv, const char *id_raw) 
                                      "\"name\":\"Configuration\","
                                      "\"description\":\"Current seaclaw configuration\","
                                      "\"mimeType\":\"application/json\"}",
-                                     130);
+                                     125);
 
     /* If memory is available, expose memory resource */
     if (err == SC_OK && srv->memory && srv->memory->vtable) {
@@ -274,7 +274,7 @@ static sc_error_t handle_resources_list(sc_mcp_host_t *srv, const char *id_raw) 
                                      "\"name\":\"Memory\","
                                      "\"description\":\"Agent memory entries\","
                                      "\"mimeType\":\"application/json\"}",
-                                     126);
+                                     110);
     }
 
     if (err == SC_OK)
@@ -350,7 +350,7 @@ static sc_error_t handle_resources_read(sc_mcp_host_t *srv, const char *id_raw,
         err = sc_json_buf_append_raw(&buf,
                                      "{\"contents\":[{\"uri\":\"seaclaw://memory\","
                                      "\"mimeType\":\"application/json\",\"text\":\"",
-                                     80);
+                                     77);
         char count_str[32];
         int n = snprintf(count_str, sizeof(count_str), "[%zu entries]", count);
         if (err == SC_OK && n > 0)

@@ -103,7 +103,7 @@ static sc_error_t lark_send(void *ctx, const char *target, size_t target_len, co
     err = sc_json_buf_init(&jbuf, c->alloc);
     if (err)
         goto inner_fail;
-    err = sc_json_buf_append_raw(&jbuf, "{\"msg_type\":\"text\",\"content\":", 28);
+    err = sc_json_buf_append_raw(&jbuf, "{\"msg_type\":\"text\",\"content\":", 29);
     if (err)
         goto jfail;
     err = sc_json_buf_append_raw(&jbuf, inner.ptr, inner.len);

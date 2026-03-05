@@ -101,7 +101,7 @@ static sc_error_t hardware_info_execute(void *ctx, sc_allocator_t *alloc,
         if (sc_json_buf_append_raw(&buf, "{\"name\":\"", 9) != SC_OK)
             goto fail;
         sc_json_append_string(&buf, boards[i].name, strlen(boards[i].name));
-        if (sc_json_buf_append_raw(&buf, "\",\"chip\":\"", 9) != SC_OK)
+        if (sc_json_buf_append_raw(&buf, "\",\"chip\":\"", 10) != SC_OK)
             goto fail;
         sc_json_append_string(&buf, boards[i].chip, strlen(boards[i].chip));
         if (sc_json_buf_append_raw(&buf, "\",\"description\":\"", 17) != SC_OK)

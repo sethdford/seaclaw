@@ -39,7 +39,7 @@ static void resolve_model(const char *model_req, size_t model_len, const char *d
 static sc_role_t role_from_string(const char *role, size_t len) {
     if (len == 4 && memcmp(role, "user", 4) == 0)
         return SC_ROLE_USER;
-    if (len == 8 && memcmp(role, "assistant", 8) == 0)
+    if (len == 9 && memcmp(role, "assistant", 9) == 0)
         return SC_ROLE_ASSISTANT;
     if (len == 6 && memcmp(role, "system", 6) == 0)
         return SC_ROLE_SYSTEM;
@@ -234,10 +234,14 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     time_t now = time(NULL);
     char id_buf[32];
     snprintf(id_buf, sizeof(id_buf), "chatcmpl-%lx", (unsigned long)now);
+    static const char mock_hdr[] = "\",\"object\":\"chat.completion\",\"created\":";
+    static const char mock_tail[] =
+        "\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\","
+        "\"content\":\"mock\"},\"finish_reason\":\"stop\"}],"
+        "\"usage\":{\"prompt_tokens\":0,\"completion_tokens\":0,\"total_tokens\":0}}";
     if (sc_json_buf_append_raw(&buf, "{\"id\":\"", 7) != SC_OK ||
         sc_json_buf_append_raw(&buf, id_buf, strlen(id_buf)) != SC_OK ||
-        sc_json_buf_append_raw(&buf,
-                               "\",\"object\":\"chat.completion\",\"created\":", 38) != SC_OK) {
+        sc_json_buf_append_raw(&buf, mock_hdr, sizeof(mock_hdr) - 1) != SC_OK) {
         sc_json_buf_free(&buf);
         return;
     }
@@ -246,11 +250,7 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     sc_json_buf_append_raw(&buf, created_buf, strlen(created_buf));
     sc_json_buf_append_raw(&buf, ",\"model\":\"", 10);
     sc_json_buf_append_raw(&buf, model, model_len_out);
-    sc_json_buf_append_raw(&buf,
-                           "\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\","
-                           "\"content\":\"mock\"},\"finish_reason\":\"stop\"}],"
-                           "\"usage\":{\"prompt_tokens\":0,\"completion_tokens\":0,\"total_tokens\":0}}",
-                           120);
+    sc_json_buf_append_raw(&buf, mock_tail, sizeof(mock_tail) - 1);
     size_t n = buf.len + 1;
     char *resp_body = (char *)alloc->alloc(alloc->ctx, n);
     if (resp_body) {
@@ -318,10 +318,14 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     char id_buf[32];
     snprintf(id_buf, sizeof(id_buf), "chatcmpl-%lx", (unsigned long)now);
 
+    static const char oc_hdr[] = "\",\"object\":\"chat.completion\",\"created\":";
+    static const char oc_choices[] =
+        "\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"";
+    static const char oc_usage[] =
+        "},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":";
     if (sc_json_buf_append_raw(&buf, "{\"id\":\"", 7) != SC_OK ||
         sc_json_buf_append_raw(&buf, id_buf, strlen(id_buf)) != SC_OK ||
-        sc_json_buf_append_raw(&buf,
-                               "\",\"object\":\"chat.completion\",\"created\":", 38) != SC_OK) {
+        sc_json_buf_append_raw(&buf, oc_hdr, sizeof(oc_hdr) - 1) != SC_OK) {
         sc_json_buf_free(&buf);
         sc_chat_response_free(alloc, &resp);
         *out_body = NULL;
@@ -336,10 +340,7 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
         sc_json_buf_append_raw(&buf, resp.model, resp.model_len);
     else
         sc_json_buf_append_raw(&buf, model, model_len_out);
-    sc_json_buf_append_raw(&buf,
-                           "\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\","
-                           "\"content\":\"",
-                           62);
+    sc_json_buf_append_raw(&buf, oc_choices, sizeof(oc_choices) - 1);
     if (resp.content && resp.content_len > 0)
         sc_json_append_string(&buf, resp.content, resp.content_len);
     else
@@ -349,10 +350,7 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
         sc_json_append_string(&buf, resp.content, resp.content_len);
     else
         sc_json_buf_append_raw(&buf, "\"\"", 2);
-    sc_json_buf_append_raw(&buf,
-                           "},\"finish_reason\":\"stop\"}],"
-                           "\"usage\":{\"prompt_tokens\":",
-                           48);
+    sc_json_buf_append_raw(&buf, oc_usage, sizeof(oc_usage) - 1);
     char usage_buf[24];
     snprintf(usage_buf, sizeof(usage_buf), "%u", resp.usage.prompt_tokens);
     sc_json_buf_append_raw(&buf, usage_buf, strlen(usage_buf));

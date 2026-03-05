@@ -105,21 +105,7 @@ static sc_error_t impl_store(void *ctx, const char *key, size_t key_len, const c
     snprintf(ts, sizeof(ts), "%ld", (long)t);
 
     /* YAML-like frontmatter */
-    size_t header_len = 128 + key_len + strlen(cat_str) + 32;
-    char *header = (char *)self->alloc->alloc(self->alloc->ctx, header_len);
-    if (!header) {
-        self->alloc->free(self->alloc->ctx, fullpath, strlen(fullpath) + 1);
-        return SC_ERR_OUT_OF_MEMORY;
-    }
-    int n = snprintf(header, header_len, "---\nkey: %.*s\ncategory: %s\ntimestamp: %s\n",
-                     (int)key_len, key, cat_str, ts);
-    if (session_id && session_id_len > 0)
-        n += snprintf(header + n, header_len - (size_t)n, "session_id: %.*s\n", (int)session_id_len,
-                      session_id);
-    n += snprintf(header + n, header_len - (size_t)n, "---\n\n");
-
     FILE *f = fopen(fullpath, "w");
-    self->alloc->free(self->alloc->ctx, header, header_len);
     self->alloc->free(self->alloc->ctx, fullpath, strlen(fullpath) + 1);
     if (!f)
         return SC_ERR_MEMORY_STORE;

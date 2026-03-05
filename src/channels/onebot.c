@@ -92,7 +92,7 @@ static sc_error_t onebot_send(void *ctx, const char *target, size_t target_len, 
         return err;
 
     /* OneBot 11: private message */
-    err = sc_json_buf_append_raw(&jbuf, "{\"message_type\":\"private\",", 27);
+    err = sc_json_buf_append_raw(&jbuf, "{\"message_type\":\"private\",", 26);
     if (err)
         goto fail;
     err = sc_json_append_key_value(&jbuf, "user_id", 7, uid, uid_len);

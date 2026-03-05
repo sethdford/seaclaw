@@ -79,17 +79,26 @@ static sc_error_t analytics_execute(void *ctx, sc_allocator_t *alloc, const sc_j
             period = "30d";
         char url[512];
         char auth[256];
-        snprintf(auth, sizeof(auth), "Bearer %s", api_key);
+        int an = snprintf(auth, sizeof(auth), "Bearer %s", api_key);
+        if (an < 0 || (size_t)an >= sizeof(auth)) {
+            *out = sc_tool_result_fail("api_key too long", 16);
+            return SC_OK;
+        }
 
+        int un;
         if (strcmp(action, "realtime") == 0) {
-            snprintf(url, sizeof(url),
+            un = snprintf(url, sizeof(url),
                      "https://plausible.io/api/v1/stats/realtime/visitors?site_id=%s", site_id);
         } else {
             const char *metrics = "visitors,pageviews,bounce_rate,visit_duration";
-            snprintf(url, sizeof(url),
+            un = snprintf(url, sizeof(url),
                      "https://plausible.io/api/v1/stats/aggregate?site_id=%s&period=%s"
                      "&metrics=%s",
                      site_id, period, metrics);
+        }
+        if (un < 0 || (size_t)un >= sizeof(url)) {
+            *out = sc_tool_result_fail("URL too long", 12);
+            return SC_OK;
         }
         sc_http_response_t resp = {0};
         sc_error_t err = sc_http_get(alloc, url, auth, &resp);

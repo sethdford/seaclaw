@@ -194,7 +194,7 @@ static sc_error_t sc_push_apns_send(sc_push_manager_t *mgr, const char *device_t
         mgr->alloc->free(mgr->alloc->ctx, jwt, strlen(jwt) + 1);
         return SC_ERR_OUT_OF_MEMORY;
     }
-    sc_error_t err = sc_json_buf_append_raw(&buf, "{\"aps\":{\"alert\":{\"title\":", 28);
+    sc_error_t err = sc_json_buf_append_raw(&buf, "{\"aps\":{\"alert\":{\"title\":", 25);
     if (err == SC_OK)
         err = sc_json_append_string(&buf, title ? title : "", title ? strlen(title) : 0);
     if (err == SC_OK)
@@ -202,7 +202,7 @@ static sc_error_t sc_push_apns_send(sc_push_manager_t *mgr, const char *device_t
     if (err == SC_OK)
         err = sc_json_append_string(&buf, body ? body : "", body ? strlen(body) : 0);
     if (err == SC_OK)
-        err = sc_json_buf_append_raw(&buf, "},\"sound\":\"default\"}}", 22);
+        err = sc_json_buf_append_raw(&buf, "},\"sound\":\"default\"}}", 21);
     if (err != SC_OK) {
         sc_json_buf_free(&buf);
         mgr->alloc->free(mgr->alloc->ctx, url, url_cap);
@@ -369,7 +369,7 @@ sc_error_t sc_push_send_to(sc_push_manager_t *mgr, const char *device_token, con
         if (err == SC_OK)
             err = sc_json_append_string(&buf, device_token, strlen(device_token));
         if (err == SC_OK)
-            err = sc_json_buf_append_raw(&buf, ",\"notification\":{\"title\":", 26);
+            err = sc_json_buf_append_raw(&buf, ",\"notification\":{\"title\":", 25);
         if (err == SC_OK)
             err = sc_json_append_string(&buf, title ? title : "", title ? strlen(title) : 0);
         if (err == SC_OK)

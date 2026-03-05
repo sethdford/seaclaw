@@ -310,6 +310,9 @@ static sc_error_t file_edit_execute(void *ctx, sc_allocator_t *alloc, const sc_j
     FILE *tf = fopen(tmp_path_buf, "wb");
 #endif
     if (!tf) {
+#ifndef _WIN32
+        close(fd);
+#endif
         alloc->free(alloc->ctx, new_contents, total_new + 1);
 #ifndef _WIN32
         free(resolved);

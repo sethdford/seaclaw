@@ -137,7 +137,7 @@ char *sc_slack_markdown_to_mrkdwn(sc_allocator_t *alloc, const char *input, size
 
         /* Bullets - -> bullet char */
         if (line_start && i + 1 < input_len && input[i] == '-' && input[i + 1] == ' ') {
-            if (sc_json_buf_append_raw(&buf, "\xe2\x80\xa2 ", 3) != SC_OK)
+            if (sc_json_buf_append_raw(&buf, "\xe2\x80\xa2 ", 4) != SC_OK)
                 goto fail;
             i += 2;
             line_start = 0;
@@ -267,7 +267,7 @@ static sc_error_t build_chat_body(sc_allocator_t *alloc, const char *channel, si
     err = sc_json_append_string(&jbuf, channel, channel_len);
     if (err)
         goto fail;
-    err = sc_json_buf_append_raw(&jbuf, ",\"mrkdwn\":true,\"text\":", 21);
+    err = sc_json_buf_append_raw(&jbuf, ",\"mrkdwn\":true,\"text\":", 22);
     if (err)
         goto fail;
     err = sc_json_append_string(&jbuf, text, text_len);
@@ -313,7 +313,7 @@ static sc_error_t build_chat_update_body(sc_allocator_t *alloc, const char *chan
     err = sc_json_append_string(&jbuf, channel, channel_len);
     if (err)
         goto fail;
-    err = sc_json_buf_append_raw(&jbuf, ",\"ts\":", 7);
+    err = sc_json_buf_append_raw(&jbuf, ",\"ts\":", 6);
     if (err)
         goto fail;
     err = sc_json_append_string(&jbuf, ts, ts_len);
