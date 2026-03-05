@@ -223,6 +223,7 @@ find_package(Threads QUIET)
 # Channels and memory engines are conditionally added above
 set(SC_CORE_SOURCES
     src/platform.c
+    src/terminal.c
     src/util.c
     src/json_util.c
     src/bus.c
@@ -302,7 +303,10 @@ set(SC_CORE_SOURCES
     src/agent/dispatcher.c
     src/agent/compaction.c
     src/agent/spawn.c
+    src/agent/worktree.c
+    src/agent/team.c
     src/agent/mailbox.c
+    src/agent/task_list.c
     src/agent/profile.c
     src/agent/planner.c
     src/agent/undo.c
@@ -392,6 +396,7 @@ set(SC_CORE_SOURCES
     src/tools/spreadsheet.c
     src/tools/report.c
     src/tools/broadcast.c
+    src/tools/send_message.c
     src/tools/calendar.c
     src/tools/jira.c
     src/tools/social.c
@@ -1202,6 +1207,7 @@ set(SC_TEST_SOURCES
     tests/test_oauth.c
     tests/test_plugin.c
     tests/test_tenant.c
+    tests/test_agent_teams.c
 )
 
 add_executable(seaclaw_tests ${SC_TEST_SOURCES} wasm/wasm_alloc.c)

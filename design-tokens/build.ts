@@ -117,6 +117,16 @@ function hexToAnsi256(hex: string): number {
   return 16 + 36 * ri + 6 * gi + bi;
 }
 
+function hexToRGB(hex: string): [number, number, number] | null {
+  const m = hex.match(/^#([0-9a-fA-F]{6})$/);
+  if (!m) return null;
+  return [
+    parseInt(m[1].substring(0, 2), 16),
+    parseInt(m[1].substring(2, 4), 16),
+    parseInt(m[1].substring(4, 6), 16),
+  ];
+}
+
 /** Convert hex color #rrggbb to 0xRRGGBB for Swift */
 function hexToSwift(hex: string): string {
   const m = hex.match(/^#([0-9a-fA-F]{6})$/);
@@ -200,8 +210,35 @@ function writeOutput(
   console.log("Wrote", dest);
 }
 
+function generateDocsReference(tokens: TokenMap): string {
+  const groups: Record<
+    string,
+    Array<{ name: string; value: string; hex?: string }>
+  > = {};
+  for (const [key, val] of Object.entries(tokens)) {
+    const parts = key.split(".");
+    const group = parts.length > 1 ? parts.slice(0, -1).join(".") : "base";
+    const name = parts[parts.length - 1];
+    if (!groups[group]) groups[group] = [];
+    const entry: { name: string; value: string; hex?: string } = {
+      name,
+      value: String(val),
+    };
+    if (typeof val === "string" && val.startsWith("#")) {
+      entry.hex = val;
+    }
+    groups[group].push(entry);
+  }
+  return JSON.stringify(
+    { generated: new Date().toISOString(), groups },
+    null,
+    2,
+  );
+}
+
 function main() {
   let tokens: TokenMap = {};
+  let p3Colors: Record<string, string> = {};
   for (const file of TOKEN_FILES) {
     const p = path.join(TOKENS_DIR, file);
     if (!fs.existsSync(p)) {
@@ -210,12 +247,15 @@ function main() {
     }
     const data = JSON.parse(fs.readFileSync(p, "utf-8"));
     tokens = { ...tokens, ...collectTokens(data) };
+    if (data.$extensions?.["seaclaw.p3Colors"]) {
+      p3Colors = { ...p3Colors, ...data.$extensions["seaclaw.p3Colors"] };
+    }
   }
   tokens = resolveRefs(tokens);
 
   const outdir = parseOutdir();
 
-  const css = generateCSS(tokens);
+  const css = generateCSS(tokens, p3Colors);
   writeOutput(
     outdir,
     path.join(ROOT, "ui", "src", "styles", "_tokens.css"),
@@ -290,6 +330,14 @@ function main() {
     }
   }
 
+  const refJson = generateDocsReference(tokens);
+  const refPath = outdir
+    ? path.join(outdir, "design-tokens-reference.json")
+    : path.join(ROOT, "docs", "design-tokens-reference.json");
+  const refDir = path.dirname(refPath);
+  if (!fs.existsSync(refDir)) fs.mkdirSync(refDir, { recursive: true });
+  writeOutput(outdir, refPath, "design-tokens-reference.json", refJson);
+
   console.log("Done.");
 }
 
@@ -311,7 +359,10 @@ const COMPONENT_PREFIXES = [
   "floating-action-button",
 ];
 
-function generateCSS(tokens: TokenMap): string {
+function generateCSS(
+  tokens: TokenMap,
+  p3Colors: Record<string, string> = {},
+): string {
   const lines: string[] = [
     "/* Auto-generated from design-tokens/ — do not edit manually */",
     ":root {",
@@ -651,6 +702,35 @@ function generateCSS(tokens: TokenMap): string {
   }
   lines.push("  }");
   lines.push("}");
+
+  // Wide gamut (P3) color overrides
+  const p3Entries = Object.entries(p3Colors);
+  if (p3Entries.length > 0) {
+    lines.push("");
+    lines.push("@media (color-gamut: p3) {");
+    lines.push("  :root {");
+    lines.push(
+      "    /* Wide gamut P3 color overrides — more vivid on supported displays */",
+    );
+    const darkP3 = p3Entries.filter(([k]) => k.startsWith("dark."));
+    for (const [k, v] of darkP3.sort()) {
+      const name = k.replace("dark.", "").replace(/-/g, "-");
+      lines.push(`    --sc-${name}: ${v};`);
+    }
+    lines.push("  }");
+    const lightP3 = p3Entries.filter(([k]) => k.startsWith("light."));
+    if (lightP3.length > 0) {
+      lines.push("  @media (prefers-color-scheme: light) {");
+      lines.push("    :root {");
+      for (const [k, v] of lightP3.sort()) {
+        const name = k.replace("light.", "").replace(/-/g, "-");
+        lines.push(`      --sc-${name}: ${v};`);
+      }
+      lines.push("    }");
+      lines.push("  }");
+    }
+    lines.push("}");
+  }
 
   return lines.join("\n");
 }
@@ -1119,89 +1199,174 @@ function generateKotlin(tokens: TokenMap): string {
 }
 
 function generateCHeader(tokens: TokenMap): string {
-  const semanticToMacro: Array<[string, string]> = [
-    ["dark.accent", "SC_COLOR_ACCENT"],
-    ["dark.success", "SC_COLOR_SUCCESS"],
-    ["dark.warning", "SC_COLOR_WARNING"],
-    ["dark.error", "SC_COLOR_ERROR"],
-    ["dark.info", "SC_COLOR_INFO"],
-    ["dark.text-muted", "SC_COLOR_MUTED"],
-    ["dark.text-faint", "SC_COLOR_FAINT"],
-    ["dark.bg", "SC_COLOR_BG"],
-    ["dark.bg-surface", "SC_COLOR_BG_SURFACE"],
-    ["dark.bg-elevated", "SC_COLOR_BG_ELEVATED"],
-    ["dark.border", "SC_COLOR_BORDER"],
-    ["dark.border-subtle", "SC_COLOR_BORDER_SUBTLE"],
-    ["light.bg", "SC_COLOR_LIGHT_BG"],
-    ["light.bg-surface", "SC_COLOR_LIGHT_BG_SURFACE"],
-    ["light.bg-elevated", "SC_COLOR_LIGHT_BG_ELEVATED"],
-    ["light.border", "SC_COLOR_LIGHT_BORDER"],
-    ["light.border-subtle", "SC_COLOR_LIGHT_BORDER_SUBTLE"],
-    ["light.text", "SC_COLOR_LIGHT_TEXT"],
-    ["light.text-muted", "SC_COLOR_LIGHT_TEXT_MUTED"],
-    ["light.text-faint", "SC_COLOR_LIGHT_TEXT_FAINT"],
-    ["light.accent", "SC_COLOR_LIGHT_ACCENT"],
-    ["light.success", "SC_COLOR_LIGHT_SUCCESS"],
-    ["light.warning", "SC_COLOR_LIGHT_WARNING"],
-    ["light.error", "SC_COLOR_LIGHT_ERROR"],
-    ["light.info", "SC_COLOR_LIGHT_INFO"],
+  /* All semantic color tokens to emit, grouped by theme */
+  const darkTokens: Array<[string, string]> = [
+    ["dark.bg", "BG"],
+    ["dark.bg-inset", "BG_INSET"],
+    ["dark.bg-surface", "BG_SURFACE"],
+    ["dark.bg-elevated", "BG_ELEVATED"],
+    ["dark.bg-overlay", "BG_OVERLAY"],
+    ["dark.text", "TEXT"],
+    ["dark.text-muted", "TEXT_MUTED"],
+    ["dark.text-faint", "TEXT_FAINT"],
+    ["dark.accent", "ACCENT"],
+    ["dark.accent-text", "ACCENT_TEXT"],
+    ["dark.accent-hover", "ACCENT_HOVER"],
+    ["dark.accent-strong", "ACCENT_STRONG"],
+    ["dark.on-accent", "ON_ACCENT"],
+    ["dark.accent-secondary", "ACCENT_SECONDARY"],
+    ["dark.accent-tertiary", "ACCENT_TERTIARY"],
+    ["dark.border", "BORDER"],
+    ["dark.border-subtle", "BORDER_SUBTLE"],
+    ["dark.success", "SUCCESS"],
+    ["dark.warning", "WARNING"],
+    ["dark.error", "ERROR"],
+    ["dark.info", "INFO"],
+    ["dark.focus-ring", "FOCUS_RING"],
+    ["dark.link", "LINK"],
   ];
-  const fallbacks: Record<string, number> = {
-    SC_COLOR_ACCENT: 209,
-    SC_COLOR_SUCCESS: 78,
-    SC_COLOR_WARNING: 178,
-    SC_COLOR_ERROR: 196,
-    SC_COLOR_INFO: 69,
-    SC_COLOR_MUTED: 245,
-    SC_COLOR_FAINT: 240,
-    SC_COLOR_BG: 235,
-    SC_COLOR_BG_SURFACE: 236,
-    SC_COLOR_BG_ELEVATED: 237,
-    SC_COLOR_BORDER: 240,
-    SC_COLOR_BORDER_SUBTLE: 238,
-    SC_COLOR_LIGHT_BG: 255,
-    SC_COLOR_LIGHT_BG_SURFACE: 254,
-    SC_COLOR_LIGHT_BG_ELEVATED: 253,
-    SC_COLOR_LIGHT_BORDER: 250,
-    SC_COLOR_LIGHT_BORDER_SUBTLE: 251,
-    SC_COLOR_LIGHT_TEXT: 16,
-    SC_COLOR_LIGHT_TEXT_MUTED: 66,
-    SC_COLOR_LIGHT_TEXT_FAINT: 102,
-    SC_COLOR_LIGHT_ACCENT: 37,
-    SC_COLOR_LIGHT_SUCCESS: 78,
-    SC_COLOR_LIGHT_WARNING: 178,
-    SC_COLOR_LIGHT_ERROR: 196,
-    SC_COLOR_LIGHT_INFO: 69,
-  };
-  const colorLines: string[] = [];
-  for (const [tokenKey, macro] of semanticToMacro) {
-    const val = tokens[tokenKey];
-    const code =
-      typeof val === "string" && val.startsWith("#")
-        ? hexToAnsi256(val)
-        : fallbacks[macro];
-    colorLines.push(`#define ${macro} "\\033[38;5;${code}m"`);
+  const lightTokens: Array<[string, string]> = [
+    ["light.bg", "BG"],
+    ["light.bg-inset", "BG_INSET"],
+    ["light.bg-surface", "BG_SURFACE"],
+    ["light.bg-elevated", "BG_ELEVATED"],
+    ["light.bg-overlay", "BG_OVERLAY"],
+    ["light.text", "TEXT"],
+    ["light.text-muted", "TEXT_MUTED"],
+    ["light.text-faint", "TEXT_FAINT"],
+    ["light.accent", "ACCENT"],
+    ["light.accent-text", "ACCENT_TEXT"],
+    ["light.accent-hover", "ACCENT_HOVER"],
+    ["light.accent-strong", "ACCENT_STRONG"],
+    ["light.on-accent", "ON_ACCENT"],
+    ["light.accent-secondary", "ACCENT_SECONDARY"],
+    ["light.accent-tertiary", "ACCENT_TERTIARY"],
+    ["light.border", "BORDER"],
+    ["light.border-subtle", "BORDER_SUBTLE"],
+    ["light.success", "SUCCESS"],
+    ["light.warning", "WARNING"],
+    ["light.error", "ERROR"],
+    ["light.info", "INFO"],
+    ["light.focus-ring", "FOCUS_RING"],
+    ["light.link", "LINK"],
+  ];
+
+  function emitColorMacros(
+    entries: Array<[string, string]>,
+    prefix: string,
+    section: string,
+  ): string {
+    const lines: string[] = [];
+    lines.push(`/* ${section} — ANSI 256-color foreground */`);
+    for (const [key, name] of entries) {
+      const macro = `${prefix}${name}`;
+      const val = tokens[key];
+      const rgb = typeof val === "string" ? hexToRGB(val) : null;
+      const code = rgb ? hexToAnsi256(val as string) : 7;
+      lines.push(`#define ${macro.padEnd(40)} "\\033[38;5;${code}m"`);
+    }
+    lines.push("");
+    lines.push(`/* ${section} — truecolor (24-bit) foreground */`);
+    for (const [key, name] of entries) {
+      const macro = `${prefix}${name}_TC`;
+      const val = tokens[key];
+      const rgb = typeof val === "string" ? hexToRGB(val) : null;
+      if (rgb) {
+        lines.push(
+          `#define ${macro.padEnd(40)} "\\033[38;2;${rgb[0]};${rgb[1]};${rgb[2]}m"`,
+        );
+      } else {
+        lines.push(`#define ${macro.padEnd(40)} "\\033[38;5;7m"`);
+      }
+    }
+    lines.push("");
+    lines.push(`/* ${section} — truecolor (24-bit) background */`);
+    for (const [key, name] of entries) {
+      const macro = `${prefix}BG_${name}_TC`;
+      const val = tokens[key];
+      const rgb = typeof val === "string" ? hexToRGB(val) : null;
+      if (rgb) {
+        lines.push(
+          `#define ${macro.padEnd(40)} "\\033[48;2;${rgb[0]};${rgb[1]};${rgb[2]}m"`,
+        );
+      } else {
+        lines.push(`#define ${macro.padEnd(40)} "\\033[48;5;7m"`);
+      }
+    }
+    lines.push("");
+    lines.push(`/* ${section} — ANSI 256-color background */`);
+    for (const [key, name] of entries) {
+      const macro = `${prefix}BG_${name}`;
+      const val = tokens[key];
+      const rgb = typeof val === "string" ? hexToRGB(val) : null;
+      const code = rgb ? hexToAnsi256(val as string) : 7;
+      lines.push(`#define ${macro.padEnd(40)} "\\033[48;5;${code}m"`);
+    }
+    return lines.join("\n");
   }
+
+  const darkSection = emitColorMacros(darkTokens, "SC_COLOR_", "Dark theme");
+  const lightSection = emitColorMacros(
+    lightTokens,
+    "SC_COLOR_LIGHT_",
+    "Light theme",
+  );
+
+  /* Legacy aliases for backward compatibility */
+  const legacyAliases = [
+    ["SC_COLOR_MUTED", "SC_COLOR_TEXT_MUTED"],
+    ["SC_COLOR_FAINT", "SC_COLOR_TEXT_FAINT"],
+  ];
+  const aliasLines = legacyAliases
+    .map(([old, cur]) => `#define ${old.padEnd(40)} ${cur}`)
+    .join("\n");
+
   return `/* Auto-generated from design-tokens/ — do not edit manually */
 #ifndef SC_DESIGN_TOKENS_H
 #define SC_DESIGN_TOKENS_H
 
-/* ANSI 256-color codes for semantic colors (from dark theme tokens) */
-${colorLines.join("\n")}
-#define SC_COLOR_RESET "\\033[0m"
-#define SC_COLOR_BOLD "\\033[1m"
-#define SC_COLOR_DIM "\\033[2m"
+/*
+ * Color macros come in four variants per token:
+ *   SC_COLOR_<NAME>        — 256-color foreground (widest terminal compat)
+ *   SC_COLOR_<NAME>_TC     — truecolor (24-bit) foreground
+ *   SC_COLOR_BG_<NAME>     — 256-color background
+ *   SC_COLOR_BG_<NAME>_TC  — truecolor (24-bit) background
+ *
+ * Use sc_terminal_color_level() from <seaclaw/terminal.h> to pick the right
+ * variant at runtime, or use sc_color_fg()/sc_color_bg() for dynamic colors.
+ */
+
+${darkSection}
+
+${lightSection}
+
+/* Legacy aliases */
+${aliasLines}
+
+/* Formatting */
+#define SC_COLOR_RESET               "\\033[0m"
+#define SC_COLOR_BOLD                "\\033[1m"
+#define SC_COLOR_DIM                 "\\033[2m"
+#define SC_COLOR_ITALIC              "\\033[3m"
+#define SC_COLOR_UNDERLINE           "\\033[4m"
+#define SC_COLOR_STRIKETHROUGH       "\\033[9m"
 
 /* Box-drawing characters (UTF-8) */
-#define SC_BOX_VERT "\\xe2\\x94\\x82"
+#define SC_BOX_VERT  "\\xe2\\x94\\x82"
 #define SC_BOX_HORIZ "\\xe2\\x94\\x80"
-#define SC_BOX_TL "\\xe2\\x94\\x8c"
-#define SC_BOX_TR "\\xe2\\x94\\x90"
-#define SC_BOX_BL "\\xe2\\x94\\x94"
-#define SC_BOX_BR "\\xe2\\x94\\x98"
-#define SC_CHEVRON "\\xe2\\x9d\\xaf"
-#define SC_CHECK "\\xe2\\x9c\\x93"
-#define SC_CROSS "\\xe2\\x9c\\x97"
+#define SC_BOX_TL    "\\xe2\\x94\\x8c"
+#define SC_BOX_TR    "\\xe2\\x94\\x90"
+#define SC_BOX_BL    "\\xe2\\x94\\x94"
+#define SC_BOX_BR    "\\xe2\\x94\\x98"
+#define SC_BOX_TEE_R "\\xe2\\x94\\x9c"
+#define SC_BOX_TEE_L "\\xe2\\x94\\xa4"
+#define SC_BOX_CROSS "\\xe2\\x94\\xbc"
+#define SC_CHEVRON   "\\xe2\\x9d\\xaf"
+#define SC_CHECK     "\\xe2\\x9c\\x93"
+#define SC_CROSS     "\\xe2\\x9c\\x97"
+#define SC_BULLET    "\\xe2\\x80\\xa2"
+#define SC_ELLIPSIS  "\\xe2\\x80\\xa6"
+#define SC_ARROW_R   "\\xe2\\x86\\x92"
 
 #endif /* SC_DESIGN_TOKENS_H */
 `;

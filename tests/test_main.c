@@ -66,6 +66,7 @@ void run_gateway_extended_tests(void);
 void run_gateway_auth_tests(void);
 void run_agent_extended_tests(void);
 void run_agent_security_tests(void);
+void run_agent_teams_tests(void);
 void run_skills_tests(void);
 void run_memory_new_tests(void);
 void run_ported_modules_tests(void);
@@ -151,6 +152,7 @@ int main(void) {
     run_gateway_auth_tests();
     run_agent_extended_tests();
     run_agent_security_tests();
+    run_agent_teams_tests();
     run_skills_tests();
     run_memory_new_tests();
     run_ported_modules_tests();

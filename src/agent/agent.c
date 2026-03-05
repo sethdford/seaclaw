@@ -1,6 +1,8 @@
 #include "seaclaw/agent.h"
 #include "seaclaw/agent/compaction.h"
 #include "seaclaw/agent/dispatcher.h"
+#include "seaclaw/agent/mailbox.h"
+#include "seaclaw/agent/tool_context.h"
 #include "seaclaw/agent/undo.h"
 #include "seaclaw/agent/memory_loader.h"
 #include "seaclaw/agent/planner.h"
@@ -26,6 +28,18 @@
 
 static uint64_t clock_diff_ms(clock_t start, clock_t end) {
     return (uint64_t)((end - start) * 1000 / CLOCKS_PER_SEC);
+}
+
+static _Thread_local sc_agent_t *sc__current_agent_for_tools;
+
+void sc_agent_set_current_for_tools(sc_agent_t *agent) {
+    sc__current_agent_for_tools = agent;
+}
+void sc_agent_clear_current_for_tools(void) {
+    sc__current_agent_for_tools = NULL;
+}
+sc_agent_t *sc_agent_get_current_for_tools(void) {
+    return sc__current_agent_for_tools;
 }
 
 static void agent_record_cost(sc_agent_t *agent, const sc_token_usage_t *usage) {
@@ -265,6 +279,16 @@ sc_error_t sc_agent_from_config(sc_agent_t *out, sc_allocator_t *alloc, sc_provi
     return SC_OK;
 }
 
+void sc_agent_set_mailbox(sc_agent_t *agent, sc_mailbox_t *mailbox) {
+    if (!agent)
+        return;
+    if (agent->mailbox)
+        sc_mailbox_unregister(agent->mailbox, (uint64_t)(uintptr_t)agent);
+    agent->mailbox = mailbox;
+    if (agent->mailbox)
+        sc_mailbox_register(agent->mailbox, (uint64_t)(uintptr_t)agent);
+}
+
 void sc_agent_set_retrieval_engine(sc_agent_t *agent, sc_retrieval_engine_t *engine) {
     if (!agent)
         return;
@@ -274,6 +298,10 @@ void sc_agent_set_retrieval_engine(sc_agent_t *agent, sc_retrieval_engine_t *eng
 void sc_agent_deinit(sc_agent_t *agent) {
     if (!agent)
         return;
+    if (agent->mailbox) {
+        sc_mailbox_unregister(agent->mailbox, (uint64_t)(uintptr_t)agent);
+        agent->mailbox = NULL;
+    }
     sc_agent_clear_history(agent);
     if (agent->history) {
         agent->alloc->free(agent->alloc->ctx, agent->history,
@@ -820,8 +848,11 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     if (response_len_out)
         *response_len_out = 0;
 
+    sc_agent_set_current_for_tools(agent);
+
     char *slash_resp = sc_agent_handle_slash_command(agent, msg, msg_len);
     if (slash_resp) {
+        sc_agent_clear_current_for_tools();
         *response_out = slash_resp;
         if (response_len_out)
             *response_len_out = strlen(slash_resp);
@@ -829,8 +860,10 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     }
 
     sc_error_t err = append_history(agent, SC_ROLE_USER, msg, msg_len, NULL, 0, NULL, 0);
-    if (err != SC_OK)
+    if (err != SC_OK) {
+        sc_agent_clear_current_for_tools();
         return err;
+    }
 
     /* Load memory context for this turn */
     char *memory_ctx = NULL;
@@ -851,8 +884,10 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
         if (memory_ctx)
             agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
-        if (err != SC_OK)
+        if (err != SC_OK) {
+            sc_agent_clear_current_for_tools();
             return err;
+        }
     } else {
         sc_prompt_config_t cfg = {
             .provider_name = agent->provider.vtable->get_name(agent->provider.ctx),
@@ -872,8 +907,10 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         err = sc_prompt_build_system(agent->alloc, &cfg, &system_prompt, &system_prompt_len);
         if (memory_ctx)
             agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
-        if (err != SC_OK)
+        if (err != SC_OK) {
+            sc_agent_clear_current_for_tools();
             return err;
+        }
     }
 
     sc_chat_message_t *msgs = NULL;
@@ -969,6 +1006,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             err = sc_context_format_messages(&turn_alloc, agent->history, agent->history_count,
                                              agent->max_history_messages, &hist_msgs, &hist_count);
             if (err != SC_OK) {
+                sc_agent_clear_current_for_tools();
                 if (system_prompt)
                     agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
                 return err;
@@ -977,6 +1015,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             sc_chat_message_t *all = (sc_chat_message_t *)turn_alloc.alloc(
                 turn_alloc.ctx, total * sizeof(sc_chat_message_t));
             if (!all) {
+                sc_agent_clear_current_for_tools();
                 if (system_prompt)
                     agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
                 return SC_ERR_OUT_OF_MEMORY;
@@ -1031,6 +1070,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                 ev.data.err.message = "provider chat failed";
                 SC_OBS_SAFE_RECORD_EVENT(agent, &ev);
             }
+            sc_agent_clear_current_for_tools();
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
             if (agent->turn_arena)
@@ -1059,6 +1099,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                                      0, NULL, 0);
                 *response_out = sc_strndup(agent->alloc, resp.content, resp.content_len);
                 if (!*response_out) {
+                    sc_agent_clear_current_for_tools();
                     sc_chat_response_free(agent->alloc, &resp);
                     if (system_prompt)
                         agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
@@ -1071,6 +1112,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent_maybe_tts(agent, resp.content, resp.content_len);
             }
             sc_chat_response_free(agent->alloc, &resp);
+            sc_agent_clear_current_for_tools();
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
             if (agent->turn_arena)
@@ -1082,6 +1124,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                                              resp.content_len, resp.tool_calls,
                                              resp.tool_calls_count);
         if (err != SC_OK) {
+            sc_agent_clear_current_for_tools();
             sc_chat_response_free(agent->alloc, &resp);
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
@@ -1355,6 +1398,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         ev.data.err.message = "tool iterations exhausted";
         SC_OBS_SAFE_RECORD_EVENT(agent, &ev);
     }
+    sc_agent_clear_current_for_tools();
     if (system_prompt)
         agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
     if (agent->turn_arena)
@@ -1384,8 +1428,11 @@ sc_error_t sc_agent_turn_stream(sc_agent_t *agent, const char *msg, size_t msg_l
     if (response_len_out)
         *response_len_out = 0;
 
+    sc_agent_set_current_for_tools(agent);
+
     char *slash_resp = sc_agent_handle_slash_command(agent, msg, msg_len);
     if (slash_resp) {
+        sc_agent_clear_current_for_tools();
         *response_out = slash_resp;
         if (response_len_out)
             *response_len_out = strlen(slash_resp);
@@ -1409,6 +1456,7 @@ sc_error_t sc_agent_turn_stream(sc_agent_t *agent, const char *msg, size_t msg_l
                 on_token(*response_out + i, n, token_ctx);
             }
         }
+        sc_agent_clear_current_for_tools();
         return fallback_err;
     }
 

@@ -1,0 +1,150 @@
+---
+title: Liquid Glass
+description: SeaClaw's Liquid Glass system — three tiers of depth-aware glassmorphic effects inspired by Apple's visionOS.
+---
+
+Liquid Glass is SeaClaw's signature depth system, inspired by Apple's visionOS glass and adapted for 2D interfaces. It creates a sense of layered surfaces that interact with the content behind them.
+
+## Three Tiers
+
+### Subtle (`glass-subtle`)
+
+The lightest glass — barely perceptible blur with a faint border. Used for backgrounds that need slight separation without drawing attention.
+
+| Property           | Value | Token                              |
+| ------------------ | ----- | ---------------------------------- |
+| Blur               | 8px   | `--sc-glass-subtle-blur`           |
+| Saturation         | 120%  | `--sc-glass-subtle-saturation`     |
+| Background opacity | 0.4   | `--sc-glass-subtle-bg-opacity`     |
+| Border opacity     | 0.06  | `--sc-glass-subtle-border-opacity` |
+
+```css
+.glass-subtle {
+  backdrop-filter: blur(var(--sc-glass-subtle-blur))
+    saturate(var(--sc-glass-subtle-saturation));
+  background: color-mix(
+    in srgb,
+    var(--sc-bg-surface) calc(var(--sc-glass-subtle-bg-opacity) * 100%),
+    transparent
+  );
+  border: 1px solid
+    color-mix(
+      in srgb,
+      white calc(var(--sc-glass-subtle-border-opacity) * 100%),
+      transparent
+    );
+}
+```
+
+**Use for**: Navigation bars, sidebar backgrounds, table headers.
+
+### Standard (`glass`)
+
+The default glass tier — noticeable blur with visible borders and a subtle inset highlight. The workhorse for most elevated surfaces.
+
+| Property           | Value | Token                                |
+| ------------------ | ----- | ------------------------------------ |
+| Blur               | 16px  | `--sc-glass-standard-blur`           |
+| Saturation         | 140%  | `--sc-glass-standard-saturation`     |
+| Background opacity | 0.5   | `--sc-glass-standard-bg-opacity`     |
+| Border opacity     | 0.08  | `--sc-glass-standard-border-opacity` |
+| Inset opacity      | 0.04  | `--sc-glass-standard-inset-opacity`  |
+
+**Use for**: Cards, panels, dropdowns, popovers.
+
+### Prominent (`glass-prominent`)
+
+Maximum glass effect — heavy blur, strong saturation, prominent borders. Creates a distinct floating surface that demands attention.
+
+| Property           | Value | Token                                 |
+| ------------------ | ----- | ------------------------------------- |
+| Blur               | 24px  | `--sc-glass-prominent-blur`           |
+| Saturation         | 160%  | `--sc-glass-prominent-saturation`     |
+| Background opacity | 0.6   | `--sc-glass-prominent-bg-opacity`     |
+| Border opacity     | 0.12  | `--sc-glass-prominent-border-opacity` |
+| Inset opacity      | 0.06  | `--sc-glass-prominent-inset-opacity`  |
+
+**Use for**: Modals, hero sections, primary CTAs, featured content.
+
+## SVG Refraction
+
+For the `glass-prominent` tier, an SVG `feDisplacementMap` filter adds a subtle lens distortion effect — content behind the glass appears slightly bent, like real frosted glass.
+
+```html
+<svg style="position:absolute;width:0;height:0">
+  <filter id="refract">
+    <feTurbulence
+      type="fractalNoise"
+      baseFrequency="0.015"
+      numOctaves="3"
+      result="noise"
+    />
+    <feDisplacementMap
+      in="SourceGraphic"
+      in2="noise"
+      scale="3"
+      xChannelSelector="R"
+      yChannelSelector="G"
+    />
+  </filter>
+</svg>
+```
+
+The filter is applied via CSS:
+
+```css
+.glass-prominent {
+  filter: url(#refract);
+}
+```
+
+## Depth + Z-Index Mapping
+
+Glass intensity correlates with elevation. Higher z-index surfaces use heavier glass:
+
+| Z-Layer             | Glass Tier        | Example        |
+| ------------------- | ----------------- | -------------- |
+| `z.base` (0)        | None              | Page content   |
+| `z.raised` (100)    | `glass-subtle`    | Sticky headers |
+| `z.dropdown` (1000) | `glass`           | Dropdowns      |
+| `z.modal` (1300)    | `glass-prominent` | Modals         |
+| `z.toast` (1500)    | `glass-prominent` | Toasts         |
+
+## Browser Support
+
+Liquid Glass requires `backdrop-filter` support (available in all modern browsers since 2020). For older browsers:
+
+```css
+@supports not (backdrop-filter: blur(1px)) {
+  .glass,
+  .glass-subtle,
+  .glass-prominent {
+    background: var(--sc-bg-surface);
+    border: 1px solid var(--sc-border-subtle);
+  }
+}
+```
+
+## Accessibility
+
+- Glass effects are purely visual — they never affect content readability
+- Text on glass surfaces still meets WCAG AA contrast requirements
+- The `prefers-reduced-transparency` media query removes glass:
+
+```css
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-subtle,
+  .glass-prominent {
+    backdrop-filter: none;
+    background: var(--sc-bg-surface);
+  }
+}
+```
+
+## Light vs Dark Mode
+
+Glass adapts to theme:
+
+- **Dark mode**: Glass tints toward the deep navy background, borders are white-opacity
+- **Light mode**: Glass tints toward white, borders use dark-opacity, saturation is higher for vibrancy

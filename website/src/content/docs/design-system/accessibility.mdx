@@ -1,0 +1,177 @@
+---
+title: Accessibility
+description: SeaClaw's accessibility system — contrast requirements, focus patterns, reduced motion, forced colors, and screen reader support.
+---
+
+Accessibility is a first-class design constraint in SeaClaw. Every token, component, and animation is validated against WCAG 2.2 AA (minimum) with AAA targets for critical paths.
+
+## Color Contrast
+
+### Requirements
+
+| Context                            | Minimum Ratio | Standard |
+| ---------------------------------- | :-----------: | -------- |
+| Normal text (< 24px)               |     4.5:1     | WCAG AA  |
+| Large text (≥ 24px or ≥ 19px bold) |      3:1      | WCAG AA  |
+| UI components & graphical objects  |      3:1      | WCAG AA  |
+| High-contrast mode text            |      7:1      | WCAG AAA |
+
+### Validated Pairs
+
+All semantic color combinations are tested:
+
+- `--sc-text` on `--sc-bg` — passes AA
+- `--sc-text-muted` on `--sc-bg` — passes AA
+- `--sc-accent-text` on `--sc-bg` — passes AA (note: `accent-text` is distinct from `accent` for this reason)
+- `--sc-on-accent` on `--sc-accent` — passes AA
+- `--sc-error` on `--sc-bg` — passes AA
+
+## Focus Management
+
+### Focus Ring
+
+Every interactive element shows a visible focus indicator using the token system:
+
+```css
+:focus-visible {
+  outline: var(--sc-focus-ring-width) solid var(--sc-focus-ring);
+  outline-offset: var(--sc-focus-ring-offset);
+}
+```
+
+In high-contrast mode, `--sc-focus-ring` is white and `--sc-focus-ring-width` increases to 3px.
+
+### Focus Trapping
+
+Modal dialogs and sheets trap focus:
+
+1. First focusable element receives focus on open
+2. Tab cycles through focusable elements within the component
+3. Shift+Tab cycles backward
+4. Escape closes the modal and returns focus to the trigger
+
+### Roving Tabindex
+
+Composite widgets use roving tabindex for arrow key navigation:
+
+- Tab bar: Left/Right arrows move between tabs
+- Menu: Up/Down arrows move between items
+- Toolbar: Left/Right arrows move between buttons
+
+## Reduced Motion
+
+The `prefers-reduced-motion: reduce` media query is respected throughout:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+```
+
+Specifically:
+
+- All micro-physics transforms are disabled
+- Glass blur is preserved (not motion-related)
+- Opacity transitions may remain (they don't trigger vestibular responses)
+- Loading spinners use reduced animation
+
+## Forced Colors (High Contrast Mode)
+
+Windows High Contrast Mode is supported via `forced-colors: active`:
+
+```css
+@media (forced-colors: active) {
+  .sc-button {
+    border: 2px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+  .sc-button:hover {
+    background: Highlight;
+    color: HighlightText;
+  }
+  .sc-card {
+    border: 1px solid CanvasText;
+  }
+}
+```
+
+System color keywords used:
+
+- `Canvas` / `CanvasText` — page background/text
+- `ButtonFace` / `ButtonText` — button background/text
+- `Highlight` / `HighlightText` — selection/hover states
+- `LinkText` — links
+
+## Reduced Transparency
+
+For users who prefer reduced transparency (`prefers-reduced-transparency: reduce`):
+
+```css
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-subtle,
+  .glass-prominent {
+    backdrop-filter: none;
+    background: var(--sc-bg-surface);
+    opacity: 1;
+  }
+}
+```
+
+## Screen Reader Support
+
+### Hidden Text
+
+Use `.sr-only` for screen-reader-only content:
+
+```css
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+```
+
+### ARIA Patterns
+
+| Component       | Role         | Key ARIA Attributes                      |
+| --------------- | ------------ | ---------------------------------------- |
+| Modal           | `dialog`     | `aria-modal`, `aria-labelledby`          |
+| Toast           | `alert`      | `aria-live="polite"`                     |
+| Badge           | —            | `aria-label` for status                  |
+| Toggle          | `switch`     | `aria-checked`                           |
+| Command Palette | `combobox`   | `aria-expanded`, `aria-activedescendant` |
+| Sidebar nav     | `navigation` | `aria-label`                             |
+
+### Live Regions
+
+Dynamic content updates use appropriate `aria-live` values:
+
+- **Toasts**: `aria-live="polite"` — announced after current speech
+- **Errors**: `aria-live="assertive"` — announced immediately
+- **Status**: `aria-live="polite"` with `aria-atomic="true"`
+
+## Testing
+
+Accessibility is validated at multiple levels:
+
+1. **Automated**: `axe-core` via Playwright E2E tests catches common violations
+2. **CI**: Lighthouse accessibility audit runs on every PR (target: 95+)
+3. **Manual**: Keyboard navigation and screen reader testing checklist
+
+```bash
+cd ui && npx playwright test e2e/accessibility.spec.ts
+```

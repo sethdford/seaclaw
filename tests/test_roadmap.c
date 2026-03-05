@@ -656,7 +656,8 @@ static void test_integ_factory_pool(void) {
     sc_agent_pool_t *pool = sc_agent_pool_create(&a, 2);
     sc_tool_t *tools = NULL;
     size_t count = 0;
-    sc_error_t err = sc_tools_create_default(&a, ".", 1, NULL, NULL, NULL, NULL, pool, &tools, &count);
+    sc_error_t err = sc_tools_create_default(&a, ".", 1, NULL, NULL, NULL, NULL, pool, NULL,
+                                             &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT(count > 0);
     sc_tools_destroy_default(&a, tools, count);
@@ -667,7 +668,8 @@ static void test_integ_factory_null_pool(void) {
     sc_allocator_t a = sc_system_allocator();
     sc_tool_t *tools = NULL;
     size_t count = 0;
-    sc_error_t err = sc_tools_create_default(&a, ".", 1, NULL, NULL, NULL, NULL, NULL, &tools, &count);
+    sc_error_t err = sc_tools_create_default(&a, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL,
+                                             &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     sc_tools_destroy_default(&a, tools, count);
 }

@@ -1,0 +1,110 @@
+---
+title: Design Tokens
+description: Complete reference for SeaClaw's W3C-format design tokens — colors, spacing, typography, motion, glass, and elevation.
+---
+
+import { Code } from "@astrojs/starlight/components";
+
+SeaClaw's design system is built on **W3C Design Tokens Community Group (DTCG)** format JSON files that compile to CSS custom properties, Swift constants, Kotlin objects, and C macros.
+
+## Token Architecture
+
+```
+design-tokens/
+  base.tokens.json         — primitive color scales, spacing, radii
+  semantic.tokens.json     — theme-aware aliases (dark, light, high-contrast)
+  typography.tokens.json   — font families, sizes, weights, tracking
+  motion.tokens.json       — durations, easings, micro-physics presets
+  glass.tokens.json        — Liquid Glass tiers (subtle, standard, prominent)
+  components.tokens.json   — component-level overrides
+  opacity.tokens.json      — opacity scale
+  elevation.tokens.json    — z-index layers and shadows
+  breakpoints.tokens.json  — responsive breakpoints
+```
+
+## Color Tokens
+
+### Dark Theme
+
+| Token                   | CSS Variable            | Usage                    |
+| ----------------------- | ----------------------- | ------------------------ |
+| `dark.bg`               | `--sc-bg`               | Page background          |
+| `dark.bg-surface`       | `--sc-bg-surface`       | Card/panel surfaces      |
+| `dark.bg-elevated`      | `--sc-bg-elevated`      | Modals, popovers         |
+| `dark.text`             | `--sc-text`             | Primary body text        |
+| `dark.text-muted`       | `--sc-text-muted`       | Secondary text           |
+| `dark.text-faint`       | `--sc-text-faint`       | Placeholder, hint text   |
+| `dark.accent`           | `--sc-accent`           | Primary accent (teal)    |
+| `dark.accent-secondary` | `--sc-accent-secondary` | Secondary accent (amber) |
+| `dark.accent-tertiary`  | `--sc-accent-tertiary`  | Tertiary accent (indigo) |
+| `dark.success`          | `--sc-success`          | Success states           |
+| `dark.warning`          | `--sc-warning`          | Warning states           |
+| `dark.error`            | `--sc-error`            | Error states             |
+| `dark.info`             | `--sc-info`             | Informational states     |
+| `dark.border`           | `--sc-border`           | Default borders          |
+| `dark.border-subtle`    | `--sc-border-subtle`    | Subtle dividers          |
+
+### Light Theme
+
+Light theme tokens mirror dark theme with adjusted values for white backgrounds. Access via the same CSS variables — they swap automatically based on `prefers-color-scheme` or explicit theme class.
+
+### High Contrast Theme
+
+High contrast tokens maximize luminance ratios for users with low vision. All text/background pairs exceed 7:1 contrast ratio (WCAG AAA).
+
+## Spacing Tokens
+
+| Token       | Value            | CSS Variable     |
+| ----------- | ---------------- | ---------------- |
+| `space.2xs` | `0.25rem` (4px)  | `--sc-space-2xs` |
+| `space.xs`  | `0.5rem` (8px)   | `--sc-space-xs`  |
+| `space.sm`  | `0.75rem` (12px) | `--sc-space-sm`  |
+| `space.md`  | `1rem` (16px)    | `--sc-space-md`  |
+| `space.lg`  | `1.5rem` (24px)  | `--sc-space-lg`  |
+| `space.xl`  | `2rem` (32px)    | `--sc-space-xl`  |
+| `space.2xl` | `3rem` (48px)    | `--sc-space-2xl` |
+| `space.3xl` | `4rem` (64px)    | `--sc-space-3xl` |
+
+## Radius Tokens
+
+| Token         | Value    | CSS Variable       |
+| ------------- | -------- | ------------------ |
+| `radius.xs`   | `4px`    | `--sc-radius-xs`   |
+| `radius.sm`   | `6px`    | `--sc-radius-sm`   |
+| `radius.md`   | `8px`    | `--sc-radius-md`   |
+| `radius.lg`   | `12px`   | `--sc-radius-lg`   |
+| `radius.xl`   | `16px`   | `--sc-radius-xl`   |
+| `radius.full` | `9999px` | `--sc-radius-full` |
+
+## Elevation Tokens
+
+Z-index layers are explicitly ordered to prevent stacking conflicts:
+
+| Token        | Value  | Usage                        |
+| ------------ | ------ | ---------------------------- |
+| `z.base`     | `0`    | Default content              |
+| `z.raised`   | `100`  | Sticky headers, raised cards |
+| `z.dropdown` | `1000` | Dropdowns, select menus      |
+| `z.sticky`   | `1100` | Sticky nav, toolbars         |
+| `z.overlay`  | `1200` | Overlays, backdrops          |
+| `z.modal`    | `1300` | Modal dialogs                |
+| `z.popover`  | `1400` | Popovers, tooltips           |
+| `z.toast`    | `1500` | Toast notifications          |
+| `z.max`      | `9999` | Absolute top layer           |
+
+## Build Pipeline
+
+Generate all platform outputs:
+
+```bash
+cd design-tokens && npx tsx build.ts
+```
+
+Outputs:
+
+- `ui/src/styles/_tokens.css` — CSS custom properties
+- `website/src/styles/_tokens.css` — Website CSS custom properties
+- `apps/shared/.../DesignTokens.swift` — Swift Color/CGFloat constants
+- `apps/android/.../DesignTokens.kt` — Kotlin Color/Dp constants
+- `include/seaclaw/design_tokens.h` — C preprocessor macros (256-color + truecolor)
+- `docs/design-tokens-reference.json` — Machine-readable reference for docs

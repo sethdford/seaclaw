@@ -1,0 +1,178 @@
+---
+title: Platform Integration
+description: How SeaClaw's design tokens map to CSS, Swift, Kotlin, and C — cross-platform consistency from a single source of truth.
+---
+
+SeaClaw's design tokens compile from JSON source files to **five platform outputs**, ensuring visual consistency across web, iOS, Android, CLI, and documentation.
+
+## Build Pipeline
+
+```
+design-tokens/*.tokens.json
+        │
+        ▼
+  design-tokens/build.ts
+        │
+        ├── ui/src/styles/_tokens.css          (Web UI)
+        ├── website/src/styles/_tokens.css     (Docs site)
+        ├── .../DesignTokens.swift              (iOS/macOS)
+        ├── .../DesignTokens.kt                 (Android)
+        ├── include/seaclaw/design_tokens.h     (CLI)
+        └── docs/design-tokens-reference.json   (Docs reference)
+```
+
+## CSS (Web)
+
+Tokens are emitted as CSS custom properties on `:root`:
+
+```css
+:root {
+  --sc-accent: #14b8a6;
+  --sc-bg: #071018;
+  --sc-text: #e4ecf4;
+  --sc-space-md: 1rem;
+  --sc-radius-lg: 12px;
+  --sc-duration-normal: 250ms;
+  --sc-ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --sc-glass-standard-blur: 16px;
+}
+```
+
+Usage:
+
+```css
+.my-component {
+  background: var(--sc-bg-surface);
+  padding: var(--sc-space-lg);
+  border-radius: var(--sc-radius-md);
+  transition: transform var(--sc-duration-fast) var(--sc-ease-spring);
+}
+```
+
+## Swift (iOS/macOS)
+
+Tokens are emitted as static properties on `SCTokens`:
+
+```swift
+struct SCTokens {
+    static let accent = Color(hex: 0x14B8A6)
+    static let bgSurface = Color(hex: 0x0F2236)
+    static let spaceMd: CGFloat = 16
+    static let radiusLg: CGFloat = 12
+    static let textBase: CGFloat = 16
+    static let weightSemibold: Font.Weight = .semibold
+}
+```
+
+Usage:
+
+```swift
+struct MyView: View {
+    var body: some View {
+        Text("Hello")
+            .foregroundColor(SCTokens.accent)
+            .padding(SCTokens.spaceLg)
+            .cornerRadius(SCTokens.radiusMd)
+    }
+}
+```
+
+## Kotlin (Android)
+
+Tokens are emitted as properties on the `SCTokens` object:
+
+```kotlin
+object SCTokens {
+    val accent = Color(0xFF14B8A6.toInt())
+    val bgSurface = Color(0xFF0F2236.toInt())
+    val spaceMd = 16.dp
+    val radiusLg = 12.dp
+    val textBase = 16.sp
+}
+```
+
+Usage:
+
+```kotlin
+@Composable
+fun MyComponent() {
+    Text(
+        text = "Hello",
+        color = SCTokens.accent,
+        fontSize = SCTokens.textBase,
+        modifier = Modifier
+            .background(SCTokens.bgSurface, RoundedCornerShape(SCTokens.radiusMd))
+            .padding(SCTokens.spaceLg)
+    )
+}
+```
+
+## C (CLI/Terminal)
+
+Tokens are emitted as preprocessor macros with four variants per color:
+
+```c
+/* 256-color foreground (widest compat) */
+#define SC_COLOR_ACCENT       "\033[38;5;43m"
+
+/* Truecolor foreground (24-bit, best quality) */
+#define SC_COLOR_ACCENT_TC    "\033[38;2;20;184;166m"
+
+/* 256-color background */
+#define SC_COLOR_BG_ACCENT    "\033[48;5;43m"
+
+/* Truecolor background */
+#define SC_COLOR_BG_ACCENT_TC "\033[48;2;20;184;166m"
+```
+
+Runtime capability detection chooses the right variant:
+
+```c
+#include <seaclaw/terminal.h>
+
+void print_status(const char *msg) {
+    sc_color_level_t level = sc_terminal_color_level();
+    if (level >= SC_COLOR_LEVEL_TRUECOLOR) {
+        printf(SC_COLOR_SUCCESS_TC "%s" SC_COLOR_RESET "\n", msg);
+    } else {
+        printf(SC_COLOR_SUCCESS "%s" SC_COLOR_RESET "\n", msg);
+    }
+}
+```
+
+### Terminal Theme Detection
+
+```c
+sc_theme_t theme = sc_terminal_theme();
+if (theme == SC_THEME_LIGHT) {
+    printf(SC_COLOR_LIGHT_ACCENT "light mode" SC_COLOR_RESET);
+} else {
+    printf(SC_COLOR_ACCENT "dark mode" SC_COLOR_RESET);
+}
+```
+
+## Token Naming Convention
+
+| JSON Source           | CSS                        | Swift                        | Kotlin                       | C                 |
+| --------------------- | -------------------------- | ---------------------------- | ---------------------------- | ----------------- |
+| `dark.accent`         | `--sc-accent`              | `SCTokens.accent`            | `SCTokens.accent`            | `SC_COLOR_ACCENT` |
+| `space.lg`            | `--sc-space-lg`            | `SCTokens.spaceLg`           | `SCTokens.spaceLg`           | N/A               |
+| `text.xl`             | `--sc-text-xl`             | `SCTokens.textXl`            | `SCTokens.textXl`            | N/A               |
+| `glass.standard.blur` | `--sc-glass-standard-blur` | `SCTokens.glassStandardBlur` | `SCTokens.glassStandardBlur` | N/A               |
+
+## Adding New Tokens
+
+1. Add the token to the appropriate `.tokens.json` file
+2. Run `npx tsx design-tokens/build.ts`
+3. All platform outputs regenerate automatically
+4. Run `design-tokens/check-drift.sh` to verify consistency
+5. Commit all generated files together
+
+## Drift Detection
+
+The pre-commit hook runs `check-drift.sh` which verifies:
+
+- UI `_tokens.css` matches generated output
+- Website `_tokens.css` matches generated output
+- C header matches generated output
+- `clang-format` consistency for the C header

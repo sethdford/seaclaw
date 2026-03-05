@@ -4,6 +4,9 @@
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/security.h"
+
+typedef struct sc_worktree_manager sc_worktree_manager_t;
+typedef struct sc_team_config sc_team_config_t;
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -47,6 +50,11 @@ typedef struct sc_agent_pool sc_agent_pool_t;
 
 sc_agent_pool_t *sc_agent_pool_create(sc_allocator_t *alloc, uint32_t max_concurrent);
 void sc_agent_pool_destroy(sc_agent_pool_t *pool);
+
+void sc_agent_pool_set_worktree_manager(sc_agent_pool_t *pool,
+    sc_worktree_manager_t *worktree_mgr);
+
+void sc_agent_pool_set_team_config(sc_agent_pool_t *pool, sc_team_config_t *team_config);
 
 sc_error_t sc_agent_pool_spawn(sc_agent_pool_t *pool, const sc_spawn_config_t *cfg,
                                const char *task, size_t task_len, const char *label,

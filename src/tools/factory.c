@@ -66,6 +66,7 @@
 #include "seaclaw/tools/schedule.h"
 #endif
 #include "seaclaw/tools/schema.h"
+#include "seaclaw/tools/send_message.h"
 #include "seaclaw/tools/shell.h"
 #include "seaclaw/tools/spawn.h"
 #include "seaclaw/tools/web_fetch.h"
@@ -78,7 +79,7 @@
 #else
 #define SC_TOOLS_CRON_COUNT 0
 #endif
-#define SC_TOOLS_COUNT_BASE (35 + SC_TOOLS_CRON_COUNT) /* 35 base + 7 cron when enabled */
+#define SC_TOOLS_COUNT_BASE (36 + SC_TOOLS_CRON_COUNT) /* 35 base + send_message + cron */
 #ifdef SC_HAS_TOOLS_BROWSER
 #define SC_TOOLS_BROWSER_COUNT 3
 #else
@@ -112,7 +113,7 @@ sc_error_t sc_tools_create_default(sc_allocator_t *alloc, const char *workspace_
                                    size_t workspace_dir_len, sc_security_policy_t *policy,
                                    const sc_config_t *config, sc_memory_t *memory,
                                    sc_cron_scheduler_t *cron, sc_agent_pool_t *agent_pool,
-                                   sc_tool_t **out_tools, size_t *out_count) {
+                                   sc_mailbox_t *mailbox, sc_tool_t **out_tools, size_t *out_count) {
     if (!alloc || !out_tools || !out_count)
         return SC_ERR_INVALID_ARGUMENT;
 #ifndef SC_HAS_CRON
@@ -352,6 +353,11 @@ sc_error_t sc_tools_create_default(sc_allocator_t *alloc, const char *workspace_
     idx++;
 
     err = sc_agent_spawn_tool_create(alloc, agent_pool, &tools[idx]);
+    if (err != SC_OK)
+        goto fail;
+    idx++;
+
+    err = sc_send_message_create(alloc, mailbox, &tools[idx]);
     if (err != SC_OK)
         goto fail;
     idx++;

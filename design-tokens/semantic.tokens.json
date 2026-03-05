@@ -1,5 +1,28 @@
 {
   "$description": "Semantic tokens — ocean-aligned theme",
+  "$extensions": {
+    "seaclaw.colorSpace": "display-p3",
+    "seaclaw.p3Colors": {
+      "dark.accent": "color(display-p3 0.078 0.722 0.651)",
+      "dark.accent-text": "color(display-p3 0.176 0.831 0.749)",
+      "dark.accent-hover": "color(display-p3 0.176 0.831 0.749)",
+      "dark.accent-strong": "color(display-p3 0.369 0.918 0.831)",
+      "dark.accent-secondary": "color(display-p3 0.961 0.620 0.043)",
+      "dark.accent-tertiary": "color(display-p3 0.388 0.400 0.945)",
+      "dark.success": "color(display-p3 0.063 0.725 0.506)",
+      "dark.warning": "color(display-p3 0.918 0.702 0.031)",
+      "dark.error": "color(display-p3 0.976 0.439 0.400)",
+      "dark.info": "color(display-p3 0.231 0.510 0.965)",
+      "dark.focus-ring": "color(display-p3 0.078 0.722 0.651)",
+      "dark.link": "color(display-p3 0.176 0.831 0.749)",
+      "light.accent": "color(display-p3 0.078 0.722 0.651)",
+      "light.accent-text": "color(display-p3 0.051 0.580 0.533)",
+      "light.success": "color(display-p3 0.022 0.588 0.412)",
+      "light.warning": "color(display-p3 0.792 0.541 0.016)",
+      "light.error": "color(display-p3 0.863 0.149 0.149)",
+      "light.info": "color(display-p3 0.145 0.388 0.922)"
+    }
+  },
   "dark": {
     "$description": "Dark theme — deep ocean",
     "bg": { "$value": "{color.neutral.50}", "$type": "color" },

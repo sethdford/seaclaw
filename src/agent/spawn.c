@@ -1,4 +1,6 @@
 #include "seaclaw/agent/spawn.h"
+#include "seaclaw/agent/team.h"
+#include "seaclaw/agent/worktree.h"
 #include "seaclaw/agent.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/providers/factory.h"
@@ -46,6 +48,8 @@ struct sc_agent_pool {
     bool used[SC_POOL_MAX_SLOTS];
     uint64_t next_id;
     uint32_t max_concurrent;
+    sc_worktree_manager_t *worktree_mgr;
+    sc_team_config_t *team_config;
 #if !defined(SC_IS_TEST) || SC_IS_TEST == 0
     pthread_mutex_t mu;
 #endif
@@ -236,6 +240,19 @@ sc_agent_pool_t *sc_agent_pool_create(sc_allocator_t *alloc, uint32_t max_concur
     return p;
 }
 
+void sc_agent_pool_set_worktree_manager(sc_agent_pool_t *pool,
+    sc_worktree_manager_t *worktree_mgr) {
+    if (!pool)
+        return;
+    pool->worktree_mgr = worktree_mgr;
+}
+
+void sc_agent_pool_set_team_config(sc_agent_pool_t *pool, sc_team_config_t *team_config) {
+    if (!pool)
+        return;
+    pool->team_config = team_config;
+}
+
 void sc_agent_pool_destroy(sc_agent_pool_t *pool) {
     if (!pool)
         return;
@@ -308,7 +325,17 @@ sc_error_t sc_agent_pool_spawn(sc_agent_pool_t *pool, const sc_spawn_config_t *c
     s->api_key = dup_opt(a, cfg->api_key, cfg->api_key_len);
     s->base_url = dup_opt(a, cfg->base_url, cfg->base_url_len);
     s->model = dup_opt(a, cfg->model, cfg->model_len);
-    s->workspace_dir = dup_opt(a, cfg->workspace_dir, cfg->workspace_dir_len);
+    if (pool->worktree_mgr) {
+        sc_worktree_t wt = {0};
+        if (sc_worktree_create(pool->worktree_mgr, s->agent_id, &wt) == SC_OK && wt.path) {
+            s->workspace_dir = sc_strdup(a, wt.path);
+            sc_worktree_free(a, &wt);
+        } else {
+            s->workspace_dir = dup_opt(a, cfg->workspace_dir, cfg->workspace_dir_len);
+        }
+    } else {
+        s->workspace_dir = dup_opt(a, cfg->workspace_dir, cfg->workspace_dir_len);
+    }
     s->system_prompt = dup_opt(a, cfg->system_prompt, cfg->system_prompt_len);
     s->task = task ? sc_strndup(a, task, task_len) : NULL;
     s->label = label ? sc_strndup(a, label, strlen(label)) : NULL;
@@ -319,6 +346,8 @@ sc_error_t sc_agent_pool_spawn(sc_agent_pool_t *pool, const sc_spawn_config_t *c
     if (!s->result)
         s->result = sc_strndup(a, "(spawned)", 9);
     s->status = (cfg->mode == SC_SPAWN_PERSISTENT) ? SC_AGENT_IDLE : SC_AGENT_COMPLETED;
+    if (pool->worktree_mgr && s->status == SC_AGENT_COMPLETED)
+        (void)sc_worktree_remove(pool->worktree_mgr, s->agent_id);
 #elif defined(SC_GATEWAY_POSIX)
     {
         sc_spawn_tctx_t *tc = (sc_spawn_tctx_t *)a->alloc(a->ctx, sizeof(*tc));

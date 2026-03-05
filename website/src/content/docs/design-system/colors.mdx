@@ -1,0 +1,134 @@
+---
+title: Color System
+description: SeaClaw's ocean-aligned color system — teal, amber, indigo accents with full dark, light, and high-contrast themes.
+---
+
+SeaClaw's color system is built on an **ocean-aligned palette** with three accent families and three theme modes.
+
+## Philosophy
+
+Colors in SeaClaw evoke the ocean — deep navy backgrounds, teal accents like sunlit water, amber highlights like sandy shores, and indigo depths. Every color is purposeful:
+
+- **Teal** — primary actions, links, focus rings
+- **Amber** — secondary emphasis, warnings, warmth
+- **Indigo** — tertiary accents, tags, decorative elements
+
+## Color Scales
+
+### Neutral Scale (Ocean Depth)
+
+The neutral scale progresses from deep ocean floor (50) to bright sky (1000):
+
+| Step | Hex       | Usage                         |
+| ---- | --------- | ----------------------------- |
+| 0    | `#000000` | True black (high-contrast bg) |
+| 50   | `#071018` | Dark theme background         |
+| 100  | `#0b1a2a` | Dark theme inset              |
+| 150  | `#0f2236` | Dark theme surface            |
+| 200  | `#152d45` | Dark theme elevated           |
+| 250  | `#1b3754` | Dark theme overlay            |
+| 300  | `#1e3a5c` | Dark borders                  |
+| 400  | `#4a6a8a` | Faint text (dark)             |
+| 500  | `#7a9ab8` | Muted text (dark)             |
+| 600  | `#94b0c8` | Faint text (light)            |
+| 700  | `#c0d0e0` | Light borders                 |
+| 750  | `#e4ecf4` | Primary text (dark)           |
+| 800  | `#eef2f6` | Light theme inset             |
+| 850  | `#f4f6f8` | Light theme elevated          |
+| 900  | `#f8fafc` | Light theme background        |
+| 1000 | `#ffffff` | Pure white                    |
+
+### Teal Scale (Primary Accent)
+
+| Step | Hex       | Usage                    |
+| ---- | --------- | ------------------------ |
+| 300  | `#5eead4` | Strong accent (dark)     |
+| 400  | `#2dd4bf` | Hover/text accent (dark) |
+| 500  | `#14b8a6` | Default accent           |
+| 600  | `#0d9488` | Light hover accent       |
+
+### Amber Scale (Secondary Accent)
+
+| Step | Hex       | Usage               |
+| ---- | --------- | ------------------- |
+| 300  | `#fcd34d` | Strong amber (dark) |
+| 400  | `#fbbf24` | Hover amber (dark)  |
+| 500  | `#f59e0b` | Default amber       |
+| 600  | `#d97706` | Light hover amber   |
+
+### Status Colors
+
+| Status  | Dark              | Light     | Purpose                       |
+| ------- | ----------------- | --------- | ----------------------------- |
+| Success | Seafoam `#10b981` | `#059669` | Confirmations, healthy states |
+| Warning | Yellow `#eab308`  | `#ca8a04` | Caution, pending states       |
+| Error   | Coral `#f97066`   | `#dc2626` | Errors, destructive actions   |
+| Info    | Blue `#3b82f6`    | `#2563eb` | Informational messages        |
+
+## Theme Modes
+
+### Dark Theme (Deep Ocean)
+
+Default theme. Navy backgrounds with high-luminance text. Accent colors are bright and saturated for maximum visibility against dark surfaces.
+
+### Light Theme (Sandy Shore)
+
+Light backgrounds with deep text. Accent colors are slightly desaturated to maintain contrast ratios on bright surfaces. All text/background pairs meet WCAG AA (4.5:1 minimum).
+
+### High Contrast
+
+Maximum contrast for accessibility. Backgrounds are pure black or white, text uses extreme values. All pairs exceed WCAG AAA (7:1 minimum). Focus rings use maximum contrast.
+
+## Contrast Requirements
+
+All semantic color pairings are validated:
+
+| Pairing                     | Minimum Ratio | Standard |
+| --------------------------- | :-----------: | -------- |
+| Text on background          |     4.5:1     | WCAG AA  |
+| Large text on background    |      3:1      | WCAG AA  |
+| UI components on background |      3:1      | WCAG AA  |
+| High-contrast text          |      7:1      | WCAG AAA |
+| Focus ring on background    |      3:1      | WCAG 2.2 |
+
+## Usage
+
+### CSS
+
+```css
+.card {
+  background: var(--sc-bg-surface);
+  color: var(--sc-text);
+  border: 1px solid var(--sc-border-subtle);
+}
+
+.badge-success {
+  background: var(--sc-success-dim);
+  color: var(--sc-success);
+}
+```
+
+### Swift
+
+```swift
+Text("Hello")
+  .foregroundColor(SCTokens.accent)
+  .background(SCTokens.bgSurface)
+```
+
+### Kotlin
+
+```kotlin
+Text(
+  text = "Hello",
+  color = SCTokens.accent,
+  modifier = Modifier.background(SCTokens.bgSurface)
+)
+```
+
+### C (Terminal)
+
+```c
+printf(SC_COLOR_ACCENT "Connected" SC_COLOR_RESET "\n");
+printf(SC_COLOR_ERROR_TC "Error: %s" SC_COLOR_RESET "\n", msg);
+```

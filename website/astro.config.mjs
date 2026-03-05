@@ -104,6 +104,19 @@ export default defineConfig({
           ],
         },
         {
+          label: "Design System",
+          items: [
+            { label: "Design Tokens", slug: "design-system/tokens" },
+            { label: "Color System", slug: "design-system/colors" },
+            { label: "Typography", slug: "design-system/typography" },
+            { label: "Motion System", slug: "design-system/motion" },
+            { label: "Liquid Glass", slug: "design-system/glass" },
+            { label: "Components", slug: "design-system/components" },
+            { label: "Accessibility", slug: "design-system/accessibility" },
+            { label: "Platform Integration", slug: "design-system/platforms" },
+          ],
+        },
+        {
           label: "Contributing",
           slug: "contributing/overview",
         },

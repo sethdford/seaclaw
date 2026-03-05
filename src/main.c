@@ -522,8 +522,8 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
     sc_tool_t *tools = NULL;
     size_t tools_count = 0;
     err = sc_tools_create_default(alloc, ws, strlen(ws), &policy, &cfg,
-                                  memory.vtable ? &memory : NULL, cron, agent_pool, &tools,
-                                  &tools_count);
+                                  memory.vtable ? &memory : NULL, cron, agent_pool, svc_mailbox,
+                                  &tools, &tools_count);
     if (err != SC_OK) {
         fprintf(stderr, "[%s] Tools init failed: %s\n", SC_CODENAME, sc_error_string(err));
         if (cron)
@@ -592,7 +592,7 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
         return err;
     }
     agent.agent_pool = agent_pool;
-    agent.mailbox = svc_mailbox;
+    sc_agent_set_mailbox(&agent, svc_mailbox);
     agent.policy_engine = NULL;
     if (cfg.policy.enabled)
         agent.policy_engine = sc_policy_engine_create(alloc);
@@ -976,7 +976,7 @@ static sc_error_t cmd_mcp(sc_allocator_t *alloc, int argc, char **argv) {
 
     sc_tool_t *tools = NULL;
     size_t tool_count = 0;
-    err = sc_tools_create_default(alloc, ".", 1, NULL, &cfg, NULL, NULL, mcp_pool, &tools,
+    err = sc_tools_create_default(alloc, ".", 1, NULL, &cfg, NULL, NULL, mcp_pool, NULL, &tools,
                                   &tool_count);
     if (err != SC_OK) {
         fprintf(stderr, "[%s] Tools init error: %s\n", SC_CODENAME, sc_error_string(err));
@@ -1203,9 +1203,10 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
 
     sc_tool_t *tools = NULL;
     size_t tools_count = 0;
+    sc_mailbox_t *gw_mailbox = sc_mailbox_create(alloc, 64);
     err = sc_tools_create_default(alloc, ws, strlen(ws), &policy, &cfg,
-                                  memory.vtable ? &memory : NULL, cron, gw_agent_pool, &tools,
-                                  &tools_count);
+                                  memory.vtable ? &memory : NULL, cron, gw_agent_pool, gw_mailbox,
+                                  &tools, &tools_count);
     if (err != SC_OK) {
         fprintf(stderr, "[%s] Tools init failed: %s\n", SC_CODENAME, sc_error_string(err));
         if (memory.vtable && memory.vtable->deinit)
@@ -1313,6 +1314,7 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
         }
 
         agent.agent_pool = gw_agent_pool;
+        sc_agent_set_mailbox(&agent, gw_mailbox);
         agent.policy_engine = NULL;
         if (cfg.policy.enabled)
             agent.policy_engine = sc_policy_engine_create(alloc);
@@ -1351,6 +1353,8 @@ cleanup:
         sc_policy_engine_destroy(agent.policy_engine);
     if (gw_thread_binding)
         sc_thread_binding_destroy(gw_thread_binding);
+    if (gw_mailbox)
+        sc_mailbox_destroy(gw_mailbox);
     if (gw_agent_pool)
         sc_agent_pool_destroy(gw_agent_pool);
     if (policy.tracker)
