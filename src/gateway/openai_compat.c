@@ -205,13 +205,21 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
         msgs[i].tool_calls_count = 0;
     }
 
-    sc_json_free(alloc, root);
-
     char provider_name[64];
     const char *model;
     size_t model_len_out;
     resolve_model(model_req, model_len, default_provider, default_model, provider_name,
                   sizeof(provider_name), &model, &model_len_out);
+
+    /* Copy model string before freeing JSON tree (model may point into it) */
+    char model_buf[256];
+    if (model_len_out >= sizeof(model_buf))
+        model_len_out = sizeof(model_buf) - 1;
+    memcpy(model_buf, model, model_len_out);
+    model_buf[model_len_out] = '\0';
+    model = model_buf;
+
+    sc_json_free(alloc, root);
 
 #ifdef SC_IS_TEST
     /* In tests, skip real provider call; return mock response */
