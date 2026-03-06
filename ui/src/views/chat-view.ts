@@ -1,6 +1,5 @@
 import { html, css, nothing } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
-import type { TemplateResult } from "lit";
 import type { GatewayStatus } from "../gateway.js";
 import { GatewayClient as GatewayClientClass } from "../gateway.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
@@ -26,134 +25,6 @@ interface ToolCall {
   input?: string;
   status: "running" | "completed";
   result?: string;
-}
-
-function copyCode(e: Event): void {
-  const btn = e.currentTarget as HTMLButtonElement;
-  const pre = btn.closest(".code-block")?.querySelector("code");
-  if (!pre) return;
-  navigator.clipboard.writeText(pre.textContent ?? "").then(() => {
-    btn.textContent = "Copied!";
-    setTimeout(() => (btn.textContent = "Copy"), 1500);
-  });
-}
-
-function renderMarkdown(text: string): (TemplateResult | string)[] {
-  const parts: (TemplateResult | string)[] = [];
-  let remaining = text;
-  while (remaining.length > 0) {
-    const codeBlock = remaining.match(/^```(\w*)\n?([\s\S]*?)```/);
-    const blockquote = remaining.match(/^(?:^|\n)> (.+)/);
-    const heading = remaining.match(/^(#{1,3}) (.+)/);
-    const hr = remaining.match(/^---\n?/);
-    const table = remaining.match(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)+)/);
-    const ul = remaining.match(/^(?:[*\-+] .+\n?)+/);
-    const ol = remaining.match(/^(?:\d+\. .+\n?)+/);
-    const inlineCode = remaining.match(/^`([^`]+)`/);
-    const link = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
-    const bold = remaining.match(/^\*\*([^*]+)\*\*/);
-    const italic = remaining.match(/^\*([^*]+)\*/);
-    const br = remaining.match(/^\n/);
-
-    if (codeBlock) {
-      const lang = codeBlock[1];
-      const code = codeBlock[2];
-      parts.push(html`
-        <div class="code-block">
-          <div class="code-header">
-            ${lang ? html`<span class="code-lang">${lang}</span>` : nothing}
-            <button class="copy-btn" @click=${copyCode}>Copy</button>
-          </div>
-          <pre><code>${code}</code></pre>
-        </div>
-      `);
-      remaining = remaining.slice(codeBlock[0].length);
-    } else if (heading) {
-      const level = heading[1].length;
-      const txt = heading[2];
-      parts.push(
-        level === 1
-          ? html`<h3 style="margin:var(--sc-space-sm) 0 var(--sc-space-xs)">${txt}</h3>`
-          : level === 2
-            ? html`<h4 style="margin:var(--sc-space-sm) 0 var(--sc-space-xs)">${txt}</h4>`
-            : html`<h5 style="margin:var(--sc-space-sm) 0 var(--sc-space-xs)">${txt}</h5>`,
-      );
-      remaining = remaining.slice(heading[0].length);
-    } else if (blockquote) {
-      parts.push(html`<blockquote class="md-blockquote">${blockquote[1]}</blockquote>`);
-      remaining = remaining.slice(blockquote[0].length);
-    } else if (hr) {
-      parts.push(
-        html`<hr
-          style="border:none;border-top:1px solid var(--sc-border);margin:var(--sc-space-sm) 0"
-        />`,
-      );
-      remaining = remaining.slice(hr[0].length);
-    } else if (table) {
-      const headerCells = table[1].split("|").filter((c: string) => c.trim());
-      const rows = table[3]
-        .trim()
-        .split("\n")
-        .map((r: string) => r.split("|").filter((c: string) => c.trim()));
-      parts.push(html`
-        <table class="md-table">
-          <thead>
-            <tr>
-              ${headerCells.map((c: string) => html`<th>${c.trim()}</th>`)}
-            </tr>
-          </thead>
-          <tbody>
-            ${rows.map(
-              (r: string[]) =>
-                html`<tr>
-                  ${r.map((c: string) => html`<td>${c.trim()}</td>`)}
-                </tr>`,
-            )}
-          </tbody>
-        </table>
-      `);
-      remaining = remaining.slice(table[0].length);
-    } else if (ul) {
-      const items = ul[0].trim().split("\n");
-      parts.push(
-        html`<ul class="md-list">
-          ${items.map((li: string) => html`<li>${li.replace(/^[*\-+] /, "")}</li>`)}
-        </ul>`,
-      );
-      remaining = remaining.slice(ul[0].length);
-    } else if (ol) {
-      const items = ol[0].trim().split("\n");
-      parts.push(
-        html`<ol class="md-list">
-          ${items.map((li: string) => html`<li>${li.replace(/^\d+\. /, "")}</li>`)}
-        </ol>`,
-      );
-      remaining = remaining.slice(ol[0].length);
-    } else if (inlineCode) {
-      parts.push(html`<code>${inlineCode[1]}</code>`);
-      remaining = remaining.slice(inlineCode[0].length);
-    } else if (link) {
-      parts.push(
-        html`<a href="${link[2]}" target="_blank" rel="noopener noreferrer">${link[1]}</a>`,
-      );
-      remaining = remaining.slice(link[0].length);
-    } else if (bold) {
-      parts.push(html`<strong>${bold[1]}</strong>`);
-      remaining = remaining.slice(bold[0].length);
-    } else if (italic) {
-      parts.push(html`<em>${italic[1]}</em>`);
-      remaining = remaining.slice(italic[0].length);
-    } else if (br) {
-      parts.push(html`<br />`);
-      remaining = remaining.slice(1);
-    } else {
-      const nextSpecial = remaining.search(/(?:\n|```|`|\[|\*\*|\*)/);
-      const chunk = nextSpecial >= 0 ? remaining.slice(0, nextSpecial) : remaining;
-      if (chunk) parts.push(chunk);
-      remaining = nextSpecial >= 0 ? remaining.slice(nextSpecial) : "";
-    }
-  }
-  return parts;
 }
 
 function formatTime(ts: number): string {
@@ -941,9 +812,18 @@ export class ScChatView extends GatewayAwareLitElement {
               `
             : nothing}
           ${this.messages.map(
-            (m) => html`
+            (m, i) => html`
               <div class="message ${m.role}">
-                ${m.role === "assistant" ? renderMarkdown(m.content) : m.content}
+                <sc-message-stream
+                  .content=${m.content}
+                  .streaming=${this.isWaiting &&
+                  m.role === "assistant" &&
+                  i === this.messages.length - 1}
+                  .role=${m.role}
+                ></sc-message-stream>
+                ${m.role === "assistant" && i > 0
+                  ? html`<sc-message-branch .branches=${1} .current=${0}></sc-message-branch>`
+                  : nothing}
                 ${m.ts != null
                   ? html`<span class="message-meta">${formatTime(m.ts)}</span>`
                   : nothing}

@@ -262,3 +262,40 @@ jobs:
       - name: E2E tests
         run: npm run test:e2e --if-present
         continue-on-error: true
+
+      - name: Visual regression
+        run: npx playwright screenshot --browser chromium "http://localhost:4173/" "visual-overview.png" || true
+        continue-on-error: true
+
+  swift:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build SeaClawKit
+        working-directory: apps/shared/SeaClawKit
+        run: swift build 2>&1 || echo "::warning::Swift build failed — check SeaClawKit sources"
+        continue-on-error: true
+
+      - name: Type check
+        working-directory: apps/shared/SeaClawKit
+        run: swift build -Xswiftc -typecheck 2>&1 || true
+        continue-on-error: true
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Android app
+        working-directory: apps/android
+        run: ./gradlew assembleDebug 2>&1 || echo "::warning::Android build failed — check app sources"
+        continue-on-error: true

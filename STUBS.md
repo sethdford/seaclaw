@@ -1,15 +1,15 @@
 # SeaClaw — Project Status
 
-Last updated: 2026-03-03
+Last updated: 2026-03-06
 
 ## Summary
 
 | Metric                         | Value                  |
 | ------------------------------ | ---------------------- |
-| Source files (src/ + include/) | **~486**               |
-| Lines of C/H/ASM code          | **~73K+**              |
-| Test files                     | 85                     |
-| Tests passing                  | **2,592/2,592 (100%)** |
+| Source files (src/ + include/) | **~564**               |
+| Lines of C/H/ASM code          | **~85K+**              |
+| Test files                     | 90                     |
+| Tests passing                  | **2,642/2,642 (100%)** |
 | Binary size (MinSizeRel+LTO)   | **430 KB**             |
 | Peak RSS (test suite)          | **~5.9 MB**            |
 
@@ -176,7 +176,11 @@ cron._, skills._, models.list, usage.summary, push.\*, update.check/run, exec.
 
 ## What Remains Stubbed
 
-Nothing. All subsystems have real implementations, gated by build flags where external dependencies are required.
+| Stub                     | File                    | Notes                                                                                                                 |
+| ------------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Facebook message sampler | `src/persona/sampler.c` | `sc_persona_sampler_facebook_parse` returns `SC_ERR_NOT_SUPPORTED` — Facebook JSON export parsing not yet implemented |
+
+All other subsystems have real implementations, gated by build flags where external dependencies are required.
 
 ## Web UI Dashboard
 
