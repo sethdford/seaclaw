@@ -375,6 +375,15 @@ static void test_persona_cli_run_validate(void) {
     SC_ASSERT_EQ(err, SC_OK);
 }
 
+static void test_persona_cli_run_feedback_apply(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_persona_cli_args_t args = {0};
+    args.action = SC_PERSONA_ACTION_FEEDBACK_APPLY;
+    args.name = "test";
+    sc_error_t err = sc_persona_cli_run(&alloc, &args);
+    SC_ASSERT_EQ(err, SC_OK);
+}
+
 static void test_creator_synthesize_merges(void) {
     sc_allocator_t alloc = sc_system_allocator();
     char *traits1[] = {"direct", "casual"};
@@ -1372,6 +1381,7 @@ void run_persona_tests(void) {
     SC_RUN_TEST(test_persona_validate_json_missing_core);
     SC_RUN_TEST(test_persona_validate_json_malformed);
     SC_RUN_TEST(test_persona_cli_run_validate);
+    SC_RUN_TEST(test_persona_cli_run_feedback_apply);
     SC_RUN_TEST(test_persona_cli_run_list);
     SC_RUN_TEST(test_persona_cli_run_show_not_found);
     SC_RUN_TEST(test_persona_cli_run_delete_not_found);

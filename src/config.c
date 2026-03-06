@@ -71,6 +71,8 @@ static void set_defaults(sc_config_t *cfg, sc_allocator_t *a) {
     cfg->agent.pool_max_concurrent = 8;
     cfg->agent.default_profile = NULL;
     cfg->agent.persona = NULL;
+    cfg->agent.persona_channels = NULL;
+    cfg->agent.persona_channels_count = 0;
     cfg->policy.enabled = false;
     cfg->policy.rules_json = NULL;
     cfg->plugins.enabled = false;
@@ -1303,6 +1305,53 @@ static sc_error_t parse_agent(sc_allocator_t *a, sc_config_t *cfg, const sc_json
         if (cfg->agent.persona)
             a->free(a->ctx, cfg->agent.persona, strlen(cfg->agent.persona) + 1);
         cfg->agent.persona = sc_strdup(a, persona);
+    }
+
+    sc_json_value_t *pc_obj = sc_json_object_get(obj, "persona_channels");
+    if (pc_obj && pc_obj->type == SC_JSON_OBJECT && pc_obj->data.object.pairs) {
+        if (cfg->agent.persona_channels) {
+            for (size_t i = 0; i < cfg->agent.persona_channels_count; i++) {
+                if (cfg->agent.persona_channels[i].channel)
+                    a->free(a->ctx, cfg->agent.persona_channels[i].channel,
+                            strlen(cfg->agent.persona_channels[i].channel) + 1);
+                if (cfg->agent.persona_channels[i].persona)
+                    a->free(a->ctx, cfg->agent.persona_channels[i].persona,
+                            strlen(cfg->agent.persona_channels[i].persona) + 1);
+            }
+            a->free(a->ctx, cfg->agent.persona_channels,
+                    cfg->agent.persona_channels_count * sizeof(sc_persona_channel_entry_t));
+        }
+        size_t n = pc_obj->data.object.len;
+        if (n > 0) {
+            sc_persona_channel_entry_t *arr =
+                (sc_persona_channel_entry_t *)a->alloc(a->ctx,
+                                                        n * sizeof(sc_persona_channel_entry_t));
+            if (arr) {
+                memset(arr, 0, n * sizeof(sc_persona_channel_entry_t));
+                size_t count = 0;
+                for (size_t i = 0; i < n && count < n; i++) {
+                    sc_json_pair_t *p = &pc_obj->data.object.pairs[i];
+                    if (!p->key || !p->value || p->value->type != SC_JSON_STRING)
+                        continue;
+                    const char *ch_name = p->key;
+                    const char *per_name = p->value->data.string.ptr;
+                    if (!ch_name || !per_name)
+                        continue;
+                    arr[count].channel = sc_strdup(a, ch_name);
+                    arr[count].persona = sc_strndup(a, per_name, p->value->data.string.len);
+                    if (arr[count].channel && arr[count].persona)
+                        count++;
+                    else {
+                        if (arr[count].channel)
+                            a->free(a->ctx, arr[count].channel, strlen(arr[count].channel) + 1);
+                        if (arr[count].persona)
+                            a->free(a->ctx, arr[count].persona, strlen(arr[count].persona) + 1);
+                    }
+                }
+                cfg->agent.persona_channels = arr;
+                cfg->agent.persona_channels_count = count;
+            }
+        }
     }
     return SC_OK;
 }

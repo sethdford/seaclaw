@@ -521,31 +521,59 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
                 fprintf(stderr, "Failed to parse Gmail export\n");
                 return perr;
             }
-            fprintf(stdout, "Found %zu messages from Gmail\n", msg_count);
-            if (messages) {
+            if (msg_count > 0 && messages) {
+                size_t prompt_cap = 1024 * 1024;
+                char *prompt_buf = (char *)alloc->alloc(alloc->ctx, prompt_cap);
+                if (!prompt_buf) {
+                    for (size_t i = 0; i < msg_count; i++)
+                        sys.free(sys.ctx, messages[i], strlen(messages[i]) + 1);
+                    sys.free(sys.ctx, messages, msg_count * sizeof(char *));
+                    return SC_ERR_OUT_OF_MEMORY;
+                }
+                size_t prompt_len = 0;
+                sc_error_t berr = sc_persona_analyzer_build_prompt(
+                    (const char **)messages, msg_count, "gmail", prompt_buf, prompt_cap,
+                    &prompt_len);
                 for (size_t i = 0; i < msg_count; i++)
-                    free(messages[i]);
-                free(messages);
+                    sys.free(sys.ctx, messages[i], strlen(messages[i]) + 1);
+                sys.free(sys.ctx, messages, msg_count * sizeof(char *));
+                if (berr != SC_OK) {
+                    alloc->free(alloc->ctx, prompt_buf, prompt_cap);
+                    return berr;
+                }
+                char prompt_path[SC_PERSONA_PATH_MAX];
+                int path_n = snprintf(prompt_path, sizeof(prompt_path), "%s/%s_gmail_prompt.txt",
+                                      pending_dir, args->name);
+                if (path_n <= 0 || (size_t)path_n >= sizeof(prompt_path)) {
+                    alloc->free(alloc->ctx, prompt_buf, prompt_cap);
+                    return SC_ERR_INVALID_ARGUMENT;
+                }
+                FILE *pf = fopen(prompt_path, "wb");
+                if (!pf) {
+                    alloc->free(alloc->ctx, prompt_buf, prompt_cap);
+                    return SC_ERR_IO;
+                }
+                size_t written = fwrite(prompt_buf, 1, prompt_len, pf);
+                fclose(pf);
+                alloc->free(alloc->ctx, prompt_buf, prompt_cap);
+                if (written != prompt_len)
+                    return SC_ERR_IO;
+                wrote_prompt = true;
+                fprintf(stdout, "Found %zu messages from Gmail\n", msg_count);
+            } else if (messages) {
+                for (size_t i = 0; i < msg_count; i++)
+                    sys.free(sys.ctx, messages[i], strlen(messages[i]) + 1);
+                sys.free(sys.ctx, messages, msg_count * sizeof(char *));
             }
         }
-        sc_persona_t template = {0};
-        template.name = sc_strdup(alloc, args->name);
-        if (!template.name)
-            return SC_ERR_OUT_OF_MEMORY;
-        template.name_len = strlen(args->name);
-        sc_error_t err = sc_persona_creator_write(alloc, &template);
-        sc_persona_deinit(alloc, &template);
-        if (err != SC_OK)
-            return err;
-        char dir_buf[SC_PERSONA_PATH_MAX];
-        const char *dir = persona_dir_path(dir_buf, sizeof(dir_buf));
-        if (dir)
-            fprintf(stdout, "Persona template created at %s/%s.json\n", dir, args->name);
-        else
-            fprintf(stdout, "Persona template created at ~/.seaclaw/personas/%s.json\n",
-                    args->name);
-        if (args->interactive)
-            fprintf(stdout, "Edit the persona file and run 'seaclaw persona update' when ready.\n");
+
+        if (!wrote_prompt) {
+            fprintf(stderr, "No messages found from any source.\n");
+            return SC_ERR_INVALID_ARGUMENT;
+        }
+        fprintf(stdout, "Analysis prompt written to %s\n", pending_dir);
+        fprintf(stdout, "Run this prompt through your AI provider, save the response, then run:\n");
+        fprintf(stdout, "  seaclaw persona create %s --from-response <path>\n", args->name);
         return SC_OK;
 #endif
     }
