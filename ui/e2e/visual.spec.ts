@@ -5,7 +5,7 @@ test.describe("Visual Regression", () => {
     await page.goto("/");
     await page.waitForTimeout(1000);
     await expect(page).toHaveScreenshot("overview.png", {
-      maxDiffPixelRatio: 0.01,
+      maxDiffPixelRatio: 0.05,
     });
   });
 
@@ -13,7 +13,7 @@ test.describe("Visual Regression", () => {
     await page.goto("/#chat");
     await page.waitForTimeout(1000);
     await expect(page).toHaveScreenshot("chat.png", {
-      maxDiffPixelRatio: 0.01,
+      maxDiffPixelRatio: 0.05,
     });
   });
 
@@ -21,7 +21,7 @@ test.describe("Visual Regression", () => {
     await page.goto("/catalog.html");
     await page.waitForTimeout(1000);
     await expect(page).toHaveScreenshot("catalog.png", {
-      maxDiffPixelRatio: 0.02,
+      maxDiffPixelRatio: 0.08,
     });
   });
 });

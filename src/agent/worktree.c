@@ -18,13 +18,27 @@ struct sc_worktree_manager {
     size_t capacity;
 };
 
+#if !(defined(SC_IS_TEST) && SC_IS_TEST == 1)
 static bool is_safe_path(const char *path) {
-    if (!path)
+    if (!path || !path[0])
         return false;
     for (const char *p = path; *p; p++) {
         char c = *p;
         if (!(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') &&
             c != '.' && c != '_' && c != '/' && c != '-' && c != '~')
+            return false;
+    }
+    return true;
+}
+#endif
+
+static bool is_safe_label(const char *label) {
+    if (!label || !label[0])
+        return false;
+    if (strstr(label, ".."))
+        return false;
+    for (const char *p = label; *p; p++) {
+        if (*p == '/' || *p == '\\')
             return false;
     }
     return true;
@@ -133,6 +147,8 @@ sc_error_t sc_worktree_create(sc_worktree_manager_t *mgr, uint64_t agent_id, con
         return SC_ERR_ALREADY_EXISTS;
 
     const char *lbl = (label && label[0]) ? label : "agent";
+    if (!is_safe_label(lbl))
+        return SC_ERR_INVALID_ARGUMENT;
     char path[1024];
     char branch[256];
     int n = snprintf(path, sizeof(path), SC_WORKTREE_PATH_FMT, mgr->repo_root, lbl);

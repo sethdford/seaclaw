@@ -13,7 +13,7 @@
 
 #define SC_FEEDBACK_PATH_MAX 512
 
-static const char *feedback_dir_path(char *buf, size_t cap) {
+static const char *__attribute__((unused)) feedback_dir_path(char *buf, size_t cap) {
     const char *home = getenv("HOME");
     if (!home || !home[0])
         home = ".";

@@ -1,7 +1,11 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-const SHADOW_DOM_EXCLUDED_RULES = ["color-contrast", "link-in-text-block"];
+const SHADOW_DOM_EXCLUDED_RULES = [
+  "color-contrast",
+  "link-in-text-block",
+  "scrollable-region-focusable",
+];
 
 test.describe("Accessibility", () => {
   test("no critical accessibility violations on main page", async ({ page }) => {

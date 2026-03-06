@@ -7,7 +7,7 @@ Scope: entire repository.
 
 seaclaw is a C11 autonomous AI assistant runtime optimized for:
 
-- minimal binary size (430 KB release with LTO, 175 exported symbols)
+- minimal binary size (~500 KB release with LTO, 175 exported symbols)
 - minimal memory footprint (5–6 MB peak RSS measured)
 - zero dependencies beyond libc, optional SQLite and libcurl
 - Zig reference implementation archived in `archive/zig-reference/`
@@ -32,7 +32,7 @@ Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
 | Metric                   | Measured         |
 | ------------------------ | ---------------- |
-| Binary size              | 430 KB           |
+| Binary size              | ~500 KB          |
 | Text section             | 280 KB           |
 | Exported symbols         | 175              |
 | Cold-start (`--version`) | 6–27 ms avg      |
@@ -62,7 +62,7 @@ These codebase realities should drive every design decision:
 2. **Binary size and memory are hard product constraints**
    - `cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON` is the release target. Every dependency and abstraction has a size cost.
    - Avoid adding unnecessary runtime allocations or large data tables without justification.
-   - Current release binary: 430 KB (with LTO). Top modules by object size:
+   - Current release binary: ~500 KB (with LTO). Top modules by object size:
      config (74 KB), agent (52 KB), control_protocol (45 KB), cli (36 KB).
 
 3. **Security-critical surfaces are first-class**
