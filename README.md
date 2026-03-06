@@ -18,7 +18,7 @@
 The smallest fully autonomous AI assistant infrastructure — a static C binary that fits on any $5 board, boots in milliseconds, and requires nothing but libc.
 
 ```
-430 KB binary · <30 ms startup · 2,513 tests · 50+ providers · 26 channels · 53 tools · Pluggable everything
+430 KB binary · <30 ms startup · 2,592 tests · 50+ providers · 26 channels · 53 tools · Pluggable everything
 ```
 
 ### Features
@@ -27,7 +27,7 @@ The smallest fully autonomous AI assistant infrastructure — a static C binary 
 - **Near-Zero Memory:** < 6 MB peak RSS. Runs comfortably on the cheapest ARM SBCs and microcontrollers.
 - **Instant Startup:** 6–27 ms on Apple Silicon, sub-50 ms on edge cores.
 - **True Portability:** Single self-contained binary across ARM, x86, and RISC-V. Drop it anywhere, it just runs.
-- **Feature-Complete:** 50+ providers, 24 channels, 53 tools, hybrid vector+FTS5 memory, multi-layer sandbox, tunnels, hardware peripherals, MCP, subagents, streaming, voice — the full stack.
+- **Feature-Complete:** 50+ providers, 27 channels, 53 tools, hybrid vector+FTS5 memory, multi-layer sandbox, tunnels, hardware peripherals, MCP, subagents, streaming, voice — the full stack.
 - **Interactive TUI:** Full-screen terminal UI with split panes, markdown rendering, multi-session tabs (Ctrl+T), tool approval prompts, streaming output, and input history. Build with `-DSC_ENABLE_TUI=ON` and run with `--tui`.
 - **Performance-Optimized:** Per-turn arena allocator, HTTP connection pooling, HTTP/2, system prompt caching — all benefiting from C-level control.
 
@@ -57,7 +57,7 @@ SeaClaw's verified numbers (measured on macOS arm64, March 2026):
 Binary size:   430 KB (MinSizeRel + LTO, all channels)
 Peak RSS:      ~5.7 MB (--version), ~5.9 MB (test suite)
 Startup:       6–27 ms avg (Apple Silicon M4 Max)
-Tests:         2,513 passing, 0 ASan errors
+Tests:         2,592 passing, 0 ASan errors
 ```
 
 ### Why Switch from OpenClaw?
@@ -568,7 +568,7 @@ Build and tests require a C11 compiler and CMake 3.16+.
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Debug -DSC_ENABLE_ALL_CHANNELS=ON
 cmake --build .                            # Dev build
-./seaclaw_tests                             # 2,513 tests
+./seaclaw_tests                             # 2,592 tests
 cd ..
 ```
 
@@ -603,13 +603,13 @@ Channel CJM coverage (ingress parsing/filtering, session key routing, account pr
 ```
 
 Language: C11 + ASM (aarch64, x86_64)
-Source files: ~466
-Lines of code: ~70,000+
-Test files: 82
-Tests: 2,513
+Source files: ~556
+Lines of code: ~83,000+
+Test files: 85
+Tests: 2,592
 Binary: 430 KB (MinSizeRel + LTO, all channels)
-Peak RSS: < 5 MB
-Startup: <2 ms (Apple Silicon)
+Peak RSS: ~5.7 MB
+Startup: 6–27 ms avg (Apple Silicon)
 Dependencies: libc + optional SQLite, libcurl
 
 ```
@@ -621,7 +621,7 @@ Dependencies: libc + optional SQLite, libcurl
 src/
 main.c CLI entry point + command routing
 agent/ Agent loop, context, planner, compaction, dispatcher
-channels/ 20 channel implementations (cli, telegram, discord, ...)
+channels/ 26 channel implementations (cli, telegram, discord, ...)
 providers/ 50+ AI provider implementations
 memory/ SQLite + markdown + LRU backends, embeddings, vector search
 tools/ 53 tool implementations
@@ -634,7 +634,7 @@ config.c Config loading/merging (~/.seaclaw/config.json)
 ...
 
 include/seaclaw/ Public C headers
-tests/ 80+ test files, 2,366 tests
+tests/ 85 test files, 2,592 tests
 asm/ Platform-specific assembly (aarch64, x86_64, generic C)
 
 ```

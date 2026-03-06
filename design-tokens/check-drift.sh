@@ -84,9 +84,9 @@ if [ -f "$TMPDIR/tokens.ts" ] && [ -f "$REPO_ROOT/docs/tokens.ts" ]; then
   fi
 fi
 
-# Check docs reference JSON
+# Check docs reference JSON (ignore "generated" timestamp which changes every build)
 if [ -f "$TMPDIR/design-tokens-reference.json" ] && [ -f "$REPO_ROOT/docs/design-tokens-reference.json" ]; then
-  if ! diff -q "$TMPDIR/design-tokens-reference.json" "$REPO_ROOT/docs/design-tokens-reference.json" >/dev/null 2>&1; then
+  if ! diff -I '"generated":' "$TMPDIR/design-tokens-reference.json" "$REPO_ROOT/docs/design-tokens-reference.json" >/dev/null 2>&1; then
     echo "DRIFT: docs/design-tokens-reference.json differs from generated output"
     DRIFT=1
   fi

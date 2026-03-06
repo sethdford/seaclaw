@@ -1,5 +1,5 @@
 #!/bin/sh
-# pre-commit: basic checks on C source files.
+# pre-commit: format checks on C source files + design token lint.
 # Activate: git config core.hooksPath .githooks
 
 CLANG_FMT="clang-format"
@@ -20,6 +20,18 @@ if [ -d "src" ] && [ -f "CMakeLists.txt" ]; then
         echo "$staged_ch" | xargs "$CLANG_FMT" --dry-run -Werror
         if [ $? -ne 0 ]; then
             echo "clang-format failed. Run: $CLANG_FMT -i <file>"
+            exit 1
+        fi
+    fi
+fi
+
+# Lint for raw hex colors in staged CSS/TS/Astro files
+if [ -x "scripts/lint-raw-colors.sh" ]; then
+    staged_style=$(git diff --cached --name-only --diff-filter=ACM -- '*.css' '*.ts' '*.tsx' '*.astro')
+    if [ -n "$staged_style" ]; then
+        ./scripts/lint-raw-colors.sh
+        if [ $? -ne 0 ]; then
+            echo "Raw hex color lint failed. Use --sc-* or --sc-web-* design tokens instead."
             exit 1
         fi
     fi

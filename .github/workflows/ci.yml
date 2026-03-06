@@ -124,6 +124,12 @@ jobs:
       - name: Test with coverage
         run: npm run test:coverage
       - run: npm run build
+      - name: Check bundle size
+        run: bash scripts/check-bundle-size.sh
+      - name: Component checklist
+        run: bash scripts/check-component.sh
+      - name: Bundle size check
+        run: bash scripts/check-bundle-size.sh
 
   ui-e2e:
     runs-on: ubuntu-latest
@@ -131,7 +137,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - name: Install
         run: cd ui && npm ci
       - name: Install Playwright browsers
@@ -207,6 +213,27 @@ jobs:
         run: scripts/benchmark.sh build/seaclaw --save-history
       - name: Run core benchmarks
         run: ./build/seaclaw_bench 2>&1 | tee benchmark-core.txt
+      - name: Check for binary size regression
+        run: |
+          SIZE=$(stat -f%z build/seaclaw 2>/dev/null || stat -c%s build/seaclaw)
+          echo "Release binary: $SIZE bytes"
+          # Hard limit: 512KB (524288 bytes)
+          if [ "$SIZE" -gt 524288 ]; then
+            echo "::error::Binary size $SIZE exceeds 512KB limit"
+            exit 1
+          fi
+          # Warn at 480KB
+          if [ "$SIZE" -gt 491520 ]; then
+            echo "::warning::Binary size $SIZE approaching 512KB limit"
+          fi
+      - name: Check test count
+        run: |
+          COUNT=$(./build/seaclaw_tests 2>&1 | grep -oE '[0-9]+/[0-9]+ passed' | head -1 | cut -d/ -f1)
+          echo "Tests: $COUNT"
+          if [ "$COUNT" -lt 2400 ]; then
+            echo "::error::Test count $COUNT dropped below 2400 minimum"
+            exit 1
+          fi
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
@@ -219,7 +246,6 @@ jobs:
 
   static-analysis:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-build
@@ -287,6 +313,49 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake clang libsqlite3-dev libcurl4-openssl-dev
+      - name: Configure
+        run: |
+          cmake -B build-fuzz \
+            -DSC_ENABLE_FUZZING=ON \
+            -DCMAKE_C_COMPILER=clang \
+            -DSC_ENABLE_CURL=ON \
+            -DSC_ENABLE_SQLITE=ON
+      - name: Build
+        run: cmake --build build-fuzz -j$(nproc)
+      - name: Create corpus and seed
+        run: |
+          mkdir -p corpus/json corpus/http corpus/url
+          echo '{}' > corpus/json/empty.json
+          echo '{"a":1}' > corpus/json/obj.json
+          echo '"hello"' > corpus/json/str.json
+      - name: Run fuzz harnesses
+        run: |
+          for h in build-fuzz/fuzz_json_parser build-fuzz/fuzz_http_parse build-fuzz/fuzz_url_validation; do
+            if [ -f "$h" ]; then
+              echo "==> Fuzzing $(basename $h)"
+              case "$(basename $h)" in
+                fuzz_json_parser) corpus=corpus/json ;;
+                fuzz_http_parse) corpus=corpus/http ;;
+                fuzz_url_validation) corpus=corpus/url ;;
+                *) corpus=corpus ;;
+              esac
+              timeout 35 "$h" -max_total_time=30 "$corpus" || true
+            fi
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-corpus
+          path: corpus/
+          retention-days: 30
+
   docker:
     runs-on: ubuntu-latest
     steps:
@@ -303,7 +372,9 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: website/package-lock.json
-      - run: cd website && npm ci && npm run build
+      - run: cd website && npm ci
+      - run: cd website && npm run check
+      - run: cd website && npm run build
       - run: test -d website/dist
 
   lighthouse:
