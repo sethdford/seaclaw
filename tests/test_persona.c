@@ -456,8 +456,8 @@ static void test_sampler_gmail_parse_empty(void) {
 }
 
 static void test_cli_parse_from_facebook_file(void) {
-    const char *argv[] = {"seaclaw", "persona", "create", "test", "--from-facebook",
-                          "/tmp/fb.json"};
+    const char *argv[] = {"seaclaw", "persona",         "create",
+                          "test",    "--from-facebook", "/tmp/fb.json"};
     sc_persona_cli_args_t args;
     memset(&args, 0, sizeof(args));
     sc_error_t e = sc_persona_cli_parse(6, argv, &args);
@@ -468,8 +468,8 @@ static void test_cli_parse_from_facebook_file(void) {
 }
 
 static void test_cli_parse_from_gmail(void) {
-    const char *argv[] = {"seaclaw", "persona", "create", "test", "--from-gmail",
-                          "/tmp/gmail.json"};
+    const char *argv[] = {"seaclaw", "persona",      "create",
+                          "test",    "--from-gmail", "/tmp/gmail.json"};
     sc_persona_cli_args_t args;
     memset(&args, 0, sizeof(args));
     sc_error_t e = sc_persona_cli_parse(6, argv, &args);
@@ -869,8 +869,7 @@ static void test_persona_examples_load_json_empty_bank(void) {
     sc_persona_example_bank_t bank;
     memset(&bank, 0, sizeof(bank));
     const char *json = "{\"examples\":[]}";
-    sc_error_t e =
-        sc_persona_examples_load_json(&alloc, "test", 4, json, strlen(json), &bank);
+    sc_error_t e = sc_persona_examples_load_json(&alloc, "test", 4, json, strlen(json), &bank);
     SC_ASSERT_EQ(e, SC_OK);
     SC_ASSERT_EQ(bank.examples_count, 0);
     if (bank.channel)
