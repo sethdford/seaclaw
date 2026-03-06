@@ -3,6 +3,7 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/persona.h"
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -369,14 +370,33 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
         }
 
         /* Step 1: extract messages, build prompt, write to .pending */
+        const char *home = getenv("HOME");
+        if (!home || !home[0]) {
+            fprintf(stderr, "HOME not set\n");
+            return SC_ERR_NOT_FOUND;
+        }
+        char pending_dir[SC_PERSONA_PATH_MAX];
+        int pn = snprintf(pending_dir, sizeof(pending_dir), "%s/.seaclaw/personas/.pending", home);
+        if (pn <= 0 || (size_t)pn >= sizeof(pending_dir))
+            return SC_ERR_INVALID_ARGUMENT;
+#if defined(__unix__) || defined(__APPLE__)
+        {
+            char parent[SC_PERSONA_PATH_MAX];
+            int pp = snprintf(parent, sizeof(parent), "%s/.seaclaw", home);
+            if (pp > 0 && (size_t)pp < sizeof(parent))
+                (void)mkdir(parent, 0755);
+            pp = snprintf(parent, sizeof(parent), "%s/.seaclaw/personas", home);
+            if (pp > 0 && (size_t)pp < sizeof(parent))
+                (void)mkdir(parent, 0755);
+            if (mkdir(pending_dir, 0755) != 0 && errno != EEXIST)
+                return SC_ERR_IO;
+        }
+#endif
+        bool wrote_prompt = false;
+        sc_allocator_t sys = sc_system_allocator();
+
         if (args->from_imessage) {
 #if defined(__APPLE__) && defined(__MACH__) && defined(SC_ENABLE_SQLITE)
-            size_t msg_count = 0;
-            const char *home = getenv("HOME");
-            if (!home || !home[0]) {
-                fprintf(stderr, "HOME not set\n");
-                return SC_ERR_NOT_FOUND;
-            }
             char db_path[SC_PERSONA_PATH_MAX];
             int n = snprintf(db_path, sizeof(db_path), "%s/Library/Messages/chat.db", home);
             if (n <= 0 || (size_t)n >= sizeof(db_path))
@@ -401,14 +421,83 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
                 sqlite3_close(db);
                 return SC_ERR_IO;
             }
+            char **messages = (char **)alloc->alloc(alloc->ctx, 500 * sizeof(char *));
+            if (!messages) {
+                sqlite3_finalize(stmt);
+                sqlite3_close(db);
+                return SC_ERR_OUT_OF_MEMORY;
+            }
+            size_t msg_count = 0;
             while (sqlite3_step(stmt) == SQLITE_ROW && msg_count < 500) {
                 const char *text = (const char *)sqlite3_column_text(stmt, 0);
-                if (text && text[0])
+                if (text && text[0]) {
+                    messages[msg_count] = sc_strdup(alloc, text);
+                    if (!messages[msg_count]) {
+                        for (size_t i = 0; i < msg_count; i++)
+                            alloc->free(alloc->ctx, messages[i], strlen(messages[i]) + 1);
+                        alloc->free(alloc->ctx, messages, 500 * sizeof(char *));
+                        sqlite3_finalize(stmt);
+                        sqlite3_close(db);
+                        return SC_ERR_OUT_OF_MEMORY;
+                    }
                     msg_count++;
+                }
             }
             sqlite3_finalize(stmt);
             sqlite3_close(db);
-            fprintf(stdout, "Found %zu messages from iMessage\n", msg_count);
+
+            if (msg_count > 0) {
+                size_t prompt_cap = 1024 * 1024;
+                char *prompt_buf = (char *)alloc->alloc(alloc->ctx, prompt_cap);
+                if (!prompt_buf) {
+                    for (size_t i = 0; i < msg_count; i++)
+                        alloc->free(alloc->ctx, messages[i], strlen(messages[i]) + 1);
+                    alloc->free(alloc->ctx, messages, 500 * sizeof(char *));
+                    return SC_ERR_OUT_OF_MEMORY;
+                }
+                size_t prompt_len = 0;
+                const char **msg_ptrs = (const char **)alloc->alloc(alloc->ctx,
+                                                                   msg_count * sizeof(const char *));
+                if (!msg_ptrs) {
+                    alloc->free(alloc->ctx, prompt_buf, prompt_cap);
+                    for (size_t i = 0; i < msg_count; i++)
+                        alloc->free(alloc->ctx, messages[i], strlen(messages[i]) + 1);
+                    alloc->free(alloc->ctx, messages, 500 * sizeof(char *));
+                    return SC_ERR_OUT_OF_MEMORY;
+                }
+                for (size_t i = 0; i < msg_count; i++)
+                    msg_ptrs[i] = messages[i];
+                sc_error_t berr = sc_persona_analyzer_build_prompt(msg_ptrs, msg_count, "imessage",
+                                                                   prompt_buf, prompt_cap,
+                                                                   &prompt_len);
+                alloc->free(alloc->ctx, msg_ptrs, msg_count * sizeof(const char *));
+                for (size_t i = 0; i < msg_count; i++)
+                    alloc->free(alloc->ctx, messages[i], strlen(messages[i]) + 1);
+                alloc->free(alloc->ctx, messages, 500 * sizeof(char *));
+                if (berr != SC_OK) {
+                    alloc->free(alloc->ctx, prompt_buf, prompt_cap);
+                    return berr;
+                }
+                char prompt_path[SC_PERSONA_PATH_MAX];
+                int path_n = snprintf(prompt_path, sizeof(prompt_path), "%s/%s_imessage_prompt.txt",
+                                     pending_dir, args->name);
+                if (path_n <= 0 || (size_t)path_n >= sizeof(prompt_path)) {
+                    alloc->free(alloc->ctx, prompt_buf, prompt_cap);
+                    return SC_ERR_INVALID_ARGUMENT;
+                }
+                FILE *pf = fopen(prompt_path, "wb");
+                if (!pf) {
+                    alloc->free(alloc->ctx, prompt_buf, prompt_cap);
+                    return SC_ERR_IO;
+                }
+                size_t written = fwrite(prompt_buf, 1, prompt_len, pf);
+                fclose(pf);
+                alloc->free(alloc->ctx, prompt_buf, prompt_cap);
+                if (written != prompt_len)
+                    return SC_ERR_IO;
+                wrote_prompt = true;
+                fprintf(stdout, "Found %zu messages from iMessage\n", msg_count);
+            }
 #else
             fprintf(stderr, "iMessage sampling requires macOS and SQLite\n");
             return SC_ERR_NOT_SUPPORTED;
@@ -484,10 +573,6 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
                     return SC_ERR_IO;
                 wrote_prompt = true;
                 fprintf(stdout, "Found %zu messages from Facebook\n", msg_count);
-            } else if (messages) {
-                for (size_t i = 0; i < msg_count; i++)
-                    sys.free(sys.ctx, messages[i], strlen(messages[i]) + 1);
-                sys.free(sys.ctx, messages, msg_count * sizeof(char *));
             }
         }
         if (args->from_gmail && args->gmail_export_path) {
@@ -560,10 +645,6 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
                     return SC_ERR_IO;
                 wrote_prompt = true;
                 fprintf(stdout, "Found %zu messages from Gmail\n", msg_count);
-            } else if (messages) {
-                for (size_t i = 0; i < msg_count; i++)
-                    sys.free(sys.ctx, messages[i], strlen(messages[i]) + 1);
-                sys.free(sys.ctx, messages, msg_count * sizeof(char *));
             }
         }
 

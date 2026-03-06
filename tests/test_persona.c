@@ -501,6 +501,17 @@ static void test_cli_parse_from_gmail(void) {
     SC_ASSERT_TRUE(strcmp(args.gmail_export_path, "/tmp/gmail.json") == 0);
 }
 
+static void test_cli_parse_from_response(void) {
+    const char *argv[] = {"seaclaw", "persona", "create", "test", "--from-response", "/tmp/resp.json"};
+    sc_persona_cli_args_t args;
+    memset(&args, 0, sizeof(args));
+    sc_error_t err = sc_persona_cli_parse(6, argv, &args);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(args.action, SC_PERSONA_ACTION_CREATE);
+    SC_ASSERT_TRUE(args.response_file != NULL);
+    SC_ASSERT_TRUE(strcmp(args.response_file, "/tmp/resp.json") == 0);
+}
+
 static void test_sampler_imessage_query(void) {
     char query[512];
     size_t query_len = 0;
@@ -928,6 +939,46 @@ static void test_persona_load_empty_name(void) {
     memset(&p, 0, sizeof(p));
     sc_error_t e = sc_persona_load(&alloc, "", 0, &p);
     SC_ASSERT_TRUE(e != SC_OK);
+}
+
+static void test_persona_prompt_respects_size_cap(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    /* Build JSON with many traits to exceed 8KB prompt */
+    char *traits_json = alloc.alloc(alloc.ctx, 16 * 1024);
+    SC_ASSERT_NOT_NULL(traits_json);
+    size_t pos = 0;
+    pos += (size_t)snprintf(traits_json + pos, 16 * 1024 - pos,
+                             "{\"version\":1,\"name\":\"big\",\"core\":{"
+                             "\"identity\":\"Test persona with many traits for size cap\","
+                             "\"traits\":[");
+    for (int i = 0; i < 120 && pos < 14 * 1024; i++) {
+        if (i > 0)
+            pos += (size_t)snprintf(traits_json + pos, 16 * 1024 - pos, ",");
+        pos += (size_t)snprintf(traits_json + pos, 16 * 1024 - pos,
+                                 "\"trait_%d_%.*s\"", i,
+                                 (int)(80 - 12), "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+    }
+    pos += (size_t)snprintf(traits_json + pos, 16 * 1024 - pos,
+                             "],\"vocabulary\":{\"preferred\":[],\"avoided\":[],\"slang\":[]},"
+                             "\"communication_rules\":[],\"values\":[],\"decision_style\":\"fast\"}}}");
+    traits_json[pos] = '\0';
+
+    sc_persona_t p;
+    memset(&p, 0, sizeof(p));
+    sc_error_t err = sc_persona_load_json(&alloc, traits_json, pos, &p);
+    alloc.free(alloc.ctx, traits_json, 16 * 1024);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    err = sc_persona_build_prompt(&alloc, &p, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(out);
+    SC_ASSERT_LE(out_len, (size_t)SC_PERSONA_PROMPT_MAX_BYTES);
+    SC_ASSERT_NOT_NULL(strstr(out, "[persona prompt truncated]"));
+
+    alloc.free(alloc.ctx, out, out_len + 1);
+    sc_persona_deinit(&alloc, &p);
 }
 
 /* sc_persona_build_prompt - edge cases */
@@ -1362,6 +1413,7 @@ void run_persona_tests(void) {
     SC_RUN_TEST(test_spawn_config_has_persona);
     SC_RUN_TEST(test_config_persona_field);
     SC_RUN_TEST(test_persona_build_prompt_core);
+    SC_RUN_TEST(test_persona_prompt_respects_size_cap);
     SC_RUN_TEST(test_persona_build_prompt_includes_examples);
     SC_RUN_TEST(test_persona_prompt_with_channel_overlay);
     SC_RUN_TEST(test_agent_set_persona_clears);
@@ -1399,6 +1451,7 @@ void run_persona_tests(void) {
     SC_RUN_TEST(test_sampler_gmail_parse_empty);
     SC_RUN_TEST(test_cli_parse_from_facebook_file);
     SC_RUN_TEST(test_cli_parse_from_gmail);
+    SC_RUN_TEST(test_cli_parse_from_response);
     SC_RUN_TEST(test_persona_select_examples_match);
     SC_RUN_TEST(test_persona_select_examples_no_channel);
     SC_RUN_TEST(test_persona_select_examples_no_match);

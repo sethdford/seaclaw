@@ -2,6 +2,9 @@
 #define SC_PERSONA_H
 
 #include "seaclaw/core/allocator.h"
+
+#define SC_PERSONA_PROMPT_MAX_BYTES (8 * 1024) /* 8 KB default cap */
+
 #include "seaclaw/core/error.h"
 
 #include <stdbool.h>
