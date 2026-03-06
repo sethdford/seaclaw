@@ -1757,9 +1757,8 @@ sc_error_t sc_agent_turn_stream(sc_agent_t *agent, const char *msg, size_t msg_l
     if (agent->persona) {
         const char *ch = agent->active_channel;
         size_t ch_len = agent->active_channel_len;
-        sc_error_t perr =
-            sc_persona_build_prompt(agent->alloc, agent->persona, ch, ch_len, &persona_prompt,
-                                    &persona_prompt_len);
+        sc_error_t perr = sc_persona_build_prompt(agent->alloc, agent->persona, ch, ch_len,
+                                                  &persona_prompt, &persona_prompt_len);
         if (perr != SC_OK) {
             if (memory_ctx)
                 agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);

@@ -208,8 +208,8 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
             }
             char query[512];
             size_t query_len = 0;
-            sc_error_t qerr = sc_persona_sampler_imessage_query(query, sizeof(query), &query_len,
-                                                                500);
+            sc_error_t qerr =
+                sc_persona_sampler_imessage_query(query, sizeof(query), &query_len, 500);
             if (qerr != SC_OK) {
                 sqlite3_close(db);
                 return qerr;
@@ -254,8 +254,7 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
             fprintf(stdout, "Persona template created at ~/.seaclaw/personas/%s.json\n",
                     args->name);
         if (args->interactive)
-            fprintf(stdout,
-                    "Edit the persona file and run 'seaclaw persona update' when ready.\n");
+            fprintf(stdout, "Edit the persona file and run 'seaclaw persona update' when ready.\n");
         return SC_OK;
 #endif
     }

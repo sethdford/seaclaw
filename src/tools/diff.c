@@ -78,10 +78,10 @@ static sc_error_t diff_execute(void *ctx, sc_allocator_t *alloc, const sc_json_v
             *out = sc_tool_result_fail("oom", 3);
             return SC_OK;
         }
-        fread(abuf, 1, (size_t)alen, af);
-        abuf[alen] = '\0';
-        fread(bbuf, 1, (size_t)blen, bf);
-        bbuf[blen] = '\0';
+        size_t ar = fread(abuf, 1, (size_t)alen, af);
+        abuf[ar] = '\0';
+        size_t br = fread(bbuf, 1, (size_t)blen, bf);
+        bbuf[br] = '\0';
         fclose(af);
         fclose(bf);
 

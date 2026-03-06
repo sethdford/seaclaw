@@ -281,10 +281,11 @@ sc_error_t sc_persona_creator_write(sc_allocator_t *alloc, const sc_persona_t *p
     if (err != SC_OK)
         goto fail;
     {
-        static const char core[] = ",\"core\":{\"identity\":\"\",\"traits\":[],"
-                                   "\"vocabulary\":{\"preferred\":[],\"avoided\":[],\"slang\":[]},"
-                                   "\"communication_rules\":[],\"values\":[],\"decision_style\":\"\"},"
-                                   "\"channel_overlays\":{}}";
+        static const char core[] =
+            ",\"core\":{\"identity\":\"\",\"traits\":[],"
+            "\"vocabulary\":{\"preferred\":[],\"avoided\":[],\"slang\":[]},"
+            "\"communication_rules\":[],\"values\":[],\"decision_style\":\"\"},"
+            "\"channel_overlays\":{}}";
         if (sc_json_buf_append_raw(&buf, core, sizeof(core) - 1) != SC_OK)
             goto fail;
     }

@@ -374,8 +374,8 @@ sc_error_t sc_persona_load(sc_allocator_t *alloc, const char *name, size_t name_
         const char *home = getenv("HOME");
         if (home && home[0] && out->name && out->name_len > 0) {
             char base[SC_PERSONA_PATH_MAX];
-            int bn = snprintf(base, sizeof(base), "%s/.seaclaw/personas/examples/%.*s",
-                              home, (int)out->name_len, out->name);
+            int bn = snprintf(base, sizeof(base), "%s/.seaclaw/personas/examples/%.*s", home,
+                              (int)out->name_len, out->name);
             if (bn > 0 && (size_t)bn < sizeof(base)) {
                 DIR *d = opendir(base);
                 if (d) {
@@ -419,8 +419,7 @@ sc_error_t sc_persona_load(sc_allocator_t *alloc, const char *name, size_t name_
                         size_t new_cap = banks_count + 1;
                         sc_persona_example_bank_t *new_banks =
                             (sc_persona_example_bank_t *)alloc->realloc(
-                                alloc->ctx, banks,
-                                banks_count * sizeof(sc_persona_example_bank_t),
+                                alloc->ctx, banks, banks_count * sizeof(sc_persona_example_bank_t),
                                 new_cap * sizeof(sc_persona_example_bank_t));
                         if (!new_banks) {
                             alloc->free(alloc->ctx, ebuf, (size_t)esz + 1);
@@ -428,9 +427,8 @@ sc_error_t sc_persona_load(sc_allocator_t *alloc, const char *name, size_t name_
                         }
                         out->example_banks = new_banks;
                         memset(&new_banks[banks_count], 0, sizeof(sc_persona_example_bank_t));
-                        sc_error_t berr = sc_persona_examples_load_json(alloc, e->d_name, ch_len,
-                                                                        ebuf, erd,
-                                                                        &new_banks[banks_count]);
+                        sc_error_t berr = sc_persona_examples_load_json(
+                            alloc, e->d_name, ch_len, ebuf, erd, &new_banks[banks_count]);
                         alloc->free(alloc->ctx, ebuf, (size_t)esz + 1);
                         if (berr == SC_OK)
                             out->example_banks_count++;

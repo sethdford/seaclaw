@@ -582,8 +582,8 @@ static void test_creator_write_and_load(void) {
             const char *home = getenv("HOME");
             if (home && home[0]) {
                 char path[512];
-                int n = snprintf(path, sizeof(path),
-                                "%s/.seaclaw/personas/test_creator_write.json", home);
+                int n = snprintf(path, sizeof(path), "%s/.seaclaw/personas/test_creator_write.json",
+                                 home);
                 if (n > 0 && (size_t)n < sizeof(path))
                     (void)unlink(path);
             }
@@ -600,8 +600,8 @@ static void test_creator_write_and_load(void) {
         const char *home = getenv("HOME");
         if (home && home[0]) {
             char path[512];
-            int n = snprintf(path, sizeof(path), "%s/.seaclaw/personas/test_creator_write.json",
-                            home);
+            int n =
+                snprintf(path, sizeof(path), "%s/.seaclaw/personas/test_creator_write.json", home);
             if (n > 0 && (size_t)n < sizeof(path))
                 (void)unlink(path);
         }
@@ -612,12 +612,11 @@ static void test_creator_write_and_load(void) {
 
 static void test_persona_prompt_with_channel_overlay(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    const char *json =
-        "{\"version\":1,\"name\":\"ch_test\","
-        "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
-        "\"channel_overlays\":{\"imessage\":{\"formality\":\"casual\","
-        "\"avg_length\":\"short\",\"emoji_usage\":\"minimal\","
-        "\"style_notes\":[\"no caps\"]}}}";
+    const char *json = "{\"version\":1,\"name\":\"ch_test\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
+                       "\"channel_overlays\":{\"imessage\":{\"formality\":\"casual\","
+                       "\"avg_length\":\"short\",\"emoji_usage\":\"minimal\","
+                       "\"style_notes\":[\"no caps\"]}}}";
     sc_persona_t p;
     memset(&p, 0, sizeof(p));
     sc_error_t err = sc_persona_load_json(&alloc, json, strlen(json), &p);
