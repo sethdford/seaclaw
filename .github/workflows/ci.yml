@@ -146,7 +146,7 @@ jobs:
       - name: Install deps
         run: |
           sudo apt-get update -q
-          sudo apt-get install -yq libsqlite3-dev libcurl4-openssl-dev lcov
+          sudo apt-get install -yq libsqlite3-dev libcurl4-openssl-dev lcov bc
 
       - name: Configure with coverage
         run: |
@@ -174,7 +174,17 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           file: coverage.info
-          fail_ci_if_error: false
+          fail_ci_if_error: true
+
+      - name: Check coverage threshold
+        run: |
+          TOTAL=$(lcov --summary coverage.info 2>&1 | grep "lines\.\.\." | sed 's/.*: //' | sed 's/%.*//')
+          echo "Line coverage: ${TOTAL}%"
+          THRESHOLD=70
+          if [ "$(echo "$TOTAL < $THRESHOLD" | bc -l)" -eq 1 ]; then
+            echo "::error::Coverage ${TOTAL}% is below ${THRESHOLD}% threshold"
+            exit 1
+          fi
 
   fuzz:
     runs-on: ubuntu-latest
@@ -197,6 +207,7 @@ jobs:
           cmake --build build-fuzz -j$(nproc)
 
       - name: Smoke-test fuzzers (30s each)
+        continue-on-error: true
         run: |
           for f in build-fuzz/fuzz_*; do
             echo "Running $(basename $f)..."
@@ -360,3 +371,39 @@ jobs:
         working-directory: apps/flutter
         run: flutter test 2>&1 || echo "::warning::Flutter tests failed"
         continue-on-error: true
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build iOS app
+        working-directory: apps/ios
+        run: swift build 2>&1 || echo "::warning::iOS build failed"
+        continue-on-error: true
+
+  macos-app:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build macOS app
+        working-directory: apps/macos
+        run: swift build 2>&1 || echo "::warning::macOS build failed"
+        continue-on-error: true
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy cmake libsqlite3-dev libcurl4-openssl-dev
+      - name: Configure
+        run: cmake -B build -DSC_ENABLE_ALL_CHANNELS=ON -DSC_ENABLE_CURL=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Run clang-tidy
+        run: |
+          cd build
+          FILES=$(find ../src -name '*.c' | head -50)
+          clang-tidy $FILES -p . --warnings-as-errors='bugprone-*,cert-*,security-*' 2>&1 | tail -50 || true

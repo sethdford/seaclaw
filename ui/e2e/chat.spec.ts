@@ -23,8 +23,8 @@ test.describe("Chat View", () => {
 
   test("empty state shows prompt", async ({ page }) => {
     const chatView = page.locator("sc-app >> sc-chat-view");
-    const emptyState = chatView.locator("sc-empty-state, .empty-state, .start-prompt").first();
-    await expect(emptyState).toBeVisible({ timeout: 5000 });
+    const emptyText = chatView.getByText("Start a conversation");
+    await expect(emptyText).toBeVisible({ timeout: 5000 });
   });
 
   test("typing in chat input works", async ({ page }) => {
