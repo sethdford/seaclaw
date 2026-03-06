@@ -1,7 +1,7 @@
 JOBS ?= $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 BUILD ?= build
 
-.PHONY: all configure build test clean release asan check fmt hooks
+.PHONY: all configure build test clean release asan check fmt format-check fuzz hooks
 
 all: build test
 
@@ -38,10 +38,19 @@ check: build
 	$(BUILD)/seaclaw_tests
 
 clean:
-	rm -rf $(BUILD) build-asan build-check
+	rm -rf $(BUILD) build-asan build-check build-fuzz
 
 fmt:
 	@find src include tests -name '*.c' -o -name '*.h' | xargs clang-format -i
+
+format-check:
+	@find src include tests -name '*.c' -o -name '*.h' | xargs clang-format --dry-run -Werror
+
+fuzz:
+	cmake -B build-fuzz -DCMAKE_C_COMPILER=clang -DSC_ENABLE_FUZZ=ON \
+		-DSC_ENABLE_ALL_CHANNELS=ON -DSC_ENABLE_CURL=ON
+	cmake --build build-fuzz -j$(JOBS)
+	@echo "Fuzz targets built. Run: ./build-fuzz/fuzz_<name> -max_total_time=30"
 
 hooks:
 	git config core.hooksPath .githooks

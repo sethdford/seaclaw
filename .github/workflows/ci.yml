@@ -48,14 +48,23 @@ jobs:
         run: ./build/seaclaw persona list
 
   asan:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install deps
+      - name: Install deps (Ubuntu)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update -q
           sudo apt-get install -yq libsqlite3-dev libcurl4-openssl-dev
+
+      - name: Install deps (macOS)
+        if: runner.os == 'macOS'
+        run: brew install sqlite3 curl
 
       - name: Configure with ASan
         run: |
@@ -67,7 +76,7 @@ jobs:
             -DSC_ENABLE_CURL=ON
 
       - name: Build
-        run: cmake --build build -j$(nproc)
+        run: cmake --build build -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
       - name: Test (ASan)
         env:
@@ -93,18 +102,24 @@ jobs:
             -DSC_ENABLE_CURL=ON
           cmake --build build -j$(nproc)
 
+      - name: Test release build
+        run: ./build/seaclaw_tests
+
       - name: Check binary size
         run: |
           SIZE=$(stat -c%s build/seaclaw 2>/dev/null || stat -f%z build/seaclaw)
           echo "Binary size: ${SIZE} bytes ($(( SIZE / 1024 )) KB)"
-          if [ "$SIZE" -gt 500000 ]; then
-            echo "::warning::Binary exceeds 500 KB target (full build)"
+          if [ "$SIZE" -gt 512000 ]; then
+            echo "::error::Binary exceeds 512 KB hard limit"
+            exit 1
+          elif [ "$SIZE" -gt 480000 ]; then
+            echo "::warning::Binary approaching 512 KB limit ($(( SIZE / 1024 )) KB)"
           fi
 
   cross-arm64:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install cross-compiler
         run: |
@@ -126,7 +141,7 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install deps
         run: |
@@ -164,7 +179,7 @@ jobs:
   fuzz:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install deps
         run: |
@@ -185,7 +200,7 @@ jobs:
         run: |
           for f in build-fuzz/fuzz_*; do
             echo "Running $(basename $f)..."
-            timeout 30 $f -max_total_time=25 || true
+            timeout 30 $f -max_total_time=25
           done
 
   ui:
