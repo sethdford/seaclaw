@@ -38,7 +38,7 @@ export default defineConfig({
             { label: "Cron System", slug: "features/cron" },
             { label: "Skills System", slug: "features/skills" },
             { label: "MCP Server Integration", slug: "features/mcp" },
-            { label: "Migration from OpenClaw", slug: "features/migrate" },
+            { label: "Migration", slug: "features/migrate" },
             { label: "Tunnel Providers", slug: "features/tunnels" },
             { label: "Voice Channel", slug: "features/voice" },
           ],

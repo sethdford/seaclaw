@@ -1,54 +1,117 @@
 ---
-title: Memory Migration
-description: Migrate memory entries between SQLite and Markdown backends.
+title: Migration
+description: Migrate from OpenClaw or between memory backends.
 ---
 
-SeaClaw provides a migration tool to transfer memory entries between backends. Use it when switching storage (e.g. SQLite → Markdown) or consolidating data.
+import { Tabs, TabItem } from "@astrojs/starlight/components";
 
-## CLI usage
+## Migration from OpenClaw
+
+SeaClaw is a drop-in replacement for [OpenClaw](https://github.com/openclaw/openclaw) (TypeScript, Node.js). It preserves your memory, config structure, and channel integrations while dramatically reducing resource usage.
+
+| Dimension        | OpenClaw               | SeaClaw                        |
+| ---------------- | ---------------------- | ------------------------------ |
+| **Binary size**  | ~28 MB (npm dist)      | **430 KB**                     |
+| **Memory**       | Node.js heap (100+ MB) | **&lt; 5 MB** peak RSS         |
+| **Dependencies** | 1,200+ npm packages    | **0** — libc + optional SQLite |
+| **Secrets**      | Plain-text API keys    | ChaCha20-Poly1305 encrypted    |
+
+### 1. Install SeaClaw
+
+<Tabs>
+  <TabItem label="Build from source">
+    ```bash git clone https://github.com/sethdford/seaclaw.git cd seaclaw &&
+    mkdir -p build && cd build cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel
+    -DSC_ENABLE_LTO=ON -DSC_ENABLE_ALL_CHANNELS=ON cmake --build . sudo cp
+    seaclaw /usr/local/bin/ ```
+  </TabItem>
+  <TabItem label="Download release">
+    ```bash curl -Lo seaclaw
+    https://github.com/sethdford/seaclaw/releases/latest/download/seaclaw-$(uname
+    -m) chmod +x seaclaw && sudo mv seaclaw /usr/local/bin/ ```
+  </TabItem>
+</Tabs>
+
+### 2. Migrate memory
+
+SeaClaw imports memories directly from OpenClaw's SQLite brain database:
 
 ```bash
-seaclaw migrate [options] [target_path]
+seaclaw migrate sqlite ~/.openclaw/brain.db
+```
+
+The migration tool auto-detects common schema variants and maps columns automatically.
+
+### 3. Migrate config
+
+SeaClaw uses the **same config structure** as OpenClaw. Most keys map 1:1.
+
+**OpenClaw** (`~/.openclaw/config.json`):
+
+```json
+{
+  "default_provider": "openai",
+  "default_model": "gpt-4o",
+  "providers": [{ "name": "openai", "api_key": "sk-proj-xxx" }]
+}
+```
+
+**SeaClaw** (`~/.seaclaw/config.json`):
+
+```json
+{
+  "models": {
+    "providers": { "openai": { "api_key": "sk-proj-xxx" } }
+  },
+  "agents": {
+    "defaults": { "model": { "primary": "gpt-4o" } }
+  }
+}
+```
+
+### 4. Verify
+
+```bash
+seaclaw doctor          # Config, provider, memory OK?
+seaclaw status          # Full system status
+seaclaw agent -m "What do you remember about me?"
+```
+
+---
+
+## Memory Backend Migration
+
+Transfer memory entries between SQLite and Markdown backends when switching storage.
+
+### CLI usage
+
+```bash
 seaclaw migrate sqlite <source_db_path> [target_path]
 seaclaw migrate markdown <source_directory> [target_path]
 ```
 
 ### Examples
 
-**Migrate from SQLite to Markdown (dry run):**
+**SQLite → Markdown:**
 
 ```bash
 seaclaw migrate sqlite ~/.seaclaw/memory.db ./memories
 ```
 
-**Migrate from Markdown to SQLite:**
+**Markdown → SQLite:**
 
 ```bash
 seaclaw migrate markdown ./old-memories ~/.seaclaw/new-memory.db
 ```
 
-**Target path only** (migrate from empty source to target; useful for dry run):
-
-```bash
-seaclaw migrate ./output-dir
-```
-
-## Supported paths
+### Supported paths
 
 | Source   | Target   | Description                   |
 | -------- | -------- | ----------------------------- |
 | SQLite   | Markdown | Export DB to Markdown files   |
 | Markdown | SQLite   | Import Markdown files into DB |
-| None     | Markdown | Empty run (0 entries)         |
 
-## How it works
-
-1. Opens the source backend (SQLite DB or Markdown directory)
-2. Lists all entries via the memory vtable `list`
-3. For each entry, calls `store` on the target backend
-4. Tracks imported, skipped, and error counts
-
-## Migration stats
+### Migration stats
 
 After migration, the CLI prints:
 
@@ -61,10 +124,6 @@ Migration: N from sqlite, M from markdown, K imported
 - `skipped`: Entries with missing key or content
 - `errors`: Store failures
 
-## Dry run
+### SQLite requirement
 
-The current implementation defaults to `dry_run: true` when source is `SC_MIGRATION_SOURCE_NONE`. For actual migrations with a real source, entries are written to the target. Check the implementation for exact dry-run behavior.
-
-## SQLite requirement
-
-When SQLite is disabled (`SC_ENABLE_SQLITE` off), only Markdown ↔ Markdown and None → Markdown migrations are supported. SQLite as source or target returns `SC_ERR_NOT_SUPPORTED`.
+When SQLite is disabled (`SC_ENABLE_SQLITE` off), only Markdown ↔ Markdown migrations are supported.

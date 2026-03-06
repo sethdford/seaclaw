@@ -92,4 +92,8 @@ ui/e2e-pressure/
 ui/e2e-*
 .audit_hmac_key
 audit_tool_test.log
-apps/shared/SeaClawKit/.build/
+audit.log
+
+# Flutter build (generated tokens only)
+apps/flutter/.dart_tool/
+apps/flutter/build/
