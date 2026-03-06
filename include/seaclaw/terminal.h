@@ -6,15 +6,12 @@
 
 typedef enum {
     SC_COLOR_LEVEL_NONE = 0,
-    SC_COLOR_LEVEL_BASIC = 1,   /* 16 colors */
-    SC_COLOR_LEVEL_256 = 2,     /* 256 colors */
+    SC_COLOR_LEVEL_BASIC = 1,    /* 16 colors */
+    SC_COLOR_LEVEL_256 = 2,      /* 256 colors */
     SC_COLOR_LEVEL_TRUECOLOR = 3 /* 24-bit RGB */
 } sc_color_level_t;
 
-typedef enum {
-    SC_THEME_DARK = 0,
-    SC_THEME_LIGHT = 1
-} sc_theme_t;
+typedef enum { SC_THEME_DARK = 0, SC_THEME_LIGHT = 1 } sc_theme_t;
 
 /**
  * Detect terminal color capabilities from environment.

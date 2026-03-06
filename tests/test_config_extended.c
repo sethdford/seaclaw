@@ -1,13 +1,13 @@
 /* Config edge cases (~30 tests). No real I/O - uses parse_json and env overrides. */
-#include "test_framework.h"
 #include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/arena.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"
-#include <string.h>
-#include <stdlib.h>
+#include "test_framework.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 static sc_config_t *make_config_with_arena(void) {
     sc_allocator_t backing = sc_system_allocator();
@@ -22,9 +22,11 @@ static sc_config_t *make_config_with_arena(void) {
 }
 
 static void free_config(sc_config_t *cfg) {
-    if (!cfg) return;
+    if (!cfg)
+        return;
     sc_allocator_t backing = sc_system_allocator();
-    if (cfg->arena) sc_arena_destroy(cfg->arena);
+    if (cfg->arena)
+        sc_arena_destroy(cfg->arena);
     backing.free(backing.ctx, cfg, sizeof(*cfg));
 }
 
@@ -42,8 +44,11 @@ static void test_config_load_nonexistent_uses_defaults(void) {
     SC_ASSERT_STR_EQ(cfg.nodes[0].name, "local");
     SC_ASSERT_STR_EQ(cfg.nodes[0].status, "online");
     sc_config_deinit(&cfg);
-    if (old_home) { setenv("HOME", old_home, 1); free(old_home); }
-    else unsetenv("HOME");
+    if (old_home) {
+        setenv("HOME", old_home, 1);
+        free(old_home);
+    } else
+        unsetenv("HOME");
 }
 
 static void test_config_empty_json_uses_defaults(void) {
@@ -235,7 +240,8 @@ static void test_config_get_provider_key_from_providers(void) {
 
 static void test_config_parse_providers_array(void) {
     sc_config_t *cfg = make_config_with_arena();
-    const char *json = "{\"providers\":[{\"name\":\"openai\",\"api_key\":\"sk-x\"},{\"name\":\"anthropic\"}]}";
+    const char *json =
+        "{\"providers\":[{\"name\":\"openai\",\"api_key\":\"sk-x\"},{\"name\":\"anthropic\"}]}";
     sc_error_t err = sc_config_parse_json(cfg, json, strlen(json));
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(cfg->providers_len, 2);
@@ -316,8 +322,11 @@ static void test_config_load_defaults_new_fields(void) {
     SC_ASSERT_FALSE(cfg.heartbeat.enabled);
     SC_ASSERT_EQ(cfg.heartbeat.interval_minutes, 30u);
     sc_config_deinit(&cfg);
-    if (old_home) { setenv("HOME", old_home, 1); free(old_home); }
-    else unsetenv("HOME");
+    if (old_home) {
+        setenv("HOME", old_home, 1);
+        free(old_home);
+    } else
+        unsetenv("HOME");
 }
 
 static void test_config_parse_new_fields(void) {
@@ -327,17 +336,20 @@ static void test_config_parse_new_fields(void) {
     sc_config_t cfg = {0};
     sc_error_t err = sc_config_load(&backing, &cfg);
     SC_ASSERT_EQ(err, SC_OK);
-    const char *json = "{\"cron\":{\"enabled\":true,\"interval_minutes\":15,\"max_run_history\":25},"
+    const char *json =
+        "{\"cron\":{\"enabled\":true,\"interval_minutes\":15,\"max_run_history\":25},"
         "\"scheduler\":{\"max_concurrent\":8},"
         "\"tunnel\":{\"provider\":\"cloudflared\",\"domain\":\"test.example.com\"},"
-        "\"memory\":{\"profile\":\"local_keyword\",\"sqlite_path\":\"/tmp/db.sqlite\",\"max_entries\":1000},"
+        "\"memory\":{\"profile\":\"local_keyword\",\"sqlite_path\":\"/tmp/"
+        "db.sqlite\",\"max_entries\":1000},"
         "\"gateway\":{\"enabled\":false},"
         "\"channels\":{\"default_channel\":\"telegram\"},"
         "\"tools\":{\"enabled_tools\":[\"shell\",\"file_read\"],\"disabled_tools\":[\"browser\"]},"
         "\"security\":{\"audit\":{\"enabled\":true,\"log_path\":\"/var/log/audit.log\"}},"
         "\"agent\":{\"token_limit\":150000,\"max_tool_iterations\":500},"
         "\"heartbeat\":{\"enabled\":true,\"interval_minutes\":15},"
-        "\"reliability\":{\"provider_retries\":3,\"provider_backoff_ms\":1000,\"fallback_providers\":[\"anthropic\",\"gemini\"]},"
+        "\"reliability\":{\"provider_retries\":3,\"provider_backoff_ms\":1000,\"fallback_"
+        "providers\":[\"anthropic\",\"gemini\"]},"
         "\"diagnostics\":{\"backend\":\"otel\",\"log_tool_calls\":true}}";
     err = sc_config_parse_json(&cfg, json, strlen(json));
     SC_ASSERT_EQ(err, SC_OK);
@@ -371,8 +383,11 @@ static void test_config_parse_new_fields(void) {
     SC_ASSERT_STR_EQ(cfg.diagnostics.backend, "otel");
     SC_ASSERT_TRUE(cfg.diagnostics.log_tool_calls);
     sc_config_deinit(&cfg);
-    if (old_home) { setenv("HOME", old_home, 1); free(old_home); }
-    else unsetenv("HOME");
+    if (old_home) {
+        setenv("HOME", old_home, 1);
+        free(old_home);
+    } else
+        unsetenv("HOME");
 }
 
 static void test_config_get_provider_base_url(void) {
@@ -463,12 +478,15 @@ static void test_config_parse_agent_parallel_tools(void) {
 
 static void test_config_parse_agent_context_pressure(void) {
     sc_config_t *cfg = make_config_with_arena();
-    const char *j =
-        "{\"agent\":{\"context_pressure_warn\":0.9,\"context_pressure_compact\":0.98,\"context_compact_target\":0.65}}";
+    const char *j = "{\"agent\":{\"context_pressure_warn\":0.9,\"context_pressure_compact\":0.98,"
+                    "\"context_compact_target\":0.65}}";
     sc_config_parse_json(cfg, j, strlen(j));
-    SC_ASSERT_TRUE(cfg->agent.context_pressure_warn > 0.89f && cfg->agent.context_pressure_warn < 0.91f);
-    SC_ASSERT_TRUE(cfg->agent.context_pressure_compact > 0.97f && cfg->agent.context_pressure_compact < 0.99f);
-    SC_ASSERT_TRUE(cfg->agent.context_compact_target > 0.64f && cfg->agent.context_compact_target < 0.66f);
+    SC_ASSERT_TRUE(cfg->agent.context_pressure_warn > 0.89f &&
+                   cfg->agent.context_pressure_warn < 0.91f);
+    SC_ASSERT_TRUE(cfg->agent.context_pressure_compact > 0.97f &&
+                   cfg->agent.context_pressure_compact < 0.99f);
+    SC_ASSERT_TRUE(cfg->agent.context_compact_target > 0.64f &&
+                   cfg->agent.context_compact_target < 0.66f);
     free_config(cfg);
 }
 
@@ -714,7 +732,8 @@ static void test_config_parse_scheduler_max_concurrent(void) {
 
 static void test_config_parse_multiple_providers_with_keys(void) {
     sc_config_t *cfg = make_config_with_arena();
-    const char *j = "{\"providers\":[{\"name\":\"a\",\"api_key\":\"k1\"},{\"name\":\"b\",\"api_key\":\"k2\"},{\"name\":\"c\"}]}";
+    const char *j = "{\"providers\":[{\"name\":\"a\",\"api_key\":\"k1\"},{\"name\":\"b\",\"api_"
+                    "key\":\"k2\"},{\"name\":\"c\"}]}";
     sc_config_parse_json(cfg, j, strlen(j));
     SC_ASSERT_EQ(cfg->providers_len, 3u);
     SC_ASSERT_STR_EQ(cfg->providers[0].api_key, "k1");
@@ -725,7 +744,8 @@ static void test_config_parse_multiple_providers_with_keys(void) {
 
 static void test_config_parse_json_nested_deep(void) {
     sc_config_t *cfg = make_config_with_arena();
-    const char *j = "{\"agent\":{\"token_limit\":50000},\"memory\":{\"backend\":\"sqlite\",\"max_entries\":500},\"gateway\":{\"port\":4444}}";
+    const char *j = "{\"agent\":{\"token_limit\":50000},\"memory\":{\"backend\":\"sqlite\",\"max_"
+                    "entries\":500},\"gateway\":{\"port\":4444}}";
     sc_config_parse_json(cfg, j, strlen(j));
     SC_ASSERT_EQ(cfg->agent.token_limit, 50000u);
     SC_ASSERT_STR_EQ(cfg->memory.backend, "sqlite");
@@ -755,8 +775,11 @@ static void test_config_parse_default_model_provider_prefix(void) {
     SC_ASSERT_STR_EQ(cfg.default_provider, "gemini");
     SC_ASSERT_STR_EQ(cfg.default_model, "gemini-2.0-flash");
     sc_config_deinit(&cfg);
-    if (old_home) { setenv("HOME", old_home, 1); free(old_home); }
-    else unsetenv("HOME");
+    if (old_home) {
+        setenv("HOME", old_home, 1);
+        free(old_home);
+    } else
+        unsetenv("HOME");
 }
 
 static void test_config_parse_workspace_path_with_slash(void) {
@@ -890,7 +913,8 @@ static void test_config_parse_agent_max_history(void) {
 
 static void test_config_parse_agent_compaction(void) {
     sc_config_t *cfg = make_config_with_arena();
-    const char *j = "{\"agent\":{\"compaction_keep_recent\":10,\"compaction_max_summary_chars\":500}}";
+    const char *j =
+        "{\"agent\":{\"compaction_keep_recent\":10,\"compaction_max_summary_chars\":500}}";
     sc_config_parse_json(cfg, j, strlen(j));
     SC_ASSERT_EQ(cfg->agent.compaction_keep_recent, 10u);
     SC_ASSERT_EQ(cfg->agent.compaction_max_summary_chars, 500u);
@@ -899,7 +923,8 @@ static void test_config_parse_agent_compaction(void) {
 
 static void test_config_parse_reliability_channel_backoff(void) {
     sc_config_t *cfg = make_config_with_arena();
-    const char *j = "{\"reliability\":{\"channel_initial_backoff_secs\":5,\"channel_max_backoff_secs\":300}}";
+    const char *j =
+        "{\"reliability\":{\"channel_initial_backoff_secs\":5,\"channel_max_backoff_secs\":300}}";
     sc_config_parse_json(cfg, j, strlen(j));
     SC_ASSERT_EQ(cfg->reliability.channel_initial_backoff_secs, 5u);
     SC_ASSERT_EQ(cfg->reliability.channel_max_backoff_secs, 300u);
@@ -908,7 +933,8 @@ static void test_config_parse_reliability_channel_backoff(void) {
 
 static void test_config_parse_diagnostics_otel(void) {
     sc_config_t *cfg = make_config_with_arena();
-    const char *j = "{\"diagnostics\":{\"backend\":\"otel\",\"otel_endpoint\":\"http://localhost:4318\",\"otel_service_name\":\"seaclaw\"}}";
+    const char *j = "{\"diagnostics\":{\"backend\":\"otel\",\"otel_endpoint\":\"http://"
+                    "localhost:4318\",\"otel_service_name\":\"seaclaw\"}}";
     sc_config_parse_json(cfg, j, strlen(j));
     SC_ASSERT_STR_EQ(cfg->diagnostics.backend, "otel");
     SC_ASSERT_STR_EQ(cfg->diagnostics.otel_endpoint, "http://localhost:4318");
@@ -947,7 +973,8 @@ static void test_config_parse_security_sandbox(void) {
 
 static void test_config_parse_provider_base_url(void) {
     sc_config_t *cfg = make_config_with_arena();
-    const char *j = "{\"providers\":[{\"name\":\"compatible\",\"base_url\":\"https://api.example.com/v1\"}]}";
+    const char *j =
+        "{\"providers\":[{\"name\":\"compatible\",\"base_url\":\"https://api.example.com/v1\"}]}";
     sc_config_parse_json(cfg, j, strlen(j));
     SC_ASSERT_EQ(cfg->providers_len, 1u);
     SC_ASSERT_STR_EQ(cfg->providers[0].base_url, "https://api.example.com/v1");
@@ -1093,7 +1120,8 @@ static void test_config_parse_very_long_key_value(void) {
     cfg->default_provider = sc_strdup(&cfg->allocator, "openai");
     cfg->default_model = sc_strdup(&cfg->allocator, "gpt-4");
     char buf[512];
-    int n = snprintf(buf, sizeof(buf), "{\"workspace\":\"%s\"}", "/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z");
+    int n = snprintf(buf, sizeof(buf), "{\"workspace\":\"%s\"}",
+                     "/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z");
     SC_ASSERT_TRUE(n > 0 && (size_t)n < sizeof(buf));
     sc_error_t err = sc_config_parse_json(cfg, buf, (size_t)n);
     SC_ASSERT_EQ(err, SC_OK);

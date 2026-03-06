@@ -32,7 +32,8 @@ typedef struct {
 static sc_error_t invoice_execute(void *ctx, sc_allocator_t *alloc, const sc_json_value_t *args,
                                   sc_tool_result_t *out) {
     (void)ctx;
-    if (!out) return SC_ERR_INVALID_ARGUMENT;
+    if (!out)
+        return SC_ERR_INVALID_ARGUMENT;
     if (!args) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;
@@ -91,9 +92,9 @@ static sc_error_t invoice_execute(void *ctx, sc_allocator_t *alloc, const sc_jso
                     double line_total = qty * price;
                     subtotal += line_total;
                     int w = snprintf(msg + n, buf_sz - (size_t)n,
-                                    "%s{\"description\":\"%s\",\"quantity\":%.0f,"
-                                    "\"unit_price\":%.2f,\"total\":%.2f}",
-                                    i > 0 ? "," : "", desc ? desc : "", qty, price, line_total);
+                                     "%s{\"description\":\"%s\",\"quantity\":%.0f,"
+                                     "\"unit_price\":%.2f,\"total\":%.2f}",
+                                     i > 0 ? "," : "", desc ? desc : "", qty, price, line_total);
                     if (w > 0)
                         n += w;
                 }
@@ -124,7 +125,7 @@ static sc_error_t invoice_execute(void *ctx, sc_allocator_t *alloc, const sc_jso
                     double line_total = qty * price;
                     subtotal += line_total;
                     int w = snprintf(msg + n, buf_sz - (size_t)n, "| %s | %.0f | %.2f | %.2f |\n",
-                                    desc ? desc : "", qty, price, line_total);
+                                     desc ? desc : "", qty, price, line_total);
                     if (w > 0)
                         n += w;
                 }

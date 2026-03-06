@@ -1,11 +1,11 @@
 /* Comprehensive memory backend tests. */
-#include "test_framework.h"
-#include "seaclaw/memory.h"
 #include "seaclaw/core/allocator.h"
-#include <string.h>
+#include "seaclaw/memory.h"
+#include "test_framework.h"
 #include <math.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 static void test_none_backend_create(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -18,7 +18,7 @@ static void test_none_backend_create(void) {
 static void test_none_backend_store(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_none_memory_create(&alloc);
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->store(mem.ctx, "k", 1, "v", 1, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
     mem.vtable->deinit(mem.ctx);
@@ -39,7 +39,7 @@ static void test_none_backend_recall_empty(void) {
 static void test_none_backend_empty_strings(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_none_memory_create(&alloc);
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->store(mem.ctx, "", 0, "", 0, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
     mem.vtable->deinit(mem.ctx);
@@ -51,8 +51,9 @@ static void test_sqlite_store_recall(void) {
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
-    sc_error_t err = mem.vtable->store(mem.ctx, "user_pref", 9, "likes dark mode", 15, &cat, NULL, 0);
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
+    sc_error_t err =
+        mem.vtable->store(mem.ctx, "user_pref", 9, "likes dark mode", 15, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
 
     sc_memory_entry_t *out = NULL;
@@ -73,7 +74,7 @@ static void test_sqlite_store_recall(void) {
 static void test_sqlite_get_forget_count(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "getme", 5, "value", 5, &cat, NULL, 0);
 
     sc_memory_entry_t entry = {0};
@@ -118,8 +119,10 @@ static void test_sqlite_session_store(void) {
     SC_ASSERT(count >= 1);
     if (msgs) {
         for (size_t i = 0; i < count; i++) {
-            if (msgs[i].role) alloc.free(alloc.ctx, (void *)msgs[i].role, msgs[i].role_len + 1);
-            if (msgs[i].content) alloc.free(alloc.ctx, (void *)msgs[i].content, msgs[i].content_len + 1);
+            if (msgs[i].role)
+                alloc.free(alloc.ctx, (void *)msgs[i].role, msgs[i].role_len + 1);
+            if (msgs[i].content)
+                alloc.free(alloc.ctx, (void *)msgs[i].content, msgs[i].content_len + 1);
         }
         alloc.free(alloc.ctx, msgs, count * sizeof(sc_message_entry_t));
     }
@@ -129,7 +132,7 @@ static void test_sqlite_session_store(void) {
 static void test_sqlite_list(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "a", 1, "x", 1, &cat, NULL, 0);
 
     sc_memory_entry_t *out = NULL;
@@ -161,7 +164,7 @@ static void test_markdown_store_get_list_forget(void) {
     char *dir = mkdtemp(tmp);
     SC_ASSERT_NOT_NULL(dir);
     sc_memory_t mem = sc_markdown_memory_create(&alloc, dir);
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->store(mem.ctx, "k1", 2, "content one", 11, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
 
@@ -178,7 +181,8 @@ static void test_markdown_store_get_list_forget(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT(count >= 1);
     if (out) {
-        for (size_t i = 0; i < count; i++) sc_memory_entry_free_fields(&alloc, &out[i]);
+        for (size_t i = 0; i < count; i++)
+            sc_memory_entry_free_fields(&alloc, &out[i]);
         alloc.free(alloc.ctx, out, count * sizeof(sc_memory_entry_t));
     }
 
@@ -245,7 +249,7 @@ static void test_none_count_zero(void) {
 static void test_none_store_multiple(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_none_memory_create(&alloc);
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->store(mem.ctx, "a", 1, "1", 1, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
     err = mem.vtable->store(mem.ctx, "b", 1, "2", 1, &cat, NULL, 0);
@@ -258,7 +262,7 @@ static void test_none_list_empty(void) {
     sc_memory_t mem = sc_none_memory_create(&alloc);
     sc_memory_entry_t *out = NULL;
     size_t count = 0;
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->list(mem.ctx, &alloc, &cat, NULL, 0, &out, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NULL(out);
@@ -269,7 +273,7 @@ static void test_none_list_empty(void) {
 static void test_none_store_with_session(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_none_memory_create(&alloc);
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CONVERSATION };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CONVERSATION};
     const char *sid = "sess-abc";
     sc_error_t err = mem.vtable->store(mem.ctx, "conv_k", 6, "conv content", 12, &cat, sid, 7);
     SC_ASSERT_EQ(err, SC_OK);
@@ -279,9 +283,9 @@ static void test_none_store_with_session(void) {
 static void test_none_categories_core_daily_conversation(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_none_memory_create(&alloc);
-    sc_memory_category_t core = { .tag = SC_MEMORY_CATEGORY_CORE };
-    sc_memory_category_t daily = { .tag = SC_MEMORY_CATEGORY_DAILY };
-    sc_memory_category_t conv = { .tag = SC_MEMORY_CATEGORY_CONVERSATION };
+    sc_memory_category_t core = {.tag = SC_MEMORY_CATEGORY_CORE};
+    sc_memory_category_t daily = {.tag = SC_MEMORY_CATEGORY_DAILY};
+    sc_memory_category_t conv = {.tag = SC_MEMORY_CATEGORY_CONVERSATION};
     mem.vtable->store(mem.ctx, "c", 1, "core", 4, &core, NULL, 0);
     mem.vtable->store(mem.ctx, "d", 1, "daily", 5, &daily, NULL, 0);
     mem.vtable->store(mem.ctx, "v", 1, "conv", 4, &conv, NULL, 0);

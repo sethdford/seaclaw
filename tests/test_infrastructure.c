@@ -1,9 +1,9 @@
-#include "test_framework.h"
-#include "seaclaw/version.h"
-#include "seaclaw/heartbeat.h"
-#include "seaclaw/cost.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#include "seaclaw/cost.h"
+#include "seaclaw/heartbeat.h"
+#include "seaclaw/version.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_version_string(void) {
@@ -112,7 +112,8 @@ static void test_heartbeat_parse_tasks_asterisk_bullet(void) {
     SC_ASSERT_EQ(count, 2u);
     SC_ASSERT_STR_EQ(tasks[0], "Task one");
     SC_ASSERT_STR_EQ(tasks[1], "Task three");
-    if (tasks) sc_heartbeat_free_tasks(&alloc, tasks, count);
+    if (tasks)
+        sc_heartbeat_free_tasks(&alloc, tasks, count);
 }
 
 static void test_heartbeat_is_empty_headers_only(void) {
@@ -131,7 +132,8 @@ static void test_heartbeat_parse_tasks_skips_empty_bullets(void) {
     sc_error_t err = sc_heartbeat_parse_tasks(&alloc, content, &tasks, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(count, 2u);
-    if (tasks) sc_heartbeat_free_tasks(&alloc, tasks, count);
+    if (tasks)
+        sc_heartbeat_free_tasks(&alloc, tasks, count);
 }
 
 static void test_heartbeat_engine_init_clamps_to_five(void) {

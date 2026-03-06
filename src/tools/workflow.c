@@ -86,7 +86,8 @@ static wf_def_t *wf_find(workflow_ctx_t *c, const char *id) {
 static sc_error_t workflow_execute(void *ctx, sc_allocator_t *alloc, const sc_json_value_t *args,
                                    sc_tool_result_t *out) {
     workflow_ctx_t *c = (workflow_ctx_t *)ctx;
-    if (!out) return SC_ERR_INVALID_ARGUMENT;
+    if (!out)
+        return SC_ERR_INVALID_ARGUMENT;
     if (!args) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;

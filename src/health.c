@@ -110,11 +110,11 @@ void sc_health_snapshot(sc_health_snapshot_t *out) {
     out->pid = sc_getpid();
     time_t now = time(NULL);
     out->uptime_seconds = (uint64_t)(now > s_start_time ? now - s_start_time : 0);
-    out->component_count = s_component_count;
     if (s_component_count > 0) {
         out->components =
             (sc_component_health_t *)malloc(s_component_count * sizeof(sc_component_health_t));
         if (out->components) {
+            out->component_count = s_component_count;
             for (size_t i = 0; i < s_component_count; i++)
                 memcpy(&out->components[i], &s_components[i].health, sizeof(sc_component_health_t));
         }

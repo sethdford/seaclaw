@@ -10,7 +10,7 @@ static size_t s_loaded_count = 0;
 #if defined(_WIN32)
 /* Windows: dlopen not available, return SC_ERR_NOT_SUPPORTED */
 sc_error_t sc_plugin_load(sc_allocator_t *alloc, const char *path, sc_plugin_host_t *host,
-                         sc_plugin_info_t *info_out, sc_plugin_handle_t **out_handle) {
+                          sc_plugin_info_t *info_out, sc_plugin_handle_t **out_handle) {
     (void)alloc;
     (void)path;
     (void)host;
@@ -36,7 +36,7 @@ typedef struct sc_plugin_handle {
 } sc_plugin_handle_t;
 
 sc_error_t sc_plugin_load(sc_allocator_t *alloc, const char *path, sc_plugin_host_t *host,
-                         sc_plugin_info_t *info_out, sc_plugin_handle_t **out_handle) {
+                          sc_plugin_info_t *info_out, sc_plugin_handle_t **out_handle) {
     (void)host;
     if (!path || !info_out || !out_handle)
         return SC_ERR_INVALID_ARGUMENT;
@@ -109,7 +109,7 @@ typedef struct sc_plugin_handle {
 } sc_plugin_handle_t;
 
 sc_error_t sc_plugin_load(sc_allocator_t *alloc, const char *path, sc_plugin_host_t *host,
-                         sc_plugin_info_t *info_out, sc_plugin_handle_t **out_handle) {
+                          sc_plugin_info_t *info_out, sc_plugin_handle_t **out_handle) {
     if (!alloc || !path || !host || !info_out || !out_handle)
         return SC_ERR_INVALID_ARGUMENT;
 

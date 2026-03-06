@@ -1,10 +1,10 @@
 /* Config validation tests — unknown keys, type checks, value validation. */
-#include "test_framework.h"
 #include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/arena.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/json.h"
+#include "test_framework.h"
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -123,9 +123,8 @@ static void test_config_validate_strict_unknown_provider_fails_in_strict(void) {
     SC_ASSERT_NOT_NULL(arena);
     cfg.arena = arena;
     cfg.allocator = sc_arena_allocator(arena);
-    const char *json =
-        "{\"default_provider\":\"unknown_fake_provider\",\"default_model\":\"x\","
-        "\"gateway\":{\"port\":3000}}";
+    const char *json = "{\"default_provider\":\"unknown_fake_provider\",\"default_model\":\"x\","
+                       "\"gateway\":{\"port\":3000}}";
     sc_error_t err = sc_config_parse_json(&cfg, json, strlen(json));
     SC_ASSERT_EQ(err, SC_OK);
     sc_error_t verr = sc_config_validate_strict(&cfg, NULL, true);

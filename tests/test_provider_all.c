@@ -307,12 +307,21 @@ static void test_openai_chat_empty_messages_graceful(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t prov;
     sc_openai_create(&alloc, "key", 3, NULL, 0, &prov);
-    sc_chat_request_t req = {.messages = NULL, .messages_count = 0, .model = "gpt-4", .model_len = 4,
-                             .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-                             .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_request_t req = {.messages = NULL,
+                             .messages_count = 0,
+                             .model = "gpt-4",
+                             .model_len = 4,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "gpt-4", 4, 0.7, &resp);
-    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT || err == SC_ERR_PROVIDER_RESPONSE);
+    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT ||
+                   err == SC_ERR_PROVIDER_RESPONSE);
     if (err == SC_OK && resp.content)
         alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     if (prov.vtable->deinit)
@@ -468,12 +477,21 @@ static void test_anthropic_chat_empty_messages_graceful(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t prov;
     sc_anthropic_create(&alloc, "key", 3, NULL, 0, &prov);
-    sc_chat_request_t req = {.messages = NULL, .messages_count = 0, .model = "claude-3", .model_len = 8,
-                             .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-                             .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_request_t req = {.messages = NULL,
+                             .messages_count = 0,
+                             .model = "claude-3",
+                             .model_len = 8,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "claude-3", 8, 0.7, &resp);
-    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT || err == SC_ERR_PROVIDER_RESPONSE);
+    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT ||
+                   err == SC_ERR_PROVIDER_RESPONSE);
     if (err == SC_OK && resp.content)
         alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     if (prov.vtable->deinit)
@@ -736,12 +754,21 @@ static void test_gemini_chat_empty_messages_graceful(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t prov;
     sc_gemini_create(&alloc, "key", 3, NULL, 0, &prov);
-    sc_chat_request_t req = {.messages = NULL, .messages_count = 0, .model = "gemini-pro", .model_len = 10,
-                             .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-                             .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_request_t req = {.messages = NULL,
+                             .messages_count = 0,
+                             .model = "gemini-pro",
+                             .model_len = 10,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "gemini-pro", 10, 0.7, &resp);
-    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT || err == SC_ERR_PROVIDER_RESPONSE);
+    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT ||
+                   err == SC_ERR_PROVIDER_RESPONSE);
     if (err == SC_OK && resp.content)
         alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     if (prov.vtable->deinit)
@@ -911,12 +938,21 @@ static void test_ollama_chat_empty_messages_graceful(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t prov;
     sc_ollama_create(&alloc, NULL, 0, NULL, 0, &prov);
-    sc_chat_request_t req = {.messages = NULL, .messages_count = 0, .model = "llama2", .model_len = 6,
-                             .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-                             .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_request_t req = {.messages = NULL,
+                             .messages_count = 0,
+                             .model = "llama2",
+                             .model_len = 6,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "llama2", 6, 0.7, &resp);
-    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT || err == SC_ERR_PROVIDER_RESPONSE);
+    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT ||
+                   err == SC_ERR_PROVIDER_RESPONSE);
     if (err == SC_OK && resp.content)
         alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     if (prov.vtable->deinit)
@@ -1048,7 +1084,8 @@ static void test_openrouter_chat_null_request_returns_error(void) {
     sc_provider_t prov;
     sc_openrouter_create(&alloc, "key", 3, NULL, 0, &prov);
     sc_chat_response_t resp = {0};
-    sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, NULL, "anthropic/claude-3", 18, 0.7, &resp);
+    sc_error_t err =
+        prov.vtable->chat(prov.ctx, &alloc, NULL, "anthropic/claude-3", 18, 0.7, &resp);
     SC_ASSERT_NEQ(err, SC_OK);
     if (prov.vtable->deinit)
         prov.vtable->deinit(prov.ctx, &alloc);
@@ -1058,12 +1095,21 @@ static void test_openrouter_chat_empty_messages_graceful(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t prov;
     sc_openrouter_create(&alloc, "key", 3, NULL, 0, &prov);
-    sc_chat_request_t req = {.messages = NULL, .messages_count = 0, .model = "openai/gpt-4", .model_len = 14,
-                             .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-                             .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_request_t req = {.messages = NULL,
+                             .messages_count = 0,
+                             .model = "openai/gpt-4",
+                             .model_len = 14,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "openai/gpt-4", 14, 0.7, &resp);
-    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT || err == SC_ERR_PROVIDER_RESPONSE);
+    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT ||
+                   err == SC_ERR_PROVIDER_RESPONSE);
     if (err == SC_OK)
         sc_chat_response_free(&alloc, &resp);
     if (prov.vtable->deinit)
@@ -1357,12 +1403,21 @@ static void test_compatible_chat_empty_messages_graceful(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t prov;
     sc_compatible_create(&alloc, "key", 3, "http://localhost:1234", 21, &prov);
-    sc_chat_request_t req = {.messages = NULL, .messages_count = 0, .model = "model", .model_len = 5,
-                             .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-                             .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_request_t req = {.messages = NULL,
+                             .messages_count = 0,
+                             .model = "model",
+                             .model_len = 5,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "model", 5, 0.7, &resp);
-    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT || err == SC_ERR_PROVIDER_RESPONSE);
+    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT ||
+                   err == SC_ERR_PROVIDER_RESPONSE);
     if (err == SC_OK)
         sc_chat_response_free(&alloc, &resp);
     if (prov.vtable->deinit)
@@ -1442,12 +1497,21 @@ static void test_claude_cli_chat_empty_messages_graceful(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t prov;
     sc_claude_cli_create(&alloc, NULL, 0, NULL, 0, &prov);
-    sc_chat_request_t req = {.messages = NULL, .messages_count = 0, .model = "claude-3", .model_len = 8,
-                             .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-                             .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_request_t req = {.messages = NULL,
+                             .messages_count = 0,
+                             .model = "claude-3",
+                             .model_len = 8,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "claude-3", 8, 0.7, &resp);
-    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT || err == SC_ERR_PROVIDER_RESPONSE);
+    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT ||
+                   err == SC_ERR_PROVIDER_RESPONSE);
     if (err == SC_OK && resp.content)
         alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     if (prov.vtable->deinit)
@@ -1949,9 +2013,17 @@ static void test_codex_cli_chat_empty_messages_graceful(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t prov;
     sc_codex_cli_create(&alloc, NULL, 0, NULL, 0, &prov);
-    sc_chat_request_t req = {.messages = NULL, .messages_count = 0, .model = "codex-mini", .model_len = 10,
-                             .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-                             .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_request_t req = {.messages = NULL,
+                             .messages_count = 0,
+                             .model = "codex-mini",
+                             .model_len = 10,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "codex-mini", 10, 0.7, &resp);
     SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT);
@@ -2035,12 +2107,21 @@ static void test_openai_codex_chat_empty_messages_graceful(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t prov;
     sc_openai_codex_create(&alloc, "key", 3, NULL, 0, &prov);
-    sc_chat_request_t req = {.messages = NULL, .messages_count = 0, .model = "o4-mini", .model_len = 7,
-                             .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-                             .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_request_t req = {.messages = NULL,
+                             .messages_count = 0,
+                             .model = "o4-mini",
+                             .model_len = 7,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "o4-mini", 7, 0.7, &resp);
-    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT || err == SC_ERR_PROVIDER_RESPONSE);
+    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT ||
+                   err == SC_ERR_PROVIDER_RESPONSE);
     if (err == SC_OK && resp.content)
         alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     if (prov.vtable->deinit)
@@ -2594,7 +2675,7 @@ static void test_compatible_structured_output_json_mode(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t prov;
     sc_compatible_create(&alloc, "key", 3, "https://api.example.com/v1/chat/completions", 44,
-                        &prov);
+                         &prov);
     sc_chat_message_t msgs[1] = {make_user_msg("respond in JSON", 15)};
     sc_chat_request_t req = make_simple_request(msgs, 1);
     req.response_format = "json_object";

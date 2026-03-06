@@ -38,15 +38,22 @@ static size_t base64url_encode(const unsigned char *in, size_t in_len, char *out
     size_t pos = 0;
     for (size_t i = 0; i < in_len; i += 3) {
         uint32_t v = (uint32_t)in[i] << 16;
-        if (i + 1 < in_len) v |= (uint32_t)in[i + 1] << 8;
-        if (i + 2 < in_len) v |= (uint32_t)in[i + 2];
+        if (i + 1 < in_len)
+            v |= (uint32_t)in[i + 1] << 8;
+        if (i + 2 < in_len)
+            v |= (uint32_t)in[i + 2];
 
-        if (pos < out_cap) out[pos++] = b64url_table[(v >> 18) & 0x3F];
-        if (pos < out_cap) out[pos++] = b64url_table[(v >> 12) & 0x3F];
-        if (i + 1 < in_len && pos < out_cap) out[pos++] = b64url_table[(v >> 6) & 0x3F];
-        if (i + 2 < in_len && pos < out_cap) out[pos++] = b64url_table[v & 0x3F];
+        if (pos < out_cap)
+            out[pos++] = b64url_table[(v >> 18) & 0x3F];
+        if (pos < out_cap)
+            out[pos++] = b64url_table[(v >> 12) & 0x3F];
+        if (i + 1 < in_len && pos < out_cap)
+            out[pos++] = b64url_table[(v >> 6) & 0x3F];
+        if (i + 2 < in_len && pos < out_cap)
+            out[pos++] = b64url_table[v & 0x3F];
     }
-    if (pos < out_cap) out[pos] = '\0';
+    if (pos < out_cap)
+        out[pos] = '\0';
     return pos;
 }
 
@@ -69,8 +76,8 @@ static char *apns_build_jwt(sc_allocator_t *alloc, const char *key_pem, size_t k
 
     /* JWT header: {"alg":"ES256","kid":"<key_id>"} */
     char header_json[128];
-    int hlen = snprintf(header_json, sizeof(header_json),
-                        "{\"alg\":\"ES256\",\"kid\":\"%s\"}", key_id);
+    int hlen =
+        snprintf(header_json, sizeof(header_json), "{\"alg\":\"ES256\",\"kid\":\"%s\"}", key_id);
     if (hlen <= 0 || (size_t)hlen >= sizeof(header_json)) {
         EVP_PKEY_free(pkey);
         return NULL;
@@ -78,8 +85,8 @@ static char *apns_build_jwt(sc_allocator_t *alloc, const char *key_pem, size_t k
 
     /* JWT payload: {"iss":"<team_id>","iat":<timestamp>} */
     char payload_json[128];
-    int plen = snprintf(payload_json, sizeof(payload_json),
-                        "{\"iss\":\"%s\",\"iat\":%lld}", team_id, (long long)time(NULL));
+    int plen = snprintf(payload_json, sizeof(payload_json), "{\"iss\":\"%s\",\"iat\":%lld}",
+                        team_id, (long long)time(NULL));
     if (plen <= 0 || (size_t)plen >= sizeof(payload_json)) {
         EVP_PKEY_free(pkey);
         return NULL;
@@ -87,15 +94,15 @@ static char *apns_build_jwt(sc_allocator_t *alloc, const char *key_pem, size_t k
 
     /* Base64url encode header and payload */
     char header_b64[256], payload_b64[256];
-    size_t h64 = base64url_encode((const unsigned char *)header_json, (size_t)hlen,
-                                  header_b64, sizeof(header_b64));
-    size_t p64 = base64url_encode((const unsigned char *)payload_json, (size_t)plen,
-                                  payload_b64, sizeof(payload_b64));
+    size_t h64 = base64url_encode((const unsigned char *)header_json, (size_t)hlen, header_b64,
+                                  sizeof(header_b64));
+    size_t p64 = base64url_encode((const unsigned char *)payload_json, (size_t)plen, payload_b64,
+                                  sizeof(payload_b64));
 
     /* Signing input: header.payload */
     char signing_input[600];
-    int si_len = snprintf(signing_input, sizeof(signing_input), "%.*s.%.*s",
-                          (int)h64, header_b64, (int)p64, payload_b64);
+    int si_len = snprintf(signing_input, sizeof(signing_input), "%.*s.%.*s", (int)h64, header_b64,
+                          (int)p64, payload_b64);
     if (si_len <= 0 || (size_t)si_len >= sizeof(signing_input)) {
         EVP_PKEY_free(pkey);
         return NULL;
@@ -116,8 +123,8 @@ static char *apns_build_jwt(sc_allocator_t *alloc, const char *key_pem, size_t k
         EVP_PKEY_free(pkey);
         return NULL;
     }
-    rc = EVP_DigestSign(mdctx, sig_der, &sig_der_len,
-                        (const unsigned char *)signing_input, (size_t)si_len);
+    rc = EVP_DigestSign(mdctx, sig_der, &sig_der_len, (const unsigned char *)signing_input,
+                        (size_t)si_len);
     EVP_MD_CTX_free(mdctx);
     EVP_PKEY_free(pkey);
     if (rc != 1)
@@ -127,24 +134,35 @@ static char *apns_build_jwt(sc_allocator_t *alloc, const char *key_pem, size_t k
      * DER: 30 <len> 02 <rlen> <R> 02 <slen> <S> */
     unsigned char r_s[64];
     memset(r_s, 0, 64);
-    if (sig_der_len < 8 || sig_der[0] != 0x30) return NULL;
+    if (sig_der_len < 8 || sig_der[0] != 0x30)
+        return NULL;
     const unsigned char *p = sig_der + 2;
-    if (*p != 0x02) return NULL;
+    if (*p != 0x02)
+        return NULL;
     p++;
     size_t rlen = *p++;
     const unsigned char *r_ptr = p;
     p += rlen;
-    if (*p != 0x02) return NULL;
+    if (*p != 0x02)
+        return NULL;
     p++;
     size_t slen = *p++;
     const unsigned char *s_ptr = p;
 
     /* Copy R (right-aligned into 32 bytes, skip leading zero) */
-    if (rlen > 32 && r_ptr[0] == 0x00) { r_ptr++; rlen--; }
-    if (rlen <= 32) memcpy(r_s + 32 - rlen, r_ptr, rlen);
+    if (rlen > 32 && r_ptr[0] == 0x00) {
+        r_ptr++;
+        rlen--;
+    }
+    if (rlen <= 32)
+        memcpy(r_s + 32 - rlen, r_ptr, rlen);
     /* Copy S (right-aligned into 32 bytes, skip leading zero) */
-    if (slen > 32 && s_ptr[0] == 0x00) { s_ptr++; slen--; }
-    if (slen <= 32) memcpy(r_s + 64 - slen, s_ptr, slen);
+    if (slen > 32 && s_ptr[0] == 0x00) {
+        s_ptr++;
+        slen--;
+    }
+    if (slen <= 32)
+        memcpy(r_s + 64 - slen, s_ptr, slen);
 
     /* Base64url encode the 64-byte R||S */
     char sig_b64[128];
@@ -153,7 +171,8 @@ static char *apns_build_jwt(sc_allocator_t *alloc, const char *key_pem, size_t k
     /* Assemble JWT: header.payload.signature */
     size_t jwt_len = (size_t)si_len + 1 + s64;
     char *jwt = (char *)alloc->alloc(alloc->ctx, jwt_len + 1);
-    if (!jwt) return NULL;
+    if (!jwt)
+        return NULL;
     snprintf(jwt, jwt_len + 1, "%s.%.*s", signing_input, (int)s64, sig_b64);
     return jwt;
 }
@@ -163,7 +182,10 @@ static sc_error_t sc_push_apns_send(sc_push_manager_t *mgr, const char *device_t
                                     const char *title, const char *body, const char *data_json) {
     (void)data_json;
 #if !defined(SC_HAS_TLS)
-    (void)mgr; (void)device_token; (void)title; (void)body;
+    (void)mgr;
+    (void)device_token;
+    (void)title;
+    (void)body;
     return SC_ERR_NOT_SUPPORTED;
 #else
     if (!mgr->config.server_key || mgr->config.server_key_len == 0)
@@ -177,8 +199,8 @@ static sc_error_t sc_push_apns_send(sc_push_manager_t *mgr, const char *device_t
         return SC_ERR_INVALID_ARGUMENT;
 
     /* Build URL */
-    const char *base = (mgr->config.endpoint && mgr->config.endpoint[0])
-                           ? mgr->config.endpoint : SC_APNS_URL_BASE;
+    const char *base =
+        (mgr->config.endpoint && mgr->config.endpoint[0]) ? mgr->config.endpoint : SC_APNS_URL_BASE;
     size_t url_cap = strlen(base) + strlen(device_token) + 1;
     char *url = (char *)mgr->alloc->alloc(mgr->alloc->ctx, url_cap);
     if (!url) {

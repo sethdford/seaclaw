@@ -3,9 +3,9 @@
 
 #include "seaclaw/agent/mailbox.h"
 #include "seaclaw/agent/spawn.h"
+#include "seaclaw/agent/task_list.h"
 #include "seaclaw/agent/team.h"
 #include "seaclaw/agent/worktree.h"
-#include "seaclaw/agent/task_list.h"
 #include "seaclaw/channel.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/arena.h"
@@ -47,10 +47,10 @@ typedef struct sc_agent sc_agent_t;
 
 /* Optional context pressure config. Pass to sc_agent_from_config; NULL = use defaults. */
 typedef struct sc_agent_context_config {
-    uint64_t token_limit;       /* 0 = resolve from model at runtime */
-    float pressure_warn;        /* warn at this ratio (default 0.85) */
-    float pressure_compact;     /* auto-compact at this ratio (default 0.95) */
-    float compact_target;      /* compact until below this ratio (default 0.70) */
+    uint64_t token_limit;   /* 0 = resolve from model at runtime */
+    float pressure_warn;    /* warn at this ratio (default 0.85) */
+    float pressure_compact; /* auto-compact at this ratio (default 0.95) */
+    float compact_target;   /* compact until below this ratio (default 0.70) */
 } sc_agent_context_config_t;
 
 /* Called when a tool needs user approval before execution.
@@ -127,8 +127,8 @@ struct sc_agent {
     struct sc_undo_stack *undo_stack;
 
     /* Intelligence features */
-    bool chain_of_thought;      /* inject reasoning instructions into prompt */
-    char *persona_prompt;       /* custom identity override; owned */
+    bool chain_of_thought; /* inject reasoning instructions into prompt */
+    char *persona_prompt;  /* custom identity override; owned */
     size_t persona_prompt_len;
 };
 

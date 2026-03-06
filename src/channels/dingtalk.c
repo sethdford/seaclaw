@@ -218,8 +218,7 @@ sc_error_t sc_dingtalk_create(sc_allocator_t *alloc, const char *webhook_or_toke
         out->vtable = &dingtalk_vtable;
         return SC_OK;
     }
-    if (webhook_or_token_len >= 8 &&
-        strncmp(webhook_or_token, "https://", 8) == 0) {
+    if (webhook_or_token_len >= 8 && strncmp(webhook_or_token, "https://", 8) == 0) {
         c->webhook_url = (char *)malloc(webhook_or_token_len + 1);
         if (!c->webhook_url) {
             free(c);

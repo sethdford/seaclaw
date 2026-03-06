@@ -5,11 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SC_WORKTREE_PATH_FMT "%s/../.worktrees/%s"
+#define SC_WORKTREE_PATH_FMT   "%s/../.worktrees/%s"
 #define SC_WORKTREE_BRANCH_FMT "agent/%llu/%s"
-#define SC_WORKTREE_CMD_ADD "git worktree add %s -b %s"
+#define SC_WORKTREE_CMD_ADD    "git worktree add %s -b %s"
 #define SC_WORKTREE_CMD_REMOVE "git worktree remove %s --force"
-#define SC_WORKTREE_INIT_CAP 8
+#define SC_WORKTREE_INIT_CAP   8
 
 struct sc_worktree_manager {
     sc_allocator_t *alloc;
@@ -19,8 +19,7 @@ struct sc_worktree_manager {
     size_t capacity;
 };
 
-static sc_worktree_t *find_by_agent_id(sc_worktree_manager_t *mgr,
-    uint64_t agent_id) {
+static sc_worktree_t *find_by_agent_id(sc_worktree_manager_t *mgr, uint64_t agent_id) {
     for (size_t i = 0; i < mgr->count; i++) {
         if (mgr->worktrees[i].agent_id == agent_id && mgr->worktrees[i].active)
             return &mgr->worktrees[i];
@@ -49,18 +48,15 @@ static sc_error_t run_git_cmd(const char *repo_root, const char *fmt, ...) {
 static sc_error_t grow_if_needed(sc_worktree_manager_t *mgr) {
     if (mgr->count < mgr->capacity)
         return SC_OK;
-    size_t new_cap = mgr->capacity == 0 ? SC_WORKTREE_INIT_CAP
-                                        : mgr->capacity * 2;
+    size_t new_cap = mgr->capacity == 0 ? SC_WORKTREE_INIT_CAP : mgr->capacity * 2;
     sc_worktree_t *n =
-        (sc_worktree_t *)mgr->alloc->alloc(mgr->alloc->ctx,
-            new_cap * sizeof(sc_worktree_t));
+        (sc_worktree_t *)mgr->alloc->alloc(mgr->alloc->ctx, new_cap * sizeof(sc_worktree_t));
     if (!n)
         return SC_ERR_OUT_OF_MEMORY;
     memset(n, 0, new_cap * sizeof(sc_worktree_t));
     if (mgr->worktrees) {
         memcpy(n, mgr->worktrees, mgr->count * sizeof(sc_worktree_t));
-        mgr->alloc->free(mgr->alloc->ctx, mgr->worktrees,
-            mgr->capacity * sizeof(sc_worktree_t));
+        mgr->alloc->free(mgr->alloc->ctx, mgr->worktrees, mgr->capacity * sizeof(sc_worktree_t));
     }
     mgr->worktrees = n;
     mgr->capacity = new_cap;
@@ -80,12 +76,10 @@ static void free_worktree(sc_allocator_t *a, sc_worktree_t *wt) {
     }
 }
 
-sc_worktree_manager_t *sc_worktree_manager_create(sc_allocator_t *alloc,
-    const char *repo_root) {
+sc_worktree_manager_t *sc_worktree_manager_create(sc_allocator_t *alloc, const char *repo_root) {
     if (!alloc || !repo_root)
         return NULL;
-    sc_worktree_manager_t *mgr =
-        (sc_worktree_manager_t *)alloc->alloc(alloc->ctx, sizeof(*mgr));
+    sc_worktree_manager_t *mgr = (sc_worktree_manager_t *)alloc->alloc(alloc->ctx, sizeof(*mgr));
     if (!mgr)
         return NULL;
     memset(mgr, 0, sizeof(*mgr));
@@ -112,8 +106,8 @@ void sc_worktree_manager_destroy(sc_worktree_manager_t *mgr) {
     a->free(a->ctx, mgr, sizeof(*mgr));
 }
 
-sc_error_t sc_worktree_create(sc_worktree_manager_t *mgr, uint64_t agent_id,
-    const char *label, const char **out_path) {
+sc_error_t sc_worktree_create(sc_worktree_manager_t *mgr, uint64_t agent_id, const char *label,
+                              const char **out_path) {
     if (!mgr || !out_path)
         return SC_ERR_INVALID_ARGUMENT;
     if (find_by_agent_id(mgr, agent_id))
@@ -122,12 +116,10 @@ sc_error_t sc_worktree_create(sc_worktree_manager_t *mgr, uint64_t agent_id,
     const char *lbl = (label && label[0]) ? label : "agent";
     char path[1024];
     char branch[256];
-    int n = snprintf(path, sizeof(path), SC_WORKTREE_PATH_FMT, mgr->repo_root,
-        lbl);
+    int n = snprintf(path, sizeof(path), SC_WORKTREE_PATH_FMT, mgr->repo_root, lbl);
     if (n < 0 || (size_t)n >= sizeof(path))
         return SC_ERR_INVALID_ARGUMENT;
-    n = snprintf(branch, sizeof(branch), SC_WORKTREE_BRANCH_FMT,
-        (unsigned long long)agent_id, lbl);
+    n = snprintf(branch, sizeof(branch), SC_WORKTREE_BRANCH_FMT, (unsigned long long)agent_id, lbl);
     if (n < 0 || (size_t)n >= sizeof(branch))
         return SC_ERR_INVALID_ARGUMENT;
 
@@ -171,8 +163,7 @@ sc_error_t sc_worktree_remove(sc_worktree_manager_t *mgr, uint64_t agent_id) {
     return SC_OK;
 }
 
-sc_error_t sc_worktree_list(sc_worktree_manager_t *mgr, sc_worktree_t **out,
-    size_t *count) {
+sc_error_t sc_worktree_list(sc_worktree_manager_t *mgr, sc_worktree_t **out, size_t *count) {
     if (!mgr || !out || !count)
         return SC_ERR_INVALID_ARGUMENT;
     *out = NULL;
@@ -186,8 +177,7 @@ sc_error_t sc_worktree_list(sc_worktree_manager_t *mgr, sc_worktree_t **out,
         return SC_OK;
 
     sc_worktree_t *arr =
-        (sc_worktree_t *)mgr->alloc->alloc(mgr->alloc->ctx,
-            n * sizeof(sc_worktree_t));
+        (sc_worktree_t *)mgr->alloc->alloc(mgr->alloc->ctx, n * sizeof(sc_worktree_t));
     if (!arr)
         return SC_ERR_OUT_OF_MEMORY;
 
@@ -207,16 +197,14 @@ sc_error_t sc_worktree_list(sc_worktree_manager_t *mgr, sc_worktree_t **out,
     return SC_OK;
 }
 
-const char *sc_worktree_path_for_agent(sc_worktree_manager_t *mgr,
-    uint64_t agent_id) {
+const char *sc_worktree_path_for_agent(sc_worktree_manager_t *mgr, uint64_t agent_id) {
     if (!mgr)
         return NULL;
     sc_worktree_t *wt = find_by_agent_id(mgr, agent_id);
     return wt ? wt->path : NULL;
 }
 
-void sc_worktree_list_free(sc_allocator_t *alloc, sc_worktree_t *list,
-    size_t count) {
+void sc_worktree_list_free(sc_allocator_t *alloc, sc_worktree_t *list, size_t count) {
     if (!alloc || !list)
         return;
     for (size_t i = 0; i < count; i++)

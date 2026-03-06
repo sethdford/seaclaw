@@ -8,12 +8,12 @@
 #include <string.h>
 
 #define TOOL_NAME "send_message"
-#define TOOL_DESC                                                                              \
-    "Send a message to a teammate agent. Use when coordinating with other agents in a team. "   \
+#define TOOL_DESC                                                                             \
+    "Send a message to a teammate agent. Use when coordinating with other agents in a team. " \
     "Provide the target agent ID (as a number) and the message content."
-#define TOOL_PARAMS                                                                          \
-    "{\"type\":\"object\",\"properties\":{"                                                \
-    "\"to_agent\":{\"type\":\"number\",\"description\":\"Target agent ID (numeric)\"},"   \
+#define TOOL_PARAMS                                                                     \
+    "{\"type\":\"object\",\"properties\":{"                                             \
+    "\"to_agent\":{\"type\":\"number\",\"description\":\"Target agent ID (numeric)\"}," \
     "\"message\":{\"type\":\"string\",\"description\":\"Message content to send\"}"     \
     "},\"required\":[\"to_agent\",\"message\"]}"
 
@@ -22,8 +22,7 @@ typedef struct {
 } send_message_ctx_t;
 
 static sc_error_t send_message_execute(void *ctx, sc_allocator_t *alloc,
-                                       const sc_json_value_t *args,
-                                       sc_tool_result_t *out) {
+                                       const sc_json_value_t *args, sc_tool_result_t *out) {
     send_message_ctx_t *c = (send_message_ctx_t *)ctx;
     if (!out)
         return SC_ERR_INVALID_ARGUMENT;
@@ -67,8 +66,8 @@ static sc_error_t send_message_execute(void *ctx, sc_allocator_t *alloc,
     size_t msg_len = strlen(message);
     uint64_t from_agent = (uint64_t)(uintptr_t)agent;
 
-    sc_error_t err = sc_mailbox_send(c->mailbox, from_agent, to_agent, SC_MSG_TASK, message,
-                                     msg_len, 0);
+    sc_error_t err =
+        sc_mailbox_send(c->mailbox, from_agent, to_agent, SC_MSG_TASK, message, msg_len, 0);
     if (err != SC_OK) {
         if (err == SC_ERR_NOT_FOUND)
             *out = sc_tool_result_fail("target agent not found", 23);
@@ -110,8 +109,7 @@ static const sc_tool_vtable_t send_message_vtable = {
     .deinit = send_message_deinit,
 };
 
-sc_error_t sc_send_message_create(sc_allocator_t *alloc, sc_mailbox_t *mailbox,
-                                  sc_tool_t *out) {
+sc_error_t sc_send_message_create(sc_allocator_t *alloc, sc_mailbox_t *mailbox, sc_tool_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
     send_message_ctx_t *ctx =

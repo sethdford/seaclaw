@@ -2,8 +2,8 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define SC_CONTEXT_DEFAULT_SYSTEM "You are a helpful AI assistant."

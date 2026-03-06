@@ -1,19 +1,19 @@
 /* Adversarial security tests - path traversal, command injection, edge cases. */
-#include "test_framework.h"
-#include "seaclaw/security.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
-#include <string.h>
+#include "seaclaw/security.h"
+#include "test_framework.h"
 #include <stdlib.h>
+#include <string.h>
 
-static const char *allowed[] = { "cat", "ls", "echo" };
+static const char *allowed[] = {"cat", "ls", "echo"};
 static const size_t allowed_len = 3;
 
 static void test_path_traversal_unix(void) {
     sc_security_policy_t policy = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
         .workspace_dir = "/tmp/workspace",
-        .allowed_paths = (const char *[]){ "/tmp/workspace" },
+        .allowed_paths = (const char *[]){"/tmp/workspace"},
         .allowed_paths_count = 1,
     };
     SC_ASSERT_FALSE(sc_security_path_allowed(&policy, "../../etc/passwd", 16));
@@ -23,7 +23,7 @@ static void test_path_traversal_unix(void) {
 static void test_path_traversal_windows(void) {
     sc_security_policy_t policy = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
-        .allowed_paths = (const char *[]){ "C:\\workspace" },
+        .allowed_paths = (const char *[]){"C:\\workspace"},
         .allowed_paths_count = 1,
     };
     SC_ASSERT_FALSE(sc_security_path_allowed(&policy, "..\\..\\windows\\system32", 22));

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-06T19:52:10.449Z",
+  "generated": "2026-03-06T20:02:44.267Z",
   "groups": {
     "color.neutral": [
       {
@@ -2628,6 +2628,84 @@
       {
         "name": "refraction-scale",
         "value": "3"
+      }
+    ],
+    "dynamic-light": [
+      {
+        "name": "angle",
+        "value": "225deg"
+      },
+      {
+        "name": "intensity",
+        "value": "0.15"
+      },
+      {
+        "name": "spread",
+        "value": "60%"
+      },
+      {
+        "name": "color-dark",
+        "value": "rgba(255,255,255,0.12)"
+      },
+      {
+        "name": "color-light",
+        "value": "rgba(255,255,255,0.18)"
+      },
+      {
+        "name": "ambient",
+        "value": "0.04"
+      }
+    ],
+    "vibrancy": [
+      {
+        "name": "text-boost",
+        "value": "1.15"
+      },
+      {
+        "name": "icon-boost",
+        "value": "1.2"
+      },
+      {
+        "name": "backdrop-brightness",
+        "value": "1.08"
+      },
+      {
+        "name": "text-shadow",
+        "value": "0 0 8px rgba(0,0,0,0.5)"
+      }
+    ],
+    "interactive": [
+      {
+        "name": "press-blur-delta",
+        "value": "-4px"
+      },
+      {
+        "name": "press-scale",
+        "value": "0.98"
+      },
+      {
+        "name": "press-saturate-boost",
+        "value": "20%"
+      },
+      {
+        "name": "hover-specular-boost",
+        "value": "1.4"
+      },
+      {
+        "name": "hover-border-glow",
+        "value": "0 0 0 1px rgba(255,255,255,0.08)"
+      },
+      {
+        "name": "focus-glow-spread",
+        "value": "8px"
+      },
+      {
+        "name": "focus-glow-color",
+        "value": "rgba(20,184,166,0.35)"
+      },
+      {
+        "name": "transition-duration",
+        "value": "200ms"
       }
     ]
   }

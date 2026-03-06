@@ -162,7 +162,8 @@ static canvas_doc_t *canvas_find(canvas_ctx_t *c, const char *id) {
 static sc_error_t canvas_execute(void *ctx, sc_allocator_t *alloc, const sc_json_value_t *args,
                                  sc_tool_result_t *out) {
     canvas_ctx_t *c = (canvas_ctx_t *)ctx;
-    if (!out) return SC_ERR_INVALID_ARGUMENT;
+    if (!out)
+        return SC_ERR_INVALID_ARGUMENT;
     if (!args) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;
@@ -181,7 +182,8 @@ static sc_error_t canvas_execute(void *ctx, sc_allocator_t *alloc, const sc_json
         const char *content = sc_json_get_string(args, "content");
         char id_buf[16];
         int n = snprintf(id_buf, sizeof(id_buf), "doc_%u", c->next_id++);
-        if (n < 0) n = 0;
+        if (n < 0)
+            n = 0;
         c->docs[c->count].id = sc_strndup(c->alloc, id_buf, (size_t)n);
         c->docs[c->count].title = title ? sc_strndup(c->alloc, title, strlen(title)) : NULL;
         c->docs[c->count].content =

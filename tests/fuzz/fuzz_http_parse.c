@@ -3,16 +3,18 @@
  * via extract_header - the same path used for WebSocket upgrade detection
  * and HTTP header extraction in gateway.c. */
 #include "seaclaw/gateway/ws_server.h"
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    if (size > 16384) return 0;
+    if (size > 16384)
+        return 0;
 
     char *buf = malloc(size + 1);
-    if (!buf) return 0;
+    if (!buf)
+        return 0;
     memcpy(buf, data, size);
     buf[size] = '\0';
 

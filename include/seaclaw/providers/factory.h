@@ -8,7 +8,7 @@
 
 struct sc_config;
 sc_error_t sc_provider_create_from_config(sc_allocator_t *alloc, const struct sc_config *cfg,
-                                         const char *name, size_t name_len, sc_provider_t *out);
+                                          const char *name, size_t name_len, sc_provider_t *out);
 
 sc_error_t sc_provider_create(sc_allocator_t *alloc, const char *name, size_t name_len,
                               const char *api_key, size_t api_key_len, const char *base_url,

@@ -1,7 +1,6 @@
 #include "seaclaw/agent/awareness.h"
-#include <string.h>
 #include <stdio.h>
-#include <time.h>
+#include <string.h>
 #include <time.h>
 
 static uint64_t now_ms(void) {
@@ -119,8 +118,7 @@ char *sc_awareness_context(const sc_awareness_t *aw, sc_allocator_t *alloc, size
     }
 
     if (has_errors) {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                                "- Recent errors (%llu total):\n",
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "- Recent errors (%llu total):\n",
                                 (unsigned long long)s->total_errors);
         size_t nerr = s->total_errors < SC_AWARENESS_MAX_RECENT_ERRORS
                           ? s->total_errors

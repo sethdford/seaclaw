@@ -3,8 +3,8 @@
 #include <string.h>
 
 char *sc_episodic_summarize_session(sc_allocator_t *alloc, const char *const *messages,
-                                   const size_t *message_lens, size_t message_count,
-                                   size_t *out_len) {
+                                    const size_t *message_lens, size_t message_count,
+                                    size_t *out_len) {
     if (!alloc || !messages || !message_lens || message_count == 0)
         return NULL;
 
@@ -82,8 +82,8 @@ sc_error_t sc_episodic_load(sc_memory_t *memory, sc_allocator_t *alloc, char **o
     sc_memory_entry_t *entries = NULL;
     size_t count = 0;
     sc_error_t err = memory->vtable->recall(memory->ctx, alloc, SC_EPISODIC_KEY_PREFIX,
-                                            SC_EPISODIC_KEY_PREFIX_LEN, SC_EPISODIC_MAX_LOAD, "",
-                                            0, &entries, &count);
+                                            SC_EPISODIC_KEY_PREFIX_LEN, SC_EPISODIC_MAX_LOAD, "", 0,
+                                            &entries, &count);
     if (err != SC_OK || !entries || count == 0)
         return SC_OK;
 

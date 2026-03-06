@@ -1,7 +1,7 @@
 /* Session manager tests */
-#include "test_framework.h"
-#include "seaclaw/session.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/session.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -305,7 +305,6 @@ static void test_session_patch_not_found(void) {
     SC_ASSERT_EQ(err, SC_ERR_NOT_FOUND);
     sc_session_manager_deinit(&mgr);
 }
-
 
 static void test_session_save_load_roundtrip(void) {
     sc_allocator_t alloc = sc_system_allocator();

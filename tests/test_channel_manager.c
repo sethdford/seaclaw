@@ -1,9 +1,9 @@
 /* Channel manager tests */
-#include "test_framework.h"
+#include "seaclaw/bus.h"
 #include "seaclaw/channel_manager.h"
 #include "seaclaw/channels/cli.h"
 #include "seaclaw/core/allocator.h"
-#include "seaclaw/bus.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_channel_manager_init_deinit(void) {

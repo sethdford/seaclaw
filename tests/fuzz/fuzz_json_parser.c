@@ -1,14 +1,16 @@
-#include "seaclaw/core/json.h"
 #include "seaclaw/core/allocator.h"
-#include <stdint.h>
+#include "seaclaw/core/json.h"
 #include <stddef.h>
+#include <stdint.h>
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    if (size > 65536) return 0;
+    if (size > 65536)
+        return 0;
 
     sc_allocator_t alloc = sc_system_allocator();
     char *buf = alloc.alloc(alloc.ctx, size + 1);
-    if (!buf) return 0;
+    if (!buf)
+        return 0;
     __builtin_memcpy(buf, data, size);
     buf[size] = '\0';
 

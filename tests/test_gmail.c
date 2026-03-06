@@ -1,9 +1,9 @@
 #if SC_HAS_GMAIL
-#include "seaclaw/channels/gmail.h"
 #include "seaclaw/channel.h"
+#include "seaclaw/channel_loop.h"
+#include "seaclaw/channels/gmail.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
-#include "seaclaw/channel_loop.h"
 #include "test_framework.h"
 #include <string.h>
 
@@ -61,8 +61,8 @@ static void test_gmail_base64url_url_chars(void) {
 static void test_gmail_create_destroy(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_channel_t ch;
-    sc_error_t err = sc_gmail_create(&alloc, "client_id", 6, "client_secret", 13, "refresh_token",
-                                    13, 60, &ch);
+    sc_error_t err =
+        sc_gmail_create(&alloc, "client_id", 6, "client_secret", 13, "refresh_token", 13, 60, &ch);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(ch.ctx);
     SC_ASSERT_STR_EQ(ch.vtable->name(ch.ctx), "gmail");
@@ -71,15 +71,15 @@ static void test_gmail_create_destroy(void) {
 
 static void test_gmail_create_null_alloc(void) {
     sc_channel_t ch;
-    sc_error_t err = sc_gmail_create(NULL, "client_id", 6, "client_secret", 13, "refresh_token",
-                                    13, 60, &ch);
+    sc_error_t err =
+        sc_gmail_create(NULL, "client_id", 6, "client_secret", 13, "refresh_token", 13, 60, &ch);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
 
 static void test_gmail_create_null_out(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_error_t err = sc_gmail_create(&alloc, "client_id", 6, "client_secret", 13, "refresh_token",
-                                    13, 60, NULL);
+    sc_error_t err =
+        sc_gmail_create(&alloc, "client_id", 6, "client_secret", 13, "refresh_token", 13, 60, NULL);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
 

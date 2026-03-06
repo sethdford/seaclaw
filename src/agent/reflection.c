@@ -70,9 +70,9 @@ sc_reflection_quality_t sc_reflection_evaluate(const char *user_query, size_t us
 }
 
 sc_error_t sc_reflection_build_critique_prompt(sc_allocator_t *alloc, const char *user_query,
-                                              size_t user_query_len, const char *response,
-                                              size_t response_len, char **out_prompt,
-                                              size_t *out_prompt_len) {
+                                               size_t user_query_len, const char *response,
+                                               size_t response_len, char **out_prompt,
+                                               size_t *out_prompt_len) {
     if (!alloc || !out_prompt)
         return SC_ERR_INVALID_ARGUMENT;
 

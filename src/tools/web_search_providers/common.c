@@ -13,6 +13,8 @@ sc_error_t sc_web_search_url_encode(sc_allocator_t *alloc, const char *input, si
                                     char **out, size_t *out_len) {
     if (!alloc || !out || !out_len)
         return SC_ERR_INVALID_ARGUMENT;
+    if (input_len > (SIZE_MAX - 1) / 3)
+        return SC_ERR_INVALID_ARGUMENT;
     size_t cap = input_len * 3 + 1;
     if (cap < 64)
         cap = 64;
@@ -33,11 +35,13 @@ sc_error_t sc_web_search_url_encode(sc_allocator_t *alloc, const char *input, si
         }
     }
     buf[j] = '\0';
-    /* Shrink to exact size so caller can free(len+1) */
     if (j + 1 < cap) {
         char *t = (char *)alloc->realloc(alloc->ctx, buf, cap, j + 1);
-        if (t)
-            buf = t;
+        if (!t) {
+            alloc->free(alloc->ctx, buf, cap);
+            return SC_ERR_OUT_OF_MEMORY;
+        }
+        buf = t;
     }
     *out = buf;
     *out_len = j;

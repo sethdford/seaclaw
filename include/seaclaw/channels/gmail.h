@@ -9,9 +9,9 @@
 #include <stddef.h>
 
 sc_error_t sc_gmail_create(sc_allocator_t *alloc, const char *client_id, size_t client_id_len,
-                          const char *client_secret, size_t client_secret_len,
-                          const char *refresh_token, size_t refresh_token_len, int poll_interval_sec,
-                          sc_channel_t *out);
+                           const char *client_secret, size_t client_secret_len,
+                           const char *refresh_token, size_t refresh_token_len,
+                           int poll_interval_sec, sc_channel_t *out);
 
 void sc_gmail_destroy(sc_channel_t *ch);
 

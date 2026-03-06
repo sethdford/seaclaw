@@ -283,8 +283,7 @@ static sc_error_t anthropic_chat(void *ctx, sc_allocator_t *alloc, const sc_chat
              memcmp(request->response_format, "json", 4) == 0)) {
             sc_json_value_t *rf_obj = sc_json_object_new(alloc);
             if (rf_obj) {
-                sc_json_object_set(alloc, rf_obj, "type",
-                    sc_json_string_new(alloc, "json", 4));
+                sc_json_object_set(alloc, rf_obj, "type", sc_json_string_new(alloc, "json", 4));
                 sc_json_object_set(alloc, root, "response_format", rf_obj);
             }
         }
@@ -601,8 +600,7 @@ static sc_error_t anthropic_stream_chat(void *ctx, sc_allocator_t *alloc,
              memcmp(request->response_format, "json", 4) == 0)) {
             sc_json_value_t *rf_obj = sc_json_object_new(alloc);
             if (rf_obj) {
-                sc_json_object_set(alloc, rf_obj, "type",
-                    sc_json_string_new(alloc, "json", 4));
+                sc_json_object_set(alloc, rf_obj, "type", sc_json_string_new(alloc, "json", 4));
                 sc_json_object_set(alloc, root, "response_format", rf_obj);
             }
         }

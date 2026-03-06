@@ -1,12 +1,12 @@
 #include "seaclaw/gateway/control_protocol.h"
 #include "seaclaw/bus.h"
-#include "seaclaw/security.h"
 #include "seaclaw/channel_catalog.h"
 #include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/process_util.h"
 #include "seaclaw/cost.h"
+#include "seaclaw/security.h"
 #ifdef SC_HAS_CRON
 #include "seaclaw/cron.h"
 #include "seaclaw/crontab.h"
@@ -58,23 +58,18 @@ static sc_error_t build_connect_response(sc_allocator_t *alloc, const sc_app_con
     sc_json_value_t *features = sc_json_object_new(alloc);
     sc_json_value_t *methods_arr = sc_json_array_new(alloc);
 
-    static const char *const methods[] = {"auth.token",      "connect",
-                                          "health",          "config.get",
-                                          "config.schema",   "capabilities",
-                                          "chat.send",
-                                          "chat.history",    "chat.abort",
-                                          "config.set",      "config.apply",
-                                          "sessions.list",   "sessions.patch",
-                                          "sessions.delete", "tools.catalog",
-                                          "channels.status", "cron.list",
-                                          "cron.add",        "cron.remove",
-                                          "cron.run",        "skills.list",
-                                          "skills.install",  "skills.enable",
-                                          "skills.disable",  "update.check",
-                                          "update.run",      "exec.approval.resolve",
-                                          "usage.summary",   "models.list",
-                                          "nodes.list",      "push.register",
-                                          "push.unregister"};
+    static const char *const methods[] = {
+        "auth.token",      "connect",         "health",
+        "config.get",      "config.schema",   "capabilities",
+        "chat.send",       "chat.history",    "chat.abort",
+        "config.set",      "config.apply",    "sessions.list",
+        "sessions.patch",  "sessions.delete", "tools.catalog",
+        "channels.status", "cron.list",       "cron.add",
+        "cron.remove",     "cron.run",        "skills.list",
+        "skills.install",  "skills.enable",   "skills.disable",
+        "update.check",    "update.run",      "exec.approval.resolve",
+        "usage.summary",   "models.list",     "nodes.list",
+        "push.register",   "push.unregister"};
     for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
         sc_json_value_t *m = sc_json_string_new(alloc, methods[i], strlen(methods[i]));
         if (m)
@@ -1166,8 +1161,8 @@ static bool is_public_method(const char *method) {
 /* ── auth.token ──────────────────────────────────────────────────────── */
 
 static sc_error_t handle_auth_token(sc_allocator_t *alloc, sc_ws_conn_t *conn,
-                                    const sc_control_protocol_t *proto,
-                                    const sc_json_value_t *root, char **out, size_t *out_len) {
+                                    const sc_control_protocol_t *proto, const sc_json_value_t *root,
+                                    char **out, size_t *out_len) {
     (void)alloc;
     const char *token = NULL;
     if (root) {
@@ -1357,11 +1352,13 @@ void sc_control_on_message(sc_ws_conn_t *conn, const char *data, size_t data_len
         return;
     }
 
-    /* Auth check: when pairing required, only public methods and auth.token allowed unauthenticated */
+    /* Auth check: when pairing required, only public methods and auth.token allowed unauthenticated
+     */
     if (proto->require_pairing && !conn->authenticated && !is_public_method(method) &&
         strcmp(method, "auth.token") != 0) {
-        sc_control_send_response(conn, id_raw, false,
-                                  "{\"error\":\"unauthorized\",\"message\":\"Authentication required\"}");
+        sc_control_send_response(
+            conn, id_raw, false,
+            "{\"error\":\"unauthorized\",\"message\":\"Authentication required\"}");
         sc_json_free(proto->alloc, root);
         return;
     }
@@ -1376,8 +1373,8 @@ void sc_control_on_message(sc_ws_conn_t *conn, const char *data, size_t data_len
 
     char *payload = NULL;
     size_t payload_len = 0;
-    sc_error_t err = build_method_response(proto->alloc, method, root, proto->app_ctx, conn,
-                                            proto, &payload, &payload_len);
+    sc_error_t err = build_method_response(proto->alloc, method, root, proto->app_ctx, conn, proto,
+                                           &payload, &payload_len);
     sc_json_free(proto->alloc, root);
 
     bool ok = (err == SC_OK);

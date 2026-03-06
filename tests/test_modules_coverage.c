@@ -1,19 +1,19 @@
-#include "test_framework.h"
-#include "seaclaw/core/allocator.h"
-#include "seaclaw/core/error.h"
-#include "seaclaw/mcp.h"
-#include "seaclaw/tunnel.h"
-#include "seaclaw/daemon.h"
-#include "seaclaw/tools/diff.h"
-#include "seaclaw/tools/apply_patch.h"
-#include "seaclaw/tools/send_message.h"
 #include "seaclaw/agent/mailbox.h"
-#include "seaclaw/memory.h"
-#include "seaclaw/memory/retrieval.h"
 #include "seaclaw/channel.h"
 #include "seaclaw/channels/dispatch.h"
+#include "seaclaw/core/allocator.h"
+#include "seaclaw/core/error.h"
+#include "seaclaw/daemon.h"
+#include "seaclaw/mcp.h"
+#include "seaclaw/memory.h"
+#include "seaclaw/memory/retrieval.h"
 #include "seaclaw/security.h"
 #include "seaclaw/tool.h"
+#include "seaclaw/tools/apply_patch.h"
+#include "seaclaw/tools/diff.h"
+#include "seaclaw/tools/send_message.h"
+#include "seaclaw/tunnel.h"
+#include "test_framework.h"
 #include <string.h>
 #include <time.h>
 
@@ -21,7 +21,7 @@
 
 static void test_mcp_server_create_destroy_valid(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
+    sc_mcp_server_config_t cfg = {.command = "echo", .args = NULL, .args_count = 0};
     sc_mcp_server_t *srv = sc_mcp_server_create(&alloc, &cfg);
     SC_ASSERT_NOT_NULL(srv);
     sc_mcp_server_destroy(srv);
@@ -93,7 +93,7 @@ static void test_tunnel_custom_create_destroy(void) {
 
 static void test_tunnel_factory_none(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_tunnel_config_t config = { .provider = SC_TUNNEL_NONE };
+    sc_tunnel_config_t config = {.provider = SC_TUNNEL_NONE};
     sc_tunnel_t t = sc_tunnel_create(&alloc, &config);
     SC_ASSERT_NOT_NULL(t.ctx);
     SC_ASSERT_STR_EQ(t.vtable->provider_name(t.ctx), "none");
@@ -284,7 +284,7 @@ static void test_temporal_decay_score(void) {
 static void test_retrieval_keyword_with_mock_data(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "key_a", 5, "alpha beta gamma", 16, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "key_b", 5, "delta epsilon", 14, &cat, NULL, 0);
 
@@ -305,7 +305,7 @@ static void test_retrieval_keyword_with_mock_data(void) {
 static void test_retrieval_hybrid_with_mock_data(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "doc1", 4, "machine learning basics", 23, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "doc2", 4, "neural network training", 23, &cat, NULL, 0);
 

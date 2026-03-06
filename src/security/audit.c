@@ -291,16 +291,16 @@ size_t sc_audit_event_write_json(const sc_audit_event_t *ev, char *buf, size_t b
             char esc[64];
             size_t elen = escape_json_string(ev->reasoning.rule_name, esc, sizeof(esc));
             esc[elen] = '\0';
-            n = snprintf(buf + pos, buf_size - pos, "%s\"rule_name\":\"%s\"",
-                         need_comma ? "," : "", esc);
+            n = snprintf(buf + pos, buf_size - pos, "%s\"rule_name\":\"%s\"", need_comma ? "," : "",
+                         esc);
             if (n >= 0 && (size_t)n < buf_size - pos) {
                 pos += (size_t)n;
                 need_comma = true;
             }
         }
         if (ev->reasoning.confidence >= 0.0f) {
-            n = snprintf(buf + pos, buf_size - pos, "%s\"confidence\":%.2f",
-                         need_comma ? "," : "", (double)ev->reasoning.confidence);
+            n = snprintf(buf + pos, buf_size - pos, "%s\"confidence\":%.2f", need_comma ? "," : "",
+                         (double)ev->reasoning.confidence);
             if (n >= 0 && (size_t)n < buf_size - pos) {
                 pos += (size_t)n;
                 need_comma = true;

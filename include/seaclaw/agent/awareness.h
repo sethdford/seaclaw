@@ -12,9 +12,9 @@
  * that the agent can inject into its prompt — e.g. recent errors,
  * health state changes, active channels, tool usage patterns. */
 
-#define SC_AWARENESS_MAX_RECENT_ERRORS 5
+#define SC_AWARENESS_MAX_RECENT_ERRORS   5
 #define SC_AWARENESS_MAX_ACTIVE_CHANNELS 8
-#define SC_AWARENESS_CHANNEL_NAME_LEN 32
+#define SC_AWARENESS_CHANNEL_NAME_LEN    32
 
 typedef struct sc_awareness_state {
     /* Recent errors (circular buffer) */

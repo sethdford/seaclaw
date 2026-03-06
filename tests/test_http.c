@@ -1,8 +1,8 @@
 /* HTTP GET tests */
-#include "test_framework.h"
-#include "seaclaw/core/http.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#include "seaclaw/core/http.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_http_get_mock(void) {
@@ -67,7 +67,8 @@ static void test_http_get_ex_mock(void) {
 #if SC_IS_TEST
     sc_allocator_t alloc = sc_system_allocator();
     sc_http_response_t resp = {0};
-    sc_error_t err = sc_http_get_ex(&alloc, "https://example.com/", "Accept: application/json\n", &resp);
+    sc_error_t err =
+        sc_http_get_ex(&alloc, "https://example.com/", "Accept: application/json\n", &resp);
     SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_NOT_SUPPORTED);
     if (err == SC_OK) {
         SC_ASSERT_NOT_NULL(resp.body);
@@ -94,8 +95,8 @@ static void test_http_post_json_mock(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_http_response_t resp = {0};
     const char *json = "{\"key\":\"value\"}";
-    sc_error_t err = sc_http_post_json(&alloc, "https://api.example.com/",
-        NULL, json, strlen(json), &resp);
+    sc_error_t err =
+        sc_http_post_json(&alloc, "https://api.example.com/", NULL, json, strlen(json), &resp);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.body);
     sc_http_response_free(&alloc, &resp);

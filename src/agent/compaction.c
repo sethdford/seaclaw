@@ -220,8 +220,8 @@ sc_error_t sc_compact_history(sc_allocator_t *alloc, sc_owned_message_t *history
 }
 
 sc_error_t sc_context_compact_for_pressure(sc_allocator_t *alloc, sc_owned_message_t *history,
-                                          size_t *history_count, size_t *history_cap,
-                                          size_t max_tokens, float target_pressure) {
+                                           size_t *history_count, size_t *history_cap,
+                                           size_t max_tokens, float target_pressure) {
     (void)history_cap;
     if (!alloc || !history || !history_count || max_tokens == 0)
         return SC_ERR_INVALID_ARGUMENT;

@@ -6,12 +6,12 @@
 #include <string.h>
 #include <unistd.h>
 
-#define SC_NOSTR_MAX_MSG          65536
-#define SC_NOSTR_SESSION_MAX      127
-#define SC_NOSTR_CONTENT_MAX      4095
-#define SC_NOSTR_MAX_TARGET       128
-#define SC_NOSTR_LAST_MSG_SIZE    4096
-#define SC_NOSTR_MOCK_EVENTS_MAX  8
+#define SC_NOSTR_MAX_MSG         65536
+#define SC_NOSTR_SESSION_MAX     127
+#define SC_NOSTR_CONTENT_MAX     4095
+#define SC_NOSTR_MAX_TARGET      128
+#define SC_NOSTR_LAST_MSG_SIZE   4096
+#define SC_NOSTR_MOCK_EVENTS_MAX 8
 
 typedef struct sc_nostr_mock_event {
     char session_key[SC_NOSTR_SESSION_MAX + 1];
@@ -63,7 +63,9 @@ static sc_error_t nostr_send(void *ctx, const char *target, size_t target_len, c
     sc_nostr_ctx_t *c = (sc_nostr_ctx_t *)ctx;
     if (c && message && message_len > 0) {
         /* Format as Nostr event JSON (kind 4 for DM). Store in buffer for test verification. */
-        size_t tlen = (target && target_len > 0) ? (target_len > SC_NOSTR_MAX_TARGET ? SC_NOSTR_MAX_TARGET : target_len) : 0;
+        size_t tlen = (target && target_len > 0)
+                          ? (target_len > SC_NOSTR_MAX_TARGET ? SC_NOSTR_MAX_TARGET : target_len)
+                          : 0;
         int n = snprintf(c->last_message, SC_NOSTR_LAST_MSG_SIZE,
                          "{\"kind\":4,\"content\":\"%.*s\",\"tags\":[[\"p\",\"%.*s\"]]}",
                          (int)message_len, message, (int)tlen, (target && tlen > 0) ? target : "");
@@ -360,8 +362,8 @@ const char *sc_nostr_test_last_message(sc_channel_t *ch) {
 }
 
 sc_error_t sc_nostr_test_inject_mock_event(sc_channel_t *ch, const char *session_key,
-                                          size_t session_key_len, const char *content,
-                                          size_t content_len) {
+                                           size_t session_key_len, const char *content,
+                                           size_t content_len) {
     if (!ch || !ch->ctx)
         return SC_ERR_INVALID_ARGUMENT;
     sc_nostr_ctx_t *c = (sc_nostr_ctx_t *)ch->ctx;

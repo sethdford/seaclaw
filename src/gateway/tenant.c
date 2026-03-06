@@ -103,7 +103,8 @@ sc_error_t sc_tenant_list(sc_tenant_store_t *store, sc_tenant_t *out, size_t max
     return SC_OK;
 }
 
-sc_error_t sc_tenant_increment_usage(sc_tenant_store_t *store, const char *user_id, uint64_t tokens) {
+sc_error_t sc_tenant_increment_usage(sc_tenant_store_t *store, const char *user_id,
+                                     uint64_t tokens) {
     if (!store || !user_id)
         return SC_ERR_INVALID_ARGUMENT;
     int idx = find_tenant(store, user_id);

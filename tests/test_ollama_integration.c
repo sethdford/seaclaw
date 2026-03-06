@@ -1,9 +1,9 @@
-#include "test_framework.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/http.h"
 #include "seaclaw/provider.h"
 #include "seaclaw/providers/ollama.h"
+#include "test_framework.h"
 #include <string.h>
 
 static bool ollama_is_running(sc_allocator_t *alloc) {

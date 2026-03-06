@@ -2,10 +2,10 @@
  * Hybrid vector search reranking: RRF merge + cross-encoder term-overlap.
  * No external dependencies.
  */
+#include "seaclaw/memory/rerank.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"
-#include "seaclaw/memory/rerank.h"
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -78,9 +78,9 @@ static void map_clear(rrf_node_t **buckets, sc_allocator_t *alloc) {
 }
 
 static sc_error_t rrf_merge_impl(sc_allocator_t *alloc, sc_search_result_t *keyword_results,
-                               size_t keyword_count, sc_search_result_t *vector_results,
-                               size_t vector_count, sc_search_result_t *merged_out,
-                               size_t max_results, size_t *merged_count, float k) {
+                                 size_t keyword_count, sc_search_result_t *vector_results,
+                                 size_t vector_count, sc_search_result_t *merged_out,
+                                 size_t max_results, size_t *merged_count, float k) {
     if (!alloc || !merged_count)
         return SC_ERR_INVALID_ARGUMENT;
     *merged_count = 0;
@@ -199,7 +199,7 @@ sc_error_t sc_rerank_rrf(sc_search_result_t *keyword_results, size_t keyword_cou
 
 /* Tokenize into words (lowercase, alnum+underscore) */
 static size_t tokenize(const char *text, size_t text_len, char **words, size_t max_words,
-                      sc_allocator_t *alloc) {
+                       sc_allocator_t *alloc) {
     size_t n = 0;
     const char *p = text;
     const char *end = text + text_len;

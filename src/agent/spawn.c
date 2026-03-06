@@ -1,8 +1,8 @@
 #include "seaclaw/agent/spawn.h"
-#include "seaclaw/agent/team.h"
-#include "seaclaw/agent/worktree.h"
 #include "seaclaw/agent.h"
 #include "seaclaw/agent/mailbox.h"
+#include "seaclaw/agent/team.h"
+#include "seaclaw/agent/worktree.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/providers/factory.h"
 #include "seaclaw/security.h"
@@ -255,7 +255,7 @@ sc_agent_pool_t *sc_agent_pool_create(sc_allocator_t *alloc, uint32_t max_concur
 }
 
 void sc_agent_pool_set_worktree_manager(sc_agent_pool_t *pool,
-    sc_worktree_manager_t *worktree_mgr) {
+                                        sc_worktree_manager_t *worktree_mgr) {
     if (!pool)
         return;
     pool->worktree_mgr = worktree_mgr;
@@ -344,8 +344,8 @@ sc_error_t sc_agent_pool_spawn(sc_agent_pool_t *pool, const sc_spawn_config_t *c
     if (pool->worktree_mgr) {
         const char *wt_path = NULL;
         const char *lbl = (label && label[0]) ? label : "agent";
-        if (sc_worktree_create(pool->worktree_mgr, s->agent_id, lbl, &wt_path) == SC_OK
-            && wt_path) {
+        if (sc_worktree_create(pool->worktree_mgr, s->agent_id, lbl, &wt_path) == SC_OK &&
+            wt_path) {
             s->workspace_dir = sc_strdup(a, wt_path);
         } else {
             s->workspace_dir = dup_opt(a, cfg->workspace_dir, cfg->workspace_dir_len);

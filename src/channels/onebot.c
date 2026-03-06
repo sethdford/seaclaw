@@ -1,6 +1,6 @@
+#include "seaclaw/channels/onebot.h"
 #include "seaclaw/channel.h"
 #include "seaclaw/channel_loop.h"
-#include "seaclaw/channels/onebot.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/http.h"
@@ -282,8 +282,7 @@ bool sc_onebot_is_configured(sc_channel_t *ch) {
     if (!ch || !ch->ctx)
         return false;
     sc_onebot_ctx_t *c = (sc_onebot_ctx_t *)ch->ctx;
-    return c->api_base != NULL && c->api_base_len > 0 &&
-           (c->user_id != NULL && c->user_id_len > 0);
+    return c->api_base != NULL && c->api_base_len > 0 && (c->user_id != NULL && c->user_id_len > 0);
 }
 
 void sc_onebot_destroy(sc_channel_t *ch) {

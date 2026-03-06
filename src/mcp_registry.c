@@ -8,9 +8,9 @@
 #include <unistd.h>
 #endif
 
-#define SC_MCP_NAME_MAX   63
-#define SC_MCP_CMD_MAX    255
-#define SC_MCP_ARGS_MAX   511
+#define SC_MCP_NAME_MAX 63
+#define SC_MCP_CMD_MAX  255
+#define SC_MCP_ARGS_MAX 511
 
 struct sc_mcp_registry {
     sc_allocator_t *alloc;

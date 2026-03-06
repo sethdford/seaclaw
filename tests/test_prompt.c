@@ -1,11 +1,11 @@
-#include "test_framework.h"
-#include "seaclaw/agent/prompt.h"
 #include "seaclaw/agent/memory_loader.h"
+#include "seaclaw/agent/prompt.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/memory.h"
-#include "seaclaw/tools/shell.h"
 #include "seaclaw/tools/factory.h"
+#include "seaclaw/tools/shell.h"
+#include "test_framework.h"
 #include <string.h>
 
 /* ─── Prompt builder tests ───────────────────────────────────────────────── */
@@ -80,7 +80,8 @@ static void test_prompt_build_with_tools(void) {
     SC_ASSERT_TRUE(strstr(out, "full") != NULL);
 
     alloc.free(alloc.ctx, out, out_len + 1);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_prompt_build_with_memory(void) {
@@ -171,8 +172,9 @@ static void test_memory_loader_with_entries(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
-    sc_error_t err = mem.vtable->store(mem.ctx, "pref_theme", 10, "User likes light mode", 21, &cat, NULL, 0);
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
+    sc_error_t err =
+        mem.vtable->store(mem.ctx, "pref_theme", 10, "User likes light mode", 21, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
 
     sc_memory_loader_t loader;

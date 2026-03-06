@@ -1,7 +1,7 @@
 /* Path security tests */
-#include "test_framework.h"
-#include "seaclaw/tools/path_security.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/tools/path_security.h"
+#include "test_framework.h"
 
 static void test_path_is_safe_relative_ok(void) {
     SC_ASSERT_TRUE(sc_path_is_safe("foo"));

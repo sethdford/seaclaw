@@ -37,7 +37,8 @@ static nb_entry_t *nb_find(notebook_ctx_t *c, const char *key) {
 static sc_error_t notebook_execute(void *ctx, sc_allocator_t *alloc, const sc_json_value_t *args,
                                    sc_tool_result_t *out) {
     notebook_ctx_t *c = (notebook_ctx_t *)ctx;
-    if (!out) return SC_ERR_INVALID_ARGUMENT;
+    if (!out)
+        return SC_ERR_INVALID_ARGUMENT;
     if (!args) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;

@@ -1,11 +1,11 @@
 /* Streaming chat and SSE parser tests */
-#include "test_framework.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/provider.h"
-#include "seaclaw/providers/sse.h"
-#include "seaclaw/providers/openai.h"
 #include "seaclaw/providers/anthropic.h"
+#include "seaclaw/providers/openai.h"
+#include "seaclaw/providers/sse.h"
+#include "test_framework.h"
 #include <string.h>
 
 static int sse_event_count;
@@ -13,9 +13,8 @@ static char sse_last_event_type[64];
 static char sse_last_data[256];
 static size_t sse_last_data_len;
 
-static void sse_event_cb(const char *event_type, size_t event_type_len,
-    const char *data, size_t data_len, void *userdata)
-{
+static void sse_event_cb(const char *event_type, size_t event_type_len, const char *data,
+                         size_t data_len, void *userdata) {
     (void)userdata;
     sse_event_count++;
     if (event_type && event_type_len < sizeof(sse_last_event_type)) {
@@ -49,7 +48,7 @@ static void test_sse_parser_single_event(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(sse_event_count, 1);
     SC_ASSERT_TRUE(strstr(sse_last_data, "\"foo\"") != NULL);
-    SC_ASSERT_EQ(sse_last_data_len, 9);  /* {"foo":1} after SSE leading-space trim */
+    SC_ASSERT_EQ(sse_last_data_len, 9); /* {"foo":1} after SSE leading-space trim */
 
     sc_sse_parser_deinit(&p);
 }
@@ -109,7 +108,9 @@ static void test_sse_parser_multiline_data(void) {
     const char *input = "data: line1\ndata: line2\ndata: line3\n\n";
     sc_sse_parser_feed(&p, input, strlen(input), sse_event_cb, NULL);
     SC_ASSERT_TRUE(sse_event_count >= 1);
-    SC_ASSERT_TRUE(strstr(sse_last_data, "line1") != NULL || strstr(sse_last_data, "line2") != NULL || strstr(sse_last_data, "line3") != NULL);
+    SC_ASSERT_TRUE(strstr(sse_last_data, "line1") != NULL ||
+                   strstr(sse_last_data, "line2") != NULL ||
+                   strstr(sse_last_data, "line3") != NULL);
     sc_sse_parser_deinit(&p);
 }
 
@@ -276,7 +277,8 @@ static bool openai_stream_got_final;
 static void openai_stream_cb(void *ctx, const sc_stream_chunk_t *chunk) {
     (void)ctx;
     openai_stream_chunk_count++;
-    if (chunk->is_final) openai_stream_got_final = true;
+    if (chunk->is_final)
+        openai_stream_got_final = true;
 }
 
 static void test_openai_stream_mock(void) {
@@ -317,8 +319,8 @@ static void test_openai_stream_mock(void) {
 
     sc_stream_chat_result_t result;
     memset(&result, 0, sizeof(result));
-    err = prov.vtable->stream_chat(prov.ctx, &alloc, &req, "gpt-4", 5, 0.7,
-        openai_stream_cb, NULL, &result);
+    err = prov.vtable->stream_chat(prov.ctx, &alloc, &req, "gpt-4", 5, 0.7, openai_stream_cb, NULL,
+                                   &result);
 
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(openai_stream_chunk_count, 4);
@@ -326,8 +328,10 @@ static void test_openai_stream_mock(void) {
     SC_ASSERT_NOT_NULL(result.content);
     SC_ASSERT_TRUE(result.content_len > 0);
 
-    if (result.content) alloc.free(alloc.ctx, (void *)result.content, result.content_len + 1);
-    if (prov.vtable->deinit) prov.vtable->deinit(prov.ctx, &alloc);
+    if (result.content)
+        alloc.free(alloc.ctx, (void *)result.content, result.content_len + 1);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
 #endif
 }
 
@@ -337,7 +341,8 @@ static bool anthropic_stream_got_final;
 static void anthropic_stream_cb(void *ctx, const sc_stream_chunk_t *chunk) {
     (void)ctx;
     anthropic_stream_chunk_count++;
-    if (chunk->is_final) anthropic_stream_got_final = true;
+    if (chunk->is_final)
+        anthropic_stream_got_final = true;
 }
 
 static void test_anthropic_stream_mock(void) {
@@ -378,8 +383,8 @@ static void test_anthropic_stream_mock(void) {
 
     sc_stream_chat_result_t result;
     memset(&result, 0, sizeof(result));
-    err = prov.vtable->stream_chat(prov.ctx, &alloc, &req, "claude-3", 8, 0.7,
-        anthropic_stream_cb, NULL, &result);
+    err = prov.vtable->stream_chat(prov.ctx, &alloc, &req, "claude-3", 8, 0.7, anthropic_stream_cb,
+                                   NULL, &result);
 
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(anthropic_stream_chunk_count, 4);
@@ -387,8 +392,10 @@ static void test_anthropic_stream_mock(void) {
     SC_ASSERT_NOT_NULL(result.content);
     SC_ASSERT_TRUE(result.content_len > 0);
 
-    if (result.content) alloc.free(alloc.ctx, (void *)result.content, result.content_len + 1);
-    if (prov.vtable->deinit) prov.vtable->deinit(prov.ctx, &alloc);
+    if (result.content)
+        alloc.free(alloc.ctx, (void *)result.content, result.content_len + 1);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
 #endif
 }
 

@@ -1,10 +1,10 @@
 /*
  * Vault tests — SC_IS_TEST uses in-memory storage.
  */
-#include "test_framework.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/security/vault.h"
+#include "test_framework.h"
 #include <stdlib.h>
 #include <string.h>
 

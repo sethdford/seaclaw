@@ -171,8 +171,8 @@ static void run_cron_tick(sc_allocator_t *alloc) {
         sc_run_result_t result = {0};
         sc_error_t run_err = sc_process_run(alloc, argv, NULL, 65536, &result);
         if (run_err != SC_OK)
-            fprintf(stderr, "[seaclaw] cron job failed: %s (err=%d)\n",
-                    entries[i].command, (int)run_err);
+            fprintf(stderr, "[seaclaw] cron job failed: %s (err=%d)\n", entries[i].command,
+                    (int)run_err);
         sc_run_result_free(alloc, &result);
 #endif
     }
@@ -202,13 +202,13 @@ typedef struct {
     size_t target_len;
 } daemon_stream_ctx_t;
 
-__attribute__((unused))
-static void daemon_stream_token(const char *delta, size_t delta_len, void *ctx) {
+__attribute__((unused)) static void daemon_stream_token(const char *delta, size_t delta_len,
+                                                        void *ctx) {
     daemon_stream_ctx_t *dctx = (daemon_stream_ctx_t *)ctx;
     if (!dctx || !dctx->channel || !dctx->channel->vtable->send_event)
         return;
     dctx->channel->vtable->send_event(dctx->channel->ctx, dctx->target, dctx->target_len, delta,
-                                       delta_len, NULL, 0, SC_OUTBOUND_STAGE_CHUNK);
+                                      delta_len, NULL, 0, SC_OUTBOUND_STAGE_CHUNK);
 }
 
 /* ── Service loop ──────────────────────────────────────────────────────── */

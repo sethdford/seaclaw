@@ -11,8 +11,7 @@ static sc_error_t migrate_v1_to_v2(sc_allocator_t *alloc, sc_json_value_t *root)
         sc_json_value_t *mem = sc_json_object_new(alloc);
         if (!mem)
             return SC_ERR_OUT_OF_MEMORY;
-        sc_json_object_set(alloc, mem, "backend",
-                           sc_json_string_new(alloc, mb, strlen(mb)));
+        sc_json_object_set(alloc, mem, "backend", sc_json_string_new(alloc, mb, strlen(mb)));
         sc_json_object_set(alloc, root, "memory", mem);
     }
     return SC_OK;

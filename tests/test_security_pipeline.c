@@ -1,15 +1,15 @@
 #define SC_IS_TEST 1
 
-#include "test_framework.h"
 #include "seaclaw/agent/action_preview.h"
 #include "seaclaw/agent/undo.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/security/audit.h"
+#include "test_framework.h"
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(__unix__) || defined(__APPLE__)
 #include <unistd.h>
@@ -21,8 +21,7 @@ static void test_action_preview_shell_shows_command(void) {
     sc_action_preview_t p;
     memset(&p, 0, sizeof(p));
     const char *args = "{\"command\":\"ls -la /tmp\"}";
-    sc_error_t err =
-        sc_action_preview_generate(&sys, "shell", args, strlen(args), &p);
+    sc_error_t err = sc_action_preview_generate(&sys, "shell", args, strlen(args), &p);
     SC_ASSERT(err == SC_OK);
     SC_ASSERT_NOT_NULL(p.description);
     SC_ASSERT(strstr(p.description, "ls -la") != NULL);
@@ -34,8 +33,7 @@ static void test_action_preview_file_write_shows_path(void) {
     sc_action_preview_t p;
     memset(&p, 0, sizeof(p));
     const char *args = "{\"path\":\"/home/user/notes.txt\"}";
-    sc_error_t err =
-        sc_action_preview_generate(&sys, "file_write", args, strlen(args), &p);
+    sc_error_t err = sc_action_preview_generate(&sys, "file_write", args, strlen(args), &p);
     SC_ASSERT(err == SC_OK);
     SC_ASSERT_NOT_NULL(p.description);
     SC_ASSERT(strstr(p.description, "/home/user/notes.txt") != NULL);
@@ -47,8 +45,7 @@ static void test_action_preview_format_produces_readable_string(void) {
     sc_action_preview_t p;
     memset(&p, 0, sizeof(p));
     const char *args = "{\"command\":\"echo hello\"}";
-    sc_error_t err =
-        sc_action_preview_generate(&sys, "shell", args, strlen(args), &p);
+    sc_error_t err = sc_action_preview_generate(&sys, "shell", args, strlen(args), &p);
     SC_ASSERT(err == SC_OK);
     char *formatted = NULL;
     size_t len = 0;

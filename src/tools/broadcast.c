@@ -25,7 +25,8 @@ typedef struct {
 static sc_error_t broadcast_execute(void *ctx, sc_allocator_t *alloc, const sc_json_value_t *args,
                                     sc_tool_result_t *out) {
     (void)ctx;
-    if (!out) return SC_ERR_INVALID_ARGUMENT;
+    if (!out)
+        return SC_ERR_INVALID_ARGUMENT;
     if (!args) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;
@@ -56,7 +57,7 @@ static sc_error_t broadcast_execute(void *ctx, sc_allocator_t *alloc, const sc_j
         const char *ch = sc_json_get_string(entry, "channel");
         const char *tgt = sc_json_get_string(entry, "target");
         n += snprintf(msg + n, buf_sz - (size_t)n, "- %s -> %s: delivered (test)\n",
-                     ch ? ch : "unknown", tgt ? tgt : "default");
+                      ch ? ch : "unknown", tgt ? tgt : "default");
     }
     *out = sc_tool_result_ok_owned(msg, (size_t)n);
 #else

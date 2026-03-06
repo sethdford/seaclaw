@@ -1,25 +1,25 @@
 /* Tests for newly ported modules (capabilities, channel_catalog, config_mutator, update, etc.) */
-#include "test_framework.h"
-#include "seaclaw/capabilities.h"
-#include "seaclaw/channel_catalog.h"
-#include "seaclaw/channel_adapters.h"
-#include "seaclaw/config_mutator.h"
-#include "seaclaw/doctor.h"
 #include "seaclaw/agent/commands.h"
-#include "seaclaw/security.h"
-#include "seaclaw/security/sandbox.h"
-#include "seaclaw/update.h"
-#include "seaclaw/service.h"
+#include "seaclaw/capabilities.h"
+#include "seaclaw/channel_adapters.h"
+#include "seaclaw/channel_catalog.h"
+#include "seaclaw/config.h"
+#include "seaclaw/config_mutator.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/arena.h"
-#include "seaclaw/config.h"
+#include "seaclaw/doctor.h"
+#include "seaclaw/security.h"
+#include "seaclaw/security/sandbox.h"
+#include "seaclaw/service.h"
+#include "seaclaw/update.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_channel_catalog_all(void) {
     size_t n = 0;
     const sc_channel_meta_t *m = sc_channel_catalog_all(&n);
     SC_ASSERT_NOT_NULL(m);
-    SC_ASSERT(n >= 1);  /* at least cli when SC_HAS_CLI */
+    SC_ASSERT(n >= 1); /* at least cli when SC_HAS_CLI */
 }
 
 static void test_channel_catalog_find_by_key(void) {
@@ -45,7 +45,8 @@ static void test_config_mutator_path_requires_restart(void) {
 }
 
 static void test_doctor_parse_df(void) {
-    const char *df = "Filesystem 1M-blocks Used Available Use% Mounted on\n/dev/sda1 1000 500 500 50% /\n";
+    const char *df =
+        "Filesystem 1M-blocks Used Available Use% Mounted on\n/dev/sda1 1000 500 500 50% /\n";
     unsigned long mb = sc_doctor_parse_df_available_mb(df, strlen(df));
     SC_ASSERT_EQ(mb, 500ul);
 }
@@ -99,9 +100,8 @@ static void test_capabilities_manifest(void) {
 static void test_config_mutator_mutate(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_mutation_result_t res = {0};
-    sc_error_t err = sc_config_mutator_mutate(&alloc, SC_MUTATION_SET,
-        "default_temperature", "0.5",
-        (sc_mutation_options_t){.apply = false}, &res);
+    sc_error_t err = sc_config_mutator_mutate(&alloc, SC_MUTATION_SET, "default_temperature", "0.5",
+                                              (sc_mutation_options_t){.apply = false}, &res);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(res.path);
     SC_ASSERT_STR_EQ(res.path, "default_temperature");
@@ -111,9 +111,8 @@ static void test_config_mutator_mutate(void) {
 static void test_config_mutator_mutate_denied_path(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_mutation_result_t res = {0};
-    sc_error_t err = sc_config_mutator_mutate(&alloc, SC_MUTATION_SET,
-        "identity.format", "compact",
-        (sc_mutation_options_t){.apply = false}, &res);
+    sc_error_t err = sc_config_mutator_mutate(&alloc, SC_MUTATION_SET, "identity.format", "compact",
+                                              (sc_mutation_options_t){.apply = false}, &res);
     SC_ASSERT_EQ(err, SC_ERR_PERMISSION_DENIED);
 }
 
@@ -128,9 +127,8 @@ static void test_config_mutator_get_path_denied(void) {
 static void test_config_mutator_mutate_unset(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_mutation_result_t res = {0};
-    sc_error_t err = sc_config_mutator_mutate(&alloc, SC_MUTATION_UNSET,
-        "memory.backend", NULL,
-        (sc_mutation_options_t){.apply = false}, &res);
+    sc_error_t err = sc_config_mutator_mutate(&alloc, SC_MUTATION_UNSET, "memory.backend", NULL,
+                                              (sc_mutation_options_t){.apply = false}, &res);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(res.path, "memory.backend");
     SC_ASSERT_TRUE(res.requires_restart);

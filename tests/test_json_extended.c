@@ -1,18 +1,20 @@
 /* JSON edge cases (~40 tests). */
-#include "test_framework.h"
-#include "seaclaw/core/json.h"
 #include "seaclaw/core/allocator.h"
-#include <string.h>
-#include <stdlib.h>
+#include "seaclaw/core/json.h"
+#include "test_framework.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 static void test_json_deeply_nested_object(void) {
     sc_allocator_t alloc = sc_system_allocator();
     char buf[4096];
     size_t pos = 0;
-    for (int i = 0; i < 64; i++) pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "{\"a\":");
+    for (int i = 0; i < 64; i++)
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "{\"a\":");
     pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "null");
-    for (int i = 0; i < 64; i++) pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "}");
+    for (int i = 0; i < 64; i++)
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "}");
     sc_json_value_t *val = NULL;
     sc_error_t err = sc_json_parse(&alloc, buf, pos, &val);
     SC_ASSERT_EQ(err, SC_OK);
@@ -24,9 +26,11 @@ static void test_json_deeply_nested_exceeds_max_depth(void) {
     sc_allocator_t alloc = sc_system_allocator();
     char buf[8192];
     size_t pos = 0;
-    for (int i = 0; i < 70; i++) pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "{\"x\":");
+    for (int i = 0; i < 70; i++)
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "{\"x\":");
     pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "0");
-    for (int i = 0; i < 70; i++) pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "}");
+    for (int i = 0; i < 70; i++)
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "}");
     sc_json_value_t *val = NULL;
     sc_error_t err = sc_json_parse(&alloc, buf, pos, &val);
     SC_ASSERT_EQ(err, SC_ERR_JSON_DEPTH);

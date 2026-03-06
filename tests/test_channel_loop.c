@@ -1,7 +1,7 @@
-#include "test_framework.h"
 #include "seaclaw/channel_loop.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_channel_loop_state_init(void) {
@@ -28,8 +28,8 @@ static void test_channel_loop_touch_updates_activity(void) {
     SC_ASSERT(state.last_activity > 0);
 }
 
-static sc_error_t noop_poll(void *ctx, sc_allocator_t *alloc,
-    sc_channel_loop_msg_t *msgs, size_t max_msgs, size_t *out_count) {
+static sc_error_t noop_poll(void *ctx, sc_allocator_t *alloc, sc_channel_loop_msg_t *msgs,
+                            size_t max_msgs, size_t *out_count) {
     (void)ctx;
     (void)alloc;
     (void)msgs;
@@ -38,8 +38,8 @@ static sc_error_t noop_poll(void *ctx, sc_allocator_t *alloc,
     return SC_OK;
 }
 
-static sc_error_t dispatch_echo(void *ctx, const char *session_key,
-    const char *content, char **response_out) {
+static sc_error_t dispatch_echo(void *ctx, const char *session_key, const char *content,
+                                char **response_out) {
     (void)ctx;
     (void)session_key;
     (void)content;
@@ -131,11 +131,14 @@ static void test_channel_loop_tick_null_dispatch_fn(void) {
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
 
-static sc_error_t poll_return_two(void *ctx, sc_allocator_t *alloc,
-    sc_channel_loop_msg_t *msgs, size_t max_msgs, size_t *out_count) {
+static sc_error_t poll_return_two(void *ctx, sc_allocator_t *alloc, sc_channel_loop_msg_t *msgs,
+                                  size_t max_msgs, size_t *out_count) {
     (void)ctx;
     (void)alloc;
-    if (max_msgs < 2) { *out_count = 0; return SC_OK; }
+    if (max_msgs < 2) {
+        *out_count = 0;
+        return SC_OK;
+    }
     strncpy(msgs[0].session_key, "sess1", sizeof(msgs[0].session_key) - 1);
     msgs[0].session_key[sizeof(msgs[0].session_key) - 1] = '\0';
     strncpy(msgs[0].content, "hello", sizeof(msgs[0].content) - 1);
@@ -151,8 +154,8 @@ static sc_error_t poll_return_two(void *ctx, sc_allocator_t *alloc,
 static int dispatch_invoked_count;
 static const char *dispatch_last_session;
 static const char *dispatch_last_content;
-static sc_error_t dispatch_count(void *ctx, const char *session_key,
-    const char *content, char **response_out) {
+static sc_error_t dispatch_count(void *ctx, const char *session_key, const char *content,
+                                 char **response_out) {
     (void)ctx;
     *response_out = NULL;
     dispatch_invoked_count++;
@@ -244,8 +247,8 @@ static void test_channel_loop_tick_processed_null_ok(void) {
     SC_ASSERT_EQ(err, SC_OK);
 }
 
-static sc_error_t poll_return_err(void *ctx, sc_allocator_t *alloc,
-    sc_channel_loop_msg_t *msgs, size_t max_msgs, size_t *out_count) {
+static sc_error_t poll_return_err(void *ctx, sc_allocator_t *alloc, sc_channel_loop_msg_t *msgs,
+                                  size_t max_msgs, size_t *out_count) {
     (void)ctx;
     (void)alloc;
     (void)msgs;

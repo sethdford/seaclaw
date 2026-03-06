@@ -120,5 +120,104 @@
       },
       "$description": "Modals, sheets, hero elements, overlays — z.modal (1300)"
     }
+  },
+  "dynamic-light": {
+    "$description": "Light source simulation for glass surfaces — cursor/gyroscope-driven",
+    "angle": {
+      "$value": "225deg",
+      "$type": "string",
+      "$description": "Default light source angle (top-left)"
+    },
+    "intensity": {
+      "$value": 0.15,
+      "$type": "number",
+      "$description": "Specular highlight base intensity"
+    },
+    "spread": {
+      "$value": "60%",
+      "$type": "string",
+      "$description": "Specular highlight spread radius"
+    },
+    "color-dark": {
+      "$value": "rgba(255,255,255,0.12)",
+      "$type": "color",
+      "$description": "Specular highlight color (dark theme)"
+    },
+    "color-light": {
+      "$value": "rgba(255,255,255,0.18)",
+      "$type": "color",
+      "$description": "Specular highlight color (light theme)"
+    },
+    "ambient": {
+      "$value": 0.04,
+      "$type": "number",
+      "$description": "Ambient light floor — minimum specular even without interaction"
+    }
+  },
+  "vibrancy": {
+    "$description": "Auto-contrast enhancement for content on glass surfaces",
+    "text-boost": {
+      "$value": 1.15,
+      "$type": "number",
+      "$description": "Text contrast multiplier on glass"
+    },
+    "icon-boost": {
+      "$value": 1.2,
+      "$type": "number",
+      "$description": "Icon contrast multiplier on glass"
+    },
+    "backdrop-brightness": {
+      "$value": 1.08,
+      "$type": "number",
+      "$description": "Brightness boost in backdrop-filter"
+    },
+    "text-shadow": {
+      "$value": "0 0 8px rgba(0,0,0,0.5)",
+      "$type": "string",
+      "$description": "Subtle text shadow for legibility on glass"
+    }
+  },
+  "interactive": {
+    "$description": "Glass-specific interaction feedback — complements micro-physics",
+    "press-blur-delta": {
+      "$value": "-4px",
+      "$type": "string",
+      "$description": "Blur decreases on press (glass compresses)"
+    },
+    "press-scale": {
+      "$value": 0.98,
+      "$type": "number",
+      "$description": "Scale factor on press"
+    },
+    "press-saturate-boost": {
+      "$value": "20%",
+      "$type": "string",
+      "$description": "Saturation increase on press"
+    },
+    "hover-specular-boost": {
+      "$value": 1.4,
+      "$type": "number",
+      "$description": "Specular intensity multiplier on hover"
+    },
+    "hover-border-glow": {
+      "$value": "0 0 0 1px rgba(255,255,255,0.08)",
+      "$type": "string",
+      "$description": "Border glow on hover"
+    },
+    "focus-glow-spread": {
+      "$value": "8px",
+      "$type": "string",
+      "$description": "Teal glow spread on focus"
+    },
+    "focus-glow-color": {
+      "$value": "rgba(20,184,166,0.35)",
+      "$type": "color",
+      "$description": "Focus glow color (teal)"
+    },
+    "transition-duration": {
+      "$value": "200ms",
+      "$type": "duration",
+      "$description": "Glass state transition duration"
+    }
   }
 }

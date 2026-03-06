@@ -9,7 +9,7 @@ void run_allocator_tests(void);
 void run_agent_subsystems_tests(void);
 void run_crypto_tests(void);
 void run_json_tests(void);
-void run_wasm_tests(void);  /* from test_wasm.c when built */
+void run_wasm_tests(void); /* from test_wasm.c when built */
 void run_string_tests(void);
 void run_slice_tests(void);
 void run_memory_tests(void);
@@ -55,6 +55,7 @@ void run_channel_manager_tests(void);
 void run_new_modules_tests(void);
 void run_provider_all_tests(void);
 void run_channel_all_tests(void);
+void run_meta_common_tests(void);
 void run_channel_integration_tests(void);
 void run_config_extended_tests(void);
 void run_config_validation_tests(void);
@@ -93,7 +94,8 @@ void run_untested_modules_tests(void);
 void run_modules_coverage_tests(void);
 
 int main(void) {
-    printf("SeaClaw Test Suite\n"); fflush(stdout);
+    printf("SeaClaw Test Suite\n");
+    fflush(stdout);
     printf("==================\n");
 
     run_allocator_tests();
@@ -146,6 +148,7 @@ int main(void) {
     run_new_modules_tests();
     run_provider_all_tests();
     run_channel_all_tests();
+    run_meta_common_tests();
     run_channel_integration_tests();
     run_config_extended_tests();
     run_config_validation_tests();

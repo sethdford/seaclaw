@@ -32,13 +32,10 @@ sc_color_level_t sc_terminal_color_level(void) {
 
     /* Known truecolor terminals */
     const char *tp = getenv("TERM_PROGRAM");
-    if (tp && (strcmp(tp, "iTerm.app") == 0 ||
-               strcmp(tp, "WezTerm") == 0 ||
-               strcmp(tp, "Alacritty") == 0 ||
-               strcmp(tp, "kitty") == 0 ||
-               strcmp(tp, "WarpTerminal") == 0 ||
-               strcmp(tp, "ghostty") == 0 ||
-               strcmp(tp, "rio") == 0)) {
+    if (tp &&
+        (strcmp(tp, "iTerm.app") == 0 || strcmp(tp, "WezTerm") == 0 ||
+         strcmp(tp, "Alacritty") == 0 || strcmp(tp, "kitty") == 0 ||
+         strcmp(tp, "WarpTerminal") == 0 || strcmp(tp, "ghostty") == 0 || strcmp(tp, "rio") == 0)) {
         cached_level = SC_COLOR_LEVEL_TRUECOLOR;
         return cached_level;
     }
@@ -88,8 +85,10 @@ sc_theme_t sc_terminal_theme(void) {
 
 static unsigned int rgb_to_ansi256(unsigned int r, unsigned int g, unsigned int b) {
     if (r == g && g == b) {
-        if (r < 8) return 16;
-        if (r > 248) return 231;
+        if (r < 8)
+            return 16;
+        if (r > 248)
+            return 231;
         return (unsigned int)(((double)r - 8.0) / 247.0 * 24.0) + 232;
     }
     unsigned int ri = (unsigned int)(((double)r / 255.0) * 5.0 + 0.5);
@@ -101,9 +100,12 @@ static unsigned int rgb_to_ansi256(unsigned int r, unsigned int g, unsigned int 
 static unsigned int rgb_to_ansi16(unsigned int r, unsigned int g, unsigned int b) {
     unsigned int bright = (r > 128 || g > 128 || b > 128) ? 60 : 0;
     unsigned int base = 30;
-    if (r > 64) base += 1;
-    if (g > 64) base += 2;
-    if (b > 64) base += 4;
+    if (r > 64)
+        base += 1;
+    if (g > 64)
+        base += 2;
+    if (b > 64)
+        base += 4;
     return base + bright;
 }
 

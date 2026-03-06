@@ -250,8 +250,8 @@ static sc_error_t openrouter_chat(void *ctx, sc_allocator_t *alloc,
     if (request->response_format && request->response_format_len > 0) {
         sc_json_value_t *rf_obj = sc_json_object_new(alloc);
         if (rf_obj) {
-            sc_json_value_t *rf_type = sc_json_string_new(alloc, request->response_format,
-                                                           request->response_format_len);
+            sc_json_value_t *rf_type =
+                sc_json_string_new(alloc, request->response_format, request->response_format_len);
             sc_json_object_set(alloc, rf_obj, "type", rf_type);
             sc_json_object_set(alloc, root, "response_format", rf_obj);
         }

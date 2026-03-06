@@ -1,16 +1,16 @@
-#include "test_framework.h"
-#include "seaclaw/security.h"
-#include "seaclaw/security/audit.h"
-#include "seaclaw/security/sandbox.h"
-#include "seaclaw/security/sandbox_internal.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/process_util.h"
 #include "seaclaw/observer.h"
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
+#include "seaclaw/security.h"
+#include "seaclaw/security/audit.h"
+#include "seaclaw/security/sandbox.h"
+#include "seaclaw/security/sandbox_internal.h"
+#include "test_framework.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 static sc_allocator_t *g_alloc;
 
@@ -27,7 +27,7 @@ static void test_risk_level_values(void) {
 static void test_policy_can_act_readonly(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_READ_ONLY,
-        .allowed_commands = (const char *[]){ "ls", "cat" },
+        .allowed_commands = (const char *[]){"ls", "cat"},
         .allowed_commands_len = 2,
     };
     SC_ASSERT_FALSE(sc_policy_can_act(&p));
@@ -36,7 +36,7 @@ static void test_policy_can_act_readonly(void) {
 static void test_policy_can_act_supervised(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
-        .allowed_commands = (const char *[]){ "ls", "cat" },
+        .allowed_commands = (const char *[]){"ls", "cat"},
         .allowed_commands_len = 2,
     };
     SC_ASSERT(sc_policy_can_act(&p));
@@ -45,7 +45,7 @@ static void test_policy_can_act_supervised(void) {
 static void test_policy_can_act_full(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_FULL,
-        .allowed_commands = (const char *[]){ "ls" },
+        .allowed_commands = (const char *[]){"ls"},
         .allowed_commands_len = 1,
     };
     SC_ASSERT(sc_policy_can_act(&p));
@@ -54,7 +54,7 @@ static void test_policy_can_act_full(void) {
 static void test_policy_allowed_commands(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
-        .allowed_commands = (const char *[]){ "git", "ls", "cat", "echo", "cargo" },
+        .allowed_commands = (const char *[]){"git", "ls", "cat", "echo", "cargo"},
         .allowed_commands_len = 5,
     };
     SC_ASSERT(sc_policy_is_command_allowed(&p, "ls"));
@@ -66,7 +66,7 @@ static void test_policy_allowed_commands(void) {
 static void test_policy_blocked_commands(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
-        .allowed_commands = (const char *[]){ "ls", "cat" },
+        .allowed_commands = (const char *[]){"ls", "cat"},
         .allowed_commands_len = 2,
     };
     SC_ASSERT_FALSE(sc_policy_is_command_allowed(&p, "rm -rf /"));
@@ -78,7 +78,7 @@ static void test_policy_blocked_commands(void) {
 static void test_policy_readonly_blocks_all(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_READ_ONLY,
-        .allowed_commands = (const char *[]){ "ls", "cat" },
+        .allowed_commands = (const char *[]){"ls", "cat"},
         .allowed_commands_len = 2,
     };
     SC_ASSERT_FALSE(sc_policy_is_command_allowed(&p, "ls"));
@@ -88,7 +88,7 @@ static void test_policy_readonly_blocks_all(void) {
 static void test_policy_command_injection_blocked(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
-        .allowed_commands = (const char *[]){ "ls", "echo" },
+        .allowed_commands = (const char *[]){"ls", "echo"},
         .allowed_commands_len = 2,
     };
     SC_ASSERT_FALSE(sc_policy_is_command_allowed(&p, "echo `whoami`"));
@@ -98,7 +98,7 @@ static void test_policy_command_injection_blocked(void) {
 }
 
 static void test_policy_risk_levels(void) {
-    sc_security_policy_t p = { .autonomy = SC_AUTONOMY_SUPERVISED };
+    sc_security_policy_t p = {.autonomy = SC_AUTONOMY_SUPERVISED};
     SC_ASSERT_EQ(sc_policy_command_risk_level(&p, "ls -la"), SC_RISK_LOW);
     SC_ASSERT_EQ(sc_policy_command_risk_level(&p, "git status"), SC_RISK_LOW);
     SC_ASSERT_EQ(sc_policy_command_risk_level(&p, "git commit -m x"), SC_RISK_MEDIUM);
@@ -109,7 +109,7 @@ static void test_policy_risk_levels(void) {
 static void test_policy_validate_command(void) {
     sc_security_policy_t p = {
         .autonomy = SC_AUTONOMY_SUPERVISED,
-        .allowed_commands = (const char *[]){ "ls", "touch" },
+        .allowed_commands = (const char *[]){"ls", "touch"},
         .allowed_commands_len = 2,
         .require_approval_for_medium_risk = 1,
         .block_high_risk_commands = 1,
@@ -168,7 +168,7 @@ static void test_pairing_guard_disabled(void) {
 
 static void test_pairing_guard_with_tokens(void) {
     sc_allocator_t sys = sc_system_allocator();
-    const char *tokens[] = { "zc_test_token" };
+    const char *tokens[] = {"zc_test_token"};
     sc_pairing_guard_t *g = sc_pairing_guard_create(&sys, 1, tokens, 1);
     SC_ASSERT_NOT_NULL(g);
     SC_ASSERT_NULL(sc_pairing_guard_pairing_code(g));
@@ -205,7 +205,7 @@ static void test_secret_store_is_encrypted(void) {
 }
 
 static void test_hex_encode_decode(void) {
-    uint8_t data[] = { 0x00, 0x01, 0xfe, 0xff };
+    uint8_t data[] = {0x00, 0x01, 0xfe, 0xff};
     char hex[16];
     sc_hex_encode(data, 4, hex);
     SC_ASSERT_STR_EQ(hex, "0001feff");
@@ -289,7 +289,7 @@ static void test_audit_event_write_json(void) {
 
 static void test_audit_logger_disabled(void) {
     sc_allocator_t sys = sc_system_allocator();
-    sc_audit_config_t cfg = { .enabled = false, .log_path = "audit.log", .max_size_mb = 10 };
+    sc_audit_config_t cfg = {.enabled = false, .log_path = "audit.log", .max_size_mb = 10};
     sc_audit_logger_t *log = sc_audit_logger_create(&sys, &cfg, "/tmp");
     SC_ASSERT_NOT_NULL(log);
     sc_audit_event_t ev;
@@ -305,7 +305,7 @@ static void test_audit_chain_verify_valid(void) {
     char *dir = mkdtemp(tmp);
     SC_ASSERT_NOT_NULL(dir);
 
-    sc_audit_config_t cfg = { .enabled = true, .log_path = "chain.log", .max_size_mb = 10 };
+    sc_audit_config_t cfg = {.enabled = true, .log_path = "chain.log", .max_size_mb = 10};
     sc_audit_logger_t *log = sc_audit_logger_create(&sys, &cfg, dir);
     SC_ASSERT_NOT_NULL(log);
 
@@ -341,7 +341,7 @@ static void test_audit_chain_tamper_detected(void) {
     char *dir = mkdtemp(tmp);
     SC_ASSERT_NOT_NULL(dir);
 
-    sc_audit_config_t cfg = { .enabled = true, .log_path = "tamper.log", .max_size_mb = 10 };
+    sc_audit_config_t cfg = {.enabled = true, .log_path = "tamper.log", .max_size_mb = 10};
     sc_audit_logger_t *log = sc_audit_logger_create(&sys, &cfg, dir);
     SC_ASSERT_NOT_NULL(log);
 
@@ -355,7 +355,7 @@ static void test_audit_chain_tamper_detected(void) {
     snprintf(log_path, sizeof(log_path), "%s/tamper.log", dir);
     FILE *f = fopen(log_path, "r+b");
     SC_ASSERT_NOT_NULL(f);
-    fseek(f, 50, SEEK_SET);  /* Tamper somewhere in the middle */
+    fseek(f, 50, SEEK_SET); /* Tamper somewhere in the middle */
     int c = fgetc(f);
     fseek(f, 50, SEEK_SET);
     fputc(c == 'a' ? 'b' : 'a', f);
@@ -379,7 +379,7 @@ static void test_audit_key_rotation_basic(void) {
     char *dir = mkdtemp(tmp);
     SC_ASSERT_NOT_NULL(dir);
 
-    sc_audit_config_t cfg = { .enabled = true, .log_path = "rot.log", .max_size_mb = 10 };
+    sc_audit_config_t cfg = {.enabled = true, .log_path = "rot.log", .max_size_mb = 10};
     sc_audit_logger_t *log = sc_audit_logger_create(&sys, &cfg, dir);
     SC_ASSERT_NOT_NULL(log);
 
@@ -412,7 +412,7 @@ static void test_audit_key_rotation_verify_detects_tamper_after_rotation(void) {
     char *dir = mkdtemp(tmp);
     SC_ASSERT_NOT_NULL(dir);
 
-    sc_audit_config_t cfg = { .enabled = true, .log_path = "tamper2.log", .max_size_mb = 10 };
+    sc_audit_config_t cfg = {.enabled = true, .log_path = "tamper2.log", .max_size_mb = 10};
     sc_audit_logger_t *log = sc_audit_logger_create(&sys, &cfg, dir);
     SC_ASSERT_NOT_NULL(log);
 
@@ -458,18 +458,18 @@ static void test_audit_rotation_interval(void) {
     char *dir = mkdtemp(tmp);
     SC_ASSERT_NOT_NULL(dir);
 
-    sc_audit_config_t cfg = { .enabled = true, .log_path = "intv.log", .max_size_mb = 10 };
+    sc_audit_config_t cfg = {.enabled = true, .log_path = "intv.log", .max_size_mb = 10};
     sc_audit_logger_t *log = sc_audit_logger_create(&sys, &cfg, dir);
     SC_ASSERT_NOT_NULL(log);
 
-    sc_audit_set_rotation_interval(log, 1);  /* 1 hour */
+    sc_audit_set_rotation_interval(log, 1); /* 1 hour */
 
     sc_audit_event_t ev;
     sc_audit_event_init(&ev, SC_AUDIT_COMMAND_EXECUTION);
     sc_audit_event_with_action(&ev, "echo a", "low", true, true);
     SC_ASSERT(sc_audit_logger_log(log, &ev) == SC_OK);
 
-    sc_audit_test_set_last_rotation_epoch(log, time(NULL) - 7200);  /* 2 hours ago */
+    sc_audit_test_set_last_rotation_epoch(log, time(NULL) - 7200); /* 2 hours ago */
     SC_ASSERT(sc_audit_logger_log(log, &ev) == SC_OK);
 
     sc_audit_logger_destroy(log, &sys);
@@ -503,7 +503,7 @@ static void test_audit_chain_delete_detected(void) {
     char *dir = mkdtemp(tmp);
     SC_ASSERT_NOT_NULL(dir);
 
-    sc_audit_config_t cfg = { .enabled = true, .log_path = "del.log", .max_size_mb = 10 };
+    sc_audit_config_t cfg = {.enabled = true, .log_path = "del.log", .max_size_mb = 10};
     sc_audit_logger_t *log = sc_audit_logger_create(&sys, &cfg, dir);
     SC_ASSERT_NOT_NULL(log);
 
@@ -525,7 +525,7 @@ static void test_audit_chain_delete_detected(void) {
     while (fgets(line, sizeof(line), fr)) {
         if (first) {
             first = false;
-            continue;  /* Skip first line (delete it) */
+            continue; /* Skip first line (delete it) */
         }
         size_t n = strlen(line);
         memcpy(buf + total, line, n + 1);
@@ -563,7 +563,7 @@ static void test_sandbox_noop(void) {
     SC_ASSERT(sb.ctx != NULL);
     SC_ASSERT(sb.vtable != NULL);
     SC_ASSERT(strcmp(sc_sandbox_name(&sb), "none") == 0);
-    const char *argv[] = { "echo", "test" };
+    const char *argv[] = {"echo", "test"};
     const char *out[16];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 16, &out_count);
@@ -583,7 +583,7 @@ static void test_sandbox_landlock_non_linux_or_test(void) {
 #else
     SC_ASSERT_FALSE(avail); /* macOS or SC_IS_TEST: not available */
 #endif
-    const char *argv[] = { "echo", "x" };
+    const char *argv[] = {"echo", "x"};
     const char *out[16];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 16, &out_count);
@@ -600,7 +600,7 @@ static void test_sandbox_firejail_non_linux(void) {
     sc_firejail_sandbox_init(&ctx, "/tmp");
     sc_sandbox_t sb = sc_firejail_sandbox_get(&ctx);
     SC_ASSERT_FALSE(sc_sandbox_is_available(&sb));
-    const char *argv[] = { "echo", "x" };
+    const char *argv[] = {"echo", "x"};
     const char *out[16];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 16, &out_count);
@@ -614,7 +614,7 @@ static void test_sandbox_bubblewrap_non_linux(void) {
     sc_bubblewrap_sandbox_init(&ctx, "/tmp");
     sc_sandbox_t sb = sc_bubblewrap_sandbox_get(&ctx);
     SC_ASSERT_FALSE(sc_sandbox_is_available(&sb));
-    const char *argv[] = { "echo", "x" };
+    const char *argv[] = {"echo", "x"};
     const char *out[16];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 16, &out_count);
@@ -626,7 +626,7 @@ static void test_seatbelt_test_mode(void) {
     sc_seatbelt_ctx_t ctx;
     sc_seatbelt_sandbox_init(&ctx, "/tmp/workspace");
     sc_sandbox_t sb = sc_seatbelt_sandbox_get(&ctx);
-    const char *argv[] = { "echo", "hello" };
+    const char *argv[] = {"echo", "hello"};
     const char *out[16];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 16, &out_count);
@@ -644,7 +644,7 @@ static void test_bubblewrap_test_mode(void) {
     sc_bubblewrap_ctx_t ctx;
     sc_bubblewrap_sandbox_init(&ctx, "/tmp/workspace");
     sc_sandbox_t sb = sc_bubblewrap_sandbox_get(&ctx);
-    const char *argv[] = { "echo", "hello" };
+    const char *argv[] = {"echo", "hello"};
     const char *out[16];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 16, &out_count);
@@ -701,7 +701,7 @@ static void test_sandbox_seatbelt_wrap_command(void) {
     sc_seatbelt_ctx_t ctx;
     sc_seatbelt_sandbox_init(&ctx, "/tmp/workspace");
     sc_sandbox_t sb = sc_seatbelt_sandbox_get(&ctx);
-    const char *argv[] = { "echo", "test" };
+    const char *argv[] = {"echo", "test"};
     const char *out[16];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 16, &out_count);
@@ -770,7 +770,7 @@ static void test_sandbox_landlock_wrap_passthrough(void) {
     sc_landlock_ctx_t ctx;
     sc_landlock_sandbox_init(&ctx, "/tmp/ws");
     sc_sandbox_t sb = sc_landlock_sandbox_get(&ctx);
-    const char *argv[] = { "ls", "-la" };
+    const char *argv[] = {"ls", "-la"};
     const char *out[8];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 8, &out_count);
@@ -811,7 +811,7 @@ static void test_sandbox_seccomp_wrap_passthrough(void) {
     sc_seccomp_ctx_t ctx;
     sc_seccomp_sandbox_init(&ctx, "/tmp", true);
     sc_sandbox_t sb = sc_seccomp_sandbox_get(&ctx);
-    const char *argv[] = { "echo", "hello" };
+    const char *argv[] = {"echo", "hello"};
     const char *out[8];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 8, &out_count);
@@ -857,7 +857,7 @@ static void test_sandbox_wasi_wrap_command_format(void) {
     sc_wasi_sandbox_ctx_t ctx;
     sc_wasi_sandbox_init(&ctx, "/tmp/workspace");
     sc_sandbox_t sb = sc_wasi_sandbox_get(&ctx);
-    const char *argv[] = { "program.wasm", "--arg1" };
+    const char *argv[] = {"program.wasm", "--arg1"};
     const char *out[16];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 16, &out_count);
@@ -913,7 +913,7 @@ static void test_sandbox_firecracker_wrap_non_linux(void) {
     sc_firecracker_ctx_t ctx;
     sc_firecracker_sandbox_init(&ctx, "/tmp");
     sc_sandbox_t sb = sc_firecracker_sandbox_get(&ctx);
-    const char *argv[] = { "echo", "x" };
+    const char *argv[] = {"echo", "x"};
     const char *out[16];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 16, &out_count);
@@ -961,7 +961,7 @@ static void test_sandbox_apply_noop_returns_ok(void) {
 }
 
 static void test_sandbox_apply_null_returns_ok(void) {
-    sc_sandbox_t sb = { .ctx = NULL, .vtable = NULL };
+    sc_sandbox_t sb = {.ctx = NULL, .vtable = NULL};
     SC_ASSERT_EQ(sc_sandbox_apply(&sb), SC_OK);
 }
 
@@ -1019,7 +1019,7 @@ static void test_sandbox_appcontainer_wrap_non_win(void) {
     sc_appcontainer_ctx_t ctx;
     sc_appcontainer_sandbox_init(&ctx, "/tmp");
     sc_sandbox_t sb = sc_appcontainer_sandbox_get(&ctx);
-    const char *argv[] = { "echo", "x" };
+    const char *argv[] = {"echo", "x"};
     const char *out[8];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 8, &out_count);
@@ -1093,7 +1093,7 @@ static void test_sandbox_noop_wrap_passthrough(void) {
 static void test_observer_noop(void) {
     sc_observer_t obs = sc_observer_noop();
     SC_ASSERT(strcmp(sc_observer_name(obs), "noop") == 0);
-    sc_observer_event_t ev = { .tag = SC_OBSERVER_EVENT_HEARTBEAT_TICK };
+    sc_observer_event_t ev = {.tag = SC_OBSERVER_EVENT_HEARTBEAT_TICK};
     sc_observer_record_event(obs, &ev);
 }
 
@@ -1101,7 +1101,7 @@ static void test_observer_metrics(void) {
     sc_metrics_observer_ctx_t ctx;
     sc_observer_t obs = sc_observer_metrics_create(&ctx);
     SC_ASSERT(strcmp(sc_observer_name(obs), "metrics") == 0);
-    sc_observer_metric_t m = { .tag = SC_OBSERVER_METRIC_TOKENS_USED, .value = 42 };
+    sc_observer_metric_t m = {.tag = SC_OBSERVER_METRIC_TOKENS_USED, .value = 42};
     sc_observer_record_metric(obs, &m);
     SC_ASSERT_EQ(sc_observer_metrics_get(&ctx, SC_OBSERVER_METRIC_TOKENS_USED), 42);
 }
@@ -1131,8 +1131,7 @@ static void test_secret_store_disabled_returns_plaintext(void) {
 static void test_sandbox_docker_vtable_wiring(void) {
     sc_allocator_t sys = sc_system_allocator();
     sc_docker_ctx_t ctx;
-    sc_docker_sandbox_init(&ctx, "/tmp/workspace", "ubuntu:22.04",
-        sys.ctx, sys.alloc, sys.free);
+    sc_docker_sandbox_init(&ctx, "/tmp/workspace", "ubuntu:22.04", sys.ctx, sys.alloc, sys.free);
     sc_sandbox_t sb = sc_docker_sandbox_get(&ctx);
     SC_ASSERT(sb.ctx != NULL);
     SC_ASSERT(sb.vtable != NULL);
@@ -1153,10 +1152,9 @@ static void test_sandbox_docker_not_available_in_test(void) {
 static void test_sandbox_docker_wrap_format(void) {
     sc_allocator_t sys = sc_system_allocator();
     sc_docker_ctx_t ctx;
-    sc_docker_sandbox_init(&ctx, "/tmp/ws", "myimage:latest",
-        sys.ctx, sys.alloc, sys.free);
+    sc_docker_sandbox_init(&ctx, "/tmp/ws", "myimage:latest", sys.ctx, sys.alloc, sys.free);
     sc_sandbox_t sb = sc_docker_sandbox_get(&ctx);
-    const char *argv[] = { "echo", "hello" };
+    const char *argv[] = {"echo", "hello"};
     const char *out[32];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 32, &out_count);
@@ -1184,7 +1182,7 @@ static void test_sandbox_firecracker_wrap_on_linux(void) {
     sc_firecracker_ctx_t ctx;
     sc_firecracker_sandbox_init(&ctx, "/tmp/ws");
     sc_sandbox_t sb = sc_firecracker_sandbox_get(&ctx);
-    const char *argv[] = { "echo", "hello" };
+    const char *argv[] = {"echo", "hello"};
     const char *out[16];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 16, &out_count);
@@ -1202,7 +1200,7 @@ static void test_sandbox_firecracker_wrap_buffer_too_small(void) {
     sc_firecracker_ctx_t ctx;
     sc_firecracker_sandbox_init(&ctx, "/tmp/ws");
     sc_sandbox_t sb = sc_firecracker_sandbox_get(&ctx);
-    const char *argv[] = { "echo" };
+    const char *argv[] = {"echo"};
     const char *out[2];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 1, out, 2, &out_count);
@@ -1223,14 +1221,18 @@ static void test_sandbox_seatbelt_profile_allows_tmp_write(void) {
 static void test_sandbox_create_each_backend(void) {
     sc_allocator_t sys = sc_system_allocator();
     sc_sandbox_alloc_t alloc = {
-        .ctx = sys.ctx, .alloc = sys.alloc, .free = sys.free,
+        .ctx = sys.ctx,
+        .alloc = sys.alloc,
+        .free = sys.free,
     };
 
     sc_sandbox_backend_t backends[] = {
-        SC_SANDBOX_NONE, SC_SANDBOX_LANDLOCK, SC_SANDBOX_FIREJAIL,
-        SC_SANDBOX_BUBBLEWRAP, SC_SANDBOX_SEATBELT, SC_SANDBOX_SECCOMP,
-        SC_SANDBOX_WASI, SC_SANDBOX_LANDLOCK_SECCOMP, SC_SANDBOX_FIRECRACKER,
-        SC_SANDBOX_APPCONTAINER, SC_SANDBOX_AUTO,
+        SC_SANDBOX_NONE,        SC_SANDBOX_LANDLOCK,
+        SC_SANDBOX_FIREJAIL,    SC_SANDBOX_BUBBLEWRAP,
+        SC_SANDBOX_SEATBELT,    SC_SANDBOX_SECCOMP,
+        SC_SANDBOX_WASI,        SC_SANDBOX_LANDLOCK_SECCOMP,
+        SC_SANDBOX_FIRECRACKER, SC_SANDBOX_APPCONTAINER,
+        SC_SANDBOX_AUTO,
     };
     size_t n = sizeof(backends) / sizeof(backends[0]);
 
@@ -1252,14 +1254,14 @@ static void test_process_run_sandboxed_null_args(void) {
     sc_error_t err = sc_process_run_sandboxed(&sys, NULL, NULL, 1024, NULL, NULL, &result);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 
-    const char *argv[] = { NULL };
+    const char *argv[] = {NULL};
     err = sc_process_run_sandboxed(&sys, argv, NULL, 1024, NULL, NULL, &result);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
 
 static void test_process_run_sandboxed_with_null_setup(void) {
     sc_allocator_t sys = sc_system_allocator();
-    const char *argv[] = { "echo", "test-sandbox", NULL };
+    const char *argv[] = {"echo", "test-sandbox", NULL};
     sc_run_result_t result = {0};
     sc_error_t err = sc_process_run_sandboxed(&sys, argv, NULL, 1024, NULL, NULL, &result);
     SC_ASSERT_EQ(err, SC_OK);
@@ -1270,7 +1272,7 @@ static void test_process_run_sandboxed_with_null_setup(void) {
 
 static void test_process_run_with_policy_null(void) {
     sc_allocator_t sys = sc_system_allocator();
-    const char *argv[] = { "echo", "policy-test", NULL };
+    const char *argv[] = {"echo", "policy-test", NULL};
     sc_run_result_t result = {0};
     sc_error_t err = sc_process_run_with_policy(&sys, argv, NULL, 1024, NULL, &result);
     SC_ASSERT_EQ(err, SC_OK);
@@ -1281,7 +1283,7 @@ static void test_process_run_with_policy_null(void) {
 static void test_process_run_with_policy_noop_sandbox(void) {
     sc_allocator_t sys = sc_system_allocator();
     sc_security_policy_t policy = {0};
-    const char *argv[] = { "echo", "sandboxed", NULL };
+    const char *argv[] = {"echo", "sandboxed", NULL};
     sc_run_result_t result = {0};
     sc_error_t err = sc_process_run_with_policy(&sys, argv, NULL, 1024, &policy, &result);
     SC_ASSERT_EQ(err, SC_OK);
@@ -1293,7 +1295,9 @@ static void test_process_run_with_policy_noop_sandbox(void) {
 static void test_sandbox_storage_create_destroy(void) {
     sc_allocator_t sys = sc_system_allocator();
     sc_sandbox_alloc_t alloc = {
-        .ctx = sys.ctx, .alloc = sys.alloc, .free = sys.free,
+        .ctx = sys.ctx,
+        .alloc = sys.alloc,
+        .free = sys.free,
     };
     sc_sandbox_storage_t *st = sc_sandbox_storage_create(&alloc);
     SC_ASSERT_NOT_NULL(st);
@@ -1345,7 +1349,7 @@ static void test_seatbelt_wrap_fails_on_truncated_profile(void) {
     memset(&ctx, 0, sizeof(ctx));
     ctx.profile_len = 0;
     sc_sandbox_t sb = sc_seatbelt_sandbox_get(&ctx);
-    const char *argv[] = { "echo", "hello" };
+    const char *argv[] = {"echo", "hello"};
     const char *out[8];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 2, out, 8, &out_count);
@@ -1367,13 +1371,13 @@ static void test_seatbelt_wrap_fails_on_truncated_profile(void) {
 static void test_firejail_extra_args_wired(void) {
     sc_firejail_ctx_t ctx;
     sc_firejail_sandbox_init(&ctx, "/tmp/ws");
-    const char *extras[] = { "--whitelist=/opt" };
+    const char *extras[] = {"--whitelist=/opt"};
     sc_firejail_sandbox_set_extra_args(&ctx, extras, 1);
     SC_ASSERT_EQ(ctx.extra_args_len, 1);
     SC_ASSERT(ctx.extra_args == extras);
 #ifdef __linux__
     sc_sandbox_t sb = sc_firejail_sandbox_get(&ctx);
-    const char *argv[] = { "ls" };
+    const char *argv[] = {"ls"};
     const char *out[16];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 1, out, 16, &out_count);
@@ -1389,7 +1393,7 @@ static void test_wasi_wrap_fails_null_workspace(void) {
     sc_wasi_sandbox_ctx_t ctx;
     sc_wasi_sandbox_init(&ctx, NULL);
     sc_sandbox_t sb = sc_wasi_sandbox_get(&ctx);
-    const char *argv[] = { "test.wasm" };
+    const char *argv[] = {"test.wasm"};
     const char *out[8];
     size_t out_count = 0;
     sc_error_t err = sc_sandbox_wrap_command(&sb, argv, 1, out, 8, &out_count);

@@ -21,7 +21,7 @@ typedef enum sc_reflection_quality {
 
 typedef struct sc_reflection_result {
     sc_reflection_quality_t quality;
-    char *feedback;  /* optional textual self-critique */
+    char *feedback; /* optional textual self-critique */
     size_t feedback_len;
 } sc_reflection_result_t;
 
@@ -34,9 +34,9 @@ sc_reflection_quality_t sc_reflection_evaluate(const char *user_query, size_t us
 /* Build a self-critique prompt for LLM-based evaluation.
  * Caller owns the returned string. */
 sc_error_t sc_reflection_build_critique_prompt(sc_allocator_t *alloc, const char *user_query,
-                                              size_t user_query_len, const char *response,
-                                              size_t response_len, char **out_prompt,
-                                              size_t *out_prompt_len);
+                                               size_t user_query_len, const char *response,
+                                               size_t response_len, char **out_prompt,
+                                               size_t *out_prompt_len);
 
 void sc_reflection_result_free(sc_allocator_t *alloc, sc_reflection_result_t *result);
 

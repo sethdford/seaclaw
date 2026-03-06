@@ -1,11 +1,11 @@
 /* Plugin system wiring tests. */
-#include "test_framework.h"
 #include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/arena.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/plugin.h"
 #include "seaclaw/plugin_loader.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_plugin_load_bad_path_fails(void) {
@@ -79,7 +79,8 @@ static void test_plugin_config_parse_with_paths(void) {
     SC_ASSERT_NOT_NULL(arena);
     cfg.arena = arena;
     cfg.allocator = sc_arena_allocator(arena);
-    const char *json = "{\"plugins\":{\"enabled\":true,\"paths\":[\"/lib/foo.so\",\"/lib/bar.so\"]}}";
+    const char *json =
+        "{\"plugins\":{\"enabled\":true,\"paths\":[\"/lib/foo.so\",\"/lib/bar.so\"]}}";
     sc_error_t err = sc_config_parse_json(&cfg, json, strlen(json));
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_TRUE(cfg.plugins.enabled);

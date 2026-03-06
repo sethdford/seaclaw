@@ -20,7 +20,7 @@ typedef enum sc_autonomy_level {
 } sc_autonomy_level_t;
 /* Backward compat aliases */
 #define SC_AUTONOMY_READ_ONLY SC_AUTONOMY_LOCKED
-#define SC_AUTONOMY_FULL     SC_AUTONOMY_AUTONOMOUS
+#define SC_AUTONOMY_FULL      SC_AUTONOMY_AUTONOMOUS
 
 /* ── Command risk level ─────────────────────────────────────────── */
 

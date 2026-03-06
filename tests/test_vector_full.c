@@ -1,17 +1,17 @@
-#include "test_framework.h"
+#include "seaclaw/core/allocator.h"
+#include "seaclaw/memory/lifecycle/semantic_cache.h"
 #include "seaclaw/memory/vector/embeddings.h"
 #include "seaclaw/memory/vector/embeddings_gemini.h"
 #include "seaclaw/memory/vector/embeddings_ollama.h"
 #include "seaclaw/memory/vector/embeddings_voyage.h"
-#include "seaclaw/memory/vector/provider_router.h"
 #include "seaclaw/memory/vector/outbox.h"
+#include "seaclaw/memory/vector/provider_router.h"
 #include "seaclaw/memory/vector/store.h"
 #include "seaclaw/memory/vector/store_pgvector.h"
 #include "seaclaw/memory/vector/store_qdrant.h"
-#include "seaclaw/memory/lifecycle/semantic_cache.h"
-#include "seaclaw/core/allocator.h"
-#include <string.h>
+#include "test_framework.h"
 #include <stdio.h>
+#include <string.h>
 
 static void test_embedding_mock_and_free(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -93,8 +93,7 @@ static void test_voyage_create_and_embed_mock(void) {
 static void test_provider_router_single(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_embedding_provider_t noop = sc_embedding_provider_noop_create(&alloc);
-    sc_embedding_provider_t p = sc_embedding_provider_router_create(&alloc,
-        noop, NULL, 0, NULL, 0);
+    sc_embedding_provider_t p = sc_embedding_provider_router_create(&alloc, noop, NULL, 0, NULL, 0);
     SC_ASSERT_NOT_NULL(p.ctx);
     SC_ASSERT_STR_EQ(p.vtable->name(p.ctx), "auto");
 
@@ -133,8 +132,7 @@ static void test_vector_store_upsert_search_mock(void) {
     SC_ASSERT_NOT_NULL(store.ctx);
 
     float emb[] = {1.0f, 0.0f, 0.0f};
-    sc_error_t err = store.vtable->upsert(store.ctx, &alloc, "k1", 2,
-        emb, 3, NULL, 0);
+    sc_error_t err = store.vtable->upsert(store.ctx, &alloc, "k1", 2, emb, 3, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(store.vtable->count(store.ctx), 1);
 
@@ -151,11 +149,9 @@ static void test_vector_store_upsert_search_mock(void) {
 static void test_pgvector_not_supported(void) {
 #if !defined(SC_ENABLE_POSTGRES)
     sc_allocator_t alloc = sc_system_allocator();
-    sc_pgvector_config_t cfg = {
-        .connection_url = "postgresql://localhost/test",
-        .table_name = "memory_vectors",
-        .dimensions = 768
-    };
+    sc_pgvector_config_t cfg = {.connection_url = "postgresql://localhost/test",
+                                .table_name = "memory_vectors",
+                                .dimensions = 768};
     sc_vector_store_t store = sc_vector_store_pgvector_create(&alloc, &cfg);
     SC_ASSERT_NOT_NULL(store.ctx);
 
@@ -169,12 +165,10 @@ static void test_pgvector_not_supported(void) {
 
 static void test_qdrant_mock(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_qdrant_config_t cfg = {
-        .url = "http://localhost:6333",
-        .api_key = NULL,
-        .collection_name = "test",
-        .dimensions = 3
-    };
+    sc_qdrant_config_t cfg = {.url = "http://localhost:6333",
+                              .api_key = NULL,
+                              .collection_name = "test",
+                              .dimensions = 3};
     sc_vector_store_t store = sc_vector_store_qdrant_create(&alloc, &cfg);
     SC_ASSERT_NOT_NULL(store.ctx);
 
@@ -184,7 +178,7 @@ static void test_qdrant_mock(void) {
     size_t n = 0;
     sc_error_t err = store.vtable->search(store.ctx, &alloc, q, 3, 5, &results, &n);
     SC_ASSERT_EQ(err, SC_OK);
-    SC_ASSERT_EQ(n, 0u);  /* mock returns empty */
+    SC_ASSERT_EQ(n, 0u); /* mock returns empty */
     SC_ASSERT_NULL(results);
 #endif
 
@@ -250,13 +244,11 @@ static void test_embedder_noop_dimensions(void) {
 static void test_semantic_cache_hit_miss(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_embedding_provider_t prov = sc_embedding_provider_noop_create(&alloc);
-    sc_semantic_cache_t *cache = sc_semantic_cache_create(&alloc,
-        60, 1000, 0.95f, &prov);
+    sc_semantic_cache_t *cache = sc_semantic_cache_create(&alloc, 60, 1000, 0.95f, &prov);
     SC_ASSERT_NOT_NULL(cache);
 
-    sc_error_t err = sc_semantic_cache_put(cache, &alloc,
-        "abc123", 6, "gpt-4", 5, "Hello response", 14, 10,
-        "hello query", 11);
+    sc_error_t err = sc_semantic_cache_put(cache, &alloc, "abc123", 6, "gpt-4", 5, "Hello response",
+                                           14, 10, "hello query", 11);
     SC_ASSERT_EQ(err, SC_OK);
 
     sc_semantic_cache_hit_t hit = {0};

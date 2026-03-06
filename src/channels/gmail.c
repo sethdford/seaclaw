@@ -16,10 +16,10 @@
 #include <strings.h>
 #include <time.h>
 
-#define GMAIL_API_BASE       "https://gmail.googleapis.com/gmail/v1/users/me"
-#define OAUTH_TOKEN_URL      "https://oauth2.googleapis.com/token"
+#define GMAIL_API_BASE        "https://gmail.googleapis.com/gmail/v1/users/me"
+#define OAUTH_TOKEN_URL       "https://oauth2.googleapis.com/token"
 #define GMAIL_SESSION_KEY_MAX 127
-#define GMAIL_CONTENT_MAX    4095
+#define GMAIL_CONTENT_MAX     4095
 
 typedef struct sc_gmail_ctx {
     sc_allocator_t *alloc;
@@ -37,7 +37,7 @@ typedef struct sc_gmail_ctx {
 
 /* base64url_decode lives in gmail_base64.c for testability */
 extern sc_error_t base64url_decode(const char *in, size_t in_len, char *out, size_t out_cap,
-                                  size_t *out_len);
+                                   size_t *out_len);
 
 #if defined(SC_HTTP_CURL) && !SC_IS_TEST
 static int form_encode_char(char *out, size_t cap, size_t *j, unsigned char c) {
@@ -147,8 +147,8 @@ const char *get_header_value(sc_json_value_t *headers, const char *name) {
     return NULL;
 }
 
-sc_error_t extract_body_from_payload(sc_allocator_t *alloc, sc_json_value_t *payload,
-                                            char *out, size_t out_cap, size_t *out_len) {
+sc_error_t extract_body_from_payload(sc_allocator_t *alloc, sc_json_value_t *payload, char *out,
+                                     size_t out_cap, size_t *out_len) {
     *out_len = 0;
     if (!payload || payload->type != SC_JSON_OBJECT)
         return SC_OK;
@@ -185,7 +185,8 @@ sc_error_t extract_body_from_payload(sc_allocator_t *alloc, sc_json_value_t *pay
             if (!part || part->type != SC_JSON_OBJECT)
                 continue;
             const char *mime = sc_json_get_string(part, "mimeType");
-            if (!mime || (strcasecmp(mime, "text/plain") != 0 && strcasecmp(mime, "text/html") != 0))
+            if (!mime ||
+                (strcasecmp(mime, "text/plain") != 0 && strcasecmp(mime, "text/html") != 0))
                 continue;
             sc_json_value_t *pbody = sc_json_object_get(part, "body");
             if (!pbody || pbody->type != SC_JSON_OBJECT)
@@ -213,7 +214,8 @@ sc_error_t extract_body_from_payload(sc_allocator_t *alloc, sc_json_value_t *pay
                         in_tag = true;
                     else if (decoded[r] == '>')
                         in_tag = false;
-                    else if (!in_tag && (decoded[r] != '\r' || (r + 1 < dec_len && decoded[r + 1] != '\n')))
+                    else if (!in_tag &&
+                             (decoded[r] != '\r' || (r + 1 < dec_len && decoded[r + 1] != '\n')))
                         out[w++] = decoded[r] == '\n' ? ' ' : decoded[r];
                 }
                 out[w] = '\0';
@@ -285,9 +287,9 @@ static const sc_channel_vtable_t gmail_vtable = {
 /* ─── Public API ─────────────────────────────────────────────────────────── */
 
 sc_error_t sc_gmail_create(sc_allocator_t *alloc, const char *client_id, size_t client_id_len,
-                          const char *client_secret, size_t client_secret_len,
-                          const char *refresh_token, size_t refresh_token_len, int poll_interval_sec,
-                          sc_channel_t *out) {
+                           const char *client_secret, size_t client_secret_len,
+                           const char *refresh_token, size_t refresh_token_len,
+                           int poll_interval_sec, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
     sc_gmail_ctx_t *c = (sc_gmail_ctx_t *)calloc(1, sizeof(*c));
@@ -383,8 +385,8 @@ sc_error_t sc_gmail_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_lo
 
     /* GET messages?q=is:unread&maxResults=10 */
     char list_url[384];
-    int nu = snprintf(list_url, sizeof(list_url),
-                      "%s/messages?q=is:unread&maxResults=10", GMAIL_API_BASE);
+    int nu = snprintf(list_url, sizeof(list_url), "%s/messages?q=is:unread&maxResults=10",
+                      GMAIL_API_BASE);
     if (nu <= 0 || (size_t)nu >= sizeof(list_url))
         return SC_ERR_INTERNAL;
 
@@ -426,7 +428,7 @@ sc_error_t sc_gmail_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_lo
         /* GET full message */
         char get_url[384];
         int ng = snprintf(get_url, sizeof(get_url), "%s/messages/%.100s?format=full",
-                         GMAIL_API_BASE, msg_id);
+                          GMAIL_API_BASE, msg_id);
         if (ng <= 0 || (size_t)ng >= sizeof(get_url))
             continue;
 
@@ -470,8 +472,8 @@ sc_error_t sc_gmail_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_lo
 
         /* Format: "Email from {from} | Subject: {subject}\n{body}" */
         char content_buf[sizeof(msgs[0].content)];
-        int nc = snprintf(content_buf, sizeof(content_buf), "Email from %s | Subject: %s\n%s",
-                          from, subject, body_buf);
+        int nc = snprintf(content_buf, sizeof(content_buf), "Email from %s | Subject: %s\n%s", from,
+                          subject, body_buf);
         if (nc <= 0 || (size_t)nc >= sizeof(content_buf))
             nc = (int)(sizeof(content_buf) - 1);
         size_t content_len = (size_t)nc;
@@ -493,8 +495,8 @@ sc_error_t sc_gmail_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_lo
 
         /* Mark as read: POST modify with removeLabelIds: ["UNREAD"] */
         char mod_url[384];
-        int nm = snprintf(mod_url, sizeof(mod_url), "%s/messages/%.100s/modify", GMAIL_API_BASE,
-                         msg_id);
+        int nm =
+            snprintf(mod_url, sizeof(mod_url), "%s/messages/%.100s/modify", GMAIL_API_BASE, msg_id);
         if (nm > 0 && (size_t)nm < sizeof(mod_url)) {
             const char *mod_body = "{\"removeLabelIds\":[\"UNREAD\"]}";
             sc_http_response_t mresp = {0};

@@ -8,7 +8,7 @@
 #include <time.h>
 
 #define SC_TASK_LIST_JSON_FILENAME "tasks.json"
-#define SC_TASK_LIST_MAX_PATH 1024
+#define SC_TASK_LIST_MAX_PATH      1024
 
 struct sc_task_list {
     sc_allocator_t *alloc;
@@ -21,23 +21,36 @@ struct sc_task_list {
 
 static const char *status_to_string(sc_task_list_status_t s) {
     switch (s) {
-    case SC_TASK_LIST_PENDING: return "pending";
-    case SC_TASK_LIST_CLAIMED: return "claimed";
-    case SC_TASK_LIST_IN_PROGRESS: return "in_progress";
-    case SC_TASK_LIST_COMPLETED: return "completed";
-    case SC_TASK_LIST_FAILED: return "failed";
-    case SC_TASK_LIST_CANCELLED: return "cancelled";
-    default: return "pending";
+    case SC_TASK_LIST_PENDING:
+        return "pending";
+    case SC_TASK_LIST_CLAIMED:
+        return "claimed";
+    case SC_TASK_LIST_IN_PROGRESS:
+        return "in_progress";
+    case SC_TASK_LIST_COMPLETED:
+        return "completed";
+    case SC_TASK_LIST_FAILED:
+        return "failed";
+    case SC_TASK_LIST_CANCELLED:
+        return "cancelled";
+    default:
+        return "pending";
     }
 }
 
 static sc_task_list_status_t status_from_string(const char *s) {
-    if (!s) return SC_TASK_LIST_PENDING;
-    if (strcmp(s, "claimed") == 0) return SC_TASK_LIST_CLAIMED;
-    if (strcmp(s, "in_progress") == 0) return SC_TASK_LIST_IN_PROGRESS;
-    if (strcmp(s, "completed") == 0) return SC_TASK_LIST_COMPLETED;
-    if (strcmp(s, "failed") == 0) return SC_TASK_LIST_FAILED;
-    if (strcmp(s, "cancelled") == 0) return SC_TASK_LIST_CANCELLED;
+    if (!s)
+        return SC_TASK_LIST_PENDING;
+    if (strcmp(s, "claimed") == 0)
+        return SC_TASK_LIST_CLAIMED;
+    if (strcmp(s, "in_progress") == 0)
+        return SC_TASK_LIST_IN_PROGRESS;
+    if (strcmp(s, "completed") == 0)
+        return SC_TASK_LIST_COMPLETED;
+    if (strcmp(s, "failed") == 0)
+        return SC_TASK_LIST_FAILED;
+    if (strcmp(s, "cancelled") == 0)
+        return SC_TASK_LIST_CANCELLED;
     return SC_TASK_LIST_PENDING;
 }
 
@@ -76,29 +89,38 @@ static sc_error_t task_list_save(sc_task_list_t *list) {
         if (i > 0 && sc_json_buf_append_raw(&buf, ",", 1) != SC_OK)
             goto fail;
         char nbuf[64];
-        int nlen = snprintf(nbuf, sizeof(nbuf),
-            "{\"id\":%llu,\"subject\":", (unsigned long long)t->id);
-        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK) goto fail;
-        sc_json_append_string(&buf, t->subject ? t->subject : "", t->subject ? strlen(t->subject) : 0);
+        int nlen =
+            snprintf(nbuf, sizeof(nbuf), "{\"id\":%llu,\"subject\":", (unsigned long long)t->id);
+        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK)
+            goto fail;
+        sc_json_append_string(&buf, t->subject ? t->subject : "",
+                              t->subject ? strlen(t->subject) : 0);
         nlen = snprintf(nbuf, sizeof(nbuf), ",\"description\":");
-        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK) goto fail;
+        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK)
+            goto fail;
         sc_json_append_string(&buf, t->description ? t->description : "",
-            t->description ? strlen(t->description) : 0);
+                              t->description ? strlen(t->description) : 0);
         nlen = snprintf(nbuf, sizeof(nbuf), ",\"owner\":%llu,\"status\":\"%s\"",
-            (unsigned long long)t->owner_agent_id, status_to_string(t->status));
-        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK) goto fail;
+                        (unsigned long long)t->owner_agent_id, status_to_string(t->status));
+        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK)
+            goto fail;
         nlen = snprintf(nbuf, sizeof(nbuf), ",\"blocked_by\":[");
-        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK) goto fail;
+        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK)
+            goto fail;
         for (size_t j = 0; j < t->blocked_by_count; j++) {
-            if (j > 0 && sc_json_buf_append_raw(&buf, ",", 1) != SC_OK) goto fail;
+            if (j > 0 && sc_json_buf_append_raw(&buf, ",", 1) != SC_OK)
+                goto fail;
             nlen = snprintf(nbuf, sizeof(nbuf), "%llu", (unsigned long long)t->blocked_by[j]);
-            if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK) goto fail;
+            if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK)
+                goto fail;
         }
         nlen = snprintf(nbuf, sizeof(nbuf), "],\"created_at\":%lld,\"updated_at\":%lld}",
-            (long long)t->created_at, (long long)t->updated_at);
-        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK) goto fail;
+                        (long long)t->created_at, (long long)t->updated_at);
+        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK)
+            goto fail;
     }
-    if (sc_json_buf_append_raw(&buf, "]", 1) != SC_OK) goto fail;
+    if (sc_json_buf_append_raw(&buf, "]", 1) != SC_OK)
+        goto fail;
 
     size_t json_len = buf.len;
     char tmp_path[SC_TASK_LIST_MAX_PATH + 8];
@@ -231,8 +253,7 @@ load_fail:
 sc_task_list_t *sc_task_list_create(sc_allocator_t *alloc, const char *dir_path, size_t max_tasks) {
     if (!alloc || max_tasks == 0)
         return NULL;
-    sc_task_list_t *list =
-        (sc_task_list_t *)alloc->alloc(alloc->ctx, sizeof(sc_task_list_t));
+    sc_task_list_t *list = (sc_task_list_t *)alloc->alloc(alloc->ctx, sizeof(sc_task_list_t));
     if (!list)
         return NULL;
     memset(list, 0, sizeof(*list));
@@ -272,8 +293,7 @@ void sc_task_list_destroy(sc_task_list_t *list) {
 }
 
 sc_error_t sc_task_list_add(sc_task_list_t *list, const char *subject, const char *description,
-                            const uint64_t *blocked_by, size_t blocked_by_count,
-                            uint64_t *out_id) {
+                            const uint64_t *blocked_by, size_t blocked_by_count, uint64_t *out_id) {
     if (!list || !subject || !out_id)
         return SC_ERR_INVALID_ARGUMENT;
     if (list->count >= list->max_tasks)
@@ -285,8 +305,7 @@ sc_error_t sc_task_list_add(sc_task_list_t *list, const char *subject, const cha
     t->subject = sc_strndup(list->alloc, subject, strlen(subject));
     if (!t->subject)
         return SC_ERR_OUT_OF_MEMORY;
-    t->description =
-        description ? sc_strndup(list->alloc, description, strlen(description)) : NULL;
+    t->description = description ? sc_strndup(list->alloc, description, strlen(description)) : NULL;
     t->owner_agent_id = 0;
     t->status = SC_TASK_LIST_PENDING;
     t->created_at = (int64_t)time(NULL);
@@ -369,11 +388,10 @@ sc_error_t sc_task_list_next_available(sc_task_list_t *list, sc_task_t *out) {
         if (out->subject)
             out->subject = sc_strndup(list->alloc, out->subject, strlen(out->subject));
         if (out->description)
-            out->description =
-                sc_strndup(list->alloc, out->description, strlen(out->description));
+            out->description = sc_strndup(list->alloc, out->description, strlen(out->description));
         if (out->blocked_by && out->blocked_by_count > 0) {
-            uint64_t *cpy = (uint64_t *)list->alloc->alloc(
-                list->alloc->ctx, out->blocked_by_count * sizeof(uint64_t));
+            uint64_t *cpy = (uint64_t *)list->alloc->alloc(list->alloc->ctx, out->blocked_by_count *
+                                                                                 sizeof(uint64_t));
             if (cpy) {
                 memcpy(cpy, t->blocked_by, out->blocked_by_count * sizeof(uint64_t));
                 out->blocked_by = cpy;
@@ -399,11 +417,10 @@ sc_error_t sc_task_list_get(sc_task_list_t *list, uint64_t task_id, sc_task_t *o
     if (out->subject)
         out->subject = sc_strndup(list->alloc, out->subject, strlen(out->subject));
     if (out->description)
-        out->description =
-            sc_strndup(list->alloc, out->description, strlen(out->description));
+        out->description = sc_strndup(list->alloc, out->description, strlen(out->description));
     if (out->blocked_by && out->blocked_by_count > 0) {
-        uint64_t *cpy = (uint64_t *)list->alloc->alloc(
-            list->alloc->ctx, out->blocked_by_count * sizeof(uint64_t));
+        uint64_t *cpy = (uint64_t *)list->alloc->alloc(list->alloc->ctx,
+                                                       out->blocked_by_count * sizeof(uint64_t));
         if (cpy) {
             memcpy(cpy, t->blocked_by, out->blocked_by_count * sizeof(uint64_t));
             out->blocked_by = cpy;
@@ -430,8 +447,7 @@ sc_error_t sc_task_list_all(sc_task_list_t *list, sc_task_t **out, size_t *out_c
     for (size_t i = 0; i < list->count; i++) {
         arr[i] = list->tasks[i];
         if (arr[i].subject)
-            arr[i].subject =
-                sc_strndup(list->alloc, arr[i].subject, strlen(arr[i].subject));
+            arr[i].subject = sc_strndup(list->alloc, arr[i].subject, strlen(arr[i].subject));
         if (arr[i].description)
             arr[i].description =
                 sc_strndup(list->alloc, arr[i].description, strlen(arr[i].description));
@@ -439,8 +455,7 @@ sc_error_t sc_task_list_all(sc_task_list_t *list, sc_task_t **out, size_t *out_c
             uint64_t *cpy = (uint64_t *)list->alloc->alloc(
                 list->alloc->ctx, arr[i].blocked_by_count * sizeof(uint64_t));
             if (cpy) {
-                memcpy(cpy, list->tasks[i].blocked_by,
-                       arr[i].blocked_by_count * sizeof(uint64_t));
+                memcpy(cpy, list->tasks[i].blocked_by, arr[i].blocked_by_count * sizeof(uint64_t));
                 arr[i].blocked_by = cpy;
             } else {
                 arr[i].blocked_by = NULL;
@@ -467,8 +482,8 @@ bool sc_task_list_is_ready(sc_task_list_t *list, uint64_t task_id) {
     return list && !sc_task_list_is_blocked(list, task_id);
 }
 
-sc_error_t sc_task_list_query(sc_task_list_t *list, sc_task_list_status_t status,
-                              sc_task_t **out, size_t *out_count) {
+sc_error_t sc_task_list_query(sc_task_list_t *list, sc_task_list_status_t status, sc_task_t **out,
+                              size_t *out_count) {
     if (!list || !out || !out_count)
         return SC_ERR_INVALID_ARGUMENT;
     *out = NULL;
@@ -476,8 +491,7 @@ sc_error_t sc_task_list_query(sc_task_list_t *list, sc_task_list_status_t status
     size_t n = sc_task_list_count_by_status(list, status);
     if (n == 0)
         return SC_OK;
-    sc_task_t *arr =
-        (sc_task_t *)list->alloc->alloc(list->alloc->ctx, n * sizeof(sc_task_t));
+    sc_task_t *arr = (sc_task_t *)list->alloc->alloc(list->alloc->ctx, n * sizeof(sc_task_t));
     if (!arr)
         return SC_ERR_OUT_OF_MEMORY;
     memset(arr, 0, n * sizeof(sc_task_t));
@@ -487,8 +501,7 @@ sc_error_t sc_task_list_query(sc_task_list_t *list, sc_task_list_status_t status
             continue;
         arr[j] = list->tasks[i];
         if (arr[j].subject)
-            arr[j].subject =
-                sc_strndup(list->alloc, arr[j].subject, strlen(arr[j].subject));
+            arr[j].subject = sc_strndup(list->alloc, arr[j].subject, strlen(arr[j].subject));
         if (arr[j].description)
             arr[j].description =
                 sc_strndup(list->alloc, arr[j].description, strlen(arr[j].description));
@@ -496,8 +509,7 @@ sc_error_t sc_task_list_query(sc_task_list_t *list, sc_task_list_status_t status
             uint64_t *cpy = (uint64_t *)list->alloc->alloc(
                 list->alloc->ctx, arr[j].blocked_by_count * sizeof(uint64_t));
             if (cpy) {
-                memcpy(cpy, list->tasks[i].blocked_by,
-                       arr[j].blocked_by_count * sizeof(uint64_t));
+                memcpy(cpy, list->tasks[i].blocked_by, arr[j].blocked_by_count * sizeof(uint64_t));
                 arr[j].blocked_by = cpy;
             } else {
                 arr[j].blocked_by = NULL;
@@ -531,8 +543,7 @@ void sc_task_free(sc_allocator_t *alloc, sc_task_t *task) {
         task->description = NULL;
     }
     if (task->blocked_by) {
-        alloc->free(alloc->ctx, task->blocked_by,
-                    task->blocked_by_count * sizeof(uint64_t));
+        alloc->free(alloc->ctx, task->blocked_by, task->blocked_by_count * sizeof(uint64_t));
         task->blocked_by = NULL;
         task->blocked_by_count = 0;
     }
@@ -554,29 +565,38 @@ sc_error_t sc_task_list_serialize(sc_task_list_t *list, char **out_json, size_t 
         if (i > 0 && sc_json_buf_append_raw(&buf, ",", 1) != SC_OK)
             goto ser_fail;
         char nbuf[64];
-        int nlen = snprintf(nbuf, sizeof(nbuf), "{\"id\":%llu,\"subject\":",
-            (unsigned long long)t->id);
-        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK) goto ser_fail;
-        sc_json_append_string(&buf, t->subject ? t->subject : "", t->subject ? strlen(t->subject) : 0);
+        int nlen =
+            snprintf(nbuf, sizeof(nbuf), "{\"id\":%llu,\"subject\":", (unsigned long long)t->id);
+        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK)
+            goto ser_fail;
+        sc_json_append_string(&buf, t->subject ? t->subject : "",
+                              t->subject ? strlen(t->subject) : 0);
         nlen = snprintf(nbuf, sizeof(nbuf), ",\"description\":");
-        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK) goto ser_fail;
+        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK)
+            goto ser_fail;
         sc_json_append_string(&buf, t->description ? t->description : "",
-            t->description ? strlen(t->description) : 0);
+                              t->description ? strlen(t->description) : 0);
         nlen = snprintf(nbuf, sizeof(nbuf), ",\"owner\":%llu,\"status\":\"%s\"",
-            (unsigned long long)t->owner_agent_id, status_to_string(t->status));
-        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK) goto ser_fail;
+                        (unsigned long long)t->owner_agent_id, status_to_string(t->status));
+        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK)
+            goto ser_fail;
         nlen = snprintf(nbuf, sizeof(nbuf), ",\"blocked_by\":[");
-        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK) goto ser_fail;
+        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK)
+            goto ser_fail;
         for (size_t j = 0; j < t->blocked_by_count; j++) {
-            if (j > 0 && sc_json_buf_append_raw(&buf, ",", 1) != SC_OK) goto ser_fail;
+            if (j > 0 && sc_json_buf_append_raw(&buf, ",", 1) != SC_OK)
+                goto ser_fail;
             nlen = snprintf(nbuf, sizeof(nbuf), "%llu", (unsigned long long)t->blocked_by[j]);
-            if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK) goto ser_fail;
+            if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK)
+                goto ser_fail;
         }
         nlen = snprintf(nbuf, sizeof(nbuf), "],\"created_at\":%lld,\"updated_at\":%lld}",
-            (long long)t->created_at, (long long)t->updated_at);
-        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK) goto ser_fail;
+                        (long long)t->created_at, (long long)t->updated_at);
+        if (sc_json_buf_append_raw(&buf, nbuf, (size_t)nlen) != SC_OK)
+            goto ser_fail;
     }
-    if (sc_json_buf_append_raw(&buf, "]", 1) != SC_OK) goto ser_fail;
+    if (sc_json_buf_append_raw(&buf, "]", 1) != SC_OK)
+        goto ser_fail;
 
     *out_json = (char *)list->alloc->alloc(list->alloc->ctx, buf.len + 1);
     if (!*out_json) {

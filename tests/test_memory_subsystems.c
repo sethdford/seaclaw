@@ -1,11 +1,11 @@
-#include "test_framework.h"
-#include "seaclaw/memory/vector_math.h"
-#include "seaclaw/memory/vector/circuit_breaker.h"
-#include "seaclaw/memory/engines.h"
-#include "seaclaw/memory.h"
 #include "seaclaw/core/allocator.h"
-#include <string.h>
+#include "seaclaw/memory.h"
+#include "seaclaw/memory/engines.h"
+#include "seaclaw/memory/vector/circuit_breaker.h"
+#include "seaclaw/memory/vector_math.h"
+#include "test_framework.h"
 #include <math.h>
+#include <string.h>
 
 static void test_vector_cosine_identical(void) {
     float a[] = {1.0f, 2.0f, 3.0f};
@@ -78,7 +78,7 @@ static void test_memory_lru_basic(void) {
     SC_ASSERT_NOT_NULL(mem.vtable);
     SC_ASSERT_STR_EQ(mem.vtable->name(mem.ctx), "memory_lru");
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->store(mem.ctx, "greeting", 8, "hello world", 11, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
 
@@ -102,7 +102,7 @@ static void test_memory_lru_basic(void) {
 static void test_memory_lru_eviction(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_memory_lru_create(&alloc, 3);
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
 
     mem.vtable->store(mem.ctx, "a", 1, "first", 5, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "b", 1, "second", 6, &cat, NULL, 0);
@@ -131,7 +131,7 @@ static void test_memory_lru_eviction(void) {
 static void test_memory_lru_recall(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_memory_lru_create(&alloc, 100);
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
 
     mem.vtable->store(mem.ctx, "user_pref", 9, "dark mode enabled", 16, &cat, NULL, 0);
     sc_memory_entry_t *out = NULL;
@@ -210,7 +210,7 @@ static void test_vector_bytes_roundtrip(void) {
 static void test_memory_lru_forget(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_memory_lru_create(&alloc, 100);
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "x", 1, "y", 1, &cat, NULL, 0);
     bool deleted = false;
     sc_error_t err = mem.vtable->forget(mem.ctx, "x", 1, &deleted);
@@ -235,7 +235,7 @@ static void test_memory_lru_count_empty(void) {
 static void test_memory_lru_insert_lookup(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_memory_lru_create(&alloc, 100);
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "k1", 2, "v1", 2, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "k2", 2, "v2", 2, &cat, NULL, 0);
     sc_memory_entry_t ent;

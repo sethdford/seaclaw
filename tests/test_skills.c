@@ -1,9 +1,9 @@
 /* Skills and skill registry tests. */
-#include "test_framework.h"
-#include "seaclaw/skills.h"
-#include "seaclaw/skill_registry.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#include "seaclaw/skill_registry.h"
+#include "seaclaw/skills.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_skills_list_delegates_to_skillforge(void) {
@@ -110,7 +110,8 @@ static void test_skill_registry_get_installed_dir(void) {
     char buf[256];
     size_t n = sc_skill_registry_get_installed_dir(buf, sizeof(buf));
     SC_ASSERT_TRUE(n > 0 || (n == 0 && !getenv("HOME")));
-    if (n >= 6) SC_ASSERT_TRUE(strstr(buf, "skills") != NULL);
+    if (n >= 6)
+        SC_ASSERT_TRUE(strstr(buf, "skills") != NULL);
 }
 
 static void test_skill_registry_publish_mock(void) {

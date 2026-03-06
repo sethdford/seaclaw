@@ -285,7 +285,8 @@ sc_error_t sc_mcp_server_list_tools(sc_mcp_server_t *srv, sc_allocator_t *alloc,
     }
     const char *mock_name = "mock_tool";
     const char *mock_desc = "Mock MCP tool";
-    const char *mock_params = "{\"type\":\"object\",\"properties\":{\"input\":{\"type\":\"string\"}}}";
+    const char *mock_params =
+        "{\"type\":\"object\",\"properties\":{\"input\":{\"type\":\"string\"}}}";
     names[0] = (char *)alloc->alloc(alloc->ctx, strlen(mock_name) + 1);
     descs[0] = (char *)alloc->alloc(alloc->ctx, strlen(mock_desc) + 1);
     params[0] = (char *)alloc->alloc(alloc->ctx, strlen(mock_params) + 1);
@@ -671,7 +672,8 @@ sc_error_t sc_mcp_init_tools(sc_allocator_t *alloc, const sc_mcp_server_config_t
         total += n;
 
         for (size_t j = 0; j < n; j++) {
-            if (!names[j]) continue;
+            if (!names[j])
+                continue;
             size_t pref_len = 32 + strlen(names[j]);
             char *prefixed = (char *)alloc->alloc(alloc->ctx, pref_len);
             if (!prefixed) {

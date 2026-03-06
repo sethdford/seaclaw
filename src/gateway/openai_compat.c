@@ -71,8 +71,8 @@ static const char *message_content(const sc_json_value_t *msg, size_t *out_len) 
     return NULL;
 }
 
-static void error_response(sc_allocator_t *alloc, int status, const char *message,
-                           int *out_status, char **out_body, size_t *out_body_len) {
+static void error_response(sc_allocator_t *alloc, int status, const char *message, int *out_status,
+                           char **out_body, size_t *out_body_len) {
     *out_status = status;
     sc_json_buf_t buf;
     if (sc_json_buf_init(&buf, alloc) != SC_OK) {
@@ -108,10 +108,9 @@ static void error_response(sc_allocator_t *alloc, int status, const char *messag
 /* sizeof(lit)-1 is a compile-time constant; avoids runtime strlen on string literals */
 #define SSE_APPEND_LIT(buf, lit) sc_json_buf_append_raw((buf), (lit), sizeof(lit) - 1)
 
-static sc_error_t append_sse_chunk(sc_json_buf_t *buf, sc_allocator_t *alloc,
-                                   const char *id, const char *model, size_t model_len,
-                                   long created, const char *delta, size_t delta_len,
-                                   bool is_final) {
+static sc_error_t append_sse_chunk(sc_json_buf_t *buf, sc_allocator_t *alloc, const char *id,
+                                   const char *model, size_t model_len, long created,
+                                   const char *delta, size_t delta_len, bool is_final) {
     (void)alloc;
     if (SSE_APPEND_LIT(buf, "data: ") != SC_OK)
         return SC_ERR_OUT_OF_MEMORY;
@@ -130,8 +129,10 @@ static sc_error_t append_sse_chunk(sc_json_buf_t *buf, sc_allocator_t *alloc,
     if (sc_json_buf_append_raw(buf, model, model_len) != SC_OK)
         return SC_ERR_OUT_OF_MEMORY;
     if (is_final) {
-        if (SSE_APPEND_LIT(buf,
-                "\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n") != SC_OK)
+        if (SSE_APPEND_LIT(
+                buf,
+                "\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n") !=
+            SC_OK)
             return SC_ERR_OUT_OF_MEMORY;
     } else {
         if (SSE_APPEND_LIT(buf, "\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"") != SC_OK)
@@ -145,11 +146,10 @@ static sc_error_t append_sse_chunk(sc_json_buf_t *buf, sc_allocator_t *alloc,
 }
 
 void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
-                                               sc_allocator_t *alloc,
-                                               const sc_app_context_t *app_ctx,
-                                               int *out_status, char **out_body,
-                                               size_t *out_body_len,
-                                               const char **out_content_type) {
+                                              sc_allocator_t *alloc,
+                                              const sc_app_context_t *app_ctx, int *out_status,
+                                              char **out_body, size_t *out_body_len,
+                                              const char **out_content_type) {
     *out_status = 500;
     *out_body = NULL;
     *out_body_len = 0;
@@ -163,7 +163,7 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
 
     if (!app_ctx || !app_ctx->config) {
         error_response(alloc, 503, "Service unavailable: no config", out_status, out_body,
-                      out_body_len);
+                       out_body_len);
         return;
     }
 
@@ -195,11 +195,10 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     }
 
     sc_json_value_t *messages_val = sc_json_object_get(root, "messages");
-    if (!messages_val || messages_val->type != SC_JSON_ARRAY ||
-        messages_val->data.array.len == 0) {
+    if (!messages_val || messages_val->type != SC_JSON_ARRAY || messages_val->data.array.len == 0) {
         sc_json_free(alloc, root);
         error_response(alloc, 400, "messages is required and must be non-empty", out_status,
-                      out_body, out_body_len);
+                       out_body, out_body_len);
         return;
     }
 
@@ -224,7 +223,7 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
             alloc->free(alloc->ctx, msgs, msg_count * sizeof(sc_chat_message_t));
             sc_json_free(alloc, root);
             error_response(alloc, 400, "Invalid message format", out_status, out_body,
-                          out_body_len);
+                           out_body_len);
             return;
         }
         const char *role_str = sc_json_get_string(item, "role");
@@ -282,13 +281,13 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
         const char *mock_chunks[] = {"m", "o", "c", "k"};
         for (size_t i = 0; i < sizeof(mock_chunks) / sizeof(mock_chunks[0]); i++) {
             if (append_sse_chunk(&buf, alloc, id_buf, model, model_len_out, created_ts,
-                                mock_chunks[i], 1, false) != SC_OK) {
+                                 mock_chunks[i], 1, false) != SC_OK) {
                 sc_json_buf_free(&buf);
                 return;
             }
         }
-        if (append_sse_chunk(&buf, alloc, id_buf, model, model_len_out, created_ts,
-                            NULL, 0, true) != SC_OK) {
+        if (append_sse_chunk(&buf, alloc, id_buf, model, model_len_out, created_ts, NULL, 0,
+                             true) != SC_OK) {
             sc_json_buf_free(&buf);
             return;
         }
@@ -299,19 +298,20 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
 #else
         sc_provider_t provider = {0};
         err = sc_provider_create_from_config(alloc, cfg, provider_name, strlen(provider_name),
-                                              &provider);
+                                             &provider);
         if (err == SC_ERR_NOT_SUPPORTED) {
             const char *api_key = sc_config_get_provider_key(cfg, provider_name);
             size_t api_key_len = api_key ? strlen(api_key) : 0;
             const char *base_url = sc_config_get_provider_base_url(cfg, provider_name);
             size_t base_url_len = base_url ? strlen(base_url) : 0;
-            err = sc_provider_create(alloc, provider_name, strlen(provider_name), api_key, api_key_len,
-                                    base_url, base_url_len, &provider);
+            err = sc_provider_create(alloc, provider_name, strlen(provider_name), api_key,
+                                     api_key_len, base_url, base_url_len, &provider);
         }
         if (err != SC_OK) {
             alloc->free(alloc->ctx, msgs, msg_count * sizeof(sc_chat_message_t));
             sc_json_buf_free(&buf);
-            error_response(alloc, 503, "Provider not available", out_status, out_body, out_body_len);
+            error_response(alloc, 503, "Provider not available", out_status, out_body,
+                           out_body_len);
             return;
         }
         sc_chat_request_t req = {
@@ -354,16 +354,16 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
             }
             if (p > start) {
                 size_t chunk_len = (size_t)(p - start);
-                if (append_sse_chunk(&buf, alloc, id_buf, model, model_len_out, created_ts,
-                                     start, chunk_len, false) != SC_OK) {
+                if (append_sse_chunk(&buf, alloc, id_buf, model, model_len_out, created_ts, start,
+                                     chunk_len, false) != SC_OK) {
                     sc_chat_response_free(alloc, &resp);
                     sc_json_buf_free(&buf);
                     return;
                 }
             }
         }
-        if (append_sse_chunk(&buf, alloc, id_buf, model, model_len_out, created_ts,
-                            NULL, 0, true) != SC_OK) {
+        if (append_sse_chunk(&buf, alloc, id_buf, model, model_len_out, created_ts, NULL, 0,
+                             true) != SC_OK) {
             sc_chat_response_free(alloc, &resp);
             sc_json_buf_free(&buf);
             return;
@@ -436,8 +436,8 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     return;
 #else
     sc_provider_t provider = {0};
-    err = sc_provider_create_from_config(alloc, cfg, provider_name, strlen(provider_name),
-                                          &provider);
+    err =
+        sc_provider_create_from_config(alloc, cfg, provider_name, strlen(provider_name), &provider);
     if (err == SC_ERR_NOT_SUPPORTED) {
         const char *api_key = sc_config_get_provider_key(cfg, provider_name);
         size_t api_key_len = api_key ? strlen(api_key) : 0;
@@ -465,8 +465,8 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     };
 
     sc_chat_response_t resp = {0};
-    err = provider.vtable->chat(provider.ctx, alloc, &req, model, model_len_out, temperature,
-                                &resp);
+    err =
+        provider.vtable->chat(provider.ctx, alloc, &req, model, model_len_out, temperature, &resp);
     alloc->free(alloc->ctx, msgs, msg_count * sizeof(sc_chat_message_t));
 
     if (provider.vtable && provider.vtable->deinit)
@@ -492,8 +492,7 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     static const char oc_hdr[] = "\",\"object\":\"chat.completion\",\"created\":";
     static const char oc_choices[] =
         "\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"";
-    static const char oc_usage[] =
-        "},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":";
+    static const char oc_usage[] = "},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":";
     if (sc_json_buf_append_raw(&buf, "{\"id\":\"", 7) != SC_OK ||
         sc_json_buf_append_raw(&buf, id_buf, strlen(id_buf)) != SC_OK ||
         sc_json_buf_append_raw(&buf, oc_hdr, sizeof(oc_hdr) - 1) != SC_OK) {
@@ -551,10 +550,8 @@ void sc_openai_compat_handle_chat_completions(const char *body, size_t body_len,
 #endif
 }
 
-void sc_openai_compat_handle_models(sc_allocator_t *alloc,
-                                    const sc_app_context_t *app_ctx,
-                                    int *out_status, char **out_body,
-                                    size_t *out_body_len) {
+void sc_openai_compat_handle_models(sc_allocator_t *alloc, const sc_app_context_t *app_ctx,
+                                    int *out_status, char **out_body, size_t *out_body_len) {
     *out_status = 200;
     *out_body = NULL;
     *out_body_len = 0;
@@ -564,7 +561,7 @@ void sc_openai_compat_handle_models(sc_allocator_t *alloc,
 
     if (!app_ctx || !app_ctx->config) {
         error_response(alloc, 503, "Service unavailable: no config", out_status, out_body,
-                      out_body_len);
+                       out_body_len);
         return;
     }
 
@@ -641,4 +638,3 @@ void sc_openai_compat_handle_models(sc_allocator_t *alloc,
     *out_body_len = buf.len;
     sc_json_buf_free(&buf);
 }
-

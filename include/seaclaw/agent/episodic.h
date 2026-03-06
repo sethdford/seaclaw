@@ -7,10 +7,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SC_EPISODIC_KEY_PREFIX "_ep:"
+#define SC_EPISODIC_KEY_PREFIX     "_ep:"
 #define SC_EPISODIC_KEY_PREFIX_LEN 4
-#define SC_EPISODIC_MAX_SUMMARY 512
-#define SC_EPISODIC_MAX_LOAD 5
+#define SC_EPISODIC_MAX_SUMMARY    512
+#define SC_EPISODIC_MAX_LOAD       5
 
 typedef struct sc_episode {
     char *summary;
@@ -24,8 +24,8 @@ typedef struct sc_episode {
  * messages is an array of alternating user/assistant content strings.
  * Caller owns the returned string. */
 char *sc_episodic_summarize_session(sc_allocator_t *alloc, const char *const *messages,
-                                   const size_t *message_lens, size_t message_count,
-                                   size_t *out_len);
+                                    const size_t *message_lens, size_t message_count,
+                                    size_t *out_len);
 
 /* Store an episode into the memory backend. */
 sc_error_t sc_episodic_store(sc_memory_t *memory, sc_allocator_t *alloc, const char *session_id,

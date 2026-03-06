@@ -1,13 +1,14 @@
-/* Tests for status.c, state.c, http_util.c, json_util.c, util.c — no network, minimal file I/O (/tmp only). */
-#include "test_framework.h"
-#include "seaclaw/status.h"
-#include "seaclaw/state.h"
+/* Tests for status.c, state.c, http_util.c, json_util.c, util.c — no network, minimal file I/O
+ * (/tmp only). */
+#include "seaclaw/core/allocator.h"
+#include "seaclaw/core/error.h"
+#include "seaclaw/core/json.h"
 #include "seaclaw/http_util.h"
 #include "seaclaw/json_util.h"
+#include "seaclaw/state.h"
+#include "seaclaw/status.h"
 #include "seaclaw/util.h"
-#include "seaclaw/core/allocator.h"
-#include "seaclaw/core/json.h"
-#include "seaclaw/core/error.h"
+#include "test_framework.h"
 #include <string.h>
 #include <unistd.h>
 
@@ -144,8 +145,8 @@ static void test_state_save_load_roundtrip(void) {
 static void test_http_util_post_null_alloc_returns_error(void) {
     char *body = NULL;
     size_t out_len = 0;
-    sc_error_t err = sc_http_util_post(NULL, "https://example.com", 18,
-        "", 0, NULL, 0, &body, &out_len);
+    sc_error_t err =
+        sc_http_util_post(NULL, "https://example.com", 18, "", 0, NULL, 0, &body, &out_len);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
 
@@ -167,8 +168,8 @@ static void test_http_util_post_null_out_body_returns_error(void) {
 static void test_http_util_get_null_alloc_returns_error(void) {
     char *body = NULL;
     size_t out_len = 0;
-    sc_error_t err = sc_http_util_get(NULL, "https://example.com", 18,
-        NULL, 0, NULL, &body, &out_len);
+    sc_error_t err =
+        sc_http_util_get(NULL, "https://example.com", 18, NULL, 0, NULL, &body, &out_len);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
 

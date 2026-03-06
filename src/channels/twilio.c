@@ -1,6 +1,6 @@
+#include "seaclaw/channels/twilio.h"
 #include "seaclaw/channel.h"
 #include "seaclaw/channel_loop.h"
-#include "seaclaw/channels/twilio.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/http.h"
@@ -52,7 +52,8 @@ static void twilio_stop(void *ctx) {
 }
 
 #if !SC_IS_TEST
-/* Percent-encode for application/x-www-form-urlencoded; append to buf, return new len or 0 on overflow. */
+/* Percent-encode for application/x-www-form-urlencoded; append to buf, return new len or 0 on
+ * overflow. */
 static size_t form_append_encoded(char *buf, size_t cap, size_t len, const char *key,
                                   size_t key_len, const char *val, size_t val_len) {
     static const char hex[] = "0123456789ABCDEF";
@@ -160,8 +161,7 @@ static sc_error_t twilio_send(void *ctx, const char *target, size_t target_len, 
         return SC_ERR_INTERNAL;
 
     char auth_buf[768];
-    int na = snprintf(auth_buf, sizeof(auth_buf), "Authorization: Basic %.*s",
-                      (int)b64_len, b64);
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Authorization: Basic %.*s", (int)b64_len, b64);
     c->alloc->free(c->alloc->ctx, b64, b64_len + 1);
     if (na <= 0 || (size_t)na >= sizeof(auth_buf))
         return SC_ERR_INTERNAL;
@@ -259,9 +259,8 @@ bool sc_twilio_is_configured(sc_channel_t *ch) {
     if (!ch || !ch->ctx)
         return false;
     sc_twilio_ctx_t *c = (sc_twilio_ctx_t *)ch->ctx;
-    return c->account_sid != NULL && c->account_sid_len > 0 &&
-           c->auth_token != NULL && c->auth_token_len > 0 &&
-           c->from_number != NULL && c->from_number_len > 0 &&
+    return c->account_sid != NULL && c->account_sid_len > 0 && c->auth_token != NULL &&
+           c->auth_token_len > 0 && c->from_number != NULL && c->from_number_len > 0 &&
            c->to_number != NULL && c->to_number_len > 0;
 }
 

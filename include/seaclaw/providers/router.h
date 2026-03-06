@@ -41,7 +41,7 @@ typedef struct sc_multi_model_router_config {
 } sc_multi_model_router_config_t;
 
 sc_error_t sc_multi_model_router_create(sc_allocator_t *alloc,
-                                       const sc_multi_model_router_config_t *config,
-                                       sc_provider_t *out);
+                                        const sc_multi_model_router_config_t *config,
+                                        sc_provider_t *out);
 
 #endif /* SC_ROUTER_H */

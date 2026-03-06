@@ -105,10 +105,9 @@ static void test_team_config_parse_with_3_members(void) {
 
 static void test_team_config_get_member_by_name(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    const char *json =
-        "{\"name\":\"team\",\"members\":["
-        "{\"name\":\"backend\",\"role\":\"builder\"},"
-        "{\"name\":\"reviewer\",\"role\":\"reviewer\"}]}";
+    const char *json = "{\"name\":\"team\",\"members\":["
+                       "{\"name\":\"backend\",\"role\":\"builder\"},"
+                       "{\"name\":\"reviewer\",\"role\":\"reviewer\"}]}";
     sc_team_config_t cfg = {0};
     SC_ASSERT_EQ(sc_team_config_parse(&alloc, json, strlen(json), &cfg), SC_OK);
 
@@ -124,11 +123,10 @@ static void test_team_config_get_member_by_name(void) {
 
 static void test_team_config_get_by_role_finds_first_match(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    const char *json =
-        "{\"name\":\"team\",\"members\":["
-        "{\"name\":\"backend\",\"role\":\"builder\"},"
-        "{\"name\":\"frontend\",\"role\":\"builder\"},"
-        "{\"name\":\"reviewer\",\"role\":\"reviewer\"}]}";
+    const char *json = "{\"name\":\"team\",\"members\":["
+                       "{\"name\":\"backend\",\"role\":\"builder\"},"
+                       "{\"name\":\"frontend\",\"role\":\"builder\"},"
+                       "{\"name\":\"reviewer\",\"role\":\"reviewer\"}]}";
     sc_team_config_t cfg = {0};
     SC_ASSERT_EQ(sc_team_config_parse(&alloc, json, strlen(json), &cfg), SC_OK);
 
@@ -141,12 +139,11 @@ static void test_team_config_get_by_role_finds_first_match(void) {
 
 static void test_team_config_parse_autonomy_levels_maps_correctly(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    const char *json =
-        "{\"name\":\"team\",\"members\":["
-        "{\"name\":\"a\",\"autonomy\":\"locked\"},"
-        "{\"name\":\"b\",\"autonomy\":\"supervised\"},"
-        "{\"name\":\"c\",\"autonomy\":\"assisted\"},"
-        "{\"name\":\"d\",\"autonomy\":\"autonomous\"}]}";
+    const char *json = "{\"name\":\"team\",\"members\":["
+                       "{\"name\":\"a\",\"autonomy\":\"locked\"},"
+                       "{\"name\":\"b\",\"autonomy\":\"supervised\"},"
+                       "{\"name\":\"c\",\"autonomy\":\"assisted\"},"
+                       "{\"name\":\"d\",\"autonomy\":\"autonomous\"}]}";
     sc_team_config_t cfg = {0};
     SC_ASSERT_EQ(sc_team_config_parse(&alloc, json, strlen(json), &cfg), SC_OK);
 
@@ -238,15 +235,15 @@ static void test_mailbox_recv_in_agent_context_works(void) {
 
     sc_agent_t agent = {0};
     SC_ASSERT_EQ(sc_agent_from_config(&agent, &a, prov, NULL, 0, NULL, NULL, NULL, NULL,
-                                      "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false,
-                                      2, NULL, 0, NULL),
+                                      "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false, 2,
+                                      NULL, 0, NULL),
                  SC_OK);
     sc_agent_set_mailbox(&agent, mb);
 
     uint64_t agent_id = (uint64_t)(uintptr_t)&agent;
-    SC_ASSERT_EQ(sc_mailbox_send(mb, 999, agent_id, SC_MSG_TASK, "API ready at /api/checkout",
-                                 24, 0),
-                 SC_OK);
+    SC_ASSERT_EQ(
+        sc_mailbox_send(mb, 999, agent_id, SC_MSG_TASK, "API ready at /api/checkout", 24, 0),
+        SC_OK);
 
     sc_message_t msg = {0};
     SC_ASSERT_EQ(sc_mailbox_recv(mb, agent_id, &msg), SC_OK);
@@ -291,8 +288,8 @@ static void test_cancel_message_sets_cancel_requested(void) {
 
     sc_agent_t agent = {0};
     SC_ASSERT_EQ(sc_agent_from_config(&agent, &a, prov, NULL, 0, NULL, NULL, NULL, NULL,
-                                      "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false,
-                                      2, NULL, 0, NULL),
+                                      "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false, 2,
+                                      NULL, 0, NULL),
                  SC_OK);
     sc_agent_set_mailbox(&agent, mb);
     SC_ASSERT_EQ(agent.cancel_requested, 0);
@@ -423,8 +420,8 @@ static void test_agent_turn_processes_mailbox_messages(void) {
 
     sc_agent_t agent = {0};
     SC_ASSERT_EQ(sc_agent_from_config(&agent, &a, prov, NULL, 0, NULL, NULL, NULL, NULL,
-                                      "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false,
-                                      2, NULL, 0, NULL),
+                                      "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false, 2,
+                                      NULL, 0, NULL),
                  SC_OK);
     sc_agent_set_mailbox(&agent, mb);
 
@@ -457,8 +454,8 @@ static void test_agent_registers_unregisters_with_mailbox(void) {
 
     sc_agent_t agent = {0};
     SC_ASSERT_EQ(sc_agent_from_config(&agent, &a, prov, NULL, 0, NULL, NULL, NULL, NULL,
-                                      "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false,
-                                      2, NULL, 0, NULL),
+                                      "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false, 2,
+                                      NULL, 0, NULL),
                  SC_OK);
     agent.agent_id = 1;
     sc_agent_set_mailbox(&agent, mb);
@@ -469,8 +466,7 @@ static void test_agent_registers_unregisters_with_mailbox(void) {
     sc_message_free(&a, &msg);
 
     sc_agent_deinit(&agent);
-    SC_ASSERT_EQ(sc_mailbox_send(mb, 999, 1, SC_MSG_TASK, "after deinit", 12, 0),
-                 SC_ERR_NOT_FOUND);
+    SC_ASSERT_EQ(sc_mailbox_send(mb, 999, 1, SC_MSG_TASK, "after deinit", 12, 0), SC_ERR_NOT_FOUND);
 
     sc_mailbox_destroy(mb);
 }
@@ -486,8 +482,8 @@ static void test_send_slash_command_sends_message(void) {
 
     sc_agent_t agent = {0};
     SC_ASSERT_EQ(sc_agent_from_config(&agent, &a, prov, NULL, 0, NULL, NULL, NULL, NULL,
-                                      "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false,
-                                      2, NULL, 0, NULL),
+                                      "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false, 2,
+                                      NULL, 0, NULL),
                  SC_OK);
     sc_agent_set_mailbox(&agent, mb);
 
@@ -541,8 +537,7 @@ static void test_task_query_by_status_returns_correct_tasks(void) {
 
     sc_task_t *pending = NULL;
     size_t pending_count = 0;
-    SC_ASSERT_EQ(sc_task_list_query(list, SC_TASK_LIST_PENDING, &pending, &pending_count),
-                 SC_OK);
+    SC_ASSERT_EQ(sc_task_list_query(list, SC_TASK_LIST_PENDING, &pending, &pending_count), SC_OK);
     SC_ASSERT_EQ(pending_count, 2u);
     SC_ASSERT_NOT_NULL(pending);
     sc_task_array_free(&a, pending, pending_count);
@@ -567,7 +562,8 @@ static void test_task_list_serialize_deserialize_round_trip_preserves_all_fields
 
     uint64_t id = 0;
     SC_ASSERT_EQ(sc_task_list_add(list, "Build checkout API", "REST endpoints for cart + payment",
-                                 NULL, 0, &id), SC_OK);
+                                  NULL, 0, &id),
+                 SC_OK);
     SC_ASSERT_EQ(id, 1u);
     SC_ASSERT_EQ(sc_task_list_claim(list, 1, 42), SC_OK);
     SC_ASSERT_EQ(sc_task_list_update_status(list, 1, SC_TASK_LIST_IN_PROGRESS), SC_OK);

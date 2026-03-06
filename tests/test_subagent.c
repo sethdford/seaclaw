@@ -1,7 +1,7 @@
-#include "test_framework.h"
-#include "seaclaw/subagent.h"
-#include "seaclaw/core/allocator.h"
 #include "seaclaw/config.h"
+#include "seaclaw/core/allocator.h"
+#include "seaclaw/subagent.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_subagent_create_destroy(void) {

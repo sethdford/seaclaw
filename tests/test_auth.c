@@ -1,26 +1,35 @@
 /* Auth module tests. Uses /tmp for credential file I/O; no network. */
-#include "test_framework.h"
 #include "seaclaw/auth.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"
-#include <string.h>
+#include "test_framework.h"
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/stat.h>
 
 /* Setup writable auth dir: create /tmp/seaclaw_auth_test_<pid>_<n>/.seaclaw and set HOME. */
 static char *setup_auth_test_home(sc_allocator_t *alloc) {
     static int counter = 0;
     char tmpdir[128];
-    int n = snprintf(tmpdir, sizeof(tmpdir), "/tmp/seaclaw_auth_test_%d_%d", (int)getpid(), counter++);
-    if (n <= 0 || (size_t)n >= sizeof(tmpdir)) return NULL;
-    if (mkdir(tmpdir, 0755) != 0) return NULL;
+    int n =
+        snprintf(tmpdir, sizeof(tmpdir), "/tmp/seaclaw_auth_test_%d_%d", (int)getpid(), counter++);
+    if (n <= 0 || (size_t)n >= sizeof(tmpdir))
+        return NULL;
+    if (mkdir(tmpdir, 0755) != 0)
+        return NULL;
     char subdir[256];
     n = snprintf(subdir, sizeof(subdir), "%s/.seaclaw", tmpdir);
-    if (n <= 0 || (size_t)n >= sizeof(subdir)) { rmdir(tmpdir); return NULL; }
-    if (mkdir(subdir, 0755) != 0) { rmdir(tmpdir); return NULL; }
+    if (n <= 0 || (size_t)n >= sizeof(subdir)) {
+        rmdir(tmpdir);
+        return NULL;
+    }
+    if (mkdir(subdir, 0755) != 0) {
+        rmdir(tmpdir);
+        return NULL;
+    }
     const char *old = getenv("HOME");
     char *saved = old ? sc_strdup(alloc, old) : NULL;
     setenv("HOME", tmpdir, 1);
@@ -68,12 +77,12 @@ static void test_oauth_token_deinit_null_safe(void) {
 
 static void test_oauth_token_is_expired_null_safe(void) {
     SC_ASSERT_FALSE(sc_oauth_token_is_expired(NULL));
-    sc_oauth_token_t t = { .expires_at = 0 };
+    sc_oauth_token_t t = {.expires_at = 0};
     SC_ASSERT_FALSE(sc_oauth_token_is_expired(&t));
 }
 
 static void test_oauth_token_is_expired_future(void) {
-    sc_oauth_token_t t = { .expires_at = (int64_t)time(NULL) + 3600 };
+    sc_oauth_token_t t = {.expires_at = (int64_t)time(NULL) + 3600};
     SC_ASSERT_FALSE(sc_oauth_token_is_expired(&t));
 }
 
@@ -181,7 +190,7 @@ static void test_auth_get_api_key_null_provider(void) {
 
 static void test_auth_save_credential_invalid_args(void) {
     sc_allocator_t sys = sc_system_allocator();
-    sc_oauth_token_t tok = { .access_token = (char *)"x", .token_type = (char *)"Bearer" };
+    sc_oauth_token_t tok = {.access_token = (char *)"x", .token_type = (char *)"Bearer"};
     SC_ASSERT_EQ(sc_auth_save_credential(NULL, "p", &tok), SC_ERR_INVALID_ARGUMENT);
     SC_ASSERT_EQ(sc_auth_save_credential(&sys, NULL, &tok), SC_ERR_INVALID_ARGUMENT);
     SC_ASSERT_EQ(sc_auth_save_credential(&sys, "p", NULL), SC_ERR_INVALID_ARGUMENT);
@@ -206,7 +215,8 @@ static void test_auth_delete_credential_invalid_args(void) {
 static void test_auth_start_device_flow_mock(void) {
     sc_allocator_t sys = sc_system_allocator();
     sc_device_code_t dc = {0};
-    sc_error_t err = sc_auth_start_device_flow(&sys, "client-id", "https://auth.example.com/device", "openid", &dc);
+    sc_error_t err = sc_auth_start_device_flow(&sys, "client-id", "https://auth.example.com/device",
+                                               "openid", &dc);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(dc.device_code);
     SC_ASSERT_NOT_NULL(dc.user_code);

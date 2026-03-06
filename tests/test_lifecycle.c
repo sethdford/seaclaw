@@ -1,21 +1,21 @@
-#include "test_framework.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/memory.h"
 #include "seaclaw/memory/lifecycle.h"
-#include <string.h>
-#include <stdlib.h>
+#include "test_framework.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
 #define sc_mkdir(path) _mkdir(path)
-#define close(fd) _close(fd)
+#define close(fd)      _close(fd)
 #else
-#include <unistd.h>
 #include <fcntl.h>
+#include <unistd.h>
 #define sc_mkdir(path) mkdir((path), 0755)
 #endif
 
@@ -47,9 +47,12 @@ static void test_cache_put_get(void) {
     SC_ASSERT_EQ(out.content_len, 11);
     SC_ASSERT_EQ(memcmp(out.content, "content one", 11), 0);
 
-    if (out.key) alloc.free(alloc.ctx, (void *)out.key, out.key_len + 1);
-    if (out.content) alloc.free(alloc.ctx, (void *)out.content, out.content_len + 1);
-    if (out.timestamp) alloc.free(alloc.ctx, (void *)out.timestamp, out.timestamp_len + 1);
+    if (out.key)
+        alloc.free(alloc.ctx, (void *)out.key, out.key_len + 1);
+    if (out.content)
+        alloc.free(alloc.ctx, (void *)out.content, out.content_len + 1);
+    if (out.timestamp)
+        alloc.free(alloc.ctx, (void *)out.timestamp, out.timestamp_len + 1);
 
     sc_memory_cache_destroy(cache);
 }
@@ -80,18 +83,24 @@ static void test_cache_eviction(void) {
 
     sc_memory_cache_get(cache, "b", 1, &out, &found);
     SC_ASSERT_TRUE(found);
-    if (out.key) alloc.free(alloc.ctx, (void *)out.key, out.key_len + 1);
-    if (out.content) alloc.free(alloc.ctx, (void *)out.content, out.content_len + 1);
+    if (out.key)
+        alloc.free(alloc.ctx, (void *)out.key, out.key_len + 1);
+    if (out.content)
+        alloc.free(alloc.ctx, (void *)out.content, out.content_len + 1);
 
     sc_memory_cache_get(cache, "c", 1, &out, &found);
     SC_ASSERT_TRUE(found);
-    if (out.key) alloc.free(alloc.ctx, (void *)out.key, out.key_len + 1);
-    if (out.content) alloc.free(alloc.ctx, (void *)out.content, out.content_len + 1);
+    if (out.key)
+        alloc.free(alloc.ctx, (void *)out.key, out.key_len + 1);
+    if (out.content)
+        alloc.free(alloc.ctx, (void *)out.content, out.content_len + 1);
 
     sc_memory_cache_get(cache, "d", 1, &out, &found);
     SC_ASSERT_TRUE(found);
-    if (out.key) alloc.free(alloc.ctx, (void *)out.key, out.key_len + 1);
-    if (out.content) alloc.free(alloc.ctx, (void *)out.content, out.content_len + 1);
+    if (out.key)
+        alloc.free(alloc.ctx, (void *)out.key, out.key_len + 1);
+    if (out.content)
+        alloc.free(alloc.ctx, (void *)out.content, out.content_len + 1);
 
     sc_memory_cache_destroy(cache);
 }
@@ -121,8 +130,10 @@ static void test_cache_invalidate(void) {
     SC_ASSERT_FALSE(found);
     sc_memory_cache_get(cache, "y", 1, &out, &found);
     SC_ASSERT_TRUE(found);
-    if (out.key) alloc.free(alloc.ctx, (void *)out.key, out.key_len + 1);
-    if (out.content) alloc.free(alloc.ctx, (void *)out.content, out.content_len + 1);
+    if (out.key)
+        alloc.free(alloc.ctx, (void *)out.key, out.key_len + 1);
+    if (out.content)
+        alloc.free(alloc.ctx, (void *)out.content, out.content_len + 1);
 
     sc_memory_cache_destroy(cache);
 }
@@ -163,7 +174,7 @@ static void test_hygiene_removes_oversized(void) {
 #endif
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
 #ifdef SC_ENABLE_SQLITE
     char big[1025];
     memset(big, 'x', 1024);
@@ -199,7 +210,7 @@ static void test_hygiene_removes_expired(void) {
 #endif
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
 #ifdef SC_ENABLE_SQLITE
     mem.vtable->store(mem.ctx, "old", 3, "old content", 11, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "new", 3, "new content", 11, &cat, NULL, 0);
@@ -234,7 +245,7 @@ static void test_hygiene_deduplicates(void) {
 #endif
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
 #ifdef SC_ENABLE_SQLITE
     mem.vtable->store(mem.ctx, "dup_a", 5, "same content", 12, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "dup_b", 5, "same content", 12, &cat, NULL, 0);
@@ -268,7 +279,7 @@ static void test_snapshot_export_import(void) {
 #endif
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
 #ifdef SC_ENABLE_SQLITE
     mem.vtable->store(mem.ctx, "snap_key1", 9, "snap_val1", 9, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "snap_key2", 9, "snap_val2", 9, &cat, NULL, 0);
@@ -312,7 +323,8 @@ static void test_snapshot_export_import(void) {
         }
         sc_memory_entry_free_fields(&alloc, &entries[i]);
     }
-    if (entries) alloc.free(alloc.ctx, entries, count * sizeof(sc_memory_entry_t));
+    if (entries)
+        alloc.free(alloc.ctx, entries, count * sizeof(sc_memory_entry_t));
     SC_ASSERT_TRUE(found_any);
 
     mem2.vtable->deinit(mem2.ctx);
@@ -333,7 +345,7 @@ static void test_summarizer_truncation(void) {
 #endif
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
 #ifdef SC_ENABLE_SQLITE
     char long_content[256];
     memset(long_content, 'a', 255);

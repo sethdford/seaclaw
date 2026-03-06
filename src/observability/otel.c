@@ -35,28 +35,45 @@ struct sc_span {
 #if !SC_IS_TEST && defined(SC_HTTP_CURL)
 static const char *event_tag_str(sc_observer_event_tag_t tag) {
     switch (tag) {
-    case SC_OBSERVER_EVENT_AGENT_START: return "agent.start";
-    case SC_OBSERVER_EVENT_LLM_REQUEST: return "llm.request";
-    case SC_OBSERVER_EVENT_LLM_RESPONSE: return "llm.response";
-    case SC_OBSERVER_EVENT_AGENT_END: return "agent.end";
-    case SC_OBSERVER_EVENT_TOOL_CALL_START: return "tool.call.start";
-    case SC_OBSERVER_EVENT_TOOL_CALL: return "tool.call";
-    case SC_OBSERVER_EVENT_TOOL_ITERATIONS_EXHAUSTED: return "tool.iterations.exhausted";
-    case SC_OBSERVER_EVENT_TURN_COMPLETE: return "turn.complete";
-    case SC_OBSERVER_EVENT_CHANNEL_MESSAGE: return "channel.message";
-    case SC_OBSERVER_EVENT_HEARTBEAT_TICK: return "heartbeat";
-    case SC_OBSERVER_EVENT_ERR: return "error";
-    default: return "unknown";
+    case SC_OBSERVER_EVENT_AGENT_START:
+        return "agent.start";
+    case SC_OBSERVER_EVENT_LLM_REQUEST:
+        return "llm.request";
+    case SC_OBSERVER_EVENT_LLM_RESPONSE:
+        return "llm.response";
+    case SC_OBSERVER_EVENT_AGENT_END:
+        return "agent.end";
+    case SC_OBSERVER_EVENT_TOOL_CALL_START:
+        return "tool.call.start";
+    case SC_OBSERVER_EVENT_TOOL_CALL:
+        return "tool.call";
+    case SC_OBSERVER_EVENT_TOOL_ITERATIONS_EXHAUSTED:
+        return "tool.iterations.exhausted";
+    case SC_OBSERVER_EVENT_TURN_COMPLETE:
+        return "turn.complete";
+    case SC_OBSERVER_EVENT_CHANNEL_MESSAGE:
+        return "channel.message";
+    case SC_OBSERVER_EVENT_HEARTBEAT_TICK:
+        return "heartbeat";
+    case SC_OBSERVER_EVENT_ERR:
+        return "error";
+    default:
+        return "unknown";
     }
 }
 
 static const char *metric_tag_str(sc_observer_metric_tag_t tag) {
     switch (tag) {
-    case SC_OBSERVER_METRIC_REQUEST_LATENCY_MS: return "request.latency_ms";
-    case SC_OBSERVER_METRIC_TOKENS_USED: return "tokens.used";
-    case SC_OBSERVER_METRIC_ACTIVE_SESSIONS: return "sessions.active";
-    case SC_OBSERVER_METRIC_QUEUE_DEPTH: return "queue.depth";
-    default: return "unknown";
+    case SC_OBSERVER_METRIC_REQUEST_LATENCY_MS:
+        return "request.latency_ms";
+    case SC_OBSERVER_METRIC_TOKENS_USED:
+        return "tokens.used";
+    case SC_OBSERVER_METRIC_ACTIVE_SESSIONS:
+        return "sessions.active";
+    case SC_OBSERVER_METRIC_QUEUE_DEPTH:
+        return "queue.depth";
+    default:
+        return "unknown";
     }
 }
 #endif
@@ -68,7 +85,8 @@ static void otel_record_event(void *ctx, const sc_observer_event_t *event) {
 #if !SC_IS_TEST && defined(SC_HTTP_CURL)
     char body[2048];
     const char *svc = c->service_name ? c->service_name : "seaclaw";
-    int n = snprintf(body, sizeof(body),
+    int n = snprintf(
+        body, sizeof(body),
         "{\"resourceLogs\":[{\"resource\":{\"attributes\":[{\"key\":\"service.name\","
         "\"value\":{\"stringValue\":\"%s\"}}]},\"scopeLogs\":[{\"logRecords\":[{"
         "\"timeUnixNano\":\"%lld000000000\",\"body\":{\"stringValue\":\"%s\"},"
@@ -96,13 +114,13 @@ static void otel_record_metric(void *ctx, const sc_observer_metric_t *metric) {
 #if !SC_IS_TEST && defined(SC_HTTP_CURL)
     char body[2048];
     const char *svc = c->service_name ? c->service_name : "seaclaw";
-    int n = snprintf(body, sizeof(body),
+    int n = snprintf(
+        body, sizeof(body),
         "{\"resourceMetrics\":[{\"resource\":{\"attributes\":[{\"key\":\"service.name\","
         "\"value\":{\"stringValue\":\"%s\"}}]},\"scopeMetrics\":[{\"metrics\":[{"
         "\"name\":\"%s\",\"gauge\":{\"dataPoints\":[{\"timeUnixNano\":\"%lld000000000\","
         "\"asInt\":\"%llu\"}]}}]}]}]}",
-        svc, metric_tag_str(metric->tag), (long long)time(NULL),
-        (unsigned long long)metric->value);
+        svc, metric_tag_str(metric->tag), (long long)time(NULL), (unsigned long long)metric->value);
     if (n <= 0 || (size_t)n >= sizeof(body))
         return;
     char url[512];

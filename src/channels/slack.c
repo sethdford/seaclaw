@@ -576,9 +576,9 @@ static sc_error_t slack_stream_append(sc_slack_ctx_t *c, const char *delta, size
         size_t new_cap = c->stream_text_cap ? c->stream_text_cap * 2 : 256;
         while (new_cap < need)
             new_cap *= 2;
-        char *p = (char *)c->alloc->realloc(c->alloc->ctx, c->stream_text,
-                                            c->stream_text_cap ? c->stream_text_cap + 1 : 0,
-                                            new_cap + 1);
+        char *p =
+            (char *)c->alloc->realloc(c->alloc->ctx, c->stream_text,
+                                      c->stream_text_cap ? c->stream_text_cap + 1 : 0, new_cap + 1);
         if (!p)
             return SC_ERR_OUT_OF_MEMORY;
         c->stream_text = p;
@@ -645,7 +645,7 @@ static sc_error_t slack_send_event(void *ctx, const char *target, size_t target_
             char *body = NULL;
             size_t body_len = 0;
             sc_error_t err = build_chat_body(c->alloc, channel, channel_len, thread_ts,
-                                              thread_ts_len, text, text_len, &body, &body_len);
+                                             thread_ts_len, text, text_len, &body, &body_len);
             if (err)
                 return err;
             char url_buf[256];
@@ -661,8 +661,7 @@ static sc_error_t slack_send_event(void *ctx, const char *target, size_t target_
             }
             if (resp.status_code >= 200 && resp.status_code < 300 && resp.body) {
                 sc_json_value_t *parsed = NULL;
-                if (sc_json_parse(c->alloc, resp.body, resp.body_len, &parsed) == SC_OK &&
-                    parsed) {
+                if (sc_json_parse(c->alloc, resp.body, resp.body_len, &parsed) == SC_OK && parsed) {
                     const char *ts = sc_json_get_string(parsed, "ts");
                     if (ts) {
                         size_t ts_len = strlen(ts);
@@ -679,9 +678,9 @@ static sc_error_t slack_send_event(void *ctx, const char *target, size_t target_
         } else {
             char *body = NULL;
             size_t body_len = 0;
-            sc_error_t err = build_chat_update_body(c->alloc, channel, channel_len,
-                                                     c->stream_ts, strlen(c->stream_ts), text,
-                                                     text_len, &body, &body_len);
+            sc_error_t err =
+                build_chat_update_body(c->alloc, channel, channel_len, c->stream_ts,
+                                       strlen(c->stream_ts), text, text_len, &body, &body_len);
             if (err)
                 return err;
             char url_buf[256];
@@ -710,9 +709,9 @@ static sc_error_t slack_send_event(void *ctx, const char *target, size_t target_
         if (c->stream_ts) {
             char *body = NULL;
             size_t body_len = 0;
-            sc_error_t err = build_chat_update_body(c->alloc, channel, channel_len,
-                                                     c->stream_ts, strlen(c->stream_ts), text,
-                                                     text_len, &body, &body_len);
+            sc_error_t err =
+                build_chat_update_body(c->alloc, channel, channel_len, c->stream_ts,
+                                       strlen(c->stream_ts), text, text_len, &body, &body_len);
             if (err) {
                 slack_stream_clear(c);
                 return err;
@@ -732,7 +731,7 @@ static sc_error_t slack_send_event(void *ctx, const char *target, size_t target_
             char *body = NULL;
             size_t body_len = 0;
             sc_error_t err = build_chat_body(c->alloc, channel, channel_len, thread_ts,
-                                              thread_ts_len, text, text_len, &body, &body_len);
+                                             thread_ts_len, text, text_len, &body, &body_len);
             if (err) {
                 slack_stream_clear(c);
                 return err;

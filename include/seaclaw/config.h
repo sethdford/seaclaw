@@ -3,11 +3,11 @@
 
 #include "seaclaw/config_types.h"
 #include "seaclaw/core/allocator.h"
-#include "seaclaw/security/audit.h"
 #include "seaclaw/core/arena.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/slice.h"
+#include "seaclaw/security/audit.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -60,9 +60,9 @@ typedef struct sc_reliability_config {
 } sc_reliability_config_t;
 
 typedef struct sc_router_config {
-    char *fast;    /* provider name for simple tasks */
-    char *standard; /* provider name for default */
-    char *powerful; /* provider name for complex tasks */
+    char *fast;          /* provider name for simple tasks */
+    char *standard;      /* provider name for default */
+    char *powerful;      /* provider name for complex tasks */
     int complexity_low;  /* below this -> fast (default 50) */
     int complexity_high; /* above this -> powerful (default 500) */
 } sc_router_config_t;
@@ -274,8 +274,8 @@ typedef struct sc_config_gateway {
     char *auth_token; /* optional; when set, used for WebSocket auth alongside pairing */
     bool allow_public_bind;
     uint32_t pair_rate_limit_per_minute;
-    int rate_limit_requests;  /* 0 = use pair_rate_limit_per_minute */
-    int rate_limit_window;   /* seconds, 0 = 60 */
+    int rate_limit_requests;   /* 0 = use pair_rate_limit_per_minute */
+    int rate_limit_window;     /* seconds, 0 = 60 */
     char *webhook_hmac_secret; /* optional, for X-Signature verification */
     char *control_ui_dir;      /* path to built Control UI static files */
     char **cors_origins;

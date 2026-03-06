@@ -1,9 +1,9 @@
-#include "test_framework.h"
 #include "seaclaw/agent/cli.h"
 #include "seaclaw/cli_commands.h"
 #include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

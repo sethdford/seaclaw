@@ -1,6 +1,6 @@
-#include "test_framework.h"
-#include "seaclaw/tunnel.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/tunnel.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_none_tunnel_create(void) {
@@ -118,7 +118,8 @@ static void test_tunnel_factory_cloudflare(void) {
     sc_tunnel_t t = sc_tunnel_create(&alloc, &config);
     SC_ASSERT_NOT_NULL(t.ctx);
     SC_ASSERT_STR_EQ(t.vtable->provider_name(t.ctx), "cloudflare");
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_factory_ngrok(void) {
@@ -133,7 +134,8 @@ static void test_tunnel_factory_ngrok(void) {
     sc_tunnel_t t = sc_tunnel_create(&alloc, &config);
     SC_ASSERT_NOT_NULL(t.ctx);
     SC_ASSERT_STR_EQ(t.vtable->provider_name(t.ctx), "ngrok");
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_none_is_running_after_start(void) {
@@ -143,7 +145,8 @@ static void test_tunnel_none_is_running_after_start(void) {
     size_t url_len = 0;
     t.vtable->start(t.ctx, 3000, &url, &url_len);
     SC_ASSERT_TRUE(t.vtable->is_running(t.ctx));
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_none_public_url(void) {
@@ -155,7 +158,8 @@ static void test_tunnel_none_public_url(void) {
     const char *pub = t.vtable->public_url(t.ctx);
     SC_ASSERT_NOT_NULL(pub);
     SC_ASSERT_TRUE(strstr(pub, "localhost") != NULL);
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_error_strings_all(void) {
@@ -168,7 +172,7 @@ static void test_tunnel_error_strings_all(void) {
 }
 
 static void test_tunnel_create_null_alloc_returns_invalid(void) {
-    sc_tunnel_config_t config = { .provider = SC_TUNNEL_NONE };
+    sc_tunnel_config_t config = {.provider = SC_TUNNEL_NONE};
     sc_tunnel_t t = sc_tunnel_create(NULL, &config);
     SC_ASSERT_NULL(t.ctx);
     SC_ASSERT_NULL(t.vtable);
@@ -182,7 +186,8 @@ static void test_tunnel_none_stop(void) {
     t.vtable->start(t.ctx, 8080, &url, &url_len);
     t.vtable->stop(t.ctx);
     SC_ASSERT_FALSE(t.vtable->is_running(t.ctx));
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_custom_url_contains_port_placeholder(void) {
@@ -193,7 +198,8 @@ static void test_tunnel_custom_url_contains_port_placeholder(void) {
     sc_tunnel_error_t err = t.vtable->start(t.ctx, 4567, &url, &url_len);
     SC_ASSERT_EQ(err, SC_TUNNEL_ERR_OK);
     SC_ASSERT_NOT_NULL(url);
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_tailscale_returns_url(void) {
@@ -206,7 +212,8 @@ static void test_tunnel_tailscale_returns_url(void) {
     SC_ASSERT_NOT_NULL(url);
     SC_ASSERT_TRUE(strstr(url, "ts.net") != NULL);
     SC_ASSERT_NOT_NULL(t.vtable->public_url(t.ctx));
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_config_ngrok_domain(void) {
@@ -221,7 +228,8 @@ static void test_tunnel_config_ngrok_domain(void) {
     sc_tunnel_t t = sc_tunnel_create(&alloc, &config);
     SC_ASSERT_NOT_NULL(t.ctx);
     SC_ASSERT_STR_EQ(t.vtable->provider_name(t.ctx), "ngrok");
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_cloudflare_create(void) {
@@ -230,21 +238,24 @@ static void test_tunnel_cloudflare_create(void) {
     SC_ASSERT_NOT_NULL(t.ctx);
     SC_ASSERT_NOT_NULL(t.vtable);
     SC_ASSERT_STR_EQ(t.vtable->provider_name(t.ctx), "cloudflare");
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_cloudflare_not_running_before_start(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_tunnel_t t = sc_cloudflare_tunnel_create(&alloc, "x", 1);
     SC_ASSERT_FALSE(t.vtable->is_running(t.ctx));
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_ngrok_not_running_before_start(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_tunnel_t t = sc_ngrok_tunnel_create(&alloc, "x", 1, NULL, 0);
     SC_ASSERT_FALSE(t.vtable->is_running(t.ctx));
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_custom_different_ports(void) {
@@ -256,7 +267,8 @@ static void test_tunnel_custom_different_ports(void) {
     sc_tunnel_error_t err = t.vtable->start(t.ctx, 9999, &url, &url_len);
     SC_ASSERT_EQ(err, SC_TUNNEL_ERR_OK);
     SC_ASSERT_NOT_NULL(url);
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_none_multiple_start_stop(void) {
@@ -269,7 +281,8 @@ static void test_tunnel_none_multiple_start_stop(void) {
     t.vtable->start(t.ctx, 4000, &url2, &len2);
     SC_ASSERT_NOT_NULL(url2);
     SC_ASSERT_TRUE(strstr(url2, "4000") != NULL);
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_provider_enum_values(void) {
@@ -287,7 +300,8 @@ static void test_tunnel_none_public_url_after_stop(void) {
     t.vtable->stop(t.ctx);
     const char *pub = t.vtable->public_url(t.ctx);
     SC_ASSERT_NOT_NULL(pub);
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_tailscale_stop(void) {
@@ -298,7 +312,8 @@ static void test_tunnel_tailscale_stop(void) {
     t.vtable->start(t.ctx, 8080, &url, &url_len);
     t.vtable->stop(t.ctx);
     SC_ASSERT_FALSE(t.vtable->is_running(t.ctx));
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 static void test_tunnel_config_provider_cloudflare(void) {
@@ -310,7 +325,8 @@ static void test_tunnel_config_provider_cloudflare(void) {
     };
     sc_tunnel_t t = sc_tunnel_create(&alloc, &cfg);
     SC_ASSERT_STR_EQ(t.vtable->provider_name(t.ctx), "cloudflare");
-    if (t.vtable->deinit) t.vtable->deinit(t.ctx, &alloc);
+    if (t.vtable->deinit)
+        t.vtable->deinit(t.ctx, &alloc);
 }
 
 void run_tunnel_tests(void) {

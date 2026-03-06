@@ -4,7 +4,7 @@
 #include <string.h>
 #include <time.h>
 
-#define SC_RATE_IP_MAX 64
+#define SC_RATE_IP_MAX      64
 #define SC_RATE_ENTRIES_MAX 512
 
 typedef struct rate_entry {
@@ -51,8 +51,7 @@ static rate_entry_t *find_or_create(sc_rate_limiter_t *lim, const char *ip) {
     e->max_requests = lim->max_requests;
     e->window_secs = (time_t)lim->window_secs;
     e->cap = 64;
-    e->timestamps =
-        (time_t *)lim->alloc->alloc(lim->alloc->ctx, e->cap * sizeof(time_t));
+    e->timestamps = (time_t *)lim->alloc->alloc(lim->alloc->ctx, e->cap * sizeof(time_t));
     if (!e->timestamps)
         return NULL;
     lim->count++;
@@ -92,9 +91,8 @@ bool sc_rate_limiter_allow(sc_rate_limiter_t *lim, const char *ip) {
     time_t now = time(NULL);
     if (e->count >= e->cap) {
         size_t new_cap = e->cap * 2;
-        time_t *n = (time_t *)lim->alloc->realloc(lim->alloc->ctx, e->timestamps,
-                                                  e->cap * sizeof(time_t),
-                                                  new_cap * sizeof(time_t));
+        time_t *n = (time_t *)lim->alloc->realloc(
+            lim->alloc->ctx, e->timestamps, e->cap * sizeof(time_t), new_cap * sizeof(time_t));
         if (!n)
             return false;
         e->timestamps = n;
@@ -110,7 +108,7 @@ void sc_rate_limiter_destroy(sc_rate_limiter_t *lim) {
     for (size_t i = 0; i < lim->count; i++) {
         if (lim->entries[i].timestamps)
             lim->alloc->free(lim->alloc->ctx, lim->entries[i].timestamps,
-                            lim->entries[i].cap * sizeof(time_t));
+                             lim->entries[i].cap * sizeof(time_t));
     }
     lim->alloc->free(lim->alloc->ctx, lim, sizeof(*lim));
 }

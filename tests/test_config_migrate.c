@@ -1,8 +1,8 @@
-#include "test_framework.h"
 #include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/json.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_migrate_missing_version_defaults_to_v1(void) {
@@ -28,8 +28,7 @@ static void test_migrate_current_version_noop(void) {
 static void test_migrate_future_version_rejected(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_json_value_t *root = sc_json_object_new(&alloc);
-    sc_json_object_set(&alloc, root, "config_version",
-                       sc_json_number_new(&alloc, 999.0));
+    sc_json_object_set(&alloc, root, "config_version", sc_json_number_new(&alloc, 999.0));
     sc_error_t err = sc_config_migrate(&alloc, root);
     SC_ASSERT_NEQ(err, SC_OK);
     sc_json_free(&alloc, root);
@@ -38,8 +37,7 @@ static void test_migrate_future_version_rejected(void) {
 static void test_migrate_v1_memory_backend_moved(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_json_value_t *root = sc_json_object_new(&alloc);
-    sc_json_object_set(&alloc, root, "memory_backend",
-                       sc_json_string_new(&alloc, "sqlite", 6));
+    sc_json_object_set(&alloc, root, "memory_backend", sc_json_string_new(&alloc, "sqlite", 6));
     sc_error_t err = sc_config_migrate(&alloc, root);
     SC_ASSERT_EQ(err, SC_OK);
     const sc_json_value_t *mem = sc_json_object_get(root, "memory");

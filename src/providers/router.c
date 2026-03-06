@@ -200,6 +200,9 @@ sc_error_t sc_router_create(sc_allocator_t *alloc, const char *const *provider_n
                         alloc->free(alloc->ctx, (void *)ri[k].model, ri[k].model_len + 1);
                 }
                 alloc->free(alloc->ctx, ri, route_count * sizeof(*ri));
+                if (r->default_model)
+                    alloc->free(alloc->ctx, r->default_model, r->default_model_len + 1);
+                alloc->free(alloc->ctx, prov_copy, sizeof(sc_provider_t) * provider_count);
                 alloc->free(alloc->ctx, r, sizeof(*r));
                 return SC_ERR_OUT_OF_MEMORY;
             }
@@ -222,6 +225,9 @@ sc_error_t sc_router_create(sc_allocator_t *alloc, const char *const *provider_n
                         alloc->free(alloc->ctx, (void *)ri[k].model, ri[k].model_len + 1);
                 }
                 alloc->free(alloc->ctx, ri, route_count * sizeof(*ri));
+                if (r->default_model)
+                    alloc->free(alloc->ctx, r->default_model, r->default_model_len + 1);
+                alloc->free(alloc->ctx, prov_copy, sizeof(sc_provider_t) * provider_count);
                 alloc->free(alloc->ctx, r, sizeof(*r));
                 return SC_ERR_OUT_OF_MEMORY;
             }

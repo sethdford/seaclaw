@@ -1,6 +1,6 @@
 /* Net security tests */
-#include "test_framework.h"
 #include "seaclaw/net_security.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_validate_url_https_ok(void) {

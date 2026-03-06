@@ -7,9 +7,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define SC_PREF_KEY_PREFIX "_pref:"
+#define SC_PREF_KEY_PREFIX     "_pref:"
 #define SC_PREF_KEY_PREFIX_LEN 6
-#define SC_PREF_MAX_LOAD 20
+#define SC_PREF_MAX_LOAD       20
 
 /* Detect if a user message is a correction/preference statement.
  * prev_role should be SC_ROLE_ASSISTANT for correction detection. */

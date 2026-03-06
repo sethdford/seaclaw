@@ -399,7 +399,7 @@ static sc_error_t gemini_chat(void *ctx, sc_allocator_t *alloc, const sc_chat_re
         if (request->response_format && request->response_format_len >= 4 &&
             memcmp(request->response_format, "json", 4) == 0) {
             sc_json_object_set(alloc, gen_cfg, "responseMimeType",
-                sc_json_string_new(alloc, "application/json", 16));
+                               sc_json_string_new(alloc, "application/json", 16));
         }
     }
 

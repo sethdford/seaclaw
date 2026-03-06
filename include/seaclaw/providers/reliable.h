@@ -34,12 +34,11 @@ typedef struct sc_reliable_config {
     int base_delay_ms;            /* default 1000 */
     int max_delay_ms;             /* default 30000 */
     int failure_threshold;        /* default 5 */
-    int recovery_timeout_seconds;  /* default 60 */
+    int recovery_timeout_seconds; /* default 60 */
 } sc_reliable_config_t;
 
 /* Create a reliable provider from config (retry, fallback, circuit breaker). */
-sc_error_t sc_reliable_provider_create(sc_allocator_t *alloc,
-                                       const sc_reliable_config_t *config,
+sc_error_t sc_reliable_provider_create(sc_allocator_t *alloc, const sc_reliable_config_t *config,
                                        sc_provider_t *out);
 
 /* Create a reliable provider that wraps an inner provider with retry and exponential backoff.

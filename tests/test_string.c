@@ -1,6 +1,6 @@
-#include "test_framework.h"
-#include "seaclaw/core/string.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/core/string.h"
+#include "test_framework.h"
 
 static void test_strdup(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -28,7 +28,7 @@ static void test_str_concat(void) {
 
 static void test_str_join(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_str_t parts[] = { SC_STR_LIT("a"), SC_STR_LIT("b"), SC_STR_LIT("c") };
+    sc_str_t parts[] = {SC_STR_LIT("a"), SC_STR_LIT("b"), SC_STR_LIT("c")};
     char *s = sc_str_join(&alloc, parts, 3, SC_STR_LIT(", "));
     SC_ASSERT_NOT_NULL(s);
     SC_ASSERT_STR_EQ(s, "a, b, c");
@@ -166,7 +166,7 @@ static void test_str_dup_empty(void) {
 
 static void test_str_join_empty(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_str_t parts[] = { SC_STR_LIT("a") };
+    sc_str_t parts[] = {SC_STR_LIT("a")};
     char *s = sc_str_join(&alloc, parts, 0, SC_STR_LIT(", "));
     SC_ASSERT_STR_EQ(s, "");
     sc_str_free(&alloc, s);
@@ -174,7 +174,7 @@ static void test_str_join_empty(void) {
 
 static void test_str_join_single(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_str_t parts[] = { SC_STR_LIT("only") };
+    sc_str_t parts[] = {SC_STR_LIT("only")};
     char *s = sc_str_join(&alloc, parts, 1, SC_STR_LIT("|"));
     SC_ASSERT_STR_EQ(s, "only");
     sc_str_free(&alloc, s);

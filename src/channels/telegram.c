@@ -398,8 +398,8 @@ static tg_media_kind_t infer_media_kind(const char *path, size_t len) {
 
 #if !SC_IS_TEST
 static sc_error_t build_edit_body(sc_allocator_t *alloc, const char *chat_id, size_t chat_id_len,
-                                   int64_t message_id, const char *text, size_t text_len, char **out,
-                                   size_t *out_len) {
+                                  int64_t message_id, const char *text, size_t text_len, char **out,
+                                  size_t *out_len) {
     sc_json_buf_t jbuf;
     sc_error_t err = sc_json_buf_init(&jbuf, alloc);
     if (err)
@@ -445,9 +445,9 @@ static sc_error_t stream_append(sc_telegram_ctx_t *c, const char *delta, size_t 
         size_t new_cap = c->stream_text_cap ? c->stream_text_cap * 2 : 256;
         while (new_cap < need)
             new_cap *= 2;
-        char *p = (char *)c->alloc->realloc(c->alloc->ctx, c->stream_text,
-                                            c->stream_text_cap ? c->stream_text_cap + 1 : 0,
-                                            new_cap + 1);
+        char *p =
+            (char *)c->alloc->realloc(c->alloc->ctx, c->stream_text,
+                                      c->stream_text_cap ? c->stream_text_cap + 1 : 0, new_cap + 1);
         if (!p)
             return SC_ERR_OUT_OF_MEMORY;
         c->stream_text = p;
@@ -502,8 +502,8 @@ static sc_error_t telegram_send_event(void *ctx, const char *target, size_t targ
                 return SC_ERR_INTERNAL;
             char *body = NULL;
             size_t body_len = 0;
-            sc_error_t err = build_send_body(c->alloc, target, target_len, text, text_len, &body,
-                                             &body_len);
+            sc_error_t err =
+                build_send_body(c->alloc, target, target_len, text, text_len, &body, &body_len);
             if (err)
                 return err;
             sc_http_response_t resp = {0};
@@ -517,8 +517,7 @@ static sc_error_t telegram_send_event(void *ctx, const char *target, size_t targ
             }
             if (resp.status_code == 200 && resp.body) {
                 sc_json_value_t *parsed = NULL;
-                if (sc_json_parse(c->alloc, resp.body, resp.body_len, &parsed) == SC_OK &&
-                    parsed) {
+                if (sc_json_parse(c->alloc, resp.body, resp.body_len, &parsed) == SC_OK && parsed) {
                     sc_json_value_t *result = sc_json_object_get(parsed, "result");
                     if (result && result->type == SC_JSON_OBJECT) {
                         double mid = sc_json_get_number(result, "message_id", 0);
@@ -531,15 +530,14 @@ static sc_error_t telegram_send_event(void *ctx, const char *target, size_t targ
                 sc_http_response_free(c->alloc, &resp);
         } else {
             char url_buf[512];
-            int n = build_api_url(url_buf, sizeof(url_buf), c->token, c->token_len,
-                                  "editMessageText");
+            int n =
+                build_api_url(url_buf, sizeof(url_buf), c->token, c->token_len, "editMessageText");
             if (n < 0 || (size_t)n >= sizeof(url_buf))
                 return SC_ERR_INTERNAL;
             char *body = NULL;
             size_t body_len = 0;
-            sc_error_t err =
-                build_edit_body(c->alloc, target, target_len, c->stream_message_id, text, text_len,
-                                &body, &body_len);
+            sc_error_t err = build_edit_body(c->alloc, target, target_len, c->stream_message_id,
+                                             text, text_len, &body, &body_len);
             if (err)
                 return err;
             sc_http_response_t resp = {0};
@@ -557,17 +555,16 @@ static sc_error_t telegram_send_event(void *ctx, const char *target, size_t targ
         size_t text_len = message_len > 0 ? message_len : (c->stream_text ? c->stream_text_len : 0);
         if (c->stream_message_id != 0) {
             char url_buf[512];
-            int n = build_api_url(url_buf, sizeof(url_buf), c->token, c->token_len,
-                                  "editMessageText");
+            int n =
+                build_api_url(url_buf, sizeof(url_buf), c->token, c->token_len, "editMessageText");
             if (n < 0 || (size_t)n >= sizeof(url_buf)) {
                 stream_clear(c);
                 return SC_ERR_INTERNAL;
             }
             char *body = NULL;
             size_t body_len = 0;
-            sc_error_t err =
-                build_edit_body(c->alloc, target, target_len, c->stream_message_id, text, text_len,
-                                &body, &body_len);
+            sc_error_t err = build_edit_body(c->alloc, target, target_len, c->stream_message_id,
+                                             text, text_len, &body, &body_len);
             if (err) {
                 stream_clear(c);
                 return err;
@@ -590,8 +587,8 @@ static sc_error_t telegram_send_event(void *ctx, const char *target, size_t targ
             }
             char *body = NULL;
             size_t body_len = 0;
-            sc_error_t err = build_send_body(c->alloc, target, target_len, text, text_len, &body,
-                                             &body_len);
+            sc_error_t err =
+                build_send_body(c->alloc, target, target_len, text, text_len, &body, &body_len);
             if (err) {
                 stream_clear(c);
                 return err;

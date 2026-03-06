@@ -1,6 +1,6 @@
-#include "test_framework.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/arena.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_system_allocator_basic(void) {
@@ -19,7 +19,8 @@ static void test_system_allocator_realloc(void) {
     p = alloc.realloc(alloc.ctx, p, 64, 256);
     SC_ASSERT_NOT_NULL(p);
     unsigned char *bytes = (unsigned char *)p;
-    for (int i = 0; i < 64; i++) SC_ASSERT_EQ(bytes[i], 0x42);
+    for (int i = 0; i < 64; i++)
+        SC_ASSERT_EQ(bytes[i], 0x42);
     alloc.free(alloc.ctx, p, 256);
 }
 

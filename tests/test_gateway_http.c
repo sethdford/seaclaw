@@ -1,9 +1,9 @@
 /* Gateway HTTP handling tests - config, health, rate limit. */
-#include "test_framework.h"
-#include "seaclaw/gateway.h"
-#include "seaclaw/health.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/crypto.h"
+#include "seaclaw/gateway.h"
+#include "seaclaw/health.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_gateway_config_defaults(void) {
@@ -25,7 +25,8 @@ static void test_gateway_health_marking(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT_EQ(r.status, SC_READINESS_READY);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 static void test_gateway_readiness_when_error(void) {
@@ -35,7 +36,8 @@ static void test_gateway_readiness_when_error(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT_EQ(r.status, SC_READINESS_NOT_READY);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 static void test_gateway_rate_limit_config(void) {
@@ -54,7 +56,7 @@ static void test_gateway_hmac_verify_helper(void) {
 
 static void test_gateway_run_test_mode(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_gateway_config_t config = { .port = 9999, .test_mode = true };
+    sc_gateway_config_t config = {.port = 9999, .test_mode = true};
     sc_error_t err = sc_gateway_run(&alloc, "127.0.0.1", 9999, &config);
     SC_ASSERT_EQ(err, SC_OK);
 }

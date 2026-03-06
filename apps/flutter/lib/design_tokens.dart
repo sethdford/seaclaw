@@ -181,6 +181,8 @@ abstract final class SCTokens {
   static const duration_slow = Duration(milliseconds: 350);
   static const duration_slower = Duration(milliseconds: 500);
   static const duration_slowest = Duration(milliseconds: 700);
+  static const dynamic_light_ambient = 0.04;
+  static const dynamic_light_intensity = 0.15;
   static const elevation_role_card = 1;
   static const elevation_role_dropdown = 2;
   static const elevation_role_modal = 3;
@@ -246,6 +248,11 @@ abstract final class SCTokens {
   static const input_padding_x = 8;
   static const input_padding_y = 8;
   static const input_radius = 8;
+  static const interactive_focus_glow_spread = 8;
+  static const interactive_hover_specular_boost = 1.4;
+  static const interactive_press_blur_delta = -4;
+  static const interactive_press_scale = 0.98;
+  static const interactive_transition_duration = Duration(milliseconds: 200);
   static const light_accent = Color(0xFF0D9488);
   static const light_accent_hover = Color(0xFF0F766E);
   static const light_accent_light = Color(0xFFCCFBF1);
@@ -414,6 +421,9 @@ abstract final class SCTokens {
   static const type_role_title_sm_font_size = 13;
   static const type_role_title_sm_font_weight = 500;
   static const type_role_title_sm_line_height = 1.5;
+  static const vibrancy_backdrop_brightness = 1.08;
+  static const vibrancy_icon_boost = 1.2;
+  static const vibrancy_text_boost = 1.15;
   static const view_transition_duration = Duration(milliseconds: 300);
   static const z_index_base = 0;
   static const z_index_dropdown = 1000;

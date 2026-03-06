@@ -29,7 +29,8 @@ typedef struct {
 static sc_error_t analytics_execute(void *ctx, sc_allocator_t *alloc, const sc_json_value_t *args,
                                     sc_tool_result_t *out) {
     (void)ctx;
-    if (!out) return SC_ERR_INVALID_ARGUMENT;
+    if (!out)
+        return SC_ERR_INVALID_ARGUMENT;
     if (!args) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;
@@ -87,14 +88,15 @@ static sc_error_t analytics_execute(void *ctx, sc_allocator_t *alloc, const sc_j
 
         int un;
         if (strcmp(action, "realtime") == 0) {
-            un = snprintf(url, sizeof(url),
-                     "https://plausible.io/api/v1/stats/realtime/visitors?site_id=%s", site_id);
+            un =
+                snprintf(url, sizeof(url),
+                         "https://plausible.io/api/v1/stats/realtime/visitors?site_id=%s", site_id);
         } else {
             const char *metrics = "visitors,pageviews,bounce_rate,visit_duration";
             un = snprintf(url, sizeof(url),
-                     "https://plausible.io/api/v1/stats/aggregate?site_id=%s&period=%s"
-                     "&metrics=%s",
-                     site_id, period, metrics);
+                          "https://plausible.io/api/v1/stats/aggregate?site_id=%s&period=%s"
+                          "&metrics=%s",
+                          site_id, period, metrics);
         }
         if (un < 0 || (size_t)un >= sizeof(url)) {
             *out = sc_tool_result_fail("URL too long", 12);

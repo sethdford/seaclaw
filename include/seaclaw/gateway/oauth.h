@@ -8,7 +8,7 @@
 #include <stdint.h>
 
 typedef struct sc_oauth_config {
-    const char *provider;      /* "google", "github", or custom */
+    const char *provider; /* "google", "github", or custom */
     const char *client_id;
     const char *client_secret;
     const char *redirect_uri;
@@ -32,11 +32,11 @@ sc_error_t sc_oauth_init(sc_allocator_t *alloc, const sc_oauth_config_t *config,
 void sc_oauth_destroy(sc_oauth_ctx_t *ctx);
 
 sc_error_t sc_oauth_generate_pkce(sc_oauth_ctx_t *ctx, char *verifier, size_t verifier_size,
-                                   char *challenge, size_t challenge_size);
+                                  char *challenge, size_t challenge_size);
 
 sc_error_t sc_oauth_build_auth_url(sc_oauth_ctx_t *ctx, const char *challenge, size_t challenge_len,
-                                    const char *state, size_t state_len,
-                                    char *url_out, size_t url_out_size);
+                                   const char *state, size_t state_len, char *url_out,
+                                   size_t url_out_size);
 
 sc_error_t sc_oauth_exchange_code(sc_oauth_ctx_t *ctx, const char *code, size_t code_len,
                                   const char *verifier, size_t verifier_len,

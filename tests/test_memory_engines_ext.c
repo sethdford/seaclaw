@@ -2,16 +2,16 @@
  * Lucid/LanceDB use in-memory mock when SC_IS_TEST. Run with engines enabled:
  * cmake -DSC_ENABLE_POSTGRES=ON -DSC_ENABLE_REDIS_ENGINE=ON -DSC_ENABLE_API_ENGINE=ON .. */
 
-#include "test_framework.h"
-#include "seaclaw/memory/engines.h"
-#include "seaclaw/memory.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/memory.h"
+#include "seaclaw/memory/engines.h"
+#include "test_framework.h"
 #include <string.h>
 
-#if (defined(SC_IS_TEST) && SC_IS_TEST) \
-    || defined(SC_ENABLE_POSTGRES) || defined(SC_HAS_REDIS_ENGINE) || defined(SC_HAS_API_ENGINE) \
-    || (defined(SC_HAS_LUCID_ENGINE) && defined(SC_IS_TEST) && SC_IS_TEST) \
-    || (defined(SC_HAS_LANCEDB_ENGINE) && defined(SC_IS_TEST) && SC_IS_TEST)
+#if (defined(SC_IS_TEST) && SC_IS_TEST) || defined(SC_ENABLE_POSTGRES) ||  \
+    defined(SC_HAS_REDIS_ENGINE) || defined(SC_HAS_API_ENGINE) ||          \
+    (defined(SC_HAS_LUCID_ENGINE) && defined(SC_IS_TEST) && SC_IS_TEST) || \
+    (defined(SC_HAS_LANCEDB_ENGINE) && defined(SC_IS_TEST) && SC_IS_TEST)
 
 #if defined(SC_HAS_LUCID_ENGINE) && defined(SC_IS_TEST) && SC_IS_TEST
 static void test_lucid_lifecycle(void) {
@@ -19,7 +19,7 @@ static void test_lucid_lifecycle(void) {
     sc_memory_t mem = sc_lucid_memory_create(&alloc, "/tmp/lucid.db", "/tmp/workspace");
     SC_ASSERT_NOT_NULL(mem.vtable);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->store(mem.ctx, "lk1", 3, "lucid data", 10, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
 
@@ -45,7 +45,7 @@ static void test_lancedb_lifecycle(void) {
     sc_memory_t mem = sc_lancedb_memory_create(&alloc, "/tmp/lance.db");
     SC_ASSERT_NOT_NULL(mem.vtable);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->store(mem.ctx, "vk1", 3, "vector data", 11, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
 
@@ -67,10 +67,11 @@ static void test_lancedb_lifecycle(void) {
 #if defined(SC_IS_TEST) && SC_IS_TEST
 static void test_postgres_lifecycle(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_memory_t mem = sc_postgres_memory_create(&alloc, "postgres://localhost/test", "public", "memories");
+    sc_memory_t mem =
+        sc_postgres_memory_create(&alloc, "postgres://localhost/test", "public", "memories");
     SC_ASSERT_NOT_NULL(mem.vtable);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->store(mem.ctx, "key1", 4, "hello", 5, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
 
@@ -130,7 +131,7 @@ static void test_redis_lifecycle(void) {
     sc_memory_t mem = sc_redis_memory_create(&alloc, "localhost", 6379, "mem");
     SC_ASSERT_NOT_NULL(mem.vtable);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->store(mem.ctx, "key1", 4, "hello", 5, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
 
@@ -180,7 +181,7 @@ static void test_api_lifecycle(void) {
     sc_memory_t mem = sc_api_memory_create(&alloc, "https://api.example.com", "test-key", 5000);
     SC_ASSERT_NOT_NULL(mem.vtable);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->store(mem.ctx, "key1", 4, "hello", 5, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
 
@@ -227,7 +228,8 @@ static void test_api_lifecycle(void) {
 static void test_postgres_forget_nonexistent(void) {
 #if defined(SC_IS_TEST) && SC_IS_TEST
     sc_allocator_t alloc = sc_system_allocator();
-    sc_memory_t mem = sc_postgres_memory_create(&alloc, "postgres://localhost/test", "public", "memories");
+    sc_memory_t mem =
+        sc_postgres_memory_create(&alloc, "postgres://localhost/test", "public", "memories");
     SC_ASSERT_NOT_NULL(mem.vtable);
 
     bool deleted = false;
@@ -242,7 +244,8 @@ static void test_postgres_forget_nonexistent(void) {
 #if defined(SC_IS_TEST) && SC_IS_TEST
 static void test_postgres_get_nonexistent(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_memory_t mem = sc_postgres_memory_create(&alloc, "postgres://localhost/test", "public", "memories");
+    sc_memory_t mem =
+        sc_postgres_memory_create(&alloc, "postgres://localhost/test", "public", "memories");
     SC_ASSERT_NOT_NULL(mem.vtable);
 
     sc_memory_entry_t entry = {0};
@@ -256,10 +259,11 @@ static void test_postgres_get_nonexistent(void) {
 
 static void test_postgres_recall_empty_query(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_memory_t mem = sc_postgres_memory_create(&alloc, "postgres://localhost/test", "public", "memories");
+    sc_memory_t mem =
+        sc_postgres_memory_create(&alloc, "postgres://localhost/test", "public", "memories");
     SC_ASSERT_NOT_NULL(mem.vtable);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->store(mem.ctx, "r1", 2, "content", 7, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
 
@@ -274,7 +278,10 @@ static void test_postgres_recall_empty_query(void) {
         alloc.free(alloc.ctx, out, count * sizeof(sc_memory_entry_t));
     }
 
-    { bool d; mem.vtable->forget(mem.ctx, "r1", 2, &d); }
+    {
+        bool d;
+        mem.vtable->forget(mem.ctx, "r1", 2, &d);
+    }
     mem.vtable->deinit(mem.ctx);
 }
 
@@ -339,10 +346,10 @@ static void test_api_forget_nonexistent(void) {
 #endif /* engine defined */
 
 void run_memory_engines_ext_tests(void) {
-#if (defined(SC_IS_TEST) && SC_IS_TEST) \
-    || defined(SC_ENABLE_POSTGRES) || defined(SC_HAS_REDIS_ENGINE) || defined(SC_HAS_API_ENGINE) \
-    || (defined(SC_HAS_LUCID_ENGINE) && defined(SC_IS_TEST) && SC_IS_TEST) \
-    || (defined(SC_HAS_LANCEDB_ENGINE) && defined(SC_IS_TEST) && SC_IS_TEST)
+#if (defined(SC_IS_TEST) && SC_IS_TEST) || defined(SC_ENABLE_POSTGRES) ||  \
+    defined(SC_HAS_REDIS_ENGINE) || defined(SC_HAS_API_ENGINE) ||          \
+    (defined(SC_HAS_LUCID_ENGINE) && defined(SC_IS_TEST) && SC_IS_TEST) || \
+    (defined(SC_HAS_LANCEDB_ENGINE) && defined(SC_IS_TEST) && SC_IS_TEST)
     SC_TEST_SUITE("Memory engines ext");
 
 #if defined(SC_HAS_LUCID_ENGINE) && defined(SC_IS_TEST) && SC_IS_TEST

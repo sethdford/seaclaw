@@ -223,7 +223,8 @@ static sc_error_t run_claude_code(sc_allocator_t *alloc, sc_security_policy_t *p
 
 static sc_error_t claude_code_execute(void *ctx, sc_allocator_t *alloc, const sc_json_value_t *args,
                                       sc_tool_result_t *out) {
-    if (!out) return SC_ERR_INVALID_ARGUMENT;
+    if (!out)
+        return SC_ERR_INVALID_ARGUMENT;
     if (!args) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;

@@ -1,9 +1,9 @@
-#include "test_framework.h"
 #include "seaclaw/channel.h"
 #include "seaclaw/channel_loop.h"
 #include "seaclaw/channels/cli.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#include "test_framework.h"
 #include <string.h>
 
 #if SC_HAS_TELEGRAM
@@ -185,9 +185,9 @@ static void test_signal_create_ex_with_policy(void) {
     sc_channel_t ch;
     const char *allow[] = {"+111", "*"};
     const char *group_allow[] = {"+222"};
-    sc_error_t err = sc_signal_create_ex(&alloc, "http://localhost:8080", 21,
-        "+1234567890", 11, allow, 2, group_allow, 1,
-        SC_SIGNAL_GROUP_POLICY_ALLOWLIST, strlen(SC_SIGNAL_GROUP_POLICY_ALLOWLIST), &ch);
+    sc_error_t err = sc_signal_create_ex(&alloc, "http://localhost:8080", 21, "+1234567890", 11,
+                                         allow, 2, group_allow, 1, SC_SIGNAL_GROUP_POLICY_ALLOWLIST,
+                                         strlen(SC_SIGNAL_GROUP_POLICY_ALLOWLIST), &ch);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(ch.ctx);
     SC_ASSERT_STR_EQ(ch.vtable->name(ch.ctx), "signal");

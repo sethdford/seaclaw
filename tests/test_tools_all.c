@@ -1,89 +1,94 @@
 /* Comprehensive tests for all tools: create, name, execute with empty args. */
-#include "test_framework.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/json.h"
+#include "seaclaw/security.h"
 #include "seaclaw/tool.h"
-#include "seaclaw/tools/factory.h"
-#include "seaclaw/tools/shell.h"
-#include "seaclaw/tools/file_read.h"
-#include "seaclaw/tools/file_write.h"
-#include "seaclaw/tools/file_edit.h"
-#include "seaclaw/tools/file_append.h"
-#include "seaclaw/tools/git.h"
-#include "seaclaw/tools/web_search.h"
-#include "seaclaw/tools/web_fetch.h"
-#include "seaclaw/tools/http_request.h"
+#include "seaclaw/tools/analytics.h"
+#include "seaclaw/tools/broadcast.h"
 #include "seaclaw/tools/browser.h"
-#include "seaclaw/tools/image.h"
-#include "seaclaw/tools/screenshot.h"
-#include "seaclaw/tools/memory_store.h"
-#include "seaclaw/tools/memory_recall.h"
-#include "seaclaw/tools/memory_list.h"
-#include "seaclaw/tools/memory_forget.h"
-#include "seaclaw/tools/message.h"
-#include "seaclaw/tools/delegate.h"
-#include "seaclaw/tools/spawn.h"
+#include "seaclaw/tools/browser_open.h"
+#include "seaclaw/tools/calendar_tool.h"
+#include "seaclaw/tools/claude_code.h"
+#include "seaclaw/tools/composio.h"
+#include "seaclaw/tools/crm.h"
 #include "seaclaw/tools/cron_add.h"
 #include "seaclaw/tools/cron_list.h"
 #include "seaclaw/tools/cron_remove.h"
 #include "seaclaw/tools/cron_run.h"
 #include "seaclaw/tools/cron_runs.h"
 #include "seaclaw/tools/cron_update.h"
-#include "seaclaw/tools/browser_open.h"
-#include "seaclaw/tools/composio.h"
+#include "seaclaw/tools/delegate.h"
+#include "seaclaw/tools/factory.h"
+#include "seaclaw/tools/file_append.h"
+#include "seaclaw/tools/file_edit.h"
+#include "seaclaw/tools/file_read.h"
+#include "seaclaw/tools/file_write.h"
+#include "seaclaw/tools/git.h"
+#include "seaclaw/tools/hardware_info.h"
 #include "seaclaw/tools/hardware_memory.h"
+#include "seaclaw/tools/http_request.h"
+#include "seaclaw/tools/i2c.h"
+#include "seaclaw/tools/image.h"
+#include "seaclaw/tools/invoice.h"
+#include "seaclaw/tools/jira.h"
+#include "seaclaw/tools/memory_forget.h"
+#include "seaclaw/tools/memory_list.h"
+#include "seaclaw/tools/memory_recall.h"
+#include "seaclaw/tools/memory_store.h"
+#include "seaclaw/tools/message.h"
+#include "seaclaw/tools/pushover.h"
+#include "seaclaw/tools/report.h"
 #include "seaclaw/tools/schedule.h"
 #include "seaclaw/tools/schema.h"
 #include "seaclaw/tools/schema_clean.h"
-#include "seaclaw/tools/pushover.h"
-#include "seaclaw/tools/hardware_info.h"
-#include "seaclaw/tools/i2c.h"
-#include "seaclaw/tools/spi.h"
-#include "seaclaw/tools/claude_code.h"
-#include "seaclaw/tools/spreadsheet.h"
-#include "seaclaw/tools/report.h"
-#include "seaclaw/tools/broadcast.h"
-#include "seaclaw/tools/calendar_tool.h"
-#include "seaclaw/tools/jira.h"
+#include "seaclaw/tools/screenshot.h"
+#include "seaclaw/tools/shell.h"
 #include "seaclaw/tools/social.h"
-#include "seaclaw/tools/crm.h"
-#include "seaclaw/tools/analytics.h"
-#include "seaclaw/tools/invoice.h"
+#include "seaclaw/tools/spawn.h"
+#include "seaclaw/tools/spi.h"
+#include "seaclaw/tools/spreadsheet.h"
+#include "seaclaw/tools/web_fetch.h"
+#include "seaclaw/tools/web_search.h"
 #include "seaclaw/tools/workflow.h"
-#include "seaclaw/security.h"
+#include "test_framework.h"
 #include <string.h>
 
-#define TOOL_TEST_3(tool_id, create_fn, expected_name, ...) \
-    static void test_##tool_id##_create(void) { \
-        sc_allocator_t alloc = sc_system_allocator(); \
-        sc_tool_t tool; \
-        sc_error_t err = create_fn(__VA_ARGS__, &tool); \
-        SC_ASSERT_EQ(err, SC_OK); \
-        if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc); \
-    } \
-    static void test_##tool_id##_name(void) { \
-        sc_allocator_t alloc = sc_system_allocator(); \
-        sc_tool_t tool; \
-        sc_error_t err = create_fn(__VA_ARGS__, &tool); \
-        SC_ASSERT_EQ(err, SC_OK); \
-        SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), expected_name); \
-        if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc); \
-    } \
-    static void test_##tool_id##_execute_empty(void) { \
-        sc_allocator_t alloc = sc_system_allocator(); \
-        sc_tool_t tool; \
-        sc_error_t err = create_fn(__VA_ARGS__, &tool); \
-        SC_ASSERT_EQ(err, SC_OK); \
-        sc_json_value_t *args = sc_json_object_new(&alloc); \
-        SC_ASSERT_NOT_NULL(args); \
-        sc_tool_result_t result; \
-        err = tool.vtable->execute(tool.ctx, &alloc, args, &result); \
-        sc_json_free(&alloc, args); \
-        SC_ASSERT(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT); \
-        if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1); \
-        if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1); \
-        if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc); \
+#define TOOL_TEST_3(tool_id, create_fn, expected_name, ...)                            \
+    static void test_##tool_id##_create(void) {                                        \
+        sc_allocator_t alloc = sc_system_allocator();                                  \
+        sc_tool_t tool;                                                                \
+        sc_error_t err = create_fn(__VA_ARGS__, &tool);                                \
+        SC_ASSERT_EQ(err, SC_OK);                                                      \
+        if (tool.vtable && tool.vtable->deinit)                                        \
+            tool.vtable->deinit(tool.ctx, &alloc);                                     \
+    }                                                                                  \
+    static void test_##tool_id##_name(void) {                                          \
+        sc_allocator_t alloc = sc_system_allocator();                                  \
+        sc_tool_t tool;                                                                \
+        sc_error_t err = create_fn(__VA_ARGS__, &tool);                                \
+        SC_ASSERT_EQ(err, SC_OK);                                                      \
+        SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), expected_name);                  \
+        if (tool.vtable && tool.vtable->deinit)                                        \
+            tool.vtable->deinit(tool.ctx, &alloc);                                     \
+    }                                                                                  \
+    static void test_##tool_id##_execute_empty(void) {                                 \
+        sc_allocator_t alloc = sc_system_allocator();                                  \
+        sc_tool_t tool;                                                                \
+        sc_error_t err = create_fn(__VA_ARGS__, &tool);                                \
+        SC_ASSERT_EQ(err, SC_OK);                                                      \
+        sc_json_value_t *args = sc_json_object_new(&alloc);                            \
+        SC_ASSERT_NOT_NULL(args);                                                      \
+        sc_tool_result_t result;                                                       \
+        err = tool.vtable->execute(tool.ctx, &alloc, args, &result);                   \
+        sc_json_free(&alloc, args);                                                    \
+        SC_ASSERT(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT);                     \
+        if (result.output_owned && result.output)                                      \
+            alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);       \
+        if (result.error_msg_owned && result.error_msg)                                \
+            alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1); \
+        if (tool.vtable && tool.vtable->deinit)                                        \
+            tool.vtable->deinit(tool.ctx, &alloc);                                     \
     }
 
 /* Workspace + policy tools */
@@ -117,7 +122,8 @@ TOOL_TEST_3(cron_remove, sc_cron_remove_create, "cron_remove", &alloc, NULL)
 TOOL_TEST_3(cron_run, sc_cron_run_create, "cron_run", &alloc, NULL)
 TOOL_TEST_3(cron_runs, sc_cron_runs_create, "cron_runs", &alloc, NULL)
 TOOL_TEST_3(cron_update, sc_cron_update_create, "cron_update", &alloc, NULL)
-TOOL_TEST_3(browser_open, sc_browser_open_create, "browser_open", &alloc, (const char*[]){"example.com"}, 1, NULL)
+TOOL_TEST_3(browser_open, sc_browser_open_create, "browser_open", &alloc,
+            (const char *[]){"example.com"}, 1, NULL)
 TOOL_TEST_3(composio, sc_composio_create, "composio", &alloc, NULL, 0, "default", 7)
 TOOL_TEST_3(hardware_memory, sc_hardware_memory_create, "hardware_memory", &alloc, NULL, 0)
 TOOL_TEST_3(schedule, sc_schedule_create, "schedule", &alloc, NULL)
@@ -133,7 +139,8 @@ static void test_claude_code_create(void) {
     sc_tool_t tool;
     sc_error_t err = sc_claude_code_create(&alloc, NULL, &tool);
     SC_ASSERT_EQ(err, SC_OK);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_claude_code_name(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -141,7 +148,8 @@ static void test_claude_code_name(void) {
     sc_error_t err = sc_claude_code_create(&alloc, NULL, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "claude_code");
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_claude_code_description(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -151,7 +159,8 @@ static void test_claude_code_description(void) {
     SC_ASSERT_NOT_NULL(desc);
     SC_ASSERT_TRUE(strlen(desc) > 0);
     SC_ASSERT_TRUE(strstr(desc, "Claude Code") != NULL);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_claude_code_execute_empty(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -165,9 +174,12 @@ static void test_claude_code_execute_empty(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_FALSE(result.success);
     SC_ASSERT_TRUE(strstr(result.error_msg, "missing prompt") != NULL);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_claude_code_execute_with_prompt(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -184,19 +196,17 @@ static void test_claude_code_execute_with_prompt(void) {
     SC_ASSERT_NOT_NULL(result.output);
     SC_ASSERT_TRUE(strstr(result.output, "fix the bug") != NULL);
     sc_tool_result_free(&alloc, &result);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_claude_code_execute_with_model_and_dir(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_tool_t tool;
     sc_claude_code_create(&alloc, NULL, &tool);
     sc_json_value_t *args = sc_json_object_new(&alloc);
-    sc_json_object_set(&alloc, args, "prompt",
-        sc_json_string_new(&alloc, "refactor", 8));
-    sc_json_object_set(&alloc, args, "model",
-        sc_json_string_new(&alloc, "claude-sonnet-4", 15));
-    sc_json_object_set(&alloc, args, "working_directory",
-        sc_json_string_new(&alloc, "/tmp", 4));
+    sc_json_object_set(&alloc, args, "prompt", sc_json_string_new(&alloc, "refactor", 8));
+    sc_json_object_set(&alloc, args, "model", sc_json_string_new(&alloc, "claude-sonnet-4", 15));
+    sc_json_object_set(&alloc, args, "working_directory", sc_json_string_new(&alloc, "/tmp", 4));
     sc_tool_result_t result;
     sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
     sc_json_free(&alloc, args);
@@ -205,7 +215,8 @@ static void test_claude_code_execute_with_model_and_dir(void) {
     SC_ASSERT_TRUE(strstr(result.output, "claude-sonnet-4") != NULL);
     SC_ASSERT_TRUE(strstr(result.output, "/tmp") != NULL);
     sc_tool_result_free(&alloc, &result);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Browser: open action rejects invalid URL scheme ───────────────────────── */
@@ -227,9 +238,12 @@ static void test_browser_open_rejects_invalid_scheme(void) {
     SC_ASSERT(!result.success);
 
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Browser_open: blocks private IP ─────────────────────────────────────── */
@@ -250,9 +264,12 @@ static void test_browser_open_blocks_private_ip(void) {
     SC_ASSERT(!result.success);
 
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Browser_open: blocks localhost ───────────────────────────────────────── */
@@ -273,9 +290,12 @@ static void test_browser_open_blocks_localhost(void) {
     SC_ASSERT(!result.success);
 
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Browser: click action works ────────────────────────────────────────── */
@@ -294,9 +314,12 @@ static void test_browser_click_action(void) {
     SC_ASSERT_NOT_NULL(result.output);
     SC_ASSERT_NOT_NULL(strstr(result.output, "#submit"));
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_browser_click_missing_selector(void) {
@@ -309,9 +332,12 @@ static void test_browser_click_missing_selector(void) {
     tool.vtable->execute(tool.ctx, &alloc, args, &result);
     SC_ASSERT_FALSE(result.success);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Browser: type action works ─────────────────────────────────────────── */
@@ -329,9 +355,12 @@ static void test_browser_type_action(void) {
     SC_ASSERT_TRUE(result.success);
     SC_ASSERT_NOT_NULL(strstr(result.output, "hello"));
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_browser_type_missing_text(void) {
@@ -344,9 +373,12 @@ static void test_browser_type_missing_text(void) {
     tool.vtable->execute(tool.ctx, &alloc, args, &result);
     SC_ASSERT_FALSE(result.success);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Browser: scroll action works ───────────────────────────────────────── */
@@ -363,9 +395,12 @@ static void test_browser_scroll_action(void) {
     SC_ASSERT_TRUE(result.success);
     SC_ASSERT_NOT_NULL(strstr(result.output, "500"));
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── SPI: list/transfer/read actions ────────────────────────────────────── */
@@ -381,9 +416,12 @@ static void test_spi_list_action(void) {
     SC_ASSERT_TRUE(result.success);
     SC_ASSERT_NOT_NULL(strstr(result.output, "devices"));
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_spi_transfer_action(void) {
@@ -399,9 +437,12 @@ static void test_spi_transfer_action(void) {
     SC_ASSERT_TRUE(result.success);
     SC_ASSERT_NOT_NULL(strstr(result.output, "rx_data"));
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_spi_read_action(void) {
@@ -416,9 +457,12 @@ static void test_spi_read_action(void) {
     SC_ASSERT_TRUE(result.success);
     SC_ASSERT_NOT_NULL(strstr(result.output, "rx_data"));
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── hardware_memory: read/write with boards ────────────────────────────── */
@@ -436,9 +480,12 @@ static void test_hardware_memory_read_action(void) {
     SC_ASSERT_TRUE(result.success);
     SC_ASSERT_NOT_NULL(result.output);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_hardware_memory_write_action(void) {
@@ -455,9 +502,12 @@ static void test_hardware_memory_write_action(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_TRUE(result.success);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_hardware_memory_unconfigured_board(void) {
@@ -472,9 +522,12 @@ static void test_hardware_memory_unconfigured_board(void) {
     tool.vtable->execute(tool.ctx, &alloc, args, &result);
     SC_ASSERT_FALSE(result.success);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── file_edit: schema has path, old_text, new_text ───────────────────────── */
@@ -487,7 +540,8 @@ static void test_file_edit_schema_has_params(void) {
     SC_ASSERT_NOT_NULL(strstr(params, "path"));
     SC_ASSERT_NOT_NULL(strstr(params, "old_text"));
     SC_ASSERT_NOT_NULL(strstr(params, "new_text"));
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Schema: validate with type returns valid ────────────────────────────── */
@@ -523,8 +577,8 @@ static void test_tools_factory_create_all(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_tool_t *tools = NULL;
     size_t count = 0;
-    sc_error_t err = sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL,
-                                              &tools, &count);
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(tools);
     SC_ASSERT(count >= 28);
@@ -543,9 +597,12 @@ static void test_file_read_execute_path_traversal_rejected(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT(!result.success);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_file_write_execute_absolute_path_rejected(void) {
@@ -560,9 +617,12 @@ static void test_file_write_execute_absolute_path_rejected(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT(!result.success);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── URL validation for web tools ───────────────────────────────────────── */
@@ -578,9 +638,12 @@ static void test_http_request_rejects_http_url(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT(!result.success);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_web_fetch_execute_missing_url(void) {
@@ -592,9 +655,12 @@ static void test_web_fetch_execute_missing_url(void) {
     sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
     SC_ASSERT(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Git tool parameter validation ─────────────────────────────────────── */
@@ -607,9 +673,12 @@ static void test_git_execute_missing_command(void) {
     sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
     SC_ASSERT(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_git_parameters_json_has_command(void) {
@@ -618,7 +687,8 @@ static void test_git_parameters_json_has_command(void) {
     sc_git_create(&alloc, ".", 1, NULL, &tool);
     const char *params = tool.vtable->parameters_json(tool.ctx);
     SC_ASSERT_NOT_NULL(strstr(params, "operation"));
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Memory tools with valid args ─────────────────────────────────────────── */
@@ -633,9 +703,12 @@ static void test_memory_store_execute_with_content(void) {
     sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
     SC_ASSERT(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_memory_recall_execute_with_query(void) {
@@ -648,9 +721,12 @@ static void test_memory_recall_execute_with_query(void) {
     sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
     SC_ASSERT(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Cron tools with valid args ─────────────────────────────────────────── */
@@ -665,9 +741,12 @@ static void test_cron_add_execute_with_spec(void) {
     sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
     SC_ASSERT(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_cron_list_execute_returns(void) {
@@ -679,9 +758,12 @@ static void test_cron_list_execute_returns(void) {
     sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
     SC_ASSERT_EQ(err, SC_OK);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Schedule tool ─────────────────────────────────────────────────────── */
@@ -691,8 +773,10 @@ static void test_schedule_parameters_have_delay(void) {
     sc_schedule_create(&alloc, NULL, &tool);
     const char *params = tool.vtable->parameters_json(tool.ctx);
     SC_ASSERT_NOT_NULL(params);
-    SC_ASSERT_TRUE(strstr(params, "delay") != NULL || strstr(params, "seconds") != NULL || strlen(params) > 0);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    SC_ASSERT_TRUE(strstr(params, "delay") != NULL || strstr(params, "seconds") != NULL ||
+                   strlen(params) > 0);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Schema validate and clean ───────────────────────────────────────────── */
@@ -760,9 +844,12 @@ static void test_file_append_execute_path_traversal_rejected(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT(!result.success);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Tool description non-empty ──────────────────────────────────────────── */
@@ -773,7 +860,8 @@ static void test_shell_description_non_empty(void) {
     const char *desc = tool.vtable->description(tool.ctx);
     SC_ASSERT_NOT_NULL(desc);
     SC_ASSERT_TRUE(strlen(desc) > 0);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_file_read_description_non_empty(void) {
@@ -782,7 +870,8 @@ static void test_file_read_description_non_empty(void) {
     sc_file_read_create(&alloc, ".", 1, NULL, &tool);
     SC_ASSERT_NOT_NULL(tool.vtable->description(tool.ctx));
     SC_ASSERT_TRUE(strlen(tool.vtable->description(tool.ctx)) > 0);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_http_request_description_non_empty(void) {
@@ -791,7 +880,8 @@ static void test_http_request_description_non_empty(void) {
     sc_http_request_create(&alloc, false, &tool);
     SC_ASSERT_NOT_NULL(tool.vtable->description(tool.ctx));
     SC_ASSERT_TRUE(strlen(tool.vtable->description(tool.ctx)) > 0);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Parameters JSON valid ───────────────────────────────────────────────── */
@@ -802,7 +892,8 @@ static void test_shell_parameters_valid_json(void) {
     const char *params = tool.vtable->parameters_json(tool.ctx);
     SC_ASSERT_NOT_NULL(params);
     SC_ASSERT_TRUE(params[0] == '{');
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_memory_store_parameters_has_key(void) {
@@ -811,7 +902,8 @@ static void test_memory_store_parameters_has_key(void) {
     sc_memory_store_create(&alloc, NULL, &tool);
     const char *params = tool.vtable->parameters_json(tool.ctx);
     SC_ASSERT_NOT_NULL(strstr(params, "key"));
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── File edit path traversal ────────────────────────────────────────────── */
@@ -828,9 +920,12 @@ static void test_file_edit_execute_path_traversal_rejected(void) {
     SC_ASSERT_EQ(err, SC_OK);
     (void)result; /* In SC_IS_TEST, mock may succeed; real mode would reject traversal */
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Web fetch rejects HTTP ───────────────────────────────────────────────── */
@@ -845,9 +940,12 @@ static void test_web_fetch_rejects_http_url(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT(!result.success);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Web search missing query ─────────────────────────────────────────────── */
@@ -861,9 +959,12 @@ static void test_web_search_execute_missing_query(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT(!result.success);
     sc_json_free(&alloc, args);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Shell workspace bounds ───────────────────────────────────────────────── */
@@ -873,7 +974,8 @@ static void test_shell_parameters_has_command(void) {
     sc_shell_create(&alloc, ".", 1, NULL, &tool);
     const char *params = tool.vtable->parameters_json(tool.ctx);
     SC_ASSERT_NOT_NULL(strstr(params, "command"));
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_file_read_parameters_has_path(void) {
@@ -882,7 +984,8 @@ static void test_file_read_parameters_has_path(void) {
     sc_file_read_create(&alloc, ".", 1, NULL, &tool);
     const char *params = tool.vtable->parameters_json(tool.ctx);
     SC_ASSERT_NOT_NULL(strstr(params, "path"));
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_file_write_parameters_has_content(void) {
@@ -891,7 +994,8 @@ static void test_file_write_parameters_has_content(void) {
     sc_file_write_create(&alloc, ".", 1, NULL, &tool);
     const char *params = tool.vtable->parameters_json(tool.ctx);
     SC_ASSERT_NOT_NULL(strstr(params, "content"));
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_image_parameters_has_prompt(void) {
@@ -900,7 +1004,8 @@ static void test_image_parameters_has_prompt(void) {
     sc_image_create(&alloc, NULL, 0, &tool);
     const char *params = tool.vtable->parameters_json(tool.ctx);
     SC_ASSERT_NOT_NULL(params);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_http_request_parameters_has_url(void) {
@@ -909,7 +1014,8 @@ static void test_http_request_parameters_has_url(void) {
     sc_http_request_create(&alloc, false, &tool);
     const char *params = tool.vtable->parameters_json(tool.ctx);
     SC_ASSERT_NOT_NULL(strstr(params, "url"));
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_web_search_parameters_has_query(void) {
@@ -918,7 +1024,8 @@ static void test_web_search_parameters_has_query(void) {
     sc_web_search_create(&alloc, NULL, NULL, 0, &tool);
     const char *params = tool.vtable->parameters_json(tool.ctx);
     SC_ASSERT_NOT_NULL(params);
-    if (tool.vtable && tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_browser_create_with_policy(void) {
@@ -929,7 +1036,8 @@ static void test_browser_create_with_policy(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(tool.ctx);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "browser");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_screenshot_create_with_policy(void) {
@@ -940,7 +1048,8 @@ static void test_screenshot_create_with_policy(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(tool.ctx);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "screenshot");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_browser_open_create_with_policy(void) {
@@ -952,12 +1061,13 @@ static void test_browser_open_create_with_policy(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(tool.ctx);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "browser_open");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Business Tools ──────────────────────────────────────────────────────── */
-static inline void biz_set_str(sc_allocator_t *a, sc_json_value_t *obj,
-                               const char *key, const char *val) {
+static inline void biz_set_str(sc_allocator_t *a, sc_json_value_t *obj, const char *key,
+                               const char *val) {
     sc_json_object_set(a, obj, key, sc_json_string_new(a, val, strlen(val)));
 }
 
@@ -967,7 +1077,8 @@ static void test_spreadsheet_create(void) {
     sc_error_t err = sc_spreadsheet_create(&alloc, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "spreadsheet");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_spreadsheet_analyze(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -983,7 +1094,8 @@ static void test_spreadsheet_analyze(void) {
     SC_ASSERT(strstr(result.output, "Rows:") != NULL);
     sc_tool_result_free(&alloc, &result);
     sc_json_free(&alloc, args);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_report_create(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -991,7 +1103,8 @@ static void test_report_create(void) {
     sc_error_t err = sc_report_create(&alloc, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "report");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_report_template(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1004,7 +1117,8 @@ static void test_report_template(void) {
     SC_ASSERT(result.output != NULL);
     SC_ASSERT(strstr(result.output, "executive_summary") != NULL);
     sc_json_free(&alloc, args);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_broadcast_create(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1012,7 +1126,8 @@ static void test_broadcast_create(void) {
     sc_error_t err = sc_broadcast_create(&alloc, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "broadcast");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_calendar_create(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1020,7 +1135,8 @@ static void test_calendar_create(void) {
     sc_error_t err = sc_calendar_create(&alloc, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "calendar");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_calendar_list(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1033,7 +1149,8 @@ static void test_calendar_list(void) {
     SC_ASSERT(result.output != NULL);
     SC_ASSERT(strstr(result.output, "Team Standup") != NULL);
     sc_json_free(&alloc, args);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_jira_create(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1041,7 +1158,8 @@ static void test_jira_create(void) {
     sc_error_t err = sc_jira_create(&alloc, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "jira");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_jira_list(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1054,7 +1172,8 @@ static void test_jira_list(void) {
     SC_ASSERT(result.output != NULL);
     SC_ASSERT(strstr(result.output, "PROJ-1") != NULL);
     sc_json_free(&alloc, args);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_social_create(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1062,7 +1181,8 @@ static void test_social_create(void) {
     sc_error_t err = sc_social_create(&alloc, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "social");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_social_post(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1078,7 +1198,8 @@ static void test_social_post(void) {
     SC_ASSERT(strstr(result.output, "posted") != NULL);
     sc_tool_result_free(&alloc, &result);
     sc_json_free(&alloc, args);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_crm_create(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1086,7 +1207,8 @@ static void test_crm_create(void) {
     sc_error_t err = sc_crm_create(&alloc, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "crm");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_crm_contacts(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1099,7 +1221,8 @@ static void test_crm_contacts(void) {
     SC_ASSERT(result.output != NULL);
     SC_ASSERT(strstr(result.output, "Alice Smith") != NULL);
     sc_json_free(&alloc, args);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_analytics_create(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1107,7 +1230,8 @@ static void test_analytics_create(void) {
     sc_error_t err = sc_analytics_create(&alloc, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "analytics");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_analytics_overview(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1120,7 +1244,8 @@ static void test_analytics_overview(void) {
     SC_ASSERT(result.output != NULL);
     SC_ASSERT(strstr(result.output, "pageviews") != NULL);
     sc_json_free(&alloc, args);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_invoice_create(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1128,7 +1253,8 @@ static void test_invoice_create(void) {
     sc_error_t err = sc_invoice_create(&alloc, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "invoice");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_invoice_parse(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1143,7 +1269,8 @@ static void test_invoice_parse(void) {
     SC_ASSERT(strstr(result.output, "parsed") != NULL);
     sc_tool_result_free(&alloc, &result);
     sc_json_free(&alloc, args);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_workflow_create(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1151,7 +1278,8 @@ static void test_workflow_create(void) {
     sc_error_t err = sc_workflow_create(&alloc, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "workflow");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_workflow_create_and_run(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1175,7 +1303,8 @@ static void test_workflow_create_and_run(void) {
     SC_ASSERT(strstr(result.output, "completed") != NULL);
     sc_tool_result_free(&alloc, &result);
     sc_json_free(&alloc, args);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 static void test_workflow_approval_gate(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1213,7 +1342,8 @@ static void test_workflow_approval_gate(void) {
     SC_ASSERT(strstr(result.output, "completed") != NULL);
     sc_tool_result_free(&alloc, &result);
     sc_json_free(&alloc, args);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_spawn_create_with_policy(void) {
@@ -1225,7 +1355,8 @@ static void test_spawn_create_with_policy(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(tool.ctx);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "spawn");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Factory-based tests for send_message, agent_query, agent_spawn, apply_patch,
@@ -1244,8 +1375,7 @@ static void test_tool_send_message_exists(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "send_message"));
     sc_tools_destroy_default(&alloc, tools, count);
@@ -1256,8 +1386,7 @@ static void test_tool_send_message_execute(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     sc_tool_t *t = find_tool_by_name(tools, count, "send_message");
     SC_ASSERT_NOT_NULL(t);
@@ -1280,8 +1409,7 @@ static void test_tool_agent_query_exists(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "agent_query"));
     sc_tools_destroy_default(&alloc, tools, count);
@@ -1292,8 +1420,7 @@ static void test_tool_agent_query_execute(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     sc_tool_t *t = find_tool_by_name(tools, count, "agent_query");
     SC_ASSERT_NOT_NULL(t);
@@ -1316,8 +1443,7 @@ static void test_tool_agent_spawn_exists(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "agent_spawn"));
     sc_tools_destroy_default(&alloc, tools, count);
@@ -1328,8 +1454,7 @@ static void test_tool_agent_spawn_execute(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     sc_tool_t *t = find_tool_by_name(tools, count, "agent_spawn");
     SC_ASSERT_NOT_NULL(t);
@@ -1351,8 +1476,7 @@ static void test_tool_apply_patch_exists(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "apply_patch"));
     sc_tools_destroy_default(&alloc, tools, count);
@@ -1363,17 +1487,16 @@ static void test_tool_apply_patch_execute(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     sc_tool_t *t = find_tool_by_name(tools, count, "apply_patch");
     SC_ASSERT_NOT_NULL(t);
     if (t) {
         sc_json_value_t *args = sc_json_object_new(&alloc);
         sc_json_object_set(&alloc, args, "file", sc_json_string_new(&alloc, "foo.txt", 7));
-        sc_json_object_set(&alloc, args, "patch",
-                           sc_json_string_new(&alloc, "--- a/foo\n+++ b/foo\n@@ -1 +1 @@\n-x\n+y\n",
-                                              36));
+        sc_json_object_set(
+            &alloc, args, "patch",
+            sc_json_string_new(&alloc, "--- a/foo\n+++ b/foo\n@@ -1 +1 @@\n-x\n+y\n", 36));
         sc_tool_result_t result = {0};
         err = t->vtable->execute(t->ctx, &alloc, args, &result);
         sc_json_free(&alloc, args);
@@ -1389,8 +1512,7 @@ static void test_tool_database_exists(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "database"));
     sc_tools_destroy_default(&alloc, tools, count);
@@ -1401,16 +1523,14 @@ static void test_tool_database_execute(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     sc_tool_t *t = find_tool_by_name(tools, count, "database");
     SC_ASSERT_NOT_NULL(t);
     if (t) {
         sc_json_value_t *args = sc_json_object_new(&alloc);
         sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "query", 5));
-        sc_json_object_set(&alloc, args, "sql",
-                           sc_json_string_new(&alloc, "SELECT 1", 8));
+        sc_json_object_set(&alloc, args, "sql", sc_json_string_new(&alloc, "SELECT 1", 8));
         sc_tool_result_t result = {0};
         err = t->vtable->execute(t->ctx, &alloc, args, &result);
         sc_json_free(&alloc, args);
@@ -1426,8 +1546,7 @@ static void test_tool_notebook_exists(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "notebook"));
     sc_tools_destroy_default(&alloc, tools, count);
@@ -1438,8 +1557,7 @@ static void test_tool_notebook_execute(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     sc_tool_t *t = find_tool_by_name(tools, count, "notebook");
     SC_ASSERT_NOT_NULL(t);
@@ -1461,8 +1579,7 @@ static void test_tool_canvas_exists(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "canvas"));
     sc_tools_destroy_default(&alloc, tools, count);
@@ -1473,8 +1590,7 @@ static void test_tool_canvas_execute(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     sc_tool_t *t = find_tool_by_name(tools, count, "canvas");
     SC_ASSERT_NOT_NULL(t);
@@ -1497,8 +1613,7 @@ static void test_tool_pdf_exists(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "pdf"));
     sc_tools_destroy_default(&alloc, tools, count);
@@ -1509,15 +1624,13 @@ static void test_tool_pdf_execute(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     sc_tool_t *t = find_tool_by_name(tools, count, "pdf");
     SC_ASSERT_NOT_NULL(t);
     if (t) {
         sc_json_value_t *args = sc_json_object_new(&alloc);
-        sc_json_object_set(&alloc, args, "path",
-                           sc_json_string_new(&alloc, "/tmp/test.pdf", 13));
+        sc_json_object_set(&alloc, args, "path", sc_json_string_new(&alloc, "/tmp/test.pdf", 13));
         sc_tool_result_t result = {0};
         err = t->vtable->execute(t->ctx, &alloc, args, &result);
         sc_json_free(&alloc, args);
@@ -1533,8 +1646,7 @@ static void test_tool_diff_exists(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "diff"));
     sc_tools_destroy_default(&alloc, tools, count);
@@ -1545,18 +1657,15 @@ static void test_tool_diff_execute(void) {
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err =
-        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
-                                 &count);
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     sc_tool_t *t = find_tool_by_name(tools, count, "diff");
     SC_ASSERT_NOT_NULL(t);
     if (t) {
         sc_json_value_t *args = sc_json_object_new(&alloc);
         sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "diff", 4));
-        sc_json_object_set(&alloc, args, "file_a",
-                           sc_json_string_new(&alloc, "/tmp/a.txt", 10));
-        sc_json_object_set(&alloc, args, "file_b",
-                           sc_json_string_new(&alloc, "/tmp/b.txt", 10));
+        sc_json_object_set(&alloc, args, "file_a", sc_json_string_new(&alloc, "/tmp/a.txt", 10));
+        sc_json_object_set(&alloc, args, "file_b", sc_json_string_new(&alloc, "/tmp/b.txt", 10));
         sc_tool_result_t result = {0};
         err = t->vtable->execute(t->ctx, &alloc, args, &result);
         sc_json_free(&alloc, args);
@@ -1765,7 +1874,8 @@ void run_tools_all_tests(void) {
     SC_TEST_SUITE("Tools (all) - Factory");
     SC_RUN_TEST(test_tools_factory_create_all);
 
-    SC_TEST_SUITE("Tools (all) - send_message, agent_query, agent_spawn, apply_patch, database, notebook, canvas, pdf, diff");
+    SC_TEST_SUITE("Tools (all) - send_message, agent_query, agent_spawn, apply_patch, database, "
+                  "notebook, canvas, pdf, diff");
     SC_RUN_TEST(test_tool_send_message_exists);
     SC_RUN_TEST(test_tool_send_message_execute);
     SC_RUN_TEST(test_tool_agent_query_exists);

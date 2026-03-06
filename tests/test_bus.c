@@ -1,15 +1,13 @@
 /* Event bus pub/sub tests */
-#include "test_framework.h"
 #include "seaclaw/bus.h"
 #include "seaclaw/core/allocator.h"
+#include "test_framework.h"
 #include <string.h>
 
 static int bus_received_count;
 static sc_bus_event_type_t bus_last_type;
 
-static bool bus_subscriber_fn(sc_bus_event_type_t type,
-    const sc_bus_event_t *ev, void *user_ctx)
-{
+static bool bus_subscriber_fn(sc_bus_event_type_t type, const sc_bus_event_t *ev, void *user_ctx) {
     (void)user_ctx;
     (void)ev;
     bus_received_count++;
@@ -89,13 +87,17 @@ static int bus_sub1_count;
 static int bus_sub2_count;
 
 static bool bus_sub1_fn(sc_bus_event_type_t type, const sc_bus_event_t *ev, void *ctx) {
-    (void)type; (void)ev; (void)ctx;
+    (void)type;
+    (void)ev;
+    (void)ctx;
     bus_sub1_count++;
     return true;
 }
 
 static bool bus_sub2_fn(sc_bus_event_type_t type, const sc_bus_event_t *ev, void *ctx) {
-    (void)type; (void)ev; (void)ctx;
+    (void)type;
+    (void)ev;
+    (void)ctx;
     bus_sub2_count++;
     return true;
 }
@@ -119,8 +121,10 @@ static void test_bus_multi_subscriber(void) {
 }
 
 static bool bus_only_tool_fn(sc_bus_event_type_t type, const sc_bus_event_t *ev, void *ctx) {
-    (void)ev; (void)ctx;
-    if (type == SC_BUS_TOOL_CALL) bus_received_count++;
+    (void)ev;
+    (void)ctx;
+    if (type == SC_BUS_TOOL_CALL)
+        bus_received_count++;
     return true;
 }
 
@@ -141,7 +145,8 @@ static char bus_received_id[SC_BUS_ID_LEN];
 static char bus_received_msg[SC_BUS_MSG_LEN];
 
 static bool bus_capture_fn(sc_bus_event_type_t type, const sc_bus_event_t *ev, void *ctx) {
-    (void)type; (void)ctx;
+    (void)type;
+    (void)ctx;
     if (ev) {
         memcpy(bus_received_channel, ev->channel, SC_BUS_CHANNEL_LEN - 1);
         bus_received_channel[SC_BUS_CHANNEL_LEN - 1] = '\0';
@@ -184,7 +189,8 @@ static int bus_order[8];
 static int bus_order_idx;
 
 static bool bus_order_fn(sc_bus_event_type_t type, const sc_bus_event_t *ev, void *ctx) {
-    (void)ev; (void)ctx;
+    (void)ev;
+    (void)ctx;
     bus_order[bus_order_idx++] = (int)type;
     return true;
 }
@@ -205,7 +211,11 @@ static void test_bus_dispatch_ordering(void) {
 
 static int bus_priority_count;
 static bool bus_high_fn(sc_bus_event_type_t t, const sc_bus_event_t *e, void *c) {
-    (void)t;(void)e;(void)c; bus_priority_count++; return true;
+    (void)t;
+    (void)e;
+    (void)c;
+    bus_priority_count++;
+    return true;
 }
 
 static void test_bus_subscriber_priority_order(void) {

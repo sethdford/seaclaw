@@ -1,6 +1,6 @@
 /* WebSocket frame encoding/decoding tests */
-#include "test_framework.h"
 #include "seaclaw/websocket/websocket.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_ws_build_frame_empty_text(void) {
@@ -8,8 +8,8 @@ static void test_ws_build_frame_empty_text(void) {
     unsigned char mask[] = {0x01, 0x02, 0x03, 0x04};
     size_t n = sc_ws_build_frame(buf, sizeof(buf), SC_WS_OP_TEXT, "", 0, mask);
     SC_ASSERT_EQ(n, 6u);
-    SC_ASSERT_EQ((unsigned char)buf[0], 0x81u);  /* FIN + text */
-    SC_ASSERT_EQ((unsigned char)buf[1], 0x80u);  /* MASK + len 0 */
+    SC_ASSERT_EQ((unsigned char)buf[0], 0x81u); /* FIN + text */
+    SC_ASSERT_EQ((unsigned char)buf[1], 0x80u); /* MASK + len 0 */
 }
 
 static void test_ws_build_frame_short_payload(void) {
@@ -19,13 +19,13 @@ static void test_ws_build_frame_short_payload(void) {
     size_t n = sc_ws_build_frame(buf, sizeof(buf), SC_WS_OP_TEXT, payload, 2, mask);
     SC_ASSERT_EQ(n, 8u);
     SC_ASSERT_EQ((unsigned char)buf[0], 0x81u);
-    SC_ASSERT_EQ((unsigned char)buf[1], 0x82u);  /* MASK + len 2 */
+    SC_ASSERT_EQ((unsigned char)buf[1], 0x82u); /* MASK + len 2 */
     SC_ASSERT_EQ((unsigned char)buf[6], (unsigned char)('H' ^ 0xAA));
     SC_ASSERT_EQ((unsigned char)buf[7], (unsigned char)('i' ^ 0xBB));
 }
 
 static void test_ws_parse_header_short_text(void) {
-    unsigned char bytes[] = {0x81, 0x05};  /* FIN, text, len 5 */
+    unsigned char bytes[] = {0x81, 0x05}; /* FIN, text, len 5 */
     sc_ws_parsed_header_t h = {0};
     int r = sc_ws_parse_header((const char *)bytes, 2, &h);
     SC_ASSERT_EQ(r, 0);
@@ -37,7 +37,7 @@ static void test_ws_parse_header_short_text(void) {
 }
 
 static void test_ws_parse_header_126_extended(void) {
-    unsigned char bytes[] = {0x82, 0x7E, 0x00, 0x80};  /* binary, len 128 */
+    unsigned char bytes[] = {0x82, 0x7E, 0x00, 0x80}; /* binary, len 128 */
     sc_ws_parsed_header_t h = {0};
     int r = sc_ws_parse_header((const char *)bytes, 4, &h);
     SC_ASSERT_EQ(r, 0);
@@ -61,7 +61,7 @@ static void test_ws_apply_mask(void) {
     unsigned char mask[] = {0x37, 0xFA, 0x21, 0x3D};
     sc_ws_apply_mask(payload, 5, mask);
     SC_ASSERT_EQ((unsigned char)payload[0], (unsigned char)('H' ^ 0x37));
-    sc_ws_apply_mask(payload, 5, mask);  /* double mask restores */
+    sc_ws_apply_mask(payload, 5, mask); /* double mask restores */
     SC_ASSERT_STR_EQ(payload, "Hello");
 }
 
@@ -139,7 +139,8 @@ static void test_ws_apply_mask_empty(void) {
 static void test_ws_connect_invalid_host_returns_error(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_ws_client_t *ws = NULL;
-    sc_error_t err = sc_ws_connect(&alloc, "ws://invalid-host-that-does-not-resolve.example/ws", &ws);
+    sc_error_t err =
+        sc_ws_connect(&alloc, "ws://invalid-host-that-does-not-resolve.example/ws", &ws);
     SC_ASSERT_NEQ(err, SC_OK);
     SC_ASSERT_NULL(ws);
 }

@@ -10,44 +10,61 @@
 
 /* Top-level keys read by sc_config_parse_json (derive from config.c) */
 static const char *const sc_config_top_keys[] = {
-    "workspace",     "default_provider", "default_model", "default_temperature", "max_tokens",
-    "api_key",       "providers",        "autonomy",      "gateway",             "memory",
-    "tools",         "cron",             "scheduler",     "runtime",             "tunnel",
-    "channels",      "agent",            "heartbeat",     "reliability",         "router",
-    "diagnostics",
-    "session",       "peripherals",      "hardware",     "browser",             "cost",
-    "mcp_servers",   "nodes",            "policy",       "plugins",             "security",
-    "secrets",       "identity",
+    "workspace",     "default_provider",
+    "default_model", "default_temperature",
+    "max_tokens",    "api_key",
+    "providers",     "autonomy",
+    "gateway",       "memory",
+    "tools",         "cron",
+    "scheduler",     "runtime",
+    "tunnel",        "channels",
+    "agent",         "heartbeat",
+    "reliability",   "router",
+    "diagnostics",   "session",
+    "peripherals",   "hardware",
+    "browser",       "cost",
+    "mcp_servers",   "nodes",
+    "policy",        "plugins",
+    "security",      "secrets",
+    "identity",
 };
 static const size_t sc_config_top_keys_len =
     sizeof(sc_config_top_keys) / sizeof(sc_config_top_keys[0]);
 
 /* Nested keys per section */
 static const char *const sc_gateway_keys[] = {
-    "enabled", "port", "host", "require_pairing", "auth_token", "allow_public_bind",
-    "pair_rate_limit_per_minute", "rate_limit_requests", "rate_limit_window",
-    "webhook_hmac_secret", "control_ui_dir", "cors_origins",
+    "enabled",
+    "port",
+    "host",
+    "require_pairing",
+    "auth_token",
+    "allow_public_bind",
+    "pair_rate_limit_per_minute",
+    "rate_limit_requests",
+    "rate_limit_window",
+    "webhook_hmac_secret",
+    "control_ui_dir",
+    "cors_origins",
 };
 static const size_t sc_gateway_keys_len = sizeof(sc_gateway_keys) / sizeof(sc_gateway_keys[0]);
 
 static const char *const sc_memory_keys[] = {
-    "profile",   "backend",  "sqlite_path", "max_entries", "auto_save",
-    "postgres_url", "postgres_schema", "postgres_table", "redis_host", "redis_port",
-    "redis_key_prefix", "api_base_url", "api_key", "api_timeout_ms",
+    "profile",          "backend",         "sqlite_path",    "max_entries",    "auto_save",
+    "postgres_url",     "postgres_schema", "postgres_table", "redis_host",     "redis_port",
+    "redis_key_prefix", "api_base_url",    "api_key",        "api_timeout_ms",
 };
 static const size_t sc_memory_keys_len = sizeof(sc_memory_keys) / sizeof(sc_memory_keys[0]);
 
 static const char *const sc_security_keys[] = {
     "autonomy_level", "sandbox", "sandbox_config", "resources", "audit",
 };
-static const size_t sc_security_keys_len =
-    sizeof(sc_security_keys) / sizeof(sc_security_keys[0]);
+static const size_t sc_security_keys_len = sizeof(sc_security_keys) / sizeof(sc_security_keys[0]);
 
 /* Core provider names */
 static const char *const sc_known_providers[] = {
-    "openai", "anthropic", "gemini", "google", "google-gemini", "ollama",
-    "openrouter", "compatible", "claude_cli", "codex_cli", "openai-codex",
-    "router", "reliable",
+    "openai",       "anthropic",  "gemini",     "google",     "google-gemini",
+    "ollama",       "openrouter", "compatible", "claude_cli", "codex_cli",
+    "openai-codex", "router",     "reliable",
 };
 static const size_t sc_known_providers_len =
     sizeof(sc_known_providers) / sizeof(sc_known_providers[0]);
@@ -86,8 +103,8 @@ static void check_unknown_top_keys(const sc_json_value_t *root, bool strict, boo
 }
 
 static void check_unknown_nested_keys(const sc_json_value_t *obj, const char *section,
-                                      const char *const *allowed, size_t allowed_len,
-                                      bool strict, bool *has_error) {
+                                      const char *const *allowed, size_t allowed_len, bool strict,
+                                      bool *has_error) {
     if (!obj || obj->type != SC_JSON_OBJECT || !obj->data.object.pairs)
         return;
     for (size_t i = 0; i < obj->data.object.len; i++) {
@@ -108,9 +125,10 @@ static sc_error_t check_type(const sc_json_value_t *obj, const char *key, sc_jso
     if (!v)
         return SC_OK;
     if (v->type != expected) {
-        const char *want = (expected == SC_JSON_STRING) ? "string" :
-                          (expected == SC_JSON_NUMBER) ? "number" :
-                          (expected == SC_JSON_BOOL)  ? "boolean" : "unknown";
+        const char *want = (expected == SC_JSON_STRING)   ? "string"
+                           : (expected == SC_JSON_NUMBER) ? "number"
+                           : (expected == SC_JSON_BOOL)   ? "boolean"
+                                                          : "unknown";
         fprintf(stderr, "[config] %s: '%s' must be %s\n", ctx, key, want);
         return strict ? SC_ERR_CONFIG_INVALID : SC_OK;
     }
@@ -142,11 +160,11 @@ sc_error_t sc_config_validate_strict(const sc_config_t *cfg, const sc_json_value
         sc_json_value_t *mem = sc_json_object_get(root, "memory");
         if (mem)
             check_unknown_nested_keys(mem, "memory", sc_memory_keys, sc_memory_keys_len, strict,
-                                     &has_error);
+                                      &has_error);
         sc_json_value_t *sec = sc_json_object_get(root, "security");
         if (sec)
             check_unknown_nested_keys(sec, "security", sc_security_keys, sc_security_keys_len,
-                                     strict, &has_error);
+                                      strict, &has_error);
     }
 
     /* Type checking */
@@ -212,7 +230,8 @@ sc_error_t sc_config_validate_strict(const sc_config_t *cfg, const sc_json_value
         const char *url = cfg->providers[i].base_url;
         if (url && strlen(url) >= 8 && !starts_with(url, "https://") &&
             !starts_with(url, "http://localhost") && !starts_with(url, "http://127.0.0.1")) {
-            fprintf(stderr, "[config] providers[%zu].base_url must use https:// (or localhost)\n", i);
+            fprintf(stderr, "[config] providers[%zu].base_url must use https:// (or localhost)\n",
+                    i);
             if (strict)
                 has_error = true;
         }
@@ -247,7 +266,7 @@ sc_error_t sc_config_validate_strict(const sc_config_t *cfg, const sc_json_value
         return SC_ERR_CONFIG_INVALID;
     if (!cfg->default_model || !cfg->default_model[0])
         return SC_ERR_CONFIG_INVALID;
-    if (cfg->gateway.port < 1 || cfg->gateway.port > 65535)
+    if (cfg->gateway.port == 0)
         return SC_ERR_CONFIG_INVALID;
     if (cfg->security.autonomy_level > 4)
         return SC_ERR_CONFIG_INVALID;

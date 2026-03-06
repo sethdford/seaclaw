@@ -8,13 +8,10 @@
  * Rust FFI uses *const u8 / *mut u8 for byte buffers, which maps to uint8_t
  * in C (not char, which may be signed on some platforms). */
 extern int32_t sonata_pipeline_init(const uint8_t *config_json, size_t config_len);
-extern int32_t sonata_stt(const float *audio, size_t samples,
-                          uint8_t *text, size_t *text_len);
-extern int32_t sonata_tts(const uint8_t *text, size_t text_len,
-                          const uint8_t *speaker_id, float emotion_exag,
-                          float *audio, size_t *audio_len);
-extern int32_t sonata_speaker_encode(const float *audio, size_t samples,
-                                     float *embedding);
+extern int32_t sonata_stt(const float *audio, size_t samples, uint8_t *text, size_t *text_len);
+extern int32_t sonata_tts(const uint8_t *text, size_t text_len, const uint8_t *speaker_id,
+                          float emotion_exag, float *audio, size_t *audio_len);
+extern int32_t sonata_speaker_encode(const float *audio, size_t samples, float *embedding);
 extern void sonata_pipeline_deinit(void);
 #endif
 
@@ -27,8 +24,7 @@ typedef struct sc_voice_ctx {
     bool running;
 } sc_voice_ctx_t;
 
-static sc_error_t voice_start(void *ctx)
-{
+static sc_error_t voice_start(void *ctx) {
     sc_voice_ctx_t *v = (sc_voice_ctx_t *)ctx;
     if (!v)
         return SC_ERR_INVALID_ARGUMENT;
@@ -46,8 +42,7 @@ static sc_error_t voice_start(void *ctx)
     return SC_OK;
 }
 
-static void voice_stop(void *ctx)
-{
+static void voice_stop(void *ctx) {
     sc_voice_ctx_t *v = (sc_voice_ctx_t *)ctx;
     if (!v)
         return;
@@ -61,11 +56,8 @@ static void voice_stop(void *ctx)
 #endif
 }
 
-static sc_error_t voice_send(void *ctx,
-    const char *target, size_t target_len,
-    const char *message, size_t message_len,
-    const char *const *media, size_t media_count)
-{
+static sc_error_t voice_send(void *ctx, const char *target, size_t target_len, const char *message,
+                             size_t message_len, const char *const *media, size_t media_count) {
     sc_voice_ctx_t *v = (sc_voice_ctx_t *)ctx;
     if (!v || !message)
         return SC_ERR_INVALID_ARGUMENT;
@@ -80,18 +72,15 @@ static sc_error_t voice_send(void *ctx,
     const size_t buf_bytes = buf_samples * sizeof(float);
     float *audio_buf = (float *)v->alloc->alloc(v->alloc->ctx, buf_bytes);
     if (!audio_buf) {
-        fprintf(stderr, "voice_channel: failed to allocate audio buffer (%zu bytes)\n",
-                buf_bytes);
+        fprintf(stderr, "voice_channel: failed to allocate audio buffer (%zu bytes)\n", buf_bytes);
         return SC_ERR_OUT_OF_MEMORY;
     }
 
     size_t audio_len = buf_samples;
-    float exag = v->config.emotion_exaggeration_set
-        ? v->config.emotion_exaggeration : 1.0f;
+    float exag = v->config.emotion_exaggeration_set ? v->config.emotion_exaggeration : 1.0f;
 
     int32_t err = sonata_tts((const uint8_t *)message, message_len,
-        (const uint8_t *)v->config.speaker_id, exag,
-        audio_buf, &audio_len);
+                             (const uint8_t *)v->config.speaker_id, exag, audio_buf, &audio_len);
     if (err != 0) {
         fprintf(stderr, "voice_channel: sonata_tts failed (err=%d)\n", err);
         v->alloc->free(v->alloc->ctx, audio_buf, buf_bytes);
@@ -99,8 +88,7 @@ static sc_error_t voice_send(void *ctx,
     }
 
     if (v->config.on_audio_ready) {
-        v->config.on_audio_ready(audio_buf, audio_len,
-                                  v->config.callback_user_data);
+        v->config.on_audio_ready(audio_buf, audio_len, v->config.callback_user_data);
     }
 
     v->alloc->free(v->alloc->ctx, audio_buf, buf_bytes);
@@ -109,14 +97,12 @@ static sc_error_t voice_send(void *ctx,
     return SC_OK;
 }
 
-static const char *voice_name(void *ctx)
-{
+static const char *voice_name(void *ctx) {
     (void)ctx;
     return "voice";
 }
 
-static bool voice_health_check(void *ctx)
-{
+static bool voice_health_check(void *ctx) {
     sc_voice_ctx_t *v = (sc_voice_ctx_t *)ctx;
     return v && v->running;
 }
@@ -132,10 +118,8 @@ static const sc_channel_vtable_t voice_vtable = {
     .stop_typing = NULL,
 };
 
-sc_error_t sc_channel_voice_create(sc_allocator_t *alloc,
-    const sc_channel_voice_config_t *config,
-    sc_channel_t *out)
-{
+sc_error_t sc_channel_voice_create(sc_allocator_t *alloc, const sc_channel_voice_config_t *config,
+                                   sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
 
@@ -159,8 +143,7 @@ sc_error_t sc_channel_voice_create(sc_allocator_t *alloc,
     return SC_OK;
 }
 
-void sc_channel_voice_destroy(sc_channel_t *ch)
-{
+void sc_channel_voice_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_voice_ctx_t *v = (sc_voice_ctx_t *)ch->ctx;
         sc_allocator_t *a = v->alloc;

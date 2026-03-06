@@ -21,8 +21,9 @@ static int b64url_char_val(char c) {
 }
 
 sc_error_t base64url_decode(const char *in, size_t in_len, char *out, size_t out_cap,
-                           size_t *out_len) {
-    while (in_len > 0 && (in[in_len - 1] == '=' || in[in_len - 1] == '\n' || in[in_len - 1] == '\r'))
+                            size_t *out_len) {
+    while (in_len > 0 &&
+           (in[in_len - 1] == '=' || in[in_len - 1] == '\n' || in[in_len - 1] == '\r'))
         in_len--;
     size_t byte_len = (in_len * 3) / 4;
     if (out_cap < byte_len + 1)

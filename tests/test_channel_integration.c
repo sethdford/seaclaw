@@ -2,11 +2,11 @@
  * Tests full lifecycle: create -> is_configured -> send -> name -> deinit.
  * Uses SC_IS_TEST (test build) which mocks network calls.
  */
-#include "test_framework.h"
 #include "seaclaw/channel.h"
 #include "seaclaw/channel_loop.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#include "test_framework.h"
 #include <string.h>
 
 #if SC_HAS_TEAMS
@@ -74,8 +74,8 @@ static void test_twilio_integration_empty_config_not_configured(void) {
 static void test_google_chat_integration_full_lifecycle(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_channel_t ch = {0};
-    sc_error_t err =
-        sc_google_chat_create(&alloc, "https://chat.googleapis.com/v1/spaces/abc/webhooks", 45, &ch);
+    sc_error_t err = sc_google_chat_create(
+        &alloc, "https://chat.googleapis.com/v1/spaces/abc/webhooks", 45, &ch);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_TRUE(sc_google_chat_is_configured(&ch));
     SC_ASSERT_STR_EQ(ch.vtable->name(ch.ctx), "google_chat");

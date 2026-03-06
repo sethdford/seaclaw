@@ -32,7 +32,8 @@ typedef struct {
 static sc_error_t jira_execute(void *ctx, sc_allocator_t *alloc, const sc_json_value_t *args,
                                sc_tool_result_t *out) {
     (void)ctx;
-    if (!out) return SC_ERR_INVALID_ARGUMENT;
+    if (!out)
+        return SC_ERR_INVALID_ARGUMENT;
     if (!args) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;
@@ -101,7 +102,8 @@ static sc_error_t jira_execute(void *ctx, sc_allocator_t *alloc, const sc_json_v
             return SC_OK;
         }
         char url[2048];
-        int url_n = snprintf(url, sizeof(url), "%s/rest/api/3/search?jql=%s&maxResults=20", base_url, jql);
+        int url_n =
+            snprintf(url, sizeof(url), "%s/rest/api/3/search?jql=%s&maxResults=20", base_url, jql);
         if (url_n < 0 || (size_t)url_n >= sizeof(url)) {
             *out = sc_tool_result_fail("URL too long", 12);
             return SC_OK;
@@ -151,13 +153,17 @@ static sc_error_t jira_execute(void *ctx, sc_allocator_t *alloc, const sc_json_v
         *out = sc_tool_result_ok_owned(rbody, rbody ? strlen(rbody) : 0);
     } else if (strcmp(action, "get") == 0) {
         const char *issue_key = sc_json_get_string(args, "issue_key");
-        if (!issue_key) { *out = sc_tool_result_fail("missing issue_key", 17); return SC_OK; }
+        if (!issue_key) {
+            *out = sc_tool_result_fail("missing issue_key", 17);
+            return SC_OK;
+        }
         char url[512];
         snprintf(url, sizeof(url), "%s/rest/api/3/issue/%s", base_url, issue_key);
         sc_http_response_t resp = {0};
         sc_error_t err = sc_http_get(alloc, url, auth, &resp);
         if (err != SC_OK || resp.status_code != 200) {
-            if (resp.owned && resp.body) sc_http_response_free(alloc, &resp);
+            if (resp.owned && resp.body)
+                sc_http_response_free(alloc, &resp);
             *out = sc_tool_result_fail("failed to get issue", 19);
             return SC_OK;
         }
@@ -173,14 +179,18 @@ static sc_error_t jira_execute(void *ctx, sc_allocator_t *alloc, const sc_json_v
         }
         char url[512];
         snprintf(url, sizeof(url), "%s/rest/api/3/issue/%s/comment", base_url, issue_key);
-        char *body = sc_sprintf(alloc,
+        char *body = sc_sprintf(
+            alloc,
             "{\"body\":{\"type\":\"doc\",\"version\":1,\"content\":[{\"type\":\"paragraph\","
-            "\"content\":[{\"type\":\"text\",\"text\":\"%s\"}]}]}}", comment);
+            "\"content\":[{\"type\":\"text\",\"text\":\"%s\"}]}]}}",
+            comment);
         sc_http_response_t resp = {0};
         sc_error_t err = sc_http_post_json(alloc, url, auth, body, body ? strlen(body) : 0, &resp);
-        if (body) alloc->free(alloc->ctx, body, strlen(body) + 1);
+        if (body)
+            alloc->free(alloc->ctx, body, strlen(body) + 1);
         if (err != SC_OK) {
-            if (resp.owned && resp.body) sc_http_response_free(alloc, &resp);
+            if (resp.owned && resp.body)
+                sc_http_response_free(alloc, &resp);
             *out = sc_tool_result_fail("failed to add comment", 21);
             return SC_OK;
         }
@@ -189,31 +199,38 @@ static sc_error_t jira_execute(void *ctx, sc_allocator_t *alloc, const sc_json_v
         *out = sc_tool_result_ok_owned(rbody, rbody ? strlen(rbody) : 0);
     } else if (strcmp(action, "update") == 0) {
         const char *issue_key = sc_json_get_string(args, "issue_key");
-        if (!issue_key) { *out = sc_tool_result_fail("missing issue_key", 17); return SC_OK; }
+        if (!issue_key) {
+            *out = sc_tool_result_fail("missing issue_key", 17);
+            return SC_OK;
+        }
         const char *status = sc_json_get_string(args, "status");
         const char *assignee = sc_json_get_string(args, "assignee");
         if (!status && !assignee) {
             *out = sc_tool_result_fail("update needs status or assignee", 31);
             return SC_OK;
         }
-        char *body = sc_sprintf(alloc, "{\"fields\":{%s%s%s%s%s%s%s}}",
-            assignee ? "\"assignee\":{\"accountId\":\"" : "",
-            assignee ? assignee : "", assignee ? "\"}" : "",
-            (assignee && status) ? "," : "",
-            status ? "\"labels\":[\"" : "",
-            status ? status : "", status ? "\"]" : "");
-        if (!body) { *out = sc_tool_result_fail("alloc failed", 12); return SC_OK; }
+        char *body =
+            sc_sprintf(alloc, "{\"fields\":{%s%s%s%s%s%s%s}}",
+                       assignee ? "\"assignee\":{\"accountId\":\"" : "", assignee ? assignee : "",
+                       assignee ? "\"}" : "", (assignee && status) ? "," : "",
+                       status ? "\"labels\":[\"" : "", status ? status : "", status ? "\"]" : "");
+        if (!body) {
+            *out = sc_tool_result_fail("alloc failed", 12);
+            return SC_OK;
+        }
         char url[512];
         snprintf(url, sizeof(url), "%s/rest/api/3/issue/%s", base_url, issue_key);
         sc_http_response_t resp = {0};
         sc_error_t err = sc_http_post_json(alloc, url, auth, body, strlen(body), &resp);
         alloc->free(alloc->ctx, body, strlen(body) + 1);
         if (err != SC_OK) {
-            if (resp.owned && resp.body) sc_http_response_free(alloc, &resp);
+            if (resp.owned && resp.body)
+                sc_http_response_free(alloc, &resp);
             *out = sc_tool_result_fail("failed to update issue", 22);
             return SC_OK;
         }
-        if (resp.owned && resp.body) sc_http_response_free(alloc, &resp);
+        if (resp.owned && resp.body)
+            sc_http_response_free(alloc, &resp);
         *out = sc_tool_result_ok("{\"updated\":true}", 17);
     } else {
         *out = sc_tool_result_fail("unknown action", 14);

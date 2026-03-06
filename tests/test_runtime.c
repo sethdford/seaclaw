@@ -1,9 +1,9 @@
 /* Runtime adapter tests */
-#include "test_framework.h"
-#include "seaclaw/runtime.h"
 #include "seaclaw/config.h"
-#include "seaclaw/platform.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/platform.h"
+#include "seaclaw/runtime.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_runtime_native_create(void) {
@@ -300,7 +300,7 @@ static void test_docker_runtime_wrap_command(void) {
     sc_runtime_t r = sc_runtime_docker(true, 256, "alpine:3", "/home/ws");
     SC_ASSERT_NOT_NULL(r.vtable->wrap_command);
 
-    const char *argv_in[] = { "echo", "hello" };
+    const char *argv_in[] = {"echo", "hello"};
     const char *argv_out[32];
     size_t argc_out = 0;
     sc_error_t err = r.vtable->wrap_command(r.ctx, argv_in, 2, argv_out, 32, &argc_out);
@@ -324,7 +324,7 @@ static void test_docker_runtime_wrap_command_no_image_returns_not_supported(void
     sc_runtime_t r = sc_runtime_docker(true, 0, NULL, ".");
     SC_ASSERT_NOT_NULL(r.vtable->wrap_command);
 
-    const char *argv_in[] = { "ls" };
+    const char *argv_in[] = {"ls"};
     const char *argv_out[32];
     size_t argc_out = 0;
     sc_error_t err = r.vtable->wrap_command(r.ctx, argv_in, 1, argv_out, 32, &argc_out);
@@ -340,7 +340,7 @@ static void test_wasm_runtime_wrap_not_supported(void) {
     sc_runtime_t r = sc_runtime_wasm(64);
     SC_ASSERT_NOT_NULL(r.vtable->wrap_command);
 
-    const char *argv_in[] = { "echo", "x" };
+    const char *argv_in[] = {"echo", "x"};
     const char *argv_out[32];
     size_t argc_out = 0;
     sc_error_t err = r.vtable->wrap_command(r.ctx, argv_in, 2, argv_out, 32, &argc_out);

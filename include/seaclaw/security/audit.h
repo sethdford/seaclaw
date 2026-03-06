@@ -54,10 +54,10 @@ typedef struct sc_audit_input {
 } sc_audit_input_t;
 
 typedef struct sc_audit_reasoning {
-    const char *decision;       /* "policy_allow", "policy_deny", "approval_required", "auto_approved" */
-    const char *rule_name;       /* which policy rule matched */
-    float confidence;            /* 0.0-1.0 (set to -1 if not applicable) */
-    uint32_t context_tokens;     /* how many tokens in context when decision was made */
+    const char *decision;  /* "policy_allow", "policy_deny", "approval_required", "auto_approved" */
+    const char *rule_name; /* which policy rule matched */
+    float confidence;      /* 0.0-1.0 (set to -1 if not applicable) */
+    uint32_t context_tokens; /* how many tokens in context when decision was made */
 } sc_audit_reasoning_t;
 
 typedef struct sc_audit_action {
@@ -84,9 +84,9 @@ typedef struct sc_audit_event {
     int64_t timestamp_s;
     uint64_t event_id;
     sc_audit_event_type_t event_type;
-    sc_audit_actor_t actor;       /* channel/username set to NULL if not used */
-    sc_audit_action_t action;     /* command set to NULL if not used */
-    sc_audit_result_t result;     /* exit_code -1, duration_ms 0, err_msg NULL if not set */
+    sc_audit_actor_t actor;   /* channel/username set to NULL if not used */
+    sc_audit_action_t action; /* command set to NULL if not used */
+    sc_audit_result_t result; /* exit_code -1, duration_ms 0, err_msg NULL if not set */
     sc_audit_security_ctx_t security;
     sc_audit_identity_t identity;
     sc_audit_input_t input;

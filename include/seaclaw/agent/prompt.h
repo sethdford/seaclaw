@@ -25,12 +25,12 @@ typedef struct sc_prompt_config {
     uint8_t autonomy_level; /* 0=readonly, 1=supervised, 2=full */
     const char *custom_instructions;
     size_t custom_instructions_len;
-    const char *persona_prompt;      /* overrides default identity when set */
+    const char *persona_prompt; /* overrides default identity when set */
     size_t persona_prompt_len;
-    const char *preferences;         /* user preference rules */
+    const char *preferences; /* user preference rules */
     size_t preferences_len;
-    bool chain_of_thought;           /* inject reasoning instructions */
-    const char *tone_hint;           /* adaptive tone directive */
+    bool chain_of_thought; /* inject reasoning instructions */
+    const char *tone_hint; /* adaptive tone directive */
     size_t tone_hint_len;
 } sc_prompt_config_t;
 

@@ -54,12 +54,11 @@ void sc_oauth_destroy(sc_oauth_ctx_t *ctx) {
 }
 
 sc_error_t sc_oauth_generate_pkce(sc_oauth_ctx_t *ctx, char *verifier, size_t verifier_size,
-                                 char *challenge, size_t challenge_size) {
+                                  char *challenge, size_t challenge_size) {
     if (!ctx || !verifier || verifier_size < 44 || !challenge || challenge_size < 44)
         return SC_ERR_INVALID_ARGUMENT;
 
-    static const char b64url[] =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    static const char b64url[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     unsigned int seed = (unsigned int)time(NULL) ^ (unsigned int)(uintptr_t)ctx;
     for (size_t i = 0; i < 43 && i < verifier_size - 1; i++) {
         seed = seed * 1103515245u + 12345u;
@@ -117,10 +116,9 @@ sc_error_t sc_oauth_build_auth_url(sc_oauth_ctx_t *ctx, const char *challenge, s
     int n = snprintf(url_out, url_out_size,
                      "%s?client_id=%s&redirect_uri=%s&response_type=code"
                      "&code_challenge=%.*s&code_challenge_method=S256&state=%.*s&scope=%s",
-                     auth_url,
-                     ctx->config.client_id ? ctx->config.client_id : "",
-                     ctx->config.redirect_uri ? ctx->config.redirect_uri : "",
-                     (int)challenge_len, challenge, (int)state_len, state,
+                     auth_url, ctx->config.client_id ? ctx->config.client_id : "",
+                     ctx->config.redirect_uri ? ctx->config.redirect_uri : "", (int)challenge_len,
+                     challenge, (int)state_len, state,
                      ctx->config.scopes ? ctx->config.scopes : "openid email");
 
     if (n < 0 || (size_t)n >= url_out_size)
@@ -165,15 +163,15 @@ sc_error_t sc_oauth_exchange_code(sc_oauth_ctx_t *ctx, const char *code, size_t 
     }
     if (blen + 20 < sizeof(body))
         memcpy(body + blen, "&redirect_uri=", 14), blen += 14;
-    for (const char *p = ctx->config.redirect_uri ? ctx->config.redirect_uri : ""; *p && blen < sizeof(body) - 4;
-         p++) {
+    for (const char *p = ctx->config.redirect_uri ? ctx->config.redirect_uri : "";
+         *p && blen < sizeof(body) - 4; p++) {
         if (oauth_form_encode_char(body, sizeof(body), &blen, (unsigned char)*p) != 0)
             return SC_ERR_INVALID_ARGUMENT;
     }
     if (blen + 20 < sizeof(body))
         memcpy(body + blen, "&client_id=", 11), blen += 11;
-    for (const char *p = ctx->config.client_id ? ctx->config.client_id : ""; *p && blen < sizeof(body) - 4;
-         p++) {
+    for (const char *p = ctx->config.client_id ? ctx->config.client_id : "";
+         *p && blen < sizeof(body) - 4; p++) {
         if (oauth_form_encode_char(body, sizeof(body), &blen, (unsigned char)*p) != 0)
             return SC_ERR_INVALID_ARGUMENT;
     }

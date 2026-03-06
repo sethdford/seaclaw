@@ -250,6 +250,14 @@ export const tokens = {
     slower: "500ms",
     slowest: "700ms",
   },
+  dynamicLight: {
+    ambient: 0.04,
+    angle: "225deg",
+    colorDark: "rgba(255,255,255,0.12)",
+    colorLight: "rgba(255,255,255,0.18)",
+    intensity: 0.15,
+    spread: "60%",
+  },
   easing: {
     easeIn: "cubic-bezier(0.55, 0, 1, 0.45)",
     easeInOut: "cubic-bezier(0.65, 0, 0.35, 1)",
@@ -369,6 +377,16 @@ export const tokens = {
     paddingX: "0.5rem",
     paddingY: "0.5rem",
     radius: "8px",
+  },
+  interactive: {
+    focusGlowColor: "rgba(20,184,166,0.35)",
+    focusGlowSpread: "8px",
+    hoverBorderGlow: "0 0 0 1px rgba(255,255,255,0.08)",
+    hoverSpecularBoost: 1.4,
+    pressBlurDelta: "-4px",
+    pressSaturateBoost: "20%",
+    pressScale: 0.98,
+    transitionDuration: "200ms",
   },
   letterSpacing: {
     2xl: "-0.02em",
@@ -637,6 +655,12 @@ export const tokens = {
     titleSmFontWeight: 500,
     titleSmLetterSpacing: "0.01em",
     titleSmLineHeight: 1.5,
+  },
+  vibrancy: {
+    backdropBrightness: 1.08,
+    iconBoost: 1.2,
+    textBoost: 1.15,
+    textShadow: "0 0 8px rgba(0,0,0,0.5)",
   },
   viewTransition: {
     duration: "300ms",

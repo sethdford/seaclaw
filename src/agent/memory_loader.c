@@ -52,7 +52,8 @@ sc_error_t sc_memory_loader_load(sc_memory_loader_t *loader, const char *query, 
 
     if (loader->retrieval_engine && loader->retrieval_engine->ctx &&
         loader->retrieval_engine->vtable) {
-        sc_adaptive_config_t acfg = {.enabled = true, .keyword_max_tokens = 3, .vector_min_tokens = 5};
+        sc_adaptive_config_t acfg = {
+            .enabled = true, .keyword_max_tokens = 3, .vector_min_tokens = 5};
         sc_query_analysis_t qa = sc_adaptive_analyze_query(query ? query : "", query_len, &acfg);
 
         sc_retrieval_options_t opts = {

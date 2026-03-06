@@ -1,9 +1,9 @@
-#include "test_framework.h"
-#include "seaclaw/cron.h"
-#include "seaclaw/crontab.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"
+#include "seaclaw/cron.h"
+#include "seaclaw/crontab.h"
+#include "test_framework.h"
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
@@ -500,9 +500,12 @@ static void test_crontab_save_load_roundtrip(void) {
 
     sc_crontab_entries_free(&alloc, loaded, loaded_count);
     for (int i = 0; i < 2; i++) {
-        if (entries[i].id) alloc.free(alloc.ctx, entries[i].id, strlen(entries[i].id) + 1);
-        if (entries[i].schedule) alloc.free(alloc.ctx, entries[i].schedule, strlen(entries[i].schedule) + 1);
-        if (entries[i].command) alloc.free(alloc.ctx, entries[i].command, strlen(entries[i].command) + 1);
+        if (entries[i].id)
+            alloc.free(alloc.ctx, entries[i].id, strlen(entries[i].id) + 1);
+        if (entries[i].schedule)
+            alloc.free(alloc.ctx, entries[i].schedule, strlen(entries[i].schedule) + 1);
+        if (entries[i].command)
+            alloc.free(alloc.ctx, entries[i].command, strlen(entries[i].command) + 1);
     }
     alloc.free(alloc.ctx, tmp_path, tmp_len + 1);
 }

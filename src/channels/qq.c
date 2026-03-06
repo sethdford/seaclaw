@@ -116,8 +116,8 @@ static sc_error_t qq_send(void *ctx, const char *target, size_t target_len, cons
     sc_json_buf_free(&jbuf);
 
     char auth_buf[256];
-    int ab = snprintf(auth_buf, sizeof(auth_buf), "Bot %s.%s",
-                      c->app_id ? c->app_id : "", c->bot_token ? c->bot_token : "");
+    int ab = snprintf(auth_buf, sizeof(auth_buf), "Bot %s.%s", c->app_id ? c->app_id : "",
+                      c->bot_token ? c->bot_token : "");
     if (ab <= 0 || (size_t)ab >= sizeof(auth_buf)) {
         c->alloc->free(c->alloc->ctx, body, body_len + 1);
         return SC_ERR_INTERNAL;
@@ -215,9 +215,8 @@ sc_error_t sc_qq_create(sc_allocator_t *alloc, const char *app_id, size_t app_id
 }
 
 sc_error_t sc_qq_create_ex(sc_allocator_t *alloc, const char *app_id, size_t app_id_len,
-                          const char *bot_token, size_t bot_token_len,
-                          const char *channel_id, size_t channel_id_len, bool sandbox,
-                          sc_channel_t *out) {
+                           const char *bot_token, size_t bot_token_len, const char *channel_id,
+                           size_t channel_id_len, bool sandbox, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
     sc_qq_ctx_t *c = (sc_qq_ctx_t *)calloc(1, sizeof(*c));

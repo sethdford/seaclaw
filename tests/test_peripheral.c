@@ -1,7 +1,7 @@
-#include "test_framework.h"
-#include "seaclaw/peripheral.h"
-#include "seaclaw/hardware.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/hardware.h"
+#include "seaclaw/peripheral.h"
+#include "test_framework.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -53,7 +53,7 @@ static void test_factory_rpi_create(void) {
 
 static void test_factory_unknown_type_returns_not_supported(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_peripheral_config_t config = { 0 };
+    sc_peripheral_config_t config = {0};
     sc_peripheral_t p;
     sc_error_t err = sc_peripheral_create(&alloc, "unknown", 7, &config, &p);
     SC_ASSERT_EQ(err, SC_ERR_NOT_SUPPORTED);
@@ -125,8 +125,7 @@ static void test_stm32_flash_behavior(void) {
     p.vtable->init_peripheral(p.ctx);
     sc_peripheral_error_t err = p.vtable->flash(p.ctx, "/tmp/firmware.hex", 17);
     SC_ASSERT_TRUE(err == SC_PERIPHERAL_ERR_UNSUPPORTED_OPERATION ||
-                   err == SC_PERIPHERAL_ERR_NONE ||
-                   err == SC_PERIPHERAL_ERR_NOT_CONNECTED);
+                   err == SC_PERIPHERAL_ERR_NONE || err == SC_PERIPHERAL_ERR_NOT_CONNECTED);
     p.vtable->destroy(p.ctx, &alloc);
 }
 
@@ -452,7 +451,7 @@ static void test_error_rpi_create_null_allocator(void) {
 }
 
 static void test_error_factory_create_null_allocator(void) {
-    sc_peripheral_config_t config = { 0 };
+    sc_peripheral_config_t config = {0};
     sc_peripheral_t p;
     sc_error_t err = sc_peripheral_create(NULL, "arduino", 7, &config, &p);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);

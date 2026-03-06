@@ -1,6 +1,6 @@
 /* Identity management tests */
-#include "test_framework.h"
 #include "seaclaw/identity.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_identity_build_unified(void) {
@@ -84,7 +84,8 @@ static void test_identity_build_unified_null_account(void) {
 
 static void test_identity_role_matching_admin(void) {
     const char *allowlist[] = {"discord:guild1:admin_role"};
-    sc_permission_level_t level = sc_identity_resolve_level("discord:guild1:admin_role", allowlist, 1);
+    sc_permission_level_t level =
+        sc_identity_resolve_level("discord:guild1:admin_role", allowlist, 1);
     SC_ASSERT_EQ(level, SC_PERM_ADMIN);
 }
 

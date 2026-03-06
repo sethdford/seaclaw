@@ -12,18 +12,18 @@
 #define SC_RRF_K 60.0f
 
 /* Convert retrieval result to search results for RRF. Caller frees with sc_rerank_free_results. */
-static sc_error_t entries_to_search_results(sc_allocator_t *alloc,
-                                            const sc_memory_entry_t *entries, const double *scores,
-                                            size_t count, sc_search_result_t *out) {
+static sc_error_t entries_to_search_results(sc_allocator_t *alloc, const sc_memory_entry_t *entries,
+                                            const double *scores, size_t count,
+                                            sc_search_result_t *out) {
     for (size_t i = 0; i < count; i++) {
-        const char *content = entries[i].content && entries[i].content_len > 0
-                                  ? entries[i].content
-                                  : (entries[i].key && entries[i].key_len > 0 ? entries[i].key
-                                                                              : NULL);
-        size_t len = content ? (entries[i].content && entries[i].content_len > 0
-                                   ? entries[i].content_len
-                                   : entries[i].key_len)
-                            : 0;
+        const char *content =
+            entries[i].content && entries[i].content_len > 0
+                ? entries[i].content
+                : (entries[i].key && entries[i].key_len > 0 ? entries[i].key : NULL);
+        size_t len =
+            content ? (entries[i].content && entries[i].content_len > 0 ? entries[i].content_len
+                                                                        : entries[i].key_len)
+                    : 0;
         out[i].content = content && len > 0 ? sc_strndup(alloc, content, len) : NULL;
         out[i].score = (float)(scores && i < count ? scores[i] : 0.0);
         out[i].rerank_score = 0.0f;
@@ -34,8 +34,8 @@ static sc_error_t entries_to_search_results(sc_allocator_t *alloc,
 
 /* Convert search results back to retrieval result. Allocates entries/scores. */
 static sc_error_t search_results_to_entries(sc_allocator_t *alloc, const char *query,
-                                            sc_search_result_t *results, size_t count,
-                                            size_t limit, sc_retrieval_result_t *out) {
+                                            sc_search_result_t *results, size_t count, size_t limit,
+                                            sc_retrieval_result_t *out) {
     out->entries = NULL;
     out->count = 0;
     out->scores = NULL;
@@ -90,8 +90,7 @@ sc_error_t sc_hybrid_retrieve(sc_allocator_t *alloc, sc_memory_t *backend, sc_em
     if (err != SC_OK)
         return err;
 
-    bool has_vector =
-        embedder && embedder->vtable && vector_store && vector_store->vtable;
+    bool has_vector = embedder && embedder->vtable && vector_store && vector_store->vtable;
 
     if (!has_vector) {
         *out = keyword_result;

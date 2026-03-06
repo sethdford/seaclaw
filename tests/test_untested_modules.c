@@ -3,22 +3,22 @@
  * voice_channel, skill_registry, crontab, update, memory/engines/api.
  * Uses SC_IS_TEST paths (no real network/IO).
  */
-#include "test_framework.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"
+#include "test_framework.h"
 #include <string.h>
 
 #if defined(SC_HAS_SONATA)
-#include "seaclaw/channels/voice_channel.h"
 #include "seaclaw/channel.h"
+#include "seaclaw/channels/voice_channel.h"
 #endif
 
-#include "seaclaw/skill_registry.h"
 #include "seaclaw/crontab.h"
-#include "seaclaw/update.h"
-#include "seaclaw/memory/engines.h"
 #include "seaclaw/memory.h"
+#include "seaclaw/memory/engines.h"
+#include "seaclaw/skill_registry.h"
+#include "seaclaw/update.h"
 
 /* ─── voice_channel (only when built with SC_HAS_SONATA) ──────────────────── */
 #if defined(SC_HAS_SONATA)
@@ -143,7 +143,7 @@ static void test_api_memory_store_recall_mock(void) {
     sc_memory_t mem = sc_api_memory_create(&alloc, "https://api.example.com", "key", 5000);
     SC_ASSERT_NOT_NULL(mem.vtable);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     sc_error_t err = mem.vtable->store(mem.ctx, "k1", 2, "content", 7, &cat, NULL, 0);
     SC_ASSERT_EQ(err, SC_OK);
 

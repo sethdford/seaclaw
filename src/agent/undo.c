@@ -20,8 +20,7 @@ struct sc_undo_stack {
 sc_undo_stack_t *sc_undo_stack_create(sc_allocator_t *alloc, size_t max_entries) {
     if (!alloc || max_entries == 0)
         return NULL;
-    sc_undo_stack_t *stack =
-        (sc_undo_stack_t *)alloc->alloc(alloc->ctx, sizeof(sc_undo_stack_t));
+    sc_undo_stack_t *stack = (sc_undo_stack_t *)alloc->alloc(alloc->ctx, sizeof(sc_undo_stack_t));
     if (!stack)
         return NULL;
     memset(stack, 0, sizeof(*stack));

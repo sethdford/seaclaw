@@ -1,16 +1,16 @@
-#include "test_framework.h"
-#include "seaclaw/agent/preferences.h"
-#include "seaclaw/agent/reflection.h"
-#include "seaclaw/agent/episodic.h"
 #include "seaclaw/agent/awareness.h"
 #include "seaclaw/agent/compaction.h"
+#include "seaclaw/agent/episodic.h"
+#include "seaclaw/agent/preferences.h"
 #include "seaclaw/agent/prompt.h"
+#include "seaclaw/agent/reflection.h"
 #include "seaclaw/bus.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/memory.h"
-#include <string.h>
+#include "test_framework.h"
 #include <stdio.h>
+#include <string.h>
 
 /* ── Tone detection ─────────────────────────────────────────────────────── */
 
@@ -122,14 +122,16 @@ static void test_reflection_good_response(void) {
     sc_reflection_config_t cfg = {.enabled = true, .min_response_tokens = 0, .max_retries = 1};
     const char *resp = "Here is a detailed answer to your question about the configuration "
                        "settings and how they interact with the runtime environment.";
-    sc_reflection_quality_t q = sc_reflection_evaluate("How does config work?", 21, resp, strlen(resp), &cfg);
+    sc_reflection_quality_t q =
+        sc_reflection_evaluate("How does config work?", 21, resp, strlen(resp), &cfg);
     SC_ASSERT_EQ(q, SC_QUALITY_GOOD);
 }
 
 static void test_reflection_refusal_response(void) {
     sc_reflection_config_t cfg = {.enabled = true};
     const char *resp = "I cannot help with that request as an AI.";
-    sc_reflection_quality_t q = sc_reflection_evaluate("do something", 12, resp, strlen(resp), &cfg);
+    sc_reflection_quality_t q =
+        sc_reflection_evaluate("do something", 12, resp, strlen(resp), &cfg);
     SC_ASSERT_EQ(q, SC_QUALITY_ACCEPTABLE);
 }
 
@@ -182,8 +184,8 @@ static void test_episodic_store_load_sqlite(void) {
     SC_ASSERT_NOT_NULL(mem.vtable);
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_error_t err = sc_episodic_store(&mem, &alloc, "session_abc", 11,
-                                      "User asked about config parsing", 31);
+    sc_error_t err =
+        sc_episodic_store(&mem, &alloc, "session_abc", 11, "User asked about config parsing", 31);
     SC_ASSERT_EQ(err, SC_OK);
 
     char *out = NULL;

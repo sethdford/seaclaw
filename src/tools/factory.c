@@ -113,7 +113,8 @@ sc_error_t sc_tools_create_default(sc_allocator_t *alloc, const char *workspace_
                                    size_t workspace_dir_len, sc_security_policy_t *policy,
                                    const sc_config_t *config, sc_memory_t *memory,
                                    sc_cron_scheduler_t *cron, sc_agent_pool_t *agent_pool,
-                                   sc_mailbox_t *mailbox, sc_tool_t **out_tools, size_t *out_count) {
+                                   sc_mailbox_t *mailbox, sc_tool_t **out_tools,
+                                   size_t *out_count) {
     if (!alloc || !out_tools || !out_count)
         return SC_ERR_INVALID_ARGUMENT;
 #ifndef SC_HAS_CRON

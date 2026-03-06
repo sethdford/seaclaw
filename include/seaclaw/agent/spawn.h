@@ -53,8 +53,7 @@ typedef struct sc_agent_pool sc_agent_pool_t;
 sc_agent_pool_t *sc_agent_pool_create(sc_allocator_t *alloc, uint32_t max_concurrent);
 void sc_agent_pool_destroy(sc_agent_pool_t *pool);
 
-void sc_agent_pool_set_worktree_manager(sc_agent_pool_t *pool,
-    sc_worktree_manager_t *worktree_mgr);
+void sc_agent_pool_set_worktree_manager(sc_agent_pool_t *pool, sc_worktree_manager_t *worktree_mgr);
 
 void sc_agent_pool_set_team_config(sc_agent_pool_t *pool, sc_team_config_t *team_config);
 

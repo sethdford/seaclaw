@@ -1,16 +1,16 @@
 /* Gateway edge cases + control protocol + event bridge tests. */
-#include "test_framework.h"
-#include "seaclaw/gateway.h"
-#include "seaclaw/gateway/rate_limit.h"
-#include "seaclaw/gateway/ws_server.h"
-#include "seaclaw/gateway/control_protocol.h"
-#include "seaclaw/gateway/event_bridge.h"
-#include "seaclaw/gateway/openai_compat.h"
 #include "seaclaw/bus.h"
-#include "seaclaw/health.h"
 #include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/json.h"
+#include "seaclaw/gateway.h"
+#include "seaclaw/gateway/control_protocol.h"
+#include "seaclaw/gateway/event_bridge.h"
+#include "seaclaw/gateway/openai_compat.h"
+#include "seaclaw/gateway/rate_limit.h"
+#include "seaclaw/gateway/ws_server.h"
+#include "seaclaw/health.h"
+#include "test_framework.h"
 #include <string.h>
 #include <time.h>
 
@@ -24,8 +24,8 @@ static void test_gateway_health_endpoint(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT_EQ(r.status, SC_READINESS_READY);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks,
-        r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 static void test_gateway_ready_endpoint(void) {
@@ -33,8 +33,8 @@ static void test_gateway_ready_endpoint(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT_EQ(r.status, SC_READINESS_READY);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks,
-        r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 static void test_gateway_rate_limit_sliding_window(void) {
@@ -93,14 +93,14 @@ static void test_gateway_auth_required(void) {
 
 static void test_gateway_run_test_mode(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_gateway_config_t config = { .port = 0, .test_mode = true };
+    sc_gateway_config_t config = {.port = 0, .test_mode = true};
     sc_error_t err = sc_gateway_run(&alloc, "127.0.0.1", 0, &config);
     SC_ASSERT_EQ(err, SC_OK);
 }
 
 static void test_gateway_run_with_host(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_gateway_config_t config = { .host = "0.0.0.0", .port = 8080, .test_mode = true };
+    sc_gateway_config_t config = {.host = "0.0.0.0", .port = 8080, .test_mode = true};
     sc_error_t err = sc_gateway_run(&alloc, "0.0.0.0", 8080, &config);
     SC_ASSERT_EQ(err, SC_OK);
 }
@@ -114,8 +114,8 @@ static void test_health_multiple_components(void) {
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT_EQ(r.status, SC_READINESS_NOT_READY);
     SC_ASSERT_EQ(r.check_count, 3u);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks,
-        r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 static void test_health_all_ok(void) {
@@ -125,8 +125,8 @@ static void test_health_all_ok(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT_EQ(r.status, SC_READINESS_READY);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks,
-        r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 static void test_health_reset_clears(void) {
@@ -137,8 +137,8 @@ static void test_health_reset_clears(void) {
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT_EQ(r.status, SC_READINESS_READY);
     SC_ASSERT_EQ(r.check_count, 0u);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks,
-        r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 static void test_gateway_config_zeroed(void) {
@@ -171,7 +171,7 @@ static void test_gateway_config_port_range(void) {
 }
 
 static void test_gateway_config_test_mode_flag(void) {
-    sc_gateway_config_t cfg = { .test_mode = true };
+    sc_gateway_config_t cfg = {.test_mode = true};
     SC_ASSERT_TRUE(cfg.test_mode);
 }
 
@@ -183,15 +183,14 @@ static void test_gateway_config_hmac_optional(void) {
     SC_ASSERT_EQ(cfg.hmac_secret_len, 3u);
 }
 
-
 static void test_health_single_error_not_ready(void) {
     sc_health_reset();
     sc_health_mark_error("x", "fail");
     sc_allocator_t alloc = sc_system_allocator();
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT_EQ(r.status, SC_READINESS_NOT_READY);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks,
-        r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 static void test_gateway_max_body_nonzero(void) {
@@ -204,7 +203,7 @@ static void test_gateway_rate_limit_nonzero(void) {
 
 static void test_gateway_run_null_config(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_gateway_config_t config = { .port = 0, .test_mode = true };
+    sc_gateway_config_t config = {.port = 0, .test_mode = true};
     sc_error_t err = sc_gateway_run(&alloc, NULL, 0, &config);
     SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_IO || err == SC_ERR_NOT_SUPPORTED);
 }
@@ -215,8 +214,8 @@ static void test_health_empty_ready(void) {
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT_EQ(r.status, SC_READINESS_READY);
     SC_ASSERT_EQ(r.check_count, 0u);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks,
-        r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 static void test_gateway_config_host_default(void) {
@@ -236,13 +235,13 @@ static void test_health_mark_ok_then_error(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT_EQ(r.status, SC_READINESS_NOT_READY);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks,
-        r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 static void test_gateway_run_bind_zero_port(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_gateway_config_t config = { .port = 0, .test_mode = true };
+    sc_gateway_config_t config = {.port = 0, .test_mode = true};
     sc_error_t err = sc_gateway_run(&alloc, "127.0.0.1", 0, &config);
     SC_ASSERT_EQ(err, SC_OK);
 }
@@ -253,8 +252,8 @@ static void test_component_check_structure(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT(r.check_count >= 0);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks,
-        r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 /* ─── WP-21B parity: additional gateway / health tests ────────────────────── */
@@ -274,7 +273,7 @@ static void test_gateway_config_hmac_len_zero(void) {
 }
 
 static void test_gateway_config_rate_limit_one(void) {
-    sc_gateway_config_t cfg = { .rate_limit_per_minute = 1 };
+    sc_gateway_config_t cfg = {.rate_limit_per_minute = 1};
     SC_ASSERT_EQ(cfg.rate_limit_per_minute, 1u);
 }
 
@@ -285,12 +284,12 @@ static void test_health_mark_ok_overwrites_error(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT_EQ(r.status, SC_READINESS_READY);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks,
-        r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 static void test_gateway_config_port_one(void) {
-    sc_gateway_config_t cfg = { .port = 1 };
+    sc_gateway_config_t cfg = {.port = 1};
     SC_ASSERT_EQ(cfg.port, 1);
 }
 
@@ -308,13 +307,13 @@ static void test_health_three_components_mixed(void) {
     sc_readiness_result_t r = sc_health_check_readiness(&alloc);
     SC_ASSERT_EQ(r.status, SC_READINESS_NOT_READY);
     SC_ASSERT_EQ(r.check_count, 3u);
-    if (r.checks) alloc.free(alloc.ctx, (void *)r.checks,
-        r.check_count * sizeof(sc_component_check_t));
+    if (r.checks)
+        alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(sc_component_check_t));
 }
 
 static void test_gateway_run_test_mode_host_loopback(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_gateway_config_t config = { .host = "127.0.0.1", .port = 3000, .test_mode = true };
+    sc_gateway_config_t config = {.host = "127.0.0.1", .port = 3000, .test_mode = true};
     sc_error_t err = sc_gateway_run(&alloc, "127.0.0.1", 3000, &config);
     SC_ASSERT_EQ(err, SC_OK);
 }
@@ -329,13 +328,15 @@ static void test_ws_server_init_deinit(void) {
 
 static void test_ws_server_upgrade_null_args(void) {
     sc_ws_conn_t *out = NULL;
-    const char *req = "GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n";
+    const char *req = "GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: "
+                      "Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n";
     sc_error_t err = sc_ws_server_upgrade(NULL, 0, req, strlen(req), &out);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
 
 static void test_ws_server_is_upgrade_valid(void) {
-    const char *req = "GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n";
+    const char *req = "GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: "
+                      "Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n";
     bool ok = sc_ws_server_is_upgrade(req, strlen(req));
     SC_ASSERT_TRUE(ok);
 }
@@ -590,7 +591,8 @@ static void test_ws_server_conn_pool_full(void) {
     }
     srv.conn_count = SC_WS_SERVER_MAX_CONNS;
     sc_ws_conn_t *out = NULL;
-    const char *req = "GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n";
+    const char *req = "GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: "
+                      "Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n";
     sc_error_t err = sc_ws_server_upgrade(&srv, 99, req, strlen(req), &out);
     SC_ASSERT_EQ(err, SC_ERR_ALREADY_EXISTS);
     SC_ASSERT_TRUE(out == NULL);
@@ -604,8 +606,8 @@ static void test_ws_server_conn_pool_full(void) {
 /* ── RPC Handler Tests ──────────────────────────────────────────────── */
 
 static void setup_proto_with_app(sc_allocator_t *alloc, sc_ws_server_t *ws,
-    sc_control_protocol_t *proto, sc_app_context_t *app,
-    sc_bus_t *bus, sc_config_t *cfg) {
+                                 sc_control_protocol_t *proto, sc_app_context_t *app, sc_bus_t *bus,
+                                 sc_config_t *cfg) {
     sc_ws_server_init(ws, alloc, NULL, NULL, NULL);
     sc_control_protocol_init(proto, alloc, ws);
     memset(app, 0, sizeof(*app));
@@ -632,7 +634,8 @@ static void test_rpc_chat_send_empty_message_rejected(void) {
     setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
     sc_ws_conn_t conn;
     memset(&conn, 0, sizeof(conn));
-    const char *msg = "{\"type\":\"req\",\"id\":\"1\",\"method\":\"chat.send\",\"params\":{\"message\":\"\"}}";
+    const char *msg =
+        "{\"type\":\"req\",\"id\":\"1\",\"method\":\"chat.send\",\"params\":{\"message\":\"\"}}";
     sc_control_on_message(&conn, msg, strlen(msg), &proto);
     teardown_proto(&ws, &proto);
 }
@@ -655,7 +658,8 @@ static void test_rpc_chat_send_null_message_rejected(void) {
 static bool s_bus_got_message = false;
 static bool chat_send_bus_listener(sc_bus_event_type_t t, const sc_bus_event_t *e, void *u) {
     (void)u;
-    if (t == SC_BUS_MESSAGE_RECEIVED && e->payload) s_bus_got_message = true;
+    if (t == SC_BUS_MESSAGE_RECEIVED && e->payload)
+        s_bus_got_message = true;
     return true;
 }
 
@@ -674,7 +678,7 @@ static void test_rpc_chat_send_valid_publishes_bus(void) {
     sc_ws_conn_t conn;
     memset(&conn, 0, sizeof(conn));
     const char *msg = "{\"type\":\"req\",\"id\":\"3\",\"method\":\"chat.send\","
-        "\"params\":{\"message\":\"hello world\"}}";
+                      "\"params\":{\"message\":\"hello world\"}}";
     sc_control_on_message(&conn, msg, strlen(msg), &proto);
     SC_ASSERT_TRUE(s_bus_got_message);
     teardown_proto(&ws, &proto);
@@ -706,7 +710,8 @@ static void test_rpc_config_apply_no_crash(void) {
     sc_ws_conn_t conn;
     memset(&conn, 0, sizeof(conn));
     const char *msg = "{\"type\":\"req\",\"id\":\"5\",\"method\":\"config.apply\","
-        "\"params\":{\"config\":\"{\\\"workspace\\\":\\\".\\\"}\"}}";;
+                      "\"params\":{\"config\":\"{\\\"workspace\\\":\\\".\\\"}\"}}";
+    ;
     sc_control_on_message(&conn, msg, strlen(msg), &proto);
     teardown_proto(&ws, &proto);
 }
@@ -722,7 +727,7 @@ static void test_rpc_cron_run_no_crash(void) {
     sc_ws_conn_t conn;
     memset(&conn, 0, sizeof(conn));
     const char *msg = "{\"type\":\"req\",\"id\":\"6\",\"method\":\"cron.run\","
-        "\"params\":{\"id\":0}}";
+                      "\"params\":{\"id\":0}}";
     sc_control_on_message(&conn, msg, strlen(msg), &proto);
     teardown_proto(&ws, &proto);
 }
@@ -738,7 +743,7 @@ static void test_rpc_skills_install_no_crash(void) {
     sc_ws_conn_t conn;
     memset(&conn, 0, sizeof(conn));
     const char *msg = "{\"type\":\"req\",\"id\":\"7\",\"method\":\"skills.install\","
-        "\"params\":{\"url\":\"https://example.com/skill.json\"}}";
+                      "\"params\":{\"url\":\"https://example.com/skill.json\"}}";
     sc_control_on_message(&conn, msg, strlen(msg), &proto);
     teardown_proto(&ws, &proto);
 }
@@ -754,7 +759,7 @@ static void test_rpc_exec_approval_no_crash(void) {
     sc_ws_conn_t conn;
     memset(&conn, 0, sizeof(conn));
     const char *msg = "{\"type\":\"req\",\"id\":\"8\",\"method\":\"exec.approval.resolve\","
-        "\"params\":{\"request_id\":\"r1\",\"approved\":true}}";
+                      "\"params\":{\"request_id\":\"r1\",\"approved\":true}}";
     sc_control_on_message(&conn, msg, strlen(msg), &proto);
     teardown_proto(&ws, &proto);
 }
@@ -840,14 +845,15 @@ static void test_event_bridge_payload_propagation(void) {
     snprintf(ev.channel, SC_BUS_CHANNEL_LEN, "cli");
     snprintf(ev.id, SC_BUS_ID_LEN, "s1");
     const char *long_msg = "This is a long message that exceeds 256 bytes. "
-        "Padding padding padding padding padding padding padding padding "
-        "padding padding padding padding padding padding padding padding "
-        "padding padding padding padding padding padding padding padding "
-        "padding padding padding padding padding padding END";
+                           "Padding padding padding padding padding padding padding padding "
+                           "padding padding padding padding padding padding padding padding "
+                           "padding padding padding padding padding padding padding padding "
+                           "padding padding padding padding padding padding END";
     ev.payload = (void *)long_msg;
     memset(ev.message, 0, SC_BUS_MSG_LEN);
     size_t ml = strlen(long_msg);
-    if (ml >= SC_BUS_MSG_LEN) ml = SC_BUS_MSG_LEN - 1;
+    if (ml >= SC_BUS_MSG_LEN)
+        ml = SC_BUS_MSG_LEN - 1;
     memcpy(ev.message, long_msg, ml);
     ev.message[ml] = '\0';
     sc_bus_publish(&bus, &ev);

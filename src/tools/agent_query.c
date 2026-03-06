@@ -21,7 +21,8 @@ static sc_error_t agent_query_execute(void *ctx, sc_allocator_t *alloc, const sc
                                       sc_tool_result_t *out) {
     agent_query_ctx_t *c = (agent_query_ctx_t *)ctx;
     (void)alloc;
-    if (!out) return SC_ERR_INVALID_ARGUMENT;
+    if (!out)
+        return SC_ERR_INVALID_ARGUMENT;
     if (!args) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;

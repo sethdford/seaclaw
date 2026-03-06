@@ -1,6 +1,6 @@
-#include "test_framework.h"
-#include "seaclaw/rag.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/rag.h"
+#include "test_framework.h"
 
 static void test_rag_init_free(void) {
     sc_allocator_t alloc = sc_system_allocator();

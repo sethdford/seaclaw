@@ -155,9 +155,9 @@ static sc_error_t discord_stream_append(sc_discord_ctx_t *c, const char *delta, 
         size_t new_cap = c->stream_text_cap ? c->stream_text_cap * 2 : 256;
         while (new_cap < need)
             new_cap *= 2;
-        char *p = (char *)c->alloc->realloc(c->alloc->ctx, c->stream_text,
-                                            c->stream_text_cap ? c->stream_text_cap + 1 : 0,
-                                            new_cap + 1);
+        char *p =
+            (char *)c->alloc->realloc(c->alloc->ctx, c->stream_text,
+                                      c->stream_text_cap ? c->stream_text_cap + 1 : 0, new_cap + 1);
         if (!p)
             return SC_ERR_OUT_OF_MEMORY;
         c->stream_text = p;
@@ -236,13 +236,11 @@ static sc_error_t discord_send_event(void *ctx, const char *target, size_t targe
             }
             if (resp.status_code >= 200 && resp.status_code < 300 && resp.body) {
                 sc_json_value_t *parsed = NULL;
-                if (sc_json_parse(c->alloc, resp.body, resp.body_len, &parsed) == SC_OK &&
-                    parsed) {
+                if (sc_json_parse(c->alloc, resp.body, resp.body_len, &parsed) == SC_OK && parsed) {
                     const char *msg_id = sc_json_get_string(parsed, "id");
                     if (msg_id) {
                         size_t id_len = strlen(msg_id);
-                        c->stream_message_id =
-                            (char *)c->alloc->alloc(c->alloc->ctx, id_len + 1);
+                        c->stream_message_id = (char *)c->alloc->alloc(c->alloc->ctx, id_len + 1);
                         if (c->stream_message_id) {
                             memcpy(c->stream_message_id, msg_id, id_len + 1);
                         }

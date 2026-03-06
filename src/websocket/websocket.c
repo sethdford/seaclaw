@@ -273,7 +273,8 @@ sc_error_t sc_ws_connect(sc_allocator_t *alloc, const char *url, sc_ws_client_t 
 #if defined(__linux__) || defined(__APPLE__)
     FILE *f = fopen("/dev/urandom", "rb");
     if (f) {
-        (void)fread(key_raw, 1, 16, f);
+        size_t r = fread(key_raw, 1, 16, f);
+        (void)r;
         fclose(f);
     } else
 #endif
@@ -441,7 +442,8 @@ sc_error_t sc_ws_send(sc_ws_client_t *ws, const char *data, size_t data_len) {
 #if defined(__linux__) || defined(__APPLE__)
     FILE *f = fopen("/dev/urandom", "rb");
     if (f) {
-        (void)fread(mask_key, 1, 4, f);
+        size_t r = fread(mask_key, 1, 4, f);
+        (void)r;
         fclose(f);
     } else
 #endif

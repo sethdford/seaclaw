@@ -1,13 +1,13 @@
 /* Gateway WebSocket RPC authentication and pairing tests. */
-#include "test_framework.h"
-#include "seaclaw/gateway/control_protocol.h"
-#include "seaclaw/gateway/ws_server.h"
-#include "seaclaw/security.h"
 #include "seaclaw/bus.h"
 #include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/arena.h"
 #include "seaclaw/core/json.h"
+#include "seaclaw/gateway/control_protocol.h"
+#include "seaclaw/gateway/ws_server.h"
+#include "seaclaw/security.h"
+#include "test_framework.h"
 #include <string.h>
 
 #ifdef SC_GATEWAY_POSIX
@@ -82,7 +82,7 @@ static void setup_proto_with_auth(sc_allocator_t *alloc, sc_ws_server_t *ws,
 }
 
 static void teardown_proto(sc_ws_server_t *ws, sc_control_protocol_t *proto,
-                          sc_pairing_guard_t *guard, sc_config_t *cfg) {
+                           sc_pairing_guard_t *guard, sc_config_t *cfg) {
     sc_control_protocol_deinit(proto);
     sc_ws_server_deinit(ws);
     if (guard)
@@ -305,8 +305,7 @@ static void test_pairing_flow(void) {
     sc_app_context_t app;
     sc_bus_t bus;
     sc_config_t cfg;
-    sc_pairing_guard_t *guard =
-        sc_pairing_guard_create(&alloc, true, NULL, 0);
+    sc_pairing_guard_t *guard = sc_pairing_guard_create(&alloc, true, NULL, 0);
     SC_ASSERT_NOT_NULL(guard);
 
     const char *code = sc_pairing_guard_pairing_code(guard);
@@ -328,7 +327,8 @@ static void test_pairing_flow(void) {
     char auth_msg[320];
     int n = snprintf(auth_msg, sizeof(auth_msg),
                      "{\"type\":\"req\",\"id\":\"pf1\",\"method\":\"auth.token\","
-                     "\"params\":{\"token\":\"%s\"}}", token);
+                     "\"params\":{\"token\":\"%s\"}}",
+                     token);
     SC_ASSERT_TRUE(n > 0 && (size_t)n < sizeof(auth_msg));
 
     send_and_capture(&conn, &proto, auth_msg);

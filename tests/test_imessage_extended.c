@@ -1,7 +1,7 @@
 #if SC_HAS_IMESSAGE
-#include "seaclaw/channels/imessage.h"
 #include "seaclaw/channel.h"
 #include "seaclaw/channel_loop.h"
+#include "seaclaw/channels/imessage.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "test_framework.h"
@@ -69,7 +69,8 @@ static void test_imessage_health_check(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_channel_t ch;
     sc_imessage_create(&alloc, "+15551234567", 11, NULL, 0, &ch);
-    (void)ch.vtable->health_check(ch.ctx); /* platform-dependent: true on macOS with db, false otherwise */
+    (void)ch.vtable->health_check(
+        ch.ctx); /* platform-dependent: true on macOS with db, false otherwise */
     sc_imessage_destroy(&ch);
 }
 

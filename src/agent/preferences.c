@@ -26,10 +26,10 @@ bool sc_preferences_is_correction(const char *message, size_t message_len) {
         const char *prefix;
         size_t len;
     } markers[] = {
-        {"no,", 3},       {"no ", 3},       {"actually,", 9}, {"actually ", 9},
-        {"i prefer", 8},  {"i'd prefer", 10}, {"don't ", 6},   {"do not ", 7},
-        {"stop ", 5},     {"please don't", 12}, {"never ", 6},   {"always ", 7},
-        {"instead,", 8},  {"instead ", 8},
+        {"no,", 3},      {"no ", 3},           {"actually,", 9}, {"actually ", 9},
+        {"i prefer", 8}, {"i'd prefer", 10},   {"don't ", 6},    {"do not ", 7},
+        {"stop ", 5},    {"please don't", 12}, {"never ", 6},    {"always ", 7},
+        {"instead,", 8}, {"instead ", 8},
     };
     size_t n = sizeof(markers) / sizeof(markers[0]);
     for (size_t i = 0; i < n; i++) {
@@ -92,9 +92,9 @@ sc_error_t sc_preferences_load(sc_memory_t *memory, sc_allocator_t *alloc, char 
 
     sc_memory_entry_t *entries = NULL;
     size_t count = 0;
-    sc_error_t err = memory->vtable->recall(memory->ctx, alloc, SC_PREF_KEY_PREFIX,
-                                            SC_PREF_KEY_PREFIX_LEN, SC_PREF_MAX_LOAD, "", 0,
-                                            &entries, &count);
+    sc_error_t err =
+        memory->vtable->recall(memory->ctx, alloc, SC_PREF_KEY_PREFIX, SC_PREF_KEY_PREFIX_LEN,
+                               SC_PREF_MAX_LOAD, "", 0, &entries, &count);
     if (err != SC_OK || !entries || count == 0)
         return SC_OK;
 

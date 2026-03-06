@@ -33,6 +33,6 @@ typedef struct sc_context_pressure {
 /* Update pressure from current_tokens and max_tokens. Emit warnings at configured
  * thresholds. Returns true if auto-compact should be triggered (>= pressure_compact). */
 bool sc_context_check_pressure(sc_context_pressure_t *p, float pressure_warn,
-                                float pressure_compact);
+                               float pressure_compact);
 
 #endif /* SC_CONTEXT_H */

@@ -1,9 +1,9 @@
-#include "test_framework.h"
-#include "seaclaw/memory/vector/store_qdrant.h"
-#include "seaclaw/memory/vector/store_pgvector.h"
-#include "seaclaw/memory/vector/store.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#include "seaclaw/memory/vector/store.h"
+#include "seaclaw/memory/vector/store_pgvector.h"
+#include "seaclaw/memory/vector/store_qdrant.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_qdrant_create_destroy(void) {
@@ -48,10 +48,11 @@ static void test_qdrant_search_mock(void) {
     size_t count = 0;
     sc_error_t err = store.vtable->search(store.ctx, &alloc, vec, 3, 5, &results, &count);
     SC_ASSERT_EQ(err, SC_OK);
-    SC_ASSERT_EQ(count, 0u);  /* mock returns 0 results */
+    SC_ASSERT_EQ(count, 0u); /* mock returns 0 results */
     if (results && count > 0) {
         for (size_t i = 0; i < count; i++)
-            if (results[i].id) alloc.free(alloc.ctx, (void *)results[i].id, strlen(results[i].id) + 1);
+            if (results[i].id)
+                alloc.free(alloc.ctx, (void *)results[i].id, strlen(results[i].id) + 1);
         alloc.free(alloc.ctx, results, count * sizeof(sc_vector_search_result_t));
     }
     store.vtable->deinit(store.ctx, &alloc);
@@ -81,7 +82,7 @@ static void test_qdrant_count_mock(void) {
     };
     sc_vector_store_t store = sc_vector_store_qdrant_create(&alloc, &cfg);
     size_t count = store.vtable->count(store.ctx);
-    SC_ASSERT_EQ(count, 0u);  /* mock returns 0 */
+    SC_ASSERT_EQ(count, 0u); /* mock returns 0 */
     store.vtable->deinit(store.ctx, &alloc);
 }
 
@@ -104,7 +105,8 @@ static void test_qdrant_mock_upsert_search_empty(void) {
     SC_ASSERT(count <= 5);
     if (results) {
         for (size_t i = 0; i < count; i++)
-            if (results[i].id) alloc.free(alloc.ctx, (void *)results[i].id, strlen(results[i].id) + 1);
+            if (results[i].id)
+                alloc.free(alloc.ctx, (void *)results[i].id, strlen(results[i].id) + 1);
         alloc.free(alloc.ctx, results, count * sizeof(sc_vector_search_result_t));
     }
     store.vtable->deinit(store.ctx, &alloc);

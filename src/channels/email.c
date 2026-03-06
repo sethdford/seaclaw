@@ -10,7 +10,7 @@
 #include <ctype.h>
 #endif
 
-#define SC_EMAIL_LAST_MSG_SIZE 4096
+#define SC_EMAIL_LAST_MSG_SIZE  4096
 #define SC_EMAIL_MOCK_INBOX_MAX 8
 
 #if !SC_IS_TEST
@@ -93,12 +93,13 @@ static sc_error_t email_send(void *ctx, const char *target, size_t target_len, c
     sc_email_ctx_t *c = (sc_email_ctx_t *)ctx;
     if (c && message && message_len > 0) {
         size_t tlen = target_len > 0 && target ? (target_len > 255 ? 255 : target_len) : 0;
-        const char *from = (c->from_address && c->from_len > 0) ? c->from_address : "seaclaw@localhost";
+        const char *from =
+            (c->from_address && c->from_len > 0) ? c->from_address : "seaclaw@localhost";
         int n = snprintf(c->last_message, SC_EMAIL_LAST_MSG_SIZE,
-                        "From: %s\r\nTo: %.*s\r\nSubject: seaclaw\r\nContent-Type: text/plain; "
-                        "charset=utf-8\r\n\r\n%.*s",
-                        from, (int)tlen, (target && tlen > 0) ? target : "",
-                        (int)message_len, message);
+                         "From: %s\r\nTo: %.*s\r\nSubject: seaclaw\r\nContent-Type: text/plain; "
+                         "charset=utf-8\r\n\r\n%.*s",
+                         from, (int)tlen, (target && tlen > 0) ? target : "", (int)message_len,
+                         message);
         if (n > 0 && (size_t)n < SC_EMAIL_LAST_MSG_SIZE) {
             c->last_message_len = (size_t)n;
         } else {
@@ -316,7 +317,7 @@ const char *sc_email_test_last_message(sc_channel_t *ch) {
 }
 
 sc_error_t sc_email_test_inject_mock_email(sc_channel_t *ch, const char *from, size_t from_len,
-                                            const char *subject_or_body, size_t body_len) {
+                                           const char *subject_or_body, size_t body_len) {
     if (!ch || !ch->ctx)
         return SC_ERR_INVALID_ARGUMENT;
     sc_email_ctx_t *c = (sc_email_ctx_t *)ch->ctx;

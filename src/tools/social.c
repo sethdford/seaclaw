@@ -29,7 +29,8 @@ typedef struct {
 static sc_error_t social_execute(void *ctx, sc_allocator_t *alloc, const sc_json_value_t *args,
                                  sc_tool_result_t *out) {
     (void)ctx;
-    if (!out) return SC_ERR_INVALID_ARGUMENT;
+    if (!out)
+        return SC_ERR_INVALID_ARGUMENT;
     if (!args) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;
@@ -102,20 +103,27 @@ static sc_error_t social_execute(void *ctx, sc_allocator_t *alloc, const sc_json
         *out = sc_tool_result_ok_owned(rbody, rbody ? strlen(rbody) : 0);
     } else if (strcmp(platform, "linkedin") == 0 && strcmp(action, "post") == 0) {
         const char *content = sc_json_get_string(args, "content");
-        if (!content) { *out = sc_tool_result_fail("missing content", 15); return SC_OK; }
-        char *body_json = sc_sprintf(alloc,
+        if (!content) {
+            *out = sc_tool_result_fail("missing content", 15);
+            return SC_OK;
+        }
+        char *body_json = sc_sprintf(
+            alloc,
             "{\"author\":\"urn:li:person:me\",\"lifecycleState\":\"PUBLISHED\","
             "\"specificContent\":{\"com.linkedin.ugc.ShareContent\":{\"shareCommentary\":"
             "{\"text\":\"%s\"},\"shareMediaCategory\":\"NONE\"}},\"visibility\":"
-            "{\"com.linkedin.ugc.MemberNetworkVisibility\":\"PUBLIC\"}}", content);
+            "{\"com.linkedin.ugc.MemberNetworkVisibility\":\"PUBLIC\"}}",
+            content);
         char auth_hdr[256];
         snprintf(auth_hdr, sizeof(auth_hdr), "Bearer %s", token);
         sc_http_response_t resp = {0};
-        sc_error_t err = sc_http_post_json(alloc, "https://api.linkedin.com/v2/ugcPosts",
-                                           auth_hdr, body_json, body_json ? strlen(body_json) : 0, &resp);
-        if (body_json) alloc->free(alloc->ctx, body_json, strlen(body_json) + 1);
+        sc_error_t err = sc_http_post_json(alloc, "https://api.linkedin.com/v2/ugcPosts", auth_hdr,
+                                           body_json, body_json ? strlen(body_json) : 0, &resp);
+        if (body_json)
+            alloc->free(alloc->ctx, body_json, strlen(body_json) + 1);
         if (err != SC_OK) {
-            if (resp.owned && resp.body) sc_http_response_free(alloc, &resp);
+            if (resp.owned && resp.body)
+                sc_http_response_free(alloc, &resp);
             *out = sc_tool_result_fail("failed to post to LinkedIn", 26);
             return SC_OK;
         }
@@ -126,12 +134,14 @@ static sc_error_t social_execute(void *ctx, sc_allocator_t *alloc, const sc_json
         char auth_hdr[256];
         snprintf(auth_hdr, sizeof(auth_hdr), "Bearer %s", token);
         const char *url = (strcmp(platform, "twitter") == 0)
-            ? "https://api.twitter.com/2/users/me/tweets?max_results=10"
-            : "https://api.linkedin.com/v2/ugcPosts?q=authors&authors=List(urn%3Ali%3Aperson%3Ame)";
+                              ? "https://api.twitter.com/2/users/me/tweets?max_results=10"
+                              : "https://api.linkedin.com/v2/"
+                                "ugcPosts?q=authors&authors=List(urn%3Ali%3Aperson%3Ame)";
         sc_http_response_t resp = {0};
         sc_error_t err = sc_http_get(alloc, url, auth_hdr, &resp);
         if (err != SC_OK || resp.status_code != 200) {
-            if (resp.owned && resp.body) sc_http_response_free(alloc, &resp);
+            if (resp.owned && resp.body)
+                sc_http_response_free(alloc, &resp);
             *out = sc_tool_result_fail("failed to read posts", 20);
             return SC_OK;
         }

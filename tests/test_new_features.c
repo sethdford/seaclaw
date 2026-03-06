@@ -1,5 +1,4 @@
 /* Tests for PDF tool, health endpoints, config reload, ws_streaming. */
-#include "test_framework.h"
 #include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/arena.h"
@@ -9,6 +8,7 @@
 #include "seaclaw/gateway.h"
 #include "seaclaw/tool.h"
 #include "seaclaw/tools/pdf.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_pdf_create(void) {
@@ -18,7 +18,8 @@ static void test_pdf_create(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(tool.vtable);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "pdf");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_pdf_missing_path(void) {
@@ -30,9 +31,12 @@ static void test_pdf_missing_path(void) {
     tool.vtable->execute(tool.ctx, &alloc, args, &result);
     sc_json_free(&alloc, args);
     SC_ASSERT_FALSE(result.success);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (result.error_msg_owned && result.error_msg) alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_pdf_test_mode(void) {
@@ -47,8 +51,10 @@ static void test_pdf_test_mode(void) {
     SC_ASSERT_TRUE(result.success);
     SC_ASSERT_NOT_NULL(result.output);
     SC_ASSERT_TRUE(strstr(result.output, "test.pdf") != NULL);
-    if (result.output_owned && result.output) alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_pdf_null_args(void) {
@@ -58,7 +64,8 @@ static void test_pdf_null_args(void) {
     sc_tool_result_t result = {0};
     sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, NULL, &result);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_health_endpoints_exist(void) {
@@ -87,7 +94,8 @@ static void test_ws_streaming_config(void) {
     cfg.allocator = sc_arena_allocator(arena);
     SC_ASSERT_FALSE(sc_config_get_provider_ws_streaming(&cfg, "openai"));
     SC_ASSERT_FALSE(sc_config_get_provider_ws_streaming(NULL, "openai"));
-    const char *json = "{\"providers\":[{\"name\":\"openai\"},{\"name\":\"test\",\"ws_streaming\":true}]}";
+    const char *json =
+        "{\"providers\":[{\"name\":\"openai\"},{\"name\":\"test\",\"ws_streaming\":true}]}";
     sc_config_parse_json(&cfg, json, strlen(json));
     SC_ASSERT_FALSE(sc_config_get_provider_ws_streaming(&cfg, "openai"));
     SC_ASSERT_TRUE(sc_config_get_provider_ws_streaming(&cfg, "test"));

@@ -1,28 +1,28 @@
-#include "test_framework.h"
-#include "seaclaw/update.h"
-#include "seaclaw/daemon.h"
+#include "seaclaw/agent.h"
+#include "seaclaw/agent/mailbox.h"
+#include "seaclaw/agent/profile.h"
+#include "seaclaw/agent/spawn.h"
+#include "seaclaw/channels/thread_binding.h"
+#include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/string.h"
-#include "seaclaw/agent/spawn.h"
-#include "seaclaw/agent/mailbox.h"
-#include "seaclaw/channels/thread_binding.h"
-#include "seaclaw/tools/agent_spawn.h"
-#include "seaclaw/tools/agent_query.h"
-#include "seaclaw/tools/canvas.h"
-#include "seaclaw/tools/apply_patch.h"
-#include "seaclaw/tools/notebook.h"
-#include "seaclaw/tools/database.h"
-#include "seaclaw/tools/diff.h"
-#include "seaclaw/security/policy_engine.h"
+#include "seaclaw/daemon.h"
+#include "seaclaw/mcp_registry.h"
 #include "seaclaw/observability/otel.h"
-#include "seaclaw/security/replay.h"
 #include "seaclaw/plugin.h"
 #include "seaclaw/plugin_loader.h"
-#include "seaclaw/mcp_registry.h"
-#include "seaclaw/agent/profile.h"
+#include "seaclaw/security/policy_engine.h"
+#include "seaclaw/security/replay.h"
+#include "seaclaw/tools/agent_query.h"
+#include "seaclaw/tools/agent_spawn.h"
+#include "seaclaw/tools/apply_patch.h"
+#include "seaclaw/tools/canvas.h"
+#include "seaclaw/tools/database.h"
+#include "seaclaw/tools/diff.h"
 #include "seaclaw/tools/factory.h"
-#include "seaclaw/config.h"
-#include "seaclaw/agent.h"
+#include "seaclaw/tools/notebook.h"
+#include "seaclaw/update.h"
+#include "test_framework.h"
 #include <string.h>
 #include <time.h>
 
@@ -39,8 +39,10 @@ static void test_pool_spawn_one_shot(void) {
     sc_agent_pool_t *p = sc_agent_pool_create(&a, 4);
     sc_spawn_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
-    cfg.provider = "openai"; cfg.provider_len = 6;
-    cfg.model = "gpt-4o"; cfg.model_len = 6;
+    cfg.provider = "openai";
+    cfg.provider_len = 6;
+    cfg.model = "gpt-4o";
+    cfg.model_len = 6;
     cfg.mode = SC_SPAWN_ONE_SHOT;
     uint64_t id = 0;
     SC_ASSERT_EQ(sc_agent_pool_spawn(p, &cfg, "hello", 5, "test", &id), SC_OK);
@@ -55,7 +57,8 @@ static void test_pool_spawn_persistent(void) {
     sc_agent_pool_t *p = sc_agent_pool_create(&a, 4);
     sc_spawn_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
-    cfg.provider = "openai"; cfg.provider_len = 6;
+    cfg.provider = "openai";
+    cfg.provider_len = 6;
     cfg.mode = SC_SPAWN_PERSISTENT;
     uint64_t id = 0;
     SC_ASSERT_EQ(sc_agent_pool_spawn(p, &cfg, "hi", 2, "pers", &id), SC_OK);
@@ -68,7 +71,8 @@ static void test_pool_cancel(void) {
     sc_agent_pool_t *p = sc_agent_pool_create(&a, 4);
     sc_spawn_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
-    cfg.provider = "openai"; cfg.provider_len = 6;
+    cfg.provider = "openai";
+    cfg.provider_len = 6;
     uint64_t id = 0;
     sc_agent_pool_spawn(p, &cfg, "t", 1, "c", &id);
     SC_ASSERT_EQ(sc_agent_pool_cancel(p, id), SC_OK);
@@ -82,7 +86,8 @@ static void test_pool_list(void) {
     sc_agent_pool_t *p = sc_agent_pool_create(&a, 4);
     sc_spawn_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
-    cfg.provider = "openai"; cfg.provider_len = 6;
+    cfg.provider = "openai";
+    cfg.provider_len = 6;
     uint64_t id1 = 0, id2 = 0;
     sc_agent_pool_spawn(p, &cfg, "a", 1, "l1", &id1);
     sc_agent_pool_spawn(p, &cfg, "b", 1, "l2", &id2);
@@ -97,10 +102,12 @@ static void test_pool_list(void) {
 static void test_pool_query(void) {
     sc_allocator_t a = sc_system_allocator();
     sc_agent_pool_t *p = sc_agent_pool_create(&a, 4);
-    char *resp = NULL; size_t rlen = 0;
+    char *resp = NULL;
+    size_t rlen = 0;
     SC_ASSERT_EQ(sc_agent_pool_query(p, 1, "q", 1, &resp, &rlen), SC_OK);
     SC_ASSERT_NOT_NULL(resp);
-    if (resp) a.free(a.ctx, resp, rlen + 1);
+    if (resp)
+        a.free(a.ctx, resp, rlen + 1);
     sc_agent_pool_destroy(p);
 }
 
@@ -149,8 +156,10 @@ static void test_mailbox_broadcast(void) {
     SC_ASSERT_EQ(sc_mailbox_pending_count(m, 2), 1);
     SC_ASSERT_EQ(sc_mailbox_pending_count(m, 3), 1);
     sc_message_t msg;
-    sc_mailbox_recv(m, 2, &msg); sc_message_free(&a, &msg);
-    sc_mailbox_recv(m, 3, &msg); sc_message_free(&a, &msg);
+    sc_mailbox_recv(m, 2, &msg);
+    sc_message_free(&a, &msg);
+    sc_mailbox_recv(m, 3, &msg);
+    sc_message_free(&a, &msg);
     sc_mailbox_destroy(m);
 }
 
@@ -216,7 +225,8 @@ static void test_agent_spawn_tool(void) {
     sc_tool_t tool = {0};
     SC_ASSERT_EQ(sc_agent_spawn_tool_create(&a, pool, &tool), SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "agent_spawn");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &a);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &a);
     sc_agent_pool_destroy(pool);
 }
 
@@ -226,7 +236,8 @@ static void test_agent_query_tool(void) {
     sc_tool_t tool = {0};
     SC_ASSERT_EQ(sc_agent_query_tool_create(&a, pool, &tool), SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "agent_query");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &a);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &a);
     sc_agent_pool_destroy(pool);
 }
 
@@ -235,7 +246,8 @@ static void test_canvas_tool(void) {
     sc_tool_t tool = {0};
     SC_ASSERT_EQ(sc_canvas_create(&a, &tool), SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "canvas");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &a);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &a);
 }
 
 static void test_apply_patch_tool(void) {
@@ -243,7 +255,8 @@ static void test_apply_patch_tool(void) {
     sc_tool_t tool = {0};
     SC_ASSERT_EQ(sc_apply_patch_create(&a, NULL, &tool), SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "apply_patch");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &a);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &a);
 }
 
 static void test_notebook_tool(void) {
@@ -251,7 +264,8 @@ static void test_notebook_tool(void) {
     sc_tool_t tool = {0};
     SC_ASSERT_EQ(sc_notebook_create(&a, NULL, &tool), SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "notebook");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &a);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &a);
 }
 
 static void test_database_tool(void) {
@@ -259,7 +273,8 @@ static void test_database_tool(void) {
     sc_tool_t tool = {0};
     SC_ASSERT_EQ(sc_database_tool_create(&a, NULL, &tool), SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "database");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &a);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &a);
 }
 
 static void test_diff_tool(void) {
@@ -273,11 +288,17 @@ static void test_policy_engine_deny(void) {
     sc_allocator_t a = sc_system_allocator();
     sc_policy_engine_t *e = sc_policy_engine_create(&a);
     SC_ASSERT_NOT_NULL(e);
-    sc_policy_match_t m = { .tool = "git", .args_contains = "push --force", .session_cost_gt = 0, .has_cost_check = false };
-    SC_ASSERT_EQ(sc_policy_engine_add_rule(e, "no-force-push", m, SC_POLICY_DENY, "blocked"), SC_OK);
-    sc_policy_eval_ctx_t ctx = { .tool_name = "git", .args_json = "{\"cmd\":\"push --force\"}", .session_cost_usd = 0 };
+    sc_policy_match_t m = {.tool = "git",
+                           .args_contains = "push --force",
+                           .session_cost_gt = 0,
+                           .has_cost_check = false};
+    SC_ASSERT_EQ(sc_policy_engine_add_rule(e, "no-force-push", m, SC_POLICY_DENY, "blocked"),
+                 SC_OK);
+    sc_policy_eval_ctx_t ctx = {
+        .tool_name = "git", .args_json = "{\"cmd\":\"push --force\"}", .session_cost_usd = 0};
     SC_ASSERT_EQ(sc_policy_engine_evaluate(e, &ctx).action, SC_POLICY_DENY);
-    sc_policy_eval_ctx_t ctx2 = { .tool_name = "git", .args_json = "{\"cmd\":\"push\"}", .session_cost_usd = 0 };
+    sc_policy_eval_ctx_t ctx2 = {
+        .tool_name = "git", .args_json = "{\"cmd\":\"push\"}", .session_cost_usd = 0};
     SC_ASSERT_EQ(sc_policy_engine_evaluate(e, &ctx2).action, SC_POLICY_ALLOW);
     sc_policy_engine_destroy(e);
 }
@@ -285,11 +306,12 @@ static void test_policy_engine_deny(void) {
 static void test_policy_engine_cost(void) {
     sc_allocator_t a = sc_system_allocator();
     sc_policy_engine_t *e = sc_policy_engine_create(&a);
-    sc_policy_match_t m = { .tool = NULL, .args_contains = NULL, .session_cost_gt = 5.0, .has_cost_check = true };
+    sc_policy_match_t m = {
+        .tool = NULL, .args_contains = NULL, .session_cost_gt = 5.0, .has_cost_check = true};
     sc_policy_engine_add_rule(e, "budget", m, SC_POLICY_DENY, "over budget");
-    sc_policy_eval_ctx_t c1 = { .tool_name = "shell", .args_json = NULL, .session_cost_usd = 3.0 };
+    sc_policy_eval_ctx_t c1 = {.tool_name = "shell", .args_json = NULL, .session_cost_usd = 3.0};
     SC_ASSERT_EQ(sc_policy_engine_evaluate(e, &c1).action, SC_POLICY_ALLOW);
-    sc_policy_eval_ctx_t c2 = { .tool_name = "shell", .args_json = NULL, .session_cost_usd = 6.0 };
+    sc_policy_eval_ctx_t c2 = {.tool_name = "shell", .args_json = NULL, .session_cost_usd = 6.0};
     SC_ASSERT_EQ(sc_policy_engine_evaluate(e, &c2).action, SC_POLICY_DENY);
     sc_policy_engine_destroy(e);
 }
@@ -297,9 +319,11 @@ static void test_policy_engine_cost(void) {
 static void test_policy_engine_approval(void) {
     sc_allocator_t a = sc_system_allocator();
     sc_policy_engine_t *e = sc_policy_engine_create(&a);
-    sc_policy_match_t m = { .tool = "shell", .args_contains = "rm -rf", .session_cost_gt = 0, .has_cost_check = false };
+    sc_policy_match_t m = {
+        .tool = "shell", .args_contains = "rm -rf", .session_cost_gt = 0, .has_cost_check = false};
     sc_policy_engine_add_rule(e, "approve-rm", m, SC_POLICY_REQUIRE_APPROVAL, "needs approval");
-    sc_policy_eval_ctx_t c = { .tool_name = "shell", .args_json = "rm -rf /tmp", .session_cost_usd = 0 };
+    sc_policy_eval_ctx_t c = {
+        .tool_name = "shell", .args_json = "rm -rf /tmp", .session_cost_usd = 0};
     SC_ASSERT_EQ(sc_policy_engine_evaluate(e, &c).action, SC_POLICY_REQUIRE_APPROVAL);
     sc_policy_engine_destroy(e);
 }
@@ -307,12 +331,17 @@ static void test_policy_engine_approval(void) {
 static void test_otel_observer(void) {
     sc_allocator_t a = sc_system_allocator();
     sc_observer_t obs = {0};
-    sc_otel_config_t cfg = { .endpoint = "http://localhost:4317", .endpoint_len = 21,
-        .service_name = "seaclaw", .service_name_len = 7,
-        .enable_traces = true, .enable_metrics = true, .enable_logs = true };
+    sc_otel_config_t cfg = {.endpoint = "http://localhost:4317",
+                            .endpoint_len = 21,
+                            .service_name = "seaclaw",
+                            .service_name_len = 7,
+                            .enable_traces = true,
+                            .enable_metrics = true,
+                            .enable_logs = true};
     SC_ASSERT_EQ(sc_otel_observer_create(&a, &cfg, &obs), SC_OK);
     SC_ASSERT_STR_EQ(obs.vtable->name(obs.ctx), "otel");
-    if (obs.vtable->deinit) obs.vtable->deinit(obs.ctx);
+    if (obs.vtable->deinit)
+        obs.vtable->deinit(obs.ctx);
 }
 
 static void test_otel_span(void) {
@@ -335,7 +364,8 @@ static void test_replay_record(void) {
     sc_replay_event_t ev;
     SC_ASSERT_EQ(sc_replay_get_event(r, 0, &ev), SC_OK);
     SC_ASSERT_EQ(ev.type, SC_REPLAY_TOOL_CALL);
-    char *json = NULL; size_t jlen = 0;
+    char *json = NULL;
+    size_t jlen = 0;
     SC_ASSERT_EQ(sc_replay_export_json(r, &a, &json, &jlen), SC_OK);
     SC_ASSERT_NOT_NULL(json);
     a.free(a.ctx, json, jlen + 1);
@@ -346,8 +376,10 @@ static void test_plugin_registry(void) {
     sc_allocator_t a = sc_system_allocator();
     sc_plugin_registry_t *reg = sc_plugin_registry_create(&a, 16);
     SC_ASSERT_NOT_NULL(reg);
-    sc_plugin_info_t info = { .name = "test-plugin", .version = "1.0.0",
-        .description = "A test plugin", .api_version = SC_PLUGIN_API_VERSION };
+    sc_plugin_info_t info = {.name = "test-plugin",
+                             .version = "1.0.0",
+                             .description = "A test plugin",
+                             .api_version = SC_PLUGIN_API_VERSION};
     SC_ASSERT_EQ(sc_plugin_register(reg, &info, NULL, 0), SC_OK);
     SC_ASSERT_EQ(sc_plugin_count(reg), 1);
     sc_plugin_info_t out;
@@ -359,14 +391,16 @@ static void test_plugin_registry(void) {
 static void test_plugin_bad_version(void) {
     sc_allocator_t a = sc_system_allocator();
     sc_plugin_registry_t *reg = sc_plugin_registry_create(&a, 4);
-    sc_plugin_info_t info = { .name = "bad", .version = "0.0.1", .description = NULL, .api_version = 999 };
+    sc_plugin_info_t info = {
+        .name = "bad", .version = "0.0.1", .description = NULL, .api_version = 999};
     SC_ASSERT_EQ(sc_plugin_register(reg, &info, NULL, 0), SC_ERR_INVALID_ARGUMENT);
     sc_plugin_registry_destroy(reg);
 }
 
 static void test_plugin_load_nonexistent(void) {
     sc_allocator_t a = sc_system_allocator();
-    sc_plugin_host_t host = {.alloc = &a, .register_tool = NULL, .register_provider = NULL, .host_ctx = NULL};
+    sc_plugin_host_t host = {
+        .alloc = &a, .register_tool = NULL, .register_provider = NULL, .host_ctx = NULL};
     sc_plugin_info_t info = {0};
     sc_plugin_handle_t *handle = NULL;
     sc_error_t err = sc_plugin_load(&a, "/nonexistent/plugin.so", &host, &info, &handle);
@@ -507,7 +541,8 @@ static void test_canvas_description(void) {
     SC_ASSERT_EQ(sc_canvas_create(&a, &tool), SC_OK);
     SC_ASSERT_NOT_NULL(tool.vtable->description(tool.ctx));
     SC_ASSERT_NOT_NULL(tool.vtable->parameters_json(tool.ctx));
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &a);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &a);
 }
 
 static void test_apply_patch_description(void) {
@@ -516,7 +551,8 @@ static void test_apply_patch_description(void) {
     SC_ASSERT_EQ(sc_apply_patch_create(&a, NULL, &tool), SC_OK);
     SC_ASSERT_NOT_NULL(tool.vtable->description(tool.ctx));
     SC_ASSERT_NOT_NULL(tool.vtable->parameters_json(tool.ctx));
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &a);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &a);
 }
 
 static void test_notebook_description(void) {
@@ -525,7 +561,8 @@ static void test_notebook_description(void) {
     SC_ASSERT_EQ(sc_notebook_create(&a, NULL, &tool), SC_OK);
     SC_ASSERT_NOT_NULL(tool.vtable->description(tool.ctx));
     SC_ASSERT_NOT_NULL(tool.vtable->parameters_json(tool.ctx));
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &a);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &a);
 }
 
 static void test_diff_description(void) {
@@ -542,7 +579,8 @@ static void test_database_description(void) {
     SC_ASSERT_EQ(sc_database_tool_create(&a, NULL, &tool), SC_OK);
     SC_ASSERT_NOT_NULL(tool.vtable->description(tool.ctx));
     SC_ASSERT_NOT_NULL(tool.vtable->parameters_json(tool.ctx));
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &a);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &a);
 }
 
 static void test_policy_engine_null(void) {
@@ -552,7 +590,7 @@ static void test_policy_engine_null(void) {
 static void test_policy_engine_no_rules_allows(void) {
     sc_allocator_t a = sc_system_allocator();
     sc_policy_engine_t *e = sc_policy_engine_create(&a);
-    sc_policy_eval_ctx_t ctx = { .tool_name = "shell", .args_json = NULL, .session_cost_usd = 0 };
+    sc_policy_eval_ctx_t ctx = {.tool_name = "shell", .args_json = NULL, .session_cost_usd = 0};
     SC_ASSERT_EQ(sc_policy_engine_evaluate(e, &ctx).action, SC_POLICY_ALLOW);
     sc_policy_engine_destroy(e);
 }
@@ -569,11 +607,6 @@ static void test_profile_by_name_null(void) {
     SC_ASSERT_NULL(sc_agent_profile_by_name("", 0));
 }
 
-
-
-
-
-
 static void test_daemon_start_returns_valid(void) {
     sc_error_t err = sc_daemon_start();
     SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_NOT_SUPPORTED || err == SC_ERR_INVALID_ARGUMENT);
@@ -589,7 +622,6 @@ static void test_update_check_null_buf(void) {
     sc_error_t err = sc_update_check(NULL, 0);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
-
 
 static void test_integ_config_defaults(void) {
     sc_allocator_t a = sc_system_allocator();
@@ -656,8 +688,8 @@ static void test_integ_factory_pool(void) {
     sc_agent_pool_t *pool = sc_agent_pool_create(&a, 2);
     sc_tool_t *tools = NULL;
     size_t count = 0;
-    sc_error_t err = sc_tools_create_default(&a, ".", 1, NULL, NULL, NULL, NULL, pool, NULL,
-                                             &tools, &count);
+    sc_error_t err =
+        sc_tools_create_default(&a, ".", 1, NULL, NULL, NULL, NULL, pool, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT(count > 0);
     sc_tools_destroy_default(&a, tools, count);
@@ -668,8 +700,8 @@ static void test_integ_factory_null_pool(void) {
     sc_allocator_t a = sc_system_allocator();
     sc_tool_t *tools = NULL;
     size_t count = 0;
-    sc_error_t err = sc_tools_create_default(&a, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL,
-                                             &tools, &count);
+    sc_error_t err =
+        sc_tools_create_default(&a, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     sc_tools_destroy_default(&a, tools, count);
 }
@@ -677,9 +709,9 @@ static void test_integ_factory_null_pool(void) {
 static void test_integ_policy_deny(void) {
     sc_allocator_t a = sc_system_allocator();
     sc_policy_engine_t *pe = sc_policy_engine_create(&a);
-    sc_policy_match_t m = { .tool = "shell" };
+    sc_policy_match_t m = {.tool = "shell"};
     sc_policy_engine_add_rule(pe, "d", m, SC_POLICY_DENY, "no");
-    sc_policy_eval_ctx_t ctx = { .tool_name = "shell", .args_json = "{}" };
+    sc_policy_eval_ctx_t ctx = {.tool_name = "shell", .args_json = "{}"};
     sc_policy_result_t res = sc_policy_engine_evaluate(pe, &ctx);
     SC_ASSERT_EQ(res.action, SC_POLICY_DENY);
     sc_policy_engine_destroy(pe);
@@ -688,9 +720,9 @@ static void test_integ_policy_deny(void) {
 static void test_integ_policy_allow(void) {
     sc_allocator_t a = sc_system_allocator();
     sc_policy_engine_t *pe = sc_policy_engine_create(&a);
-    sc_policy_match_t m = { .tool = "shell" };
+    sc_policy_match_t m = {.tool = "shell"};
     sc_policy_engine_add_rule(pe, "d", m, SC_POLICY_DENY, "no");
-    sc_policy_eval_ctx_t ctx = { .tool_name = "file_read", .args_json = "{}" };
+    sc_policy_eval_ctx_t ctx = {.tool_name = "file_read", .args_json = "{}"};
     sc_policy_result_t res = sc_policy_engine_evaluate(pe, &ctx);
     SC_ASSERT_EQ(res.action, SC_POLICY_ALLOW);
     sc_policy_engine_destroy(pe);
@@ -718,7 +750,8 @@ static void test_integ_pool_roundtrip(void) {
     size_t ic = 0;
     SC_ASSERT_EQ(sc_agent_pool_list(pool, &a, &info, &ic), SC_OK);
     SC_ASSERT(ic >= 1);
-    if (info) a.free(a.ctx, info, ic * sizeof(sc_agent_pool_info_t));
+    if (info)
+        a.free(a.ctx, info, ic * sizeof(sc_agent_pool_info_t));
     SC_ASSERT_EQ(sc_agent_pool_cancel(pool, id), SC_OK);
     sc_agent_pool_destroy(pool);
 }
@@ -756,7 +789,6 @@ static void test_integ_plugin_registry(void) {
     SC_ASSERT_EQ(sc_plugin_count(reg), 0);
     sc_plugin_registry_destroy(reg);
 }
-
 
 static void test_update_apply_test_mode(void) {
     sc_error_t err = sc_update_apply();

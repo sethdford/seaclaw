@@ -1,5 +1,5 @@
-#include "test_framework.h"
 #include "seaclaw/core/slice.h"
+#include "test_framework.h"
 
 static void test_str_lit_macro(void) {
     sc_str_t s = SC_STR_LIT("hello");

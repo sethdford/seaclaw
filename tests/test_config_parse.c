@@ -1,17 +1,17 @@
 /* Config parsing and validation tests. */
-#include "test_framework.h"
 #include "seaclaw/config.h"
 #include "seaclaw/config_parse.h"
-#include "seaclaw/daemon.h"
 #include "seaclaw/core/allocator.h"
-#include "seaclaw/core/json.h"
 #include "seaclaw/core/arena.h"
 #include "seaclaw/core/error.h"
+#include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
+#include "seaclaw/daemon.h"
 #include "seaclaw/security/sandbox.h"
-#include <string.h>
-#include <stdlib.h>
+#include "test_framework.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 static void test_config_parse_empty_json(void) {
@@ -35,7 +35,8 @@ static void test_config_parse_with_providers(void) {
     SC_ASSERT_NOT_NULL(arena);
     cfg_local.arena = arena;
     cfg_local.allocator = sc_arena_allocator(arena);
-    const char *json = "{\"default_provider\":\"openai\",\"providers\":[{\"name\":\"openai\",\"api_key\":\"sk-test\"}]}";
+    const char *json = "{\"default_provider\":\"openai\",\"providers\":[{\"name\":\"openai\",\"api_"
+                       "key\":\"sk-test\"}]}";
     sc_error_t err = sc_config_parse_json(&cfg_local, json, strlen(json));
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(cfg_local.default_provider, "openai");
@@ -52,9 +53,11 @@ static void test_config_parse_all_sections(void) {
     SC_ASSERT_NOT_NULL(arena);
     cfg_local.allocator = sc_arena_allocator(arena);
     cfg_local.arena = arena;
-    const char *json = "{\"workspace\":\"/tmp\",\"default_model\":\"gpt-4\","
+    const char *json =
+        "{\"workspace\":\"/tmp\",\"default_model\":\"gpt-4\","
         "\"autonomy\":{\"level\":\"readonly\"},\"gateway\":{\"port\":8080,\"host\":\"0.0.0.0\"},"
-        "\"memory\":{\"backend\":\"sqlite\",\"auto_save\":true},\"security\":{\"autonomy_level\":0}}";
+        "\"memory\":{\"backend\":\"sqlite\",\"auto_save\":true},\"security\":{\"autonomy_level\":0}"
+        "}";
     sc_error_t err = sc_config_parse_json(&cfg_local, json, strlen(json));
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(cfg_local.workspace_dir, "/tmp");
@@ -213,14 +216,13 @@ static void test_config_parse_sandbox_config(void) {
     SC_ASSERT_NOT_NULL(arena);
     cfg_local.allocator = sc_arena_allocator(arena);
     cfg_local.arena = arena;
-    const char *j =
-        "{\"security\":{\"sandbox\":\"seatbelt\",\"sandbox_config\":{"
-        "\"enabled\":true,"
-        "\"firejail_args\":[\"--whitelist=/opt\",\"--rlimit-cpu=10\"],"
-        "\"net_proxy\":{\"enabled\":true,\"deny_all\":true,"
-        "\"proxy_addr\":\"http://127.0.0.1:8080\","
-        "\"allowed_domains\":[\"api.example.com\",\"*.github.com\"]}"
-        "}}}";
+    const char *j = "{\"security\":{\"sandbox\":\"seatbelt\",\"sandbox_config\":{"
+                    "\"enabled\":true,"
+                    "\"firejail_args\":[\"--whitelist=/opt\",\"--rlimit-cpu=10\"],"
+                    "\"net_proxy\":{\"enabled\":true,\"deny_all\":true,"
+                    "\"proxy_addr\":\"http://127.0.0.1:8080\","
+                    "\"allowed_domains\":[\"api.example.com\",\"*.github.com\"]}"
+                    "}}}";
     sc_error_t err = sc_config_parse_json(&cfg_local, j, strlen(j));
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_TRUE(cfg_local.security.sandbox_config.enabled);
@@ -230,10 +232,13 @@ static void test_config_parse_sandbox_config(void) {
     SC_ASSERT_STR_EQ(cfg_local.security.sandbox_config.firejail_args[1], "--rlimit-cpu=10");
     SC_ASSERT_TRUE(cfg_local.security.sandbox_config.net_proxy.enabled);
     SC_ASSERT_TRUE(cfg_local.security.sandbox_config.net_proxy.deny_all);
-    SC_ASSERT_STR_EQ(cfg_local.security.sandbox_config.net_proxy.proxy_addr, "http://127.0.0.1:8080");
+    SC_ASSERT_STR_EQ(cfg_local.security.sandbox_config.net_proxy.proxy_addr,
+                     "http://127.0.0.1:8080");
     SC_ASSERT_EQ(cfg_local.security.sandbox_config.net_proxy.allowed_domains_len, 2);
-    SC_ASSERT_STR_EQ(cfg_local.security.sandbox_config.net_proxy.allowed_domains[0], "api.example.com");
-    SC_ASSERT_STR_EQ(cfg_local.security.sandbox_config.net_proxy.allowed_domains[1], "*.github.com");
+    SC_ASSERT_STR_EQ(cfg_local.security.sandbox_config.net_proxy.allowed_domains[0],
+                     "api.example.com");
+    SC_ASSERT_STR_EQ(cfg_local.security.sandbox_config.net_proxy.allowed_domains[1],
+                     "*.github.com");
     sc_arena_destroy(arena);
 }
 
@@ -311,9 +316,9 @@ static void test_config_parse_email_channel(void) {
     cfg.arena = arena;
     cfg.allocator = sc_arena_allocator(arena);
     const char *json = "{\"channels\":{\"email\":{\"smtp_host\":\"smtp.gmail.com\","
-        "\"smtp_port\":587,\"from_address\":\"me@gmail.com\","
-        "\"smtp_user\":\"me@gmail.com\",\"smtp_pass\":\"apppassword\","
-        "\"imap_host\":\"imap.gmail.com\",\"imap_port\":993}}}";
+                       "\"smtp_port\":587,\"from_address\":\"me@gmail.com\","
+                       "\"smtp_user\":\"me@gmail.com\",\"smtp_pass\":\"apppassword\","
+                       "\"imap_host\":\"imap.gmail.com\",\"imap_port\":993}}}";
     sc_error_t err = sc_config_parse_json(&cfg, json, strlen(json));
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(cfg.channels.email.smtp_host, "smtp.gmail.com");
@@ -350,8 +355,8 @@ static void test_config_parse_mcp_servers(void) {
     cfg.arena = arena;
     cfg.allocator = sc_arena_allocator(arena);
     const char *json = "{\"mcp_servers\":{\"filesystem\":{\"command\":\"npx\","
-        "\"args\":[\"-y\",\"@modelcontextprotocol/server-filesystem\"]},"
-        "\"search\":{\"command\":\"search-server\",\"args\":[]}}}";
+                       "\"args\":[\"-y\",\"@modelcontextprotocol/server-filesystem\"]},"
+                       "\"search\":{\"command\":\"search-server\",\"args\":[]}}}";
     sc_error_t err = sc_config_parse_json(&cfg, json, strlen(json));
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(cfg.mcp_servers_len, 2u);
@@ -388,8 +393,8 @@ static void test_config_parse_nodes_array(void) {
     SC_ASSERT_NOT_NULL(arena);
     cfg.arena = arena;
     cfg.allocator = sc_arena_allocator(arena);
-    const char *json =
-        "{\"nodes\":[{\"name\":\"local\",\"status\":\"online\"},{\"name\":\"remote-1\",\"status\":\"offline\"}]}";
+    const char *json = "{\"nodes\":[{\"name\":\"local\",\"status\":\"online\"},{\"name\":\"remote-"
+                       "1\",\"status\":\"offline\"}]}";
     sc_error_t err = sc_config_parse_json(&cfg, json, strlen(json));
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(cfg.nodes_len, 2u);
@@ -415,9 +420,9 @@ static void test_config_parse_memory_postgres(void) {
     cfg.arena = arena;
     cfg.allocator = sc_arena_allocator(arena);
     const char *json = "{\"memory\":{\"backend\":\"postgres\","
-        "\"postgres_url\":\"postgres://localhost/test\","
-        "\"postgres_schema\":\"myschema\","
-        "\"postgres_table\":\"entries\"}}";
+                       "\"postgres_url\":\"postgres://localhost/test\","
+                       "\"postgres_schema\":\"myschema\","
+                       "\"postgres_table\":\"entries\"}}";
     sc_error_t err = sc_config_parse_json(&cfg, json, strlen(json));
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(cfg.memory.backend, "postgres");
@@ -436,8 +441,8 @@ static void test_config_parse_memory_redis(void) {
     cfg.arena = arena;
     cfg.allocator = sc_arena_allocator(arena);
     const char *json = "{\"memory\":{\"backend\":\"redis\","
-        "\"redis_host\":\"redis.local\",\"redis_port\":6380,"
-        "\"redis_key_prefix\":\"sc\"}}";
+                       "\"redis_host\":\"redis.local\",\"redis_port\":6380,"
+                       "\"redis_key_prefix\":\"sc\"}}";
     sc_error_t err = sc_config_parse_json(&cfg, json, strlen(json));
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(cfg.memory.backend, "redis");
@@ -456,8 +461,8 @@ static void test_config_parse_memory_api(void) {
     cfg.arena = arena;
     cfg.allocator = sc_arena_allocator(arena);
     const char *json = "{\"memory\":{\"backend\":\"api\","
-        "\"api_base_url\":\"https://mem.example.com\","
-        "\"api_key\":\"test-key\",\"api_timeout_ms\":3000}}";
+                       "\"api_base_url\":\"https://mem.example.com\","
+                       "\"api_key\":\"test-key\",\"api_timeout_ms\":3000}}";
     sc_error_t err = sc_config_parse_json(&cfg, json, strlen(json));
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(cfg.memory.backend, "api");
@@ -476,14 +481,13 @@ static void test_config_sandbox_save_roundtrip(void) {
     cfg.allocator = sc_arena_allocator(arena);
     cfg.arena = arena;
 
-    const char *j =
-        "{\"security\":{\"sandbox\":\"firejail\",\"sandbox_config\":{"
-        "\"enabled\":true,\"backend\":\"firejail\","
-        "\"firejail_args\":[\"--whitelist=/opt\",\"--net=none\"],"
-        "\"net_proxy\":{\"enabled\":true,\"deny_all\":false,"
-        "\"proxy_addr\":\"http://10.0.0.1:3128\","
-        "\"allowed_domains\":[\"api.example.com\",\"*.internal.io\"]}"
-        "}}}";
+    const char *j = "{\"security\":{\"sandbox\":\"firejail\",\"sandbox_config\":{"
+                    "\"enabled\":true,\"backend\":\"firejail\","
+                    "\"firejail_args\":[\"--whitelist=/opt\",\"--net=none\"],"
+                    "\"net_proxy\":{\"enabled\":true,\"deny_all\":false,"
+                    "\"proxy_addr\":\"http://10.0.0.1:3128\","
+                    "\"allowed_domains\":[\"api.example.com\",\"*.internal.io\"]}"
+                    "}}}";
     sc_error_t err = sc_config_parse_json(&cfg, j, strlen(j));
     SC_ASSERT_EQ(err, SC_OK);
 

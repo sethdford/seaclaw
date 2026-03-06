@@ -2,14 +2,14 @@
  * Crypto tests: ChaCha20, SHA-256, HMAC-SHA256.
  * Test vectors from RFC 6234 (SHA-256) and RFC 4231 (HMAC-SHA256).
  */
-#include "test_framework.h"
-#include "seaclaw/crypto.h"
-#include "seaclaw/security.h"
-#include "seaclaw/multimodal.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
-#include <string.h>
+#include "seaclaw/crypto.h"
+#include "seaclaw/multimodal.h"
+#include "seaclaw/security.h"
+#include "test_framework.h"
 #include <stdint.h>
+#include <string.h>
 
 static void test_chacha20_roundtrip_empty(void);
 static void test_chacha20_roundtrip_short(void);
@@ -42,10 +42,12 @@ static void test_chacha20_zero_length(void);
 static void hex_to_bytes(const char *hex, uint8_t *out, size_t *out_len) {
     size_t n = 0;
     for (; hex[0] && hex[1]; hex += 2, n++) {
-        unsigned int a = (hex[0] >= 'a') ? hex[0] - 'a' + 10 :
-                         (hex[0] >= 'A') ? hex[0] - 'A' + 10 : hex[0] - '0';
-        unsigned int b = (hex[1] >= 'a') ? hex[1] - 'a' + 10 :
-                         (hex[1] >= 'A') ? hex[1] - 'A' + 10 : hex[1] - '0';
+        unsigned int a = (hex[0] >= 'a')   ? hex[0] - 'a' + 10
+                         : (hex[0] >= 'A') ? hex[0] - 'A' + 10
+                                           : hex[0] - '0';
+        unsigned int b = (hex[1] >= 'a')   ? hex[1] - 'a' + 10
+                         : (hex[1] >= 'A') ? hex[1] - 'A' + 10
+                                           : hex[1] - '0';
         out[n] = (uint8_t)((a << 4) | b);
     }
     *out_len = n;
@@ -53,11 +55,14 @@ static void hex_to_bytes(const char *hex, uint8_t *out, size_t *out_len) {
 
 static int hex_eq(const uint8_t *a, const char *hex_b, size_t len) {
     for (size_t i = 0; i < len && hex_b[i * 2]; i++) {
-        unsigned int b = (hex_b[i * 2] >= 'a') ? hex_b[i * 2] - 'a' + 10 :
-                         (hex_b[i * 2] >= 'A') ? hex_b[i * 2] - 'A' + 10 : hex_b[i * 2] - '0';
-        b = (b << 4) | ((hex_b[i * 2 + 1] >= 'a') ? hex_b[i * 2 + 1] - 'a' + 10 :
-                        (hex_b[i * 2 + 1] >= 'A') ? hex_b[i * 2 + 1] - 'A' + 10 : hex_b[i * 2 + 1] - '0');
-        if (a[i] != (uint8_t)b) return 0;
+        unsigned int b = (hex_b[i * 2] >= 'a')   ? hex_b[i * 2] - 'a' + 10
+                         : (hex_b[i * 2] >= 'A') ? hex_b[i * 2] - 'A' + 10
+                                                 : hex_b[i * 2] - '0';
+        b = (b << 4) | ((hex_b[i * 2 + 1] >= 'a')   ? hex_b[i * 2 + 1] - 'a' + 10
+                        : (hex_b[i * 2 + 1] >= 'A') ? hex_b[i * 2 + 1] - 'A' + 10
+                                                    : hex_b[i * 2 + 1] - '0');
+        if (a[i] != (uint8_t)b)
+            return 0;
     }
     return 1;
 }
@@ -121,7 +126,8 @@ static void test_chacha20_roundtrip_block(void) {
     uint8_t key[32];
     uint8_t nonce[12];
     uint8_t in[64], out[64], dec[64];
-    for (int i = 0; i < 64; i++) in[i] = (uint8_t)i;
+    for (int i = 0; i < 64; i++)
+        in[i] = (uint8_t)i;
     memset(key, 0x33, 32);
     memset(nonce, 0x44, 12);
     sc_chacha20_encrypt(key, nonce, 0, in, out, 64);
@@ -133,7 +139,8 @@ static void test_chacha20_roundtrip_multi_block(void) {
     uint8_t key[32];
     uint8_t nonce[12];
     uint8_t in[200], out[200], dec[200];
-    for (int i = 0; i < 200; i++) in[i] = (uint8_t)(i * 7);
+    for (int i = 0; i < 200; i++)
+        in[i] = (uint8_t)(i * 7);
     memset(key, 0x55, 32);
     memset(nonce, 0x66, 12);
     sc_chacha20_encrypt(key, nonce, 1, in, out, 200);
@@ -145,7 +152,8 @@ static void test_chacha20_partial_block(void) {
     uint8_t key[32];
     uint8_t nonce[12];
     uint8_t in[100], out[100], dec[100];
-    for (int i = 0; i < 100; i++) in[i] = (uint8_t)i;
+    for (int i = 0; i < 100; i++)
+        in[i] = (uint8_t)i;
     memset(key, 0x77, 32);
     memset(nonce, 0x88, 12);
     sc_chacha20_encrypt(key, nonce, 5, in, out, 100);
@@ -179,7 +187,8 @@ static void test_sha256_long(void) {
 static void test_sha256_multi_block(void) {
     uint8_t msg[65];
     uint8_t out[32];
-    for (int i = 0; i < 65; i++) msg[i] = 'a';
+    for (int i = 0; i < 65; i++)
+        msg[i] = 'a';
     sc_sha256(msg, 65, out);
     const char *exp = "635361c48bb9eab14198e76ea8ab7f1a41685d6ad62aa9146d301d4f17eb0ae0";
     SC_ASSERT_TRUE(hex_eq(out, exp, 32));
@@ -190,8 +199,7 @@ static void test_chacha20_rfc7539_vector(void) {
     uint8_t key[32];
     uint8_t nonce[12];
     size_t n;
-    hex_to_bytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
-                 key, &n);
+    hex_to_bytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", key, &n);
     hex_to_bytes("000000000000004a00000000", nonce, &n);
     uint8_t plain[114], cipher[114], expected[114];
     hex_to_bytes("4c616469657320616e642047656e746c656d656e206f662074686520636c617373"
@@ -313,7 +321,8 @@ static void test_base64_encode_roundtrip_hello(void) {
     sc_error_t err = sc_multimodal_encode_base64(&alloc, "Hello", 5, &b64, &len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(b64, "SGVsbG8=");
-    if (b64) alloc.free(alloc.ctx, b64, len + 1);
+    if (b64)
+        alloc.free(alloc.ctx, b64, len + 1);
 }
 
 static void test_base64_encode_binary(void) {
@@ -324,7 +333,8 @@ static void test_base64_encode_binary(void) {
     sc_error_t err = sc_multimodal_encode_base64(&alloc, data, 4, &b64, &len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(b64);
-    if (b64) alloc.free(alloc.ctx, b64, len + 1);
+    if (b64)
+        alloc.free(alloc.ctx, b64, len + 1);
 }
 
 static void test_chacha20_decrypt_inverts_encrypt(void) {
@@ -333,7 +343,8 @@ static void test_chacha20_decrypt_inverts_encrypt(void) {
     memset(key, 0x11, 32);
     memset(nonce, 0x22, 12);
     uint8_t orig[64];
-    for (int i = 0; i < 64; i++) orig[i] = (uint8_t)(i ^ 0x55);
+    for (int i = 0; i < 64; i++)
+        orig[i] = (uint8_t)(i ^ 0x55);
     uint8_t enc[64], dec[64];
     sc_chacha20_encrypt(key, nonce, 0, orig, enc, 64);
     sc_chacha20_decrypt(key, nonce, 0, enc, dec, 64);

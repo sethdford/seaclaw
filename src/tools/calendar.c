@@ -35,7 +35,8 @@ typedef struct {
 static sc_error_t calendar_execute(void *ctx, sc_allocator_t *alloc, const sc_json_value_t *args,
                                    sc_tool_result_t *out) {
     (void)ctx;
-    if (!out) return SC_ERR_INVALID_ARGUMENT;
+    if (!out)
+        return SC_ERR_INVALID_ARGUMENT;
     if (!args) {
         *out = sc_tool_result_fail("invalid args", 12);
         return SC_ERR_INVALID_ARGUMENT;
@@ -159,7 +160,8 @@ static sc_error_t calendar_execute(void *ctx, sc_allocator_t *alloc, const sc_js
         if (resp.owned && resp.body)
             sc_http_response_free(alloc, &resp);
         (void)err;
-        *out = sc_tool_result_ok("{\"deleted\":true,\"note\":\"use HTTP DELETE for real deletion\"}", 57);
+        *out = sc_tool_result_ok(
+            "{\"deleted\":true,\"note\":\"use HTTP DELETE for real deletion\"}", 57);
     } else {
         *out = sc_tool_result_fail("unsupported action", 18);
     }

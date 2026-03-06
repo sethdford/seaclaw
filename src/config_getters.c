@@ -40,7 +40,7 @@ sc_error_t sc_config_validate(const sc_config_t *cfg) {
         return SC_ERR_CONFIG_INVALID;
     if (cfg->security.autonomy_level > 4)
         return SC_ERR_CONFIG_INVALID;
-    if (cfg->gateway.port < 1 || cfg->gateway.port > 65535)
+    if (cfg->gateway.port == 0)
         return SC_ERR_CONFIG_INVALID;
     if (sc_config_provider_requires_api_key(cfg->default_provider)) {
         const char *key = sc_config_default_provider_key(cfg);

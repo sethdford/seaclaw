@@ -1,9 +1,9 @@
-#include "test_framework.h"
-#include "seaclaw/skillforge.h"
-#include "seaclaw/onboard.h"
+#include "seaclaw/core/allocator.h"
 #include "seaclaw/daemon.h"
 #include "seaclaw/migration.h"
-#include "seaclaw/core/allocator.h"
+#include "seaclaw/onboard.h"
+#include "seaclaw/skillforge.h"
+#include "test_framework.h"
 #include <time.h>
 
 static void test_skillforge_create_destroy(void) {
@@ -151,7 +151,7 @@ static struct tm make_tm(int min, int hour, int mday, int mon, int wday) {
     t.tm_min = min;
     t.tm_hour = hour;
     t.tm_mday = mday;
-    t.tm_mon = mon - 1;  /* tm_mon is 0-based */
+    t.tm_mon = mon - 1; /* tm_mon is 0-based */
     t.tm_wday = wday;
     return t;
 }
@@ -237,10 +237,10 @@ static void test_cron_match_range_with_step(void) {
 
 static void test_cron_match_complex_expression(void) {
     /* every 5 min, 9am-5pm, weekdays */
-    struct tm match = make_tm(10, 12, 3, 3, 3);     /* Wed 12:10 Mar 3 */
-    struct tm no_min = make_tm(13, 12, 3, 3, 3);    /* not on 5-min boundary */
-    struct tm no_hour = make_tm(10, 20, 3, 3, 3);   /* 8pm outside range */
-    struct tm no_dow = make_tm(10, 12, 3, 3, 6);    /* Saturday */
+    struct tm match = make_tm(10, 12, 3, 3, 3);   /* Wed 12:10 Mar 3 */
+    struct tm no_min = make_tm(13, 12, 3, 3, 3);  /* not on 5-min boundary */
+    struct tm no_hour = make_tm(10, 20, 3, 3, 3); /* 8pm outside range */
+    struct tm no_dow = make_tm(10, 12, 3, 3, 6);  /* Saturday */
     SC_ASSERT_TRUE(sc_cron_schedule_matches("*/5 9-17 * * 1-5", &match));
     SC_ASSERT_FALSE(sc_cron_schedule_matches("*/5 9-17 * * 1-5", &no_min));
     SC_ASSERT_FALSE(sc_cron_schedule_matches("*/5 9-17 * * 1-5", &no_hour));
@@ -263,7 +263,7 @@ static void test_cron_match_too_few_fields(void) {
 }
 
 static void test_cron_match_dom_and_month(void) {
-    struct tm t = make_tm(0, 0, 25, 12, 4);  /* Dec 25 */
+    struct tm t = make_tm(0, 0, 25, 12, 4); /* Dec 25 */
     SC_ASSERT_TRUE(sc_cron_schedule_matches("0 0 25 12 *", &t));
     SC_ASSERT_FALSE(sc_cron_schedule_matches("0 0 24 12 *", &t));
     SC_ASSERT_FALSE(sc_cron_schedule_matches("0 0 25 11 *", &t));

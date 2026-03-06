@@ -1,18 +1,18 @@
 #include "seaclaw/agent.h"
 #include "seaclaw/agent/awareness.h"
 #include "seaclaw/agent/compaction.h"
-#include "seaclaw/agent/episodic.h"
-#include "seaclaw/agent/preferences.h"
-#include "seaclaw/agent/reflection.h"
-#include "seaclaw/agent/team.h"
 #include "seaclaw/agent/dispatcher.h"
+#include "seaclaw/agent/episodic.h"
 #include "seaclaw/agent/mailbox.h"
-#include "seaclaw/agent/task_list.h"
-#include "seaclaw/agent/tool_context.h"
-#include "seaclaw/agent/undo.h"
 #include "seaclaw/agent/memory_loader.h"
 #include "seaclaw/agent/planner.h"
+#include "seaclaw/agent/preferences.h"
 #include "seaclaw/agent/prompt.h"
+#include "seaclaw/agent/reflection.h"
+#include "seaclaw/agent/task_list.h"
+#include "seaclaw/agent/team.h"
+#include "seaclaw/agent/tool_context.h"
+#include "seaclaw/agent/undo.h"
 #include "seaclaw/context.h"
 #include "seaclaw/context_tokens.h"
 #include "seaclaw/core/json.h"
@@ -733,10 +733,9 @@ char *sc_agent_handle_slash_command(sc_agent_t *agent, const char *message, size
         uint64_t to_id = (uint64_t)strtoull(p, (char **)&p, 10);
         while (*p == ' ' || *p == '\t')
             p++;
-        uint64_t from_id =
-            agent->agent_id ? agent->agent_id : (uint64_t)(uintptr_t)agent;
-        sc_error_t err = sc_mailbox_send(agent->mailbox, from_id, to_id, SC_MSG_TASK,
-                                         p, strlen(p), 0);
+        uint64_t from_id = agent->agent_id ? agent->agent_id : (uint64_t)(uintptr_t)agent;
+        sc_error_t err =
+            sc_mailbox_send(agent->mailbox, from_id, to_id, SC_MSG_TASK, p, strlen(p), 0);
         if (err != SC_OK)
             return sc_sprintf(agent->alloc, "Send failed: %s", sc_error_string(err));
         return sc_sprintf(agent->alloc, "Sent to agent #%llu", (unsigned long long)to_id);
@@ -747,11 +746,9 @@ char *sc_agent_handle_slash_command(sc_agent_t *agent, const char *message, size
             return sc_strndup(agent->alloc, "Task list not configured.", 25);
         size_t pending = sc_task_list_count_by_status(agent->task_list, SC_TASK_LIST_PENDING);
         size_t claimed = sc_task_list_count_by_status(agent->task_list, SC_TASK_LIST_CLAIMED);
-        size_t completed =
-            sc_task_list_count_by_status(agent->task_list, SC_TASK_LIST_COMPLETED);
-        return sc_sprintf(agent->alloc,
-                          "Tasks: %zu pending, %zu claimed, %zu completed",
-                          pending, claimed, completed);
+        size_t completed = sc_task_list_count_by_status(agent->task_list, SC_TASK_LIST_COMPLETED);
+        return sc_sprintf(agent->alloc, "Tasks: %zu pending, %zu claimed, %zu completed", pending,
+                          claimed, completed);
     }
 
     if (sc_strncasecmp(cmd_buf, "task", 4) == 0) {
@@ -761,8 +758,8 @@ char *sc_agent_handle_slash_command(sc_agent_t *agent, const char *message, size
         while (*p == ' ' || *p == '\t')
             p++;
         if (!*p)
-            return sc_strndup(agent->alloc,
-                              "Usage: /task add <subject> | claim <id> | done <id>", 52);
+            return sc_strndup(agent->alloc, "Usage: /task add <subject> | claim <id> | done <id>",
+                              52);
         if (sc_strncasecmp(p, "add", 3) == 0) {
             p += 3;
             while (*p == ' ' || *p == '\t')
@@ -770,8 +767,7 @@ char *sc_agent_handle_slash_command(sc_agent_t *agent, const char *message, size
             if (!*p)
                 return sc_strndup(agent->alloc, "Usage: /task add <subject>", 26);
             uint64_t id = 0;
-            sc_error_t err =
-                sc_task_list_add(agent->task_list, p, NULL, NULL, 0, &id);
+            sc_error_t err = sc_task_list_add(agent->task_list, p, NULL, NULL, 0, &id);
             if (err != SC_OK)
                 return sc_sprintf(agent->alloc, "Add failed: %s", sc_error_string(err));
             return sc_sprintf(agent->alloc, "Task #%llu created", (unsigned long long)id);
@@ -783,8 +779,7 @@ char *sc_agent_handle_slash_command(sc_agent_t *agent, const char *message, size
             if (!*p)
                 return sc_strndup(agent->alloc, "Usage: /task claim <id>", 23);
             uint64_t tid = (uint64_t)strtoull(p, NULL, 10);
-            uint64_t aid =
-                agent->agent_id ? agent->agent_id : (uint64_t)(uintptr_t)agent;
+            uint64_t aid = agent->agent_id ? agent->agent_id : (uint64_t)(uintptr_t)agent;
             sc_error_t err = sc_task_list_claim(agent->task_list, tid, aid);
             if (err != SC_OK)
                 return sc_sprintf(agent->alloc, "Claim failed: %s", sc_error_string(err));
@@ -803,8 +798,7 @@ char *sc_agent_handle_slash_command(sc_agent_t *agent, const char *message, size
                 return sc_sprintf(agent->alloc, "Done failed: %s", sc_error_string(err));
             return sc_sprintf(agent->alloc, "Task #%llu completed", (unsigned long long)tid);
         }
-        return sc_strndup(agent->alloc,
-                          "Usage: /task add <subject> | claim <id> | done <id>", 52);
+        return sc_strndup(agent->alloc, "Usage: /task add <subject> | claim <id> | done <id>", 52);
     }
 
     if (sc_strncasecmp(cmd_buf, "undo", 4) == 0) {
@@ -835,7 +829,7 @@ static sc_policy_action_t sc_agent_check_policy(sc_agent_t *agent, const char *t
 }
 
 static sc_policy_action_t evaluate_tool_policy(sc_agent_t *agent, const char *tool_name,
-                                                const char *args_json) {
+                                               const char *args_json) {
     sc_policy_action_t base = sc_agent_check_policy(agent, tool_name, args_json);
     if (base == SC_POLICY_DENY)
         return SC_POLICY_DENY;
@@ -965,8 +959,8 @@ static void process_mailbox_messages(sc_agent_t *agent) {
         char buf[512];
         size_t payload_len = msg.payload_len < 400 ? msg.payload_len : 400;
         int n = snprintf(buf, sizeof(buf), "[Message from agent %llu]: %.*s",
-                        (unsigned long long)msg.from_agent, (int)payload_len,
-                        msg.payload ? msg.payload : "");
+                         (unsigned long long)msg.from_agent, (int)payload_len,
+                         msg.payload ? msg.payload : "");
         if (n > 0)
             (void)append_history(agent, SC_ROLE_USER, buf, (size_t)n, NULL, 0, NULL, 0);
         sc_message_free(agent->alloc, &msg);
@@ -1109,10 +1103,9 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     req.tools_count = agent->tool_specs_count;
 
     uint32_t iter = 0;
-    uint64_t max_tokens = agent->token_limit
-                              ? agent->token_limit
-                              : sc_context_tokens_resolve(0, agent->model_name,
-                                                          agent->model_name_len);
+    uint64_t max_tokens =
+        agent->token_limit ? agent->token_limit
+                           : sc_context_tokens_resolve(0, agent->model_name, agent->model_name_len);
     if (max_tokens == 0)
         max_tokens = 128000u;
 
@@ -1161,9 +1154,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
 
         /* Context pressure: estimate tokens, check thresholds, auto-compact if needed */
         {
-            uint64_t current =
-                sc_estimate_tokens(agent->history, agent->history_count) +
-                (uint64_t)((system_prompt_len + 3) / 4);
+            uint64_t current = sc_estimate_tokens(agent->history, agent->history_count) +
+                               (uint64_t)((system_prompt_len + 3) / 4);
             sc_context_pressure_t pr = {
                 .current_tokens = (size_t)current,
                 .max_tokens = (size_t)max_tokens,
@@ -1173,10 +1165,9 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             };
             if (sc_context_check_pressure(&pr, agent->context_pressure_warn,
                                           agent->context_pressure_compact)) {
-                sc_context_compact_for_pressure(agent->alloc, agent->history,
-                                                 &agent->history_count, &agent->history_cap,
-                                                 (size_t)max_tokens,
-                                                 agent->context_compact_target);
+                sc_context_compact_for_pressure(agent->alloc, agent->history, &agent->history_count,
+                                                &agent->history_cap, (size_t)max_tokens,
+                                                agent->context_compact_target);
                 agent->context_pressure_warning_85_emitted = false;
                 agent->context_pressure_warning_95_emitted = false;
             } else {
@@ -1282,8 +1273,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             }
             if (resp.content && resp.content_len > 0) {
                 /* Reflection: evaluate response quality */
-                sc_reflection_config_t refl_cfg = {.enabled = true, .min_response_tokens = 0,
-                                                   .max_retries = 0};
+                sc_reflection_config_t refl_cfg = {
+                    .enabled = true, .min_response_tokens = 0, .max_retries = 0};
                 sc_reflection_quality_t quality =
                     sc_reflection_evaluate(msg, msg_len, resp.content, resp.content_len, &refl_cfg);
                 (void)quality; /* logged via observer if needed */
@@ -1348,240 +1339,253 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             if (agent->autonomy_level == SC_AUTONOMY_LOCKED) {
                 for (size_t tc = 0; tc < tc_count; tc++) {
                     const sc_tool_call_t *call = &calls[tc];
-                    (void)append_history(agent, SC_ROLE_TOOL, "Action blocked: agent is in locked mode", 38,
-                                         call->name, call->name_len, call->id, call->id_len);
+                    (void)append_history(agent, SC_ROLE_TOOL,
+                                         "Action blocked: agent is in locked mode", 38, call->name,
+                                         call->name_len, call->id, call->id_len);
                     if (agent->cancel_requested)
                         break;
                 }
             } else {
-            /* Use dispatcher for parallel execution when enabled (Tier 1.3) */
-            sc_dispatcher_t dispatcher;
-            sc_dispatcher_default(&dispatcher);
-            if (tc_count > 1)
-                dispatcher.max_parallel = 4;
-            dispatcher.timeout_secs = 30;
+                /* Use dispatcher for parallel execution when enabled (Tier 1.3) */
+                sc_dispatcher_t dispatcher;
+                sc_dispatcher_default(&dispatcher);
+                if (tc_count > 1)
+                    dispatcher.max_parallel = 4;
+                dispatcher.timeout_secs = 30;
 
-            sc_dispatch_result_t dispatch_result;
-            memset(&dispatch_result, 0, sizeof(dispatch_result));
-            err = sc_dispatcher_dispatch(&dispatcher, agent->alloc, agent->tools,
-                                         agent->tools_count, calls, tc_count, &dispatch_result);
+                sc_dispatch_result_t dispatch_result;
+                memset(&dispatch_result, 0, sizeof(dispatch_result));
+                err = sc_dispatcher_dispatch(&dispatcher, agent->alloc, agent->tools,
+                                             agent->tools_count, calls, tc_count, &dispatch_result);
 
-            if (err == SC_OK && dispatch_result.results) {
-                for (size_t tc = 0; tc < tc_count; tc++) {
-                    const sc_tool_call_t *call = &calls[tc];
-                    sc_tool_result_t *result = &dispatch_result.results[tc];
+                if (err == SC_OK && dispatch_result.results) {
+                    for (size_t tc = 0; tc < tc_count; tc++) {
+                        const sc_tool_call_t *call = &calls[tc];
+                        sc_tool_result_t *result = &dispatch_result.results[tc];
 
-                    char tn_buf[64];
-                    size_t tn =
-                        (call->name_len < sizeof(tn_buf) - 1) ? call->name_len : sizeof(tn_buf) - 1;
-                    if (tn > 0 && call->name)
-                        memcpy(tn_buf, call->name, tn);
-                    tn_buf[tn] = '\0';
-                    const char *args_str = call->arguments ? call->arguments : "";
+                        char tn_buf[64];
+                        size_t tn = (call->name_len < sizeof(tn_buf) - 1) ? call->name_len
+                                                                          : sizeof(tn_buf) - 1;
+                        if (tn > 0 && call->name)
+                            memcpy(tn_buf, call->name, tn);
+                        tn_buf[tn] = '\0';
+                        const char *args_str = call->arguments ? call->arguments : "";
 
-                    /* Policy evaluation (dispatcher path) */
-                    sc_policy_action_t pa = evaluate_tool_policy(agent, tn_buf[0] ? tn_buf : "unknown", args_str);
-                    if (pa == SC_POLICY_DENY) {
+                        /* Policy evaluation (dispatcher path) */
+                        sc_policy_action_t pa =
+                            evaluate_tool_policy(agent, tn_buf[0] ? tn_buf : "unknown", args_str);
+                        if (pa == SC_POLICY_DENY) {
+                            if (agent->audit_logger) {
+                                sc_audit_event_t aev;
+                                sc_audit_event_init(&aev, SC_AUDIT_POLICY_VIOLATION);
+                                sc_audit_event_with_identity(
+                                    &aev, agent->agent_id,
+                                    agent->model_name ? agent->model_name : "unknown", NULL);
+                                sc_audit_event_with_action(&aev, tn_buf[0] ? tn_buf : "unknown",
+                                                           "denied", false, false);
+                                sc_audit_logger_log(agent->audit_logger, &aev);
+                            }
+                            sc_tool_result_free(agent->alloc, result);
+                            *result = sc_tool_result_fail("denied by policy", 16);
+                        } else if (pa == SC_POLICY_REQUIRE_APPROVAL) {
+                            result->needs_approval = true;
+                        }
+
+                        /* Autonomy: SUPERVISED forces approval; ASSISTED for medium/high risk */
+                        if (agent->autonomy_level == SC_AUTONOMY_SUPERVISED) {
+                            result->needs_approval = true;
+                        } else if (agent->autonomy_level == SC_AUTONOMY_ASSISTED) {
+                            if (sc_tool_risk_level(tn_buf[0] ? tn_buf : "unknown") >=
+                                SC_RISK_MEDIUM)
+                                result->needs_approval = true;
+                        }
+
+                        /* Feature 2: explicit failure when approval required but no callback */
+                        if (result->needs_approval && !agent->approval_cb) {
+                            sc_tool_result_free(agent->alloc, result);
+                            *result = sc_tool_result_fail("requires human approval", 23);
+                        }
+
+                        /* Approval flow: if tool needs approval, ask user and retry */
+                        if (result->needs_approval && agent->approval_cb) {
+                            char tn_tmp[64];
+                            size_t tn2 = (call->name_len < sizeof(tn_tmp) - 1) ? call->name_len
+                                                                               : sizeof(tn_tmp) - 1;
+                            if (tn2 > 0 && call->name)
+                                memcpy(tn_tmp, call->name, tn2);
+                            tn_tmp[tn2] = '\0';
+                            bool user_approved =
+                                agent->approval_cb(agent->approval_ctx, tn_tmp, args_str);
+                            if (user_approved) {
+                                sc_tool_result_free(agent->alloc, result);
+                                if (agent->policy)
+                                    agent->policy->pre_approved = true;
+                                sc_tool_t *tool = find_tool(agent, call->name, call->name_len);
+                                if (tool) {
+                                    sc_json_value_t *retry_args = NULL;
+                                    if (call->arguments_len > 0)
+                                        (void)sc_json_parse(agent->alloc, call->arguments,
+                                                            call->arguments_len, &retry_args);
+                                    *result = sc_tool_result_fail("invalid arguments", 16);
+                                    if (retry_args) {
+                                        if (tool->vtable->execute)
+                                            tool->vtable->execute(tool->ctx, agent->alloc,
+                                                                  retry_args, result);
+                                        sc_json_free(agent->alloc, retry_args);
+                                    }
+                                }
+                            } else {
+                                sc_tool_result_free(agent->alloc, result);
+                                *result = sc_tool_result_fail("user denied action", 18);
+                            }
+                        }
+
+                        {
+                            sc_observer_event_t ev = {.tag = SC_OBSERVER_EVENT_TOOL_CALL,
+                                                      .data = {{0}}};
+                            ev.data.tool_call.tool = tn_buf[0] ? tn_buf : "unknown";
+                            ev.data.tool_call.duration_ms = 0;
+                            ev.data.tool_call.success = result->success;
+                            ev.data.tool_call.detail =
+                                result->success
+                                    ? NULL
+                                    : (result->error_msg ? result->error_msg : "failed");
+                            SC_OBS_SAFE_RECORD_EVENT(agent, &ev);
+                        }
+
+                        const char *res_content =
+                            result->success ? result->output : result->error_msg;
+                        size_t res_len =
+                            result->success ? result->output_len : result->error_msg_len;
+                        (void)append_history(agent, SC_ROLE_TOOL, res_content, res_len, call->name,
+                                             call->name_len, call->id, call->id_len);
+
                         if (agent->audit_logger) {
                             sc_audit_event_t aev;
-                            sc_audit_event_init(&aev, SC_AUDIT_POLICY_VIOLATION);
-                            sc_audit_event_with_identity(&aev, agent->agent_id,
+                            sc_audit_event_init(&aev, SC_AUDIT_COMMAND_EXECUTION);
+                            sc_audit_event_with_identity(
+                                &aev, agent->agent_id,
                                 agent->model_name ? agent->model_name : "unknown", NULL);
-                            sc_audit_event_with_action(&aev, tn_buf[0] ? tn_buf : "unknown", "denied",
-                                                       false, false);
+                            sc_audit_event_with_action(&aev, tn_buf, "tool", result->success, true);
+                            sc_audit_event_with_result(&aev, result->success, 0, 0,
+                                                       result->success ? NULL : result->error_msg);
                             sc_audit_logger_log(agent->audit_logger, &aev);
                         }
-                        sc_tool_result_free(agent->alloc, result);
-                        *result = sc_tool_result_fail("denied by policy", 16);
-                    } else if (pa == SC_POLICY_REQUIRE_APPROVAL) {
-                        result->needs_approval = true;
-                    }
 
-                    /* Autonomy: SUPERVISED forces approval; ASSISTED for medium/high risk */
-                    if (agent->autonomy_level == SC_AUTONOMY_SUPERVISED) {
-                        result->needs_approval = true;
-                    } else if (agent->autonomy_level == SC_AUTONOMY_ASSISTED) {
-                        if (sc_tool_risk_level(tn_buf[0] ? tn_buf : "unknown") >= SC_RISK_MEDIUM)
-                            result->needs_approval = true;
+                        if (agent->cancel_requested)
+                            break;
                     }
+                    sc_dispatch_result_free(agent->alloc, &dispatch_result);
+                } else {
+                    /* Fallback: sequential if dispatcher fails */
+                    for (size_t tc = 0; tc < tc_count; tc++) {
+                        const sc_tool_call_t *call = &calls[tc];
+                        sc_tool_t *tool = find_tool(agent, call->name, call->name_len);
+                        if (!tool) {
+                            (void)append_history(agent, SC_ROLE_TOOL, "tool not found", 14,
+                                                 call->name, call->name_len, call->id,
+                                                 call->id_len);
+                            continue;
+                        }
+                        char pol_tn[64];
+                        size_t pol_tn_len = call->name_len < sizeof(pol_tn) - 1
+                                                ? call->name_len
+                                                : sizeof(pol_tn) - 1;
+                        if (pol_tn_len > 0 && call->name)
+                            memcpy(pol_tn, call->name, pol_tn_len);
+                        pol_tn[pol_tn_len] = '\0';
 
-                    /* Feature 2: explicit failure when approval required but no callback */
-                    if (result->needs_approval && !agent->approval_cb) {
-                        sc_tool_result_free(agent->alloc, result);
-                        *result = sc_tool_result_fail("requires human approval", 23);
-                    }
+                        sc_policy_action_t pa = evaluate_tool_policy(
+                            agent, pol_tn, call->arguments ? call->arguments : "");
+                        bool force_approval = (agent->autonomy_level == SC_AUTONOMY_SUPERVISED) ||
+                                              (agent->autonomy_level == SC_AUTONOMY_ASSISTED &&
+                                               sc_tool_risk_level(pol_tn) >= SC_RISK_MEDIUM);
 
-                    /* Approval flow: if tool needs approval, ask user and retry */
-                    if (result->needs_approval && agent->approval_cb) {
-                        char tn_tmp[64];
-                        size_t tn2 = (call->name_len < sizeof(tn_tmp) - 1) ? call->name_len
-                                                                           : sizeof(tn_tmp) - 1;
-                        if (tn2 > 0 && call->name)
-                            memcpy(tn_tmp, call->name, tn2);
-                        tn_tmp[tn2] = '\0';
-                        bool user_approved =
-                            agent->approval_cb(agent->approval_ctx, tn_tmp, args_str);
-                        if (user_approved) {
-                            sc_tool_result_free(agent->alloc, result);
-                            if (agent->policy)
-                                agent->policy->pre_approved = true;
-                            sc_tool_t *tool = find_tool(agent, call->name, call->name_len);
-                            if (tool) {
+                        sc_tool_result_t result = sc_tool_result_fail("invalid arguments", 16);
+                        if (pa == SC_POLICY_DENY) {
+                            if (agent->audit_logger) {
+                                sc_audit_event_t aev;
+                                sc_audit_event_init(&aev, SC_AUDIT_POLICY_VIOLATION);
+                                sc_audit_event_with_identity(
+                                    &aev, agent->agent_id,
+                                    agent->model_name ? agent->model_name : "unknown", NULL);
+                                sc_audit_event_with_action(&aev, pol_tn, "denied", false, false);
+                                sc_audit_logger_log(agent->audit_logger, &aev);
+                            }
+                            result = sc_tool_result_fail("denied by policy", 16);
+                        } else if (pa == SC_POLICY_REQUIRE_APPROVAL || force_approval) {
+                            result = sc_tool_result_fail("pending approval", 16);
+                            result.needs_approval = true;
+                        } else {
+                            sc_json_value_t *args = NULL;
+                            if (call->arguments_len > 0) {
+                                sc_error_t pe = sc_json_parse(agent->alloc, call->arguments,
+                                                              call->arguments_len, &args);
+                                if (pe == SC_OK && args) {
+                                    tool->vtable->execute(tool->ctx, agent->alloc, args, &result);
+                                    sc_json_free(agent->alloc, args);
+                                }
+                            }
+                        }
+
+                        /* Feature 2: explicit failure when approval required but no callback */
+                        if (result.needs_approval && !agent->approval_cb) {
+                            sc_tool_result_free(agent->alloc, &result);
+                            result = sc_tool_result_fail("requires human approval", 23);
+                        }
+
+                        /* Approval retry for sequential fallback path */
+                        if (result.needs_approval && agent->approval_cb) {
+                            char seq_tn[64];
+                            size_t seq_n = (call->name_len < sizeof(seq_tn) - 1)
+                                               ? call->name_len
+                                               : sizeof(seq_tn) - 1;
+                            if (seq_n > 0 && call->name)
+                                memcpy(seq_tn, call->name, seq_n);
+                            seq_tn[seq_n] = '\0';
+                            if (agent->approval_cb(agent->approval_ctx, seq_tn,
+                                                   call->arguments ? call->arguments : "")) {
+                                sc_tool_result_free(agent->alloc, &result);
+                                if (agent->policy)
+                                    agent->policy->pre_approved = true;
                                 sc_json_value_t *retry_args = NULL;
                                 if (call->arguments_len > 0)
                                     (void)sc_json_parse(agent->alloc, call->arguments,
                                                         call->arguments_len, &retry_args);
-                                *result = sc_tool_result_fail("invalid arguments", 16);
+                                result = sc_tool_result_fail("invalid arguments", 16);
                                 if (retry_args) {
-                                    if (tool->vtable->execute)
-                                        tool->vtable->execute(tool->ctx, agent->alloc, retry_args,
-                                                              result);
+                                    tool->vtable->execute(tool->ctx, agent->alloc, retry_args,
+                                                          &result);
                                     sc_json_free(agent->alloc, retry_args);
                                 }
+                            } else {
+                                sc_tool_result_free(agent->alloc, &result);
+                                result = sc_tool_result_fail("user denied action", 18);
                             }
-                        } else {
-                            sc_tool_result_free(agent->alloc, result);
-                            *result = sc_tool_result_fail("user denied action", 18);
                         }
-                    }
 
-                    {
-                        sc_observer_event_t ev = {.tag = SC_OBSERVER_EVENT_TOOL_CALL,
-                                                  .data = {{0}}};
-                        ev.data.tool_call.tool = tn_buf[0] ? tn_buf : "unknown";
-                        ev.data.tool_call.duration_ms = 0;
-                        ev.data.tool_call.success = result->success;
-                        ev.data.tool_call.detail =
-                            result->success ? NULL
-                                            : (result->error_msg ? result->error_msg : "failed");
-                        SC_OBS_SAFE_RECORD_EVENT(agent, &ev);
-                    }
-
-                    const char *res_content = result->success ? result->output : result->error_msg;
-                    size_t res_len = result->success ? result->output_len : result->error_msg_len;
-                    (void)append_history(agent, SC_ROLE_TOOL, res_content, res_len, call->name,
-                                         call->name_len, call->id, call->id_len);
-
-                    if (agent->audit_logger) {
-                        sc_audit_event_t aev;
-                        sc_audit_event_init(&aev, SC_AUDIT_COMMAND_EXECUTION);
-                        sc_audit_event_with_identity(&aev, agent->agent_id,
-                            agent->model_name ? agent->model_name : "unknown", NULL);
-                        sc_audit_event_with_action(&aev, tn_buf, "tool", result->success, true);
-                        sc_audit_event_with_result(&aev, result->success, 0, 0,
-                                                   result->success ? NULL : result->error_msg);
-                        sc_audit_logger_log(agent->audit_logger, &aev);
-                    }
-
-                    if (agent->cancel_requested)
-                        break;
-                }
-                sc_dispatch_result_free(agent->alloc, &dispatch_result);
-            } else {
-                /* Fallback: sequential if dispatcher fails */
-                for (size_t tc = 0; tc < tc_count; tc++) {
-                    const sc_tool_call_t *call = &calls[tc];
-                    sc_tool_t *tool = find_tool(agent, call->name, call->name_len);
-                    if (!tool) {
-                        (void)append_history(agent, SC_ROLE_TOOL, "tool not found", 14, call->name,
+                        const char *res_content = result.success ? result.output : result.error_msg;
+                        size_t res_len = result.success ? result.output_len : result.error_msg_len;
+                        (void)append_history(agent, SC_ROLE_TOOL, res_content, res_len, call->name,
                                              call->name_len, call->id, call->id_len);
-                        continue;
-                    }
-                    char pol_tn[64];
-                    size_t pol_tn_len = call->name_len < sizeof(pol_tn) - 1
-                                            ? call->name_len
-                                            : sizeof(pol_tn) - 1;
-                    if (pol_tn_len > 0 && call->name)
-                        memcpy(pol_tn, call->name, pol_tn_len);
-                    pol_tn[pol_tn_len] = '\0';
 
-                    sc_policy_action_t pa = evaluate_tool_policy(agent, pol_tn,
-                                                                 call->arguments ? call->arguments : "");
-                    bool force_approval = (agent->autonomy_level == SC_AUTONOMY_SUPERVISED) ||
-                        (agent->autonomy_level == SC_AUTONOMY_ASSISTED &&
-                         sc_tool_risk_level(pol_tn) >= SC_RISK_MEDIUM);
-
-                    sc_tool_result_t result = sc_tool_result_fail("invalid arguments", 16);
-                    if (pa == SC_POLICY_DENY) {
                         if (agent->audit_logger) {
                             sc_audit_event_t aev;
-                            sc_audit_event_init(&aev, SC_AUDIT_POLICY_VIOLATION);
-                            sc_audit_event_with_identity(&aev, agent->agent_id,
+                            sc_audit_event_init(&aev, SC_AUDIT_COMMAND_EXECUTION);
+                            sc_audit_event_with_identity(
+                                &aev, agent->agent_id,
                                 agent->model_name ? agent->model_name : "unknown", NULL);
-                            sc_audit_event_with_action(&aev, pol_tn, "denied", false, false);
+                            sc_audit_event_with_action(&aev, pol_tn, "tool", result.success, true);
+                            sc_audit_event_with_result(&aev, result.success, 0, 0,
+                                                       result.success ? NULL : result.error_msg);
                             sc_audit_logger_log(agent->audit_logger, &aev);
                         }
-                        result = sc_tool_result_fail("denied by policy", 16);
-                    } else if (pa == SC_POLICY_REQUIRE_APPROVAL || force_approval) {
-                        result = sc_tool_result_fail("pending approval", 16);
-                        result.needs_approval = true;
-                    } else {
-                        sc_json_value_t *args = NULL;
-                        if (call->arguments_len > 0) {
-                            sc_error_t pe = sc_json_parse(agent->alloc, call->arguments,
-                                                          call->arguments_len, &args);
-                            if (pe == SC_OK && args) {
-                                tool->vtable->execute(tool->ctx, agent->alloc, args, &result);
-                                sc_json_free(agent->alloc, args);
-                            }
-                        }
-                    }
 
-                    /* Feature 2: explicit failure when approval required but no callback */
-                    if (result.needs_approval && !agent->approval_cb) {
                         sc_tool_result_free(agent->alloc, &result);
-                        result = sc_tool_result_fail("requires human approval", 23);
+                        if (agent->cancel_requested)
+                            break;
                     }
-
-                    /* Approval retry for sequential fallback path */
-                    if (result.needs_approval && agent->approval_cb) {
-                        char seq_tn[64];
-                        size_t seq_n = (call->name_len < sizeof(seq_tn) - 1) ? call->name_len
-                                                                             : sizeof(seq_tn) - 1;
-                        if (seq_n > 0 && call->name)
-                            memcpy(seq_tn, call->name, seq_n);
-                        seq_tn[seq_n] = '\0';
-                        if (agent->approval_cb(agent->approval_ctx, seq_tn,
-                                               call->arguments ? call->arguments : "")) {
-                            sc_tool_result_free(agent->alloc, &result);
-                            if (agent->policy)
-                                agent->policy->pre_approved = true;
-                            sc_json_value_t *retry_args = NULL;
-                            if (call->arguments_len > 0)
-                                (void)sc_json_parse(agent->alloc, call->arguments,
-                                                    call->arguments_len, &retry_args);
-                            result = sc_tool_result_fail("invalid arguments", 16);
-                            if (retry_args) {
-                                tool->vtable->execute(tool->ctx, agent->alloc, retry_args, &result);
-                                sc_json_free(agent->alloc, retry_args);
-                            }
-                        } else {
-                            sc_tool_result_free(agent->alloc, &result);
-                            result = sc_tool_result_fail("user denied action", 18);
-                        }
-                    }
-
-                    const char *res_content = result.success ? result.output : result.error_msg;
-                    size_t res_len = result.success ? result.output_len : result.error_msg_len;
-                    (void)append_history(agent, SC_ROLE_TOOL, res_content, res_len, call->name,
-                                         call->name_len, call->id, call->id_len);
-
-                    if (agent->audit_logger) {
-                        sc_audit_event_t aev;
-                        sc_audit_event_init(&aev, SC_AUDIT_COMMAND_EXECUTION);
-                        sc_audit_event_with_identity(&aev, agent->agent_id,
-                            agent->model_name ? agent->model_name : "unknown", NULL);
-                        sc_audit_event_with_action(&aev, pol_tn, "tool", result.success, true);
-                        sc_audit_event_with_result(&aev, result.success, 0, 0,
-                                                   result.success ? NULL : result.error_msg);
-                        sc_audit_logger_log(agent->audit_logger, &aev);
-                    }
-
-                    sc_tool_result_free(agent->alloc, &result);
-                    if (agent->cancel_requested)
-                        break;
                 }
-            }
             }
         }
         /* Messages will be reformatted at top of next iteration via arena */

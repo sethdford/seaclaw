@@ -1,14 +1,14 @@
-#include "test_framework.h"
+#include "seaclaw/core/allocator.h"
 #include "seaclaw/mcp.h"
 #include "seaclaw/mcp_server.h"
-#include "seaclaw/core/allocator.h"
-#include "seaclaw/tool.h"
 #include "seaclaw/memory.h"
+#include "seaclaw/tool.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_mcp_server_create_destroy(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
+    sc_mcp_server_config_t cfg = {.command = "echo", .args = NULL, .args_count = 0};
     sc_mcp_server_t *srv = sc_mcp_server_create(&alloc, &cfg);
     SC_ASSERT_NOT_NULL(srv);
     sc_mcp_server_destroy(srv);
@@ -16,7 +16,7 @@ static void test_mcp_server_create_destroy(void) {
 
 static void test_mcp_server_connect_test_mode(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
+    sc_mcp_server_config_t cfg = {.command = "echo", .args = NULL, .args_count = 0};
     sc_mcp_server_t *srv = sc_mcp_server_create(&alloc, &cfg);
     SC_ASSERT_NOT_NULL(srv);
     sc_error_t err = sc_mcp_server_connect(srv);
@@ -26,7 +26,7 @@ static void test_mcp_server_connect_test_mode(void) {
 
 static void test_mcp_server_list_tools_mock(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
+    sc_mcp_server_config_t cfg = {.command = "echo", .args = NULL, .args_count = 0};
     sc_mcp_server_t *srv = sc_mcp_server_create(&alloc, &cfg);
     sc_mcp_server_connect(srv);
     char **names = NULL, **descs = NULL, **params = NULL;
@@ -51,13 +51,12 @@ static void test_mcp_server_list_tools_mock(void) {
 
 static void test_mcp_server_call_tool_mock(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
+    sc_mcp_server_config_t cfg = {.command = "echo", .args = NULL, .args_count = 0};
     sc_mcp_server_t *srv = sc_mcp_server_create(&alloc, &cfg);
     sc_mcp_server_connect(srv);
     char *result = NULL;
     size_t result_len = 0;
-    sc_error_t err = sc_mcp_server_call_tool(srv, &alloc, "mock_tool", "{}",
-        &result, &result_len);
+    sc_error_t err = sc_mcp_server_call_tool(srv, &alloc, "mock_tool", "{}", &result, &result_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(result);
     alloc.free(alloc.ctx, result, result_len + 1);
@@ -66,7 +65,7 @@ static void test_mcp_server_call_tool_mock(void) {
 
 static void test_mcp_init_tools_mock(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
+    sc_mcp_server_config_t cfg = {.command = "echo", .args = NULL, .args_count = 0};
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err = sc_mcp_init_tools(&alloc, &cfg, 1, &tools, &count);
@@ -77,21 +76,31 @@ static void test_mcp_init_tools_mock(void) {
 
 /* ── MCP Host (server mode) tests ────────────────────────────────────────── */
 
-static sc_error_t mock_tool_execute(void *ctx, sc_allocator_t *alloc,
-    const sc_json_value_t *args, sc_tool_result_t *out)
-{
-    (void)ctx; (void)args;
+static sc_error_t mock_tool_execute(void *ctx, sc_allocator_t *alloc, const sc_json_value_t *args,
+                                    sc_tool_result_t *out) {
+    (void)ctx;
+    (void)args;
     const char *msg = "mock ok";
     size_t len = strlen(msg);
     char *buf = (char *)alloc->alloc(alloc->ctx, len + 1);
-    if (!buf) return SC_ERR_OUT_OF_MEMORY;
+    if (!buf)
+        return SC_ERR_OUT_OF_MEMORY;
     memcpy(buf, msg, len + 1);
     *out = sc_tool_result_ok_owned(buf, len);
     return SC_OK;
 }
-static const char *mock_tool_name(void *ctx) { (void)ctx; return "test_tool"; }
-static const char *mock_tool_desc(void *ctx) { (void)ctx; return "A test tool"; }
-static const char *mock_tool_params(void *ctx) { (void)ctx; return "{\"type\":\"object\",\"properties\":{}}"; }
+static const char *mock_tool_name(void *ctx) {
+    (void)ctx;
+    return "test_tool";
+}
+static const char *mock_tool_desc(void *ctx) {
+    (void)ctx;
+    return "A test tool";
+}
+static const char *mock_tool_params(void *ctx) {
+    (void)ctx;
+    return "{\"type\":\"object\",\"properties\":{}}";
+}
 
 static const sc_tool_vtable_t mock_host_vtable = {
     .execute = mock_tool_execute,
@@ -156,7 +165,8 @@ static void test_mcp_host_create_with_memory(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(host);
     sc_mcp_host_destroy(host);
-    if (mem.vtable && mem.vtable->deinit) mem.vtable->deinit(mem.ctx);
+    if (mem.vtable && mem.vtable->deinit)
+        mem.vtable->deinit(mem.ctx);
 }
 
 static void test_mcp_server_null_config_fails(void) {
@@ -167,14 +177,14 @@ static void test_mcp_server_null_config_fails(void) {
 
 static void test_mcp_server_call_tool_nonexistent(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
+    sc_mcp_server_config_t cfg = {.command = "echo", .args = NULL, .args_count = 0};
     sc_mcp_server_t *srv = sc_mcp_server_create(&alloc, &cfg);
     SC_ASSERT_NOT_NULL(srv);
     sc_mcp_server_connect(srv);
     char *result = NULL;
     size_t result_len = 0;
-    sc_error_t err = sc_mcp_server_call_tool(srv, &alloc, "nonexistent_tool", "{}",
-        &result, &result_len);
+    sc_error_t err =
+        sc_mcp_server_call_tool(srv, &alloc, "nonexistent_tool", "{}", &result, &result_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(result);
     alloc.free(alloc.ctx, result, result_len + 1);
@@ -183,7 +193,7 @@ static void test_mcp_server_call_tool_nonexistent(void) {
 
 static void test_mcp_server_double_connect(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
+    sc_mcp_server_config_t cfg = {.command = "echo", .args = NULL, .args_count = 0};
     sc_mcp_server_t *srv = sc_mcp_server_create(&alloc, &cfg);
     SC_ASSERT_NOT_NULL(srv);
     sc_error_t err1 = sc_mcp_server_connect(srv);
@@ -233,7 +243,7 @@ static void test_mcp_host_create_many_tools(void) {
 
 static void test_mcp_server_list_tools_not_connected(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
+    sc_mcp_server_config_t cfg = {.command = "echo", .args = NULL, .args_count = 0};
     sc_mcp_server_t *srv = sc_mcp_server_create(&alloc, &cfg);
     SC_ASSERT_NOT_NULL(srv);
     char **names = NULL, **descs = NULL, **params = NULL;
@@ -256,7 +266,7 @@ static void test_mcp_server_list_tools_not_connected(void) {
 
 static void test_mcp_init_tools_null_out_rejected(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
+    sc_mcp_server_config_t cfg = {.command = "echo", .args = NULL, .args_count = 0};
     sc_tool_t *tools = NULL;
     size_t count = 0;
     sc_error_t err = sc_mcp_init_tools(&alloc, &cfg, 1, NULL, &count);
@@ -266,7 +276,7 @@ static void test_mcp_init_tools_null_out_rejected(void) {
 }
 
 static void test_mcp_host_create_null_alloc_rejected(void) {
-    sc_tool_t tools[1] = {{ .ctx = NULL, .vtable = &mock_host_vtable }};
+    sc_tool_t tools[1] = {{.ctx = NULL, .vtable = &mock_host_vtable}};
     sc_mcp_host_t *host = NULL;
     sc_error_t err = sc_mcp_host_create(NULL, tools, 1, NULL, &host);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
@@ -274,13 +284,13 @@ static void test_mcp_host_create_null_alloc_rejected(void) {
 
 static void test_mcp_server_create_null_command_fails(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_mcp_server_config_t cfg = { .command = NULL, .args = NULL, .args_count = 0 };
+    sc_mcp_server_config_t cfg = {.command = NULL, .args = NULL, .args_count = 0};
     sc_mcp_server_t *srv = sc_mcp_server_create(&alloc, &cfg);
     SC_ASSERT_NULL(srv);
 }
 
 static void test_mcp_server_create_null_alloc_fails(void) {
-    sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
+    sc_mcp_server_config_t cfg = {.command = "echo", .args = NULL, .args_count = 0};
     sc_mcp_server_t *srv = sc_mcp_server_create(NULL, &cfg);
     SC_ASSERT_NULL(srv);
 }

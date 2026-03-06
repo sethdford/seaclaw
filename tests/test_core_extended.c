@@ -1,12 +1,12 @@
 /* Core utility edge cases (~30 tests). */
-#include "test_framework.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/arena.h"
-#include "seaclaw/core/string.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/slice.h"
-#include <string.h>
+#include "seaclaw/core/string.h"
+#include "test_framework.h"
 #include <stdio.h>
+#include <string.h>
 
 static void test_arena_multiple_allocs(void) {
     sc_allocator_t sys = sc_system_allocator();
@@ -53,7 +53,8 @@ static void test_string_null_inputs(void) {
 static void test_string_very_long(void) {
     sc_allocator_t alloc = sc_system_allocator();
     char buf[10000];
-    for (size_t i = 0; i < sizeof(buf) - 1; i++) buf[i] = 'x';
+    for (size_t i = 0; i < sizeof(buf) - 1; i++)
+        buf[i] = 'x';
     buf[sizeof(buf) - 1] = '\0';
     char *s = sc_strdup(&alloc, buf);
     SC_ASSERT_NOT_NULL(s);
@@ -64,7 +65,8 @@ static void test_string_very_long(void) {
 static void test_allocator_zero_size(void) {
     sc_allocator_t alloc = sc_system_allocator();
     void *p = alloc.alloc(alloc.ctx, 0);
-    if (p) alloc.free(alloc.ctx, p, 0);
+    if (p)
+        alloc.free(alloc.ctx, p, 0);
 }
 
 static void test_allocator_realloc_grow_shrink(void) {
@@ -75,7 +77,8 @@ static void test_allocator_realloc_grow_shrink(void) {
     p = alloc.realloc(alloc.ctx, p, 64, 256);
     SC_ASSERT_NOT_NULL(p);
     unsigned char *b = (unsigned char *)p;
-    for (int i = 0; i < 64; i++) SC_ASSERT_EQ(b[i], 0x42);
+    for (int i = 0; i < 64; i++)
+        SC_ASSERT_EQ(b[i], 0x42);
     p = alloc.realloc(alloc.ctx, p, 256, 32);
     SC_ASSERT_NOT_NULL(p);
     alloc.free(alloc.ctx, p, 32);
@@ -111,7 +114,7 @@ static void test_strndup_zero_len(void) {
 
 static void test_str_join_empty_parts(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_str_t parts[] = { SC_STR_LIT("") };
+    sc_str_t parts[] = {SC_STR_LIT("")};
     char *s = sc_str_join(&alloc, parts, 1, SC_STR_LIT(", "));
     SC_ASSERT_NOT_NULL(s);
     sc_str_free(&alloc, s);
@@ -119,7 +122,7 @@ static void test_str_join_empty_parts(void) {
 
 static void test_str_join_single(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_str_t parts[] = { SC_STR_LIT("a") };
+    sc_str_t parts[] = {SC_STR_LIT("a")};
     char *s = sc_str_join(&alloc, parts, 1, SC_STR_LIT("-"));
     SC_ASSERT_STR_EQ(s, "a");
     sc_str_free(&alloc, s);
@@ -219,7 +222,7 @@ static void test_str_concat_normal(void) {
 
 static void test_str_join_multiple(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_str_t parts[] = { SC_STR_LIT("a"), SC_STR_LIT("b"), SC_STR_LIT("c") };
+    sc_str_t parts[] = {SC_STR_LIT("a"), SC_STR_LIT("b"), SC_STR_LIT("c")};
     char *s = sc_str_join(&alloc, parts, 3, SC_STR_LIT("|"));
     SC_ASSERT_STR_EQ(s, "a|b|c");
     sc_str_free(&alloc, s);

@@ -1,5 +1,4 @@
 #include "seaclaw/gateway.h"
-#include "seaclaw/gateway/openai_compat.h"
 #include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
@@ -7,11 +6,12 @@
 #include "seaclaw/core/string.h"
 #include "seaclaw/crypto.h"
 #include "seaclaw/gateway/control_protocol.h"
-#include "seaclaw/security.h"
 #include "seaclaw/gateway/event_bridge.h"
+#include "seaclaw/gateway/openai_compat.h"
 #include "seaclaw/gateway/rate_limit.h"
 #include "seaclaw/gateway/ws_server.h"
 #include "seaclaw/health.h"
+#include "seaclaw/security.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,10 +111,9 @@ static bool is_webhook_path(const char *path) {
     return path_is(path, "/webhook") || strncmp(path, "/webhook/", 9) == 0 ||
            path_is(path, "/telegram") || path_is(path, "/slack/events") ||
            path_is(path, "/whatsapp") || path_is(path, "/line") || path_is(path, "/lark") ||
-           path_is(path, "/discord") || path_is(path, "/facebook") ||
-           path_is(path, "/instagram") || path_is(path, "/twitter") ||
-           path_is(path, "/google_rcs") || path_is(path, "/google_chat") ||
-           path_is(path, "/dingtalk") || path_is(path, "/teams") ||
+           path_is(path, "/discord") || path_is(path, "/facebook") || path_is(path, "/instagram") ||
+           path_is(path, "/twitter") || path_is(path, "/google_rcs") ||
+           path_is(path, "/google_chat") || path_is(path, "/dingtalk") || path_is(path, "/teams") ||
            path_is(path, "/twilio") || path_is(path, "/onebot") || path_is(path, "/qq");
 }
 
@@ -349,7 +348,8 @@ static void handle_http_request(sc_gateway_state_t *gw, int fd, const char *meth
 
     if (gw->rate_limiter && !sc_rate_limiter_allow(gw->rate_limiter, client_ip)) {
         send_json_rate_limited(fd, "{\"error\":\"rate limited\"}",
-                              gw->config.rate_limit_window > 0 ? gw->config.rate_limit_window : 60);
+                               gw->config.rate_limit_window > 0 ? gw->config.rate_limit_window
+                                                                : 60);
         return;
     }
 
@@ -377,11 +377,10 @@ static void handle_http_request(sc_gateway_state_t *gw, int fd, const char *meth
         char *resp_body = NULL;
         size_t resp_len = 0;
         const char *content_type = "application/json";
-        sc_openai_compat_handle_chat_completions(body, body_len, gw->alloc,
-                                                  gw->config.app_ctx, &status, &resp_body,
-                                                  &resp_len, &content_type);
+        sc_openai_compat_handle_chat_completions(body, body_len, gw->alloc, gw->config.app_ctx,
+                                                 &status, &resp_body, &resp_len, &content_type);
         send_response(fd, status, content_type, resp_body ? resp_body : "{}",
-                     resp_body ? resp_len : 2, 0);
+                      resp_body ? resp_len : 2, 0);
         if (resp_body && gw->alloc)
             gw->alloc->free(gw->alloc->ctx, resp_body, resp_len + 1);
         return;
@@ -393,8 +392,8 @@ static void handle_http_request(sc_gateway_state_t *gw, int fd, const char *meth
         sc_openai_compat_handle_models(gw->alloc, gw->config.app_ctx, &status, &resp_body,
                                        &resp_len);
         send_response(fd, status, "application/json",
-                     resp_body ? resp_body : "{\"object\":\"list\",\"data\":[]}",
-                     resp_body ? resp_len : 24, 0);
+                      resp_body ? resp_body : "{\"object\":\"list\",\"data\":[]}",
+                      resp_body ? resp_len : 24, 0);
         if (resp_body && gw->alloc)
             gw->alloc->free(gw->alloc->ctx, resp_body, resp_len + 1);
         return;

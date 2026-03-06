@@ -10,10 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SC_IMAP_OUTBOX_MAX   32
-#define SC_IMAP_MOCK_QUEUE_MAX 16
+#define SC_IMAP_OUTBOX_MAX      32
+#define SC_IMAP_MOCK_QUEUE_MAX  16
 #define SC_IMAP_SESSION_KEY_MAX 127
-#define SC_IMAP_CONTENT_MAX  4095
+#define SC_IMAP_CONTENT_MAX     4095
 
 typedef struct sc_imap_outbox_entry {
     char *target;
@@ -81,8 +81,10 @@ static sc_error_t imap_send(void *ctx, const char *target, size_t target_len, co
     char *t = sc_strndup(c->alloc, target, target_len);
     char *m = sc_strndup(c->alloc, message, message_len);
     if (!t || !m) {
-        if (t) c->alloc->free(c->alloc->ctx, t, target_len + 1);
-        if (m) c->alloc->free(c->alloc->ctx, m, message_len + 1);
+        if (t)
+            c->alloc->free(c->alloc->ctx, t, target_len + 1);
+        if (m)
+            c->alloc->free(c->alloc->ctx, m, message_len + 1);
         return SC_ERR_OUT_OF_MEMORY;
     }
     c->outbox[c->outbox_count].target = t;
@@ -96,8 +98,10 @@ static sc_error_t imap_send(void *ctx, const char *target, size_t target_len, co
     char *t = sc_strndup(c->alloc, target, target_len);
     char *m = sc_strndup(c->alloc, message, message_len);
     if (!t || !m) {
-        if (t) c->alloc->free(c->alloc->ctx, t, target_len + 1);
-        if (m) c->alloc->free(c->alloc->ctx, m, message_len + 1);
+        if (t)
+            c->alloc->free(c->alloc->ctx, t, target_len + 1);
+        if (m)
+            c->alloc->free(c->alloc->ctx, m, message_len + 1);
         return SC_ERR_OUT_OF_MEMORY;
     }
     c->outbox[c->outbox_count].target = t;
@@ -132,7 +136,7 @@ static const sc_channel_vtable_t imap_vtable = {
 };
 
 sc_error_t sc_imap_create(sc_allocator_t *alloc, const sc_imap_config_t *config,
-                         sc_channel_t *out) {
+                          sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
 
@@ -156,7 +160,8 @@ sc_error_t sc_imap_create(sc_allocator_t *alloc, const sc_imap_config_t *config,
     if (config && config->imap_username && config->imap_username_len > 0) {
         c->imap_username = (char *)malloc(config->imap_username_len + 1);
         if (!c->imap_username) {
-            if (c->imap_host) free(c->imap_host);
+            if (c->imap_host)
+                free(c->imap_host);
             free(c);
             return SC_ERR_OUT_OF_MEMORY;
         }
@@ -167,8 +172,10 @@ sc_error_t sc_imap_create(sc_allocator_t *alloc, const sc_imap_config_t *config,
     if (config && config->imap_password && config->imap_password_len > 0) {
         c->imap_password = (char *)malloc(config->imap_password_len + 1);
         if (!c->imap_password) {
-            if (c->imap_host) free(c->imap_host);
-            if (c->imap_username) free(c->imap_username);
+            if (c->imap_host)
+                free(c->imap_host);
+            if (c->imap_username)
+                free(c->imap_username);
             free(c);
             return SC_ERR_OUT_OF_MEMORY;
         }
@@ -179,9 +186,12 @@ sc_error_t sc_imap_create(sc_allocator_t *alloc, const sc_imap_config_t *config,
     if (config && config->imap_folder && config->imap_folder_len > 0) {
         c->imap_folder = (char *)malloc(config->imap_folder_len + 1);
         if (!c->imap_folder) {
-            if (c->imap_host) free(c->imap_host);
-            if (c->imap_username) free(c->imap_username);
-            if (c->imap_password) free(c->imap_password);
+            if (c->imap_host)
+                free(c->imap_host);
+            if (c->imap_username)
+                free(c->imap_username);
+            if (c->imap_password)
+                free(c->imap_password);
             free(c);
             return SC_ERR_OUT_OF_MEMORY;
         }
@@ -208,10 +218,14 @@ void sc_imap_destroy(sc_channel_t *ch) {
         if (c->outbox[i].message)
             free(c->outbox[i].message);
     }
-    if (c->imap_host) free(c->imap_host);
-    if (c->imap_username) free(c->imap_username);
-    if (c->imap_password) free(c->imap_password);
-    if (c->imap_folder) free(c->imap_folder);
+    if (c->imap_host)
+        free(c->imap_host);
+    if (c->imap_username)
+        free(c->imap_username);
+    if (c->imap_password)
+        free(c->imap_password);
+    if (c->imap_folder)
+        free(c->imap_folder);
     free(c);
     ch->ctx = NULL;
     ch->vtable = NULL;
@@ -226,7 +240,7 @@ bool sc_imap_is_configured(sc_channel_t *ch) {
 }
 
 sc_error_t sc_imap_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_loop_msg_t *msgs,
-                       size_t max_msgs, size_t *out_count) {
+                        size_t max_msgs, size_t *out_count) {
     if (!channel_ctx || !msgs || !out_count)
         return SC_ERR_INVALID_ARGUMENT;
     *out_count = 0;
@@ -267,14 +281,15 @@ sc_error_t sc_imap_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_loo
 
 #if SC_IS_TEST
 sc_error_t sc_imap_test_push_mock(sc_channel_t *ch, const char *session_key, size_t session_key_len,
-                                 const char *content, size_t content_len) {
+                                  const char *content, size_t content_len) {
     if (!ch || !ch->ctx)
         return SC_ERR_INVALID_ARGUMENT;
     sc_imap_ctx_t *c = (sc_imap_ctx_t *)ch->ctx;
     if (c->mock_count >= SC_IMAP_MOCK_QUEUE_MAX)
         return SC_ERR_OUT_OF_MEMORY;
     size_t idx = c->mock_tail;
-    size_t sk_copy = session_key_len > SC_IMAP_SESSION_KEY_MAX ? SC_IMAP_SESSION_KEY_MAX : session_key_len;
+    size_t sk_copy =
+        session_key_len > SC_IMAP_SESSION_KEY_MAX ? SC_IMAP_SESSION_KEY_MAX : session_key_len;
     size_t ct_copy = content_len > SC_IMAP_CONTENT_MAX ? SC_IMAP_CONTENT_MAX : content_len;
     memcpy(c->mock_queue[idx].session_key, session_key, sk_copy);
     c->mock_queue[idx].session_key[sk_copy] = '\0';

@@ -65,7 +65,8 @@ sc_error_t sc_provider_create_from_config(sc_allocator_t *alloc, const sc_config
             .fast = fast,
             .standard = standard,
             .powerful = powerful,
-            .complexity_threshold_low = cfg->router.complexity_low > 0 ? cfg->router.complexity_low : 50,
+            .complexity_threshold_low =
+                cfg->router.complexity_low > 0 ? cfg->router.complexity_low : 50,
             .complexity_threshold_high =
                 cfg->router.complexity_high > 0 ? cfg->router.complexity_high : 500,
         };
@@ -104,8 +105,8 @@ sc_error_t sc_provider_create_from_config(sc_allocator_t *alloc, const sc_config
             return err;
 
         sc_provider_t fallback = {0};
-        if (cfg->reliability.fallback_providers_len > 0 &&
-            cfg->reliability.fallback_providers[0] && cfg->reliability.fallback_providers[0][0]) {
+        if (cfg->reliability.fallback_providers_len > 0 && cfg->reliability.fallback_providers[0] &&
+            cfg->reliability.fallback_providers[0][0]) {
             const char *fb_name = cfg->reliability.fallback_providers[0];
             size_t fb_len = strlen(fb_name);
             const char *fb_key = sc_config_get_provider_key(cfg, fb_name);
@@ -128,8 +129,11 @@ sc_error_t sc_provider_create_from_config(sc_allocator_t *alloc, const sc_config
         sc_reliable_config_t rcfg = {
             .primary = primary,
             .fallback = fallback,
-            .max_retries = cfg->reliability.provider_retries > 0 ? (int)cfg->reliability.provider_retries : 3,
-            .base_delay_ms = cfg->reliability.provider_backoff_ms > 0 ? (int)cfg->reliability.provider_backoff_ms : 1000,
+            .max_retries =
+                cfg->reliability.provider_retries > 0 ? (int)cfg->reliability.provider_retries : 3,
+            .base_delay_ms = cfg->reliability.provider_backoff_ms > 0
+                                 ? (int)cfg->reliability.provider_backoff_ms
+                                 : 1000,
             .max_delay_ms = 30000,
             .failure_threshold = 5,
             .recovery_timeout_seconds = 60,

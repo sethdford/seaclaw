@@ -8,10 +8,10 @@
 #include "seaclaw/update.h"
 #endif
 #include "seaclaw/version.h"
+#include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>

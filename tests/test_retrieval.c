@@ -1,10 +1,10 @@
-#include "test_framework.h"
-#include "seaclaw/memory.h"
-#include "seaclaw/memory/retrieval.h"
-#include "seaclaw/memory/rerank.h"
-#include "seaclaw/memory/vector.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/string.h"
+#include "seaclaw/memory.h"
+#include "seaclaw/memory/rerank.h"
+#include "seaclaw/memory/retrieval.h"
+#include "seaclaw/memory/vector.h"
+#include "test_framework.h"
 #include <math.h>
 #include <string.h>
 
@@ -14,7 +14,7 @@ static void test_keyword_basic_match(void) {
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "user_pref", 9, "likes dark mode", 15, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "pet", 3, "dog named Spot", 14, &cat, NULL, 0);
 
@@ -45,7 +45,7 @@ static void test_keyword_case_insensitive(void) {
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "k1", 2, "Hello World", 11, &cat, NULL, 0);
 
     sc_retrieval_options_t opts = {
@@ -74,7 +74,7 @@ static void test_keyword_no_match_returns_empty(void) {
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "k1", 2, "apple banana", 12, &cat, NULL, 0);
 
     sc_retrieval_options_t opts = {
@@ -117,7 +117,7 @@ static void test_rrf_combines_rankings(void) {
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "a", 1, "alpha", 5, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "b", 1, "beta", 4, &cat, NULL, 0);
 
@@ -145,7 +145,7 @@ static void test_mmr_diversifies_results(void) {
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "dup1", 4, "cat dog cat", 11, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "dup2", 4, "cat dog cat", 11, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "diff", 4, "bird fish", 9, &cat, NULL, 0);
@@ -196,7 +196,7 @@ static void test_keyword_limit_respected(void) {
 #ifdef SC_ENABLE_SQLITE
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "a", 1, "alpha", 5, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "b", 1, "alpha", 5, &cat, NULL, 0);
     mem.vtable->store(mem.ctx, "c", 1, "alpha", 5, &cat, NULL, 0);
@@ -303,7 +303,7 @@ static void test_retrieval_engine_with_sqlite_backend(void) {
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
     SC_ASSERT_NOT_NULL(mem.ctx);
 
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "fav", 3, "coffee and tea", 14, &cat, NULL, 0);
 
     sc_retrieval_engine_t eng = sc_retrieval_create(&alloc, &mem);
@@ -333,7 +333,7 @@ static void test_semantic_retrieve_with_local_embedder(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
     SC_ASSERT_NOT_NULL(mem.ctx);
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "doc1", 4, "machine learning basics", 23, &cat, NULL, 0);
     sc_retrieval_options_t opts = {
         .mode = SC_RETRIEVAL_SEMANTIC,
@@ -355,14 +355,32 @@ static void test_semantic_retrieve_with_local_embedder(void) {
 static void test_rerank_rrf_overlapping_merges_correctly(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_search_result_t kw[3] = {
-        {.content = sc_strdup(&alloc, "doc A"), .score = 0.9f, .rerank_score = 0.0f, .original_rank = 0},
-        {.content = sc_strdup(&alloc, "doc B"), .score = 0.8f, .rerank_score = 0.0f, .original_rank = 1},
-        {.content = sc_strdup(&alloc, "doc C"), .score = 0.7f, .rerank_score = 0.0f, .original_rank = 2},
+        {.content = sc_strdup(&alloc, "doc A"),
+         .score = 0.9f,
+         .rerank_score = 0.0f,
+         .original_rank = 0},
+        {.content = sc_strdup(&alloc, "doc B"),
+         .score = 0.8f,
+         .rerank_score = 0.0f,
+         .original_rank = 1},
+        {.content = sc_strdup(&alloc, "doc C"),
+         .score = 0.7f,
+         .rerank_score = 0.0f,
+         .original_rank = 2},
     };
     sc_search_result_t vec[3] = {
-        {.content = sc_strdup(&alloc, "doc B"), .score = 0.95f, .rerank_score = 0.0f, .original_rank = 0},
-        {.content = sc_strdup(&alloc, "doc A"), .score = 0.85f, .rerank_score = 0.0f, .original_rank = 1},
-        {.content = sc_strdup(&alloc, "doc D"), .score = 0.75f, .rerank_score = 0.0f, .original_rank = 2},
+        {.content = sc_strdup(&alloc, "doc B"),
+         .score = 0.95f,
+         .rerank_score = 0.0f,
+         .original_rank = 0},
+        {.content = sc_strdup(&alloc, "doc A"),
+         .score = 0.85f,
+         .rerank_score = 0.0f,
+         .original_rank = 1},
+        {.content = sc_strdup(&alloc, "doc D"),
+         .score = 0.75f,
+         .rerank_score = 0.0f,
+         .original_rank = 2},
     };
     sc_search_result_t merged[8];
     size_t count = 0;
@@ -379,12 +397,24 @@ static void test_rerank_rrf_overlapping_merges_correctly(void) {
 static void test_rerank_rrf_disjoint_combines_both(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_search_result_t kw[2] = {
-        {.content = sc_strdup(&alloc, "keyword only"), .score = 0.9f, .rerank_score = 0.0f, .original_rank = 0},
-        {.content = sc_strdup(&alloc, "another kw"), .score = 0.8f, .rerank_score = 0.0f, .original_rank = 1},
+        {.content = sc_strdup(&alloc, "keyword only"),
+         .score = 0.9f,
+         .rerank_score = 0.0f,
+         .original_rank = 0},
+        {.content = sc_strdup(&alloc, "another kw"),
+         .score = 0.8f,
+         .rerank_score = 0.0f,
+         .original_rank = 1},
     };
     sc_search_result_t vec[2] = {
-        {.content = sc_strdup(&alloc, "vector only"), .score = 0.95f, .rerank_score = 0.0f, .original_rank = 0},
-        {.content = sc_strdup(&alloc, "another vec"), .score = 0.85f, .rerank_score = 0.0f, .original_rank = 1},
+        {.content = sc_strdup(&alloc, "vector only"),
+         .score = 0.95f,
+         .rerank_score = 0.0f,
+         .original_rank = 0},
+        {.content = sc_strdup(&alloc, "another vec"),
+         .score = 0.85f,
+         .rerank_score = 0.0f,
+         .original_rank = 1},
     };
     sc_search_result_t merged[8];
     size_t count = 0;
@@ -399,9 +429,18 @@ static void test_rerank_rrf_disjoint_combines_both(void) {
 static void test_rerank_cross_encoder_scores_term_overlap(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_search_result_t results[3] = {
-        {.content = sc_strdup(&alloc, "apple banana"), .score = 0.5f, .rerank_score = 0.0f, .original_rank = 0},
-        {.content = sc_strdup(&alloc, "apple cherry"), .score = 0.4f, .rerank_score = 0.0f, .original_rank = 1},
-        {.content = sc_strdup(&alloc, "orange grape"), .score = 0.6f, .rerank_score = 0.0f, .original_rank = 2},
+        {.content = sc_strdup(&alloc, "apple banana"),
+         .score = 0.5f,
+         .rerank_score = 0.0f,
+         .original_rank = 0},
+        {.content = sc_strdup(&alloc, "apple cherry"),
+         .score = 0.4f,
+         .rerank_score = 0.0f,
+         .original_rank = 1},
+        {.content = sc_strdup(&alloc, "orange grape"),
+         .score = 0.6f,
+         .rerank_score = 0.0f,
+         .original_rank = 2},
     };
     sc_error_t err = sc_rerank_cross_encoder("apple banana", results, 3);
     SC_ASSERT_EQ(err, SC_OK);
@@ -420,7 +459,8 @@ static void test_rerank_empty_results_handled_gracefully(void) {
     SC_ASSERT_EQ(count, 0u);
 
     sc_allocator_t a = sc_system_allocator();
-    sc_search_result_t results[1] = {{.content = sc_strdup(&a, "x"), .score = 0.5f, .rerank_score = 0.0f, .original_rank = 0}};
+    sc_search_result_t results[1] = {
+        {.content = sc_strdup(&a, "x"), .score = 0.5f, .rerank_score = 0.0f, .original_rank = 0}};
     err = sc_rerank_cross_encoder("query", results, 0);
     SC_ASSERT_EQ(err, SC_OK);
     sc_rerank_free_results(results, 1);
@@ -429,12 +469,24 @@ static void test_rerank_empty_results_handled_gracefully(void) {
 static void test_rerank_k_parameter_affects_ranking(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_search_result_t kw[2] = {
-        {.content = sc_strdup(&alloc, "first"), .score = 0.9f, .rerank_score = 0.0f, .original_rank = 0},
-        {.content = sc_strdup(&alloc, "second"), .score = 0.8f, .rerank_score = 0.0f, .original_rank = 1},
+        {.content = sc_strdup(&alloc, "first"),
+         .score = 0.9f,
+         .rerank_score = 0.0f,
+         .original_rank = 0},
+        {.content = sc_strdup(&alloc, "second"),
+         .score = 0.8f,
+         .rerank_score = 0.0f,
+         .original_rank = 1},
     };
     sc_search_result_t vec[2] = {
-        {.content = sc_strdup(&alloc, "second"), .score = 0.95f, .rerank_score = 0.0f, .original_rank = 0},
-        {.content = sc_strdup(&alloc, "first"), .score = 0.85f, .rerank_score = 0.0f, .original_rank = 1},
+        {.content = sc_strdup(&alloc, "second"),
+         .score = 0.95f,
+         .rerank_score = 0.0f,
+         .original_rank = 0},
+        {.content = sc_strdup(&alloc, "first"),
+         .score = 0.85f,
+         .rerank_score = 0.0f,
+         .original_rank = 1},
     };
     sc_search_result_t merged_k10[8], merged_k100[8];
     size_t c10 = 0, c100 = 0;
@@ -456,7 +508,7 @@ static void test_hybrid_retrieve_with_vector(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
     SC_ASSERT_NOT_NULL(mem.ctx);
-    sc_memory_category_t cat = { .tag = SC_MEMORY_CATEGORY_CORE };
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE};
     mem.vtable->store(mem.ctx, "v1", 2, "neural network training", 23, &cat, NULL, 0);
     sc_retrieval_options_t opts = {
         .mode = SC_RETRIEVAL_HYBRID,

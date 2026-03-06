@@ -1,7 +1,7 @@
 /* Process util tests (under SC_IS_TEST: stub impl, no real process execution) */
-#include "test_framework.h"
-#include "seaclaw/core/process_util.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/core/process_util.h"
+#include "test_framework.h"
 
 static void test_process_run_stub_success(void) {
     sc_allocator_t alloc = sc_system_allocator();

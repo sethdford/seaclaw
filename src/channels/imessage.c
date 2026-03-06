@@ -17,7 +17,7 @@
 #endif
 #endif
 
-#define SC_IMESSAGE_SENT_RING_SIZE 8
+#define SC_IMESSAGE_SENT_RING_SIZE  8
 #define SC_IMESSAGE_SENT_PREFIX_LEN 128
 
 typedef struct sc_imessage_ctx {
@@ -36,8 +36,8 @@ typedef struct sc_imessage_ctx {
 #if !SC_IS_TEST && defined(__APPLE__) && defined(__MACH__)
 static void imessage_record_sent(sc_imessage_ctx_t *c, const char *msg, size_t msg_len) {
     size_t slot = c->sent_ring_idx % SC_IMESSAGE_SENT_RING_SIZE;
-    size_t copy_len = msg_len < SC_IMESSAGE_SENT_PREFIX_LEN - 1
-                          ? msg_len : SC_IMESSAGE_SENT_PREFIX_LEN - 1;
+    size_t copy_len =
+        msg_len < SC_IMESSAGE_SENT_PREFIX_LEN - 1 ? msg_len : SC_IMESSAGE_SENT_PREFIX_LEN - 1;
     memcpy(c->sent_ring[slot], msg, copy_len);
     c->sent_ring[slot][copy_len] = '\0';
     c->sent_ring_len[slot] = copy_len;
@@ -192,8 +192,10 @@ static bool imessage_health_check(void *ctx) {
     if (n < 0 || (size_t)n >= sizeof(db_path))
         return false;
     if (access(db_path, R_OK) != 0) {
-        fprintf(stderr, "[%s] imessage: ~/Library/Messages/chat.db not readable (Full Disk Access required)\n",
-                SC_CODENAME);
+        fprintf(
+            stderr,
+            "[%s] imessage: ~/Library/Messages/chat.db not readable (Full Disk Access required)\n",
+            SC_CODENAME);
         return false;
     }
     return true;
@@ -245,8 +247,8 @@ sc_error_t sc_imessage_create(sc_allocator_t *alloc, const char *default_target,
                 sqlite3 *db = NULL;
                 if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK) {
                     sqlite3_stmt *stmt = NULL;
-                    if (sqlite3_prepare_v2(db, "SELECT MAX(ROWID) FROM message", -1, &stmt,
-                                           NULL) == SQLITE_OK) {
+                    if (sqlite3_prepare_v2(db, "SELECT MAX(ROWID) FROM message", -1, &stmt, NULL) ==
+                        SQLITE_OK) {
                         if (sqlite3_step(stmt) == SQLITE_ROW)
                             c->last_rowid = sqlite3_column_int64(stmt, 0);
                         sqlite3_finalize(stmt);
@@ -380,7 +382,8 @@ sc_error_t sc_imessage_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel
 
         c->last_rowid = rowid;
         count++;
-        fprintf(stderr, "[imessage] received from %s: %.*s\n", handle, (int)(text_len > 80 ? 80 : text_len), text);
+        fprintf(stderr, "[imessage] received from %s: %.*s\n", handle,
+                (int)(text_len > 80 ? 80 : text_len), text);
     }
 
     sqlite3_finalize(stmt);

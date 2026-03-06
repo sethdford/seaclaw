@@ -1,18 +1,18 @@
-#include "test_framework.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/provider.h"
-#include "seaclaw/providers/openai.h"
 #include "seaclaw/providers/anthropic.h"
+#include "seaclaw/providers/codex_cli.h"
+#include "seaclaw/providers/error_classify.h"
+#include "seaclaw/providers/factory.h"
 #include "seaclaw/providers/ollama.h"
+#include "seaclaw/providers/openai.h"
+#include "seaclaw/providers/openai_codex.h"
 #include "seaclaw/providers/reliable.h"
 #include "seaclaw/providers/router.h"
-#include "seaclaw/providers/codex_cli.h"
-#include "seaclaw/providers/openai_codex.h"
-#include "seaclaw/providers/error_classify.h"
-#include "seaclaw/providers/sse.h"
 #include "seaclaw/providers/scrub.h"
-#include "seaclaw/providers/factory.h"
+#include "seaclaw/providers/sse.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_openai_create_succeeds(void) {
@@ -22,7 +22,8 @@ static void test_openai_create_succeeds(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(prov.ctx);
     SC_ASSERT_NOT_NULL(prov.vtable);
-    if (prov.vtable->deinit) prov.vtable->deinit(prov.ctx, &alloc);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
 }
 
 static void test_openai_get_name(void) {
@@ -32,7 +33,8 @@ static void test_openai_get_name(void) {
     SC_ASSERT_EQ(err, SC_OK);
     const char *name = prov.vtable->get_name(prov.ctx);
     SC_ASSERT_STR_EQ(name, "openai");
-    if (prov.vtable->deinit) prov.vtable->deinit(prov.ctx, &alloc);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
 }
 
 static void test_openai_supports_native_tools(void) {
@@ -41,28 +43,29 @@ static void test_openai_supports_native_tools(void) {
     sc_error_t err = sc_openai_create(&alloc, NULL, 0, NULL, 0, &prov);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_TRUE(prov.vtable->supports_native_tools(prov.ctx));
-    if (prov.vtable->deinit) prov.vtable->deinit(prov.ctx, &alloc);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
 }
 
 static void test_provider_factory_openai(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t prov;
-    sc_error_t err = sc_provider_create(&alloc, "openai", 6,
-        "sk-test", 7, NULL, 0, &prov);
+    sc_error_t err = sc_provider_create(&alloc, "openai", 6, "sk-test", 7, NULL, 0, &prov);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(prov.vtable->get_name(prov.ctx), "openai");
-    if (prov.vtable->deinit) prov.vtable->deinit(prov.ctx, &alloc);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
 }
 
 static void test_provider_factory_anthropic(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_provider_t prov;
-    sc_error_t err = sc_provider_create(&alloc, "anthropic", 9,
-        "test-key", 8, NULL, 0, &prov);
+    sc_error_t err = sc_provider_create(&alloc, "anthropic", 9, "test-key", 8, NULL, 0, &prov);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT(prov.vtable != NULL);
     SC_ASSERT_STR_EQ(prov.vtable->get_name(prov.ctx), "anthropic");
-    if (prov.vtable->deinit) prov.vtable->deinit(prov.ctx, &alloc);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
 }
 
 static void test_openai_chat_mock_in_test(void) {
@@ -102,8 +105,10 @@ static void test_openai_chat_mock_in_test(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.content);
     SC_ASSERT_TRUE(resp.content_len > 0);
-    if (resp.content) alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
-    if (prov.vtable->deinit) prov.vtable->deinit(prov.ctx, &alloc);
+    if (resp.content)
+        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
 }
 
 static void test_openai_chat_with_tools_mock(void) {
@@ -130,7 +135,8 @@ static void test_openai_chat_with_tools_mock(void) {
         .name_len = 5,
         .description = "Run shell command",
         .description_len = 16,
-        .parameters_json = "{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"}}}",
+        .parameters_json =
+            "{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"}}}",
         .parameters_json_len = 55,
     }};
 
@@ -158,7 +164,8 @@ static void test_openai_chat_with_tools_mock(void) {
     SC_ASSERT_TRUE(memcmp(resp.tool_calls[0].name, "shell", 5) == 0);
     SC_ASSERT_TRUE(resp.tool_calls[0].arguments_len > 0);
     sc_chat_response_free(&alloc, &resp);
-    if (prov.vtable->deinit) prov.vtable->deinit(prov.ctx, &alloc);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
 }
 
 static void test_reliable_wraps_inner_succeeds(void) {
@@ -185,17 +192,32 @@ static void test_reliable_retries_then_succeeds(void) {
     err = sc_reliable_create(&alloc, inner, 3, 50, &reliable);
     SC_ASSERT_EQ(err, SC_OK);
 
-    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER, .content = "hi", .content_len = 2,
-        .name = NULL, .name_len = 0, .tool_call_id = NULL, .tool_call_id_len = 0,
-        .content_parts = NULL, .content_parts_count = 0}};
-    sc_chat_request_t req = {.messages = msgs, .messages_count = 1, .model = "gpt-4", .model_len = 5,
-        .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-        .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER,
+                                  .content = "hi",
+                                  .content_len = 2,
+                                  .name = NULL,
+                                  .name_len = 0,
+                                  .tool_call_id = NULL,
+                                  .tool_call_id_len = 0,
+                                  .content_parts = NULL,
+                                  .content_parts_count = 0}};
+    sc_chat_request_t req = {.messages = msgs,
+                             .messages_count = 1,
+                             .model = "gpt-4",
+                             .model_len = 5,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     err = reliable.vtable->chat(reliable.ctx, &alloc, &req, "gpt-4", 5, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.content);
-    if (resp.content) alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    if (resp.content)
+        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     reliable.vtable->deinit(reliable.ctx, &alloc);
 }
 
@@ -208,13 +230,16 @@ static void test_router_resolves_hint(void) {
     const char *names[] = {"fast", "smart"};
     size_t name_lens[] = {4, 5};
     sc_provider_t providers[] = {fast_prov, smart_prov};
-    sc_router_route_entry_t routes[1] = {
-        {.hint = "reasoning", .hint_len = 9, .route = {.provider_name = "smart", .provider_name_len = 5, .model = "claude-opus", .model_len = 11}}
-    };
+    sc_router_route_entry_t routes[1] = {{.hint = "reasoning",
+                                          .hint_len = 9,
+                                          .route = {.provider_name = "smart",
+                                                    .provider_name_len = 5,
+                                                    .model = "claude-opus",
+                                                    .model_len = 11}}};
 
     sc_provider_t router;
-    sc_error_t err = sc_router_create(&alloc, names, name_lens, 2, providers,
-        routes, 1, "default", 7, &router);
+    sc_error_t err =
+        sc_router_create(&alloc, names, name_lens, 2, providers, routes, 1, "default", 7, &router);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(router.vtable->get_name(router.ctx), "router");
     router.vtable->deinit(router.ctx, &alloc);
@@ -241,16 +266,31 @@ static void test_multi_model_router_below_threshold_uses_fast(void) {
     SC_ASSERT_STR_EQ(router.vtable->get_name(router.ctx), "router");
 
     /* Short message: ~1 token -> fast */
-    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER, .content = "hi", .content_len = 2,
-        .name = NULL, .name_len = 0, .tool_call_id = NULL, .tool_call_id_len = 0,
-        .content_parts = NULL, .content_parts_count = 0}};
-    sc_chat_request_t req = {.messages = msgs, .messages_count = 1, .model = "gpt-4", .model_len = 5,
-        .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-        .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER,
+                                  .content = "hi",
+                                  .content_len = 2,
+                                  .name = NULL,
+                                  .name_len = 0,
+                                  .tool_call_id = NULL,
+                                  .tool_call_id_len = 0,
+                                  .content_parts = NULL,
+                                  .content_parts_count = 0}};
+    sc_chat_request_t req = {.messages = msgs,
+                             .messages_count = 1,
+                             .model = "gpt-4",
+                             .model_len = 5,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     err = router.vtable->chat(router.ctx, &alloc, &req, "gpt-4", 5, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
-    if (resp.content) alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    if (resp.content)
+        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     router.vtable->deinit(router.ctx, &alloc);
 }
 
@@ -276,16 +316,31 @@ static void test_multi_model_router_between_thresholds_uses_standard(void) {
     for (size_t i = 0; i < sizeof(buf) - 1; i++)
         buf[i] = 'x';
     buf[sizeof(buf) - 1] = '\0';
-    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER, .content = buf, .content_len = sizeof(buf) - 1,
-        .name = NULL, .name_len = 0, .tool_call_id = NULL, .tool_call_id_len = 0,
-        .content_parts = NULL, .content_parts_count = 0}};
-    sc_chat_request_t req = {.messages = msgs, .messages_count = 1, .model = "gpt-4", .model_len = 5,
-        .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-        .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER,
+                                  .content = buf,
+                                  .content_len = sizeof(buf) - 1,
+                                  .name = NULL,
+                                  .name_len = 0,
+                                  .tool_call_id = NULL,
+                                  .tool_call_id_len = 0,
+                                  .content_parts = NULL,
+                                  .content_parts_count = 0}};
+    sc_chat_request_t req = {.messages = msgs,
+                             .messages_count = 1,
+                             .model = "gpt-4",
+                             .model_len = 5,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     err = router.vtable->chat(router.ctx, &alloc, &req, "gpt-4", 5, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
-    if (resp.content) alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    if (resp.content)
+        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     router.vtable->deinit(router.ctx, &alloc);
 }
 
@@ -311,16 +366,31 @@ static void test_multi_model_router_above_threshold_uses_powerful(void) {
     for (size_t i = 0; i < sizeof(buf) - 1; i++)
         buf[i] = 'x';
     buf[sizeof(buf) - 1] = '\0';
-    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER, .content = buf, .content_len = sizeof(buf) - 1,
-        .name = NULL, .name_len = 0, .tool_call_id = NULL, .tool_call_id_len = 0,
-        .content_parts = NULL, .content_parts_count = 0}};
-    sc_chat_request_t req = {.messages = msgs, .messages_count = 1, .model = "claude", .model_len = 6,
-        .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-        .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER,
+                                  .content = buf,
+                                  .content_len = sizeof(buf) - 1,
+                                  .name = NULL,
+                                  .name_len = 0,
+                                  .tool_call_id = NULL,
+                                  .tool_call_id_len = 0,
+                                  .content_parts = NULL,
+                                  .content_parts_count = 0}};
+    sc_chat_request_t req = {.messages = msgs,
+                             .messages_count = 1,
+                             .model = "claude",
+                             .model_len = 6,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     err = router.vtable->chat(router.ctx, &alloc, &req, "claude", 6, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
-    if (resp.content) alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    if (resp.content)
+        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     router.vtable->deinit(router.ctx, &alloc);
 }
 
@@ -341,16 +411,31 @@ static void test_multi_model_router_missing_fast_falls_back_to_standard(void) {
     SC_ASSERT_EQ(err, SC_OK);
 
     /* Very short -> would use fast, but fast missing -> standard */
-    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER, .content = "hi", .content_len = 2,
-        .name = NULL, .name_len = 0, .tool_call_id = NULL, .tool_call_id_len = 0,
-        .content_parts = NULL, .content_parts_count = 0}};
-    sc_chat_request_t req = {.messages = msgs, .messages_count = 1, .model = "gpt-4", .model_len = 5,
-        .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-        .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER,
+                                  .content = "hi",
+                                  .content_len = 2,
+                                  .name = NULL,
+                                  .name_len = 0,
+                                  .tool_call_id = NULL,
+                                  .tool_call_id_len = 0,
+                                  .content_parts = NULL,
+                                  .content_parts_count = 0}};
+    sc_chat_request_t req = {.messages = msgs,
+                             .messages_count = 1,
+                             .model = "gpt-4",
+                             .model_len = 5,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     err = router.vtable->chat(router.ctx, &alloc, &req, "gpt-4", 5, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
-    if (resp.content) alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    if (resp.content)
+        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     router.vtable->deinit(router.ctx, &alloc);
 }
 
@@ -360,17 +445,32 @@ static void test_codex_cli_create_and_chat(void) {
     sc_error_t err = sc_codex_cli_create(&alloc, NULL, 0, NULL, 0, &prov);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(prov.vtable->get_name(prov.ctx), "codex-cli");
-    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER, .content = "hello", .content_len = 5,
-        .name = NULL, .name_len = 0, .tool_call_id = NULL, .tool_call_id_len = 0,
-        .content_parts = NULL, .content_parts_count = 0}};
-    sc_chat_request_t req = {.messages = msgs, .messages_count = 1, .model = "m", .model_len = 1,
-        .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-        .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER,
+                                  .content = "hello",
+                                  .content_len = 5,
+                                  .name = NULL,
+                                  .name_len = 0,
+                                  .tool_call_id = NULL,
+                                  .tool_call_id_len = 0,
+                                  .content_parts = NULL,
+                                  .content_parts_count = 0}};
+    sc_chat_request_t req = {.messages = msgs,
+                             .messages_count = 1,
+                             .model = "m",
+                             .model_len = 1,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     err = prov.vtable->chat(prov.ctx, &alloc, &req, "m", 1, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.content);
-    if (resp.content) alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    if (resp.content)
+        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     prov.vtable->deinit(prov.ctx, &alloc);
 }
 
@@ -380,17 +480,32 @@ static void test_openai_codex_create_and_chat(void) {
     sc_error_t err = sc_openai_codex_create(&alloc, "test-key", 8, NULL, 0, &prov);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(prov.vtable->get_name(prov.ctx), "openai-codex");
-    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER, .content = "hi", .content_len = 2,
-        .name = NULL, .name_len = 0, .tool_call_id = NULL, .tool_call_id_len = 0,
-        .content_parts = NULL, .content_parts_count = 0}};
-    sc_chat_request_t req = {.messages = msgs, .messages_count = 1, .model = "o4-mini", .model_len = 7,
-        .temperature = 0.7, .max_tokens = 0, .tools = NULL, .tools_count = 0,
-        .timeout_secs = 0, .reasoning_effort = NULL, .reasoning_effort_len = 0};
+    sc_chat_message_t msgs[1] = {{.role = SC_ROLE_USER,
+                                  .content = "hi",
+                                  .content_len = 2,
+                                  .name = NULL,
+                                  .name_len = 0,
+                                  .tool_call_id = NULL,
+                                  .tool_call_id_len = 0,
+                                  .content_parts = NULL,
+                                  .content_parts_count = 0}};
+    sc_chat_request_t req = {.messages = msgs,
+                             .messages_count = 1,
+                             .model = "o4-mini",
+                             .model_len = 7,
+                             .temperature = 0.7,
+                             .max_tokens = 0,
+                             .tools = NULL,
+                             .tools_count = 0,
+                             .timeout_secs = 0,
+                             .reasoning_effort = NULL,
+                             .reasoning_effort_len = 0};
     sc_chat_response_t resp = {0};
     err = prov.vtable->chat(prov.ctx, &alloc, &req, "o4-mini", 7, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.content);
-    if (resp.content) alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    if (resp.content)
+        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
     prov.vtable->deinit(prov.ctx, &alloc);
 }
 
@@ -414,7 +529,8 @@ static void test_sse_parse_delta(void) {
     SC_ASSERT_EQ(res.tag, SC_SSE_DELTA);
     SC_ASSERT_NOT_NULL(res.delta);
     SC_ASSERT_STR_EQ(res.delta, "Hello");
-    if (res.delta) alloc.free(alloc.ctx, res.delta, res.delta_len + 1);
+    if (res.delta)
+        alloc.free(alloc.ctx, res.delta, res.delta_len + 1);
 }
 
 static void test_sse_parse_done(void) {

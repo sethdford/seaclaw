@@ -1,7 +1,7 @@
 /* SSE client tests */
-#include "test_framework.h"
-#include "seaclaw/sse/sse_client.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/sse/sse_client.h"
+#include "test_framework.h"
 #include <string.h>
 
 static int sse_cb_count;
@@ -12,16 +12,17 @@ static void sse_callback(void *ctx, const sc_sse_event_t *event) {
     (void)ctx;
     sse_cb_count++;
     if (event->event_type) {
-        size_t n = event->event_type_len < sizeof(sse_last_event_type) - 1 ?
-            event->event_type_len : sizeof(sse_last_event_type) - 1;
+        size_t n = event->event_type_len < sizeof(sse_last_event_type) - 1
+                       ? event->event_type_len
+                       : sizeof(sse_last_event_type) - 1;
         memcpy(sse_last_event_type, event->event_type, n);
         sse_last_event_type[n] = '\0';
     } else {
         sse_last_event_type[0] = '\0';
     }
     if (event->data) {
-        size_t n = event->data_len < sizeof(sse_last_data) - 1 ?
-            event->data_len : sizeof(sse_last_data) - 1;
+        size_t n = event->data_len < sizeof(sse_last_data) - 1 ? event->data_len
+                                                               : sizeof(sse_last_data) - 1;
         memcpy(sse_last_data, event->data, n);
         sse_last_data[n] = '\0';
     } else {
@@ -36,8 +37,8 @@ static void test_sse_connect_mock(void) {
     sse_last_data[0] = '\0';
 
     sc_allocator_t alloc = sc_system_allocator();
-    sc_error_t err = sc_sse_connect(&alloc, "https://example.com/sse",
-        NULL, NULL, sse_callback, NULL);
+    sc_error_t err =
+        sc_sse_connect(&alloc, "https://example.com/sse", NULL, NULL, sse_callback, NULL);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(sse_cb_count, 1);
     SC_ASSERT_STR_EQ(sse_last_event_type, "message");

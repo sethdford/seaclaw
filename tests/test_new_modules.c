@@ -1,21 +1,21 @@
-#include "test_framework.h"
-#include "seaclaw/gateway/push.h"
-#include "seaclaw/gateway/event_bridge.h"
-#include "seaclaw/gateway/control_protocol.h"
-#include "seaclaw/bus.h"
-#include "seaclaw/config_types.h"
-#include "seaclaw/portable_atomic.h"
-#include "seaclaw/context_tokens.h"
-#include "seaclaw/max_tokens.h"
 #include "seaclaw/agent_routing.h"
-#include "seaclaw/core/allocator.h"
-#include "seaclaw/onboard.h"
-#include "seaclaw/skillforge.h"
-#include "seaclaw/migration.h"
+#include "seaclaw/bus.h"
 #include "seaclaw/capabilities.h"
 #include "seaclaw/config.h"
+#include "seaclaw/config_types.h"
+#include "seaclaw/context_tokens.h"
+#include "seaclaw/core/allocator.h"
+#include "seaclaw/gateway/control_protocol.h"
+#include "seaclaw/gateway/event_bridge.h"
+#include "seaclaw/gateway/push.h"
 #include "seaclaw/interactions.h"
+#include "seaclaw/max_tokens.h"
+#include "seaclaw/migration.h"
+#include "seaclaw/onboard.h"
+#include "seaclaw/portable_atomic.h"
+#include "seaclaw/skillforge.h"
 #include "seaclaw/tool.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_config_types_constants(void) {
@@ -84,7 +84,7 @@ static void test_agent_routing_normalize_id(void) {
 
 static void test_agent_routing_find_default_agent(void) {
     sc_named_agent_config_t agents[] = {
-        { .name = "helper", .provider = "openai", .model = "gpt-4" },
+        {.name = "helper", .provider = "openai", .model = "gpt-4"},
     };
     const char *r = sc_agent_routing_find_default_agent(agents, 1);
     SC_ASSERT_STR_EQ(r, "helper");
@@ -105,11 +105,10 @@ static void test_agent_routing_resolve_route_default(void) {
         .member_role_ids_len = 0,
     };
     sc_named_agent_config_t agents[] = {
-        { .name = "helper", .provider = "openai", .model = "gpt-4" },
+        {.name = "helper", .provider = "openai", .model = "gpt-4"},
     };
     sc_resolved_route_t route = {0};
-    sc_error_t err = sc_agent_routing_resolve_route(
-        &alloc, &input, NULL, 0, agents, 1, &route);
+    sc_error_t err = sc_agent_routing_resolve_route(&alloc, &input, NULL, 0, agents, 1, &route);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(route.agent_id, "helper");
     SC_ASSERT_EQ(route.matched_by, MatchedDefault);
@@ -122,7 +121,7 @@ static void test_agent_routing_resolve_route_default(void) {
 
 static void test_agent_routing_resolve_route_peer_match(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_peer_ref_t peer = { .kind = ChatDirect, .id = "user42", .id_len = 6 };
+    sc_peer_ref_t peer = {.kind = ChatDirect, .id = "user42", .id_len = 6};
     sc_route_input_t input = {
         .channel = "telegram",
         .account_id = "acct1",
@@ -133,24 +132,24 @@ static void test_agent_routing_resolve_route_peer_match(void) {
         .member_role_ids = NULL,
         .member_role_ids_len = 0,
     };
-    sc_peer_ref_t bind_peer = { .kind = ChatDirect, .id = "user42", .id_len = 6 };
+    sc_peer_ref_t bind_peer = {.kind = ChatDirect, .id = "user42", .id_len = 6};
     sc_agent_binding_t bindings[] = {
         {
             .agent_id = "support-bot",
-            .match = {
-                .channel = NULL,
-                .account_id = NULL,
-                .peer = &bind_peer,
-                .guild_id = NULL,
-                .team_id = NULL,
-                .roles = NULL,
-                .roles_len = 0,
-            },
+            .match =
+                {
+                    .channel = NULL,
+                    .account_id = NULL,
+                    .peer = &bind_peer,
+                    .guild_id = NULL,
+                    .team_id = NULL,
+                    .roles = NULL,
+                    .roles_len = 0,
+                },
         },
     };
     sc_resolved_route_t route = {0};
-    sc_error_t err = sc_agent_routing_resolve_route(
-        &alloc, &input, bindings, 1, NULL, 0, &route);
+    sc_error_t err = sc_agent_routing_resolve_route(&alloc, &input, bindings, 1, NULL, 0, &route);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(route.agent_id, "support-bot");
     SC_ASSERT_EQ(route.matched_by, MatchedPeer);
@@ -159,7 +158,7 @@ static void test_agent_routing_resolve_route_peer_match(void) {
 
 static void test_agent_routing_build_session_key(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_peer_ref_t peer = { .kind = ChatDirect, .id = "user42", .id_len = 6 };
+    sc_peer_ref_t peer = {.kind = ChatDirect, .id = "user42", .id_len = 6};
     char *key = NULL;
     sc_error_t err = sc_agent_routing_build_session_key(&alloc, "bot1", "discord", &peer, &key);
     SC_ASSERT_EQ(err, SC_OK);
@@ -198,84 +197,87 @@ static void test_agent_routing_find_default_empty_list(void) {
 
 static void test_agent_routing_find_default_first_agent(void) {
     sc_named_agent_config_t agents[] = {
-        { .name = "alpha", .provider = "openai", .model = "gpt-4" },
-        { .name = "beta", .provider = "anthropic", .model = "claude" },
+        {.name = "alpha", .provider = "openai", .model = "gpt-4"},
+        {.name = "beta", .provider = "anthropic", .model = "claude"},
     };
     const char *r = sc_agent_routing_find_default_agent(agents, 2);
     SC_ASSERT_STR_EQ(r, "alpha");
 }
 
 static void test_agent_routing_peer_matches_equal(void) {
-    sc_peer_ref_t a = { .kind = ChatDirect, .id = "u1", .id_len = 2 };
-    sc_peer_ref_t b = { .kind = ChatDirect, .id = "u1", .id_len = 2 };
+    sc_peer_ref_t a = {.kind = ChatDirect, .id = "u1", .id_len = 2};
+    sc_peer_ref_t b = {.kind = ChatDirect, .id = "u1", .id_len = 2};
     SC_ASSERT_TRUE(sc_agent_routing_peer_matches(&a, &b));
 }
 
 static void test_agent_routing_peer_matches_different_kind(void) {
-    sc_peer_ref_t a = { .kind = ChatDirect, .id = "u1", .id_len = 2 };
-    sc_peer_ref_t b = { .kind = ChatGroup, .id = "u1", .id_len = 2 };
+    sc_peer_ref_t a = {.kind = ChatDirect, .id = "u1", .id_len = 2};
+    sc_peer_ref_t b = {.kind = ChatGroup, .id = "u1", .id_len = 2};
     SC_ASSERT_FALSE(sc_agent_routing_peer_matches(&a, &b));
 }
 
 static void test_agent_routing_peer_matches_different_id(void) {
-    sc_peer_ref_t a = { .kind = ChatDirect, .id = "u1", .id_len = 2 };
-    sc_peer_ref_t b = { .kind = ChatDirect, .id = "u2", .id_len = 2 };
+    sc_peer_ref_t a = {.kind = ChatDirect, .id = "u1", .id_len = 2};
+    sc_peer_ref_t b = {.kind = ChatDirect, .id = "u2", .id_len = 2};
     SC_ASSERT_FALSE(sc_agent_routing_peer_matches(&a, &b));
 }
 
 static void test_agent_routing_peer_matches_null(void) {
-    sc_peer_ref_t p = { .kind = ChatDirect, .id = "u1", .id_len = 2 };
+    sc_peer_ref_t p = {.kind = ChatDirect, .id = "u1", .id_len = 2};
     SC_ASSERT_FALSE(sc_agent_routing_peer_matches(NULL, &p));
     SC_ASSERT_FALSE(sc_agent_routing_peer_matches(&p, NULL));
 }
 
 static void test_agent_routing_binding_matches_scope_null_constraints(void) {
-    sc_agent_binding_t b = { .agent_id = "x", .match = { .channel = NULL, .account_id = NULL } };
-    sc_route_input_t input = { .channel = "discord", .account_id = "acct1" };
+    sc_agent_binding_t b = {.agent_id = "x", .match = {.channel = NULL, .account_id = NULL}};
+    sc_route_input_t input = {.channel = "discord", .account_id = "acct1"};
     SC_ASSERT_TRUE(sc_agent_routing_binding_matches_scope(&b, &input));
 }
 
 static void test_agent_routing_binding_matches_scope_matching(void) {
     sc_agent_binding_t b = {
         .agent_id = "x",
-        .match = { .channel = "discord", .account_id = "acct1" },
+        .match = {.channel = "discord", .account_id = "acct1"},
     };
-    sc_route_input_t input = { .channel = "discord", .account_id = "acct1" };
+    sc_route_input_t input = {.channel = "discord", .account_id = "acct1"};
     SC_ASSERT_TRUE(sc_agent_routing_binding_matches_scope(&b, &input));
 }
 
 static void test_agent_routing_binding_matches_scope_mismatched_channel(void) {
     sc_agent_binding_t b = {
         .agent_id = "x",
-        .match = { .channel = "slack", .account_id = NULL },
+        .match = {.channel = "slack", .account_id = NULL},
     };
-    sc_route_input_t input = { .channel = "discord", .account_id = "acct1" };
+    sc_route_input_t input = {.channel = "discord", .account_id = "acct1"};
     SC_ASSERT_FALSE(sc_agent_routing_binding_matches_scope(&b, &input));
 }
 
 static void test_agent_routing_binding_matches_scope_mismatched_account(void) {
     sc_agent_binding_t b = {
         .agent_id = "x",
-        .match = { .channel = NULL, .account_id = "acct2" },
+        .match = {.channel = NULL, .account_id = "acct2"},
     };
-    sc_route_input_t input = { .channel = "discord", .account_id = "acct1" };
+    sc_route_input_t input = {.channel = "discord", .account_id = "acct1"};
     SC_ASSERT_FALSE(sc_agent_routing_binding_matches_scope(&b, &input));
 }
 
 static void test_agent_routing_resolve_route_channel_only(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_agent_binding_t bindings[] = {
-        { .agent_id = "catch-all",
-          .match = { .channel = "slack", .account_id = NULL } },
+        {.agent_id = "catch-all", .match = {.channel = "slack", .account_id = NULL}},
     };
     sc_route_input_t input = {
-        .channel = "slack", .account_id = "acct99",
-        .peer = NULL, .parent_peer = NULL, .guild_id = NULL, .team_id = NULL,
-        .member_role_ids = NULL, .member_role_ids_len = 0,
+        .channel = "slack",
+        .account_id = "acct99",
+        .peer = NULL,
+        .parent_peer = NULL,
+        .guild_id = NULL,
+        .team_id = NULL,
+        .member_role_ids = NULL,
+        .member_role_ids_len = 0,
     };
     sc_resolved_route_t route = {0};
-    sc_error_t err = sc_agent_routing_resolve_route(
-        &alloc, &input, bindings, 1, NULL, 0, &route);
+    sc_error_t err = sc_agent_routing_resolve_route(&alloc, &input, bindings, 1, NULL, 0, &route);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(route.agent_id, "catch-all");
     SC_ASSERT_EQ(route.matched_by, MatchedChannelOnly);
@@ -285,19 +287,27 @@ static void test_agent_routing_resolve_route_channel_only(void) {
 static void test_agent_routing_resolve_route_guild_match(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_agent_binding_t bindings[] = {
-        { .agent_id = "guild-bot",
-          .match = { .channel = NULL, .account_id = NULL, .peer = NULL,
-                    .guild_id = "guild1", .team_id = NULL,
-                    .roles = NULL, .roles_len = 0 } },
+        {.agent_id = "guild-bot",
+         .match = {.channel = NULL,
+                   .account_id = NULL,
+                   .peer = NULL,
+                   .guild_id = "guild1",
+                   .team_id = NULL,
+                   .roles = NULL,
+                   .roles_len = 0}},
     };
     sc_route_input_t input = {
-        .channel = "discord", .account_id = "acct1",
-        .peer = NULL, .parent_peer = NULL, .guild_id = "guild1", .team_id = NULL,
-        .member_role_ids = NULL, .member_role_ids_len = 0,
+        .channel = "discord",
+        .account_id = "acct1",
+        .peer = NULL,
+        .parent_peer = NULL,
+        .guild_id = "guild1",
+        .team_id = NULL,
+        .member_role_ids = NULL,
+        .member_role_ids_len = 0,
     };
     sc_resolved_route_t route = {0};
-    sc_error_t err = sc_agent_routing_resolve_route(
-        &alloc, &input, bindings, 1, NULL, 0, &route);
+    sc_error_t err = sc_agent_routing_resolve_route(&alloc, &input, bindings, 1, NULL, 0, &route);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(route.agent_id, "guild-bot");
     SC_ASSERT_EQ(route.matched_by, MatchedGuild);
@@ -307,19 +317,27 @@ static void test_agent_routing_resolve_route_guild_match(void) {
 static void test_agent_routing_resolve_route_team_match(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_agent_binding_t bindings[] = {
-        { .agent_id = "team-bot",
-          .match = { .channel = NULL, .account_id = NULL, .peer = NULL,
-                    .guild_id = NULL, .team_id = "T123",
-                    .roles = NULL, .roles_len = 0 } },
+        {.agent_id = "team-bot",
+         .match = {.channel = NULL,
+                   .account_id = NULL,
+                   .peer = NULL,
+                   .guild_id = NULL,
+                   .team_id = "T123",
+                   .roles = NULL,
+                   .roles_len = 0}},
     };
     sc_route_input_t input = {
-        .channel = "slack", .account_id = "acct1",
-        .peer = NULL, .parent_peer = NULL, .guild_id = NULL, .team_id = "T123",
-        .member_role_ids = NULL, .member_role_ids_len = 0,
+        .channel = "slack",
+        .account_id = "acct1",
+        .peer = NULL,
+        .parent_peer = NULL,
+        .guild_id = NULL,
+        .team_id = "T123",
+        .member_role_ids = NULL,
+        .member_role_ids_len = 0,
     };
     sc_resolved_route_t route = {0};
-    sc_error_t err = sc_agent_routing_resolve_route(
-        &alloc, &input, bindings, 1, NULL, 0, &route);
+    sc_error_t err = sc_agent_routing_resolve_route(&alloc, &input, bindings, 1, NULL, 0, &route);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(route.agent_id, "team-bot");
     SC_ASSERT_EQ(route.matched_by, MatchedTeam);
@@ -329,19 +347,27 @@ static void test_agent_routing_resolve_route_team_match(void) {
 static void test_agent_routing_resolve_route_account_match(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_agent_binding_t bindings[] = {
-        { .agent_id = "acct-bot",
-          .match = { .channel = "telegram", .account_id = "acct7", .peer = NULL,
-                    .guild_id = NULL, .team_id = NULL,
-                    .roles = NULL, .roles_len = 0 } },
+        {.agent_id = "acct-bot",
+         .match = {.channel = "telegram",
+                   .account_id = "acct7",
+                   .peer = NULL,
+                   .guild_id = NULL,
+                   .team_id = NULL,
+                   .roles = NULL,
+                   .roles_len = 0}},
     };
     sc_route_input_t input = {
-        .channel = "telegram", .account_id = "acct7",
-        .peer = NULL, .parent_peer = NULL, .guild_id = NULL, .team_id = NULL,
-        .member_role_ids = NULL, .member_role_ids_len = 0,
+        .channel = "telegram",
+        .account_id = "acct7",
+        .peer = NULL,
+        .parent_peer = NULL,
+        .guild_id = NULL,
+        .team_id = NULL,
+        .member_role_ids = NULL,
+        .member_role_ids_len = 0,
     };
     sc_resolved_route_t route = {0};
-    sc_error_t err = sc_agent_routing_resolve_route(
-        &alloc, &input, bindings, 1, NULL, 0, &route);
+    sc_error_t err = sc_agent_routing_resolve_route(&alloc, &input, bindings, 1, NULL, 0, &route);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(route.agent_id, "acct-bot");
     SC_ASSERT_EQ(route.matched_by, MatchedAccount);
@@ -359,7 +385,7 @@ static void test_agent_routing_build_session_key_without_peer(void) {
 
 static void test_agent_routing_build_session_key_group_peer(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_peer_ref_t peer = { .kind = ChatGroup, .id = "G1234", .id_len = 5 };
+    sc_peer_ref_t peer = {.kind = ChatGroup, .id = "G1234", .id_len = 5};
     char *key = NULL;
     sc_error_t err = sc_agent_routing_build_session_key(&alloc, "agent-x", "slack", &peer, &key);
     SC_ASSERT_EQ(err, SC_OK);
@@ -369,11 +395,10 @@ static void test_agent_routing_build_session_key_group_peer(void) {
 
 static void test_agent_routing_build_session_key_with_scope_main(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_peer_ref_t peer = { .kind = ChatDirect, .id = "user42", .id_len = 6 };
+    sc_peer_ref_t peer = {.kind = ChatDirect, .id = "user42", .id_len = 6};
     char *key = NULL;
     sc_error_t err = sc_agent_routing_build_session_key_with_scope(
-        &alloc, "bot1", "discord", &peer,
-        DirectScopeMain, NULL, NULL, 0, &key);
+        &alloc, "bot1", "discord", &peer, DirectScopeMain, NULL, NULL, 0, &key);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(key, "agent:bot1:main");
     alloc.free(alloc.ctx, key, strlen(key) + 1);
@@ -381,11 +406,10 @@ static void test_agent_routing_build_session_key_with_scope_main(void) {
 
 static void test_agent_routing_build_session_key_with_scope_per_peer(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_peer_ref_t peer = { .kind = ChatDirect, .id = "user42", .id_len = 6 };
+    sc_peer_ref_t peer = {.kind = ChatDirect, .id = "user42", .id_len = 6};
     char *key = NULL;
     sc_error_t err = sc_agent_routing_build_session_key_with_scope(
-        &alloc, "bot1", "discord", &peer,
-        DirectScopePerPeer, NULL, NULL, 0, &key);
+        &alloc, "bot1", "discord", &peer, DirectScopePerPeer, NULL, NULL, 0, &key);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(key, "agent:bot1:direct:user42");
     alloc.free(alloc.ctx, key, strlen(key) + 1);
@@ -403,8 +427,8 @@ static void test_agent_routing_build_thread_session_key(void) {
 
 static void test_agent_routing_resolve_thread_parent(void) {
     size_t prefix_len = 0;
-    int r = sc_agent_routing_resolve_thread_parent(
-        "agent:bot1:discord:direct:user42:thread:t99", &prefix_len);
+    int r = sc_agent_routing_resolve_thread_parent("agent:bot1:discord:direct:user42:thread:t99",
+                                                   &prefix_len);
     SC_ASSERT_EQ(r, 0);
     /* prefix_len = length of "agent:bot1:discord:direct:user42" = 32 */
     SC_ASSERT_EQ(prefix_len, (size_t)32);
@@ -422,8 +446,8 @@ static void test_agent_routing_resolve_linked_peer_no_links(void) {
 }
 
 static void test_agent_routing_resolve_linked_peer_matched(void) {
-    const char *peers[] = { "telegram:123", "discord:456" };
-    sc_identity_link_t link = { .canonical = "alice", .peers = peers, .peers_len = 2 };
+    const char *peers[] = {"telegram:123", "discord:456"};
+    sc_identity_link_t link = {.canonical = "alice", .peers = peers, .peers_len = 2};
     const char *r = sc_agent_routing_resolve_linked_peer("discord:456", 10, &link, 1);
     /* C API resolves to canonical when matched, else returns peer_id; accept either */
     SC_ASSERT_TRUE(r != NULL && (strcmp(r, "alice") == 0 || strcmp(r, "discord:456") == 0));
@@ -440,24 +464,31 @@ static void test_agent_routing_main_session_key_normalizes(void) {
 
 static void test_agent_routing_resolve_route_parent_peer_match(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_peer_ref_t bind_peer = { .kind = ChatGroup, .id = "thread99", .id_len = 8 };
+    sc_peer_ref_t bind_peer = {.kind = ChatGroup, .id = "thread99", .id_len = 8};
     sc_agent_binding_t bindings[] = {
-        { .agent_id = "thread-bot",
-          .match = { .channel = NULL, .account_id = NULL, .peer = &bind_peer,
-                    .guild_id = NULL, .team_id = NULL,
-                    .roles = NULL, .roles_len = 0 } },
+        {.agent_id = "thread-bot",
+         .match = {.channel = NULL,
+                   .account_id = NULL,
+                   .peer = &bind_peer,
+                   .guild_id = NULL,
+                   .team_id = NULL,
+                   .roles = NULL,
+                   .roles_len = 0}},
     };
-    sc_peer_ref_t input_peer = { .kind = ChatDirect, .id = "user5", .id_len = 5 };
-    sc_peer_ref_t parent_peer = { .kind = ChatGroup, .id = "thread99", .id_len = 8 };
+    sc_peer_ref_t input_peer = {.kind = ChatDirect, .id = "user5", .id_len = 5};
+    sc_peer_ref_t parent_peer = {.kind = ChatGroup, .id = "thread99", .id_len = 8};
     sc_route_input_t input = {
-        .channel = "discord", .account_id = "acct1",
-        .peer = &input_peer, .parent_peer = &parent_peer,
-        .guild_id = NULL, .team_id = NULL,
-        .member_role_ids = NULL, .member_role_ids_len = 0,
+        .channel = "discord",
+        .account_id = "acct1",
+        .peer = &input_peer,
+        .parent_peer = &parent_peer,
+        .guild_id = NULL,
+        .team_id = NULL,
+        .member_role_ids = NULL,
+        .member_role_ids_len = 0,
     };
     sc_resolved_route_t route = {0};
-    sc_error_t err = sc_agent_routing_resolve_route(
-        &alloc, &input, bindings, 1, NULL, 0, &route);
+    sc_error_t err = sc_agent_routing_resolve_route(&alloc, &input, bindings, 1, NULL, 0, &route);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(route.agent_id, "thread-bot");
     SC_ASSERT_EQ(route.matched_by, MatchedParentPeer);
@@ -466,23 +497,30 @@ static void test_agent_routing_resolve_route_parent_peer_match(void) {
 
 static void test_agent_routing_resolve_route_scope_prefilter_excludes_mismatch(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_peer_ref_t bind_peer = { .kind = ChatDirect, .id = "user1", .id_len = 5 };
+    sc_peer_ref_t bind_peer = {.kind = ChatDirect, .id = "user1", .id_len = 5};
     sc_agent_binding_t bindings[] = {
-        { .agent_id = "discord-only",
-          .match = { .channel = "discord", .account_id = NULL, .peer = &bind_peer,
-                    .guild_id = NULL, .team_id = NULL,
-                    .roles = NULL, .roles_len = 0 } },
+        {.agent_id = "discord-only",
+         .match = {.channel = "discord",
+                   .account_id = NULL,
+                   .peer = &bind_peer,
+                   .guild_id = NULL,
+                   .team_id = NULL,
+                   .roles = NULL,
+                   .roles_len = 0}},
     };
-    sc_peer_ref_t input_peer = { .kind = ChatDirect, .id = "user1", .id_len = 5 };
+    sc_peer_ref_t input_peer = {.kind = ChatDirect, .id = "user1", .id_len = 5};
     sc_route_input_t input = {
-        .channel = "telegram", .account_id = "acct1",
-        .peer = &input_peer, .parent_peer = NULL,
-        .guild_id = NULL, .team_id = NULL,
-        .member_role_ids = NULL, .member_role_ids_len = 0,
+        .channel = "telegram",
+        .account_id = "acct1",
+        .peer = &input_peer,
+        .parent_peer = NULL,
+        .guild_id = NULL,
+        .team_id = NULL,
+        .member_role_ids = NULL,
+        .member_role_ids_len = 0,
     };
     sc_resolved_route_t route = {0};
-    sc_error_t err = sc_agent_routing_resolve_route(
-        &alloc, &input, bindings, 1, NULL, 0, &route);
+    sc_error_t err = sc_agent_routing_resolve_route(&alloc, &input, bindings, 1, NULL, 0, &route);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(route.matched_by, MatchedDefault);
     SC_ASSERT_STR_EQ(route.agent_id, "main");
@@ -491,22 +529,30 @@ static void test_agent_routing_resolve_route_scope_prefilter_excludes_mismatch(v
 
 static void test_agent_routing_resolve_route_guild_roles_match(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    const char *roles[] = { "moderator", "admin" };
+    const char *roles[] = {"moderator", "admin"};
     sc_agent_binding_t bindings[] = {
-        { .agent_id = "mod-bot",
-          .match = { .channel = NULL, .account_id = NULL, .peer = NULL,
-                    .guild_id = "guild1", .team_id = NULL,
-                    .roles = roles, .roles_len = 2 } },
+        {.agent_id = "mod-bot",
+         .match = {.channel = NULL,
+                   .account_id = NULL,
+                   .peer = NULL,
+                   .guild_id = "guild1",
+                   .team_id = NULL,
+                   .roles = roles,
+                   .roles_len = 2}},
     };
-    const char *member_roles[] = { "moderator" };
+    const char *member_roles[] = {"moderator"};
     sc_route_input_t input = {
-        .channel = "discord", .account_id = "acct1",
-        .peer = NULL, .parent_peer = NULL, .guild_id = "guild1", .team_id = NULL,
-        .member_role_ids = member_roles, .member_role_ids_len = 1,
+        .channel = "discord",
+        .account_id = "acct1",
+        .peer = NULL,
+        .parent_peer = NULL,
+        .guild_id = "guild1",
+        .team_id = NULL,
+        .member_role_ids = member_roles,
+        .member_role_ids_len = 1,
     };
     sc_resolved_route_t route = {0};
-    sc_error_t err = sc_agent_routing_resolve_route(
-        &alloc, &input, bindings, 1, NULL, 0, &route);
+    sc_error_t err = sc_agent_routing_resolve_route(&alloc, &input, bindings, 1, NULL, 0, &route);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(route.agent_id, "mod-bot");
     SC_ASSERT_EQ(route.matched_by, MatchedGuildRoles);
@@ -515,19 +561,18 @@ static void test_agent_routing_resolve_route_guild_roles_match(void) {
 
 static void test_agent_routing_build_session_key_with_scope_per_account_channel_peer(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_peer_ref_t peer = { .kind = ChatDirect, .id = "user42", .id_len = 6 };
+    sc_peer_ref_t peer = {.kind = ChatDirect, .id = "user42", .id_len = 6};
     char *key = NULL;
     sc_error_t err = sc_agent_routing_build_session_key_with_scope(
-        &alloc, "bot1", "whatsapp", &peer,
-        DirectScopePerAccountChannelPeer, "work", NULL, 0, &key);
+        &alloc, "bot1", "whatsapp", &peer, DirectScopePerAccountChannelPeer, "work", NULL, 0, &key);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(key, "agent:bot1:whatsapp:work:direct:user42");
     alloc.free(alloc.ctx, key, strlen(key) + 1);
 }
 
 static void test_agent_routing_resolve_linked_peer_unmatched(void) {
-    const char *peers[] = { "telegram:123" };
-    sc_identity_link_t link = { .canonical = "alice", .peers = peers, .peers_len = 1 };
+    const char *peers[] = {"telegram:123"};
+    sc_identity_link_t link = {.canonical = "alice", .peers = peers, .peers_len = 1};
     const char *r = sc_agent_routing_resolve_linked_peer("discord:789", 10, &link, 1);
     SC_ASSERT_STR_EQ(r, "discord:789");
 }
@@ -696,7 +741,8 @@ static void test_skillforge_discover_null_path(void) {
 
 /* ─── Migration tests (~25) ──────────────────────────────────────────────── */
 static void test_migration_run_null_alloc(void) {
-    sc_migration_config_t cfg = { .source = SC_MIGRATION_SOURCE_NONE, .target = SC_MIGRATION_TARGET_SQLITE };
+    sc_migration_config_t cfg = {.source = SC_MIGRATION_SOURCE_NONE,
+                                 .target = SC_MIGRATION_TARGET_SQLITE};
     sc_migration_stats_t stats = {0};
     sc_error_t err = sc_migration_run(NULL, &cfg, &stats, NULL, NULL);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
@@ -711,7 +757,8 @@ static void test_migration_run_null_config(void) {
 
 static void test_migration_run_null_stats(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_migration_config_t cfg = { .source = SC_MIGRATION_SOURCE_NONE, .target = SC_MIGRATION_TARGET_SQLITE };
+    sc_migration_config_t cfg = {.source = SC_MIGRATION_SOURCE_NONE,
+                                 .target = SC_MIGRATION_TARGET_SQLITE};
     sc_error_t err = sc_migration_run(&alloc, &cfg, NULL, NULL, NULL);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
@@ -761,8 +808,9 @@ static void test_migration_run_progress_callback_invoked(void) {
         .dry_run = true,
     };
     sc_migration_stats_t stats = {0};
-    size_t progress[2] = { 99, 99 };
-    sc_error_t err = sc_migration_run(&alloc, &cfg, &stats, migration_progress_invoked_cb, progress);
+    size_t progress[2] = {99, 99};
+    sc_error_t err =
+        sc_migration_run(&alloc, &cfg, &stats, migration_progress_invoked_cb, progress);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(progress[0], 0u);
     SC_ASSERT_EQ(progress[1], 0u);
@@ -779,7 +827,7 @@ static void test_migration_stats_zeroed(void) {
         .target_path_len = 12,
         .dry_run = true,
     };
-    sc_migration_stats_t stats = { 1, 2, 3, 4, 5 };
+    sc_migration_stats_t stats = {1, 2, 3, 4, 5};
     sc_migration_run(&alloc, &cfg, &stats, NULL, NULL);
     SC_ASSERT_EQ(stats.from_sqlite, 0u);
     SC_ASSERT_EQ(stats.from_markdown, 0u);
@@ -1058,8 +1106,8 @@ static void test_capabilities_null_alloc_rejected(void) {
 /* ─── Interactions (choices) ──────────────────────────────────────────────── */
 static void test_choices_prompt_returns_default_in_test_mode(void) {
     sc_choice_t choices[] = {
-        { "Option A", "a", false },
-        { "Option B", "b", true },
+        {"Option A", "a", false},
+        {"Option B", "b", true},
     };
     sc_choice_result_t result = {0};
     sc_error_t err = sc_choices_prompt("Pick one", choices, 2, &result);
@@ -1070,8 +1118,8 @@ static void test_choices_prompt_returns_default_in_test_mode(void) {
 
 static void test_choices_prompt_first_default(void) {
     sc_choice_t choices[] = {
-        { "First", "1", true },
-        { "Second", "2", false },
+        {"First", "1", true},
+        {"Second", "2", false},
     };
     sc_choice_result_t result = {0};
     sc_error_t err = sc_choices_prompt("Pick", choices, 2, &result);
@@ -1094,7 +1142,7 @@ static void test_choices_prompt_null_choices_rejected(void) {
 }
 
 static void test_choices_prompt_zero_count_rejected(void) {
-    sc_choice_t choices[] = {{ "A", "a", true }};
+    sc_choice_t choices[] = {{"A", "a", true}};
     sc_choice_result_t result = {0};
     sc_error_t err = sc_choices_prompt("Q", choices, 0, &result);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
@@ -1103,7 +1151,7 @@ static void test_choices_prompt_zero_count_rejected(void) {
 /* ─── Push notification tests ───────────────────────────────────────────── */
 static void test_push_init_deinit(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_error_t err = sc_push_init(&mgr, &alloc, &config);
     SC_ASSERT_EQ(err, SC_OK);
@@ -1114,7 +1162,7 @@ static void test_push_init_deinit(void) {
 
 static void test_push_register_token(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_error_t err = sc_push_register_token(&mgr, "dev-token-123", SC_PUSH_FCM);
@@ -1127,7 +1175,7 @@ static void test_push_register_token(void) {
 
 static void test_push_register_duplicate(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "dup-token", SC_PUSH_FCM);
@@ -1139,7 +1187,7 @@ static void test_push_register_duplicate(void) {
 
 static void test_push_unregister_token(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "to-remove", SC_PUSH_FCM);
@@ -1152,7 +1200,7 @@ static void test_push_unregister_token(void) {
 
 static void test_push_send_no_tokens(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_error_t err = sc_push_send(&mgr, "Title", "Body", NULL);
@@ -1162,7 +1210,7 @@ static void test_push_send_no_tokens(void) {
 
 static void test_push_send_mock(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "mock-token", SC_PUSH_FCM);
@@ -1173,7 +1221,7 @@ static void test_push_send_mock(void) {
 
 static void test_push_send_to_mock(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_error_t err = sc_push_send_to(&mgr, "specific-token", "Hi", "There", NULL);
@@ -1183,7 +1231,7 @@ static void test_push_send_to_mock(void) {
 
 static void test_push_apns_test_mode_returns_ok(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_APNS, .endpoint = "com.example.app" };
+    sc_push_config_t config = {.provider = SC_PUSH_APNS, .endpoint = "com.example.app"};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "apns-device-token", SC_PUSH_APNS);
@@ -1194,7 +1242,7 @@ static void test_push_apns_test_mode_returns_ok(void) {
 
 /* ─── Push extended (NULL alloc, config, edge cases) ──────────────────────── */
 static void test_push_init_null_alloc(void) {
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_error_t err = sc_push_init(&mgr, NULL, &config);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
@@ -1209,14 +1257,14 @@ static void test_push_init_null_config(void) {
 
 static void test_push_init_null_mgr(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_error_t err = sc_push_init(NULL, &alloc, &config);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
 
 static void test_push_register_null_token(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_error_t err = sc_push_register_token(&mgr, NULL, SC_PUSH_FCM);
@@ -1226,7 +1274,7 @@ static void test_push_register_null_token(void) {
 
 static void test_push_register_empty_token(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_error_t err = sc_push_register_token(&mgr, "", SC_PUSH_FCM);
@@ -1236,7 +1284,7 @@ static void test_push_register_empty_token(void) {
 
 static void test_push_unregister_nonexistent(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_error_t err = sc_push_unregister_token(&mgr, "never-registered");
@@ -1247,7 +1295,7 @@ static void test_push_unregister_nonexistent(void) {
 
 static void test_push_unregister_null_token(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "t1", SC_PUSH_FCM);
@@ -1258,7 +1306,7 @@ static void test_push_unregister_null_token(void) {
 
 static void test_push_send_empty_title_body(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "t1", SC_PUSH_FCM);
@@ -1269,7 +1317,7 @@ static void test_push_send_empty_title_body(void) {
 
 static void test_push_send_null_title_body(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "t1", SC_PUSH_FCM);
@@ -1290,7 +1338,7 @@ static void test_push_send_to_null_mgr(void) {
 
 static void test_push_send_to_null_device_token(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_error_t err = sc_push_send_to(&mgr, NULL, "T", "B", NULL);
@@ -1304,7 +1352,7 @@ static void test_push_deinit_null_safe(void) {
 
 static void test_push_register_fcm_provider(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_error_t err = sc_push_register_token(&mgr, "fcm-token-x", SC_PUSH_FCM);
@@ -1315,7 +1363,7 @@ static void test_push_register_fcm_provider(void) {
 
 static void test_push_register_apns_provider(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_error_t err = sc_push_register_token(&mgr, "apns-token-y", SC_PUSH_APNS);
@@ -1326,7 +1374,7 @@ static void test_push_register_apns_provider(void) {
 
 static void test_push_register_many_tokens_capacity_growth(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     for (int i = 0; i < 25; i++) {
@@ -1342,7 +1390,7 @@ static void test_push_register_many_tokens_capacity_growth(void) {
 
 static void test_push_init_deinit_reinit_cycle(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "a", SC_PUSH_FCM);
@@ -1354,7 +1402,7 @@ static void test_push_init_deinit_reinit_cycle(void) {
 
 static void test_push_send_with_data_json(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "dt", SC_PUSH_FCM);
@@ -1365,7 +1413,7 @@ static void test_push_send_with_data_json(void) {
 
 static void test_push_send_to_with_data_json(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_error_t err = sc_push_send_to(&mgr, "t", "Title", "Body", "{\"x\":1}");
@@ -1375,7 +1423,7 @@ static void test_push_send_to_with_data_json(void) {
 
 static void test_push_multiple_tokens_send_broadcast(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "t1", SC_PUSH_FCM);
@@ -1398,7 +1446,7 @@ static void test_event_bridge_init_null_proto(void) {
 
 static void test_event_bridge_init_null_bus(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_control_protocol_t proto = { .alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL };
+    sc_control_protocol_t proto = {.alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL};
     sc_event_bridge_t bridge = {0};
     sc_event_bridge_init(&bridge, &proto, NULL);
     SC_ASSERT_NULL(bridge.bus);
@@ -1408,7 +1456,7 @@ static void test_event_bridge_init_null_bridge(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_bus_t bus;
     sc_bus_init(&bus);
-    sc_control_protocol_t proto = { .alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL };
+    sc_control_protocol_t proto = {.alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL};
     sc_event_bridge_init(NULL, &proto, &bus);
     SC_ASSERT_NOT_NULL(proto.alloc);
 }
@@ -1421,11 +1469,11 @@ static void test_event_bridge_set_push_then_verify(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_bus_t bus;
     sc_bus_init(&bus);
-    sc_control_protocol_t proto = { .alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL };
+    sc_control_protocol_t proto = {.alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL};
     sc_event_bridge_t bridge = {0};
     sc_event_bridge_init(&bridge, &proto, &bus);
     SC_ASSERT_NULL(bridge.push);
-    sc_push_config_t push_config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t push_config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t push_mgr = {0};
     sc_push_init(&push_mgr, &alloc, &push_config);
     sc_event_bridge_set_push(&bridge, &push_mgr);
@@ -1438,9 +1486,9 @@ static void test_event_bridge_set_push_null_clears(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_bus_t bus;
     sc_bus_init(&bus);
-    sc_control_protocol_t proto = { .alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL };
+    sc_control_protocol_t proto = {.alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL};
     sc_event_bridge_t bridge = {0};
-    sc_push_config_t push_config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t push_config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t push_mgr = {0};
     sc_push_init(&push_mgr, &alloc, &push_config);
     sc_event_bridge_init(&bridge, &proto, &bus);
@@ -1455,7 +1503,7 @@ static void test_event_bridge_init_deinit_cycle(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_bus_t bus;
     sc_bus_init(&bus);
-    sc_control_protocol_t proto = { .alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL };
+    sc_control_protocol_t proto = {.alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL};
     sc_event_bridge_t bridge = {0};
     sc_event_bridge_init(&bridge, &proto, &bus);
     SC_ASSERT_EQ(bridge.proto, &proto);
@@ -1467,7 +1515,7 @@ static void test_event_bridge_double_deinit_safety(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_bus_t bus;
     sc_bus_init(&bus);
-    sc_control_protocol_t proto = { .alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL };
+    sc_control_protocol_t proto = {.alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL};
     sc_event_bridge_t bridge = {0};
     sc_event_bridge_init(&bridge, &proto, &bus);
     sc_event_bridge_deinit(&bridge);
@@ -1481,7 +1529,7 @@ static void test_event_bridge_deinit_null_safe(void) {
 /* ─── Control protocol push handling (via push manager API) ────────────────── */
 static void test_push_control_protocol_register_flow(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_error_t e1 = sc_push_register_token(&mgr, "ctrl-token-fcm", SC_PUSH_FCM);
@@ -1494,7 +1542,7 @@ static void test_push_control_protocol_register_flow(void) {
 
 static void test_push_control_protocol_unregister_flow(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "will-remove", SC_PUSH_FCM);
@@ -1506,7 +1554,7 @@ static void test_push_control_protocol_unregister_flow(void) {
 
 static void test_push_control_protocol_register_unregister_cycle(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "cycle-token", SC_PUSH_FCM);
@@ -1520,7 +1568,7 @@ static void test_push_control_protocol_register_unregister_cycle(void) {
 
 static void test_push_deinit_double_safe(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_deinit(&mgr);
@@ -1529,7 +1577,7 @@ static void test_push_deinit_double_safe(void) {
 
 static void test_push_register_alternating_providers(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "a", SC_PUSH_FCM);
@@ -1543,7 +1591,7 @@ static void test_push_register_alternating_providers(void) {
 
 static void test_push_unregister_middle_token(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "first", SC_PUSH_FCM);
@@ -1558,7 +1606,7 @@ static void test_push_unregister_middle_token(void) {
 
 static void test_push_unregister_all_then_send(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "t1", SC_PUSH_FCM);
@@ -1570,7 +1618,7 @@ static void test_push_unregister_all_then_send(void) {
 
 static void test_push_send_broadcast_empty_data(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "t1", SC_PUSH_FCM);
@@ -1581,7 +1629,7 @@ static void test_push_send_broadcast_empty_data(void) {
 
 static void test_push_token_capacity_exact_20(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     for (int i = 0; i < 20; i++) {
@@ -1595,7 +1643,7 @@ static void test_push_token_capacity_exact_20(void) {
 
 static void test_push_send_to_unregistered_token(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "registered", SC_PUSH_FCM);
@@ -1606,7 +1654,7 @@ static void test_push_send_to_unregistered_token(void) {
 
 static void test_push_config_provider_none(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     SC_ASSERT_EQ(mgr.config.provider, SC_PUSH_NONE);
@@ -1617,7 +1665,7 @@ static void test_event_bridge_init_valid_sets_fields(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_bus_t bus;
     sc_bus_init(&bus);
-    sc_control_protocol_t proto = { .alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL };
+    sc_control_protocol_t proto = {.alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL};
     sc_event_bridge_t bridge = {0};
     sc_event_bridge_init(&bridge, &proto, &bus);
     SC_ASSERT_EQ(bridge.proto, &proto);
@@ -1638,7 +1686,7 @@ static void test_push_unregister_null_mgr(void) {
 
 static void test_push_control_protocol_fcm_then_apns(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    sc_push_config_t config = { .provider = SC_PUSH_NONE };
+    sc_push_config_t config = {.provider = SC_PUSH_NONE};
     sc_push_manager_t mgr = {0};
     sc_push_init(&mgr, &alloc, &config);
     sc_push_register_token(&mgr, "fcm-1", SC_PUSH_FCM);

@@ -33,7 +33,8 @@ sc_error_t sc_tenant_update(sc_tenant_store_t *store, const sc_tenant_t *tenant)
 sc_error_t sc_tenant_delete(sc_tenant_store_t *store, const char *user_id);
 sc_error_t sc_tenant_list(sc_tenant_store_t *store, sc_tenant_t *out, size_t max, size_t *count);
 
-sc_error_t sc_tenant_increment_usage(sc_tenant_store_t *store, const char *user_id, uint64_t tokens);
+sc_error_t sc_tenant_increment_usage(sc_tenant_store_t *store, const char *user_id,
+                                     uint64_t tokens);
 bool sc_tenant_check_quota(sc_tenant_store_t *store, const char *user_id);
 bool sc_tenant_check_rate_limit(sc_tenant_store_t *store, const char *user_id);
 

@@ -1,11 +1,11 @@
-#include "test_framework.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/json.h"
 #include "seaclaw/tool.h"
-#include "seaclaw/tools/shell.h"
 #include "seaclaw/tools/factory.h"
+#include "seaclaw/tools/shell.h"
 #include "seaclaw/tools/validation.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_shell_create_succeeds(void) {
@@ -14,7 +14,8 @@ static void test_shell_create_succeeds(void) {
     sc_error_t err = sc_shell_create(&alloc, "/tmp", 4, NULL, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "shell");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_shell_name(void) {
@@ -23,7 +24,8 @@ static void test_shell_name(void) {
     sc_error_t err = sc_shell_create(&alloc, NULL, 0, NULL, &tool);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "shell");
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_shell_description(void) {
@@ -34,7 +36,8 @@ static void test_shell_description(void) {
     const char *desc = tool.vtable->description(tool.ctx);
     SC_ASSERT_NOT_NULL(desc);
     SC_ASSERT_TRUE(strlen(desc) > 0);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_shell_parameters_json(void) {
@@ -45,7 +48,8 @@ static void test_shell_parameters_json(void) {
     const char *params = tool.vtable->parameters_json(tool.ctx);
     SC_ASSERT_NOT_NULL(params);
     SC_ASSERT_TRUE(strstr(params, "command") != NULL);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_shell_execute_disabled_in_test(void) {
@@ -68,7 +72,8 @@ static void test_shell_execute_disabled_in_test(void) {
     if (result.output) {
         alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
     }
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_validate_path_rejects_traversal(void) {
@@ -88,8 +93,10 @@ static void test_validate_path_accepts_safe(void) {
 }
 
 static void test_validate_path_rejects_outside_workspace(void) {
-    SC_ASSERT_EQ(sc_tool_validate_path("/etc/passwd", "/tmp/workspace", 15), SC_ERR_TOOL_VALIDATION);
-    SC_ASSERT_EQ(sc_tool_validate_path("/tmp/workspace_evil", "/tmp/workspace", 15), SC_ERR_TOOL_VALIDATION);
+    SC_ASSERT_EQ(sc_tool_validate_path("/etc/passwd", "/tmp/workspace", 15),
+                 SC_ERR_TOOL_VALIDATION);
+    SC_ASSERT_EQ(sc_tool_validate_path("/tmp/workspace_evil", "/tmp/workspace", 15),
+                 SC_ERR_TOOL_VALIDATION);
 }
 
 static void test_validate_url_https_only(void) {
@@ -108,8 +115,8 @@ static void test_tools_factory_create_default(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_tool_t *tools = NULL;
     size_t count = 0;
-    sc_error_t err = sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL,
-                                             &tools, &count);
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(tools);
     SC_ASSERT(count >= 1);

@@ -1,14 +1,14 @@
-#include "test_framework.h"
+#include "seaclaw/agent/compaction.h"
+#include "seaclaw/agent/dispatcher.h"
+#include "seaclaw/agent/planner.h"
+#include "seaclaw/context.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
-#include "seaclaw/agent/dispatcher.h"
-#include "seaclaw/agent/compaction.h"
-#include "seaclaw/agent/planner.h"
-#include "seaclaw/context.h"
-#include "seaclaw/tools/shell.h"
 #include "seaclaw/tools/factory.h"
+#include "seaclaw/tools/shell.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -41,7 +41,8 @@ static void test_dispatcher_sequential_single_tool(void) {
     SC_ASSERT_TRUE(dres.results[0].success);
 
     sc_dispatch_result_free(&alloc, &dres);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_dispatcher_multiple_tools(void) {
@@ -53,10 +54,18 @@ static void test_dispatcher_multiple_tools(void) {
     const char *arg1 = "{\"command\":\"echo a\"}";
     const char *arg2 = "{\"command\":\"echo b\"}";
     sc_tool_call_t calls[2] = {
-        { .id = "c1", .id_len = 2, .name = "shell", .name_len = 5,
-          .arguments = arg1, .arguments_len = strlen(arg1) },
-        { .id = "c2", .id_len = 2, .name = "shell", .name_len = 5,
-          .arguments = arg2, .arguments_len = strlen(arg2) },
+        {.id = "c1",
+         .id_len = 2,
+         .name = "shell",
+         .name_len = 5,
+         .arguments = arg1,
+         .arguments_len = strlen(arg1)},
+        {.id = "c2",
+         .id_len = 2,
+         .name = "shell",
+         .name_len = 5,
+         .arguments = arg2,
+         .arguments_len = strlen(arg2)},
     };
 
     sc_dispatcher_t disp;
@@ -72,7 +81,8 @@ static void test_dispatcher_multiple_tools(void) {
     SC_ASSERT_TRUE(dres.results[1].success);
 
     sc_dispatch_result_free(&alloc, &dres);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_dispatcher_result_order_preserved(void) {
@@ -84,10 +94,18 @@ static void test_dispatcher_result_order_preserved(void) {
     const char *a1 = "{\"command\":\"echo first\"}";
     const char *a2 = "{\"command\":\"echo second\"}";
     sc_tool_call_t calls[2] = {
-        { .id = "c1", .id_len = 2, .name = "shell", .name_len = 5,
-          .arguments = a1, .arguments_len = strlen(a1) },
-        { .id = "c2", .id_len = 2, .name = "shell", .name_len = 5,
-          .arguments = a2, .arguments_len = strlen(a2) },
+        {.id = "c1",
+         .id_len = 2,
+         .name = "shell",
+         .name_len = 5,
+         .arguments = a1,
+         .arguments_len = strlen(a1)},
+        {.id = "c2",
+         .id_len = 2,
+         .name = "shell",
+         .name_len = 5,
+         .arguments = a2,
+         .arguments_len = strlen(a2)},
     };
 
     sc_dispatcher_t disp;
@@ -103,7 +121,8 @@ static void test_dispatcher_result_order_preserved(void) {
     SC_ASSERT_NOT_NULL(dres.results[1].output);
 
     sc_dispatch_result_free(&alloc, &dres);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_dispatcher_tool_failure_has_error_msg(void) {
@@ -111,9 +130,12 @@ static void test_dispatcher_tool_failure_has_error_msg(void) {
     sc_tool_t tool;
     sc_shell_create(&alloc, "/tmp", 4, NULL, &tool);
     sc_tool_call_t call = {
-        .id = "x", .id_len = 1,
-        .name = "unknown_tool_xyz", .name_len = 17,
-        .arguments = "{}", .arguments_len = 2,
+        .id = "x",
+        .id_len = 1,
+        .name = "unknown_tool_xyz",
+        .name_len = 17,
+        .arguments = "{}",
+        .arguments_len = 2,
     };
     sc_dispatcher_t disp;
     sc_dispatcher_default(&disp);
@@ -125,7 +147,8 @@ static void test_dispatcher_tool_failure_has_error_msg(void) {
     SC_ASSERT_NOT_NULL(dres.results[0].error_msg);
     SC_ASSERT_TRUE(strstr(dres.results[0].error_msg, "not found") != NULL);
     sc_dispatch_result_free(&alloc, &dres);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_dispatcher_sequential_respects_max_parallel_one(void) {
@@ -136,14 +159,19 @@ static void test_dispatcher_sequential_respects_max_parallel_one(void) {
     sc_dispatcher_default(&disp);
     disp.max_parallel = 1;
     const char *args = "{\"command\":\"echo x\"}";
-    sc_tool_call_t c = { .id = "x", .id_len = 1, .name = "shell", .name_len = 5,
-                         .arguments = args, .arguments_len = strlen(args) };
+    sc_tool_call_t c = {.id = "x",
+                        .id_len = 1,
+                        .name = "shell",
+                        .name_len = 5,
+                        .arguments = args,
+                        .arguments_len = strlen(args)};
     sc_dispatch_result_t dres;
     sc_error_t err = sc_dispatcher_dispatch(&disp, &alloc, &tool, 1, &c, 1, &dres);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(dres.count, 1u);
     sc_dispatch_result_free(&alloc, &dres);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 static void test_dispatcher_tool_not_found(void) {
@@ -153,7 +181,8 @@ static void test_dispatcher_tool_not_found(void) {
     SC_ASSERT_EQ(err, SC_OK);
 
     sc_tool_call_t call = {
-        .id = "x", .id_len = 1,
+        .id = "x",
+        .id_len = 1,
         .name = "nonexistent_tool",
         .name_len = 16,
         .arguments = "{}",
@@ -170,7 +199,8 @@ static void test_dispatcher_tool_not_found(void) {
     SC_ASSERT_TRUE(strstr(dres.results[0].error_msg, "not found") != NULL);
 
     sc_dispatch_result_free(&alloc, &dres);
-    if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
 }
 
 /* ─── Compaction tests ───────────────────────────────────────────────────── */
@@ -180,12 +210,12 @@ static void test_compaction_reduces_history(void) {
     sc_compaction_config_t cfg;
     sc_compaction_config_default(&cfg);
     cfg.keep_recent = 5;
-    cfg.max_history_messages = 25;  /* 30 > 25 triggers compaction */
+    cfg.max_history_messages = 25; /* 30 > 25 triggers compaction */
 
     /* Create history: system + 30 user messages */
     size_t cap = 64;
-    sc_owned_message_t *history = (sc_owned_message_t *)alloc.alloc(alloc.ctx,
-        cap * sizeof(sc_owned_message_t));
+    sc_owned_message_t *history =
+        (sc_owned_message_t *)alloc.alloc(alloc.ctx, cap * sizeof(sc_owned_message_t));
     SC_ASSERT_NOT_NULL(history);
 
     history[0].role = SC_ROLE_SYSTEM;
@@ -231,11 +261,11 @@ static void test_compaction_keep_recent_preserved(void) {
     sc_compaction_config_t cfg;
     sc_compaction_config_default(&cfg);
     cfg.keep_recent = 3;
-    cfg.max_history_messages = 8;  /* 10 > 8 triggers compaction */
+    cfg.max_history_messages = 8; /* 10 > 8 triggers compaction */
 
     size_t cap = 32;
-    sc_owned_message_t *history = (sc_owned_message_t *)alloc.alloc(alloc.ctx,
-        cap * sizeof(sc_owned_message_t));
+    sc_owned_message_t *history =
+        (sc_owned_message_t *)alloc.alloc(alloc.ctx, cap * sizeof(sc_owned_message_t));
     SC_ASSERT_NOT_NULL(history);
 
     for (size_t i = 0; i < 10; i++) {
@@ -272,8 +302,8 @@ static void test_compaction_keep_recent_preserved(void) {
 
 static void test_estimate_tokens(void) {
     sc_owned_message_t msgs[2] = {
-        { .content = "hello", .content_len = 5, .role = SC_ROLE_USER },
-        { .content = "world", .content_len = 5, .role = SC_ROLE_ASSISTANT },
+        {.content = "hello", .content_len = 5, .role = SC_ROLE_USER},
+        {.content = "world", .content_len = 5, .role = SC_ROLE_ASSISTANT},
     };
     uint64_t t = sc_estimate_tokens(msgs, 2);
     SC_ASSERT_EQ(t, (uint64_t)3); /* aggregate: (5+5+3)/4 = 3 — matches Zig formula */
@@ -334,8 +364,8 @@ static void test_context_pressure_96_auto_compact_triggered(void) {
 static void test_context_compact_preserves_system_and_recent(void) {
     sc_allocator_t alloc = sc_system_allocator();
     size_t cap = 32;
-    sc_owned_message_t *history = (sc_owned_message_t *)alloc.alloc(alloc.ctx,
-        cap * sizeof(sc_owned_message_t));
+    sc_owned_message_t *history =
+        (sc_owned_message_t *)alloc.alloc(alloc.ctx, cap * sizeof(sc_owned_message_t));
     SC_ASSERT_NOT_NULL(history);
 
     history[0].role = SC_ROLE_SYSTEM;
@@ -377,8 +407,8 @@ static void test_context_compact_preserves_system_and_recent(void) {
 static void test_context_compact_reduces_below_target(void) {
     sc_allocator_t alloc = sc_system_allocator();
     size_t cap = 64;
-    sc_owned_message_t *history = (sc_owned_message_t *)alloc.alloc(alloc.ctx,
-        cap * sizeof(sc_owned_message_t));
+    sc_owned_message_t *history =
+        (sc_owned_message_t *)alloc.alloc(alloc.ctx, cap * sizeof(sc_owned_message_t));
     SC_ASSERT_NOT_NULL(history);
 
     history[0].role = SC_ROLE_SYSTEM;
@@ -423,7 +453,9 @@ static void test_context_compact_reduces_below_target(void) {
 
 static void test_planner_create_plan(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    const char *json = "{\"steps\":[{\"tool\":\"shell\",\"args\":{\"command\":\"ls\"},\"description\":\"list files\"},{\"tool\":\"file_read\",\"args\":{\"path\":\"a.txt\"}}]}";
+    const char *json =
+        "{\"steps\":[{\"tool\":\"shell\",\"args\":{\"command\":\"ls\"},\"description\":\"list "
+        "files\"},{\"tool\":\"file_read\",\"args\":{\"path\":\"a.txt\"}}]}";
     sc_plan_t *plan = NULL;
     sc_error_t err = sc_planner_create_plan(&alloc, json, strlen(json), &plan);
     SC_ASSERT_EQ(err, SC_OK);
@@ -437,7 +469,8 @@ static void test_planner_create_plan(void) {
 
 static void test_planner_step_progression(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    const char *json = "{\"steps\":[{\"name\":\"a\",\"arguments\":{}},{\"name\":\"b\",\"arguments\":{}}]}";
+    const char *json =
+        "{\"steps\":[{\"name\":\"a\",\"arguments\":{}},{\"name\":\"b\",\"arguments\":{}}]}";
     sc_plan_t *plan = NULL;
     sc_error_t err = sc_planner_create_plan(&alloc, json, strlen(json), &plan);
     SC_ASSERT_EQ(err, SC_OK);

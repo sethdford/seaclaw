@@ -20,8 +20,8 @@ static const char *risk_for_tool(const char *tool_name) {
 }
 
 sc_error_t sc_action_preview_generate(sc_allocator_t *alloc, const char *tool_name,
-                                     const char *args_json, size_t args_json_len,
-                                     sc_action_preview_t *out) {
+                                      const char *args_json, size_t args_json_len,
+                                      sc_action_preview_t *out) {
     if (!alloc || !tool_name || !out)
         return SC_ERR_INVALID_ARGUMENT;
     memset(out, 0, sizeof(*out));

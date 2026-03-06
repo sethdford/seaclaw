@@ -3,11 +3,11 @@
  * Uses SEACLAW_VAULT_KEY env var for XOR key; falls back to base64 (obfuscation only).
  * SC_IS_TEST: in-memory storage only, no file I/O.
  */
+#include "seaclaw/security/vault.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
-#include "seaclaw/security/vault.h"
 #include <ctype.h>
 #include <errno.h>
 #include <stdint.h>
@@ -34,7 +34,7 @@ static void sc_vault_secure_zero(void *p, size_t n) {
 }
 #endif
 
-#define VAULT_KEY_MAX 64
+#define VAULT_KEY_MAX  64
 #define VAULT_PATH_MAX 1024
 
 struct sc_vault {
@@ -48,8 +48,7 @@ struct sc_vault {
 #endif
 };
 
-static const char b64_table[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 static size_t base64_encode(const unsigned char *in, size_t in_len, char *out, size_t out_cap) {
     size_t out_size = ((in_len + 2) / 3) * 4;
@@ -269,7 +268,9 @@ sc_vault_t *sc_vault_create(sc_allocator_t *alloc, const char *vault_path) {
         v->has_key = false;
         v->key_len = 0;
 #ifndef SC_IS_TEST
-        fprintf(stderr, "[vault] SEACLAW_VAULT_KEY not set — secrets stored as base64 (obfuscation only)\n");
+        fprintf(
+            stderr,
+            "[vault] SEACLAW_VAULT_KEY not set — secrets stored as base64 (obfuscation only)\n");
 #endif
     }
 
@@ -353,7 +354,8 @@ sc_error_t sc_vault_get(sc_vault_t *vault, const char *key, char *out, size_t ou
 
     unsigned char decoded[4096];
     size_t decoded_len = 0;
-    sc_error_t decode_err = base64_decode(stored, stored_len, decoded, sizeof(decoded), &decoded_len);
+    sc_error_t decode_err =
+        base64_decode(stored, stored_len, decoded, sizeof(decoded), &decoded_len);
 #if !(defined(SC_IS_TEST) && SC_IS_TEST)
     sc_json_free(vault->alloc, obj);
 #endif

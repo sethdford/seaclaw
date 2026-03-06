@@ -1,6 +1,6 @@
-#include "test_framework.h"
-#include "seaclaw/core/json.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/core/json.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_json_parse_null(void) {
@@ -184,9 +184,15 @@ static void test_json_reject_nan_infinity(void) {
     sc_json_value_t *val = NULL;
 
     SC_ASSERT_NEQ(sc_json_parse(&alloc, "NaN", 3, &val), SC_OK);
-    if (val) { sc_json_free(&alloc, val); val = NULL; }
+    if (val) {
+        sc_json_free(&alloc, val);
+        val = NULL;
+    }
     SC_ASSERT_NEQ(sc_json_parse(&alloc, "Infinity", 8, &val), SC_OK);
-    if (val) { sc_json_free(&alloc, val); val = NULL; }
+    if (val) {
+        sc_json_free(&alloc, val);
+        val = NULL;
+    }
 }
 
 static void test_json_append_helpers(void) {

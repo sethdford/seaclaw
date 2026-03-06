@@ -1,6 +1,6 @@
-#include "test_framework.h"
-#include "seaclaw/multimodal.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/multimodal.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_base64_encode_empty(void) {
@@ -63,8 +63,8 @@ static void test_parse_markers_single(void) {
     size_t ref_count = 0;
     char *cleaned = NULL;
     size_t cleaned_len = 0;
-    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text),
-        &refs, &ref_count, &cleaned, &cleaned_len);
+    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text), &refs, &ref_count,
+                                                 &cleaned, &cleaned_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(ref_count, 1u);
     SC_ASSERT_EQ(refs[0].type, SC_IMAGE_REF_LOCAL);
@@ -82,8 +82,8 @@ static void test_parse_markers_url(void) {
     size_t ref_count = 0;
     char *cleaned = NULL;
     size_t cleaned_len = 0;
-    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text),
-        &refs, &ref_count, &cleaned, &cleaned_len);
+    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text), &refs, &ref_count,
+                                                 &cleaned, &cleaned_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(ref_count, 1u);
     SC_ASSERT_EQ(refs[0].type, SC_IMAGE_REF_URL);
@@ -109,8 +109,8 @@ static void test_build_openai_image(void) {
     sc_allocator_t alloc = sc_system_allocator();
     char *json = NULL;
     size_t json_len = 0;
-    sc_error_t err = sc_multimodal_build_openai_image(&alloc,
-        "data:image/png;base64,abc123", 28, &json, &json_len);
+    sc_error_t err = sc_multimodal_build_openai_image(&alloc, "data:image/png;base64,abc123", 28,
+                                                      &json, &json_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(json);
     SC_ASSERT(json_len > 0);
@@ -121,8 +121,8 @@ static void test_build_anthropic_image(void) {
     sc_allocator_t alloc = sc_system_allocator();
     char *json = NULL;
     size_t json_len = 0;
-    sc_error_t err = sc_multimodal_build_anthropic_image(&alloc,
-        "image/png", "abc123", 6, &json, &json_len);
+    sc_error_t err =
+        sc_multimodal_build_anthropic_image(&alloc, "image/png", "abc123", 6, &json, &json_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(json);
     alloc.free(alloc.ctx, json, json_len + 1);
@@ -132,8 +132,8 @@ static void test_build_gemini_image(void) {
     sc_allocator_t alloc = sc_system_allocator();
     char *json = NULL;
     size_t json_len = 0;
-    sc_error_t err = sc_multimodal_build_gemini_image(&alloc,
-        "image/jpeg", "xyz789", 6, &json, &json_len);
+    sc_error_t err =
+        sc_multimodal_build_gemini_image(&alloc, "image/jpeg", "xyz789", 6, &json, &json_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(json);
     alloc.free(alloc.ctx, json, json_len + 1);
@@ -150,17 +150,17 @@ static void test_encode_image_raw(void) {
 }
 
 static void test_detect_mime_webp(void) {
-    unsigned char webp[] = {'R','I','F','F',0,0,0,0,'W','E','B','P'};
+    unsigned char webp[] = {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P'};
     SC_ASSERT_STR_EQ(sc_multimodal_detect_mime(webp, 12), "image/webp");
 }
 
 static void test_detect_mime_gif(void) {
-    unsigned char gif[] = {'G','I','F','8'};
+    unsigned char gif[] = {'G', 'I', 'F', '8'};
     SC_ASSERT_STR_EQ(sc_multimodal_detect_mime(gif, 4), "image/gif");
 }
 
 static void test_detect_mime_bmp(void) {
-    unsigned char bmp[] = {'B','M'};
+    unsigned char bmp[] = {'B', 'M'};
     SC_ASSERT_STR_EQ(sc_multimodal_detect_mime(bmp, 2), "image/bmp");
 }
 
@@ -171,8 +171,8 @@ static void test_parse_markers_multiple(void) {
     size_t ref_count = 0;
     char *cleaned = NULL;
     size_t cleaned_len = 0;
-    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text),
-        &refs, &ref_count, &cleaned, &cleaned_len);
+    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text), &refs, &ref_count,
+                                                 &cleaned, &cleaned_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(ref_count, 2u);
     SC_ASSERT_STR_EQ(refs[0].value, "/tmp/a.png");
@@ -190,8 +190,8 @@ static void test_parse_markers_case_insensitive(void) {
     size_t ref_count = 0;
     char *cleaned = NULL;
     size_t cleaned_len = 0;
-    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text),
-        &refs, &ref_count, &cleaned, &cleaned_len);
+    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text), &refs, &ref_count,
+                                                 &cleaned, &cleaned_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(ref_count, 3u);
     SC_ASSERT_STR_EQ(refs[0].value, "/tmp/x.png");
@@ -210,8 +210,8 @@ static void test_parse_markers_img_alias(void) {
     size_t ref_count = 0;
     char *cleaned = NULL;
     size_t cleaned_len = 0;
-    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text),
-        &refs, &ref_count, &cleaned, &cleaned_len);
+    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text), &refs, &ref_count,
+                                                 &cleaned, &cleaned_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(ref_count, 1u);
     SC_ASSERT_EQ(refs[0].type, SC_IMAGE_REF_URL);
@@ -228,8 +228,8 @@ static void test_parse_markers_data_uri(void) {
     size_t ref_count = 0;
     char *cleaned = NULL;
     size_t cleaned_len = 0;
-    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text),
-        &refs, &ref_count, &cleaned, &cleaned_len);
+    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text), &refs, &ref_count,
+                                                 &cleaned, &cleaned_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(ref_count, 1u);
     SC_ASSERT_EQ(refs[0].type, SC_IMAGE_REF_DATA_URI);
@@ -246,12 +246,13 @@ static void test_parse_markers_none(void) {
     size_t ref_count = 0;
     char *cleaned = NULL;
     size_t cleaned_len = 0;
-    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text),
-        &refs, &ref_count, &cleaned, &cleaned_len);
+    sc_error_t err = sc_multimodal_parse_markers(&alloc, text, strlen(text), &refs, &ref_count,
+                                                 &cleaned, &cleaned_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(ref_count, 0u);
     SC_ASSERT_NOT_NULL(cleaned);
-    if (refs) alloc.free(alloc.ctx, refs, 4 * sizeof(sc_image_ref_t));
+    if (refs)
+        alloc.free(alloc.ctx, refs, 4 * sizeof(sc_image_ref_t));
     alloc.free(alloc.ctx, cleaned, cleaned_len + 1);
 }
 
@@ -260,7 +261,8 @@ static void test_parse_markers_null_alloc(void) {
     size_t ref_count = 0;
     char *cleaned = NULL;
     size_t cleaned_len = 0;
-    sc_error_t err = sc_multimodal_parse_markers(NULL, "x", 1, &refs, &ref_count, &cleaned, &cleaned_len);
+    sc_error_t err =
+        sc_multimodal_parse_markers(NULL, "x", 1, &refs, &ref_count, &cleaned, &cleaned_len);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
 

@@ -209,8 +209,10 @@ sc_error_t sc_rrf_merge(sc_allocator_t *alloc, const sc_memory_entry_t **source_
                 if (entry_dup(alloc, c, &merged[merged_count], 0.0) != SC_OK)
                     break;
                 scores[merged_count] = rrf_term;
-                if (!map_put(&map, alloc, key, key_len, rrf_term, merged_count))
+                if (!map_put(&map, alloc, key, key_len, rrf_term, merged_count)) {
+                    sc_memory_entry_free_fields(alloc, &merged[merged_count]);
                     break;
+                }
                 merged_count++;
             }
         }
