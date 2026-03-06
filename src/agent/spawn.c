@@ -30,6 +30,7 @@ typedef struct sc_pool_slot {
     char *base_url;
     char *workspace_dir;
     char *system_prompt;
+    char *persona_name;
     double temperature;
     uint32_t max_iterations;
     sc_security_policy_t *policy;
@@ -89,6 +90,7 @@ static void slot_free(sc_allocator_t *a, sc_pool_slot_t *s) {
     free_str(a, &s->base_url);
     free_str(a, &s->workspace_dir);
     free_str(a, &s->system_prompt);
+    free_str(a, &s->persona_name);
 }
 
 static void slot_deinit_agent(sc_allocator_t *a, sc_pool_slot_t *s) {
@@ -151,7 +153,8 @@ static void *spawn_thread(void *arg) {
         memset(ag, 0, sizeof(*ag));
         if (sc_agent_from_config(ag, a, prov, NULL, 0, NULL, NULL, NULL, s->policy, mdl,
                                  strlen(mdl), pn, strlen(pn), temp, ws, strlen(ws), mi, 50, false,
-                                 2, sys, strlen(sys), NULL) != SC_OK) {
+                                 2, sys, strlen(sys), s->persona_name,
+                                 s->persona_name ? strlen(s->persona_name) : 0, NULL) != SC_OK) {
             a->free(a->ctx, ag, sizeof(*ag));
             result = sc_strndup(a, "(agent create failed)", 21);
             goto done;
@@ -188,7 +191,8 @@ static void *spawn_thread(void *arg) {
         sc_agent_t ag = {0};
         if (sc_agent_from_config(&ag, a, prov, NULL, 0, NULL, NULL, NULL, s->policy, mdl,
                                  strlen(mdl), pn, strlen(pn), temp, ws, strlen(ws), mi, 50, false,
-                                 2, sys, strlen(sys), NULL) != SC_OK) {
+                                 2, sys, strlen(sys), s->persona_name,
+                                 s->persona_name ? strlen(s->persona_name) : 0, NULL) != SC_OK) {
             result = sc_strndup(a, "(agent create failed)", 21);
             goto done;
         }
@@ -354,6 +358,7 @@ sc_error_t sc_agent_pool_spawn(sc_agent_pool_t *pool, const sc_spawn_config_t *c
         s->workspace_dir = dup_opt(a, cfg->workspace_dir, cfg->workspace_dir_len);
     }
     s->system_prompt = dup_opt(a, cfg->system_prompt, cfg->system_prompt_len);
+    s->persona_name = dup_opt(a, cfg->persona_name, cfg->persona_name_len);
     s->task = task ? sc_strndup(a, task, task_len) : NULL;
     s->label = label ? sc_strndup(a, label, strlen(label)) : NULL;
     s->mailbox = cfg->mailbox;

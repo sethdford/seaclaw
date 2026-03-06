@@ -103,9 +103,6 @@
 #if SC_HAS_QQ
 #include "seaclaw/channels/qq.h"
 #endif
-#if SC_HAS_FACEBOOK
-#include "seaclaw/channels/facebook.h"
-#endif
 #if SC_HAS_INSTAGRAM
 #include "seaclaw/channels/instagram.h"
 #endif
@@ -701,7 +698,8 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
         &agent, alloc, provider, tools, tools_count, memory.vtable ? &memory : NULL,
         session_store.vtable ? &session_store : NULL, observer.vtable ? &observer : NULL, &policy,
         model, strlen(model), prov_name, prov_name_len, temp, ws, strlen(ws), max_iters, max_hist,
-        cfg.memory.auto_save, 2, NULL, 0, &ctx_cfg);
+        cfg.memory.auto_save, 2, NULL, 0, cfg.agent.persona,
+        cfg.agent.persona ? strlen(cfg.agent.persona) : 0, &ctx_cfg);
     if (err != SC_OK) {
         fprintf(stderr, "[%s] Agent init failed: %s\n", SC_CODENAME, sc_error_string(err));
         if (observer.vtable && observer.vtable->deinit)
@@ -995,28 +993,6 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
     }
 #endif
 
-#if SC_HAS_FACEBOOK
-    sc_channel_t facebook_ch = {0};
-    if (cfg.channels.facebook.page_id && cfg.channels.facebook.page_access_token) {
-        err = sc_facebook_create(
-            alloc, cfg.channels.facebook.page_id, strlen(cfg.channels.facebook.page_id),
-            cfg.channels.facebook.page_access_token,
-            strlen(cfg.channels.facebook.page_access_token), cfg.channels.facebook.app_secret,
-            cfg.channels.facebook.app_secret ? strlen(cfg.channels.facebook.app_secret) : 0,
-            &facebook_ch);
-        if (err == SC_OK) {
-            channels[ch_count].channel_ctx = facebook_ch.ctx;
-            channels[ch_count].channel = &facebook_ch;
-            channels[ch_count].poll_fn = sc_facebook_poll;
-            channels[ch_count].webhook_fn = sc_facebook_on_webhook;
-            channels[ch_count].interval_ms = 1000;
-            channels[ch_count].last_poll_ms = 0;
-            ch_count++;
-            fprintf(stderr, "[%s] facebook channel configured (webhook+poll)\n", SC_CODENAME);
-        }
-    }
-#endif
-
 #if SC_HAS_INSTAGRAM
     sc_channel_t instagram_ch = {0};
     if (cfg.channels.instagram.business_account_id && cfg.channels.instagram.access_token) {
@@ -1059,14 +1035,10 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
 
 #if SC_HAS_GOOGLE_RCS
     sc_channel_t google_rcs_ch = {0};
-    if (cfg.channels.google_rcs.agent_id) {
-        err = sc_google_rcs_create(alloc, cfg.channels.google_rcs.agent_id,
-                                   strlen(cfg.channels.google_rcs.agent_id),
-                                   cfg.channels.google_rcs.service_account_json_path,
-                                   cfg.channels.google_rcs.service_account_json_path
-                                       ? strlen(cfg.channels.google_rcs.service_account_json_path)
-                                       : 0,
-                                   &google_rcs_ch);
+    if (cfg.channels.google_rcs.agent_id && cfg.channels.google_rcs.token) {
+        err = sc_google_rcs_create(
+            alloc, cfg.channels.google_rcs.agent_id, strlen(cfg.channels.google_rcs.agent_id),
+            cfg.channels.google_rcs.token, strlen(cfg.channels.google_rcs.token), &google_rcs_ch);
         if (err == SC_OK) {
             channels[ch_count].channel_ctx = google_rcs_ch.ctx;
             channels[ch_count].channel = &google_rcs_ch;
@@ -1162,10 +1134,6 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
 #if SC_HAS_GOOGLE_CHAT
     if (google_chat_ch.ctx)
         sc_google_chat_destroy(&google_chat_ch);
-#endif
-#if SC_HAS_FACEBOOK
-    if (facebook_ch.ctx)
-        sc_facebook_destroy(&facebook_ch);
 #endif
 #if SC_HAS_INSTAGRAM
     if (instagram_ch.ctx)
@@ -1671,7 +1639,8 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
         err = sc_agent_from_config(
             &agent, alloc, provider, tools, tools_count, memory.vtable ? &memory : NULL, NULL, NULL,
             &policy, model, strlen(model), prov_name, prov_name_len, temp, ws, strlen(ws),
-            max_iters, max_hist, cfg.memory.auto_save, 2, NULL, 0, &gw_ctx_cfg);
+            max_iters, max_hist, cfg.memory.auto_save, 2, NULL, 0, cfg.agent.persona,
+            cfg.agent.persona ? strlen(cfg.agent.persona) : 0, &gw_ctx_cfg);
         if (err != SC_OK) {
             fprintf(stderr, "[%s] Agent init failed: %s\n", SC_CODENAME, sc_error_string(err));
             if (gw_retrieval_engine.vtable && gw_retrieval_engine.vtable->deinit)

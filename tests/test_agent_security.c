@@ -183,7 +183,7 @@ static void test_locked_mode_blocks_all_tools(void) {
     memset(&agent, 0, sizeof(agent));
     sc_error_t err = sc_agent_from_config(&agent, &alloc, prov, tools, 1, NULL, NULL, NULL, NULL,
                                           "gpt-4", 5, "openai", 6, 0.7, ".", 1, 25, 50, false,
-                                          SC_AUTONOMY_LOCKED, NULL, 0, NULL);
+                                          SC_AUTONOMY_LOCKED, NULL, 0, NULL, 0, NULL);
     SC_ASSERT_EQ(err, SC_OK);
 
     char *r = NULL;
@@ -237,7 +237,7 @@ static void test_supervised_forces_approval_on_all_tools(void) {
     memset(&agent, 0, sizeof(agent));
     sc_error_t err = sc_agent_from_config(&agent, &alloc, prov, tools, 1, NULL, NULL, NULL, NULL,
                                           "gpt-4", 5, "openai", 6, 0.7, ".", 1, 25, 50, false,
-                                          SC_AUTONOMY_SUPERVISED, NULL, 0, NULL);
+                                          SC_AUTONOMY_SUPERVISED, NULL, 0, NULL, 0, NULL);
     SC_ASSERT_EQ(err, SC_OK);
     agent.approval_cb = test_approval_cb;
     agent.approval_ctx = NULL;
@@ -300,7 +300,7 @@ static void test_policy_deny_blocks_tool_in_agent_flow(void) {
     memset(&agent, 0, sizeof(agent));
     sc_error_t err = sc_agent_from_config(&agent, &alloc, prov, tools, 1, NULL, NULL, NULL, NULL,
                                           "gpt-4", 5, "openai", 6, 0.7, ".", 1, 25, 50, false,
-                                          SC_AUTONOMY_AUTONOMOUS, NULL, 0, NULL);
+                                          SC_AUTONOMY_AUTONOMOUS, NULL, 0, NULL, 0, NULL);
     SC_ASSERT_EQ(err, SC_OK);
     agent.policy_engine = pe;
 
@@ -344,7 +344,7 @@ static void test_needs_approval_no_callback_fails_explicitly(void) {
     memset(&agent, 0, sizeof(agent));
     sc_error_t err = sc_agent_from_config(&agent, &alloc, prov, tools, 1, NULL, NULL, NULL, NULL,
                                           "gpt-4", 5, "openai", 6, 0.7, ".", 1, 25, 50, false,
-                                          SC_AUTONOMY_AUTONOMOUS, NULL, 0, NULL);
+                                          SC_AUTONOMY_AUTONOMOUS, NULL, 0, NULL, 0, NULL);
     SC_ASSERT_EQ(err, SC_OK);
     agent.policy_engine = pe;
     agent.approval_cb = NULL; /* no callback */
@@ -386,7 +386,7 @@ static void test_approval_cb_deny_yields_user_denied(void) {
     memset(&agent, 0, sizeof(agent));
     sc_error_t err = sc_agent_from_config(&agent, &alloc, prov, tools, 1, NULL, NULL, NULL, NULL,
                                           "gpt-4", 5, "openai", 6, 0.7, ".", 1, 25, 50, false,
-                                          SC_AUTONOMY_SUPERVISED, NULL, 0, NULL);
+                                          SC_AUTONOMY_SUPERVISED, NULL, 0, NULL, 0, NULL);
     SC_ASSERT_EQ(err, SC_OK);
     agent.approval_cb = test_approval_cb;
     agent.approval_ctx = NULL;

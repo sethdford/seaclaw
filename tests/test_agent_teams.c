@@ -236,7 +236,7 @@ static void test_mailbox_recv_in_agent_context_works(void) {
     sc_agent_t agent = {0};
     SC_ASSERT_EQ(sc_agent_from_config(&agent, &a, prov, NULL, 0, NULL, NULL, NULL, NULL,
                                       "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false, 2,
-                                      NULL, 0, NULL),
+                                      NULL, 0, NULL, 0, NULL),
                  SC_OK);
     sc_agent_set_mailbox(&agent, mb);
 
@@ -289,7 +289,7 @@ static void test_cancel_message_sets_cancel_requested(void) {
     sc_agent_t agent = {0};
     SC_ASSERT_EQ(sc_agent_from_config(&agent, &a, prov, NULL, 0, NULL, NULL, NULL, NULL,
                                       "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false, 2,
-                                      NULL, 0, NULL),
+                                      NULL, 0, NULL, 0, NULL),
                  SC_OK);
     sc_agent_set_mailbox(&agent, mb);
     SC_ASSERT_EQ(agent.cancel_requested, 0);
@@ -421,7 +421,7 @@ static void test_agent_turn_processes_mailbox_messages(void) {
     sc_agent_t agent = {0};
     SC_ASSERT_EQ(sc_agent_from_config(&agent, &a, prov, NULL, 0, NULL, NULL, NULL, NULL,
                                       "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false, 2,
-                                      NULL, 0, NULL),
+                                      NULL, 0, NULL, 0, NULL),
                  SC_OK);
     sc_agent_set_mailbox(&agent, mb);
 
@@ -455,7 +455,7 @@ static void test_agent_registers_unregisters_with_mailbox(void) {
     sc_agent_t agent = {0};
     SC_ASSERT_EQ(sc_agent_from_config(&agent, &a, prov, NULL, 0, NULL, NULL, NULL, NULL,
                                       "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false, 2,
-                                      NULL, 0, NULL),
+                                      NULL, 0, NULL, 0, NULL),
                  SC_OK);
     agent.agent_id = 1;
     sc_agent_set_mailbox(&agent, mb);
@@ -483,7 +483,7 @@ static void test_send_slash_command_sends_message(void) {
     sc_agent_t agent = {0};
     SC_ASSERT_EQ(sc_agent_from_config(&agent, &a, prov, NULL, 0, NULL, NULL, NULL, NULL,
                                       "gpt-4o-mini", 10, "openai", 6, 0.7, ".", 1, 5, 20, false, 2,
-                                      NULL, 0, NULL),
+                                      NULL, 0, NULL, 0, NULL),
                  SC_OK);
     sc_agent_set_mailbox(&agent, mb);
 

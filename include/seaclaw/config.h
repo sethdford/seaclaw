@@ -45,6 +45,9 @@ typedef struct sc_autonomy_config {
 typedef struct sc_runtime_config {
     char *kind;
     char *docker_image;
+    char *gce_project;
+    char *gce_zone;
+    char *gce_instance;
 } sc_runtime_config_t;
 
 typedef struct sc_reliability_config {
@@ -81,6 +84,7 @@ typedef struct sc_agent_config {
     uint64_t message_timeout_secs;
     uint32_t pool_max_concurrent;
     char *default_profile;
+    char *persona;
     float context_pressure_warn;    /* warn at this ratio (default 0.85) */
     float context_pressure_compact; /* auto-compact at this ratio (default 0.95) */
     float context_compact_target;   /* compact until below this ratio (default 0.70) */
@@ -218,6 +222,7 @@ typedef struct sc_twitter_channel_config {
 
 typedef struct sc_google_rcs_channel_config {
     char *agent_id;
+    char *token;
     char *service_account_json_path;
 } sc_google_rcs_channel_config_t;
 

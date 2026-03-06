@@ -377,11 +377,11 @@ sc_error_t sc_agent_cli_run(sc_allocator_t *alloc, const char *const *argv, size
         .compact_target = cfg.agent.context_compact_target,
     };
     sc_agent_t agent;
-    err = sc_agent_from_config(&agent, alloc, provider, tools, tools_count,
-                               memory.vtable ? &memory : NULL,
-                               session_store.vtable ? &session_store : NULL, &observer, NULL, model,
-                               strlen(model), prov_name, prov_name_len, temp, ws, strlen(ws),
-                               max_iters, max_hist, cfg.memory.auto_save, 2, NULL, 0, &ctx_cfg);
+    err = sc_agent_from_config(
+        &agent, alloc, provider, tools, tools_count, memory.vtable ? &memory : NULL,
+        session_store.vtable ? &session_store : NULL, &observer, NULL, model, strlen(model),
+        prov_name, prov_name_len, temp, ws, strlen(ws), max_iters, max_hist, cfg.memory.auto_save,
+        2, NULL, 0, cfg.agent.persona, cfg.agent.persona ? strlen(cfg.agent.persona) : 0, &ctx_cfg);
     if (err != SC_OK) {
         fprintf(stderr, "[%s] Agent init failed: %s\n", SC_CODENAME, sc_error_string(err));
         if (observer.vtable && observer.vtable->deinit)

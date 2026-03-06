@@ -15,6 +15,7 @@
 #include "seaclaw/memory.h"
 #include "seaclaw/memory/retrieval.h"
 #include "seaclaw/observer.h"
+#include "seaclaw/persona.h"
 #include "seaclaw/provider.h"
 #include "seaclaw/security.h"
 #include "seaclaw/security/audit.h"
@@ -130,21 +131,23 @@ struct sc_agent {
     bool chain_of_thought; /* inject reasoning instructions into prompt */
     char *persona_prompt;  /* custom identity override; owned */
     size_t persona_prompt_len;
+
+    sc_persona_t *persona; /* loaded from config; owned */
+    char *persona_name;
+    size_t persona_name_len;
 };
 
 /* Create agent from minimal config (no full config loader yet).
  * ctx_cfg: optional context pressure config; NULL = use defaults. */
-sc_error_t sc_agent_from_config(sc_agent_t *out, sc_allocator_t *alloc, sc_provider_t provider,
-                                const sc_tool_t *tools, size_t tools_count, sc_memory_t *memory,
-                                sc_session_store_t *session_store, sc_observer_t *observer,
-                                sc_security_policy_t *policy, const char *model_name,
-                                size_t model_name_len, const char *default_provider,
-                                size_t default_provider_len, double temperature,
-                                const char *workspace_dir, size_t workspace_dir_len,
-                                uint32_t max_tool_iterations, uint32_t max_history_messages,
-                                bool auto_save, uint8_t autonomy_level,
-                                const char *custom_instructions, size_t custom_instructions_len,
-                                const sc_agent_context_config_t *ctx_cfg);
+sc_error_t sc_agent_from_config(
+    sc_agent_t *out, sc_allocator_t *alloc, sc_provider_t provider, const sc_tool_t *tools,
+    size_t tools_count, sc_memory_t *memory, sc_session_store_t *session_store,
+    sc_observer_t *observer, sc_security_policy_t *policy, const char *model_name,
+    size_t model_name_len, const char *default_provider, size_t default_provider_len,
+    double temperature, const char *workspace_dir, size_t workspace_dir_len,
+    uint32_t max_tool_iterations, uint32_t max_history_messages, bool auto_save,
+    uint8_t autonomy_level, const char *custom_instructions, size_t custom_instructions_len,
+    const char *persona, size_t persona_len, const sc_agent_context_config_t *ctx_cfg);
 
 void sc_agent_deinit(sc_agent_t *agent);
 

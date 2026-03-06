@@ -90,7 +90,7 @@ static void *subagent_thread_fn(void *arg) {
             sc_agent_t agent = {0};
             if (sc_agent_from_config(&agent, alloc, provider, NULL, 0, NULL, NULL, NULL, NULL,
                                      model, model_len, prov, prov_len, temp, ws, ws_len, 25, 50,
-                                     false, 2, NULL, 0, NULL) == SC_OK) {
+                                     false, 2, NULL, 0, NULL, 0, NULL) == SC_OK) {
                 char *resp = NULL;
                 size_t resp_len = 0;
                 const char *sys = "You are a helpful assistant. Answer concisely.";

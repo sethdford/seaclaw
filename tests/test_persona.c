@@ -1,4 +1,8 @@
+#include "seaclaw/agent/prompt.h"
+#include "seaclaw/agent/spawn.h"
+#include "seaclaw/config.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/core/arena.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/persona.h"
 #include "test_framework.h"
@@ -221,6 +225,41 @@ static void test_persona_select_examples_no_channel(void) {
     SC_ASSERT_EQ(count, 0);
 }
 
+static void test_persona_prompt_overrides_default(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_prompt_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.persona_prompt = "You are acting as TestUser. Direct and curious.";
+    cfg.persona_prompt_len = strlen(cfg.persona_prompt);
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_prompt_build_system(&alloc, &cfg, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(out);
+    SC_ASSERT_TRUE(strstr(out, "TestUser") != NULL);
+    SC_ASSERT_TRUE(strstr(out, "SeaClaw") == NULL);
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_sampler_imessage_query(void) {
+    char query[512];
+    size_t query_len = 0;
+    sc_error_t err = sc_persona_sampler_imessage_query(query, sizeof(query), &query_len, 500);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(query_len > 0);
+    SC_ASSERT_NOT_NULL(strstr(query, "message"));
+    SC_ASSERT_NOT_NULL(strstr(query, "LIMIT"));
+}
+
+static void test_spawn_config_persona_field(void) {
+    sc_spawn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.persona_name = "seth";
+    cfg.persona_name_len = 4;
+    SC_ASSERT_STR_EQ(cfg.persona_name, "seth");
+    SC_ASSERT_EQ(cfg.persona_name_len, 4);
+}
+
 static void test_persona_select_examples_no_match(void) {
     sc_persona_example_t imsg_examples[] = {
         {.context = "casual greeting", .incoming = "hey", .response = "yo"},
@@ -267,6 +306,58 @@ static void test_persona_build_prompt_core(void) {
     alloc.free(alloc.ctx, out, out_len + 1);
 }
 
+static void test_agent_persona_prompt_injected(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_prompt_config_t cfg = {
+        .provider_name = "openai",
+        .provider_name_len = 6,
+        .model_name = "gpt-4",
+        .model_name_len = 5,
+        .workspace_dir = "/tmp",
+        .workspace_dir_len = 4,
+        .tools = NULL,
+        .tools_count = 0,
+        .memory_context = NULL,
+        .memory_context_len = 0,
+        .autonomy_level = 1,
+        .custom_instructions = NULL,
+        .custom_instructions_len = 0,
+        .persona_prompt = "You are acting as TestUser. Personality: direct.",
+        .persona_prompt_len = 48,
+    };
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_prompt_build_system(&alloc, &cfg, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "TestUser"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_spawn_config_has_persona(void) {
+    sc_spawn_config_t cfg = {
+        .persona_name = "seth",
+        .persona_name_len = 4,
+    };
+    SC_ASSERT_NOT_NULL(cfg.persona_name);
+    SC_ASSERT_EQ(cfg.persona_name_len, (size_t)4);
+}
+
+static void test_config_persona_field(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json = "{\"agent\":{\"persona\":\"seth\"}}";
+    sc_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    sc_arena_t *arena = sc_arena_create(alloc);
+    SC_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = sc_arena_allocator(arena);
+    sc_error_t err = sc_config_parse_json(&cfg, json, strlen(json));
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(cfg.agent.persona);
+    SC_ASSERT_STR_EQ(cfg.agent.persona, "seth");
+    sc_config_deinit(&cfg);
+}
+
 static void test_persona_build_prompt_with_overlay(void) {
     sc_allocator_t alloc = sc_system_allocator();
     char *notes[] = {"drops punctuation"};
@@ -306,9 +397,15 @@ void run_persona_tests(void) {
     SC_RUN_TEST(test_persona_load_json_basic);
     SC_RUN_TEST(test_persona_load_json_empty);
     SC_RUN_TEST(test_persona_load_not_found);
+    SC_RUN_TEST(test_agent_persona_prompt_injected);
+    SC_RUN_TEST(test_spawn_config_has_persona);
+    SC_RUN_TEST(test_config_persona_field);
     SC_RUN_TEST(test_persona_build_prompt_core);
     SC_RUN_TEST(test_persona_build_prompt_with_overlay);
     SC_RUN_TEST(test_persona_examples_load_json);
+    SC_RUN_TEST(test_persona_prompt_overrides_default);
+    SC_RUN_TEST(test_spawn_config_persona_field);
+    SC_RUN_TEST(test_sampler_imessage_query);
     SC_RUN_TEST(test_persona_select_examples_match);
     SC_RUN_TEST(test_persona_select_examples_no_channel);
     SC_RUN_TEST(test_persona_select_examples_no_match);

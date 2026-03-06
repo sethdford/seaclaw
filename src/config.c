@@ -70,6 +70,7 @@ static void set_defaults(sc_config_t *cfg, sc_allocator_t *a) {
     cfg->agent.message_timeout_secs = 600;
     cfg->agent.pool_max_concurrent = 8;
     cfg->agent.default_profile = NULL;
+    cfg->agent.persona = NULL;
     cfg->policy.enabled = false;
     cfg->policy.rules_json = NULL;
     cfg->plugins.enabled = false;
@@ -92,6 +93,9 @@ static void set_defaults(sc_config_t *cfg, sc_allocator_t *a) {
     cfg->router.complexity_high = 500;
     cfg->runtime.kind = sc_strdup(a, "native");
     cfg->runtime.docker_image = NULL;
+    cfg->runtime.gce_project = NULL;
+    cfg->runtime.gce_zone = NULL;
+    cfg->runtime.gce_instance = NULL;
     cfg->memory.profile = sc_strdup(a, "markdown_only");
     cfg->memory.backend = sc_strdup(a, "markdown");
     cfg->memory.auto_save = true;
@@ -593,6 +597,24 @@ static sc_error_t parse_runtime(sc_allocator_t *a, sc_config_t *cfg, const sc_js
             a->free(a->ctx, cfg->runtime.docker_image, strlen(cfg->runtime.docker_image) + 1);
         cfg->runtime.docker_image = sc_strdup(a, docker_image);
     }
+    const char *gce_project = sc_json_get_string(obj, "gce_project");
+    if (gce_project) {
+        if (cfg->runtime.gce_project)
+            a->free(a->ctx, cfg->runtime.gce_project, strlen(cfg->runtime.gce_project) + 1);
+        cfg->runtime.gce_project = sc_strdup(a, gce_project);
+    }
+    const char *gce_zone = sc_json_get_string(obj, "gce_zone");
+    if (gce_zone) {
+        if (cfg->runtime.gce_zone)
+            a->free(a->ctx, cfg->runtime.gce_zone, strlen(cfg->runtime.gce_zone) + 1);
+        cfg->runtime.gce_zone = sc_strdup(a, gce_zone);
+    }
+    const char *gce_instance = sc_json_get_string(obj, "gce_instance");
+    if (gce_instance) {
+        if (cfg->runtime.gce_instance)
+            a->free(a->ctx, cfg->runtime.gce_instance, strlen(cfg->runtime.gce_instance) + 1);
+        cfg->runtime.gce_instance = sc_strdup(a, gce_instance);
+    }
     return SC_OK;
 }
 
@@ -1065,6 +1087,12 @@ static void parse_google_rcs_channel(sc_allocator_t *a, sc_config_t *cfg,
             a->free(a->ctx, rcs->agent_id, strlen(rcs->agent_id) + 1);
         rcs->agent_id = sc_strdup(a, s);
     }
+    s = sc_json_get_string(val, "token");
+    if (s) {
+        if (rcs->token)
+            a->free(a->ctx, rcs->token, strlen(rcs->token) + 1);
+        rcs->token = sc_strdup(a, s);
+    }
     s = sc_json_get_string(val, "service_account_json_path");
     if (s) {
         if (rcs->service_account_json_path)
@@ -1270,6 +1298,12 @@ static sc_error_t parse_agent(sc_allocator_t *a, sc_config_t *cfg, const sc_json
         sc_json_get_number(obj, "context_compact_target", cfg->agent.context_compact_target);
     if (cct > 0.0 && cct <= 1.0)
         cfg->agent.context_compact_target = (float)cct;
+    const char *persona = sc_json_get_string(obj, "persona");
+    if (persona) {
+        if (cfg->agent.persona)
+            a->free(a->ctx, cfg->agent.persona, strlen(cfg->agent.persona) + 1);
+        cfg->agent.persona = sc_strdup(a, persona);
+    }
     return SC_OK;
 }
 static sc_error_t parse_policy_cfg(sc_allocator_t *a, sc_config_t *cfg,

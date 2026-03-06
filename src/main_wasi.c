@@ -60,7 +60,7 @@ static int run_agent_loop(sc_allocator_t *alloc) {
     err = sc_agent_from_config(&agent, alloc, provider, NULL,
                                0, /* no tools: shell not available in WASM */
                                NULL, NULL, NULL, NULL, model, strlen(model), "wasm_openai", 11, 0.7,
-                               workspace, 1, 10, 30, false, 0, NULL, 0, NULL);
+                               workspace, 1, 10, 30, false, 0, NULL, 0, NULL, 0, NULL);
     if (err != SC_OK) {
         sc_wasm_channel_destroy(&channel);
         provider.vtable->deinit(provider.ctx, alloc);

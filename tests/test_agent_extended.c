@@ -241,7 +241,7 @@ static void test_agent_tool_call_round_trip(void) {
     err = sc_agent_from_config(&agent, &alloc, prov,
         &shell_tool, 1, NULL, NULL, NULL, NULL,
         "gpt-4", 5, "openai", 6, 0.7,
-        ".", 1, 25, 50, false, 0, NULL, 0, NULL);
+        ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(agent.tool_specs_count, 1u);
     SC_ASSERT_EQ(agent.tools_count, 1u);

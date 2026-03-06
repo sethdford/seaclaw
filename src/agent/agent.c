@@ -18,6 +18,7 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/observer.h"
+#include "seaclaw/persona.h"
 #include "seaclaw/provider.h"
 #include "seaclaw/voice.h"
 #include <ctype.h>
@@ -126,17 +127,15 @@ static int sc_strncasecmp(const char *a, const char *b, size_t n) {
     return 0;
 }
 
-sc_error_t sc_agent_from_config(sc_agent_t *out, sc_allocator_t *alloc, sc_provider_t provider,
-                                const sc_tool_t *tools, size_t tools_count, sc_memory_t *memory,
-                                sc_session_store_t *session_store, sc_observer_t *observer,
-                                sc_security_policy_t *policy, const char *model_name,
-                                size_t model_name_len, const char *default_provider,
-                                size_t default_provider_len, double temperature,
-                                const char *workspace_dir, size_t workspace_dir_len,
-                                uint32_t max_tool_iterations, uint32_t max_history_messages,
-                                bool auto_save, uint8_t autonomy_level,
-                                const char *custom_instructions, size_t custom_instructions_len,
-                                const sc_agent_context_config_t *ctx_cfg) {
+sc_error_t sc_agent_from_config(
+    sc_agent_t *out, sc_allocator_t *alloc, sc_provider_t provider, const sc_tool_t *tools,
+    size_t tools_count, sc_memory_t *memory, sc_session_store_t *session_store,
+    sc_observer_t *observer, sc_security_policy_t *policy, const char *model_name,
+    size_t model_name_len, const char *default_provider, size_t default_provider_len,
+    double temperature, const char *workspace_dir, size_t workspace_dir_len,
+    uint32_t max_tool_iterations, uint32_t max_history_messages, bool auto_save,
+    uint8_t autonomy_level, const char *custom_instructions, size_t custom_instructions_len,
+    const char *persona, size_t persona_len, const sc_agent_context_config_t *ctx_cfg) {
     if (!out || !alloc || !provider.vtable || !model_name) {
         return SC_ERR_INVALID_ARGUMENT;
     }
@@ -275,6 +274,20 @@ sc_error_t sc_agent_from_config(sc_agent_t *out, sc_allocator_t *alloc, sc_provi
         out->cached_static_prompt_cap = out->cached_static_prompt_len;
     }
 
+    if (persona && persona_len > 0) {
+        out->persona_name = sc_strndup(alloc, persona, persona_len);
+        out->persona_name_len = persona_len;
+        out->persona = (sc_persona_t *)alloc->alloc(alloc->ctx, sizeof(sc_persona_t));
+        if (out->persona) {
+            memset(out->persona, 0, sizeof(sc_persona_t));
+            sc_error_t perr = sc_persona_load(alloc, persona, persona_len, out->persona);
+            if (perr != SC_OK) {
+                alloc->free(alloc->ctx, out->persona, sizeof(sc_persona_t));
+                out->persona = NULL;
+            }
+        }
+    }
+
     out->turn_arena = sc_arena_create(*alloc);
 
     out->audit_logger = NULL;
@@ -354,6 +367,19 @@ void sc_agent_deinit(sc_agent_t *agent) {
         agent->alloc->free(agent->alloc->ctx, agent->custom_instructions,
                            agent->custom_instructions_len + 1);
         agent->custom_instructions = NULL;
+    }
+    if (agent->persona) {
+        sc_persona_deinit(agent->alloc, agent->persona);
+        agent->alloc->free(agent->alloc->ctx, agent->persona, sizeof(sc_persona_t));
+        agent->persona = NULL;
+    }
+    if (agent->persona_name) {
+        agent->alloc->free(agent->alloc->ctx, agent->persona_name, agent->persona_name_len + 1);
+        agent->persona_name = NULL;
+    }
+    if (agent->persona_prompt) {
+        agent->alloc->free(agent->alloc->ctx, agent->persona_prompt, agent->persona_prompt_len + 1);
+        agent->persona_prompt = NULL;
     }
     if (agent->provider.vtable && agent->provider.vtable->deinit) {
         agent->provider.vtable->deinit(agent->provider.ctx, agent->alloc);
@@ -667,6 +693,10 @@ char *sc_agent_handle_slash_command(sc_agent_t *agent, const char *message, size
         scfg.mode = SC_SPAWN_ONE_SHOT;
         scfg.max_iterations = 10;
         scfg.mailbox = agent->mailbox;
+        if (agent->persona_name) {
+            scfg.persona_name = agent->persona_name;
+            scfg.persona_name_len = agent->persona_name_len;
+        }
         uint64_t new_id = 0;
         sc_error_t err =
             sc_agent_pool_spawn(agent->agent_pool, &scfg, arg_buf, arg_len, "cli-spawn", &new_id);
@@ -1038,6 +1068,18 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         sc_memory_loader_init(&loader, agent->alloc, agent->memory, agent->retrieval_engine, 10,
                               4000);
         (void)sc_memory_loader_load(&loader, msg, msg_len, "", 0, &memory_ctx, &memory_ctx_len);
+    }
+
+    /* Build persona prompt lazily when persona is loaded */
+    if (agent->persona && !agent->persona_prompt) {
+        char *pp = NULL;
+        size_t pp_len = 0;
+        sc_error_t perr =
+            sc_persona_build_prompt(agent->alloc, agent->persona, NULL, 0, &pp, &pp_len);
+        if (perr == SC_OK) {
+            agent->persona_prompt = pp;
+            agent->persona_prompt_len = pp_len;
+        }
     }
 
     /* Build system prompt using cached static portion when available */

@@ -31,6 +31,8 @@ typedef struct sc_spawn_config {
     size_t workspace_dir_len;
     const char *system_prompt;
     size_t system_prompt_len;
+    const char *persona_name;
+    size_t persona_name_len;
     const char *const *tool_names;
     size_t tool_names_count;
     sc_security_policy_t *policy;
