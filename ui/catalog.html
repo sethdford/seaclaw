@@ -71,6 +71,10 @@
       <a href="#sc-animated-icon">sc-animated-icon</a>
       <a href="#sc-activity-feed">sc-activity-feed</a>
       <a href="#sc-welcome">sc-welcome</a>
+      <a href="#sc-thinking">sc-thinking</a>
+      <a href="#sc-tool-result">sc-tool-result</a>
+      <a href="#sc-message-stream">sc-message-stream</a>
+      <a href="#sc-message-branch">sc-message-branch</a>
     </nav>
     <main class="catalog-main">
       <header class="catalog-header">
@@ -762,6 +766,46 @@
         <div class="code-snippet"><pre><code>&lt;sc-welcome&gt;&lt;/sc-welcome&gt;</code></pre></div>
       </section>
 
+      <section class="component-section" id="sc-thinking">
+        <h2>sc-thinking</h2>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 480px;">
+            <sc-thinking active .steps=${["Analyzing request", "Planning steps"]} duration="3200"></sc-thinking>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-thinking active .steps=&#x27;["Analyzing..."]&#x27;&gt;&lt;/sc-thinking&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-tool-result">
+        <h2>sc-tool-result</h2>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 480px;">
+            <sc-tool-result tool="shell" status="success" content="File created successfully"></sc-tool-result>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-tool-result tool=&quot;shell&quot; status=&quot;success&quot;&gt;&lt;/sc-tool-result&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-message-stream">
+        <h2>sc-message-stream</h2>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 480px;">
+            <sc-message-stream content="Hello! This supports **bold**, *italic*, and `code`." role="assistant"></sc-message-stream>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-message-stream content=&quot;...&quot; role=&quot;assistant&quot;&gt;&lt;/sc-message-stream&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-message-branch">
+        <h2>sc-message-branch</h2>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 480px;">
+            <sc-message-branch branches="3" current="1"></sc-message-branch>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-message-branch branches=&quot;3&quot; current=&quot;1&quot;&gt;&lt;/sc-message-branch&gt;</code></pre></div>
+      </section>
+
     <sc-toast></sc-toast>
 
     <script type="module">
@@ -797,6 +841,11 @@
       import "/src/components/sc-animated-icon.js";
       import "/src/components/sc-activity-feed.js";
       import "/src/components/sc-welcome.js";
+      import "/src/components/sc-thinking.js";
+      import "/src/components/sc-tool-result.js";
+      import "/src/components/sc-message-branch.js";
+      import "/src/components/sc-message-stream.js";
+      import "/src/components/sc-message-branch.js";
 
       // Theme toggle
       function setTheme(theme) {

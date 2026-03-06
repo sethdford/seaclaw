@@ -48,6 +48,16 @@ while IFS= read -r file; do
       continue
     fi
 
+    # Allow hex inside var() fallbacks: var(--sc-xxx, #fff)
+    fallback_cleaned=$(echo "$line" | sed -E 's/var\(--sc-[a-zA-Z0-9_-]+,[[:space:]]*#[0-9a-fA-F]{3,8}\)//g')
+    # Allow hex inside color-mix() that wraps var() with hex fallback
+    fallback_cleaned=$(echo "$fallback_cleaned" | sed -E 's/var\(--[a-zA-Z0-9_-]+,[[:space:]]*#[0-9a-fA-F]{3,8}\)//g')
+    # Allow hex inside linear-gradient mask tricks (gradient masking pattern)
+    fallback_cleaned=$(echo "$fallback_cleaned" | sed -E 's/linear-gradient\(#[0-9a-fA-F]{3,8}[^)]*\)//g')
+    if ! echo "$fallback_cleaned" | grep -qE '#[0-9a-fA-F]{3,8}\b'; then
+      continue
+    fi
+
     cleaned=$(echo "$line" | sed -E 's/bg-\[#[0-9a-fA-F]{3,8}\]//g')
 
     if echo "$cleaned" | grep -qE '#[0-9a-fA-F]{3,8}\b'; then

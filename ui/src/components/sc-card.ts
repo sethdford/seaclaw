@@ -7,7 +7,8 @@ export class ScCard extends LitElement {
   @property({ type: Boolean }) clickable = false;
   @property({ type: Boolean }) accent = false;
   @property({ type: Boolean }) elevated = false;
-  @property({ type: Boolean }) glass = false;
+  @property({ type: Boolean }) glass = true;
+  @property({ type: Boolean }) solid = false;
 
   static override styles = css`
     :host {
@@ -187,7 +188,7 @@ export class ScCard extends LitElement {
       this.clickable ? "clickable" : "",
       this.accent ? "accent" : "",
       this.elevated ? "elevated" : "",
-      this.glass ? "glass" : "",
+      !this.solid ? "glass" : "",
     ]
       .filter(Boolean)
       .join(" ");

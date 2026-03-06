@@ -4,6 +4,7 @@ import type { GatewayClient, GatewayStatus } from "./gateway.js";
 import { GatewayClient as GatewayClientClass } from "./gateway.js";
 import { DemoGatewayClient } from "./demo-gateway.js";
 import { setGateway } from "./gateway-provider.js";
+import { dynamicLight } from "./lib/dynamic-light.js";
 import { icons } from "./icons.js";
 import "./components/floating-mic.js";
 import "./components/sidebar.js";
@@ -383,6 +384,7 @@ export class ScApp extends LitElement {
     document.addEventListener("keydown", this._keyHandler);
     window.addEventListener("hashchange", this._hashHandler);
     this._onHashChange();
+    dynamicLight.start();
 
     const wsUrl =
       typeof window !== "undefined" &&
@@ -413,6 +415,7 @@ export class ScApp extends LitElement {
     super.disconnectedCallback();
     document.removeEventListener("keydown", this._keyHandler);
     window.removeEventListener("hashchange", this._hashHandler);
+    dynamicLight.stop();
     this.gateway?.disconnect();
   }
 

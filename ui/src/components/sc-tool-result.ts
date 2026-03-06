@@ -1,0 +1,179 @@
+import { LitElement, html, css } from "lit";
+import { customElement, property } from "lit/decorators.js";
+import { icons } from "../icons.js";
+
+type ToolStatus = "running" | "success" | "error";
+
+@customElement("sc-tool-result")
+export class ScToolResult extends LitElement {
+  @property({ type: String }) tool = "";
+  @property({ type: String }) status: ToolStatus = "running";
+  @property({ type: String }) content = "";
+  @property({ type: Boolean }) collapsed = false;
+
+  static override styles = css`
+    @keyframes sc-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    :host {
+      display: block;
+    }
+
+    .container {
+      border-radius: var(--sc-radius-lg);
+      overflow: hidden;
+      background: color-mix(
+        in srgb,
+        var(--sc-surface) var(--sc-glass-standard-bg-opacity, 6%),
+        transparent
+      );
+      backdrop-filter: blur(var(--sc-glass-standard-blur, 24px))
+        saturate(var(--sc-glass-standard-saturate, 180%));
+      -webkit-backdrop-filter: blur(var(--sc-glass-standard-blur, 24px))
+        saturate(var(--sc-glass-standard-saturate, 180%));
+      border: 1px solid
+        color-mix(
+          in srgb,
+          var(--sc-border) var(--sc-glass-standard-border-opacity, 8%),
+          transparent
+        );
+      border-left-width: 4px;
+      border-left-color: var(--sc-accent-secondary);
+    }
+
+    .container.status-success {
+      border-left-color: var(--sc-accent);
+    }
+
+    .container.status-error {
+      border-left-color: var(--sc-error);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: var(--sc-space-sm);
+      padding: var(--sc-space-sm) var(--sc-space-md);
+      font-family: var(--sc-font);
+      font-size: var(--sc-text-sm);
+      font-weight: var(--sc-weight-medium);
+      color: var(--sc-text);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .header:hover {
+      background: color-mix(in srgb, var(--sc-surface) 8%, transparent);
+    }
+
+    .header:focus-visible {
+      outline: var(--sc-focus-ring-width) solid var(--sc-focus-ring);
+      outline-offset: -2px;
+    }
+
+    .icon {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      color: inherit;
+    }
+
+    .icon.running {
+      animation: sc-spin var(--sc-duration-slow) linear infinite;
+    }
+
+    .icon.success {
+      color: var(--sc-accent);
+    }
+
+    .icon.error {
+      color: var(--sc-error);
+    }
+
+    .content {
+      font-family: var(--sc-font-mono);
+      font-size: var(--sc-text-xs);
+      color: var(--sc-text);
+      padding: var(--sc-space-md);
+      border-top: 1px solid var(--sc-border-subtle);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 300px;
+      overflow-y: auto;
+      transition: max-height var(--sc-duration-normal) var(--sc-ease-out);
+    }
+
+    .content.collapsed {
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      border-top-width: 0;
+      overflow: hidden;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .content {
+        transition: none;
+      }
+
+      .icon.running {
+        animation: none;
+      }
+    }
+  `;
+
+  private _toggle() {
+    this.collapsed = !this.collapsed;
+  }
+
+  private _onKeyDown(e: KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      this._toggle();
+    }
+  }
+
+  private _statusIcon() {
+    switch (this.status) {
+      case "running":
+        return html`<span class="icon running" aria-hidden="true">${icons.refresh}</span>`;
+      case "success":
+        return html`<span class="icon success" aria-hidden="true">${icons.check}</span>`;
+      case "error":
+        return html`<span class="icon error" aria-hidden="true">${icons.x}</span>`;
+      default:
+        return html`<span class="icon" aria-hidden="true">${icons.refresh}</span>`;
+    }
+  }
+
+  override render() {
+    const statusClass = `status-${this.status}`;
+    return html`
+      <div class="container ${statusClass}">
+        <div
+          class="header"
+          role="button"
+          tabindex="0"
+          aria-expanded=${!this.collapsed}
+          aria-label="Toggle ${this.tool} result"
+          @click=${this._toggle}
+          @keydown=${this._onKeyDown}
+        >
+          ${this._statusIcon()}
+          <span>${this.tool}</span>
+        </div>
+        <div class="content ${this.collapsed ? "collapsed" : ""}">${this.content}</div>
+      </div>
+    `;
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "sc-tool-result": ScToolResult;
+  }
+}
