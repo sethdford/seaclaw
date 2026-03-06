@@ -28,7 +28,7 @@
       "1000": { "$value": "#ffffff", "$type": "color" }
     },
     "teal": {
-      "$description": "Primary accent — ocean teal/aqua",
+      "$description": "Legacy ocean teal/aqua — retained for reference",
       "50": { "$value": "#f0fdfa", "$type": "color" },
       "100": { "$value": "#ccfbf1", "$type": "color" },
       "200": { "$value": "#99f6e4", "$type": "color" },
@@ -44,6 +44,24 @@
       "light-600": { "$value": "#0f766e", "$type": "color" },
       "light-400": { "$value": "#14b8a6", "$type": "color" },
       "light-subtle": { "$value": "rgba(13, 148, 136, 0.10)", "$type": "color" }
+    },
+    "fidelity": {
+      "$description": "Primary accent — Fidelity-inspired green",
+      "50": { "$value": "#f3fae8", "$type": "color" },
+      "100": { "$value": "#e2f2c8", "$type": "color" },
+      "200": { "$value": "#c5e59a", "$type": "color" },
+      "300": { "$value": "#a3d46a", "$type": "color" },
+      "400": { "$value": "#8DC63F", "$type": "color" },
+      "500": { "$value": "#7AB648", "$type": "color" },
+      "600": { "$value": "#5A9A30", "$type": "color" },
+      "700": { "$value": "#47802A", "$type": "color" },
+      "800": { "$value": "#366320", "$type": "color" },
+      "900": { "$value": "#264A17", "$type": "color" },
+      "dark-subtle": { "$value": "rgba(122, 182, 72, 0.14)", "$type": "color" },
+      "light-500": { "$value": "#5A9A30", "$type": "color" },
+      "light-600": { "$value": "#47802A", "$type": "color" },
+      "light-400": { "$value": "#7AB648", "$type": "color" },
+      "light-subtle": { "$value": "rgba(90, 154, 48, 0.10)", "$type": "color" }
     },
     "seafoam": {
       "$description": "Secondary — sea foam green for success states",

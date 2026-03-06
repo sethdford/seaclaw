@@ -50,7 +50,7 @@ const tools = [
     <link rel="icon" type="image/png" sizes="32x32" href={`${base}favicon-32.png`} />
     <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
     <link rel="manifest" href={`${base}site.webmanifest`} />
-    <meta name="theme-color" content="#14b8a6" />
+    <meta name="theme-color" content="#7AB648" />
     <meta property="og:title" content="SeaClaw — Bring AI to every device on Earth" />
     <meta property="og:description" content="430 KB binary. 50+ AI providers. 27 channels. 53 tools. Zero dependencies. Pure C." />
     <meta property="og:type" content="website" />
@@ -108,7 +108,7 @@ const tools = [
           <rect width="100%" height="100%" filter="url(#sc-refract)" fill="transparent" />
         </svg>
       </div>
-      <div class="ambient-teal" style="top: 15%; left: 50%; transform: translateX(-50%);"></div>
+      <div class="ambient-accent" style="top: 15%; left: 50%; transform: translateX(-50%);"></div>
       <div class="ambient-indigo" style="top: 30%; right: 10%;"></div>
       <div class="hero-content text-center max-w-3xl mx-auto relative z-10">
         <img
@@ -210,7 +210,7 @@ const tools = [
     {/* ═══ ARCHITECTURE ═══ */}
 
     <section id="architecture" class="relative py-16 md:py-32 px-6">
-      <div class="ambient-teal" style="top: 20%; left: 10%;"></div>
+      <div class="ambient-accent" style="top: 20%; left: 10%;"></div>
       <div class="ambient-indigo" style="bottom: 10%; right: 15%;"></div>
       <div class="max-w-4xl mx-auto text-center">
         <h2 class="arch-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4 opacity-0" style="color: var(--sc-web-text); letter-spacing: -0.03em;">
@@ -384,7 +384,7 @@ const tools = [
     {/* ═══ CTA ═══ */}
 
     <section class="relative py-20 md:py-40 px-6">
-      <div class="ambient-teal" style="top: 30%; left: 30%;"></div>
+      <div class="ambient-accent" style="top: 30%; left: 30%;"></div>
       <div class="ambient-indigo" style="top: 40%; right: 20%;"></div>
       <div class="max-w-3xl mx-auto text-center">
         <h2 class="cta-title font-sans font-black text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.05] mb-6 opacity-0" style="color: var(--sc-web-text); letter-spacing: -0.04em;">
@@ -497,7 +497,7 @@ const tools = [
 
           /* ─── PARALLAX: ambient gradients drift at different scroll speeds ─── */
           if (!isMobile) {
-            document.querySelectorAll(".ambient-teal").forEach((el) => {
+            document.querySelectorAll(".ambient-accent").forEach((el) => {
               gsap.to(el, {
                 y: -120, ease: "none",
                 scrollTrigger: { trigger: el.parentElement, start: "top bottom", end: "bottom top", scrub: 0.8 },

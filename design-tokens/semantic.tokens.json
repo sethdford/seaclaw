@@ -6,28 +6,28 @@
     "com.seaclaw.version": "0.3.0",
     "seaclaw.colorSpace": "display-p3",
     "seaclaw.p3Colors": {
-      "dark.accent": "color(display-p3 0.078 0.722 0.651)",
-      "dark.accent-text": "color(display-p3 0.176 0.831 0.749)",
-      "dark.accent-hover": "color(display-p3 0.176 0.831 0.749)",
-      "dark.accent-strong": "color(display-p3 0.369 0.918 0.831)",
+      "dark.accent": "color(display-p3 0.420 0.680 0.220)",
+      "dark.accent-text": "color(display-p3 0.490 0.740 0.180)",
+      "dark.accent-hover": "color(display-p3 0.490 0.740 0.180)",
+      "dark.accent-strong": "color(display-p3 0.570 0.800 0.330)",
       "dark.accent-secondary": "color(display-p3 0.961 0.620 0.043)",
       "dark.accent-tertiary": "color(display-p3 0.388 0.400 0.945)",
       "dark.success": "color(display-p3 0.063 0.725 0.506)",
       "dark.warning": "color(display-p3 0.918 0.702 0.031)",
       "dark.error": "color(display-p3 0.976 0.439 0.400)",
       "dark.info": "color(display-p3 0.231 0.510 0.965)",
-      "dark.focus-ring": "color(display-p3 0.078 0.722 0.651)",
-      "dark.link": "color(display-p3 0.176 0.831 0.749)",
-      "light.accent": "color(display-p3 0.078 0.722 0.651)",
-      "light.accent-text": "color(display-p3 0.051 0.580 0.533)",
-      "light.success": "color(display-p3 0.022 0.588 0.412)",
+      "dark.focus-ring": "color(display-p3 0.420 0.680 0.220)",
+      "dark.link": "color(display-p3 0.490 0.740 0.180)",
+      "light.accent": "color(display-p3 0.420 0.680 0.220)",
+      "light.accent-text": "color(display-p3 0.240 0.480 0.130)",
+      "light.success": "color(display-p3 0.000 0.480 0.000)",
       "light.warning": "color(display-p3 0.792 0.541 0.016)",
-      "light.error": "color(display-p3 0.863 0.149 0.149)",
+      "light.error": "color(display-p3 0.760 0.000 0.000)",
       "light.info": "color(display-p3 0.145 0.388 0.922)"
     }
   },
   "dark": {
-    "$description": "Dark theme — deep ocean midnight, tonal blue surfaces, atmospheric glow",
+    "$description": "Dark theme — deep ocean midnight with Fidelity green accents",
     "bg": { "$value": "{color.neutral.50}", "$type": "color" },
     "bg-inset": { "$value": "{color.neutral.100}", "$type": "color" },
     "bg-surface": { "$value": "{color.neutral.150}", "$type": "color" },
@@ -38,15 +38,18 @@
     "text-muted": { "$value": "{color.neutral.500}", "$type": "color" },
     "text-faint": { "$value": "{color.neutral.400}", "$type": "color" },
 
-    "accent": { "$value": "{color.teal.500}", "$type": "color" },
+    "accent": { "$value": "{color.fidelity.500}", "$type": "color" },
     "accent-text": {
-      "$value": "{color.teal.400}",
+      "$value": "{color.fidelity.400}",
       "$type": "color",
-      "$description": "Accent color for text on dark backgrounds"
+      "$description": "Fidelity green for text on dark backgrounds"
     },
-    "accent-hover": { "$value": "{color.teal.400}", "$type": "color" },
-    "accent-subtle": { "$value": "{color.teal.dark-subtle}", "$type": "color" },
-    "accent-strong": { "$value": "{color.teal.300}", "$type": "color" },
+    "accent-hover": { "$value": "{color.fidelity.400}", "$type": "color" },
+    "accent-subtle": {
+      "$value": "{color.fidelity.dark-subtle}",
+      "$type": "color"
+    },
+    "accent-strong": { "$value": "{color.fidelity.300}", "$type": "color" },
     "on-accent": { "$value": "#ffffff", "$type": "color" },
 
     "accent-secondary": { "$value": "{color.amber.500}", "$type": "color" },
@@ -101,14 +104,14 @@
     "info": { "$value": "{color.blue.500}", "$type": "color" },
     "info-dim": { "$value": "{color.blue.dim}", "$type": "color" },
 
-    "focus-ring": { "$value": "{color.teal.500}", "$type": "color" },
+    "focus-ring": { "$value": "{color.fidelity.500}", "$type": "color" },
     "focus-ring-width": { "$value": "2px", "$type": "dimension" },
     "focus-ring-offset": { "$value": "2px", "$type": "dimension" },
 
-    "link": { "$value": "{color.teal.400}", "$type": "color" },
-    "link-hover": { "$value": "{color.teal.300}", "$type": "color" },
-    "link-active": { "$value": "{color.teal.500}", "$type": "color" },
-    "link-visited": { "$value": "{color.teal.600}", "$type": "color" },
+    "link": { "$value": "{color.fidelity.400}", "$type": "color" },
+    "link-hover": { "$value": "{color.fidelity.300}", "$type": "color" },
+    "link-active": { "$value": "{color.fidelity.500}", "$type": "color" },
+    "link-visited": { "$value": "{color.fidelity.600}", "$type": "color" },
 
     "hover-overlay": {
       "$value": "rgba(255, 255, 255, 0.06)",
@@ -152,7 +155,7 @@
       "$type": "shadow"
     },
     "shadow-glow-accent": {
-      "$value": "0 0 0 1px var(--sc-accent-subtle), 0 4px 16px rgba(20,184,166,0.15)",
+      "$value": "0 0 0 1px var(--sc-accent-subtle), 0 4px 16px rgba(122,182,72,0.15)",
       "$type": "shadow"
     },
     "shadow-inset": {
@@ -164,46 +167,49 @@
       "$type": "string"
     },
     "surface-glow": {
-      "$value": "radial-gradient(ellipse at 50% 0%, rgba(20,184,166,0.08) 0%, transparent 70%)",
+      "$value": "radial-gradient(ellipse at 50% 0%, rgba(122,182,72,0.08) 0%, transparent 70%)",
       "$type": "string",
-      "$description": "Ambient teal glow at the top of cards — creates atmospheric depth"
+      "$description": "Ambient Fidelity green glow at the top of cards — creates atmospheric depth"
     },
     "button-gradient-primary": {
       "$value": "linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(0,0,0,0.18) 100%)",
       "$type": "string"
     },
     "hero-gradient": {
-      "$value": "linear-gradient(135deg, rgba(20,184,166,0.10) 0%, rgba(16,185,129,0.05) 40%, rgba(99,102,241,0.03) 80%, transparent 100%)",
+      "$value": "linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(99,102,241,0.03) 80%, transparent 100%)",
       "$type": "string",
-      "$description": "Atmospheric ocean gradient — teal to seafoam with a hint of deep indigo"
+      "$description": "Atmospheric gradient — Fidelity green to forest with a hint of deep indigo"
     }
   },
   "light": {
-    "$description": "Light theme — coastal morning: warm canvas, white surfaces, ocean-tinted depth",
-    "bg": { "$value": "{color.neutral.850}", "$type": "color" },
-    "bg-inset": { "$value": "{color.neutral.800}", "$type": "color" },
+    "$description": "Light theme — Fidelity corporate clean: green accent, white/gray surfaces, charcoal text",
+    "bg": { "$value": "#F5F5F5", "$type": "color" },
+    "bg-inset": { "$value": "#EFEFEF", "$type": "color" },
     "bg-surface": { "$value": "#ffffff", "$type": "color" },
-    "bg-warm": { "$value": "{color.neutral.900}", "$type": "color" },
-    "bg-elevated": { "$value": "{color.neutral.825}", "$type": "color" },
-    "bg-overlay": { "$value": "{color.neutral.1000}", "$type": "color" },
+    "bg-warm": { "$value": "#FAFAFA", "$type": "color" },
+    "bg-elevated": { "$value": "#F8F8F8", "$type": "color" },
+    "bg-overlay": { "$value": "#ffffff", "$type": "color" },
 
-    "text": { "$value": "{color.neutral.100}", "$type": "color" },
-    "text-muted": { "$value": "{color.neutral.400}", "$type": "color" },
-    "text-faint": { "$value": "{color.neutral.500}", "$type": "color" },
+    "text": { "$value": "#333333", "$type": "color" },
+    "text-muted": { "$value": "#666666", "$type": "color" },
+    "text-faint": { "$value": "#999999", "$type": "color" },
 
-    "accent": { "$value": "{color.teal.600}", "$type": "color" },
+    "accent": { "$value": "{color.fidelity.500}", "$type": "color" },
     "accent-text": {
-      "$value": "{color.teal.700}",
+      "$value": "{color.fidelity.700}",
       "$type": "color",
-      "$description": "WCAG AA: accent color for text on light backgrounds (4.5:1 contrast)"
+      "$description": "WCAG AA: Fidelity dark green for text on light backgrounds (4.5:1 contrast)"
     },
-    "accent-hover": { "$value": "{color.teal.light-600}", "$type": "color" },
+    "accent-hover": { "$value": "{color.fidelity.600}", "$type": "color" },
     "accent-subtle": {
-      "$value": "rgba(13, 148, 136, 0.08)",
+      "$value": "rgba(122, 182, 72, 0.08)",
       "$type": "color"
     },
-    "accent-light": { "$value": "{color.teal.100}", "$type": "color" },
-    "accent-strong": { "$value": "{color.teal.light-400}", "$type": "color" },
+    "accent-light": { "$value": "{color.fidelity.100}", "$type": "color" },
+    "accent-strong": {
+      "$value": "{color.fidelity.light-400}",
+      "$type": "color"
+    },
     "on-accent": { "$value": "#ffffff", "$type": "color" },
 
     "accent-secondary": { "$value": "{color.amber.600}", "$type": "color" },
@@ -246,26 +252,29 @@
     },
     "on-accent-tertiary": { "$value": "#ffffff", "$type": "color" },
 
-    "border": { "$value": "{color.neutral.700}", "$type": "color" },
-    "border-subtle": { "$value": "{color.neutral.750}", "$type": "color" },
+    "border": { "$value": "#D9D9D9", "$type": "color" },
+    "border-subtle": { "$value": "#E8E8E8", "$type": "color" },
 
-    "success": { "$value": "{color.seafoam.light-500}", "$type": "color" },
-    "success-dim": { "$value": "{color.seafoam.light-dim}", "$type": "color" },
+    "success": { "$value": "#008000", "$type": "color" },
+    "success-dim": { "$value": "rgba(0, 128, 0, 0.08)", "$type": "color" },
     "warning": { "$value": "{color.yellow.light-500}", "$type": "color" },
     "warning-dim": { "$value": "{color.yellow.light-dim}", "$type": "color" },
-    "error": { "$value": "{color.coral.light-500}", "$type": "color" },
-    "error-dim": { "$value": "{color.coral.light-subtle}", "$type": "color" },
+    "error": { "$value": "#CC0000", "$type": "color" },
+    "error-dim": { "$value": "rgba(204, 0, 0, 0.08)", "$type": "color" },
     "info": { "$value": "{color.blue.light-500}", "$type": "color" },
     "info-dim": { "$value": "{color.blue.light-dim}", "$type": "color" },
 
-    "focus-ring": { "$value": "{color.teal.light-500}", "$type": "color" },
+    "focus-ring": { "$value": "{color.fidelity.light-500}", "$type": "color" },
     "focus-ring-width": { "$value": "2px", "$type": "dimension" },
     "focus-ring-offset": { "$value": "2px", "$type": "dimension" },
 
-    "link": { "$value": "{color.teal.light-500}", "$type": "color" },
-    "link-hover": { "$value": "{color.teal.light-600}", "$type": "color" },
-    "link-active": { "$value": "{color.teal.light-400}", "$type": "color" },
-    "link-visited": { "$value": "{color.teal.light-600}", "$type": "color" },
+    "link": { "$value": "{color.fidelity.light-500}", "$type": "color" },
+    "link-hover": { "$value": "{color.fidelity.light-600}", "$type": "color" },
+    "link-active": { "$value": "{color.fidelity.light-400}", "$type": "color" },
+    "link-visited": {
+      "$value": "{color.fidelity.light-600}",
+      "$type": "color"
+    },
 
     "hover-overlay": { "$value": "rgba(0, 0, 0, 0.04)", "$type": "color" },
     "pressed-overlay": { "$value": "rgba(0, 0, 0, 0.08)", "$type": "color" },
@@ -296,26 +305,26 @@
       "$type": "shadow"
     },
     "shadow-card": {
-      "$value": "0 1px 3px rgba(6,18,36,0.08), 0 4px 12px rgba(6,18,36,0.06), 0 8px 28px rgba(6,18,36,0.04)",
+      "$value": "0 1px 2px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.03)",
       "$type": "shadow",
-      "$description": "Triple-layer card shadow — visible separation on light canvas"
+      "$description": "Clean, minimal card shadow — Fidelity corporate feel"
     },
     "shadow-glow-accent": {
-      "$value": "0 0 0 1px rgba(13,148,136,0.12), 0 4px 16px rgba(13,148,136,0.2)",
+      "$value": "0 0 0 1px rgba(90,154,48,0.12), 0 4px 16px rgba(90,154,48,0.15)",
       "$type": "shadow",
-      "$description": "Teal-tinted glow for hover/focus states"
+      "$description": "Fidelity green glow for hover/focus states"
     },
     "shadow-inset": {
-      "$value": "inset 0 1px 2px rgba(6,18,36,0.06)",
+      "$value": "inset 0 1px 2px rgba(0,0,0,0.04)",
       "$type": "shadow"
     },
     "surface-gradient": {
-      "$value": "linear-gradient(180deg, #ffffff 0%, #f5f8fb 100%)",
+      "$value": "linear-gradient(180deg, #ffffff 0%, #f9f9f9 100%)",
       "$type": "string",
-      "$description": "White to soft sky-blue — visible depth on light-mode cards"
+      "$description": "White to near-white — subtle depth on Fidelity clean cards"
     },
     "surface-glow": {
-      "$value": "radial-gradient(ellipse at 50% 0%, rgba(20,184,166,0.08) 0%, transparent 70%)",
+      "$value": "radial-gradient(ellipse at 50% 0%, rgba(122,182,72,0.06) 0%, transparent 70%)",
       "$type": "string"
     },
     "button-gradient-primary": {
@@ -324,9 +333,9 @@
       "$description": "Convex pillow gradient — visible 3D depth on buttons"
     },
     "hero-gradient": {
-      "$value": "linear-gradient(135deg, rgba(20,184,166,0.07) 0%, rgba(20,184,166,0.03) 50%, transparent 100%)",
+      "$value": "linear-gradient(135deg, rgba(122,182,72,0.07) 0%, rgba(122,182,72,0.03) 50%, transparent 100%)",
       "$type": "string",
-      "$description": "Ocean teal gradient — single-hue, varying intensity for depth"
+      "$description": "Fidelity green gradient — single-hue, varying intensity for depth"
     }
   },
   "high-contrast": {
@@ -341,11 +350,11 @@
     "text-muted": { "$value": "{color.neutral.700}", "$type": "color" },
     "text-faint": { "$value": "{color.neutral.600}", "$type": "color" },
 
-    "accent": { "$value": "#2dd4bf", "$type": "color" },
-    "accent-text": { "$value": "#0f766e", "$type": "color" },
-    "accent-hover": { "$value": "#5eead4", "$type": "color" },
-    "accent-subtle": { "$value": "rgba(45, 212, 191, 0.2)", "$type": "color" },
-    "accent-strong": { "$value": "#14b8a6", "$type": "color" },
+    "accent": { "$value": "#8DC63F", "$type": "color" },
+    "accent-text": { "$value": "#47802A", "$type": "color" },
+    "accent-hover": { "$value": "#a3d46a", "$type": "color" },
+    "accent-subtle": { "$value": "rgba(122, 182, 72, 0.2)", "$type": "color" },
+    "accent-strong": { "$value": "#7AB648", "$type": "color" },
     "on-accent": { "$value": "#000000", "$type": "color" },
 
     "border": { "$value": "{color.neutral.600}", "$type": "color" },

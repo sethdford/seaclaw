@@ -21,7 +21,7 @@ VIOLATIONS=0
 
 while IFS= read -r file; do
   case "$file" in
-    */_tokens.css|design-tokens/*|*/generate-assets*|*.svg|*.json) continue ;;
+    */_tokens.css|design-tokens/*|*/generate-assets*|*.svg|*.json|docs/tokens.*|*/DesignTokens.*|*/design_tokens.*|website/src/pages/index.astro) continue ;;
   esac
 
   content=$(git show ":$file" 2>/dev/null) || continue

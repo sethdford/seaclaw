@@ -482,7 +482,7 @@
   }
 
   /* ── Ambient gradients ── */
-  .ambient-teal {
+  .ambient-accent {
     position: absolute;
     width: 600px;
     height: 600px;
@@ -720,7 +720,7 @@
 .btn-primary,
 .btn-outline,
 .card-spotlight,
-.ambient-teal,
+.ambient-accent,
 .ambient-indigo,
 .dash-preview,
 #terminal,
@@ -804,7 +804,7 @@
     opacity: 1;
   }
 
-  .ambient-teal,
+  .ambient-accent,
   .ambient-indigo {
     display: none;
   }
@@ -866,7 +866,7 @@
 /* ── Print ── */
 @media print {
   nav,
-  .ambient-teal,
+  .ambient-accent,
   .ambient-indigo,
   footer {
     display: none !important;

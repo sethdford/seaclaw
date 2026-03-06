@@ -64,7 +64,7 @@ export class ScButton extends LitElement {
       background-image: var(--sc-button-gradient-primary);
       transform: translateY(-2px);
       box-shadow:
-        0 4px 16px rgba(13, 148, 136, 0.25),
+        0 4px 16px rgba(90, 154, 48, 0.25),
         0 2px 6px rgba(6, 18, 36, 0.1),
         inset 0 1px 0 rgba(255, 255, 255, 0.35),
         inset 0 -1px 0 rgba(0, 0, 0, 0.15);
