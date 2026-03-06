@@ -1,6 +1,5 @@
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
-#include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/persona.h"
 #include <errno.h>
@@ -266,74 +265,126 @@ sc_error_t sc_persona_creator_synthesize(sc_allocator_t *alloc, const sc_persona
 
 #define SC_PERSONA_CREATOR_PATH_MAX 512
 
+static sc_error_t write_json_string(FILE *f, const char *s) {
+    fputc('"', f);
+    for (const char *p = s ? s : ""; *p; p++) {
+        switch (*p) {
+        case '"': fputs("\\\"", f); break;
+        case '\\': fputs("\\\\", f); break;
+        case '\n': fputs("\\n", f); break;
+        case '\r': fputs("\\r", f); break;
+        case '\t': fputs("\\t", f); break;
+        default: fputc(*p, f); break;
+        }
+    }
+    fputc('"', f);
+    return SC_OK;
+}
+
+static sc_error_t write_json_string_array(FILE *f, char **arr, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        if (i > 0)
+            fputc(',', f);
+        if (write_json_string(f, arr[i] ? arr[i] : "") != SC_OK)
+            return SC_ERR_IO;
+    }
+    return SC_OK;
+}
+
 sc_error_t sc_persona_creator_write(sc_allocator_t *alloc, const sc_persona_t *persona) {
     if (!alloc || !persona || !persona->name)
         return SC_ERR_INVALID_ARGUMENT;
 
-    sc_json_buf_t buf;
-    sc_error_t err = sc_json_buf_init(&buf, alloc);
-    if (err != SC_OK)
-        return err;
-
-    if (sc_json_buf_append_raw(&buf, "{\"version\":1,", 12) != SC_OK)
-        goto fail;
-    err = sc_json_append_key_value(&buf, "name", 4, persona->name, persona->name_len);
-    if (err != SC_OK)
-        goto fail;
-    {
-        static const char core[] =
-            ",\"core\":{\"identity\":\"\",\"traits\":[],"
-            "\"vocabulary\":{\"preferred\":[],\"avoided\":[],\"slang\":[]},"
-            "\"communication_rules\":[],\"values\":[],\"decision_style\":\"\"},"
-            "\"channel_overlays\":{}}";
-        if (sc_json_buf_append_raw(&buf, core, sizeof(core) - 1) != SC_OK)
-            goto fail;
-    }
-
     const char *home = getenv("HOME");
-    if (!home || !home[0]) {
-        sc_json_buf_free(&buf);
+    if (!home || !home[0])
         return SC_ERR_NOT_FOUND;
-    }
     char dir_buf[SC_PERSONA_CREATOR_PATH_MAX];
     int n = snprintf(dir_buf, sizeof(dir_buf), "%s/.seaclaw/personas", home);
-    if (n <= 0 || (size_t)n >= sizeof(dir_buf)) {
-        sc_json_buf_free(&buf);
+    if (n <= 0 || (size_t)n >= sizeof(dir_buf))
         return SC_ERR_INVALID_ARGUMENT;
-    }
 #if defined(__unix__) || defined(__APPLE__)
     char parent[SC_PERSONA_CREATOR_PATH_MAX];
     int pn = snprintf(parent, sizeof(parent), "%s/.seaclaw", home);
     if (pn > 0 && (size_t)pn < sizeof(parent))
         (void)mkdir(parent, 0755);
-    if (mkdir(dir_buf, 0755) != 0 && errno != EEXIST) {
-        sc_json_buf_free(&buf);
+    if (mkdir(dir_buf, 0755) != 0 && errno != EEXIST)
         return SC_ERR_IO;
-    }
 #endif
 
     char path[SC_PERSONA_CREATOR_PATH_MAX];
     n = snprintf(path, sizeof(path), "%s/%.*s.json", dir_buf, (int)persona->name_len,
                  persona->name);
-    if (n <= 0 || (size_t)n >= sizeof(path)) {
-        sc_json_buf_free(&buf);
+    if (n <= 0 || (size_t)n >= sizeof(path))
         return SC_ERR_INVALID_ARGUMENT;
-    }
 
     FILE *f = fopen(path, "wb");
-    if (!f) {
-        sc_json_buf_free(&buf);
+    if (!f)
         return SC_ERR_IO;
+
+    fputs("{\n  \"version\": 1,\n  \"name\": ", f);
+    if (write_json_string(f, persona->name) != SC_OK)
+        goto fail;
+    fputs(",\n  \"core\": {\n", f);
+
+    fputs("    \"identity\": ", f);
+    if (write_json_string(f, persona->identity) != SC_OK)
+        goto fail;
+    fputs(",\n    \"traits\": [", f);
+    if (write_json_string_array(f, persona->traits, persona->traits_count) != SC_OK)
+        goto fail;
+    fputs("],\n    \"vocabulary\": {\n      \"preferred\": [", f);
+    if (write_json_string_array(f, persona->preferred_vocab, persona->preferred_vocab_count) != SC_OK)
+        goto fail;
+    fputs("],\n      \"avoided\": [", f);
+    if (write_json_string_array(f, persona->avoided_vocab, persona->avoided_vocab_count) != SC_OK)
+        goto fail;
+    fputs("],\n      \"slang\": [", f);
+    if (write_json_string_array(f, persona->slang, persona->slang_count) != SC_OK)
+        goto fail;
+    fputs("]\n    },\n    \"communication_rules\": [", f);
+    if (write_json_string_array(f, persona->communication_rules,
+                                persona->communication_rules_count) != SC_OK)
+        goto fail;
+    fputs("],\n    \"values\": [", f);
+    if (write_json_string_array(f, persona->values, persona->values_count) != SC_OK)
+        goto fail;
+    fputs("],\n    \"decision_style\": ", f);
+    if (write_json_string(f, persona->decision_style) != SC_OK)
+        goto fail;
+
+    fputs("\n  },\n  \"channel_overlays\": {\n", f);
+    for (size_t i = 0; i < persona->overlays_count; i++) {
+        const sc_persona_overlay_t *ov = &persona->overlays[i];
+        if (!ov->channel)
+            continue;
+        if (i > 0)
+            fputs(",\n", f);
+        fputs("    ", f);
+        if (write_json_string(f, ov->channel) != SC_OK)
+            goto fail;
+        fputs(": {\n      \"formality\": ", f);
+        if (write_json_string(f, ov->formality) != SC_OK)
+            goto fail;
+        fputs(",\n      \"avg_length\": ", f);
+        if (write_json_string(f, ov->avg_length) != SC_OK)
+            goto fail;
+        fputs(",\n      \"emoji_usage\": ", f);
+        if (write_json_string(f, ov->emoji_usage) != SC_OK)
+            goto fail;
+        fputs(",\n      \"style_notes\": [", f);
+        if (write_json_string_array(f, ov->style_notes, ov->style_notes_count) != SC_OK)
+            goto fail;
+        fputs("]\n    }", f);
     }
-    if (buf.len > 0 && fwrite(buf.ptr, 1, buf.len, f) != buf.len) {
+    fputs("\n  }\n}\n", f);
+
+    if (ferror(f)) {
         fclose(f);
-        sc_json_buf_free(&buf);
         return SC_ERR_IO;
     }
     fclose(f);
-    sc_json_buf_free(&buf);
     return SC_OK;
 fail:
-    sc_json_buf_free(&buf);
-    return err != SC_OK ? err : SC_ERR_IO;
+    fclose(f);
+    return SC_ERR_IO;
 }
