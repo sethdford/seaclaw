@@ -603,6 +603,8 @@ sc_audit_logger_t *sc_audit_logger_create(sc_allocator_t *alloc, const sc_audit_
         snprintf(path, sizeof(path), "%s/%s", base_dir, config->log_path);
 
     char key_path[SC_AUDIT_MAX_PATH];
+    if (base_len + 17 >= sizeof(key_path))
+        return NULL;
     if (base_len > 0 && base_dir[base_len - 1] == '/')
         snprintf(key_path, sizeof(key_path), "%s.audit_hmac_key", base_dir);
     else
@@ -861,6 +863,8 @@ sc_error_t sc_audit_load_key(const char *base_dir, unsigned char key[32]) {
         return SC_ERR_INVALID_ARGUMENT;
     char key_path[SC_AUDIT_MAX_PATH];
     size_t base_len = strlen(base_dir);
+    if (base_len + 17 >= sizeof(key_path))
+        return SC_ERR_INVALID_ARGUMENT;
     if (base_len > 0 && base_dir[base_len - 1] == '/')
         snprintf(key_path, sizeof(key_path), "%s.audit_hmac_key", base_dir);
     else

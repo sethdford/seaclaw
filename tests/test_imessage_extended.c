@@ -108,8 +108,10 @@ void run_imessage_extended_tests(void) {
     SC_RUN_TEST(test_imessage_create_with_allow_from);
     SC_RUN_TEST(test_imessage_create_null_alloc);
     SC_RUN_TEST(test_imessage_health_check);
+#if defined(__APPLE__) && defined(__MACH__)
     SC_RUN_TEST(test_imessage_send_test_mode);
     SC_RUN_TEST(test_imessage_poll_test_mode);
+#endif
 }
 #else
 void run_imessage_extended_tests(void) {

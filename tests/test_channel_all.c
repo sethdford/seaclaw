@@ -1021,7 +1021,11 @@ static void test_imessage_health_check(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_channel_t ch;
     sc_imessage_create(&alloc, NULL, 0, NULL, 0, &ch);
+#ifdef __APPLE__
     SC_ASSERT_TRUE(ch.vtable->health_check(ch.ctx));
+#else
+    SC_ASSERT_FALSE(ch.vtable->health_check(ch.ctx));
+#endif
     sc_imessage_destroy(&ch);
 }
 
