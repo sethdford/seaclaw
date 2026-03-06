@@ -19,7 +19,8 @@ typedef struct sc_mcp_server sc_mcp_server_t;
 sc_mcp_server_t *sc_mcp_server_create(sc_allocator_t *alloc, const sc_mcp_server_config_t *config);
 sc_error_t sc_mcp_server_connect(sc_mcp_server_t *srv);
 sc_error_t sc_mcp_server_list_tools(sc_mcp_server_t *srv, sc_allocator_t *alloc, char ***out_names,
-                                    char ***out_descriptions, size_t *out_count);
+                                    char ***out_descriptions, char ***out_params,
+                                    size_t *out_count);
 sc_error_t sc_mcp_server_call_tool(sc_mcp_server_t *srv, sc_allocator_t *alloc,
                                    const char *tool_name, const char *args_json, char **out_result,
                                    size_t *out_result_len);

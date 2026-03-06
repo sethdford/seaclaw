@@ -9,6 +9,7 @@ export default defineConfig({
   base: "/",
   integrations: [
     starlight({
+      disable404Route: true,
       title: "SeaClaw",
       logo: {
         src: "./public/seaclaw.svg",

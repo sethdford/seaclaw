@@ -89,6 +89,8 @@ void run_tenant_tests(void);
 void run_gmail_tests(void);
 void run_imessage_extended_tests(void);
 void run_intelligence_tests(void);
+void run_untested_modules_tests(void);
+void run_modules_coverage_tests(void);
 
 int main(void) {
     printf("SeaClaw Test Suite\n"); fflush(stdout);
@@ -178,6 +180,8 @@ int main(void) {
     run_gmail_tests();
     run_imessage_extended_tests();
     run_intelligence_tests();
+    run_untested_modules_tests();
+    run_modules_coverage_tests();
 
     SC_TEST_REPORT();
     SC_TEST_EXIT();

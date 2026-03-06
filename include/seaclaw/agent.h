@@ -125,6 +125,11 @@ struct sc_agent {
 
     sc_audit_logger_t *audit_logger;
     struct sc_undo_stack *undo_stack;
+
+    /* Intelligence features */
+    bool chain_of_thought;      /* inject reasoning instructions into prompt */
+    char *persona_prompt;       /* custom identity override; owned */
+    size_t persona_prompt_len;
 };
 
 /* Create agent from minimal config (no full config loader yet).

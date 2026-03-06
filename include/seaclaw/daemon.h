@@ -19,10 +19,14 @@ bool sc_cron_schedule_matches(const char *schedule, const struct tm *tm);
 
 struct sc_agent;
 
+typedef sc_error_t (*sc_channel_webhook_fn)(void *channel_ctx, sc_allocator_t *alloc,
+                                            const char *body, size_t body_len);
+
 typedef struct sc_service_channel {
     void *channel_ctx;
     sc_channel_t *channel; /* full channel vtable — used for sending replies */
     sc_channel_loop_poll_fn poll_fn;
+    sc_channel_webhook_fn webhook_fn; /* optional — NULL for polling-only channels */
     uint32_t interval_ms;
     int64_t last_poll_ms;
 } sc_service_channel_t;

@@ -436,6 +436,19 @@ static sc_error_t parse_gateway(sc_allocator_t *a, sc_config_t *cfg, const sc_js
             a->free(a->ctx, cfg->gateway.control_ui_dir, strlen(cfg->gateway.control_ui_dir) + 1);
         cfg->gateway.control_ui_dir = sc_strdup(a, uid);
     }
+    sc_json_value_t *cors = sc_json_object_get(obj, "cors_origins");
+    if (cors && cors->type == SC_JSON_ARRAY) {
+        if (cfg->gateway.cors_origins) {
+            for (size_t i = 0; i < cfg->gateway.cors_origins_len; i++)
+                if (cfg->gateway.cors_origins[i])
+                    a->free(a->ctx, cfg->gateway.cors_origins[i],
+                            strlen(cfg->gateway.cors_origins[i]) + 1);
+            a->free(a->ctx, cfg->gateway.cors_origins,
+                    cfg->gateway.cors_origins_len * sizeof(char *));
+        }
+        parse_string_array(a, &cfg->gateway.cors_origins,
+                           &cfg->gateway.cors_origins_len, cors);
+    }
     return SC_OK;
 }
 
@@ -1055,10 +1068,15 @@ static sc_error_t parse_agent(sc_allocator_t *a, sc_config_t *cfg, const sc_json
 }
 static sc_error_t parse_policy_cfg(sc_allocator_t *a, sc_config_t *cfg,
                                    const sc_json_value_t *obj) {
-    (void)a;
     if (!obj || obj->type != SC_JSON_OBJECT)
         return SC_OK;
     cfg->policy.enabled = sc_json_get_bool(obj, "enabled", cfg->policy.enabled);
+    const char *rj = sc_json_get_string(obj, "rules_json");
+    if (rj) {
+        if (cfg->policy.rules_json)
+            a->free(a->ctx, cfg->policy.rules_json, strlen(cfg->policy.rules_json) + 1);
+        cfg->policy.rules_json = sc_strdup(a, rj);
+    }
     return SC_OK;
 }
 static sc_error_t parse_plugins_cfg(sc_allocator_t *a, sc_config_t *cfg,
@@ -1069,6 +1087,13 @@ static sc_error_t parse_plugins_cfg(sc_allocator_t *a, sc_config_t *cfg,
     if (obj->type == SC_JSON_OBJECT) {
         cfg->plugins.enabled = sc_json_get_bool(obj, "enabled", cfg->plugins.enabled);
         paths_arr = sc_json_object_get(obj, "paths");
+        const char *pd = sc_json_get_string(obj, "plugin_dir");
+        if (pd) {
+            if (cfg->plugins.plugin_dir)
+                a->free(a->ctx, cfg->plugins.plugin_dir,
+                        strlen(cfg->plugins.plugin_dir) + 1);
+            cfg->plugins.plugin_dir = sc_strdup(a, pd);
+        }
     } else if (obj->type == SC_JSON_ARRAY) {
         paths_arr = obj;
     } else {

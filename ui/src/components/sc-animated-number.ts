@@ -16,6 +16,7 @@ export class ScAnimatedNumber extends LitElement {
     :host {
       display: inline;
       font-variant-numeric: tabular-nums;
+      font-family: var(--sc-font);
     }
   `;
 

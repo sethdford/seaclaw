@@ -198,7 +198,7 @@ static void *spawn_thread(void *arg) {
             sc_agent_set_mailbox(&ag, s->mailbox);
         char *resp = NULL;
         size_t rlen = 0;
-        sc_agent_turn(&ag, task, task_len, &resp, &rlen);
+        sc_error_t turn_err = sc_agent_turn(&ag, task, task_len, &resp, &rlen);
         if (resp && rlen > 0) {
             result = sc_strndup(a, resp, rlen);
             a->free(a->ctx, resp, rlen + 1);
@@ -206,8 +206,10 @@ static void *spawn_thread(void *arg) {
             a->free(a->ctx, resp, rlen + 1);
         }
         sc_agent_deinit(&ag);
-        if (!result)
-            result = sc_strndup(a, "(no response)", 13);
+        if (!result) {
+            const char *err_str = sc_error_string(turn_err);
+            result = sc_strndup(a, err_str, strlen(err_str));
+        }
         if (pool->worktree_mgr)
             (void)sc_worktree_remove(pool->worktree_mgr, s->agent_id);
     }

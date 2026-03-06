@@ -1,3 +1,5 @@
 dist/
 node_modules/
 *.svg
+# Auto-generated from design tokens — do not reformat
+src/styles/_tokens.css

@@ -111,7 +111,11 @@ static bool is_webhook_path(const char *path) {
     return path_is(path, "/webhook") || strncmp(path, "/webhook/", 9) == 0 ||
            path_is(path, "/telegram") || path_is(path, "/slack/events") ||
            path_is(path, "/whatsapp") || path_is(path, "/line") || path_is(path, "/lark") ||
-           path_is(path, "/discord");
+           path_is(path, "/discord") || path_is(path, "/facebook") ||
+           path_is(path, "/instagram") || path_is(path, "/twitter") ||
+           path_is(path, "/google_rcs") || path_is(path, "/google_chat") ||
+           path_is(path, "/dingtalk") || path_is(path, "/teams") ||
+           path_is(path, "/twilio") || path_is(path, "/onebot") || path_is(path, "/qq");
 }
 
 static const char *webhook_path_to_channel(const char *path, char *buf, size_t buf_len) {

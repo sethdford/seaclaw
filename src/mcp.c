@@ -264,38 +264,49 @@ sc_error_t sc_mcp_server_connect(sc_mcp_server_t *srv) {
 }
 
 sc_error_t sc_mcp_server_list_tools(sc_mcp_server_t *srv, sc_allocator_t *alloc, char ***out_names,
-                                    char ***out_descriptions, size_t *out_count) {
-    if (!srv || !alloc || !out_names || !out_descriptions || !out_count)
+                                    char ***out_descriptions, char ***out_params,
+                                    size_t *out_count) {
+    if (!srv || !alloc || !out_names || !out_descriptions || !out_params || !out_count)
         return SC_ERR_INVALID_ARGUMENT;
 
 #if defined(SC_IS_TEST) && SC_IS_TEST != 0
     *out_count = 1;
     char **names = (char **)alloc->alloc(alloc->ctx, sizeof(char *));
     char **descs = (char **)alloc->alloc(alloc->ctx, sizeof(char *));
-    if (!names || !descs) {
+    char **params = (char **)alloc->alloc(alloc->ctx, sizeof(char *));
+    if (!names || !descs || !params) {
         if (names)
             alloc->free(alloc->ctx, names, sizeof(char *));
         if (descs)
             alloc->free(alloc->ctx, descs, sizeof(char *));
+        if (params)
+            alloc->free(alloc->ctx, params, sizeof(char *));
         return SC_ERR_OUT_OF_MEMORY;
     }
     const char *mock_name = "mock_tool";
     const char *mock_desc = "Mock MCP tool";
+    const char *mock_params = "{\"type\":\"object\",\"properties\":{\"input\":{\"type\":\"string\"}}}";
     names[0] = (char *)alloc->alloc(alloc->ctx, strlen(mock_name) + 1);
     descs[0] = (char *)alloc->alloc(alloc->ctx, strlen(mock_desc) + 1);
-    if (!names[0] || !descs[0]) {
+    params[0] = (char *)alloc->alloc(alloc->ctx, strlen(mock_params) + 1);
+    if (!names[0] || !descs[0] || !params[0]) {
         if (names[0])
             alloc->free(alloc->ctx, names[0], strlen(mock_name) + 1);
         if (descs[0])
             alloc->free(alloc->ctx, descs[0], strlen(mock_desc) + 1);
+        if (params[0])
+            alloc->free(alloc->ctx, params[0], strlen(mock_params) + 1);
         alloc->free(alloc->ctx, names, sizeof(char *));
         alloc->free(alloc->ctx, descs, sizeof(char *));
+        alloc->free(alloc->ctx, params, sizeof(char *));
         return SC_ERR_OUT_OF_MEMORY;
     }
     strcpy(names[0], mock_name);
     strcpy(descs[0], mock_desc);
+    strcpy(params[0], mock_params);
     *out_names = names;
     *out_descriptions = descs;
+    *out_params = params;
     return SC_OK;
 #else
     if (!srv->connected)
@@ -320,16 +331,20 @@ sc_error_t sc_mcp_server_list_tools(sc_mcp_server_t *srv, sc_allocator_t *alloc,
     size_t n = tools_arr->data.array.len;
     char **names = (char **)alloc->alloc(alloc->ctx, n * sizeof(char *));
     char **descs = (char **)alloc->alloc(alloc->ctx, n * sizeof(char *));
-    if (!names || !descs) {
+    char **params = (char **)alloc->alloc(alloc->ctx, n * sizeof(char *));
+    if (!names || !descs || !params) {
         if (names)
             alloc->free(alloc->ctx, names, n * sizeof(char *));
         if (descs)
             alloc->free(alloc->ctx, descs, n * sizeof(char *));
+        if (params)
+            alloc->free(alloc->ctx, params, n * sizeof(char *));
         sc_json_free(alloc, resp);
         return SC_ERR_OUT_OF_MEMORY;
     }
     memset(names, 0, n * sizeof(char *));
     memset(descs, 0, n * sizeof(char *));
+    memset(params, 0, n * sizeof(char *));
 
     for (size_t i = 0; i < n; i++) {
         sc_json_value_t *item = tools_arr->data.array.items[i];
@@ -348,17 +363,33 @@ sc_error_t sc_mcp_server_list_tools(sc_mcp_server_t *srv, sc_allocator_t *alloc,
         size_t desc_len =
             (desc_val && desc_val->type == SC_JSON_STRING) ? desc_val->data.string.len : 0;
 
+        sc_json_value_t *schema_val = sc_json_object_get(item, "inputSchema");
+        char *schema_str = NULL;
+        size_t schema_len = 0;
+        if (schema_val && schema_val->type == SC_JSON_OBJECT)
+            sc_json_stringify(alloc, schema_val, &schema_str, &schema_len);
+
         names[i] = (char *)alloc->alloc(alloc->ctx, name_len + 1);
         descs[i] = (char *)alloc->alloc(alloc->ctx, desc_len + 1);
-        if (!names[i] || !descs[i]) {
+        if (!schema_str) {
+            params[i] = (char *)alloc->alloc(alloc->ctx, 3);
+            if (params[i])
+                strcpy(params[i], "{}");
+        } else {
+            params[i] = schema_str;
+        }
+        if (!names[i] || !descs[i] || !params[i]) {
             for (size_t j = 0; j <= i; j++) {
                 if (names[j])
                     alloc->free(alloc->ctx, names[j], strlen(names[j]) + 1);
                 if (descs[j])
                     alloc->free(alloc->ctx, descs[j], strlen(descs[j]) + 1);
+                if (params[j])
+                    alloc->free(alloc->ctx, params[j], strlen(params[j]) + 1);
             }
             alloc->free(alloc->ctx, names, n * sizeof(char *));
             alloc->free(alloc->ctx, descs, n * sizeof(char *));
+            alloc->free(alloc->ctx, params, n * sizeof(char *));
             sc_json_free(alloc, resp);
             return SC_ERR_OUT_OF_MEMORY;
         }
@@ -369,6 +400,7 @@ sc_error_t sc_mcp_server_list_tools(sc_mcp_server_t *srv, sc_allocator_t *alloc,
     sc_json_free(alloc, resp);
     *out_names = names;
     *out_descriptions = descs;
+    *out_params = params;
     *out_count = n;
     return SC_OK;
 #endif
@@ -626,9 +658,9 @@ sc_error_t sc_mcp_init_tools(sc_allocator_t *alloc, const sc_mcp_server_config_t
             continue;
         }
 
-        char **names = NULL, **descs = NULL;
+        char **names = NULL, **descs = NULL, **tool_params = NULL;
         size_t n = 0;
-        err = sc_mcp_server_list_tools(srv, alloc, &names, &descs, &n);
+        err = sc_mcp_server_list_tools(srv, alloc, &names, &descs, &tool_params, &n);
         if (err != SC_OK || n == 0) {
             sc_mcp_server_destroy(srv);
             continue;
@@ -646,9 +678,13 @@ sc_error_t sc_mcp_init_tools(sc_allocator_t *alloc, const sc_mcp_server_config_t
                 for (size_t k = j; k < n; k++) {
                     alloc->free(alloc->ctx, names[k], strlen(names[k]) + 1);
                     alloc->free(alloc->ctx, descs[k], strlen(descs[k]) + 1);
+                    if (tool_params && tool_params[k])
+                        alloc->free(alloc->ctx, tool_params[k], strlen(tool_params[k]) + 1);
                 }
                 alloc->free(alloc->ctx, names, n * sizeof(char *));
                 alloc->free(alloc->ctx, descs, n * sizeof(char *));
+                if (tool_params)
+                    alloc->free(alloc->ctx, tool_params, n * sizeof(char *));
                 if (j == 0)
                     sc_mcp_server_destroy(srv);
                 servers[i] = NULL;
@@ -663,9 +699,13 @@ sc_error_t sc_mcp_init_tools(sc_allocator_t *alloc, const sc_mcp_server_config_t
                 for (size_t k = j; k < n; k++) {
                     alloc->free(alloc->ctx, names[k], strlen(names[k]) + 1);
                     alloc->free(alloc->ctx, descs[k], strlen(descs[k]) + 1);
+                    if (tool_params && tool_params[k])
+                        alloc->free(alloc->ctx, tool_params[k], strlen(tool_params[k]) + 1);
                 }
                 alloc->free(alloc->ctx, names, n * sizeof(char *));
                 alloc->free(alloc->ctx, descs, n * sizeof(char *));
+                if (tool_params)
+                    alloc->free(alloc->ctx, tool_params, n * sizeof(char *));
                 if (j == 0)
                     sc_mcp_server_destroy(srv);
                 servers[i] = NULL;
@@ -677,9 +717,13 @@ sc_error_t sc_mcp_init_tools(sc_allocator_t *alloc, const sc_mcp_server_config_t
             w->original_name = names[j];
             w->prefixed_name = prefixed;
             w->desc = descs[j];
-            w->params_json = (char *)alloc->alloc(alloc->ctx, 3);
-            if (w->params_json)
-                strcpy(w->params_json, "{}");
+            if (tool_params && tool_params[j]) {
+                w->params_json = tool_params[j];
+            } else {
+                w->params_json = (char *)alloc->alloc(alloc->ctx, 3);
+                if (w->params_json)
+                    strcpy(w->params_json, "{}");
+            }
             w->server_index = i;
 
             sc_tool_t *tools_buf = (sc_tool_t *)alloc->realloc(
@@ -690,9 +734,13 @@ sc_error_t sc_mcp_init_tools(sc_allocator_t *alloc, const sc_mcp_server_config_t
                 for (size_t k = j + 1; k < n; k++) {
                     alloc->free(alloc->ctx, names[k], strlen(names[k]) + 1);
                     alloc->free(alloc->ctx, descs[k], strlen(descs[k]) + 1);
+                    if (tool_params && tool_params[k])
+                        alloc->free(alloc->ctx, tool_params[k], strlen(tool_params[k]) + 1);
                 }
                 alloc->free(alloc->ctx, names, n * sizeof(char *));
                 alloc->free(alloc->ctx, descs, n * sizeof(char *));
+                if (tool_params)
+                    alloc->free(alloc->ctx, tool_params, n * sizeof(char *));
                 servers[i] = NULL;
                 goto fail;
             }
@@ -702,6 +750,8 @@ sc_error_t sc_mcp_init_tools(sc_allocator_t *alloc, const sc_mcp_server_config_t
         }
         alloc->free(alloc->ctx, names, n * sizeof(char *));
         alloc->free(alloc->ctx, descs, n * sizeof(char *));
+        if (tool_params)
+            alloc->free(alloc->ctx, tool_params, n * sizeof(char *));
     }
 
     alloc->free(alloc->ctx, servers, config_count * sizeof(sc_mcp_server_t *));

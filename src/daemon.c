@@ -169,7 +169,10 @@ static void run_cron_tick(sc_allocator_t *alloc) {
 #ifndef SC_IS_TEST
         const char *argv[] = {"/bin/sh", "-c", entries[i].command, NULL};
         sc_run_result_t result = {0};
-        sc_process_run(alloc, argv, NULL, 65536, &result);
+        sc_error_t run_err = sc_process_run(alloc, argv, NULL, 65536, &result);
+        if (run_err != SC_OK)
+            fprintf(stderr, "[seaclaw] cron job failed: %s (err=%d)\n",
+                    entries[i].command, (int)run_err);
         sc_run_result_free(alloc, &result);
 #endif
     }

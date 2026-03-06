@@ -1,5 +1,9 @@
 #include "seaclaw/agent.h"
+#include "seaclaw/agent/awareness.h"
 #include "seaclaw/agent/compaction.h"
+#include "seaclaw/agent/episodic.h"
+#include "seaclaw/agent/preferences.h"
+#include "seaclaw/agent/reflection.h"
 #include "seaclaw/agent/team.h"
 #include "seaclaw/agent/dispatcher.h"
 #include "seaclaw/agent/mailbox.h"
@@ -996,6 +1000,42 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         return err;
     }
 
+    /* Detect preferences from user corrections and store them */
+    if (agent->memory && sc_preferences_is_correction(msg, msg_len)) {
+        size_t pref_len = 0;
+        char *pref = sc_preferences_extract(agent->alloc, msg, msg_len, &pref_len);
+        if (pref) {
+            sc_preferences_store(agent->memory, agent->alloc, pref, pref_len);
+            agent->alloc->free(agent->alloc->ctx, pref, pref_len + 1);
+        }
+    }
+
+    /* Detect tone from recent user messages */
+    const char *tone_hint = NULL;
+    size_t tone_hint_len = 0;
+    {
+        const char *recent_msgs[3];
+        size_t recent_lens[3];
+        size_t rm_count = 0;
+        for (size_t i = agent->history_count; i > 0 && rm_count < 3; i--) {
+            if (agent->history[i - 1].role == SC_ROLE_USER && agent->history[i - 1].content) {
+                recent_msgs[rm_count] = agent->history[i - 1].content;
+                recent_lens[rm_count] = agent->history[i - 1].content_len;
+                rm_count++;
+            }
+        }
+        if (rm_count > 0) {
+            sc_tone_t tone = sc_detect_tone(recent_msgs, recent_lens, rm_count);
+            tone_hint = sc_tone_hint_string(tone, &tone_hint_len);
+        }
+    }
+
+    /* Load user preferences for prompt injection */
+    char *pref_ctx = NULL;
+    size_t pref_ctx_len = 0;
+    if (agent->memory)
+        (void)sc_preferences_load(agent->memory, agent->alloc, &pref_ctx, &pref_ctx_len);
+
     /* Load memory context for this turn */
     char *memory_ctx = NULL;
     size_t memory_ctx_len = 0;
@@ -1009,13 +1049,15 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     /* Build system prompt using cached static portion when available */
     char *system_prompt = NULL;
     size_t system_prompt_len = 0;
-    if (agent->cached_static_prompt) {
+    if (agent->cached_static_prompt && !pref_ctx && !tone_hint && !agent->persona_prompt) {
         err = sc_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
                                          agent->cached_static_prompt_len, memory_ctx,
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
         if (memory_ctx)
             agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
         if (err != SC_OK) {
+            if (pref_ctx)
+                agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
             sc_agent_clear_current_for_tools();
             return err;
         }
@@ -1034,15 +1076,26 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             .autonomy_level = agent->autonomy_level,
             .custom_instructions = agent->custom_instructions,
             .custom_instructions_len = agent->custom_instructions_len,
+            .persona_prompt = agent->persona_prompt,
+            .persona_prompt_len = agent->persona_prompt_len,
+            .preferences = pref_ctx,
+            .preferences_len = pref_ctx_len,
+            .chain_of_thought = agent->chain_of_thought,
+            .tone_hint = tone_hint,
+            .tone_hint_len = tone_hint_len,
         };
         err = sc_prompt_build_system(agent->alloc, &cfg, &system_prompt, &system_prompt_len);
         if (memory_ctx)
             agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
         if (err != SC_OK) {
+            if (pref_ctx)
+                agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
             sc_agent_clear_current_for_tools();
             return err;
         }
     }
+    if (pref_ctx)
+        agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
 
     sc_chat_message_t *msgs = NULL;
     size_t msgs_count = 0;
@@ -1098,10 +1151,12 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         msgs = NULL;
         msgs_count = 0;
         iter++;
-        /* Compact history if it exceeds limits (before each provider call) */
+        /* Compact history if it exceeds limits (before each provider call).
+         * Uses LLM summarization when the provider is available, with
+         * rule-based fallback. */
         if (sc_should_compact(agent->history, agent->history_count, &compact_cfg)) {
-            sc_compact_history(agent->alloc, agent->history, &agent->history_count,
-                               &agent->history_cap, &compact_cfg);
+            sc_compact_history_llm(agent->alloc, agent->history, &agent->history_count,
+                                   &agent->history_cap, &compact_cfg, &agent->provider);
         }
 
         /* Context pressure: estimate tokens, check thresholds, auto-compact if needed */
@@ -1226,6 +1281,13 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                 SC_OBS_SAFE_RECORD_EVENT(agent, &ev);
             }
             if (resp.content && resp.content_len > 0) {
+                /* Reflection: evaluate response quality */
+                sc_reflection_config_t refl_cfg = {.enabled = true, .min_response_tokens = 0,
+                                                   .max_retries = 0};
+                sc_reflection_quality_t quality =
+                    sc_reflection_evaluate(msg, msg_len, resp.content, resp.content_len, &refl_cfg);
+                (void)quality; /* logged via observer if needed */
+
                 (void)append_history(agent, SC_ROLE_ASSISTANT, resp.content, resp.content_len, NULL,
                                      0, NULL, 0);
                 *response_out = sc_strndup(agent->alloc, resp.content, resp.content_len);

@@ -184,6 +184,43 @@ typedef struct sc_whatsapp_channel_config {
     char *verify_token;
 } sc_whatsapp_channel_config_t;
 
+typedef struct sc_line_channel_config {
+    char *channel_token;
+    char *channel_secret;
+    char *user_id;
+} sc_line_channel_config_t;
+
+typedef struct sc_google_chat_channel_config {
+    char *webhook_url;
+} sc_google_chat_channel_config_t;
+
+typedef struct sc_facebook_channel_config {
+    char *page_id;
+    char *page_access_token;
+    char *verify_token;
+    char *app_secret;
+} sc_facebook_channel_config_t;
+
+typedef struct sc_instagram_channel_config {
+    char *business_account_id;
+    char *access_token;
+    char *verify_token;
+    char *app_secret;
+} sc_instagram_channel_config_t;
+
+typedef struct sc_twitter_channel_config {
+    char *api_key;
+    char *api_secret;
+    char *access_token;
+    char *access_token_secret;
+    char *bearer_token;
+} sc_twitter_channel_config_t;
+
+typedef struct sc_google_rcs_channel_config {
+    char *agent_id;
+    char *service_account_json_path;
+} sc_google_rcs_channel_config_t;
+
 typedef struct sc_channels_config {
     bool cli;
     char *default_channel;
@@ -199,6 +236,12 @@ typedef struct sc_channels_config {
     sc_telegram_channel_config_t telegram;
     sc_slack_channel_config_t slack;
     sc_whatsapp_channel_config_t whatsapp;
+    sc_line_channel_config_t line;
+    sc_google_chat_channel_config_t google_chat;
+    sc_facebook_channel_config_t facebook;
+    sc_instagram_channel_config_t instagram;
+    sc_twitter_channel_config_t twitter;
+    sc_google_rcs_channel_config_t google_rcs;
 } sc_channels_config_t;
 
 typedef struct sc_memory_config {

@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tsx build.ts",
     "docs": "npx tsx generate-docs.ts",
-    "check": "npm run build"
+    "check": "npm run build",
+    "check:drift": "bash check-drift.sh"
   },
   "devDependencies": {
     "tsx": "^4.21.0"

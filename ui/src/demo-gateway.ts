@@ -1,7 +1,5 @@
 import type { GatewayStatus, ServerFeatures } from "./gateway.js";
 
-type RequestHandler = (method: string, params?: Record<string, unknown>) => unknown;
-
 const DEMO_CHANNELS = [
   { key: "telegram", label: "Telegram", configured: true, healthy: true, status: "Connected" },
   { key: "discord", label: "Discord", configured: true, healthy: true, status: "Connected" },
@@ -90,7 +88,7 @@ const DEMO_EVENTS = [
   },
 ];
 
-function handleRequest(method: string, params?: Record<string, unknown>): unknown {
+function handleRequest(method: string, _params?: Record<string, unknown>): unknown {
   switch (method) {
     case "connect":
       return {

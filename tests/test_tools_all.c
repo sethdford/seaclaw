@@ -1228,6 +1228,345 @@ static void test_spawn_create_with_policy(void) {
     if (tool.vtable->deinit) tool.vtable->deinit(tool.ctx, &alloc);
 }
 
+/* ─── Factory-based tests for send_message, agent_query, agent_spawn, apply_patch,
+ *     database, notebook, canvas, pdf, diff ───────────────────────────────────── */
+static sc_tool_t *find_tool_by_name(sc_tool_t *tools, size_t count, const char *name) {
+    for (size_t i = 0; i < count; i++) {
+        if (tools[i].vtable && tools[i].vtable->name &&
+            strcmp(tools[i].vtable->name(tools[i].ctx), name) == 0)
+            return &tools[i];
+    }
+    return NULL;
+}
+
+static void test_tool_send_message_exists(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "send_message"));
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_send_message_execute(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_tool_t *t = find_tool_by_name(tools, count, "send_message");
+    SC_ASSERT_NOT_NULL(t);
+    if (t) {
+        sc_json_value_t *args = sc_json_object_new(&alloc);
+        sc_json_object_set(&alloc, args, "to_agent", sc_json_number_new(&alloc, 1));
+        sc_json_object_set(&alloc, args, "message", sc_json_string_new(&alloc, "hello", 5));
+        sc_tool_result_t result = {0};
+        err = t->vtable->execute(t->ctx, &alloc, args, &result);
+        sc_json_free(&alloc, args);
+        SC_ASSERT_EQ(err, SC_OK);
+        SC_ASSERT_NOT_NULL(result.output);
+        sc_tool_result_free(&alloc, &result);
+    }
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_agent_query_exists(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "agent_query"));
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_agent_query_execute(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_tool_t *t = find_tool_by_name(tools, count, "agent_query");
+    SC_ASSERT_NOT_NULL(t);
+    if (t) {
+        sc_json_value_t *args = sc_json_object_new(&alloc);
+        sc_json_object_set(&alloc, args, "agent_id", sc_json_number_new(&alloc, 1));
+        sc_json_object_set(&alloc, args, "message", sc_json_string_new(&alloc, "test", 4));
+        sc_tool_result_t result = {0};
+        err = t->vtable->execute(t->ctx, &alloc, args, &result);
+        sc_json_free(&alloc, args);
+        SC_ASSERT_EQ(err, SC_OK);
+        SC_ASSERT_NOT_NULL(result.output);
+        sc_tool_result_free(&alloc, &result);
+    }
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_agent_spawn_exists(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "agent_spawn"));
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_agent_spawn_execute(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_tool_t *t = find_tool_by_name(tools, count, "agent_spawn");
+    SC_ASSERT_NOT_NULL(t);
+    if (t) {
+        sc_json_value_t *args = sc_json_object_new(&alloc);
+        sc_json_object_set(&alloc, args, "task", sc_json_string_new(&alloc, "test task", 9));
+        sc_tool_result_t result = {0};
+        err = t->vtable->execute(t->ctx, &alloc, args, &result);
+        sc_json_free(&alloc, args);
+        SC_ASSERT_EQ(err, SC_OK);
+        SC_ASSERT_NOT_NULL(result.output);
+        sc_tool_result_free(&alloc, &result);
+    }
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_apply_patch_exists(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "apply_patch"));
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_apply_patch_execute(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_tool_t *t = find_tool_by_name(tools, count, "apply_patch");
+    SC_ASSERT_NOT_NULL(t);
+    if (t) {
+        sc_json_value_t *args = sc_json_object_new(&alloc);
+        sc_json_object_set(&alloc, args, "file", sc_json_string_new(&alloc, "foo.txt", 7));
+        sc_json_object_set(&alloc, args, "patch",
+                           sc_json_string_new(&alloc, "--- a/foo\n+++ b/foo\n@@ -1 +1 @@\n-x\n+y\n",
+                                              36));
+        sc_tool_result_t result = {0};
+        err = t->vtable->execute(t->ctx, &alloc, args, &result);
+        sc_json_free(&alloc, args);
+        SC_ASSERT_EQ(err, SC_OK);
+        SC_ASSERT_NOT_NULL(result.output);
+        sc_tool_result_free(&alloc, &result);
+    }
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_database_exists(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "database"));
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_database_execute(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_tool_t *t = find_tool_by_name(tools, count, "database");
+    SC_ASSERT_NOT_NULL(t);
+    if (t) {
+        sc_json_value_t *args = sc_json_object_new(&alloc);
+        sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "query", 5));
+        sc_json_object_set(&alloc, args, "sql",
+                           sc_json_string_new(&alloc, "SELECT 1", 8));
+        sc_tool_result_t result = {0};
+        err = t->vtable->execute(t->ctx, &alloc, args, &result);
+        sc_json_free(&alloc, args);
+        SC_ASSERT_EQ(err, SC_OK);
+        SC_ASSERT_NOT_NULL(result.output);
+        sc_tool_result_free(&alloc, &result);
+    }
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_notebook_exists(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "notebook"));
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_notebook_execute(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_tool_t *t = find_tool_by_name(tools, count, "notebook");
+    SC_ASSERT_NOT_NULL(t);
+    if (t) {
+        sc_json_value_t *args = sc_json_object_new(&alloc);
+        sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "list", 4));
+        sc_tool_result_t result = {0};
+        err = t->vtable->execute(t->ctx, &alloc, args, &result);
+        sc_json_free(&alloc, args);
+        SC_ASSERT_EQ(err, SC_OK);
+        SC_ASSERT_NOT_NULL(result.output);
+        sc_tool_result_free(&alloc, &result);
+    }
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_canvas_exists(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "canvas"));
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_canvas_execute(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_tool_t *t = find_tool_by_name(tools, count, "canvas");
+    SC_ASSERT_NOT_NULL(t);
+    if (t) {
+        sc_json_value_t *args = sc_json_object_new(&alloc);
+        sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "create", 6));
+        sc_json_object_set(&alloc, args, "content", sc_json_string_new(&alloc, "test", 4));
+        sc_tool_result_t result = {0};
+        err = t->vtable->execute(t->ctx, &alloc, args, &result);
+        sc_json_free(&alloc, args);
+        SC_ASSERT_EQ(err, SC_OK);
+        SC_ASSERT_NOT_NULL(result.output);
+        sc_tool_result_free(&alloc, &result);
+    }
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_pdf_exists(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "pdf"));
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_pdf_execute(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_tool_t *t = find_tool_by_name(tools, count, "pdf");
+    SC_ASSERT_NOT_NULL(t);
+    if (t) {
+        sc_json_value_t *args = sc_json_object_new(&alloc);
+        sc_json_object_set(&alloc, args, "path",
+                           sc_json_string_new(&alloc, "/tmp/test.pdf", 13));
+        sc_tool_result_t result = {0};
+        err = t->vtable->execute(t->ctx, &alloc, args, &result);
+        sc_json_free(&alloc, args);
+        SC_ASSERT_EQ(err, SC_OK);
+        SC_ASSERT_NOT_NULL(result.output);
+        sc_tool_result_free(&alloc, &result);
+    }
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_diff_exists(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "diff"));
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_diff_execute(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t *tools = NULL;
+    size_t count = 0;
+    sc_error_t err =
+        sc_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, &tools,
+                                 &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_tool_t *t = find_tool_by_name(tools, count, "diff");
+    SC_ASSERT_NOT_NULL(t);
+    if (t) {
+        sc_json_value_t *args = sc_json_object_new(&alloc);
+        sc_json_object_set(&alloc, args, "action", sc_json_string_new(&alloc, "diff", 4));
+        sc_json_object_set(&alloc, args, "file_a",
+                           sc_json_string_new(&alloc, "/tmp/a.txt", 10));
+        sc_json_object_set(&alloc, args, "file_b",
+                           sc_json_string_new(&alloc, "/tmp/b.txt", 10));
+        sc_tool_result_t result = {0};
+        err = t->vtable->execute(t->ctx, &alloc, args, &result);
+        sc_json_free(&alloc, args);
+        SC_ASSERT_EQ(err, SC_OK);
+        SC_ASSERT_NOT_NULL(result.output);
+        sc_tool_result_free(&alloc, &result);
+    }
+    sc_tools_destroy_default(&alloc, tools, count);
+}
+
 void run_tools_all_tests(void) {
     SC_TEST_SUITE("Tools (all) - Shell/File");
     SC_RUN_TEST(test_shell_create);
@@ -1425,4 +1764,24 @@ void run_tools_all_tests(void) {
 
     SC_TEST_SUITE("Tools (all) - Factory");
     SC_RUN_TEST(test_tools_factory_create_all);
+
+    SC_TEST_SUITE("Tools (all) - send_message, agent_query, agent_spawn, apply_patch, database, notebook, canvas, pdf, diff");
+    SC_RUN_TEST(test_tool_send_message_exists);
+    SC_RUN_TEST(test_tool_send_message_execute);
+    SC_RUN_TEST(test_tool_agent_query_exists);
+    SC_RUN_TEST(test_tool_agent_query_execute);
+    SC_RUN_TEST(test_tool_agent_spawn_exists);
+    SC_RUN_TEST(test_tool_agent_spawn_execute);
+    SC_RUN_TEST(test_tool_apply_patch_exists);
+    SC_RUN_TEST(test_tool_apply_patch_execute);
+    SC_RUN_TEST(test_tool_database_exists);
+    SC_RUN_TEST(test_tool_database_execute);
+    SC_RUN_TEST(test_tool_notebook_exists);
+    SC_RUN_TEST(test_tool_notebook_execute);
+    SC_RUN_TEST(test_tool_canvas_exists);
+    SC_RUN_TEST(test_tool_canvas_execute);
+    SC_RUN_TEST(test_tool_pdf_exists);
+    SC_RUN_TEST(test_tool_pdf_execute);
+    SC_RUN_TEST(test_tool_diff_exists);
+    SC_RUN_TEST(test_tool_diff_execute);
 }

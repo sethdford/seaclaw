@@ -51,15 +51,18 @@ fi
 
 # 6. Check test coverage
 TESTS_FILE="src/components/components.test.ts"
-if [ -f "$TESTS_FILE" ]; then
-  if grep -q "$NAME" "$TESTS_FILE"; then
-    echo "PASS: Has test in components.test.ts"
-  else
-    echo "FAIL: No test found in components.test.ts for $NAME"
-    ERRORS=$((ERRORS + 1))
+EXTRA_TESTS_FILE="src/components/extra-components.test.ts"
+FOUND_TEST=0
+for TF in "$TESTS_FILE" "$EXTRA_TESTS_FILE"; do
+  if [ -f "$TF" ] && grep -q "$NAME" "$TF"; then
+    FOUND_TEST=1
+    break
   fi
+done
+if [ "$FOUND_TEST" -eq 1 ]; then
+  echo "PASS: Has test in component test files"
 else
-  echo "FAIL: components.test.ts not found"
+  echo "FAIL: No test found for $NAME in components.test.ts or extra-components.test.ts"
   ERRORS=$((ERRORS + 1))
 fi
 

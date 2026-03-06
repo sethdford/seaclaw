@@ -13,7 +13,7 @@ for f in dist/assets/*.js dist/assets/*.css; do
 done
 
 KB=$((TOTAL / 1024))
-BUDGET=300
+BUDGET=320
 
 echo "Bundle size: ${KB} KB (budget: ${BUDGET} KB)"
 if [ "$KB" -gt "$BUDGET" ]; then

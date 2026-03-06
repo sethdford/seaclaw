@@ -179,7 +179,7 @@ if(SC_ENABLE_GOOGLE_CHAT)
     list(APPEND CHANNEL_SOURCES src/channels/google_chat.c)
 endif()
 if(SC_ENABLE_GMAIL)
-    list(APPEND CHANNEL_SOURCES src/channels/gmail.c)
+    list(APPEND CHANNEL_SOURCES src/channels/gmail_base64.c src/channels/gmail.c)
 endif()
 if(SC_ENABLE_VOICE)
     list(APPEND CHANNEL_SOURCES src/channels/voice_channel.c)
@@ -192,6 +192,7 @@ if(SC_ENABLE_ALL_CHANNELS)
         src/channels/qq.c
         src/channels/maixcam.c
         src/channels/dispatch.c
+        src/channels/gmail_base64.c
         src/channels/gmail.c
     )
 endif()
@@ -1085,7 +1086,7 @@ endif()
 if(SC_ENABLE_GOOGLE_CHAT)
     target_compile_definitions(seaclaw_core_test PRIVATE SC_HAS_GOOGLE_CHAT=1)
 endif()
-if(SC_ENABLE_VOICE)
+if(SC_ENABLE_SONATA)
     target_compile_definitions(seaclaw_core_test PRIVATE SC_HAS_SONATA=1)
 endif()
 target_compile_definitions(seaclaw_core_test PRIVATE SC_HAS_SIGNAL=1 SC_HAS_NOSTR=1 SC_HAS_QQ=1 SC_HAS_MAIXCAM=1 SC_HAS_DISPATCH=1 SC_HAS_GMAIL=1 SC_HAS_THREAD_BINDING=1)
@@ -1241,6 +1242,8 @@ set(SC_TEST_SOURCES
     tests/test_plugin.c
     tests/test_tenant.c
     tests/test_agent_teams.c
+    tests/test_untested_modules.c
+    tests/test_modules_coverage.c
 )
 
 add_executable(seaclaw_tests ${SC_TEST_SOURCES} wasm/wasm_alloc.c)

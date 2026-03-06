@@ -7,6 +7,57 @@
 #include "test_framework.h"
 #include <string.h>
 
+/* Declare internal functions for testing */
+extern sc_error_t base64url_decode(const char *in, size_t in_len, char *out, size_t out_cap,
+                                   size_t *out_len);
+
+static void test_gmail_base64url_basic(void) {
+    char out[256];
+    size_t out_len = 0;
+    /* "SGVsbG8gV29ybGQ" is base64url for "Hello World" */
+    sc_error_t err = base64url_decode("SGVsbG8gV29ybGQ", 15, out, sizeof(out), &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out_len, 11u);
+    out[out_len] = '\0';
+    SC_ASSERT_STR_EQ(out, "Hello World");
+}
+
+static void test_gmail_base64url_padding(void) {
+    char out[256];
+    size_t out_len = 0;
+    /* "dGVzdA" is base64url for "test" (no padding) */
+    sc_error_t err = base64url_decode("dGVzdA", 6, out, sizeof(out), &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out_len, 4u);
+    out[out_len] = '\0';
+    SC_ASSERT_STR_EQ(out, "test");
+}
+
+static void test_gmail_base64url_empty(void) {
+    char out[16];
+    size_t out_len = 99;
+    sc_error_t err = base64url_decode("", 0, out, sizeof(out), &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out_len, 0u);
+}
+
+static void test_gmail_base64url_overflow(void) {
+    char out[4]; /* too small for "Hello World" */
+    size_t out_len = 0;
+    sc_error_t err = base64url_decode("SGVsbG8gV29ybGQ", 15, out, sizeof(out), &out_len);
+    SC_ASSERT_TRUE(err != SC_OK); /* should fail on overflow */
+}
+
+static void test_gmail_base64url_url_chars(void) {
+    char out[256];
+    size_t out_len = 0;
+    /* base64url uses - instead of + and _ instead of / */
+    /* "A-B_" is valid base64url */
+    sc_error_t err = base64url_decode("A-B_", 4, out, sizeof(out), &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out_len, 3u);
+}
+
 static void test_gmail_create_destroy(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_channel_t ch;
@@ -87,6 +138,11 @@ static void test_gmail_is_configured(void) {
 void run_gmail_tests(void) {
     SC_TEST_SUITE("Gmail");
 
+    SC_RUN_TEST(test_gmail_base64url_basic);
+    SC_RUN_TEST(test_gmail_base64url_padding);
+    SC_RUN_TEST(test_gmail_base64url_empty);
+    SC_RUN_TEST(test_gmail_base64url_overflow);
+    SC_RUN_TEST(test_gmail_base64url_url_chars);
     SC_RUN_TEST(test_gmail_create_destroy);
     SC_RUN_TEST(test_gmail_create_null_alloc);
     SC_RUN_TEST(test_gmail_create_null_out);

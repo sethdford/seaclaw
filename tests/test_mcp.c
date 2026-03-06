@@ -29,18 +29,23 @@ static void test_mcp_server_list_tools_mock(void) {
     sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
     sc_mcp_server_t *srv = sc_mcp_server_create(&alloc, &cfg);
     sc_mcp_server_connect(srv);
-    char **names = NULL, **descs = NULL;
+    char **names = NULL, **descs = NULL, **params = NULL;
     size_t count = 0;
-    sc_error_t err = sc_mcp_server_list_tools(srv, &alloc, &names, &descs, &count);
+    sc_error_t err = sc_mcp_server_list_tools(srv, &alloc, &names, &descs, &params, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(count, 1u);
     SC_ASSERT_STR_EQ(names[0], "mock_tool");
+    SC_ASSERT_NOT_NULL(params[0]);
+    SC_ASSERT_TRUE(strlen(params[0]) > 2);
     for (size_t i = 0; i < count; i++) {
         alloc.free(alloc.ctx, names[i], strlen(names[i]) + 1);
         alloc.free(alloc.ctx, descs[i], strlen(descs[i]) + 1);
+        if (params[i])
+            alloc.free(alloc.ctx, params[i], strlen(params[i]) + 1);
     }
     alloc.free(alloc.ctx, names, count * sizeof(char *));
     alloc.free(alloc.ctx, descs, count * sizeof(char *));
+    alloc.free(alloc.ctx, params, count * sizeof(char *));
     sc_mcp_server_destroy(srv);
 }
 
@@ -231,17 +236,21 @@ static void test_mcp_server_list_tools_not_connected(void) {
     sc_mcp_server_config_t cfg = { .command = "echo", .args = NULL, .args_count = 0 };
     sc_mcp_server_t *srv = sc_mcp_server_create(&alloc, &cfg);
     SC_ASSERT_NOT_NULL(srv);
-    char **names = NULL, **descs = NULL;
+    char **names = NULL, **descs = NULL, **params = NULL;
     size_t count = 0;
-    sc_error_t err = sc_mcp_server_list_tools(srv, &alloc, &names, &descs, &count);
+    sc_error_t err = sc_mcp_server_list_tools(srv, &alloc, &names, &descs, &params, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_TRUE(count >= 1);
     for (size_t i = 0; i < count; i++) {
         alloc.free(alloc.ctx, names[i], strlen(names[i]) + 1);
         alloc.free(alloc.ctx, descs[i], strlen(descs[i]) + 1);
+        if (params && params[i])
+            alloc.free(alloc.ctx, params[i], strlen(params[i]) + 1);
     }
     alloc.free(alloc.ctx, names, count * sizeof(char *));
     alloc.free(alloc.ctx, descs, count * sizeof(char *));
+    if (params)
+        alloc.free(alloc.ctx, params, count * sizeof(char *));
     sc_mcp_server_destroy(srv);
 }
 

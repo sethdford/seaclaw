@@ -3,9 +3,9 @@
 #include <ctype.h>
 #include <string.h>
 
-static sc_slash_cmd_t g_parsed;
-static char g_name_buf[64];
-static char g_arg_buf[512];
+static _Thread_local sc_slash_cmd_t g_parsed;
+static _Thread_local char g_name_buf[64];
+static _Thread_local char g_arg_buf[512];
 
 static int ci_equal(const char *a, size_t na, const char *b, size_t nb) {
     if (na != nb)

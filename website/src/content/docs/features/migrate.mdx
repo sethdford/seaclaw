@@ -3,8 +3,6 @@ title: Migration
 description: Migrate from OpenClaw or between memory backends.
 ---
 
-import { Tabs, TabItem } from "@astrojs/starlight/components";
-
 ## Migration from OpenClaw
 
 SeaClaw is a drop-in replacement for [OpenClaw](https://github.com/openclaw/openclaw) (TypeScript, Node.js). It preserves your memory, config structure, and channel integrations while dramatically reducing resource usage.
@@ -18,19 +16,22 @@ SeaClaw is a drop-in replacement for [OpenClaw](https://github.com/openclaw/open
 
 ### 1. Install SeaClaw
 
-<Tabs>
-  <TabItem label="Build from source">
-    ```bash git clone https://github.com/sethdford/seaclaw.git cd seaclaw &&
-    mkdir -p build && cd build cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel
-    -DSC_ENABLE_LTO=ON -DSC_ENABLE_ALL_CHANNELS=ON cmake --build . sudo cp
-    seaclaw /usr/local/bin/ ```
-  </TabItem>
-  <TabItem label="Download release">
-    ```bash curl -Lo seaclaw
-    https://github.com/sethdford/seaclaw/releases/latest/download/seaclaw-$(uname
-    -m) chmod +x seaclaw && sudo mv seaclaw /usr/local/bin/ ```
-  </TabItem>
-</Tabs>
+**Build from source (recommended):**
+
+```bash
+git clone https://github.com/sethdford/seaclaw.git
+cd seaclaw && mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON -DSC_ENABLE_ALL_CHANNELS=ON
+cmake --build .
+sudo cp seaclaw /usr/local/bin/
+```
+
+**Or download a release:**
+
+```bash
+curl -Lo seaclaw https://github.com/sethdford/seaclaw/releases/latest/download/seaclaw-$(uname -m)
+chmod +x seaclaw && sudo mv seaclaw /usr/local/bin/
+```
 
 ### 2. Migrate memory
 

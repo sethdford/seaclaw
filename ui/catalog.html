@@ -70,6 +70,7 @@
       <a href="#sc-animated-number">sc-animated-number</a>
       <a href="#sc-animated-icon">sc-animated-icon</a>
       <a href="#sc-activity-feed">sc-activity-feed</a>
+      <a href="#sc-welcome">sc-welcome</a>
     </nav>
     <main class="catalog-main">
       <header class="catalog-header">
@@ -751,6 +752,16 @@
         <div class="code-snippet"><pre><code>&lt;sc-activity-feed .events=${'{[{type:"message",channel:"Telegram",user:"Alice",preview:"Hello!",time:Date.now()}]}'}&gt;&lt;/sc-activity-feed&gt;</code></pre></div>
       </section>
 
+      <section class="component-section" id="sc-welcome">
+        <h2>sc-welcome</h2>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 640px;">
+            <sc-welcome></sc-welcome>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-welcome&gt;&lt;/sc-welcome&gt;</code></pre></div>
+      </section>
+
     <sc-toast></sc-toast>
 
     <script type="module">
@@ -785,6 +796,7 @@
       import "/src/components/sc-animated-number.js";
       import "/src/components/sc-animated-icon.js";
       import "/src/components/sc-activity-feed.js";
+      import "/src/components/sc-welcome.js";
 
       // Theme toggle
       function setTheme(theme) {

@@ -9,7 +9,9 @@
 #include <unistd.h>
 #endif
 #include "seaclaw/agent.h"
+#include "seaclaw/agent/awareness.h"
 #include "seaclaw/agent/cli.h"
+#include "seaclaw/agent/episodic.h"
 #include "seaclaw/agent/spawn.h"
 #include "seaclaw/bus.h"
 #include "seaclaw/channel.h"
@@ -73,6 +75,30 @@
 #endif
 #if SC_HAS_WHATSAPP
 #include "seaclaw/channels/whatsapp.h"
+#endif
+#if SC_HAS_LINE
+#include "seaclaw/channels/line.h"
+#endif
+#if SC_HAS_LARK
+#include "seaclaw/channels/lark.h"
+#endif
+#if SC_HAS_GOOGLE_CHAT
+#include "seaclaw/channels/google_chat.h"
+#endif
+#if SC_HAS_DINGTALK
+#include "seaclaw/channels/dingtalk.h"
+#endif
+#if SC_HAS_TEAMS
+#include "seaclaw/channels/teams.h"
+#endif
+#if SC_HAS_TWILIO
+#include "seaclaw/channels/twilio.h"
+#endif
+#if SC_HAS_ONEBOT
+#include "seaclaw/channels/onebot.h"
+#endif
+#if SC_HAS_QQ
+#include "seaclaw/channels/qq.h"
 #endif
 
 #define SC_VERSION  "0.3.0"
@@ -443,6 +469,28 @@ static void *svc_gateway_thread(void *arg) {
     return NULL;
 }
 
+/* Webhook dispatcher — routes gateway webhook POSTs to the correct channel handler */
+typedef struct webhook_dispatcher_ctx {
+    sc_allocator_t *alloc;
+    sc_service_channel_t *channels;
+    size_t ch_count;
+} webhook_dispatcher_ctx_t;
+
+__attribute__((unused))
+static void webhook_dispatcher(const char *channel, const char *body, size_t body_len, void *ctx) {
+    webhook_dispatcher_ctx_t *d = (webhook_dispatcher_ctx_t *)ctx;
+    if (!d || !channel || !body)
+        return;
+    for (size_t i = 0; i < d->ch_count; i++) {
+        const char *name = d->channels[i].channel->vtable->name(d->channels[i].channel_ctx);
+        if (!name || strcmp(name, channel) != 0)
+            continue;
+        if (d->channels[i].webhook_fn)
+            d->channels[i].webhook_fn(d->channels[i].channel_ctx, d->alloc, body, body_len);
+        return;
+    }
+}
+
 static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv) {
     bool with_gateway = false;
     for (int i = 2; i < argc && argv[i]; i++) {
@@ -663,6 +711,7 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
         sc_config_deinit(&cfg);
         return err;
     }
+    agent.chain_of_thought = true;
     agent.agent_pool = agent_pool;
     sc_agent_set_mailbox(&agent, svc_mailbox);
     agent.policy_engine = NULL;
@@ -683,6 +732,7 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
 
     /* ── Wire channels ────────────────────────────────────────────────── */
     sc_service_channel_t channels[10];
+    memset(channels, 0, sizeof(channels));
     size_t ch_count = 0;
 
 #if SC_HAS_EMAIL
@@ -864,6 +914,7 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
             channels[ch_count].channel_ctx = whatsapp_ch.ctx;
             channels[ch_count].channel = &whatsapp_ch;
             channels[ch_count].poll_fn = sc_whatsapp_poll;
+            channels[ch_count].webhook_fn = sc_whatsapp_on_webhook;
             channels[ch_count].interval_ms = 1000;
             channels[ch_count].last_poll_ms = 0;
             ch_count++;
@@ -894,6 +945,13 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
         svc_app_ctx.tools = tools;
         svc_app_ctx.tools_count = tools_count;
         gw_config.app_ctx = &svc_app_ctx;
+
+        static webhook_dispatcher_ctx_t wh_ctx;
+        wh_ctx.alloc = alloc;
+        wh_ctx.channels = channels;
+        wh_ctx.ch_count = ch_count;
+        gw_config.on_webhook = webhook_dispatcher;
+        gw_config.on_webhook_ctx = &wh_ctx;
 
         gw_tctx.alloc = alloc;
         gw_tctx.config = gw_config;
@@ -1438,7 +1496,12 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
             goto cleanup;
         }
         sc_agent_set_retrieval_engine(&agent, &gw_retrieval_engine);
+        agent.chain_of_thought = true;
         agent_active = true;
+
+        /* Proactive awareness: subscribe to bus events */
+        sc_awareness_t awareness;
+        sc_awareness_init(&awareness, &bus);
 
         if (cfg.security.audit.enabled) {
             sc_audit_config_t acfg = SC_AUDIT_CONFIG_DEFAULT;

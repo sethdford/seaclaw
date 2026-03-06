@@ -1,5 +1,6 @@
 #include "seaclaw/agent/compaction.h"
 #include "seaclaw/core/string.h"
+#include "seaclaw/provider.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -302,6 +303,103 @@ sc_error_t sc_context_compact_for_pressure(sc_allocator_t *alloc, sc_owned_messa
                     remaining * sizeof(sc_owned_message_t));
         }
         count -= (compact_end - start - 1);
+    }
+
+    *history_count = count;
+    return SC_OK;
+}
+
+sc_error_t sc_compact_history_llm(sc_allocator_t *alloc, sc_owned_message_t *history,
+                                  size_t *history_count, size_t *history_cap,
+                                  const sc_compaction_config_t *config, sc_provider_t *provider) {
+    if (!alloc || !history || !history_count || !history_cap || !config)
+        return SC_ERR_INVALID_ARGUMENT;
+
+    if (!provider || !provider->vtable || !provider->vtable->chat_with_system)
+        return sc_compact_history(alloc, history, history_count, history_cap, config);
+
+    size_t count = *history_count;
+    if (!sc_should_compact(history, count, config))
+        return SC_OK;
+
+    bool has_system = history[0].role == SC_ROLE_SYSTEM;
+    size_t start = has_system ? 1 : 0;
+    size_t non_system = count - start;
+
+    uint32_t keep = config->keep_recent;
+    if (keep > (uint32_t)non_system)
+        keep = (uint32_t)non_system;
+
+    size_t compact_count = non_system - keep;
+    if (compact_count == 0)
+        return SC_OK;
+
+    size_t compact_end = start + compact_count;
+
+    uint32_t max_src = config->max_source_chars;
+    if (max_src == 0)
+        max_src = SC_COMPACTION_DEFAULT_MAX_SOURCE_CHARS;
+
+    size_t raw_alloc = 0;
+    char *raw = build_summary(alloc, history, start, compact_end, max_src, &raw_alloc);
+    if (!raw)
+        return SC_ERR_OUT_OF_MEMORY;
+
+    static const char sys_prompt[] =
+        "Summarize the following conversation excerpt concisely, preserving key decisions, "
+        "facts, and action items. Output only the summary, no preamble.";
+
+    char *llm_summary = NULL;
+    size_t llm_summary_len = 0;
+    sc_error_t err = provider->vtable->chat_with_system(
+        provider->ctx, alloc, sys_prompt, sizeof(sys_prompt) - 1, raw, strlen(raw), "gpt-4o-mini",
+        11, 0.2, &llm_summary, &llm_summary_len);
+
+    alloc->free(alloc->ctx, raw, raw_alloc);
+
+    if (err != SC_OK || !llm_summary || llm_summary_len == 0) {
+        if (llm_summary)
+            alloc->free(alloc->ctx, llm_summary, llm_summary_len + 1);
+        return sc_compact_history(alloc, history, history_count, history_cap, config);
+    }
+
+    uint32_t max_sum = config->max_summary_chars;
+    if (max_sum == 0)
+        max_sum = SC_COMPACTION_DEFAULT_MAX_SUMMARY_CHARS;
+    if (llm_summary_len > max_sum) {
+        llm_summary[max_sum] = '\0';
+        llm_summary_len = max_sum;
+    }
+
+    static const char llm_prefix[] = "[LLM compaction summary]\n";
+    size_t prefix_len = sizeof(llm_prefix) - 1;
+    char *summary_content = (char *)alloc->alloc(alloc->ctx, prefix_len + llm_summary_len + 1);
+    if (!summary_content) {
+        alloc->free(alloc->ctx, llm_summary, llm_summary_len + 1);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+    memcpy(summary_content, llm_prefix, prefix_len);
+    memcpy(summary_content + prefix_len, llm_summary, llm_summary_len + 1);
+    alloc->free(alloc->ctx, llm_summary, llm_summary_len + 1);
+
+    free_messages(alloc, history, start, compact_end);
+
+    history[start].role = SC_ROLE_ASSISTANT;
+    history[start].content = summary_content;
+    history[start].content_len = prefix_len + llm_summary_len;
+    history[start].name = NULL;
+    history[start].name_len = 0;
+    history[start].tool_call_id = NULL;
+    history[start].tool_call_id_len = 0;
+
+    if (compact_end > start + 1) {
+        size_t shift = compact_end - start - 1;
+        size_t remaining = count - compact_end;
+        if (remaining > 0) {
+            memmove(&history[start + 1], &history[compact_end],
+                    remaining * sizeof(sc_owned_message_t));
+        }
+        count -= shift;
     }
 
     *history_count = count;

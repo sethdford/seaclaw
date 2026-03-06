@@ -8,6 +8,7 @@
 #include "seaclaw/bus.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/string.h"
+#include "seaclaw/memory.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -172,6 +173,31 @@ static void test_episodic_summarize_null(void) {
     char *summary = sc_episodic_summarize_session(NULL, NULL, NULL, 0, NULL);
     SC_ASSERT_NULL(summary);
 }
+
+#ifdef SC_ENABLE_SQLITE
+static void test_episodic_store_load_sqlite(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+
+    sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
+    SC_ASSERT_NOT_NULL(mem.vtable);
+    SC_ASSERT_NOT_NULL(mem.ctx);
+
+    sc_error_t err = sc_episodic_store(&mem, &alloc, "session_abc", 11,
+                                      "User asked about config parsing", 31);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    err = sc_episodic_load(&mem, &alloc, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(out);
+    SC_ASSERT_TRUE(out_len > 0);
+    SC_ASSERT_TRUE(strstr(out, "config parsing") != NULL);
+
+    alloc.free(alloc.ctx, out, out_len + 1);
+    mem.vtable->deinit(mem.ctx);
+}
+#endif
 
 /* ── Awareness ──────────────────────────────────────────────────────────── */
 
@@ -394,6 +420,9 @@ void run_intelligence_tests(void) {
 
     SC_RUN_TEST(test_episodic_summarize_basic);
     SC_RUN_TEST(test_episodic_summarize_null);
+#ifdef SC_ENABLE_SQLITE
+    SC_RUN_TEST(test_episodic_store_load_sqlite);
+#endif
 
     SC_RUN_TEST(test_awareness_init_deinit);
     SC_RUN_TEST(test_awareness_tracks_messages);

@@ -1,0 +1,29 @@
+#!/bin/sh
+# commit-msg: enforce conventional commit format
+# Types: feat, fix, refactor, test, docs, chore, perf, ci, build, style
+# Format: <type>[(<scope>)][!]: <description>
+
+MSG=$(head -1 "$1")
+
+# Allow merge commits
+if echo "$MSG" | grep -qE "^Merge "; then
+    exit 0
+fi
+
+# Allow revert commits
+if echo "$MSG" | grep -qE "^Revert "; then
+    exit 0
+fi
+
+PATTERN="^(feat|fix|refactor|test|docs|chore|perf|ci|build|style)(\([a-z0-9_/-]+\))?\!?: .{3,}"
+
+if ! echo "$MSG" | grep -qE "$PATTERN"; then
+    echo "Error: commit message does not follow conventional format."
+    echo ""
+    echo "  Expected: <type>[(<scope>)]: <description>"
+    echo "  Types:    feat fix refactor test docs chore perf ci build style"
+    echo "  Example:  feat(imessage): add echo suppression ring buffer"
+    echo ""
+    echo "  Got: $MSG"
+    exit 1
+fi

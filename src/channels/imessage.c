@@ -71,9 +71,9 @@ static void imessage_stop(void *ctx) {
         c->running = false;
 }
 
-#if !SC_IS_TEST && defined(__APPLE__) && defined(__MACH__)
+#if (defined(__APPLE__) && defined(__MACH__)) || SC_IS_TEST
 /* Escape " and \ for AppleScript string literal */
-static size_t escape_for_applescript(char *out, size_t out_cap, const char *in, size_t in_len) {
+size_t escape_for_applescript(char *out, size_t out_cap, const char *in, size_t in_len) {
     size_t j = 0;
     for (size_t i = 0; i < in_len && j + 2 < out_cap; i++) {
         if (in[i] == '\\' || in[i] == '"') {

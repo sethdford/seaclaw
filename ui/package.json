@@ -19,6 +19,8 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "check:component": "bash scripts/check-component.sh",
+    "check:components": "bash scripts/check-all-components.sh",
+    "check:bundle-size": "bash scripts/check-bundle-size.sh",
     "visual:snapshot": "bash scripts/visual-regression.sh",
     "docs": "(cd ../design-tokens && npm run docs) && bash scripts/icon-inventory.sh && bash scripts/component-docs.sh",
     "docs:icons": "bash scripts/icon-inventory.sh",
