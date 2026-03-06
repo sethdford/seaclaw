@@ -26,7 +26,7 @@ Key extension points:
 - `src/peripherals/` (`sc_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **587 source + header files, ~98K lines of C, ~38K lines of tests, 2,681 tests, 33 channels**.
+Current scale: **587 source + header files, ~99K lines of C, ~38K lines of tests, 2,708 tests, 33 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -76,7 +76,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `SC_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 2,681+ tests must pass at zero ASan errors**
+5. **All 2,708+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `SC_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -140,9 +140,9 @@ Required:
 src/
   main.c                CLI entrypoint and command routing
   agent/                agent loop, context, planner, compaction, dispatcher
-  channels/             20 channel implementations (cli, telegram, discord, slack, ...)
+  channels/             33 channel implementations (cli, telegram, discord, slack, ...)
   providers/            50+ AI provider implementations (9 core + 41 compatible services)
-  tools/                53 tool implementations
+  tools/                73 tool implementations
   memory/               SQLite + markdown + LRU backends, embeddings, vector search
   security/             policy, pairing, secrets, sandbox backends (landlock, firejail, bwrap)
   runtime/              runtime adapters (native, docker, wasm, cloudflare)
@@ -158,7 +158,7 @@ src/
 
 include/seaclaw/       public C headers
 
-tests/                 91 test files, 2,678+ tests
+tests/                 94 test files, 2,708+ tests
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 

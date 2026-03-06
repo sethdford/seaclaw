@@ -206,7 +206,7 @@ function toCSS(palette: ColorPalette): string {
 
 function main() {
   const args = process.argv.slice(2);
-  let hex = "#14b8a6";
+  let hex = "#7AB648";
   let format = "both";
 
   for (let i = 0; i < args.length; i++) {

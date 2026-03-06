@@ -98,3 +98,4 @@ audit.log
 apps/flutter/.dart_tool/
 apps/flutter/build/
 build2/
+apps/shared/SeaClawKit/.build/

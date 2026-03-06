@@ -74,4 +74,17 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc, const char *host, uint16_t port
 
 bool sc_gateway_path_is(const char *path, const char *base);
 
+/* Path security: returns true if path contains traversal attempts (.., %2e%2e, %00, etc.) */
+bool sc_gateway_path_has_traversal(const char *path);
+
+/* Webhook routing: returns true if path matches a webhook endpoint */
+bool sc_gateway_is_webhook_path(const char *path);
+
+/* CORS: returns true if origin is allowed (localhost/127.0.0.1/[::1] or in allowed list) */
+bool sc_gateway_is_allowed_origin(const char *origin, const char *const *allowed, size_t n);
+
+/* Content-Length parsing: SC_OK + *out_len, SC_ERR_INVALID_ARGUMENT (non-numeric),
+ * SC_ERR_GATEWAY_BODY_TOO_LARGE (exceeds max). value is the part after "Content-Length: " */
+sc_error_t sc_gateway_parse_content_length(const char *value, size_t max_body, size_t *out_len);
+
 #endif /* SC_GATEWAY_H */

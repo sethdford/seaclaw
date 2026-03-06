@@ -645,9 +645,8 @@ static void test_persona_prompt_with_channel_overlay(void) {
 
 static void test_persona_build_prompt_includes_examples(void) {
     sc_allocator_t alloc = sc_system_allocator();
-    const char *json =
-        "{\"version\":1,\"name\":\"ex_test\","
-        "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]}}";
+    const char *json = "{\"version\":1,\"name\":\"ex_test\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]}}";
     sc_persona_t p;
     memset(&p, 0, sizeof(p));
     sc_error_t err = sc_persona_load_json(&alloc, json, strlen(json), &p);

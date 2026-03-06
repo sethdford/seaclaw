@@ -491,8 +491,7 @@ typedef struct webhook_dispatcher_ctx {
     size_t ch_count;
 } webhook_dispatcher_ctx_t;
 
-static void webhook_dispatcher(const char *channel, const char *body,
-                                                       size_t body_len, void *ctx) {
+static void webhook_dispatcher(const char *channel, const char *body, size_t body_len, void *ctx) {
     webhook_dispatcher_ctx_t *d = (webhook_dispatcher_ctx_t *)ctx;
     if (!d || !channel || !body)
         return;
@@ -1430,7 +1429,7 @@ static bool gw_agent_on_message(sc_bus_event_type_t type, const sc_bus_event_t *
         memset(&eev, 0, sizeof(eev));
         eev.type = SC_BUS_ERROR;
         int ec = snprintf(eev.channel, SC_BUS_CHANNEL_LEN, "%s",
-                         ev->channel[0] ? ev->channel : "gateway");
+                          ev->channel[0] ? ev->channel : "gateway");
         if (ec < 0 || (size_t)ec >= SC_BUS_CHANNEL_LEN)
             (void)snprintf(eev.channel, SC_BUS_CHANNEL_LEN, "gateway");
         int ei = snprintf(eev.id, SC_BUS_ID_LEN, "%s", ev->id);

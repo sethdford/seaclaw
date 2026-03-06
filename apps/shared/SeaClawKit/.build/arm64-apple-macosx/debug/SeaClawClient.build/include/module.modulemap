@@ -1,3 +1,0 @@
-module SeaClawClient {
-    header "/Users/sethford/Documents/nullclaw/apps/shared/SeaClawKit/.build/arm64-apple-macosx/debug/SeaClawClient.build/include/SeaClawClient-Swift.h"
-}

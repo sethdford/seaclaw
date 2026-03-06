@@ -280,7 +280,8 @@ sc_error_t sc_agent_from_config(
             sc_error_t perr = sc_persona_load(alloc, persona, persona_len, out->persona);
             if (perr != SC_OK) {
 #ifndef SC_IS_TEST
-                fprintf(stderr, "[seaclaw] warning: persona '%.*s' not found, running without persona\n",
+                fprintf(stderr,
+                        "[seaclaw] warning: persona '%.*s' not found, running without persona\n",
                         (int)persona_len, persona);
 #endif
                 alloc->free(alloc->ctx, out->persona, sizeof(sc_persona_t));

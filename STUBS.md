@@ -1,15 +1,15 @@
 # SeaClaw — Project Status
 
-Last updated: 2026-03-06
+Last updated: 2026-03-02
 
 ## Summary
 
 | Metric                         | Value                  |
 | ------------------------------ | ---------------------- |
-| Source files (src/ + include/) | **~564**               |
-| Lines of C/H/ASM code          | **~85K+**              |
-| Test files                     | 90                     |
-| Tests passing                  | **2,681/2,681 (100%)** |
+| Source files (src/ + include/) | **587**                |
+| Lines of C/H/ASM code          | **~99K**               |
+| Test files                     | 94                     |
+| Tests passing                  | **2,708/2,708 (100%)** |
 | Binary size (MinSizeRel+LTO)   | **430 KB**             |
 | Peak RSS (test suite)          | **~5.9 MB**            |
 
@@ -59,7 +59,7 @@ Last updated: 2026-03-06
 | -------- | ------------------------ |
 | Dispatch | Forwards to sub-channels |
 
-## Tools — All 53 Real (with all feature flags)
+## Tools — All 73 Real (with all feature flags)
 
 Every tool has a real implementation. In test mode (`SC_IS_TEST`), they return mock
 data to avoid side effects. Highlights:

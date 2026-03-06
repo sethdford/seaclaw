@@ -57,7 +57,7 @@ sc_error_t sc_hardware_discover(sc_allocator_t *alloc, sc_hardware_info_t *resul
         }
     }
 
-    /* Check for probe-rs (STM32) */
+    /* Check for probe-rs (STM32). Constant string: no user input, safe from shell injection. */
     if (system("probe-rs --version >/dev/null 2>&1") == 0 && found < max_count) {
         sc_hardware_info_t *r = &results[found];
         strncpy(r->board_name, "STM32F401RETx", sizeof(r->board_name) - 1);

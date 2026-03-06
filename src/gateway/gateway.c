@@ -107,7 +107,20 @@ bool sc_gateway_path_is(const char *path, const char *base) {
     return path_is(path, base);
 }
 
-static bool is_webhook_path(const char *path) {
+bool sc_gateway_path_has_traversal(const char *path) {
+    if (!path)
+        return false;
+    return strstr(path, "..") != NULL || strstr(path, "%2e%2e") != NULL ||
+           strstr(path, "%2E%2E") != NULL || strstr(path, "%2e%2E") != NULL ||
+           strstr(path, "%2E%2e") != NULL || strstr(path, "%00") != NULL ||
+           strstr(path, "%252e%252e") != NULL || strstr(path, "%252E%252E") != NULL;
+}
+
+bool sc_gateway_is_webhook_path(const char *path) {
+    if (!path)
+        return false;
+    if (strstr(path, "..") != NULL || strstr(path, "%2e") != NULL || strstr(path, "%2E") != NULL)
+        return false;
     return path_is(path, "/webhook") || strncmp(path, "/webhook/", 9) == 0 ||
            path_is(path, "/telegram") || path_is(path, "/slack/events") ||
            path_is(path, "/whatsapp") || path_is(path, "/line") || path_is(path, "/lark") ||
@@ -115,6 +128,40 @@ static bool is_webhook_path(const char *path) {
            path_is(path, "/twitter") || path_is(path, "/google_rcs") ||
            path_is(path, "/google_chat") || path_is(path, "/dingtalk") || path_is(path, "/teams") ||
            path_is(path, "/twilio") || path_is(path, "/onebot") || path_is(path, "/qq");
+}
+
+bool sc_gateway_is_allowed_origin(const char *origin, const char *const *allowed, size_t n) {
+    if (!origin || !origin[0])
+        return true;
+    if (strstr(origin, "://localhost") != NULL || strstr(origin, "://127.0.0.1") != NULL ||
+        strstr(origin, "://[::1]") != NULL)
+        return true;
+    for (size_t i = 0; i < n; i++) {
+        if (allowed[i] && strcmp(origin, allowed[i]) == 0)
+            return true;
+    }
+    return false;
+}
+
+sc_error_t sc_gateway_parse_content_length(const char *value, size_t max_body, size_t *out_len) {
+    if (!value || !out_len)
+        return SC_ERR_INVALID_ARGUMENT;
+    while (*value == ' ')
+        value++;
+    if (*value == '\0')
+        return SC_ERR_INVALID_ARGUMENT;
+    char *end;
+    long v = strtol(value, &end, 10);
+    if (v < 0 || end == value)
+        return SC_ERR_INVALID_ARGUMENT;
+    if ((size_t)v > max_body)
+        return SC_ERR_GATEWAY_BODY_TOO_LARGE;
+    *out_len = (size_t)v;
+    return SC_OK;
+}
+
+static bool is_webhook_path(const char *path) {
+    return sc_gateway_is_webhook_path(path);
 }
 
 static const char *webhook_path_to_channel(const char *path, char *buf, size_t buf_len) {
@@ -172,16 +219,7 @@ static const char *const *s_cors_origins = NULL;
 static size_t s_cors_origins_len = 0;
 
 static bool is_allowed_origin(const char *origin) {
-    if (!origin || !origin[0])
-        return true;
-    if (strstr(origin, "://localhost") != NULL || strstr(origin, "://127.0.0.1") != NULL ||
-        strstr(origin, "://[::1]") != NULL)
-        return true;
-    for (size_t i = 0; i < s_cors_origins_len; i++) {
-        if (s_cors_origins[i] && strcmp(origin, s_cors_origins[i]) == 0)
-            return true;
-    }
-    return false;
+    return sc_gateway_is_allowed_origin(origin, s_cors_origins, s_cors_origins_len);
 }
 
 static const char *s_request_origin = NULL;
@@ -281,8 +319,7 @@ static const char *mime_for_ext(const char *path) {
 static bool serve_static_file(int fd, const char *base_dir, const char *url_path) {
     if (!base_dir || !url_path)
         return false;
-    if (strstr(url_path, "..") || strstr(url_path, "%2e%2e") || strstr(url_path, "%2E%2E") ||
-        strstr(url_path, "%2e%2E") || strstr(url_path, "%2E%2e") || strstr(url_path, "%00"))
+    if (sc_gateway_path_has_traversal(url_path))
         return false;
 
     char filepath[1024];

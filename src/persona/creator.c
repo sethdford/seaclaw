@@ -185,9 +185,8 @@ overlay_oom:
             for (size_t k = 0; k < buf[i].style_notes_count; k++)
                 if (buf[i].style_notes[k])
                     alloc->free(alloc->ctx, buf[i].style_notes[k],
-                               strlen(buf[i].style_notes[k]) + 1);
-            alloc->free(alloc->ctx, buf[i].style_notes,
-                       buf[i].style_notes_count * sizeof(char *));
+                                strlen(buf[i].style_notes[k]) + 1);
+            alloc->free(alloc->ctx, buf[i].style_notes, buf[i].style_notes_count * sizeof(char *));
         }
     }
     alloc->free(alloc->ctx, buf, total * sizeof(sc_persona_overlay_t));
@@ -331,12 +330,24 @@ static sc_error_t write_json_string(FILE *f, const char *s) {
     fputc('"', f);
     for (const char *p = s ? s : ""; *p; p++) {
         switch (*p) {
-        case '"': fputs("\\\"", f); break;
-        case '\\': fputs("\\\\", f); break;
-        case '\n': fputs("\\n", f); break;
-        case '\r': fputs("\\r", f); break;
-        case '\t': fputs("\\t", f); break;
-        default: fputc(*p, f); break;
+        case '"':
+            fputs("\\\"", f);
+            break;
+        case '\\':
+            fputs("\\\\", f);
+            break;
+        case '\n':
+            fputs("\\n", f);
+            break;
+        case '\r':
+            fputs("\\r", f);
+            break;
+        case '\t':
+            fputs("\\t", f);
+            break;
+        default:
+            fputc(*p, f);
+            break;
         }
     }
     fputc('"', f);
@@ -395,7 +406,8 @@ sc_error_t sc_persona_creator_write(sc_allocator_t *alloc, const sc_persona_t *p
     if (write_json_string_array(f, persona->traits, persona->traits_count) != SC_OK)
         goto fail;
     fputs("],\n    \"vocabulary\": {\n      \"preferred\": [", f);
-    if (write_json_string_array(f, persona->preferred_vocab, persona->preferred_vocab_count) != SC_OK)
+    if (write_json_string_array(f, persona->preferred_vocab, persona->preferred_vocab_count) !=
+        SC_OK)
         goto fail;
     fputs("],\n      \"avoided\": [", f);
     if (write_json_string_array(f, persona->avoided_vocab, persona->avoided_vocab_count) != SC_OK)

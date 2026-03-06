@@ -2,6 +2,7 @@
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/peripheral.h"
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,6 +44,34 @@ static bool impl_health_check(void *ctx) {
 static void set_default_board_name(sc_arduino_ctx_t *s) {
     strncpy(s->board_name, "arduino-uno", sizeof(s->board_name) - 1);
     s->board_name[sizeof(s->board_name) - 1] = '\0';
+}
+
+static bool __attribute__((unused)) is_safe_path(const char *path) {
+    if (!path)
+        return false;
+    if (strstr(path, "..") != NULL)
+        return false;
+    for (const char *p = path; *p; p++) {
+        char c = *p;
+        if (!(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') &&
+            c != '.' && c != '_' && c != '/' && c != '-' && c != '~')
+            return false;
+    }
+    return true;
+}
+
+static bool __attribute__((unused)) is_safe_path_len(const char *path, size_t len) {
+    if (!path || len == 0)
+        return false;
+    for (size_t i = 0; i < len; i++) {
+        if (i + 1 < len && path[i] == '.' && path[i + 1] == '.')
+            return false;
+        char c = path[i];
+        if (!(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') &&
+            c != '.' && c != '_' && c != '/' && c != '-' && c != '~')
+            return false;
+    }
+    return true;
 }
 
 static sc_peripheral_error_t impl_init(void *ctx) {
@@ -269,6 +298,8 @@ static sc_peripheral_error_t impl_flash(void *ctx, const char *firmware_path, si
         return SC_PERIPHERAL_ERR_FLASH_FAILED;
 
 #ifndef SC_IS_TEST
+    if (!is_safe_path(s->serial_port) || !is_safe_path(firmware_path))
+        return SC_PERIPHERAL_ERR_FLASH_FAILED;
     char cmd[512];
     int n =
         snprintf(cmd, sizeof(cmd), "avrdude -p atmega328p -c arduino -P %.*s -U flash:w:%.*s:i -q",

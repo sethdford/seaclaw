@@ -442,9 +442,12 @@ sc_error_t sc_daemon_start(void) {
     setsid();
     if (chdir("/") != 0)
         _exit(127);
-    (void)freopen("/dev/null", "r", stdin);
-    (void)freopen("/dev/null", "w", stdout);
-    (void)freopen("/dev/null", "w", stderr);
+    if (!freopen("/dev/null", "r", stdin))
+        _exit(127);
+    if (!freopen("/dev/null", "w", stdout))
+        _exit(127);
+    if (!freopen("/dev/null", "w", stderr))
+        _exit(127);
 
     execlp("seaclaw", "seaclaw", "service-loop", (char *)NULL);
     _exit(1);

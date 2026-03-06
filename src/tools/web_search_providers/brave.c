@@ -32,8 +32,12 @@ sc_error_t sc_web_search_brave(sc_allocator_t *alloc, const char *query, size_t 
     }
 
     char headers_buf[512];
-    snprintf(headers_buf, sizeof(headers_buf), "X-Subscription-Token: %s\nAccept: application/json",
-             api_key);
+    int hn = snprintf(headers_buf, sizeof(headers_buf),
+                      "X-Subscription-Token: %s\nAccept: application/json", api_key);
+    if (hn < 0 || (size_t)hn >= sizeof(headers_buf)) {
+        *out = sc_tool_result_fail("headers too long", 15);
+        return SC_OK;
+    }
 
     sc_http_response_t resp = {0};
     err = sc_http_get_ex(alloc, url_buf, headers_buf, &resp);
@@ -77,8 +81,13 @@ sc_error_t sc_web_search_brave(sc_allocator_t *alloc, const char *query, size_t 
     }
     size_t len = 0;
     n = snprintf(buf, cap, "Results for: %.*s\n\n", (int)query_len, query);
-    if (n > 0)
-        len = (size_t)n;
+    if (n < 0 || (size_t)n >= cap) {
+        alloc->free(alloc->ctx, buf, cap);
+        sc_json_free(alloc, parsed);
+        *out = sc_tool_result_fail("output buffer too small", 22);
+        return SC_OK;
+    }
+    len = (size_t)n;
 
     int max_r = count;
     if (max_r > (int)results->data.array.len)
@@ -99,6 +108,8 @@ sc_error_t sc_web_search_brave(sc_allocator_t *alloc, const char *query, size_t 
 
         char line[1024];
         int ln = snprintf(line, sizeof(line), "%d. %s\n   %s\n   %s\n\n", i + 1, title, url, desc);
+        if (ln < 0 || (size_t)ln >= sizeof(line))
+            continue; /* skip truncated result line */
         if (ln > 0 && len + (size_t)ln < cap) {
             memcpy(buf + len, line, (size_t)ln + 1);
             len += (size_t)ln;

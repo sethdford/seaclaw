@@ -39,7 +39,8 @@ typedef struct sc_postgres_memory {
 #endif
 } sc_postgres_memory_t;
 
-__attribute__((unused)) static const char *category_to_string(const sc_memory_category_t *cat) {
+#if (defined(SC_IS_TEST) && SC_IS_TEST) || defined(SC_ENABLE_POSTGRES)
+static const char *category_to_string(const sc_memory_category_t *cat) {
     if (!cat)
         return "core";
     switch (cat->tag) {
@@ -57,6 +58,7 @@ __attribute__((unused)) static const char *category_to_string(const sc_memory_ca
         return "core";
     }
 }
+#endif
 
 #if defined(SC_IS_TEST) && SC_IS_TEST
 static void mock_free_entry(sc_allocator_t *alloc, mock_entry_t *e) {

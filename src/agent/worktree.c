@@ -1,14 +1,13 @@
 #include "seaclaw/agent/worktree.h"
+#include "seaclaw/core/process_util.h"
 #include "seaclaw/core/string.h"
-#include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define SC_WORKTREE_PATH_FMT   "%s/../.worktrees/%s"
 #define SC_WORKTREE_BRANCH_FMT "agent/%llu/%s"
-#define SC_WORKTREE_CMD_ADD    "git worktree add %s -b %s"
-#define SC_WORKTREE_CMD_REMOVE "git worktree remove %s --force"
 #define SC_WORKTREE_INIT_CAP   8
 
 struct sc_worktree_manager {
@@ -19,6 +18,18 @@ struct sc_worktree_manager {
     size_t capacity;
 };
 
+static bool is_safe_path(const char *path) {
+    if (!path)
+        return false;
+    for (const char *p = path; *p; p++) {
+        char c = *p;
+        if (!(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') &&
+            c != '.' && c != '_' && c != '/' && c != '-' && c != '~')
+            return false;
+    }
+    return true;
+}
+
 static sc_worktree_t *find_by_agent_id(sc_worktree_manager_t *mgr, uint64_t agent_id) {
     for (size_t i = 0; i < mgr->count; i++) {
         if (mgr->worktrees[i].agent_id == agent_id && mgr->worktrees[i].active)
@@ -27,22 +38,28 @@ static sc_worktree_t *find_by_agent_id(sc_worktree_manager_t *mgr, uint64_t agen
     return NULL;
 }
 
-static sc_error_t __attribute__((unused)) run_git_cmd(const char *repo_root, const char *fmt, ...) {
-    char cmd[1024];
-    va_list ap;
-    va_start(ap, fmt);
-    int n = vsnprintf(cmd, sizeof(cmd), fmt, ap);
-    va_end(ap);
-    if (n < 0 || (size_t)n >= sizeof(cmd))
+static sc_error_t run_git_worktree_add(sc_allocator_t *alloc, const char *repo_root,
+                                       const char *path, const char *branch) {
+    if (!is_safe_path(repo_root) || !is_safe_path(path) || !is_safe_path(branch))
         return SC_ERR_INVALID_ARGUMENT;
+    const char *argv[] = {"git", "worktree", "add", path, "-b", branch, NULL};
+    sc_run_result_t result = {0};
+    sc_error_t err = sc_process_run(alloc, argv, repo_root, 4096, &result);
+    bool ok = (err == SC_OK && result.success);
+    sc_run_result_free(alloc, &result);
+    return ok ? SC_OK : SC_ERR_IO;
+}
 
-    char full_cmd[1280];
-    n = snprintf(full_cmd, sizeof(full_cmd), "cd %s && %s", repo_root, cmd);
-    if (n < 0 || (size_t)n >= sizeof(full_cmd))
+static sc_error_t run_git_worktree_remove(sc_allocator_t *alloc, const char *repo_root,
+                                          const char *path) {
+    if (!is_safe_path(repo_root) || !is_safe_path(path))
         return SC_ERR_INVALID_ARGUMENT;
-
-    int r = system(full_cmd);
-    return (r == 0) ? SC_OK : SC_ERR_IO;
+    const char *argv[] = {"git", "worktree", "remove", path, "--force", NULL};
+    sc_run_result_t result = {0};
+    sc_error_t err = sc_process_run(alloc, argv, repo_root, 4096, &result);
+    bool ok = (err == SC_OK && result.success);
+    sc_run_result_free(alloc, &result);
+    return ok ? SC_OK : SC_ERR_IO;
 }
 
 static sc_error_t grow_if_needed(sc_worktree_manager_t *mgr) {
@@ -127,7 +144,7 @@ sc_error_t sc_worktree_create(sc_worktree_manager_t *mgr, uint64_t agent_id, con
     (void)path;
     (void)branch;
 #else
-    if (run_git_cmd(mgr->repo_root, SC_WORKTREE_CMD_ADD, path, branch) != SC_OK)
+    if (run_git_worktree_add(mgr->alloc, mgr->repo_root, path, branch) != SC_OK)
         return SC_ERR_IO;
 #endif
 
@@ -155,7 +172,7 @@ sc_error_t sc_worktree_remove(sc_worktree_manager_t *mgr, uint64_t agent_id) {
 #if defined(SC_IS_TEST) && SC_IS_TEST == 1
     (void)wt;
 #else
-    if (run_git_cmd(mgr->repo_root, SC_WORKTREE_CMD_REMOVE, wt->path) != SC_OK)
+    if (run_git_worktree_remove(mgr->alloc, mgr->repo_root, wt->path) != SC_OK)
         return SC_ERR_IO;
 #endif
 

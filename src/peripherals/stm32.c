@@ -2,6 +2,7 @@
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/peripheral.h"
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,20 @@ typedef struct sc_stm32_ctx {
     char board_name[64];
     bool connected;
 } sc_stm32_ctx_t;
+
+static bool __attribute__((unused)) is_safe_path_len(const char *path, size_t len) {
+    if (!path || len == 0)
+        return false;
+    for (size_t i = 0; i < len; i++) {
+        if (i + 1 < len && path[i] == '.' && path[i + 1] == '.')
+            return false;
+        char c = path[i];
+        if (!(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') &&
+            c != '.' && c != '_' && c != '/' && c != '-' && c != '~')
+            return false;
+    }
+    return true;
+}
 
 static const char *impl_name(void *ctx) {
     sc_stm32_ctx_t *s = (sc_stm32_ctx_t *)ctx;
@@ -44,6 +59,7 @@ static sc_peripheral_error_t impl_init(void *ctx) {
 
 #ifndef SC_IS_TEST
 #ifndef _WIN32
+    /* Constant string: no user input, safe from shell injection */
     char cmd[128];
     snprintf(cmd, sizeof(cmd), "probe-rs info 2>/dev/null");
     FILE *f = popen(cmd, "r");
@@ -57,6 +73,7 @@ static sc_peripheral_error_t impl_init(void *ctx) {
     }
     pclose(f);
 
+    /* Constant string: no user input, safe from shell injection */
     if (system("probe-rs --version >/dev/null 2>&1") != 0)
         return SC_PERIPHERAL_ERR_DEVICE_NOT_FOUND;
 
@@ -84,6 +101,8 @@ static sc_peripheral_error_t impl_read(void *ctx, uint32_t addr, uint8_t *out_va
 
 #ifndef SC_IS_TEST
 #ifndef _WIN32
+    if (!is_safe_path_len(s->chip, s->chip_len))
+        return SC_PERIPHERAL_ERR_IO;
     char cmd[256];
     snprintf(cmd, sizeof(cmd), "probe-rs read --chip %.*s 0x%x 1 2>/dev/null", (int)s->chip_len,
              s->chip, (unsigned)addr);
@@ -116,6 +135,8 @@ static sc_peripheral_error_t impl_write(void *ctx, uint32_t addr, uint8_t data) 
 
 #ifndef SC_IS_TEST
 #ifndef _WIN32
+    if (!is_safe_path_len(s->chip, s->chip_len))
+        return SC_PERIPHERAL_ERR_IO;
     char cmd[256];
     snprintf(cmd, sizeof(cmd), "probe-rs write --chip %.*s 0x%x %02x 2>/dev/null", (int)s->chip_len,
              s->chip, (unsigned)addr, (unsigned)data);
@@ -142,6 +163,8 @@ static sc_peripheral_error_t impl_flash(void *ctx, const char *firmware_path, si
 
 #ifndef SC_IS_TEST
 #ifndef _WIN32
+    if (!is_safe_path_len(s->chip, s->chip_len) || !is_safe_path_len(firmware_path, path_len))
+        return SC_PERIPHERAL_ERR_FLASH_FAILED;
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "probe-rs download --chip %.*s %.*s 2>/dev/null", (int)s->chip_len,
              s->chip, (int)path_len, firmware_path);

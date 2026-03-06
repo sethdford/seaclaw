@@ -47,7 +47,8 @@ typedef struct sc_redis_memory {
 #endif
 } sc_redis_memory_t;
 
-__attribute__((unused)) static const char *category_to_string(const sc_memory_category_t *cat) {
+#if (defined(SC_IS_TEST) && SC_IS_TEST) || defined(SC_ENABLE_REDIS_ENGINE)
+static const char *category_to_string(const sc_memory_category_t *cat) {
     if (!cat)
         return "core";
     switch (cat->tag) {
@@ -65,6 +66,7 @@ __attribute__((unused)) static const char *category_to_string(const sc_memory_ca
         return "core";
     }
 }
+#endif
 
 #if defined(SC_IS_TEST) && SC_IS_TEST
 static void mock_free_entry(sc_allocator_t *alloc, mock_entry_t *e) {
@@ -112,6 +114,7 @@ static int redis_connect(sc_redis_memory_t *self) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     char port_str[8];
+    /* Truncation acceptable: port is 0-65535, max 5 digits + null */
     (void)snprintf(port_str, sizeof(port_str), "%u", (unsigned)self->port);
     if (getaddrinfo(self->host, port_str, &hints, &res) != 0)
         return -1;
@@ -302,12 +305,17 @@ static sc_error_t impl_store(void *ctx, const char *key, size_t key_len, const c
     size_t sid_len = (session_id && session_id_len > 0) ? session_id_len : 0;
 
     char ts_buf[32];
-    snprintf(ts_buf, sizeof(ts_buf), "%lu", (unsigned long)time(NULL));
-    size_t ts_len = strlen(ts_buf);
+    int tsn = snprintf(ts_buf, sizeof(ts_buf), "%lu", (unsigned long)time(NULL));
+    if (tsn < 0 || (size_t)tsn >= sizeof(ts_buf))
+        return SC_ERR_INVALID_ARGUMENT;
+    size_t ts_len = (size_t)tsn;
 
     char id_buf[64];
-    snprintf(id_buf, sizeof(id_buf), "%lu-%u", (unsigned long)time(NULL), (unsigned)rand());
-    size_t id_len = strlen(id_buf);
+    int idn =
+        snprintf(id_buf, sizeof(id_buf), "%lu-%u", (unsigned long)time(NULL), (unsigned)rand());
+    if (idn < 0 || (size_t)idn >= sizeof(id_buf))
+        return SC_ERR_INVALID_ARGUMENT;
+    size_t id_len = (size_t)idn;
 
     char entry_key[512];
     int ek = snprintf(entry_key, sizeof(entry_key), "%s:entry:%.*s",
@@ -361,18 +369,20 @@ static sc_error_t impl_store(void *ctx, const char *key, size_t key_len, const c
         return SC_ERR_MEMORY_STORE;
     if (redis_send_bulk(self->sock, "SADD", 4) != 0)
         return SC_ERR_MEMORY_STORE;
-    if (redis_send_bulk(self->sock, keys_key, strlen(keys_key)) != 0)
+    if (redis_send_bulk(self->sock, keys_key, (size_t)kkn) != 0)
         return SC_ERR_MEMORY_STORE;
     redis_recv_reply(self->sock, reply, sizeof(reply), &rlen);
 
     char cat_key[256];
-    snprintf(cat_key, sizeof(cat_key), "%s:cat:%s", self->key_prefix ? self->key_prefix : "mem",
-             cat_str);
+    int ckn = snprintf(cat_key, sizeof(cat_key), "%s:cat:%s",
+                       self->key_prefix ? self->key_prefix : "mem", cat_str);
+    if (ckn < 0 || (size_t)ckn >= sizeof(cat_key))
+        return SC_ERR_MEMORY_STORE;
     if (redis_send_array_start(self->sock, 3) != 0)
         return SC_ERR_MEMORY_STORE;
     if (redis_send_bulk(self->sock, "SADD", 4) != 0)
         return SC_ERR_MEMORY_STORE;
-    if (redis_send_bulk(self->sock, cat_key, strlen(cat_key)) != 0)
+    if (redis_send_bulk(self->sock, cat_key, (size_t)ckn) != 0)
         return SC_ERR_MEMORY_STORE;
     if (redis_send_bulk(self->sock, key, key_len) != 0)
         return SC_ERR_MEMORY_STORE;
@@ -380,13 +390,16 @@ static sc_error_t impl_store(void *ctx, const char *key, size_t key_len, const c
 
     if (session_id && session_id_len > 0) {
         char sess_key[512];
-        snprintf(sess_key, sizeof(sess_key), "%s:sessions:%.*s",
-                 self->key_prefix ? self->key_prefix : "mem", (int)session_id_len, session_id);
+        int skn =
+            snprintf(sess_key, sizeof(sess_key), "%s:sessions:%.*s",
+                     self->key_prefix ? self->key_prefix : "mem", (int)session_id_len, session_id);
+        if (skn < 0 || (size_t)skn >= sizeof(sess_key))
+            return SC_ERR_MEMORY_STORE;
         if (redis_send_array_start(self->sock, 3) != 0)
             return SC_ERR_MEMORY_STORE;
         if (redis_send_bulk(self->sock, "SADD", 4) != 0)
             return SC_ERR_MEMORY_STORE;
-        if (redis_send_bulk(self->sock, sess_key, strlen(sess_key)) != 0)
+        if (redis_send_bulk(self->sock, sess_key, (size_t)skn) != 0)
             return SC_ERR_MEMORY_STORE;
         if (redis_send_bulk(self->sock, key, key_len) != 0)
             return SC_ERR_MEMORY_STORE;
@@ -484,12 +497,15 @@ static sc_error_t impl_recall(void *ctx, sc_allocator_t *alloc, const char *quer
     if (redis_connect(self) != 0)
         return SC_ERR_MEMORY_BACKEND;
     char keys_key[256];
-    snprintf(keys_key, sizeof(keys_key), "%s:keys", self->key_prefix ? self->key_prefix : "mem");
+    int kkn = snprintf(keys_key, sizeof(keys_key), "%s:keys",
+                       self->key_prefix ? self->key_prefix : "mem");
+    if (kkn < 0 || (size_t)kkn >= sizeof(keys_key))
+        return SC_ERR_MEMORY_BACKEND;
     if (redis_send_array_start(self->sock, 2) != 0)
         return SC_ERR_MEMORY_BACKEND;
     if (redis_send_bulk(self->sock, "SMEMBERS", 8) != 0)
         return SC_ERR_MEMORY_BACKEND;
-    if (redis_send_bulk(self->sock, keys_key, strlen(keys_key)) != 0)
+    if (redis_send_bulk(self->sock, keys_key, (size_t)kkn) != 0)
         return SC_ERR_MEMORY_BACKEND;
     char reply[REDIS_RECV_BUF];
     size_t rlen;
@@ -538,13 +554,15 @@ static sc_error_t impl_recall(void *ctx, sc_allocator_t *alloc, const char *quer
         const char *kstart = keys[ki].ptr;
         size_t klen = keys[ki].len;
         char entry_key[512];
-        snprintf(entry_key, sizeof(entry_key), "%s:entry:%.*s",
-                 self->key_prefix ? self->key_prefix : "mem", (int)klen, kstart);
+        int ekn = snprintf(entry_key, sizeof(entry_key), "%s:entry:%.*s",
+                           self->key_prefix ? self->key_prefix : "mem", (int)klen, kstart);
+        if (ekn < 0 || (size_t)ekn >= sizeof(entry_key))
+            break;
         if (redis_send_array_start(self->sock, 2) != 0)
             break;
         if (redis_send_bulk(self->sock, "HGETALL", 7) != 0)
             break;
-        if (redis_send_bulk(self->sock, entry_key, strlen(entry_key)) != 0)
+        if (redis_send_bulk(self->sock, entry_key, (size_t)ekn) != 0)
             break;
         char hr[2048];
         size_t hrlen;
@@ -643,13 +661,15 @@ static sc_error_t impl_get(void *ctx, sc_allocator_t *alloc, const char *key, si
     if (redis_connect(self) != 0)
         return SC_ERR_MEMORY_BACKEND;
     char entry_key[512];
-    snprintf(entry_key, sizeof(entry_key), "%s:entry:%.*s",
-             self->key_prefix ? self->key_prefix : "mem", (int)key_len, key);
+    int ekn = snprintf(entry_key, sizeof(entry_key), "%s:entry:%.*s",
+                       self->key_prefix ? self->key_prefix : "mem", (int)key_len, key);
+    if (ekn < 0 || (size_t)ekn >= sizeof(entry_key))
+        return SC_ERR_MEMORY_BACKEND;
     if (redis_send_array_start(self->sock, 2) != 0)
         return SC_ERR_MEMORY_BACKEND;
     if (redis_send_bulk(self->sock, "HGETALL", 7) != 0)
         return SC_ERR_MEMORY_BACKEND;
-    if (redis_send_bulk(self->sock, entry_key, strlen(entry_key)) != 0)
+    if (redis_send_bulk(self->sock, entry_key, (size_t)ekn) != 0)
         return SC_ERR_MEMORY_BACKEND;
     char reply[2048];
     size_t rlen;
@@ -758,12 +778,15 @@ static sc_error_t impl_list(void *ctx, sc_allocator_t *alloc, const sc_memory_ca
     if (redis_connect(self) != 0)
         return SC_ERR_MEMORY_BACKEND;
     char keys_key[256];
-    snprintf(keys_key, sizeof(keys_key), "%s:keys", self->key_prefix ? self->key_prefix : "mem");
+    int kkn = snprintf(keys_key, sizeof(keys_key), "%s:keys",
+                       self->key_prefix ? self->key_prefix : "mem");
+    if (kkn < 0 || (size_t)kkn >= sizeof(keys_key))
+        return SC_ERR_MEMORY_BACKEND;
     if (redis_send_array_start(self->sock, 2) != 0)
         return SC_ERR_MEMORY_BACKEND;
     if (redis_send_bulk(self->sock, "SMEMBERS", 8) != 0)
         return SC_ERR_MEMORY_BACKEND;
-    if (redis_send_bulk(self->sock, keys_key, strlen(keys_key)) != 0)
+    if (redis_send_bulk(self->sock, keys_key, (size_t)kkn) != 0)
         return SC_ERR_MEMORY_BACKEND;
     char reply[REDIS_RECV_BUF];
     size_t rlen;
@@ -806,13 +829,15 @@ static sc_error_t impl_list(void *ctx, sc_allocator_t *alloc, const sc_memory_ca
         const char *kstart = keys[ki].ptr;
         size_t klen = keys[ki].len;
         char entry_key[512];
-        snprintf(entry_key, sizeof(entry_key), "%s:entry:%.*s",
-                 self->key_prefix ? self->key_prefix : "mem", (int)klen, kstart);
+        int ekn = snprintf(entry_key, sizeof(entry_key), "%s:entry:%.*s",
+                           self->key_prefix ? self->key_prefix : "mem", (int)klen, kstart);
+        if (ekn < 0 || (size_t)ekn >= sizeof(entry_key))
+            break;
         if (redis_send_array_start(self->sock, 2) != 0)
             break;
         if (redis_send_bulk(self->sock, "HGETALL", 7) != 0)
             break;
-        if (redis_send_bulk(self->sock, entry_key, strlen(entry_key)) != 0)
+        if (redis_send_bulk(self->sock, entry_key, (size_t)ekn) != 0)
             break;
         char hr[2048];
         size_t hrlen;
@@ -917,7 +942,7 @@ static sc_error_t impl_forget(void *ctx, const char *key, size_t key_len, bool *
         return SC_ERR_MEMORY_BACKEND;
     if (redis_send_bulk(self->sock, "SREM", 4) != 0)
         return SC_ERR_MEMORY_BACKEND;
-    if (redis_send_bulk(self->sock, keys_key, strlen(keys_key)) != 0)
+    if (redis_send_bulk(self->sock, keys_key, (size_t)kkn) != 0)
         return SC_ERR_MEMORY_BACKEND;
     if (redis_send_bulk(self->sock, key, key_len) != 0)
         return SC_ERR_MEMORY_BACKEND;
@@ -943,12 +968,15 @@ static sc_error_t impl_count(void *ctx, size_t *out) {
     if (redis_connect(self) != 0)
         return SC_ERR_MEMORY_BACKEND;
     char keys_key[256];
-    snprintf(keys_key, sizeof(keys_key), "%s:keys", self->key_prefix ? self->key_prefix : "mem");
+    int kkn = snprintf(keys_key, sizeof(keys_key), "%s:keys",
+                       self->key_prefix ? self->key_prefix : "mem");
+    if (kkn < 0 || (size_t)kkn >= sizeof(keys_key))
+        return SC_ERR_MEMORY_BACKEND;
     if (redis_send_array_start(self->sock, 2) != 0)
         return SC_ERR_MEMORY_BACKEND;
     if (redis_send_bulk(self->sock, "SCARD", 5) != 0)
         return SC_ERR_MEMORY_BACKEND;
-    if (redis_send_bulk(self->sock, keys_key, strlen(keys_key)) != 0)
+    if (redis_send_bulk(self->sock, keys_key, (size_t)kkn) != 0)
         return SC_ERR_MEMORY_BACKEND;
     char reply[128];
     size_t rlen;

@@ -241,7 +241,6 @@ sc_error_t sc_oauth_exchange_code(sc_oauth_ctx_t *ctx, const char *code, size_t 
 #else
     (void)code_len;
     (void)verifier_len;
-    (void)token_url;
     return SC_ERR_NOT_SUPPORTED;
 #endif
 }

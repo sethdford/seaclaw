@@ -128,7 +128,11 @@ static sc_error_t write_config_file(sc_allocator_t *alloc, const char *path, con
     char *tmp_path = (char *)alloc->alloc(alloc->ctx, tmp_len);
     if (!tmp_path)
         return SC_ERR_OUT_OF_MEMORY;
-    (void)snprintf(tmp_path, tmp_len, "%s.tmp", path);
+    int tn = snprintf(tmp_path, tmp_len, "%s.tmp", path);
+    if (tn < 0 || (size_t)tn >= tmp_len) {
+        alloc->free(alloc->ctx, tmp_path, tmp_len);
+        return SC_ERR_INVALID_ARGUMENT;
+    }
 
     FILE *f = fopen(tmp_path, "wb");
     if (!f) {
@@ -244,7 +248,11 @@ sc_error_t sc_config_mutator_default_path(sc_allocator_t *alloc, char **out_path
     char *p = (char *)alloc->alloc(alloc->ctx, n);
     if (!p)
         return SC_ERR_OUT_OF_MEMORY;
-    (void)snprintf(p, n, "%s/.seaclaw/config.json", home);
+    int pn = snprintf(p, n, "%s/.seaclaw/config.json", home);
+    if (pn < 0 || (size_t)pn >= n) {
+        alloc->free(alloc->ctx, p, n);
+        return SC_ERR_INVALID_ARGUMENT;
+    }
     *out_path = p;
     return SC_OK;
 }
@@ -557,11 +565,16 @@ sc_error_t sc_config_mutator_mutate(sc_allocator_t *alloc, sc_mutation_action_t 
             size_t bak_len = strlen(cfg_path) + 5;
             backup_path = (char *)alloc->alloc(alloc->ctx, bak_len);
             if (backup_path) {
-                (void)snprintf(backup_path, bak_len, "%s.bak", cfg_path);
-                FILE *bak = fopen(backup_path, "wb");
-                if (bak) {
-                    (void)fwrite(content, 1, content_len, bak);
-                    fclose(bak);
+                int bkn = snprintf(backup_path, bak_len, "%s.bak", cfg_path);
+                if (bkn < 0 || (size_t)bkn >= bak_len) {
+                    alloc->free(alloc->ctx, backup_path, bak_len);
+                    backup_path = NULL;
+                } else {
+                    FILE *bak = fopen(backup_path, "wb");
+                    if (bak) {
+                        (void)fwrite(content, 1, content_len, bak);
+                        fclose(bak);
+                    }
                 }
             }
         }

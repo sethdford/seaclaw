@@ -236,6 +236,12 @@ jobs:
       - name: Lint
         run: npm run lint --if-present
 
+      - name: Install ripgrep (for lint:strict)
+        run: sudo apt-get update -q && sudo apt-get install -yq ripgrep
+
+      - name: Strict lint
+        run: npm run lint:strict
+
       - name: Unit tests
         run: npm test --if-present
 
