@@ -311,6 +311,86 @@ static void test_web_search_searxng_zero_count(void) {
     SC_ASSERT_NEQ(err, SC_OK);
 }
 
+static void test_web_search_firecrawl_null_alloc(void) {
+    sc_tool_result_t result = {0};
+    sc_error_t err = sc_web_search_firecrawl(NULL, "q", 1, 1, "key", &result);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
+static void test_web_search_firecrawl_null_query(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_result_t result = {0};
+    sc_error_t err = sc_web_search_firecrawl(&alloc, NULL, 0, 1, "key", &result);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
+static void test_web_search_firecrawl_null_api_key(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_result_t result = {0};
+    sc_error_t err = sc_web_search_firecrawl(&alloc, "q", 1, 1, NULL, &result);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
+static void test_web_search_firecrawl_null_out(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_error_t err = sc_web_search_firecrawl(&alloc, "q", 1, 1, "key", NULL);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
+static void test_web_search_firecrawl_zero_query_len(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_result_t result = {0};
+    sc_error_t err = sc_web_search_firecrawl(&alloc, "q", 0, 1, "key", &result);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
+static void test_web_search_firecrawl_count_zero(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_result_t result = {0};
+    sc_error_t err = sc_web_search_firecrawl(&alloc, "q", 1, 0, "key", &result);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
+static void test_web_search_firecrawl_count_over_ten(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_result_t result = {0};
+    sc_error_t err = sc_web_search_firecrawl(&alloc, "q", 1, 11, "key", &result);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
+static void test_web_search_jina_null_alloc(void) {
+    sc_tool_result_t result = {0};
+    sc_error_t err = sc_web_search_jina(NULL, "q", 1, 1, "key", &result);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
+static void test_web_search_jina_null_query(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_result_t result = {0};
+    sc_error_t err = sc_web_search_jina(&alloc, NULL, 0, 1, "key", &result);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
+static void test_web_search_jina_null_api_key(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_result_t result = {0};
+    sc_error_t err = sc_web_search_jina(&alloc, "q", 1, 1, NULL, &result);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
+static void test_web_search_jina_null_out(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_error_t err = sc_web_search_jina(&alloc, "q", 1, 1, "key", NULL);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
+static void test_web_search_jina_zero_query_len(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_result_t result = {0};
+    sc_error_t err = sc_web_search_jina(&alloc, "q", 0, 1, "key", &result);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
 /* ─── Config Getters ──────────────────────────────────────────────────────── */
 
 static void test_config_get_provider_key_null(void) {
@@ -427,6 +507,20 @@ void run_coverage_new_tests(void) {
     SC_RUN_TEST(test_web_search_searxng_null_alloc);
     SC_RUN_TEST(test_web_search_searxng_null_query);
     SC_RUN_TEST(test_web_search_searxng_zero_count);
+
+    SC_RUN_TEST(test_web_search_firecrawl_null_alloc);
+    SC_RUN_TEST(test_web_search_firecrawl_null_query);
+    SC_RUN_TEST(test_web_search_firecrawl_null_api_key);
+    SC_RUN_TEST(test_web_search_firecrawl_null_out);
+    SC_RUN_TEST(test_web_search_firecrawl_zero_query_len);
+    SC_RUN_TEST(test_web_search_firecrawl_count_zero);
+    SC_RUN_TEST(test_web_search_firecrawl_count_over_ten);
+
+    SC_RUN_TEST(test_web_search_jina_null_alloc);
+    SC_RUN_TEST(test_web_search_jina_null_query);
+    SC_RUN_TEST(test_web_search_jina_null_api_key);
+    SC_RUN_TEST(test_web_search_jina_null_out);
+    SC_RUN_TEST(test_web_search_jina_zero_query_len);
 
     SC_RUN_TEST(test_config_get_provider_key_null);
     SC_RUN_TEST(test_config_get_provider_key_null_name);

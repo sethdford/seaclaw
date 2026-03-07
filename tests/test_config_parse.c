@@ -472,6 +472,76 @@ static void test_config_parse_memory_api(void) {
     sc_arena_destroy(arena);
 }
 
+/* ─── config_serialize: sc_config_save ──────────────────────────────────────── */
+static void test_config_save_null_cfg_returns_error(void) {
+    sc_error_t err = sc_config_save(NULL);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void test_config_save_null_path_returns_error(void) {
+    sc_allocator_t backing = sc_system_allocator();
+    sc_config_t cfg = {0};
+    sc_arena_t *arena = sc_arena_create(backing);
+    SC_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = sc_arena_allocator(arena);
+    cfg.default_provider = sc_strdup(&cfg.allocator, "ollama");
+    cfg.default_model = sc_strdup(&cfg.allocator, "llama2");
+    cfg.gateway.port = 3000;
+    cfg.config_path = NULL;
+    sc_error_t err = sc_config_save(&cfg);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+    sc_arena_destroy(arena);
+}
+
+static void test_config_save_roundtrip_key_fields(void) {
+    sc_allocator_t backing = sc_system_allocator();
+    sc_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    sc_arena_t *arena = sc_arena_create(backing);
+    SC_ASSERT_NOT_NULL(arena);
+    cfg.allocator = sc_arena_allocator(arena);
+    cfg.arena = arena;
+    cfg.workspace_dir = sc_strdup(&cfg.allocator, "/tmp/test-workspace");
+    cfg.default_provider = sc_strdup(&cfg.allocator, "ollama");
+    cfg.default_model = sc_strdup(&cfg.allocator, "llama3");
+    cfg.gateway.port = 3000;
+
+    char tmp_path[] = "/tmp/sc_test_save_XXXXXX";
+    int fd = mkstemp(tmp_path);
+    SC_ASSERT(fd >= 0);
+    close(fd);
+    cfg.config_path = tmp_path;
+
+    sc_error_t err = sc_config_save(&cfg);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    FILE *f = fopen(tmp_path, "r");
+    SC_ASSERT_NOT_NULL(f);
+    char buf[4096];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    buf[n] = '\0';
+    unlink(tmp_path);
+
+    sc_config_t cfg2;
+    memset(&cfg2, 0, sizeof(cfg2));
+    sc_arena_t *arena2 = sc_arena_create(backing);
+    SC_ASSERT_NOT_NULL(arena2);
+    cfg2.allocator = sc_arena_allocator(arena2);
+    cfg2.arena = arena2;
+    err = sc_config_parse_json(&cfg2, buf, n);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    SC_ASSERT_STR_EQ(cfg2.workspace_dir, "/tmp/test-workspace");
+    SC_ASSERT_STR_EQ(cfg2.default_provider, "ollama");
+    SC_ASSERT_STR_EQ(cfg2.default_model, "llama3");
+    SC_ASSERT_EQ(cfg2.gateway.port, 3000);
+
+    sc_arena_destroy(arena);
+    sc_arena_destroy(arena2);
+}
+
 static void test_config_sandbox_save_roundtrip(void) {
     sc_allocator_t backing = sc_system_allocator();
     sc_config_t cfg;
@@ -566,6 +636,11 @@ void run_config_parse_tests(void) {
     SC_RUN_TEST(test_config_parse_memory_postgres);
     SC_RUN_TEST(test_config_parse_memory_redis);
     SC_RUN_TEST(test_config_parse_memory_api);
+
+    SC_TEST_SUITE("Config serialize");
+    SC_RUN_TEST(test_config_save_null_cfg_returns_error);
+    SC_RUN_TEST(test_config_save_null_path_returns_error);
+    SC_RUN_TEST(test_config_save_roundtrip_key_fields);
 
     SC_TEST_SUITE("Config sandbox roundtrip");
     SC_RUN_TEST(test_config_sandbox_save_roundtrip);

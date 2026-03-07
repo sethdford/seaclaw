@@ -27,6 +27,7 @@ option(SC_ENABLE_CRON "Build cron scheduler support" OFF)
 option(SC_ENABLE_PUSH "Build push notification support (FCM/APNS)" OFF)
 option(SC_ENABLE_UPDATE "Build update check/apply support" OFF)
 option(SC_ENABLE_SKILLS "Build skillforge support" OFF)
+option(SC_ENABLE_PERSONA "Enable persona system" ON)
 
 # WASM build: cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..
 
@@ -426,7 +427,6 @@ set(SC_CORE_SOURCES
     src/tools/image.c
     src/tools/agent_spawn.c
     src/tools/agent_query.c
-    src/tools/persona.c
     src/tools/apply_patch.c
     src/tools/pdf.c
     src/tools/spreadsheet.c
@@ -535,16 +535,19 @@ endif()
 # WASI sandbox is cross-platform
 list(APPEND SC_CORE_SOURCES src/security/wasi_sandbox.c)
 
-# Persona system
-list(APPEND SC_CORE_SOURCES
-    src/persona/persona.c
-    src/persona/examples.c
-    src/persona/sampler.c
-    src/persona/analyzer.c
-    src/persona/creator.c
-    src/persona/cli.c
-    src/persona/feedback.c
-)
+# Persona system (~138 KB; disable for minimal/embedded builds)
+if(SC_ENABLE_PERSONA)
+    list(APPEND SC_CORE_SOURCES
+        src/persona/persona.c
+        src/persona/examples.c
+        src/persona/sampler.c
+        src/persona/analyzer.c
+        src/persona/creator.c
+        src/persona/cli.c
+        src/persona/feedback.c
+        src/tools/persona.c
+    )
+endif()
 
 # Browser automation tools
 if(SC_ENABLE_TOOLS_BROWSER)
@@ -667,6 +670,9 @@ if(SC_ENABLE_UPDATE)
 endif()
 if(SC_ENABLE_SKILLS)
     target_compile_definitions(seaclaw_core PRIVATE SC_HAS_SKILLS=1)
+endif()
+if(SC_ENABLE_PERSONA)
+    target_compile_definitions(seaclaw_core PUBLIC SC_HAS_PERSONA=1)
 endif()
 
 # --- Compile definitions for enabled channels (for conditional compilation in source) ---

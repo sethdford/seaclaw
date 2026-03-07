@@ -48,10 +48,10 @@ for token in $DEFINED; do
   fi
 
   # Search ui/src (excluding _tokens.css)
-  UI=$(find "$ROOT/ui/src" \( -name "*.ts" -o -name "*.css" \) ! -path "*_tokens.css" -print0 2>/dev/null | xargs -0 grep -l -e "$token" 2>/dev/null | wc -l | tr -d ' ') || UI=0
+  UI=$(find "$ROOT/ui/src" \( -name "*.ts" -o -name "*.css" \) ! -path "*_tokens.css" ! -path "*node_modules*" -print0 2>/dev/null | xargs -0 grep -l -e "$token" 2>/dev/null | wc -l | tr -d ' ') || UI=0
 
-  # Search website/
-  WEB=$(find "$ROOT/website" \( -name "*.css" -o -name "*.astro" -o -name "*.mdx" -o -name "*.ts" -o -name "*.tsx" \) ! -path "*_tokens.css" -print0 2>/dev/null | xargs -0 grep -l -e "$token" 2>/dev/null | wc -l | tr -d ' ') || WEB=0
+  # Search website/ (exclude node_modules, dist, _tokens.css)
+  WEB=$(find "$ROOT/website" \( -name "*.css" -o -name "*.astro" -o -name "*.mdx" -o -name "*.ts" -o -name "*.tsx" \) ! -path "*_tokens*" ! -path "*node_modules*" ! -path "*dist*" ! -path "*/.astro/*" -print0 2>/dev/null | xargs -0 grep -l -e "$token" 2>/dev/null | wc -l | tr -d ' ') || WEB=0
 
   # Search docs/
   DOCS=$(find "$ROOT/docs" \( -name "*.md" -o -name "*.mdx" -o -name "*.json" -o -name "*.ts" \) -print0 2>/dev/null | xargs -0 grep -l -e "$token" 2>/dev/null | wc -l | tr -d ' ') || DOCS=0
