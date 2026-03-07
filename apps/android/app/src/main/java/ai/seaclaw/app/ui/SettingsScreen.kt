@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,16 +47,16 @@ fun SettingsScreen(gatewayManager: GatewayManager) {
             Box(
                 modifier = Modifier
                     .size(12.dp)
-                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .clip(CircleShape)
                     .background(
-                        color = if (isConnected) androidx.compose.material3.MaterialTheme.colorScheme.primary
-                        else androidx.compose.material3.MaterialTheme.colorScheme.error
+                        color = if (isConnected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error
                     )
             )
             Text(
                 text = if (isConnected) "Connected" else "Disconnected",
-                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
         OutlinedTextField(
@@ -69,8 +70,8 @@ fun SettingsScreen(gatewayManager: GatewayManager) {
         Text(
             text = "WebSocket URL, e.g. wss://10.0.2.2:3000/ws",
             modifier = Modifier.padding(top = SCTokens.spaceSm),
-            style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Button(
             onClick = {
