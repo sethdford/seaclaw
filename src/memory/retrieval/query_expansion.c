@@ -30,6 +30,8 @@ sc_error_t sc_query_expand(sc_allocator_t *alloc, const char *raw_query, size_t 
     memset(out, 0, sizeof(*out));
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
+    if (!raw_query)
+        return SC_ERR_INVALID_ARGUMENT;
 
     /* Trim */
     while (raw_len > 0 && (raw_query[0] == ' ' || raw_query[0] == '\t' || raw_query[0] == '\n' ||

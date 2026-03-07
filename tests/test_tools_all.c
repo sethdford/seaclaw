@@ -631,6 +631,144 @@ static void test_file_write_execute_absolute_path_rejected(void) {
         tool.vtable->deinit(tool.ctx, &alloc);
 }
 
+/* ─── File tool edge cases: empty path, missing fields ─────────────────────── */
+static void test_file_read_execute_empty_path_returns_error(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_file_read_create(&alloc, ".", 1, NULL, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "path", sc_json_string_new(&alloc, "", 0));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT(!result.success);
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+static void test_file_read_execute_missing_path_returns_error(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_file_read_create(&alloc, ".", 1, NULL, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT(!result.success);
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+static void test_file_write_execute_empty_path_returns_error(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_file_write_create(&alloc, ".", 1, NULL, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "path", sc_json_string_new(&alloc, "", 0));
+    sc_json_object_set(&alloc, args, "content", sc_json_string_new(&alloc, "hello", 5));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT(!result.success);
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+static void test_file_write_execute_missing_content_defaults_to_empty(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_file_write_create(&alloc, ".", 1, NULL, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "path", sc_json_string_new(&alloc, "test.txt", 8));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(result.success);
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+static void test_file_edit_execute_empty_path_returns_error(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_file_edit_create(&alloc, ".", 1, NULL, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "path", sc_json_string_new(&alloc, "", 0));
+    sc_json_object_set(&alloc, args, "old_text", sc_json_string_new(&alloc, "a", 1));
+    sc_json_object_set(&alloc, args, "new_text", sc_json_string_new(&alloc, "b", 1));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT(!result.success);
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+static void test_file_edit_execute_missing_old_text_returns_error(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_file_edit_create(&alloc, ".", 1, NULL, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "path", sc_json_string_new(&alloc, "test.txt", 8));
+    sc_json_object_set(&alloc, args, "new_text", sc_json_string_new(&alloc, "b", 1));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT(!result.success);
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
+}
+
+static void test_file_edit_execute_missing_new_text_returns_error(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_tool_t tool;
+    sc_file_edit_create(&alloc, ".", 1, NULL, &tool);
+    sc_json_value_t *args = sc_json_object_new(&alloc);
+    sc_json_object_set(&alloc, args, "path", sc_json_string_new(&alloc, "test.txt", 8));
+    sc_json_object_set(&alloc, args, "old_text", sc_json_string_new(&alloc, "a", 1));
+    sc_tool_result_t result;
+    sc_error_t err = tool.vtable->execute(tool.ctx, &alloc, args, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT(!result.success);
+    sc_json_free(&alloc, args);
+    if (result.output_owned && result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    if (result.error_msg_owned && result.error_msg)
+        alloc.free(alloc.ctx, (void *)result.error_msg, result.error_msg_len + 1);
+    if (tool.vtable && tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
+}
+
 /* ─── URL validation for web tools ───────────────────────────────────────── */
 static void test_http_request_rejects_http_url(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -2096,6 +2234,13 @@ void run_tools_all_tests(void) {
     SC_RUN_TEST(test_file_write_execute_absolute_path_rejected);
     SC_RUN_TEST(test_file_read_parameters_has_path);
     SC_RUN_TEST(test_file_write_parameters_has_content);
+    SC_RUN_TEST(test_file_read_execute_empty_path_returns_error);
+    SC_RUN_TEST(test_file_read_execute_missing_path_returns_error);
+    SC_RUN_TEST(test_file_write_execute_empty_path_returns_error);
+    SC_RUN_TEST(test_file_write_execute_missing_content_defaults_to_empty);
+    SC_RUN_TEST(test_file_edit_execute_empty_path_returns_error);
+    SC_RUN_TEST(test_file_edit_execute_missing_old_text_returns_error);
+    SC_RUN_TEST(test_file_edit_execute_missing_new_text_returns_error);
     SC_RUN_TEST(test_shell_parameters_has_command);
     SC_RUN_TEST(test_shell_description_non_empty);
     SC_RUN_TEST(test_shell_parameters_valid_json);

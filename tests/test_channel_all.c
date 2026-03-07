@@ -414,7 +414,7 @@ static void test_facebook_webhook_malformed(void) {
     err = sc_facebook_on_webhook(ch.ctx, &alloc, "", 0);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
     err = sc_facebook_on_webhook(ch.ctx, &alloc, "}{", 2);
-    (void)err;
+    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_JSON_PARSE || err == SC_ERR_INVALID_ARGUMENT);
     sc_facebook_destroy(&ch);
 }
 
@@ -490,7 +490,7 @@ static void test_instagram_webhook_malformed(void) {
     err = sc_instagram_on_webhook(ch.ctx, &alloc, "", 0);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
     err = sc_instagram_on_webhook(ch.ctx, &alloc, "}{", 2);
-    (void)err;
+    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_JSON_PARSE || err == SC_ERR_INVALID_ARGUMENT);
     sc_instagram_destroy(&ch);
 }
 
@@ -566,7 +566,7 @@ static void test_twitter_webhook_malformed(void) {
     err = sc_twitter_on_webhook(ch.ctx, &alloc, "", 0);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
     err = sc_twitter_on_webhook(ch.ctx, &alloc, "}{", 2);
-    (void)err;
+    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_JSON_PARSE || err == SC_ERR_INVALID_ARGUMENT);
     sc_twitter_destroy(&ch);
 }
 
@@ -642,7 +642,7 @@ static void test_google_rcs_webhook_malformed(void) {
     err = sc_google_rcs_on_webhook(ch.ctx, &alloc, "", 0);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
     err = sc_google_rcs_on_webhook(ch.ctx, &alloc, "}{", 2);
-    (void)err;
+    SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_JSON_PARSE || err == SC_ERR_INVALID_ARGUMENT);
     sc_google_rcs_destroy(&ch);
 }
 

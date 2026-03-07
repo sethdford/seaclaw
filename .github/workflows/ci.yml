@@ -256,7 +256,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           files: coverage.info
-          fail_ci_if_error: false
+          fail_ci_if_error: true
       - uses: actions/upload-artifact@v7
         with:
           name: coverage-report

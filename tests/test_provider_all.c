@@ -1670,6 +1670,139 @@ static void test_factory_gpt4o_not_provider_name(void) {
     SC_ASSERT_NEQ(err, SC_OK);
 }
 
+/* ─── Provider error handling (factory path) ─────────────────────────────── */
+static void test_factory_openai_create_empty_key(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t prov;
+    sc_error_t err = sc_provider_create(&alloc, "openai", 6, "", 0, NULL, 0, &prov);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(prov.ctx);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
+}
+
+static void test_factory_anthropic_create_empty_key(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t prov;
+    sc_error_t err = sc_provider_create(&alloc, "anthropic", 9, "", 0, NULL, 0, &prov);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(prov.ctx);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
+}
+
+static void test_factory_gemini_create_empty_key(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t prov;
+    sc_error_t err = sc_provider_create(&alloc, "gemini", 6, "", 0, NULL, 0, &prov);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(prov.ctx);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
+}
+
+static void test_factory_openai_chat_returns_stub(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t prov;
+    sc_error_t err = sc_provider_create(&alloc, "openai", 6, "", 0, NULL, 0, &prov);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_chat_message_t msgs[1] = {make_user_msg("hello", 5)};
+    sc_chat_request_t req = make_simple_request(msgs, 1);
+    sc_chat_response_t resp = {0};
+    err = prov.vtable->chat(prov.ctx, &alloc, &req, "gpt-4", 4, 0.7, &resp);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(resp.content);
+    sc_chat_response_free(&alloc, &resp);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
+}
+
+static void test_factory_openai_chat_with_system_returns_stub(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t prov;
+    sc_error_t err = sc_provider_create(&alloc, "openai", 6, "", 0, NULL, 0, &prov);
+    SC_ASSERT_EQ(err, SC_OK);
+    char *out = NULL;
+    size_t out_len = 0;
+    err = prov.vtable->chat_with_system(prov.ctx, &alloc, "You are helpful", 16, "Hello", 5,
+                                        "gpt-4", 5, 0.7, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(out);
+    SC_ASSERT_TRUE(out_len > 0);
+    if (out)
+        alloc.free(alloc.ctx, out, out_len + 1);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
+}
+
+static void test_factory_anthropic_chat_returns_stub(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t prov;
+    sc_error_t err = sc_provider_create(&alloc, "anthropic", 9, "", 0, NULL, 0, &prov);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_chat_message_t msgs[1] = {make_user_msg("hi", 2)};
+    sc_chat_request_t req = make_simple_request(msgs, 1);
+    sc_chat_response_t resp = {0};
+    err = prov.vtable->chat(prov.ctx, &alloc, &req, "claude-3", 8, 0.7, &resp);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(resp.content);
+    sc_chat_response_free(&alloc, &resp);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
+}
+
+static void test_factory_anthropic_chat_with_system_returns_stub(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t prov;
+    sc_error_t err = sc_provider_create(&alloc, "anthropic", 9, "", 0, NULL, 0, &prov);
+    SC_ASSERT_EQ(err, SC_OK);
+    char *out = NULL;
+    size_t out_len = 0;
+    err = prov.vtable->chat_with_system(prov.ctx, &alloc, "System prompt", 13, "User msg", 8,
+                                        "claude-3-sonnet", 15, 0.7, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(out);
+    SC_ASSERT_TRUE(out_len > 0);
+    if (out)
+        alloc.free(alloc.ctx, out, out_len + 1);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
+}
+
+static void test_factory_gemini_chat_returns_stub(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t prov;
+    sc_error_t err = sc_provider_create(&alloc, "gemini", 6, "", 0, NULL, 0, &prov);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_chat_message_t msgs[1] = {make_user_msg("hello", 5)};
+    sc_chat_request_t req = make_simple_request(msgs, 1);
+    sc_chat_response_t resp = {0};
+    err = prov.vtable->chat(prov.ctx, &alloc, &req, "gemini-pro", 10, 0.7, &resp);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(resp.content);
+    sc_chat_response_free(&alloc, &resp);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
+}
+
+static void test_factory_gemini_chat_with_system_returns_stub(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t prov;
+    sc_error_t err = sc_provider_create(&alloc, "gemini", 6, "", 0, NULL, 0, &prov);
+    SC_ASSERT_EQ(err, SC_OK);
+    char *out = NULL;
+    size_t out_len = 0;
+    err = prov.vtable->chat_with_system(prov.ctx, &alloc, "You are helpful", 16, "Hello", 5,
+                                        "gemini-pro", 10, 0.7, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(out);
+    SC_ASSERT_TRUE(out_len > 0);
+    if (out)
+        alloc.free(alloc.ctx, out, out_len + 1);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
+}
+
 /* ─── SSE parsing ────────────────────────────────────────────────────────── */
 static void test_sse_parse_line_data_extracts_delta(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -2868,6 +3001,15 @@ void run_provider_all_tests(void) {
     SC_RUN_TEST(test_factory_openrouter_resolves);
     SC_RUN_TEST(test_factory_case_sensitive_unknown);
     SC_RUN_TEST(test_factory_gpt4o_not_provider_name);
+    SC_RUN_TEST(test_factory_openai_create_empty_key);
+    SC_RUN_TEST(test_factory_anthropic_create_empty_key);
+    SC_RUN_TEST(test_factory_gemini_create_empty_key);
+    SC_RUN_TEST(test_factory_openai_chat_returns_stub);
+    SC_RUN_TEST(test_factory_openai_chat_with_system_returns_stub);
+    SC_RUN_TEST(test_factory_anthropic_chat_returns_stub);
+    SC_RUN_TEST(test_factory_anthropic_chat_with_system_returns_stub);
+    SC_RUN_TEST(test_factory_gemini_chat_returns_stub);
+    SC_RUN_TEST(test_factory_gemini_chat_with_system_returns_stub);
 
     SC_RUN_TEST(test_sse_parse_line_data_extracts_delta);
     SC_RUN_TEST(test_sse_parse_line_done);

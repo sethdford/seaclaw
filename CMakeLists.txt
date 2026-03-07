@@ -1323,6 +1323,7 @@ set(SC_TEST_SOURCES
     tests/test_agent_teams.c
     tests/test_untested_modules.c
     tests/test_modules_coverage.c
+    tests/test_coverage_new.c
     tests/test_context.c
     tests/test_qmd.c
 )

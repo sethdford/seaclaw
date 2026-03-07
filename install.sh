@@ -68,21 +68,15 @@ main() {
     arch=$(detect_arch)
     os=$(detect_os)
 
-    case "$os" in
-        linux)  bin_name="seaclaw-linux-x86_64.bin" ;;
-        macos)  bin_name="seaclaw-macos-aarch64.bin" ;;
-        *)      bin_name="" ;;
+    case "${os}-${arch}" in
+        linux-x86_64)   bin_name="seaclaw-linux-x86_64.bin" ;;
+        linux-aarch64)  bin_name="seaclaw-linux-aarch64.bin" ;;
+        macos-aarch64)  bin_name="seaclaw-macos-aarch64.bin" ;;
+        *)
+            red "Unsupported platform: $os $arch"
+            exit 1
+            ;;
     esac
-
-    # Linux supports x86_64 only in release; macOS supports aarch64 only
-    if [ "$os" = "linux" ] && [ "$arch" != "x86_64" ]; then
-        red "Linux releases currently support x86_64 only. Your arch: $arch"
-        exit 1
-    fi
-    if [ "$os" = "macos" ] && [ "$arch" != "aarch64" ]; then
-        red "macOS releases currently support aarch64 only. Your arch: $arch"
-        exit 1
-    fi
 
     # Resolve version from latest GitHub release
     api_url="https://api.github.com/repos/$REPO/releases/latest"

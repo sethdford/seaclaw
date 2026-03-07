@@ -66,12 +66,7 @@ static void test_onboard_run_test_mode(void) {
 
 static void test_onboard_run_invalid_alloc(void) {
     sc_error_t err = sc_onboard_run(NULL);
-    /* With NULL alloc, if not in test mode would fail; test mode still returns OK */
-#ifdef SC_IS_TEST
     SC_ASSERT(err == SC_OK);
-#else
-    (void)err;
-#endif
 }
 
 static void test_daemon_start_test_mode(void) {

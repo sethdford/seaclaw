@@ -85,9 +85,7 @@
 #else
 #define SC_TOOLS_CRON_COUNT 0
 #endif
-#define SC_TOOLS_COUNT_BASE \
-    (41 +                   \
-     SC_TOOLS_CRON_COUNT) /* 41 base tools + cron tools */
+#define SC_TOOLS_COUNT_BASE (41 + SC_TOOLS_CRON_COUNT) /* 41 base tools + cron tools */
 #ifdef SC_HAS_TOOLS_BROWSER
 #define SC_TOOLS_BROWSER_COUNT 3
 #else

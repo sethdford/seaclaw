@@ -558,8 +558,7 @@ static sc_error_t append_history_with_tool_calls(sc_agent_t *agent, const char *
                 owned[i].name_len = src->name_len;
             }
             if (src->arguments && src->arguments_len > 0) {
-                owned[i].arguments =
-                    sc_strndup(agent->alloc, src->arguments, src->arguments_len);
+                owned[i].arguments = sc_strndup(agent->alloc, src->arguments, src->arguments_len);
                 if (!owned[i].arguments) {
                     free_owned_tool_calls(agent->alloc, owned, tool_calls_count);
                     agent->alloc->free(agent->alloc->ctx, dup, content_len ? content_len + 1 : 1);

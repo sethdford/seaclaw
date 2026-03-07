@@ -399,7 +399,7 @@ sc_error_t sc_persona_creator_write(sc_allocator_t *alloc, const sc_persona_t *p
 
     char path[SC_PERSONA_CREATOR_PATH_MAX];
     int n = snprintf(path, sizeof(path), "%s/%.*s.json", dir_buf, (int)persona->name_len,
-                    persona->name);
+                     persona->name);
     if (n <= 0 || (size_t)n >= sizeof(path))
         return SC_ERR_INVALID_ARGUMENT;
 
