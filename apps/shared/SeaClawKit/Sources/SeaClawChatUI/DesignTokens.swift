@@ -157,6 +157,9 @@ public enum SCTokens {
     // MARK: - Glass
     public static let glassAmbient: Double = 0.04
     public static let glassIntensity: Double = 0.15
+    public static let glassChatActionsBgOpacity: Double = 0.9
+    public static let glassChatBgOpacity: Double = 0.85
+    public static let glassChatBorderOpacity: Double = 0.08
     public static let glassProminentBgOpacity: Double = 0.08
     public static let glassProminentBorderOpacity: Double = 0.12
     public static let glassProminentInsetOpacity: Double = 0.1
@@ -177,6 +180,8 @@ public enum SCTokens {
     public static let glassBackdropBrightness: Double = 1.08
     public static let glassIconBoost: Double = 1.2
     public static let glassTextBoost: Double = 1.15
+    public static let glassChatActionsBlur: CGFloat = 16
+    public static let glassChatBlur: CGFloat = 24
     public static let glassProminentBlur: CGFloat = 32
     public static let glassStandardBlur: CGFloat = 24
     public static let glassSubtleBlur: CGFloat = 12

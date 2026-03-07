@@ -158,6 +158,16 @@
       "$value": "0 0 0 1px var(--sc-accent-subtle), 0 4px 16px rgba(122,182,72,0.15)",
       "$type": "shadow"
     },
+    "shadow-glow-blue": {
+      "$value": "0 0 0 1px rgba(59,130,246,0.12), 0 4px 16px rgba(59,130,246,0.10)",
+      "$type": "shadow",
+      "$description": "Blue glow for chat focus/hover states"
+    },
+    "user-message-gradient": {
+      "$value": "linear-gradient(135deg, #1e40af, #2563eb)",
+      "$type": "string",
+      "$description": "Deep-to-vibrant blue gradient for user chat bubbles"
+    },
     "shadow-inset": {
       "$value": "inset 0 1px 2px rgba(0,0,0,0.06)",
       "$type": "shadow"
@@ -313,6 +323,14 @@
       "$value": "0 0 0 1px rgba(90,154,48,0.12), 0 4px 16px rgba(90,154,48,0.15)",
       "$type": "shadow",
       "$description": "Fidelity green glow for hover/focus states"
+    },
+    "shadow-glow-blue": {
+      "$value": "0 0 0 1px rgba(37,99,235,0.12), 0 4px 12px rgba(37,99,235,0.08)",
+      "$type": "shadow"
+    },
+    "user-message-gradient": {
+      "$value": "linear-gradient(135deg, #2563eb, #3b82f6)",
+      "$type": "string"
     },
     "shadow-inset": {
       "$value": "inset 0 1px 2px rgba(0,0,0,0.04)",

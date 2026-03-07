@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-07T13:38:19.387Z",
+  "generated": "2026-03-07T15:36:36.324Z",
   "groups": {
     "color.neutral": [
       {
@@ -1755,6 +1755,14 @@
         "value": "0 0 0 1px var(--sc-accent-subtle), 0 4px 16px rgba(122,182,72,0.15)"
       },
       {
+        "name": "shadow-glow-blue",
+        "value": "0 0 0 1px rgba(59,130,246,0.12), 0 4px 16px rgba(59,130,246,0.10)"
+      },
+      {
+        "name": "user-message-gradient",
+        "value": "linear-gradient(135deg, #1e40af, #2563eb)"
+      },
+      {
         "name": "shadow-inset",
         "value": "inset 0 1px 2px rgba(0,0,0,0.06)"
       },
@@ -2035,6 +2043,14 @@
       {
         "name": "shadow-glow-accent",
         "value": "0 0 0 1px rgba(90,154,48,0.12), 0 4px 16px rgba(90,154,48,0.15)"
+      },
+      {
+        "name": "shadow-glow-blue",
+        "value": "0 0 0 1px rgba(37,99,235,0.12), 0 4px 12px rgba(37,99,235,0.08)"
+      },
+      {
+        "name": "user-message-gradient",
+        "value": "linear-gradient(135deg, #2563eb, #3b82f6)"
       },
       {
         "name": "shadow-inset",
@@ -2703,6 +2719,32 @@
       {
         "name": "refraction-scale",
         "value": "3"
+      }
+    ],
+    "glass.chat": [
+      {
+        "name": "blur",
+        "value": "24px"
+      },
+      {
+        "name": "saturate",
+        "value": "180%"
+      },
+      {
+        "name": "bg-opacity",
+        "value": "0.85"
+      },
+      {
+        "name": "border-opacity",
+        "value": "0.08"
+      },
+      {
+        "name": "actions-bg-opacity",
+        "value": "0.9"
+      },
+      {
+        "name": "actions-blur",
+        "value": "16px"
       }
     ],
     "dynamic-light": [

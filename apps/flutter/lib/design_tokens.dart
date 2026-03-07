@@ -216,6 +216,11 @@ abstract final class SCTokens {
   static const font_weight_medium = 500;
   static const font_weight_normal = 400;
   static const font_weight_semibold = 600;
+  static const glass_chat_actions_bg_opacity = 0.9;
+  static const glass_chat_actions_blur = 16;
+  static const glass_chat_bg_opacity = 0.85;
+  static const glass_chat_blur = 24;
+  static const glass_chat_border_opacity = 0.08;
   static const glass_prominent_bg_opacity = 0.08;
   static const glass_prominent_blur = 32;
   static const glass_prominent_border_opacity = 0.12;

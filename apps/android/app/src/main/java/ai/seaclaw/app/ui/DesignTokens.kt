@@ -197,6 +197,9 @@ object SCTokens {
     // Glass
     val glassAmbient = 0.04f
     val glassIntensity = 0.15f
+    val glassChatActionsBgOpacity = 0.9f
+    val glassChatBgOpacity = 0.85f
+    val glassChatBorderOpacity = 0.08f
     val glassProminentBgOpacity = 0.08f
     val glassProminentBorderOpacity = 0.12f
     val glassProminentInsetOpacity = 0.1f
@@ -217,6 +220,8 @@ object SCTokens {
     val glassBackdropBrightness = 1.08f
     val glassIconBoost = 1.2f
     val glassTextBoost = 1.15f
+    val glassChatActionsBlur = 16.dp
+    val glassChatBlur = 24.dp
     val glassProminentBlur = 32.dp
     val glassStandardBlur = 24.dp
     val glassSubtleBlur = 12.dp

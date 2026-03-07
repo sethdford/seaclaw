@@ -119,6 +119,23 @@
         "$description": "Visible refraction distortion"
       },
       "$description": "Modals, sheets, hero elements, overlays — z.modal (1300)"
+    },
+    "chat": {
+      "$description": "Chat-specific glass — blue-tinted for sessions panel and message actions",
+      "blur": { "$value": "24px", "$type": "dimension" },
+      "saturate": { "$value": "180%", "$type": "string" },
+      "bg-opacity": {
+        "$value": 0.85,
+        "$type": "number",
+        "$description": "Higher opacity for readability"
+      },
+      "border-opacity": { "$value": 0.08, "$type": "number" },
+      "actions-bg-opacity": {
+        "$value": 0.9,
+        "$type": "number",
+        "$description": "Message actions toolbar"
+      },
+      "actions-blur": { "$value": "16px", "$type": "dimension" }
     }
   },
   "dynamic-light": {
