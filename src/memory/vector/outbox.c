@@ -82,8 +82,9 @@ sc_error_t sc_embedding_outbox_flush(sc_embedding_outbox_t *ob, sc_allocator_t *
 
         sc_embedding_provider_result_t res = {0};
         sc_error_t err = provider->vtable->embed(provider->ctx, alloc, txt, txt_len, &res);
-        if (err == SC_OK && res.values && callback) {
-            callback(userdata, it->id ? it->id : "", it->id_len, res.values, res.dimensions);
+        if (err == SC_OK) {
+            if (res.values && callback)
+                callback(userdata, it->id ? it->id : "", it->id_len, res.values, res.dimensions);
             sc_embedding_provider_free(alloc, &res);
         }
     }

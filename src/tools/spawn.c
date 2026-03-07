@@ -214,9 +214,12 @@ static const char *spawn_parameters_json(void *ctx) {
     return SC_SPAWN_PARAMS;
 }
 static void spawn_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    if (ctx)
-        free(ctx);
+    sc_spawn_ctx_t *c = (sc_spawn_ctx_t *)ctx;
+    if (!c)
+        return;
+    if (c->workspace_dir)
+        alloc->free(alloc->ctx, (void *)c->workspace_dir, c->workspace_dir_len + 1);
+    free(c);
 }
 
 static const sc_tool_vtable_t spawn_vtable = {

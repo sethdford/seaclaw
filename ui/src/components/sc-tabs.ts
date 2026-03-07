@@ -151,7 +151,6 @@ export class ScTabs extends LitElement {
               role="tab"
               data-tab-id=${tab.id}
               aria-selected=${this.value === tab.id}
-              aria-controls="panel-${tab.id}"
               id="tab-${tab.id}"
               tabindex=${this.value === tab.id ? 0 : -1}
               @click=${() => this._onTabClick(tab.id)}

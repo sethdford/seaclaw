@@ -120,18 +120,8 @@ sc_error_t sc_episodic_load(sc_memory_t *memory, sc_allocator_t *alloc, char **o
         *out_len = pos;
 
 cleanup:
-    for (size_t i = 0; i < count; i++) {
-        if (entries[i].key)
-            alloc->free(alloc->ctx, (void *)entries[i].key, entries[i].key_len + 1);
-        if (entries[i].content)
-            alloc->free(alloc->ctx, (void *)entries[i].content, entries[i].content_len + 1);
-        if (entries[i].id && entries[i].id != entries[i].key)
-            alloc->free(alloc->ctx, (void *)entries[i].id, entries[i].id_len + 1);
-        if (entries[i].timestamp)
-            alloc->free(alloc->ctx, (void *)entries[i].timestamp, entries[i].timestamp_len + 1);
-        if (entries[i].session_id)
-            alloc->free(alloc->ctx, (void *)entries[i].session_id, entries[i].session_id_len + 1);
-    }
+    for (size_t i = 0; i < count; i++)
+        sc_memory_entry_free_fields(alloc, &entries[i]);
     alloc->free(alloc->ctx, entries, count * sizeof(sc_memory_entry_t));
     return err;
 }
