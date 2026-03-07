@@ -2,12 +2,14 @@ import { test, expect } from "@playwright/test";
 
 /**
  * Full chat flow test with Gemini backend.
+ * Uses baseURL from playwright.config (preview server on 4173).
  * Run with: npx playwright test chat-gemini-flow --project=chromium
+ * Requires: gateway on 3000 for real backend, or use ?demo for demo mode.
  */
 test.describe("Chat Gemini Flow", () => {
   test("full chat flow - send message and get Gemini response", async ({ page }) => {
-    // 1. Navigate to app
-    await page.goto("http://localhost:5173/");
+    // 1. Navigate to app (uses baseURL from config)
+    await page.goto("/");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1000);
 
@@ -27,7 +29,7 @@ test.describe("Chat Gemini Flow", () => {
     }
 
     // 3. Navigate to Chat
-    await page.goto("http://localhost:5173/#chat");
+    await page.goto("/#chat");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1000);
 

@@ -292,16 +292,17 @@ sc_error_t sc_gmail_create(sc_allocator_t *alloc, const char *client_id, size_t 
                            int poll_interval_sec, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_gmail_ctx_t *c = (sc_gmail_ctx_t *)calloc(1, sizeof(*c));
+    sc_gmail_ctx_t *c = (sc_gmail_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     c->poll_interval_sec = poll_interval_sec > 0 ? poll_interval_sec : 60;
 
     if (client_id && client_id_len > 0) {
         c->client_id = sc_strndup(alloc, client_id, client_id_len);
         if (!c->client_id) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
     }
@@ -310,7 +311,7 @@ sc_error_t sc_gmail_create(sc_allocator_t *alloc, const char *client_id, size_t 
         if (!c->client_secret) {
             if (c->client_id)
                 alloc->free(alloc->ctx, c->client_id, strlen(c->client_id) + 1);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
     }
@@ -321,7 +322,7 @@ sc_error_t sc_gmail_create(sc_allocator_t *alloc, const char *client_id, size_t 
                 alloc->free(alloc->ctx, c->client_id, strlen(c->client_id) + 1);
             if (c->client_secret)
                 alloc->free(alloc->ctx, c->client_secret, strlen(c->client_secret) + 1);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
     }
@@ -334,15 +335,18 @@ sc_error_t sc_gmail_create(sc_allocator_t *alloc, const char *client_id, size_t 
 void sc_gmail_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_gmail_ctx_t *c = (sc_gmail_ctx_t *)ch->ctx;
-        if (c->client_id)
-            c->alloc->free(c->alloc->ctx, c->client_id, strlen(c->client_id) + 1);
-        if (c->client_secret)
-            c->alloc->free(c->alloc->ctx, c->client_secret, strlen(c->client_secret) + 1);
-        if (c->refresh_token)
-            c->alloc->free(c->alloc->ctx, c->refresh_token, strlen(c->refresh_token) + 1);
-        if (c->access_token)
-            c->alloc->free(c->alloc->ctx, c->access_token, c->access_token_len + 1);
-        free(c);
+        sc_allocator_t *a = c->alloc;
+        if (a) {
+            if (c->client_id)
+                a->free(a->ctx, c->client_id, strlen(c->client_id) + 1);
+            if (c->client_secret)
+                a->free(a->ctx, c->client_secret, strlen(c->client_secret) + 1);
+            if (c->refresh_token)
+                a->free(a->ctx, c->refresh_token, strlen(c->refresh_token) + 1);
+            if (c->access_token)
+                a->free(a->ctx, c->access_token, c->access_token_len + 1);
+            a->free(a->ctx, c, sizeof(*c));
+        }
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

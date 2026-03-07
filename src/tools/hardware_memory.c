@@ -223,13 +223,15 @@ static const char *hardware_memory_params(void *ctx) {
 }
 static void hardware_memory_deinit(void *ctx, sc_allocator_t *alloc) {
     sc_hardware_memory_ctx_t *c = (sc_hardware_memory_ctx_t *)ctx;
-    if (c && c->boards) {
+    if (!c || !alloc)
+        return;
+    if (c->boards) {
         for (size_t i = 0; i < c->boards_count; i++)
             if (c->boards[i])
                 alloc->free(alloc->ctx, c->boards[i], strlen(c->boards[i]) + 1);
         alloc->free(alloc->ctx, c->boards, c->boards_count * sizeof(char *));
     }
-    free(ctx);
+    alloc->free(alloc->ctx, c, sizeof(*c));
 }
 
 static const sc_tool_vtable_t hardware_memory_vtable = {
@@ -244,15 +246,16 @@ sc_error_t sc_hardware_memory_create(sc_allocator_t *alloc, const char *const *b
                                      size_t boards_count, sc_tool_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_hardware_memory_ctx_t *c = (sc_hardware_memory_ctx_t *)calloc(1, sizeof(*c));
+    sc_hardware_memory_ctx_t *c = (sc_hardware_memory_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     c->boards_count = boards_count;
     if (boards && boards_count > 0) {
         c->boards = (char **)alloc->alloc(alloc->ctx, boards_count * sizeof(char *));
         if (!c->boards) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memset(c->boards, 0, boards_count * sizeof(char *));
@@ -263,7 +266,7 @@ sc_error_t sc_hardware_memory_create(sc_allocator_t *alloc, const char *const *b
                 for (size_t j = 0; j < i; j++)
                     alloc->free(alloc->ctx, c->boards[j], strlen(c->boards[j]) + 1);
                 alloc->free(alloc->ctx, c->boards, boards_count * sizeof(char *));
-                free(c);
+                alloc->free(alloc->ctx, c, sizeof(*c));
                 return SC_ERR_OUT_OF_MEMORY;
             }
             memcpy(c->boards[i], boards[i], len + 1);

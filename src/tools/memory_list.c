@@ -78,9 +78,8 @@ static const char *memory_list_parameters_json(void *ctx) {
     return SC_MEMORY_LIST_PARAMS;
 }
 static void memory_list_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    if (ctx)
-        free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, sizeof(sc_memory_list_ctx_t));
 }
 
 static const sc_tool_vtable_t memory_list_vtable = {

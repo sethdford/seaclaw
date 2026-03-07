@@ -252,6 +252,87 @@ sc_error_t sc_oauth_refresh_token(sc_oauth_ctx_t *ctx, sc_oauth_session_t *sessi
     session->expires_at = (int64_t)time(NULL) + 3600;
     snprintf(session->access_token, sizeof(session->access_token), "refreshed-test-token");
     return SC_OK;
+#elif defined(SC_HTTP_CURL)
+    const char *token_url = ctx->config.token_url;
+    if (!token_url) {
+        if (ctx->config.provider && strcmp(ctx->config.provider, "google") == 0)
+            token_url = "https://oauth2.googleapis.com/token";
+        else if (ctx->config.provider && strcmp(ctx->config.provider, "github") == 0)
+            token_url = "https://github.com/login/oauth/access_token";
+        else
+            return SC_ERR_INVALID_ARGUMENT;
+    }
+
+    char body[2048];
+    size_t blen = 0;
+    if (blen + 40 < sizeof(body))
+        memcpy(body + blen, "grant_type=refresh_token&refresh_token=", 39), blen += 39;
+    for (const char *p = session->refresh_token; *p && blen < sizeof(body) - 4; p++) {
+        if (oauth_form_encode_char(body, sizeof(body), &blen, (unsigned char)*p) != 0)
+            return SC_ERR_INVALID_ARGUMENT;
+    }
+    if (blen + 20 < sizeof(body))
+        memcpy(body + blen, "&client_id=", 11), blen += 11;
+    for (const char *p = ctx->config.client_id ? ctx->config.client_id : "";
+         *p && blen < sizeof(body) - 4; p++) {
+        if (oauth_form_encode_char(body, sizeof(body), &blen, (unsigned char)*p) != 0)
+            return SC_ERR_INVALID_ARGUMENT;
+    }
+    if (ctx->config.client_secret && ctx->config.client_secret[0]) {
+        if (blen + 20 < sizeof(body))
+            memcpy(body + blen, "&client_secret=", 15), blen += 15;
+        for (const char *p = ctx->config.client_secret; *p && blen < sizeof(body) - 4; p++) {
+            if (oauth_form_encode_char(body, sizeof(body), &blen, (unsigned char)*p) != 0)
+                return SC_ERR_INVALID_ARGUMENT;
+        }
+    }
+    body[blen] = '\0';
+
+    sc_http_response_t resp = {0};
+    sc_error_t err = sc_http_request(ctx->alloc, token_url, "POST",
+                                     "Content-Type: application/x-www-form-urlencoded\n"
+                                     "Accept: application/json\nUser-Agent: SeaClaw/1.0",
+                                     body, blen, &resp);
+    if (err != SC_OK)
+        return err;
+    if (resp.status_code < 200 || resp.status_code >= 300) {
+        if (resp.owned && resp.body)
+            sc_http_response_free(ctx->alloc, &resp);
+        return SC_ERR_PROVIDER_AUTH;
+    }
+
+    int64_t expires_at = (int64_t)time(NULL) + 3600;
+    sc_json_value_t *root = NULL;
+    if (resp.body && resp.body_len > 0) {
+        if (sc_json_parse(ctx->alloc, resp.body, resp.body_len, &root) == SC_OK && root) {
+            const char *at = sc_json_get_string(root, "access_token");
+            const char *rt = sc_json_get_string(root, "refresh_token");
+            double exp = sc_json_get_number(root, "expires_in", 3600.0);
+            if (at) {
+                size_t atlen = strlen(at);
+                if (atlen >= sizeof(session->access_token))
+                    atlen = sizeof(session->access_token) - 1;
+                memcpy(session->access_token, at, atlen);
+                session->access_token[atlen] = '\0';
+            }
+            if (rt) {
+                size_t rtlen = strlen(rt);
+                if (rtlen >= sizeof(session->refresh_token))
+                    rtlen = sizeof(session->refresh_token) - 1;
+                memcpy(session->refresh_token, rt, rtlen);
+                session->refresh_token[rtlen] = '\0';
+            }
+            if (exp > 0)
+                expires_at = (int64_t)time(NULL) + (int64_t)exp;
+            sc_json_free(ctx->alloc, root);
+        }
+    }
+
+    session->expires_at = expires_at;
+
+    if (resp.owned && resp.body)
+        sc_http_response_free(ctx->alloc, &resp);
+    return SC_OK;
 #else
     (void)ctx;
     (void)session;

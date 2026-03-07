@@ -17,15 +17,23 @@ typedef pthread_mutex_t sc_mutex_t;
 #define sc_mutex_destroy(m) pthread_mutex_destroy(m)
 #endif
 
+#if defined(_WIN32) || defined(_WIN64)
 static sc_mutex_t s_bus_mutex;
-static bool s_bus_mutex_init = false;
-
+static volatile LONG s_bus_once = 0;
 static void ensure_mutex(void) {
-    if (!s_bus_mutex_init) {
+    if (InterlockedCompareExchange(&s_bus_once, 1, 0) == 0)
         sc_mutex_init(&s_bus_mutex);
-        s_bus_mutex_init = true;
-    }
 }
+#else
+static sc_mutex_t s_bus_mutex;
+static pthread_once_t s_bus_once = PTHREAD_ONCE_INIT;
+static void init_bus_mutex(void) {
+    sc_mutex_init(&s_bus_mutex);
+}
+static void ensure_mutex(void) {
+    pthread_once(&s_bus_once, init_bus_mutex);
+}
+#endif
 
 void sc_bus_init(sc_bus_t *bus) {
     if (!bus)

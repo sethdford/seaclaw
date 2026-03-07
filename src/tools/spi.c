@@ -218,9 +218,8 @@ static const char *spi_parameters_json(void *ctx) {
     return SC_SPI_PARAMS;
 }
 static void spi_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    if (ctx)
-        free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, sizeof(sc_spi_ctx_t));
 }
 
 static const sc_tool_vtable_t spi_vtable = {
@@ -233,13 +232,16 @@ static const sc_tool_vtable_t spi_vtable = {
 
 sc_error_t sc_spi_create(sc_allocator_t *alloc, const char *device, size_t device_len,
                          sc_tool_t *out) {
-    sc_spi_ctx_t *c = (sc_spi_ctx_t *)calloc(1, sizeof(*c));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    sc_spi_ctx_t *c = (sc_spi_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     if (device && device_len > 0) {
         c->device = sc_strndup(alloc, device, device_len);
         if (!c->device) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         c->device_len = device_len;

@@ -284,6 +284,8 @@ static void send_response(int fd, int status, const char *content_type, const ch
                      "Content-Type: %s\r\n"
                      "Connection: close\r\n"
                      "Content-Length: %zu\r\n"
+                     "X-Frame-Options: DENY\r\n"
+                     "X-Content-Type-Options: nosniff\r\n"
                      "%s"
                      "%s"
                      "\r\n",

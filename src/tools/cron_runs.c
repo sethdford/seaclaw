@@ -169,9 +169,8 @@ static const char *cron_runs_params(void *ctx) {
     return CRON_RUNS_PARAMS;
 }
 static void cron_runs_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)ctx;
-    (void)alloc;
-    free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, sizeof(sc_cron_tool_ctx_t));
 }
 
 static const sc_tool_vtable_t cron_runs_vtable = {
@@ -185,9 +184,11 @@ static const sc_tool_vtable_t cron_runs_vtable = {
 sc_error_t sc_cron_runs_create(sc_allocator_t *alloc, sc_cron_scheduler_t *sched, sc_tool_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_cron_tool_ctx_t *ctx = (sc_cron_tool_ctx_t *)calloc(1, sizeof(sc_cron_tool_ctx_t));
+    sc_cron_tool_ctx_t *ctx =
+        (sc_cron_tool_ctx_t *)alloc->alloc(alloc->ctx, sizeof(sc_cron_tool_ctx_t));
     if (!ctx)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(ctx, 0, sizeof(sc_cron_tool_ctx_t));
     ctx->sched = sched;
     out->ctx = ctx;
     out->vtable = &cron_runs_vtable;

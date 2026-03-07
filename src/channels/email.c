@@ -212,14 +212,15 @@ sc_error_t sc_email_create(sc_allocator_t *alloc, const char *smtp_host, size_t 
                            sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_email_ctx_t *c = (sc_email_ctx_t *)calloc(1, sizeof(*c));
+    sc_email_ctx_t *c = (sc_email_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (smtp_host && smtp_host_len > 0) {
-        c->smtp_host = (char *)malloc(smtp_host_len + 1);
+        c->smtp_host = (char *)alloc->alloc(alloc->ctx, smtp_host_len + 1);
         if (!c->smtp_host) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->smtp_host, smtp_host, smtp_host_len);
@@ -228,11 +229,11 @@ sc_error_t sc_email_create(sc_allocator_t *alloc, const char *smtp_host, size_t 
     }
     c->smtp_port = smtp_port > 0 ? smtp_port : 587;
     if (from_address && from_len > 0) {
-        c->from_address = (char *)malloc(from_len + 1);
+        c->from_address = (char *)alloc->alloc(alloc->ctx, from_len + 1);
         if (!c->from_address) {
             if (c->smtp_host)
-                free(c->smtp_host);
-            free(c);
+                alloc->free(alloc->ctx, c->smtp_host, c->smtp_host_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->from_address, from_address, from_len);
@@ -284,17 +285,20 @@ sc_error_t sc_email_set_imap(sc_channel_t *ch, const char *imap_host, size_t ima
 void sc_email_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_email_ctx_t *c = (sc_email_ctx_t *)ch->ctx;
-        if (c->smtp_host)
-            free(c->smtp_host);
-        if (c->smtp_user)
-            free(c->smtp_user);
-        if (c->smtp_pass)
-            free(c->smtp_pass);
-        if (c->imap_host)
-            free(c->imap_host);
-        if (c->from_address)
-            free(c->from_address);
-        free(c);
+        sc_allocator_t *a = c->alloc;
+        if (a) {
+            if (c->smtp_host)
+                a->free(a->ctx, c->smtp_host, c->smtp_host_len + 1);
+            if (c->smtp_user)
+                a->free(a->ctx, c->smtp_user, c->smtp_user_len + 1);
+            if (c->smtp_pass)
+                a->free(a->ctx, c->smtp_pass, c->smtp_pass_len + 1);
+            if (c->imap_host)
+                a->free(a->ctx, c->imap_host, c->imap_host_len + 1);
+            if (c->from_address)
+                a->free(a->ctx, c->from_address, c->from_len + 1);
+            a->free(a->ctx, c, sizeof(*c));
+        }
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

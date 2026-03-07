@@ -1,7 +1,6 @@
 /*
  * Firebase CLI tool — execute Firebase CLI commands.
  */
-#include "seaclaw/tools/cli_wrapper_common.h"
 #include "seaclaw/tools/firebase.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
@@ -10,6 +9,7 @@
 #include "seaclaw/core/string.h"
 #include "seaclaw/security.h"
 #include "seaclaw/tool.h"
+#include "seaclaw/tools/cli_wrapper_common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -130,9 +130,8 @@ static const char *firebase_parameters_json(void *ctx) {
     return SC_FIREBASE_PARAMS;
 }
 static void firebase_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    if (ctx)
-        free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, sizeof(sc_firebase_ctx_t));
 }
 
 static const sc_tool_vtable_t firebase_vtable = {
@@ -146,9 +145,10 @@ static const sc_tool_vtable_t firebase_vtable = {
 sc_error_t sc_firebase_create(sc_allocator_t *alloc, sc_security_policy_t *policy, sc_tool_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_firebase_ctx_t *c = (sc_firebase_ctx_t *)calloc(1, sizeof(*c));
+    sc_firebase_ctx_t *c = (sc_firebase_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->policy = policy;
     out->ctx = c;
     out->vtable = &firebase_vtable;

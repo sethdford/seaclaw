@@ -4,7 +4,6 @@ import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import "../components/sc-page-hero.js";
 import "../components/sc-section-header.js";
-import "../components/sc-stat-card.js";
 import "../components/sc-card.js";
 import "../components/sc-badge.js";
 import "../components/sc-skeleton.js";
@@ -35,17 +34,6 @@ export class ScModelsView extends GatewayAwareLitElement {
     :host {
       display: block;
       max-width: 1200px;
-    }
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--sc-space-md);
-      margin-bottom: var(--sc-space-xl);
-    }
-    @media (max-width: 640px) {
-      .stats-row {
-        grid-template-columns: 1fr;
-      }
     }
     .info-bar {
       display: flex;
@@ -214,34 +202,6 @@ export class ScModelsView extends GatewayAwareLitElement {
         <sc-skeleton variant="card" height="80px"></sc-skeleton>
         <sc-skeleton variant="card" height="80px"></sc-skeleton>
         <sc-skeleton variant="card" height="80px"></sc-skeleton>
-      </div>
-    `;
-  }
-
-  private _renderStats() {
-    const providerCount = this.providers.length;
-    const modelCount = this.providers.reduce((sum, p) => {
-      const models = (p as ProviderItem & { models?: unknown[] }).models;
-      return sum + (Array.isArray(models) ? models.length : 0);
-    }, 0);
-    return html`
-      <div class="stats-row">
-        <sc-stat-card
-          .value=${providerCount}
-          label="Providers"
-          style="--sc-stagger-delay: 0ms"
-        ></sc-stat-card>
-        <sc-stat-card
-          .value=${modelCount}
-          label="Models"
-          style="--sc-stagger-delay: 80ms"
-        ></sc-stat-card>
-        <sc-stat-card
-          .value=${0}
-          label="Cost Today"
-          prefix="$"
-          style="--sc-stagger-delay: 160ms"
-        ></sc-stat-card>
       </div>
     `;
   }

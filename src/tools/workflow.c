@@ -295,8 +295,8 @@ static const char *workflow_params(void *ctx) {
     return TOOL_PARAMS;
 }
 static void workflow_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, sizeof(workflow_ctx_t));
 }
 
 static const sc_tool_vtable_t workflow_vtable = {
@@ -310,9 +310,10 @@ static const sc_tool_vtable_t workflow_vtable = {
 sc_error_t sc_workflow_create(sc_allocator_t *alloc, sc_tool_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    workflow_ctx_t *c = (workflow_ctx_t *)calloc(1, sizeof(*c));
+    workflow_ctx_t *c = (workflow_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     out->ctx = c;
     out->vtable = &workflow_vtable;

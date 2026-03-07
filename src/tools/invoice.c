@@ -193,8 +193,8 @@ static const char *invoice_params(void *ctx) {
     return TOOL_PARAMS;
 }
 static void invoice_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, sizeof(invoice_ctx_t));
 }
 
 static const sc_tool_vtable_t invoice_vtable = {
@@ -206,10 +206,12 @@ static const sc_tool_vtable_t invoice_vtable = {
 };
 
 sc_error_t sc_invoice_create(sc_allocator_t *alloc, sc_tool_t *out) {
-    (void)alloc;
-    void *ctx = calloc(1, sizeof(invoice_ctx_t));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    void *ctx = alloc->alloc(alloc->ctx, sizeof(invoice_ctx_t));
     if (!ctx)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(ctx, 0, sizeof(invoice_ctx_t));
     out->ctx = ctx;
     out->vtable = &invoice_vtable;
     return SC_OK;

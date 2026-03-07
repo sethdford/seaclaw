@@ -77,9 +77,8 @@ static const char *memory_forget_parameters_json(void *ctx) {
     return SC_MEMORY_FORGET_PARAMS;
 }
 static void memory_forget_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    if (ctx)
-        free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, sizeof(sc_memory_forget_ctx_t));
 }
 
 static const sc_tool_vtable_t memory_forget_vtable = {
@@ -91,10 +90,12 @@ static const sc_tool_vtable_t memory_forget_vtable = {
 };
 
 sc_error_t sc_memory_forget_create(sc_allocator_t *alloc, sc_memory_t *memory, sc_tool_t *out) {
-    (void)alloc;
-    sc_memory_forget_ctx_t *c = (sc_memory_forget_ctx_t *)calloc(1, sizeof(*c));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    sc_memory_forget_ctx_t *c = (sc_memory_forget_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->memory = memory;
     out->ctx = c;
     out->vtable = &memory_forget_vtable;

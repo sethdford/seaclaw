@@ -780,12 +780,12 @@ static const char *anthropic_get_name(void *ctx) {
 
 static void anthropic_deinit(void *ctx, sc_allocator_t *alloc) {
     sc_anthropic_ctx_t *ac = (sc_anthropic_ctx_t *)ctx;
-    if (!ac)
+    if (!ac || !alloc)
         return;
     if (ac->api_key)
-        free(ac->api_key);
+        alloc->free(alloc->ctx, ac->api_key, ac->api_key_len + 1);
     if (ac->base_url)
-        free(ac->base_url);
+        alloc->free(alloc->ctx, ac->base_url, ac->base_url_len + 1);
     alloc->free(alloc->ctx, ac, sizeof(*ac));
 }
 
@@ -805,14 +805,16 @@ static const sc_provider_vtable_t anthropic_vtable = {
 
 sc_error_t sc_anthropic_create(sc_allocator_t *alloc, const char *api_key, size_t api_key_len,
                                const char *base_url, size_t base_url_len, sc_provider_t *out) {
-    (void)alloc;
-    sc_anthropic_ctx_t *ac = (sc_anthropic_ctx_t *)calloc(1, sizeof(*ac));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    sc_anthropic_ctx_t *ac = (sc_anthropic_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*ac));
     if (!ac)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(ac, 0, sizeof(*ac));
     if (api_key && api_key_len > 0) {
-        ac->api_key = (char *)malloc(api_key_len + 1);
+        ac->api_key = (char *)alloc->alloc(alloc->ctx, api_key_len + 1);
         if (!ac->api_key) {
-            free(ac);
+            alloc->free(alloc->ctx, ac, sizeof(*ac));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(ac->api_key, api_key, api_key_len);
@@ -820,11 +822,11 @@ sc_error_t sc_anthropic_create(sc_allocator_t *alloc, const char *api_key, size_
         ac->api_key_len = api_key_len;
     }
     if (base_url && base_url_len > 0) {
-        ac->base_url = (char *)malloc(base_url_len + 1);
+        ac->base_url = (char *)alloc->alloc(alloc->ctx, base_url_len + 1);
         if (!ac->base_url) {
             if (ac->api_key)
-                free(ac->api_key);
-            free(ac);
+                alloc->free(alloc->ctx, ac->api_key, ac->api_key_len + 1);
+            alloc->free(alloc->ctx, ac, sizeof(*ac));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(ac->base_url, base_url, base_url_len);

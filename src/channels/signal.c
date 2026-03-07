@@ -472,7 +472,7 @@ sc_error_t sc_signal_create_ex(sc_allocator_t *alloc, const char *http_url, size
 #endif
 
     if (http_url && http_url_len > 0) {
-        c->http_url = (char *)malloc(http_url_len + 1);
+        c->http_url = (char *)alloc->alloc(alloc->ctx, http_url_len + 1);
         if (!c->http_url) {
             alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
@@ -483,10 +483,10 @@ sc_error_t sc_signal_create_ex(sc_allocator_t *alloc, const char *http_url, size
     }
 
     if (account && account_len > 0) {
-        c->account = (char *)malloc(account_len + 1);
+        c->account = (char *)alloc->alloc(alloc->ctx, account_len + 1);
         if (!c->account) {
             if (c->http_url)
-                free(c->http_url);
+                alloc->free(alloc->ctx, c->http_url, c->http_url_len + 1);
             alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
@@ -504,9 +504,9 @@ sc_error_t sc_signal_create_ex(sc_allocator_t *alloc, const char *http_url, size
         c->group_policy = (char *)alloc->alloc(alloc->ctx, group_policy_len + 1);
         if (!c->group_policy) {
             if (c->http_url)
-                free(c->http_url);
+                alloc->free(alloc->ctx, c->http_url, c->http_url_len + 1);
             if (c->account)
-                free(c->account);
+                alloc->free(alloc->ctx, c->account, c->account_len + 1);
             alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
@@ -616,9 +616,9 @@ void sc_signal_destroy(sc_channel_t *ch) {
         signal_stop(c);
         free_group_policy(c);
         if (c->http_url)
-            free(c->http_url);
+            a->free(a->ctx, c->http_url, c->http_url_len + 1);
         if (c->account)
-            free(c->account);
+            a->free(a->ctx, c->account, c->account_len + 1);
 #if !SC_IS_TEST && defined(SC_HTTP_CURL)
         pthread_mutex_destroy(&c->typing_mu);
 #endif

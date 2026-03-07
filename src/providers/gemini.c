@@ -902,15 +902,14 @@ static sc_error_t gemini_stream_chat(void *ctx, sc_allocator_t *alloc,
 }
 
 static void gemini_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     sc_gemini_ctx_t *gc = (sc_gemini_ctx_t *)ctx;
-    if (!gc)
+    if (!gc || !alloc)
         return;
     if (gc->api_key)
-        free(gc->api_key);
+        alloc->free(alloc->ctx, gc->api_key, gc->api_key_len + 1);
     if (gc->oauth_token)
-        free(gc->oauth_token);
-    free(gc);
+        alloc->free(alloc->ctx, gc->oauth_token, gc->oauth_token_len + 1);
+    alloc->free(alloc->ctx, gc, sizeof(*gc));
 }
 
 static const sc_provider_vtable_t gemini_vtable = {

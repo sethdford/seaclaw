@@ -113,13 +113,12 @@ static const char *image_parameters_json(void *ctx) {
     return SC_IMAGE_PARAMS;
 }
 static void image_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     sc_image_ctx_t *c = (sc_image_ctx_t *)ctx;
-    if (!c)
+    if (!c || !alloc)
         return;
     if (c->api_key)
-        free(c->api_key);
-    free(c);
+        alloc->free(alloc->ctx, c->api_key, c->api_key_len + 1);
+    alloc->free(alloc->ctx, c, sizeof(*c));
 }
 
 static const sc_tool_vtable_t image_vtable = {
@@ -132,14 +131,16 @@ static const sc_tool_vtable_t image_vtable = {
 
 sc_error_t sc_image_create(sc_allocator_t *alloc, const char *api_key, size_t api_key_len,
                            sc_tool_t *out) {
-    (void)alloc;
-    sc_image_ctx_t *c = (sc_image_ctx_t *)calloc(1, sizeof(*c));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    sc_image_ctx_t *c = (sc_image_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     if (api_key && api_key_len > 0) {
-        c->api_key = (char *)malloc(api_key_len + 1);
+        c->api_key = (char *)alloc->alloc(alloc->ctx, api_key_len + 1);
         if (!c->api_key) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->api_key, api_key, api_key_len);

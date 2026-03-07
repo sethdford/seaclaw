@@ -219,15 +219,16 @@ sc_error_t sc_facebook_create(sc_allocator_t *alloc, const char *page_id, size_t
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
 
-    sc_facebook_ctx_t *c = (sc_facebook_ctx_t *)calloc(1, sizeof(*c));
+    sc_facebook_ctx_t *c = (sc_facebook_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
 
     if (page_id && page_id_len > 0) {
-        c->page_id = (char *)malloc(page_id_len + 1);
+        c->page_id = (char *)alloc->alloc(alloc->ctx, page_id_len + 1);
         if (!c->page_id) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->page_id, page_id, page_id_len);
@@ -236,11 +237,11 @@ sc_error_t sc_facebook_create(sc_allocator_t *alloc, const char *page_id, size_t
     }
 
     if (page_access_token && token_len > 0) {
-        c->page_access_token = (char *)malloc(token_len + 1);
+        c->page_access_token = (char *)alloc->alloc(alloc->ctx, token_len + 1);
         if (!c->page_access_token) {
             if (c->page_id)
-                free(c->page_id);
-            free(c);
+                alloc->free(alloc->ctx, c->page_id, c->page_id_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->page_access_token, page_access_token, token_len);
@@ -249,13 +250,13 @@ sc_error_t sc_facebook_create(sc_allocator_t *alloc, const char *page_id, size_t
     }
 
     if (app_secret && secret_len > 0) {
-        c->app_secret = (char *)malloc(secret_len + 1);
+        c->app_secret = (char *)alloc->alloc(alloc->ctx, secret_len + 1);
         if (!c->app_secret) {
             if (c->page_id)
-                free(c->page_id);
+                alloc->free(alloc->ctx, c->page_id, c->page_id_len + 1);
             if (c->page_access_token)
-                free(c->page_access_token);
-            free(c);
+                alloc->free(alloc->ctx, c->page_access_token, c->page_access_token_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->app_secret, app_secret, secret_len);
@@ -271,13 +272,16 @@ sc_error_t sc_facebook_create(sc_allocator_t *alloc, const char *page_id, size_t
 void sc_facebook_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_facebook_ctx_t *c = (sc_facebook_ctx_t *)ch->ctx;
-        if (c->page_id)
-            free(c->page_id);
-        if (c->page_access_token)
-            free(c->page_access_token);
-        if (c->app_secret)
-            free(c->app_secret);
-        free(c);
+        sc_allocator_t *a = c->alloc;
+        if (a) {
+            if (c->page_id)
+                a->free(a->ctx, c->page_id, c->page_id_len + 1);
+            if (c->page_access_token)
+                a->free(a->ctx, c->page_access_token, c->page_access_token_len + 1);
+            if (c->app_secret)
+                a->free(a->ctx, c->app_secret, c->app_secret_len + 1);
+            a->free(a->ctx, c, sizeof(*c));
+        }
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

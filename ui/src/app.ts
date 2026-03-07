@@ -390,6 +390,9 @@ export class ScApp extends LitElement {
   gateway: GatewayClient | null = null;
   private _keyHandler = this._onGlobalKey.bind(this);
   private _hashHandler = this._onHashChange.bind(this);
+  private _statusHandler = ((e: CustomEvent<GatewayStatus>) => {
+    this.connectionStatus = e.detail;
+  }) as EventListener;
 
   private get _isDemo(): boolean {
     return new URLSearchParams(window.location.search).has("demo");

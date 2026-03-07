@@ -606,23 +606,25 @@ export class ScVoiceView extends GatewayAwareLitElement {
   }
 
   override firstUpdated(): void {
-    this.speechSupported = "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
-    if (!this.speechSupported) {
-      this.voiceStatus = "unsupported";
-      ScToast.show({
-        message: "Speech recognition is not supported in this browser",
-        variant: "info",
-      });
-    }
-    this._restoreFromCache();
-    const gw = this.gateway;
-    if (gw) {
-      this._boundGateway = gw;
-      this._connectionStatus = gw.status;
-      gw.addEventListener(GatewayClientClass.EVENT_GATEWAY, this.gatewayHandler);
-      gw.addEventListener(GatewayClientClass.EVENT_STATUS, this.statusHandler as EventListener);
-    }
-    this._loading = false;
+    requestAnimationFrame(() => {
+      this.speechSupported = "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
+      if (!this.speechSupported) {
+        this.voiceStatus = "unsupported";
+        ScToast.show({
+          message: "Speech recognition is not supported in this browser",
+          variant: "info",
+        });
+      }
+      this._restoreFromCache();
+      const gw = this.gateway;
+      if (gw) {
+        this._boundGateway = gw;
+        this._connectionStatus = gw.status;
+        gw.addEventListener(GatewayClientClass.EVENT_GATEWAY, this.gatewayHandler);
+        gw.addEventListener(GatewayClientClass.EVENT_STATUS, this.statusHandler as EventListener);
+      }
+      this._loading = false;
+    });
   }
 
   protected override async load(): Promise<void> {
@@ -690,8 +692,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
       this.voiceStatus = "processing";
     }
     this._cacheMessages();
-    this.requestUpdate();
-    this._scrollConversation();
+    requestAnimationFrame(() => this._scrollConversation());
   }
 
   private _scrollConversation(): void {
@@ -719,12 +720,12 @@ export class ScVoiceView extends GatewayAwareLitElement {
       const r = event.results[event.results.length - 1];
       if (!r) return;
       this.transcript = r[0]?.transcript ?? "";
-      this.requestUpdate();
+      requestAnimationFrame(() => this.requestUpdate());
     };
     rec.onend = () => {
       if (this.voiceStatus === "listening") this.voiceStatus = "idle";
       this.recognition = null;
-      this.requestUpdate();
+      requestAnimationFrame(() => this.requestUpdate());
     };
     rec.onerror = (ev: Event) => {
       this.voiceStatus = "idle";
@@ -733,7 +734,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
       if (errCode !== "aborted" && errCode !== "no-speech") {
         ScToast.show({ message: `Speech recognition error: ${errCode}`, variant: "error" });
       }
-      this.requestUpdate();
+      requestAnimationFrame(() => this.requestUpdate());
     };
     rec.start();
     this.recognition = rec;

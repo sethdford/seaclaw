@@ -914,15 +914,14 @@ static const char *openai_get_name(void *ctx) {
 }
 
 static void openai_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     sc_openai_ctx_t *oc = (sc_openai_ctx_t *)ctx;
-    if (!oc)
+    if (!oc || !alloc)
         return;
     if (oc->api_key)
-        free(oc->api_key);
+        alloc->free(alloc->ctx, oc->api_key, oc->api_key_len + 1);
     if (oc->base_url)
-        free(oc->base_url);
-    free(oc);
+        alloc->free(alloc->ctx, oc->base_url, oc->base_url_len + 1);
+    alloc->free(alloc->ctx, oc, sizeof(*oc));
 }
 
 static const sc_provider_vtable_t openai_vtable = {

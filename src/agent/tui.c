@@ -657,8 +657,9 @@ static bool handle_slash_command(sc_tui_state_t *state) {
         }
         const char *task_msg = state->input_buf + 12;
         size_t task_len = state->input_len - 12;
-        g_bg_task = (tui_bg_task_t *)calloc(1, sizeof(tui_bg_task_t));
+        g_bg_task = (tui_bg_task_t *)state->alloc->alloc(state->alloc->ctx, sizeof(tui_bg_task_t));
         if (g_bg_task) {
+            memset(g_bg_task, 0, sizeof(tui_bg_task_t));
             g_bg_task->state = state;
             g_bg_task->msg = sc_strndup(state->alloc, task_msg, task_len);
             g_bg_task->msg_len = task_len;
@@ -879,8 +880,10 @@ sc_error_t sc_tui_run(sc_tui_state_t *state) {
                             continue;
                         }
 
-                        active_turn = (tui_turn_ctx_t *)calloc(1, sizeof(*active_turn));
+                        active_turn = (tui_turn_ctx_t *)state->alloc->alloc(state->alloc->ctx,
+                                                                            sizeof(*active_turn));
                         if (active_turn) {
+                            memset(active_turn, 0, sizeof(*active_turn));
                             active_turn->state = state;
                             active_turn->msg =
                                 sc_strndup(state->alloc, state->input_buf, state->input_len);
@@ -979,7 +982,7 @@ sc_error_t sc_tui_run(sc_tui_state_t *state) {
                                    active_turn->response_len + 1);
             if (active_turn->msg)
                 state->alloc->free(state->alloc->ctx, active_turn->msg, active_turn->msg_len + 1);
-            free(active_turn);
+            state->alloc->free(state->alloc->ctx, active_turn, sizeof(*active_turn));
             active_turn = NULL;
         }
 
@@ -1001,7 +1004,7 @@ sc_error_t sc_tui_run(sc_tui_state_t *state) {
             }
             if (g_bg_task->msg)
                 state->alloc->free(state->alloc->ctx, g_bg_task->msg, g_bg_task->msg_len + 1);
-            free(g_bg_task);
+            state->alloc->free(state->alloc->ctx, g_bg_task, sizeof(*g_bg_task));
             g_bg_task = NULL;
         }
 
@@ -1020,7 +1023,7 @@ sc_error_t sc_tui_run(sc_tui_state_t *state) {
         if (active_turn->response)
             state->alloc->free(state->alloc->ctx, active_turn->response,
                                active_turn->response_len + 1);
-        free(active_turn);
+        state->alloc->free(state->alloc->ctx, active_turn, sizeof(*active_turn));
     }
 
     /* Clean up background task */
@@ -1033,7 +1036,7 @@ sc_error_t sc_tui_run(sc_tui_state_t *state) {
             state->alloc->free(state->alloc->ctx, g_bg_task->msg, g_bg_task->msg_len + 1);
         if (g_bg_task->response)
             state->alloc->free(state->alloc->ctx, g_bg_task->response, g_bg_task->response_len + 1);
-        free(g_bg_task);
+        state->alloc->free(state->alloc->ctx, g_bg_task, sizeof(*g_bg_task));
         g_bg_task = NULL;
     }
 

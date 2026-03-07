@@ -125,6 +125,129 @@ function handleRequest(method: string, _params?: Record<string, unknown>): unkno
       };
     case "activity.recent":
       return { events: DEMO_EVENTS };
+    case "config.get":
+      return {
+        exists: true,
+        raw: JSON.stringify(
+          {
+            default_provider: "openai",
+            default_model: "gpt-4o",
+            workspace_dir: "~/projects",
+          },
+          null,
+          2,
+        ),
+        workspace_dir: "~/projects",
+        default_provider: "openai",
+        default_model: "gpt-4o",
+        max_tokens: 0,
+        temperature: 0.7,
+      };
+    case "config.schema":
+      return { schema: { type: "object", properties: {} } };
+    case "config.set":
+      return { saved: true };
+    case "tools.catalog":
+      return {
+        tools: [
+          { name: "shell", description: "Execute shell commands", category: "system" },
+          { name: "file_read", description: "Read file contents", category: "filesystem" },
+          { name: "file_write", description: "Write file contents", category: "filesystem" },
+          { name: "git", description: "Git operations", category: "dev" },
+          { name: "web_search", description: "Search the web", category: "web" },
+          { name: "web_fetch", description: "Fetch URL contents", category: "web" },
+        ],
+      };
+    case "models.list":
+      return {
+        models: [
+          { id: "gpt-4o", provider: "openai", context_window: 128000 },
+          { id: "claude-sonnet-4-20250514", provider: "anthropic", context_window: 200000 },
+          { id: "gemini-2.5-pro", provider: "gemini", context_window: 1000000 },
+        ],
+        providers: [
+          {
+            name: "openai",
+            has_key: true,
+            base_url: "https://api.openai.com",
+            native_tools: true,
+            is_default: true,
+          },
+          {
+            name: "anthropic",
+            has_key: true,
+            base_url: "https://api.anthropic.com",
+            native_tools: true,
+            is_default: false,
+          },
+          {
+            name: "gemini",
+            has_key: true,
+            base_url: "https://api.gemini.google.com",
+            native_tools: true,
+            is_default: false,
+          },
+        ],
+        default_model: "gpt-4o",
+      };
+    case "nodes.list":
+      return {
+        nodes: [
+          {
+            id: "local",
+            hostname: "localhost",
+            status: "healthy",
+            uptime_seconds: 86400,
+            type: "gateway",
+          },
+        ],
+      };
+    case "skills.list":
+      return {
+        skills: [
+          { name: "code-review", enabled: true, description: "Review code for issues" },
+          { name: "test-gen", enabled: false, description: "Generate unit tests" },
+        ],
+      };
+    case "skills.enable":
+    case "skills.disable":
+    case "skills.install":
+      return { ok: true };
+    case "usage.summary":
+      return {
+        session_cost_usd: 0.42,
+        daily_cost_usd: 3.14,
+        monthly_cost_usd: 28.5,
+        total_tokens: 125000,
+        request_count: 47,
+      };
+    case "cron.list":
+      return {
+        jobs: [
+          {
+            id: 1,
+            name: "Daily Backup",
+            schedule: "0 2 * * *",
+            enabled: true,
+            last_run: Date.now() - 86400000,
+          },
+        ],
+      };
+    case "cron.runs":
+      return { runs: [] };
+    case "cron.add":
+      return { id: Date.now() };
+    case "cron.update":
+    case "cron.run":
+    case "cron.remove":
+      return { ok: true };
+    case "sessions.patch":
+    case "sessions.delete":
+      return { ok: true };
+    case "chat.send":
+      return { status: "ok", sessionKey: "demo-session" };
+    case "persona.set":
+      return { ok: true };
     default:
       return {};
   }

@@ -215,11 +215,11 @@ static const char *spawn_parameters_json(void *ctx) {
 }
 static void spawn_deinit(void *ctx, sc_allocator_t *alloc) {
     sc_spawn_ctx_t *c = (sc_spawn_ctx_t *)ctx;
-    if (!c)
+    if (!c || !alloc)
         return;
     if (c->workspace_dir)
         alloc->free(alloc->ctx, (void *)c->workspace_dir, c->workspace_dir_len + 1);
-    free(c);
+    alloc->free(alloc->ctx, c, sizeof(*c));
 }
 
 static const sc_tool_vtable_t spawn_vtable = {
@@ -232,13 +232,16 @@ static const sc_tool_vtable_t spawn_vtable = {
 
 sc_error_t sc_spawn_create(sc_allocator_t *alloc, const char *workspace_dir,
                            size_t workspace_dir_len, sc_security_policy_t *policy, sc_tool_t *out) {
-    sc_spawn_ctx_t *c = (sc_spawn_ctx_t *)calloc(1, sizeof(*c));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    sc_spawn_ctx_t *c = (sc_spawn_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     if (workspace_dir && workspace_dir_len > 0) {
         c->workspace_dir = sc_strndup(alloc, workspace_dir, workspace_dir_len);
         if (!c->workspace_dir) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         c->workspace_dir_len = workspace_dir_len;

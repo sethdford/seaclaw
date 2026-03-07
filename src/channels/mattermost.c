@@ -226,18 +226,17 @@ sc_error_t sc_mattermost_poll(void *channel_ctx, sc_allocator_t *alloc, sc_chann
 
 sc_error_t sc_mattermost_create(sc_allocator_t *alloc, const char *url, size_t url_len,
                                 const char *token, size_t token_len, sc_channel_t *out) {
-    (void)alloc;
-    sc_mattermost_ctx_t *c = (sc_mattermost_ctx_t *)calloc(1, sizeof(*c));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    sc_mattermost_ctx_t *c = (sc_mattermost_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
+    c->alloc = alloc;
     if (url && url_len > 0) {
-        c->url = (char *)malloc(url_len + 1);
+        c->url = (char *)alloc->alloc(alloc->ctx, url_len + 1);
         if (!c->url) {
-            if (c->channel_id)
-                free(c->channel_id);
-            if (c->last_post_id && c->alloc)
-                c->alloc->free(c->alloc->ctx, c->last_post_id, strlen(c->last_post_id) + 1);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->url, url, url_len);
@@ -245,11 +244,11 @@ sc_error_t sc_mattermost_create(sc_allocator_t *alloc, const char *url, size_t u
         c->url_len = url_len;
     }
     if (token && token_len > 0) {
-        c->token = (char *)malloc(token_len + 1);
+        c->token = (char *)alloc->alloc(alloc->ctx, token_len + 1);
         if (!c->token) {
             if (c->url)
-                free(c->url);
-            free(c);
+                alloc->free(alloc->ctx, c->url, c->url_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->token, token, token_len);
@@ -264,11 +263,18 @@ sc_error_t sc_mattermost_create(sc_allocator_t *alloc, const char *url, size_t u
 void sc_mattermost_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_mattermost_ctx_t *c = (sc_mattermost_ctx_t *)ch->ctx;
-        if (c->url)
-            free(c->url);
-        if (c->token)
-            free(c->token);
-        free(c);
+        sc_allocator_t *a = c->alloc;
+        if (a) {
+            if (c->url)
+                a->free(a->ctx, c->url, c->url_len + 1);
+            if (c->token)
+                a->free(a->ctx, c->token, c->token_len + 1);
+            if (c->channel_id)
+                a->free(a->ctx, c->channel_id, strlen(c->channel_id) + 1);
+            if (c->last_post_id)
+                a->free(a->ctx, c->last_post_id, strlen(c->last_post_id) + 1);
+            a->free(a->ctx, c, sizeof(*c));
+        }
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

@@ -269,13 +269,12 @@ static const char *claude_cli_get_name(void *ctx) {
     return "claude-cli";
 }
 static void claude_cli_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     sc_claude_cli_ctx_t *cc = (sc_claude_cli_ctx_t *)ctx;
-    if (cc && cc->claude_path) {
-        free(cc->claude_path);
-        free(cc);
-    } else if (cc)
-        free(cc);
+    if (!cc || !alloc)
+        return;
+    if (cc->claude_path)
+        alloc->free(alloc->ctx, cc->claude_path, cc->claude_path_len + 1);
+    alloc->free(alloc->ctx, cc, sizeof(*cc));
 }
 
 static const sc_provider_vtable_t claude_cli_vtable = {
@@ -295,16 +294,16 @@ static const sc_provider_vtable_t claude_cli_vtable = {
 
 sc_error_t sc_claude_cli_create(sc_allocator_t *alloc, const char *api_key, size_t api_key_len,
                                 const char *base_url, size_t base_url_len, sc_provider_t *out) {
-    (void)alloc;
     (void)api_key;
     (void)api_key_len;
     (void)base_url;
     (void)base_url_len;
-    sc_claude_cli_ctx_t *cc = (sc_claude_cli_ctx_t *)calloc(1, sizeof(*cc));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    sc_claude_cli_ctx_t *cc = (sc_claude_cli_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*cc));
     if (!cc)
         return SC_ERR_OUT_OF_MEMORY;
-    cc->claude_path = NULL;
-    cc->claude_path_len = 0;
+    memset(cc, 0, sizeof(*cc));
     out->ctx = cc;
     out->vtable = &claude_cli_vtable;
     return SC_OK;

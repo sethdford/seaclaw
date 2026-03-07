@@ -893,7 +893,7 @@ sc_error_t sc_slack_create_ex(sc_allocator_t *alloc, const char *token, size_t t
     memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (token && token_len > 0) {
-        c->token = (char *)malloc(token_len + 1);
+        c->token = (char *)alloc->alloc(alloc->ctx, token_len + 1);
         if (!c->token) {
             alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
@@ -903,32 +903,34 @@ sc_error_t sc_slack_create_ex(sc_allocator_t *alloc, const char *token, size_t t
         c->token_len = token_len;
     }
     if (channel_ids && channel_ids_count > 0) {
-        c->channel_ids = (char **)calloc(channel_ids_count, sizeof(char *));
+        c->channel_ids = (char **)alloc->alloc(alloc->ctx, channel_ids_count * sizeof(char *));
         if (!c->channel_ids) {
             if (c->token)
-                free(c->token);
+                alloc->free(alloc->ctx, c->token, token_len + 1);
             alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
-        c->last_ts = (char **)calloc(channel_ids_count, sizeof(char *));
+        memset(c->channel_ids, 0, channel_ids_count * sizeof(char *));
+        c->last_ts = (char **)alloc->alloc(alloc->ctx, channel_ids_count * sizeof(char *));
         if (!c->last_ts) {
-            free(c->channel_ids);
+            alloc->free(alloc->ctx, c->channel_ids, channel_ids_count * sizeof(char *));
             if (c->token)
-                free(c->token);
+                alloc->free(alloc->ctx, c->token, c->token_len + 1);
             alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
+        memset(c->last_ts, 0, channel_ids_count * sizeof(char *));
         for (size_t i = 0; i < channel_ids_count; i++) {
             if (channel_ids[i]) {
                 size_t len = strlen(channel_ids[i]);
-                c->channel_ids[i] = (char *)malloc(len + 1);
+                c->channel_ids[i] = (char *)alloc->alloc(alloc->ctx, len + 1);
                 if (!c->channel_ids[i]) {
                     for (size_t j = 0; j < i; j++)
-                        free(c->channel_ids[j]);
-                    free(c->channel_ids);
-                    free(c->last_ts);
+                        alloc->free(alloc->ctx, c->channel_ids[j], strlen(c->channel_ids[j]) + 1);
+                    alloc->free(alloc->ctx, c->channel_ids, channel_ids_count * sizeof(char *));
+                    alloc->free(alloc->ctx, c->last_ts, channel_ids_count * sizeof(char *));
                     if (c->token)
-                        free(c->token);
+                        alloc->free(alloc->ctx, c->token, c->token_len + 1);
                     alloc->free(alloc->ctx, c, sizeof(*c));
                     return SC_ERR_OUT_OF_MEMORY;
                 }
@@ -952,21 +954,23 @@ void sc_slack_destroy(sc_channel_t *ch) {
         sc_slack_ctx_t *c = (sc_slack_ctx_t *)ch->ctx;
         sc_allocator_t *a = c->alloc;
         if (c->token)
-            free(c->token);
+            a->free(a->ctx, c->token, c->token_len + 1);
         if (c->bot_user_id && a)
             a->free(a->ctx, c->bot_user_id, strlen(c->bot_user_id) + 1);
         if (c->channel_ids) {
             for (size_t i = 0; i < c->channel_ids_count; i++)
                 if (c->channel_ids[i])
-                    free(c->channel_ids[i]);
-            free(c->channel_ids);
+                    a->free(a->ctx, c->channel_ids[i], strlen(c->channel_ids[i]) + 1);
+            if (a)
+                a->free(a->ctx, c->channel_ids, c->channel_ids_count * sizeof(char *));
         }
         if (c->last_ts) {
             if (a && a->free)
                 for (size_t i = 0; i < c->channel_ids_count; i++)
                     if (c->last_ts[i])
                         a->free(a->ctx, c->last_ts[i], strlen(c->last_ts[i]) + 1);
-            free(c->last_ts);
+            if (a)
+                a->free(a->ctx, c->last_ts, c->channel_ids_count * sizeof(char *));
         }
         a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;

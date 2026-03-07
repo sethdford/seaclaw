@@ -499,7 +499,7 @@ static void browser_deinit(void *ctx, sc_allocator_t *alloc) {
 #else
     (void)alloc;
 #endif
-    free(bc);
+    alloc->free(alloc->ctx, bc, sizeof(*bc));
 }
 
 static const sc_tool_vtable_t browser_vtable = {
@@ -512,10 +512,13 @@ static const sc_tool_vtable_t browser_vtable = {
 
 sc_error_t sc_browser_create(sc_allocator_t *alloc, bool enabled, sc_security_policy_t *policy,
                              sc_tool_t *out) {
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
     (void)enabled;
-    sc_browser_ctx_t *c = (sc_browser_ctx_t *)calloc(1, sizeof(*c));
+    sc_browser_ctx_t *c = (sc_browser_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->policy = policy;
     c->alloc = alloc;
     out->ctx = c;
