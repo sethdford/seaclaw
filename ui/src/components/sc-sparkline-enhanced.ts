@@ -50,7 +50,7 @@ export class ScSparklineEnhanced extends LitElement {
       font-size: var(--sc-text-xs);
       color: var(--sc-text);
       pointer-events: none;
-      transition: opacity 150ms;
+      transition: opacity var(--sc-duration-normal);
       white-space: nowrap;
       z-index: var(--sc-z-tooltip);
     }

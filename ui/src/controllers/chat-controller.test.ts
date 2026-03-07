@@ -388,13 +388,13 @@ describe("ChatController", () => {
       const ctrl = new ChatController(host as unknown as ReactiveControllerHost, getGateway);
       ctrl.items = [{ type: "message", role: "assistant", content: "Hi", ts: 1 }];
 
-      ctrl.toggleReaction(0, "👍");
+      ctrl.toggleReaction(0, "like");
 
       const item = ctrl.items[0];
       expect(item.type).toBe("message");
       if (item.type === "message") {
         expect(item.reactions).toHaveLength(1);
-        expect(item.reactions![0]).toEqual({ emoji: "👍", count: 1, mine: true });
+        expect(item.reactions![0]).toEqual({ value: "like", count: 1, mine: true });
       }
     });
 
@@ -408,11 +408,11 @@ describe("ChatController", () => {
           role: "assistant",
           content: "Hi",
           ts: 1,
-          reactions: [{ emoji: "❤️", count: 1, mine: true }],
+          reactions: [{ value: "heart", count: 1, mine: true }],
         },
       ];
 
-      ctrl.toggleReaction(0, "❤️");
+      ctrl.toggleReaction(0, "heart");
 
       const item = ctrl.items[0];
       if (item.type === "message") {
@@ -426,8 +426,8 @@ describe("ChatController", () => {
       const ctrl = new ChatController(host as unknown as ReactiveControllerHost, getGateway);
       ctrl.items = [{ type: "message", role: "user", content: "Hi", ts: 1 }];
 
-      ctrl.toggleReaction(5, "👍");
-      ctrl.toggleReaction(-1, "👍");
+      ctrl.toggleReaction(5, "like");
+      ctrl.toggleReaction(-1, "like");
 
       const item = ctrl.items[0];
       if (item.type === "message") {
@@ -441,7 +441,7 @@ describe("ChatController", () => {
       const ctrl = new ChatController(host as unknown as ReactiveControllerHost, getGateway);
       ctrl.items = [{ type: "tool_call", id: "t1", name: "shell", status: "running", ts: 1 }];
 
-      ctrl.toggleReaction(0, "👍");
+      ctrl.toggleReaction(0, "like");
 
       expect(ctrl.items[0].type).toBe("tool_call");
     });

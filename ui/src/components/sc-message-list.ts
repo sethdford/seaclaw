@@ -128,7 +128,8 @@ export class ScMessageList extends LitElement {
       display: flex;
       flex-direction: column;
       gap: var(--sc-space-xs);
-      animation: sc-slide-up var(--sc-duration-fast) var(--sc-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+      animation: sc-slide-up var(--sc-duration-fast)
+        var(--sc-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
     }
     .message:hover sc-message-actions {
       opacity: 1;
@@ -221,14 +222,14 @@ export class ScMessageList extends LitElement {
       background: var(--sc-bg-elevated);
     }
     .pill-icon svg {
-      width: 14px;
-      height: 14px;
-      vertical-align: -2px;
+      width: var(--sc-icon-sm);
+      height: var(--sc-icon-sm);
+      vertical-align: calc(-1 * var(--sc-space-2xs));
     }
     @keyframes sc-fade-up {
       from {
         opacity: 0;
-        transform: translateX(-50%) translateY(8px);
+        transform: translateX(-50%) translateY(var(--sc-space-sm));
       }
       to {
         opacity: 1;

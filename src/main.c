@@ -1247,6 +1247,7 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
         }
 
         agent.agent_pool = gw_agent_pool;
+        agent.scheduler = (struct sc_cron_scheduler *)cron;
         sc_agent_set_mailbox(&agent, gw_mailbox);
         agent.policy_engine = NULL;
         if (cfg.policy.enabled)

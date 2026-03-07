@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-07T22:51:53.353Z",
+  "generated": "2026-03-07T23:23:14.299Z",
   "groups": {
     "color.neutral": [
       {
@@ -1189,6 +1189,14 @@
       {
         "name": "slowest",
         "value": "700ms"
+      },
+      {
+        "name": "ambient",
+        "value": "25s"
+      },
+      {
+        "name": "ambient-slow",
+        "value": "30s"
       }
     ],
     "easing": [

@@ -696,10 +696,62 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         &history_count);
                 }
 
-                /* 3. Build awareness context from history via shared analyzer */
-                if (history_entries && history_count > 0) {
-                    convo_ctx = sc_conversation_build_awareness(alloc, history_entries,
-                                                                history_count, &convo_ctx_len);
+                /* 2b. Cross-channel awareness: load history from OTHER channels
+                 * for the same contact (e.g. Gmail history when texting via iMessage) */
+                sc_channel_history_entry_t *cross_entries = NULL;
+                size_t cross_count = 0;
+#ifdef SC_HAS_PERSONA
+                {
+                    const sc_contact_profile_t *cp_cross = NULL;
+                    if (agent->persona)
+                        cp_cross = sc_persona_find_contact(agent->persona, batch_key, key_len);
+                    if (cp_cross && cp_cross->email) {
+                        size_t email_len = strlen(cp_cross->email);
+                        for (size_t ci = 0; ci < channel_count; ci++) {
+                            if (&channels[ci] == ch)
+                                continue;
+                            if (!channels[ci].channel->vtable->load_conversation_history)
+                                continue;
+                            channels[ci].channel->vtable->load_conversation_history(
+                                channels[ci].channel->ctx, alloc, cp_cross->email, email_len, 5,
+                                &cross_entries, &cross_count);
+                            if (cross_entries && cross_count > 0)
+                                break;
+                        }
+                    }
+                }
+#endif
+
+                /* 3. Build awareness context from history via shared analyzer.
+                 * Merge primary + cross-channel history into one array. */
+                if (history_count > 0 || cross_count > 0) {
+                    size_t total = history_count + cross_count;
+                    sc_channel_history_entry_t *merged_history = NULL;
+                    if (cross_count > 0 && history_count > 0) {
+                        merged_history = (sc_channel_history_entry_t *)alloc->alloc(
+                            alloc->ctx, total * sizeof(sc_channel_history_entry_t));
+                        if (merged_history) {
+                            if (cross_entries)
+                                memcpy(merged_history, cross_entries,
+                                       cross_count * sizeof(sc_channel_history_entry_t));
+                            memcpy(merged_history + cross_count, history_entries,
+                                   history_count * sizeof(sc_channel_history_entry_t));
+                        }
+                    }
+                    const sc_channel_history_entry_t *ctx_entries = merged_history ? merged_history
+                                                                    : history_entries
+                                                                        ? history_entries
+                                                                        : cross_entries;
+                    size_t ctx_count = merged_history    ? total
+                                       : history_entries ? history_count
+                                                         : cross_count;
+                    if (ctx_entries && ctx_count > 0) {
+                        convo_ctx = sc_conversation_build_awareness(alloc, ctx_entries, ctx_count,
+                                                                    &convo_ctx_len);
+                    }
+                    if (merged_history)
+                        alloc->free(alloc->ctx, merged_history,
+                                    total * sizeof(sc_channel_history_entry_t));
                 }
 
                 /* 4. Response constraints via channel vtable */
@@ -737,6 +789,9 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (history_entries)
                     alloc->free(alloc->ctx, history_entries,
                                 history_count * sizeof(sc_channel_history_entry_t));
+                if (cross_entries)
+                    alloc->free(alloc->ctx, cross_entries,
+                                cross_count * sizeof(sc_channel_history_entry_t));
 #endif
 
                 /* Persist each individual message + the single response */

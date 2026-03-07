@@ -137,6 +137,8 @@ public enum SCTokens {
     public static let weightSemibold: CGFloat = 600
 
     // MARK: - Duration
+    public static let durationAmbient: Double = 25
+    public static let durationAmbientslow: Double = 30
     public static let durationFast: Double = 0.1
     public static let durationInstant: Double = 0.05
     public static let durationModerate: Double = 0.3

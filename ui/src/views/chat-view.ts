@@ -483,8 +483,8 @@ export class ScChatView extends GatewayAwareLitElement {
                 }
               }
             }}
-            @sc-toggle-reaction=${(e: CustomEvent<{ index: number; emoji: string }>) =>
-              this.chat.toggleReaction?.(e.detail.index, e.detail.emoji)}
+            @sc-toggle-reaction=${(e: CustomEvent<{ index: number; value: string }>) =>
+              this.chat.toggleReaction?.(e.detail.index, e.detail.value)}
             @sc-retry=${(e: CustomEvent<{ content?: string }>) => {
               if (e.detail?.content) this._handleSend(e.detail.content);
               else this._retry();
@@ -554,8 +554,8 @@ export class ScChatView extends GatewayAwareLitElement {
             .y=${this._tapback.y}
             .messageIndex=${this._tapback.index}
             .messageContent=${this._tapback.content}
-            @sc-react=${(e: CustomEvent<{ emoji: string; index: number }>) => {
-              this.chat.toggleReaction?.(e.detail.index, e.detail.emoji);
+            @sc-react=${(e: CustomEvent<{ value: string; index: number }>) => {
+              this.chat.toggleReaction?.(e.detail.index, e.detail.value);
               this._tapback = { ...this._tapback, open: false };
             }}
             @sc-tapback-close=${() => (this._tapback = { ...this._tapback, open: false })}

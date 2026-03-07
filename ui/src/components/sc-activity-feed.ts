@@ -49,10 +49,10 @@ export class ScActivityFeed extends LitElement {
       }
     }
     .event-icon {
-      width: 1.25rem;
-      height: 1.25rem;
+      width: var(--sc-icon-md);
+      height: var(--sc-icon-md);
       flex-shrink: 0;
-      margin-top: 1px;
+      margin-top: var(--sc-space-2xs);
     }
     .event-icon svg {
       width: 100%;
@@ -84,7 +84,7 @@ export class ScActivityFeed extends LitElement {
       color: var(--sc-text-faint);
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
-      margin-top: 1px;
+      margin-top: var(--sc-space-2xs);
     }
     .empty {
       text-align: center;

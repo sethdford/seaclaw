@@ -126,6 +126,7 @@ static void free_contact_profile(sc_allocator_t *alloc, sc_contact_profile_t *cp
         return;
     free_contact_string(alloc, cp->contact_id);
     free_contact_string(alloc, cp->name);
+    free_contact_string(alloc, cp->email);
     free_contact_string(alloc, cp->relationship);
     free_contact_string(alloc, cp->relationship_stage);
     free_contact_string(alloc, cp->warmth_level);
@@ -338,6 +339,38 @@ sc_error_t sc_contact_profile_build_context(sc_allocator_t *alloc, const sc_cont
             pos += (size_t)w;
     }
 
+    /* Relationship stage behavior gating (VoiceAI relationship-triggers) */
+    if (cp->relationship_stage) {
+        const char *stage = cp->relationship_stage;
+        if (strcmp(stage, "stranger") == 0) {
+            w = snprintf(buf + pos, cap - pos,
+                         "\nSTAGE RULES: This is a new contact. Be polite, warm but boundaried. "
+                         "Ask permission before probing questions. No tough love. "
+                         "No deep vulnerability. Keep it surface-level friendly.\n");
+        } else if (strcmp(stage, "acquaintance") == 0) {
+            w = snprintf(buf + pos, cap - pos,
+                         "\nSTAGE RULES: You know this person casually. "
+                         "You can share relatable stories and be a bit more personal. "
+                         "Still ask before going deep. Warmth level: friendly.\n");
+        } else if (strcmp(stage, "friend") == 0) {
+            w = snprintf(
+                buf + pos, cap - pos,
+                "\nSTAGE RULES: This is a friend. You can be honest, share personal things, "
+                "give direct feedback when asked, and show real concern. "
+                "Warmth level: warm.\n");
+        } else if (strcmp(stage, "trusted_confidant") == 0 || strcmp(stage, "inner_circle") == 0) {
+            w = snprintf(buf + pos, cap - pos,
+                         "\nSTAGE RULES: This is inner circle. No filters needed. "
+                         "You can disagree strongly, express disappointment, share deepest fears, "
+                         "give tough love, challenge their beliefs. Full vulnerability. "
+                         "Warmth level: family/loving.\n");
+        } else {
+            w = 0;
+        }
+        if (w > 0)
+            pos += (size_t)w;
+    }
+
     w = snprintf(buf + pos, cap - pos, "--- End contact profile ---\n");
     if (w > 0)
         pos += (size_t)w;
@@ -530,6 +563,9 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
             s = sc_json_get_string(cval, "name");
             if (s)
                 cp->name = sc_strdup(alloc, s);
+            s = sc_json_get_string(cval, "email");
+            if (s)
+                cp->email = sc_strdup(alloc, s);
             s = sc_json_get_string(cval, "relationship");
             if (s)
                 cp->relationship = sc_strdup(alloc, s);

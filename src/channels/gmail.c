@@ -273,6 +273,174 @@ static bool gmail_health_check(void *ctx) {
     return c->access_token != NULL && c->access_token_len > 0;
 }
 
+static sc_error_t gmail_load_conversation_history(void *ctx, sc_allocator_t *alloc,
+                                                  const char *contact_id, size_t contact_id_len,
+                                                  size_t limit, sc_channel_history_entry_t **out,
+                                                  size_t *out_count) {
+    (void)ctx;
+    if (!alloc || !contact_id || !out || !out_count)
+        return SC_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+
+#if SC_IS_TEST || !defined(SC_HTTP_CURL)
+    (void)contact_id_len;
+    (void)limit;
+    return SC_ERR_NOT_SUPPORTED;
+#else
+    sc_gmail_ctx_t *c = (sc_gmail_ctx_t *)ctx;
+    if (!c)
+        return SC_ERR_INVALID_ARGUMENT;
+
+    sc_error_t err = ensure_access_token(c);
+    if (err != SC_OK)
+        return err;
+
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Bearer %s", c->access_token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return SC_ERR_INTERNAL;
+
+    if (limit > 10)
+        limit = 10;
+
+    /* Search for messages from/to this contact */
+    char query_buf[256];
+    char contact_buf[128];
+    size_t clen =
+        contact_id_len < sizeof(contact_buf) - 1 ? contact_id_len : sizeof(contact_buf) - 1;
+    memcpy(contact_buf, contact_id, clen);
+    contact_buf[clen] = '\0';
+
+    /* URL-encode spaces in the query by using {from:X OR to:X} */
+    size_t qj = 0;
+    const char *prefix = "from:";
+    for (const char *p = prefix; *p; p++)
+        query_buf[qj++] = *p;
+    for (size_t i = 0; i < clen && qj < sizeof(query_buf) - 20; i++)
+        query_buf[qj++] = contact_buf[i];
+    const char *mid = "+OR+to:";
+    for (const char *p = mid; *p; p++)
+        query_buf[qj++] = *p;
+    for (size_t i = 0; i < clen && qj < sizeof(query_buf) - 2; i++)
+        query_buf[qj++] = contact_buf[i];
+    query_buf[qj] = '\0';
+
+    char list_url[512];
+    int nu = snprintf(list_url, sizeof(list_url), "%s/messages?q=%s&maxResults=%zu", GMAIL_API_BASE,
+                      query_buf, limit);
+    if (nu <= 0 || (size_t)nu >= sizeof(list_url))
+        return SC_ERR_INTERNAL;
+
+    sc_http_response_t resp = {0};
+    err = sc_http_get(alloc, list_url, auth_buf, &resp);
+    if (err != SC_OK || !resp.body || resp.status_code != 200) {
+        if (resp.owned && resp.body)
+            sc_http_response_free(alloc, &resp);
+        return err != SC_OK ? err : SC_ERR_INTERNAL;
+    }
+
+    sc_json_value_t *parsed = NULL;
+    err = sc_json_parse(alloc, resp.body, resp.body_len, &parsed);
+    if (resp.owned && resp.body)
+        sc_http_response_free(alloc, &resp);
+    if (err != SC_OK || !parsed)
+        return SC_OK;
+
+    sc_json_value_t *messages_arr = sc_json_object_get(parsed, "messages");
+    if (!messages_arr || messages_arr->type != SC_JSON_ARRAY) {
+        sc_json_free(alloc, parsed);
+        return SC_OK;
+    }
+
+    size_t arr_len = messages_arr->data.array.len;
+    if (arr_len > limit)
+        arr_len = limit;
+
+    sc_channel_history_entry_t *entries =
+        (sc_channel_history_entry_t *)alloc->alloc(alloc->ctx, arr_len * sizeof(*entries));
+    if (!entries) {
+        sc_json_free(alloc, parsed);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+    memset(entries, 0, arr_len * sizeof(*entries));
+    size_t count = 0;
+
+    for (size_t i = 0; i < arr_len; i++) {
+        sc_json_value_t *msg_ref = messages_arr->data.array.items[i];
+        if (!msg_ref || msg_ref->type != SC_JSON_OBJECT)
+            continue;
+        const char *msg_id = sc_json_get_string(msg_ref, "id");
+        if (!msg_id)
+            continue;
+
+        char get_url[384];
+        int ng = snprintf(get_url, sizeof(get_url),
+                          "%s/messages/"
+                          "%.100s?format=metadata&metadataHeaders=From&metadataHeaders=Subject&"
+                          "metadataHeaders=Date",
+                          GMAIL_API_BASE, msg_id);
+        if (ng <= 0 || (size_t)ng >= sizeof(get_url))
+            continue;
+
+        sc_http_response_t gresp = {0};
+        err = sc_http_get(alloc, get_url, auth_buf, &gresp);
+        if (err != SC_OK || !gresp.body || gresp.status_code != 200) {
+            if (gresp.owned && gresp.body)
+                sc_http_response_free(alloc, &gresp);
+            continue;
+        }
+
+        sc_json_value_t *msg_full = NULL;
+        err = sc_json_parse(alloc, gresp.body, gresp.body_len, &msg_full);
+        if (gresp.owned && gresp.body)
+            sc_http_response_free(alloc, &gresp);
+        if (err != SC_OK || !msg_full)
+            continue;
+
+        sc_json_value_t *payload = sc_json_object_get(msg_full, "payload");
+        sc_json_value_t *headers = payload ? sc_json_object_get(payload, "headers") : NULL;
+        const char *from = get_header_value(headers, "From");
+        const char *subject = get_header_value(headers, "Subject");
+        const char *date = get_header_value(headers, "Date");
+
+        /* Determine from_me by checking if "from" contains our own address */
+        bool from_me = false;
+        if (from) {
+            /* Simple heuristic: if "from" doesn't contain the contact_id, it's from us */
+            if (!strstr(from, contact_buf))
+                from_me = true;
+        }
+
+        entries[count].from_me = from_me;
+        snprintf(entries[count].text, sizeof(entries[0].text), "[Email] %s: %s",
+                 from_me ? "You" : (from ? from : "?"), subject ? subject : "(no subject)");
+        if (date) {
+            size_t dlen = strlen(date);
+            if (dlen >= sizeof(entries[0].timestamp))
+                dlen = sizeof(entries[0].timestamp) - 1;
+            memcpy(entries[count].timestamp, date, dlen);
+            entries[count].timestamp[dlen] = '\0';
+        }
+        count++;
+        sc_json_free(alloc, msg_full);
+    }
+
+    sc_json_free(alloc, parsed);
+
+    /* Reverse to chronological order (API returns newest first) */
+    for (size_t i = 0; i < count / 2; i++) {
+        sc_channel_history_entry_t tmp = entries[i];
+        entries[i] = entries[count - 1 - i];
+        entries[count - 1 - i] = tmp;
+    }
+
+    *out = entries;
+    *out_count = count;
+    return SC_OK;
+#endif
+}
+
 static const sc_channel_vtable_t gmail_vtable = {
     .start = gmail_start,
     .stop = gmail_stop,
@@ -282,6 +450,7 @@ static const sc_channel_vtable_t gmail_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
+    .load_conversation_history = gmail_load_conversation_history,
 };
 
 /* ─── Public API ─────────────────────────────────────────────────────────── */

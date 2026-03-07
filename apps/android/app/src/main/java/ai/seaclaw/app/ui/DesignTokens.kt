@@ -153,6 +153,8 @@ object SCTokens {
     val trackingXs = 0.02f
 
     // Duration (milliseconds)
+    val durationAmbient = 25000L
+    val durationAmbientslow = 30000L
     val durationFast = 100L
     val durationInstant = 50L
     val durationModerate = 300L

@@ -256,6 +256,8 @@
   --sc-duration-slow: 350ms;
   --sc-duration-slower: 500ms;
   --sc-duration-slowest: 700ms;
+  --sc-duration-ambient: 25s;
+  --sc-duration-ambient-slow: 30s;
   --sc-linear: linear;
   --sc-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --sc-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -793,6 +795,8 @@
     --sc-duration-slow: 0ms;
     --sc-duration-slower: 0ms;
     --sc-duration-slowest: 0ms;
+    --sc-duration-ambient: 0ms;
+    --sc-duration-ambient-slow: 0ms;
   }
 }
 

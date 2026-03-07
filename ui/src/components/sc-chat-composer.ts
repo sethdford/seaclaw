@@ -25,6 +25,8 @@ export class ScChatComposer extends LitElement {
   @property({ type: String, attribute: "stream-elapsed" }) streamElapsed = "";
   @property({ type: String }) placeholder = "Type a message...";
   @property({ type: String }) model = "";
+  @property({ type: Boolean, attribute: "voice-active" }) voiceActive = false;
+  @property({ type: Boolean, attribute: "voice-supported" }) voiceSupported = true;
 
   @state() private _dragOver = false;
   @state() private _attachedFiles: FilePreviewItem[] = [];
@@ -160,6 +162,10 @@ export class ScChatComposer extends LitElement {
       background: var(--sc-bg-elevated);
       color: var(--sc-accent);
     }
+    .icon-btn:focus-visible {
+      outline: 2px solid var(--sc-accent);
+      outline-offset: 2px;
+    }
     .icon-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
@@ -167,6 +173,10 @@ export class ScChatComposer extends LitElement {
     .icon-btn svg {
       width: 20px;
       height: 20px;
+    }
+    .mic-btn.active {
+      background: var(--sc-accent-subtle);
+      color: var(--sc-accent);
     }
     .send-btn {
       display: flex;
@@ -371,6 +381,15 @@ export class ScChatComposer extends LitElement {
     this._fileInput?.click();
   }
 
+  private _handleMicClick(): void {
+    if (this.disabled) return;
+    if (this.voiceActive) {
+      this.dispatchEvent(new CustomEvent("sc-voice-stop", { bubbles: true, composed: true }));
+    } else {
+      this.dispatchEvent(new CustomEvent("sc-voice-start", { bubbles: true, composed: true }));
+    }
+  }
+
   private async _processFiles(files: File[]): Promise<void> {
     for (const file of files) {
       const item: FilePreviewItem = { name: file.name, size: file.size, type: file.type };
@@ -513,6 +532,17 @@ export class ScChatComposer extends LitElement {
               >
                 ${icons["file-text"]}
               </button>
+              ${this.voiceSupported
+                ? html`<button
+                    class="icon-btn mic-btn ${this.voiceActive ? "active" : ""}"
+                    type="button"
+                    ?disabled=${this.disabled}
+                    @click=${this._handleMicClick}
+                    aria-label="Voice input"
+                  >
+                    ${icons.mic}
+                  </button>`
+                : nothing}
               ${this.streamElapsed
                 ? html`<span class="elapsed">${this.streamElapsed}</span>`
                 : nothing}

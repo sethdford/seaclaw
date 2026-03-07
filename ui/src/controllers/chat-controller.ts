@@ -8,7 +8,7 @@ import {
 
 export type MessageStatus = "sending" | "sent" | "streaming" | "complete" | "failed";
 export interface Reaction {
-  emoji: string;
+  value: string;
   count: number;
   mine: boolean;
 }
@@ -413,12 +413,12 @@ export class ChatController implements ReactiveController {
     return -1;
   }
 
-  toggleReaction(index: number, emoji: string): void {
+  toggleReaction(index: number, value: string): void {
     if (index < 0 || index >= this.items.length) return;
     const item = this.items[index];
     if (item.type !== "message") return;
     const reactions = [...(item.reactions ?? [])];
-    const existing = reactions.findIndex((r) => r.emoji === emoji);
+    const existing = reactions.findIndex((r) => r.value === value);
     if (existing >= 0) {
       if (reactions[existing].mine) {
         reactions[existing] = {
@@ -435,7 +435,7 @@ export class ChatController implements ReactiveController {
         };
       }
     } else {
-      reactions.push({ emoji, count: 1, mine: true });
+      reactions.push({ value, count: 1, mine: true });
     }
     this.items = [
       ...this.items.slice(0, index),

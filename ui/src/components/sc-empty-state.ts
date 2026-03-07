@@ -38,7 +38,8 @@ export class ScEmptyState extends LitElement {
       color: var(--sc-text-muted);
       max-width: 320px;
       line-height: var(--sc-leading-relaxed);
-      animation: sc-fade-in var(--sc-duration-normal) var(--sc-ease-out) 100ms both;
+      animation: sc-fade-in var(--sc-duration-normal) var(--sc-ease-out) var(--sc-duration-fast)
+        both;
     }
 
     .slot {

@@ -495,6 +495,7 @@ sc_error_t sc_app_bootstrap(sc_app_ctx_t *ctx, sc_allocator_t *alloc, const char
             goto fail;
         bi->agent.chain_of_thought = true;
         bi->agent.agent_pool = bi->agent_pool;
+        bi->agent.scheduler = (struct sc_cron_scheduler *)bi->cron;
         sc_agent_set_mailbox(&bi->agent, bi->mailbox);
         bi->agent.policy_engine = NULL;
         if (bi->cfg.policy.enabled)

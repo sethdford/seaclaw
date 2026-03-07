@@ -286,6 +286,8 @@ export const tokens = {
     radius: "12px",
   },
   duration: {
+    ambient: "25s",
+    ambientSlow: "30s",
     fast: "100ms",
     instant: "50ms",
     moderate: "300ms",

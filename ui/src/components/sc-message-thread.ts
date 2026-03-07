@@ -15,6 +15,14 @@ import { formatTime, formatTimestampForDivider } from "../utils.js";
 
 const FIVE_MIN_MS = 5 * 60 * 1000;
 
+const VALUE_TO_ICON: Record<string, keyof typeof icons> = {
+  like: "thumbs-up",
+  dislike: "thumbs-down",
+  heart: "heart",
+  copy: "copy",
+  bookmark: "bookmark-simple",
+};
+
 type Block =
   | { type: "time-divider"; ts: number }
   | {
@@ -208,8 +216,20 @@ export class ScMessageThread extends LitElement {
       border-color: var(--sc-accent);
       background: var(--sc-accent-subtle);
     }
-    .reaction-emoji {
-      font-size: var(--sc-text-sm);
+    .reaction-icon {
+      width: var(--sc-icon-sm);
+      height: var(--sc-icon-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .reaction-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .reaction-fallback {
+      font-size: var(--sc-text-xs);
+      color: var(--sc-text-muted);
     }
     .reaction-count {
       color: var(--sc-text-muted);
@@ -336,12 +356,12 @@ export class ScMessageThread extends LitElement {
       }),
     );
   }
-  private _toggleReaction(idx: number, emoji: string): void {
+  private _toggleReaction(idx: number, value: string): void {
     this.dispatchEvent(
       new CustomEvent("sc-toggle-reaction", {
         bubbles: true,
         composed: true,
-        detail: { index: idx, emoji },
+        detail: { index: idx, value },
       }),
     );
   }
@@ -383,18 +403,22 @@ export class ScMessageThread extends LitElement {
               ${item.reactions?.length
                 ? html`
                     <div class="reaction-pills">
-                      ${item.reactions.map(
-                        (r: { emoji: string; count: number; mine: boolean }) => html`
+                      ${item.reactions.map((r: { value: string; count: number; mine: boolean }) => {
+                        const iconKey = VALUE_TO_ICON[r.value];
+                        const icon = iconKey ? icons[iconKey] : null;
+                        return html`
                           <button
                             class="reaction-pill ${r.mine ? "mine" : ""}"
-                            @click=${() => this._toggleReaction(idx, r.emoji)}
-                            aria-label="${r.emoji} ${r.count}"
+                            @click=${() => this._toggleReaction(idx, r.value)}
+                            aria-label="${r.value} ${r.count}"
                           >
-                            <span class="reaction-emoji">${r.emoji}</span
-                            ><span class="reaction-count">${r.count}</span>
+                            ${icon
+                              ? html`<span class="reaction-icon">${icon}</span>`
+                              : html`<span class="reaction-fallback">${r.value}</span>`}
+                            <span class="reaction-count">${r.count}</span>
                           </button>
-                        `,
-                      )}
+                        `;
+                      })}
                     </div>
                   `
                 : nothing}

@@ -301,7 +301,7 @@ test.describe("Skills View (Demo Mode)", () => {
         const app = document.querySelector("sc-app");
         const sv = app?.shadowRoot?.querySelector("sc-skills-view");
         const detail = sv?.shadowRoot?.querySelector("sc-skill-detail");
-        return !!detail?.shadowRoot?.querySelector(".detail-name");
+        return !!detail?.querySelector(".detail-name");
       });
       expect(hasName).toBe(true);
     }).toPass({ timeout: 5000 });
@@ -331,7 +331,7 @@ test.describe("Skills View (Demo Mode)", () => {
         const app = document.querySelector("sc-app");
         const sv = app?.shadowRoot?.querySelector("sc-skills-view");
         const detail = sv?.shadowRoot?.querySelector("sc-skill-detail");
-        return detail?.shadowRoot?.querySelectorAll(".detail-actions sc-button").length ?? 0;
+        return detail?.querySelectorAll(".detail-actions sc-button").length ?? 0;
       });
       expect(btnCount).toBeGreaterThanOrEqual(2);
     }).toPass({ timeout: 5000 });

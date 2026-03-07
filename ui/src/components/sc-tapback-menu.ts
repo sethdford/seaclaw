@@ -8,11 +8,11 @@ const MENU_OFFSET_Y = 50;
 const MENU_MIN_Y = 10;
 
 const REACTIONS = [
-  { key: "👍", icon: "thumbs-up", label: "Thumbs up" }, // sc-lint-ok
-  { key: "👎", icon: "thumbs-down", label: "Thumbs down" }, // sc-lint-ok
-  { key: "❤️", icon: "heart", label: "Heart" }, // sc-lint-ok
-  { key: "📋", icon: "copy", label: "Copy" }, // sc-lint-ok
-  { key: "🔖", icon: "bookmark-simple", label: "Bookmark" }, // sc-lint-ok
+  { icon: "thumbs-up", label: "Like", value: "like" },
+  { icon: "thumbs-down", label: "Dislike", value: "dislike" },
+  { icon: "heart", label: "Heart", value: "heart" },
+  { icon: "copy", label: "Copy", value: "copy" },
+  { icon: "bookmark-simple", label: "Bookmark", value: "bookmark" },
 ] as const;
 
 @customElement("sc-tapback-menu")
@@ -91,12 +91,12 @@ export class ScTapbackMenu extends LitElement {
   `;
 
   private _onClick(reaction: (typeof REACTIONS)[number]) {
-    if (reaction.icon === "copy") navigator.clipboard?.writeText(this.messageContent);
+    if (reaction.value === "copy") navigator.clipboard?.writeText(this.messageContent);
     this.dispatchEvent(
       new CustomEvent("sc-react", {
         bubbles: true,
         composed: true,
-        detail: { emoji: reaction.key, index: this.messageIndex },
+        detail: { value: reaction.value, index: this.messageIndex },
       }),
     );
   }

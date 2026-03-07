@@ -24,8 +24,10 @@ export class ScDialog extends LitElement {
       inset: 0;
       z-index: var(--sc-z-modal-backdrop);
       background: var(--sc-backdrop-overlay);
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      backdrop-filter: blur(var(--sc-glass-standard-blur))
+        saturate(var(--sc-glass-standard-saturate));
+      -webkit-backdrop-filter: blur(var(--sc-glass-standard-blur))
+        saturate(var(--sc-glass-standard-saturate));
       display: flex;
       align-items: center;
       justify-content: center;
@@ -51,8 +53,10 @@ export class ScDialog extends LitElement {
       width: 100%;
       max-width: var(--sc-modal-max-width, 400px);
       background: color-mix(in srgb, var(--sc-bg-overlay) 85%, transparent);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      backdrop-filter: blur(var(--sc-glass-standard-blur))
+        saturate(var(--sc-glass-standard-saturate));
+      -webkit-backdrop-filter: blur(var(--sc-glass-standard-blur))
+        saturate(var(--sc-glass-standard-saturate));
       border: 1px solid var(--sc-glass-border-color);
       border-radius: var(--sc-radius-xl);
       box-shadow: var(--sc-shadow-xl);

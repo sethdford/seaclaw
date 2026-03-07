@@ -174,7 +174,7 @@ export class ScApp extends LitElement {
       );
       pointer-events: none;
       z-index: 0;
-      animation: sc-ambient-drift 25s ease-in-out infinite; /* sc-lint-ok ambient: intentionally long, not a UI interaction duration */
+      animation: sc-ambient-drift var(--sc-duration-ambient) var(--sc-ease-in-out) infinite;
     }
     main::after {
       content: "";
@@ -190,7 +190,8 @@ export class ScApp extends LitElement {
       );
       pointer-events: none;
       z-index: 0;
-      animation: sc-ambient-drift 30s ease-in-out infinite reverse; /* sc-lint-ok ambient: intentionally long, not a UI interaction duration */
+      animation: sc-ambient-drift var(--sc-duration-ambient-slow) var(--sc-ease-in-out) infinite
+        reverse;
     }
 
     .view-enter {

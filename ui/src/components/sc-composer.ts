@@ -26,8 +26,8 @@ export class ScComposer extends LitElement {
       gap: var(--sc-space-xs);
       padding: var(--sc-space-md);
       background: color-mix(in srgb, var(--sc-bg-surface) 80%, transparent);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(var(--sc-glass-subtle-blur));
+      -webkit-backdrop-filter: blur(var(--sc-glass-subtle-blur));
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius-xl);
       box-shadow: var(--sc-shadow-inset);
@@ -189,7 +189,7 @@ export class ScComposer extends LitElement {
         transform var(--sc-duration-fast) var(--sc-ease-out);
       animation: sc-card-enter var(--sc-duration-normal)
         var(--sc-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
-      animation-delay: calc(var(--bento-idx) * 80ms);
+      animation-delay: calc(var(--bento-idx) * var(--sc-cascade-delay, 30ms));
     }
     .bento-card:hover {
       background: var(--sc-bg-elevated);

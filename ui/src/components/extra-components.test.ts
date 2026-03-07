@@ -2527,6 +2527,53 @@ describe("sc-chat-composer", () => {
     expect(el.shadowRoot?.querySelector('[aria-label="Attach file"]')).toBeTruthy();
     el.remove();
   });
+  it("shows mic button when voiceSupported", async () => {
+    const el = document.createElement("sc-chat-composer") as HTMLElement & {
+      updateComplete: Promise<boolean>;
+    };
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelector('[aria-label="Voice input"]')).toBeTruthy();
+    el.remove();
+  });
+  it("hides mic button when voiceSupported is false", async () => {
+    const el = document.createElement("sc-chat-composer") as HTMLElement & {
+      voiceSupported: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.voiceSupported = false;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelector('[aria-label="Voice input"]')).toBeNull();
+    el.remove();
+  });
+  it("dispatches sc-voice-start on mic click when not voiceActive", async () => {
+    const el = document.createElement("sc-chat-composer") as HTMLElement & {
+      voiceActive: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    document.body.appendChild(el);
+    await el.updateComplete;
+    let eventName = "";
+    el.addEventListener("sc-voice-start", () => (eventName = "sc-voice-start"));
+    (el.shadowRoot?.querySelector('[aria-label="Voice input"]') as HTMLElement)?.click();
+    expect(eventName).toBe("sc-voice-start");
+    el.remove();
+  });
+  it("dispatches sc-voice-stop on mic click when voiceActive", async () => {
+    const el = document.createElement("sc-chat-composer") as HTMLElement & {
+      voiceActive: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.voiceActive = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    let eventName = "";
+    el.addEventListener("sc-voice-stop", () => (eventName = "sc-voice-stop"));
+    (el.shadowRoot?.querySelector('[aria-label="Voice input"]') as HTMLElement)?.click();
+    expect(eventName).toBe("sc-voice-stop");
+    el.remove();
+  });
 });
 
 describe("sc-message-thread", () => {

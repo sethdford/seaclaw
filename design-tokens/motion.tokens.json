@@ -40,6 +40,16 @@
       "$value": "700ms",
       "$type": "duration",
       "$description": "Hero/page transitions"
+    },
+    "ambient": {
+      "$value": "25s",
+      "$type": "duration",
+      "$description": "Ambient background animations (drift, gradient) — not UI interaction"
+    },
+    "ambient-slow": {
+      "$value": "30s",
+      "$type": "duration",
+      "$description": "Slower ambient background animations"
     }
   },
   "easing": {

@@ -34,6 +34,7 @@ typedef struct sc_persona_example_bank {
 typedef struct sc_contact_profile {
     char *contact_id;
     char *name;
+    char *email;
     char *relationship;
     char *relationship_stage;
     char *warmth_level;

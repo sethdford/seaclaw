@@ -267,6 +267,159 @@ char *sc_conversation_build_awareness(sc_allocator_t *alloc,
                 pos += (size_t)w;
         }
 
+        /* Real-time noticing (VoiceAI realtime-noticing) */
+        {
+            /* Detect energy drop: their messages getting shorter over time */
+            if (count >= 6) {
+                size_t first_half_len = 0, first_half_n = 0;
+                size_t second_half_len = 0, second_half_n = 0;
+                size_t mid = count / 2;
+                for (size_t i = 0; i < count; i++) {
+                    if (!entries[i].from_me) {
+                        size_t tl = strlen(entries[i].text);
+                        if (i < mid) {
+                            first_half_len += tl;
+                            first_half_n++;
+                        } else {
+                            second_half_len += tl;
+                            second_half_n++;
+                        }
+                    }
+                }
+                if (first_half_n > 0 && second_half_n > 0) {
+                    size_t avg1 = first_half_len / first_half_n;
+                    size_t avg2 = second_half_len / second_half_n;
+                    if (avg1 > 40 && avg2 < avg1 / 2) {
+                        w = snprintf(buf + pos, CTX_BUF_CAP - pos,
+                                     "NOTICE: Their messages are getting shorter "
+                                     "(energy dropping). Be gentler, check in.\n");
+                        if (w > 0)
+                            pos += (size_t)w;
+                    }
+                }
+            }
+
+            /* Detect repeated theme: same words appearing 3+ times across their messages */
+            {
+                typedef struct {
+                    char word[32];
+                    int hits;
+                } word_freq_t;
+                word_freq_t freq[16];
+                size_t freq_n = 0;
+                for (size_t i = 0; i < count; i++) {
+                    if (entries[i].from_me)
+                        continue;
+                    const char *t = entries[i].text;
+                    size_t tl = strlen(t);
+                    size_t wi = 0;
+                    while (wi < tl) {
+                        while (wi < tl && (t[wi] == ' ' || t[wi] == '\n'))
+                            wi++;
+                        size_t ws = wi;
+                        while (wi < tl && t[wi] != ' ' && t[wi] != '\n')
+                            wi++;
+                        size_t wlen = wi - ws;
+                        if (wlen < 4 || wlen > 30)
+                            continue;
+                        char word[32];
+                        for (size_t k = 0; k < wlen && k < 31; k++) {
+                            word[k] = t[ws + k];
+                            if (word[k] >= 'A' && word[k] <= 'Z')
+                                word[k] += 32;
+                        }
+                        word[wlen < 31 ? wlen : 31] = '\0';
+                        /* Skip common words */
+                        if (strcmp(word, "the") == 0 || strcmp(word, "and") == 0 ||
+                            strcmp(word, "that") == 0 || strcmp(word, "this") == 0 ||
+                            strcmp(word, "with") == 0 || strcmp(word, "have") == 0 ||
+                            strcmp(word, "just") == 0 || strcmp(word, "like") == 0 ||
+                            strcmp(word, "know") == 0 || strcmp(word, "what") == 0 ||
+                            strcmp(word, "from") == 0 || strcmp(word, "about") == 0)
+                            continue;
+                        bool found = false;
+                        for (size_t f = 0; f < freq_n; f++) {
+                            if (strcmp(freq[f].word, word) == 0) {
+                                freq[f].hits++;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found && freq_n < 16) {
+                            memcpy(freq[freq_n].word, word, strlen(word) + 1);
+                            freq[freq_n].hits = 1;
+                            freq_n++;
+                        }
+                    }
+                }
+                for (size_t f = 0; f < freq_n; f++) {
+                    if (freq[f].hits >= 3) {
+                        w = snprintf(buf + pos, CTX_BUF_CAP - pos,
+                                     "NOTICE: They keep mentioning '%s' "
+                                     "(%d times). This matters to them.\n",
+                                     freq[f].word, freq[f].hits);
+                        if (w > 0)
+                            pos += (size_t)w;
+                        break;
+                    }
+                }
+            }
+
+            /* Detect topic deflection: they asked you something, you answered,
+             * they immediately changed topic without acknowledging */
+            if (count >= 3) {
+                for (size_t i = 2; i < count; i++) {
+                    if (i >= 2 && !entries[i - 2].from_me && entries[i - 1].from_me &&
+                        !entries[i].from_me) {
+                        const char *q = entries[i - 2].text;
+                        const char *r = entries[i].text;
+                        bool had_question = false;
+                        for (size_t j = 0; j < strlen(q); j++)
+                            if (q[j] == '?')
+                                had_question = true;
+                        if (had_question && strlen(r) > 10) {
+                            bool shares_words = false;
+                            /* Quick check: does the follow-up share any significant word with the
+                             * question? */
+                            for (size_t j = 0; j + 4 < strlen(q); j++) {
+                                char chunk[6];
+                                for (int k = 0; k < 5; k++) {
+                                    chunk[k] = q[j + k];
+                                    if (chunk[k] >= 'A' && chunk[k] <= 'Z')
+                                        chunk[k] += 32;
+                                }
+                                chunk[5] = '\0';
+                                /* Check if this 5-char chunk appears in the follow-up */
+                                for (size_t k = 0; k + 4 < strlen(r); k++) {
+                                    char rc[6];
+                                    for (int l = 0; l < 5; l++) {
+                                        rc[l] = r[k + l];
+                                        if (rc[l] >= 'A' && rc[l] <= 'Z')
+                                            rc[l] += 32;
+                                    }
+                                    rc[5] = '\0';
+                                    if (strcmp(chunk, rc) == 0) {
+                                        shares_words = true;
+                                        break;
+                                    }
+                                }
+                                if (shares_words)
+                                    break;
+                            }
+                            if (!shares_words) {
+                                w = snprintf(buf + pos, CTX_BUF_CAP - pos,
+                                             "NOTICE: They may have deflected from a topic. "
+                                             "Don't force it — follow their lead.\n");
+                                if (w > 0)
+                                    pos += (size_t)w;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         w = snprintf(buf + pos, CTX_BUF_CAP - pos,
                      "\nUse this context naturally. Reference specific details they mentioned. "
                      "Do NOT summarize or acknowledge this context aloud.\n");

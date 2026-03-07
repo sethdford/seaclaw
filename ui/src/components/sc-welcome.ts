@@ -73,16 +73,16 @@ export class ScWelcome extends LitElement {
     }
     /* Staggered entrance for cards */
     .step-card:nth-child(1) {
-      animation-delay: 80ms;
+      animation-delay: calc(1 * var(--sc-stagger-delay));
     }
     .step-card:nth-child(2) {
-      animation-delay: 140ms;
+      animation-delay: calc(2 * var(--sc-stagger-delay));
     }
     .step-card:nth-child(3) {
-      animation-delay: 200ms;
+      animation-delay: calc(3 * var(--sc-stagger-delay));
     }
     .step-card:nth-child(4) {
-      animation-delay: 260ms;
+      animation-delay: calc(4 * var(--sc-stagger-delay));
     }
 
     .step-icon-wrap {

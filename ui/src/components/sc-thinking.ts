@@ -82,11 +82,11 @@ export class ScThinking extends LitElement {
     }
 
     .dot:nth-child(2) {
-      animation-delay: 150ms;
+      animation-delay: var(--sc-duration-normal);
     }
 
     .dot:nth-child(3) {
-      animation-delay: 300ms;
+      animation-delay: var(--sc-duration-moderate);
     }
 
     .summary {

@@ -118,8 +118,10 @@ export class ScCommandPalette extends LitElement {
 
     .panel {
       background: color-mix(in srgb, var(--sc-bg-overlay) 85%, transparent);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      backdrop-filter: blur(var(--sc-glass-standard-blur))
+        saturate(var(--sc-glass-standard-saturate));
+      -webkit-backdrop-filter: blur(var(--sc-glass-standard-blur))
+        saturate(var(--sc-glass-standard-saturate));
       box-shadow: var(--sc-shadow-xl);
       border: 1px solid var(--sc-glass-border-color);
       border-radius: var(--sc-radius-xl);
