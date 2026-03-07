@@ -3,10 +3,53 @@
 #include "seaclaw/core/string.h"
 #include "seaclaw/cron.h"
 #include "seaclaw/crontab.h"
+#include "seaclaw/platform.h"
 #include "test_framework.h"
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+
+/* Unique crontab path per test to avoid shared-state flakiness. */
+static sc_error_t get_unique_crontab_path(sc_allocator_t *alloc, char **path, size_t *path_len) {
+    static unsigned counter;
+    char *tmp = sc_platform_get_temp_dir(alloc);
+    if (!tmp) {
+        const char *t = getenv("TMPDIR");
+        if (!t)
+            t = getenv("TEMP");
+        if (!t)
+            t = "/tmp";
+        size_t tlen = strlen(t);
+        size_t cap = tlen + 64;
+        *path = (char *)alloc->alloc(alloc->ctx, cap);
+        if (!*path)
+            return SC_ERR_OUT_OF_MEMORY;
+        int n = snprintf(*path, cap, "%s/seaclaw_crontab_test_%u.json", t, counter++);
+        if (n < 0 || (size_t)n >= cap) {
+            alloc->free(alloc->ctx, *path, cap);
+            *path = NULL;
+            return SC_ERR_INTERNAL;
+        }
+        *path_len = (size_t)n;
+        return SC_OK;
+    }
+    size_t tlen = strlen(tmp);
+    size_t cap = tlen + 64;
+    *path = (char *)alloc->alloc(alloc->ctx, cap);
+    if (!*path) {
+        alloc->free(alloc->ctx, tmp, tlen + 1);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+    int n = snprintf(*path, cap, "%s/seaclaw_crontab_test_%u.json", tmp, counter++);
+    alloc->free(alloc->ctx, tmp, tlen + 1);
+    if (n < 0 || (size_t)n >= cap) {
+        alloc->free(alloc->ctx, *path, cap);
+        *path = NULL;
+        return SC_ERR_INTERNAL;
+    }
+    *path_len = (size_t)n;
+    return SC_OK;
+}
 
 static void test_cron_create_destroy(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -470,7 +513,7 @@ static void test_crontab_save_load_roundtrip(void) {
     sc_allocator_t alloc = sc_system_allocator();
     char *tmp_path = NULL;
     size_t tmp_len = 0;
-    sc_crontab_get_path(&alloc, &tmp_path, &tmp_len);
+    SC_ASSERT_EQ(get_unique_crontab_path(&alloc, &tmp_path, &tmp_len), SC_OK);
     SC_ASSERT_NOT_NULL(tmp_path);
     unlink(tmp_path);
 
@@ -514,12 +557,7 @@ static void test_crontab_add(void) {
     sc_allocator_t alloc = sc_system_allocator();
     char *path = NULL;
     size_t path_len = 0;
-    sc_crontab_get_path(&alloc, &path, &path_len);
-    unlink(path);
-    /* Ensure no stale file from prior tests */
-    FILE *f = fopen(path, "w");
-    if (f)
-        fclose(f);
+    SC_ASSERT_EQ(get_unique_crontab_path(&alloc, &path, &path_len), SC_OK);
     unlink(path);
 
     char *new_id = NULL;
@@ -542,7 +580,7 @@ static void test_crontab_remove(void) {
     sc_allocator_t alloc = sc_system_allocator();
     char *path = NULL;
     size_t path_len = 0;
-    sc_crontab_get_path(&alloc, &path, &path_len);
+    SC_ASSERT_EQ(get_unique_crontab_path(&alloc, &path, &path_len), SC_OK);
     unlink(path);
 
     char *id1 = NULL, *id2 = NULL;

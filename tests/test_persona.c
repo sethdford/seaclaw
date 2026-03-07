@@ -12,6 +12,7 @@
 #include "seaclaw/tools/persona.h"
 #include "test_framework.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #if defined(__unix__) || defined(__APPLE__)
 #include <unistd.h>
@@ -478,6 +479,30 @@ static void test_sampler_gmail_parse_empty(void) {
     SC_ASSERT_EQ(count, (size_t)0);
 }
 
+static void test_cli_parse_export(void) {
+    const char *argv[] = {"seaclaw", "persona", "export", "seth"};
+    sc_persona_cli_args_t args = {0};
+    SC_ASSERT_EQ(sc_persona_cli_parse(4, argv, &args), SC_OK);
+    SC_ASSERT_EQ(args.action, SC_PERSONA_ACTION_EXPORT);
+    SC_ASSERT_TRUE(strcmp(args.name, "seth") == 0);
+}
+
+static void test_cli_parse_merge(void) {
+    const char *argv[] = {"seaclaw", "persona", "merge", "combined", "a", "b"};
+    sc_persona_cli_args_t args = {0};
+    SC_ASSERT_EQ(sc_persona_cli_parse(6, argv, &args), SC_OK);
+    SC_ASSERT_EQ(args.action, SC_PERSONA_ACTION_MERGE);
+    SC_ASSERT_TRUE(strcmp(args.name, "combined") == 0);
+}
+
+static void test_cli_parse_import(void) {
+    const char *argv[] = {"seaclaw", "persona", "import", "newpersona", "--from-file", "/tmp/p.json"};
+    sc_persona_cli_args_t args = {0};
+    SC_ASSERT_EQ(sc_persona_cli_parse(6, argv, &args), SC_OK);
+    SC_ASSERT_EQ(args.action, SC_PERSONA_ACTION_IMPORT);
+    SC_ASSERT_TRUE(strcmp(args.name, "newpersona") == 0);
+}
+
 static void test_cli_parse_from_facebook_file(void) {
     const char *argv[] = {"seaclaw", "persona",         "create",
                           "test",    "--from-facebook", "/tmp/fb.json"};
@@ -758,6 +783,67 @@ static void test_creator_write_and_load(void) {
 #endif
 #endif
 }
+
+static void test_persona_base_dir_returns_override_when_set(void) {
+#if defined(__unix__) || defined(__APPLE__)
+    char tmpdir[] = "/tmp/seaclaw_base_dir_test_XXXXXX";
+    if (!mkdtemp(tmpdir)) {
+        return;
+    }
+    setenv("SC_PERSONA_DIR", tmpdir, 1);
+    char buf[512];
+    const char *got = sc_persona_base_dir(buf, sizeof(buf));
+    unsetenv("SC_PERSONA_DIR");
+    rmdir(tmpdir);
+    SC_ASSERT_NOT_NULL(got);
+    SC_ASSERT_STR_EQ(got, tmpdir);
+#else
+    (void)0;
+#endif
+}
+
+#if defined(__unix__) || defined(__APPLE__)
+static void test_persona_load_save_roundtrip_with_temp_dir(void) {
+    char tmpdir[] = "/tmp/seaclaw_persona_test_XXXXXX";
+    if (!mkdtemp(tmpdir))
+        return; /* skip if can't create temp dir */
+
+    setenv("SC_PERSONA_DIR", tmpdir, 1);
+
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_persona_t p = {0};
+    p.name = "roundtrip_test";
+    p.name_len = strlen(p.name);
+    p.identity = "Test identity";
+    sc_error_t err = sc_persona_creator_write(&alloc, &p);
+    if (err != SC_OK) {
+        unsetenv("SC_PERSONA_DIR");
+        rmdir(tmpdir);
+        return;
+    }
+
+    sc_persona_t loaded = {0};
+    err = sc_persona_load(&alloc, "roundtrip_test", 14, &loaded);
+    unsetenv("SC_PERSONA_DIR");
+    if (err != SC_OK) {
+        char path[512];
+        snprintf(path, sizeof(path), "%s/roundtrip_test.json", tmpdir);
+        unlink(path);
+        rmdir(tmpdir);
+        return;
+    }
+
+    SC_ASSERT_STR_EQ(loaded.name, "roundtrip_test");
+    SC_ASSERT_STR_EQ(loaded.identity, "Test identity");
+
+    sc_persona_deinit(&alloc, &loaded);
+
+    char path[512];
+    snprintf(path, sizeof(path), "%s/roundtrip_test.json", tmpdir);
+    unlink(path);
+    rmdir(tmpdir);
+}
+#endif
 
 static void test_persona_prompt_with_channel_overlay(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -1443,6 +1529,10 @@ void run_persona_tests(void) {
     SC_RUN_TEST(test_persona_cli_run_delete_not_found);
     SC_RUN_TEST(test_persona_cli_run_create_no_provider);
     SC_RUN_TEST(test_creator_write_and_load);
+    SC_RUN_TEST(test_persona_base_dir_returns_override_when_set);
+#if defined(__unix__) || defined(__APPLE__)
+    SC_RUN_TEST(test_persona_load_save_roundtrip_with_temp_dir);
+#endif
     SC_RUN_TEST(test_persona_tool_create);
     SC_RUN_TEST(test_creator_synthesize_merges);
     SC_RUN_TEST(test_analyzer_builds_prompt);
@@ -1453,6 +1543,9 @@ void run_persona_tests(void) {
     SC_RUN_TEST(test_sampler_facebook_parse_null);
     SC_RUN_TEST(test_sampler_gmail_parse_basic);
     SC_RUN_TEST(test_sampler_gmail_parse_empty);
+    SC_RUN_TEST(test_cli_parse_export);
+    SC_RUN_TEST(test_cli_parse_merge);
+    SC_RUN_TEST(test_cli_parse_import);
     SC_RUN_TEST(test_cli_parse_from_facebook_file);
     SC_RUN_TEST(test_cli_parse_from_gmail);
     SC_RUN_TEST(test_cli_parse_from_response);

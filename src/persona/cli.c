@@ -18,12 +18,44 @@
 
 #define SC_PERSONA_PATH_MAX 512
 
+static bool str_in_arr(const char *str, char **arr, size_t count) {
+    for (size_t i = 0; i < count; i++)
+        if (arr[i] && strcmp(arr[i], str) == 0)
+            return true;
+    return false;
+}
+
+static void diff_scalar(const char *label, const char *old_val, const char *new_val) {
+    const char *o = old_val && old_val[0] ? old_val : "(none)";
+    const char *n = new_val && new_val[0] ? new_val : "(none)";
+    if (strcmp(o, n) == 0)
+        return;
+    fprintf(stdout, "%s:\n  - \"%s\"\n  + \"%s\"\n", label, o, n);
+}
+
+static void diff_arr(const char *label, char **a_arr, size_t a_count, char **b_arr,
+                     size_t b_count) {
+    bool any = false;
+    for (size_t i = 0; i < a_count; i++)
+        if (a_arr[i] && !str_in_arr(a_arr[i], b_arr, b_count)) {
+            if (!any) {
+                fprintf(stdout, "%s:\n", label);
+                any = true;
+            }
+            fprintf(stdout, "  - %s\n", a_arr[i]);
+        }
+    for (size_t i = 0; i < b_count; i++)
+        if (b_arr[i] && !str_in_arr(b_arr[i], a_arr, a_count)) {
+            if (!any) {
+                fprintf(stdout, "%s:\n", label);
+                any = true;
+            }
+            fprintf(stdout, "  + %s\n", b_arr[i]);
+        }
+}
+
 static const char *persona_dir_path(char *buf, size_t cap) {
-    const char *home = getenv("HOME");
-    if (!home || !home[0])
-        home = ".";
-    int n = snprintf(buf, cap, "%s/.seaclaw/personas", home);
-    return (n > 0 && (size_t)n < cap) ? buf : NULL;
+    return sc_persona_base_dir(buf, cap);
 }
 
 sc_error_t sc_persona_cli_parse(int argc, const char **argv, sc_persona_cli_args_t *out) {
@@ -109,6 +141,37 @@ sc_error_t sc_persona_cli_parse(int argc, const char **argv, sc_persona_cli_args
             return SC_ERR_INVALID_ARGUMENT;
         out->action = SC_PERSONA_ACTION_FEEDBACK_APPLY;
         out->name = argv[4];
+    } else if (strcmp(action, "diff") == 0) {
+        out->action = SC_PERSONA_ACTION_DIFF;
+        if (argc < 5)
+            return SC_ERR_INVALID_ARGUMENT;
+        out->name = argv[3];
+        out->diff_name = argv[4];
+    } else if (strcmp(action, "export") == 0) {
+        out->action = SC_PERSONA_ACTION_EXPORT;
+        if (argc < 4)
+            return SC_ERR_INVALID_ARGUMENT;
+        out->name = argv[3];
+    } else if (strcmp(action, "merge") == 0) {
+        out->action = SC_PERSONA_ACTION_MERGE;
+        if (argc < 6)
+            return SC_ERR_INVALID_ARGUMENT;
+        out->name = argv[3];
+        out->merge_sources = (const char **)(argv + 4);
+        out->merge_sources_count = (size_t)(argc - 4);
+    } else if (strcmp(action, "import") == 0) {
+        out->action = SC_PERSONA_ACTION_IMPORT;
+        if (argc < 4)
+            return SC_ERR_INVALID_ARGUMENT;
+        out->name = argv[3];
+        for (int i = 4; i < argc; i++) {
+            if (strcmp(argv[i], "--from-stdin") == 0)
+                out->import_file = NULL;
+            else if (strcmp(argv[i], "--from-file") == 0 && i + 1 < argc) {
+                out->import_file = argv[i + 1];
+                i++;
+            }
+        }
     } else {
         return SC_ERR_INVALID_ARGUMENT;
     }
@@ -214,13 +277,13 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
         return SC_OK;
 #else
 #if defined(__unix__) || defined(__APPLE__)
-        const char *home = getenv("HOME");
-        if (!home || !home[0]) {
-            fprintf(stderr, "HOME not set\n");
+        char base[SC_PERSONA_PATH_MAX];
+        if (!sc_persona_base_dir(base, sizeof(base))) {
+            fprintf(stderr, "Could not resolve persona directory (HOME or SC_PERSONA_DIR)\n");
             return SC_ERR_NOT_FOUND;
         }
         char path[SC_PERSONA_PATH_MAX];
-        int n = snprintf(path, sizeof(path), "%s/.seaclaw/personas/%s.json", home, args->name);
+        int n = snprintf(path, sizeof(path), "%s/%s.json", base, args->name);
         if (n <= 0 || (size_t)n >= sizeof(path)) {
             fprintf(stderr, "Invalid persona name\n");
             return SC_ERR_INVALID_ARGUMENT;
@@ -283,6 +346,282 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
         }
         fprintf(stdout, "Feedback applied to persona: %s\n", args->name);
         return SC_OK;
+    }
+    case SC_PERSONA_ACTION_DIFF: {
+        if (!args->name || !args->name[0] || !args->diff_name || !args->diff_name[0]) {
+            fprintf(stderr, "Persona diff requires two persona names\n");
+            return SC_ERR_INVALID_ARGUMENT;
+        }
+#if defined(SC_IS_TEST) && SC_IS_TEST
+        (void)alloc;
+        return SC_OK;
+#else
+        sc_persona_t a = {0}, b = {0};
+        sc_error_t err = sc_persona_load(alloc, args->name, strlen(args->name), &a);
+        if (err != SC_OK) {
+            fprintf(stderr, "Persona not found: %s\n", args->name);
+            return err;
+        }
+        err = sc_persona_load(alloc, args->diff_name, strlen(args->diff_name), &b);
+        if (err != SC_OK) {
+            fprintf(stderr, "Persona not found: %s\n", args->diff_name);
+            sc_persona_deinit(alloc, &a);
+            return err;
+        }
+
+        diff_scalar("identity", a.identity, b.identity);
+        diff_arr("traits", a.traits, a.traits_count, b.traits, b.traits_count);
+        diff_arr("preferred_vocab", a.preferred_vocab, a.preferred_vocab_count,
+                 b.preferred_vocab, b.preferred_vocab_count);
+        diff_arr("avoided_vocab", a.avoided_vocab, a.avoided_vocab_count,
+                 b.avoided_vocab, b.avoided_vocab_count);
+        diff_arr("slang", a.slang, a.slang_count, b.slang, b.slang_count);
+        diff_arr("communication_rules", a.communication_rules, a.communication_rules_count,
+                 b.communication_rules, b.communication_rules_count);
+        diff_arr("values", a.values, a.values_count, b.values, b.values_count);
+        diff_scalar("decision_style", a.decision_style, b.decision_style);
+
+        /* Overlays: compare by channel */
+        bool overlay_any = false;
+        for (size_t i = 0; i < a.overlays_count; i++) {
+            const sc_persona_overlay_t *oa = &a.overlays[i];
+            size_t ch_len = oa->channel ? strlen(oa->channel) : 0;
+            const sc_persona_overlay_t *ob = sc_persona_find_overlay(&b, oa->channel, ch_len);
+            if (!ob) {
+                if (!overlay_any) {
+                    fprintf(stdout, "overlays:\n");
+                    overlay_any = true;
+                }
+                fprintf(stdout, "  - %s\n", oa->channel ? oa->channel : "(unknown)");
+            } else {
+                const char *af = oa->formality ? oa->formality : "";
+                const char *bf = ob->formality ? ob->formality : "";
+                const char *aa = oa->avg_length ? oa->avg_length : "";
+                const char *ba = ob->avg_length ? ob->avg_length : "";
+                const char *ae = oa->emoji_usage ? oa->emoji_usage : "";
+                const char *be = ob->emoji_usage ? ob->emoji_usage : "";
+                if (strcmp(af, bf) != 0 || strcmp(aa, ba) != 0 || strcmp(ae, be) != 0) {
+                    if (!overlay_any) {
+                        fprintf(stdout, "overlays:\n");
+                        overlay_any = true;
+                    }
+                    fprintf(stdout, "  ~ %s (formality/avg_length/emoji changed)\n",
+                            oa->channel ? oa->channel : "(unknown)");
+                }
+            }
+        }
+        for (size_t i = 0; i < b.overlays_count; i++) {
+            const sc_persona_overlay_t *ob = &b.overlays[i];
+            size_t ch_len = ob->channel ? strlen(ob->channel) : 0;
+            const sc_persona_overlay_t *oa = sc_persona_find_overlay(&a, ob->channel, ch_len);
+            if (!oa) {
+                if (!overlay_any) {
+                    fprintf(stdout, "overlays:\n");
+                    overlay_any = true;
+                }
+                fprintf(stdout, "  + %s\n", ob->channel ? ob->channel : "(unknown)");
+            }
+        }
+
+        sc_persona_deinit(alloc, &a);
+        sc_persona_deinit(alloc, &b);
+        return SC_OK;
+#endif
+    }
+    case SC_PERSONA_ACTION_EXPORT: {
+        if (!args->name || !args->name[0]) {
+            fprintf(stderr, "Persona name required for export\n");
+            return SC_ERR_INVALID_ARGUMENT;
+        }
+#if defined(__unix__) || defined(__APPLE__)
+        char path[SC_PERSONA_PATH_MAX];
+        const char *dir = persona_dir_path(path, sizeof(path));
+        if (!dir) {
+            fprintf(stderr, "Could not resolve persona directory\n");
+            return SC_ERR_NOT_FOUND;
+        }
+        int n = snprintf(path, sizeof(path), "%s/%s.json", dir, args->name);
+        if (n <= 0 || (size_t)n >= sizeof(path)) {
+            fprintf(stderr, "Invalid persona name\n");
+            return SC_ERR_INVALID_ARGUMENT;
+        }
+        FILE *f = fopen(path, "rb");
+        if (!f) {
+            fprintf(stderr, "Persona not found: %s\n", args->name);
+            return SC_ERR_NOT_FOUND;
+        }
+        if (fseek(f, 0, SEEK_END) != 0) {
+            fclose(f);
+            return SC_ERR_IO;
+        }
+        long sz = ftell(f);
+        if (sz < 0 || sz > (long)(1024 * 1024)) {
+            fclose(f);
+            return sz < 0 ? SC_ERR_IO : SC_ERR_INVALID_ARGUMENT;
+        }
+        rewind(f);
+        char *buf = (char *)alloc->alloc(alloc->ctx, (size_t)sz + 1);
+        if (!buf) {
+            fclose(f);
+            return SC_ERR_OUT_OF_MEMORY;
+        }
+        size_t read_len = fread(buf, 1, (size_t)sz, f);
+        fclose(f);
+        if (read_len != (size_t)sz) {
+            alloc->free(alloc->ctx, buf, (size_t)sz + 1);
+            return SC_ERR_IO;
+        }
+        buf[read_len] = '\0';
+        fprintf(stdout, "%s", buf);
+        alloc->free(alloc->ctx, buf, (size_t)sz + 1);
+        return SC_OK;
+#else
+        fprintf(stderr, "Persona export requires POSIX\n");
+        return SC_ERR_NOT_SUPPORTED;
+#endif
+    }
+    case SC_PERSONA_ACTION_MERGE: {
+        if (!args->name || !args->name[0]) {
+            fprintf(stderr, "Output persona name required for merge\n");
+            return SC_ERR_INVALID_ARGUMENT;
+        }
+        if (!args->merge_sources || args->merge_sources_count < 2) {
+            fprintf(stderr, "Merge requires at least 2 source personas\n");
+            return SC_ERR_INVALID_ARGUMENT;
+        }
+        sc_persona_t *partials =
+            (sc_persona_t *)alloc->alloc(alloc->ctx, args->merge_sources_count * sizeof(sc_persona_t));
+        if (!partials)
+            return SC_ERR_OUT_OF_MEMORY;
+        memset(partials, 0, args->merge_sources_count * sizeof(sc_persona_t));
+        sc_error_t err = SC_OK;
+        for (size_t i = 0; i < args->merge_sources_count; i++) {
+            err = sc_persona_load(alloc, args->merge_sources[i], strlen(args->merge_sources[i]),
+                                  &partials[i]);
+            if (err != SC_OK) {
+                fprintf(stderr, "Persona not found: %s\n", args->merge_sources[i]);
+                for (size_t j = 0; j < i; j++)
+                    sc_persona_deinit(alloc, &partials[j]);
+                alloc->free(alloc->ctx, partials,
+                           args->merge_sources_count * sizeof(sc_persona_t));
+                return err;
+            }
+        }
+        sc_persona_t merged = {0};
+        err = sc_persona_creator_synthesize(alloc, partials, args->merge_sources_count, args->name,
+                                           strlen(args->name), &merged);
+        for (size_t i = 0; i < args->merge_sources_count; i++)
+            sc_persona_deinit(alloc, &partials[i]);
+        alloc->free(alloc->ctx, partials, args->merge_sources_count * sizeof(sc_persona_t));
+        if (err != SC_OK) {
+            fprintf(stderr, "Failed to merge personas\n");
+            return err;
+        }
+        err = sc_persona_creator_write(alloc, &merged);
+        sc_persona_deinit(alloc, &merged);
+        if (err != SC_OK)
+            return err;
+        fprintf(stdout, "Merged persona created: %s\n", args->name);
+        return SC_OK;
+    }
+    case SC_PERSONA_ACTION_IMPORT: {
+        if (!args->name || !args->name[0]) {
+            fprintf(stderr, "Persona name required for import\n");
+            return SC_ERR_INVALID_ARGUMENT;
+        }
+        char *json = NULL;
+        size_t json_len = 0;
+        if (args->import_file) {
+            FILE *f = fopen(args->import_file, "rb");
+            if (!f) {
+                fprintf(stderr, "Could not open file: %s\n", args->import_file);
+                return SC_ERR_IO;
+            }
+            if (fseek(f, 0, SEEK_END) != 0) {
+                fclose(f);
+                return SC_ERR_IO;
+            }
+            long sz = ftell(f);
+            if (sz < 0 || sz > (long)(1024 * 1024)) {
+                fclose(f);
+                return sz < 0 ? SC_ERR_IO : SC_ERR_INVALID_ARGUMENT;
+            }
+            rewind(f);
+            json = (char *)alloc->alloc(alloc->ctx, (size_t)sz + 1);
+            if (!json) {
+                fclose(f);
+                return SC_ERR_OUT_OF_MEMORY;
+            }
+            json_len = fread(json, 1, (size_t)sz, f);
+            fclose(f);
+            json[json_len] = '\0';
+        } else {
+            size_t cap = 64 * 1024;
+            json = (char *)alloc->alloc(alloc->ctx, cap);
+            if (!json)
+                return SC_ERR_OUT_OF_MEMORY;
+            size_t pos = 0;
+            int c;
+            while (pos < cap - 1 && (c = getchar()) != EOF)
+                json[pos++] = (char)c;
+            json[pos] = '\0';
+            json_len = pos;
+        }
+        char *err_msg = NULL;
+        size_t err_len = 0;
+        sc_error_t err = sc_persona_validate_json(alloc, json, json_len, &err_msg, &err_len);
+        if (err != SC_OK) {
+            fprintf(stderr, "Invalid persona JSON: %s\n", err_msg ? err_msg : "unknown");
+            if (err_msg)
+                alloc->free(alloc->ctx, err_msg, err_len + 1);
+            alloc->free(alloc->ctx, json, json_len + 1);
+            return err;
+        }
+#if defined(__unix__) || defined(__APPLE__)
+        char dir_buf[SC_PERSONA_PATH_MAX];
+        const char *dir = persona_dir_path(dir_buf, sizeof(dir_buf));
+        if (!dir) {
+            fprintf(stderr, "Could not resolve persona directory\n");
+            alloc->free(alloc->ctx, json, json_len + 1);
+            return SC_ERR_NOT_FOUND;
+        }
+        const char *home = getenv("HOME");
+        if (!home || !home[0]) {
+            fprintf(stderr, "HOME not set\n");
+            alloc->free(alloc->ctx, json, json_len + 1);
+            return SC_ERR_NOT_FOUND;
+        }
+        char parent[SC_PERSONA_PATH_MAX];
+        int pn = snprintf(parent, sizeof(parent), "%s/.seaclaw", home);
+        if (pn > 0 && (size_t)pn < sizeof(parent))
+            (void)mkdir(parent, 0755);
+        pn = snprintf(parent, sizeof(parent), "%s/.seaclaw/personas", home);
+        if (pn > 0 && (size_t)pn < sizeof(parent))
+            (void)mkdir(parent, 0755);
+        char out_path[SC_PERSONA_PATH_MAX];
+        int on = snprintf(out_path, sizeof(out_path), "%s/%s.json", dir, args->name);
+        if (on <= 0 || (size_t)on >= sizeof(out_path)) {
+            alloc->free(alloc->ctx, json, json_len + 1);
+            return SC_ERR_INVALID_ARGUMENT;
+        }
+        FILE *out = fopen(out_path, "wb");
+        if (!out) {
+            fprintf(stderr, "Could not write persona: %s\n", args->name);
+            alloc->free(alloc->ctx, json, json_len + 1);
+            return SC_ERR_IO;
+        }
+        size_t written = fwrite(json, 1, json_len, out);
+        fclose(out);
+        alloc->free(alloc->ctx, json, json_len + 1);
+        if (written != json_len)
+            return SC_ERR_IO;
+        fprintf(stdout, "Persona imported: %s\n", args->name);
+        return SC_OK;
+#else
+        alloc->free(alloc->ctx, json, json_len + 1);
+        fprintf(stderr, "Persona import requires POSIX\n");
+        return SC_ERR_NOT_SUPPORTED;
+#endif
     }
     case SC_PERSONA_ACTION_CREATE:
     case SC_PERSONA_ACTION_UPDATE: {
@@ -370,24 +709,29 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
         }
 
         /* Step 1: extract messages, build prompt, write to .pending */
-        const char *home = getenv("HOME");
-        if (!home || !home[0]) {
-            fprintf(stderr, "HOME not set\n");
+        char base[SC_PERSONA_PATH_MAX];
+        if (!sc_persona_base_dir(base, sizeof(base))) {
+            fprintf(stderr, "Could not resolve persona directory (HOME or SC_PERSONA_DIR)\n");
             return SC_ERR_NOT_FOUND;
         }
         char pending_dir[SC_PERSONA_PATH_MAX];
-        int pn = snprintf(pending_dir, sizeof(pending_dir), "%s/.seaclaw/personas/.pending", home);
+        int pn = snprintf(pending_dir, sizeof(pending_dir), "%s/.pending", base);
         if (pn <= 0 || (size_t)pn >= sizeof(pending_dir))
             return SC_ERR_INVALID_ARGUMENT;
 #if defined(__unix__) || defined(__APPLE__)
         {
-            char parent[SC_PERSONA_PATH_MAX];
-            int pp = snprintf(parent, sizeof(parent), "%s/.seaclaw", home);
-            if (pp > 0 && (size_t)pp < sizeof(parent))
-                (void)mkdir(parent, 0755);
-            pp = snprintf(parent, sizeof(parent), "%s/.seaclaw/personas", home);
-            if (pp > 0 && (size_t)pp < sizeof(parent))
-                (void)mkdir(parent, 0755);
+            const char *override = getenv("SC_PERSONA_DIR");
+            if (!override || !override[0]) {
+                const char *home = getenv("HOME");
+                if (home && home[0]) {
+                    char parent[SC_PERSONA_PATH_MAX];
+                    int pp = snprintf(parent, sizeof(parent), "%s/.seaclaw", home);
+                    if (pp > 0 && (size_t)pp < sizeof(parent))
+                        (void)mkdir(parent, 0755);
+                }
+            }
+            if (mkdir(base, 0755) != 0 && errno != EEXIST)
+                return SC_ERR_IO;
             if (mkdir(pending_dir, 0755) != 0 && errno != EEXIST)
                 return SC_ERR_IO;
         }
@@ -397,6 +741,11 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
 
         if (args->from_imessage) {
 #if defined(__APPLE__) && defined(__MACH__) && defined(SC_ENABLE_SQLITE)
+            const char *home = getenv("HOME");
+            if (!home || !home[0]) {
+                fprintf(stderr, "HOME not set\n");
+                return SC_ERR_NOT_FOUND;
+            }
             char db_path[SC_PERSONA_PATH_MAX];
             int n = snprintf(db_path, sizeof(db_path), "%s/Library/Messages/chat.db", home);
             if (n <= 0 || (size_t)n >= sizeof(db_path))

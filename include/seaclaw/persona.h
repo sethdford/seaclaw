@@ -54,6 +54,10 @@ typedef struct sc_persona {
     size_t example_banks_count;
 } sc_persona_t;
 
+/* Returns persona base directory path in buf (either SC_PERSONA_DIR or ~/.seaclaw/personas).
+   Returns buf on success, NULL on failure. */
+const char *sc_persona_base_dir(char *buf, size_t cap);
+
 sc_error_t sc_persona_load(sc_allocator_t *alloc, const char *name, size_t name_len,
                            sc_persona_t *out);
 
@@ -129,12 +133,17 @@ typedef enum {
     SC_PERSONA_ACTION_LIST,
     SC_PERSONA_ACTION_DELETE,
     SC_PERSONA_ACTION_VALIDATE,
-    SC_PERSONA_ACTION_FEEDBACK_APPLY
+    SC_PERSONA_ACTION_FEEDBACK_APPLY,
+    SC_PERSONA_ACTION_DIFF,
+    SC_PERSONA_ACTION_EXPORT,
+    SC_PERSONA_ACTION_MERGE,
+    SC_PERSONA_ACTION_IMPORT
 } sc_persona_action_t;
 
 typedef struct sc_persona_cli_args {
     sc_persona_action_t action;
     const char *name;
+    const char *diff_name; /* second persona for diff action */
     bool from_imessage;
     bool from_gmail;
     bool from_facebook;
@@ -142,6 +151,9 @@ typedef struct sc_persona_cli_args {
     const char *facebook_export_path;
     const char *gmail_export_path;
     const char *response_file; /* --from-response <path> */
+    const char **merge_sources;
+    size_t merge_sources_count;
+    const char *import_file; /* --from-file <path> or NULL for --from-stdin */
 } sc_persona_cli_args_t;
 
 sc_error_t sc_persona_cli_parse(int argc, const char **argv, sc_persona_cli_args_t *out);

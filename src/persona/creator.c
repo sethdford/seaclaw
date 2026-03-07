@@ -377,25 +377,29 @@ sc_error_t sc_persona_creator_write(sc_allocator_t *alloc, const sc_persona_t *p
     if (!alloc || !persona || !persona->name)
         return SC_ERR_INVALID_ARGUMENT;
 
-    const char *home = getenv("HOME");
-    if (!home || !home[0])
-        return SC_ERR_NOT_FOUND;
     char dir_buf[SC_PERSONA_CREATOR_PATH_MAX];
-    int n = snprintf(dir_buf, sizeof(dir_buf), "%s/.seaclaw/personas", home);
-    if (n <= 0 || (size_t)n >= sizeof(dir_buf))
-        return SC_ERR_INVALID_ARGUMENT;
+    if (!sc_persona_base_dir(dir_buf, sizeof(dir_buf)))
+        return SC_ERR_NOT_FOUND;
 #if defined(__unix__) || defined(__APPLE__)
-    char parent[SC_PERSONA_CREATOR_PATH_MAX];
-    int pn = snprintf(parent, sizeof(parent), "%s/.seaclaw", home);
-    if (pn > 0 && (size_t)pn < sizeof(parent))
-        (void)mkdir(parent, 0755);
-    if (mkdir(dir_buf, 0755) != 0 && errno != EEXIST)
-        return SC_ERR_IO;
+    {
+        const char *override = getenv("SC_PERSONA_DIR");
+        if (!override || !override[0]) {
+            const char *home = getenv("HOME");
+            if (home && home[0]) {
+                char parent[SC_PERSONA_CREATOR_PATH_MAX];
+                int pn = snprintf(parent, sizeof(parent), "%s/.seaclaw", home);
+                if (pn > 0 && (size_t)pn < sizeof(parent))
+                    (void)mkdir(parent, 0755);
+            }
+        }
+        if (mkdir(dir_buf, 0755) != 0 && errno != EEXIST)
+            return SC_ERR_IO;
+    }
 #endif
 
     char path[SC_PERSONA_CREATOR_PATH_MAX];
-    n = snprintf(path, sizeof(path), "%s/%.*s.json", dir_buf, (int)persona->name_len,
-                 persona->name);
+    int n = snprintf(path, sizeof(path), "%s/%.*s.json", dir_buf, (int)persona->name_len,
+                    persona->name);
     if (n <= 0 || (size_t)n >= sizeof(path))
         return SC_ERR_INVALID_ARGUMENT;
 

@@ -1286,7 +1286,8 @@ static sc_error_t cmd_persona(sc_allocator_t *alloc, int argc, char **argv) {
     if (err != SC_OK) {
         fprintf(
             stderr,
-            "Usage: seaclaw persona <create|update|show|list|delete|validate> [name] [options]\n");
+            "Usage: seaclaw persona <create|update|show|list|delete|validate|export|merge|import> "
+            "[name] [options]\n");
         fprintf(
             stderr,
             "  create <name> [--from-imessage] [--from-gmail] [--from-facebook] [--interactive]\n");
@@ -1295,6 +1296,9 @@ static sc_error_t cmd_persona(sc_allocator_t *alloc, int argc, char **argv) {
         fprintf(stderr, "  list\n");
         fprintf(stderr, "  delete <name>\n");
         fprintf(stderr, "  validate <name>\n");
+        fprintf(stderr, "  export <name>\n");
+        fprintf(stderr, "  merge <output_name> <name1> <name2> [name3...]\n");
+        fprintf(stderr, "  import <name> [--from-stdin | --from-file <path>]\n");
         return err;
     }
     return sc_persona_cli_run(alloc, &args);
@@ -1626,6 +1630,7 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
         .bus = &bus,
         .tools = tools,
         .tools_count = tools_count,
+        .agent = NULL,
     };
 
     /* ── Gateway config ────────────────────────────────────────────────── */
@@ -1710,6 +1715,7 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
         agent_bridge.agent = &agent;
         agent_bridge.bus = &bus;
         agent_bridge.thread_binding = gw_thread_binding;
+        app_ctx.agent = &agent;
         sc_bus_subscribe(&bus, gw_agent_on_message, &agent_bridge, SC_BUS_MESSAGE_RECEIVED);
 
         fprintf(stderr, "[%s] gateway+agent mode (provider=%s tools=%zu)\n", SC_CODENAME, prov_name,
