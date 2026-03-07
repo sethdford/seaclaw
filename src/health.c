@@ -52,7 +52,7 @@ static health_entry_t *get_or_create(const char *component) {
     strncpy(e->name, component, SC_MAX_NAME - 1);
     e->name[SC_MAX_NAME - 1] = '\0';
     memset(&e->health, 0, sizeof(e->health));
-    strcpy(e->health.status, "starting");
+    snprintf(e->health.status, sizeof(e->health.status), "%s", "starting");
     return e;
 }
 

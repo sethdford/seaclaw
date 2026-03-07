@@ -61,35 +61,35 @@ static void detect_columns(sqlite3 *db, const char **key_expr, const char **cont
     sqlite3_finalize(stmt);
 
     if (has_content)
-        strcpy(content_buf, "content");
+        snprintf(content_buf, sizeof(content_buf), "%s", "content");
     else if (has_value)
-        strcpy(content_buf, "value");
+        snprintf(content_buf, sizeof(content_buf), "%s", "value");
     else if (has_text)
-        strcpy(content_buf, "text");
+        snprintf(content_buf, sizeof(content_buf), "%s", "text");
     else if (has_memory)
-        strcpy(content_buf, "memory");
+        snprintf(content_buf, sizeof(content_buf), "%s", "memory");
     else {
         *content_col = NULL;
         return;
     }
 
     if (has_key)
-        strcpy(key_buf, "key");
+        snprintf(key_buf, sizeof(key_buf), "%s", "key");
     else if (has_id)
-        strcpy(key_buf, "id");
+        snprintf(key_buf, sizeof(key_buf), "%s", "id");
     else if (has_name)
-        strcpy(key_buf, "name");
+        snprintf(key_buf, sizeof(key_buf), "%s", "name");
     else
-        strcpy(key_buf, "CAST(rowid AS TEXT)");
+        snprintf(key_buf, sizeof(key_buf), "%s", "CAST(rowid AS TEXT)");
 
     if (has_category)
-        strcpy(category_buf, "category");
+        snprintf(category_buf, sizeof(category_buf), "%s", "category");
     else if (has_kind)
-        strcpy(category_buf, "kind");
+        snprintf(category_buf, sizeof(category_buf), "%s", "kind");
     else if (has_type)
-        strcpy(category_buf, "type");
+        snprintf(category_buf, sizeof(category_buf), "%s", "type");
     else
-        strcpy(category_buf, "'core'");
+        snprintf(category_buf, sizeof(category_buf), "%s", "'core'");
 
     *key_expr = key_buf;
     *content_col = content_buf;

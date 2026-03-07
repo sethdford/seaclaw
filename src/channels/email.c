@@ -507,7 +507,7 @@ sc_error_t sc_email_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_lo
                     blen = avail;
                 if (blen > 0) {
                     if (ct_len > 0) {
-                        strcat(content, "\n\n");
+                        memcpy(content + ct_len, "\n\n", 2);
                         ct_len += 2;
                     }
                     memcpy(content + ct_len, body_result.stdout_buf, blen);
