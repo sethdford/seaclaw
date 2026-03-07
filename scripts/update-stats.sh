@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# update-stats.sh — Sync AGENTS.md, README.md, and STUBS.md with actual repo metrics.
+# update-stats.sh — Sync AGENTS.md and README.md with actual repo metrics.
 # Usage: ./scripts/update-stats.sh [--apply]
 #   Without --apply: prints stats only (dry run).
-#   With --apply: patches AGENTS.md, README.md, and STUBS.md in place.
+#   With --apply: patches AGENTS.md and README.md in place.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
@@ -24,10 +24,10 @@ TEST_FILES=$(find tests -name 'test_*.c' | wc -l | tr -d ' ')
 TEST_LINES_RAW=$(find tests \( -name '*.c' -o -name '*.h' \) -exec cat {} + | wc -l | tr -d ' ')
 TEST_LINES_K=$(( (TEST_LINES_RAW + 500) / 1000 ))
 
-# Count channels
+# Count channels (exclude non-channel infrastructure)
 CHANNEL_COUNT=$(find src/channels -maxdepth 1 -name '*.c' ! -name 'factory.c' ! -name 'meta_common.c' | wc -l | tr -d ' ')
 
-# Count tools
+# Count tools (exclude factory)
 TOOL_COUNT=$(find src/tools -maxdepth 1 -name '*.c' ! -name 'factory.c' | wc -l | tr -d ' ')
 
 # Get test count from binary (try multiple build dirs)
@@ -46,9 +46,9 @@ else
     TEST_COUNT_FMT="unknown"
 fi
 
-# Get binary size (prefer MinSizeRel builds, then fallback)
+# Get binary size (prefer MinSizeRel builds, then release, then debug)
 BINARY_KB="unknown"
-for bin in build2/seaclaw build-release/seaclaw build/seaclaw; do
+for bin in build-size/seaclaw build2/seaclaw build-release/seaclaw build/seaclaw; do
     if [ -f "$bin" ]; then
         BINARY_BYTES=$(stat -f%z "$bin" 2>/dev/null || stat -c%s "$bin" 2>/dev/null || echo 0)
         BINARY_KB=$((BINARY_BYTES / 1024))
@@ -75,62 +75,70 @@ fi
 echo ""
 echo "Patching AGENTS.md..."
 
-# Patch AGENTS.md "Current scale" line
+# "Current scale" line (test count, channels, lines, etc.)
 sed -i.bak -E \
     "s/Current scale: \*\*[^*]+\*\*/Current scale: **${SRC_COUNT} source + header files, ~${C_LINES_K}K lines of C, ~${TEST_LINES_K}K lines of tests, ${TEST_COUNT_FMT} tests, ${CHANNEL_COUNT} channels**/" \
     AGENTS.md && rm -f AGENTS.md.bak
 
+# "tests/" repo-map line (test files + test count)
+sed -i.bak -E \
+    "s|tests/[[:space:]]+[0-9]+ test files, [0-9,]+\+? tests|tests/                 ${TEST_FILES} test files, ${TEST_COUNT_FMT}+ tests|" \
+    AGENTS.md && rm -f AGENTS.md.bak
+
+# "tools/" repo-map line (tool count)
+sed -i.bak -E \
+    "s|tools/[[:space:]]+[0-9]+ tool implementations|tools/                ${TOOL_COUNT} tool implementations|" \
+    AGENTS.md && rm -f AGENTS.md.bak
+
+# "channels/" repo-map line (channel count)
+sed -i.bak -E \
+    "s|channels/[[:space:]]+[0-9]+ channel implementations|channels/             ${CHANNEL_COUNT} channel implementations|" \
+    AGENTS.md && rm -f AGENTS.md.bak
+
+# Binary size — all ~NNN KB references
+if [ "$BINARY_KB" != "unknown" ]; then
+    sed -i.bak -E \
+        "s/~[0-9]+ KB/~${BINARY_KB} KB/g" \
+        AGENTS.md && rm -f AGENTS.md.bak
+fi
+
+# "All N+ tests" rule-of-thumb line
+sed -i.bak -E \
+    "s/All [0-9,]+\+ tests must pass/All ${TEST_COUNT_FMT}+ tests must pass/" \
+    AGENTS.md && rm -f AGENTS.md.bak
+
 echo "Patching README.md..."
 
-# Patch README.md tagline (line with tests · providers · channels · tools)
+# Test count — all "NNNN tests" / "NNNN+ tests" references
 sed -i.bak -E \
-    "s/[0-9,]+ tests/${TEST_COUNT_FMT} tests/g" \
+    "s/[0-9,]+\+? tests/${TEST_COUNT_FMT}+ tests/g" \
     README.md && rm -f README.md.bak
 
-# Patch README.md "Tests:" lines
+# "Tests:" stat line
 sed -i.bak -E \
     "s/Tests:[[:space:]]+[0-9,]+ passing/Tests:         ${TEST_COUNT_FMT} passing/" \
     README.md && rm -f README.md.bak
 
-# Patch README.md "tests/" stat line
+# "tests/" stat line
 sed -i.bak -E \
-    "s|tests/[[:space:]]+[0-9]+ test files, [0-9,]+ tests|tests/ ${TEST_FILES} test files, ${TEST_COUNT_FMT} tests|" \
+    "s|tests/[[:space:]]+[0-9]+ test files, [0-9,]+\+? tests|tests/ ${TEST_FILES} test files, ${TEST_COUNT_FMT} tests|" \
     README.md && rm -f README.md.bak
 
-echo "Patching STUBS.md..."
+# "# run all tests" comment with count
+sed -i.bak -E \
+    "s/# [0-9,]+ tests$/# ${TEST_COUNT_FMT} tests/" \
+    README.md && rm -f README.md.bak
 
-if [ -f STUBS.md ]; then
-    # Patch test count
+# Binary size — all ~NNN KB references
+if [ "$BINARY_KB" != "unknown" ]; then
     sed -i.bak -E \
-        "s/Tests passing[[:space:]]+\| \*\*[^*]+\*\*/Tests passing                  | **${TEST_COUNT}\/${TEST_COUNT} (100%)**/" \
-        STUBS.md && rm -f STUBS.md.bak
-
-    # Patch lines of code
-    sed -i.bak -E \
-        "s/Lines of C\/H\/ASM code[[:space:]]+\| \*\*~[0-9]+K\*\*/Lines of C\/H\/ASM code          | **~${C_LINES_K}K**/" \
-        STUBS.md && rm -f STUBS.md.bak
-
-    # Patch source file count
-    sed -i.bak -E \
-        "s/Source files \(src\/ \+ include\/\)[[:space:]]*\| \*\*[0-9]+\*\*/Source files (src\/ + include\/) | **${SRC_COUNT}**/" \
-        STUBS.md && rm -f STUBS.md.bak
-
-    # Patch test file count
-    sed -i.bak -E \
-        "s/Test files[[:space:]]+\| [0-9]+/Test files                     | ${TEST_FILES}/" \
-        STUBS.md && rm -f STUBS.md.bak
-
-    # Patch binary size
-    if [ "$BINARY_KB" != "unknown" ]; then
-        sed -i.bak -E \
-            "s/Binary size \(MinSizeRel\+LTO\)[[:space:]]+\| \*\*~[0-9]+ KB\*\*/Binary size (MinSizeRel+LTO)   | **~${BINARY_KB} KB**/" \
-            STUBS.md && rm -f STUBS.md.bak
-    fi
-
-    # Update date
-    sed -i.bak -E \
-        "s/Last updated: [0-9]{4}-[0-9]{2}-[0-9]{2}/Last updated: $(date +%Y-%m-%d)/" \
-        STUBS.md && rm -f STUBS.md.bak
+        "s/~[0-9]+ KB/~${BINARY_KB} KB/g" \
+        README.md && rm -f README.md.bak
 fi
 
-echo "Done. Review changes with: git diff AGENTS.md README.md STUBS.md"
+# Tools count in tagline and feature list (60+ → actual)
+sed -i.bak -E \
+    "s/[0-9]+ channels, [0-9]+\+ tools/${CHANNEL_COUNT} channels, ${TOOL_COUNT}+ tools/g" \
+    README.md && rm -f README.md.bak
+
+echo "Done. Review changes with: git diff AGENTS.md README.md"

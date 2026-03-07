@@ -141,6 +141,16 @@ persona-create-test: build
     ./build/seaclaw persona show just_test
     echo "Persona smoke test passed"
 
+# ── Stats ────────────────────────────────────────────────────────────────
+
+# Update metrics in AGENTS.md, README.md, PROJECT_STATUS.md
+update-stats: build
+    @scripts/update-stats.sh --apply
+
+# Dry-run stats (show what would change)
+stats: build
+    @scripts/update-stats.sh
+
 # ── Info ─────────────────────────────────────────────────────────────────
 
 # Show binary size and test count

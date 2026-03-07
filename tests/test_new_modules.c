@@ -787,9 +787,6 @@ static void test_migration_run_null_stats_fails(void) {
     SC_ASSERT_NEQ(err, SC_OK);
 }
 
-#if 0
-static size_t g_migration_progress_invoked_cur, g_migration_progress_invoked_tot;
-#endif
 static void migration_progress_invoked_cb(void *ctx, size_t cur, size_t tot) {
     size_t *p = (size_t *)ctx;
     p[0] = cur;

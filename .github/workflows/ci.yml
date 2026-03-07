@@ -10,6 +10,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
+      - name: Cache CMake build
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: ${{ runner.os }}-cmake-${{ hashFiles('CMakeLists.txt', 'src/**', 'include/**') }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-
       - uses: ./.github/actions/setup-build
         with:
           enable-asan: "true"
@@ -29,8 +36,8 @@ jobs:
         run: |
           COUNT=$(./build/seaclaw_tests 2>&1 | grep -oE '[0-9]+/[0-9]+ passed' | head -1 | cut -d/ -f1)
           echo "Test count: $COUNT"
-          if [ "$COUNT" -lt 2900 ]; then
-            echo "Test count regression: $COUNT < 2900 baseline"
+          if [ "$COUNT" -lt 2950 ]; then
+            echo "Test count regression: $COUNT < 2950 baseline"
             exit 1
           fi
       - name: Check for untested modules
@@ -99,7 +106,6 @@ jobs:
 
   build-android:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v4
@@ -137,6 +143,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+      - name: Build gateway
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DSC_BUILD_TESTS=OFF
+          cmake --build build -j$(nproc)
+      - name: Start gateway
+        run: |
+          nohup ./build/seaclaw gateway --port 3000 &>/dev/null &
+          sleep 2
       - name: Install
         run: cd ui && npm ci
       - name: Install Playwright browsers
@@ -218,7 +234,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y clang-format libcurl4-openssl-dev libsqlite3-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libsqlite3-dev
+          sudo apt-get install -y clang-format-18 || sudo apt-get install -y clang-format
+          if command -v clang-format-18 >/dev/null; then
+            sudo ln -sf $(which clang-format-18) /usr/local/bin/clang-format
+          fi
       - name: Run scripts/check.sh
         run: scripts/check.sh
 
@@ -283,8 +305,8 @@ jobs:
       - uses: ./.github/actions/run-tests
       - name: Generate coverage report
         run: |
-          lcov --capture --directory build --output-file coverage.info --ignore-errors mismatch
-          lcov --remove coverage.info '/usr/*' '*/tests/*' '*/vendor/*' --output-file coverage.info
+          lcov --capture --directory build --output-file coverage.info --ignore-errors mismatch,gcov
+          lcov --remove coverage.info '/usr/*' '*/tests/*' '*/vendor/*' --output-file coverage.info --ignore-errors unused
           lcov --list coverage.info | tail -20
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
@@ -363,8 +385,17 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev libcurl4-openssl-dev
       - name: Install Ollama
         run: curl -fsSL https://ollama.com/install.sh | sh
+      - name: Start Ollama server
+        run: nohup ollama serve &>/dev/null &
+      - name: Wait for Ollama
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:11434/api/version && break || sleep 1
+          done
       - name: Pull tinyllama
         run: ollama pull tinyllama
       - name: Build

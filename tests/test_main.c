@@ -83,6 +83,7 @@ void run_cli_tests(void);
 void run_vector_stores_tests(void);
 void run_memory_engines_ext_tests(void);
 void run_runtime_tests(void);
+void run_runtime_bundle_tests(void);
 void run_channel_loop_tests(void);
 void run_util_modules_tests(void);
 void run_roadmap_tests(void);
@@ -185,6 +186,7 @@ int main(void) {
     run_cli_tests();
     run_memory_engines_ext_tests();
     run_runtime_tests();
+    run_runtime_bundle_tests();
     run_channel_loop_tests();
     run_util_modules_tests();
     run_roadmap_tests();

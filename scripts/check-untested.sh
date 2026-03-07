@@ -5,7 +5,7 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-SKIP_PATTERNS="factory.c|meta_common.c|main.c"
+SKIP_PATTERNS="^factory$|^meta_common$|^main$|^main_wasi$"
 FOUND=0
 
 for src in $(find src -name '*.c' | sort); do

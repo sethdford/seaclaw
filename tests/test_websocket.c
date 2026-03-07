@@ -129,6 +129,61 @@ static void test_ws_parse_header_null_out(void) {
     SC_ASSERT_NEQ(r, 0);
 }
 
+static void test_ws_build_frame_buf_too_small_returns_zero(void) {
+    char buf[5];
+    unsigned char mask[] = {0, 0, 0, 0};
+    size_t n = sc_ws_build_frame(buf, sizeof(buf), SC_WS_OP_TEXT, "", 0, mask);
+    SC_ASSERT_EQ(n, 0u);
+}
+
+static void test_ws_build_frame_buf_insufficient_for_payload_returns_zero(void) {
+    char buf[7];
+    unsigned char mask[] = {0, 0, 0, 0};
+    const char *payload = "Hi";
+    size_t n = sc_ws_build_frame(buf, sizeof(buf), SC_WS_OP_TEXT, payload, 2, mask);
+    SC_ASSERT_EQ(n, 0u);
+}
+
+static void test_ws_parse_header_bytes_len_zero_returns_error(void) {
+    unsigned char bytes[] = {0x81, 0x05};
+    sc_ws_parsed_header_t h = {0};
+    int r = sc_ws_parse_header((const char *)bytes, 0, &h);
+    SC_ASSERT_EQ(r, -1);
+}
+
+static void test_ws_parse_header_null_out_returns_negative_one(void) {
+    unsigned char bytes[] = {0x81, 0x05};
+    int r = sc_ws_parse_header((const char *)bytes, 2, NULL);
+    SC_ASSERT_EQ(r, -1);
+}
+
+static void test_ws_parse_header_bytes_len_one_returns_error(void) {
+    unsigned char bytes[] = {0x81};
+    sc_ws_parsed_header_t h = {0};
+    int r = sc_ws_parse_header((const char *)bytes, 1, &h);
+    SC_ASSERT_EQ(r, -1);
+}
+
+static void test_ws_build_frame_payload_125_bytes_verify_size(void) {
+    char buf[256];
+    unsigned char mask[] = {0x11, 0x22, 0x33, 0x44};
+    char payload[125];
+    for (size_t i = 0; i < 125; i++)
+        payload[i] = (char)(i & 0xFF);
+    size_t n = sc_ws_build_frame(buf, sizeof(buf), SC_WS_OP_TEXT, payload, 125, mask);
+    SC_ASSERT_EQ(n, 131u); /* 2 header + 4 mask + 125 payload */
+}
+
+static void test_ws_apply_mask_roundtrip_restores_data(void) {
+    char data[] = "roundtrip test data";
+    size_t len = strlen(data);
+    unsigned char mask[] = {0xAB, 0xCD, 0xEF, 0x12};
+    sc_ws_apply_mask(data, len, mask);
+    SC_ASSERT(strcmp(data, "roundtrip test data") != 0);
+    sc_ws_apply_mask(data, len, mask);
+    SC_ASSERT_STR_EQ(data, "roundtrip test data");
+}
+
 static void test_ws_apply_mask_empty(void) {
     char payload[] = "";
     unsigned char mask[] = {1, 2, 3, 4};
@@ -190,6 +245,13 @@ void run_websocket_tests(void) {
     SC_RUN_TEST(test_ws_parse_header_close);
     SC_RUN_TEST(test_ws_parse_header_insufficient_bytes);
     SC_RUN_TEST(test_ws_parse_header_null_out);
+    SC_RUN_TEST(test_ws_build_frame_buf_too_small_returns_zero);
+    SC_RUN_TEST(test_ws_build_frame_buf_insufficient_for_payload_returns_zero);
+    SC_RUN_TEST(test_ws_parse_header_bytes_len_zero_returns_error);
+    SC_RUN_TEST(test_ws_parse_header_null_out_returns_negative_one);
+    SC_RUN_TEST(test_ws_parse_header_bytes_len_one_returns_error);
+    SC_RUN_TEST(test_ws_build_frame_payload_125_bytes_verify_size);
+    SC_RUN_TEST(test_ws_apply_mask_roundtrip_restores_data);
     SC_RUN_TEST(test_ws_apply_mask);
     SC_RUN_TEST(test_ws_apply_mask_empty);
     SC_RUN_TEST(test_ws_connect_stub);

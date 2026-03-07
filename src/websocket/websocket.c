@@ -40,6 +40,10 @@ struct sc_ws_client {
     SSL *ssl;
     SSL_CTX *ssl_ctx;
 #endif
+    char *frag_buf;
+    size_t frag_len;
+    size_t frag_cap;
+    unsigned frag_opcode;
 #endif
 };
 
@@ -589,25 +593,106 @@ sc_error_t sc_ws_recv(sc_ws_client_t *ws, sc_allocator_t *alloc, char **data_out
                 alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
             continue;
         case SC_WS_OP_PONG:
-        case SC_WS_OP_CONTINUATION:
             if (payload)
                 alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
             continue;
         case SC_WS_OP_CLOSE:
+            if (ws->frag_buf) {
+                alloc->free(alloc->ctx, ws->frag_buf, ws->frag_cap);
+                ws->frag_buf = NULL;
+                ws->frag_len = 0;
+                ws->frag_cap = 0;
+            }
             if (payload)
                 alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
             ws->sockfd = SC_WS_INVALID_SOCK;
-            return SC_ERR_IO; /* Connection closed by server */
+            return SC_ERR_IO;
         case SC_WS_OP_TEXT:
         case SC_WS_OP_BINARY:
-            *data_out = payload ? payload : (char *)alloc->alloc(alloc->ctx, 1);
-            *data_len_out = hdr.payload_len;
-            if (!*data_out && hdr.payload_len > 0)
-                return SC_ERR_OUT_OF_MEMORY;
-            if (hdr.payload_len == 0 && *data_out) {
-                (*data_out)[0] = '\0';
+            if (hdr.fin) {
+                if (ws->frag_buf) {
+                    alloc->free(alloc->ctx, ws->frag_buf, ws->frag_cap);
+                    ws->frag_buf = NULL;
+                    ws->frag_len = 0;
+                    ws->frag_cap = 0;
+                }
+                *data_out = payload ? payload : (char *)alloc->alloc(alloc->ctx, 1);
+                *data_len_out = hdr.payload_len;
+                if (!*data_out && hdr.payload_len > 0)
+                    return SC_ERR_OUT_OF_MEMORY;
+                if (hdr.payload_len == 0 && *data_out)
+                    (*data_out)[0] = '\0';
+                return SC_OK;
             }
-            return SC_OK;
+            /* First fragment of a multi-frame message */
+            if (ws->frag_buf) {
+                alloc->free(alloc->ctx, ws->frag_buf, ws->frag_cap);
+                ws->frag_buf = NULL;
+                ws->frag_len = 0;
+                ws->frag_cap = 0;
+            }
+            ws->frag_opcode = hdr.opcode;
+            ws->frag_cap = hdr.payload_len > 0 ? hdr.payload_len + 1 : 64;
+            ws->frag_buf = (char *)alloc->alloc(alloc->ctx, ws->frag_cap);
+            if (!ws->frag_buf) {
+                if (payload)
+                    alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
+                return SC_ERR_OUT_OF_MEMORY;
+            }
+            if (payload && hdr.payload_len > 0)
+                memcpy(ws->frag_buf, payload, hdr.payload_len);
+            ws->frag_len = hdr.payload_len;
+            if (payload)
+                alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
+            continue;
+        case SC_WS_OP_CONTINUATION:
+            if (!ws->frag_buf) {
+                if (payload)
+                    alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
+                continue;
+            }
+            if (hdr.payload_len > 0 && payload) {
+                size_t need = ws->frag_len + hdr.payload_len;
+                if (need > SC_WS_MAX_MSG) {
+                    alloc->free(alloc->ctx, ws->frag_buf, ws->frag_cap);
+                    ws->frag_buf = NULL;
+                    ws->frag_len = 0;
+                    ws->frag_cap = 0;
+                    alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
+                    return SC_ERR_IO;
+                }
+                if (need + 1 > ws->frag_cap) {
+                    size_t new_cap = ws->frag_cap * 2;
+                    while (new_cap < need + 1)
+                        new_cap *= 2;
+                    char *nb =
+                        (char *)alloc->realloc(alloc->ctx, ws->frag_buf, ws->frag_cap, new_cap);
+                    if (!nb) {
+                        alloc->free(alloc->ctx, ws->frag_buf, ws->frag_cap);
+                        ws->frag_buf = NULL;
+                        ws->frag_len = 0;
+                        ws->frag_cap = 0;
+                        alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
+                        return SC_ERR_OUT_OF_MEMORY;
+                    }
+                    ws->frag_buf = nb;
+                    ws->frag_cap = new_cap;
+                }
+                memcpy(ws->frag_buf + ws->frag_len, payload, hdr.payload_len);
+                ws->frag_len += hdr.payload_len;
+            }
+            if (payload)
+                alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
+            if (hdr.fin) {
+                ws->frag_buf[ws->frag_len] = '\0';
+                *data_out = ws->frag_buf;
+                *data_len_out = ws->frag_len;
+                ws->frag_buf = NULL;
+                ws->frag_len = 0;
+                ws->frag_cap = 0;
+                return SC_OK;
+            }
+            continue;
         default:
             if (payload)
                 alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
@@ -623,6 +708,12 @@ void sc_ws_close(sc_ws_client_t *ws, sc_allocator_t *alloc) {
     if (!ws)
         return;
 #if defined(SC_GATEWAY_POSIX) && !SC_IS_TEST
+    if (ws->frag_buf && alloc) {
+        alloc->free(alloc->ctx, ws->frag_buf, ws->frag_cap);
+        ws->frag_buf = NULL;
+        ws->frag_len = 0;
+        ws->frag_cap = 0;
+    }
     if (ws->sockfd != SC_WS_INVALID_SOCK) {
         char close_buf[16];
         unsigned char mask[4] = {0, 0, 0, 0};

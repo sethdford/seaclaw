@@ -118,10 +118,10 @@ static sc_error_t parse_qmd_json(sc_allocator_t *alloc, const char *json_buf, si
 sc_error_t sc_qmd_keyword_candidates(sc_allocator_t *alloc, const char *workspace_dir,
                                      size_t workspace_len, const char *query, size_t query_len,
                                      unsigned limit, sc_memory_entry_t **out, size_t *out_count) {
+    if (!alloc || !out || !out_count)
+        return SC_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_count = 0;
-    if (!alloc)
-        return SC_ERR_INVALID_ARGUMENT;
 
 #ifdef SC_IS_TEST
     (void)workspace_dir;

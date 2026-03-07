@@ -231,9 +231,7 @@ set(MEMORY_ENGINE_SOURCES
 if(SC_ENABLE_MEMORY_LRU_ENGINE)
     list(APPEND MEMORY_ENGINE_SOURCES src/memory/engines/memory_lru.c)
 endif()
-if(SC_ENABLE_SQLITE)
-    list(APPEND MEMORY_ENGINE_SOURCES src/memory/engines/sqlite.c)
-endif()
+list(APPEND MEMORY_ENGINE_SOURCES src/memory/engines/sqlite.c)
 # postgres, redis, api: always built (mock in SC_IS_TEST; real when SC_ENABLE_*)
 list(APPEND MEMORY_ENGINE_SOURCES
     src/memory/engines/postgres.c
@@ -1243,6 +1241,10 @@ if(SC_ENABLE_ASAN)
 endif()
 
 # --- Tests ---
+option(SC_BUILD_TESTS "Build the test suite" ON)
+if(NOT SC_BUILD_TESTS)
+    return()
+endif()
 enable_testing()
 
 set(SC_TEST_SOURCES
@@ -1325,6 +1327,7 @@ set(SC_TEST_SOURCES
     tests/test_cli.c
     tests/test_memory_engines_ext.c
     tests/test_runtime.c
+    tests/test_runtime_bundle.c
     tests/test_util_modules.c
     tests/test_roadmap.c
     tests/test_new_features.c
