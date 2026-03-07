@@ -1,5 +1,5 @@
 import { LitElement, html, css } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { icons } from "../icons.js";
 import { formatRelative } from "../utils.js";
 
@@ -15,6 +15,16 @@ export class ScChatSessionsPanel extends LitElement {
   @property({ type: Array }) sessions: ChatSession[] = [];
 
   @property({ type: Boolean, reflect: true }) open = false;
+
+  @state() private _searchQuery = "";
+
+  @state() private _focusedIndex = -1;
+
+  private get _filteredSessions(): ChatSession[] {
+    const q = this._searchQuery.toLowerCase();
+    if (!q) return this.sessions;
+    return this.sessions.filter((s) => s.title.toLowerCase().includes(q));
+  }
 
   static override styles = css`
     :host {
@@ -89,6 +99,38 @@ export class ScChatSessionsPanel extends LitElement {
       flex-shrink: 0;
     }
 
+    .search-wrap {
+      padding: 0 var(--sc-space-sm);
+      margin-bottom: var(--sc-space-xs);
+    }
+
+    .search-input {
+      box-sizing: border-box;
+      width: 100%;
+      padding: var(--sc-space-xs) var(--sc-space-sm);
+      background: var(--sc-bg-inset);
+      border: 1px solid var(--sc-border-subtle);
+      border-radius: var(--sc-radius);
+      color: var(--sc-text);
+      font-family: var(--sc-font);
+      font-size: var(--sc-text-sm);
+      outline: none;
+      transition: border-color var(--sc-duration-fast);
+    }
+
+    .search-input:focus {
+      border-color: var(--sc-accent);
+    }
+
+    .search-input:focus-visible {
+      outline: 2px solid var(--sc-accent);
+      outline-offset: 2px;
+    }
+
+    .search-input::placeholder {
+      color: var(--sc-text-faint);
+    }
+
     .session-list {
       flex: 1;
       overflow-y: auto;
@@ -99,6 +141,8 @@ export class ScChatSessionsPanel extends LitElement {
     }
 
     .group-label {
+      position: sticky;
+      top: 0;
       display: block;
       font-size: var(--sc-text-2xs, 10px);
       font-weight: var(--sc-weight-medium);
@@ -107,6 +151,8 @@ export class ScChatSessionsPanel extends LitElement {
       letter-spacing: 0.05em;
       padding: var(--sc-space-sm) var(--sc-space-md);
       margin-top: var(--sc-space-xs);
+      background: var(--sc-bg-surface);
+      z-index: 1;
     }
 
     .session-group:first-child .group-label {
@@ -142,6 +188,10 @@ export class ScChatSessionsPanel extends LitElement {
     .session-item.active {
       border-left-color: var(--sc-accent);
       background: color-mix(in srgb, var(--sc-accent) 8%, var(--sc-bg-surface));
+    }
+
+    .session-item.focused {
+      background: var(--sc-bg-elevated);
     }
 
     .session-item:focus-visible {
@@ -209,6 +259,14 @@ export class ScChatSessionsPanel extends LitElement {
       height: 14px;
     }
 
+    .empty-state {
+      padding: var(--sc-space-lg);
+      text-align: center;
+      font-size: var(--sc-text-sm);
+      color: var(--sc-text-muted);
+      font-family: var(--sc-font);
+    }
+
     @media (prefers-reduced-motion: reduce) {
       :host {
         opacity: 1;
@@ -217,7 +275,8 @@ export class ScChatSessionsPanel extends LitElement {
       }
       .new-chat-btn,
       .session-item,
-      .delete-btn {
+      .delete-btn,
+      .search-input {
         transition: none;
       }
     }
@@ -253,19 +312,23 @@ export class ScChatSessionsPanel extends LitElement {
     );
   }
 
-  private _groupSessions(): Array<{ label: string; sessions: ChatSession[] }> {
+  private _groupSessions(
+    sessions: ChatSession[],
+  ): Array<{ label: string; sessions: ChatSession[] }> {
     const now = Date.now();
     const day = 86400000;
     const today: ChatSession[] = [];
     const yesterday: ChatSession[] = [];
     const thisWeek: ChatSession[] = [];
+    const thisMonth: ChatSession[] = [];
     const older: ChatSession[] = [];
 
-    for (const s of this.sessions) {
+    for (const s of sessions) {
       const age = now - s.ts;
       if (age < day) today.push(s);
       else if (age < 2 * day) yesterday.push(s);
       else if (age < 7 * day) thisWeek.push(s);
+      else if (age < 30 * day) thisMonth.push(s);
       else older.push(s);
     }
 
@@ -273,8 +336,26 @@ export class ScChatSessionsPanel extends LitElement {
     if (today.length) groups.push({ label: "Today", sessions: today });
     if (yesterday.length) groups.push({ label: "Yesterday", sessions: yesterday });
     if (thisWeek.length) groups.push({ label: "This Week", sessions: thisWeek });
+    if (thisMonth.length) groups.push({ label: "This Month", sessions: thisMonth });
     if (older.length) groups.push({ label: "Older", sessions: older });
     return groups;
+  }
+
+  private _onListKeydown(e: KeyboardEvent): void {
+    const groups = this._groupSessions(this._filteredSessions);
+    const flatSessions = groups.flatMap((g) => g.sessions);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      this._focusedIndex = Math.min(this._focusedIndex + 1, flatSessions.length - 1);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      this._focusedIndex = Math.max(this._focusedIndex - 1, 0);
+    } else if (e.key === "Enter" && this._focusedIndex >= 0 && flatSessions[this._focusedIndex]) {
+      e.preventDefault();
+      this._onSelect(flatSessions[this._focusedIndex].id);
+    } else if (e.key === "Escape") {
+      this._focusedIndex = -1;
+    }
   }
 
   private _startRename(e: Event, _s: ChatSession): void {
@@ -312,54 +393,88 @@ export class ScChatSessionsPanel extends LitElement {
   }
 
   override render() {
+    const filteredGroups = this._groupSessions(this._filteredSessions);
+    let startIndex = 0;
+    const groupsWithIndices = filteredGroups.map((g) => {
+      const result = { ...g, startIndex };
+      startIndex += g.sessions.length;
+      return result;
+    });
+
     return html`
       <div class="panel" role="navigation" aria-label="Chat sessions">
         <button type="button" class="new-chat-btn" @click=${this._onNewChat} aria-label="New chat">
           ${icons["file-text"]} New Chat
         </button>
-        <div class="session-list">
-          ${this._groupSessions().map(
-            (group) => html`
-              <div class="session-group">
-                <span class="group-label">${group.label}</span>
-                ${group.sessions.map(
-                  (s) => html`
-                    <div
-                      class="session-item ${s.active ? "active" : ""}"
-                      role="button"
-                      tabindex="0"
-                      @click=${() => this._onSelect(s.id)}
-                      @keydown=${(e: KeyboardEvent) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          this._onSelect(s.id);
-                        }
-                      }}
-                    >
-                      <div class="session-content">
-                        <span
-                          class="session-title"
-                          @dblclick=${(e: Event) => this._startRename(e, s)}
-                          @blur=${(e: Event) => this._finishRename(e, s.id)}
-                          @keydown=${(e: KeyboardEvent) => this._renameKeydown(e, s.id)}
-                          >${s.title || "Untitled"}</span
+        <div class="search-wrap">
+          <input
+            class="search-input"
+            type="text"
+            placeholder="Search sessions..."
+            .value=${this._searchQuery}
+            @input=${(e: Event) => {
+              this._searchQuery = (e.target as HTMLInputElement).value;
+              this._focusedIndex = -1;
+            }}
+            aria-label="Search sessions"
+          />
+        </div>
+        <div
+          class="session-list"
+          role="listbox"
+          tabindex="0"
+          aria-label="Session list"
+          @keydown=${this._onListKeydown}
+        >
+          ${filteredGroups.length === 0
+            ? html`<div class="empty-state">No sessions found</div>`
+            : groupsWithIndices.map((group) => {
+                return html`
+                  <div class="session-group">
+                    <span class="group-label">${group.label}</span>
+                    ${group.sessions.map((s, si) => {
+                      const flatIndex = group.startIndex + si;
+                      const isFocused = flatIndex === this._focusedIndex;
+                      return html`
+                        <div
+                          class="session-item ${s.active ? "active" : ""} ${isFocused
+                            ? "focused"
+                            : ""}"
+                          role="option"
+                          tabindex="-1"
+                          aria-selected=${isFocused}
+                          @click=${() => this._onSelect(s.id)}
+                          @keydown=${(e: KeyboardEvent) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              this._onSelect(s.id);
+                            }
+                          }}
                         >
-                        <span class="session-ts">${formatRelative(s.ts)}</span>
-                      </div>
-                      <button
-                        type="button"
-                        class="delete-btn"
-                        aria-label="Delete session"
-                        @click=${(e: Event) => this._onDelete(e, s.id)}
-                      >
-                        ${icons.x}
-                      </button>
-                    </div>
-                  `,
-                )}
-              </div>
-            `,
-          )}
+                          <div class="session-content">
+                            <span
+                              class="session-title"
+                              @dblclick=${(e: Event) => this._startRename(e, s)}
+                              @blur=${(e: Event) => this._finishRename(e, s.id)}
+                              @keydown=${(e: KeyboardEvent) => this._renameKeydown(e, s.id)}
+                              >${s.title || "Untitled"}</span
+                            >
+                            <span class="session-ts">${formatRelative(s.ts)}</span>
+                          </div>
+                          <button
+                            type="button"
+                            class="delete-btn"
+                            aria-label="Delete session"
+                            @click=${(e: Event) => this._onDelete(e, s.id)}
+                          >
+                            ${icons.x}
+                          </button>
+                        </div>
+                      `;
+                    })}
+                  </div>
+                `;
+              })}
         </div>
       </div>
     `;
