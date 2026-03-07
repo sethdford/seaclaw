@@ -2,14 +2,14 @@ import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
+import type { DataTableColumnV2 } from "../components/sc-data-table-v2.js";
 import "../components/sc-button.js";
-import "../components/sc-card.js";
-import "../components/sc-input.js";
+import "../components/sc-data-table-v2.js";
+import "../components/sc-json-viewer.js";
 import "../components/sc-page-hero.js";
 import "../components/sc-section-header.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
-import "../components/sc-stat-card.js";
 
 interface ToolDef {
   name?: string;
@@ -24,79 +24,24 @@ export class ScToolsView extends GatewayAwareLitElement {
       display: block;
       max-width: 1200px;
     }
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--sc-space-md);
-      margin-bottom: var(--sc-space-xl);
+    .table-section {
+      margin-top: var(--sc-space-xl);
     }
-    .search {
-      margin-bottom: var(--sc-space-xl);
-      max-width: 400px;
-    }
-    .search input {
-      width: 100%;
-      padding: var(--sc-space-sm) var(--sc-space-md);
-      background: var(--sc-bg-surface);
-      border: 1px solid var(--sc-border);
+    .expand-panel {
+      margin-top: var(--sc-space-md);
+      padding: var(--sc-space-md);
+      background: var(--sc-bg-elevated);
+      border: 1px solid var(--sc-border-subtle);
       border-radius: var(--sc-radius);
-      color: var(--sc-text);
-      font-size: var(--sc-text-sm);
     }
-    .search input:focus {
-      outline: none;
-      border-color: var(--sc-accent);
-    }
-    .search input::placeholder {
-      color: var(--sc-text-muted);
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: var(--sc-space-xl);
-    }
-    .grid-full {
-      grid-column: 1 / -1;
-    }
-    .card-name {
+    .expand-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--sc-space-md);
       font-weight: var(--sc-weight-semibold);
-      font-size: var(--sc-text-lg);
-      color: var(--sc-accent-text, var(--sc-accent));
-      margin-bottom: var(--sc-space-sm);
-    }
-    .card-desc {
       font-size: var(--sc-text-base);
-      color: var(--sc-text-muted);
-      margin-bottom: var(--sc-space-sm);
-      line-height: var(--sc-leading-normal);
-    }
-    .card-schema {
-      font-size: var(--sc-text-xs);
-      font-family: var(--sc-font-mono);
-      color: var(--sc-text-muted);
-      background: var(--sc-bg);
-      padding: var(--sc-space-sm);
-      border-radius: var(--sc-radius-sm);
-      max-height: 6rem;
-      overflow: auto;
-    }
-    @media (max-width: 640px) /* --sc-breakpoint-md */ {
-      .stats-row {
-        grid-template-columns: 1fr;
-      }
-    }
-    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
-      .grid {
-        grid-template-columns: 1fr 1fr;
-      }
-      .search {
-        max-width: 100%;
-      }
-    }
-    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
-      .grid {
-        grid-template-columns: 1fr;
-      }
+      color: var(--sc-text);
     }
     @media (prefers-reduced-motion: reduce) {
       * {
@@ -107,9 +52,8 @@ export class ScToolsView extends GatewayAwareLitElement {
 
   @state() private tools: ToolDef[] = [];
   @state() private loading = true;
-  @state() private filter = "";
   @state() private error = "";
-  @state() private expandedCards = new Set<string>();
+  @state() private _expandedTool: string | null = null;
 
   protected override async load(): Promise<void> {
     await this.loadTools();
@@ -132,59 +76,65 @@ export class ScToolsView extends GatewayAwareLitElement {
     }
   }
 
-  private toggleSchema(name: string): void {
-    const next = new Set(this.expandedCards);
-    if (next.has(name)) next.delete(name);
-    else next.add(name);
-    this.expandedCards = next;
+  private get tableRows(): Record<string, unknown>[] {
+    return this.tools.map((t) => ({
+      name: t.name ?? "unnamed",
+      description: t.description ?? "",
+      paramsCount: Array.isArray(t.parameters)
+        ? t.parameters.length
+        : t.parameters != null && typeof t.parameters === "object"
+          ? Object.keys(t.parameters as Record<string, unknown>).length
+          : 0,
+      parameters: t.parameters,
+    }));
   }
 
-  private get filteredTools(): ToolDef[] {
-    const q = this.filter.toLowerCase().trim();
-    if (!q) return this.tools;
-    return this.tools.filter(
-      (t) =>
-        (t.name ?? "").toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q),
-    );
+  private readonly columns: DataTableColumnV2[] = [
+    { key: "name", label: "Name", sortable: true },
+    { key: "description", label: "Description" },
+    {
+      key: "paramsCount",
+      label: "Parameters",
+      align: "right",
+      sortable: true,
+      render: (v) => (v != null && typeof v === "number" ? String(v) : "0"),
+    },
+  ];
+
+  private _onRowClick(e: CustomEvent<{ row: Record<string, unknown>; index: number }>): void {
+    const name = String(e.detail.row.name ?? "");
+    this._expandedTool = this._expandedTool === name ? null : name;
+  }
+
+  private get _expandedToolData(): unknown {
+    if (!this._expandedTool) return undefined;
+    const t = this.tools.find((x) => (x.name ?? "unnamed") === this._expandedTool);
+    return t?.parameters;
   }
 
   private _renderSkeleton() {
     return html`
-      <div class="search">
-        <sc-input type="text" placeholder="Search tools..." disabled></sc-input>
-      </div>
-      <div class="grid sc-stagger">
-        <sc-skeleton variant="card" height="80px"></sc-skeleton>
-        <sc-skeleton variant="card" height="80px"></sc-skeleton>
-        <sc-skeleton variant="card" height="80px"></sc-skeleton>
-        <sc-skeleton variant="card" height="80px"></sc-skeleton>
+      <sc-page-hero>
+        <sc-section-header heading="Tools" description="Loading..."></sc-section-header>
+      </sc-page-hero>
+      <div class="table-section">
+        <sc-skeleton variant="card" height="200px"></sc-skeleton>
       </div>
     `;
   }
 
   private _renderContent() {
-    const filtered = this.filteredTools;
-    const totalTools = this.tools.length;
-    const enabledTools = this.tools.length;
+    const rows = this.tableRows;
+    const count = this.tools.length;
+    const expandedParams = this._expandedToolData;
+
     return html`
       <sc-page-hero>
         <sc-section-header
           heading="Tools"
-          description="Available capabilities and tool integrations"
+          description=${`${count} tool${count === 1 ? "" : "s"} available`}
         ></sc-section-header>
       </sc-page-hero>
-      <div class="stats-row">
-        <sc-stat-card
-          .value=${totalTools}
-          label="Total Tools"
-          style="--sc-stagger-delay: 0ms"
-        ></sc-stat-card>
-        <sc-stat-card
-          .value=${enabledTools}
-          label="Enabled"
-          style="--sc-stagger-delay: 80ms"
-        ></sc-stat-card>
-      </div>
       ${this.error
         ? html`<sc-empty-state
             .icon=${icons.warning}
@@ -192,56 +142,46 @@ export class ScToolsView extends GatewayAwareLitElement {
             description=${this.error}
           ></sc-empty-state>`
         : nothing}
-      <div class="search" role="search" aria-label="Filter tools">
-        <sc-input
-          type="text"
-          placeholder="Search tools..."
-          aria-label="Search tools"
-          .value=${this.filter}
-          @sc-input=${(e: CustomEvent<{ value: string }>) => {
-            this.filter = e.detail.value;
-          }}
-        ></sc-input>
-      </div>
-      <div class="grid sc-stagger">
-        ${filtered.length === 0
+      <div class="table-section" role="region" aria-label="Tools table">
+        ${rows.length === 0
           ? html`
-              <div class="grid-full">
-                <sc-empty-state
-                  .icon=${icons.wrench}
-                  heading="No tools available"
-                  description="Tools will appear here when the gateway provides them."
-                ></sc-empty-state>
-              </div>
+              <sc-empty-state
+                .icon=${icons.wrench}
+                heading="No tools available"
+                description="Tools will appear here when the gateway provides them."
+              ></sc-empty-state>
             `
-          : filtered.map(
-              (t) => html`
-                <sc-card glass>
-                  <div class="card-name">${t.name ?? "unnamed"}</div>
-                  <div class="card-desc">${t.description ?? ""}</div>
-                  ${t.parameters != null
-                    ? html`
+          : html`
+              <sc-data-table-v2
+                .columns=${this.columns}
+                .rows=${rows}
+                searchable
+                @sc-row-click=${this._onRowClick}
+              ></sc-data-table-v2>
+              ${expandedParams !== undefined
+                ? html`
+                    <div class="expand-panel" role="region" aria-label="Parameter schema">
+                      <div class="expand-panel-header">
+                        <span>Parameters: ${this._expandedTool}</span>
                         <sc-button
                           variant="ghost"
                           size="sm"
-                          @click=${() => this.toggleSchema(t.name ?? "")}
-                          aria-expanded=${this.expandedCards.has(t.name ?? "")}
-                          aria-label=${`${this.expandedCards.has(t.name ?? "") ? "Hide" : "Show"} parameters for ${t.name ?? "tool"}`}
+                          @click=${() => {
+                            this._expandedTool = null;
+                          }}
+                          aria-label="Close parameter view"
                         >
-                          ${this.expandedCards.has(t.name ?? "") ? "Hide params" : "Show params"}
+                          Close
                         </sc-button>
-                        ${this.expandedCards.has(t.name ?? "")
-                          ? html`
-                              <pre class="card-schema">
-${JSON.stringify(t.parameters, null, 2)}</pre
-                              >
-                            `
-                          : ""}
-                      `
-                    : ""}
-                </sc-card>
-              `,
-            )}
+                      </div>
+                      <sc-json-viewer
+                        .data=${expandedParams}
+                        root-label="parameters"
+                      ></sc-json-viewer>
+                    </div>
+                  `
+                : nothing}
+            `}
       </div>
     `;
   }
