@@ -9,6 +9,7 @@
 #include "seaclaw/gateway/event_bridge.h"
 #include "seaclaw/gateway/openai_compat.h"
 #include "seaclaw/gateway/rate_limit.h"
+#include "seaclaw/gateway/thread_pool.h"
 #include "seaclaw/gateway/ws_server.h"
 #include "seaclaw/health.h"
 #include "seaclaw/security.h"
