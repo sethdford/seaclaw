@@ -119,8 +119,16 @@ static sc_error_t homeassistant_execute(void *ctx, sc_allocator_t *alloc,
             *out = sc_tool_result_fail("entity_id too long", 18);
             return SC_OK;
         }
+        if (strchr(entity_id, '/') || strstr(entity_id, "..")) {
+            *out = sc_tool_result_fail("invalid entity_id", 17);
+            return SC_OK;
+        }
         char api_url[512];
-        snprintf(api_url, sizeof(api_url), "%s/api/states/%s", url, entity_id);
+        int eid_n = snprintf(api_url, sizeof(api_url), "%s/api/states/%s", url, entity_id);
+        if (eid_n < 0 || (size_t)eid_n >= sizeof(api_url)) {
+            *out = sc_tool_result_fail("url too long", 12);
+            return SC_OK;
+        }
         sc_http_response_t resp = {0};
         sc_error_t err = sc_http_get(alloc, api_url, auth, &resp);
         if (err != SC_OK || resp.status_code != 200) {

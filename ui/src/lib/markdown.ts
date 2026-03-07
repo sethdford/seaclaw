@@ -136,8 +136,24 @@ function renderToken(token: Token, options?: RenderOptions): TemplateResult | ty
   switch (token.type) {
     case "heading": {
       const h = token as Tokens.Heading;
-      const tag = `h${h.depth}` as "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
-      return html`<${tag} class="md-heading">${renderInlineTokens(h.tokens, options)}</${tag}>`;
+      const content = renderInlineTokens(h.tokens, options);
+      const cls = "md-heading";
+      switch (h.depth) {
+        case 1:
+          return html`<h1 class=${cls}>${content}</h1>`;
+        case 2:
+          return html`<h2 class=${cls}>${content}</h2>`;
+        case 3:
+          return html`<h3 class=${cls}>${content}</h3>`;
+        case 4:
+          return html`<h4 class=${cls}>${content}</h4>`;
+        case 5:
+          return html`<h5 class=${cls}>${content}</h5>`;
+        case 6:
+          return html`<h6 class=${cls}>${content}</h6>`;
+        default:
+          return html`<h1 class=${cls}>${content}</h1>`;
+      }
     }
     case "paragraph": {
       const p = token as Tokens.Paragraph;
