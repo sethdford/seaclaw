@@ -470,7 +470,7 @@ export class ScConfigView extends GatewayAwareLitElement {
   private _renderSaveStatusBadge(): TemplateResult | typeof nothing {
     if (this.saving) return html`<sc-badge variant="warning">Saving...</sc-badge>`;
     if (this.saveStatus === "saved") return html`<sc-badge variant="success">Saved</sc-badge>`;
-    if (this.hasChanges()) return html`<sc-badge variant="warning">Unsaved</sc-badge>`;
+    if (this.hasChanges()) return html`<sc-badge variant="warning">Unsaved changes</sc-badge>`;
     if (this.saveStatus === "error")
       return html`<sc-badge variant="error">${this.errorMessage || "Error"}</sc-badge>`;
     return nothing;

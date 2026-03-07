@@ -4,13 +4,13 @@ import type { GatewayClient } from "../gateway.js";
 import { GatewayClient as GatewayClientClass } from "../gateway.js";
 import type { GatewayStatus } from "../gateway.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
-import { SESSION_KEY_VOICE, formatRelative } from "../utils.js";
+import { SESSION_KEY_VOICE } from "../utils.js";
+import type { ChatItem } from "../controllers/chat-controller.js";
 import { icons } from "../icons.js";
 import { ScToast } from "../components/sc-toast.js";
 import "../components/sc-button.js";
 import "../components/sc-skeleton.js";
-import "../components/sc-message-stream.js";
-import "../components/sc-thinking.js";
+import "../components/sc-message-thread.js";
 
 type VoiceStatus = "idle" | "listening" | "processing" | "unsupported";
 
@@ -114,6 +114,13 @@ export class ScVoiceView extends GatewayAwareLitElement {
       display: flex;
       align-items: center;
       gap: var(--sc-space-sm);
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: var(--sc-space-md);
+      margin-bottom: var(--sc-space-lg);
     }
 
     .staleness {
@@ -533,6 +540,9 @@ export class ScVoiceView extends GatewayAwareLitElement {
   @state() private _messages: VoiceMessage[] = [];
   @state() private _connectionStatus: GatewayStatus = "disconnected";
   @state() private _loading = true;
+  @state() private _sessionStartTs: number | null = null;
+  @state() private _sessionDurationSec = 0;
+  private _durationTimer: ReturnType<typeof setInterval> | null = null;
 
   private gatewayHandler = (e: Event): void => this.onGatewayEvent(e);
   private statusHandler = (e: Event): void => {
@@ -542,6 +552,29 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
   private get _cacheKey(): string {
     return `sc-voice-messages`;
+  }
+
+  private get _sessionCountKey(): string {
+    return `sc-voice-session-count`;
+  }
+
+  private get _sessionCount(): number {
+    try {
+      const raw = sessionStorage.getItem(this._sessionCountKey);
+      const n = raw ? parseInt(raw, 10) : 1;
+      return Number.isFinite(n) && n >= 1 ? n : 1;
+    } catch {
+      return 1;
+    }
+  }
+
+  private _incrementSessionCount(): void {
+    try {
+      const next = this._sessionCount + 1;
+      sessionStorage.setItem(this._sessionCountKey, String(next));
+    } catch {
+      /* ignore */
+    }
   }
 
   private _cacheMessages(): void {
@@ -602,6 +635,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   }
 
   override disconnectedCallback(): void {
+    this._stopDurationTimer();
     this._boundGateway?.removeEventListener(GatewayClientClass.EVENT_GATEWAY, this.gatewayHandler);
     this._boundGateway?.removeEventListener(
       GatewayClientClass.EVENT_STATUS,
@@ -610,6 +644,68 @@ export class ScVoiceView extends GatewayAwareLitElement {
     this._boundGateway = null;
     this.stopRecognition();
     super.disconnectedCallback();
+  }
+
+  private _startDurationTimer(): void {
+    if (this._durationTimer) return;
+    this._sessionStartTs = Date.now();
+    this._sessionDurationSec = 0;
+    this._durationTimer = setInterval(() => {
+      if (this._sessionStartTs) {
+        this._sessionDurationSec = Math.floor((Date.now() - this._sessionStartTs) / 1000);
+        this.requestUpdate();
+      }
+    }, 1000);
+  }
+
+  private _stopDurationTimer(): void {
+    if (this._durationTimer) {
+      clearInterval(this._durationTimer);
+      this._durationTimer = null;
+    }
+    this._sessionStartTs = null;
+    this._sessionDurationSec = 0;
+  }
+
+  private _formatDuration(sec: number): string {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `0:${String(s).padStart(2, "0")}`;
+  }
+
+  private _newSession(): void {
+    this._messages = [];
+    this._stopDurationTimer();
+    this._cacheMessages();
+    this._incrementSessionCount();
+    this.requestUpdate();
+    ScToast.show({ message: "New session started", variant: "info" });
+  }
+
+  private _exportConversation(): void {
+    if (this._messages.length === 0) {
+      ScToast.show({ message: "No conversation to export", variant: "info" });
+      return;
+    }
+    const lines = this._messages.map((m) => `**${m.role}:**\n${m.content}`);
+    const md = lines.join("\n\n");
+    const blob = new Blob([md], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `voice-conversation-${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    ScToast.show({ message: "Conversation exported", variant: "success" });
+  }
+
+  private get _chatItems(): ChatItem[] {
+    return this._messages.map((m) => ({
+      type: "message" as const,
+      role: m.role,
+      content: m.content,
+      ts: m.ts,
+    }));
   }
 
   private _findLastAssistantIdx(): number {
@@ -727,7 +823,9 @@ export class ScVoiceView extends GatewayAwareLitElement {
     const text = this.transcript.trim();
     const gw = this.gateway;
     if (!text || !gw) return;
+    const wasEmpty = this._messages.length === 0;
     this._messages = [...this._messages, { role: "user", content: text, ts: Date.now() }];
+    if (wasEmpty) this._startDurationTimer();
     this.transcript = "";
     this.voiceStatus = "processing";
     this._cacheMessages();
@@ -767,8 +865,15 @@ export class ScVoiceView extends GatewayAwareLitElement {
   override render() {
     if (this._loading) return this._renderSkeleton();
     return html`
-      ${this._renderHero()} ${this._renderConversation()} ${this._renderVoiceZone()}
-      ${this._renderInputBar()}
+      ${this._renderHero()}
+      <div class="stats-row">
+        <sc-stat-card
+          .value=${this._messages.length}
+          label="Messages"
+          style="--sc-stagger-delay: 0ms"
+        ></sc-stat-card>
+      </div>
+      ${this._renderConversation()} ${this._renderVoiceZone()} ${this._renderInputBar()}
     `;
   }
 

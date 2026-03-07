@@ -121,7 +121,7 @@ void sc_synth_report_final(void) {
     printf("\n");
 }
 
-static bool write_tmp_config(uint16_t port, char *tmpdir, size_t tmpdir_len) {
+static bool write_tmp_config(const sc_synth_config_t *cfg, char *tmpdir, size_t tmpdir_len) {
     snprintf(tmpdir, tmpdir_len, "/tmp/sc_synth_XXXXXX");
     if (!mkdtemp(tmpdir))
         return false;
@@ -133,14 +133,20 @@ static bool write_tmp_config(uint16_t port, char *tmpdir, size_t tmpdir_len) {
     FILE *f = fopen(cfgpath, "w");
     if (!f)
         return false;
-    fprintf(f, "{\"gateway\":{\"port\":%u}}", port);
+    fprintf(f,
+            "{\n"
+            "  \"default_provider\": \"gemini\",\n"
+            "  \"default_model\": \"%s\",\n"
+            "  \"providers\": [{\"name\": \"gemini\", \"api_key\": \"%s\"}],\n"
+            "  \"gateway\": {\"port\": %u}\n"
+            "}",
+            cfg->gemini_model, cfg->gemini_api_key ? cfg->gemini_api_key : "", cfg->gateway_port);
     fclose(f);
     return true;
 }
 
-pid_t sc_synth_gateway_start(const char *binary, uint16_t port, char *tmpdir_out,
-                             size_t tmpdir_len) {
-    if (!write_tmp_config(port, tmpdir_out, tmpdir_len)) {
+pid_t sc_synth_gateway_start(const sc_synth_config_t *cfg, char *tmpdir_out, size_t tmpdir_len) {
+    if (!write_tmp_config(cfg, tmpdir_out, tmpdir_len)) {
         SC_SYNTH_LOG("failed to write temp gateway config");
         return -1;
     }
@@ -149,7 +155,7 @@ pid_t sc_synth_gateway_start(const char *binary, uint16_t port, char *tmpdir_out
         setenv("HOME", tmpdir_out, 1);
         freopen("/dev/null", "w", stdout);
         freopen("/dev/null", "w", stderr);
-        execl(binary, binary, "gateway", (char *)NULL);
+        execl(cfg->binary_path, cfg->binary_path, "gateway", (char *)NULL);
         _exit(127);
     }
     return pid;
@@ -316,9 +322,9 @@ int main(int argc, char **argv) {
     char gw_tmpdir[256] = {0};
 
     if (need_gw) {
-        SC_SYNTH_LOG("starting gateway on port %u...", cfg.gateway_port);
-        gw =
-            sc_synth_gateway_start(cfg.binary_path, cfg.gateway_port, gw_tmpdir, sizeof(gw_tmpdir));
+        SC_SYNTH_LOG("starting gateway on port %u with provider gemini/%s...", cfg.gateway_port,
+                     cfg.gemini_model);
+        gw = sc_synth_gateway_start(&cfg, gw_tmpdir, sizeof(gw_tmpdir));
         if (gw < 0 || !sc_synth_gateway_wait(&alloc, cfg.gateway_port, 15)) {
             SC_SYNTH_LOG("gateway failed to start");
             if (gw > 0)

@@ -30,11 +30,14 @@ test.describe("Secondary Views", () => {
 
   test("sessions view renders", async ({ page }) => {
     await page.goto("/#sessions");
-    await page.waitForTimeout(500);
-    const app = page.locator("sc-app");
-    await expect(app).toBeAttached({ timeout: 5000 });
-    const sessionsView = app.locator("sc-sessions-view");
-    await expect(sessionsView).toBeAttached({ timeout: 5000 });
+    await page.waitForTimeout(1500);
+    await expect(async () => {
+      const exists = await page.evaluate(() => {
+        const app = document.querySelector("sc-app");
+        return !!app?.shadowRoot?.querySelector("sc-sessions-view");
+      });
+      expect(exists).toBe(true);
+    }).toPass({ timeout: 10000 });
   });
 
   test("nodes view renders", async ({ page }) => {

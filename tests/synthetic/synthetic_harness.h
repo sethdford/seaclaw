@@ -123,8 +123,7 @@ void sc_synth_regression_free_tests(sc_allocator_t *alloc, sc_synth_test_case_t 
 void sc_synth_report_category(const char *name, const sc_synth_metrics_t *m);
 void sc_synth_report_final(void);
 #include <sys/types.h>
-pid_t sc_synth_gateway_start(const char *binary, uint16_t port, char *tmpdir_out,
-                             size_t tmpdir_len);
+pid_t sc_synth_gateway_start(const sc_synth_config_t *cfg, char *tmpdir_out, size_t tmpdir_len);
 bool sc_synth_gateway_wait(sc_allocator_t *alloc, uint16_t port, int timeout_secs);
 void sc_synth_gateway_stop(pid_t pid);
 void sc_synth_gateway_cleanup(const char *tmpdir);

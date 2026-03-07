@@ -389,6 +389,8 @@ sc_error_t sc_imessage_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel
                       "FROM message m "
                       "JOIN handle h ON m.handle_id = h.ROWID "
                       "WHERE m.is_from_me = 0 AND m.text IS NOT NULL "
+                      "AND LENGTH(m.text) > 0 "
+                      "AND m.associated_message_type = 0 "
                       "AND m.ROWID > ? "
                       "ORDER BY m.ROWID ASC LIMIT ?";
 

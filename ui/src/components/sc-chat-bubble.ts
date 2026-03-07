@@ -64,10 +64,13 @@ export class ScChatBubble extends LitElement {
     .bubble.role-user {
       margin-left: auto;
       max-width: 75%;
-      background: var(--sc-accent);
-      color: var(--sc-on-accent);
-      border-radius: var(--sc-radius-2xl, 20px) var(--sc-radius-2xl, 20px) var(--sc-radius-xs, 4px)
-        var(--sc-radius-2xl, 20px);
+      background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--sc-accent) 85%, transparent),
+        var(--sc-accent-hover)
+      );
+      color: var(--sc-on-accent-text, var(--sc-on-accent));
+      border-radius: 20px 20px 6px 20px;
       animation: sc-bubble-send var(--sc-duration-moderate, 250ms)
         var(--sc-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
     }
@@ -91,11 +94,12 @@ export class ScChatBubble extends LitElement {
     .bubble.role-assistant {
       margin-right: auto;
       max-width: 85%;
-      background: var(--sc-bg-elevated);
+      background: color-mix(in srgb, var(--sc-bg-surface) 65%, transparent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       color: var(--sc-text);
-      border: 1px solid var(--sc-border-subtle);
-      border-radius: var(--sc-radius-2xl, 20px) var(--sc-radius-2xl, 20px)
-        var(--sc-radius-2xl, 20px) var(--sc-radius-xs, 4px);
+      border: 1px solid color-mix(in srgb, white 8%, transparent);
+      border-radius: 20px 20px 20px 6px;
       box-shadow: var(--sc-shadow-xs);
       animation: sc-bubble-receive var(--sc-duration-normal) var(--sc-ease-out) both;
     }
@@ -108,12 +112,24 @@ export class ScChatBubble extends LitElement {
       left: calc(-1 * var(--sc-space-sm));
       width: var(--sc-space-sm);
       height: calc(var(--sc-space-sm) + var(--sc-space-2xs));
-      background: var(--sc-bg-elevated);
+      background: color-mix(in srgb, var(--sc-bg-surface) 65%, transparent);
       clip-path: polygon(100% 0, 100% 100%, 0 100%);
     }
 
     .bubble.role-assistant.show-tail::after {
       --tail-display: block;
+    }
+
+    @media (prefers-reduced-transparency: reduce) {
+      .bubble.role-assistant {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: var(--sc-bg-surface);
+        border: 1px solid var(--sc-border-subtle);
+      }
+      .bubble.role-assistant::after {
+        background: var(--sc-bg-surface);
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -267,12 +283,12 @@ export class ScChatBubble extends LitElement {
 
     .cursor {
       display: inline-block;
-      width: var(--sc-space-2xs);
+      width: 2px;
       height: 1em;
       background: var(--sc-accent);
       margin-left: var(--sc-space-2xs);
       vertical-align: text-bottom;
-      animation: sc-blink 1s step-end infinite;
+      animation: sc-pulse var(--sc-duration-slow) var(--sc-ease-in-out) infinite;
     }
 
     .bubble.role-user .cursor {

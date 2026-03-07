@@ -11,6 +11,7 @@ import "../components/sc-page-hero.js";
 import "../components/sc-section-header.js";
 import "../components/sc-sheet.js";
 import "../components/sc-skeleton.js";
+import "../components/sc-stat-card.js";
 
 interface NodeItem {
   id?: string;
@@ -42,6 +43,12 @@ export class ScNodesView extends GatewayAwareLitElement {
     :host {
       display: block;
       max-width: 1200px;
+    }
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: var(--sc-space-md);
+      margin-bottom: var(--sc-space-2xl);
     }
     .header-actions {
       display: flex;
@@ -165,6 +172,10 @@ export class ScNodesView extends GatewayAwareLitElement {
       <sc-page-hero>
         <sc-section-header heading="Nodes" description="Loading..."></sc-section-header>
       </sc-page-hero>
+      <div class="stats-row">
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+      </div>
       <div class="table-section">
         <sc-skeleton variant="card" height="200px"></sc-skeleton>
       </div>
@@ -179,6 +190,20 @@ export class ScNodesView extends GatewayAwareLitElement {
           description="Connected node instances and their status"
         ></sc-section-header>
       </sc-page-hero>
+      <div class="stats-row">
+        <sc-stat-card
+          .value=${this.nodes.length}
+          label="Total Nodes"
+          style="--sc-stagger-delay: 0ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this.nodes.filter((n) =>
+            ["ok", "healthy", "connected", "online"].includes((n.status ?? "").toLowerCase()),
+          ).length}
+          label="Healthy"
+          style="--sc-stagger-delay: 80ms"
+        ></sc-stat-card>
+      </div>
       <div class="header-actions">
         ${this.lastLoadedAt
           ? html`<span class="staleness">Last updated ${this.stalenessLabel}</span>`

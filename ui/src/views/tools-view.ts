@@ -8,6 +8,7 @@ import "../components/sc-data-table-v2.js";
 import "../components/sc-json-viewer.js";
 import "../components/sc-page-hero.js";
 import "../components/sc-section-header.js";
+import "../components/sc-stat-card.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
 
@@ -23,6 +24,12 @@ export class ScToolsView extends GatewayAwareLitElement {
     :host {
       display: block;
       max-width: 1200px;
+    }
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: var(--sc-space-md);
+      margin-bottom: var(--sc-space-2xl);
     }
     .table-section {
       margin-top: var(--sc-space-xl);
@@ -117,6 +124,11 @@ export class ScToolsView extends GatewayAwareLitElement {
       <sc-page-hero>
         <sc-section-header heading="Tools" description="Loading..."></sc-section-header>
       </sc-page-hero>
+      <div class="stats-row sc-stagger">
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+      </div>
       <div class="table-section">
         <sc-skeleton variant="card" height="200px"></sc-skeleton>
       </div>
@@ -135,6 +147,27 @@ export class ScToolsView extends GatewayAwareLitElement {
           description=${`${count} tool${count === 1 ? "" : "s"} available`}
         ></sc-section-header>
       </sc-page-hero>
+      <div class="stats-row">
+        <sc-stat-card
+          .value=${count}
+          label="Total Tools"
+          style="--sc-stagger-delay: 0ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this.tools.filter((t) => {
+            const p = t.parameters;
+            if (!p) return false;
+            return Array.isArray(p) ? p.length > 0 : Object.keys(p as object).length > 0;
+          }).length}
+          label="With Parameters"
+          style="--sc-stagger-delay: 80ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${rows.reduce((sum, r) => sum + (Number(r.paramsCount) || 0), 0)}
+          label="Total Parameters"
+          style="--sc-stagger-delay: 160ms"
+        ></sc-stat-card>
+      </div>
       ${this.error
         ? html`<sc-empty-state
             .icon=${icons.warning}

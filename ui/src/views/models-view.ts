@@ -5,6 +5,7 @@ import { icons } from "../icons.js";
 import { ScToast } from "../components/sc-toast.js";
 import "../components/sc-page-hero.js";
 import "../components/sc-section-header.js";
+import "../components/sc-stat-card.js";
 import "../components/sc-card.js";
 import "../components/sc-badge.js";
 import "../components/sc-button.js";
@@ -49,6 +50,12 @@ export class ScModelsView extends GatewayAwareLitElement {
     :host {
       display: block;
       max-width: 1200px;
+    }
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: var(--sc-space-md);
+      margin-bottom: var(--sc-space-2xl);
     }
     .info-section {
       display: grid;
@@ -289,6 +296,28 @@ export class ScModelsView extends GatewayAwareLitElement {
           </div>
         </sc-section-header>
       </sc-page-hero>
+      <div class="stats-row">
+        <sc-stat-card
+          .value=${this.providers.length}
+          label="Providers"
+          style="--sc-stagger-delay: 0ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this.providers.filter((p) => p.has_key).length}
+          label="Configured"
+          style="--sc-stagger-delay: 80ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this.providers.filter((p) => p.native_tools).length}
+          label="Native Tools"
+          style="--sc-stagger-delay: 160ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this.usageByProvider.length}
+          label="Usage Providers"
+          style="--sc-stagger-delay: 240ms"
+        ></sc-stat-card>
+      </div>
       ${this.error
         ? html`<sc-empty-state
             .icon=${icons.warning}
@@ -310,6 +339,12 @@ export class ScModelsView extends GatewayAwareLitElement {
           description="AI model providers and their configurations"
         ></sc-section-header>
       </sc-page-hero>
+      <div class="stats-row sc-stagger">
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+      </div>
       <div class="info-section sc-stagger">
         <sc-skeleton variant="card" height="80px"></sc-skeleton>
         <sc-skeleton variant="card" height="80px"></sc-skeleton>

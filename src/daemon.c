@@ -374,14 +374,56 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 count == 0)
                 continue;
 
-            for (size_t m = 0; m < count; m++) {
-                char *response = NULL;
-                size_t response_len = 0;
+            /*
+             * Batch consecutive messages from the same sender into one prompt.
+             * A real person reads all pending messages, then replies once.
+             */
+            for (size_t m = 0; m < count; /* advanced inside */) {
                 size_t content_len = strlen(msgs[m].content);
-                if (content_len == 0)
+                if (content_len == 0) {
+                    m++;
+                    continue;
+                }
+
+                const char *batch_key = msgs[m].session_key;
+                size_t key_len = strlen(batch_key);
+
+                /* Gather consecutive messages from the same sender */
+                char combined[4096];
+                size_t combined_len = 0;
+                size_t batch_start = m;
+                size_t batch_end = m;
+
+                while (m < count && strcmp(msgs[m].session_key, batch_key) == 0) {
+                    size_t mlen = strlen(msgs[m].content);
+                    if (mlen == 0) {
+                        m++;
+                        continue;
+                    }
+                    if (combined_len + mlen + 2 >= sizeof(combined))
+                        break;
+                    if (combined_len > 0)
+                        combined[combined_len++] = '\n';
+                    memcpy(combined + combined_len, msgs[m].content, mlen);
+                    combined_len += mlen;
+                    batch_end = m;
+                    m++;
+                }
+                combined[combined_len] = '\0';
+
+                if (combined_len == 0)
                     continue;
 
-                size_t key_len = strlen(msgs[m].session_key);
+#ifndef SC_IS_TEST
+                /* Reading delay: humans take time to read before responding */
+                {
+                    size_t msg_count = batch_end - batch_start + 1;
+                    unsigned int read_ms = 2500 + (unsigned int)(msg_count * 1500);
+                    if (read_ms > 8000)
+                        read_ms = 8000;
+                    usleep(read_ms * 1000);
+                }
+#endif
 
                 sc_agent_clear_history(agent);
 
@@ -471,25 +513,32 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
+                char *response = NULL;
+                size_t response_len = 0;
                 sc_error_t err =
-                    sc_agent_turn(agent, msgs[m].content, content_len, &response, &response_len);
+                    sc_agent_turn(agent, combined, combined_len, &response, &response_len);
 
-                /* Persist this exchange */
+                /* Persist each individual message + the single response */
                 if (agent->session_store && agent->session_store->vtable &&
                     agent->session_store->vtable->save_message) {
-                    agent->session_store->vtable->save_message(agent->session_store->ctx,
-                                                               msgs[m].session_key, key_len, "user",
-                                                               4, msgs[m].content, content_len);
+                    for (size_t b = batch_start; b <= batch_end; b++) {
+                        size_t blen = strlen(msgs[b].content);
+                        if (blen > 0) {
+                            agent->session_store->vtable->save_message(agent->session_store->ctx,
+                                                                       batch_key, key_len, "user",
+                                                                       4, msgs[b].content, blen);
+                        }
+                    }
                     if (err == SC_OK && response && response_len > 0) {
-                        agent->session_store->vtable->save_message(
-                            agent->session_store->ctx, msgs[m].session_key, key_len, "assistant", 9,
-                            response, response_len);
+                        agent->session_store->vtable->save_message(agent->session_store->ctx,
+                                                                   batch_key, key_len, "assistant",
+                                                                   9, response, response_len);
                     }
                 }
 
                 if (err == SC_OK && response && response_len > 0) {
-                    ch->channel->vtable->send(ch->channel->ctx, msgs[m].session_key, key_len,
-                                              response, response_len, NULL, 0);
+                    ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, response,
+                                              response_len, NULL, 0);
                 }
                 if (response) {
                     alloc->free(alloc->ctx, response, response_len + 1);

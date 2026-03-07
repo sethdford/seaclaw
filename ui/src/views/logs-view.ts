@@ -130,16 +130,12 @@ export class ScLogsView extends GatewayAwareLitElement {
     .log-area {
       flex: 1;
       min-height: 0;
-      background: var(--sc-bg-inset);
-      border: 1px solid var(--sc-border);
-      border-radius: var(--sc-radius);
       padding: var(--sc-space-md);
       overflow-y: auto;
       font-family: var(--sc-font-mono);
       font-size: var(--sc-text-sm);
       line-height: 1.6;
       color: var(--sc-text);
-      box-shadow: var(--sc-shadow-sm);
     }
     .log-area::-webkit-scrollbar {
       width: 8px;
@@ -155,26 +151,62 @@ export class ScLogsView extends GatewayAwareLitElement {
     .log-area::-webkit-scrollbar-thumb:hover {
       background: var(--sc-text-muted);
     }
-    .log-line {
-      margin-bottom: var(--sc-space-md);
-      padding: var(--sc-space-sm);
-      border-radius: var(--sc-radius-sm);
+    .log-timeline {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .log-entry {
+      display: grid;
+      grid-template-columns: 12px 1fr;
+      gap: var(--sc-space-md);
+      padding-bottom: var(--sc-space-md);
+      position: relative;
       word-break: break-word;
+      animation: sc-slide-up var(--sc-duration-normal) var(--sc-ease-out) both;
     }
-    .log-line:nth-child(odd) {
-      background: var(--sc-bg-surface);
+    .log-entry .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: var(--sc-radius-full);
+      margin-top: 6px;
+      flex-shrink: 0;
+      justify-self: center;
     }
-    .log-line:nth-child(even) {
-      background: var(--sc-bg-inset);
+    .log-entry .dot.debug {
+      background: var(--sc-text-muted);
     }
-    .log-line-header {
+    .log-entry .dot.info {
+      background: var(--sc-info);
+    }
+    .log-entry .dot.warn {
+      background: var(--sc-accent-secondary);
+    }
+    .log-entry .dot.error {
+      background: var(--sc-error);
+    }
+    .log-entry .dot.success {
+      background: var(--sc-success);
+    }
+    .log-entry .line {
+      position: absolute;
+      left: 5px;
+      top: 16px;
+      bottom: 0;
+      width: 1px;
+      background: var(--sc-border-subtle);
+    }
+    .log-entry:last-child .line {
+      display: none;
+    }
+    .log-entry-header {
       display: flex;
       align-items: center;
       gap: var(--sc-space-sm);
       margin-bottom: var(--sc-space-xs);
     }
     .log-ts {
-      color: var(--sc-text-muted);
+      color: var(--sc-text-faint);
       font-variant-numeric: tabular-nums;
       font-size: var(--sc-text-xs);
     }
@@ -183,6 +215,11 @@ export class ScLogsView extends GatewayAwareLitElement {
     }
     .json-wrapper {
       margin-top: var(--sc-space-xs);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .log-entry {
+        animation: none;
+      }
     }
     @media (max-width: 768px) /* --sc-breakpoint-lg */ {
       .header {
@@ -288,6 +325,22 @@ export class ScLogsView extends GatewayAwareLitElement {
     }
   }
 
+  /** Severity for timeline dot: debug=gray, info=blue, warn=amber, error=red, success=green */
+  private dotStatus(event: string): "debug" | "info" | "warn" | "error" | "success" {
+    switch (event) {
+      case EVENT_NAMES.CHAT:
+        return "success";
+      case EVENT_NAMES.TOOL_CALL:
+        return "info";
+      case EVENT_NAMES.ERROR:
+        return "error";
+      case EVENT_NAMES.HEALTH:
+        return "warn";
+      default:
+        return "debug";
+    }
+  }
+
   private scrollToBottom(): void {
     this.updateComplete.then(() => {
       const el = this.shadowRoot?.querySelector(".log-area");
@@ -363,7 +416,7 @@ export class ScLogsView extends GatewayAwareLitElement {
     const entries = this.filteredLogs;
     void this._relativeTimeKey;
     return html`
-      <sc-card class="log-card">
+      <sc-card class="log-card" glass>
         <div class="log-area-wrapper">
           <div class="log-area" role="log" aria-live="polite">
             ${entries.length === 0
@@ -374,21 +427,32 @@ export class ScLogsView extends GatewayAwareLitElement {
                     description="Logs will stream here in real-time as the system processes requests."
                   ></sc-empty-state>
                 `
-              : entries.map(
-                  (l) => html`
-                    <div class="log-line">
-                      <div class="log-line-header">
-                        <span class="log-ts" title=${l.ts} aria-label=${`Timestamp: ${l.ts}`}
-                          >${formatRelativeTime(l.ts)}</span
-                        >
-                        <span class="event ${this.eventClass(l.event)}">[${l.event}]</span>
-                      </div>
-                      <div class="json-wrapper">
-                        <sc-json-viewer .data=${l.payload} expandedDepth=${1}></sc-json-viewer>
-                      </div>
-                    </div>
-                  `,
-                )}
+              : html`
+                  <div class="log-timeline">
+                    ${entries.map(
+                      (l, i) => html`
+                        <div class="log-entry" style="animation-delay: ${i * 50}ms">
+                          <div class="dot ${this.dotStatus(l.event)}" aria-hidden="true"></div>
+                          <div class="line" aria-hidden="true"></div>
+                          <div class="content">
+                            <div class="log-entry-header">
+                              <span class="log-ts" title=${l.ts} aria-label=${`Timestamp: ${l.ts}`}
+                                >${formatRelativeTime(l.ts)}</span
+                              >
+                              <span class="event ${this.eventClass(l.event)}">[${l.event}]</span>
+                            </div>
+                            <div class="json-wrapper">
+                              <sc-json-viewer
+                                .data=${l.payload}
+                                expandedDepth=${1}
+                              ></sc-json-viewer>
+                            </div>
+                          </div>
+                        </div>
+                      `,
+                    )}
+                  </div>
+                `}
           </div>
         </div>
       </sc-card>

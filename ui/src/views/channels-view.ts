@@ -12,6 +12,7 @@ import "../components/sc-section-header.js";
 import "../components/sc-sheet.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-segmented-control.js";
+import "../components/sc-stat-card.js";
 
 interface ChannelStatus {
   key?: string;
@@ -33,6 +34,12 @@ export class ScChannelsView extends GatewayAwareLitElement {
     :host {
       display: block;
       max-width: 1200px;
+    }
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: var(--sc-space-md);
+      margin-bottom: var(--sc-space-2xl);
     }
     .filters {
       margin-bottom: var(--sc-space-lg);
@@ -164,6 +171,11 @@ export class ScChannelsView extends GatewayAwareLitElement {
       <sc-page-hero>
         <sc-section-header heading="Channels" description="Loading..."></sc-section-header>
       </sc-page-hero>
+      <div class="stats-row">
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+      </div>
       <div class="table-section">
         <sc-skeleton variant="card" height="200px"></sc-skeleton>
       </div>
@@ -178,6 +190,23 @@ export class ScChannelsView extends GatewayAwareLitElement {
           description="Messaging integrations and their connection status"
         ></sc-section-header>
       </sc-page-hero>
+      <div class="stats-row">
+        <sc-stat-card
+          .value=${this.channels.length}
+          label="Total Channels"
+          style="--sc-stagger-delay: 0ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this.channels.filter((ch) => ch.configured === true).length}
+          label="Configured"
+          style="--sc-stagger-delay: 80ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this.channels.filter((ch) => ch.healthy === true).length}
+          label="Healthy"
+          style="--sc-stagger-delay: 160ms"
+        ></sc-stat-card>
+      </div>
       ${this.error
         ? html`<sc-empty-state
             .icon=${icons.warning}
