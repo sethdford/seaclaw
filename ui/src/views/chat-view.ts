@@ -357,6 +357,9 @@ export class ScChatView extends GatewayAwareLitElement {
       cursor: not-allowed;
     }
     .thinking {
+      display: flex;
+      align-items: center;
+      gap: var(--sc-space-sm);
       align-self: flex-start;
       padding: var(--sc-space-sm) var(--sc-space-md);
       font-size: var(--sc-text-base);
@@ -1113,10 +1116,7 @@ export class ScChatView extends GatewayAwareLitElement {
           })()}
           ${this.isWaiting
             ? html`
-                <div
-                  class="thinking"
-                  style="display:flex;align-items:center;gap:var(--sc-space-sm)"
-                >
+                <div class="thinking">
                   <sc-thinking .active=${true} .steps=${[]}></sc-thinking>
                   <span class="stream-elapsed">${this._streamElapsed}</span>
                   <button class="abort-btn" @click=${() => this.handleAbort()}>Abort</button>
