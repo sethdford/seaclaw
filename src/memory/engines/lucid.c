@@ -805,11 +805,18 @@ sc_memory_t sc_lucid_memory_create(sc_allocator_t *alloc, const char *db_path,
     memset(self, 0, sizeof(sc_lucid_memory_t));
     self->alloc = alloc;
     self->workspace_dir = alloc->alloc(alloc->ctx, strlen(workspace_dir) + 1);
-    if (self->workspace_dir)
-        memcpy(self->workspace_dir, workspace_dir, strlen(workspace_dir) + 1);
+    if (!self->workspace_dir) {
+        alloc->free(alloc->ctx, self, sizeof(sc_lucid_memory_t));
+        return (sc_memory_t){.ctx = NULL, .vtable = NULL};
+    }
+    memcpy(self->workspace_dir, workspace_dir, strlen(workspace_dir) + 1);
     self->lucid_cmd = alloc->alloc(alloc->ctx, 6);
-    if (self->lucid_cmd)
-        memcpy(self->lucid_cmd, "lucid", 6);
+    if (!self->lucid_cmd) {
+        alloc->free(alloc->ctx, self->workspace_dir, strlen(workspace_dir) + 1);
+        alloc->free(alloc->ctx, self, sizeof(sc_lucid_memory_t));
+        return (sc_memory_t){.ctx = NULL, .vtable = NULL};
+    }
+    memcpy(self->lucid_cmd, "lucid", 6);
     return (sc_memory_t){.ctx = self, .vtable = &lucid_vtable_stub};
 }
 

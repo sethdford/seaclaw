@@ -228,14 +228,15 @@ sc_error_t sc_google_chat_create(sc_allocator_t *alloc, const char *webhook_url,
                                  size_t webhook_url_len, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_google_chat_ctx_t *c = (sc_google_chat_ctx_t *)calloc(1, sizeof(*c));
+    sc_google_chat_ctx_t *c = (sc_google_chat_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (webhook_url && webhook_url_len > 0) {
         c->webhook_url = (char *)malloc(webhook_url_len + 1);
         if (!c->webhook_url) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->webhook_url, webhook_url, webhook_url_len);
@@ -250,9 +251,11 @@ sc_error_t sc_google_chat_create(sc_allocator_t *alloc, const char *webhook_url,
 void sc_google_chat_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_google_chat_ctx_t *c = (sc_google_chat_ctx_t *)ch->ctx;
+        sc_allocator_t *a = c->alloc;
         if (c->webhook_url)
             free(c->webhook_url);
-        free(c);
+        if (a)
+            a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

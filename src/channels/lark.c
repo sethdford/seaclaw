@@ -210,15 +210,16 @@ sc_error_t sc_lark_create(sc_allocator_t *alloc, const char *app_id_or_webhook, 
                           const char *app_secret, size_t app_secret_len, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_lark_ctx_t *c = (sc_lark_ctx_t *)calloc(1, sizeof(*c));
+    sc_lark_ctx_t *c = (sc_lark_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (app_id_or_webhook && app_id_len > 0) {
         if (app_id_len >= 8 && strncmp(app_id_or_webhook, "https://", 8) == 0) {
             c->webhook_url = (char *)malloc(app_id_len + 1);
             if (!c->webhook_url) {
-                free(c);
+                alloc->free(alloc->ctx, c, sizeof(*c));
                 return SC_ERR_OUT_OF_MEMORY;
             }
             memcpy(c->webhook_url, app_id_or_webhook, app_id_len);
@@ -227,7 +228,7 @@ sc_error_t sc_lark_create(sc_allocator_t *alloc, const char *app_id_or_webhook, 
         } else {
             c->app_id = (char *)malloc(app_id_len + 1);
             if (!c->app_id) {
-                free(c);
+                alloc->free(alloc->ctx, c, sizeof(*c));
                 return SC_ERR_OUT_OF_MEMORY;
             }
             memcpy(c->app_id, app_id_or_webhook, app_id_len);
@@ -264,13 +265,14 @@ bool sc_lark_is_configured(sc_channel_t *ch) {
 void sc_lark_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_lark_ctx_t *c = (sc_lark_ctx_t *)ch->ctx;
+        sc_allocator_t *a = c->alloc;
         if (c->webhook_url)
             free(c->webhook_url);
         if (c->app_id)
             free(c->app_id);
         if (c->app_secret)
             free(c->app_secret);
-        free(c);
+        a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

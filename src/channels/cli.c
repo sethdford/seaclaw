@@ -13,6 +13,7 @@
 #endif
 
 typedef struct sc_cli_ctx {
+    sc_allocator_t *alloc;
     bool running;
 } sc_cli_ctx_t;
 
@@ -67,10 +68,13 @@ static const sc_channel_vtable_t cli_vtable = {
 };
 
 sc_error_t sc_cli_create(sc_allocator_t *alloc, sc_channel_t *out) {
-    (void)alloc;
-    sc_cli_ctx_t *c = (sc_cli_ctx_t *)calloc(1, sizeof(*c));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    sc_cli_ctx_t *c = (sc_cli_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
+    c->alloc = alloc;
     c->running = false;
     out->ctx = c;
     out->vtable = &cli_vtable;
@@ -79,7 +83,10 @@ sc_error_t sc_cli_create(sc_allocator_t *alloc, sc_channel_t *out) {
 
 void sc_cli_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
-        free(ch->ctx);
+        sc_cli_ctx_t *c = (sc_cli_ctx_t *)ch->ctx;
+        sc_allocator_t *a = c->alloc;
+        if (a)
+            a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

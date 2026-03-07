@@ -1,4 +1,6 @@
 #include "seaclaw/channels/maixcam.h"
+#include "seaclaw/core/allocator.h"
+#include "seaclaw/core/string.h"
 #include <stdint.h>
 #if defined(__linux__) && !SC_IS_TEST
 #include <fcntl.h>
@@ -120,7 +122,7 @@ sc_error_t sc_maixcam_create(sc_allocator_t *alloc, const char *host, size_t hos
         memcpy(c->host, host, host_len);
         c->host[host_len] = '\0';
     } else {
-        c->host = strdup("0.0.0.0");
+        c->host = sc_strndup(alloc, "0.0.0.0", 7);
         if (!c->host) {
             free(c);
             return SC_ERR_OUT_OF_MEMORY;

@@ -887,14 +887,15 @@ sc_error_t sc_slack_create_ex(sc_allocator_t *alloc, const char *token, size_t t
         return SC_ERR_INVALID_ARGUMENT;
     if (channel_ids_count > SLACK_MAX_CHANNELS)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_slack_ctx_t *c = (sc_slack_ctx_t *)calloc(1, sizeof(*c));
+    sc_slack_ctx_t *c = (sc_slack_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (token && token_len > 0) {
         c->token = (char *)malloc(token_len + 1);
         if (!c->token) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->token, token, token_len);
@@ -906,7 +907,7 @@ sc_error_t sc_slack_create_ex(sc_allocator_t *alloc, const char *token, size_t t
         if (!c->channel_ids) {
             if (c->token)
                 free(c->token);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         c->last_ts = (char **)calloc(channel_ids_count, sizeof(char *));
@@ -914,7 +915,7 @@ sc_error_t sc_slack_create_ex(sc_allocator_t *alloc, const char *token, size_t t
             free(c->channel_ids);
             if (c->token)
                 free(c->token);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         for (size_t i = 0; i < channel_ids_count; i++) {
@@ -928,7 +929,7 @@ sc_error_t sc_slack_create_ex(sc_allocator_t *alloc, const char *token, size_t t
                     free(c->last_ts);
                     if (c->token)
                         free(c->token);
-                    free(c);
+                    alloc->free(alloc->ctx, c, sizeof(*c));
                     return SC_ERR_OUT_OF_MEMORY;
                 }
                 memcpy(c->channel_ids[i], channel_ids[i], len + 1);
@@ -949,10 +950,11 @@ sc_error_t sc_slack_create(sc_allocator_t *alloc, const char *token, size_t toke
 void sc_slack_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_slack_ctx_t *c = (sc_slack_ctx_t *)ch->ctx;
+        sc_allocator_t *a = c->alloc;
         if (c->token)
             free(c->token);
-        if (c->bot_user_id && c->alloc)
-            c->alloc->free(c->alloc->ctx, c->bot_user_id, strlen(c->bot_user_id) + 1);
+        if (c->bot_user_id && a)
+            a->free(a->ctx, c->bot_user_id, strlen(c->bot_user_id) + 1);
         if (c->channel_ids) {
             for (size_t i = 0; i < c->channel_ids_count; i++)
                 if (c->channel_ids[i])
@@ -960,13 +962,13 @@ void sc_slack_destroy(sc_channel_t *ch) {
             free(c->channel_ids);
         }
         if (c->last_ts) {
-            if (c->alloc && c->alloc->free)
+            if (a && a->free)
                 for (size_t i = 0; i < c->channel_ids_count; i++)
                     if (c->last_ts[i])
-                        c->alloc->free(c->alloc->ctx, c->last_ts[i], strlen(c->last_ts[i]) + 1);
+                        a->free(a->ctx, c->last_ts[i], strlen(c->last_ts[i]) + 1);
             free(c->last_ts);
         }
-        free(c);
+        a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

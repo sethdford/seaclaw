@@ -270,14 +270,15 @@ sc_error_t sc_twilio_create(sc_allocator_t *alloc, const char *account_sid, size
                             sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_twilio_ctx_t *c = (sc_twilio_ctx_t *)calloc(1, sizeof(*c));
+    sc_twilio_ctx_t *c = (sc_twilio_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (account_sid && account_sid_len > 0) {
         c->account_sid = (char *)malloc(account_sid_len + 1);
         if (!c->account_sid) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->account_sid, account_sid, account_sid_len);
@@ -289,7 +290,7 @@ sc_error_t sc_twilio_create(sc_allocator_t *alloc, const char *account_sid, size
         if (!c->auth_token) {
             if (c->account_sid)
                 free(c->account_sid);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->auth_token, auth_token, auth_token_len);
@@ -303,7 +304,7 @@ sc_error_t sc_twilio_create(sc_allocator_t *alloc, const char *account_sid, size
                 free(c->auth_token);
             if (c->account_sid)
                 free(c->account_sid);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->from_number, from_number, from_number_len);
@@ -319,7 +320,7 @@ sc_error_t sc_twilio_create(sc_allocator_t *alloc, const char *account_sid, size
                 free(c->auth_token);
             if (c->account_sid)
                 free(c->account_sid);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->to_number, to_number, to_number_len);
@@ -334,6 +335,7 @@ sc_error_t sc_twilio_create(sc_allocator_t *alloc, const char *account_sid, size
 void sc_twilio_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_twilio_ctx_t *c = (sc_twilio_ctx_t *)ch->ctx;
+        sc_allocator_t *a = c->alloc;
         if (c->account_sid)
             free(c->account_sid);
         if (c->auth_token)
@@ -342,7 +344,7 @@ void sc_twilio_destroy(sc_channel_t *ch) {
             free(c->from_number);
         if (c->to_number)
             free(c->to_number);
-        free(c);
+        a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

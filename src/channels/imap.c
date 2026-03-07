@@ -199,7 +199,7 @@ sc_error_t sc_imap_create(sc_allocator_t *alloc, const sc_imap_config_t *config,
         c->imap_folder[config->imap_folder_len] = '\0';
         c->imap_folder_len = config->imap_folder_len;
     } else {
-        c->imap_folder = strdup("INBOX");
+        c->imap_folder = sc_strndup(c->alloc, "INBOX", 5);
         c->imap_folder_len = 5;
     }
 

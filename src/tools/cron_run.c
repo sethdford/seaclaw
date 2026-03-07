@@ -109,8 +109,8 @@ static const char *cron_run_params(void *ctx) {
     return CRON_RUN_PARAMS;
 }
 static void cron_run_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    free(ctx);
+    if (ctx)
+        alloc->free(alloc->ctx, ctx, sizeof(sc_cron_tool_ctx_t));
 }
 
 static const sc_tool_vtable_t cron_run_vtable = {

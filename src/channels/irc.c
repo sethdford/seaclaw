@@ -15,6 +15,7 @@
 #define IRC_RECV_BUF_SIZE   4096
 
 typedef struct sc_irc_ctx {
+    sc_allocator_t *alloc;
     char *server;
     size_t server_len;
     uint16_t port;

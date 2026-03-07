@@ -30,6 +30,19 @@ static sc_tunnel_error_t impl_start(void *ctx, uint16_t local_port, char **publi
 
     impl_stop(ctx);
 
+#if SC_IS_TEST
+    (void)local_port;
+    char *mock = sc_strdup(self->alloc, "https://test-ngrok.ngrok-free.app");
+    if (!mock)
+        return SC_TUNNEL_ERR_START_FAILED;
+    if (self->public_url)
+        self->alloc->free(self->alloc->ctx, self->public_url, strlen(self->public_url) + 1);
+    self->public_url = mock;
+    self->running = true;
+    *public_url_out = mock;
+    *url_len = strlen(mock);
+    return SC_TUNNEL_ERR_OK;
+#else
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "ngrok http %u 2>/dev/null", (unsigned)local_port);
 
@@ -78,6 +91,7 @@ static sc_tunnel_error_t impl_start(void *ctx, uint16_t local_port, char **publi
     *public_url_out = found_url;
     *url_len = strlen(found_url);
     return SC_TUNNEL_ERR_OK;
+#endif /* SC_IS_TEST */
 }
 
 static void impl_stop(void *ctx) {

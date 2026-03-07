@@ -6,7 +6,6 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include <stdbool.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define SC_WEB_MAX_TOKEN_LEN      128
@@ -212,9 +211,10 @@ sc_error_t sc_web_create_with_token(sc_allocator_t *alloc, const char *auth_toke
                                     size_t auth_token_len, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_web_ctx_t *c = (sc_web_ctx_t *)calloc(1, sizeof(*c));
+    sc_web_ctx_t *c = (sc_web_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
 
     if (auth_token && auth_token_len > 0 && auth_token_len < SC_WEB_MAX_TOKEN_LEN) {

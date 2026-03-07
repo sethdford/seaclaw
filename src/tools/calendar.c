@@ -5,7 +5,6 @@
 #include "seaclaw/core/string.h"
 #include "seaclaw/tool.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -182,8 +181,8 @@ static const char *calendar_params(void *ctx) {
     return TOOL_PARAMS;
 }
 static void calendar_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    free(ctx);
+    if (ctx)
+        alloc->free(alloc->ctx, ctx, sizeof(calendar_ctx_t));
 }
 
 static const sc_tool_vtable_t calendar_vtable = {
@@ -195,10 +194,10 @@ static const sc_tool_vtable_t calendar_vtable = {
 };
 
 sc_error_t sc_calendar_create(sc_allocator_t *alloc, sc_tool_t *out) {
-    (void)alloc;
-    void *ctx = calloc(1, sizeof(calendar_ctx_t));
+    void *ctx = alloc->alloc(alloc->ctx, sizeof(calendar_ctx_t));
     if (!ctx)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(ctx, 0, sizeof(calendar_ctx_t));
     out->ctx = ctx;
     out->vtable = &calendar_vtable;
     return SC_OK;

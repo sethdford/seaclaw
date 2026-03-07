@@ -4,7 +4,6 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/tool.h"
-#include <stdlib.h>
 #include <string.h>
 
 #define SC_MESSAGE_NAME "message"
@@ -79,9 +78,8 @@ static const char *message_parameters_json(void *ctx) {
     return SC_MESSAGE_PARAMS;
 }
 static void message_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     if (ctx)
-        free(ctx);
+        alloc->free(alloc->ctx, ctx, sizeof(sc_message_ctx_t));
 }
 
 static const sc_tool_vtable_t message_vtable = {
@@ -100,10 +98,10 @@ void sc_message_tool_set_channel(sc_tool_t *tool, sc_channel_t *channel) {
 }
 
 sc_error_t sc_message_create(sc_allocator_t *alloc, sc_channel_t *channel, sc_tool_t *out) {
-    (void)alloc;
-    sc_message_ctx_t *c = (sc_message_ctx_t *)calloc(1, sizeof(*c));
+    sc_message_ctx_t *c = (sc_message_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->channel = channel;
     out->ctx = c;
     out->vtable = &message_vtable;

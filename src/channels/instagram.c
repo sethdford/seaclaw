@@ -4,12 +4,11 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define INSTAGRAM_ENDPOINT        "me/messages"
-#define INSTAGRAM_ENDPOINT_LEN   12
-#define INSTAGRAM_QUEUE_MAX      32
+#define INSTAGRAM_ENDPOINT_LEN    12
+#define INSTAGRAM_QUEUE_MAX       32
 #define INSTAGRAM_SESSION_KEY_MAX 127
 #define INSTAGRAM_CONTENT_MAX     4095
 
@@ -222,14 +221,15 @@ sc_error_t sc_instagram_create(sc_allocator_t *alloc, const char *business_accou
                                size_t app_secret_len, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_instagram_ctx_t *c = (sc_instagram_ctx_t *)calloc(1, sizeof(*c));
+    sc_instagram_ctx_t *c = (sc_instagram_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (business_account_id && business_account_id_len > 0) {
         c->business_account_id = sc_strndup(alloc, business_account_id, business_account_id_len);
         if (!c->business_account_id) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         c->business_account_id_len = business_account_id_len;
@@ -239,7 +239,7 @@ sc_error_t sc_instagram_create(sc_allocator_t *alloc, const char *business_accou
         if (!c->access_token) {
             if (c->business_account_id)
                 sc_str_free(alloc, c->business_account_id);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         c->access_token_len = access_token_len;
@@ -251,7 +251,7 @@ sc_error_t sc_instagram_create(sc_allocator_t *alloc, const char *business_accou
                 sc_str_free(alloc, c->access_token);
             if (c->business_account_id)
                 sc_str_free(alloc, c->business_account_id);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         c->app_secret_len = app_secret_len;
@@ -264,15 +264,16 @@ sc_error_t sc_instagram_create(sc_allocator_t *alloc, const char *business_accou
 void sc_instagram_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_instagram_ctx_t *c = (sc_instagram_ctx_t *)ch->ctx;
-        if (c->alloc) {
+        sc_allocator_t *a = c->alloc;
+        if (a) {
             if (c->business_account_id)
-                sc_str_free(c->alloc, c->business_account_id);
+                sc_str_free(a, c->business_account_id);
             if (c->access_token)
-                sc_str_free(c->alloc, c->access_token);
+                sc_str_free(a, c->access_token);
             if (c->app_secret)
-                sc_str_free(c->alloc, c->app_secret);
+                sc_str_free(a, c->app_secret);
+            a->free(a->ctx, c, sizeof(*c));
         }
-        free(c);
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

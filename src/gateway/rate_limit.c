@@ -90,6 +90,8 @@ bool sc_rate_limiter_allow(sc_rate_limiter_t *lim, const char *ip) {
 
     time_t now = time(NULL);
     if (e->count >= e->cap) {
+        if (e->cap > SIZE_MAX / 2)
+            return false;
         size_t new_cap = e->cap * 2;
         time_t *n = (time_t *)lim->alloc->realloc(
             lim->alloc->ctx, e->timestamps, e->cap * sizeof(time_t), new_cap * sizeof(time_t));

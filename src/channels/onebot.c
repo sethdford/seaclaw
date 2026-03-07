@@ -233,14 +233,15 @@ sc_error_t sc_onebot_create_ex(sc_allocator_t *alloc, const char *api_base, size
                                const char *user_id, size_t user_id_len, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_onebot_ctx_t *c = (sc_onebot_ctx_t *)calloc(1, sizeof(*c));
+    sc_onebot_ctx_t *c = (sc_onebot_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (api_base && api_base_len > 0) {
         c->api_base = (char *)malloc(api_base_len + 1);
         if (!c->api_base) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->api_base, api_base, api_base_len);
@@ -252,7 +253,7 @@ sc_error_t sc_onebot_create_ex(sc_allocator_t *alloc, const char *api_base, size
         if (!c->access_token) {
             if (c->api_base)
                 free(c->api_base);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->access_token, access_token, access_token_len);
@@ -288,13 +289,14 @@ bool sc_onebot_is_configured(sc_channel_t *ch) {
 void sc_onebot_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_onebot_ctx_t *c = (sc_onebot_ctx_t *)ch->ctx;
+        sc_allocator_t *a = c->alloc;
         if (c->api_base)
             free(c->api_base);
         if (c->access_token)
             free(c->access_token);
         if (c->user_id)
             free(c->user_id);
-        free(c);
+        a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

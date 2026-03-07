@@ -1,7 +1,6 @@
 /*
  * gcloud CLI tool — execute Google Cloud CLI commands.
  */
-#include "seaclaw/tools/cli_wrapper_common.h"
 #include "seaclaw/tools/gcloud.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
@@ -10,8 +9,8 @@
 #include "seaclaw/core/string.h"
 #include "seaclaw/security.h"
 #include "seaclaw/tool.h"
+#include "seaclaw/tools/cli_wrapper_common.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define SC_GCLOUD_NAME "gcloud"
@@ -130,9 +129,8 @@ static const char *gcloud_parameters_json(void *ctx) {
     return SC_GCLOUD_PARAMS;
 }
 static void gcloud_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     if (ctx)
-        free(ctx);
+        alloc->free(alloc->ctx, ctx, sizeof(sc_gcloud_ctx_t));
 }
 
 static const sc_tool_vtable_t gcloud_vtable = {
@@ -146,9 +144,10 @@ static const sc_tool_vtable_t gcloud_vtable = {
 sc_error_t sc_gcloud_create(sc_allocator_t *alloc, sc_security_policy_t *policy, sc_tool_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_gcloud_ctx_t *c = (sc_gcloud_ctx_t *)calloc(1, sizeof(*c));
+    sc_gcloud_ctx_t *c = (sc_gcloud_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->policy = policy;
     out->ctx = c;
     out->vtable = &gcloud_vtable;

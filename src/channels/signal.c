@@ -462,9 +462,10 @@ sc_error_t sc_signal_create_ex(sc_allocator_t *alloc, const char *http_url, size
                                sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_signal_ctx_t *c = (sc_signal_ctx_t *)calloc(1, sizeof(*c));
+    sc_signal_ctx_t *c = (sc_signal_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
 #if !SC_IS_TEST && defined(SC_HTTP_CURL)
     pthread_mutex_init(&c->typing_mu, NULL);
@@ -473,7 +474,7 @@ sc_error_t sc_signal_create_ex(sc_allocator_t *alloc, const char *http_url, size
     if (http_url && http_url_len > 0) {
         c->http_url = (char *)malloc(http_url_len + 1);
         if (!c->http_url) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->http_url, http_url, http_url_len);
@@ -486,7 +487,7 @@ sc_error_t sc_signal_create_ex(sc_allocator_t *alloc, const char *http_url, size
         if (!c->account) {
             if (c->http_url)
                 free(c->http_url);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->account, account, account_len);
@@ -506,7 +507,7 @@ sc_error_t sc_signal_create_ex(sc_allocator_t *alloc, const char *http_url, size
                 free(c->http_url);
             if (c->account)
                 free(c->account);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->group_policy, group_policy, group_policy_len);
@@ -611,6 +612,7 @@ sc_error_t sc_signal_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_l
 void sc_signal_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_signal_ctx_t *c = (sc_signal_ctx_t *)ch->ctx;
+        sc_allocator_t *a = c->alloc;
         signal_stop(c);
         free_group_policy(c);
         if (c->http_url)
@@ -620,7 +622,7 @@ void sc_signal_destroy(sc_channel_t *ch) {
 #if !SC_IS_TEST && defined(SC_HTTP_CURL)
         pthread_mutex_destroy(&c->typing_mu);
 #endif
-        free(c);
+        a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;
     }
