@@ -133,6 +133,19 @@ const char *sc_config_persona_for_channel(const sc_config_t *cfg, const char *ch
     return cfg->agent.persona;
 }
 
+const char *sc_config_persona_for_contact(const sc_config_t *cfg, const char *contact_id) {
+    if (!cfg)
+        return NULL;
+    if (contact_id && cfg->agent.persona_contacts && cfg->agent.persona_contacts_count > 0) {
+        for (size_t i = 0; i < cfg->agent.persona_contacts_count; i++) {
+            if (cfg->agent.persona_contacts[i].channel &&
+                strcmp(cfg->agent.persona_contacts[i].channel, contact_id) == 0)
+                return cfg->agent.persona_contacts[i].persona;
+        }
+    }
+    return NULL;
+}
+
 bool sc_config_get_tool_model_override(const sc_config_t *cfg, const char *tool_name,
                                        const char **provider_out, const char **model_out) {
     if (!cfg || !tool_name)
