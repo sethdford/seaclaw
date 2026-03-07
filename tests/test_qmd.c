@@ -16,7 +16,6 @@ static void test_qmd_header_compiles(void) {
 }
 
 static void test_qmd_keyword_candidates_null_alloc_returns_error(void) {
-    sc_allocator_t alloc = sc_system_allocator();
     sc_memory_entry_t *out = NULL;
     size_t count = 0;
     sc_error_t err = sc_qmd_keyword_candidates(NULL, "/tmp", 4, "query", 5, 10, &out, &count);
