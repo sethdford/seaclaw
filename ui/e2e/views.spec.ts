@@ -28,16 +28,11 @@ test.describe("Secondary Views", () => {
     await expect(toolsView).toBeAttached({ timeout: 5000 });
   });
 
-  test("sessions view redirects to chat", async ({ page }) => {
+  test("sessions view renders", async ({ page }) => {
     await page.goto("/?demo#sessions");
-    await expect(page.locator("sc-app >> sc-chat-view")).toBeAttached({ timeout: 10000 });
-    await expect(async () => {
-      const exists = await page.evaluate(() => {
-        const app = document.querySelector("sc-app");
-        return !!app?.shadowRoot?.querySelector("sc-chat-view");
-      });
-      expect(exists).toBe(true);
-    }).toPass({ timeout: 10000 });
+    await page.waitForLoadState("domcontentloaded");
+    const sessionsView = page.locator("sc-app >> sc-sessions-view");
+    await expect(sessionsView).toBeAttached({ timeout: 5000 });
   });
 
   test("nodes view renders", async ({ page }) => {
@@ -265,9 +260,7 @@ test.describe("Skills View (Demo Mode)", () => {
       const inner = card?.shadowRoot?.querySelector("sc-card") as HTMLElement;
       inner?.click();
     });
-    await expect(page.locator("sc-app >> sc-skills-view >> sc-skill-detail")).toBeAttached({
-      timeout: 5000,
-    });
+    await page.waitForTimeout(500);
     await expect(async () => {
       const hasDetail = await page.evaluate(() => {
         const app = document.querySelector("sc-app");
@@ -296,15 +289,13 @@ test.describe("Skills View (Demo Mode)", () => {
       const inner = card?.shadowRoot?.querySelector("sc-card") as HTMLElement;
       inner?.click();
     });
-    await expect(page.locator("sc-app >> sc-skills-view >> sc-skill-detail")).toBeAttached({
-      timeout: 5000,
-    });
+    await page.waitForTimeout(500);
     await expect(async () => {
       const hasName = await page.evaluate(() => {
         const app = document.querySelector("sc-app");
         const sv = app?.shadowRoot?.querySelector("sc-skills-view");
         const detail = sv?.shadowRoot?.querySelector("sc-skill-detail");
-        return !!detail?.querySelector(".detail-name");
+        return !!detail?.shadowRoot?.querySelector(".detail-name");
       });
       expect(hasName).toBe(true);
     }).toPass({ timeout: 5000 });
@@ -328,15 +319,13 @@ test.describe("Skills View (Demo Mode)", () => {
       const inner = card?.shadowRoot?.querySelector("sc-card") as HTMLElement;
       inner?.click();
     });
-    await expect(page.locator("sc-app >> sc-skills-view >> sc-skill-detail")).toBeAttached({
-      timeout: 5000,
-    });
+    await page.waitForTimeout(500);
     await expect(async () => {
       const btnCount = await page.evaluate(() => {
         const app = document.querySelector("sc-app");
         const sv = app?.shadowRoot?.querySelector("sc-skills-view");
         const detail = sv?.shadowRoot?.querySelector("sc-skill-detail");
-        return detail?.querySelectorAll(".detail-actions sc-button").length ?? 0;
+        return detail?.shadowRoot?.querySelectorAll(".detail-actions sc-button").length ?? 0;
       });
       expect(btnCount).toBeGreaterThanOrEqual(2);
     }).toPass({ timeout: 5000 });

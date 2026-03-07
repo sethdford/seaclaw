@@ -77,6 +77,8 @@ static sc_error_t teams_send(void *ctx, const char *target, size_t target_len, c
     sc_teams_ctx_t *c = (sc_teams_ctx_t *)ctx;
 
 #if SC_IS_TEST
+    if (!c->webhook_url || c->webhook_url_len == 0)
+        return SC_ERR_CHANNEL_NOT_CONFIGURED;
     {
         size_t len = message_len > 4095 ? 4095 : message_len;
         if (message && len > 0)
@@ -184,7 +186,7 @@ sc_error_t sc_teams_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_lo
         return SC_ERR_INVALID_ARGUMENT;
     *out_count = 0;
 #if SC_IS_TEST
-    {
+    if (c->mock_count > 0) {
         size_t n = c->mock_count < max_msgs ? c->mock_count : max_msgs;
         for (size_t i = 0; i < n; i++) {
             memcpy(msgs[i].session_key, c->mock_msgs[i].session_key, 128);

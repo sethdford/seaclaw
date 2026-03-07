@@ -845,7 +845,7 @@ sc_error_t sc_telegram_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel
     *out_count = 0;
 
 #if SC_IS_TEST
-    {
+    if (c->mock_count > 0) {
         (void)alloc;
         size_t n = c->mock_count < max_msgs ? c->mock_count : max_msgs;
         for (size_t i = 0; i < n; i++) {
@@ -856,6 +856,7 @@ sc_error_t sc_telegram_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel
         c->mock_count = 0;
         return SC_OK;
     }
+    return SC_OK;
 #else
     if (!c->token || c->token_len == 0)
         return SC_OK;

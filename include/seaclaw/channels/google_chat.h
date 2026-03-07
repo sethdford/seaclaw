@@ -21,4 +21,11 @@ bool sc_google_chat_is_configured(sc_channel_t *ch);
 
 void sc_google_chat_destroy(sc_channel_t *ch);
 
+#if SC_IS_TEST
+sc_error_t sc_google_chat_test_inject_mock(sc_channel_t *ch, const char *session_key,
+                                           size_t session_key_len, const char *content,
+                                           size_t content_len);
+const char *sc_google_chat_test_get_last_message(sc_channel_t *ch, size_t *out_len);
+#endif
+
 #endif /* SC_CHANNELS_GOOGLE_CHAT_H */

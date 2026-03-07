@@ -1,14 +1,5 @@
 import { test, expect } from "@playwright/test";
-import {
-  shadowClick,
-  shadowCount,
-  shadowCountIn,
-  shadowExists,
-  shadowExistsIn,
-  shadowText,
-  WAIT,
-  POLL,
-} from "./helpers.js";
+import { shadowCount, shadowExists, shadowText, WAIT, POLL } from "./helpers.js";
 
 // ─────────────────────────────────────────────────────────────
 // Chat View (Interactions)
@@ -103,7 +94,7 @@ test.describe("Config (Interactions)", () => {
     // Verify raw JSON view: textarea or code block with JSON content
     await expect(async () => {
       const text = await page.evaluate(shadowText("sc-config-view"));
-      expect(text).toMatch(/"provider"|"openrouter"/);
+      expect(text).toMatch(/"default_provider"|"openrouter"/);
     }).toPass({ timeout: POLL });
 
     // Click again to switch back to Form

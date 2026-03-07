@@ -192,7 +192,7 @@ sc_error_t sc_instagram_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channe
         return SC_ERR_INVALID_ARGUMENT;
     *out_count = 0;
 #if SC_IS_TEST
-    {
+    if (c->mock_count > 0) {
         size_t n = c->mock_count < max_msgs ? c->mock_count : max_msgs;
         for (size_t i = 0; i < n; i++) {
             memcpy(msgs[i].session_key, c->mock_msgs[i].session_key, 128);

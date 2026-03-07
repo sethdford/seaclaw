@@ -506,13 +506,16 @@ sc_error_t sc_imessage_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel
 #if SC_IS_TEST
     {
         sc_imessage_ctx_t *c = (sc_imessage_ctx_t *)channel_ctx;
-        size_t n = c->mock_count < max_msgs ? c->mock_count : max_msgs;
-        for (size_t i = 0; i < n; i++) {
-            memcpy(msgs[i].session_key, c->mock_msgs[i].session_key, 128);
-            memcpy(msgs[i].content, c->mock_msgs[i].content, 4096);
+        if (c->mock_count > 0) {
+            size_t n = c->mock_count < max_msgs ? c->mock_count : max_msgs;
+            for (size_t i = 0; i < n; i++) {
+                memcpy(msgs[i].session_key, c->mock_msgs[i].session_key, 128);
+                memcpy(msgs[i].content, c->mock_msgs[i].content, 4096);
+            }
+            *out_count = n;
+            c->mock_count = 0;
+            return SC_OK;
         }
-        *out_count = n;
-        c->mock_count = 0;
         return SC_OK;
     }
 #elif !defined(__APPLE__) || !defined(__MACH__)

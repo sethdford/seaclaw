@@ -154,7 +154,7 @@ sc_error_t sc_matrix_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_l
         return SC_ERR_INVALID_ARGUMENT;
     *out_count = 0;
 #if SC_IS_TEST
-    {
+    if (ctx->mock_count > 0) {
         size_t n = ctx->mock_count < max_msgs ? ctx->mock_count : max_msgs;
         for (size_t i = 0; i < n; i++) {
             memcpy(msgs[i].session_key, ctx->mock_msgs[i].session_key, 128);
@@ -164,6 +164,7 @@ sc_error_t sc_matrix_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_l
         ctx->mock_count = 0;
         return SC_OK;
     }
+    return SC_OK;
 #else
 #if defined(SC_HTTP_CURL)
     if (!ctx->homeserver || ctx->homeserver_len == 0)

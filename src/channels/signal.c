@@ -597,7 +597,7 @@ sc_error_t sc_signal_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_l
     *out_count = 0;
 
 #if SC_IS_TEST
-    {
+    if (c->mock_count > 0) {
         (void)alloc;
         size_t n = c->mock_count < max_msgs ? c->mock_count : max_msgs;
         for (size_t i = 0; i < n; i++) {
@@ -608,6 +608,7 @@ sc_error_t sc_signal_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_l
         c->mock_count = 0;
         return SC_OK;
     }
+    return SC_OK;
 #else
     if (!c->http_url || !c->account || c->account_len == 0)
         return SC_OK;
