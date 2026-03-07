@@ -1,4 +1,6 @@
 #include "seaclaw/tools/agent_spawn.h"
+#include "seaclaw/agent.h"
+#include "seaclaw/agent/tool_context.h"
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include <stdio.h>
@@ -56,6 +58,12 @@ static sc_error_t agent_spawn_execute(void *ctx, sc_allocator_t *alloc, const sc
         cfg.mode = SC_SPAWN_PERSISTENT;
     else
         cfg.mode = SC_SPAWN_ONE_SHOT;
+
+    sc_agent_t *parent = sc_agent_get_current_for_tools();
+    if (parent && parent->persona_name && parent->persona_name_len > 0) {
+        cfg.persona_name = parent->persona_name;
+        cfg.persona_name_len = parent->persona_name_len;
+    }
 
     const char *model = sc_json_get_string(args, "model");
     if (model) {

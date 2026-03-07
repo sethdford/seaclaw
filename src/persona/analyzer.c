@@ -92,22 +92,46 @@ sc_error_t sc_persona_analyzer_parse_response(sc_allocator_t *alloc, const char 
     sc_json_value_t *vocab = sc_json_object_get(root, "vocabulary");
     if (vocab && vocab->type == SC_JSON_OBJECT) {
         sc_json_value_t *pref = sc_json_object_get(vocab, "preferred");
-        if (pref)
-            parse_string_array_from_json(alloc, pref, &out->preferred_vocab,
-                                         &out->preferred_vocab_count);
+        if (pref) {
+            err = parse_string_array_from_json(alloc, pref, &out->preferred_vocab,
+                                               &out->preferred_vocab_count);
+            if (err != SC_OK) {
+                sc_persona_deinit(alloc, out);
+                sc_json_free(alloc, root);
+                return err;
+            }
+        }
         sc_json_value_t *avoid = sc_json_object_get(vocab, "avoided");
-        if (avoid)
-            parse_string_array_from_json(alloc, avoid, &out->avoided_vocab,
-                                         &out->avoided_vocab_count);
+        if (avoid) {
+            err = parse_string_array_from_json(alloc, avoid, &out->avoided_vocab,
+                                               &out->avoided_vocab_count);
+            if (err != SC_OK) {
+                sc_persona_deinit(alloc, out);
+                sc_json_free(alloc, root);
+                return err;
+            }
+        }
         sc_json_value_t *sl = sc_json_object_get(vocab, "slang");
-        if (sl)
-            parse_string_array_from_json(alloc, sl, &out->slang, &out->slang_count);
+        if (sl) {
+            err = parse_string_array_from_json(alloc, sl, &out->slang, &out->slang_count);
+            if (err != SC_OK) {
+                sc_persona_deinit(alloc, out);
+                sc_json_free(alloc, root);
+                return err;
+            }
+        }
     }
 
     sc_json_value_t *rules = sc_json_object_get(root, "communication_rules");
-    if (rules)
-        parse_string_array_from_json(alloc, rules, &out->communication_rules,
-                                     &out->communication_rules_count);
+    if (rules) {
+        err = parse_string_array_from_json(alloc, rules, &out->communication_rules,
+                                           &out->communication_rules_count);
+        if (err != SC_OK) {
+            sc_persona_deinit(alloc, out);
+            sc_json_free(alloc, root);
+            return err;
+        }
+    }
 
     const char *formality = sc_json_get_string(root, "formality");
     const char *avg_length = sc_json_get_string(root, "avg_length");

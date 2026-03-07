@@ -304,7 +304,16 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                     const char *current = agent->persona_name ? agent->persona_name : "";
                     if (channel_persona && channel_persona[0] &&
                         strcmp(channel_persona, current) != 0) {
-                        sc_agent_set_persona(agent, channel_persona, strlen(channel_persona));
+                        sc_error_t perr =
+                            sc_agent_set_persona(agent, channel_persona, strlen(channel_persona));
+                        if (perr != SC_OK) {
+#ifndef SC_IS_TEST
+                            fprintf(stderr,
+                                    "[seaclaw] warning: failed to switch persona to '%s' for "
+                                    "channel '%s'\n",
+                                    channel_persona, agent->active_channel ? agent->active_channel : "?");
+#endif
+                        }
                     }
                 }
 

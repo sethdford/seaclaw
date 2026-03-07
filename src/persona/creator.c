@@ -308,11 +308,20 @@ sc_error_t sc_persona_creator_synthesize(sc_allocator_t *alloc, const sc_persona
         }
     }
 
-    if (count > 0 && partials[0].decision_style) {
-        out->decision_style = sc_strdup(alloc, partials[0].decision_style);
-        if (!out->decision_style) {
-            sc_persona_deinit(alloc, out);
-            return SC_ERR_OUT_OF_MEMORY;
+    for (size_t i = 0; i < count; i++) {
+        if (partials[i].identity && !out->identity) {
+            out->identity = sc_strdup(alloc, partials[i].identity);
+            if (!out->identity) {
+                sc_persona_deinit(alloc, out);
+                return SC_ERR_OUT_OF_MEMORY;
+            }
+        }
+        if (partials[i].decision_style && !out->decision_style) {
+            out->decision_style = sc_strdup(alloc, partials[i].decision_style);
+            if (!out->decision_style) {
+                sc_persona_deinit(alloc, out);
+                return SC_ERR_OUT_OF_MEMORY;
+            }
         }
     }
 

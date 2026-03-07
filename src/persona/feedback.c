@@ -170,8 +170,19 @@ sc_error_t sc_persona_feedback_apply(sc_allocator_t *alloc, const char *persona_
         }
 
         if (!bank) {
-            /* Create new bank - would require realloc of example_banks; keep simple: skip */
-            continue;
+            size_t bc = persona.example_banks_count;
+            sc_persona_example_bank_t *new_banks = (sc_persona_example_bank_t *)alloc->realloc(
+                alloc->ctx, persona.example_banks, bc * sizeof(sc_persona_example_bank_t),
+                (bc + 1) * sizeof(sc_persona_example_bank_t));
+            if (!new_banks)
+                continue;
+            persona.example_banks = new_banks;
+            memset(&persona.example_banks[bc], 0, sizeof(sc_persona_example_bank_t));
+            persona.example_banks[bc].channel = sc_strndup(alloc, channel, channel_len);
+            if (!persona.example_banks[bc].channel)
+                continue;
+            persona.example_banks_count = bc + 1;
+            bank = &persona.example_banks[bc];
         }
 
         /* Append new example */
