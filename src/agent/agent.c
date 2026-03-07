@@ -711,6 +711,10 @@ char *sc_agent_handle_slash_command(sc_agent_t *agent, const char *message, size
     if (sc_strncasecmp(cmd_buf, "retry", 5) == 0) {
         if (agent->history_count > 0) {
             sc_owned_message_t *last = &agent->history[agent->history_count - 1];
+            if (last->role != SC_ROLE_ASSISTANT) {
+                return sc_strndup(agent->alloc,
+                                  "Nothing to retry. Last message is not from assistant.", 53);
+            }
             if (last->content) {
                 agent->alloc->free(agent->alloc->ctx, last->content, last->content_len + 1);
                 last->content = NULL;

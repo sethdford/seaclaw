@@ -10,6 +10,8 @@ import "./sc-animated-number.js";
 import "./sc-activity-feed.js";
 import "./sc-thinking.js";
 import "./sc-tool-result.js";
+import "./sc-code-block.js";
+import "./sc-latex.js";
 import "./sc-message-stream.js";
 import "./sc-message-branch.js";
 
@@ -262,6 +264,102 @@ describe("sc-tool-result", () => {
   });
 });
 
+describe("sc-code-block", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("sc-code-block")).toBeDefined();
+  });
+
+  it("renders with plain code when no language", async () => {
+    const el = document.createElement("sc-code-block") as HTMLElement & {
+      code: string;
+      language: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.code = "const x = 1;";
+    el.language = "";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const langLabel = el.shadowRoot?.querySelector(".lang-label");
+    expect(langLabel?.textContent).toBe("plain");
+    const codeEl = el.shadowRoot?.querySelector("code");
+    expect(codeEl?.textContent).toContain("const x = 1;");
+    el.remove();
+  });
+
+  it("renders with language label", async () => {
+    const el = document.createElement("sc-code-block") as HTMLElement & {
+      code: string;
+      language: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.code = "print('hi')";
+    el.language = "python";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const langLabel = el.shadowRoot?.querySelector(".lang-label");
+    expect(langLabel?.textContent).toBe("python");
+    el.remove();
+  });
+
+  it("copy button is present and labeled", async () => {
+    const el = document.createElement("sc-code-block") as HTMLElement & {
+      code: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.code = "test";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const copyBtn = el.shadowRoot?.querySelector(".copy-btn");
+    expect(copyBtn).toBeTruthy();
+    expect(copyBtn?.getAttribute("aria-label")).toBe("Copy code");
+    expect(copyBtn?.textContent).toContain("Copy");
+    el.remove();
+  });
+
+  it("renders code content correctly", async () => {
+    const el = document.createElement("sc-code-block") as HTMLElement & {
+      code: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.code = "function foo() { return 42; }";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const content = el.shadowRoot?.querySelector(".content");
+    expect(content?.textContent).toContain("function foo()");
+    expect(content?.textContent).toContain("42");
+    el.remove();
+  });
+});
+
+describe("sc-latex", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("sc-latex")).toBeDefined();
+  });
+
+  it("should have default properties", () => {
+    const el = document.createElement("sc-latex") as HTMLElement & {
+      latex: string;
+      display: boolean;
+    };
+    expect(el.latex).toBe("");
+    expect(el.display).toBe(false);
+  });
+
+  it("renders raw latex before KaTeX loads", async () => {
+    const el = document.createElement("sc-latex") as HTMLElement & {
+      latex: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.latex = "E = mc^2";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const span = el.shadowRoot?.querySelector(".latex-raw, .katex");
+    expect(span).toBeTruthy();
+    expect(el.shadowRoot?.innerHTML).toContain("E = mc^2");
+    el.remove();
+  });
+});
+
 describe("sc-message-stream", () => {
   it("should be defined as a custom element", () => {
     expect(customElements.get("sc-message-stream")).toBeDefined();
@@ -293,6 +391,79 @@ describe("sc-message-stream", () => {
     el.remove();
   });
 
+  it("renders markdown headings", async () => {
+    const el = document.createElement("sc-message-stream") as HTMLElement & {
+      content: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.content = "## Section Title";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const h2 = el.shadowRoot?.querySelector("h2.md-heading");
+    expect(h2).toBeTruthy();
+    expect(h2?.textContent).toContain("Section Title");
+    el.remove();
+  });
+
+  it("renders markdown code blocks via sc-code-block", async () => {
+    const el = document.createElement("sc-message-stream") as HTMLElement & {
+      content: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.content = "```js\nconst x = 1;\n```";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const codeBlock = el.shadowRoot?.querySelector("sc-code-block");
+    expect(codeBlock).toBeTruthy();
+    expect((codeBlock as { code: string }).code).toContain("const x = 1;");
+    el.remove();
+  });
+
+  it("renders markdown lists", async () => {
+    const el = document.createElement("sc-message-stream") as HTMLElement & {
+      content: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.content = "- Item one\n- Item two";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const ul = el.shadowRoot?.querySelector("ul.md-list");
+    expect(ul).toBeTruthy();
+    const items = el.shadowRoot?.querySelectorAll("li.md-list-item");
+    expect(items?.length).toBeGreaterThanOrEqual(2);
+    el.remove();
+  });
+
+  it("renders markdown links", async () => {
+    const el = document.createElement("sc-message-stream") as HTMLElement & {
+      content: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.content = "[Click here](https://example.com)";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const link = el.shadowRoot?.querySelector("a[href='https://example.com']");
+    expect(link).toBeTruthy();
+    expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.textContent).toContain("Click here");
+    el.remove();
+  });
+
+  it("renders inline bold, italic, code", async () => {
+    const el = document.createElement("sc-message-stream") as HTMLElement & {
+      content: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.content = "**bold** _italic_ `code`";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const content = el.shadowRoot?.querySelector(".content");
+    expect(content?.querySelector("strong")).toBeTruthy();
+    expect(content?.querySelector("em")).toBeTruthy();
+    expect(content?.querySelector("code.inline")).toBeTruthy();
+    el.remove();
+  });
+
   it("shows cursor when streaming", async () => {
     const el = document.createElement("sc-message-stream") as HTMLElement & {
       content: string;
@@ -305,6 +476,21 @@ describe("sc-message-stream", () => {
     await el.updateComplete;
     const cursor = el.shadowRoot?.querySelector(".cursor");
     expect(cursor).toBeTruthy();
+    el.remove();
+  });
+
+  it("does not show cursor when not streaming", async () => {
+    const el = document.createElement("sc-message-stream") as HTMLElement & {
+      content: string;
+      streaming: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.content = "Complete text";
+    el.streaming = false;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const cursor = el.shadowRoot?.querySelector(".cursor");
+    expect(cursor).toBeNull();
     el.remove();
   });
 });

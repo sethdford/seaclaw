@@ -147,7 +147,10 @@ static sc_error_t facebook_execute(void *ctx, sc_allocator_t *alloc, const sc_js
     char *rbody = sc_strndup(alloc, resp.body, resp.body_len);
     if (resp.owned && resp.body)
         sc_http_response_free(alloc, &resp);
-    *out = sc_tool_result_ok_owned(rbody ? rbody : "{}", rbody ? strlen(rbody) : 2);
+    if (rbody)
+        *out = sc_tool_result_ok_owned(rbody, strlen(rbody));
+    else
+        *out = sc_tool_result_ok("{}", 2);
     return SC_OK;
 #endif
 }

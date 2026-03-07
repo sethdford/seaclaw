@@ -34,8 +34,11 @@ bool sc_meta_verify_webhook(const char *body, size_t body_len, const char *signa
                    computed);
 
     char hex[65];
-    for (int i = 0; i < 32; i++)
-        snprintf(hex + i * 2, 3, "%02x", computed[i]);
+    for (int i = 0; i < 32; i++) {
+        int n = snprintf(hex + i * 2, 3, "%02x", computed[i]);
+        if (n < 0 || n >= 3)
+            return false;
+    }
     hex[64] = '\0';
 
     unsigned char diff = 0;

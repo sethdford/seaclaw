@@ -1265,6 +1265,7 @@ enable_testing()
 
 set(SC_TEST_SOURCES
     tests/test_main.c
+    tests/test_agent_modules.c
     tests/test_agent_subsystems.c
     tests/test_crypto.c
     tests/test_wasm.c

@@ -117,7 +117,7 @@ jfail:
 
 static void twitter_queue_push(sc_twitter_ctx_t *c, const char *from, size_t from_len,
                                const char *body, size_t body_len) {
-    if (c->queue_count >= TWITTER_QUEUE_MAX)
+    if (!c || !from || !body || c->queue_count >= TWITTER_QUEUE_MAX)
         return;
     sc_twitter_queued_msg_t *slot = &c->queue[c->queue_tail];
     size_t sk = from_len < TWITTER_SESSION_KEY_MAX ? from_len : TWITTER_SESSION_KEY_MAX;

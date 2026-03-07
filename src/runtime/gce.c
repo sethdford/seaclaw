@@ -87,7 +87,7 @@ static sc_error_t gce_wrap_command(void *ctx, const char **argv_in, size_t argc_
     }
     cmd_buf[cmd_off] = '\0';
 
-    static char command_arg[4128];
+    char command_arg[4128];
     snprintf(command_arg, sizeof(command_arg), "--command=%s", cmd_buf);
     argv_out[idx++] = command_arg;
 
