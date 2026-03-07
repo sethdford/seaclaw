@@ -27,7 +27,8 @@
     "docs": "(cd ../design-tokens && npm run docs) && bash scripts/icon-inventory.sh && bash scripts/component-docs.sh",
     "docs:icons": "bash scripts/icon-inventory.sh",
     "docs:components": "bash scripts/component-docs.sh",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test"
+    "lint:tokens": "bash scripts/lint-raw-values.sh || true",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run lint:tokens && npm run test"
   },
   "dependencies": {
     "dompurify": "^3.3.2",

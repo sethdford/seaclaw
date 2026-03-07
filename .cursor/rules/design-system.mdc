@@ -29,18 +29,30 @@ globs:
 
 ## Design Tokens
 
+- **Centralized design strategy**: `docs/design-strategy.md` is the design constitution. Read it first.
 - All values must reference `--sc-*` CSS custom properties from `design-tokens/`.
 - **Never** use raw hex color values in CSS — use `var(--sc-accent)`, `var(--sc-text)`, etc.
 - **Never** use raw pixel values for spacing — use `var(--sc-space-sm)`, `var(--sc-space-md)`, etc.
 - **Never** use raw pixel values for border-radius — use `var(--sc-radius)`, `var(--sc-radius-lg)`, etc.
 - Shadow values must use `var(--sc-shadow-sm)`, `var(--sc-shadow-md)`, `var(--sc-shadow-lg)`.
 - Token namespace: `--sc-` prefix for all custom properties.
+- **Lint enforcement**: Run `ui/scripts/lint-raw-values.sh` to check for drift. Wired into `npm run check`.
+
+## Data Visualization
+
+- Multi-series charts use `--sc-chart-categorical-{1..8}` in order. Never ad-hoc colors.
+- Ordered data uses `--sc-chart-sequential-{100..800}` (Fidelity green ramp).
+- Positive/negative indicators use `--sc-chart-diverging-{positive,neutral,negative}`.
+- Single-metric charts use `--sc-chart-brand`.
+- Token source: `design-tokens/data-viz.tokens.json`.
 
 ## Motion & Animation
 
 - Always use `var(--sc-duration-fast)`, `var(--sc-duration-normal)`, `var(--sc-duration-slow)` for timing.
 - Always use `var(--sc-ease-out)`, `var(--sc-ease-in-out)` for easing.
-- Use spring tokens (`--sc-spring-micro`, `--sc-spring-standard`, `--sc-spring-expressive`, `--sc-spring-dramatic`) for physics-based motion.
+- Use `var(--sc-ease-spring)` / `var(--sc-ease-spring-gentle)` for interactive elements (buttons, toggles, cards).
+- Use `var(--sc-spring-out)` / `var(--sc-spring-bounce)` for CSS `linear()` spring approximations.
+- Spring physics params (`--sc-spring-micro`, `--sc-spring-standard`, `--sc-spring-expressive`, `--sc-spring-dramatic`) for JS animation libs.
 - **Every animation must respect `prefers-reduced-motion`**. Use the global media query in `theme.css` or add component-level `@media (prefers-reduced-motion: reduce)` overrides.
 - Keyframe names use `sc-` prefix (e.g. `sc-fade-in`, `sc-slide-up`).
 

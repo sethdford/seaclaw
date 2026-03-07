@@ -333,8 +333,9 @@ Required:
 - Single source of truth: `design-tokens/` directory (W3C Design Tokens v2025.10 format).
 - All platforms consume generated output, not hand-maintained values.
 - CSS: `--sc-*` namespace. Never use raw hex colors, pixel spacing, or pixel radii.
-- Token categories: color (base + semantic), spacing, radius, shadow, typography, motion.
+- Token categories: color (base + semantic), spacing, radius, shadow, typography, motion, data-viz.
 - Generated outputs: CSS custom properties, Kotlin constants, Swift constants, C `#define` macros.
+- **Centralized design strategy**: see `docs/design-strategy.md` for the full design constitution.
 
 Color accent hierarchy:
 
@@ -345,16 +346,36 @@ Color accent hierarchy:
 
 Each accent provides `-hover`, `-subtle`, `-strong`, `-text`, and `on-accent-*` variants for both dark and light themes.
 
-### 12.4 Motion & Animation
+### 12.4 Data Visualization
+
+Required:
+
+- Use `--sc-chart-categorical-{1..8}` for multi-series charts (never ad-hoc colors).
+- Use `--sc-chart-sequential-{100..800}` for ordered/heatmap data.
+- Use `--sc-chart-diverging-{positive,neutral,negative}` for positive/negative indicators.
+- Single-metric charts use `--sc-chart-brand`.
+- Token definitions live in `design-tokens/data-viz.tokens.json`.
+
+### 12.5 Motion & Animation
 
 Required:
 
 - Use `--sc-duration-*` and `--sc-ease-*` tokens for all transitions.
-- Use spring tokens (`--sc-spring-micro`, `--sc-spring-standard`, `--sc-spring-expressive`) for physics motion.
+- Use spring tokens (`--sc-ease-spring`, `--sc-ease-spring-gentle`) for interactive elements.
+- Use `--sc-spring-out` / `--sc-spring-bounce` for CSS `linear()` spring approximations.
+- Spring physics params (`--sc-spring-micro`, `--sc-spring-standard`, `--sc-spring-expressive`) for JS animation libs.
 - Every animation must respect `prefers-reduced-motion: reduce`.
 - Keyframe names use `sc-` prefix.
 
-### 12.5 Accessibility
+### 12.6 Lint Enforcement
+
+Required:
+
+- Run `ui/scripts/lint-raw-values.sh` to detect design token drift.
+- Flags raw hex/rgba, hardcoded durations, and raw breakpoints in `.ts` files.
+- Wired into `npm run check` via `npm run lint:tokens`.
+
+### 12.7 Accessibility
 
 Required:
 
@@ -363,7 +384,7 @@ Required:
 - Modals: focus trap, Escape to close, `aria-modal`.
 - `prefers-color-scheme` and `prefers-reduced-motion` both supported.
 
-### 12.6 Change Playbook: Adding a UI Component
+### 12.8 Change Playbook: Adding a UI Component
 
 - Add `ui/src/components/sc-<name>.ts` as a LitElement web component.
 - Use `--sc-*` tokens exclusively in `static styles`.

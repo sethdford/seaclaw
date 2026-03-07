@@ -355,6 +355,7 @@ set(SC_CORE_SOURCES
     src/agent/outcomes.c
     src/agent/episodic.c
     src/agent/reflection.c
+    src/agent/input_guard.c
     src/providers/error_classify.c
     src/providers/api_key.c
     src/providers/helpers.c
@@ -1365,6 +1366,7 @@ set(SC_TEST_SOURCES
     tests/test_awareness.c
     tests/test_episodic.c
     tests/test_reflection.c
+    tests/test_input_guard.c
 )
 if(SC_ENABLE_PERSONA)
     list(APPEND SC_TEST_SOURCES tests/test_persona.c)

@@ -234,6 +234,57 @@ describe("sc-nodes-view", () => {
     expect(el.shadowRoot?.children.length).toBeGreaterThan(0);
     el.remove();
   });
+
+  it("renders page hero with heading", async () => {
+    const el = createView("sc-nodes-view");
+    await el.updateComplete;
+    const hero = el.shadowRoot?.querySelector("sc-page-hero");
+    expect(hero).toBeTruthy();
+    const header = el.shadowRoot?.querySelector("sc-section-header");
+    expect(header?.getAttribute("heading")).toBe("Nodes");
+    el.remove();
+  });
+
+  it("renders stat cards row", async () => {
+    const el = createView("sc-nodes-view");
+    await el.updateComplete;
+    const statCards = el.shadowRoot?.querySelectorAll("sc-stat-card");
+    expect(statCards?.length).toBe(4);
+    el.remove();
+  });
+
+  it("renders search input", async () => {
+    const el = createView("sc-nodes-view");
+    await el.updateComplete;
+    const input = el.shadowRoot?.querySelector("sc-input");
+    expect(input).toBeTruthy();
+    el.remove();
+  });
+
+  it("renders refresh button with aria-label", async () => {
+    const el = createView("sc-nodes-view");
+    await el.updateComplete;
+    const btn = el.shadowRoot?.querySelector('sc-button[aria-label="Refresh nodes"]');
+    expect(btn).toBeTruthy();
+    el.remove();
+  });
+
+  it("shows empty state when no nodes loaded", async () => {
+    const el = createView("sc-nodes-view");
+    await el.updateComplete;
+    const emptyState = el.shadowRoot?.querySelector("sc-empty-state");
+    expect(emptyState).toBeTruthy();
+    el.remove();
+  });
+
+  it("has scoped CSS via adoptedStyleSheets or style elements", async () => {
+    const el = createView("sc-nodes-view");
+    await el.updateComplete;
+    const hasAdopted = (el.shadowRoot?.adoptedStyleSheets?.length ?? 0) > 0;
+    const hasStyle = (el.shadowRoot?.querySelectorAll("style")?.length ?? 0) > 0;
+    expect(hasAdopted || hasStyle).toBe(true);
+    el.remove();
+  });
 });
 
 describe("sc-usage-view", () => {
@@ -264,9 +315,12 @@ describe("sc-logs-view", () => {
   });
 });
 
+/* ── Accessibility: all views ─────────────────────────────── */
+
 describe("view accessibility", () => {
   const ALL_VIEWS = [
     "sc-overview-view",
+    "sc-chat-view",
     "sc-agents-view",
     "sc-sessions-view",
     "sc-models-view",
@@ -292,4 +346,86 @@ describe("view accessibility", () => {
       el.remove();
     });
   }
+});
+
+/* ── Deep view-specific tests ─────────────────────────────── */
+
+describe("sc-overview-view deep", () => {
+  it("renders page hero or skeleton on load", async () => {
+    const el = createView("sc-overview-view");
+    await el.updateComplete;
+    const hero = el.shadowRoot?.querySelector("sc-page-hero");
+    const skel = el.shadowRoot?.querySelector("sc-skeleton");
+    expect(hero || skel).toBeTruthy();
+    el.remove();
+  });
+
+  it("renders stat cards or skeleton", async () => {
+    const el = createView("sc-overview-view");
+    await el.updateComplete;
+    const stats = el.shadowRoot?.querySelectorAll("sc-stat-card, sc-skeleton");
+    expect(stats?.length).toBeGreaterThanOrEqual(1);
+    el.remove();
+  });
+});
+
+describe("sc-tools-view deep", () => {
+  it("has page hero or skeleton on load", async () => {
+    const el = createView("sc-tools-view");
+    await el.updateComplete;
+    const hero = el.shadowRoot?.querySelector("sc-page-hero, sc-skeleton");
+    expect(hero).toBeTruthy();
+    el.remove();
+  });
+});
+
+describe("sc-channels-view deep", () => {
+  it("has page hero or skeleton on load", async () => {
+    const el = createView("sc-channels-view");
+    await el.updateComplete;
+    const hero = el.shadowRoot?.querySelector("sc-page-hero, sc-skeleton");
+    expect(hero).toBeTruthy();
+    el.remove();
+  });
+});
+
+describe("sc-security-view deep", () => {
+  it("has content on initial render", async () => {
+    const el = createView("sc-security-view");
+    await el.updateComplete;
+    expect(el.shadowRoot?.children.length).toBeGreaterThan(0);
+    el.remove();
+  });
+});
+
+describe("sc-sessions-view deep", () => {
+  it("has session panel or skeleton", async () => {
+    const el = createView("sc-sessions-view");
+    await el.updateComplete;
+    const panel = el.shadowRoot?.querySelector(".session-list-panel, .sessions, sc-skeleton");
+    expect(panel).toBeTruthy();
+    el.remove();
+  });
+});
+
+describe("sc-automations-view deep", () => {
+  it("has page hero", async () => {
+    const el = createView("sc-automations-view");
+    await el.updateComplete;
+    const hero = el.shadowRoot?.querySelector("sc-page-hero");
+    expect(hero).toBeTruthy();
+    el.remove();
+  });
+});
+
+describe("sc-logs-view deep", () => {
+  it("has log controls or card", async () => {
+    const el = createView("sc-logs-view");
+    await el.updateComplete;
+    const controls = el.shadowRoot?.querySelector(
+      ".controls, .filters, sc-segmented-control, .log-area, sc-card",
+    );
+    expect(controls).toBeTruthy();
+    el.remove();
+  });
 });

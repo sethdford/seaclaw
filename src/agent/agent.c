@@ -3,6 +3,7 @@
 #include "seaclaw/agent/compaction.h"
 #include "seaclaw/agent/dispatcher.h"
 #include "seaclaw/agent/episodic.h"
+#include "seaclaw/agent/input_guard.h"
 #include "seaclaw/agent/mailbox.h"
 #include "seaclaw/agent/memory_loader.h"
 #include "seaclaw/agent/outcomes.h"
@@ -1282,6 +1283,18 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         if (response_len_out)
             *response_len_out = strlen(slash_resp);
         return SC_OK;
+    }
+
+    /* Prompt injection defense-in-depth */
+    {
+        sc_injection_risk_t risk = SC_INJECTION_SAFE;
+        sc_input_guard_check(msg, msg_len, &risk);
+        if (risk == SC_INJECTION_HIGH_RISK && agent->observer) {
+            sc_observer_event_t ev = {.tag = SC_OBSERVER_EVENT_ERR};
+            ev.data.err.component = "input_guard";
+            ev.data.err.message = "high-risk injection pattern detected";
+            sc_observer_record_event(*agent->observer, &ev);
+        }
     }
 
     sc_error_t err = append_history(agent, SC_ROLE_USER, msg, msg_len, NULL, 0, NULL, 0);

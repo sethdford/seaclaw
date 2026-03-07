@@ -107,6 +107,7 @@ void run_tavily_tests(void);
 void run_awareness_tests(void);
 void run_episodic_tests(void);
 void run_reflection_tests(void);
+void run_input_guard_tests(void);
 
 int main(void) {
     printf("SeaClaw Test Suite\n");
@@ -215,6 +216,7 @@ int main(void) {
     run_awareness_tests();
     run_episodic_tests();
     run_reflection_tests();
+    run_input_guard_tests();
 
     SC_TEST_REPORT();
     SC_TEST_EXIT();
