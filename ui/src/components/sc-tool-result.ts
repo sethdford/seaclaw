@@ -18,38 +18,41 @@ export class ScToolResult extends LitElement {
       }
     }
 
+    @keyframes sc-pulse-border {
+      0%,
+      100% {
+        border-left-color: var(--sc-info);
+      }
+      50% {
+        border-left-color: rgba(59, 130, 246, 0.3);
+      }
+    }
+
     :host {
       display: block;
     }
 
     .container {
-      border-radius: var(--sc-radius-lg);
+      background: var(--sc-bg-surface);
+      border: 1px solid var(--sc-border);
+      border-left: 3px solid var(--sc-info);
+      border-radius: var(--sc-radius);
+      box-shadow: var(--sc-shadow-xs);
       overflow: hidden;
-      background: color-mix(
-        in srgb,
-        var(--sc-surface, var(--sc-bg-surface)) var(--sc-glass-standard-bg-opacity, 6%),
-        transparent
-      );
-      backdrop-filter: blur(var(--sc-glass-standard-blur, 24px))
-        saturate(var(--sc-glass-standard-saturate, 180%));
-      -webkit-backdrop-filter: blur(var(--sc-glass-standard-blur, 24px))
-        saturate(var(--sc-glass-standard-saturate, 180%));
-      border: 1px solid
-        color-mix(
-          in srgb,
-          var(--sc-border) var(--sc-glass-standard-border-opacity, 8%),
-          transparent
-        );
-      border-left-width: 4px;
-      border-left-color: var(--sc-accent-secondary);
+    }
+
+    .container.status-running {
+      animation: sc-pulse-border 1.5s ease-in-out infinite;
     }
 
     .container.status-success {
-      border-left-color: var(--sc-accent);
+      border-left-color: var(--sc-success);
+      animation: none;
     }
 
     .container.status-error {
       border-left-color: var(--sc-error);
+      animation: none;
     }
 
     .header {
@@ -93,6 +96,11 @@ export class ScToolResult extends LitElement {
       color: var(--sc-error);
     }
 
+    .tool-body {
+      overflow: hidden;
+      transition: max-height var(--sc-duration-normal) var(--sc-ease-out);
+    }
+
     .content {
       font-family: var(--sc-font-mono);
       font-size: var(--sc-text-xs);
@@ -116,6 +124,11 @@ export class ScToolResult extends LitElement {
     }
 
     @media (prefers-reduced-motion: reduce) {
+      .container.status-running {
+        animation: none;
+      }
+
+      .tool-body,
       .content {
         transition: none;
       }
@@ -166,7 +179,7 @@ export class ScToolResult extends LitElement {
           ${this._statusIcon()}
           <span>${this.tool}</span>
         </div>
-        <div class="content ${this.collapsed ? "collapsed" : ""}">${this.content}</div>
+        <div class="content tool-body ${this.collapsed ? "collapsed" : ""}">${this.content}</div>
       </div>
     `;
   }
