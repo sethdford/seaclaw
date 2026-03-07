@@ -43,6 +43,142 @@ import "./sc-chat-composer.js";
 import "./sc-message-thread.js";
 import "./sc-chart.js";
 import "./sc-json-viewer.js";
+import "./sc-pagination.js";
+import "./sc-data-table-v2.js";
+
+describe("sc-pagination", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("sc-pagination")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("sc-pagination");
+    expect(el).toBeInstanceOf(HTMLElement);
+  });
+
+  it("should compute page count from total and pageSize", () => {
+    const el = document.createElement("sc-pagination") as any;
+    el.total = 100;
+    el.pageSize = 10;
+    expect(el.pageCount).toBe(10);
+  });
+
+  it("should default page to 1", () => {
+    const el = document.createElement("sc-pagination") as any;
+    expect(el.page).toBe(1);
+  });
+
+  it("should default pageSize to 10", () => {
+    const el = document.createElement("sc-pagination") as any;
+    expect(el.pageSize).toBe(10);
+  });
+
+  it("should fire sc-page-change on page navigation", async () => {
+    const el = document.createElement("sc-pagination") as any;
+    el.total = 50;
+    el.pageSize = 10;
+    el.page = 1;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const events: any[] = [];
+    el.addEventListener("sc-page-change", (e: any) => events.push(e.detail));
+
+    const nextBtn = el.shadowRoot?.querySelector('[aria-label="Next page"]') as HTMLButtonElement;
+    nextBtn?.click();
+    expect(events.length).toBe(1);
+    expect(events[0].page).toBe(2);
+    el.remove();
+  });
+
+  it("should render showing label", async () => {
+    const el = document.createElement("sc-pagination") as any;
+    el.total = 100;
+    el.pageSize = 10;
+    el.page = 1;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const text = el.shadowRoot?.textContent;
+    expect(text).toContain("1");
+    expect(text).toContain("10");
+    expect(text).toContain("100");
+    el.remove();
+  });
+});
+
+describe("sc-data-table-v2", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("sc-data-table-v2")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("sc-data-table-v2");
+    expect(el).toBeInstanceOf(HTMLElement);
+  });
+
+  it("should render rows", async () => {
+    const el = document.createElement("sc-data-table-v2") as any;
+    el.columns = [{ key: "name", label: "Name" }];
+    el.rows = [{ name: "Alice" }, { name: "Bob" }];
+    el.paginated = false;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const tds = el.shadowRoot?.querySelectorAll("td");
+    expect(tds?.length).toBeGreaterThanOrEqual(2);
+    el.remove();
+  });
+
+  it("should fire sc-row-click on row click", async () => {
+    const el = document.createElement("sc-data-table-v2") as any;
+    el.columns = [{ key: "name", label: "Name" }];
+    el.rows = [{ name: "Alice" }];
+    el.paginated = false;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const events: any[] = [];
+    el.addEventListener("sc-row-click", (e: any) => events.push(e.detail));
+
+    const row = el.shadowRoot?.querySelector("tbody tr") as HTMLElement;
+    row?.click();
+    expect(events.length).toBe(1);
+    expect(events[0].row.name).toBe("Alice");
+    el.remove();
+  });
+
+  it("should sort when clicking sortable column", async () => {
+    const el = document.createElement("sc-data-table-v2") as any;
+    el.columns = [{ key: "name", label: "Name", sortable: true }];
+    el.rows = [{ name: "Bob" }, { name: "Alice" }];
+    el.paginated = false;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const th = el.shadowRoot?.querySelector("th") as HTMLElement;
+    th?.click();
+    await el.updateComplete;
+
+    const cells = el.shadowRoot?.querySelectorAll("td");
+    expect(cells?.[0]?.textContent?.trim()).toBe("Alice");
+    el.remove();
+  });
+
+  it("should show empty state for no rows", async () => {
+    const el = document.createElement("sc-data-table-v2") as any;
+    el.columns = [{ key: "name", label: "Name" }];
+    el.rows = [];
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const text = el.shadowRoot?.textContent;
+    expect(text).toContain("No data");
+    el.remove();
+  });
+
+  it("should default paginated to true", () => {
+    const el = document.createElement("sc-data-table-v2") as any;
+    expect(el.paginated).toBe(true);
+  });
+});
 
 describe("sc-json-viewer", () => {
   it("should be defined as a custom element", () => {
