@@ -1,0 +1,33 @@
+---
+description: Security module standards — high-risk area requiring extra review
+globs:
+  - "src/security/**"
+  - "include/seaclaw/security.h"
+  - "include/seaclaw/crypto.h"
+---
+
+# Security Module (High Risk)
+
+This is a high-blast-radius area. Read AGENTS.md sections 3.5 and 7.5 before any change.
+
+## Principles
+
+- Deny-by-default for all access and exposure boundaries
+- Never log secrets, raw tokens, or sensitive payloads
+- HTTPS-only for all outbound URLs — HTTP is rejected at the tool layer
+- Keep network/filesystem/shell scope as narrow as possible
+- Every change must include threat/risk notes in the commit message
+
+## Specific Rules
+
+- Pairing: never weaken lockout thresholds or bypass code validation
+- AEAD encryption: use stack buffers for `ChaCha20Poly1305.decrypt`, then `dupe()`
+- Secret store: always check `encrypt`/`decrypt` return values — never fall back to plaintext silently
+- Sandbox backends (landlock, firejail, bwrap): test on both macOS and Linux
+- Policy: never silently broaden permissions or capabilities
+
+## Required Tests
+
+- At least one boundary/failure-mode test per change
+- Test lockout, invalid input, privilege escalation paths
+- Use `SC_IS_TEST` for any crypto or network operations

@@ -1,0 +1,30 @@
+---
+description: Design token JSON editing standards
+globs:
+  - "design-tokens/**"
+---
+
+# Design Tokens
+
+Source of truth: `design-tokens/` directory. W3C Design Tokens v2025.10 format.
+
+## Token File Structure
+
+- `base.tokens.json` — color primitives (OKLCH)
+- `breakpoints.tokens.json` — responsive breakpoints
+- `components.tokens.json` — component-specific tokens
+- `data-viz.tokens.json` — chart/visualization colors
+- `elevation.tokens.json` — shadow/depth tokens
+- `glass.tokens.json` — glassmorphism tokens
+- `motion.tokens.json` — duration, easing, springs
+- `opacity.tokens.json` — opacity scale
+- `typography.tokens.json` — font sizes, weights, line heights
+
+## Rules
+
+- All tokens use `$value` and `$type` (W3C format). Add `$description` for non-obvious tokens.
+- Token names map to `--sc-*` CSS custom properties after build.
+- After editing any `.tokens.json` file, run `cd design-tokens && npm run build` to regenerate outputs.
+- Generated outputs: CSS (`_tokens.css`), Kotlin (`DesignTokens.kt`), Swift (`DesignTokens.swift`), C (`design_tokens.h`).
+- Never hand-edit generated output files — edit the `.tokens.json` source.
+- Reference `docs/design-strategy.md` for the design philosophy behind token choices.

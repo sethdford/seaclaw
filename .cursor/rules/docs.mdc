@@ -1,0 +1,27 @@
+---
+description: Documentation standards for docs/ directory
+globs:
+  - "docs/**"
+---
+
+# Documentation Standards
+
+## File Organization
+
+- `docs/` — guides, standards, reference docs
+- `docs/plans/` — implementation plans (named `YYYY-MM-DD-<slug>.md`)
+- Generated docs (`icon-inventory.md`, `components.md`) are auto-built via `cd ui && npm run docs`
+
+## Formatting
+
+- Every doc must start with YAML frontmatter (`---` delimiters)
+- Use ATX headings (`#`, `##`, `###`) — no setext underlines
+- Cross-reference other docs with relative links (e.g., `[design strategy](design-strategy.md)`)
+- Code examples must specify language in fenced blocks
+
+## Content Rules
+
+- Standards docs are the "constitution" — agent rules and cursor rules point to them
+- Keep docs concise and actionable, not verbose
+- Update `AGENTS.md` or cursor rules when adding a new standard doc
+- Never include real API keys, credentials, or personal data in examples

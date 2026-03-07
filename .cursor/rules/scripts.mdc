@@ -1,0 +1,35 @@
+---
+description: Standards for build, lint, and utility scripts
+globs:
+  - "scripts/**"
+  - "ui/scripts/**"
+  - "website/scripts/**"
+---
+
+# Scripts
+
+## Conventions
+
+- Use `#!/usr/bin/env bash` shebang and `set -euo pipefail`
+- Scripts must work on both macOS and Linux (use `$(nproc)` with `sysctl -n hw.ncpu` fallback)
+- Document usage in a comment at the top of the file
+- Exit with non-zero on failure — CI depends on exit codes
+
+## Wiring
+
+New scripts should be wired into at least one of:
+- `package.json` scripts (for npm-based checks)
+- `.githooks/pre-commit` or `.githooks/pre-push` (for local enforcement)
+- `.github/workflows/ci.yml` (for CI enforcement)
+
+Document which hook/CI job runs the script in a comment at the top.
+
+## Existing Key Scripts
+
+| Script | Purpose | Runs in |
+|--------|---------|---------|
+| `scripts/check.sh` | C build + test | CI, pre-push |
+| `scripts/lint-raw-colors.sh` | Hex color lint | pre-commit, CI |
+| `ui/scripts/lint-raw-values.sh` | Token drift lint | pre-commit, CI |
+| `ui/scripts/check-bundle-size.sh` | 350KB budget | CI |
+| `ui/scripts/check-all-components.sh` | Component checklist | CI |
