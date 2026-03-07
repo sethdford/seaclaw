@@ -7,6 +7,7 @@
 #include "seaclaw/crypto.h"
 #include "seaclaw/gateway/control_protocol.h"
 #include "seaclaw/gateway/event_bridge.h"
+#include "seaclaw/gateway/oauth.h"
 #include "seaclaw/gateway/openai_compat.h"
 #include "seaclaw/gateway/rate_limit.h"
 #include "seaclaw/gateway/thread_pool.h"
@@ -77,6 +78,16 @@ typedef struct rate_entry {
     time_t window_start;
 } rate_entry_t;
 
+#define SC_OAUTH_PENDING_MAX  64
+#define SC_OAUTH_STATE_LEN    48
+#define SC_OAUTH_VERIFIER_LEN 64
+
+typedef struct sc_oauth_pending_entry {
+    char state[SC_OAUTH_STATE_LEN];
+    char verifier[SC_OAUTH_VERIFIER_LEN];
+    time_t created_at;
+} sc_oauth_pending_entry_t;
+
 typedef struct sc_gateway_state {
     sc_allocator_t *alloc;
     sc_gateway_config_t config;
@@ -87,6 +98,8 @@ typedef struct sc_gateway_state {
     sc_rate_limiter_t *rate_limiter;
     sc_ws_server_t ws;
     sc_pairing_guard_t *pairing_guard;
+    sc_oauth_pending_entry_t oauth_pending[SC_OAUTH_PENDING_MAX];
+    size_t oauth_pending_count;
 } sc_gateway_state_t;
 
 static void trim_crlf(char *s) {
@@ -220,24 +233,17 @@ static bool verify_hmac(const char *body, size_t body_len, const char *sig_heade
 
 static const char *const *s_cors_origins = NULL;
 static size_t s_cors_origins_len = 0;
-static const char *s_request_origin = NULL;
 #ifdef SC_GATEWAY_POSIX
-static pthread_mutex_t s_cors_mutex = PTHREAD_MUTEX_INITIALIZER;
+static _Thread_local const char *s_request_origin = NULL;
 #endif
 
 /* Returns origin to echo in CORS header, or "" if not allowed. Caller must use result
- * immediately; holds s_cors_mutex during read. */
+ * immediately. Uses thread-local s_request_origin (set per-request in main or worker). */
 static const char *get_cors_origin_for_response(void) {
-#ifdef SC_GATEWAY_POSIX
-    pthread_mutex_lock(&s_cors_mutex);
-#endif
     const char *cors = "";
     if (s_request_origin &&
         sc_gateway_is_allowed_origin(s_request_origin, s_cors_origins, s_cors_origins_len))
         cors = s_request_origin;
-#ifdef SC_GATEWAY_POSIX
-    pthread_mutex_unlock(&s_cors_mutex);
-#endif
     return cors;
 }
 
