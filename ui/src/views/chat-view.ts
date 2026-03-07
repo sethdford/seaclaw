@@ -8,6 +8,7 @@ import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import { ScToast } from "../components/sc-toast.js";
 import { ChatController, type ChatItem, type GatewayLike } from "../controllers/chat-controller.js";
+import "../components/sc-button.js";
 import "../components/sc-chat-composer.js";
 import "../components/sc-message-thread.js";
 import "../components/sc-tapback-menu.js";
@@ -95,22 +96,7 @@ export class ScChatView extends GatewayAwareLitElement {
       background: var(--sc-text-muted);
     }
     .retry-btn {
-      background: transparent;
-      border: 1px solid var(--sc-border);
-      color: var(--sc-text-muted);
-      font-size: var(--sc-text-xs);
-      font-family: var(--sc-font);
-      padding: var(--sc-space-2xs) var(--sc-space-sm);
-      border-radius: var(--sc-radius-sm);
-      cursor: pointer;
       margin-top: var(--sc-space-xs);
-      transition:
-        color var(--sc-duration-fast),
-        border-color var(--sc-duration-fast);
-    }
-    .retry-btn:hover {
-      color: var(--sc-text);
-      border-color: var(--sc-text-muted);
     }
     .error-banner {
       display: flex;
@@ -183,6 +169,7 @@ export class ScChatView extends GatewayAwareLitElement {
   @state() private _sessionsPanelOpen = false;
   @state() private _sessions: ChatSession[] = [];
   @state() private _tapback = { open: false, x: 0, y: 0, index: -1, content: "" };
+  @query("sc-chat-composer") private _composer!: HTMLElement & { focus?: () => void };
   @query("sc-message-thread") private _messageThread!: HTMLElement & {
     scrollToBottom: () => void;
     scrollToItem: (idx: number) => void;
@@ -235,17 +222,27 @@ export class ScChatView extends GatewayAwareLitElement {
     const gw = this.gateway;
     if (!gw) return;
     try {
-      const res = await gw.request<{ sessions?: Array<{ id: string; title: string; ts: number }> }>(
-        "sessions.list",
-        {},
-      );
+      const res = await gw.request<{
+        sessions?: Array<{
+          key?: string;
+          label?: string;
+          created_at?: number;
+          last_active?: number;
+          turn_count?: number;
+        }>;
+      }>("sessions.list", {});
       if (res?.sessions && Array.isArray(res.sessions)) {
-        this._sessions = res.sessions.map((s) => ({
-          id: s.id,
-          title: s.title ?? "Untitled",
-          ts: s.ts ?? Date.now(),
-          active: s.id === this.sessionKey,
-        }));
+        this._sessions = res.sessions.map((s) => {
+          const id = s.key ?? "";
+          const title = s.label ?? "Untitled";
+          const ts = s.last_active ?? s.created_at ?? Date.now();
+          return {
+            id,
+            title,
+            ts: typeof ts === "number" ? ts : Date.now(),
+            active: id === this.sessionKey,
+          };
+        });
       }
     } catch {
       this._sessions = [];
@@ -335,6 +332,12 @@ export class ScChatView extends GatewayAwareLitElement {
     };
   }
 
+  private _handleEdit(content: string, _index: number): void {
+    this.inputValue = content;
+    this.requestUpdate();
+    this.updateComplete.then(() => this._composer?.focus?.());
+  }
+
   private _handleRegenerate(idx: number): void {
     const items = this.chat.items;
     if (idx < 0 || idx >= items.length) return;
@@ -369,7 +372,7 @@ export class ScChatView extends GatewayAwareLitElement {
           {
             type: "message",
             role: "user",
-            content: `\u{1F4CE} ${f.name} (${(f.size / 1024).toFixed(1)} KB)`,
+            content: `[attachment] ${f.name} (${(f.size / 1024).toFixed(1)} KB)`,
             ts: Date.now(),
           },
         ];
@@ -456,7 +459,8 @@ export class ScChatView extends GatewayAwareLitElement {
           @sc-session-rename=${this._onSessionRename}
         ></sc-chat-sessions-panel>
         <div class="container">
-          ${this._renderStatusBar()} ${this._renderErrorBanner()} ${this._renderSearch()}
+          ${this._renderStatusBar()} ${this._renderErrorBanner()}
+          ${this._renderHistoryErrorBanner()} ${this._renderSearch()}
           <sc-message-thread
             .items=${this.chat.items}
             .isWaiting=${this.chat.isWaiting}
@@ -494,6 +498,9 @@ export class ScChatView extends GatewayAwareLitElement {
                   .find((i) => i.type === "message" && i.role === "user");
                 if (prevUser?.type === "message") this._handleSend(prevUser.content);
               }
+            }}
+            @sc-edit=${(e: CustomEvent<{ content: string; index: number }>) => {
+              this._handleEdit(e.detail.content, e.detail.index);
             }}
             @sc-tapback=${(
               e: CustomEvent<{ x: number; y: number; index: number; content: string }>,
@@ -613,6 +620,23 @@ export class ScChatView extends GatewayAwareLitElement {
     `;
   }
 
+  private _renderHistoryErrorBanner() {
+    if (!this.chat.historyError) return nothing;
+    return html`
+      <div class="error-banner">
+        <span>${this.chat.historyError}</span>
+        <sc-button
+          variant="ghost"
+          size="sm"
+          @click=${() => this.chat.loadHistory(this.sessionKey)}
+          aria-label="Retry loading history"
+        >
+          Retry
+        </sc-button>
+      </div>
+    `;
+  }
+
   private _renderSearch() {
     if (!this._searchOpen) return nothing;
     return html`
@@ -649,8 +673,14 @@ export class ScChatView extends GatewayAwareLitElement {
 
   private _renderRetryButton() {
     if (!this.chat.lastFailedMessage) return nothing;
-    return html`<button class="retry-btn" @click=${this._retry} aria-label="Retry last message">
+    return html`<sc-button
+      variant="ghost"
+      size="sm"
+      @click=${this._retry}
+      aria-label="Retry last message"
+      class="retry-btn"
+    >
       Retry last message
-    </button>`;
+    </sc-button>`;
   }
 }

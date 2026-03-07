@@ -13,6 +13,7 @@ import "../components/sc-skeleton.js";
 import "../components/sc-form-group.js";
 import "../components/sc-combobox.js";
 import "../components/sc-code-block.js";
+import "../components/sc-empty-state.js";
 
 type SaveStatus = "saved" | "error" | "unsaved" | "idle";
 
@@ -156,26 +157,10 @@ export class ScConfigView extends GatewayAwareLitElement {
       margin-top: var(--sc-space-2xs);
     }
     .raw-area {
-      min-height: 17.5rem;
-      padding: var(--sc-space-md) var(--sc-space-md);
-      background: var(--sc-bg-inset);
-      border: 1px solid var(--sc-border);
-      border-radius: var(--sc-radius-md);
-      color: var(--sc-text);
-      font-family: var(--sc-font-mono);
-      font-size: var(--sc-text-sm);
-      resize: vertical;
-      transition:
-        border-color var(--sc-duration-fast),
-        box-shadow var(--sc-duration-fast);
-    }
-    .raw-area:hover:not(:focus) {
-      border-color: var(--sc-text-muted);
-    }
-    .raw-area:focus {
-      outline: none;
-      border-color: var(--sc-accent);
-      box-shadow: 0 0 0 var(--sc-radius-sm) var(--sc-accent-subtle);
+      --sc-font: var(--sc-font-mono);
+      --sc-text-base: var(--sc-text-sm);
+      --sc-bg-elevated: var(--sc-bg-inset);
+      width: 100%;
     }
     .unsaved-banner {
       position: sticky;
@@ -220,6 +205,7 @@ export class ScConfigView extends GatewayAwareLitElement {
   @state() private sectionCollapsed = false;
   @state() private saveStatus: SaveStatus = "idle";
   @state() private errorMessage = "";
+  @state() private loadError = "";
   @state() private saving = false;
   @state() private providerOptions: { value: string; label: string }[] = DEFAULT_PROVIDERS;
   @state() private modelOptions: { value: string; label: string }[] = COMMON_MODELS;
@@ -245,6 +231,7 @@ export class ScConfigView extends GatewayAwareLitElement {
 
   protected override async load(): Promise<void> {
     this.loading = true;
+    this.loadError = "";
     await Promise.all([this.loadConfig(), this.loadSchema(), this.loadProviderOptions()]);
     this.loading = false;
   }
@@ -267,6 +254,7 @@ export class ScConfigView extends GatewayAwareLitElement {
     } catch (e) {
       this.saveStatus = "error";
       this.errorMessage = e instanceof Error ? e.message : "Load failed";
+      this.loadError = e instanceof Error ? e.message : "Load failed";
     }
   }
 
@@ -448,6 +436,12 @@ export class ScConfigView extends GatewayAwareLitElement {
 
   override render() {
     if (this.loading) return this._renderSkeleton();
+    if (this.loadError)
+      return html`<sc-empty-state
+        .icon=${icons.warning}
+        heading="Error"
+        description=${this.loadError}
+      ></sc-empty-state>`;
     if (this.rawMode) return this._renderRaw();
     return this._renderForm();
   }
@@ -508,15 +502,16 @@ export class ScConfigView extends GatewayAwareLitElement {
         <div class="form">
           ${this.rawEditing
             ? html`
-                <textarea
+                <sc-textarea
                   class="raw-area"
                   .value=${this.rawText}
-                  @input=${(e: Event) => {
-                    this.rawText = (e.target as HTMLTextAreaElement).value;
+                  @sc-input=${(e: CustomEvent<{ value: string }>) => {
+                    this.rawText = e.detail.value;
                     if (this.saveStatus === "saved") this.saveStatus = "idle";
                   }}
-                  spellcheck="false"
-                ></textarea>
+                  rows="12"
+                  resize="vertical"
+                ></sc-textarea>
                 <sc-button variant="secondary" size="sm" @click=${() => (this.rawEditing = false)}>
                   Done editing
                 </sc-button>

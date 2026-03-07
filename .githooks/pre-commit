@@ -77,7 +77,9 @@ fi
 staged_ui_ts=$(git diff --cached --name-only --diff-filter=ACM -- 'ui/src/**/*.ts' | grep -v '.test.' | grep -v 'demo-gateway' || true)
 if [ -n "$staged_ui_ts" ] && [ -x "ui/scripts/lint-raw-values.sh" ]; then
     echo "Checking design token usage in staged UI files..."
-    (cd ui && bash scripts/lint-raw-values.sh)
+    # Strip ui/ prefix since lint script runs from ui/ dir
+    stripped=$(echo "$staged_ui_ts" | sed 's|^ui/||')
+    (cd ui && bash scripts/lint-raw-values.sh $stripped)
     if [ $? -ne 0 ]; then
         echo "Token lint failed. Use --sc-* design tokens instead of raw hex/rgba/durations."
         exit 1

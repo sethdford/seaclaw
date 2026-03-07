@@ -14,6 +14,7 @@ import "../components/sc-message-thread.js";
 import "../components/sc-page-hero.js";
 import "../components/sc-section-header.js";
 import "../components/sc-stat-card.js";
+import "../components/sc-empty-state.js";
 
 type VoiceStatus = "idle" | "listening" | "processing" | "unsupported";
 
@@ -35,7 +36,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
       flex: 1;
       min-height: 0;
       color: var(--sc-text);
-      max-width: 720px;
+      max-width: 45rem;
       width: 100%;
       margin: 0 auto;
       padding: var(--sc-space-lg) var(--sc-space-xl);
@@ -47,16 +48,16 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     .stats-row {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(11.25rem, 1fr));
       gap: var(--sc-space-md);
       margin-bottom: var(--sc-space-2xl);
     }
-    @media (max-width: 640px) /* --sc-breakpoint-md */ {
+    @media (max-width: 40rem) /* --sc-breakpoint-md */ {
       .stats-row {
         grid-template-columns: 1fr 1fr;
       }
     }
-    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+    @media (max-width: 30rem) /* --sc-breakpoint-sm */ {
       .stats-row {
         grid-template-columns: 1fr;
       }
@@ -83,8 +84,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -60%);
-      width: 240px;
-      height: 240px;
+      width: 15rem;
+      height: 15rem;
       border-radius: 50%;
       background: radial-gradient(circle, var(--sc-accent-subtle) 0%, transparent 70%);
       opacity: 0.4;
@@ -94,7 +95,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     .mic-orb-glow.active {
       opacity: 0.8;
-      animation: sc-glow-breathe 3s ease-in-out infinite;
+      animation: sc-glow-breathe 3s ease-in-out infinite; /* sc-lint-ok: ambient */
     }
 
     @keyframes sc-glow-breathe {
@@ -115,8 +116,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
     }
 
     .mic-btn {
-      width: 96px;
-      height: 96px;
+      width: var(--sc-space-5xl);
+      height: var(--sc-space-5xl);
       border-radius: 50%;
       border: 2px solid var(--sc-border);
       background: var(--sc-bg-surface);
@@ -155,7 +156,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     .mic-btn:focus-visible {
       outline: 2px solid var(--sc-accent);
-      outline-offset: 4px;
+      outline-offset: var(--sc-space-xs);
     }
 
     .mic-btn:disabled {
@@ -176,8 +177,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
       position: absolute;
       top: 50%;
       left: 50%;
-      width: 96px;
-      height: 96px;
+      width: var(--sc-space-5xl);
+      height: var(--sc-space-5xl);
       border-radius: 50%;
       border: 2px solid var(--sc-accent);
       transform: translate(-50%, -50%) scale(1);
@@ -186,7 +187,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
     }
 
     .mic-ring.active {
-      animation: sc-ring-expand 2s ease-out infinite;
+      animation: sc-ring-expand 2s ease-out infinite; /* sc-lint-ok: ambient */
     }
 
     .mic-ring.ring-2.active {
@@ -234,78 +235,18 @@ export class ScVoiceView extends GatewayAwareLitElement {
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius-lg);
       box-shadow: var(--sc-shadow-card);
-      backdrop-filter: blur(var(--sc-glass-subtle-blur, 12px));
-      -webkit-backdrop-filter: blur(var(--sc-glass-subtle-blur, 12px));
+      backdrop-filter: blur(var(--sc-glass-subtle-blur));
+      -webkit-backdrop-filter: blur(var(--sc-glass-subtle-blur));
       flex-shrink: 0;
     }
 
-    .input-bar textarea {
+    .input-bar sc-textarea {
       flex: 1;
-      min-height: 44px;
-      max-height: 120px;
-      padding: var(--sc-space-sm) var(--sc-space-md);
-      background: var(--sc-bg);
-      border: 1px solid var(--sc-border);
-      border-radius: var(--sc-radius);
-      color: var(--sc-text);
-      font-family: var(--sc-font);
-      font-size: var(--sc-text-base);
-      resize: none;
-      line-height: 1.5;
-      box-sizing: border-box;
-      transition:
-        border-color var(--sc-duration-fast) var(--sc-ease-out),
-        box-shadow var(--sc-duration-fast) var(--sc-ease-out);
+      --sc-bg-elevated: var(--sc-bg);
     }
 
-    .input-bar textarea:focus {
-      outline: none;
-      border-color: var(--sc-accent);
-      box-shadow: 0 0 0 3px var(--sc-accent-subtle);
-    }
-
-    .input-bar textarea::placeholder {
-      color: var(--sc-text-muted);
-    }
-
-    .send-btn {
-      padding: var(--sc-space-sm) var(--sc-space-lg);
-      min-height: 44px;
-      background: var(--sc-accent);
-      background-image: var(--sc-button-gradient-primary);
-      color: var(--sc-on-accent, var(--sc-bg));
-      border: none;
-      border-radius: var(--sc-radius);
-      font-weight: var(--sc-weight-semibold, 600);
-      cursor: pointer;
-      font-size: var(--sc-text-base);
-      box-shadow: var(--sc-shadow-glow-accent);
-      transition:
-        background var(--sc-duration-fast) var(--sc-ease-out),
-        box-shadow var(--sc-duration-fast) var(--sc-ease-out),
-        transform var(--sc-duration-fast) var(--sc-ease-out);
-    }
-
-    .send-btn:hover:not(:disabled) {
-      background: var(--sc-accent-hover);
-      background-image: var(--sc-button-gradient-primary);
-      box-shadow: var(--sc-shadow-glow-accent);
-      transform: translateY(-1px);
-    }
-
-    .send-btn:active:not(:disabled) {
-      transform: translateY(1px) scaleY(0.97) scaleX(1.01);
-      box-shadow: var(--sc-shadow-sm);
-    }
-
-    .send-btn:disabled {
-      opacity: var(--sc-opacity-disabled, 0.5);
-      cursor: not-allowed;
-    }
-
-    .send-btn:focus-visible {
-      outline: 2px solid var(--sc-accent);
-      outline-offset: 2px;
+    .input-bar sc-button {
+      min-height: 2.75rem;
     }
 
     /* ── Conversation zone ────────────────────────────── */
@@ -313,7 +254,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
     @keyframes sc-slide-up {
       from {
         opacity: 0;
-        transform: translateY(8px);
+        transform: translateY(var(--sc-space-sm));
       }
       to {
         opacity: 1;
@@ -395,35 +336,10 @@ export class ScVoiceView extends GatewayAwareLitElement {
       animation: sc-slide-up var(--sc-duration-normal) var(--sc-ease-out) both;
     }
 
-    .empty-conversation {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: var(--sc-space-md);
-      padding: var(--sc-space-lg);
-      text-align: center;
-      flex: 1;
-    }
-
-    .empty-icon {
-      width: 48px;
-      height: 48px;
-      color: var(--sc-text-muted);
-      opacity: 0.3;
-    }
-
-    .empty-text {
-      color: var(--sc-text-muted);
-      font-size: var(--sc-text-sm);
-      max-width: 280px;
-      line-height: 1.6;
-    }
-
     /* ── Skeleton ─────────────────────────────────────── */
 
     .skeleton-hero {
-      height: 90px;
+      height: 5.625rem;
       margin-bottom: var(--sc-space-2xl, 2rem);
       border-radius: var(--sc-radius-xl, 16px);
     }
@@ -440,24 +356,21 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     /* ── Responsive ───────────────────────────────────── */
 
-    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+    @media (max-width: 30rem) /* --sc-breakpoint-sm */ {
       :host {
         max-width: 100%;
-        padding: var(--sc-space-sm) var(--sc-space-md);
-      }
-      .hero {
         padding: var(--sc-space-sm) var(--sc-space-md);
       }
       .input-bar {
         flex-direction: column;
         align-items: stretch;
       }
-      .send-btn {
-        min-height: 40px;
+      .input-bar sc-button {
+        min-height: 2.5rem;
       }
       .mic-btn {
-        width: 72px;
-        height: 72px;
+        width: 4.5rem;
+        height: 4.5rem;
       }
       .mic-btn svg {
         width: 2rem;
@@ -480,6 +393,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
   @state() private transcript = "";
   @state() private voiceStatus: VoiceStatus = "idle";
   @state() private speechSupported = true;
+  @state() private error = "";
+  @state() private _lastFailedMessage = "";
   @state() private recognition: SpeechRecognition | null = null;
   @state() private _messages: VoiceMessage[] = [];
   @state() private _connectionStatus: GatewayStatus = "disconnected";
@@ -766,6 +681,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
     const text = this.transcript.trim();
     const gw = this.gateway;
     if (!text || !gw) return;
+    this.error = "";
     const wasEmpty = this._messages.length === 0;
     this._messages = [...this._messages, { role: "user", content: text, ts: Date.now() }];
     if (wasEmpty) this._startDurationTimer();
@@ -781,8 +697,21 @@ export class ScVoiceView extends GatewayAwareLitElement {
     } catch (err) {
       this.voiceStatus = "idle";
       const msg = err instanceof Error ? err.message : "Failed to send message";
+      this.error = msg;
+      this._lastFailedMessage = text;
       ScToast.show({ message: msg, variant: "error" });
     }
+  }
+
+  private _retrySend(): void {
+    this.error = "";
+    const msg = this._lastFailedMessage;
+    this._lastFailedMessage = "";
+    if (!msg) return;
+    this._messages = this._messages.slice(0, -1);
+    this.transcript = msg;
+    this._cacheMessages();
+    this.updateComplete.then(() => this.send());
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
@@ -808,8 +737,17 @@ export class ScVoiceView extends GatewayAwareLitElement {
   override render() {
     if (this._loading) return this._renderSkeleton();
     return html`
-      ${this._renderHero()} ${this._renderConversation()} ${this._renderVoiceZone()}
-      ${this._renderInputBar()}
+      ${this._renderHero()}
+      ${this.error
+        ? html`
+            <sc-empty-state .icon=${icons.warning} heading="Error" description=${this.error}>
+              <sc-button variant="primary" @click=${this._retrySend} aria-label="Retry">
+                Retry
+              </sc-button>
+            </sc-empty-state>
+          `
+        : nothing}
+      ${this._renderConversation()} ${this._renderVoiceZone()} ${this._renderInputBar()}
     `;
   }
 
@@ -901,18 +839,20 @@ export class ScVoiceView extends GatewayAwareLitElement {
   private _renderInputBar() {
     return html`
       <div class="input-bar">
-        <textarea
+        <sc-textarea
           placeholder="Speech transcript appears here, or type manually…"
           .value=${this.transcript}
           ?disabled=${this._connectionStatus === "disconnected"}
-          @input=${(e: Event) => {
-            this.transcript = (e.target as HTMLTextAreaElement).value;
+          @sc-input=${(e: CustomEvent<{ value: string }>) => {
+            this.transcript = e.detail.value;
           }}
           @keydown=${this.handleKeyDown}
+          resize="none"
+          rows="2"
           aria-label="Speech transcript"
-        ></textarea>
-        <button
-          class="send-btn"
+        ></sc-textarea>
+        <sc-button
+          variant="primary"
           ?disabled=${!this.transcript.trim() ||
           this.voiceStatus === "processing" ||
           this._connectionStatus === "disconnected"}
@@ -920,7 +860,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
           aria-label="Send voice message"
         >
           Send
-        </button>
+        </sc-button>
       </div>
     `;
   }
@@ -929,13 +869,11 @@ export class ScVoiceView extends GatewayAwareLitElement {
     if (this._messages.length === 0 && this.voiceStatus !== "processing") {
       return html`
         <div class="conversation conversation-empty">
-          <div class="empty-conversation">
-            <div class="empty-icon">${icons.mic}</div>
-            <div class="empty-text">
-              Your voice conversation will appear here.<br />
-              Tap the microphone or type a message to begin.
-            </div>
-          </div>
+          <sc-empty-state
+            .icon=${icons.mic}
+            heading="No conversation yet"
+            description="Your voice conversation will appear here. Tap the microphone or type a message to begin."
+          ></sc-empty-state>
         </div>
       `;
     }

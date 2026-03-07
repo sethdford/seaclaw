@@ -161,36 +161,8 @@ export class ScAutomationsView extends GatewayAwareLitElement {
       margin-bottom: var(--sc-space-xs);
     }
 
-    .form-textarea {
+    sc-textarea {
       width: 100%;
-      box-sizing: border-box;
-      min-height: 6.25rem;
-      padding: var(--sc-space-sm) var(--sc-space-md);
-      font-family: var(--sc-font);
-      font-size: var(--sc-text-base);
-      background: var(--sc-bg-elevated);
-      border: 1px solid var(--sc-border);
-      border-radius: var(--sc-radius);
-      color: var(--sc-text);
-      resize: vertical;
-      transition:
-        border-color var(--sc-duration-fast) var(--sc-ease-out),
-        box-shadow var(--sc-duration-fast) var(--sc-ease-out);
-    }
-
-    .form-textarea::placeholder {
-      color: var(--sc-text-muted);
-    }
-
-    .form-textarea:focus {
-      outline: none;
-      border-color: var(--sc-accent);
-      box-shadow: 0 0 0 0.1875rem var(--sc-accent-subtle);
-    }
-
-    .form-textarea:focus-visible {
-      outline: 2px solid var(--sc-accent);
-      outline-offset: var(--sc-focus-ring-offset);
     }
 
     .form-select {
@@ -309,7 +281,6 @@ export class ScAutomationsView extends GatewayAwareLitElement {
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .form-textarea,
       .form-select {
         transition: none;
       }
@@ -320,6 +291,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
   @state() private runsMap = new Map<number, CronRun[]>();
   @state() private channels: ChannelStatus[] = [];
   @state() private loading = false;
+  @state() private error = "";
   @state() private activeTab = "agent";
   @state() private showAgentModal = false;
   @state() private showShellModal = false;
@@ -340,6 +312,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
     const gw = this.gateway;
     if (!gw) return;
     this.loading = true;
+    this.error = "";
     try {
       const listRes = await gw.request<{ jobs?: CronJob[] }>("cron.list", {});
       const jobs = listRes?.jobs ?? [];
@@ -378,7 +351,8 @@ export class ScAutomationsView extends GatewayAwareLitElement {
       } catch {
         this.channels = [];
       }
-    } catch {
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : "Failed to load automations";
       this.jobs = [];
       this.runsMap = new Map();
     } finally {
@@ -789,13 +763,13 @@ export class ScAutomationsView extends GatewayAwareLitElement {
           </div>
           <div class="form-group">
             <label for="agent-prompt">Prompt</label>
-            <textarea
-              id="agent-prompt"
-              class="form-textarea"
+            <sc-textarea
               placeholder="Summarize my unread messages..."
               .value=${this.agentPrompt}
-              @input=${(e: Event) => (this.agentPrompt = (e.target as HTMLTextAreaElement).value)}
-            ></textarea>
+              rows="3"
+              @sc-input=${(e: CustomEvent<{ value: string }>) =>
+                (this.agentPrompt = e.detail.value)}
+            ></sc-textarea>
           </div>
           <div class="form-group">
             <label>Mode</label>
@@ -947,11 +921,20 @@ export class ScAutomationsView extends GatewayAwareLitElement {
     `;
   }
 
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+  }
+
   override render() {
     return html`
       <sc-page-hero>
         <sc-section-header heading="Automations" description="Scheduled agent tasks and shell jobs">
-          <sc-button variant="primary" @click=${this._openNewAutomation}>New Automation</sc-button>
+          <sc-button
+            variant="primary"
+            @click=${this._openNewAutomation}
+            aria-label="Create new automation"
+            >New Automation</sc-button
+          >
         </sc-section-header>
       </sc-page-hero>
 
@@ -978,8 +961,19 @@ export class ScAutomationsView extends GatewayAwareLitElement {
         @tab-change=${(e: CustomEvent<string>) => (this.activeTab = e.detail)}
       ></sc-tabs>
 
-      ${this.loading ? this._renderSkeleton() : this._renderJobList()} ${this._renderAgentModal()}
-      ${this._renderShellModal()} ${this._renderDeleteModal()}
+      ${this.error
+        ? html`<sc-empty-state .icon=${icons.warning} heading="Error" description=${this.error}>
+            <sc-button
+              variant="primary"
+              @click=${() => this.load()}
+              aria-label="Retry loading automations"
+              >Retry</sc-button
+            >
+          </sc-empty-state>`
+        : this.loading
+          ? this._renderSkeleton()
+          : this._renderJobList()}
+      ${this._renderAgentModal()} ${this._renderShellModal()} ${this._renderDeleteModal()}
     `;
   }
 }
