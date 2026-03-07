@@ -684,14 +684,8 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc, const char *host, uint16_t port
         return SC_OK;
     }
 
-#ifdef SC_GATEWAY_POSIX
-    pthread_mutex_lock(&s_cors_mutex);
-#endif
     s_cors_origins = cfg.cors_origins;
     s_cors_origins_len = cfg.cors_origins_len;
-#ifdef SC_GATEWAY_POSIX
-    pthread_mutex_unlock(&s_cors_mutex);
-#endif
 
 #ifdef SC_GATEWAY_POSIX
     sc_gateway_state_t *gw = NULL;
@@ -962,25 +956,12 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc, const char *host, uint16_t port
                     char *v = line + 7;
                     while (*v == ' ')
                         v++;
-#ifdef SC_GATEWAY_POSIX
-                    pthread_mutex_lock(&s_cors_mutex);
-#endif
                     s_request_origin = v;
-#ifdef SC_GATEWAY_POSIX
-                    pthread_mutex_unlock(&s_cors_mutex);
-#endif
                 }
             }
 
-            if (rejected) {
-#ifdef SC_GATEWAY_POSIX
-                pthread_mutex_lock(&s_cors_mutex);
-#endif
+            if (rejected)
                 s_request_origin = NULL;
-#ifdef SC_GATEWAY_POSIX
-                pthread_mutex_unlock(&s_cors_mutex);
-#endif
-            }
 
             if (!rejected) {
                 if (body_len > 0 && body_len <= cfg.max_body_size) {

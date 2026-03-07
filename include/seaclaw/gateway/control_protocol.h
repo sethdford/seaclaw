@@ -41,7 +41,11 @@ typedef struct sc_control_protocol {
     bool require_pairing;
     struct sc_pairing_guard *pairing_guard;
     const char *auth_token;
-    void *oauth_ctx;        /* sc_oauth_ctx_t * for auth.oauth.* methods */
+    void *oauth_ctx; /* sc_oauth_ctx_t * for auth.oauth.* methods */
+    void *oauth_pending_ctx;
+    void (*oauth_pending_store)(void *ctx, const char *state, const char *verifier);
+    const char *(*oauth_pending_lookup)(void *ctx, const char *state);
+    void (*oauth_pending_remove)(void *ctx, const char *state);
     uint32_t rpc_count;     /* RPC calls in current window */
     uint64_t rpc_window_ms; /* Window start timestamp */
 } sc_control_protocol_t;
@@ -56,6 +60,11 @@ void sc_control_set_auth(sc_control_protocol_t *proto, bool require_pairing,
                          struct sc_pairing_guard *pairing_guard, const char *auth_token);
 
 void sc_control_set_oauth(sc_control_protocol_t *proto, void *oauth_ctx);
+
+void sc_control_set_oauth_pending(sc_control_protocol_t *proto, void *ctx,
+                                  void (*store)(void *ctx, const char *state, const char *verifier),
+                                  const char *(*lookup)(void *ctx, const char *state),
+                                  void (*remove)(void *ctx, const char *state));
 
 void sc_control_on_message(sc_ws_conn_t *conn, const char *data, size_t data_len, void *ctx);
 void sc_control_on_close(sc_ws_conn_t *conn, void *ctx);

@@ -2047,6 +2047,18 @@ void sc_control_set_oauth(sc_control_protocol_t *proto, void *oauth_ctx) {
     proto->oauth_ctx = oauth_ctx;
 }
 
+void sc_control_set_oauth_pending(sc_control_protocol_t *proto, void *ctx,
+                                  void (*store)(void *ctx, const char *state, const char *verifier),
+                                  const char *(*lookup)(void *ctx, const char *state),
+                                  void (*remove)(void *ctx, const char *state)) {
+    if (!proto)
+        return;
+    proto->oauth_pending_ctx = ctx;
+    proto->oauth_pending_store = store;
+    proto->oauth_pending_lookup = lookup;
+    proto->oauth_pending_remove = remove;
+}
+
 /* ── Incoming message handler ────────────────────────────────────────── */
 
 void sc_control_on_message(sc_ws_conn_t *conn, const char *data, size_t data_len, void *ctx) {
