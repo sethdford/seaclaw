@@ -50,7 +50,7 @@ export class ScButton extends LitElement {
     button.variant-primary {
       background: var(--sc-accent);
       background-image: var(--sc-button-gradient-primary);
-      color: var(--sc-on-accent, #ffffff);
+      color: var(--sc-on-accent);
       text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
       box-shadow:
         var(--sc-shadow-sm),
@@ -189,6 +189,9 @@ export class ScButton extends LitElement {
     @media (prefers-reduced-motion: reduce) {
       button {
         transition: none !important;
+      }
+      .spinner {
+        animation: none !important;
       }
     }
   `;

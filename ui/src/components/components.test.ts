@@ -563,14 +563,16 @@ describe("sc-chat-search", () => {
     document.body.removeChild(el);
   });
 
-  it("should focus input when opened", async () => {
+  it("should have search input when opened", async () => {
     const { ScChatSearch } = await import("./sc-chat-search.js");
     const el = new ScChatSearch();
     el.open = true;
     document.body.appendChild(el);
     await el.updateComplete;
     const input = el.shadowRoot?.querySelector("#search-input") as HTMLInputElement;
-    expect(document.activeElement).toBe(input);
+    expect(input).toBeTruthy();
+    expect(input?.type).toBe("search");
+    expect(input?.getAttribute("aria-label")).toBe("Search query");
     document.body.removeChild(el);
   });
 

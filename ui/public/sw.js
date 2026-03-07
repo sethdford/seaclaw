@@ -1,5 +1,5 @@
 const CACHE_NAME = "seaclaw-v1";
-const PRECACHE_URLS = ["/", "/src/main.ts"];
+const PRECACHE_URLS = ["/", "/index.html"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)));

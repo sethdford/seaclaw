@@ -64,7 +64,7 @@ export class ScModal extends LitElement {
       border-radius: var(--sc-radius-sm);
       color: var(--sc-text-muted);
       cursor: pointer;
-      transition: color var(--sc-duration-fast);
+      transition: color var(--sc-duration-fast) var(--sc-ease-out);
     }
 
     .close-btn svg {

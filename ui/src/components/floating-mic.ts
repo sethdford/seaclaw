@@ -34,9 +34,9 @@ export class ScFloatingMic extends LitElement {
     }
     .btn.listening {
       background: var(--sc-error);
-      animation: pulse-red 1s ease-in-out infinite;
+      animation: sc-pulse-red var(--sc-duration-slow) ease-in-out infinite;
     }
-    @keyframes pulse-red {
+    @keyframes sc-pulse-red {
       0%,
       100% {
         box-shadow: 0 0 0 0 color-mix(in srgb, var(--sc-error) 50%, transparent);

@@ -603,12 +603,10 @@
         <p style="margin-bottom: var(--sc-space-md); color: var(--sc-text-muted);">Inline search bar for chat conversations. Use Cmd+F / Ctrl+F in chat view to open.</p>
         <div class="playground">
           <div class="preview" style="width: 100%; min-width: 320px;">
-            <sc-chat-search
-              .open=${true}
-              .query=${"test"}
-              .matchCount=${3}
-              .currentMatch=${1}
-            ></sc-chat-search>
+            <sc-chat-search id="chat-search-preview"></sc-chat-search>
+          </div>
+          <div class="controls">
+            <label><input type="checkbox" data-target="chat-search-preview" data-prop="open" checked /> Open</label>
           </div>
         </div>
         <div class="code-snippet"><pre><code>&lt;sc-chat-search .open=${true} .query=${"test"} .matchCount=${3} .currentMatch=${1}&gt;&lt;/sc-chat-search&gt;</code></pre></div>
@@ -889,6 +887,7 @@
       import "/src/components/sc-breadcrumb.js";
       import "/src/components/sc-slider.js";
       import "/src/components/sc-search.js";
+      import "/src/components/sc-chat-search.js";
       import "/src/components/sc-segmented-control.js";
       import "/src/components/sc-data-table.js";
       import "/src/components/sc-date-picker.js";
@@ -1197,6 +1196,15 @@
         const btn = document.getElementById("anum-trigger");
         if (btn) btn.textContent = anumVal === 50 ? "Animate to 100" : anumVal === 100 ? "Reset to 0" : "Animate to 50";
       });
+
+      // Chat search
+      const chatSearchPreview = document.getElementById("chat-search-preview");
+      if (chatSearchPreview) {
+        chatSearchPreview.open = true;
+        chatSearchPreview.query = "test";
+        chatSearchPreview.matchCount = 3;
+        chatSearchPreview.currentMatch = 1;
+      }
 
       // Shortcut overlay
       document.getElementById("shortcut-overlay-trigger")?.addEventListener("click", () => {

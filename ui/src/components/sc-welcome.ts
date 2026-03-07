@@ -23,9 +23,9 @@ export class ScWelcome extends LitElement {
       display: block;
     }
     .welcome {
-      animation: welcome-enter 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation: sc-welcome-enter var(--sc-duration-slow) var(--sc-ease-out) both;
     }
-    @keyframes welcome-enter {
+    @keyframes sc-welcome-enter {
       from {
         opacity: 0;
         transform: translateY(12px);
@@ -94,8 +94,8 @@ export class ScWelcome extends LitElement {
       border-radius: var(--sc-radius-lg, 12px);
       background: color-mix(in srgb, var(--sc-accent) 10%, transparent);
       transition:
-        background 280ms ease,
-        transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+        background var(--sc-duration-normal) var(--sc-ease-out),
+        transform var(--sc-duration-normal) var(--sc-ease-out);
     }
     .step-card:hover .step-icon-wrap {
       background: color-mix(in srgb, var(--sc-accent) 18%, transparent);
@@ -158,7 +158,7 @@ export class ScWelcome extends LitElement {
       text-decoration: none;
       font-family: var(--sc-font);
       padding: var(--sc-space-sm);
-      transition: color 200ms ease;
+      transition: color var(--sc-duration-normal) var(--sc-ease-out);
       letter-spacing: 0.01em;
     }
     .dismiss-link:hover {
@@ -180,7 +180,7 @@ export class ScWelcome extends LitElement {
       height: 3.5rem;
       color: var(--sc-success);
       margin: 0 auto var(--sc-space-lg, 1.5rem);
-      animation: sc-icon-pop 500ms cubic-bezier(0.22, 1, 0.36, 1);
+      animation: sc-icon-pop var(--sc-duration-slow) var(--sc-ease-out);
     }
     .celebration .check-icon svg {
       width: 100%;

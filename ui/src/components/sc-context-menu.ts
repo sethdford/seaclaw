@@ -112,7 +112,7 @@ export class ScContextMenu extends LitElement {
   private _clickOutsideHandler = (e: MouseEvent) => this._onClickOutside(e);
   private _keyHandler = (e: KeyboardEvent) => this._onKeyDown(e);
 
-  private get _actionItems(): ContextMenuItem[] {
+  private get _actionItems(): Extract<ContextMenuItem, { action: () => void }>[] {
     return this.items.filter(
       (i): i is Extract<ContextMenuItem, { action: () => void }> => !("divider" in i && i.divider),
     );

@@ -20,7 +20,7 @@ export class ScCard extends LitElement {
       background: var(--sc-bg-surface);
       background-image: var(--sc-surface-gradient);
       border: 1px solid var(--sc-border-subtle);
-      border-radius: var(--sc-radius-xl, 16px);
+      border-radius: var(--sc-radius-xl);
       padding: var(--sc-space-xl);
       box-shadow:
         var(--sc-shadow-card),
@@ -98,7 +98,7 @@ export class ScCard extends LitElement {
         var(--sc-accent),
         color-mix(in srgb, var(--sc-accent) 40%, transparent)
       );
-      border-radius: var(--sc-radius-xl, 16px) var(--sc-radius-xl, 16px) 0 0;
+      border-radius: var(--sc-radius-xl) var(--sc-radius-xl) 0 0;
     }
     .card.accent::before {
       background: linear-gradient(

@@ -471,6 +471,16 @@ export class ScChatView extends GatewayAwareLitElement {
   @state() private showScrollPill = false;
   @state() private lastFailedMessage = "";
   @state() private _streamElapsed = "";
+  @state() private _searchOpen = false;
+  @state() private _searchQuery = "";
+  @state() private _searchCurrentMatch = 0;
+  @state() private _dragOver = false;
+  @state() private _contextMenu: {
+    open: boolean;
+    x: number;
+    y: number;
+    items: ContextMenuItem[];
+  } = { open: false, x: 0, y: 0, items: [] };
   @query("#message-list") private messageList!: HTMLElement;
   @query("#chat-input") private inputEl!: HTMLTextAreaElement;
 

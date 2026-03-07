@@ -48,7 +48,7 @@ for entry in "${PAGES[@]}"; do
     # Compare with baseline (pixel diff using ImageMagick if available)
     if command -v compare &>/dev/null; then
       DIFF_METRIC=$(compare -metric AE "$BASELINE_DIR/${name}.png" "$SCREENSHOT" "$DIFF_DIR/${name}-diff.png" 2>&1 || true)
-      if [ "${DIFF_METRIC:-0}" -gt 100 ]; then
+      if ! [[ "${DIFF_METRIC:-0}" =~ ^[0-9]+$ ]] || [ "${DIFF_METRIC:-0}" -gt 100 ]; then
         echo "VISUAL DIFF: ${name} changed (${DIFF_METRIC} pixels differ)"
         FAILURES=$((FAILURES + 1))
       else
@@ -56,9 +56,11 @@ for entry in "${PAGES[@]}"; do
       fi
     else
       echo "SKIP: ImageMagick not installed, cannot compare ${name}"
+      FAILURES=$((FAILURES + 1))
     fi
   else
     echo "NO BASELINE: ${name} — run with --update to create"
+    FAILURES=$((FAILURES + 1))
   fi
 done
 

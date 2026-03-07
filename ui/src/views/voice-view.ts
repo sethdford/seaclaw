@@ -43,9 +43,9 @@ export class ScVoiceView extends GatewayAwareLitElement {
       align-items: center;
       justify-content: center;
       transition:
-        background 0.2s,
-        border-color 0.2s,
-        transform 0.2s;
+        background var(--sc-duration-fast) var(--sc-ease-out),
+        border-color var(--sc-duration-fast) var(--sc-ease-out),
+        transform var(--sc-duration-fast) var(--sc-ease-out);
     }
     .mic-btn svg {
       width: 2rem;
@@ -59,10 +59,10 @@ export class ScVoiceView extends GatewayAwareLitElement {
     .mic-btn.active {
       background: var(--sc-accent);
       border-color: var(--sc-accent);
-      color: var(--sc-on-accent, #ffffff);
-      animation: pulse-mic 1.5s ease-in-out infinite;
+      color: var(--sc-on-accent);
+      animation: sc-pulse-mic 1.5s ease-in-out infinite;
     }
-    @keyframes pulse-mic {
+    @keyframes sc-pulse-mic {
       0%,
       100% {
         transform: scale(1);
@@ -89,8 +89,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
       resize: vertical;
       box-sizing: border-box;
       transition:
-        border-color 0.2s var(--sc-ease-out),
-        box-shadow 0.2s var(--sc-ease-out);
+        border-color var(--sc-duration-fast) var(--sc-ease-out),
+        box-shadow var(--sc-duration-fast) var(--sc-ease-out);
     }
     .transcript-area textarea:focus {
       outline: none;
