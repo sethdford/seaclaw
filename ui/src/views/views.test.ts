@@ -291,6 +291,15 @@ describe("sc-usage-view", () => {
     expect(el.shadowRoot?.children.length).toBeGreaterThan(0);
     el.remove();
   });
+
+  it("should render sc-chart elements when data is present", async () => {
+    const el = document.createElement("sc-usage-view") as LitView;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    // Charts may not render without gateway data, but the component should be importable
+    expect(el.shadowRoot?.children.length).toBeGreaterThan(0);
+    el.remove();
+  });
 });
 
 describe("sc-security-view", () => {

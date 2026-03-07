@@ -8,10 +8,10 @@ import "../components/sc-stat-card.js";
 import "../components/sc-card.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
-import "../components/sc-animated-number.js";
-import "../components/sc-sparkline-enhanced.js";
-import "../components/sc-metric-row.js";
-import "../components/sc-forecast-chart.js";
+import "../components/sc-button.js";
+import "../components/sc-chart.js";
+import type { ChartData } from "../components/sc-chart.js";
+import "../components/sc-segmented-control.js";
 
 interface DailyCost {
   date: string;
@@ -50,6 +50,12 @@ const CHART_COLORS = [
   "var(--sc-chart-categorical-5)",
 ];
 
+const TIME_RANGE_OPTIONS = [
+  { value: "24h", label: "24h" },
+  { value: "7d", label: "7d" },
+  { value: "30d", label: "30d" },
+];
+
 @customElement("sc-usage-view")
 export class ScUsageView extends GatewayAwareLitElement {
   static override styles = css`
@@ -60,16 +66,16 @@ export class ScUsageView extends GatewayAwareLitElement {
     }
     .stats-row {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: var(--sc-space-md);
       margin-bottom: var(--sc-space-2xl);
     }
-    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
+    @media (max-width: 640px) {
       .stats-row {
         grid-template-columns: repeat(2, 1fr);
       }
     }
-    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+    @media (max-width: 480px) {
       .stats-row {
         grid-template-columns: 1fr;
       }
@@ -83,6 +89,14 @@ export class ScUsageView extends GatewayAwareLitElement {
       text-transform: uppercase;
       letter-spacing: 0.06em;
       margin-bottom: var(--sc-space-sm);
+    }
+    .chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--sc-space-md);
+      margin-bottom: var(--sc-space-md);
+      flex-wrap: wrap;
     }
     .chart-inner {
       padding: var(--sc-space-sm) var(--sc-space-md) var(--sc-space-md);
@@ -136,7 +150,7 @@ export class ScUsageView extends GatewayAwareLitElement {
       min-width: 2.5rem;
       text-align: right;
     }
-    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+    @media (max-width: 480px) {
       .provider-name {
         width: 5rem;
       }
@@ -151,6 +165,7 @@ export class ScUsageView extends GatewayAwareLitElement {
   @state() private summary: UsageSummary = {};
   @state() private loading = false;
   @state() private error = "";
+  @state() private _timeRange: "24h" | "7d" | "30d" = "24h";
 
   protected override async load(): Promise<void> {
     await this.loadSummary();
@@ -191,16 +206,63 @@ export class ScUsageView extends GatewayAwareLitElement {
     return new Intl.NumberFormat("en-US").format(v);
   }
 
-  private _trendBadge(): { trend: string; direction: "up" | "down" | "flat" } {
-    const projected = this.summary.projected_monthly_usd ?? 0;
-    const previous = this.summary.previous_month_cost_usd ?? 0;
-    if (previous <= 0) return { trend: "", direction: "flat" };
-    const pctChange = ((projected - previous) / previous) * 100;
-    const sign = pctChange >= 0 ? "+" : "";
+  private _tokenChartLabels(): string[] {
+    const count = this._timeRange === "24h" ? 24 : this._timeRange === "7d" ? 7 : 30;
+    if (this._timeRange === "24h") {
+      return Array.from({ length: count }, (_, i) => `${i.toString().padStart(2, "0")}:00`);
+    }
+    return Array.from({ length: count }, (_, i) => `Day ${i + 1}`);
+  }
+
+  private _tokenChartData(): ChartData {
+    const trend = this.summary.token_trend ?? [];
+    const labels = this._tokenChartLabels();
+    const count = labels.length;
+    const data =
+      trend.length >= count
+        ? trend.slice(-count)
+        : [...Array(count - trend.length).fill(0), ...trend];
     return {
-      trend: `${sign}${Math.round(pctChange)}% vs last mo`,
-      direction: pctChange > 0 ? "up" : pctChange < 0 ? "down" : "flat",
+      labels,
+      datasets: [
+        {
+          data,
+          color: "var(--sc-chart-brand)",
+          backgroundColor: "var(--sc-chart-brand)",
+        },
+      ],
     };
+  }
+
+  private _costBreakdownData(): {
+    labels: string[];
+    datasets: { data: number[]; backgroundColor?: string[] }[];
+  } {
+    const s = this.summary;
+    const sessionCost = s.session_cost_usd ?? 0;
+    const dailyCost = s.daily_cost_usd ?? 0;
+    const monthlyCost = s.monthly_cost_usd ?? 0;
+    return {
+      labels: ["Session", "Daily", "Monthly"],
+      datasets: [
+        {
+          data: [sessionCost, dailyCost, monthlyCost],
+          backgroundColor: [CHART_COLORS[0], CHART_COLORS[1], CHART_COLORS[2]],
+        },
+      ],
+    };
+  }
+
+  private _exportUsage(): void {
+    const blob = new Blob([JSON.stringify(this.summary, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `usage-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   private _renderSkeleton() {
@@ -209,46 +271,53 @@ export class ScUsageView extends GatewayAwareLitElement {
         <sc-skeleton variant="card" height="90px"></sc-skeleton>
         <sc-skeleton variant="card" height="90px"></sc-skeleton>
         <sc-skeleton variant="card" height="90px"></sc-skeleton>
-        <sc-skeleton variant="card" height="90px"></sc-skeleton>
       </div>
+      <sc-skeleton variant="card" height="200px"></sc-skeleton>
       <sc-skeleton variant="card" height="200px"></sc-skeleton>
     `;
   }
 
-  private _renderForecast() {
-    const history = this.summary.daily_cost_history;
-    if (!history || history.length < 2) return nothing;
+  private _renderTokenChart() {
+    const trend = this.summary.token_trend;
+    if (!trend || trend.length < 2) return nothing;
 
+    const chartData = this._tokenChartData();
     return html`
       <div class="section">
-        <div class="section-label">Monthly Forecast</div>
+        <div class="chart-header">
+          <div class="section-label">Token Usage</div>
+          <sc-segmented-control
+            .options=${TIME_RANGE_OPTIONS}
+            .value=${this._timeRange}
+            @sc-change=${(e: CustomEvent<{ value: string }>) => {
+              this._timeRange = e.detail.value as "24h" | "7d" | "30d";
+            }}
+          ></sc-segmented-control>
+        </div>
         <sc-card glass>
           <div class="chart-inner">
-            <sc-forecast-chart
-              .history=${history}
-              .projectedTotal=${this.summary.projected_monthly_usd ?? 0}
-              .daysInMonth=${this.summary.days_in_month ?? 31}
-            ></sc-forecast-chart>
+            <sc-chart type="area" .data=${chartData} height=${200}></sc-chart>
           </div>
         </sc-card>
       </div>
     `;
   }
 
-  private _renderTokenTrend() {
-    const trend = this.summary.token_trend;
-    if (!trend || trend.length < 2) return nothing;
+  private _renderCostBreakdownChart() {
+    const s = this.summary;
+    const sessionCost = s.session_cost_usd ?? 0;
+    const dailyCost = s.daily_cost_usd ?? 0;
+    const monthlyCost = s.monthly_cost_usd ?? 0;
+    const hasData = sessionCost > 0 || dailyCost > 0 || monthlyCost > 0;
+    if (!hasData) return nothing;
+
+    const chartData = this._costBreakdownData();
     return html`
       <div class="section">
-        <div class="section-label">Token Usage (24h)</div>
+        <div class="section-label">Cost Breakdown</div>
         <sc-card glass>
           <div class="chart-inner">
-            <sc-sparkline-enhanced
-              .data=${trend}
-              .width=${640}
-              .height=${64}
-              tooltipLabel="tokens"
-            ></sc-sparkline-enhanced>
+            <sc-chart type="bar" .data=${chartData} height=${140} horizontal></sc-chart>
           </div>
         </sc-card>
       </div>
@@ -294,66 +363,50 @@ export class ScUsageView extends GatewayAwareLitElement {
     `;
   }
 
-  private _renderMetrics() {
-    const s = this.summary;
-    const items = [
-      { label: "Avg Cost / Request", value: this.formatCurrency(s.cost_per_request) },
-      { label: "Tokens / Turn", value: this.formatNumber(s.tokens_per_turn) },
-      { label: "Turns Today", value: this.formatNumber(s.turns_today) },
-      { label: "This Week", value: this.formatNumber(s.turns_week) },
-    ];
-    return html`<sc-metric-row .items=${items}></sc-metric-row>`;
-  }
-
   override render() {
     const s = this.summary;
     const dailyCost = s.daily_cost_usd ?? 0;
-    const monthlyCost = s.monthly_cost_usd ?? 0;
-    const projectedCost = s.projected_monthly_usd ?? 0;
-    const requestCount = s.request_count ?? 0;
     const totalTokens = s.total_tokens ?? 0;
-    const { trend, direction } = this._trendBadge();
+    const requestCount = s.request_count ?? 0;
 
-    const isEmpty =
-      dailyCost === 0 &&
-      monthlyCost === 0 &&
-      projectedCost === 0 &&
-      totalTokens === 0 &&
-      requestCount === 0;
+    const isEmpty = dailyCost === 0 && totalTokens === 0 && requestCount === 0;
 
     return html`
       <sc-page-hero>
         <sc-section-header
           heading="Usage"
           description="Token consumption, cost tracking, and forecasting"
-        ></sc-section-header>
+        >
+          <sc-button
+            variant="ghost"
+            size="sm"
+            @click=${this._exportUsage}
+            aria-label="Export usage data as JSON"
+          >
+            <span style="display:inline-flex;width:1em;height:1em" aria-hidden="true"
+              >${icons.export}</span
+            >
+            Export
+          </sc-button>
+        </sc-section-header>
       </sc-page-hero>
 
       <div class="stats-row">
         <sc-stat-card
-          .value=${dailyCost}
-          label="Spend Today"
-          prefix="$"
+          .value=${totalTokens}
+          label="Tokens Today"
           style="--sc-stagger-delay: 0ms"
         ></sc-stat-card>
         <sc-stat-card
-          .value=${monthlyCost}
-          label="This Month"
+          .value=${dailyCost}
+          label="Cost Today"
           prefix="$"
           style="--sc-stagger-delay: 80ms"
         ></sc-stat-card>
         <sc-stat-card
-          .value=${projectedCost}
-          label="Projected Month-End"
-          prefix="$"
-          trend=${trend}
-          trendDirection=${direction}
-          style="--sc-stagger-delay: 160ms"
-        ></sc-stat-card>
-        <sc-stat-card
           .value=${requestCount}
           label="Requests"
-          style="--sc-stagger-delay: 240ms"
+          style="--sc-stagger-delay: 160ms"
         ></sc-stat-card>
       </div>
 
@@ -371,12 +424,12 @@ export class ScUsageView extends GatewayAwareLitElement {
               <sc-empty-state
                 .icon=${icons["bar-chart"]}
                 heading="No usage data"
-                description="Usage metrics will appear here once you start making requests."
+                description="Start a conversation or run a tool to generate usage metrics. Data will appear here once requests are made."
               ></sc-empty-state>
             `
           : html`
-              ${this._renderForecast()} ${this._renderTokenTrend()} ${this._renderProviders()}
-              ${this._renderMetrics()}
+              ${this._renderTokenChart()} ${this._renderCostBreakdownChart()}
+              ${this._renderProviders()}
             `}
     `;
   }
