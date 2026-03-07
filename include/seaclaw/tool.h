@@ -72,9 +72,9 @@ static inline sc_tool_result_t sc_tool_result_fail_owned(const char *error_msg, 
 }
 
 static inline void sc_tool_result_free(sc_allocator_t *alloc, sc_tool_result_t *r) {
-    if (r->output_owned && r->output && r->output_len > 0)
+    if (r->output_owned && r->output)
         alloc->free(alloc->ctx, (void *)r->output, r->output_len + 1);
-    if (r->error_msg_owned && r->error_msg && r->error_msg_len > 0)
+    if (r->error_msg_owned && r->error_msg)
         alloc->free(alloc->ctx, (void *)r->error_msg, r->error_msg_len + 1);
     r->output = NULL;
     r->error_msg = NULL;

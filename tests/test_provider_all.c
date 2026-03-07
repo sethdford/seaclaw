@@ -486,8 +486,7 @@ static void test_anthropic_chat_empty_messages_graceful(void) {
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "claude-3", 8, 0.7, &resp);
     SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT ||
                    err == SC_ERR_PROVIDER_RESPONSE);
-    if (err == SC_OK && resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     if (prov.vtable->deinit)
         prov.vtable->deinit(prov.ctx, &alloc);
 }
@@ -999,8 +998,7 @@ static void test_openrouter_chat_mock(void) {
         prov.vtable->chat(prov.ctx, &alloc, &req, "anthropic/claude-3", 18, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.content);
-    if (resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     if (prov.vtable->deinit)
         prov.vtable->deinit(prov.ctx, &alloc);
 }
@@ -2115,8 +2113,7 @@ static void test_codex_cli_chat_mock(void) {
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "codex-mini", 10, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.content);
-    if (resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     if (prov.vtable->deinit)
         prov.vtable->deinit(prov.ctx, &alloc);
 }
@@ -2153,8 +2150,7 @@ static void test_codex_cli_chat_empty_messages_graceful(void) {
     sc_chat_response_t resp = {0};
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "codex-mini", 10, 0.7, &resp);
     SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT);
-    if (err == SC_OK && resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     if (prov.vtable->deinit)
         prov.vtable->deinit(prov.ctx, &alloc);
 }
@@ -2198,8 +2194,7 @@ static void test_openai_codex_chat_mock(void) {
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "o4-mini", 7, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.content);
-    if (resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     if (prov.vtable->deinit)
         prov.vtable->deinit(prov.ctx, &alloc);
 }
@@ -2248,8 +2243,7 @@ static void test_openai_codex_chat_empty_messages_graceful(void) {
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "o4-mini", 7, 0.7, &resp);
     SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_INVALID_ARGUMENT ||
                    err == SC_ERR_PROVIDER_RESPONSE);
-    if (err == SC_OK && resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     if (prov.vtable->deinit)
         prov.vtable->deinit(prov.ctx, &alloc);
 }
@@ -2393,8 +2387,7 @@ static void test_reliable_chat_with_extras_primary_succeeds(void) {
     sc_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "gpt-4", 4, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.content);
-    if (resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     if (prov.vtable->deinit)
         prov.vtable->deinit(prov.ctx, &alloc);
 }

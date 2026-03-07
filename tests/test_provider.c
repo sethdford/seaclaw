@@ -105,8 +105,7 @@ static void test_openai_chat_mock_in_test(void) {
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.content);
     SC_ASSERT_TRUE(resp.content_len > 0);
-    if (resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     if (prov.vtable->deinit)
         prov.vtable->deinit(prov.ctx, &alloc);
 }
@@ -216,8 +215,7 @@ static void test_reliable_retries_then_succeeds(void) {
     err = reliable.vtable->chat(reliable.ctx, &alloc, &req, "gpt-4", 5, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.content);
-    if (resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     reliable.vtable->deinit(reliable.ctx, &alloc);
 }
 
@@ -289,8 +287,7 @@ static void test_multi_model_router_below_threshold_uses_fast(void) {
     sc_chat_response_t resp = {0};
     err = router.vtable->chat(router.ctx, &alloc, &req, "gpt-4", 5, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
-    if (resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     router.vtable->deinit(router.ctx, &alloc);
 }
 
@@ -339,8 +336,7 @@ static void test_multi_model_router_between_thresholds_uses_standard(void) {
     sc_chat_response_t resp = {0};
     err = router.vtable->chat(router.ctx, &alloc, &req, "gpt-4", 5, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
-    if (resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     router.vtable->deinit(router.ctx, &alloc);
 }
 
@@ -389,8 +385,7 @@ static void test_multi_model_router_above_threshold_uses_powerful(void) {
     sc_chat_response_t resp = {0};
     err = router.vtable->chat(router.ctx, &alloc, &req, "claude", 6, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
-    if (resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     router.vtable->deinit(router.ctx, &alloc);
 }
 
@@ -434,8 +429,7 @@ static void test_multi_model_router_missing_fast_falls_back_to_standard(void) {
     sc_chat_response_t resp = {0};
     err = router.vtable->chat(router.ctx, &alloc, &req, "gpt-4", 5, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
-    if (resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     router.vtable->deinit(router.ctx, &alloc);
 }
 
@@ -469,8 +463,7 @@ static void test_codex_cli_create_and_chat(void) {
     err = prov.vtable->chat(prov.ctx, &alloc, &req, "m", 1, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.content);
-    if (resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     prov.vtable->deinit(prov.ctx, &alloc);
 }
 
@@ -504,8 +497,7 @@ static void test_openai_codex_create_and_chat(void) {
     err = prov.vtable->chat(prov.ctx, &alloc, &req, "o4-mini", 7, 0.7, &resp);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(resp.content);
-    if (resp.content)
-        alloc.free(alloc.ctx, (void *)resp.content, resp.content_len + 1);
+    sc_chat_response_free(&alloc, &resp);
     prov.vtable->deinit(prov.ctx, &alloc);
 }
 

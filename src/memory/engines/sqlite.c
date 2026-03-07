@@ -185,7 +185,7 @@ static sc_error_t impl_recall(void *ctx, sc_allocator_t *alloc, const char *quer
     *out_count = 0;
 
     if (!query || query_len == 0) {
-        *out = (sc_memory_entry_t *)alloc->alloc(alloc->ctx, 0);
+        *out = NULL;
         return SC_OK;
     }
 

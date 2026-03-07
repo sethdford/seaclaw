@@ -790,11 +790,13 @@ export class ScSessionsView extends GatewayAwareLitElement {
                 ? filtered.map((s, i) => this._renderSessionCard(s, i))
                 : TIME_GROUP_ORDER.filter((g) => groups.has(g)).map(
                     (g) => html`
-                      <div class="group-label">${g}</div>
-                      ${groups.get(g)!.map((s) => {
-                        const idx = filtered.indexOf(s);
-                        return this._renderSessionCard(s, idx);
-                      })}
+                      <div role="group" aria-label=${g}>
+                        <div class="group-label" role="presentation">${g}</div>
+                        ${groups.get(g)!.map((s) => {
+                          const idx = filtered.indexOf(s);
+                          return this._renderSessionCard(s, idx);
+                        })}
+                      </div>
                     `,
                   )}
           </div>
