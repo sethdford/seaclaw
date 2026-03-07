@@ -1,11 +1,12 @@
-import { html, css, nothing } from "lit";
+import { html, css, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
-import "../components/sc-card.js";
-import "../components/sc-skeleton.js";
-import "../components/sc-empty-state.js";
+import "../components/sc-badge.js";
 import "../components/sc-button.js";
+import "../components/sc-card.js";
+import "../components/sc-empty-state.js";
+import "../components/sc-skeleton.js";
 
 interface NodeItem {
   id?: string;
@@ -43,11 +44,14 @@ export class ScNodesView extends GatewayAwareLitElement {
       gap: var(--sc-space-xl);
       margin-bottom: var(--sc-space-2xl);
     }
-    .node-card {
-      padding: var(--sc-space-md);
-      background: var(--sc-bg-surface);
-      border: 1px solid var(--sc-border);
-      border-radius: var(--sc-radius);
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--sc-space-sm);
+    }
+    .staleness {
+      font-size: var(--sc-text-xs);
+      color: var(--sc-text-muted);
     }
     .node-header {
       display: flex;
@@ -105,38 +109,6 @@ export class ScNodesView extends GatewayAwareLitElement {
       font-size: var(--sc-text-sm);
       color: var(--sc-text-muted);
     }
-    .health-status.ok {
-      color: var(--sc-success);
-    }
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: var(--sc-space-2xl) var(--sc-space-lg);
-    }
-    .empty-icon {
-      width: 2.5rem;
-      height: 2.5rem;
-      color: var(--sc-text-muted);
-      margin-bottom: var(--sc-space-md);
-    }
-    .empty-icon svg {
-      width: 100%;
-      height: 100%;
-    }
-    .empty-title {
-      font-size: var(--sc-text-lg);
-      font-weight: var(--sc-weight-semibold);
-      color: var(--sc-text);
-      margin: 0 0 var(--sc-space-xs);
-    }
-    .empty-desc {
-      font-size: var(--sc-text-sm);
-      color: var(--sc-text-muted);
-      margin: 0;
-    }
     @media (max-width: 768px) {
       .nodes-grid {
         grid-template-columns: 1fr 1fr;
@@ -145,6 +117,13 @@ export class ScNodesView extends GatewayAwareLitElement {
     @media (max-width: 480px) {
       .nodes-grid {
         grid-template-columns: 1fr;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
       }
     }
   `;
@@ -188,68 +167,84 @@ export class ScNodesView extends GatewayAwareLitElement {
     return t || "unknown";
   }
 
+  private _renderSkeleton(): TemplateResult {
+    return html`
+      <div class="nodes-grid">
+        <sc-skeleton variant="card" height="100px"></sc-skeleton>
+      </div>
+    `;
+  }
+
+  private _renderGrid(): TemplateResult {
+    if (this.loading && this.nodes.length === 0) return this._renderSkeleton();
+    if (this.nodes.length === 0) {
+      return html`
+        <sc-empty-state
+          .icon=${icons.monitor}
+          heading="No nodes connected"
+          description="Connected devices and gateways will appear here."
+        ></sc-empty-state>
+      `;
+    }
+    return html`
+      <div class="nodes-grid">
+        ${this.nodes.map(
+          (n) => html`
+            <sc-card>
+              <div class="node-header">
+                <span class="status-dot ${this.statusDotClass(n.status)}" aria-hidden="true"></span>
+                <span class="node-id">${n.id ?? "—"}</span>
+              </div>
+              <div class="node-type">${this.typeLabel(n.type)}</div>
+              <div class="node-info">WebSocket connections: ${n.ws_connections ?? 0}</div>
+            </sc-card>
+          `,
+        )}
+      </div>
+    `;
+  }
+
+  private _renderHealth(): TemplateResult {
+    return html`
+      <div class="health-section">
+        <div class="health-title">Gateway health</div>
+        <div class="health-status">
+          ${this.loading && !this.healthStatus
+            ? html`<span class="staleness">Loading...</span>`
+            : html`<sc-badge variant=${this.healthStatus === "ok" ? "success" : "neutral"}
+                >${this.healthStatus || "—"}</sc-badge
+              >`}
+        </div>
+      </div>
+    `;
+  }
+
   override render() {
     return html`
       <div class="header">
         <h2>Nodes & Devices</h2>
-        <div style="display:flex;align-items:center;gap:var(--sc-space-sm)">
+        <div class="header-actions">
           ${this.lastLoadedAt
-            ? html`<span style="font-size:var(--sc-text-xs);color:var(--sc-text-muted)">
-                Updated ${this.stalenessLabel}
-              </span>`
+            ? html`<span class="staleness">Updated ${this.stalenessLabel}</span>`
             : nothing}
-          <button
-            class="refresh-btn"
-            ?disabled=${this.loading}
+          <sc-button
+            size="sm"
+            .loading=${this.loading}
             @click=${() => this.load()}
             aria-label="Refresh nodes"
+            >Refresh</sc-button
           >
-            ${this.loading ? "Refreshing..." : "Refresh"}
-          </button>
         </div>
       </div>
 
-      ${this.error ? html`<p class="error">${this.error}</p>` : ""}
-      ${this.loading && this.nodes.length === 0
-        ? html`
-            <div class="nodes-grid">
-              <div class="node-card skeleton skeleton-card"></div>
-            </div>
-          `
-        : this.nodes.length === 0
-          ? html`
-              <div class="empty-state">
-                <div class="empty-icon">${icons.monitor}</div>
-                <p class="empty-title">No nodes connected</p>
-                <p class="empty-desc">Connected devices and gateways will appear here.</p>
-              </div>
-            `
-          : html`
-              <div class="nodes-grid">
-                ${this.nodes.map(
-                  (n) => html`
-                    <div class="node-card">
-                      <div class="node-header">
-                        <span
-                          class="status-dot ${this.statusDotClass(n.status)}"
-                          aria-hidden="true"
-                        ></span>
-                        <span class="node-id">${n.id ?? "—"}</span>
-                      </div>
-                      <div class="node-type">${this.typeLabel(n.type)}</div>
-                      <div class="node-info">WebSocket connections: ${n.ws_connections ?? 0}</div>
-                    </div>
-                  `,
-                )}
-              </div>
-            `}
-
-      <div class="health-section">
-        <div class="health-title">Gateway health</div>
-        <div class="health-status ${this.healthStatus === "ok" ? "ok" : ""}">
-          ${this.loading && !this.healthStatus ? "Loading..." : this.healthStatus || "—"}
-        </div>
-      </div>
+      ${this.error
+        ? html`<sc-empty-state
+            .icon=${icons.warning}
+            heading="Error"
+            .description=${this.error}
+          ></sc-empty-state>`
+        : ""}
+      ${!this.error ? this._renderGrid() : ""} ${this._renderHealth()}
     `;
   }
 }

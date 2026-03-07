@@ -22,12 +22,12 @@ export class ScMessageActions extends LitElement {
       position: absolute;
       top: -28px;
       right: var(--sc-space-sm);
-      padding: var(--sc-space-2xs) var(--sc-space-xs);
-      background: color-mix(in srgb, var(--sc-bg-surface) 90%, transparent);
+      padding: var(--sc-space-2xs) var(--sc-space-sm);
+      background: color-mix(in srgb, var(--sc-bg-overlay, var(--sc-bg-surface)) 85%, transparent);
       backdrop-filter: blur(16px) saturate(180%);
       -webkit-backdrop-filter: blur(16px) saturate(180%);
       border: 1px solid var(--sc-border-subtle);
-      border-radius: var(--sc-radius);
+      border-radius: var(--sc-radius-full);
       box-shadow: var(--sc-shadow-sm);
       opacity: 0;
       transform: translateY(-4px);

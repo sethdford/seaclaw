@@ -26,7 +26,8 @@ describe("sc-composer", () => {
     const sendBtn = el.shadowRoot?.querySelector(".send-btn");
     expect(textarea).toBeTruthy();
     expect(sendBtn).toBeTruthy();
-    expect(sendBtn?.textContent?.trim()).toBe("Send");
+    expect(sendBtn?.getAttribute("aria-label")).toBe("Send");
+    expect(sendBtn?.querySelector("svg")).toBeTruthy();
     el.remove();
   });
 
@@ -115,44 +116,31 @@ describe("sc-composer", () => {
     el.remove();
   });
 
-  it("renders prompt pills when showSuggestions is true", async () => {
+  it("renders bento cards when showSuggestions is true", async () => {
     const el = document.createElement("sc-composer") as ScComposerEl;
     el.showSuggestions = true;
     document.body.appendChild(el);
     await el.updateComplete;
-    const pills = el.shadowRoot?.querySelectorAll(".prompt-pill") ?? [];
-    expect(pills.length).toBe(4);
-    expect(pills[0]?.textContent).toContain("Explain how this project is architected");
-    expect(pills[1]?.textContent).toContain("Write a Python web scraper");
-    expect(pills[2]?.textContent).toContain("Help me debug an issue");
-    expect(pills[3]?.textContent).toContain("What can you do?");
+    const cards = el.shadowRoot?.querySelectorAll(".bento-card") ?? [];
+    expect(cards.length).toBe(4);
+    expect(cards[0]?.textContent).toContain("Explore the project");
+    expect(cards[1]?.textContent).toContain("Write code");
+    expect(cards[2]?.textContent).toContain("Debug an issue");
+    expect(cards[3]?.textContent).toContain("Ask anything");
     el.remove();
   });
 
-  it("fires sc-use-suggestion when pill clicked", async () => {
+  it("fires sc-use-suggestion when bento card clicked", async () => {
     const onSuggestion = vi.fn();
     const el = document.createElement("sc-composer") as ScComposerEl;
     el.showSuggestions = true;
     el.addEventListener("sc-use-suggestion", onSuggestion);
     document.body.appendChild(el);
     await el.updateComplete;
-    const pills = el.shadowRoot?.querySelectorAll(".prompt-pill") ?? [];
-    (pills[0] as HTMLButtonElement).click();
+    const cards = el.shadowRoot?.querySelectorAll(".bento-card") ?? [];
+    (cards[0] as HTMLButtonElement).click();
     expect(onSuggestion).toHaveBeenCalledTimes(1);
-    expect(onSuggestion.mock.calls[0][0].detail.text).toBe(
-      "Explain how this project is architected",
-    );
-    el.remove();
-  });
-
-  it("shows character count", async () => {
-    const el = document.createElement("sc-composer") as ScComposerEl;
-    el.value = "hi";
-    document.body.appendChild(el);
-    await el.updateComplete;
-    const charCount = el.shadowRoot?.querySelector(".char-count");
-    expect(charCount).toBeTruthy();
-    expect(charCount?.textContent).toContain("2 characters");
+    expect(onSuggestion.mock.calls[0][0].detail.text).toBe("Explore the project");
     el.remove();
   });
 });

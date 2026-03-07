@@ -6,6 +6,7 @@ import "../components/sc-card.js";
 import "../components/sc-badge.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
+import "../components/sc-search.js";
 
 interface ProviderItem {
   name?: string;
@@ -112,9 +113,17 @@ export class ScModelsView extends GatewayAwareLitElement {
         grid-template-columns: 1fr 1fr;
       }
     }
+    .search-wrap {
+      margin-bottom: var(--sc-space-xl);
+    }
     @media (max-width: 480px) {
       .grid {
         grid-template-columns: 1fr;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0s !important;
       }
     }
   `;
@@ -124,6 +133,13 @@ export class ScModelsView extends GatewayAwareLitElement {
   @state() private providers: ProviderItem[] = [];
   @state() private loading = true;
   @state() private error = "";
+  @state() private filter = "";
+
+  private get filteredProviders(): ProviderItem[] {
+    const q = this.filter.toLowerCase().trim();
+    if (!q) return this.providers;
+    return this.providers.filter((p) => (p.name ?? "").toLowerCase().includes(q));
+  }
 
   protected override async load(): Promise<void> {
     const gw = this.gateway;
@@ -167,6 +183,13 @@ export class ScModelsView extends GatewayAwareLitElement {
             description=${this.error}
           ></sc-empty-state>`
         : nothing}
+      <div class="search-wrap">
+        <sc-search
+          placeholder="Search providers..."
+          @sc-search=${(e: CustomEvent<{ query: string }>) => (this.filter = e.detail.query)}
+          @sc-clear=${() => (this.filter = "")}
+        ></sc-search>
+      </div>
       ${this._renderInfoBar()} ${this._renderGrid()}
     `;
   }
@@ -198,24 +221,27 @@ export class ScModelsView extends GatewayAwareLitElement {
   }
 
   private _renderGrid() {
+    const filtered = this.filteredProviders;
     return html`
       <div class="grid sc-stagger">
-        ${this.providers.length === 0
+        ${filtered.length === 0
           ? html`
               <sc-empty-state
                 .icon=${icons.cpu}
-                heading="No providers configured"
-                description="Configure an AI provider in your config to get started."
+                heading=${this.filter ? "No matching providers" : "No providers configured"}
+                description=${this.filter
+                  ? "Try a different search term."
+                  : "Configure an AI provider in your config to get started."}
               ></sc-empty-state>
             `
-          : this.providers.map((p) => this._renderProviderCard(p))}
+          : filtered.map((p) => this._renderProviderCard(p))}
       </div>
     `;
   }
 
   private _renderProviderCard(p: ProviderItem) {
     return html`
-      <sc-card>
+      <sc-card aria-label=${`Provider: ${p.name ?? "unnamed"}`}>
         <div class="card-header">
           <span class="card-name ${p.is_default ? "default" : ""}">${p.name ?? "unnamed"}</span>
           ${p.is_default ? html`<sc-badge variant="info">default</sc-badge>` : nothing}

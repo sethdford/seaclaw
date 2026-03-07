@@ -4,6 +4,8 @@ import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import "../components/sc-card.js";
 import "../components/sc-empty-state.js";
+import "../components/sc-skeleton.js";
+import "../components/sc-badge.js";
 
 interface SecurityConfig {
   autonomy_level?: number;
@@ -65,21 +67,22 @@ export class ScSecurityView extends GatewayAwareLitElement {
       color: var(--sc-text);
       margin-bottom: var(--sc-space-sm);
     }
-    .autonomy-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--sc-space-xs);
-      padding: var(--sc-space-xs) var(--sc-space-sm);
-      border-radius: var(--sc-radius-sm);
-      font-size: var(--sc-text-sm);
-      font-weight: var(--sc-weight-semibold);
-      background: var(--sc-bg-elevated);
-      margin-bottom: var(--sc-space-sm);
-    }
     .autonomy-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
+    }
+    .autonomy-dot.level-0 {
+      background: var(--sc-success);
+    }
+    .autonomy-dot.level-1 {
+      background: var(--sc-warning);
+    }
+    .autonomy-dot.level-2 {
+      background: var(--sc-error);
+    }
+    .domains-label {
+      margin-top: var(--sc-space-xs);
     }
     .description {
       font-size: var(--sc-text-sm);

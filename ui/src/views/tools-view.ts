@@ -2,6 +2,7 @@ import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
+import "../components/sc-button.js";
 import "../components/sc-card.js";
 import "../components/sc-input.js";
 import "../components/sc-skeleton.js";
@@ -31,7 +32,7 @@ export class ScToolsView extends GatewayAwareLitElement {
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius);
       color: var(--sc-text);
-      font-size: 0.875rem;
+      font-size: var(--sc-text-sm);
     }
     .search input:focus {
       outline: none;
@@ -70,14 +71,6 @@ export class ScToolsView extends GatewayAwareLitElement {
       max-height: 6rem;
       overflow: auto;
     }
-    .schema-toggle {
-      background: none;
-      border: none;
-      color: var(--sc-accent-text, var(--sc-accent));
-      cursor: pointer;
-      font-size: var(--sc-text-xs);
-      padding: var(--sc-space-xs) 0;
-    }
     @media (max-width: 768px) {
       .grid {
         grid-template-columns: 1fr 1fr;
@@ -89,6 +82,11 @@ export class ScToolsView extends GatewayAwareLitElement {
     @media (max-width: 480px) {
       .grid {
         grid-template-columns: 1fr;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0s !important;
       }
     }
   `;
@@ -136,23 +134,22 @@ export class ScToolsView extends GatewayAwareLitElement {
     );
   }
 
-  override render() {
+  private _renderSkeleton() {
+    return html`
+      <div class="search">
+        <sc-input type="text" placeholder="Search tools..." disabled></sc-input>
+      </div>
+      <div class="grid sc-stagger">
+        <sc-skeleton variant="card" height="80px"></sc-skeleton>
+        <sc-skeleton variant="card" height="80px"></sc-skeleton>
+        <sc-skeleton variant="card" height="80px"></sc-skeleton>
+        <sc-skeleton variant="card" height="80px"></sc-skeleton>
+      </div>
+    `;
+  }
+
+  private _renderContent() {
     const filtered = this.filteredTools;
-
-    if (this.loading) {
-      return html`
-        <div class="search">
-          <sc-input type="text" placeholder="Search tools..." disabled></sc-input>
-        </div>
-        <div class="grid sc-stagger">
-          <sc-skeleton variant="card" height="80px"></sc-skeleton>
-          <sc-skeleton variant="card" height="80px"></sc-skeleton>
-          <sc-skeleton variant="card" height="80px"></sc-skeleton>
-          <sc-skeleton variant="card" height="80px"></sc-skeleton>
-        </div>
-      `;
-    }
-
     return html`
       ${this.error
         ? html`<sc-empty-state
@@ -190,14 +187,15 @@ export class ScToolsView extends GatewayAwareLitElement {
                   <div class="card-desc">${t.description ?? ""}</div>
                   ${t.parameters != null
                     ? html`
-                        <button
-                          class="schema-toggle"
+                        <sc-button
+                          variant="ghost"
+                          size="sm"
                           @click=${() => this.toggleSchema(t.name ?? "")}
                           aria-expanded=${this.expandedCards.has(t.name ?? "")}
                           aria-label=${`${this.expandedCards.has(t.name ?? "") ? "Hide" : "Show"} parameters for ${t.name ?? "tool"}`}
                         >
                           ${this.expandedCards.has(t.name ?? "") ? "Hide params" : "Show params"}
-                        </button>
+                        </sc-button>
                         ${this.expandedCards.has(t.name ?? "")
                           ? html`
                               <pre class="card-schema">
@@ -212,5 +210,12 @@ ${JSON.stringify(t.parameters, null, 2)}</pre
             )}
       </div>
     `;
+  }
+
+  override render() {
+    if (this.loading) {
+      return this._renderSkeleton();
+    }
+    return this._renderContent();
   }
 }

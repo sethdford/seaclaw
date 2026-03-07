@@ -62,15 +62,15 @@ describe("sc-chat-view", () => {
     el.remove();
   });
 
-  it("has suggested prompt pills in composer when empty", async () => {
+  it("has suggested bento cards in composer when empty", async () => {
     const el = document.createElement("sc-chat-view") as HTMLElement & {
       updateComplete: Promise<boolean>;
     };
     document.body.appendChild(el);
     await el.updateComplete;
     const composer = el.shadowRoot?.querySelector("sc-composer");
-    const pills = composer?.shadowRoot?.querySelectorAll(".prompt-pill") ?? [];
-    expect(pills.length).toBeGreaterThanOrEqual(1);
+    const cards = composer?.shadowRoot?.querySelectorAll(".bento-card") ?? [];
+    expect(cards.length).toBeGreaterThanOrEqual(1);
     el.remove();
   });
 

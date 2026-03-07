@@ -5,9 +5,11 @@ import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import "../components/sc-card.js";
 import "../components/sc-skeleton.js";
+import "../components/sc-page-hero.js";
+import "../components/sc-section-header.js";
+import "../components/sc-stat-card.js";
 import "../components/sc-empty-state.js";
 import "../components/sc-button.js";
-import "../components/sc-animated-number.js";
 import "../components/sc-tooltip.js";
 
 interface ConfigData {
@@ -43,88 +45,16 @@ export class ScAgentsView extends GatewayAwareLitElement {
       padding: var(--sc-space-lg) var(--sc-space-xl);
     }
 
-    /* ── Hero zone ────────────────────────────────────── */
-
-    .hero {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: var(--sc-space-md);
-      padding: var(--sc-space-xl) var(--sc-space-2xl);
-      margin-bottom: var(--sc-space-2xl, 2rem);
-      background-image: var(--sc-hero-gradient);
-      border-radius: var(--sc-radius-xl, 16px);
-      border: 1px solid var(--sc-border-subtle, var(--sc-border));
-    }
-
-    .hero-left {
-      display: flex;
-      flex-direction: column;
-      gap: var(--sc-space-2xs);
-      min-width: 0;
-    }
-
-    .hero-title {
-      margin: 0;
-      font-size: clamp(1.5rem, 2.5vw, 2rem);
-      font-weight: var(--sc-weight-bold, 700);
-      letter-spacing: -0.03em;
-      color: var(--sc-text);
-      line-height: 1.1;
-    }
-
-    .hero-meta {
-      display: flex;
-      align-items: center;
-      gap: var(--sc-space-sm);
-      font-size: var(--sc-text-xs);
-      color: var(--sc-text-muted);
-    }
-
-    .hero-actions {
-      display: flex;
-      align-items: center;
-      gap: var(--sc-space-sm);
-    }
-
     .staleness {
       font-size: var(--sc-text-xs);
       color: var(--sc-text-muted);
     }
-
-    /* ── Metrics zone ─────────────────────────────────── */
 
     .metrics {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: var(--sc-space-lg, 1.5rem);
       margin-bottom: var(--sc-space-2xl, 2rem);
-    }
-
-    .stat-label {
-      font-size: var(--sc-text-xs);
-      font-weight: var(--sc-weight-semibold, 600);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--sc-accent-text, var(--sc-accent));
-      margin-bottom: var(--sc-space-xs);
-    }
-
-    .stat-value {
-      font-size: clamp(1.5rem, 2.5vw, 2rem);
-      font-weight: var(--sc-weight-bold, 700);
-      letter-spacing: -0.04em;
-      font-variant-numeric: tabular-nums;
-      color: var(--sc-text);
-      line-height: 1.1;
-      animation: sc-overshoot-in var(--sc-duration-moderate) var(--sc-spring-out) backwards;
-    }
-
-    .stat-desc {
-      font-size: var(--sc-text-xs);
-      color: var(--sc-text-muted);
-      margin-top: var(--sc-space-2xs);
     }
 
     /* ── Sessions zone ────────────────────────────────── */
@@ -212,14 +142,6 @@ export class ScAgentsView extends GatewayAwareLitElement {
       color: var(--sc-text);
     }
 
-    /* ── Skeleton ─────────────────────────────────────── */
-
-    .skeleton-hero {
-      height: 90px;
-      margin-bottom: var(--sc-space-2xl, 2rem);
-      border-radius: var(--sc-radius-xl, 16px);
-    }
-
     .skeleton-metrics {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -257,12 +179,6 @@ export class ScAgentsView extends GatewayAwareLitElement {
       }
       .profile-grid {
         grid-template-columns: 1fr;
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .stat-value {
-        animation: none !important;
       }
     }
   `;
@@ -348,22 +264,14 @@ export class ScAgentsView extends GatewayAwareLitElement {
     const provider = this.config.default_provider || "\u2014";
     const model = this.config.default_model || "\u2014";
     return html`
-      <div class="hero">
-        <div class="hero-left">
-          <h2 class="hero-title">SeaClaw Agent</h2>
-          <div class="hero-meta">
-            <span>${provider}</span>
-            <span>&middot;</span>
-            <span>${model}</span>
-          </div>
-        </div>
-        <div class="hero-actions">
+      <sc-page-hero>
+        <sc-section-header heading="SeaClaw Agent" description="${provider} · ${model}">
           <span class="staleness">${this.stalenessLabel}</span>
-          <sc-button size="sm" @click=${() => this.load()} aria-label="Refresh data">
-            Refresh
-          </sc-button>
-        </div>
-      </div>
+          <sc-button size="sm" @click=${() => this.load()} aria-label="Refresh data"
+            >Refresh</sc-button
+          >
+        </sc-section-header>
+      </sc-page-hero>
     `;
   }
 
@@ -371,23 +279,21 @@ export class ScAgentsView extends GatewayAwareLitElement {
 
   private _renderMetrics() {
     const metrics = [
-      { label: "Sessions", value: this.sessions.length, desc: "Active conversations" },
-      { label: "Turns", value: this.totalTurns, desc: "Total messages exchanged" },
-      { label: "Tools", value: this._toolCount, desc: "Available capabilities" },
-      { label: "Channels", value: this._channelCount, desc: "Messaging integrations" },
+      { label: "Sessions", value: this.sessions.length },
+      { label: "Turns", value: this.totalTurns },
+      { label: "Tools", value: this._toolCount },
+      { label: "Channels", value: this._channelCount },
     ];
 
     return html`
-      <div class="metrics sc-stagger">
+      <div class="metrics">
         ${metrics.map(
-          (m) => html`
-            <sc-card hoverable accent>
-              <div class="stat-label">${m.label}</div>
-              <div class="stat-value">
-                <sc-animated-number .value=${m.value}></sc-animated-number>
-              </div>
-              <div class="stat-desc">${m.desc}</div>
-            </sc-card>
+          (m, i) => html`
+            <sc-stat-card
+              .value=${m.value}
+              .label=${m.label}
+              style="--sc-stagger-delay: ${i * 80}ms"
+            ></sc-stat-card>
           `,
         )}
       </div>
@@ -484,7 +390,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
 
   private _renderSkeleton() {
     return html`
-      <sc-skeleton variant="card" class="skeleton-hero"></sc-skeleton>
+      <sc-skeleton variant="card" height="90px"></sc-skeleton>
       <div class="skeleton-metrics">
         <sc-skeleton variant="stat-card"></sc-skeleton>
         <sc-skeleton variant="stat-card"></sc-skeleton>

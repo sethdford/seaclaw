@@ -5,6 +5,10 @@ import { icons } from "../icons.js";
 import { ScToast } from "../components/sc-toast.js";
 import "../components/sc-card.js";
 import "../components/sc-button.js";
+import "../components/sc-page-hero.js";
+import "../components/sc-section-header.js";
+import "../components/sc-stat-card.js";
+import "../components/sc-metric-row.js";
 import "../components/sc-tabs.js";
 import "../components/sc-modal.js";
 import "../components/sc-input.js";
@@ -123,59 +127,11 @@ export class ScAutomationsView extends GatewayAwareLitElement {
       color: var(--sc-text);
     }
 
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
       gap: var(--sc-space-md);
       margin-bottom: var(--sc-space-xl);
-    }
-
-    .header-title {
-      display: flex;
-      align-items: center;
-      gap: var(--sc-space-sm);
-      margin: 0;
-      font-size: var(--sc-text-xl);
-      font-weight: var(--sc-weight-semibold);
-      color: var(--sc-text);
-    }
-
-    .header-title .icon {
-      width: 24px;
-      height: 24px;
-      color: var(--sc-text-muted);
-    }
-
-    .stats-bar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--sc-space-md);
-      margin-bottom: var(--sc-space-xl);
-    }
-
-    .stat-card {
-      flex: 1;
-      min-width: 100px;
-      padding: var(--sc-space-md) var(--sc-space-lg);
-      background: var(--sc-bg-surface);
-      border: 1px solid var(--sc-border-subtle);
-      border-radius: var(--sc-radius-lg);
-      box-shadow: var(--sc-shadow-xs);
-    }
-
-    .stat-value {
-      font-size: var(--sc-text-xl);
-      font-weight: var(--sc-weight-semibold);
-      color: var(--sc-text);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .stat-label {
-      font-size: var(--sc-text-xs);
-      color: var(--sc-text-muted);
-      margin-top: var(--sc-space-2xs);
     }
 
     .job-list {
@@ -333,12 +289,8 @@ export class ScAutomationsView extends GatewayAwareLitElement {
     }
 
     @media (max-width: 640px) {
-      .stats-bar {
-        flex-direction: column;
-      }
-
-      .stat-card {
-        min-width: 100%;
+      .stats-row {
+        grid-template-columns: 1fr 1fr;
       }
     }
 
@@ -653,32 +605,60 @@ export class ScAutomationsView extends GatewayAwareLitElement {
 
   override render() {
     return html`
-      <div class="header">
-        <h1 class="header-title">
-          <span class="icon" aria-hidden="true">${icons.timer}</span>
-          Automations
-        </h1>
-        <sc-button variant="primary" @click=${this._openNewAutomation}> New Automation </sc-button>
+      <sc-page-hero>
+        <sc-section-header
+          heading="Automations"
+          description="AI-driven tasks and shell jobs running on schedule"
+        >
+          <sc-button variant="primary" @click=${this._openNewAutomation}>New Automation</sc-button>
+        </sc-section-header>
+      </sc-page-hero>
+
+      <div class="stats-row">
+        <sc-stat-card
+          .value=${this.totalCount}
+          label="Total"
+          style="--sc-stagger-delay: 0ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this.activeCount}
+          label="Active"
+          accent="primary"
+          style="--sc-stagger-delay: 80ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this.pausedCount}
+          label="Paused"
+          accent="secondary"
+          style="--sc-stagger-delay: 160ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this.failedCount}
+          label="Failed"
+          accent="error"
+          style="--sc-stagger-delay: 240ms"
+        ></sc-stat-card>
       </div>
 
-      <div class="stats-bar">
-        <div class="stat-card">
-          <div class="stat-value">${this.totalCount}</div>
-          <div class="stat-label">Total</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${this.activeCount}</div>
-          <div class="stat-label">Active</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${this.pausedCount}</div>
-          <div class="stat-label">Paused</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${this.failedCount}</div>
-          <div class="stat-label">Failed</div>
-        </div>
-      </div>
+      <sc-metric-row
+        .items=${[
+          {
+            label: "Agent Tasks",
+            value: String(this.jobs.filter((j) => j.type === "agent").length),
+          },
+          {
+            label: "Shell Jobs",
+            value: String(this.jobs.filter((j) => j.type === "shell").length),
+          },
+          {
+            label: "Success Rate",
+            value:
+              this.jobs.length > 0
+                ? Math.round(((this.jobs.length - this.failedCount) / this.jobs.length) * 100) + "%"
+                : "—",
+          },
+        ]}
+      ></sc-metric-row>
 
       <sc-tabs
         .tabs=${[

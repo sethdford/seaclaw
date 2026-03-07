@@ -11,6 +11,7 @@ import { icons } from "../icons.js";
 import { formatTime } from "../utils.js";
 
 const TWO_MIN_MS = 2 * 60 * 1000;
+const FIVE_MIN_MS = 5 * 60 * 1000;
 
 @customElement("sc-message-list")
 export class ScMessageList extends LitElement {
@@ -40,7 +41,6 @@ export class ScMessageList extends LitElement {
       padding: var(--sc-space-md);
       display: flex;
       flex-direction: column;
-      gap: var(--sc-space-md);
     }
     @keyframes sc-slide-up {
       from {
@@ -52,6 +52,73 @@ export class ScMessageList extends LitElement {
         transform: translateY(0);
       }
     }
+    .message-row {
+      display: flex;
+      gap: var(--sc-space-sm);
+      align-items: flex-end;
+    }
+    .message-row.user-row {
+      justify-content: flex-end;
+    }
+    .message-row.assistant-row {
+      justify-content: flex-start;
+    }
+    .message-row.sender-change {
+      margin-top: var(--sc-space-lg);
+    }
+    .message-row.same-sender {
+      margin-top: var(--sc-space-2xs);
+    }
+    .message-row:first-child {
+      margin-top: 0;
+    }
+    .avatar {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--sc-text-sm);
+      font-family: var(--sc-font);
+    }
+    .avatar.assistant {
+      background: var(--sc-accent);
+      color: var(--sc-on-accent, #fff);
+    }
+    .avatar.user {
+      background: var(--sc-bg-elevated);
+      color: var(--sc-text-muted);
+    }
+    .avatar-spacer {
+      flex-shrink: 0;
+      width: 28px;
+      min-width: 28px;
+    }
+    .time-divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--sc-space-sm);
+      margin: var(--sc-space-md) 0;
+    }
+    .time-divider::before,
+    .time-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--sc-border-subtle));
+    }
+    .time-divider::after {
+      background: linear-gradient(to left, transparent, var(--sc-border-subtle));
+    }
+    .time-divider span {
+      font-size: var(--sc-text-2xs, 10px);
+      color: var(--sc-text-faint);
+      white-space: nowrap;
+    }
     .message {
       position: relative;
       max-width: 75%;
@@ -61,9 +128,7 @@ export class ScMessageList extends LitElement {
       display: flex;
       flex-direction: column;
       gap: var(--sc-space-xs);
-      box-shadow: var(--sc-shadow-xs);
-      animation: sc-slide-up var(--sc-duration-normal)
-        var(--sc-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+      animation: sc-slide-up 150ms var(--sc-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
     }
     .message:hover sc-message-actions {
       opacity: 1;
@@ -71,19 +136,26 @@ export class ScMessageList extends LitElement {
     }
     .message.user {
       align-self: flex-end;
-      background: var(--sc-user-message-gradient);
-      color: var(--sc-on-accent);
-      border-radius: var(--sc-radius-lg) var(--sc-radius-lg) var(--sc-radius-sm) var(--sc-radius-lg);
+      background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--sc-accent) 85%, transparent),
+        var(--sc-accent-hover)
+      );
+      color: var(--sc-on-accent, #fff);
+      border-radius: 20px 20px 6px 20px;
     }
     .message.assistant {
       align-self: flex-start;
-      background: var(--sc-bg-surface);
-      border: 1px solid var(--sc-border);
+      max-width: 85%;
+      background: color-mix(in srgb, var(--sc-bg-surface) 80%, transparent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 20px 20px 20px 6px;
       color: var(--sc-text);
-      border-radius: var(--sc-radius-lg) var(--sc-radius-lg) var(--sc-radius-lg) var(--sc-radius-sm);
     }
     .message.continuation {
-      margin-top: calc(var(--sc-space-xs) - var(--sc-space-md));
+      margin-top: 0;
     }
     .message.continuation .message-meta {
       display: none;
@@ -201,7 +273,10 @@ export class ScMessageList extends LitElement {
       padding: var(--sc-space-lg) 0;
     }
     @media (max-width: 640px) {
-      .message {
+      .message.user {
+        max-width: 95%;
+      }
+      .message.assistant {
         max-width: 95%;
       }
     }
@@ -290,16 +365,40 @@ export class ScMessageList extends LitElement {
     );
   }
 
-  private _renderItem(item: ChatItem, idx: number): ReturnType<typeof html> {
+  private _renderMessageRow(
+    item: Extract<ChatItem, { type: "message" }>,
+    idx: number,
+  ): ReturnType<typeof html>[] {
     const lastAssistantIdx = this._findLastAssistantIdx();
-    if (item.type === "message") {
-      const isStreaming = this.isWaiting && item.role === "assistant" && idx === lastAssistantIdx;
-      const isContinuation = this._computeContinuation(idx);
-      return html`
+    const isStreaming = this.isWaiting && item.role === "assistant" && idx === lastAssistantIdx;
+    const isContinuation = this._computeContinuation(idx);
+    const prevItem = this.items[idx - 1];
+    const prevMsg = prevItem?.type === "message" ? prevItem : null;
+    const prevTs = prevMsg?.ts ?? 0;
+    const ts = item.ts ?? 0;
+    const needsDivider = !isContinuation && prevMsg != null && Math.abs(ts - prevTs) > FIVE_MIN_MS;
+    const senderChange = prevMsg == null || prevMsg.role !== item.role;
+    const rowMarginClass = idx === 0 ? "" : senderChange ? "sender-change" : "same-sender";
+
+    const parts: ReturnType<typeof html>[] = [];
+    if (needsDivider) {
+      parts.push(html` <div class="time-divider"><span>${formatTime(ts)}</span></div> `);
+    }
+
+    const staggerDelay = `min(${idx * 30}ms, 300ms)`;
+    const avatarEl = isContinuation
+      ? html`<span class="avatar-spacer" aria-hidden="true"></span>`
+      : item.role === "assistant"
+        ? html`<span class="avatar assistant" aria-hidden="true">~</span>`
+        : html`<span class="avatar user" aria-hidden="true">U</span>`;
+
+    parts.push(html`
+      <div class="message-row ${item.role}-row ${rowMarginClass}" id="msg-row-${idx}">
+        ${avatarEl}
         <div
           id="msg-${idx}"
           class="message ${item.role} ${isContinuation ? "continuation" : ""}"
-          style="--sc-stagger-index: ${idx}; animation-delay: min(calc(50ms * var(--sc-stagger-index)), 300ms);"
+          style="animation-delay: ${staggerDelay};"
           @contextmenu=${(ev: MouseEvent) => this._onContextMenu(ev, item)}
         >
           <sc-message-actions
@@ -316,7 +415,18 @@ export class ScMessageList extends LitElement {
             ? html`<span class="message-meta">${formatTime(item.ts)}</span>`
             : nothing}
         </div>
-      `;
+      </div>
+    `);
+
+    return parts;
+  }
+
+  private _renderItem(
+    item: ChatItem,
+    idx: number,
+  ): ReturnType<typeof html> | ReturnType<typeof html>[] {
+    if (item.type === "message") {
+      return this._renderMessageRow(item, idx);
     }
     if (item.type === "tool_call") {
       return html`
@@ -361,7 +471,10 @@ export class ScMessageList extends LitElement {
               </div>
             `
           : html`
-              ${this.items.map((item, idx) => this._renderItem(item, idx))}
+              ${this.items.flatMap((item, idx) => {
+                const result = this._renderItem(item, idx);
+                return Array.isArray(result) ? result : [result];
+              })}
               ${this.isWaiting
                 ? html`
                     <div class="thinking">

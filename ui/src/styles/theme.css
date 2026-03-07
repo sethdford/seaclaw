@@ -135,6 +135,79 @@ body {
   animation-delay: 440ms;
 }
 
+/* Hover lift — subtle card elevation on hover */
+.sc-hover-lift {
+  transition:
+    transform var(--sc-duration-normal, 200ms)
+      var(--sc-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
+    box-shadow var(--sc-duration-normal, 200ms) var(--sc-ease-out, ease-out);
+}
+
+.sc-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sc-shadow-lg);
+}
+
+.sc-hover-lift:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Press squash — button feedback */
+.sc-press {
+  transition: transform var(--sc-duration-fast, 100ms) var(--sc-ease-out, ease-out);
+}
+
+.sc-press:active {
+  transform: scale(0.97);
+}
+
+/* Cascade entrance — staggered slide for timeline/list items */
+.sc-cascade > * {
+  animation: sc-slide-up var(--sc-duration-normal, 200ms) var(--sc-ease-out, ease-out) both;
+}
+
+.sc-cascade > :nth-child(1) {
+  animation-delay: 0ms;
+}
+.sc-cascade > :nth-child(2) {
+  animation-delay: 50ms;
+}
+.sc-cascade > :nth-child(3) {
+  animation-delay: 100ms;
+}
+.sc-cascade > :nth-child(4) {
+  animation-delay: 150ms;
+}
+.sc-cascade > :nth-child(5) {
+  animation-delay: 200ms;
+}
+.sc-cascade > :nth-child(6) {
+  animation-delay: 250ms;
+}
+.sc-cascade > :nth-child(7) {
+  animation-delay: 300ms;
+}
+.sc-cascade > :nth-child(8) {
+  animation-delay: 350ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-hover-lift,
+  .sc-press {
+    transition: none;
+  }
+  .sc-hover-lift:hover {
+    transform: none;
+  }
+  .sc-hover-lift:active,
+  .sc-press:active {
+    transform: none;
+  }
+  .sc-cascade > * {
+    animation: none;
+  }
+}
+
 .view-enter {
   animation:
     sc-fade-in var(--sc-duration-normal) var(--sc-ease-out),

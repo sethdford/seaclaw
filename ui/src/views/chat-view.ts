@@ -48,7 +48,9 @@ export class ScChatView extends GatewayAwareLitElement {
       padding: var(--sc-space-xs) var(--sc-space-md);
       font-size: var(--sc-text-xs);
       color: var(--sc-text-muted);
-      background: transparent;
+      background: color-mix(in srgb, var(--sc-bg-surface) 60%, transparent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--sc-border-subtle);
     }
 

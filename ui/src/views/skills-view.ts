@@ -8,6 +8,7 @@ import "../components/sc-input.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
 import "../components/sc-button.js";
+import "../components/sc-switch.js";
 
 interface Skill {
   name: string;
@@ -43,7 +44,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
       align-items: center;
     }
     .install-row input {
-      padding: var(--sc-space-sm) 0.75rem;
+      padding: var(--sc-space-sm) var(--sc-space-md);
       background: var(--sc-bg);
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius);
@@ -75,32 +76,6 @@ export class ScSkillsView extends GatewayAwareLitElement {
       align-items: center;
       justify-content: space-between;
     }
-    .toggle {
-      position: relative;
-      width: 44px;
-      height: 24px;
-      background: var(--sc-border);
-      border-radius: var(--sc-radius-lg);
-      cursor: pointer;
-      transition: background var(--sc-duration-fast);
-    }
-    .toggle.enabled {
-      background: var(--sc-accent);
-    }
-    .toggle::after {
-      content: "";
-      position: absolute;
-      top: var(--sc-space-2xs);
-      left: var(--sc-space-2xs);
-      width: 20px;
-      height: 20px;
-      background: white;
-      border-radius: 50%;
-      transition: transform var(--sc-duration-fast);
-    }
-    .toggle.enabled::after {
-      transform: translateX(20px);
-    }
     .status {
       font-size: var(--sc-text-xs);
       color: var(--sc-text-muted);
@@ -119,6 +94,11 @@ export class ScSkillsView extends GatewayAwareLitElement {
       }
       .install-row input {
         width: 100%;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0s !important;
       }
     }
   `;
@@ -193,7 +173,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
     }
   }
 
-  override render() {
+  private _renderHeader() {
     return html`
       <div class="header">
         <h2>Skills</h2>
@@ -208,6 +188,60 @@ export class ScSkillsView extends GatewayAwareLitElement {
           <sc-button variant="primary" @click=${this.installSkill}>Install</sc-button>
         </div>
       </div>
+    `;
+  }
+
+  private _renderSkeleton() {
+    return html`
+      <div class="skills-grid sc-stagger">
+        <sc-skeleton variant="card" height="100px"></sc-skeleton>
+        <sc-skeleton variant="card" height="100px"></sc-skeleton>
+        <sc-skeleton variant="card" height="100px"></sc-skeleton>
+      </div>
+    `;
+  }
+
+  private _renderSkillGrid() {
+    if (this.skills.length === 0) {
+      return html`
+        <div class="skills-grid sc-stagger">
+          <div class="grid-full">
+            <sc-empty-state
+              .icon=${icons.puzzle}
+              heading="No skills installed"
+              description="Install skills to extend your agent's capabilities."
+            ></sc-empty-state>
+          </div>
+        </div>
+      `;
+    }
+    return html`
+      <div class="skills-grid sc-stagger">
+        ${this.skills.map(
+          (skill) => html`
+            <sc-card>
+              <div class="skill-card-inner">
+                <div class="skill-name">${skill.name}</div>
+                <div class="skill-desc">${skill.description ?? "No description"}</div>
+                <div class="skill-footer">
+                  <span class="status"> ${skill.enabled !== false ? "Enabled" : "Disabled"} </span>
+                  <sc-switch
+                    .checked=${skill.enabled !== false}
+                    @sc-change=${() => this.toggleSkill(skill)}
+                    .label=${`Toggle ${skill.name}`}
+                  ></sc-switch>
+                </div>
+              </div>
+            </sc-card>
+          `,
+        )}
+      </div>
+    `;
+  }
+
+  override render() {
+    return html`
+      ${this._renderHeader()}
       ${this.error
         ? html`<sc-empty-state
             .icon=${icons.warning}
@@ -215,59 +249,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
             description=${this.error}
           ></sc-empty-state>`
         : nothing}
-      ${this.loading
-        ? html`
-            <div class="skills-grid sc-stagger">
-              <sc-skeleton variant="card" height="100px"></sc-skeleton>
-              <sc-skeleton variant="card" height="100px"></sc-skeleton>
-              <sc-skeleton variant="card" height="100px"></sc-skeleton>
-            </div>
-          `
-        : this.skills.length === 0
-          ? html`
-              <div class="skills-grid sc-stagger">
-                <div class="grid-full">
-                  <sc-empty-state
-                    .icon=${icons.puzzle}
-                    heading="No skills installed"
-                    description="Install skills to extend your agent's capabilities."
-                  ></sc-empty-state>
-                </div>
-              </div>
-            `
-          : html`
-              <div class="skills-grid sc-stagger">
-                ${this.skills.map(
-                  (skill) => html`
-                    <sc-card>
-                      <div class="skill-card-inner">
-                        <div class="skill-name">${skill.name}</div>
-                        <div class="skill-desc">${skill.description ?? "No description"}</div>
-                        <div class="skill-footer">
-                          <span class="status">
-                            ${skill.enabled !== false ? "Enabled" : "Disabled"}
-                          </span>
-                          <div
-                            class="toggle ${skill.enabled !== false ? "enabled" : ""}"
-                            @click=${() => this.toggleSkill(skill)}
-                            @keydown=${(e: KeyboardEvent) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                this.toggleSkill(skill);
-                              }
-                            }}
-                            role="switch"
-                            tabindex="0"
-                            aria-checked=${skill.enabled !== false}
-                            aria-label="Toggle ${skill.name}"
-                          ></div>
-                        </div>
-                      </div>
-                    </sc-card>
-                  `,
-                )}
-              </div>
-            `}
+      ${this.loading ? this._renderSkeleton() : this._renderSkillGrid()}
     `;
   }
 }

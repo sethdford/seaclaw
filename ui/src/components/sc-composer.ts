@@ -5,10 +5,10 @@ import "./sc-file-preview.js";
 import type { FilePreviewItem } from "./sc-file-preview.js";
 
 const SUGGESTIONS = [
-  "Explain how this project is architected",
-  "Write a Python web scraper",
-  "Help me debug an issue",
-  "What can you do?",
+  { icon: "compass", title: "Explore the project", desc: "Architecture, patterns, and structure" },
+  { icon: "code", title: "Write code", desc: "Python, scripts, web scrapers, and more" },
+  { icon: "bug", title: "Debug an issue", desc: "Trace errors and find root causes" },
+  { icon: "question", title: "Ask anything", desc: "General questions about capabilities" },
 ];
 
 const LINE_HEIGHT = 24;
@@ -22,11 +22,22 @@ export class ScComposer extends LitElement {
       flex-direction: column;
       gap: var(--sc-space-xs);
       padding: var(--sc-space-md);
-      background: var(--sc-bg-surface);
-      border-top: 1px solid var(--sc-border);
+      background: color-mix(in srgb, var(--sc-bg-surface) 80%, transparent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--sc-border);
+      border-radius: var(--sc-radius-xl);
+      box-shadow: var(--sc-shadow-inset);
       transition:
+        border-color var(--sc-duration-normal) var(--sc-ease-out),
+        box-shadow var(--sc-duration-normal) var(--sc-ease-out),
         outline var(--sc-duration-fast) var(--sc-ease-out),
         background var(--sc-duration-fast) var(--sc-ease-out);
+    }
+    .input-wrap:focus-within {
+      box-shadow:
+        0 0 0 2px var(--sc-accent-subtle),
+        var(--sc-shadow-inset);
     }
     .input-wrap.drag-over {
       outline: 2px dashed var(--sc-accent);
@@ -43,8 +54,8 @@ export class ScComposer extends LitElement {
       min-height: 44px;
       max-height: ${LINE_HEIGHT * MAX_LINES}px;
       padding: var(--sc-space-sm) var(--sc-space-md);
-      background: var(--sc-bg);
-      border: 1px solid var(--sc-border);
+      background: transparent;
+      border: none;
       border-radius: var(--sc-radius);
       color: var(--sc-text);
       font-family: var(--sc-font);
@@ -54,12 +65,9 @@ export class ScComposer extends LitElement {
     }
     .input-bar textarea:focus {
       outline: none;
-      border-color: var(--sc-accent);
-      box-shadow: 0 0 0 3px var(--sc-accent-subtle);
     }
     .input-bar textarea:focus-visible {
-      outline: 2px solid var(--sc-accent);
-      outline-offset: 2px;
+      outline: none;
     }
     .input-bar textarea::placeholder {
       color: var(--sc-text-muted);
@@ -68,23 +76,23 @@ export class ScComposer extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      min-width: 44px;
-      min-height: 44px;
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      min-height: 36px;
       padding: 0;
       background: transparent;
-      border: 1px solid var(--sc-border);
+      border: none;
       border-radius: var(--sc-radius);
       color: var(--sc-text-muted);
       cursor: pointer;
       transition:
         color var(--sc-duration-fast),
-        border-color var(--sc-duration-fast),
         background var(--sc-duration-fast);
     }
     .attach-btn:hover:not(:disabled) {
+      background: var(--sc-bg-elevated);
       color: var(--sc-accent);
-      border-color: var(--sc-accent);
-      background: var(--sc-accent-subtle);
     }
     .attach-btn:disabled {
       opacity: var(--sc-opacity-disabled, 0.5);
@@ -95,58 +103,38 @@ export class ScComposer extends LitElement {
       height: 20px;
     }
     .send-btn {
-      padding: var(--sc-space-sm) var(--sc-space-lg);
-      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      min-height: 40px;
+      padding: 0;
       background: var(--sc-accent);
       color: var(--sc-bg);
       border: none;
-      border-radius: var(--sc-radius);
-      font-weight: var(--sc-weight-medium);
+      border-radius: var(--sc-radius-full);
       cursor: pointer;
-      font-size: var(--sc-text-base);
       font-family: var(--sc-font);
-      transition: background var(--sc-duration-fast) var(--sc-ease-out);
+      transition:
+        background var(--sc-duration-fast) var(--sc-ease-out),
+        transform var(--sc-duration-fast) var(--sc-spring-micro, cubic-bezier(0.34, 1.56, 0.64, 1));
+    }
+    .send-btn svg {
+      width: 18px;
+      height: 18px;
     }
     .send-btn:hover:not(:disabled) {
       background: var(--sc-accent-hover);
     }
+    .send-btn:active:not(:disabled) {
+      transform: scale(0.92);
+    }
     .send-btn:disabled {
-      opacity: var(--sc-opacity-disabled, 0.5);
+      opacity: 0.4;
       cursor: not-allowed;
     }
     .send-btn:focus-visible {
-      outline: 2px solid var(--sc-accent);
-      outline-offset: 2px;
-    }
-    .char-count {
-      font-size: var(--sc-text-xs);
-      color: var(--sc-text-muted);
-    }
-    .suggested-prompts {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--sc-space-sm);
-      justify-content: center;
-      margin-top: var(--sc-space-xs);
-    }
-    .prompt-pill {
-      background: var(--sc-bg-surface);
-      border: 1px solid var(--sc-border);
-      border-radius: var(--sc-radius-full);
-      padding: var(--sc-space-xs) var(--sc-space-md);
-      font-family: var(--sc-font);
-      font-size: var(--sc-text-sm);
-      color: var(--sc-text);
-      cursor: pointer;
-      transition: all var(--sc-duration-fast) var(--sc-ease-out);
-      white-space: nowrap;
-    }
-    .prompt-pill:hover {
-      background: var(--sc-bg-elevated);
-      border-color: var(--sc-accent);
-      color: var(--sc-accent);
-    }
-    .prompt-pill:focus-visible {
       outline: 2px solid var(--sc-accent);
       outline-offset: 2px;
     }
@@ -155,21 +143,110 @@ export class ScComposer extends LitElement {
       color: var(--sc-text-muted);
       font-variant-numeric: tabular-nums;
     }
+    .input-bar-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--sc-space-sm);
+    }
+    .welcome-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--sc-space-lg);
+      padding: var(--sc-space-lg) 0;
+    }
+    .welcome-heading {
+      font-size: var(--sc-text-2xl, 1.5rem);
+      font-weight: var(--sc-weight-light, 300);
+      color: var(--sc-text-muted);
+      letter-spacing: -0.01em;
+    }
+    .bento-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--sc-space-sm);
+      max-width: 420px;
+      width: 100%;
+    }
+    .bento-card {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sc-space-xs);
+      padding: var(--sc-space-md);
+      background: var(--sc-bg-surface);
+      border: 1px solid var(--sc-border);
+      border-radius: var(--sc-radius);
+      cursor: pointer;
+      text-align: left;
+      font-family: var(--sc-font);
+      transition:
+        background var(--sc-duration-fast) var(--sc-ease-out),
+        border-color var(--sc-duration-fast) var(--sc-ease-out),
+        box-shadow var(--sc-duration-fast) var(--sc-ease-out),
+        transform var(--sc-duration-fast) var(--sc-ease-out);
+      animation: sc-card-enter var(--sc-duration-normal)
+        var(--sc-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+      animation-delay: calc(var(--bento-idx) * 80ms);
+    }
+    .bento-card:hover {
+      background: var(--sc-bg-elevated);
+      border-color: var(--sc-accent);
+      box-shadow: var(--sc-shadow-glow-blue);
+      transform: translateY(-1px);
+    }
+    .bento-card:focus-visible {
+      outline: 2px solid var(--sc-accent);
+      outline-offset: 2px;
+    }
+    .bento-card:active {
+      transform: scale(0.98);
+    }
+    .bento-icon {
+      display: flex;
+      color: var(--sc-accent);
+    }
+    .bento-icon svg {
+      width: 24px;
+      height: 24px;
+    }
+    .bento-title {
+      font-size: var(--sc-text-sm);
+      font-weight: var(--sc-weight-medium);
+      color: var(--sc-text);
+    }
+    .bento-desc {
+      font-size: var(--sc-text-xs);
+      color: var(--sc-text-muted);
+      line-height: 1.4;
+    }
+    @keyframes sc-card-enter {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
     @media (max-width: 640px) {
       .input-bar {
         flex-direction: column;
         align-items: stretch;
       }
-      .send-btn {
-        min-height: 40px;
+      .bento-grid {
+        grid-template-columns: 1fr;
       }
     }
     @media (prefers-reduced-motion: reduce) {
       .input-wrap,
       .attach-btn,
       .send-btn,
-      .prompt-pill {
+      .bento-card {
         transition: none;
+      }
+      .bento-card {
+        animation: none;
       }
     }
   `;
@@ -329,42 +406,50 @@ export class ScComposer extends LitElement {
             @keydown=${this._handleKeyDown}
           ></textarea>
           <input id="file-input" type="file" multiple hidden @change=${this._handleFileChange} />
-          <button
-            class="attach-btn"
-            type="button"
-            ?disabled=${this.disabled}
-            @click=${this._handleAttachClick}
-            aria-label="Attach file"
-          >
-            ${icons["file-text"]}
-          </button>
-          <button
-            class="send-btn"
-            type="button"
-            ?disabled=${!canSend}
-            @click=${this._emitSend}
-            aria-label="Send"
-          >
-            Send
-          </button>
+          <div class="input-bar-actions">
+            <button
+              class="attach-btn"
+              type="button"
+              ?disabled=${this.disabled}
+              @click=${this._handleAttachClick}
+              aria-label="Attach file"
+            >
+              ${icons["file-text"]}
+            </button>
+            ${this.streamElapsed
+              ? html`<span class="stream-elapsed">${this.streamElapsed}</span>`
+              : nothing}
+            <button
+              class="send-btn"
+              type="button"
+              ?disabled=${!canSend}
+              @click=${this._emitSend}
+              aria-label="Send"
+            >
+              ${icons["arrow-up"]}
+            </button>
+          </div>
         </div>
-        <div class="char-count">${this.value.length} characters</div>
-        ${this.streamElapsed
-          ? html`<span class="stream-elapsed">${this.streamElapsed}</span>`
-          : nothing}
         ${this.showSuggestions
           ? html`
-              <div class="suggested-prompts">
-                ${SUGGESTIONS.map(
-                  (text) =>
-                    html`<button
-                      class="prompt-pill"
-                      type="button"
-                      @click=${() => this._handlePillClick(text)}
-                    >
-                      ${text}
-                    </button>`,
-                )}
+              <div class="welcome-state">
+                <span class="welcome-heading">How can I help?</span>
+                <div class="bento-grid">
+                  ${SUGGESTIONS.map(
+                    (s, i) => html`
+                      <button
+                        class="bento-card"
+                        type="button"
+                        style="--bento-idx: ${i}"
+                        @click=${() => this._handlePillClick(s.title)}
+                      >
+                        <span class="bento-icon">${icons[s.icon as keyof typeof icons]}</span>
+                        <span class="bento-title">${s.title}</span>
+                        <span class="bento-desc">${s.desc}</span>
+                      </button>
+                    `,
+                  )}
+                </div>
               </div>
             `
           : nothing}

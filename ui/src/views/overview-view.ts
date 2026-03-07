@@ -1,6 +1,6 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import { formatDate } from "../utils.js";
+import { formatDate, formatRelative } from "../utils.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import { observeAllCards } from "../utils/scroll-entrance.js";
@@ -10,11 +10,14 @@ import "../components/sc-badge.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
 import "../components/sc-button.js";
-import "../components/sc-animated-number.js";
 import "../components/sc-welcome.js";
 import "../components/sc-welcome-card.js";
 import "../components/sc-tooltip.js";
-import "../components/sc-activity-feed.js";
+import "../components/sc-page-hero.js";
+import "../components/sc-section-header.js";
+import "../components/sc-stat-card.js";
+import "../components/sc-metric-row.js";
+import "../components/sc-timeline.js";
 
 interface HealthRes {
   status?: string;
@@ -164,36 +167,15 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
     /* ── Metrics zone ─────────────────────────────────── */
 
+    .metrics-block {
+      margin-bottom: var(--sc-space-2xl, 2rem);
+    }
+
     .metrics {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: var(--sc-space-lg, 1.5rem);
-      margin-bottom: var(--sc-space-2xl, 2rem);
-    }
-
-    .stat-label {
-      font-size: var(--sc-text-xs);
-      font-weight: var(--sc-weight-semibold, 600);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--sc-accent-text, var(--sc-accent));
-      margin-bottom: var(--sc-space-xs);
-    }
-
-    .stat-value {
-      font-size: clamp(1.5rem, 2.5vw, 2rem);
-      font-weight: var(--sc-weight-bold, 700);
-      letter-spacing: -0.04em;
-      font-variant-numeric: tabular-nums;
-      color: var(--sc-text);
-      line-height: 1.1;
-      animation: sc-overshoot-in var(--sc-duration-moderate) var(--sc-spring-out) backwards;
-    }
-
-    .stat-desc {
-      font-size: var(--sc-text-xs);
-      color: var(--sc-text-muted);
-      margin-top: var(--sc-space-2xs);
+      margin-bottom: var(--sc-space-md);
     }
 
     /* ── Detail zone ──────────────────────────────────── */
@@ -313,11 +295,6 @@ export class ScOverviewView extends GatewayAwareLitElement {
       .metrics {
         grid-template-columns: 1fr;
       }
-      .hero {
-        padding: var(--sc-space-lg);
-        flex-direction: column;
-        align-items: flex-start;
-      }
       .skeleton-metrics {
         grid-template-columns: 1fr;
       }
@@ -431,6 +408,32 @@ export class ScOverviewView extends GatewayAwareLitElement {
     return sorted.slice(0, 5);
   }
 
+  private get _timelineItems() {
+    type Ev = ActivityEvent & { message?: string; text?: string; level?: string; detail?: string };
+    return this.activityEvents.map((ev: Ev) => {
+      let message = ev.message ?? ev.text ?? "";
+      if (!message && ev.type === "message") {
+        message = `${ev.user ?? ""} via ${ev.channel ?? ""}: ${ev.preview ?? ""}`.trim();
+      } else if (!message && ev.type === "tool_exec") {
+        message = `Tool ${ev.tool ?? ""}: ${ev.command ?? ""}`.trim();
+      } else if (!message && ev.type === "session_start") {
+        message = `Session ${ev.session ?? ""} started`.trim();
+      }
+      if (!message) message = "Activity";
+      const ts = typeof ev.time === "number" ? ev.time : Date.now();
+      return {
+        time: formatRelative(ts),
+        message,
+        status: (ev.level === "error" ? "error" : ev.level === "success" ? "success" : "info") as
+          | "success"
+          | "error"
+          | "info"
+          | "pending",
+        detail: ev.detail,
+      };
+    });
+  }
+
   private get _onboarded(): boolean {
     return localStorage.getItem("sc-onboarded") === "true";
   }
@@ -450,8 +453,10 @@ export class ScOverviewView extends GatewayAwareLitElement {
   private _renderHero() {
     if (!this._onboarded) {
       return html`
-        <sc-welcome-card></sc-welcome-card>
-        <sc-welcome></sc-welcome>
+        <sc-page-hero>
+          <sc-welcome-card></sc-welcome-card>
+          <sc-welcome></sc-welcome>
+        </sc-page-hero>
       `;
     }
 
@@ -459,38 +464,44 @@ export class ScOverviewView extends GatewayAwareLitElement {
     const cap = this.capabilities;
 
     return html`
-      <div class="hero">
-        <div class="hero-left">
-          <sc-tooltip text=${gwOk ? "All subsystems responding" : "Gateway is unreachable"}>
-            <span class="status-dot ${gwOk ? "operational" : "offline"}" aria-hidden="true"></span>
-          </sc-tooltip>
-          <div class="hero-status">
-            <h2 class="hero-title">${gwOk ? "Operational" : "Offline"}</h2>
-            <div class="hero-meta">
-              <span>${cap.version ?? "SeaClaw"}</span>
-              ${this.updateInfo.available
-                ? html`<span>&middot;</span>
-                    <a
-                      class="update-link"
-                      href=${this.updateInfo.url ?? "#"}
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      Update to ${this.updateInfo.latest_version}
-                    </a>`
-                : nothing}
+      <sc-page-hero>
+        <sc-section-header heading="Overview" description="System health and activity at a glance">
+          <div class="hero-actions">
+            ${this.lastLoadedAt
+              ? html`<span class="staleness">Updated ${this.stalenessLabel}</span>`
+              : nothing}
+            <sc-tooltip text="Reload all dashboard data" position="bottom">
+              <sc-button variant="secondary" @click=${() => this.load()}>Refresh</sc-button>
+            </sc-tooltip>
+          </div>
+        </sc-section-header>
+        <div class="hero-inner">
+          <div class="hero-left">
+            <sc-tooltip text=${gwOk ? "All subsystems responding" : "Gateway is unreachable"}>
+              <span
+                class="status-dot ${gwOk ? "operational" : "offline"}"
+                aria-hidden="true"
+              ></span>
+            </sc-tooltip>
+            <div class="hero-status">
+              <div class="hero-meta">
+                <span>${cap.version ?? "SeaClaw"}</span>
+                ${this.updateInfo.available
+                  ? html`<span>&middot;</span>
+                      <a
+                        class="update-link"
+                        href=${this.updateInfo.url ?? "#"}
+                        target="_blank"
+                        rel="noopener"
+                      >
+                        Update to ${this.updateInfo.latest_version}
+                      </a>`
+                  : nothing}
+              </div>
             </div>
           </div>
         </div>
-        <div class="hero-actions">
-          ${this.lastLoadedAt
-            ? html`<span class="staleness">Updated ${this.stalenessLabel}</span>`
-            : nothing}
-          <sc-tooltip text="Reload all dashboard data" position="bottom">
-            <sc-button variant="secondary" @click=${() => this.load()}>Refresh</sc-button>
-          </sc-tooltip>
-        </div>
-      </div>
+      </sc-page-hero>
     `;
   }
 
@@ -499,25 +510,39 @@ export class ScOverviewView extends GatewayAwareLitElement {
   private _renderMetrics() {
     const cap = this.capabilities;
     const metrics = [
-      { label: "Providers", value: cap.providers ?? 0, desc: "AI model backends" },
-      { label: "Channels", value: cap.channels ?? 0, desc: "Messaging integrations" },
-      { label: "Tools", value: cap.tools ?? 0, desc: "Available capabilities" },
-      { label: "Sessions", value: this.sessions.length, desc: "Active conversations" },
+      { label: "Providers", value: cap.providers ?? 0 },
+      { label: "Channels", value: cap.channels ?? 0 },
+      { label: "Tools", value: cap.tools ?? 0 },
+      { label: "Sessions", value: this.sessions.length },
     ];
 
     return html`
-      <div class="metrics sc-stagger">
-        ${metrics.map(
-          (m) => html`
-            <sc-card hoverable accent>
-              <div class="stat-label">${m.label}</div>
-              <div class="stat-value">
-                <sc-animated-number .value=${m.value}></sc-animated-number>
-              </div>
-              <div class="stat-desc">${m.desc}</div>
-            </sc-card>
-          `,
-        )}
+      <div class="metrics-block">
+        <div class="metrics">
+          ${metrics.map(
+            (m, i) => html`
+              <sc-stat-card
+                .value=${m.value}
+                .label=${m.label}
+                style="--sc-stagger-delay: ${i * 80}ms"
+              ></sc-stat-card>
+            `,
+          )}
+        </div>
+        <sc-metric-row
+          .items=${[
+            { label: "Sessions Today", value: String(this.sessions.length) },
+            {
+              label: "Channels Active",
+              value: String(this.channels.filter((c) => c.configured).length),
+            },
+            {
+              label: "Status",
+              value: this.gatewayOperational ? "Healthy" : "Offline",
+              accent: this.gatewayOperational ? "success" : "error",
+            },
+          ]}
+        ></sc-metric-row>
       </div>
     `;
   }
@@ -530,7 +555,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
         <div class="details-row">
           <sc-card hoverable accent>
             <div class="section-label">Live Activity</div>
-            <sc-activity-feed .events=${this.activityEvents}></sc-activity-feed>
+            <sc-timeline .items=${this._timelineItems}></sc-timeline>
           </sc-card>
 
           <sc-card hoverable accent>

@@ -1,9 +1,11 @@
-import { html, css, nothing } from "lit";
+import { html, css, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { ScToast } from "../components/sc-toast.js";
 import { icons } from "../icons.js";
 import "../components/sc-input.js";
+import "../components/sc-button.js";
+import "../components/sc-skeleton.js";
 
 type SaveStatus = "saved" | "error" | "unsaved" | "idle";
 
@@ -68,8 +70,8 @@ export class ScConfigView extends GatewayAwareLitElement {
     .status.unsaved::before {
       content: "";
       display: inline-block;
-      width: 6px;
-      height: 6px;
+      width: var(--sc-space-2xs);
+      height: var(--sc-space-2xs);
       border-radius: 50%;
       background: var(--sc-accent);
       margin-right: var(--sc-space-xs);
@@ -79,35 +81,6 @@ export class ScConfigView extends GatewayAwareLitElement {
       display: flex;
       gap: var(--sc-space-sm);
       align-items: center;
-    }
-    .toggle-btn {
-      padding: var(--sc-space-sm) var(--sc-space-md);
-      background: var(--sc-bg-elevated);
-      color: var(--sc-text);
-      border: 1px solid var(--sc-border);
-      border-radius: var(--sc-radius);
-      font-size: var(--sc-text-sm);
-      cursor: pointer;
-    }
-    .toggle-btn:hover {
-      background: var(--sc-border);
-    }
-    .save-btn {
-      padding: var(--sc-space-sm) var(--sc-space-md);
-      background: var(--sc-accent);
-      color: var(--sc-bg);
-      border: none;
-      border-radius: var(--sc-radius);
-      font-weight: var(--sc-weight-medium);
-      cursor: pointer;
-      font-size: var(--sc-text-base);
-    }
-    .save-btn:hover:not(:disabled) {
-      background: var(--sc-accent-hover);
-    }
-    .save-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
     }
     .form {
       display: flex;
@@ -242,8 +215,17 @@ export class ScConfigView extends GatewayAwareLitElement {
         width: 100%;
       }
     }
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0s !important;
+        transition-duration: 0s !important;
+      }
+    }
   `;
 
+  @state() private loading = true;
   @state() private config: ConfigData = {};
   @state() private edited: ConfigData = {};
   @state() private schema: ConfigSchema = {};
@@ -272,7 +254,9 @@ export class ScConfigView extends GatewayAwareLitElement {
   }
 
   protected override async load(): Promise<void> {
+    this.loading = true;
     await Promise.all([this.loadConfig(), this.loadSchema()]);
+    this.loading = false;
   }
 
   private async loadConfig(): Promise<void> {
@@ -425,6 +409,72 @@ export class ScConfigView extends GatewayAwareLitElement {
   }
 
   override render() {
+    if (this.loading) return this._renderSkeleton();
+    if (this.rawMode) return this._renderRaw();
+    return this._renderForm();
+  }
+
+  private _renderSkeleton(): TemplateResult {
+    return html`
+      <div class="header">
+        <sc-skeleton variant="line" width="120px" height="var(--sc-text-base)"></sc-skeleton>
+        <div class="header-actions">
+          <sc-skeleton variant="line" width="80px" height="32px"></sc-skeleton>
+          <sc-skeleton variant="line" width="60px" height="32px"></sc-skeleton>
+        </div>
+      </div>
+      <div class="form">
+        <sc-skeleton variant="card" height="280px"></sc-skeleton>
+      </div>
+    `;
+  }
+
+  private _renderRaw(): TemplateResult {
+    const statusText =
+      this.saveStatus === "saved"
+        ? "Saved"
+        : this.saveStatus === "error"
+          ? this.errorMessage || "Error"
+          : this.hasChanges()
+            ? "Unsaved changes"
+            : "";
+    return html`
+      <div class="header">
+        <span class="status ${this.saveStatus}">${statusText}</span>
+        <div class="header-actions">
+          <sc-button
+            variant="ghost"
+            size="sm"
+            @click=${this.toggleRawMode}
+            aria-label=${this.rawMode ? "Switch to form editor" : "Switch to raw JSON editor"}
+          >
+            ${this.rawMode ? "Form" : "Raw JSON"}
+          </sc-button>
+          <sc-button
+            variant="primary"
+            ?disabled=${!this.hasChanges()}
+            @click=${() => this.save()}
+            aria-label="Save configuration"
+          >
+            Save
+          </sc-button>
+        </div>
+      </div>
+      <div class="form">
+        <textarea
+          class="raw-area"
+          .value=${this.rawText}
+          @input=${(e: Event) => {
+            this.rawText = (e.target as HTMLTextAreaElement).value;
+            if (this.saveStatus === "saved") this.saveStatus = "idle";
+          }}
+          spellcheck="false"
+        ></textarea>
+      </div>
+    `;
+  }
+
+  private _renderForm(): TemplateResult {
     const statusText =
       this.saveStatus === "saved"
         ? "Saved"
@@ -450,120 +500,101 @@ export class ScConfigView extends GatewayAwareLitElement {
       <div class="header">
         <span class="status ${this.saveStatus}">${statusText}</span>
         <div class="header-actions">
-          <button
-            class="toggle-btn"
+          <sc-button
+            variant="ghost"
+            size="sm"
             @click=${this.toggleRawMode}
             aria-label=${this.rawMode ? "Switch to form editor" : "Switch to raw JSON editor"}
           >
             ${this.rawMode ? "Form" : "Raw JSON"}
-          </button>
-          <button
-            class="save-btn"
+          </sc-button>
+          <sc-button
+            variant="primary"
             ?disabled=${!this.hasChanges()}
             @click=${() => this.save()}
             aria-label="Save configuration"
           >
             Save
-          </button>
+          </sc-button>
         </div>
       </div>
-      ${this.rawMode
-        ? html`
-            <div class="form">
-              <textarea
-                class="raw-area"
-                .value=${this.rawText}
-                @input=${(e: Event) => {
-                  this.rawText = (e.target as HTMLTextAreaElement).value;
-                  if (this.saveStatus === "saved") this.saveStatus = "idle";
-                }}
-                spellcheck="false"
-              ></textarea>
-            </div>
-          `
-        : html`
-            <div class="form">
-              <div class="section ${this.sectionCollapsed ? "collapsed" : ""}">
-                <div
-                  class="section-header ${this.sectionCollapsed ? "collapsed" : ""}"
-                  role="button"
-                  tabindex="0"
-                  aria-expanded=${!this.sectionCollapsed}
-                  aria-label="General configuration"
-                  @click=${() => (this.sectionCollapsed = !this.sectionCollapsed)}
-                  @keydown=${(e: KeyboardEvent) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      this.sectionCollapsed = !this.sectionCollapsed;
-                    }
-                  }}
-                >
-                  <span>General</span>
-                  <span class="chevron">${icons["caret-down"]}</span>
-                </div>
-                <div class="section-content">
-                  ${fieldKeys.map((key) => {
-                    const prop = props[key] as SchemaProperty | undefined;
-                    const desc = prop?.description ?? "";
-                    const val = this.edited[key as keyof ConfigData];
-                    const inputType =
-                      prop?.type === "integer" || prop?.type === "number" ? "number" : "text";
+      <div class="form">
+        <div class="section ${this.sectionCollapsed ? "collapsed" : ""}">
+          <div
+            class="section-header ${this.sectionCollapsed ? "collapsed" : ""}"
+            role="button"
+            tabindex="0"
+            aria-expanded=${!this.sectionCollapsed}
+            aria-label="General configuration"
+            @click=${() => (this.sectionCollapsed = !this.sectionCollapsed)}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                this.sectionCollapsed = !this.sectionCollapsed;
+              }
+            }}
+          >
+            <span>General</span>
+            <span class="chevron">${icons["caret-down"]}</span>
+          </div>
+          <div class="section-content">
+            ${fieldKeys.map((key) => {
+              const prop = props[key] as SchemaProperty | undefined;
+              const desc = prop?.description ?? "";
+              const val = this.edited[key as keyof ConfigData];
+              const inputType =
+                prop?.type === "integer" || prop?.type === "number" ? "number" : "text";
 
-                    const ariaLabels: Record<string, string> = {
-                      workspace_dir: "Workspace directory",
-                      default_provider: "Provider",
-                      default_model: "Model",
-                      max_tokens: "Max tokens",
-                      temperature: "Temperature",
-                    };
-                    const ariaLabel = ariaLabels[key] ?? key.replace(/_/g, " ");
-                    return html`
-                      <div class="field">
-                        <label for="${key}">${key.replace(/_/g, " ")}</label>
-                        ${desc ? html`<div class="description">${desc}</div>` : nothing}
-                        <sc-input
-                          aria-label=${ariaLabel}
-                          type="${inputType}"
-                          .min=${inputType === "number" ? 0 : undefined}
-                          .max=${key === "temperature" ? 2 : undefined}
-                          .step=${key === "temperature"
-                            ? 0.1
-                            : inputType === "number"
-                              ? 1
-                              : undefined}
-                          .value=${String(val ?? "")}
-                          @sc-input=${(e: CustomEvent<{ value: string }>) => {
-                            const raw = e.detail.value;
-                            const v =
-                              inputType === "number"
-                                ? key === "temperature"
-                                  ? parseFloat(raw)
-                                  : parseInt(raw, 10)
-                                : raw;
-                            const parsed =
-                              inputType === "number"
-                                ? isNaN(v as number)
-                                  ? key === "temperature"
-                                    ? 0.7
-                                    : 0
-                                  : key === "temperature"
-                                    ? Math.max(0, Math.min(2, v as number))
-                                    : v
-                                : v;
-                            this.edited = {
-                              ...this.edited,
-                              [key]: parsed,
-                            };
-                            if (this.saveStatus === "saved") this.saveStatus = "idle";
-                          }}
-                        ></sc-input>
-                      </div>
-                    `;
-                  })}
+              const ariaLabels: Record<string, string> = {
+                workspace_dir: "Workspace directory",
+                default_provider: "Provider",
+                default_model: "Model",
+                max_tokens: "Max tokens",
+                temperature: "Temperature",
+              };
+              const ariaLabel = ariaLabels[key] ?? key.replace(/_/g, " ");
+              return html`
+                <div class="field">
+                  <label for="${key}">${key.replace(/_/g, " ")}</label>
+                  ${desc ? html`<div class="description">${desc}</div>` : nothing}
+                  <sc-input
+                    aria-label=${ariaLabel}
+                    type="${inputType}"
+                    .min=${inputType === "number" ? 0 : undefined}
+                    .max=${key === "temperature" ? 2 : undefined}
+                    .step=${key === "temperature" ? 0.1 : inputType === "number" ? 1 : undefined}
+                    .value=${String(val ?? "")}
+                    @sc-input=${(e: CustomEvent<{ value: string }>) => {
+                      const raw = e.detail.value;
+                      const v =
+                        inputType === "number"
+                          ? key === "temperature"
+                            ? parseFloat(raw)
+                            : parseInt(raw, 10)
+                          : raw;
+                      const parsed =
+                        inputType === "number"
+                          ? isNaN(v as number)
+                            ? key === "temperature"
+                              ? 0.7
+                              : 0
+                            : key === "temperature"
+                              ? Math.max(0, Math.min(2, v as number))
+                              : v
+                          : v;
+                      this.edited = {
+                        ...this.edited,
+                        [key]: parsed,
+                      };
+                      if (this.saveStatus === "saved") this.saveStatus = "idle";
+                    }}
+                  ></sc-input>
                 </div>
-              </div>
-            </div>
-          `}
+              `;
+            })}
+          </div>
+        </div>
+      </div>
     `;
   }
 }

@@ -1,12 +1,12 @@
-import { html, css, nothing } from "lit";
+import { html, css, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import "../components/sc-card.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
-import "../components/sc-animated-icon.js";
 import "../components/sc-badge.js";
+import "../components/sc-search.js";
 
 interface ChannelStatus {
   key?: string;
@@ -25,6 +25,13 @@ export class ScChannelsView extends GatewayAwareLitElement {
     :host {
       display: block;
       max-width: 1200px;
+    }
+    .channel-card {
+      position: relative;
+      overflow: hidden;
+    }
+    .search-wrap {
+      margin-bottom: var(--sc-space-xl);
     }
     .grid {
       display: grid;
@@ -116,11 +123,17 @@ export class ScChannelsView extends GatewayAwareLitElement {
         grid-template-columns: 1fr;
       }
     }
+    @media (prefers-reduced-motion: reduce) {
+      .grid.sc-stagger > * {
+        animation: none;
+      }
+    }
   `;
 
   @state() private channels: ChannelStatus[] = [];
   @state() private loading = true;
   @state() private error = "";
+  @state() private filter = "";
 
   protected override async load(): Promise<void> {
     await this.loadChannels();
@@ -152,20 +165,31 @@ export class ScChannelsView extends GatewayAwareLitElement {
     return "error";
   }
 
-  override render() {
-    if (this.loading) {
-      return html`
-        <div class="grid sc-stagger">
-          <sc-skeleton variant="channel-card"></sc-skeleton>
-          <sc-skeleton variant="channel-card"></sc-skeleton>
-          <sc-skeleton variant="channel-card"></sc-skeleton>
-          <sc-skeleton variant="channel-card"></sc-skeleton>
-          <sc-skeleton variant="channel-card"></sc-skeleton>
-          <sc-skeleton variant="channel-card"></sc-skeleton>
-        </div>
-      `;
-    }
+  private get filteredChannels(): ChannelStatus[] {
+    const q = this.filter.trim().toLowerCase();
+    if (!q) return this.channels;
+    return this.channels.filter(
+      (ch) =>
+        (ch.name ?? "").toLowerCase().includes(q) ||
+        (ch.key ?? "").toLowerCase().includes(q) ||
+        (ch.label ?? "").toLowerCase().includes(q),
+    );
+  }
 
+  private _renderSkeleton(): TemplateResult {
+    return html`
+      <div class="grid sc-stagger">
+        <sc-skeleton variant="channel-card"></sc-skeleton>
+        <sc-skeleton variant="channel-card"></sc-skeleton>
+        <sc-skeleton variant="channel-card"></sc-skeleton>
+        <sc-skeleton variant="channel-card"></sc-skeleton>
+        <sc-skeleton variant="channel-card"></sc-skeleton>
+        <sc-skeleton variant="channel-card"></sc-skeleton>
+      </div>
+    `;
+  }
+
+  private _renderContent(): TemplateResult {
     return html`
       ${this.error
         ? html`<sc-empty-state
@@ -175,19 +199,21 @@ export class ScChannelsView extends GatewayAwareLitElement {
           ></sc-empty-state>`
         : nothing}
       <div class="grid sc-stagger">
-        ${this.channels.length === 0
+        ${this.filteredChannels.length === 0
           ? html`
               <div class="grid-full">
                 <sc-empty-state
                   .icon=${icons.radio}
-                  heading="No channels configured"
-                  description="Configure messaging channels to receive and send messages."
+                  heading=${this.filter.trim() ? "No matching channels" : "No channels configured"}
+                  description=${this.filter.trim()
+                    ? "Try a different search term."
+                    : "Configure messaging channels to receive and send messages."}
                 ></sc-empty-state>
               </div>
             `
-          : this.channels.map(
+          : this.filteredChannels.map(
               (ch) => html`
-                <sc-card hoverable style="position: relative; overflow: hidden;">
+                <sc-card hoverable class="channel-card">
                   ${this.dotClass(ch) !== "unconfigured"
                     ? html`<div class="card-accent ${this.dotClass(ch)}" aria-hidden="true"></div>`
                     : nothing}
@@ -211,6 +237,23 @@ export class ScChannelsView extends GatewayAwareLitElement {
               `,
             )}
       </div>
+    `;
+  }
+
+  override render() {
+    if (this.loading) {
+      return this._renderSkeleton();
+    }
+
+    return html`
+      <div class="search-wrap">
+        <sc-search
+          placeholder="Search channels..."
+          @sc-search=${(e: CustomEvent<{ value: string }>) => (this.filter = e.detail.value)}
+          @sc-clear=${() => (this.filter = "")}
+        ></sc-search>
+      </div>
+      ${this._renderContent()}
     `;
   }
 }
