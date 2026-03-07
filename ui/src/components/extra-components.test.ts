@@ -2248,6 +2248,12 @@ describe("sc-chart", () => {
     expect(el.horizontal).toBe(false);
   });
 
+  it("should accept horizontal property", () => {
+    const el = document.createElement("sc-chart") as any;
+    el.horizontal = true;
+    expect(el.horizontal).toBe(true);
+  });
+
   it("should render a canvas when data has entries", async () => {
     const el = document.createElement("sc-chart") as any;
     el.type = "bar";

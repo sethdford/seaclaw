@@ -141,6 +141,11 @@ export class ScChart extends LitElement {
 
     const Chart = ChartModule.default;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const cs = getComputedStyle(this);
+    const fontFamily = cs.getPropertyValue("--sc-font").trim() || "Avenir, system-ui, sans-serif";
+    const textMuted = cs.getPropertyValue("--sc-text-muted").trim() || "hsl(207 24% 47%)";
+    const borderSubtle =
+      cs.getPropertyValue("--sc-border-subtle").trim() || "rgba(255,255,255,0.06)";
 
     const chartType = this.type === "area" ? "line" : this.type;
     const config = {
@@ -158,10 +163,8 @@ export class ScChart extends LitElement {
         plugins: {
           legend: {
             labels: {
-              font: { family: "var(--sc-font)" },
-              color:
-                getComputedStyle(this).getPropertyValue("--sc-text-muted").trim() ||
-                "hsl(207 24% 47%)",
+              font: { family: fontFamily },
+              color: textMuted,
             },
           },
         },
@@ -169,29 +172,17 @@ export class ScChart extends LitElement {
           chartType !== "doughnut"
             ? {
                 x: {
-                  grid: {
-                    color:
-                      getComputedStyle(this).getPropertyValue("--sc-border-subtle").trim() ||
-                      "rgba(255,255,255,0.06)",
-                  },
+                  grid: { color: borderSubtle },
                   ticks: {
-                    font: { family: "var(--sc-font)" },
-                    color:
-                      getComputedStyle(this).getPropertyValue("--sc-text-muted").trim() ||
-                      "hsl(207 24% 47%)",
+                    font: { family: fontFamily },
+                    color: textMuted,
                   },
                 },
                 y: {
-                  grid: {
-                    color:
-                      getComputedStyle(this).getPropertyValue("--sc-border-subtle").trim() ||
-                      "rgba(255,255,255,0.06)",
-                  },
+                  grid: { color: borderSubtle },
                   ticks: {
-                    font: { family: "var(--sc-font)" },
-                    color:
-                      getComputedStyle(this).getPropertyValue("--sc-text-muted").trim() ||
-                      "hsl(207 24% 47%)",
+                    font: { family: fontFamily },
+                    color: textMuted,
                   },
                 },
               }
