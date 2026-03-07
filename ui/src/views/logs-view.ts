@@ -10,9 +10,10 @@ import "../components/sc-input.js";
 import "../components/sc-button.js";
 import "../components/sc-empty-state.js";
 import "../components/sc-card.js";
-import "../components/sc-json-viewer.js";
 import "../components/sc-segmented-control.js";
 import "../components/sc-badge.js";
+import "../components/sc-timeline.js";
+import type { TimelineItem } from "../components/sc-timeline.js";
 
 interface LogEntry {
   ts: string;
@@ -152,76 +153,6 @@ export class ScLogsView extends GatewayAwareLitElement {
     .log-area::-webkit-scrollbar-thumb:hover {
       background: var(--sc-text-muted);
     }
-    .log-timeline {
-      display: flex;
-      flex-direction: column;
-      position: relative;
-    }
-    .log-entry {
-      display: grid;
-      grid-template-columns: 12px 1fr;
-      gap: var(--sc-space-md);
-      padding-bottom: var(--sc-space-md);
-      position: relative;
-      word-break: break-word;
-      animation: sc-slide-up var(--sc-duration-normal) var(--sc-ease-out) both;
-    }
-    .log-entry .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: var(--sc-radius-full);
-      margin-top: 6px;
-      flex-shrink: 0;
-      justify-self: center;
-    }
-    .log-entry .dot.debug {
-      background: var(--sc-text-muted);
-    }
-    .log-entry .dot.info {
-      background: var(--sc-info);
-    }
-    .log-entry .dot.warn {
-      background: var(--sc-accent-secondary);
-    }
-    .log-entry .dot.error {
-      background: var(--sc-error);
-    }
-    .log-entry .dot.success {
-      background: var(--sc-success);
-    }
-    .log-entry .line {
-      position: absolute;
-      left: 5px;
-      top: 16px;
-      bottom: 0;
-      width: 1px;
-      background: var(--sc-border-subtle);
-    }
-    .log-entry:last-child .line {
-      display: none;
-    }
-    .log-entry-header {
-      display: flex;
-      align-items: center;
-      gap: var(--sc-space-sm);
-      margin-bottom: var(--sc-space-xs);
-    }
-    .log-ts {
-      color: var(--sc-text-faint);
-      font-variant-numeric: tabular-nums;
-      font-size: var(--sc-text-xs);
-    }
-    .event {
-      font-weight: var(--sc-weight-semibold);
-    }
-    .json-wrapper {
-      margin-top: var(--sc-space-xs);
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .log-entry {
-        animation: none;
-      }
-    }
     @media (max-width: 768px) /* --sc-breakpoint-lg */ {
       .header {
         flex-wrap: wrap;
@@ -311,23 +242,8 @@ export class ScLogsView extends GatewayAwareLitElement {
     this.requestUpdate();
   }
 
-  private eventClass(event: string): string {
-    switch (event) {
-      case EVENT_NAMES.CHAT:
-        return "chat";
-      case EVENT_NAMES.TOOL_CALL:
-        return "tool-call";
-      case EVENT_NAMES.ERROR:
-        return "error";
-      case EVENT_NAMES.HEALTH:
-        return "health";
-      default:
-        return "";
-    }
-  }
-
-  /** Severity for timeline dot: debug=gray, info=blue, warn=amber, error=red, success=green */
-  private dotStatus(event: string): "debug" | "info" | "warn" | "error" | "success" {
+  /** Map log event to sc-timeline status */
+  private timelineStatus(event: string): TimelineItem["status"] {
     switch (event) {
       case EVENT_NAMES.CHAT:
         return "success";
@@ -336,10 +252,22 @@ export class ScLogsView extends GatewayAwareLitElement {
       case EVENT_NAMES.ERROR:
         return "error";
       case EVENT_NAMES.HEALTH:
-        return "warn";
+        return "pending";
       default:
-        return "debug";
+        return "pending";
     }
+  }
+
+  private toTimelineItems(entries: LogEntry[]): TimelineItem[] {
+    return entries.map((l) => {
+      const payloadStr = Object.keys(l.payload).length > 0 ? JSON.stringify(l.payload) : undefined;
+      return {
+        time: formatRelativeTime(l.ts),
+        message: `[${l.event}]`,
+        status: this.timelineStatus(l.event),
+        detail: payloadStr,
+      };
+    });
   }
 
   private scrollToBottom(): void {
@@ -416,6 +344,7 @@ export class ScLogsView extends GatewayAwareLitElement {
   private _renderLogArea(): ReturnType<typeof html> {
     const entries = this.filteredLogs;
     void this._relativeTimeKey;
+    const timelineItems = this.toTimelineItems(entries);
     return html`
       <div class="sc-stagger">
         <sc-card class="log-card" glass>
@@ -430,33 +359,10 @@ export class ScLogsView extends GatewayAwareLitElement {
                     ></sc-empty-state>
                   `
                 : html`
-                    <div class="log-timeline">
-                      ${entries.map(
-                        (l, i) => html`
-                          <div class="log-entry" style="animation-delay: ${i * 50}ms">
-                            <div class="dot ${this.dotStatus(l.event)}" aria-hidden="true"></div>
-                            <div class="line" aria-hidden="true"></div>
-                            <div class="content">
-                              <div class="log-entry-header">
-                                <span
-                                  class="log-ts"
-                                  title=${l.ts}
-                                  aria-label=${`Timestamp: ${l.ts}`}
-                                  >${formatRelativeTime(l.ts)}</span
-                                >
-                                <span class="event ${this.eventClass(l.event)}">[${l.event}]</span>
-                              </div>
-                              <div class="json-wrapper">
-                                <sc-json-viewer
-                                  .data=${l.payload}
-                                  expandedDepth=${1}
-                                ></sc-json-viewer>
-                              </div>
-                            </div>
-                          </div>
-                        `,
-                      )}
-                    </div>
+                    <sc-timeline
+                      .items=${timelineItems}
+                      .max=${Math.max(entries.length, 10000)}
+                    ></sc-timeline>
                   `}
             </div>
           </div>

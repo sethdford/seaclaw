@@ -70,7 +70,7 @@ export class ScChatBubble extends LitElement {
         var(--sc-accent-hover)
       );
       color: var(--sc-on-accent-text, var(--sc-on-accent));
-      border-radius: 20px 20px 6px 20px;
+      border-radius: var(--sc-radius-xl) var(--sc-radius-xl) var(--sc-radius-sm) var(--sc-radius-xl);
       animation: sc-bubble-send var(--sc-duration-fast) var(--sc-ease-out) both;
     }
 

@@ -51,6 +51,16 @@ export class ScNodesView extends GatewayAwareLitElement {
       gap: var(--sc-space-md);
       margin-bottom: var(--sc-space-2xl);
     }
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
+      .stats-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
+    }
     .header-actions {
       display: flex;
       align-items: center;
@@ -202,7 +212,7 @@ export class ScNodesView extends GatewayAwareLitElement {
             ["ok", "healthy", "connected", "online"].includes((n.status ?? "").toLowerCase()),
           ).length}
           label="Healthy"
-          style="--sc-stagger-delay: 80ms"
+          style="--sc-stagger-delay: 50ms"
         ></sc-stat-card>
       </div>
       <div class="header-actions">

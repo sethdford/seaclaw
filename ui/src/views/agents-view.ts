@@ -65,10 +65,10 @@ export class ScAgentsView extends GatewayAwareLitElement {
       color: var(--sc-text-muted);
     }
 
-    .metrics {
+    .stats-row {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: var(--sc-space-lg);
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: var(--sc-space-md);
       margin-bottom: var(--sc-space-2xl);
     }
 
@@ -121,13 +121,6 @@ export class ScAgentsView extends GatewayAwareLitElement {
       color: var(--sc-text);
     }
 
-    .skeleton-metrics {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: var(--sc-space-lg);
-      margin-bottom: var(--sc-space-2xl);
-    }
-
     .skeleton-sessions {
       margin-bottom: var(--sc-space-2xl);
     }
@@ -142,7 +135,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
       }
     }
 
-    @media (max-width: 480px) {
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
       .metrics,
       .skeleton-metrics {
         grid-template-columns: 1fr;
@@ -308,13 +301,13 @@ export class ScAgentsView extends GatewayAwareLitElement {
     ];
 
     return html`
-      <div class="metrics">
+      <div class="stats-row">
         ${metrics.map(
           (m, i) => html`
             <sc-stat-card
               .value=${m.value}
               .label=${m.label}
-              style="--sc-stagger-delay: ${i * 80}ms"
+              style="--sc-stagger-delay: ${i * 50}ms"
             ></sc-stat-card>
           `,
         )}
@@ -401,12 +394,11 @@ export class ScAgentsView extends GatewayAwareLitElement {
 
   private _renderSkeleton() {
     return html`
-      <sc-skeleton variant="card" height="90px"></sc-skeleton>
-      <div class="skeleton-metrics">
-        <sc-skeleton variant="stat-card"></sc-skeleton>
-        <sc-skeleton variant="stat-card"></sc-skeleton>
-        <sc-skeleton variant="stat-card"></sc-skeleton>
-        <sc-skeleton variant="stat-card"></sc-skeleton>
+      <div class="stats-row">
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
       </div>
       <sc-skeleton variant="card" height="160px" class="skeleton-sessions"></sc-skeleton>
       <sc-skeleton variant="card" height="100px"></sc-skeleton>

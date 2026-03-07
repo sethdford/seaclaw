@@ -67,13 +67,13 @@ export class ScUsageView extends GatewayAwareLitElement {
     }
     .stats-row {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: var(--sc-space-md);
       margin-bottom: var(--sc-space-2xl);
     }
     @media (max-width: 640px) /* --sc-breakpoint-md */ {
       .stats-row {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: 1fr 1fr;
       }
     }
     @media (max-width: 480px) /* --sc-breakpoint-sm */ {
@@ -268,7 +268,7 @@ export class ScUsageView extends GatewayAwareLitElement {
 
   private _renderSkeleton() {
     return html`
-      <div class="stats-row sc-stagger">
+      <div class="stats-row">
         <sc-skeleton variant="card" height="90px"></sc-skeleton>
         <sc-skeleton variant="card" height="90px"></sc-skeleton>
         <sc-skeleton variant="card" height="90px"></sc-skeleton>
@@ -402,12 +402,12 @@ export class ScUsageView extends GatewayAwareLitElement {
           .value=${dailyCost}
           label="Cost Today"
           prefix="$"
-          style="--sc-stagger-delay: 80ms"
+          style="--sc-stagger-delay: 50ms"
         ></sc-stat-card>
         <sc-stat-card
           .value=${requestCount}
           label="Requests"
-          style="--sc-stagger-delay: 160ms"
+          style="--sc-stagger-delay: 100ms"
         ></sc-stat-card>
       </div>
 

@@ -42,6 +42,16 @@ export class ScChannelsView extends GatewayAwareLitElement {
       gap: var(--sc-space-md);
       margin-bottom: var(--sc-space-2xl);
     }
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
+      .stats-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
+    }
     .filters {
       margin-bottom: var(--sc-space-lg);
     }
@@ -200,12 +210,12 @@ export class ScChannelsView extends GatewayAwareLitElement {
         <sc-stat-card
           .value=${this.channels.filter((ch) => ch.configured === true).length}
           label="Configured"
-          style="--sc-stagger-delay: 80ms"
+          style="--sc-stagger-delay: 50ms"
         ></sc-stat-card>
         <sc-stat-card
           .value=${this.channels.filter((ch) => ch.healthy === true).length}
           label="Healthy"
-          style="--sc-stagger-delay: 160ms"
+          style="--sc-stagger-delay: 100ms"
         ></sc-stat-card>
       </div>
       ${this.error

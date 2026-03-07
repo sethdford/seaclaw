@@ -296,7 +296,7 @@ export class ScDataTableV2 extends LitElement {
       margin-top: var(--sc-space-md);
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
       .table-wrap table {
         display: none;
       }
@@ -336,7 +336,7 @@ export class ScDataTableV2 extends LitElement {
       }
     }
 
-    @media (min-width: 641px) {
+    @media (min-width: 641px) /* --sc-breakpoint-md */ {
       .cards {
         display: none;
       }

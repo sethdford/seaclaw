@@ -32,6 +32,16 @@ export class ScToolsView extends GatewayAwareLitElement {
       gap: var(--sc-space-md);
       margin-bottom: var(--sc-space-2xl);
     }
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
+      .stats-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
+    }
     .table-section {
       margin-top: var(--sc-space-xl);
     }
@@ -125,7 +135,7 @@ export class ScToolsView extends GatewayAwareLitElement {
       <sc-page-hero>
         <sc-section-header heading="Tools" description="Loading..."></sc-section-header>
       </sc-page-hero>
-      <div class="stats-row sc-stagger">
+      <div class="stats-row">
         <sc-skeleton variant="card" height="90px"></sc-skeleton>
         <sc-skeleton variant="card" height="90px"></sc-skeleton>
         <sc-skeleton variant="card" height="90px"></sc-skeleton>
@@ -161,12 +171,12 @@ export class ScToolsView extends GatewayAwareLitElement {
             return Array.isArray(p) ? p.length > 0 : Object.keys(p as object).length > 0;
           }).length}
           label="With Parameters"
-          style="--sc-stagger-delay: 80ms"
+          style="--sc-stagger-delay: 50ms"
         ></sc-stat-card>
         <sc-stat-card
           .value=${rows.reduce((sum, r) => sum + (Number(r.paramsCount) || 0), 0)}
           label="Total Parameters"
-          style="--sc-stagger-delay: 160ms"
+          style="--sc-stagger-delay: 100ms"
         ></sc-stat-card>
       </div>
       ${this.error

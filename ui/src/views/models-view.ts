@@ -58,6 +58,16 @@ export class ScModelsView extends GatewayAwareLitElement {
       gap: var(--sc-space-md);
       margin-bottom: var(--sc-space-2xl);
     }
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
+      .stats-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
+    }
     .info-section {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -306,17 +316,17 @@ export class ScModelsView extends GatewayAwareLitElement {
         <sc-stat-card
           .value=${this.providers.filter((p) => p.has_key).length}
           label="Configured"
-          style="--sc-stagger-delay: 80ms"
+          style="--sc-stagger-delay: 50ms"
         ></sc-stat-card>
         <sc-stat-card
           .value=${this.providers.filter((p) => p.native_tools).length}
           label="Native Tools"
-          style="--sc-stagger-delay: 160ms"
+          style="--sc-stagger-delay: 100ms"
         ></sc-stat-card>
         <sc-stat-card
           .value=${this.usageByProvider.length}
           label="Usage Providers"
-          style="--sc-stagger-delay: 240ms"
+          style="--sc-stagger-delay: 150ms"
         ></sc-stat-card>
       </div>
       ${this.error
@@ -340,11 +350,11 @@ export class ScModelsView extends GatewayAwareLitElement {
           description="AI model providers and their configurations"
         ></sc-section-header>
       </sc-page-hero>
-      <div class="stats-row sc-stagger">
-        <sc-skeleton variant="card" height="90px"></sc-skeleton>
-        <sc-skeleton variant="card" height="90px"></sc-skeleton>
-        <sc-skeleton variant="card" height="90px"></sc-skeleton>
-        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+      <div class="stats-row">
+        <sc-skeleton variant="card" height="90px" style="--sc-stagger-delay: 0ms"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px" style="--sc-stagger-delay: 50ms"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px" style="--sc-stagger-delay: 100ms"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px" style="--sc-stagger-delay: 150ms"></sc-skeleton>
       </div>
       <div class="info-section sc-stagger">
         <sc-skeleton variant="card" height="80px"></sc-skeleton>

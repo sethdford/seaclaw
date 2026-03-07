@@ -57,9 +57,9 @@ export class ScSkillsView extends GatewayAwareLitElement {
     }
     .stats-row {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: var(--sc-space-md);
-      margin-bottom: var(--sc-space-xl);
+      margin-bottom: var(--sc-space-2xl);
     }
     .toolbar {
       display: flex;
@@ -279,17 +279,22 @@ export class ScSkillsView extends GatewayAwareLitElement {
       margin-bottom: var(--sc-space-lg);
       max-width: 400px;
     }
-    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
-      .skills-grid {
-        grid-template-columns: 1fr 1fr;
-      }
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
       .stats-row {
         grid-template-columns: 1fr 1fr;
       }
     }
     @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
       .skills-grid {
         grid-template-columns: 1fr;
+      }
+    }
+    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
+      .skills-grid {
+        grid-template-columns: 1fr 1fr;
       }
     }
     @media (prefers-reduced-motion: reduce) {
@@ -533,11 +538,31 @@ export class ScSkillsView extends GatewayAwareLitElement {
 
   private _renderStats(): TemplateResult {
     const c = this.statusCounts;
-    return html`<div class="stats-row sc-stagger">
-      <sc-stat-card label="Installed" .value=${c.total} accent="primary"></sc-stat-card>
-      <sc-stat-card label="Enabled" .value=${c.enabled} accent="secondary"></sc-stat-card>
-      <sc-stat-card label="Disabled" .value=${c.disabled} accent="tertiary"></sc-stat-card>
-      <sc-stat-card label="Registry" .value=${c.registry} accent="primary"></sc-stat-card>
+    return html`<div class="stats-row">
+      <sc-stat-card
+        label="Installed"
+        .value=${c.total}
+        accent="primary"
+        style="--sc-stagger-delay: 0ms"
+      ></sc-stat-card>
+      <sc-stat-card
+        label="Enabled"
+        .value=${c.enabled}
+        accent="secondary"
+        style="--sc-stagger-delay: 50ms"
+      ></sc-stat-card>
+      <sc-stat-card
+        label="Disabled"
+        .value=${c.disabled}
+        accent="tertiary"
+        style="--sc-stagger-delay: 100ms"
+      ></sc-stat-card>
+      <sc-stat-card
+        label="Registry"
+        .value=${c.registry}
+        accent="primary"
+        style="--sc-stagger-delay: 150ms"
+      ></sc-stat-card>
     </div>`;
   }
 

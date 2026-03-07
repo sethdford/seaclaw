@@ -97,9 +97,9 @@ function handleRequest(method: string, _params?: Record<string, unknown>): unkno
         features: { methods: [], sessions: true, cron: true, skills: true, cost_tracking: true },
       };
     case "health":
-      return { status: "operational" };
+      return { status: "operational", uptime_secs: 172800 };
     case "capabilities":
-      return { version: "0.42.0", tools: 53, channels: 20, providers: 50 };
+      return { version: "0.42.0", tools: 53, channels: 20, providers: 50, peak_rss_mb: 5.9 };
     case "channels.status":
       return { channels: DEMO_CHANNELS };
     case "sessions.list":

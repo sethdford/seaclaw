@@ -111,6 +111,16 @@ export class ScMessageActions extends LitElement {
       });
   }
 
+  private _onEdit(): void {
+    this.dispatchEvent(
+      new CustomEvent("sc-edit", {
+        bubbles: true,
+        composed: true,
+        detail: { content: this.content, index: this.index },
+      }),
+    );
+  }
+
   private _onRetry(): void {
     this.dispatchEvent(
       new CustomEvent("sc-retry", {
@@ -144,6 +154,15 @@ export class ScMessageActions extends LitElement {
       </button>
       ${this.role === "user"
         ? html`
+            <button
+              type="button"
+              class="action-btn"
+              aria-label="Edit"
+              title="Edit"
+              @click=${this._onEdit}
+            >
+              ${icons["pencil-simple"]}
+            </button>
             <button
               type="button"
               class="action-btn"

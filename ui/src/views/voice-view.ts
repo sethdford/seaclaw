@@ -11,6 +11,9 @@ import { ScToast } from "../components/sc-toast.js";
 import "../components/sc-button.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-message-thread.js";
+import "../components/sc-page-hero.js";
+import "../components/sc-section-header.js";
+import "../components/sc-stat-card.js";
 
 type VoiceStatus = "idle" | "listening" | "processing" | "unsupported";
 
@@ -40,88 +43,23 @@ export class ScVoiceView extends GatewayAwareLitElement {
       overflow: hidden;
     }
 
-    /* ── Hero zone ────────────────────────────────────── */
-
-    .hero {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: var(--sc-space-md);
-      padding: var(--sc-space-md) var(--sc-space-lg);
-      margin-bottom: var(--sc-space-md);
-      background-image: var(--sc-hero-gradient);
-      border-radius: var(--sc-radius-lg);
-      border: 1px solid var(--sc-border-subtle, var(--sc-border));
-      flex-shrink: 0;
-    }
-
-    .hero-left {
-      display: flex;
-      align-items: center;
-      gap: var(--sc-space-lg);
-      min-width: 0;
-    }
-
-    .hero-title {
-      margin: 0;
-      font-size: var(--sc-text-lg);
-      font-weight: var(--sc-weight-bold, 700);
-      letter-spacing: -0.02em;
-      color: var(--sc-text);
-      line-height: 1.2;
-    }
-
-    .hero-meta {
-      display: flex;
-      align-items: center;
-      gap: var(--sc-space-sm);
-      font-size: var(--sc-text-xs);
-      color: var(--sc-text-muted);
-    }
-
-    .status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .status-dot.connected {
-      background: var(--sc-success);
-      box-shadow: 0 0 6px var(--sc-success);
-    }
-
-    .status-dot.disconnected {
-      background: var(--sc-error);
-    }
-
-    .status-dot.connecting {
-      background: var(--sc-warning);
-      animation: sc-status-pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes sc-status-pulse {
-      0%,
-      100% {
-        box-shadow: 0 0 4px var(--sc-warning);
-      }
-      50% {
-        box-shadow: 0 0 12px var(--sc-warning);
-      }
-    }
-
-    .hero-actions {
-      display: flex;
-      align-items: center;
-      gap: var(--sc-space-sm);
-    }
+    /* ── Stats row ────────────────────────────────────── */
 
     .stats-row {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: var(--sc-space-md);
-      margin-bottom: var(--sc-space-lg);
+      margin-bottom: var(--sc-space-2xl);
+    }
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
+      .stats-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
     }
 
     .staleness {
@@ -887,27 +825,12 @@ export class ScVoiceView extends GatewayAwareLitElement {
   }
 
   private _renderHero() {
-    const statusLabel =
-      this._connectionStatus === "connected"
-        ? "Connected"
-        : this._connectionStatus === "connecting"
-          ? "Reconnecting\u2026"
-          : "Disconnected";
-    const durationLabel =
-      this._sessionStartTs != null ? this._formatDuration(this._sessionDurationSec) : "0:00";
-    const subtitle = `${statusLabel} · ${durationLabel} · Session ${this._sessionCount}`;
     return html`
-      <div class="hero">
-        <div class="hero-left">
-          <span class="status-dot ${this._connectionStatus}" aria-hidden="true"></span>
-          <div>
-            <h2 class="hero-title">Voice Assistant</h2>
-            <div class="hero-meta">
-              <span>${subtitle}</span>
-            </div>
-          </div>
-        </div>
-        <div class="hero-actions">
+      <sc-page-hero>
+        <sc-section-header
+          heading="Voice"
+          description="Voice assistant with speech recognition and real-time conversation"
+        >
           <span class="staleness">${this.stalenessLabel}</span>
           <sc-button
             variant="ghost"
@@ -929,7 +852,25 @@ export class ScVoiceView extends GatewayAwareLitElement {
           <sc-button size="sm" @click=${() => this.load()} aria-label="Refresh data">
             Refresh
           </sc-button>
-        </div>
+        </sc-section-header>
+      </sc-page-hero>
+      <div class="stats-row">
+        <sc-stat-card
+          .value=${this._messages.length}
+          label="Messages"
+          style="--sc-stagger-delay: 0ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this._sessionDurationSec}
+          label="Duration"
+          suffix="s"
+          style="--sc-stagger-delay: 50ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this._sessionCount}
+          label="Sessions"
+          style="--sc-stagger-delay: 100ms"
+        ></sc-stat-card>
       </div>
     `;
   }

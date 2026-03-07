@@ -7,6 +7,8 @@ import { icons } from "../icons.js";
 @customElement("sc-stat-card")
 export class ScStatCard extends LitElement {
   @property({ type: Number }) value = 0;
+  /** When set, renders this string instead of animated number (e.g. "2d 0h", "5.9 MB") */
+  @property({ type: String }) valueStr = "";
   @property({ type: String }) label = "";
   @property({ type: String }) trend = "";
   @property({ type: String }) trendDirection: "up" | "down" | "flat" = "flat";
@@ -127,11 +129,15 @@ export class ScStatCard extends LitElement {
               `
             : nothing}
           <div class="value">
-            <sc-animated-number
-              .value=${this.value}
-              .prefix=${this.prefix}
-              .suffix=${this.suffix}
-            ></sc-animated-number>
+            ${this.valueStr
+              ? html`${this.prefix}${this.valueStr}${this.suffix}`
+              : html`
+                  <sc-animated-number
+                    .value=${this.value}
+                    .prefix=${this.prefix}
+                    .suffix=${this.suffix}
+                  ></sc-animated-number>
+                `}
           </div>
           <div class="label">${this.label}</div>
           ${this.progress >= 0

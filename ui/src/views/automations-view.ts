@@ -137,9 +137,9 @@ export class ScAutomationsView extends GatewayAwareLitElement {
 
     .stats-row {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: var(--sc-space-md);
-      margin-bottom: var(--sc-space-xl);
+      margin-bottom: var(--sc-space-2xl);
     }
 
     .job-list {
@@ -299,6 +299,11 @@ export class ScAutomationsView extends GatewayAwareLitElement {
     @media (max-width: 640px) /* --sc-breakpoint-md */ {
       .stats-row {
         grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+      .stats-row {
+        grid-template-columns: 1fr;
       }
     }
 
@@ -662,19 +667,19 @@ export class ScAutomationsView extends GatewayAwareLitElement {
           .value=${this.activeCount}
           label="Active"
           accent="primary"
-          style="--sc-stagger-delay: 80ms"
+          style="--sc-stagger-delay: 50ms"
         ></sc-stat-card>
         <sc-stat-card
           .value=${this.pausedCount}
           label="Paused"
           accent="secondary"
-          style="--sc-stagger-delay: 160ms"
+          style="--sc-stagger-delay: 100ms"
         ></sc-stat-card>
         <sc-stat-card
           .value=${this.failedCount}
           label="Failed"
           accent="error"
-          style="--sc-stagger-delay: 240ms"
+          style="--sc-stagger-delay: 150ms"
         ></sc-stat-card>
       </div>
       <sc-metric-row
@@ -701,6 +706,12 @@ export class ScAutomationsView extends GatewayAwareLitElement {
 
   private _renderSkeleton() {
     return html`
+      <div class="stats-row">
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+        <sc-skeleton variant="card" height="90px"></sc-skeleton>
+      </div>
       <div class="job-list">
         <sc-skeleton variant="card" height="160px"></sc-skeleton>
         <sc-skeleton variant="card" height="160px"></sc-skeleton>

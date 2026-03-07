@@ -50,10 +50,9 @@ test.describe("Chat View", () => {
     await expect(messagesArea).toBeAttached({ timeout: 5000 });
   });
 
-  test("sc-message-stream component is available", async ({ page }) => {
-    // Verify the component is registered by checking customElements
+  test("sc-message-thread component is available", async ({ page }) => {
     const registered = await page.evaluate(() => {
-      return customElements.get("sc-message-stream") !== undefined;
+      return customElements.get("sc-message-thread") !== undefined;
     });
     expect(registered).toBe(true);
   });

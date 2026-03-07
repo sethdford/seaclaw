@@ -15,6 +15,10 @@
 #include <string.h>
 #include <time.h>
 
+#if defined(__APPLE__) && defined(__MACH__) && defined(SC_ENABLE_SQLITE) && !defined(SC_IS_TEST)
+#include <sqlite3.h>
+#endif
+
 #if !defined(_WIN32) && !defined(__CYGWIN__)
 #include <errno.h>
 #include <signal.h>
@@ -293,6 +297,349 @@ static void service_signal_handler(int sig) {
 
 /* ── Streaming callback for channels with send_event ─────────────────────── */
 
+/* ---- iMessage conversation history loader ---- */
+
+#if defined(__APPLE__) && defined(__MACH__) && defined(SC_ENABLE_SQLITE) && !defined(SC_IS_TEST)
+static char *load_imessage_context(sc_allocator_t *alloc, const char *handle, size_t *out_len) {
+    *out_len = 0;
+    const char *home = getenv("HOME");
+    if (!home)
+        return NULL;
+
+    char db_path[512];
+    int n = snprintf(db_path, sizeof(db_path), "%s/Library/Messages/chat.db", home);
+    if (n < 0 || (size_t)n >= sizeof(db_path))
+        return NULL;
+
+    sqlite3 *db = NULL;
+    if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
+        if (db)
+            sqlite3_close(db);
+        return NULL;
+    }
+
+    const char *sql = "SELECT m.is_from_me, m.text, "
+                      "  datetime(m.date/1000000000 + 978307200, 'unixepoch', 'localtime') as ts "
+                      "FROM message m "
+                      "JOIN handle h ON m.handle_id = h.ROWID "
+                      "WHERE h.id = ?1 AND m.associated_message_type = 0 "
+                      "ORDER BY m.date DESC LIMIT 25";
+
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        sqlite3_close(db);
+        return NULL;
+    }
+    sqlite3_bind_text(stmt, 1, handle, -1, NULL);
+
+    typedef struct {
+        int from_me;
+        char text[512];
+        char ts[32];
+    } msg_row_t;
+    msg_row_t rows[25];
+    size_t row_count = 0;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW && row_count < 25) {
+        rows[row_count].from_me = sqlite3_column_int(stmt, 0);
+        const char *txt = (const char *)sqlite3_column_text(stmt, 1);
+        const char *ts = (const char *)sqlite3_column_text(stmt, 2);
+        if (txt && strlen(txt) > 0) {
+            size_t tlen = strlen(txt);
+            if (tlen >= sizeof(rows[0].text))
+                tlen = sizeof(rows[0].text) - 1;
+            memcpy(rows[row_count].text, txt, tlen);
+            rows[row_count].text[tlen] = '\0';
+        } else if (rows[row_count].from_me) {
+            snprintf(rows[row_count].text, sizeof(rows[0].text), "[you replied]");
+        } else {
+            snprintf(rows[row_count].text, sizeof(rows[0].text), "[image or attachment]");
+        }
+        if (ts) {
+            size_t tslen = strlen(ts);
+            if (tslen >= sizeof(rows[0].ts))
+                tslen = sizeof(rows[0].ts) - 1;
+            memcpy(rows[row_count].ts, ts, tslen);
+            rows[row_count].ts[tslen] = '\0';
+        } else {
+            rows[row_count].ts[0] = '\0';
+        }
+        row_count++;
+    }
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    if (row_count == 0)
+        return NULL;
+
+    size_t buf_cap = 16384;
+    char *buf = (char *)alloc->alloc(alloc->ctx, buf_cap);
+    if (!buf)
+        return NULL;
+
+    size_t pos = 0;
+    int w = snprintf(buf + pos, buf_cap - pos, "\n--- Recent conversation thread ---\n");
+    if (w > 0)
+        pos += (size_t)w;
+
+    for (size_t i = row_count; i > 0; i--) {
+        msg_row_t *r = &rows[i - 1];
+        const char *who = r->from_me ? "You" : "Them";
+        w = snprintf(buf + pos, buf_cap - pos, "[%s] %s: %s\n", r->ts, who, r->text);
+        if (w > 0 && pos + (size_t)w < buf_cap)
+            pos += (size_t)w;
+    }
+
+    w = snprintf(buf + pos, buf_cap - pos, "--- End of recent thread ---\n\n");
+    if (w > 0)
+        pos += (size_t)w;
+
+    /*
+     * Analyze conversation state: extract emotional tone, active topics,
+     * and relationship dynamics from the thread. This gives the model
+     * structured awareness beyond raw messages.
+     */
+    {
+        /* Detect if last message from them was emotional */
+        bool they_seem_frustrated = false;
+        bool they_seem_excited = false;
+        bool they_seem_sad = false;
+        bool open_question = false;
+        bool they_sent_link = false;
+        bool logistics_thread = false;
+        const char *last_them_msg = NULL;
+
+        for (size_t i = 0; i < row_count; i++) {
+            /* rows[0] is most recent */
+            if (!rows[i].from_me) {
+                if (!last_them_msg)
+                    last_them_msg = rows[i].text;
+                char *t = rows[i].text;
+                size_t tl = strlen(t);
+                for (size_t j = 0; j < tl; j++) {
+                    if (t[j] == '?' && !rows[i].from_me)
+                        open_question = true;
+                    if (t[j] == '!' && tl > 3)
+                        they_seem_excited = true;
+                }
+                /* Check for frustration words */
+                for (size_t j = 0; j + 3 < tl; j++) {
+                    char a = t[j];
+                    if (a >= 'A' && a <= 'Z')
+                        a += 32;
+                    char b = t[j + 1];
+                    if (b >= 'A' && b <= 'Z')
+                        b += 32;
+                    char c = t[j + 2];
+                    if (c >= 'A' && c <= 'Z')
+                        c += 32;
+                    char d = t[j + 3];
+                    if (d >= 'A' && d <= 'Z')
+                        d += 32;
+                    if (a == 'd' && b == 'a' && c == 'm' && d == 'n')
+                        they_seem_frustrated = true;
+                    if (a == 'u' && b == 'g' && c == 'h')
+                        they_seem_frustrated = true;
+                }
+                /* Check for link */
+                for (size_t j = 0; j + 4 < tl; j++) {
+                    if (memcmp(t + j, "http", 4) == 0)
+                        they_sent_link = true;
+                }
+            }
+            /* Check for logistics keywords */
+            char *t2 = rows[i].text;
+            size_t t2l = strlen(t2);
+            for (size_t j = 0; j + 5 < t2l; j++) {
+                char lo[6];
+                for (int k = 0; k < 5; k++) {
+                    lo[k] = t2[j + k];
+                    if (lo[k] >= 'A' && lo[k] <= 'Z')
+                        lo[k] += 32;
+                }
+                lo[5] = 0;
+                if (strcmp(lo, "fligh") == 0 || strcmp(lo, "airpo") == 0 ||
+                    strcmp(lo, "leavi") == 0 || strcmp(lo, "booke") == 0 ||
+                    strcmp(lo, "arriv") == 0 || strcmp(lo, "monda") == 0 ||
+                    strcmp(lo, "frida") == 0)
+                    logistics_thread = true;
+            }
+        }
+
+        /* Build situational awareness block */
+        w = snprintf(buf + pos, buf_cap - pos, "--- Conversation awareness ---\n");
+        if (w > 0)
+            pos += (size_t)w;
+
+        if (they_seem_frustrated) {
+            w = snprintf(buf + pos, buf_cap - pos,
+                         "They seem frustrated. Be calm, acknowledge it, don't be dismissive.\n");
+            if (w > 0)
+                pos += (size_t)w;
+        }
+        if (they_seem_excited) {
+            w = snprintf(buf + pos, buf_cap - pos,
+                         "They seem excited about something. Be genuinely happy for them.\n");
+            if (w > 0)
+                pos += (size_t)w;
+        }
+        if (they_seem_sad) {
+            w = snprintf(
+                buf + pos, buf_cap - pos,
+                "They seem sad or down. Be present and gentle. Don't try to fix it immediately.\n");
+            if (w > 0)
+                pos += (size_t)w;
+        }
+        if (open_question) {
+            w = snprintf(buf + pos, buf_cap - pos,
+                         "They asked a question. Make sure you actually answer it.\n");
+            if (w > 0)
+                pos += (size_t)w;
+        }
+        if (they_sent_link) {
+            w = snprintf(
+                buf + pos, buf_cap - pos,
+                "They shared a link. Acknowledge it, say you'll look at it, or comment on it.\n");
+            if (w > 0)
+                pos += (size_t)w;
+        }
+        if (logistics_thread) {
+            w = snprintf(
+                buf + pos, buf_cap - pos,
+                "There's an active logistics/travel thread. Stay on topic with specifics.\n");
+            if (w > 0)
+                pos += (size_t)w;
+        }
+
+        w = snprintf(buf + pos, buf_cap - pos,
+                     "\nUse this context naturally. Reference specific details they mentioned. "
+                     "Do NOT summarize or acknowledge this context aloud.\n");
+        if (w > 0)
+            pos += (size_t)w;
+    }
+
+    buf[pos] = '\0';
+    *out_len = pos;
+    return buf;
+}
+#endif
+
+/* ---- Response Decision Engine ---- */
+
+/*
+ * Classify a message and decide whether/how to respond.
+ * Returns:
+ *   0 = RESPOND normally (generate full response)
+ *   1 = SKIP (don't respond at all — message doesn't warrant a reply)
+ *   2 = DELAY (respond, but with extra delay — thoughtful/emotional content)
+ *
+ * Also sets *delay_extra_ms to additional delay beyond the base reading delay.
+ */
+#if !defined(SC_IS_TEST)
+static int classify_response_action(const char *msg, size_t msg_len, unsigned int *delay_extra_ms) {
+    *delay_extra_ms = 0;
+
+    if (msg_len == 0)
+        return 1; /* skip empty */
+
+    /* Messages that don't warrant a response */
+    static const char *skip_patterns[] = {"lol",   "haha",    "hahaha",     "lmao",     "ok",
+                                          "okay",  "k",       "nice",       "cool",     "ya",
+                                          "yep",   "yup",     "mhm",        "hmm",      "Liked",
+                                          "Loved", "Laughed", "Emphasized", "Disliked", NULL};
+
+    /* Normalize: strip whitespace and compare lowercase */
+    char norm[64];
+    size_t ni = 0;
+    for (size_t i = 0; i < msg_len && ni < sizeof(norm) - 1; i++) {
+        char c = msg[i];
+        if (c >= 'A' && c <= 'Z')
+            c += 32;
+        if (c != ' ' && c != '\n' && c != '\r')
+            norm[ni++] = c;
+    }
+    norm[ni] = '\0';
+
+    for (int i = 0; skip_patterns[i]; i++) {
+        if (strcmp(norm, skip_patterns[i]) == 0)
+            return 1; /* skip */
+    }
+
+    /* Single emoji or very short non-text messages */
+    if (msg_len <= 2)
+        return 1; /* skip */
+
+    /* URL-only messages: respond briefly, quick timing */
+    {
+        bool has_url = false;
+        for (size_t i = 0; i + 4 < msg_len; i++) {
+            if (memcmp(msg + i, "http", 4) == 0) {
+                has_url = true;
+                break;
+            }
+        }
+        if (has_url) {
+            /* Check if there's meaningful text beyond the URL */
+            size_t non_url_chars = 0;
+            bool in_url = false;
+            for (size_t i = 0; i < msg_len; i++) {
+                if (!in_url && i + 4 < msg_len && memcmp(msg + i, "http", 4) == 0)
+                    in_url = true;
+                if (in_url && (msg[i] == ' ' || msg[i] == '\n'))
+                    in_url = false;
+                if (!in_url && msg[i] != ' ' && msg[i] != '\n')
+                    non_url_chars++;
+            }
+            if (non_url_chars < 5) {
+                /* URL with minimal text — brief acknowledgment, short delay */
+                *delay_extra_ms = 3000;
+                return 0;
+            }
+        }
+    }
+
+    /* Emotional/important messages deserve a thoughtful delay */
+    static const char *emotional_markers[] = {
+        "miss",    "love",     "hurt",   "stress",    "depress",   "lonely",     "scared",
+        "worried", "sorry",    "afraid", "giving up", "feel like", "don't know", "can't",
+        "help me", "need you", "cry",    "sad",       NULL};
+
+    for (int i = 0; emotional_markers[i]; i++) {
+        const char *marker = emotional_markers[i];
+        size_t mlen = strlen(marker);
+        for (size_t j = 0; j + mlen <= msg_len; j++) {
+            bool match = true;
+            for (size_t k = 0; k < mlen; k++) {
+                char a = msg[j + k];
+                char b = marker[k];
+                if (a >= 'A' && a <= 'Z')
+                    a += 32;
+                if (a != b) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                *delay_extra_ms = 8000; /* 8 extra seconds for emotional */
+                return 2;               /* delayed response */
+            }
+        }
+    }
+
+    /* Question messages: normal response, moderate delay */
+    for (size_t i = 0; i < msg_len; i++) {
+        if (msg[i] == '?') {
+            *delay_extra_ms = 2000;
+            return 0;
+        }
+    }
+
+    /* Default: respond normally */
+    *delay_extra_ms = 0;
+    return 0;
+}
+#endif
+
 /* ── Service loop ──────────────────────────────────────────────────────── */
 
 sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
@@ -415,12 +762,35 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                     continue;
 
 #ifndef SC_IS_TEST
-                /* Reading delay: humans take time to read before responding */
+                /* Response decision: should we respond? How long to wait? */
+                unsigned int extra_delay_ms = 0;
+                int action = classify_response_action(combined, combined_len, &extra_delay_ms);
+                if (action == 1) {
+                    /* SKIP: message doesn't warrant a response (lol, ok, tapback, etc.) */
+                    fprintf(stderr, "[seaclaw] skipping message (no response needed): %.*s\n",
+                            (int)(combined_len > 40 ? 40 : combined_len), combined);
+                    /* Still persist the message for history */
+                    if (agent->session_store && agent->session_store->vtable &&
+                        agent->session_store->vtable->save_message) {
+                        for (size_t b = batch_start; b <= batch_end; b++) {
+                            size_t blen = strlen(msgs[b].content);
+                            if (blen > 0)
+                                agent->session_store->vtable->save_message(
+                                    agent->session_store->ctx, batch_key, key_len, "user", 4,
+                                    msgs[b].content, blen);
+                        }
+                    }
+                    continue;
+                }
+                /* Adaptive timing based on message type */
                 {
                     size_t msg_count = batch_end - batch_start + 1;
                     unsigned int read_ms = 2500 + (unsigned int)(msg_count * 1500);
                     if (read_ms > 8000)
                         read_ms = 8000;
+                    read_ms += extra_delay_ms;
+                    if (read_ms > 15000)
+                        read_ms = 15000;
                     usleep(read_ms * 1000);
                 }
 #endif
@@ -515,8 +885,46 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 char *response = NULL;
                 size_t response_len = 0;
+
+                /* Temporarily inject iMessage conversation history as context */
+                char *saved_ci = agent->custom_instructions;
+                size_t saved_ci_len = agent->custom_instructions_len;
+                char *convo_ctx = NULL;
+                size_t convo_ctx_len = 0;
+
+#if defined(__APPLE__) && defined(__MACH__) && defined(SC_ENABLE_SQLITE) && !defined(SC_IS_TEST)
+                convo_ctx = load_imessage_context(alloc, batch_key, &convo_ctx_len);
+                if (convo_ctx && convo_ctx_len > 0) {
+                    size_t merged_len = convo_ctx_len + (saved_ci_len ? saved_ci_len + 1 : 0);
+                    char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
+                    if (merged) {
+                        size_t mpos = 0;
+                        if (saved_ci && saved_ci_len > 0) {
+                            memcpy(merged, saved_ci, saved_ci_len);
+                            mpos = saved_ci_len;
+                            merged[mpos++] = '\n';
+                        }
+                        memcpy(merged + mpos, convo_ctx, convo_ctx_len);
+                        mpos += convo_ctx_len;
+                        merged[mpos] = '\0';
+                        agent->custom_instructions = merged;
+                        agent->custom_instructions_len = mpos;
+                    }
+                }
+#endif
+
                 sc_error_t err =
                     sc_agent_turn(agent, combined, combined_len, &response, &response_len);
+
+                /* Restore original custom_instructions */
+                if (convo_ctx) {
+                    if (agent->custom_instructions != saved_ci)
+                        alloc->free(alloc->ctx, agent->custom_instructions,
+                                    agent->custom_instructions_len + 1);
+                    agent->custom_instructions = saved_ci;
+                    agent->custom_instructions_len = saved_ci_len;
+                    alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                }
 
                 /* Persist each individual message + the single response */
                 if (agent->session_store && agent->session_store->vtable &&

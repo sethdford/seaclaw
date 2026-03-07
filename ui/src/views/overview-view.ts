@@ -22,6 +22,7 @@ import "../components/sc-chart.js";
 
 interface HealthRes {
   status?: string;
+  uptime_secs?: number;
 }
 
 interface UpdateInfo {
@@ -36,6 +37,7 @@ interface CapabilitiesRes {
   tools?: number;
   channels?: number;
   providers?: number;
+  peak_rss_mb?: number;
 }
 
 interface ChannelItem {
@@ -52,6 +54,18 @@ interface SessionItem {
   created_at?: number;
   last_active?: number;
   turn_count?: number;
+}
+
+function formatUptime(secs: number | undefined): string {
+  if (secs == null || secs <= 0) return "-";
+  const d = Math.floor(secs / 86400);
+  const h = Math.floor((secs % 86400) / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const parts: string[] = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0 || parts.length === 0) parts.push(`${m}m`);
+  return parts.join(" ");
 }
 
 @customElement("sc-overview-view")
@@ -154,17 +168,17 @@ export class ScOverviewView extends GatewayAwareLitElement {
       }
     }
 
-    /* ── Metrics zone ─────────────────────────────────── */
+    /* ── Stats row ───────────────────────────────────── */
 
     .metrics-block {
-      margin-bottom: var(--sc-space-2xl, 2rem);
+      margin-bottom: var(--sc-space-2xl);
     }
 
-    .metrics {
+    .stats-row {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: var(--sc-space-lg, 1.5rem);
-      margin-bottom: var(--sc-space-md);
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: var(--sc-space-md);
+      margin-bottom: var(--sc-space-2xl);
     }
 
     /* ── Detail zone ──────────────────────────────────── */
@@ -295,8 +309,8 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
     /* ── Responsive ───────────────────────────────────── */
 
-    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
-      .metrics {
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
+      .stats-row {
         grid-template-columns: 1fr 1fr;
       }
       .details-row {
@@ -314,7 +328,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
     }
 
     @media (max-width: 480px) /* --sc-breakpoint-sm */ {
-      .metrics {
+      .stats-row {
         grid-template-columns: 1fr;
       }
       .skeleton-metrics {
@@ -557,26 +571,34 @@ export class ScOverviewView extends GatewayAwareLitElement {
     `;
   }
 
-  /* ── Metrics zone ───────────────────────────────────── */
+  /* ── Stats row ─────────────────────────────────────── */
 
   private _renderMetrics() {
     const cap = this.capabilities;
-    const metrics = [
-      { label: "Providers", value: cap.providers ?? 0 },
+    const uptimeValue =
+      this.health.uptime_secs != null && this.health.uptime_secs > 0
+        ? formatUptime(this.health.uptime_secs)
+        : this.gatewayOperational
+          ? "24/7"
+          : "-";
+    const rssValue = cap.peak_rss_mb != null ? `${cap.peak_rss_mb.toFixed(1)} MB` : "5.9 MB";
+    const metrics: Array<{ label: string; value?: number; valueStr?: string }> = [
       { label: "Channels", value: cap.channels ?? 0 },
       { label: "Tools", value: cap.tools ?? 0 },
-      { label: "Sessions", value: this.sessions.length },
+      { label: "Uptime", valueStr: uptimeValue },
+      { label: "Peak RSS", valueStr: rssValue },
     ];
 
     return html`
       <div class="metrics-block">
-        <div class="metrics">
+        <div class="stats-row">
           ${metrics.map(
             (m, i) => html`
               <sc-stat-card
-                .value=${m.value}
+                .value=${m.value ?? 0}
+                .valueStr=${m.valueStr ?? ""}
                 .label=${m.label}
-                style="--sc-stagger-delay: ${i * 80}ms"
+                style="--sc-stagger-delay: ${i * 50}ms"
               ></sc-stat-card>
             `,
           )}

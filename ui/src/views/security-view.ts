@@ -68,13 +68,18 @@ export class ScSecurityView extends GatewayAwareLitElement {
     }
     .stats-row {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: var(--sc-space-md);
-      margin-bottom: var(--sc-space-xl);
+      margin-bottom: var(--sc-space-2xl);
     }
     @media (max-width: 640px) /* --sc-breakpoint-md */ {
       .stats-row {
         grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+      .stats-row {
+        grid-template-columns: 1fr;
       }
     }
     .grid {
@@ -642,19 +647,19 @@ export class ScSecurityView extends GatewayAwareLitElement {
           .value=${this.pairingEnabled ? 1 : 0}
           label="Pairing"
           accent=${this.pairingEnabled ? "primary" : "error"}
-          style="--sc-stagger-delay: 80ms"
+          style="--sc-stagger-delay: 50ms"
         ></sc-stat-card>
         <sc-stat-card
           .value=${this.httpsOnly ? 1 : 0}
           label="HTTPS Only"
           accent=${this.httpsOnly ? "primary" : "error"}
-          style="--sc-stagger-delay: 160ms"
+          style="--sc-stagger-delay: 100ms"
         ></sc-stat-card>
         <sc-stat-card
           .value=${this.sandboxEnabled ? 1 : 0}
           label="Sandbox"
           accent=${this.sandboxEnabled ? "primary" : "error"}
-          style="--sc-stagger-delay: 240ms"
+          style="--sc-stagger-delay: 150ms"
         ></sc-stat-card>
       </div>
       <div class="grid">

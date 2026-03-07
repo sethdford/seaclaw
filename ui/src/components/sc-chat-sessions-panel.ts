@@ -28,6 +28,8 @@ export class ScChatSessionsPanel extends LitElement {
 
   static override styles = css`
     :host {
+      --_panel-width: 260px;
+      --_panel-width-expanded: 280px;
       display: block;
       width: 0;
       overflow: hidden;
@@ -36,11 +38,11 @@ export class ScChatSessionsPanel extends LitElement {
     }
 
     :host([open]) {
-      width: 260px;
+      width: var(--_panel-width);
     }
 
     .panel {
-      width: 260px;
+      width: var(--_panel-width);
       height: 100%;
       display: flex;
       flex-direction: column;
@@ -48,14 +50,14 @@ export class ScChatSessionsPanel extends LitElement {
       border-right: 1px solid var(--sc-border-subtle);
     }
 
-    @media (max-width: 768px) /* --sc-breakpoint-md */ {
+    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
       :host([open]) {
         position: fixed;
         left: 0;
         top: 0;
         bottom: 0;
         z-index: 20;
-        width: 280px;
+        width: var(--_panel-width-expanded);
       }
     }
 
@@ -183,7 +185,7 @@ export class ScChatSessionsPanel extends LitElement {
     }
 
     .session-item.active {
-      border-left-color: var(--sc-accent);
+      border-left-color: var(--sc-accent-subtle);
       background: color-mix(in srgb, var(--sc-accent) 8%, var(--sc-bg-surface));
     }
 
@@ -284,13 +286,6 @@ export class ScChatSessionsPanel extends LitElement {
       font-family: var(--sc-font);
     }
 
-    @media (prefers-reduced-transparency: reduce) {
-      .panel {
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        background: var(--sc-bg-surface);
-      }
-    }
     @media (prefers-reduced-motion: reduce) {
       :host {
         transition: none;
