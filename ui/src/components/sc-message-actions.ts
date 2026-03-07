@@ -1,5 +1,5 @@
 import { LitElement, html, css } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { icons } from "../icons.js";
 import { ScToast } from "./sc-toast.js";
 import "./sc-toast.js";
@@ -12,6 +12,8 @@ export class ScMessageActions extends LitElement {
 
   @property({ type: Number }) index = -1;
 
+  @state() private _copied = false;
+
   static override styles = css`
     :host {
       display: flex;
@@ -21,19 +23,14 @@ export class ScMessageActions extends LitElement {
       top: -28px;
       right: var(--sc-space-sm);
       padding: var(--sc-space-2xs) var(--sc-space-xs);
-      background: color-mix(
-        in srgb,
-        var(--sc-bg-surface) var(--sc-glass-standard-bg-opacity, 92%),
-        transparent
-      );
-      backdrop-filter: blur(var(--sc-glass-standard-blur, 24px))
-        saturate(var(--sc-glass-standard-saturate, 180%));
-      -webkit-backdrop-filter: blur(var(--sc-glass-standard-blur, 24px))
-        saturate(var(--sc-glass-standard-saturate, 180%));
+      background: color-mix(in srgb, var(--sc-bg-surface) 90%, transparent);
+      backdrop-filter: blur(16px) saturate(180%);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
       border: 1px solid var(--sc-border-subtle);
       border-radius: var(--sc-radius);
       box-shadow: var(--sc-shadow-sm);
       opacity: 0;
+      transform: translateY(-4px);
       transition:
         opacity var(--sc-duration-fast) var(--sc-ease-out),
         transform var(--sc-duration-fast) var(--sc-ease-out);
@@ -42,6 +39,7 @@ export class ScMessageActions extends LitElement {
 
     :host(:focus-within) {
       opacity: 1;
+      transform: translateY(0);
     }
 
     .action-btn {
@@ -71,6 +69,10 @@ export class ScMessageActions extends LitElement {
       outline-offset: 2px;
     }
 
+    .action-btn.copied {
+      color: var(--sc-success);
+    }
+
     .action-btn svg {
       width: 16px;
       height: 16px;
@@ -90,6 +92,10 @@ export class ScMessageActions extends LitElement {
     if (!this.content) return;
     navigator.clipboard?.writeText(this.content).catch(() => {});
     ScToast.show({ message: "Copied to clipboard", variant: "success" });
+    this._copied = true;
+    setTimeout(() => {
+      this._copied = false;
+    }, 1500);
     this.dispatchEvent(
       new CustomEvent("sc-copy", {
         bubbles: true,
@@ -121,12 +127,24 @@ export class ScMessageActions extends LitElement {
 
   override render() {
     return html`
-      <button type="button" class="action-btn" aria-label="Copy" @click=${this._onCopy}>
-        ${icons.copy}
+      <button
+        type="button"
+        class="action-btn ${this._copied ? "copied" : ""}"
+        aria-label="Copy"
+        title=${this._copied ? "Copied!" : "Copy"}
+        @click=${this._onCopy}
+      >
+        ${this._copied ? icons.check : icons.copy}
       </button>
       ${this.role === "user"
         ? html`
-            <button type="button" class="action-btn" aria-label="Retry" @click=${this._onRetry}>
+            <button
+              type="button"
+              class="action-btn"
+              aria-label="Retry"
+              title="Retry"
+              @click=${this._onRetry}
+            >
               ${icons["arrow-clockwise"]}
             </button>
           `
@@ -135,6 +153,7 @@ export class ScMessageActions extends LitElement {
               type="button"
               class="action-btn"
               aria-label="Regenerate"
+              title="Regenerate"
               @click=${this._onRegenerate}
             >
               ${icons.refresh}

@@ -67,6 +67,7 @@ export class ScMessageList extends LitElement {
     }
     .message:hover sc-message-actions {
       opacity: 1;
+      transform: translateY(0);
     }
     .message.user {
       align-self: flex-end;
