@@ -305,6 +305,8 @@ function handleRequest(method: string, _params?: Record<string, unknown>): unkno
           { id: "local", name: "Local", status: "healthy", uptime: 172800, version: "0.42.0" },
         ],
       };
+      case "nodes.action":
+        return { ok: true };
     case "cron.runs":
       return { runs: [] };
     case "cron.add":

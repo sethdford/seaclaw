@@ -162,7 +162,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
 
     /* ── Responsive ───────────────────────────────────── */
 
-    @media (max-width: 768px) {
+    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
       .metrics,
       .skeleton-metrics {
         grid-template-columns: repeat(2, 1fr);
@@ -172,7 +172,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
       }
     }
 
-    @media (max-width: 480px) {
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
       .metrics,
       .skeleton-metrics {
         grid-template-columns: 1fr;

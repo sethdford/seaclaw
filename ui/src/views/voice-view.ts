@@ -175,21 +175,14 @@ export class ScVoiceView extends GatewayAwareLitElement {
       border-radius: 50%;
       border: 2px solid var(--sc-border);
       background: var(--sc-bg-surface);
-      background-image: linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.08) 0%,
-        rgba(0, 0, 0, 0.04) 100%
-      );
+      background-image: var(--sc-surface-gradient);
       color: var(--sc-text-muted);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
-      box-shadow:
-        var(--sc-shadow-card),
-        inset 0 1px 0 rgba(255, 255, 255, 0.15),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+      box-shadow: var(--sc-shadow-card);
       transition:
         background var(--sc-duration-fast) var(--sc-ease-out),
         border-color var(--sc-duration-fast) var(--sc-ease-out),
@@ -200,17 +193,14 @@ export class ScVoiceView extends GatewayAwareLitElement {
     .mic-btn svg {
       width: 2.5rem;
       height: 2.5rem;
-      filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
+      filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--sc-text) 10%, transparent));
     }
 
     .mic-btn:hover:not(:disabled) {
       background: var(--sc-bg-elevated);
       border-color: var(--sc-accent);
       color: var(--sc-accent-text, var(--sc-accent));
-      box-shadow:
-        var(--sc-shadow-md),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+      box-shadow: var(--sc-shadow-md);
       transform: translateY(-2px);
     }
 
@@ -230,17 +220,10 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     .mic-btn.active {
       background: var(--sc-accent);
-      background-image: linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.25) 0%,
-        rgba(0, 0, 0, 0.12) 100%
-      );
+      background-image: var(--sc-button-gradient-primary);
       border-color: var(--sc-accent);
-      color: var(--sc-on-accent, #fff);
-      box-shadow:
-        0 4px 20px rgba(122, 182, 72, 0.35),
-        inset 0 1px 0 rgba(255, 255, 255, 0.3),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+      color: var(--sc-on-accent);
+      box-shadow: var(--sc-shadow-glow-accent);
       transform: translateY(-1px);
     }
 
@@ -302,16 +285,11 @@ export class ScVoiceView extends GatewayAwareLitElement {
       align-items: flex-end;
       padding: var(--sc-space-md);
       background: var(--sc-bg-surface);
-      background-image: var(
-        --sc-surface-gradient,
-        linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%)
-      );
+      background-image: var(--sc-surface-gradient);
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius-lg);
       margin-bottom: var(--sc-space-xl);
-      box-shadow:
-        var(--sc-shadow-card),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      box-shadow: var(--sc-shadow-card);
       backdrop-filter: blur(var(--sc-glass-subtle-blur, 12px));
       -webkit-backdrop-filter: blur(var(--sc-glass-subtle-blur, 12px));
     }
@@ -349,21 +327,14 @@ export class ScVoiceView extends GatewayAwareLitElement {
       padding: var(--sc-space-sm) var(--sc-space-lg);
       min-height: 44px;
       background: var(--sc-accent);
-      background-image: linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.2) 0%,
-        rgba(0, 0, 0, 0.1) 100%
-      );
+      background-image: var(--sc-button-gradient-primary);
       color: var(--sc-on-accent, var(--sc-bg));
       border: none;
       border-radius: var(--sc-radius);
       font-weight: var(--sc-weight-semibold, 600);
       cursor: pointer;
       font-size: var(--sc-text-base);
-      box-shadow:
-        0 2px 8px rgba(122, 182, 72, 0.2),
-        inset 0 1px 0 rgba(255, 255, 255, 0.25),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+      box-shadow: var(--sc-shadow-glow-accent);
       transition:
         background var(--sc-duration-fast) var(--sc-ease-out),
         box-shadow var(--sc-duration-fast) var(--sc-ease-out),
@@ -372,23 +343,14 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     .send-btn:hover:not(:disabled) {
       background: var(--sc-accent-hover);
-      background-image: linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.25) 0%,
-        rgba(0, 0, 0, 0.08) 100%
-      );
-      box-shadow:
-        0 4px 16px rgba(122, 182, 72, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.3),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+      background-image: var(--sc-button-gradient-primary);
+      box-shadow: var(--sc-shadow-glow-accent);
       transform: translateY(-1px);
     }
 
     .send-btn:active:not(:disabled) {
       transform: translateY(1px) scaleY(0.97) scaleX(1.01);
-      box-shadow:
-        0 1px 4px rgba(122, 182, 72, 0.2),
-        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      box-shadow: var(--sc-shadow-sm);
     }
 
     .send-btn:disabled {
@@ -424,13 +386,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius-lg);
       background: var(--sc-bg-surface);
-      background-image: var(
-        --sc-surface-gradient,
-        linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%)
-      );
-      box-shadow:
-        var(--sc-shadow-card),
-        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      background-image: var(--sc-surface-gradient);
+      box-shadow: var(--sc-shadow-card);
       scroll-behavior: smooth;
     }
 
@@ -450,27 +407,19 @@ export class ScVoiceView extends GatewayAwareLitElement {
     .msg.user {
       align-self: flex-end;
       background: var(--sc-accent);
-      background-image: linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.15) 0%,
-        rgba(0, 0, 0, 0.08) 100%
-      );
+      background-image: var(--sc-button-gradient-primary);
       color: var(--sc-on-accent, var(--sc-bg));
-      box-shadow:
-        0 2px 8px rgba(122, 182, 72, 0.18),
-        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      box-shadow: var(--sc-shadow-glow-accent);
       border-bottom-right-radius: var(--sc-radius-sm, 4px);
     }
 
     .msg.assistant {
       align-self: flex-start;
       background: var(--sc-bg-elevated);
-      background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, transparent 100%);
+      background-image: var(--sc-surface-gradient);
       border: 1px solid var(--sc-border);
       color: var(--sc-text);
-      box-shadow:
-        var(--sc-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05)),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      box-shadow: var(--sc-shadow-sm);
       border-bottom-left-radius: var(--sc-radius-sm, 4px);
     }
 
@@ -538,7 +487,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     /* ── Responsive ───────────────────────────────────── */
 
-    @media (max-width: 480px) {
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
       :host {
         max-width: 100%;
         padding: var(--sc-space-md);
@@ -559,7 +508,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
         animation: none !important;
       }
       .mic-btn.active {
-        box-shadow: 0 0 0 6px var(--sc-accent-subtle);
+        box-shadow: var(--sc-shadow-glow-accent);
       }
     }
   `;

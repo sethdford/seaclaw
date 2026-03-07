@@ -250,7 +250,7 @@ export class ScApp extends LitElement {
       display: none;
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
       .layout {
         grid-template-columns: 1fr;
         grid-template-rows: 1fr auto;
@@ -312,8 +312,8 @@ export class ScApp extends LitElement {
       inset: 0;
       z-index: 9998;
       background: color-mix(in srgb, var(--sc-bg) 40%, transparent);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(var(--sc-blur-sm, 4px));
+      -webkit-backdrop-filter: blur(var(--sc-blur-sm, 4px));
     }
     .more-sheet {
       position: fixed;
@@ -339,10 +339,10 @@ export class ScApp extends LitElement {
       }
     }
     .more-sheet-handle {
-      width: 36px;
-      height: 4px;
+      width: var(--sc-space-2xl, 36px);
+      height: var(--sc-space-2xs, 4px);
       background: var(--sc-border);
-      border-radius: 2px;
+      border-radius: var(--sc-radius-sm, 2px);
       margin: 0 auto var(--sc-space-md);
     }
     .more-sheet-grid {

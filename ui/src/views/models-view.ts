@@ -104,7 +104,7 @@ export class ScModelsView extends GatewayAwareLitElement {
     .info-card {
       margin-bottom: var(--sc-space-2xl);
     }
-    @media (max-width: 768px) {
+    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
       .grid {
         grid-template-columns: 1fr 1fr;
       }
@@ -112,7 +112,7 @@ export class ScModelsView extends GatewayAwareLitElement {
     .search-wrap {
       margin-bottom: var(--sc-space-xl);
     }
-    @media (max-width: 480px) {
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
       .grid {
         grid-template-columns: 1fr;
       }

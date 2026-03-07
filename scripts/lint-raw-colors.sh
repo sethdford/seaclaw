@@ -36,7 +36,7 @@ while IFS= read -r file; do
     content=$(git show ":$file" 2>/dev/null) || continue
   fi
 
-  matches=$(printf '%s' "$content" | grep -nE '#[0-9a-fA-F]{3,8}[^0-9a-fA-F]' \
+  matches=$(printf '%s' "$content" | grep -nE '#[0-9a-fA-F]{3,8}([^0-9a-zA-Z_-]|$)' \
     | grep -vE '^[0-9]+:[[:space:]]*//' \
     | grep -vE '^[0-9]+:[[:space:]]*\*' \
     | grep -vE '^[0-9]+:[[:space:]]*/\*' \
@@ -54,7 +54,7 @@ while IFS= read -r file; do
       -e 's/linear-gradient\(#[0-9a-fA-F]{3,8}[^)]*\)//g' \
       -e 's/bg-\[#[0-9a-fA-F]{3,8}\]//g')
 
-    if printf '%s' "$cleaned" | grep -qE '#[0-9a-fA-F]{3,8}[^0-9a-fA-F]'; then
+    if printf '%s' "$cleaned" | grep -qE '#[0-9a-fA-F]{3,8}([^0-9a-zA-Z_-]|$)'; then
       echo "  $file:$lineno: raw hex color -- use a --sc-* token instead"
       echo "    $line"
       VIOLATIONS=$((VIOLATIONS + 1))

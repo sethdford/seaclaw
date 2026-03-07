@@ -122,12 +122,12 @@ export class ScChannelsView extends GatewayAwareLitElement {
         color-mix(in srgb, var(--sc-error) 40%, transparent)
       );
     }
-    @media (max-width: 768px) {
+    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
       .grid {
         grid-template-columns: 1fr 1fr;
       }
     }
-    @media (max-width: 480px) {
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
       .grid {
         grid-template-columns: 1fr;
       }

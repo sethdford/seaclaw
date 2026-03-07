@@ -87,7 +87,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
       gap: var(--sc-space-md);
       margin-bottom: var(--sc-space-xl);
     }
-    @media (max-width: 640px) {
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
       .stats-row {
         grid-template-columns: 1fr;
       }
@@ -379,7 +379,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
       display: none;
     }
 
-    @media (max-width: 48rem) {
+    @media (max-width: 48rem) /* --sc-breakpoint-lg */ {
       .layout {
         height: auto;
         min-height: calc(100dvh - 12rem);

@@ -263,7 +263,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
     /* ── Responsive ───────────────────────────────────── */
 
-    @media (max-width: 768px) {
+    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
       .metrics {
         grid-template-columns: 1fr 1fr;
       }
@@ -278,7 +278,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
       }
     }
 
-    @media (max-width: 480px) {
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
       .metrics {
         grid-template-columns: 1fr;
       }

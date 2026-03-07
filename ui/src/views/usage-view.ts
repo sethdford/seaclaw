@@ -34,7 +34,7 @@ export class ScUsageView extends GatewayAwareLitElement {
       gap: var(--sc-space-md);
       margin-bottom: var(--sc-space-xl);
     }
-    @media (max-width: 640px) {
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
       .stats-row {
         grid-template-columns: 1fr;
       }
@@ -100,7 +100,7 @@ export class ScUsageView extends GatewayAwareLitElement {
       border-radius: var(--sc-radius-sm);
       transition: width var(--sc-duration-normal) var(--sc-ease-out);
     }
-    @media (max-width: 768px) {
+    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
       .cards {
         grid-template-columns: 1fr 1fr;
       }
@@ -111,7 +111,7 @@ export class ScUsageView extends GatewayAwareLitElement {
         width: 100%;
       }
     }
-    @media (max-width: 480px) {
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
       .cards {
         grid-template-columns: 1fr;
       }

@@ -133,7 +133,7 @@ export class ScLogsView extends GatewayAwareLitElement {
       font-weight: var(--sc-weight-semibold);
       margin-right: var(--sc-space-sm);
     }
-    @media (max-width: 768px) {
+    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
       .header {
         flex-wrap: wrap;
       }
@@ -141,7 +141,7 @@ export class ScLogsView extends GatewayAwareLitElement {
         flex-wrap: wrap;
       }
     }
-    @media (max-width: 480px) {
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
       .filter-input {
         width: 100%;
       }

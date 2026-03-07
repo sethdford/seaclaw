@@ -175,7 +175,7 @@ export class ScConfigView extends GatewayAwareLitElement {
       border-color: var(--sc-accent);
       box-shadow: 0 0 0 3px var(--sc-accent-subtle);
     }
-    @media (max-width: 480px) {
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
       :host {
         max-width: 100%;
       }

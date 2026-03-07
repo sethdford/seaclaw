@@ -34,7 +34,7 @@ test.describe("Live Gateway E2E", () => {
     const sendBtn = chatView.locator(".send-btn");
     await sendBtn.click();
 
-    const assistantMsg = chatView.locator(".message.assistant").first();
+    const assistantMsg = chatView.locator("sc-message-list .message.assistant").first();
     await expect(assistantMsg).toBeVisible({ timeout: 30000 });
 
     const content = await assistantMsg.evaluate((el) => {
@@ -56,10 +56,10 @@ test.describe("Live Gateway E2E", () => {
     const sendBtn = chatView.locator(".send-btn");
     await sendBtn.click();
 
-    const thinkingOrStream = chatView.locator("sc-thinking, .message.assistant");
+    const thinkingOrStream = chatView.locator("sc-thinking, sc-message-list .message.assistant");
     await expect(thinkingOrStream.first()).toBeVisible({ timeout: 15000 });
 
-    const assistantMsg = chatView.locator(".message.assistant").first();
+    const assistantMsg = chatView.locator("sc-message-list .message.assistant").first();
     await expect(assistantMsg).toBeVisible({ timeout: 30000 });
   });
 
@@ -74,7 +74,7 @@ test.describe("Live Gateway E2E", () => {
 
     await textarea.fill("Remember this number: 42. Reply with just OK.");
     await sendBtn.click();
-    const firstReply = chatView.locator(".message.assistant").first();
+    const firstReply = chatView.locator("sc-message-list .message.assistant").first();
     await expect(firstReply).toBeVisible({ timeout: 30000 });
     await page.waitForTimeout(3000);
 
@@ -82,7 +82,7 @@ test.describe("Live Gateway E2E", () => {
     await sendBtn.click();
 
     await page.waitForTimeout(5000);
-    const replies = chatView.locator(".message.assistant");
+    const replies = chatView.locator("sc-message-list .message.assistant");
     const count = await replies.count();
     expect(count).toBeGreaterThanOrEqual(2);
     const lastReply = replies.nth(count - 1);
@@ -107,7 +107,7 @@ test.describe("Live Gateway E2E", () => {
     const sendBtn = chatView.locator(".send-btn");
     await sendBtn.click();
 
-    const assistantMsg = chatView.locator(".message.assistant").first();
+    const assistantMsg = chatView.locator("sc-message-list .message.assistant").first();
     await expect(assistantMsg).toBeVisible({ timeout: 30000 });
 
     await page.screenshot({

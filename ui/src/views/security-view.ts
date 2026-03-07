@@ -3,7 +3,6 @@ import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import { ScToast } from "../components/sc-toast.js";
-import "../components/sc-toast.js";
 import "../components/sc-page-hero.js";
 import "../components/sc-section-header.js";
 import "../components/sc-stat-card.js";
@@ -58,7 +57,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
       gap: var(--sc-space-md);
       margin-bottom: var(--sc-space-xl);
     }
-    @media (max-width: 640px) {
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
       .stats-row {
         grid-template-columns: 1fr;
       }
@@ -173,12 +172,12 @@ export class ScSecurityView extends GatewayAwareLitElement {
     .check-icon.warn {
       color: var(--sc-warning);
     }
-    @media (max-width: 768px) {
+    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
       .grid {
         grid-template-columns: 1fr 1fr;
       }
     }
-    @media (max-width: 480px) {
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
       .grid {
         grid-template-columns: 1fr;
       }

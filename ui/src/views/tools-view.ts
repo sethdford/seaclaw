@@ -80,12 +80,12 @@ export class ScToolsView extends GatewayAwareLitElement {
       max-height: 6rem;
       overflow: auto;
     }
-    @media (max-width: 640px) {
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
       .stats-row {
         grid-template-columns: 1fr;
       }
     }
-    @media (max-width: 768px) {
+    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
       .grid {
         grid-template-columns: 1fr 1fr;
       }
@@ -93,7 +93,7 @@ export class ScToolsView extends GatewayAwareLitElement {
         max-width: 100%;
       }
     }
-    @media (max-width: 480px) {
+    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
       .grid {
         grid-template-columns: 1fr;
       }

@@ -288,7 +288,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
       border-radius: var(--sc-radius);
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 640px) /* --sc-breakpoint-md */ {
       .stats-row {
         grid-template-columns: 1fr 1fr;
       }

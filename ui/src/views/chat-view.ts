@@ -8,9 +8,8 @@ import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import { ScToast } from "../components/sc-toast.js";
 import { ChatController, type ChatItem, type GatewayLike } from "../controllers/chat-controller.js";
-import "../components/sc-chat-composer.js";
-import "../components/sc-message-thread.js";
-import "../components/sc-tapback-menu.js";
+import "../components/sc-composer.js";
+import "../components/sc-message-list.js";
 import "../components/sc-chat-search.js";
 import "../components/sc-chat-sessions-panel.js";
 import "../components/sc-context-menu.js";
@@ -22,25 +21,34 @@ export class ScChatView extends GatewayAwareLitElement {
       display: flex;
       flex-direction: column;
       height: 100%;
-      max-height: calc(100vh - 120px);
+      overflow: hidden;
     }
     .main-wrap {
       display: flex;
-      flex-direction: row;
       flex: 1;
-      min-width: 0;
-      position: relative;
-      width: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+    sc-chat-sessions-panel {
+      flex-shrink: 0;
+      height: 100%;
     }
     .container {
       display: flex;
       flex-direction: column;
       flex: 1;
+      min-width: 0;
       height: 100%;
-      max-width: 720px;
-      margin: 0 auto;
       position: relative;
+    }
+    .content-wrap {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      max-width: 800px;
       width: 100%;
+      margin: 0 auto;
     }
     .status-bar {
       display: flex;
@@ -50,21 +58,24 @@ export class ScChatView extends GatewayAwareLitElement {
       font-size: var(--sc-text-xs);
       color: var(--sc-text-muted);
       background: color-mix(in srgb, var(--sc-bg-surface) 60%, transparent);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(var(--sc-glass-subtle-blur, 12px));
+      -webkit-backdrop-filter: blur(var(--sc-glass-subtle-blur, 12px));
       border-bottom: 1px solid var(--sc-border-subtle);
     }
+
     .status-left,
     .status-right {
       display: flex;
       align-items: center;
       gap: var(--sc-space-sm);
     }
+
     .status-title {
       font-weight: var(--sc-weight-medium);
       color: var(--sc-text);
       font-size: var(--sc-text-sm);
     }
+
     .kbd-hint {
       display: inline-flex;
       align-items: center;
@@ -78,8 +89,8 @@ export class ScChatView extends GatewayAwareLitElement {
       line-height: 1;
     }
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: var(--sc-space-sm, 8px);
+      height: var(--sc-space-sm, 8px);
       border-radius: 50%;
     }
     .status-dot.connected {
@@ -114,7 +125,7 @@ export class ScChatView extends GatewayAwareLitElement {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: var(--sc-space-md);
+      padding: var(--sc-space-md) var(--sc-space-md);
       background: var(--sc-error-dim);
       border: 1px solid var(--sc-error);
       border-radius: var(--sc-radius);
@@ -128,11 +139,11 @@ export class ScChatView extends GatewayAwareLitElement {
       cursor: pointer;
       display: flex;
       align-items: center;
-      padding: 4px;
+      padding: var(--sc-space-2xs, 4px);
     }
     .error-banner button svg {
-      width: 16px;
-      height: 16px;
+      width: var(--sc-icon-sm, 16px);
+      height: var(--sc-icon-sm, 16px);
       line-height: 1;
     }
     .sessions-toggle {
@@ -154,8 +165,8 @@ export class ScChatView extends GatewayAwareLitElement {
       border-color: var(--sc-text-muted);
     }
     .sessions-toggle svg {
-      width: 18px;
-      height: 18px;
+      width: var(--sc-icon-sm, 18px);
+      height: var(--sc-icon-sm, 18px);
     }
     @media (prefers-reduced-motion: reduce) {
       .status-dot.connecting {
@@ -165,6 +176,7 @@ export class ScChatView extends GatewayAwareLitElement {
   `;
 
   @property() sessionKey = "default";
+
   private chat = new ChatController(this, () => this.gateway as GatewayLike | null);
 
   @state() private inputValue = "";
@@ -180,20 +192,7 @@ export class ScChatView extends GatewayAwareLitElement {
   } = { open: false, x: 0, y: 0, items: [] };
   @state() private _sessionsPanelOpen = false;
   @state() private _sessions: ChatSession[] = [];
-  @state() private _tapback: {
-    open: boolean;
-    x: number;
-    y: number;
-    index: number;
-    content: string;
-  } = {
-    open: false,
-    x: 0,
-    y: 0,
-    index: -1,
-    content: "",
-  };
-  @query("sc-message-thread") private _messageThread!: HTMLElement & {
+  @query("sc-message-list") private _messageList!: HTMLElement & {
     scrollToBottom: () => void;
     scrollToItem: (idx: number) => void;
   };
@@ -215,7 +214,9 @@ export class ScChatView extends GatewayAwareLitElement {
     if (!q) return [];
     const indices: number[] = [];
     this.chat.items.forEach((item, idx) => {
-      if (item.type === "message" && item.content.toLowerCase().includes(q)) indices.push(idx);
+      if (item.type === "message" && item.content.toLowerCase().includes(q)) {
+        indices.push(idx);
+      }
     });
     return indices;
   }
@@ -223,7 +224,8 @@ export class ScChatView extends GatewayAwareLitElement {
   private _scrollToMatch(matchIndex: number): void {
     const indices = this._getSearchMatchIndices();
     if (matchIndex < 0 || matchIndex >= indices.length) return;
-    this._messageThread?.scrollToItem(indices[matchIndex]);
+    const itemIdx = indices[matchIndex];
+    this._messageList?.scrollToItem(itemIdx);
   }
 
   override firstUpdated(): void {
@@ -279,12 +281,14 @@ export class ScChatView extends GatewayAwareLitElement {
     const detail = ev.detail as { event?: string; payload?: Record<string, unknown> };
     if (!detail?.event) return;
     const payload = detail.payload ?? {};
+
     if (detail.event === "health") {
       this.requestUpdate();
       return;
     }
+
     this.chat.handleEvent(detail.event, payload, this.sessionKey);
-    this._messageThread?.scrollToBottom();
+    this._messageList?.scrollToBottom();
   }
 
   private async _retry(): Promise<void> {
@@ -294,7 +298,7 @@ export class ScChatView extends GatewayAwareLitElement {
       const msg = err instanceof Error ? err.message : "Failed to send message";
       ScToast.show({ message: msg, variant: "error" });
     }
-    this._messageThread?.scrollToBottom();
+    this._messageList?.scrollToBottom();
   }
 
   private _copyMessage(item: Extract<ChatItem, { type: "message" }>): void {
@@ -315,7 +319,11 @@ export class ScChatView extends GatewayAwareLitElement {
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "Copy message", icon: icons.copy, action: () => this._copyMessage(item) },
+        {
+          label: "Copy message",
+          icon: icons.copy,
+          action: () => this._copyMessage(item),
+        },
         {
           label: "Retry",
           icon: icons["arrow-clockwise"],
@@ -360,11 +368,13 @@ export class ScChatView extends GatewayAwareLitElement {
           {
             type: "message",
             role: "user",
-            content: `\u{1F4CE} ${f.name} (${(f.size / 1024).toFixed(1)} KB)`,
+            content: `📎 ${f.name} (${(f.size / 1024).toFixed(1)} KB)`,
             ts: Date.now(),
           },
         ];
-        if (f.dataUrl) attachments.push({ name: f.name, type: f.type, data: f.dataUrl });
+        if (f.dataUrl) {
+          attachments.push({ name: f.name, type: f.type, data: f.dataUrl });
+        }
       }
       this.chat.cacheMessages(this.sessionKey);
       this.requestUpdate();
@@ -379,26 +389,44 @@ export class ScChatView extends GatewayAwareLitElement {
       const msg = err instanceof Error ? err.message : "Failed to send message";
       ScToast.show({ message: msg, variant: "error" });
     }
-    this._messageThread?.scrollToBottom();
+    this._messageList?.scrollToBottom();
   }
 
   private _onSessionSelect(e: CustomEvent<{ id: string }>): void {
+    const id = e.detail.id;
     this.dispatchEvent(
-      new CustomEvent("navigate", { bubbles: true, composed: true, detail: `chat:${e.detail.id}` }),
+      new CustomEvent("navigate", {
+        bubbles: true,
+        composed: true,
+        detail: `chat:${id}`,
+      }),
     );
   }
+
   private _onSessionNew(): void {
     this.dispatchEvent(
-      new CustomEvent("navigate", { bubbles: true, composed: true, detail: "chat:default" }),
+      new CustomEvent("navigate", {
+        bubbles: true,
+        composed: true,
+        detail: "chat:default",
+      }),
     );
   }
+
   private _onSessionDelete(e: CustomEvent<{ id: string }>): void {
-    this._sessions = this._sessions.filter((s) => s.id !== e.detail.id);
-    if (this.sessionKey === e.detail.id)
+    const id = e.detail.id;
+    this._sessions = this._sessions.filter((s) => s.id !== id);
+    if (this.sessionKey === id) {
       this.dispatchEvent(
-        new CustomEvent("navigate", { bubbles: true, composed: true, detail: "chat:default" }),
+        new CustomEvent("navigate", {
+          bubbles: true,
+          composed: true,
+          detail: "chat:default",
+        }),
       );
+    }
   }
+
   private async _onSessionRename(e: CustomEvent<{ id: string; title: string }>): Promise<void> {
     const { id, title } = e.detail;
     const gw = this.gateway;
@@ -406,29 +434,10 @@ export class ScChatView extends GatewayAwareLitElement {
       try {
         await gw.request("sessions.patch", { key: id, label: title });
         this._sessions = this._sessions.map((s) => (s.id === id ? { ...s, title } : s));
-      } catch {}
+      } catch {
+        /* ignore */
+      }
     }
-  }
-
-  private _handleSlashCommand(command: string): void {
-    if (command === "/export") this._handleExport();
-    else if (command === "/clear") {
-      this.chat.items = [];
-      this.chat.cacheMessages(this.sessionKey);
-    }
-  }
-
-  private _handleExport(): void {
-    const md = this.chat.exportAsMarkdown?.() ?? "";
-    if (!md) return;
-    const blob = new Blob([md], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `chat-${this.sessionKey}-${new Date().toISOString().slice(0, 10)}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-    ScToast.show({ message: "Conversation exported", variant: "success" });
   }
 
   override render() {
@@ -448,75 +457,54 @@ export class ScChatView extends GatewayAwareLitElement {
         ></sc-chat-sessions-panel>
         <div class="container">
           ${this._renderStatusBar()} ${this._renderErrorBanner()} ${this._renderSearch()}
-          <sc-message-thread
-            .items=${this.chat.items}
-            .isWaiting=${this.chat.isWaiting}
-            .streamElapsed=${this.chat.streamElapsed}
-            .historyLoading=${this.chat.historyLoading}
-            @sc-context-menu=${(e: CustomEvent<{ event: MouseEvent; item: ChatItem }>) =>
-              this._onMessageContextMenu(e.detail.event, e.detail.item)}
-            @sc-abort=${() => this.handleAbort()}
-            @sc-retry=${(e: CustomEvent<{ content: string; index: number }>) => {
-              this._handleSend(e.detail.content);
-              this._messageThread?.scrollToBottom();
-            }}
-            @sc-regenerate=${(e: CustomEvent<{ content: string; index: number }>) => {
-              this._handleRegenerate(e.detail.index);
-              this._messageThread?.scrollToBottom();
-            }}
-            @sc-branch-navigate=${(e: CustomEvent<{ index: number; direction: number }>) => {
-              const item = this.chat.items[e.detail.index];
-              if (item?.type === "message" && item.id) this.chat.getBranchMessages?.(item.id);
-            }}
-            @sc-toggle-reaction=${(e: CustomEvent<{ index: number; emoji: string }>) =>
-              this.chat.toggleReaction?.(e.detail.index, e.detail.emoji)}
-          ></sc-message-thread>
-          ${this._renderRetryButton()}
-          <sc-chat-composer
-            .value=${this.inputValue}
-            .waiting=${this.chat.isWaiting}
-            .disabled=${this.connectionStatus === "disconnected"}
-            .showSuggestions=${this.chat.items.length === 0}
-            .streamElapsed=${this.chat.streamElapsed}
-            .placeholder=${this.connectionStatus === "disconnected"
-              ? "Disconnected \u2014 reconnect to send messages"
-              : "Type a message... (Enter to send, Shift+Enter for newline)"}
-            @sc-send=${(
-              e: CustomEvent<{
-                message: string;
-                files?: Array<{ name: string; size: number; type: string; dataUrl?: string }>;
-              }>,
-            ) => this._handleSend(e.detail.message, e.detail.files)}
-            @sc-use-suggestion=${(e: CustomEvent<{ text: string }>) =>
-              this._handleSend(e.detail.text)}
-            @sc-input-change=${(e: CustomEvent<{ value: string }>) => {
-              this.inputValue = e.detail.value;
-            }}
-            @sc-abort=${() => this.handleAbort()}
-            @sc-slash-command=${(e: CustomEvent<{ command: string }>) =>
-              this._handleSlashCommand(e.detail.command)}
-          ></sc-chat-composer>
+          <div class="content-wrap">
+            <sc-message-list
+              .items=${this.chat.items}
+              .isWaiting=${this.chat.isWaiting}
+              .streamElapsed=${this.chat.streamElapsed}
+              .historyLoading=${this.chat.historyLoading}
+              @sc-context-menu=${(e: CustomEvent<{ event: MouseEvent; item: ChatItem }>) =>
+                this._onMessageContextMenu(e.detail.event, e.detail.item)}
+              @sc-abort=${() => this.handleAbort()}
+              @sc-retry=${(e: CustomEvent<{ content: string; index: number }>) =>
+                this._handleSend(e.detail.content)}
+              @sc-regenerate=${(e: CustomEvent<{ content: string; index: number }>) =>
+                this._handleRegenerate(e.detail.index)}
+            ></sc-message-list>
+            ${this._renderRetryButton()}
+            <sc-composer
+              .value=${this.inputValue}
+              .waiting=${this.chat.isWaiting}
+              .disabled=${this.connectionStatus === "disconnected"}
+              .showSuggestions=${this.chat.items.length === 0}
+              .streamElapsed=${this.chat.streamElapsed}
+              .placeholder=${this.connectionStatus === "disconnected"
+                ? "Disconnected — reconnect to send messages"
+                : "Type a message... (Enter to send, Shift+Enter for newline)"}
+              @sc-send=${(
+                e: CustomEvent<{
+                  message: string;
+                  files?: Array<{ name: string; size: number; type: string; dataUrl?: string }>;
+                }>,
+              ) => this._handleSend(e.detail.message, e.detail.files)}
+              @sc-use-suggestion=${(e: CustomEvent<{ text: string }>) =>
+                this._handleSend(e.detail.text)}
+              @sc-input-change=${(e: CustomEvent<{ value: string }>) => {
+                this.inputValue = e.detail.value;
+              }}
+            ></sc-composer>
+          </div>
           ${this._contextMenu.open
-            ? html` <sc-context-menu
-                .open=${this._contextMenu.open}
-                .x=${this._contextMenu.x}
-                .y=${this._contextMenu.y}
-                .items=${this._contextMenu.items}
-                @close=${() => (this._contextMenu = { ...this._contextMenu, open: false })}
-              ></sc-context-menu>`
+            ? html`
+                <sc-context-menu
+                  .open=${this._contextMenu.open}
+                  .x=${this._contextMenu.x}
+                  .y=${this._contextMenu.y}
+                  .items=${this._contextMenu.items}
+                  @close=${() => (this._contextMenu = { ...this._contextMenu, open: false })}
+                ></sc-context-menu>
+              `
             : nothing}
-          <sc-tapback-menu
-            .open=${this._tapback.open}
-            .x=${this._tapback.x}
-            .y=${this._tapback.y}
-            .messageIndex=${this._tapback.index}
-            .messageContent=${this._tapback.content}
-            @sc-react=${(e: CustomEvent<{ emoji: string; index: number }>) => {
-              this.chat.toggleReaction?.(e.detail.index, e.detail.emoji);
-              this._tapback = { ...this._tapback, open: false };
-            }}
-            @sc-tapback-close=${() => (this._tapback = { ...this._tapback, open: false })}
-          ></sc-tapback-menu>
         </div>
       </div>
     `;
@@ -547,14 +535,6 @@ export class ScChatView extends GatewayAwareLitElement {
           >${this.sessionKey === "default" ? "New Chat" : this.sessionKey}</span
         >
         <div class="status-right">
-          <button
-            type="button"
-            class="sessions-toggle"
-            @click=${() => this._handleExport()}
-            aria-label="Export conversation"
-          >
-            ${icons.export}
-          </button>
           <kbd class="kbd-hint">⌘F</kbd>
         </div>
       </div>
