@@ -44,12 +44,38 @@ export class ScChatView extends GatewayAwareLitElement {
     .status-bar {
       display: flex;
       align-items: center;
-      gap: var(--sc-space-sm);
-      padding: var(--sc-space-sm) var(--sc-space-md);
+      justify-content: space-between;
+      padding: var(--sc-space-xs) var(--sc-space-md);
       font-size: var(--sc-text-xs);
       color: var(--sc-text-muted);
-      background: var(--sc-bg-surface);
-      border-bottom: 1px solid var(--sc-border);
+      background: transparent;
+      border-bottom: 1px solid var(--sc-border-subtle);
+    }
+
+    .status-left,
+    .status-right {
+      display: flex;
+      align-items: center;
+      gap: var(--sc-space-sm);
+    }
+
+    .status-title {
+      font-weight: var(--sc-weight-medium);
+      color: var(--sc-text);
+      font-size: var(--sc-text-sm);
+    }
+
+    .kbd-hint {
+      display: inline-flex;
+      align-items: center;
+      padding: var(--sc-space-2xs) var(--sc-space-xs);
+      font-size: var(--sc-text-2xs, 10px);
+      font-family: var(--sc-font);
+      background: var(--sc-bg-elevated);
+      border: 1px solid var(--sc-border);
+      border-radius: var(--sc-radius-sm);
+      color: var(--sc-text-muted);
+      line-height: 1;
     }
     .status-dot {
       width: 8px;
@@ -472,16 +498,24 @@ export class ScChatView extends GatewayAwareLitElement {
           : "Disconnected";
     return html`
       <div class="status-bar">
-        <button
-          type="button"
-          class="sessions-toggle"
-          @click=${() => (this._sessionsPanelOpen = !this._sessionsPanelOpen)}
-          aria-label=${this._sessionsPanelOpen ? "Close sessions" : "Open sessions"}
+        <div class="status-left">
+          <button
+            type="button"
+            class="sessions-toggle"
+            @click=${() => (this._sessionsPanelOpen = !this._sessionsPanelOpen)}
+            aria-label=${this._sessionsPanelOpen ? "Close sessions" : "Open sessions"}
+          >
+            ${icons["sidebar-toggle"]}
+          </button>
+          <span class="status-dot ${this.connectionStatus}" aria-hidden="true"></span>
+          <span>${label}</span>
+        </div>
+        <span class="status-title"
+          >${this.sessionKey === "default" ? "New Chat" : this.sessionKey}</span
         >
-          ${icons["sidebar-toggle"]}
-        </button>
-        <span class="status-dot ${this.connectionStatus}" aria-hidden="true"></span>
-        <span>${label}</span>
+        <div class="status-right">
+          <kbd class="kbd-hint">⌘F</kbd>
+        </div>
       </div>
     `;
   }
