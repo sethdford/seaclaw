@@ -583,23 +583,26 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
 #ifdef SC_HAS_PERSONA
-                /* Apply per-channel persona override if configured */
-                if (config && agent->active_channel) {
-                    const char *channel_persona =
-                        sc_config_persona_for_channel(config, agent->active_channel);
-                    const char *current = agent->persona_name ? agent->persona_name : "";
-                    if (channel_persona && channel_persona[0] &&
-                        strcmp(channel_persona, current) != 0) {
-                        sc_error_t perr =
-                            sc_agent_set_persona(agent, channel_persona, strlen(channel_persona));
-                        if (perr != SC_OK) {
+                /* Apply persona override: per-contact takes priority, then per-channel */
+                if (config) {
+                    const char *persona_override = NULL;
+                    if (batch_key && key_len > 0)
+                        persona_override = sc_config_persona_for_contact(config, batch_key);
+                    if (!persona_override && agent->active_channel)
+                        persona_override =
+                            sc_config_persona_for_channel(config, agent->active_channel);
+                    if (persona_override && persona_override[0]) {
+                        const char *current = agent->persona_name ? agent->persona_name : "";
+                        if (strcmp(persona_override, current) != 0) {
+                            sc_error_t perr = sc_agent_set_persona(agent, persona_override,
+                                                                   strlen(persona_override));
+                            if (perr != SC_OK) {
 #ifndef SC_IS_TEST
-                            fprintf(stderr,
-                                    "[seaclaw] warning: failed to switch persona to '%s' for "
-                                    "channel '%s'\n",
-                                    channel_persona,
-                                    agent->active_channel ? agent->active_channel : "?");
+                                fprintf(stderr,
+                                        "[seaclaw] warning: failed to switch persona to '%s'\n",
+                                        persona_override);
 #endif
+                            }
                         }
                     }
                 }

@@ -50,6 +50,9 @@ typedef struct sc_gateway_config {
 
     /* Application context for RPC methods (sessions, tools, config, etc.) */
     struct sc_app_context *app_ctx;
+
+    /* OAuth context for /api/auth/oauth/* routes (NULL = OAuth disabled) */
+    void *oauth_ctx;
 } sc_gateway_config_t;
 
 /* ──────────────────────────────────────────────────────────────────────────

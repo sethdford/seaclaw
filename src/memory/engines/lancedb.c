@@ -3,6 +3,12 @@
  * When SC_ENABLE_SQLITE is not set (production build), all operations return
  * SC_ERR_NOT_SUPPORTED. This is intentional, documented stub behavior. */
 
+/*
+ * Name suggests: native LanceDB vector DB backend.
+ * Actually: SQLite-based storage with text search (LIKE). No LanceDB library.
+ * A native implementation would require the actual LanceDB libraries.
+ */
+
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"

@@ -4,6 +4,10 @@
 #include <string.h>
 #include <time.h>
 
+#ifdef SC_GATEWAY_POSIX
+#include <pthread.h>
+#endif
+
 #define SC_RATE_IP_MAX      64
 #define SC_RATE_ENTRIES_MAX 512
 
@@ -22,6 +26,9 @@ struct sc_rate_limiter {
     size_t count;
     int max_requests;
     int window_secs;
+#ifdef SC_GATEWAY_POSIX
+    pthread_mutex_t mutex;
+#endif
 };
 
 static void prune_entry(rate_entry_t *e) {
@@ -75,6 +82,12 @@ sc_rate_limiter_t *sc_rate_limiter_create(sc_allocator_t *alloc, int requests_pe
     lim->alloc = alloc;
     lim->max_requests = requests_per_window;
     lim->window_secs = window_secs;
+#ifdef SC_GATEWAY_POSIX
+    if (pthread_mutex_init(&lim->mutex, NULL) != 0) {
+        alloc->free(alloc->ctx, lim, sizeof(*lim));
+        return NULL;
+    }
+#endif
     return lim;
 }
 
@@ -82,26 +95,45 @@ bool sc_rate_limiter_allow(sc_rate_limiter_t *lim, const char *ip) {
     if (!lim || !ip)
         return true;
 
+#ifdef SC_GATEWAY_POSIX
+    pthread_mutex_lock(&lim->mutex);
+#endif
     rate_entry_t *e = find_or_create(lim, ip);
-    if (!e)
+    if (!e) {
+#ifdef SC_GATEWAY_POSIX
+        pthread_mutex_unlock(&lim->mutex);
+#endif
         return false;
+    }
 
     prune_entry(e);
 
     time_t now = time(NULL);
     if (e->count >= e->cap) {
-        if (e->cap > SIZE_MAX / 2)
+        if (e->cap > SIZE_MAX / 2) {
+#ifdef SC_GATEWAY_POSIX
+            pthread_mutex_unlock(&lim->mutex);
+#endif
             return false;
+        }
         size_t new_cap = e->cap * 2;
         time_t *n = (time_t *)lim->alloc->realloc(
             lim->alloc->ctx, e->timestamps, e->cap * sizeof(time_t), new_cap * sizeof(time_t));
-        if (!n)
+        if (!n) {
+#ifdef SC_GATEWAY_POSIX
+            pthread_mutex_unlock(&lim->mutex);
+#endif
             return false;
+        }
         e->timestamps = n;
         e->cap = new_cap;
     }
     e->timestamps[e->count++] = now;
-    return e->count <= (size_t)e->max_requests;
+    bool ok = e->count <= (size_t)e->max_requests;
+#ifdef SC_GATEWAY_POSIX
+    pthread_mutex_unlock(&lim->mutex);
+#endif
+    return ok;
 }
 
 void sc_rate_limiter_destroy(sc_rate_limiter_t *lim) {

@@ -41,6 +41,7 @@ typedef struct sc_control_protocol {
     bool require_pairing;
     struct sc_pairing_guard *pairing_guard;
     const char *auth_token;
+    void *oauth_ctx;        /* sc_oauth_ctx_t * for auth.oauth.* methods */
     uint32_t rpc_count;     /* RPC calls in current window */
     uint64_t rpc_window_ms; /* Window start timestamp */
 } sc_control_protocol_t;
@@ -53,6 +54,8 @@ void sc_control_set_app_ctx(sc_control_protocol_t *proto, sc_app_context_t *ctx)
 
 void sc_control_set_auth(sc_control_protocol_t *proto, bool require_pairing,
                          struct sc_pairing_guard *pairing_guard, const char *auth_token);
+
+void sc_control_set_oauth(sc_control_protocol_t *proto, void *oauth_ctx);
 
 void sc_control_on_message(sc_ws_conn_t *conn, const char *data, size_t data_len, void *ctx);
 void sc_control_on_close(sc_ws_conn_t *conn, void *ctx);

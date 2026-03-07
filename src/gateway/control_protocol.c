@@ -8,6 +8,7 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/process_util.h"
 #include "seaclaw/cost.h"
+#include "seaclaw/gateway/oauth.h"
 #include "seaclaw/security.h"
 #ifdef SC_HAS_CRON
 #include "seaclaw/cron.h"
@@ -2038,6 +2039,12 @@ void sc_control_set_auth(sc_control_protocol_t *proto, bool require_pairing,
     proto->require_pairing = require_pairing;
     proto->pairing_guard = pairing_guard;
     proto->auth_token = auth_token && auth_token[0] ? auth_token : NULL;
+}
+
+void sc_control_set_oauth(sc_control_protocol_t *proto, void *oauth_ctx) {
+    if (!proto)
+        return;
+    proto->oauth_ctx = oauth_ctx;
 }
 
 /* ── Incoming message handler ────────────────────────────────────────── */
