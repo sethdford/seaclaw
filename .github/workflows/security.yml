@@ -74,7 +74,7 @@ jobs:
           enable-fuzz: "true"
           enable-curl: "true"
           extra-apt: clang
-          extra-cmake-flags: -DCMAKE_C_COMPILER=clang
+          extra-cmake-flags: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
       - name: Create seed corpora
         run: |
           mkdir -p corpus/json corpus/url corpus/http

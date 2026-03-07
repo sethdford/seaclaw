@@ -953,33 +953,9 @@ export class ScChatView extends GatewayAwareLitElement {
   }
 
   override render() {
-    const statusLabel =
-      this.connectionStatus === "connected"
-        ? "Connected"
-        : this.connectionStatus === "connecting"
-          ? "Reconnecting…"
-          : "Disconnected";
-
     return html`
       <div class="container">
-        <div class="status-bar">
-          <span class="status-dot ${this.connectionStatus}" aria-hidden="true"></span>
-          <span>${statusLabel}</span>
-        </div>
-        ${this.errorBanner
-          ? html`
-              <div class="error-banner">
-                <span>${this.errorBanner}</span>
-                <button
-                  class="dismiss-btn"
-                  @click=${() => (this.errorBanner = "")}
-                  aria-label="Dismiss"
-                >
-                  ${icons.x}
-                </button>
-              </div>
-            `
-          : nothing}
+        ${this._renderStatusBar()} ${this._renderErrorBanner()}
         <div
           id="message-list"
           class="messages ${this._dragOver ? "drag-over" : ""}"
@@ -990,173 +966,212 @@ export class ScChatView extends GatewayAwareLitElement {
           @dragleave=${this._handleDragLeave}
           @drop=${this._handleDrop}
         >
-          ${this._searchOpen
-            ? html`
-                <sc-chat-search
-                  .open=${this._searchOpen}
-                  .query=${this._searchQuery}
-                  .matchCount=${this._getSearchMatchIndices().length}
-                  .currentMatch=${this._searchCurrentMatch}
-                  @sc-search-change=${(e: CustomEvent<{ query: string }>) => {
-                    this._searchQuery = e.detail.query;
-                    this._searchCurrentMatch = 0;
-                  }}
-                  @sc-search-next=${() => {
-                    const indices = this._getSearchMatchIndices();
-                    if (indices.length === 0) return;
-                    this._searchCurrentMatch = (this._searchCurrentMatch % indices.length) + 1;
-                    this._scrollToMatch(this._searchCurrentMatch - 1);
-                  }}
-                  @sc-search-prev=${() => {
-                    const indices = this._getSearchMatchIndices();
-                    if (indices.length === 0) return;
-                    this._searchCurrentMatch =
-                      this._searchCurrentMatch <= 1 ? indices.length : this._searchCurrentMatch - 1;
-                    this._scrollToMatch(this._searchCurrentMatch - 1);
-                  }}
-                  @sc-search-close=${() => {
-                    this._searchOpen = false;
-                    this._searchQuery = "";
-                    this._searchCurrentMatch = 0;
-                  }}
-                ></sc-chat-search>
-              `
-            : nothing}
-          ${this.items.length === 0
-            ? html`
-                <sc-empty-state
-                  .icon=${icons["chat-circle"]}
-                  heading="Start a conversation"
-                  description="Ask SeaClaw anything — write code, answer questions, use tools."
-                >
-                  <div class="suggested-prompts">
-                    <button
-                      class="prompt-pill"
-                      @click=${() => this._useSuggestion("Explain how this project is architected")}
-                    >
-                      Explain how this project is architected
-                    </button>
-                    <button
-                      class="prompt-pill"
-                      @click=${() => this._useSuggestion("Write a Python web scraper")}
-                    >
-                      Write a Python web scraper
-                    </button>
-                    <button
-                      class="prompt-pill"
-                      @click=${() => this._useSuggestion("Help me debug an issue")}
-                    >
-                      Help me debug an issue
-                    </button>
-                    <button
-                      class="prompt-pill"
-                      @click=${() => this._useSuggestion("What can you do?")}
-                    >
-                      What can you do?
-                    </button>
-                  </div>
-                </sc-empty-state>
-              `
-            : nothing}
-          ${(() => {
-            let lastAssistantIdx = -1;
-            for (let i = this.items.length - 1; i >= 0; i--) {
-              const it = this.items[i];
-              if (it.type === "message" && it.role === "assistant") {
-                lastAssistantIdx = i;
-                break;
-              }
-            }
-            return this.items.map((item, idx) => {
-              if (item.type === "message") {
-                const isStreaming =
-                  this.isWaiting && item.role === "assistant" && idx === lastAssistantIdx;
-                return html`
-                  <div
-                    id="msg-${idx}"
-                    class="message ${item.role}"
-                    style="--sc-stagger-index: ${idx}; animation-delay: min(calc(var(--sc-stagger-delay) * var(--sc-stagger-index)), var(--sc-stagger-max));"
-                    @contextmenu=${(ev: MouseEvent) => this._onMessageContextMenu(ev, item)}
-                  >
-                    <sc-message-stream
-                      .content=${item.content}
-                      .streaming=${isStreaming}
-                      .role=${item.role}
-                    ></sc-message-stream>
-                    ${item.ts != null
-                      ? html`<span class="message-meta">${formatTime(item.ts)}</span>`
-                      : nothing}
-                  </div>
-                `;
-              }
-              if (item.type === "tool_call") {
-                return html`
-                  <sc-tool-result
-                    .tool=${item.name}
-                    .status=${item.status === "completed"
-                      ? item.result?.startsWith("Error")
-                        ? "error"
-                        : "success"
-                      : "running"}
-                    .content=${item.result ?? item.input ?? ""}
-                  ></sc-tool-result>
-                `;
-              }
-              if (item.type === "thinking") {
-                return html`
-                  <sc-reasoning-block
-                    .content=${item.content}
-                    .streaming=${item.streaming}
-                    .duration=${item.duration ?? ""}
-                  ></sc-reasoning-block>
-                `;
-              }
-              return nothing;
-            });
-          })()}
-          ${this.isWaiting
-            ? html`
-                <div class="thinking">
-                  <sc-thinking .active=${true} .steps=${[]}></sc-thinking>
-                  <span class="stream-elapsed">${this._streamElapsed}</span>
-                  <button class="abort-btn" @click=${() => this.handleAbort()}>Abort</button>
-                </div>
-              `
-            : nothing}
+          ${this._renderSearch()} ${this.items.length === 0 ? this._renderEmptyState() : nothing}
+          ${this._renderMessages()} ${this.isWaiting ? this._renderThinking() : nothing}
         </div>
-        ${this.showScrollPill
-          ? html`<button class="scroll-bottom-pill" @click=${() => this.scrollToBottom()}>
-              <span class="pill-icon">${icons["arrow-down"]}</span> New messages
-            </button>`
-          : nothing}
-        ${this.lastFailedMessage
-          ? html`<button class="retry-btn" @click=${this._retry}>Retry last message</button>`
-          : nothing}
-        <div class="input-wrap">
-          <div class="input-bar">
-            <textarea
-              id="chat-input"
-              placeholder=${this.connectionStatus === "disconnected"
-                ? "Disconnected — reconnect to send messages"
-                : "Type a message... (Enter to send, Shift+Enter for newline)"}
-              .value=${this.inputValue}
-              ?disabled=${this.connectionStatus === "disconnected"}
-              @input=${this.handleInput}
-              @keydown=${this.handleKeyDown}
-            ></textarea>
-            <button
-              class="send-btn"
-              ?disabled=${!this.inputValue.trim() ||
-              this.isWaiting ||
-              this.connectionStatus === "disconnected"}
-              @click=${() => this.send()}
-              aria-label="Send"
-            >
-              Send
-            </button>
+        ${this._renderScrollPill()} ${this._renderRetryButton()} ${this._renderInputBar()}
+      </div>
+    `;
+  }
+
+  private _renderStatusBar() {
+    const label =
+      this.connectionStatus === "connected"
+        ? "Connected"
+        : this.connectionStatus === "connecting"
+          ? "Reconnecting\u2026"
+          : "Disconnected";
+    return html`
+      <div class="status-bar">
+        <span class="status-dot ${this.connectionStatus}" aria-hidden="true"></span>
+        <span>${label}</span>
+      </div>
+    `;
+  }
+
+  private _renderErrorBanner() {
+    if (!this.errorBanner) return nothing;
+    return html`
+      <div class="error-banner">
+        <span>${this.errorBanner}</span>
+        <button class="dismiss-btn" @click=${() => (this.errorBanner = "")} aria-label="Dismiss">
+          ${icons.x}
+        </button>
+      </div>
+    `;
+  }
+
+  private _renderSearch() {
+    if (!this._searchOpen) return nothing;
+    return html`
+      <sc-chat-search
+        .open=${this._searchOpen}
+        .query=${this._searchQuery}
+        .matchCount=${this._getSearchMatchIndices().length}
+        .currentMatch=${this._searchCurrentMatch}
+        @sc-search-change=${(e: CustomEvent<{ query: string }>) => {
+          this._searchQuery = e.detail.query;
+          this._searchCurrentMatch = 0;
+        }}
+        @sc-search-next=${() => {
+          const indices = this._getSearchMatchIndices();
+          if (indices.length === 0) return;
+          this._searchCurrentMatch = (this._searchCurrentMatch % indices.length) + 1;
+          this._scrollToMatch(this._searchCurrentMatch - 1);
+        }}
+        @sc-search-prev=${() => {
+          const indices = this._getSearchMatchIndices();
+          if (indices.length === 0) return;
+          this._searchCurrentMatch =
+            this._searchCurrentMatch <= 1 ? indices.length : this._searchCurrentMatch - 1;
+          this._scrollToMatch(this._searchCurrentMatch - 1);
+        }}
+        @sc-search-close=${() => {
+          this._searchOpen = false;
+          this._searchQuery = "";
+          this._searchCurrentMatch = 0;
+        }}
+      ></sc-chat-search>
+    `;
+  }
+
+  private _renderEmptyState() {
+    return html`
+      <sc-empty-state
+        .icon=${icons["chat-circle"]}
+        heading="Start a conversation"
+        description="Ask SeaClaw anything — write code, answer questions, use tools."
+      >
+        <div class="suggested-prompts">
+          <button
+            class="prompt-pill"
+            @click=${() => this._useSuggestion("Explain how this project is architected")}
+          >
+            Explain how this project is architected
+          </button>
+          <button
+            class="prompt-pill"
+            @click=${() => this._useSuggestion("Write a Python web scraper")}
+          >
+            Write a Python web scraper
+          </button>
+          <button class="prompt-pill" @click=${() => this._useSuggestion("Help me debug an issue")}>
+            Help me debug an issue
+          </button>
+          <button class="prompt-pill" @click=${() => this._useSuggestion("What can you do?")}>
+            What can you do?
+          </button>
+        </div>
+      </sc-empty-state>
+    `;
+  }
+
+  private _renderMessages() {
+    let lastAssistantIdx = -1;
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const it = this.items[i];
+      if (it.type === "message" && it.role === "assistant") {
+        lastAssistantIdx = i;
+        break;
+      }
+    }
+    return this.items.map((item, idx) => {
+      if (item.type === "message") {
+        const isStreaming = this.isWaiting && item.role === "assistant" && idx === lastAssistantIdx;
+        return html`
+          <div
+            id="msg-${idx}"
+            class="message ${item.role}"
+            style="--sc-stagger-index: ${idx}; animation-delay: min(calc(var(--sc-stagger-delay) * var(--sc-stagger-index)), var(--sc-stagger-max));"
+            @contextmenu=${(ev: MouseEvent) => this._onMessageContextMenu(ev, item)}
+          >
+            <sc-message-stream
+              .content=${item.content}
+              .streaming=${isStreaming}
+              .role=${item.role}
+            ></sc-message-stream>
+            ${item.ts != null
+              ? html`<span class="message-meta">${formatTime(item.ts)}</span>`
+              : nothing}
           </div>
-          <span class="char-count">${this.inputValue.length} characters</span>
+        `;
+      }
+      if (item.type === "tool_call") {
+        return html`
+          <sc-tool-result
+            .tool=${item.name}
+            .status=${item.status === "completed"
+              ? item.result?.startsWith("Error")
+                ? "error"
+                : "success"
+              : "running"}
+            .content=${item.result ?? item.input ?? ""}
+          ></sc-tool-result>
+        `;
+      }
+      if (item.type === "thinking") {
+        return html`
+          <sc-reasoning-block
+            .content=${item.content}
+            .streaming=${item.streaming}
+            .duration=${item.duration ?? ""}
+          ></sc-reasoning-block>
+        `;
+      }
+      return nothing;
+    });
+  }
+
+  private _renderThinking() {
+    return html`
+      <div class="thinking">
+        <sc-thinking .active=${true} .steps=${[]}></sc-thinking>
+        <span class="stream-elapsed">${this._streamElapsed}</span>
+        <button class="abort-btn" @click=${() => this.handleAbort()}>Abort</button>
+      </div>
+    `;
+  }
+
+  private _renderScrollPill() {
+    if (!this.showScrollPill) return nothing;
+    return html`
+      <button class="scroll-bottom-pill" @click=${() => this.scrollToBottom()}>
+        <span class="pill-icon">${icons["arrow-down"]}</span> New messages
+      </button>
+    `;
+  }
+
+  private _renderRetryButton() {
+    if (!this.lastFailedMessage) return nothing;
+    return html`<button class="retry-btn" @click=${this._retry}>Retry last message</button>`;
+  }
+
+  private _renderInputBar() {
+    return html`
+      <div class="input-wrap">
+        <div class="input-bar">
+          <textarea
+            id="chat-input"
+            placeholder=${this.connectionStatus === "disconnected"
+              ? "Disconnected \u2014 reconnect to send messages"
+              : "Type a message... (Enter to send, Shift+Enter for newline)"}
+            .value=${this.inputValue}
+            ?disabled=${this.connectionStatus === "disconnected"}
+            @input=${this.handleInput}
+            @keydown=${this.handleKeyDown}
+          ></textarea>
+          <button
+            class="send-btn"
+            ?disabled=${!this.inputValue.trim() ||
+            this.isWaiting ||
+            this.connectionStatus === "disconnected"}
+            @click=${() => this.send()}
+            aria-label="Send"
+          >
+            Send
+          </button>
         </div>
+        <span class="char-count">${this.inputValue.length} characters</span>
       </div>
     `;
   }

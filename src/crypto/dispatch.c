@@ -19,7 +19,7 @@ extern void sc_sha256_generic(const uint8_t *data, size_t len, uint8_t out[32]);
 extern void sc_hmac_sha256_generic(const uint8_t *key, size_t key_len, const uint8_t *msg,
                                    size_t msg_len, uint8_t out[32]);
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) && !defined(SC_IS_TEST)
 extern void sc_sha256_x86_64(const uint8_t *data, size_t len, uint8_t out[32]);
 
 static bool has_sha_ni(void) {
@@ -43,7 +43,7 @@ void sc_chacha20_decrypt(const uint8_t key[32], const uint8_t nonce[12], uint32_
 }
 
 void sc_sha256(const uint8_t *data, size_t len, uint8_t out[32]) {
-#if defined(__x86_64__) && !SC_IS_TEST
+#if defined(__x86_64__) && !defined(SC_IS_TEST)
     if (!sha_ni_checked) {
         sha_ni_available = has_sha_ni();
         sha_ni_checked = true;
