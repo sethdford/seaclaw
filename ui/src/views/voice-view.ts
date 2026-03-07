@@ -4,7 +4,7 @@ import type { GatewayClient } from "../gateway.js";
 import { GatewayClient as GatewayClientClass } from "../gateway.js";
 import type { GatewayStatus } from "../gateway.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
-import { SESSION_KEY_VOICE } from "../utils.js";
+import { SESSION_KEY_VOICE, formatRelative } from "../utils.js";
 import type { ChatItem } from "../controllers/chat-controller.js";
 import { icons } from "../icons.js";
 import { ScToast } from "../components/sc-toast.js";
@@ -386,17 +386,22 @@ export class ScVoiceView extends GatewayAwareLitElement {
     .conversation {
       display: flex;
       flex-direction: column;
-      gap: var(--sc-space-md);
       flex: 1;
       min-height: 0;
-      overflow-y: auto;
       padding: var(--sc-space-lg);
       border: 1px solid var(--sc-border);
       border-radius: var(--sc-radius-lg);
       background: var(--sc-bg-surface);
       background-image: var(--sc-surface-gradient);
       box-shadow: var(--sc-shadow-card);
+    }
+    .conversation-empty {
+      overflow-y: auto;
       scroll-behavior: smooth;
+    }
+    .conversation-thread {
+      overflow: hidden;
+      padding: 0;
     }
 
     .msg {
@@ -873,6 +878,17 @@ export class ScVoiceView extends GatewayAwareLitElement {
           label="Messages"
           style="--sc-stagger-delay: 0ms"
         ></sc-stat-card>
+        <sc-stat-card
+          .value=${this._sessionDurationSec}
+          label="Duration"
+          suffix="s"
+          style="--sc-stagger-delay: 80ms"
+        ></sc-stat-card>
+        <sc-stat-card
+          .value=${this._sessionCount}
+          label="Sessions"
+          style="--sc-stagger-delay: 160ms"
+        ></sc-stat-card>
       </div>
       ${this._renderConversation()} ${this._renderVoiceZone()} ${this._renderInputBar()}
     `;
@@ -897,9 +913,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
           ? "Reconnecting\u2026"
           : "Disconnected";
     const durationLabel =
-      this._sessionStartTs != null
-        ? this._formatDuration(this._sessionDurationSec)
-        : "0:00";
+      this._sessionStartTs != null ? this._formatDuration(this._sessionDurationSec) : "0:00";
     const subtitle = `${statusLabel} · ${durationLabel} · Session ${this._sessionCount}`;
     return html`
       <div class="hero">
@@ -992,7 +1006,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   private _renderConversation() {
     if (this._messages.length === 0 && this.voiceStatus !== "processing") {
       return html`
-        <div class="conversation conversation-empty">
+        <div class="conversation">
           <div class="empty-conversation">
             <div class="empty-icon">${icons.mic}</div>
             <div class="empty-text">
@@ -1004,13 +1018,39 @@ export class ScVoiceView extends GatewayAwareLitElement {
       `;
     }
 
+    const lastAssistantIdx = this._findLastAssistantIdx();
+
     return html`
-      <div class="conversation conversation-thread">
-        <sc-message-thread
-          .items=${this._chatItems}
-          .isWaiting=${this.voiceStatus === "processing"}
-          .streamElapsed=${""}
-        ></sc-message-thread>
+      <div class="conversation" role="log" aria-live="polite" aria-label="Voice conversation">
+        ${this._messages.map((msg, idx) => {
+          if (msg.role === "user") {
+            return html`
+              <div class="msg user">
+                <span>${msg.content}</span>
+                <span class="msg-meta">${formatRelative(msg.ts)}</span>
+              </div>
+            `;
+          }
+          const isStreaming = this.voiceStatus === "processing" && idx === lastAssistantIdx;
+          return html`
+            <div class="msg assistant">
+              <sc-message-stream
+                .content=${msg.content}
+                .streaming=${isStreaming}
+                .role=${"assistant"}
+              ></sc-message-stream>
+              <span class="msg-meta">${formatRelative(msg.ts)}</span>
+            </div>
+          `;
+        })}
+        ${this.voiceStatus === "processing" &&
+        (this._messages.length === 0 || this._messages[this._messages.length - 1]?.role === "user")
+          ? html`
+              <div class="thinking-row">
+                <sc-thinking .active=${true} .steps=${[]}></sc-thinking>
+              </div>
+            `
+          : nothing}
       </div>
     `;
   }

@@ -23,10 +23,10 @@ export class ScMessageActions extends LitElement {
       top: -28px;
       right: var(--sc-space-sm);
       padding: var(--sc-space-2xs) var(--sc-space-sm);
-      background: color-mix(in srgb, var(--sc-bg-overlay, var(--sc-bg-surface)) 85%, transparent);
-      backdrop-filter: blur(16px) saturate(180%);
-      -webkit-backdrop-filter: blur(16px) saturate(180%);
-      border: 1px solid var(--sc-border-subtle);
+      background: color-mix(in srgb, var(--sc-bg-overlay, var(--sc-bg-surface)) 65%, transparent);
+      backdrop-filter: blur(var(--sc-glass-subtle-blur, 12px));
+      -webkit-backdrop-filter: blur(var(--sc-glass-subtle-blur, 12px));
+      border: 1px solid color-mix(in srgb, white 8%, transparent);
       border-radius: var(--sc-radius-full);
       box-shadow: var(--sc-shadow-sm);
       opacity: 0;
@@ -46,8 +46,8 @@ export class ScMessageActions extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 28px;
-      height: 28px;
+      width: 24px;
+      height: 24px;
       padding: 0;
       background: transparent;
       border: none;

@@ -252,6 +252,13 @@ export class ScChatComposer extends LitElement {
       font-size: var(--sc-text-xs);
       color: var(--sc-text-muted);
     }
+    @media (prefers-reduced-transparency: reduce) {
+      .composer {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: var(--sc-bg-surface);
+      }
+    }
     @media (max-width: 640px) /* --sc-breakpoint-md */ {
       .input-row {
         flex-wrap: wrap;
@@ -500,9 +507,6 @@ export class ScChatComposer extends LitElement {
               >
                 ${icons["file-text"]}
               </button>
-              ${tokenEstimate > 0
-                ? html`<span class="token-count">~${tokenEstimate} tokens</span>`
-                : nothing}
               ${this.streamElapsed
                 ? html`<span class="elapsed">${this.streamElapsed}</span>`
                 : nothing}
