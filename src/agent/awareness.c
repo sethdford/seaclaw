@@ -124,7 +124,8 @@ char *sc_awareness_context(const sc_awareness_t *aw, sc_allocator_t *alloc, size
                           ? s->total_errors
                           : SC_AWARENESS_MAX_RECENT_ERRORS;
         for (size_t i = 0; i < nerr && pos < sizeof(buf) - 300; i++) {
-            size_t idx = (s->error_write_idx - nerr + i) % SC_AWARENESS_MAX_RECENT_ERRORS;
+            size_t idx = (s->error_write_idx + SC_AWARENESS_MAX_RECENT_ERRORS - nerr + i) %
+                        SC_AWARENESS_MAX_RECENT_ERRORS;
             pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "  - %s\n",
                                     s->recent_errors[idx].text);
         }

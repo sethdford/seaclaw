@@ -49,3 +49,39 @@ describe("views", () => {
     });
   }
 });
+
+describe("sc-chat-view", () => {
+  it("renders sc-empty-state when no messages", async () => {
+    const el = document.createElement("sc-chat-view") as HTMLElement & {
+      updateComplete: Promise<boolean>;
+    };
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const emptyState = el.shadowRoot?.querySelector("sc-empty-state");
+    expect(emptyState).toBeTruthy();
+    el.remove();
+  });
+
+  it("has suggested prompt pills", async () => {
+    const el = document.createElement("sc-chat-view") as HTMLElement & {
+      updateComplete: Promise<boolean>;
+    };
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const pills = el.shadowRoot?.querySelectorAll(".prompt-pill");
+    expect(pills.length).toBeGreaterThanOrEqual(1);
+    el.remove();
+  });
+
+  it("message list has role=log and aria-live", async () => {
+    const el = document.createElement("sc-chat-view") as HTMLElement & {
+      updateComplete: Promise<boolean>;
+    };
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const messageList = el.shadowRoot?.querySelector("#message-list");
+    expect(messageList?.getAttribute("role")).toBe("log");
+    expect(messageList?.getAttribute("aria-live")).toBe("polite");
+    el.remove();
+  });
+});

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { render } from "lit";
-import { html } from "lit";
 import { renderMarkdown } from "./markdown.js";
 
 /** Render a TemplateResult to a container and return the container's innerHTML. */
