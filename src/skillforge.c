@@ -284,6 +284,8 @@ sc_error_t sc_skillforge_execute(sc_allocator_t *alloc, const sc_skillforge_t *s
 sc_error_t sc_skillforge_install(const char *name, const char *url) {
     if (!name || !name[0] || !url || !url[0])
         return SC_ERR_INVALID_ARGUMENT;
+    if (strchr(name, '/') || strchr(name, '\\') || strstr(name, ".."))
+        return SC_ERR_INVALID_ARGUMENT;
 
 #ifdef SC_IS_TEST
     (void)url;
@@ -332,6 +334,8 @@ sc_error_t sc_skillforge_install(const char *name, const char *url) {
 
 sc_error_t sc_skillforge_uninstall(sc_skillforge_t *sf, const char *name) {
     if (!sf || !name)
+        return SC_ERR_INVALID_ARGUMENT;
+    if (strchr(name, '/') || strchr(name, '\\') || strstr(name, ".."))
         return SC_ERR_INVALID_ARGUMENT;
     for (size_t i = 0; i < sf->skills_len; i++) {
         if (strcmp(sf->skills[i].name, name) == 0) {

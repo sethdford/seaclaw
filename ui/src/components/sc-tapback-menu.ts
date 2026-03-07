@@ -3,11 +3,11 @@ import { customElement, property } from "lit/decorators.js";
 import { icons } from "../icons.js";
 
 const REACTIONS = [
-  { key: "thumbs-up", emoji: "👍", label: "Thumbs up" },
-  { key: "thumbs-down", emoji: "👎", label: "Thumbs down" },
-  { key: "heart", emoji: "❤️", label: "Heart" },
-  { key: "copy", emoji: "copy", label: "Copy" },
-  { key: "bookmark-simple", emoji: "🔖", label: "Bookmark" },
+  { key: "thumbs-up", label: "Thumbs up" },
+  { key: "thumbs-down", label: "Thumbs down" },
+  { key: "heart", label: "Heart" },
+  { key: "copy", label: "Copy" },
+  { key: "bookmark-simple", label: "Bookmark" },
 ] as const;
 
 @customElement("sc-tapback-menu")
@@ -51,14 +51,14 @@ export class ScTapbackMenu extends LitElement {
       border-radius: var(--sc-radius-full);
       box-shadow: var(--sc-shadow-lg);
       z-index: 101;
-      animation: sc-tapback-enter 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+      animation: sc-tapback-enter var(--sc-duration-fast) var(--sc-spring-micro);
     }
     .reaction-btn {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 36px;
-      height: 36px;
+      width: var(--sc-space-2xl);
+      height: var(--sc-space-2xl);
       border-radius: var(--sc-radius-full);
       border: none;
       background: transparent;
@@ -75,8 +75,8 @@ export class ScTapbackMenu extends LitElement {
       outline-offset: 2px;
     }
     .reaction-btn svg {
-      width: 20px;
-      height: 20px;
+      width: var(--sc-space-lg);
+      height: var(--sc-space-lg);
     }
     @media (prefers-reduced-motion: reduce) {
       .bar {
@@ -85,13 +85,13 @@ export class ScTapbackMenu extends LitElement {
     }
   `;
 
-  private _onClick(emoji: string) {
-    if (emoji === "copy") navigator.clipboard?.writeText(this.messageContent);
+  private _onClick(key: string) {
+    if (key === "copy") navigator.clipboard?.writeText(this.messageContent);
     this.dispatchEvent(
       new CustomEvent("sc-react", {
         bubbles: true,
         composed: true,
-        detail: { emoji, index: this.messageIndex },
+        detail: { emoji: key, index: this.messageIndex },
       }),
     );
   }
@@ -134,10 +134,10 @@ export class ScTapbackMenu extends LitElement {
               aria-label=${r.label}
               @click=${(e: Event) => {
                 e.stopPropagation();
-                this._onClick(r.emoji);
+                this._onClick(r.key);
               }}
             >
-              ${r.emoji === "copy" ? icons.copy : html`${r.emoji}`}
+              ${icons[r.key]}
             </button>
           `,
         )}
