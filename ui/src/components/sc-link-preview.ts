@@ -96,8 +96,8 @@ export class ScLinkPreview extends LitElement {
     }
 
     .fav {
-      width: var(--sc-text-sm);
-      height: var(--sc-text-sm);
+      width: var(--sc-text-base);
+      height: var(--sc-text-base);
       border-radius: var(--sc-space-2xs);
     }
 

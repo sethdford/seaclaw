@@ -88,14 +88,14 @@ export class ScForecastChart extends LitElement {
     }
     .end-label {
       fill: var(--sc-text);
-      font-size: 12px;
+      font-size: var(--sc-text-sm);
       font-weight: 600;
       font-family: var(--sc-font);
       font-variant-numeric: tabular-nums;
     }
     .today-label {
       fill: var(--sc-text-muted);
-      font-size: 10px;
+      font-size: var(--sc-text-2xs);
       font-family: var(--sc-font);
       text-transform: uppercase;
       letter-spacing: 0.04em;
@@ -126,7 +126,7 @@ export class ScForecastChart extends LitElement {
     }
     .tooltip-projected {
       color: var(--sc-text-muted);
-      font-size: 10px;
+      font-size: var(--sc-text-2xs);
       font-style: italic;
     }
     @media (prefers-reduced-motion: reduce) {
