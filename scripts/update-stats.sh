@@ -141,4 +141,21 @@ sed -i.bak -E \
     "s/[0-9]+ channels, [0-9]+\+ tools/${CHANNEL_COUNT} channels, ${TOOL_COUNT}+ tools/g" \
     README.md && rm -f README.md.bak
 
+# Stats block: "Source files:", "Lines of code:", "Test files:", "Tests:"
+sed -i.bak -E \
+    "s/^Source files: [0-9]+$/Source files: ${SRC_COUNT}/" \
+    README.md && rm -f README.md.bak
+
+sed -i.bak -E \
+    "s/^Lines of code: ~[0-9]+K$/Lines of code: ~${C_LINES_K}K/" \
+    README.md && rm -f README.md.bak
+
+sed -i.bak -E \
+    "s/^Test files: [0-9]+$/Test files: ${TEST_FILES}/" \
+    README.md && rm -f README.md.bak
+
+sed -i.bak -E \
+    "s/^Tests: [0-9,]+$/Tests: ${TEST_COUNT_FMT}/" \
+    README.md && rm -f README.md.bak
+
 echo "Done. Review changes with: git diff AGENTS.md README.md"
