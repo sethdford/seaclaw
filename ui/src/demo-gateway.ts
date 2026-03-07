@@ -251,33 +251,114 @@ function handleRequest(method: string, _params?: Record<string, unknown>): unkno
         skills: [
           {
             name: "web-research",
-            description: "Deep web research with citations",
-            installed: true,
+            description: "Deep web research with source citations and fact-checking",
             enabled: true,
+            parameters: '{"query": "string", "depth": "number"}',
           },
           {
             name: "code-review",
-            description: "Automated code review with suggestions",
-            installed: true,
+            description: "Automated code review with inline suggestions and severity ratings",
             enabled: true,
+            parameters: '{"files": "string[]", "strictness": "string"}',
           },
           {
             name: "data-analysis",
-            description: "Analyze CSV and JSON datasets",
-            installed: false,
+            description: "Analyze CSV, JSON, and SQL datasets with visualizations",
+            enabled: true,
+            parameters: '{"source": "string"}',
+          },
+          {
+            name: "email-digest",
+            description: "Summarize and prioritize inbox messages across providers",
             enabled: false,
           },
           {
             name: "image-gen",
-            description: "Generate images via DALL-E or Stable Diffusion",
-            installed: false,
+            description: "Generate images via DALL-E, Stable Diffusion, or Flux",
             enabled: false,
+          },
+          {
+            name: "git-assistant",
+            description: "Automated git operations: branch, commit, rebase, and PR creation",
+            enabled: true,
+            parameters: '{"repo": "string"}',
+          },
+        ],
+      };
+    case "skills.search":
+      return {
+        entries: [
+          {
+            name: "code-review",
+            description: "Automated code review with inline suggestions",
+            version: "1.2.0",
+            author: "seaclaw",
+            url: "https://github.com/seaclaw/skill-registry/tree/main/skills/code-review",
+            tags: "development, review",
+          },
+          {
+            name: "email-digest",
+            description: "Daily email digest and inbox summarization",
+            version: "1.0.0",
+            author: "seaclaw",
+            url: "https://github.com/seaclaw/skill-registry/tree/main/skills/email-digest",
+            tags: "email, productivity",
+          },
+          {
+            name: "web-research",
+            description: "Deep web research with source citations",
+            version: "2.1.0",
+            author: "seaclaw",
+            url: "https://github.com/seaclaw/skill-registry/tree/main/skills/web-research",
+            tags: "research, web",
+          },
+          {
+            name: "calendar-sync",
+            description: "Sync and manage calendar events across providers",
+            version: "1.0.0",
+            author: "community",
+            url: "https://github.com/seaclaw/skill-registry/tree/main/skills/calendar-sync",
+            tags: "calendar, productivity",
+          },
+          {
+            name: "slack-bridge",
+            description: "Bridge conversations between Slack and other channels",
+            version: "0.9.0",
+            author: "community",
+            url: "https://github.com/seaclaw/skill-registry/tree/main/skills/slack-bridge",
+            tags: "communication, slack",
+          },
+          {
+            name: "test-runner",
+            description: "Run and report test suites across languages and frameworks",
+            version: "1.1.0",
+            author: "seaclaw",
+            url: "https://github.com/seaclaw/skill-registry/tree/main/skills/test-runner",
+            tags: "development, testing",
+          },
+          {
+            name: "deploy-helper",
+            description: "Automated deployment to cloud providers with rollback support",
+            version: "0.8.0",
+            author: "community",
+            url: "https://github.com/seaclaw/skill-registry/tree/main/skills/deploy-helper",
+            tags: "devops, deployment",
+          },
+          {
+            name: "doc-writer",
+            description: "Generate and maintain API documentation from source code",
+            version: "1.3.0",
+            author: "seaclaw",
+            url: "https://github.com/seaclaw/skill-registry/tree/main/skills/doc-writer",
+            tags: "documentation, development",
           },
         ],
       };
     case "skills.enable":
     case "skills.disable":
     case "skills.install":
+    case "skills.uninstall":
+    case "skills.update":
       return { ok: true };
     case "usage.summary":
       return {
@@ -305,8 +386,8 @@ function handleRequest(method: string, _params?: Record<string, unknown>): unkno
           { id: "local", name: "Local", status: "healthy", uptime: 172800, version: "0.42.0" },
         ],
       };
-      case "nodes.action":
-        return { ok: true };
+    case "nodes.action":
+      return { ok: true };
     case "cron.runs":
       return { runs: [] };
     case "cron.add":

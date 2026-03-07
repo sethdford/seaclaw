@@ -18,6 +18,7 @@
 #endif
 #include "seaclaw/session.h"
 #ifdef SC_HAS_SKILLS
+#include "seaclaw/skill_registry.h"
 #include "seaclaw/skillforge.h"
 #endif
 #include "seaclaw/tool.h"
@@ -61,18 +62,19 @@ static sc_error_t build_connect_response(sc_allocator_t *alloc, const sc_app_con
     sc_json_value_t *methods_arr = sc_json_array_new(alloc);
 
     static const char *const methods[] = {
-        "auth.token",      "connect",         "health",
-        "config.get",      "config.schema",   "capabilities",
-        "chat.send",       "chat.history",    "chat.abort",
-        "config.set",      "config.apply",    "sessions.list",
-        "sessions.patch",  "sessions.delete", "persona.set",
-        "tools.catalog",   "channels.status", "cron.list",
-        "cron.add",        "cron.remove",     "cron.run",
-        "cron.update",     "cron.runs",       "skills.list",
-        "skills.install",  "skills.enable",   "skills.disable",
-        "update.check",    "update.run",      "exec.approval.resolve",
-        "usage.summary",   "models.list",     "nodes.list",
-        "activity.recent", "push.register",   "push.unregister"};
+        "auth.token",      "connect",          "health",
+        "config.get",      "config.schema",    "capabilities",
+        "chat.send",       "chat.history",     "chat.abort",
+        "config.set",      "config.apply",     "sessions.list",
+        "sessions.patch",  "sessions.delete",  "persona.set",
+        "tools.catalog",   "channels.status",  "cron.list",
+        "cron.add",        "cron.remove",      "cron.run",
+        "cron.update",     "cron.runs",        "skills.list",
+        "skills.install",  "skills.enable",    "skills.disable",
+        "skills.search",   "skills.uninstall", "skills.update",
+        "update.check",    "update.run",       "exec.approval.resolve",
+        "usage.summary",   "models.list",      "nodes.list",
+        "activity.recent", "push.register",    "push.unregister"};
     for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
         sc_json_value_t *m = sc_json_string_new(alloc, methods[i], strlen(methods[i]));
         if (m)
@@ -1050,6 +1052,96 @@ static sc_error_t handle_skills_install(sc_allocator_t *alloc, sc_app_context_t 
     return err;
 }
 
+/* ── skills.search ───────────────────────────────────────────────────── */
+
+static sc_error_t handle_skills_search(sc_allocator_t *alloc, const sc_json_value_t *root,
+                                       char **out, size_t *out_len) {
+    const char *query = NULL;
+    if (root) {
+        sc_json_value_t *params = sc_json_object_get(root, "params");
+        if (params)
+            query = sc_json_get_string(params, "query");
+    }
+
+    sc_skill_registry_entry_t *entries = NULL;
+    size_t count = 0;
+    sc_error_t e = sc_skill_registry_search(alloc, query, &entries, &count);
+
+    sc_json_value_t *obj = sc_json_object_new(alloc);
+    if (!obj) {
+        if (entries)
+            sc_skill_registry_entries_free(alloc, entries, count);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+
+    sc_json_value_t *arr = sc_json_array_new(alloc);
+    if (e == SC_OK && entries) {
+        for (size_t i = 0; i < count; i++) {
+            sc_json_value_t *entry = sc_json_object_new(alloc);
+            json_set_str(alloc, entry, "name", entries[i].name);
+            if (entries[i].description)
+                json_set_str(alloc, entry, "description", entries[i].description);
+            if (entries[i].version)
+                json_set_str(alloc, entry, "version", entries[i].version);
+            if (entries[i].author)
+                json_set_str(alloc, entry, "author", entries[i].author);
+            if (entries[i].url)
+                json_set_str(alloc, entry, "url", entries[i].url);
+            if (entries[i].tags)
+                json_set_str(alloc, entry, "tags", entries[i].tags);
+            sc_json_array_push(alloc, arr, entry);
+        }
+        sc_skill_registry_entries_free(alloc, entries, count);
+    }
+
+    sc_json_object_set(alloc, obj, "entries", arr);
+    sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+    sc_json_free(alloc, obj);
+    return err;
+}
+
+/* ── skills.uninstall ────────────────────────────────────────────────── */
+
+static sc_error_t handle_skills_uninstall(sc_allocator_t *alloc, sc_app_context_t *app,
+                                          const sc_json_value_t *root, char **out,
+                                          size_t *out_len) {
+    bool success = false;
+
+    if (root && app && app->skills) {
+        sc_json_value_t *params = sc_json_object_get(root, "params");
+        if (params) {
+            const char *name = sc_json_get_string(params, "name");
+            if (name) {
+                sc_error_t e = sc_skillforge_uninstall(app->skills, name);
+                success = (e == SC_OK);
+            }
+        }
+    }
+
+    sc_json_value_t *obj = sc_json_object_new(alloc);
+    if (!obj)
+        return SC_ERR_OUT_OF_MEMORY;
+    sc_json_object_set(alloc, obj, "uninstalled", sc_json_bool_new(alloc, success));
+    sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+    sc_json_free(alloc, obj);
+    return err;
+}
+
+/* ── skills.update ───────────────────────────────────────────────────── */
+
+static sc_error_t handle_skills_update(sc_allocator_t *alloc, char **out, size_t *out_len) {
+    sc_error_t e = sc_skill_registry_update(alloc);
+    bool success = (e == SC_OK);
+
+    sc_json_value_t *obj = sc_json_object_new(alloc);
+    if (!obj)
+        return SC_ERR_OUT_OF_MEMORY;
+    sc_json_object_set(alloc, obj, "updated", sc_json_bool_new(alloc, success));
+    sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+    sc_json_free(alloc, obj);
+    return err;
+}
+
 #endif /* SC_HAS_SKILLS */
 
 /* ── models.list ─────────────────────────────────────────────────────── */
@@ -1552,6 +1644,12 @@ static sc_error_t build_method_response(sc_allocator_t *alloc, const char *metho
         return handle_skill_toggle(alloc, app, root, false, payload_out, payload_len_out);
     if (strcmp(method, "skills.install") == 0)
         return handle_skills_install(alloc, app, root, payload_out, payload_len_out);
+    if (strcmp(method, "skills.search") == 0)
+        return handle_skills_search(alloc, root, payload_out, payload_len_out);
+    if (strcmp(method, "skills.uninstall") == 0)
+        return handle_skills_uninstall(alloc, app, root, payload_out, payload_len_out);
+    if (strcmp(method, "skills.update") == 0)
+        return handle_skills_update(alloc, payload_out, payload_len_out);
 #endif
 #ifdef SC_HAS_UPDATE
     if (strcmp(method, "update.check") == 0)
