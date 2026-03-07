@@ -3,7 +3,7 @@
 # ── Stage 1: Build ────────────────────────────────────────────
 FROM alpine:3.23 AS builder
 
-RUN apk add --no-cache build-base cmake sqlite-dev curl-dev
+RUN apk add --no-cache build-base cmake sqlite-dev curl-dev linux-headers
 
 WORKDIR /app
 COPY CMakeLists.txt ./

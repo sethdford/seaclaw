@@ -369,6 +369,54 @@ static void test_reload_flag_get_again_returns_false_cleared(void) {
     SC_ASSERT_FALSE(sc_config_get_and_clear_reload_requested());
 }
 
+/* ─── sc_config_get_tool_model_override ─────────────────────────────────────── */
+
+static void test_config_get_tool_model_override_null_cfg(void) {
+    const char *prov = NULL, *mod = NULL;
+    SC_ASSERT_FALSE(sc_config_get_tool_model_override(NULL, "web_search", &prov, &mod));
+}
+
+static void test_config_get_tool_model_override_null_tool(void) {
+    sc_config_t cfg = {0};
+    const char *prov = NULL, *mod = NULL;
+    SC_ASSERT_FALSE(sc_config_get_tool_model_override(&cfg, NULL, &prov, &mod));
+}
+
+static void test_config_get_tool_model_override_not_found(void) {
+    sc_config_t *cfg = make_config_with_arena();
+    cfg->default_provider = sc_strdup(&cfg->allocator, "openai");
+    cfg->default_model = sc_strdup(&cfg->allocator, "gpt-4");
+    const char *prov = NULL, *mod = NULL;
+    SC_ASSERT_FALSE(sc_config_get_tool_model_override(cfg, "web_search", &prov, &mod));
+    free_config(cfg);
+}
+
+static void test_config_get_tool_model_override_found(void) {
+    sc_config_t *cfg = make_config_with_arena();
+    cfg->default_provider = sc_strdup(&cfg->allocator, "openai");
+    cfg->default_model = sc_strdup(&cfg->allocator, "gpt-4");
+    const char *json = "{\"tools\":{\"tool_model_overrides\":{"
+                       "\"web_search\":{\"provider\":\"gemini\",\"model\":\"gemini-2.5-flash\"},"
+                       "\"shell\":{\"provider\":\"anthropic\",\"model\":\"claude-sonnet-4.6\"}"
+                       "}}}";
+    sc_error_t err = sc_config_parse_json(cfg, json, strlen(json));
+    SC_ASSERT_EQ(err, SC_OK);
+    const char *prov = NULL, *mod = NULL;
+    SC_ASSERT_TRUE(sc_config_get_tool_model_override(cfg, "web_search", &prov, &mod));
+    SC_ASSERT_NOT_NULL(prov);
+    SC_ASSERT_NOT_NULL(mod);
+    SC_ASSERT_STR_EQ(prov, "gemini");
+    SC_ASSERT_STR_EQ(mod, "gemini-2.5-flash");
+    prov = NULL;
+    mod = NULL;
+    SC_ASSERT_TRUE(sc_config_get_tool_model_override(cfg, "shell", &prov, &mod));
+    SC_ASSERT_NOT_NULL(prov);
+    SC_ASSERT_NOT_NULL(mod);
+    SC_ASSERT_STR_EQ(prov, "anthropic");
+    SC_ASSERT_STR_EQ(mod, "claude-sonnet-4.6");
+    free_config(cfg);
+}
+
 /* ─── run ──────────────────────────────────────────────────────────────────── */
 
 void run_config_getters_tests(void) {
@@ -409,4 +457,8 @@ void run_config_getters_tests(void) {
     SC_RUN_TEST(test_persona_for_channel_falls_back_to_default);
     SC_RUN_TEST(test_reload_flag_set_then_get_returns_true);
     SC_RUN_TEST(test_reload_flag_get_again_returns_false_cleared);
+    SC_RUN_TEST(test_config_get_tool_model_override_null_cfg);
+    SC_RUN_TEST(test_config_get_tool_model_override_null_tool);
+    SC_RUN_TEST(test_config_get_tool_model_override_not_found);
+    SC_RUN_TEST(test_config_get_tool_model_override_found);
 }

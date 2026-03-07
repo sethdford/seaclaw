@@ -5,6 +5,7 @@
 #include "seaclaw/core/process_util.h"
 #include "seaclaw/core/string.h"
 #ifdef SC_HAS_CRON
+#include "seaclaw/cron.h"
 #include "seaclaw/crontab.h"
 #endif
 #include <limits.h>
@@ -24,6 +25,13 @@
 #define SC_DAEMON_PID_DIR  ".seaclaw"
 #define SC_DAEMON_PID_FILE "seaclaw.pid"
 #define SC_MAX_PATH        1024
+
+/* GCC's warn_unused_result is not suppressed by (void) casts */
+#define SC_IGNORE_RESULT(expr)   \
+    do {                         \
+        if ((expr)) { /* noop */ \
+        }                        \
+    } while (0)
 
 static sc_error_t validate_home(const char *home) {
     if (!home || !home[0]) {
@@ -200,6 +208,74 @@ static void run_cron_tick(sc_allocator_t *alloc) {
     alloc->free(alloc->ctx, cron_path, cron_path_len + 1);
 }
 
+sc_error_t sc_service_run_agent_cron(sc_allocator_t *alloc, sc_agent_t *agent,
+                                     sc_service_channel_t *channels, size_t channel_count) {
+    if (!alloc || !agent || !agent->scheduler)
+        return SC_ERR_INVALID_ARGUMENT;
+
+    size_t job_count = 0;
+    const sc_cron_job_t *jobs = sc_cron_list_jobs(agent->scheduler, &job_count);
+    if (!jobs || job_count == 0)
+        return SC_OK;
+
+    time_t now = time(NULL);
+    struct tm tm;
+    localtime_r(&now, &tm);
+
+    for (size_t i = 0; i < job_count; i++) {
+        if (jobs[i].type != SC_CRON_JOB_AGENT || !jobs[i].enabled || jobs[i].paused)
+            continue;
+        if (!jobs[i].command || !jobs[i].expression)
+            continue;
+        if (!sc_cron_schedule_matches(jobs[i].expression, &tm))
+            continue;
+
+        const char *prompt = jobs[i].command;
+        size_t prompt_len = strlen(prompt);
+        const char *target_channel = jobs[i].channel;
+
+        if (target_channel && channels) {
+            agent->active_channel = target_channel;
+            agent->active_channel_len = strlen(target_channel);
+        }
+
+        char *response = NULL;
+        size_t response_len = 0;
+#ifndef SC_IS_TEST
+        sc_error_t err = sc_agent_turn(agent, prompt, prompt_len, &response, &response_len);
+#else
+        (void)prompt_len;
+        sc_error_t err = SC_OK;
+        response = sc_strndup(alloc, "[agent-cron-test]", 17);
+        response_len = 17;
+#endif
+
+        if (err == SC_OK && response && response_len > 0 && target_channel && channels) {
+            for (size_t c = 0; c < channel_count; c++) {
+                if (!channels[c].channel || !channels[c].channel->vtable ||
+                    !channels[c].channel->vtable->name)
+                    continue;
+                const char *ch_name = channels[c].channel->vtable->name(channels[c].channel->ctx);
+                if (ch_name && strcmp(ch_name, target_channel) == 0) {
+                    if (channels[c].channel->vtable->send) {
+                        (void)channels[c].channel->vtable->send(channels[c].channel->ctx, NULL, 0,
+                                                                response, response_len, NULL, 0);
+                    }
+                    break;
+                }
+            }
+        }
+
+        (void)sc_cron_add_run(agent->scheduler, alloc, jobs[i].id, (int64_t)now,
+                              err == SC_OK ? "success" : "failed", response);
+
+        if (response)
+            alloc->free(alloc->ctx, response, response_len + 1);
+        sc_agent_clear_history(agent);
+    }
+    return SC_OK;
+}
+
 #endif /* SC_HAS_CRON */
 
 /* ── Signal handling (non-test only) ─────────────────────────────────── */
@@ -233,6 +309,7 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
     (void)config;
 #ifdef SC_HAS_CRON
     run_cron_tick(alloc);
+    sc_service_run_agent_cron(alloc, agent, channels, channel_count);
 #endif
     return SC_OK;
 #else
@@ -269,6 +346,7 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
             time_t current_minute = t / 60;
             if (current_minute > last_cron_minute) {
                 run_cron_tick(alloc);
+                sc_service_run_agent_cron(alloc, agent, channels, channel_count);
                 last_cron_minute = current_minute;
             }
         }
@@ -666,7 +744,7 @@ sc_error_t sc_daemon_uninstall(void) {
     char cmd[SC_MAX_PATH * 2];
     n = snprintf(cmd, sizeof(cmd), "launchctl unload \"%s\"", plist);
     if (n > 0 && (size_t)n < sizeof(cmd))
-        (void)system(cmd);
+        SC_IGNORE_RESULT(system(cmd));
 
     remove(plist);
     return SC_OK;
@@ -709,7 +787,7 @@ sc_error_t sc_daemon_install(sc_allocator_t *alloc) {
     n = snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p \"%s\"", dir);
     if (n <= 0 || (size_t)n >= sizeof(mkdir_cmd))
         return SC_ERR_IO;
-    (void)system(mkdir_cmd);
+    SC_IGNORE_RESULT(system(mkdir_cmd));
 
     char bin[SC_MAX_PATH];
     int found = 0;
@@ -754,7 +832,7 @@ sc_error_t sc_daemon_install(sc_allocator_t *alloc) {
             bin, home);
     fclose(f);
 
-    (void)system("systemctl --user daemon-reload");
+    SC_IGNORE_RESULT(system("systemctl --user daemon-reload"));
     if (system("systemctl --user enable --now " SC_SYSTEMD_UNIT) != 0)
         return SC_ERR_IO;
 
@@ -762,7 +840,7 @@ sc_error_t sc_daemon_install(sc_allocator_t *alloc) {
 }
 
 sc_error_t sc_daemon_uninstall(void) {
-    (void)system("systemctl --user disable --now " SC_SYSTEMD_UNIT);
+    SC_IGNORE_RESULT(system("systemctl --user disable --now " SC_SYSTEMD_UNIT));
 
     const char *home = getenv("HOME");
     if (!home)
@@ -774,7 +852,7 @@ sc_error_t sc_daemon_uninstall(void) {
     if (n > 0 && (size_t)n < sizeof(unit_path))
         remove(unit_path);
 
-    (void)system("systemctl --user daemon-reload");
+    SC_IGNORE_RESULT(system("systemctl --user daemon-reload"));
     return SC_OK;
 }
 

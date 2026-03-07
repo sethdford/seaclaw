@@ -131,8 +131,10 @@ struct sc_agent {
     struct sc_undo_stack *undo_stack;
 
     /* Superhuman intelligence features */
-    struct sc_awareness *awareness; /* optional; bus-based situational awareness */
+    struct sc_awareness *awareness;      /* optional; bus-based situational awareness */
+    struct sc_cron_scheduler *scheduler; /* optional; in-memory cron scheduler for agent jobs */
     sc_reflection_config_t reflection;
+    struct sc_outcome_tracker *outcomes; /* optional; tracks tool results and user corrections */
 
     bool chain_of_thought; /* inject reasoning instructions into prompt */
     char *persona_prompt;  /* custom identity override; owned */
@@ -175,6 +177,10 @@ void sc_agent_set_retrieval_engine(sc_agent_t *agent, sc_retrieval_engine_t *eng
 /* Optional: set awareness for situational context injection. Caller owns awareness lifecycle. */
 struct sc_awareness;
 void sc_agent_set_awareness(sc_agent_t *agent, struct sc_awareness *awareness);
+
+/* Optional: set outcome tracker for continuous learning. Caller owns tracker lifecycle. */
+struct sc_outcome_tracker;
+void sc_agent_set_outcomes(sc_agent_t *agent, struct sc_outcome_tracker *tracker);
 
 /* Run one conversation turn: send to provider, process tool calls, iterate. */
 sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, char **response_out,

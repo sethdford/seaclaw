@@ -238,6 +238,99 @@ static void test_agent_slash_clear(void) {
     sc_agent_deinit(&agent);
 }
 
+static void test_agent_sessions_command(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    mock_provider_t mock_ctx;
+    sc_provider_t prov = mock_provider_create(&alloc, &mock_ctx);
+
+    sc_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    sc_error_t err =
+        sc_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL, "gpt-4o", 6,
+                             "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    char *response = NULL;
+    size_t response_len = 0;
+    err = sc_agent_turn(&agent, "/sessions", 9, &response, &response_len);
+
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(response);
+    SC_ASSERT_TRUE(strstr(response, "Active sessions") != NULL);
+
+    if (response)
+        alloc.free(alloc.ctx, response, strlen(response) + 1);
+    sc_agent_deinit(&agent);
+}
+
+static void test_agent_kill_command(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    mock_provider_t mock_ctx;
+    sc_provider_t prov = mock_provider_create(&alloc, &mock_ctx);
+
+    sc_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    sc_error_t err =
+        sc_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL, "gpt-4o", 6,
+                             "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    /* Do a turn to add history */
+    char *r1 = NULL;
+    size_t r1_len = 0;
+    err = sc_agent_turn(&agent, "hi", 2, &r1, &r1_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(agent.history_count, 2);
+    if (r1)
+        alloc.free(alloc.ctx, r1, r1_len + 1);
+
+    /* Send /kill */
+    char *r2 = NULL;
+    size_t r2_len = 0;
+    err = sc_agent_turn(&agent, "/kill", 5, &r2, &r2_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(strstr(r2, "Session killed") != NULL);
+    SC_ASSERT_EQ(agent.history_count, 0);
+
+    if (r2)
+        alloc.free(alloc.ctx, r2, strlen(r2) + 1);
+    sc_agent_deinit(&agent);
+}
+
+static void test_agent_retry_command(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    mock_provider_t mock_ctx;
+    sc_provider_t prov = mock_provider_create(&alloc, &mock_ctx);
+
+    sc_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    sc_error_t err =
+        sc_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL, "gpt-4o", 6,
+                             "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    /* Do a turn to add history */
+    char *r1 = NULL;
+    size_t r1_len = 0;
+    err = sc_agent_turn(&agent, "hello", 5, &r1, &r1_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(agent.history_count, 2);
+    if (r1)
+        alloc.free(alloc.ctx, r1, r1_len + 1);
+
+    /* Send /retry */
+    char *r2 = NULL;
+    size_t r2_len = 0;
+    err = sc_agent_turn(&agent, "/retry", 6, &r2, &r2_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(strstr(r2, "Last response removed") != NULL);
+    SC_ASSERT_EQ(agent.history_count, 1);
+
+    if (r2)
+        alloc.free(alloc.ctx, r2, strlen(r2) + 1);
+    sc_agent_deinit(&agent);
+}
+
 static void test_agent_slash_model(void) {
     sc_allocator_t alloc = sc_system_allocator();
     mock_provider_t mock_ctx;
@@ -707,6 +800,9 @@ void run_e2e_tests(void) {
     SC_RUN_TEST(test_agent_turn_simple);
     SC_RUN_TEST(test_agent_slash_help);
     SC_RUN_TEST(test_agent_slash_clear);
+    SC_RUN_TEST(test_agent_sessions_command);
+    SC_RUN_TEST(test_agent_kill_command);
+    SC_RUN_TEST(test_agent_retry_command);
     SC_RUN_TEST(test_agent_slash_model);
     SC_RUN_TEST(test_agent_slash_status);
     SC_RUN_TEST(test_config_defaults);

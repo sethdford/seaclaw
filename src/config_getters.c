@@ -133,6 +133,23 @@ const char *sc_config_persona_for_channel(const sc_config_t *cfg, const char *ch
     return cfg->agent.persona;
 }
 
+bool sc_config_get_tool_model_override(const sc_config_t *cfg, const char *tool_name,
+                                       const char **provider_out, const char **model_out) {
+    if (!cfg || !tool_name)
+        return false;
+    for (size_t i = 0; i < cfg->tools.model_overrides_len; i++) {
+        if (cfg->tools.model_overrides[i].tool_name &&
+            strcmp(cfg->tools.model_overrides[i].tool_name, tool_name) == 0) {
+            if (provider_out)
+                *provider_out = cfg->tools.model_overrides[i].provider;
+            if (model_out)
+                *model_out = cfg->tools.model_overrides[i].model;
+            return true;
+        }
+    }
+    return false;
+}
+
 static volatile _Atomic int sc_reload_flag = 0;
 
 void sc_config_set_reload_requested(void) {

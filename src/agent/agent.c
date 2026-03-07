@@ -5,6 +5,7 @@
 #include "seaclaw/agent/episodic.h"
 #include "seaclaw/agent/mailbox.h"
 #include "seaclaw/agent/memory_loader.h"
+#include "seaclaw/agent/outcomes.h"
 #include "seaclaw/agent/planner.h"
 #include "seaclaw/agent/preferences.h"
 #include "seaclaw/agent/prompt.h"
@@ -156,6 +157,9 @@ sc_error_t sc_agent_from_config(
     out->max_history_messages = max_history_messages ? max_history_messages : 50;
     out->auto_save = auto_save;
     out->autonomy_level = autonomy_level;
+    out->reflection.enabled = true;
+    out->reflection.max_retries = 1;
+    out->reflection.min_response_tokens = 0;
     out->custom_instructions = NULL;
     out->custom_instructions_len = 0;
     if (custom_instructions && custom_instructions_len > 0) {
@@ -384,6 +388,12 @@ void sc_agent_set_awareness(sc_agent_t *agent, struct sc_awareness *awareness) {
     if (!agent)
         return;
     agent->awareness = awareness;
+}
+
+void sc_agent_set_outcomes(sc_agent_t *agent, struct sc_outcome_tracker *tracker) {
+    if (!agent)
+        return;
+    agent->outcomes = tracker;
 }
 
 void sc_agent_deinit(sc_agent_t *agent) {
@@ -655,6 +665,9 @@ char *sc_agent_handle_slash_command(sc_agent_t *agent, const char *message, size
                            "  /help, /commands   Show this help\n"
                            "  /quit, /exit      End session\n"
                            "  /clear            Clear conversation history\n"
+                           "  /sessions         List active sessions\n"
+                           "  /kill             Clear history and reset session\n"
+                           "  /retry            Remove last response; resend to retry\n"
                            "  /model [name]     Show or switch model\n"
                            "  /provider         Show current provider\n"
                            "  /tools            List available tools\n"
@@ -681,6 +694,42 @@ char *sc_agent_handle_slash_command(sc_agent_t *agent, const char *message, size
         sc_strncasecmp(cmd_buf, "reset", 5) == 0) {
         sc_agent_clear_history(agent);
         return sc_strndup(agent->alloc, "History cleared.", 16);
+    }
+
+    if (sc_strncasecmp(cmd_buf, "sessions", 8) == 0) {
+        return sc_strndup(agent->alloc, "Active sessions:\n- default (current)\n", 42);
+    }
+
+    if (sc_strncasecmp(cmd_buf, "kill", 4) == 0) {
+        sc_agent_clear_history(agent);
+        return sc_strndup(agent->alloc, "Session killed. History cleared.", 33);
+    }
+
+    if (sc_strncasecmp(cmd_buf, "retry", 5) == 0) {
+        if (agent->history_count > 0) {
+            sc_owned_message_t *last = &agent->history[agent->history_count - 1];
+            if (last->content) {
+                agent->alloc->free(agent->alloc->ctx, last->content, last->content_len + 1);
+                last->content = NULL;
+            }
+            if (last->name) {
+                agent->alloc->free(agent->alloc->ctx, last->name, last->name_len + 1);
+                last->name = NULL;
+            }
+            if (last->tool_call_id) {
+                agent->alloc->free(agent->alloc->ctx, last->tool_call_id,
+                                   last->tool_call_id_len + 1);
+                last->tool_call_id = NULL;
+            }
+            if (last->tool_calls && last->tool_calls_count > 0) {
+                free_owned_tool_calls(agent->alloc, last->tool_calls, last->tool_calls_count);
+                last->tool_calls = NULL;
+                last->tool_calls_count = 0;
+            }
+            agent->history_count--;
+        }
+        return sc_strndup(agent->alloc, "Last response removed. Send your message again to retry.",
+                          57);
     }
 
     if (sc_strncasecmp(cmd_buf, "model", 5) == 0) {
@@ -1433,12 +1482,31 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                 SC_OBS_SAFE_RECORD_EVENT(agent, &ev);
             }
             if (resp.content && resp.content_len > 0) {
-                /* Reflection: evaluate response quality */
-                sc_reflection_config_t refl_cfg = {
-                    .enabled = true, .min_response_tokens = 0, .max_retries = 0};
-                sc_reflection_quality_t quality =
-                    sc_reflection_evaluate(msg, msg_len, resp.content, resp.content_len, &refl_cfg);
-                (void)quality; /* logged via observer if needed */
+                /* Reflection: evaluate response quality and retry if needed */
+                sc_reflection_quality_t quality = sc_reflection_evaluate(
+                    msg, msg_len, resp.content, resp.content_len, &agent->reflection);
+
+                if (quality == SC_QUALITY_NEEDS_RETRY && agent->reflection.enabled &&
+                    agent->reflection.max_retries > 0 && iter < agent->max_tool_iterations - 1) {
+                    agent->reflection.max_retries--;
+                    char *critique = NULL;
+                    size_t critique_len = 0;
+                    sc_error_t cerr = sc_reflection_build_critique_prompt(
+                        agent->alloc, msg, msg_len, resp.content, resp.content_len, &critique,
+                        &critique_len);
+                    if (cerr == SC_OK && critique) {
+                        (void)append_history(agent, SC_ROLE_ASSISTANT, resp.content,
+                                             resp.content_len, NULL, 0, NULL, 0);
+                        (void)append_history(agent, SC_ROLE_USER, critique, critique_len, NULL, 0,
+                                             NULL, 0);
+                        agent->alloc->free(agent->alloc->ctx, critique, critique_len + 1);
+                        sc_chat_response_free(agent->alloc, &resp);
+                        iter++;
+                        continue; /* retry with critique feedback */
+                    }
+                    if (critique)
+                        agent->alloc->free(agent->alloc->ctx, critique, critique_len + 1);
+                }
 
                 (void)append_history(agent, SC_ROLE_ASSISTANT, resp.content, resp.content_len, NULL,
                                      0, NULL, 0);
@@ -1928,6 +1996,8 @@ sc_error_t sc_agent_turn_stream(sc_agent_t *agent, const char *msg, size_t msg_l
         persona_prompt = NULL;
         if (memory_ctx)
             agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
+        if (awareness_ctx)
+            agent->alloc->free(agent->alloc->ctx, awareness_ctx, awareness_ctx_len + 1);
         if (err != SC_OK) {
             sc_agent_clear_current_for_tools();
             return err;

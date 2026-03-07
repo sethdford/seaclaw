@@ -4,6 +4,7 @@
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/json.h"
+#include "seaclaw/provider.h"
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -37,6 +38,14 @@ typedef struct sc_plan {
  * Caller must call sc_plan_free. */
 sc_error_t sc_planner_create_plan(sc_allocator_t *alloc, const char *goal_json,
                                   size_t goal_json_len, sc_plan_t **out);
+
+/* Generate a plan from a natural language goal by asking the LLM to decompose it.
+ * Uses the provider to produce structured JSON, then parses it via sc_planner_create_plan.
+ * tool_names: array of available tool names (used in the system prompt).
+ * Caller must call sc_plan_free on the result. */
+sc_error_t sc_planner_generate(sc_allocator_t *alloc, sc_provider_t *provider, const char *model,
+                               size_t model_len, const char *goal, size_t goal_len,
+                               const char *const *tool_names, size_t tool_count, sc_plan_t **out);
 
 /* Get next pending step, or NULL if none. Does not modify step status. */
 sc_plan_step_t *sc_planner_next_step(const sc_plan_t *plan);

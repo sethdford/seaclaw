@@ -47,6 +47,12 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                           sc_service_channel_t *channels, size_t channel_count,
                           struct sc_agent *agent, const struct sc_config *config);
 
+/* Run agent-type cron jobs that match the current time.
+ * Iterates the agent's in-memory scheduler, fires sc_agent_turn for SC_CRON_JOB_AGENT entries,
+ * and routes responses to the specified channel. */
+sc_error_t sc_service_run_agent_cron(sc_allocator_t *alloc, struct sc_agent *agent,
+                                     sc_service_channel_t *channels, size_t channel_count);
+
 sc_error_t sc_daemon_install(sc_allocator_t *alloc);
 sc_error_t sc_daemon_uninstall(void);
 sc_error_t sc_daemon_logs(void);

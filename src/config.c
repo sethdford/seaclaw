@@ -590,6 +590,51 @@ static sc_error_t parse_tools(sc_allocator_t *a, sc_config_t *cfg, const sc_json
         }
         parse_string_array(a, &cfg->tools.disabled_tools, &cfg->tools.disabled_tools_len, dis);
     }
+    sc_json_value_t *tmo = sc_json_object_get(obj, "tool_model_overrides");
+    if (tmo && tmo->type == SC_JSON_OBJECT && tmo->data.object.pairs) {
+        for (size_t i = 0; i < cfg->tools.model_overrides_len; i++) {
+            sc_tool_model_override_t *o = &cfg->tools.model_overrides[i];
+            if (o->tool_name) {
+                a->free(a->ctx, o->tool_name, strlen(o->tool_name) + 1);
+                o->tool_name = NULL;
+            }
+            if (o->provider) {
+                a->free(a->ctx, o->provider, strlen(o->provider) + 1);
+                o->provider = NULL;
+            }
+            if (o->model) {
+                a->free(a->ctx, o->model, strlen(o->model) + 1);
+                o->model = NULL;
+            }
+        }
+        cfg->tools.model_overrides_len = 0;
+        for (size_t i = 0; i < tmo->data.object.len &&
+                           cfg->tools.model_overrides_len < SC_TOOL_MODEL_OVERRIDES_MAX;
+             i++) {
+            sc_json_pair_t *p = &tmo->data.object.pairs[i];
+            if (!p->key || !p->value || p->value->type != SC_JSON_OBJECT)
+                continue;
+            const char *prov = sc_json_get_string(p->value, "provider");
+            const char *mod = sc_json_get_string(p->value, "model");
+            if (!prov || !prov[0] || !mod || !mod[0])
+                continue;
+            sc_tool_model_override_t *o =
+                &cfg->tools.model_overrides[cfg->tools.model_overrides_len];
+            o->tool_name = sc_strdup(a, p->key);
+            o->provider = sc_strdup(a, prov);
+            o->model = sc_strdup(a, mod);
+            if (o->tool_name && o->provider && o->model)
+                cfg->tools.model_overrides_len++;
+            else {
+                if (o->tool_name)
+                    a->free(a->ctx, o->tool_name, strlen(o->tool_name) + 1);
+                if (o->provider)
+                    a->free(a->ctx, o->provider, strlen(o->provider) + 1);
+                if (o->model)
+                    a->free(a->ctx, o->model, strlen(o->model) + 1);
+            }
+        }
+    }
     return SC_OK;
 }
 

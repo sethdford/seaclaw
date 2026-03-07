@@ -31,6 +31,8 @@ static void free_job(sc_allocator_t *alloc, sc_cron_job_t *job) {
         sc_str_free(alloc, job->command);
     if (job->name)
         sc_str_free(alloc, job->name);
+    if (job->channel)
+        sc_str_free(alloc, job->channel);
     if (job->last_status)
         sc_str_free(alloc, job->last_status);
     memset(job, 0, sizeof(*job));
@@ -108,6 +110,52 @@ sc_error_t sc_cron_add_job(sc_cron_scheduler_t *sched, sc_allocator_t *alloc,
                           ? sc_strndup(alloc, expression, strlen(expression))
                           : sc_strndup(alloc, "* * * * *", 9);
     job->command = sc_strndup(alloc, command, strlen(command));
+    job->name = (name && name[0]) ? sc_strndup(alloc, name, strlen(name)) : NULL;
+    if (!job->command || !job->expression) {
+        free_job(alloc, job);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+    job->enabled = true;
+    job->paused = false;
+    job->one_shot = false;
+    job->created_at_s = (int64_t)time(NULL);
+
+    sched->jobs_len++;
+    return SC_OK;
+}
+
+sc_error_t sc_cron_add_agent_job(sc_cron_scheduler_t *sched, sc_allocator_t *alloc,
+                                 const char *expression, const char *prompt, const char *channel,
+                                 const char *name, uint64_t *out_id) {
+    if (!sched || !alloc || !prompt || !out_id)
+        return SC_ERR_INVALID_ARGUMENT;
+    if (sched->jobs_len >= sched->max_tasks)
+        return SC_ERR_OUT_OF_MEMORY;
+
+    if (sched->jobs_len >= sched->jobs_cap) {
+        size_t new_cap = sched->jobs_cap == 0 ? 8 : sched->jobs_cap * 2;
+        if (new_cap > sched->max_tasks)
+            new_cap = sched->max_tasks;
+        sc_cron_job_t *n = (sc_cron_job_t *)alloc->realloc(alloc->ctx, sched->jobs,
+                                                           sched->jobs_cap * sizeof(sc_cron_job_t),
+                                                           new_cap * sizeof(sc_cron_job_t));
+        if (!n)
+            return SC_ERR_OUT_OF_MEMORY;
+        sched->jobs = n;
+        sched->jobs_cap = new_cap;
+    }
+
+    sc_cron_job_t *job = &sched->jobs[sched->jobs_len];
+    memset(job, 0, sizeof(*job));
+    job->id = sched->next_job_id++;
+    *out_id = job->id;
+    job->type = SC_CRON_JOB_AGENT;
+
+    job->expression = expression && expression[0]
+                          ? sc_strndup(alloc, expression, strlen(expression))
+                          : sc_strndup(alloc, "* * * * *", 9);
+    job->command = sc_strndup(alloc, prompt, strlen(prompt));
+    job->channel = (channel && channel[0]) ? sc_strndup(alloc, channel, strlen(channel)) : NULL;
     job->name = (name && name[0]) ? sc_strndup(alloc, name, strlen(name)) : NULL;
     if (!job->command || !job->expression) {
         free_job(alloc, job);

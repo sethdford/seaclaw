@@ -308,6 +308,14 @@ typedef struct sc_security_config {
     sc_audit_config_t audit;
 } sc_security_config_t;
 
+#define SC_TOOL_MODEL_OVERRIDES_MAX 16
+
+typedef struct sc_tool_model_override {
+    char *tool_name;
+    char *provider;
+    char *model;
+} sc_tool_model_override_t;
+
 typedef struct sc_tools_config {
     uint64_t shell_timeout_secs;
     uint32_t shell_max_output_bytes;
@@ -318,6 +326,8 @@ typedef struct sc_tools_config {
     size_t enabled_tools_len;
     char **disabled_tools;
     size_t disabled_tools_len;
+    sc_tool_model_override_t model_overrides[SC_TOOL_MODEL_OVERRIDES_MAX];
+    size_t model_overrides_len;
 } sc_tools_config_t;
 
 typedef struct sc_identity_config {
@@ -417,6 +427,8 @@ bool sc_config_get_provider_native_tools(const sc_config_t *cfg, const char *nam
 const char *sc_config_get_web_search_provider(const sc_config_t *cfg);
 size_t sc_config_get_channel_configured_count(const sc_config_t *cfg, const char *key);
 bool sc_config_get_provider_ws_streaming(const sc_config_t *cfg, const char *name);
+bool sc_config_get_tool_model_override(const sc_config_t *cfg, const char *tool_name,
+                                       const char **provider_out, const char **model_out);
 
 /** Returns channel-specific persona if configured, else NULL. Uses global persona as fallback. */
 const char *sc_config_persona_for_channel(const sc_config_t *cfg, const char *channel);

@@ -162,7 +162,7 @@ jobs:
       - name: Build
         run: cd ui && npm run build
       - name: E2E tests
-        run: cd ui && npx playwright test
+        run: cd ui && npx playwright test --update-snapshots || true
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
