@@ -417,46 +417,51 @@ export class ScLogsView extends GatewayAwareLitElement {
     const entries = this.filteredLogs;
     void this._relativeTimeKey;
     return html`
-      <sc-card class="log-card sc-stagger" glass>
-        <div class="log-area-wrapper">
-          <div class="log-area" role="log" aria-live="polite">
-            ${entries.length === 0
-              ? html`
-                  <sc-empty-state
-                    .icon=${icons["file-text"]}
-                    heading="Waiting for events..."
-                    description="Logs will stream here in real-time as the system processes requests."
-                  ></sc-empty-state>
-                `
-              : html`
-                  <div class="log-timeline">
-                    ${entries.map(
-                      (l, i) => html`
-                        <div class="log-entry" style="animation-delay: ${i * 50}ms">
-                          <div class="dot ${this.dotStatus(l.event)}" aria-hidden="true"></div>
-                          <div class="line" aria-hidden="true"></div>
-                          <div class="content">
-                            <div class="log-entry-header">
-                              <span class="log-ts" title=${l.ts} aria-label=${`Timestamp: ${l.ts}`}
-                                >${formatRelativeTime(l.ts)}</span
-                              >
-                              <span class="event ${this.eventClass(l.event)}">[${l.event}]</span>
-                            </div>
-                            <div class="json-wrapper">
-                              <sc-json-viewer
-                                .data=${l.payload}
-                                expandedDepth=${1}
-                              ></sc-json-viewer>
+      <div class="sc-stagger">
+        <sc-card class="log-card" glass>
+          <div class="log-area-wrapper">
+            <div class="log-area" role="log" aria-live="polite">
+              ${entries.length === 0
+                ? html`
+                    <sc-empty-state
+                      .icon=${icons["file-text"]}
+                      heading="Waiting for events..."
+                      description="Logs will stream here in real-time as the system processes requests."
+                    ></sc-empty-state>
+                  `
+                : html`
+                    <div class="log-timeline">
+                      ${entries.map(
+                        (l, i) => html`
+                          <div class="log-entry" style="animation-delay: ${i * 50}ms">
+                            <div class="dot ${this.dotStatus(l.event)}" aria-hidden="true"></div>
+                            <div class="line" aria-hidden="true"></div>
+                            <div class="content">
+                              <div class="log-entry-header">
+                                <span
+                                  class="log-ts"
+                                  title=${l.ts}
+                                  aria-label=${`Timestamp: ${l.ts}`}
+                                  >${formatRelativeTime(l.ts)}</span
+                                >
+                                <span class="event ${this.eventClass(l.event)}">[${l.event}]</span>
+                              </div>
+                              <div class="json-wrapper">
+                                <sc-json-viewer
+                                  .data=${l.payload}
+                                  expandedDepth=${1}
+                                ></sc-json-viewer>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      `,
-                    )}
-                  </div>
-                `}
+                        `,
+                      )}
+                    </div>
+                  `}
+            </div>
           </div>
-        </div>
-      </sc-card>
+        </sc-card>
+      </div>
     `;
   }
 

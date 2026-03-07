@@ -634,7 +634,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
       ${filtered.length === 0 && this.skills.length > 0
         ? html`<sc-empty-state
             .icon=${icons.magnifyingGlass}
-            heading="No matches"
+            heading=${this.localSearch ? `No results for "${this.localSearch}"` : "No matches"}
             description="Try a different search or clear filters."
           ></sc-empty-state>`
         : filtered.length === 0
@@ -720,7 +720,11 @@ export class ScSkillsView extends GatewayAwareLitElement {
         : this.filteredRegistryResults.length === 0
           ? html`<sc-empty-state
               .icon=${icons.compass}
-              heading=${this.activeTag ? "No registry skills with this tag" : "No results"}
+              heading=${this.registryQuery
+                ? `No results for "${this.registryQuery}"`
+                : this.activeTag
+                  ? "No registry skills with this tag"
+                  : "No results"}
               description=${this.activeTag
                 ? "Try a different tag or search query."
                 : "Try a different search query."}
