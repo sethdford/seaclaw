@@ -57,7 +57,7 @@ SeaClaw's verified numbers (measured on macOS arm64, March 2026):
 Binary size:   ~500 KB (MinSizeRel + LTO, all channels)
 Peak RSS:      ~5.7 MB (--version), ~5.9 MB (test suite)
 Startup:       6–27 ms avg (Apple Silicon M4 Max)
-Tests:         2895 passing, 0 ASan errors
+Tests:         2910 passing, 0 ASan errors
 ```
 
 ### Why Switch from OpenClaw?
@@ -603,7 +603,7 @@ Build and tests require a C11 compiler and CMake 3.16+.
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Debug -DSC_ENABLE_ALL_CHANNELS=ON
 cmake --build .                            # Dev build
-./seaclaw_tests                             # 2895 tests
+./seaclaw_tests                             # 2910 tests
 cd ..
 ```
 
@@ -670,7 +670,7 @@ config.c Config loading/merging (~/.seaclaw/config.json)
 ...
 
 include/seaclaw/ Public C headers
-tests/ 92 test files, 2895 tests
+tests/ 92 test files, 2910 tests
 asm/ Platform-specific assembly (aarch64, x86_64, generic C)
 
 ```

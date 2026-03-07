@@ -26,7 +26,7 @@ Key extension points:
 - `src/peripherals/` (`sc_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **588 source + header files, ~101K lines of C, ~41K lines of tests, 2,910+ tests, 33 channels**.
+Current scale: **588 source + header files, ~101K lines of C, ~42K lines of tests, 2910 tests, 32 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
