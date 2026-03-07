@@ -440,6 +440,10 @@ export class ScApp extends LitElement {
         this.chatSessionKey = sessionPart;
       }
       this._ensureLoaded(targetTab).then(() => {
+        if (this._viewError) {
+          this.tab = targetTab;
+          return;
+        }
         if (!document.startViewTransition) {
           this.tab = targetTab;
           return;
@@ -466,6 +470,10 @@ export class ScApp extends LitElement {
       e.preventDefault();
       this.shortcutOverlayOpen = !this.shortcutOverlayOpen;
     }
+    if (e.key === "Escape" && this.moreSheetOpen) {
+      e.preventDefault();
+      this.moreSheetOpen = false;
+    }
   }
 
   private _toggleSidebar(): void {
@@ -475,8 +483,14 @@ export class ScApp extends LitElement {
 
   private async _ensureLoaded(tab: TabId): Promise<void> {
     if (loadedViews.has(tab)) return;
-    await VIEW_IMPORTS[tab]();
-    loadedViews.add(tab);
+    try {
+      await VIEW_IMPORTS[tab]();
+      loadedViews.add(tab);
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      console.error(`[sc-app] failed to load view "${tab}":`, err);
+      this._viewError = err;
+    }
   }
 
   private async _switchTab(tab: TabId): Promise<void> {
