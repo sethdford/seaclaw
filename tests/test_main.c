@@ -46,7 +46,9 @@ void run_net_security_tests(void);
 void run_path_security_tests(void);
 void run_process_util_tests(void);
 void run_prompt_tests(void);
+#ifdef SC_HAS_PERSONA
 void run_persona_tests(void);
+#endif
 void run_lifecycle_tests(void);
 void run_observer_tests(void);
 void run_session_tests(void);
@@ -143,7 +145,9 @@ int main(void) {
     run_path_security_tests();
     run_process_util_tests();
     run_prompt_tests();
+#ifdef SC_HAS_PERSONA
     run_persona_tests();
+#endif
     run_lifecycle_tests();
     run_observer_tests();
     run_session_tests();

@@ -297,6 +297,7 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                     agent->active_channel_len = 0;
                 }
 
+#ifdef SC_HAS_PERSONA
                 /* Apply per-channel persona override if configured */
                 if (config && agent->active_channel) {
                     const char *channel_persona =
@@ -317,6 +318,7 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
+#endif
 
                 /* Restore prior conversation for this sender */
                 if (agent->session_store && agent->session_store->vtable &&

@@ -49,7 +49,9 @@
 #ifdef SC_HAS_SKILLS
 #include "seaclaw/skillforge.h"
 #endif
+#ifdef SC_HAS_PERSONA
 #include "seaclaw/persona.h"
+#endif
 #include "seaclaw/plugin_loader.h"
 #include "seaclaw/tool.h"
 #include "seaclaw/tools/factory.h"
@@ -138,7 +140,9 @@ static sc_error_t cmd_service(sc_allocator_t *alloc, int argc, char **argv);
 static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv);
 static sc_error_t cmd_skills(sc_allocator_t *alloc, int argc, char **argv);
 static sc_error_t cmd_migrate(sc_allocator_t *alloc, int argc, char **argv);
+#ifdef SC_HAS_PERSONA
 static sc_error_t cmd_persona(sc_allocator_t *alloc, int argc, char **argv);
+#endif
 
 static const sc_command_t commands[] = {
     {"agent", "Start interactive agent (--demo: use local Ollama)", cmd_agent},
@@ -159,7 +163,9 @@ static const sc_command_t commands[] = {
     {"sandbox", "Show sandbox status and backends", cmd_sandbox},
     {"migrate", "Migrate memory backends", cmd_migrate},
     {"memory", "Memory operations", cmd_memory},
+#ifdef SC_HAS_PERSONA
     {"persona", "Create and manage persona profiles", cmd_persona},
+#endif
     {"workspace", "Workspace management", cmd_workspace},
     {"capabilities", "Show available capabilities", cmd_capabilities},
     {"models", "List available models", cmd_models},
@@ -1280,6 +1286,7 @@ static sc_error_t cmd_skills(sc_allocator_t *alloc, int argc, char **argv) {
 }
 #endif
 
+#ifdef SC_HAS_PERSONA
 static sc_error_t cmd_persona(sc_allocator_t *alloc, int argc, char **argv) {
     sc_persona_cli_args_t args;
     sc_error_t err = sc_persona_cli_parse(argc, (const char **)argv, &args);
@@ -1303,6 +1310,7 @@ static sc_error_t cmd_persona(sc_allocator_t *alloc, int argc, char **argv) {
     }
     return sc_persona_cli_run(alloc, &args);
 }
+#endif
 
 static sc_error_t cmd_migrate(sc_allocator_t *alloc, int argc, char **argv) {
     sc_migration_config_t mc = {

@@ -18,7 +18,9 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/observer.h"
+#ifdef SC_HAS_PERSONA
 #include "seaclaw/persona.h"
+#endif
 #include "seaclaw/provider.h"
 #include "seaclaw/voice.h"
 #include <ctype.h>
@@ -274,6 +276,7 @@ sc_error_t sc_agent_from_config(
     if (persona && persona_len > 0) {
         out->persona_name = sc_strndup(alloc, persona, persona_len);
         out->persona_name_len = persona_len;
+#ifdef SC_HAS_PERSONA
         out->persona = (sc_persona_t *)alloc->alloc(alloc->ctx, sizeof(sc_persona_t));
         if (out->persona) {
             memset(out->persona, 0, sizeof(sc_persona_t));
@@ -288,6 +291,7 @@ sc_error_t sc_agent_from_config(
                 out->persona = NULL;
             }
         }
+#endif
     }
 
     out->turn_arena = sc_arena_create(*alloc);
@@ -300,6 +304,7 @@ sc_error_t sc_agent_from_config(
     return SC_OK;
 }
 
+#ifdef SC_HAS_PERSONA
 sc_error_t sc_agent_set_persona(sc_agent_t *agent, const char *name, size_t name_len) {
     if (!agent)
         return SC_ERR_INVALID_ARGUMENT;
@@ -350,6 +355,7 @@ sc_error_t sc_agent_set_persona(sc_agent_t *agent, const char *name, size_t name
 
     return SC_OK;
 }
+#endif
 
 void sc_agent_set_mailbox(sc_agent_t *agent, sc_mailbox_t *mailbox) {
     if (!agent)
@@ -421,11 +427,13 @@ void sc_agent_deinit(sc_agent_t *agent) {
                            agent->custom_instructions_len + 1);
         agent->custom_instructions = NULL;
     }
+#ifdef SC_HAS_PERSONA
     if (agent->persona) {
         sc_persona_deinit(agent->alloc, agent->persona);
         agent->alloc->free(agent->alloc->ctx, agent->persona, sizeof(sc_persona_t));
         agent->persona = NULL;
     }
+#endif
     if (agent->persona_name) {
         agent->alloc->free(agent->alloc->ctx, agent->persona_name, agent->persona_name_len + 1);
         agent->persona_name = NULL;
@@ -1154,6 +1162,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     /* Build persona prompt fresh each turn (channel-dependent; no caching) */
     char *persona_prompt = NULL;
     size_t persona_prompt_len = 0;
+#ifdef SC_HAS_PERSONA
     if (agent->persona) {
         const char *ch = agent->active_channel;
         size_t ch_len = agent->active_channel_len;
@@ -1168,6 +1177,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             return perr;
         }
     }
+#endif
 
     /* Build system prompt using cached static portion when available */
     char *system_prompt = NULL;
@@ -1838,6 +1848,7 @@ sc_error_t sc_agent_turn_stream(sc_agent_t *agent, const char *msg, size_t msg_l
     /* Build persona prompt fresh each turn (channel-dependent; no caching) */
     char *persona_prompt = NULL;
     size_t persona_prompt_len = 0;
+#ifdef SC_HAS_PERSONA
     if (agent->persona) {
         const char *ch = agent->active_channel;
         size_t ch_len = agent->active_channel_len;
@@ -1850,6 +1861,7 @@ sc_error_t sc_agent_turn_stream(sc_agent_t *agent, const char *msg, size_t msg_l
             return perr;
         }
     }
+#endif
 
     char *system_prompt = NULL;
     size_t system_prompt_len = 0;

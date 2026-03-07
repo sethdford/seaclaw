@@ -92,7 +92,8 @@
 #else
 #define SC_TOOLS_PERSONA_COUNT 0
 #endif
-#define SC_TOOLS_COUNT_BASE (41 + SC_TOOLS_CRON_COUNT - 1 + SC_TOOLS_PERSONA_COUNT) /* 40 base + persona(0|1) + cron */
+#define SC_TOOLS_COUNT_BASE \
+    (41 + SC_TOOLS_CRON_COUNT - 1 + SC_TOOLS_PERSONA_COUNT) /* 40 base + persona(0|1) + cron */
 #ifdef SC_HAS_TOOLS_BROWSER
 #define SC_TOOLS_BROWSER_COUNT 3
 #else

@@ -1289,7 +1289,6 @@ set(SC_TEST_SOURCES
     tests/test_multimodal.c
     tests/test_retrieval.c
     tests/test_prompt.c
-    tests/test_persona.c
     tests/test_vector.c
     tests/test_vector_full.c
     tests/test_lifecycle.c
@@ -1339,11 +1338,17 @@ set(SC_TEST_SOURCES
     tests/test_context.c
     tests/test_qmd.c
 )
+if(SC_ENABLE_PERSONA)
+    list(APPEND SC_TEST_SOURCES tests/test_persona.c)
+endif()
 
 add_executable(seaclaw_tests ${SC_TEST_SOURCES} wasm/wasm_alloc.c)
 target_link_libraries(seaclaw_tests seaclaw_core_test)
 target_include_directories(seaclaw_tests PRIVATE ${SC_ROOT}/tests)
 target_compile_definitions(seaclaw_tests PRIVATE SC_IS_TEST=1 SC_GATEWAY_TEST_MODE=1 SC_HAS_NONE_ENGINE=1 SC_HAS_CRON=1 SC_HAS_PUSH=1 SC_HAS_UPDATE=1 SC_HAS_SKILLS=1)
+if(SC_ENABLE_PERSONA)
+    target_compile_definitions(seaclaw_tests PRIVATE SC_HAS_PERSONA=1)
+endif()
 if(UNIX AND NOT WIN32)
     target_compile_definitions(seaclaw_tests PRIVATE SC_GATEWAY_POSIX=1)
 endif()

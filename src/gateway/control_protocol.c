@@ -522,6 +522,7 @@ static sc_error_t handle_persona_set(sc_allocator_t *alloc, sc_app_context_t *ap
         return err;
     }
 
+#ifdef SC_HAS_PERSONA
     sc_error_t err = sc_agent_set_persona(app->agent, name, name_len);
     if (err != SC_OK) {
         const char *emsg = sc_error_string(err);
@@ -530,6 +531,14 @@ static sc_error_t handle_persona_set(sc_allocator_t *alloc, sc_app_context_t *ap
         sc_json_free(alloc, obj);
         return serr;
     }
+#else
+    (void)name;
+    (void)name_len;
+    json_set_str(alloc, obj, "error", "persona support not built (SC_ENABLE_PERSONA=OFF)");
+    sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+    sc_json_free(alloc, obj);
+    return err;
+#endif
 
     sc_json_object_set(alloc, obj, "ok", sc_json_bool_new(alloc, true));
     sc_error_t serr = sc_json_stringify(alloc, obj, out, out_len);

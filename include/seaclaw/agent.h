@@ -202,7 +202,9 @@ uint32_t sc_agent_estimate_tokens(const char *text, size_t len);
 sc_error_t sc_agent_execute_plan(sc_agent_t *agent, const char *plan_json, size_t plan_json_len,
                                  char **summary_out, size_t *summary_len_out);
 
+#ifdef SC_HAS_PERSONA
 /* Switch persona mid-conversation. name=NULL or name_len=0 clears the persona. */
 sc_error_t sc_agent_set_persona(sc_agent_t *agent, const char *name, size_t name_len);
+#endif
 
 #endif /* SC_AGENT_H */

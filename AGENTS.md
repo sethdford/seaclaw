@@ -7,7 +7,7 @@ Scope: entire repository.
 
 seaclaw is a C11 autonomous AI assistant runtime optimized for:
 
-- minimal binary size (~500 KB release with LTO, 175 exported symbols)
+- minimal binary size (~530 KB release with LTO)
 - minimal memory footprint (5–6 MB peak RSS measured)
 - zero dependencies beyond libc, optional SQLite and libcurl
 - Zig reference implementation archived in `archive/zig-reference/`
@@ -26,19 +26,18 @@ Key extension points:
 - `src/peripherals/` (`sc_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **587 source + header files, ~91K lines of C, ~41K lines of tests, 2895 tests, 33 channels**.
+Current scale: **588 source + header files, ~101K lines of C, ~41K lines of tests, 2,910+ tests, 33 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
 | Metric                   | Measured       |
 | ------------------------ | -------------- |
-| Binary size              | ~500 KB        |
-| Text section             | 448 KB         |
-| Exported symbols         | 188            |
+| Binary size              | ~530 KB        |
+| Text section             | 480 KB         |
 | Cold-start (`--version`) | 4–27 ms avg    |
 | Peak RSS (`--version`)   | ~5.7 MB        |
-| Peak RSS (test suite)    | ~7.2 MB        |
-| Test throughput          | 830+ tests/sec |
+| Peak RSS (test suite)    | ~6.0 MB        |
+| Test throughput          | 700+ tests/sec |
 
 Build and test:
 
@@ -62,7 +61,7 @@ These codebase realities should drive every design decision:
 2. **Binary size and memory are hard product constraints**
    - `cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON` is the release target. Every dependency and abstraction has a size cost.
    - Avoid adding unnecessary runtime allocations or large data tables without justification.
-   - Current release binary: ~500 KB (all features with LTO).
+   - Current release binary: ~530 KB (all features with LTO).
 
 3. **Security-critical surfaces are first-class**
    - `src/gateway/gateway.c`, `src/security/`, `src/tools/`, `src/runtime/` carry high blast radius.
@@ -157,7 +156,7 @@ src/
 
 include/seaclaw/       public C headers
 
-tests/                 95 test files, 2,895+ tests
+tests/                 92 test files, 2,910+ tests
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 
