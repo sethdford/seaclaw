@@ -1,16 +1,16 @@
 #include "seaclaw/agent/awareness.h"
 #include "seaclaw/agent/compaction.h"
+#include "seaclaw/agent/episodic.h"
 #include "seaclaw/agent/outcomes.h"
 #include "seaclaw/agent/planner.h"
-#include "seaclaw/agent/episodic.h"
 #include "seaclaw/agent/preferences.h"
 #include "seaclaw/agent/prompt.h"
 #include "seaclaw/agent/reflection.h"
 #include "seaclaw/bus.h"
-#include "seaclaw/cron.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"
+#include "seaclaw/cron.h"
 #include "seaclaw/memory.h"
 #include "test_framework.h"
 #include <stdio.h>
@@ -539,7 +539,8 @@ static void test_reflection_good_after_long_response(void) {
     sc_reflection_config_t cfg = {.enabled = true, .min_response_tokens = 0, .max_retries = 2};
     const char *resp = "This is a comprehensive answer that thoroughly addresses the question "
                        "about configuration settings and runtime behavior.";
-    sc_reflection_quality_t q = sc_reflection_evaluate("How does config?", 16, resp, strlen(resp), &cfg);
+    sc_reflection_quality_t q =
+        sc_reflection_evaluate("How does config?", 16, resp, strlen(resp), &cfg);
     SC_ASSERT_EQ(q, SC_QUALITY_GOOD);
 }
 
@@ -547,8 +548,8 @@ static void test_reflection_critique_prompt_format(void) {
     sc_allocator_t alloc = sc_system_allocator();
     char *critique = NULL;
     size_t len = 0;
-    sc_error_t err = sc_reflection_build_critique_prompt(&alloc, "what is 2+2?", 12, "idk", 3,
-                                                         &critique, &len);
+    sc_error_t err =
+        sc_reflection_build_critique_prompt(&alloc, "what is 2+2?", 12, "idk", 3, &critique, &len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(critique);
     SC_ASSERT_TRUE(strstr(critique, "what is 2+2?") != NULL);
@@ -568,9 +569,9 @@ static void test_planner_generate_stub(void) {
     memset(&dummy_vtable, 0, sizeof(dummy_vtable));
     sc_provider_t dummy_provider = {.vtable = &dummy_vtable, .ctx = NULL};
 
-    sc_error_t err = sc_planner_generate(&alloc, &dummy_provider, "gpt-4o", 6,
-                                         "Find all TODO comments in the codebase", 39, tools, 3,
-                                         &plan);
+    sc_error_t err =
+        sc_planner_generate(&alloc, &dummy_provider, "gpt-4o", 6,
+                            "Find all TODO comments in the codebase", 39, tools, 3, &plan);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(plan);
     SC_ASSERT_TRUE(plan->steps_count > 0);
@@ -584,6 +585,48 @@ static void test_planner_generate_null_args(void) {
     sc_error_t err = sc_planner_generate(NULL, NULL, NULL, 0, NULL, 0, NULL, 0, &plan);
     SC_ASSERT_NEQ(err, SC_OK);
     err = sc_planner_generate(&alloc, NULL, NULL, 0, "test", 4, NULL, 0, &plan);
+    SC_ASSERT_NEQ(err, SC_OK);
+}
+
+static void test_planner_replan_basic(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_plan_t *plan = NULL;
+    const char *tools[] = {"shell", "file_read", "web_search"};
+
+    sc_provider_vtable_t dummy_vtable;
+    memset(&dummy_vtable, 0, sizeof(dummy_vtable));
+    sc_provider_t dummy_provider = {.vtable = &dummy_vtable, .ctx = NULL};
+
+    sc_error_t err = sc_planner_replan(&alloc, &dummy_provider, "gpt-4o", 6,
+                                       "Find TODOs in codebase", 23, "  [1] grep: done\n", 18,
+                                       "shell: command not found", 24, tools, 3, &plan);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(plan);
+    SC_ASSERT_TRUE(plan->steps_count > 0);
+    SC_ASSERT_NOT_NULL(plan->steps[0].tool_name);
+    SC_ASSERT_TRUE(strcmp(plan->steps[0].tool_name, "shell") == 0);
+    sc_plan_free(&alloc, plan);
+}
+
+static void test_planner_replan_null_args(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_plan_t *plan = NULL;
+    const char *tools[] = {"shell"};
+
+    sc_provider_vtable_t dummy_vtable;
+    memset(&dummy_vtable, 0, sizeof(dummy_vtable));
+    sc_provider_t dummy_provider = {.vtable = &dummy_vtable, .ctx = NULL};
+
+    sc_error_t err = sc_planner_replan(NULL, &dummy_provider, "gpt-4o", 6, "goal", 4, "progress", 8,
+                                       "fail", 4, tools, 1, &plan);
+    SC_ASSERT_NEQ(err, SC_OK);
+
+    err = sc_planner_replan(&alloc, NULL, "gpt-4o", 6, "goal", 4, "progress", 8, "fail", 4, tools,
+                            1, &plan);
+    SC_ASSERT_NEQ(err, SC_OK);
+
+    err = sc_planner_replan(&alloc, &dummy_provider, "gpt-4o", 6, NULL, 0, "progress", 8, "fail", 4,
+                            tools, 1, &plan);
     SC_ASSERT_NEQ(err, SC_OK);
 }
 
@@ -799,6 +842,8 @@ void run_intelligence_tests(void) {
     /* Upgrade 4: Plan generation */
     SC_RUN_TEST(test_planner_generate_stub);
     SC_RUN_TEST(test_planner_generate_null_args);
+    SC_RUN_TEST(test_planner_replan_basic);
+    SC_RUN_TEST(test_planner_replan_null_args);
 
     /* Upgrade 5: Outcome tracking */
     SC_RUN_TEST(test_outcome_tracker_init);

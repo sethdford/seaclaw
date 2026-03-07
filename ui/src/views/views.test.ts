@@ -104,3 +104,162 @@ describe("sc-chat-view", () => {
     el.remove();
   });
 });
+
+type LitView = HTMLElement & { updateComplete: Promise<boolean> };
+
+function createView(tag: string): LitView {
+  const el = document.createElement(tag) as LitView;
+  document.body.appendChild(el);
+  return el;
+}
+
+describe("sc-overview-view", () => {
+  it("renders skeleton while loading", async () => {
+    const el = createView("sc-overview-view");
+    await el.updateComplete;
+    const skeletons = el.shadowRoot?.querySelectorAll("sc-skeleton");
+    expect(skeletons?.length).toBeGreaterThanOrEqual(1);
+    el.remove();
+  });
+
+  it("has shadow DOM content on first render", async () => {
+    const el = createView("sc-overview-view");
+    await el.updateComplete;
+    expect(el.shadowRoot?.children.length).toBeGreaterThan(0);
+    el.remove();
+  });
+});
+
+describe("sc-agents-view", () => {
+  it("renders shadow DOM content", async () => {
+    const el = createView("sc-agents-view");
+    await el.updateComplete;
+    expect(el.shadowRoot?.children.length).toBeGreaterThan(0);
+    el.remove();
+  });
+
+  it("has scoped CSS via adoptedStyleSheets or style elements", async () => {
+    const el = createView("sc-agents-view");
+    await el.updateComplete;
+    const hasAdopted = (el.shadowRoot?.adoptedStyleSheets?.length ?? 0) > 0;
+    const hasStyle = (el.shadowRoot?.querySelectorAll("style")?.length ?? 0) > 0;
+    expect(hasAdopted || hasStyle).toBe(true);
+    el.remove();
+  });
+});
+
+describe("sc-models-view", () => {
+  it("renders skeleton or content on first render", async () => {
+    const el = createView("sc-models-view");
+    await el.updateComplete;
+    const hasSkeleton = el.shadowRoot?.querySelector("sc-skeleton");
+    const hasContent = el.shadowRoot?.querySelector("h2, sc-page-hero, sc-search");
+    expect(hasSkeleton || hasContent).toBeTruthy();
+    el.remove();
+  });
+});
+
+describe("sc-tools-view", () => {
+  it("renders skeleton while loading", async () => {
+    const el = createView("sc-tools-view");
+    await el.updateComplete;
+    const skeletons = el.shadowRoot?.querySelectorAll("sc-skeleton");
+    expect(skeletons?.length).toBeGreaterThanOrEqual(1);
+    el.remove();
+  });
+});
+
+describe("sc-channels-view", () => {
+  it("renders skeleton or channel grid", async () => {
+    const el = createView("sc-channels-view");
+    await el.updateComplete;
+    const hasSkeleton = el.shadowRoot?.querySelector("sc-skeleton");
+    const hasGrid = el.shadowRoot?.querySelector(".grid, sc-search");
+    expect(hasSkeleton || hasGrid).toBeTruthy();
+    el.remove();
+  });
+});
+
+describe("sc-sessions-view", () => {
+  it("renders session list panel", async () => {
+    const el = createView("sc-sessions-view");
+    await el.updateComplete;
+    const panel = el.shadowRoot?.querySelector(".session-list-panel");
+    expect(panel).toBeTruthy();
+    el.remove();
+  });
+});
+
+describe("sc-config-view", () => {
+  it("renders skeleton while loading", async () => {
+    const el = createView("sc-config-view");
+    await el.updateComplete;
+    const skeletons = el.shadowRoot?.querySelectorAll("sc-skeleton");
+    expect(skeletons?.length).toBeGreaterThanOrEqual(1);
+    el.remove();
+  });
+});
+
+describe("sc-automations-view", () => {
+  it("renders content after load", async () => {
+    const el = createView("sc-automations-view");
+    await el.updateComplete;
+    expect(el.shadowRoot?.children.length).toBeGreaterThan(0);
+    el.remove();
+  });
+});
+
+describe("sc-skills-view", () => {
+  it("renders content after load", async () => {
+    const el = createView("sc-skills-view");
+    await el.updateComplete;
+    expect(el.shadowRoot?.children.length).toBeGreaterThan(0);
+    el.remove();
+  });
+});
+
+describe("sc-voice-view", () => {
+  it("renders voice UI content", async () => {
+    const el = createView("sc-voice-view");
+    await el.updateComplete;
+    expect(el.shadowRoot?.children.length).toBeGreaterThan(0);
+    el.remove();
+  });
+});
+
+describe("sc-nodes-view", () => {
+  it("renders content after load", async () => {
+    const el = createView("sc-nodes-view");
+    await el.updateComplete;
+    expect(el.shadowRoot?.children.length).toBeGreaterThan(0);
+    el.remove();
+  });
+});
+
+describe("sc-usage-view", () => {
+  it("renders content after load", async () => {
+    const el = createView("sc-usage-view");
+    await el.updateComplete;
+    expect(el.shadowRoot?.children.length).toBeGreaterThan(0);
+    el.remove();
+  });
+});
+
+describe("sc-security-view", () => {
+  it("renders content after load", async () => {
+    const el = createView("sc-security-view");
+    await el.updateComplete;
+    expect(el.shadowRoot?.children.length).toBeGreaterThan(0);
+    el.remove();
+  });
+});
+
+describe("sc-logs-view", () => {
+  it("renders log area", async () => {
+    const el = createView("sc-logs-view");
+    await el.updateComplete;
+    const logCard = el.shadowRoot?.querySelector("sc-card.log-card, .log-area");
+    expect(logCard).toBeTruthy();
+    el.remove();
+  });
+});

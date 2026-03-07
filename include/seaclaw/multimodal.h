@@ -36,6 +36,9 @@ sc_error_t sc_multimodal_encode_base64(sc_allocator_t *alloc, const void *data, 
 /* Detect MIME type from first few bytes */
 const char *sc_multimodal_detect_mime(const void *header, size_t header_len);
 
+/* Detect audio MIME type from file path extension (e.g. .wav -> "audio/wav") */
+const char *sc_multimodal_detect_audio_mime(const char *path, size_t path_len);
+
 /* Encode a local image file to base64 data URI */
 sc_error_t sc_multimodal_encode_image(sc_allocator_t *alloc, const char *file_path,
                                       char **out_data_uri, size_t *out_len);

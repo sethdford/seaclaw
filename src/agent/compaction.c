@@ -166,6 +166,20 @@ static void free_messages(sc_allocator_t *alloc, sc_owned_message_t *history, si
                     if (cp->data.image_base64.media_type)
                         alloc->free(alloc->ctx, (void *)cp->data.image_base64.media_type,
                                     cp->data.image_base64.media_type_len + 1);
+                } else if (cp->tag == SC_CONTENT_PART_AUDIO_BASE64) {
+                    if (cp->data.audio_base64.data)
+                        alloc->free(alloc->ctx, (void *)cp->data.audio_base64.data,
+                                    cp->data.audio_base64.data_len + 1);
+                    if (cp->data.audio_base64.media_type)
+                        alloc->free(alloc->ctx, (void *)cp->data.audio_base64.media_type,
+                                    cp->data.audio_base64.media_type_len + 1);
+                } else if (cp->tag == SC_CONTENT_PART_VIDEO_URL) {
+                    if (cp->data.video_url.url)
+                        alloc->free(alloc->ctx, (void *)cp->data.video_url.url,
+                                    cp->data.video_url.url_len + 1);
+                    if (cp->data.video_url.media_type)
+                        alloc->free(alloc->ctx, (void *)cp->data.video_url.media_type,
+                                    cp->data.video_url.media_type_len + 1);
                 }
             }
             alloc->free(alloc->ctx, history[i].content_parts,

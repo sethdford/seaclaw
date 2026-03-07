@@ -1,5 +1,6 @@
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/multimodal.h"
+#include "seaclaw/provider.h"
 #include "test_framework.h"
 #include <string.h>
 
@@ -266,6 +267,64 @@ static void test_parse_markers_null_alloc(void) {
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
 
+static void test_content_part_audio_create(void) {
+    sc_content_part_t part = {0};
+    part.tag = SC_CONTENT_PART_AUDIO_BASE64;
+    part.data.audio_base64.data = "SGVsbG8=";
+    part.data.audio_base64.data_len = 8;
+    part.data.audio_base64.media_type = "audio/wav";
+    part.data.audio_base64.media_type_len = 9;
+
+    SC_ASSERT_EQ(part.tag, SC_CONTENT_PART_AUDIO_BASE64);
+    SC_ASSERT_NOT_NULL(part.data.audio_base64.data);
+    SC_ASSERT_EQ(part.data.audio_base64.data_len, 8u);
+    SC_ASSERT_STR_EQ(part.data.audio_base64.media_type, "audio/wav");
+    SC_ASSERT_EQ(part.data.audio_base64.media_type_len, 9u);
+}
+
+static void test_content_part_video_create(void) {
+    sc_content_part_t part = {0};
+    part.tag = SC_CONTENT_PART_VIDEO_URL;
+    part.data.video_url.url = "https://example.com/video.mp4";
+    part.data.video_url.url_len = 28;
+    part.data.video_url.media_type = "video/mp4";
+    part.data.video_url.media_type_len = 9;
+
+    SC_ASSERT_EQ(part.tag, SC_CONTENT_PART_VIDEO_URL);
+    SC_ASSERT_NOT_NULL(part.data.video_url.url);
+    SC_ASSERT_EQ(part.data.video_url.url_len, 28u);
+    SC_ASSERT_STR_EQ(part.data.video_url.media_type, "video/mp4");
+    SC_ASSERT_EQ(part.data.video_url.media_type_len, 9u);
+}
+
+static void test_multimodal_detect_audio_mime_wav(void) {
+    SC_ASSERT_STR_EQ(sc_multimodal_detect_audio_mime("file.wav", 8), "audio/wav");
+}
+
+static void test_multimodal_detect_audio_mime_mp3(void) {
+    SC_ASSERT_STR_EQ(sc_multimodal_detect_audio_mime("track.mp3", 9), "audio/mpeg");
+}
+
+static void test_multimodal_detect_audio_mime_ogg(void) {
+    SC_ASSERT_STR_EQ(sc_multimodal_detect_audio_mime("sound.ogg", 9), "audio/ogg");
+}
+
+static void test_multimodal_detect_audio_mime_m4a(void) {
+    SC_ASSERT_STR_EQ(sc_multimodal_detect_audio_mime("song.m4a", 8), "audio/mp4");
+}
+
+static void test_multimodal_detect_audio_mime_flac(void) {
+    SC_ASSERT_STR_EQ(sc_multimodal_detect_audio_mime("lossless.flac", 13), "audio/flac");
+}
+
+static void test_multimodal_detect_audio_mime_unknown(void) {
+    SC_ASSERT_STR_EQ(sc_multimodal_detect_audio_mime("file.xyz", 8), "audio/wav");
+}
+
+static void test_multimodal_detect_audio_mime_path(void) {
+    SC_ASSERT_STR_EQ(sc_multimodal_detect_audio_mime("/tmp/recordings/voice.wav", 26), "audio/wav");
+}
+
 void run_multimodal_tests(void) {
     SC_TEST_SUITE("Multimodal");
     SC_RUN_TEST(test_base64_encode_empty);
@@ -290,4 +349,13 @@ void run_multimodal_tests(void) {
     SC_RUN_TEST(test_parse_markers_data_uri);
     SC_RUN_TEST(test_parse_markers_none);
     SC_RUN_TEST(test_parse_markers_null_alloc);
+    SC_RUN_TEST(test_content_part_audio_create);
+    SC_RUN_TEST(test_content_part_video_create);
+    SC_RUN_TEST(test_multimodal_detect_audio_mime_wav);
+    SC_RUN_TEST(test_multimodal_detect_audio_mime_mp3);
+    SC_RUN_TEST(test_multimodal_detect_audio_mime_ogg);
+    SC_RUN_TEST(test_multimodal_detect_audio_mime_m4a);
+    SC_RUN_TEST(test_multimodal_detect_audio_mime_flac);
+    SC_RUN_TEST(test_multimodal_detect_audio_mime_unknown);
+    SC_RUN_TEST(test_multimodal_detect_audio_mime_path);
 }

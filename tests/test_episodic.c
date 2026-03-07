@@ -2,6 +2,7 @@
 #include "seaclaw/agent/episodic.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/memory.h"
+#include "seaclaw/provider.h"
 #include "test_framework.h"
 #include <string.h>
 
@@ -95,12 +96,54 @@ static void test_episodic_key_prefix(void) {
     SC_ASSERT_EQ(SC_EPISODIC_KEY_PREFIX_LEN, 4);
 }
 
+static void test_episodic_summarize_llm_null_args(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t prov = {0};
+    const char *msgs[] = {"How do I build?", "Run cmake --build build"};
+    size_t lens[] = {16, 24};
+
+    SC_ASSERT_NULL(sc_episodic_summarize_session_llm(NULL, &prov, msgs, lens, 2, NULL));
+    SC_ASSERT_NULL(sc_episodic_summarize_session_llm(&alloc, &prov, NULL, lens, 2, NULL));
+}
+
+static void test_episodic_summarize_llm_basic(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t prov = {0};
+    const char *msgs[] = {"How do I compile seaclaw?", "Run cmake --build build"};
+    size_t lens[] = {25, 24};
+
+    size_t out_len = 0;
+    char *summary = sc_episodic_summarize_session_llm(&alloc, &prov, msgs, lens, 2, &out_len);
+    SC_ASSERT_NOT_NULL(summary);
+    SC_ASSERT_TRUE(out_len > 0);
+    SC_ASSERT_TRUE(strstr(summary, "LLM summary:") != NULL);
+    SC_ASSERT_TRUE(strstr(summary, "compile seaclaw") != NULL);
+    alloc.free(alloc.ctx, summary, out_len + 1);
+}
+
+static void test_episodic_summarize_llm_fallback(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *msgs[] = {"What is the build command?", "Use cmake --build build"};
+    size_t lens[] = {25, 22};
+
+    size_t out_len = 0;
+    char *summary = sc_episodic_summarize_session_llm(&alloc, NULL, msgs, lens, 2, &out_len);
+    SC_ASSERT_NOT_NULL(summary);
+    SC_ASSERT_TRUE(out_len > 0);
+    SC_ASSERT_TRUE(strstr(summary, "Session topic:") != NULL);
+    SC_ASSERT_TRUE(strstr(summary, "build command") != NULL);
+    alloc.free(alloc.ctx, summary, out_len + 1);
+}
+
 void run_episodic_tests(void) {
     SC_TEST_SUITE("Episodic");
     SC_RUN_TEST(test_episodic_summarize_null);
     SC_RUN_TEST(test_episodic_summarize_basic);
     SC_RUN_TEST(test_episodic_summarize_long_truncation);
     SC_RUN_TEST(test_episodic_summarize_skips_empty_first);
+    SC_RUN_TEST(test_episodic_summarize_llm_null_args);
+    SC_RUN_TEST(test_episodic_summarize_llm_basic);
+    SC_RUN_TEST(test_episodic_summarize_llm_fallback);
     SC_RUN_TEST(test_episodic_store_null_args);
     SC_RUN_TEST(test_episodic_load_null_args);
     SC_RUN_TEST(test_episodic_store_with_session_id);

@@ -1,5 +1,6 @@
 #include "seaclaw/agent/planner.h"
 #include "seaclaw/core/string.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -233,6 +234,158 @@ sc_error_t sc_planner_generate(sc_allocator_t *alloc, sc_provider_t *provider, c
     }
 
     /* Find the JSON object in the response (skip any markdown fences) */
+    const char *json_start = resp.content;
+    size_t json_len = resp.content_len;
+    for (size_t i = 0; i < resp.content_len; i++) {
+        if (resp.content[i] == '{') {
+            json_start = resp.content + i;
+            json_len = resp.content_len - i;
+            break;
+        }
+    }
+
+    err = sc_planner_create_plan(alloc, json_start, json_len, out);
+    sc_chat_response_free(alloc, &resp);
+    return err;
+#endif
+}
+
+/* ── Replan after step failure ───────────────────────────────────────────── */
+
+#define SC_REPLAN_SYS_PREFIX                                                          \
+    "You are a task planner. A plan step failed. Create a REVISED plan to achieve "   \
+    "the remaining goal.\nReturn ONLY valid JSON with this exact format:\n"           \
+    "{\"steps\":[{\"tool\":\"tool_name\",\"args\":{...},\"description\":\"...\"}]}\n" \
+    "Available tools: "
+
+#define SC_REPLAN_SYS_SUFFIX "\nKeep plans minimal — fewest steps that accomplish the goal."
+
+sc_error_t sc_planner_replan(sc_allocator_t *alloc, sc_provider_t *provider, const char *model,
+                             size_t model_len, const char *original_goal, size_t original_goal_len,
+                             const char *progress_summary, size_t progress_summary_len,
+                             const char *failure_detail, size_t failure_detail_len,
+                             const char *const *tool_names, size_t tool_count, sc_plan_t **out) {
+    if (!alloc || !provider || !provider->vtable || !original_goal || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+
+#ifdef SC_IS_TEST
+    (void)model;
+    (void)model_len;
+    (void)progress_summary;
+    (void)progress_summary_len;
+    (void)failure_detail;
+    (void)failure_detail_len;
+    (void)tool_names;
+    (void)tool_count;
+    const char *stub = "{\"steps\":[{\"tool\":\"shell\",\"args\":{\"command\":\"echo replan\"},"
+                       "\"description\":\"replanned step\"}]}";
+    return sc_planner_create_plan(alloc, stub, strlen(stub), out);
+#else
+    /* Build system prompt: prefix + tool names + suffix */
+    size_t sys_cap = strlen(SC_REPLAN_SYS_PREFIX) + strlen(SC_REPLAN_SYS_SUFFIX) + 2;
+    for (size_t i = 0; i < tool_count; i++)
+        sys_cap += tool_names[i] ? strlen(tool_names[i]) + 2 : 0;
+
+    char *sys = (char *)alloc->alloc(alloc->ctx, sys_cap);
+    if (!sys)
+        return SC_ERR_OUT_OF_MEMORY;
+
+    size_t pos = 0;
+    size_t plen = strlen(SC_REPLAN_SYS_PREFIX);
+    memcpy(sys, SC_REPLAN_SYS_PREFIX, plen);
+    pos = plen;
+
+    for (size_t i = 0; i < tool_count; i++) {
+        if (!tool_names[i])
+            continue;
+        if (i > 0) {
+            sys[pos++] = ',';
+            sys[pos++] = ' ';
+        }
+        size_t nlen = strlen(tool_names[i]);
+        memcpy(sys + pos, tool_names[i], nlen);
+        pos += nlen;
+    }
+
+    size_t slen = strlen(SC_REPLAN_SYS_SUFFIX);
+    memcpy(sys + pos, SC_REPLAN_SYS_SUFFIX, slen);
+    pos += slen;
+    sys[pos] = '\0';
+
+    /* Build user message: goal + progress + failure */
+    size_t user_cap = 256;
+    if (original_goal_len > 0)
+        user_cap += original_goal_len;
+    if (progress_summary_len > 0)
+        user_cap += progress_summary_len;
+    if (failure_detail_len > 0)
+        user_cap += failure_detail_len;
+
+    char *user = (char *)alloc->alloc(alloc->ctx, user_cap);
+    if (!user) {
+        alloc->free(alloc->ctx, sys, sys_cap);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+
+    int off = snprintf(user, user_cap, "The original goal was: %.*s\n", (int)original_goal_len,
+                       original_goal);
+    if (off < 0)
+        off = 0;
+
+    if (progress_summary && progress_summary_len > 0) {
+        off += snprintf(user + off, user_cap - (size_t)off, "Progress so far: %.*s\n",
+                        (int)progress_summary_len, progress_summary);
+        if (off < 0)
+            off = (int)(user_cap - 1);
+    }
+
+    if (failure_detail && failure_detail_len > 0) {
+        off += snprintf(user + off, user_cap - (size_t)off, "The last step failed: %.*s\n",
+                        (int)failure_detail_len, failure_detail);
+        if (off < 0)
+            off = (int)(user_cap - 1);
+    }
+
+    off += snprintf(user + off, user_cap - (size_t)off,
+                    "Create a revised plan to achieve the remaining goal.");
+    if (off < 0 || (size_t)off >= user_cap)
+        off = (int)user_cap - 1;
+    size_t user_len = (size_t)off;
+
+    sc_chat_message_t msgs[2];
+    memset(msgs, 0, sizeof(msgs));
+    msgs[0].role = SC_ROLE_SYSTEM;
+    msgs[0].content = sys;
+    msgs[0].content_len = pos;
+    msgs[1].role = SC_ROLE_USER;
+    msgs[1].content = user;
+    msgs[1].content_len = user_len;
+
+    sc_chat_request_t req;
+    memset(&req, 0, sizeof(req));
+    req.model = model;
+    req.model_len = model_len;
+    req.messages = msgs;
+    req.messages_count = 2;
+    req.temperature = 0.2;
+
+    sc_chat_response_t resp;
+    memset(&resp, 0, sizeof(resp));
+
+    sc_error_t err =
+        provider->vtable->chat(provider->ctx, alloc, &req, model, model_len, 0.2, &resp);
+    alloc->free(alloc->ctx, sys, sys_cap);
+    alloc->free(alloc->ctx, user, user_cap);
+
+    if (err != SC_OK)
+        return err;
+
+    if (!resp.content || resp.content_len == 0) {
+        sc_chat_response_free(alloc, &resp);
+        return SC_ERR_INVALID_ARGUMENT;
+    }
+
     const char *json_start = resp.content;
     size_t json_len = resp.content_len;
     for (size_t i = 0; i < resp.content_len; i++) {

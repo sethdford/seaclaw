@@ -4,6 +4,7 @@
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/memory.h"
+#include "seaclaw/provider.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -26,6 +27,13 @@ typedef struct sc_episode {
 char *sc_episodic_summarize_session(sc_allocator_t *alloc, const char *const *messages,
                                     const size_t *message_lens, size_t message_count,
                                     size_t *out_len);
+
+/* LLM-based session summarization — calls the provider to produce a concise
+ * 2-3 sentence summary. Falls back to rule-based on provider failure.
+ * Caller owns the returned string. */
+char *sc_episodic_summarize_session_llm(sc_allocator_t *alloc, sc_provider_t *provider,
+                                        const char *const *messages, const size_t *message_lens,
+                                        size_t message_count, size_t *out_len);
 
 /* Store an episode into the memory backend. */
 sc_error_t sc_episodic_store(sc_memory_t *memory, sc_allocator_t *alloc, const char *session_id,

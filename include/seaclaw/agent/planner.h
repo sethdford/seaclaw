@@ -47,6 +47,15 @@ sc_error_t sc_planner_generate(sc_allocator_t *alloc, sc_provider_t *provider, c
                                size_t model_len, const char *goal, size_t goal_len,
                                const char *const *tool_names, size_t tool_count, sc_plan_t **out);
 
+/* Generate a revised plan after a step failure. Takes the original goal,
+ * what has succeeded so far, and what failed. Returns a new plan.
+ * Under SC_IS_TEST, returns a minimal stub plan. */
+sc_error_t sc_planner_replan(sc_allocator_t *alloc, sc_provider_t *provider, const char *model,
+                             size_t model_len, const char *original_goal, size_t original_goal_len,
+                             const char *progress_summary, size_t progress_summary_len,
+                             const char *failure_detail, size_t failure_detail_len,
+                             const char *const *tool_names, size_t tool_count, sc_plan_t **out);
+
 /* Get next pending step, or NULL if none. Does not modify step status. */
 sc_plan_step_t *sc_planner_next_step(const sc_plan_t *plan);
 

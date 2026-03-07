@@ -161,7 +161,7 @@ Backend:
 
 UI:
 
-- `ui/src/views/cron-view.ts` — full rewrite to `automations-view.ts`
+- `ui/src/views/automations-view.ts` — replaced former `cron-view.ts` (now deleted)
 - `ui/src/app.ts` — routing rename
 - `ui/src/components/sidebar.ts` — label/icon
 - `ui/src/components/command-palette.ts` — label/icon

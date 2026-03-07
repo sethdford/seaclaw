@@ -70,6 +70,40 @@ sc_error_t sc_multimodal_encode_base64(sc_allocator_t *alloc, const void *data, 
     return SC_OK;
 }
 
+const char *sc_multimodal_detect_audio_mime(const char *path, size_t path_len) {
+    if (!path || path_len == 0)
+        return "audio/wav";
+    const char *dot = NULL;
+    for (size_t i = path_len; i > 0; i--) {
+        if (path[i - 1] == '.') {
+            dot = path + i - 1;
+            break;
+        }
+        if (path[i - 1] == '/' || path[i - 1] == '\\')
+            break;
+    }
+    if (!dot || dot >= path + path_len - 1)
+        return "audio/wav";
+    const char *ext = dot + 1;
+    size_t ext_len = (size_t)(path + path_len - ext);
+    if (ext_len == 3 && to_lower(ext[0]) == 'w' && to_lower(ext[1]) == 'a' &&
+        to_lower(ext[2]) == 'v')
+        return "audio/wav";
+    if (ext_len == 3 && to_lower(ext[0]) == 'm' && to_lower(ext[1]) == 'p' &&
+        to_lower(ext[2]) == '3')
+        return "audio/mpeg";
+    if (ext_len == 3 && to_lower(ext[0]) == 'o' && to_lower(ext[1]) == 'g' &&
+        to_lower(ext[2]) == 'g')
+        return "audio/ogg";
+    if (ext_len == 3 && to_lower(ext[0]) == 'm' && to_lower(ext[1]) == '4' &&
+        to_lower(ext[2]) == 'a')
+        return "audio/mp4";
+    if (ext_len == 3 && to_lower(ext[0]) == 'f' && to_lower(ext[1]) == 'l' &&
+        to_lower(ext[2]) == 'a')
+        return "audio/flac";
+    return "audio/wav";
+}
+
 const char *sc_multimodal_detect_mime(const void *header, size_t header_len) {
     const unsigned char *h = (const unsigned char *)header;
     if (header_len >= 4 && h[0] == 0x89 && h[1] == 'P' && h[2] == 'N' && h[3] == 'G')

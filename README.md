@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Bring AI to every device on Earth.</strong><br>
-  <strong>~561 KB binary. < 6 MB RAM. Boots in <30 ms. Runs on anything with a CPU.</strong>
+  <strong>~511 KB binary. < 6 MB RAM. Boots in <30 ms. Runs on anything with a CPU.</strong>
 </p>
 
 <p align="center">
@@ -18,12 +18,12 @@
 The smallest fully autonomous AI assistant infrastructure — a static C binary that fits on any $5 board, boots in milliseconds, and requires nothing but libc.
 
 ```
-~561 KB binary · <30 ms startup · 3185+ tests · 50+ providers · 33 channels · 66+ tools · Pluggable everything
+~511 KB binary · <30 ms startup · 3185+ tests · 50+ providers · 33 channels · 66+ tools · Pluggable everything
 ```
 
 ### Features
 
-- **Impossibly Small:** ~561 KB static binary — no runtime, no VM, no framework overhead.
+- **Impossibly Small:** ~511 KB static binary — no runtime, no VM, no framework overhead.
 - **Near-Zero Memory:** < 6 MB peak RSS. Runs comfortably on the cheapest ARM SBCs and microcontrollers.
 - **Instant Startup:** 6–27 ms on Apple Silicon, sub-50 ms on edge cores.
 - **True Portability:** Single self-contained binary across ARM, x86, and RISC-V. Drop it anywhere, it just runs.
@@ -46,7 +46,7 @@ Similar projects in the autonomous AI assistant space (data sourced from each pr
 | ----------------- | ------------------------------------------------ | ------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------- | ----------------- |
 | **Language**      | TypeScript                                       | Python                                      | Go                                             | Rust                                                  | **C**             |
 | **RAM** ¹         | —                                                | —                                           | < 10 MB                                        | < 5 MB                                                | **< 6 MB**        |
-| **Binary Size** ¹ | ~28 MB (npm dist)                                | N/A (Python)                                | ~8 MB                                          | ~8.8 MB                                               | **~561 KB**       |
+| **Binary Size** ¹ | ~28 MB (npm dist)                                | N/A (Python)                                | ~8 MB                                          | ~8.8 MB                                               | **~511 KB**       |
 | **Runtime Deps**  | Node.js ≥22                                      | Python ≥3.11                                | None (static)                                  | None (static)                                         | **None (static)** |
 
 > ¹ RAM and binary size figures for other projects are self-reported from their respective READMEs. SeaClaw's numbers are measured locally with `/usr/bin/time -l` on a MinSizeRel + LTO build.
@@ -54,7 +54,7 @@ Similar projects in the autonomous AI assistant space (data sourced from each pr
 SeaClaw's verified numbers (measured on macOS arm64, March 2026):
 
 ```
-Binary size:   ~561 KB (MinSizeRel + LTO, all channels)
+Binary size:   ~511 KB (MinSizeRel + LTO, all channels)
 Peak RSS:      ~5.7 MB (--version), ~5.9 MB (test suite)
 Startup:       6–27 ms avg (Apple Silicon M4 Max)
 Tests:         3185 passing, 0 ASan errors
@@ -619,7 +619,7 @@ cmake --build build
 ./build/seaclaw_tests
 ```
 
-Release build (~561 KB):
+Release build (~511 KB):
 
 ```bash
 mkdir -p build-release && cd build-release
@@ -646,7 +646,7 @@ Source files: 597
 Lines of code: ~104K
 Test files: 101
 Tests: 3185
-Binary: ~561 KB (MinSizeRel + LTO, all channels)
+Binary: ~511 KB (MinSizeRel + LTO, all channels)
 Peak RSS: ~5.7 MB
 Startup: 6–27 ms avg (Apple Silicon)
 Dependencies: libc + optional SQLite, libcurl
@@ -677,7 +677,48 @@ include/seaclaw/ Public C headers
 tests/ 101 test files, 3185 tests
 asm/ Platform-specific assembly (aarch64, x86_64, generic C)
 
+ui/ Web UI (LitElement + Vite)
+apps/ios/ Native iOS app (SwiftUI)
+apps/android/ Native Android app (Kotlin + Jetpack Compose)
+apps/shared/ Shared packages (SeaClawKit for iOS)
+
 ```
+
+### Web UI
+
+The gateway ships a modern web dashboard built with **LitElement** and **Vite**. It connects to the gateway WebSocket and provides real-time chat, agent monitoring, tool results, session history, voice input, and full configuration management.
+
+```bash
+cd ui
+npm install
+npm run dev          # http://localhost:5173
+npm run build        # production build → ui/dist/
+npm test             # vitest unit tests
+npx playwright test  # E2E tests
+```
+
+Design system tokens live in `ui/src/styles/_tokens.css`. Components use the `sc-` prefix (e.g., `sc-card`, `sc-button`, `sc-badge`).
+
+### Mobile Apps
+
+Native companion apps connect to the gateway via WebSocket:
+
+**iOS** (SwiftUI, requires Xcode 15+):
+
+```bash
+cd apps/ios
+swift build
+open Package.swift   # opens in Xcode
+```
+
+**Android** (Kotlin + Jetpack Compose, requires Android Studio + JDK 17):
+
+```bash
+cd apps/android
+./gradlew assembleDebug
+```
+
+Both apps persist the gateway URL, show real-time connection status, and support chat with tool call visualization. Shared design tokens live in `apps/shared/`.
 
 ## Versioning
 

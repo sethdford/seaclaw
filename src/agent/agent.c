@@ -54,7 +54,8 @@ static uint64_t clock_diff_ms(clock_t start, clock_t end) {
 }
 
 static sc_error_t execute_plan_steps(sc_agent_t *agent, sc_plan_t *plan, char **summary_out,
-                                     size_t *summary_len_out);
+                                     size_t *summary_len_out, const char *original_goal,
+                                     size_t original_goal_len);
 
 static _Thread_local sc_agent_t *sc__current_agent_for_tools;
 
@@ -173,7 +174,8 @@ sc_error_t sc_agent_from_config(
     out->auto_save = auto_save;
     out->autonomy_level = autonomy_level;
     out->reflection.enabled = true;
-    out->reflection.max_retries = 1;
+    out->reflection.use_llm = true;
+    out->reflection.max_retries = 2;
     out->reflection.min_response_tokens = 0;
     out->custom_instructions = NULL;
     out->custom_instructions_len = 0;
@@ -679,6 +681,21 @@ void sc_agent_clear_history(sc_agent_t *agent) {
                         agent->alloc->free(agent->alloc->ctx,
                                            (void *)cp->data.image_base64.media_type,
                                            cp->data.image_base64.media_type_len + 1);
+                } else if (cp->tag == SC_CONTENT_PART_AUDIO_BASE64) {
+                    if (cp->data.audio_base64.data)
+                        agent->alloc->free(agent->alloc->ctx, (void *)cp->data.audio_base64.data,
+                                           cp->data.audio_base64.data_len + 1);
+                    if (cp->data.audio_base64.media_type)
+                        agent->alloc->free(agent->alloc->ctx,
+                                           (void *)cp->data.audio_base64.media_type,
+                                           cp->data.audio_base64.media_type_len + 1);
+                } else if (cp->tag == SC_CONTENT_PART_VIDEO_URL) {
+                    if (cp->data.video_url.url)
+                        agent->alloc->free(agent->alloc->ctx, (void *)cp->data.video_url.url,
+                                           cp->data.video_url.url_len + 1);
+                    if (cp->data.video_url.media_type)
+                        agent->alloc->free(agent->alloc->ctx, (void *)cp->data.video_url.media_type,
+                                           cp->data.video_url.media_type_len + 1);
                 }
             }
             agent->alloc->free(agent->alloc->ctx, agent->history[i].content_parts,
@@ -921,7 +938,7 @@ char *sc_agent_handle_slash_command(sc_agent_t *agent, const char *message, size
         }
         char *summary = NULL;
         size_t summary_len = 0;
-        err = execute_plan_steps(agent, plan, &summary, &summary_len);
+        err = execute_plan_steps(agent, plan, &summary, &summary_len, arg_buf, arg_len);
         sc_plan_free(agent->alloc, plan);
         if (err != SC_OK)
             return sc_sprintf(agent->alloc, "Plan execution failed: %s", sc_error_string(err));
@@ -2272,10 +2289,12 @@ sc_error_t sc_agent_turn_stream(sc_agent_t *agent, const char *msg, size_t msg_l
 /* ── Planner execution (Tier 1.4) ────────────────────────────────────── */
 
 static sc_error_t execute_plan_steps(sc_agent_t *agent, sc_plan_t *plan, char **summary_out,
-                                     size_t *summary_len_out) {
+                                     size_t *summary_len_out, const char *original_goal,
+                                     size_t original_goal_len) {
     generate_trace_id(agent->trace_id);
     char result_buf[4096];
     int result_off = 0;
+    bool replanned = false;
     result_off += snprintf(result_buf + result_off, sizeof(result_buf) - (size_t)result_off,
                            "Plan: %zu steps\n", plan->steps_count);
 
@@ -2345,6 +2364,105 @@ static sc_error_t execute_plan_steps(sc_agent_t *agent, sc_plan_t *plan, char **
                                "  [%zu] %s: %s (%llums)\n", i + 1, desc, ok ? "done" : "FAILED",
                                (unsigned long long)tool_duration_ms);
 
+        /* Replan on failure: one attempt, only when original goal is available */
+        if (!ok && original_goal && original_goal_len > 0 && !replanned && agent->provider.vtable &&
+            agent->model_name) {
+            char progress_buf[2048];
+            int prog_off = 0;
+            for (size_t j = 0; j < i && prog_off < (int)sizeof(progress_buf) - 64; j++) {
+                if (plan->steps[j].status == SC_PLAN_STEP_DONE && plan->steps[j].description) {
+                    prog_off +=
+                        snprintf(progress_buf + prog_off, sizeof(progress_buf) - (size_t)prog_off,
+                                 "  [%zu] %s: done\n", j + 1, plan->steps[j].description);
+                }
+            }
+            if (prog_off <= 0)
+                prog_off = snprintf(progress_buf, sizeof(progress_buf), "(none)");
+
+            char fail_buf[512];
+            int fail_off = snprintf(fail_buf, sizeof(fail_buf), "%s: %s", plan->steps[i].tool_name,
+                                    result.error_msg ? result.error_msg : "failed");
+            if (fail_off < 0)
+                fail_off = 0;
+
+            const char **tool_names = NULL;
+            size_t tn_count = 0;
+            if (agent->tools_count > 0) {
+                tool_names = (const char **)agent->alloc->alloc(
+                    agent->alloc->ctx, agent->tools_count * sizeof(const char *));
+                if (tool_names) {
+                    for (size_t k = 0; k < agent->tools_count; k++) {
+                        const char *tn = agent->tools[k].vtable->name
+                                             ? agent->tools[k].vtable->name(agent->tools[k].ctx)
+                                             : NULL;
+                        if (tn)
+                            tool_names[tn_count++] = tn;
+                    }
+                }
+            }
+
+            sc_plan_t *new_plan = NULL;
+            sc_error_t replan_err = sc_planner_replan(
+                agent->alloc, &agent->provider, agent->model_name, agent->model_name_len,
+                original_goal, original_goal_len, progress_buf, (size_t)prog_off, fail_buf,
+                (size_t)fail_off, tool_names, tn_count, &new_plan);
+
+            if (tool_names)
+                agent->alloc->free(agent->alloc->ctx, (void *)tool_names,
+                                   agent->tools_count * sizeof(const char *));
+
+            if (replan_err == SC_OK && new_plan && new_plan->steps_count > 0) {
+                /* Free old steps from i+1 onward */
+                for (size_t j = i + 1; j < plan->steps_count; j++) {
+                    if (plan->steps[j].tool_name)
+                        agent->alloc->free(agent->alloc->ctx, plan->steps[j].tool_name,
+                                           strlen(plan->steps[j].tool_name) + 1);
+                    if (plan->steps[j].args_json)
+                        agent->alloc->free(agent->alloc->ctx, plan->steps[j].args_json,
+                                           strlen(plan->steps[j].args_json) + 1);
+                    if (plan->steps[j].description)
+                        agent->alloc->free(agent->alloc->ctx, plan->steps[j].description,
+                                           strlen(plan->steps[j].description) + 1);
+                }
+
+                size_t new_total = i + 1 + new_plan->steps_count;
+                if (new_total > plan->steps_cap) {
+                    size_t new_cap = new_total;
+                    sc_plan_step_t *new_steps = (sc_plan_step_t *)agent->alloc->alloc(
+                        agent->alloc->ctx, new_cap * sizeof(sc_plan_step_t));
+                    if (new_steps) {
+                        memcpy(new_steps, plan->steps, (i + 1) * sizeof(sc_plan_step_t));
+                        agent->alloc->free(agent->alloc->ctx, plan->steps,
+                                           plan->steps_cap * sizeof(sc_plan_step_t));
+                        plan->steps = new_steps;
+                        plan->steps_cap = new_cap;
+                    }
+                }
+
+                if (plan->steps_cap >= new_total) {
+                    for (size_t j = 0; j < new_plan->steps_count; j++) {
+                        sc_plan_step_t *dst = &plan->steps[i + 1 + j];
+                        dst->tool_name = sc_strdup(agent->alloc, new_plan->steps[j].tool_name);
+                        dst->args_json = new_plan->steps[j].args_json
+                                             ? sc_strdup(agent->alloc, new_plan->steps[j].args_json)
+                                             : NULL;
+                        dst->description =
+                            new_plan->steps[j].description
+                                ? sc_strdup(agent->alloc, new_plan->steps[j].description)
+                                : NULL;
+                        dst->status = SC_PLAN_STEP_PENDING;
+                    }
+                    plan->steps_count = i + 1 + new_plan->steps_count;
+                    replanned = true;
+                    result_off +=
+                        snprintf(result_buf + result_off, sizeof(result_buf) - (size_t)result_off,
+                                 "  [replan] %zu new steps\n", new_plan->steps_count);
+                }
+
+                sc_plan_free(agent->alloc, new_plan);
+            }
+        }
+
         sc_tool_result_free(agent->alloc, &result);
     }
 
@@ -2369,7 +2487,7 @@ sc_error_t sc_agent_execute_plan(sc_agent_t *agent, const char *plan_json, size_
     if (err != SC_OK)
         return err;
 
-    err = execute_plan_steps(agent, plan, summary_out, summary_len_out);
+    err = execute_plan_steps(agent, plan, summary_out, summary_len_out, NULL, 0);
     sc_plan_free(agent->alloc, plan);
     return err;
 }

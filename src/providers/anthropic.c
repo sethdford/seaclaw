@@ -284,6 +284,11 @@ static sc_error_t anthropic_chat(void *ctx, sc_allocator_t *alloc, const sc_chat
                                                                   cp->data.image_url.url_len));
                             sc_json_object_set(alloc, part, "source", src_obj);
                         }
+                    } else if (cp->tag == SC_CONTENT_PART_AUDIO_BASE64 ||
+                               cp->tag == SC_CONTENT_PART_VIDEO_URL) {
+                        /* Anthropic does not support audio/video in content; skip */
+                        sc_json_free(alloc, part);
+                        continue;
                     }
                     sc_json_array_push(alloc, parts_arr, part);
                 }
@@ -678,6 +683,11 @@ static sc_error_t anthropic_stream_chat(void *ctx, sc_allocator_t *alloc,
                                                                   cp->data.image_url.url_len));
                             sc_json_object_set(alloc, part, "source", src_obj);
                         }
+                    } else if (cp->tag == SC_CONTENT_PART_AUDIO_BASE64 ||
+                               cp->tag == SC_CONTENT_PART_VIDEO_URL) {
+                        /* Anthropic does not support audio/video in content; skip */
+                        sc_json_free(alloc, part);
+                        continue;
                     }
                     sc_json_array_push(alloc, parts_arr, part);
                 }

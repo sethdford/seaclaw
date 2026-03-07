@@ -73,14 +73,25 @@ fun SettingsScreen(gatewayManager: GatewayManager) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Button(
-            onClick = {
-                if (isConnected) gatewayManager.disconnect()
-                else gatewayManager.connect()
-            },
-            modifier = Modifier.padding(top = SCTokens.spaceMd)
+        Row(
+            modifier = Modifier.padding(top = SCTokens.spaceMd),
+            horizontalArrangement = Arrangement.spacedBy(SCTokens.spaceSm)
         ) {
-            Text(if (isConnected) "Disconnect" else "Connect")
+            Button(
+                onClick = {
+                    if (isConnected) gatewayManager.disconnect()
+                    else gatewayManager.connect()
+                }
+            ) {
+                Text(if (isConnected) "Disconnect" else "Connect")
+            }
+            if (isConnected) {
+                Button(
+                    onClick = { gatewayManager.reconnect() }
+                ) {
+                    Text("Reconnect")
+                }
+            }
         }
     }
 }

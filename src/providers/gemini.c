@@ -377,6 +377,38 @@ static sc_error_t gemini_chat(void *ctx, sc_allocator_t *alloc, const sc_chat_re
                                                               cp->data.image_url.url_len));
                         sc_json_array_push(alloc, parts_arr, tp);
                     }
+                } else if (cp->tag == SC_CONTENT_PART_AUDIO_BASE64) {
+                    sc_json_value_t *ap = sc_json_object_new(alloc);
+                    if (ap) {
+                        sc_json_value_t *id = sc_json_object_new(alloc);
+                        if (id) {
+                            sc_json_object_set(
+                                alloc, id, "mimeType",
+                                sc_json_string_new(alloc, cp->data.audio_base64.media_type,
+                                                   cp->data.audio_base64.media_type_len));
+                            sc_json_object_set(alloc, id, "data",
+                                               sc_json_string_new(alloc, cp->data.audio_base64.data,
+                                                                  cp->data.audio_base64.data_len));
+                            sc_json_object_set(alloc, ap, "inlineData", id);
+                        }
+                        sc_json_array_push(alloc, parts_arr, ap);
+                    }
+                } else if (cp->tag == SC_CONTENT_PART_VIDEO_URL) {
+                    sc_json_value_t *vp = sc_json_object_new(alloc);
+                    if (vp) {
+                        sc_json_value_t *fd = sc_json_object_new(alloc);
+                        if (fd) {
+                            sc_json_object_set(
+                                alloc, fd, "mimeType",
+                                sc_json_string_new(alloc, cp->data.video_url.media_type,
+                                                   cp->data.video_url.media_type_len));
+                            sc_json_object_set(alloc, fd, "fileUri",
+                                               sc_json_string_new(alloc, cp->data.video_url.url,
+                                                                  cp->data.video_url.url_len));
+                            sc_json_object_set(alloc, vp, "fileData", fd);
+                        }
+                        sc_json_array_push(alloc, parts_arr, vp);
+                    }
                 }
             }
         } else if (m->content && m->content_len > 0) {
@@ -748,6 +780,38 @@ static sc_error_t gemini_stream_chat(void *ctx, sc_allocator_t *alloc,
                                            sc_json_string_new(alloc, cp->data.image_url.url,
                                                               cp->data.image_url.url_len));
                         sc_json_array_push(alloc, parts_arr, tp);
+                    }
+                } else if (cp->tag == SC_CONTENT_PART_AUDIO_BASE64) {
+                    sc_json_value_t *ap = sc_json_object_new(alloc);
+                    if (ap) {
+                        sc_json_value_t *id = sc_json_object_new(alloc);
+                        if (id) {
+                            sc_json_object_set(
+                                alloc, id, "mimeType",
+                                sc_json_string_new(alloc, cp->data.audio_base64.media_type,
+                                                   cp->data.audio_base64.media_type_len));
+                            sc_json_object_set(alloc, id, "data",
+                                               sc_json_string_new(alloc, cp->data.audio_base64.data,
+                                                                  cp->data.audio_base64.data_len));
+                            sc_json_object_set(alloc, ap, "inlineData", id);
+                        }
+                        sc_json_array_push(alloc, parts_arr, ap);
+                    }
+                } else if (cp->tag == SC_CONTENT_PART_VIDEO_URL) {
+                    sc_json_value_t *vp = sc_json_object_new(alloc);
+                    if (vp) {
+                        sc_json_value_t *fd = sc_json_object_new(alloc);
+                        if (fd) {
+                            sc_json_object_set(
+                                alloc, fd, "mimeType",
+                                sc_json_string_new(alloc, cp->data.video_url.media_type,
+                                                   cp->data.video_url.media_type_len));
+                            sc_json_object_set(alloc, fd, "fileUri",
+                                               sc_json_string_new(alloc, cp->data.video_url.url,
+                                                                  cp->data.video_url.url_len));
+                            sc_json_object_set(alloc, vp, "fileData", fd);
+                        }
+                        sc_json_array_push(alloc, parts_arr, vp);
                     }
                 }
             }

@@ -268,6 +268,33 @@ static sc_error_t openai_chat(void *ctx, sc_allocator_t *alloc, const sc_chat_re
                             }
                             sc_json_object_set(alloc, part, "image_url", iu);
                         }
+                    } else if (cp->tag == SC_CONTENT_PART_AUDIO_BASE64) {
+                        /* OpenAI input_audio:
+                         * {"type":"input_audio","input_audio":{"data":"<base64>","format":"<format>"}}
+                         */
+                        const char *mt = cp->data.audio_base64.media_type;
+                        size_t mt_len = cp->data.audio_base64.media_type_len;
+                        const char *slash = memchr(mt, '/', mt_len);
+                        const char *format = slash ? slash + 1 : mt;
+                        size_t format_len = slash ? (size_t)(mt + mt_len - format) : mt_len;
+                        sc_json_object_set(alloc, part, "type",
+                                           sc_json_string_new(alloc, "input_audio", 11));
+                        sc_json_value_t *ia = sc_json_object_new(alloc);
+                        if (ia) {
+                            sc_json_object_set(alloc, ia, "data",
+                                               sc_json_string_new(alloc, cp->data.audio_base64.data,
+                                                                  cp->data.audio_base64.data_len));
+                            sc_json_object_set(alloc, ia, "format",
+                                               sc_json_string_new(alloc, format, format_len));
+                            sc_json_object_set(alloc, part, "input_audio", ia);
+                        }
+                    } else if (cp->tag == SC_CONTENT_PART_VIDEO_URL) {
+                        /* OpenAI does not support video; treat URL as text description */
+                        sc_json_object_set(alloc, part, "type",
+                                           sc_json_string_new(alloc, "text", 4));
+                        sc_json_object_set(alloc, part, "text",
+                                           sc_json_string_new(alloc, cp->data.video_url.url,
+                                                              cp->data.video_url.url_len));
                     }
                     sc_json_array_push(alloc, parts_arr, part);
                 }

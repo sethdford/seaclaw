@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -44,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import ai.seaclaw.app.ui.SCTokens
 import ai.seaclaw.app.GatewayClient
 import ai.seaclaw.app.GatewayManager
+import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.launch
 
 @Composable
@@ -52,6 +57,7 @@ fun ChatScreen(gatewayManager: GatewayManager) {
     val toolCalls = remember { mutableStateListOf<ToolCallItem>() }
     var inputText by remember { mutableStateOf("") }
     var errorBanner by remember { mutableStateOf<String?>(null) }
+    val isConnected by gatewayManager.isConnected.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -131,6 +137,28 @@ fun ChatScreen(gatewayManager: GatewayManager) {
             .fillMaxSize()
             .padding(SCTokens.spaceMd)
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = SCTokens.spaceXs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(SCTokens.spaceXs)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        color = if (isConnected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error
+                    )
+            )
+            Text(
+                text = if (isConnected) "Connected" else "Disconnected",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         errorBanner?.let { msg ->
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),

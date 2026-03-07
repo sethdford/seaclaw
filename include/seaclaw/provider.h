@@ -38,10 +38,26 @@ typedef struct sc_content_part_image_base64 {
     size_t media_type_len;
 } sc_content_part_image_base64_t;
 
+typedef struct sc_content_part_audio_base64 {
+    const char *data;
+    size_t data_len;
+    const char *media_type; /* e.g. "audio/wav", "audio/mp3" */
+    size_t media_type_len;
+} sc_content_part_audio_base64_t;
+
+typedef struct sc_content_part_video_url {
+    const char *url;
+    size_t url_len;
+    const char *media_type; /* e.g. "video/mp4" */
+    size_t media_type_len;
+} sc_content_part_video_url_t;
+
 typedef enum sc_content_part_tag {
     SC_CONTENT_PART_TEXT,
     SC_CONTENT_PART_IMAGE_URL,
     SC_CONTENT_PART_IMAGE_BASE64,
+    SC_CONTENT_PART_AUDIO_BASE64,
+    SC_CONTENT_PART_VIDEO_URL,
 } sc_content_part_tag_t;
 
 typedef struct sc_content_part {
@@ -53,6 +69,8 @@ typedef struct sc_content_part {
         } text;
         sc_content_part_image_url_t image_url;
         sc_content_part_image_base64_t image_base64;
+        sc_content_part_audio_base64_t audio_base64;
+        sc_content_part_video_url_t video_url;
     } data;
 } sc_content_part_t;
 
