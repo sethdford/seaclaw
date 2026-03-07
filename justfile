@@ -57,13 +57,12 @@ fuzz duration="30":
     #!/usr/bin/env bash
     set -euo pipefail
     CC="${FUZZ_CC:-$(command -v /opt/homebrew/opt/llvm/bin/clang || echo clang)}"
-    cmake -B build-fuzz -DSC_ENABLE_FUZZ=ON -DCMAKE_C_COMPILER="$CC"
+    cmake -B build-fuzz -DSC_ENABLE_FUZZ=ON -DSC_ENABLE_FUZZING=ON -DCMAKE_C_COMPILER="$CC"
     cmake --build build-fuzz -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
-    mkdir -p corpus/json corpus/config corpus/tool_params
-    for harness in fuzz_json_parse fuzz_config_load fuzz_tool_params; do
+    for harness in fuzz_json_parse fuzz_config_load fuzz_tool_params fuzz_base64 fuzz_json fuzz_config fuzz_url_encode fuzz_persona_json fuzz_sse fuzz_http_parse; do
         if [ -f "build-fuzz/$harness" ]; then
             echo "==> Fuzzing $harness for {{duration}}s"
-            ./build-fuzz/$harness -max_total_time={{duration}} corpus/${harness#fuzz_}/ || true
+            timeout $(({{duration}} + 5)) ./build-fuzz/$harness -max_total_time={{duration}} || true
         fi
     done
 
@@ -71,12 +70,16 @@ fuzz duration="30":
 
 # Check C formatting
 fmt-check:
-    @find src include -name '*.c' -o -name '*.h' | head -50 | xargs clang-format --dry-run -Werror
+    @find src include tests -name '*.c' -o -name '*.h' | head -80 | xargs clang-format --dry-run -Werror
 
 # Fix C formatting
 fmt:
-    @find src include -name '*.c' -o -name '*.h' | xargs clang-format -i
-    @echo "Formatted all C sources"
+    @find src include tests -name '*.c' -o -name '*.h' | xargs clang-format -i
+    @echo "Formatted all C sources and tests"
+
+# Check for source files without tests
+check-untested:
+    @scripts/check-untested.sh
 
 # ── Service ──────────────────────────────────────────────────────────────
 

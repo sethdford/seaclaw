@@ -5,11 +5,15 @@ public struct SCGlassModifier: ViewModifier {
     let tier: Tier
 
     public func body(content: Content) -> some View {
+        #if swift(>=6.2)
         if #available(iOS 26.0, macOS 26.0, *) {
             content.glassEffect(.regular, in: .rect(cornerRadius: glassRadius))
         } else {
             content.background(.ultraThinMaterial).clipShape(RoundedRectangle(cornerRadius: glassRadius))
         }
+        #else
+        content.background(.ultraThinMaterial).clipShape(RoundedRectangle(cornerRadius: glassRadius))
+        #endif
     }
 
     private var glassRadius: CGFloat {

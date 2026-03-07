@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "tsx build.ts",
-    "postbuild": "npx -y prettier --write ../ui/src/styles/_tokens.css ../website/src/styles/_tokens.css 2>/dev/null || true",
+    "postbuild": "npx -y prettier --write --config ../ui/.prettierrc ../ui/src/styles/_tokens.css ../website/src/styles/_tokens.css 2>/dev/null || true",
     "docs": "npx tsx generate-docs.ts",
     "check": "npm run build",
     "check:drift": "bash check-drift.sh"

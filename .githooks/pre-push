@@ -24,6 +24,12 @@ if [ -f "CMakeLists.txt" ]; then
         exit 1
     fi
     cd ..
+
+    # Auto-sync stats in AGENTS.md, README.md, and STUBS.md
+    if [ -x "scripts/update-stats.sh" ]; then
+        echo "Syncing project stats..."
+        bash scripts/update-stats.sh --apply 2>/dev/null || true
+    fi
 else
     echo "No build system found. Skipping pre-push tests."
 fi

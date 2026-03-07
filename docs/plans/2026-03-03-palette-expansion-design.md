@@ -1,3 +1,7 @@
+---
+title: Palette Expansion Design
+---
+
 # Palette Expansion — Unify on Ocean-Teal + Add Amber & Indigo
 
 **Date:** 2026-03-03

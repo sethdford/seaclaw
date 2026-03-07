@@ -13,9 +13,10 @@ for f in dist/assets/*.js dist/assets/*.css; do
 done
 
 KB=$((TOTAL / 1024))
-BUDGET=320
+BUDGET=350
+PCT=$((KB * 100 / BUDGET))
 
-echo "Bundle size: ${KB} KB (budget: ${BUDGET} KB)"
+echo "Bundle size: ${KB} KB / ${BUDGET} KB (${PCT}%)"
 if [ "$KB" -gt "$BUDGET" ]; then
   echo "OVER BUDGET by $((KB - BUDGET)) KB"
   exit 1

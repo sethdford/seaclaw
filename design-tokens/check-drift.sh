@@ -16,6 +16,12 @@ npx tsx build.ts --outdir "$TMPDIR" 2>/dev/null || {
   exit 1
 }
 
+# Format generated CSS to match committed (prettier) version
+# Use ui/.prettierrc so output matches postbuild formatting
+if [ -f "$TMPDIR/_tokens.css" ] && [ -f "$REPO_ROOT/ui/.prettierrc" ]; then
+  npx -y prettier --write --config "$REPO_ROOT/ui/.prettierrc" "$TMPDIR/_tokens.css" 2>/dev/null || true
+fi
+
 DRIFT=0
 
 # Check CSS output

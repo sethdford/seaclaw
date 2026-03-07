@@ -43,7 +43,7 @@ FROM alpine:3.23 AS release-base
 
 LABEL org.opencontainers.image.source=https://github.com/sethdford/seaclaw
 
-RUN apk add --no-cache ca-certificates curl tzdata libsqlite3
+RUN apk add --no-cache ca-certificates curl tzdata sqlite-libs
 
 COPY --from=builder /app/build/seaclaw /usr/local/bin/seaclaw
 COPY --from=config /seaclaw-data /seaclaw-data

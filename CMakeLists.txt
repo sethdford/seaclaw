@@ -1306,6 +1306,7 @@ set(SC_TEST_SOURCES
     tests/test_imessage_extended.c
     tests/test_intelligence.c
     tests/test_config_extended.c
+    tests/test_config_getters.c
     tests/test_config_validation.c
     tests/test_json_extended.c
     tests/test_security_extended.c
@@ -1337,6 +1338,8 @@ set(SC_TEST_SOURCES
     tests/test_coverage_new.c
     tests/test_context.c
     tests/test_qmd.c
+    tests/test_terminal.c
+    tests/test_tavily.c
 )
 if(SC_ENABLE_PERSONA)
     list(APPEND SC_TEST_SOURCES tests/test_persona.c)

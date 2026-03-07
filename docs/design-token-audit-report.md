@@ -1,3 +1,7 @@
+---
+title: Design Token Audit Report
+---
+
 # Design Token Audit Report
 
 **Date:** 2026-03-07  

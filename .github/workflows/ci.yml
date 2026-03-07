@@ -29,8 +29,8 @@ jobs:
         run: |
           COUNT=$(./build/seaclaw_tests 2>&1 | grep -oE '[0-9]+/[0-9]+ passed' | head -1 | cut -d/ -f1)
           echo "Test count: $COUNT"
-          if [ "$COUNT" -lt 2700 ]; then
-            echo "Test count regression: $COUNT < 2700 baseline"
+          if [ "$COUNT" -lt 2900 ]; then
+            echo "Test count regression: $COUNT < 2900 baseline"
             exit 1
           fi
 
@@ -125,6 +125,8 @@ jobs:
       - name: Test with coverage
         run: npm run test:coverage
       - run: npm run build
+      - name: Enforce bundle size budget (320KB)
+        run: bash scripts/check-bundle-size.sh
 
   ui-e2e:
     runs-on: ubuntu-latest
@@ -148,6 +150,31 @@ jobs:
           path: ui/test-results/
           retention-days: 7
 
+  visual-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: cd ui && npm ci
+      - name: Install Playwright browsers
+        run: cd ui && npx playwright install --with-deps chromium
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+      - name: Capture screenshots
+        run: cd ui && bash scripts/visual-regression.sh
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: visual-regression
+          path: |
+            ui/visual-regression/*.png
+            ui/visual-regression/diff/
+          retention-days: 14
+
   build-deb:
     runs-on: ubuntu-latest
     steps:
@@ -155,7 +182,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake gcc libsqlite3-dev libcurl4-openssl-dev \
+          sudo apt-get install -y build-essential cmake gcc libsqlite3-dev libcurl4-openssl-dev \
             debhelper devscripts fakeroot
       - name: Build .deb package
         run: bash scripts/build-deb.sh

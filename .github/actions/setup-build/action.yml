@@ -65,7 +65,7 @@ runs:
         if [ "${{ inputs.enable-lto }}" = "true" ]; then CMAKE_FLAGS="$CMAKE_FLAGS -DSC_ENABLE_LTO=ON"; fi
         if [ "${{ inputs.enable-fuzz }}" = "true" ]; then CMAKE_FLAGS="$CMAKE_FLAGS -DSC_ENABLE_FUZZING=ON"; fi
         if [ "${{ inputs.enable-coverage }}" = "true" ]; then
-          CMAKE_FLAGS="$CMAKE_FLAGS -DCMAKE_C_FLAGS=--coverage -fprofile-arcs -ftest-coverage"
+          CMAKE_FLAGS="$CMAKE_FLAGS -DCMAKE_C_FLAGS=--coverage"
         fi
         if [ -n "${{ inputs.extra-cmake-flags }}" ]; then CMAKE_FLAGS="$CMAKE_FLAGS ${{ inputs.extra-cmake-flags }}"; fi
         cmake .. $CMAKE_FLAGS
