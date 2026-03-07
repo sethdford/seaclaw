@@ -366,6 +366,139 @@ static void test_compaction_keep_recent_preserved(void) {
     alloc.free(alloc.ctx, history, cap * sizeof(sc_owned_message_t));
 }
 
+static void test_compaction_frees_tool_calls(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_compaction_config_t cfg;
+    sc_compaction_config_default(&cfg);
+    cfg.keep_recent = 5;
+    cfg.max_history_messages = 25; /* 31 > 25 triggers compaction */
+
+    size_t cap = 64;
+    sc_owned_message_t *history =
+        (sc_owned_message_t *)alloc.alloc(alloc.ctx, cap * sizeof(sc_owned_message_t));
+    SC_ASSERT_NOT_NULL(history);
+    memset(history, 0, cap * sizeof(sc_owned_message_t));
+
+    history[0].role = SC_ROLE_SYSTEM;
+    history[0].content = sc_strndup(&alloc, "system", 6);
+    history[0].content_len = 6;
+
+    for (size_t i = 1; i <= 30; i++) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "msg-%zu", i);
+        size_t len = strlen(buf);
+        history[i].role = (i == 10) ? SC_ROLE_ASSISTANT : SC_ROLE_USER;
+        history[i].content = sc_strndup(&alloc, buf, len);
+        history[i].content_len = len;
+
+        /* Message 10 (index 10) is ASSISTANT with tool_calls — in compact range [1, 21) */
+        if (i == 10) {
+            sc_tool_call_t *tcs = (sc_tool_call_t *)alloc.alloc(alloc.ctx, sizeof(sc_tool_call_t));
+            SC_ASSERT_NOT_NULL(tcs);
+            memset(tcs, 0, sizeof(sc_tool_call_t));
+            tcs[0].id = sc_strndup(&alloc, "call_1", 6);
+            tcs[0].id_len = 6;
+            tcs[0].name = sc_strndup(&alloc, "shell", 5);
+            tcs[0].name_len = 5;
+            tcs[0].arguments = sc_strndup(&alloc, "{}", 2);
+            tcs[0].arguments_len = 2;
+            history[i].tool_calls = tcs;
+            history[i].tool_calls_count = 1;
+        }
+    }
+
+    size_t count = 31;
+    SC_ASSERT_TRUE(sc_should_compact(history, count, &cfg));
+
+    sc_error_t err = sc_compact_history(&alloc, history, &count, &cap, &cfg);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(count < 31);
+
+    /* Free remaining messages (compaction freed tool_calls in compacted range) */
+    for (size_t i = 0; i < count; i++) {
+        if (history[i].content)
+            alloc.free(alloc.ctx, history[i].content, history[i].content_len + 1);
+        if (history[i].tool_calls) {
+            for (size_t j = 0; j < history[i].tool_calls_count; j++) {
+                sc_tool_call_t *tc = &history[i].tool_calls[j];
+                if (tc->id && tc->id_len > 0)
+                    alloc.free(alloc.ctx, (void *)tc->id, tc->id_len + 1);
+                if (tc->name && tc->name_len > 0)
+                    alloc.free(alloc.ctx, (void *)tc->name, tc->name_len + 1);
+                if (tc->arguments && tc->arguments_len > 0)
+                    alloc.free(alloc.ctx, (void *)tc->arguments, tc->arguments_len + 1);
+            }
+            alloc.free(alloc.ctx, history[i].tool_calls,
+                       history[i].tool_calls_count * sizeof(sc_tool_call_t));
+        }
+    }
+    alloc.free(alloc.ctx, history, cap * sizeof(sc_owned_message_t));
+}
+
+static void test_context_compact_pressure_with_tool_calls(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    size_t cap = 64;
+    sc_owned_message_t *history =
+        (sc_owned_message_t *)alloc.alloc(alloc.ctx, cap * sizeof(sc_owned_message_t));
+    SC_ASSERT_NOT_NULL(history);
+    memset(history, 0, cap * sizeof(sc_owned_message_t));
+
+    history[0].role = SC_ROLE_SYSTEM;
+    history[0].content = sc_strndup(&alloc, "You are helpful", 15);
+    history[0].content_len = 15;
+
+    for (size_t i = 1; i <= 15; i++) {
+        char buf[512];
+        memset(buf, 'x', 280);
+        snprintf(buf + 280, sizeof(buf) - 280, " message %zu", i);
+        size_t len = strlen(buf);
+        history[i].role = (i == 5) ? SC_ROLE_ASSISTANT : SC_ROLE_USER;
+        history[i].content = sc_strndup(&alloc, buf, len);
+        history[i].content_len = len;
+
+        /* Message 5 (index 5) is ASSISTANT with tool_calls — in compact range */
+        if (i == 5) {
+            sc_tool_call_t *tcs = (sc_tool_call_t *)alloc.alloc(alloc.ctx, sizeof(sc_tool_call_t));
+            SC_ASSERT_NOT_NULL(tcs);
+            memset(tcs, 0, sizeof(sc_tool_call_t));
+            tcs[0].id = sc_strndup(&alloc, "call_1", 6);
+            tcs[0].id_len = 6;
+            tcs[0].name = sc_strndup(&alloc, "shell", 5);
+            tcs[0].name_len = 5;
+            tcs[0].arguments = sc_strndup(&alloc, "{}", 2);
+            tcs[0].arguments_len = 2;
+            history[i].tool_calls = tcs;
+            history[i].tool_calls_count = 1;
+        }
+    }
+
+    size_t count = 16;
+    sc_error_t err = sc_context_compact_for_pressure(&alloc, history, &count, &cap, 1000, 0.70f);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(history[0].role == SC_ROLE_SYSTEM);
+    SC_ASSERT_STR_EQ(history[0].content, "You are helpful");
+    SC_ASSERT_TRUE(strstr(history[1].content, "Previous context compacted") != NULL);
+
+    for (size_t i = 0; i < count; i++) {
+        if (history[i].content)
+            alloc.free(alloc.ctx, history[i].content, history[i].content_len + 1);
+        if (history[i].tool_calls) {
+            for (size_t j = 0; j < history[i].tool_calls_count; j++) {
+                sc_tool_call_t *tc = &history[i].tool_calls[j];
+                if (tc->id && tc->id_len > 0)
+                    alloc.free(alloc.ctx, (void *)tc->id, tc->id_len + 1);
+                if (tc->name && tc->name_len > 0)
+                    alloc.free(alloc.ctx, (void *)tc->name, tc->name_len + 1);
+                if (tc->arguments && tc->arguments_len > 0)
+                    alloc.free(alloc.ctx, (void *)tc->arguments, tc->arguments_len + 1);
+            }
+            alloc.free(alloc.ctx, history[i].tool_calls,
+                       history[i].tool_calls_count * sizeof(sc_tool_call_t));
+        }
+    }
+    alloc.free(alloc.ctx, history, cap * sizeof(sc_owned_message_t));
+}
+
 static void test_estimate_tokens(void) {
     sc_owned_message_t msgs[2] = {
         {.content = "hello", .content_len = 5, .role = SC_ROLE_USER},
@@ -601,6 +734,8 @@ void run_agent_subsystems_tests(void) {
     SC_RUN_TEST(test_dispatcher_tool_not_found);
     SC_RUN_TEST(test_compaction_reduces_history);
     SC_RUN_TEST(test_compaction_keep_recent_preserved);
+    SC_RUN_TEST(test_compaction_frees_tool_calls);
+    SC_RUN_TEST(test_context_compact_pressure_with_tool_calls);
     SC_RUN_TEST(test_estimate_tokens);
     SC_RUN_TEST(test_estimate_tokens_text_known_string);
     SC_RUN_TEST(test_context_pressure_50_no_warning);

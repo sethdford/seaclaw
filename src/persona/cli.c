@@ -18,6 +18,7 @@
 
 #define SC_PERSONA_PATH_MAX 512
 
+#if !(defined(SC_IS_TEST) && SC_IS_TEST)
 static bool str_in_arr(const char *str, char **arr, size_t count) {
     for (size_t i = 0; i < count; i++)
         if (arr[i] && strcmp(arr[i], str) == 0)
@@ -53,6 +54,7 @@ static void diff_arr(const char *label, char **a_arr, size_t a_count, char **b_a
             fprintf(stdout, "  + %s\n", b_arr[i]);
         }
 }
+#endif
 
 static const char *persona_dir_path(char *buf, size_t cap) {
     return sc_persona_base_dir(buf, cap);
@@ -371,10 +373,10 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
 
         diff_scalar("identity", a.identity, b.identity);
         diff_arr("traits", a.traits, a.traits_count, b.traits, b.traits_count);
-        diff_arr("preferred_vocab", a.preferred_vocab, a.preferred_vocab_count,
-                 b.preferred_vocab, b.preferred_vocab_count);
-        diff_arr("avoided_vocab", a.avoided_vocab, a.avoided_vocab_count,
-                 b.avoided_vocab, b.avoided_vocab_count);
+        diff_arr("preferred_vocab", a.preferred_vocab, a.preferred_vocab_count, b.preferred_vocab,
+                 b.preferred_vocab_count);
+        diff_arr("avoided_vocab", a.avoided_vocab, a.avoided_vocab_count, b.avoided_vocab,
+                 b.avoided_vocab_count);
         diff_arr("slang", a.slang, a.slang_count, b.slang, b.slang_count);
         diff_arr("communication_rules", a.communication_rules, a.communication_rules_count,
                  b.communication_rules, b.communication_rules_count);
@@ -489,8 +491,8 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
             fprintf(stderr, "Merge requires at least 2 source personas\n");
             return SC_ERR_INVALID_ARGUMENT;
         }
-        sc_persona_t *partials =
-            (sc_persona_t *)alloc->alloc(alloc->ctx, args->merge_sources_count * sizeof(sc_persona_t));
+        sc_persona_t *partials = (sc_persona_t *)alloc->alloc(
+            alloc->ctx, args->merge_sources_count * sizeof(sc_persona_t));
         if (!partials)
             return SC_ERR_OUT_OF_MEMORY;
         memset(partials, 0, args->merge_sources_count * sizeof(sc_persona_t));
@@ -502,14 +504,13 @@ sc_error_t sc_persona_cli_run(sc_allocator_t *alloc, const sc_persona_cli_args_t
                 fprintf(stderr, "Persona not found: %s\n", args->merge_sources[i]);
                 for (size_t j = 0; j < i; j++)
                     sc_persona_deinit(alloc, &partials[j]);
-                alloc->free(alloc->ctx, partials,
-                           args->merge_sources_count * sizeof(sc_persona_t));
+                alloc->free(alloc->ctx, partials, args->merge_sources_count * sizeof(sc_persona_t));
                 return err;
             }
         }
         sc_persona_t merged = {0};
         err = sc_persona_creator_synthesize(alloc, partials, args->merge_sources_count, args->name,
-                                           strlen(args->name), &merged);
+                                            strlen(args->name), &merged);
         for (size_t i = 0; i < args->merge_sources_count; i++)
             sc_persona_deinit(alloc, &partials[i]);
         alloc->free(alloc->ctx, partials, args->merge_sources_count * sizeof(sc_persona_t));

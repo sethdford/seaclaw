@@ -192,9 +192,28 @@ Set the default persona in `~/.seaclaw/config.json`:
 
 The agent will load this persona and inject its prompt into the system message.
 
-### Per-Channel Override
+### Per-Channel Persona Config
 
-Channel overlays are applied automatically when the agent responds on a given channel. No extra config is needed; the persona file defines overlays per channel.
+Use different personas per channel. Set `agent.persona` as the default, then override specific channels with `agent.persona_channels`:
+
+```json
+{
+  "agent": {
+    "persona": "seth",
+    "persona_channels": {
+      "imessage": "seth_casual",
+      "gmail": "seth_professional",
+      "slack": "seth_work"
+    }
+  }
+}
+```
+
+When the agent responds on `imessage`, it loads `seth_casual`; on `gmail`, `seth_professional`. Channels not listed use the default `seth`.
+
+### Channel Overlays (within a persona)
+
+Channel overlays are applied automatically when the agent responds on a given channel. No extra config is needed; the persona file defines overlays per channel (formality, length, emoji usage).
 
 ### CLI Commands
 
@@ -210,6 +229,22 @@ seaclaw persona validate myname
 
 # Delete a persona
 seaclaw persona delete myname
+
+# Export persona JSON to stdout
+seaclaw persona export myname
+
+# Merge multiple personas into one
+seaclaw persona merge output_name persona1 persona2 [persona3 ...]
+
+# Import persona from file or stdin
+seaclaw persona import myname --from-file /path/to/persona.json
+seaclaw persona import myname --from-stdin   # read JSON from stdin
+
+# Diff two personas (identity, traits, overlays)
+seaclaw persona diff persona1 persona2
+
+# Apply recorded feedback to persona
+seaclaw persona feedback apply myname
 ```
 
 ## Example Banks
@@ -290,16 +325,30 @@ When the agent responds on a channel (e.g. `imessage`, `telegram`, `cli`), the p
 
 Overlays let the same persona adapt: casual on iMessage, more formal on Slack, terse on CLI.
 
+## Environment Override
+
+For tests or custom layouts, set `SC_PERSONA_DIR` to override the persona base directory (default `~/.seaclaw/personas`):
+
+```bash
+export SC_PERSONA_DIR=/tmp/my-personas
+seaclaw persona list   # lists /tmp/my-personas/*.json
+```
+
 ## CLI Reference
 
-| Command                                                                              | Description                         |
-| ------------------------------------------------------------------------------------ | ----------------------------------- |
-| `seaclaw persona list`                                                               | List all persona profiles           |
-| `seaclaw persona show <name>`                                                        | Display persona (rendered prompt)   |
-| `seaclaw persona validate <name>`                                                    | Validate persona JSON               |
-| `seaclaw persona create <name> [--from-imessage \| --from-gmail \| --from-facebook]` | Create persona from message history |
-| `seaclaw persona delete <name>`                                                      | Remove persona file                 |
-| `seaclaw persona feedback apply <name>`                                              | Apply recorded feedback to persona  |
+| Command                                                                                                        | Description                                       |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `seaclaw persona list`                                                                                         | List all persona profiles                         |
+| `seaclaw persona show <name>`                                                                                  | Display persona (rendered prompt)                 |
+| `seaclaw persona validate <name>`                                                                              | Validate persona JSON                             |
+| `seaclaw persona create <name> [--from-imessage \| --from-gmail \| --from-facebook \| --from-response <path>]` | Create persona from message history               |
+| `seaclaw persona update <name> [--from-imessage \| ...]`                                                       | Update existing persona from sources              |
+| `seaclaw persona delete <name>`                                                                                | Remove persona file                               |
+| `seaclaw persona export <name>`                                                                                | Export persona JSON to stdout                     |
+| `seaclaw persona merge <output> <name1> <name2> [...]`                                                         | Merge multiple personas into one                  |
+| `seaclaw persona import <name> [--from-file <path> \| --from-stdin]`                                           | Import persona from file or stdin                 |
+| `seaclaw persona diff <name1> <name2>`                                                                         | Compare two personas (identity, traits, overlays) |
+| `seaclaw persona feedback apply <name>`                                                                        | Apply recorded feedback to persona                |
 
 ## Persona for Agents
 

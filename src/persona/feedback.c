@@ -15,10 +15,10 @@
 
 #if !(defined(SC_IS_TEST) && SC_IS_TEST)
 static const char *feedback_dir_path(char *buf, size_t cap) {
-    const char *home = getenv("HOME");
-    if (!home || !home[0])
-        home = ".";
-    int n = snprintf(buf, cap, "%s/.seaclaw/personas/feedback", home);
+    char base[SC_FEEDBACK_PATH_MAX];
+    if (!sc_persona_base_dir(base, sizeof(base)))
+        return NULL;
+    int n = snprintf(buf, cap, "%s/feedback", base);
     return (n > 0 && (size_t)n < cap) ? buf : NULL;
 }
 #endif
@@ -215,23 +215,23 @@ sc_error_t sc_persona_feedback_apply(sc_allocator_t *alloc, const char *persona_
 
     /* Rewrite example bank files for modified banks */
     {
-        const char *home = getenv("HOME");
-        if (home && home[0]) {
-            char base[SC_FEEDBACK_PATH_MAX];
-            int bn = snprintf(base, sizeof(base), "%s/.seaclaw/personas/examples/%.*s", home,
+        char base[SC_FEEDBACK_PATH_MAX];
+        if (sc_persona_base_dir(base, sizeof(base))) {
+            char ex_base[SC_FEEDBACK_PATH_MAX];
+            int bn = snprintf(ex_base, sizeof(ex_base), "%s/examples/%.*s", base,
                               (int)persona_name_len, persona_name);
-            if (bn > 0 && (size_t)bn < sizeof(base)) {
+            if (bn > 0 && (size_t)bn < sizeof(ex_base)) {
                 for (size_t i = 0; i < persona.example_banks_count; i++) {
                     sc_persona_example_bank_t *b = &persona.example_banks[i];
                     if (!b->channel || !b->examples)
                         continue;
                     char ex_path[SC_FEEDBACK_PATH_MAX];
-                    int pn2 =
-                        snprintf(ex_path, sizeof(ex_path), "%s/%s/examples.json", base, b->channel);
+                    int pn2 = snprintf(ex_path, sizeof(ex_path), "%s/%s/examples.json", ex_base,
+                                       b->channel);
                     if (pn2 <= 0 || (size_t)pn2 >= sizeof(ex_path))
                         continue;
                     char dir_path[SC_FEEDBACK_PATH_MAX];
-                    int dn = snprintf(dir_path, sizeof(dir_path), "%s/%s", base, b->channel);
+                    int dn = snprintf(dir_path, sizeof(dir_path), "%s/%s", ex_base, b->channel);
                     if (dn > 0 && (size_t)dn < sizeof(dir_path))
                         (void)mkdir(dir_path, 0755);
                     sc_json_buf_t jbuf;

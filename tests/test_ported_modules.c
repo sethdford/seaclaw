@@ -51,6 +51,115 @@ static void test_doctor_parse_df(void) {
     SC_ASSERT_EQ(mb, 500ul);
 }
 
+static void test_doctor_truncate_null_alloc(void) {
+    char *out = (char *)0x1;
+    sc_error_t err = sc_doctor_truncate_for_display(NULL, "hello", 5, 10, &out);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void test_doctor_truncate_null_string(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *out = (char *)0x1;
+    sc_error_t err = sc_doctor_truncate_for_display(&alloc, NULL, 0, 10, &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NULL(out);
+}
+
+static void test_doctor_truncate_zero_len(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *out = NULL;
+    const char *s = "hello";
+    sc_error_t err = sc_doctor_truncate_for_display(&alloc, s, 0, 10, &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(out);
+    SC_ASSERT_STR_EQ(out, "hello");
+    alloc.free(alloc.ctx, out, strlen(out) + 1);
+}
+
+static void test_doctor_truncate_normal_truncation(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *out = NULL;
+    const char *s = "hello world";
+    sc_error_t err = sc_doctor_truncate_for_display(&alloc, s, 11, 5, &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(out);
+    SC_ASSERT_EQ(strlen(out), 5u);
+    SC_ASSERT_TRUE(strncmp(out, "hello", 5) == 0);
+    alloc.free(alloc.ctx, out, strlen(out) + 1);
+}
+
+static void test_doctor_truncate_shorter_than_max(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *out = NULL;
+    const char *s = "hi";
+    sc_error_t err = sc_doctor_truncate_for_display(&alloc, s, 2, 10, &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(out);
+    SC_ASSERT_STR_EQ(out, "hi");
+    alloc.free(alloc.ctx, out, strlen(out) + 1);
+}
+
+static void test_doctor_truncate_null_out(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_error_t err = sc_doctor_truncate_for_display(&alloc, "hello", 5, 10, NULL);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void test_doctor_check_config_null_alloc(void) {
+    sc_config_t cfg = {0};
+    sc_diag_item_t *items = NULL;
+    size_t count = 0;
+    sc_error_t err = sc_doctor_check_config_semantics(NULL, &cfg, &items, &count);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void test_doctor_check_config_null_cfg(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_diag_item_t *items = NULL;
+    size_t count = 0;
+    sc_error_t err = sc_doctor_check_config_semantics(&alloc, NULL, &items, &count);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void test_doctor_check_config_null_out(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_config_t cfg = {0};
+    char prov[] = "openai";
+    cfg.default_provider = prov;
+    cfg.default_temperature = 0.7;
+    cfg.gateway.port = 3000;
+    sc_error_t err = sc_doctor_check_config_semantics(&alloc, &cfg, NULL, NULL);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void test_doctor_check_config_valid_with_defaults(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_config_t cfg = {0};
+    char prov[] = "openai";
+    char key[] = "telegram";
+    cfg.default_provider = prov;
+    cfg.default_temperature = 0.7;
+    cfg.gateway.port = 3000;
+    cfg.channels.channel_config_keys[0] = key;
+    cfg.channels.channel_config_counts[0] = 1;
+    cfg.channels.channel_config_len = 1;
+
+    sc_diag_item_t *items = NULL;
+    size_t count = 0;
+    sc_error_t err = sc_doctor_check_config_semantics(&alloc, &cfg, &items, &count);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(items);
+    SC_ASSERT_TRUE(count > 0);
+
+    for (size_t i = 0; i < count; i++) {
+        if (items[i].category)
+            alloc.free(alloc.ctx, (void *)items[i].category, strlen(items[i].category) + 1);
+        if (items[i].message)
+            alloc.free(alloc.ctx, (void *)items[i].message, strlen(items[i].message) + 1);
+    }
+    alloc.free(alloc.ctx, items, sizeof(sc_diag_item_t) * 16);
+}
+
 static void test_agent_commands_parse(void) {
     const sc_slash_cmd_t *c = sc_agent_commands_parse("/new", 4);
     SC_ASSERT_NOT_NULL(c);
@@ -194,6 +303,16 @@ void run_ported_modules_tests(void) {
     SC_RUN_TEST(test_config_mutator_mutate_denied_path);
     SC_RUN_TEST(test_config_mutator_mutate_unset);
     SC_RUN_TEST(test_doctor_parse_df);
+    SC_RUN_TEST(test_doctor_truncate_null_alloc);
+    SC_RUN_TEST(test_doctor_truncate_null_string);
+    SC_RUN_TEST(test_doctor_truncate_zero_len);
+    SC_RUN_TEST(test_doctor_truncate_normal_truncation);
+    SC_RUN_TEST(test_doctor_truncate_shorter_than_max);
+    SC_RUN_TEST(test_doctor_truncate_null_out);
+    SC_RUN_TEST(test_doctor_check_config_null_alloc);
+    SC_RUN_TEST(test_doctor_check_config_null_cfg);
+    SC_RUN_TEST(test_doctor_check_config_null_out);
+    SC_RUN_TEST(test_doctor_check_config_valid_with_defaults);
     SC_RUN_TEST(test_agent_commands_parse);
     SC_RUN_TEST(test_agent_commands_bare_reset_prompt);
     SC_RUN_TEST(test_rate_tracker);

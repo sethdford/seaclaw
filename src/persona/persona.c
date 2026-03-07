@@ -11,6 +11,24 @@
 #define SC_PERSONA_PROMPT_INIT_CAP 4096
 #define SC_PERSONA_PATH_MAX        512
 
+/* --- Persona base directory (SC_PERSONA_DIR override for tests) --- */
+
+const char *sc_persona_base_dir(char *buf, size_t cap) {
+    const char *override = getenv("SC_PERSONA_DIR");
+    if (override && override[0]) {
+        size_t len = strlen(override);
+        if (len + 1 > cap)
+            return NULL;
+        memcpy(buf, override, len + 1);
+        return buf;
+    }
+    const char *home = getenv("HOME");
+    if (!home || !home[0])
+        return NULL;
+    int n = snprintf(buf, cap, "%s/.seaclaw/personas", home);
+    return (n > 0 && (size_t)n < cap) ? buf : NULL;
+}
+
 /* --- Overlay lookup --- */
 
 const sc_persona_overlay_t *sc_persona_find_overlay(const sc_persona_t *persona,
@@ -483,12 +501,11 @@ sc_error_t sc_persona_load(sc_allocator_t *alloc, const char *name, size_t name_
                            sc_persona_t *out) {
     if (!alloc || !name || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    const char *home = getenv("HOME");
-    if (!home || !home[0])
+    char base[SC_PERSONA_PATH_MAX];
+    if (!sc_persona_base_dir(base, sizeof(base)))
         return SC_ERR_NOT_FOUND;
     char path[SC_PERSONA_PATH_MAX];
-    int n =
-        snprintf(path, sizeof(path), "%s/.seaclaw/personas/%.*s.json", home, (int)name_len, name);
+    int n = snprintf(path, sizeof(path), "%s/%.*s.json", base, (int)name_len, name);
     if (n <= 0 || (size_t)n >= sizeof(path))
         return SC_ERR_INVALID_ARGUMENT;
     FILE *f = fopen(path, "rb");
@@ -522,22 +539,22 @@ sc_error_t sc_persona_load(sc_allocator_t *alloc, const char *name, size_t name_
         return err;
 
 #if !(defined(SC_IS_TEST) && SC_IS_TEST) && (defined(__unix__) || defined(__APPLE__))
-    /* Load example banks from ~/.seaclaw/personas/examples/<name>/<channel>/examples.json */
+    /* Load example banks from <base>/examples/<name>/<channel>/examples.json */
     {
-        const char *home = getenv("HOME");
-        if (home && home[0] && out->name && out->name_len > 0) {
-            char base[SC_PERSONA_PATH_MAX];
-            int bn = snprintf(base, sizeof(base), "%s/.seaclaw/personas/examples/%.*s", home,
+        char base[SC_PERSONA_PATH_MAX];
+        if (sc_persona_base_dir(base, sizeof(base)) && out->name && out->name_len > 0) {
+            char ex_base[SC_PERSONA_PATH_MAX];
+            int bn = snprintf(ex_base, sizeof(ex_base), "%s/examples/%.*s", base,
                               (int)out->name_len, out->name);
-            if (bn > 0 && (size_t)bn < sizeof(base)) {
-                DIR *d = opendir(base);
+            if (bn > 0 && (size_t)bn < sizeof(ex_base)) {
+                DIR *d = opendir(ex_base);
                 if (d) {
                     struct dirent *e;
                     while ((e = readdir(d)) != NULL) {
                         if (e->d_name[0] == '\0' || e->d_name[0] == '.')
                             continue;
                         char ch_path[SC_PERSONA_PATH_MAX];
-                        int pn = snprintf(ch_path, sizeof(ch_path), "%s/%s/examples.json", base,
+                        int pn = snprintf(ch_path, sizeof(ch_path), "%s/%s/examples.json", ex_base,
                                           e->d_name);
                         if (pn <= 0 || (size_t)pn >= sizeof(ch_path))
                             continue;

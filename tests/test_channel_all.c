@@ -255,6 +255,20 @@ static void test_slack_poll_test_mode(void) {
     SC_ASSERT_EQ(out, 0);
     sc_slack_destroy(&ch);
 }
+
+static void test_slack_webhook_malformed(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_channel_t ch = {0};
+    sc_error_t err = sc_slack_create(&alloc, "token", 5, &ch);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_channel_loop_msg_t msgs[4];
+    size_t out = 99;
+    err = sc_slack_poll(ch.ctx, &alloc, msgs, 4, &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    err = sc_slack_poll(ch.ctx, &alloc, msgs, 0, &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_slack_destroy(&ch);
+}
 #endif
 
 /* ─── WhatsApp ────────────────────────────────────────────────────────────── */
@@ -1452,6 +1466,20 @@ static void test_telegram_create_destroy_lifecycle(void) {
     SC_ASSERT_NOT_NULL(ch.ctx);
     sc_telegram_destroy(&ch);
 }
+
+static void test_telegram_webhook_malformed(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_channel_t ch = {0};
+    sc_error_t err = sc_telegram_create(&alloc, "t", 1, &ch);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_channel_loop_msg_t msgs[4];
+    size_t out = 99;
+    err = sc_telegram_poll(ch.ctx, &alloc, msgs, 4, &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    err = sc_telegram_poll(ch.ctx, &alloc, msgs, 0, &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_telegram_destroy(&ch);
+}
 #endif
 
 #if SC_HAS_DISCORD
@@ -1496,6 +1524,20 @@ static void test_discord_poll_empty(void) {
     err = sc_discord_poll(ch.ctx, &alloc, msgs, 4, &count);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(count, 0u);
+    sc_discord_destroy(&ch);
+}
+
+static void test_discord_webhook_malformed(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_channel_t ch = {0};
+    sc_error_t err = sc_discord_create(&alloc, "t", 1, &ch);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_channel_loop_msg_t msgs[4];
+    size_t out = 99;
+    err = sc_discord_poll(ch.ctx, &alloc, msgs, 4, &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    err = sc_discord_poll(ch.ctx, &alloc, msgs, 0, &out);
+    SC_ASSERT_EQ(err, SC_OK);
     sc_discord_destroy(&ch);
 }
 #endif
@@ -1830,6 +1872,7 @@ void run_channel_all_tests(void) {
     SC_RUN_TEST(test_telegram_start_stop_typing);
     SC_RUN_TEST(test_telegram_allowlist);
     SC_RUN_TEST(test_telegram_send_long_message);
+    SC_RUN_TEST(test_telegram_webhook_malformed);
 #endif
 #if SC_HAS_DISCORD
     SC_RUN_TEST(test_discord_start_stop_lifecycle);
@@ -1840,6 +1883,7 @@ void run_channel_all_tests(void) {
     SC_RUN_TEST(test_discord_send_without_token_fails);
     SC_RUN_TEST(test_discord_poll_test_mode);
     SC_RUN_TEST(test_discord_poll_empty);
+    SC_RUN_TEST(test_discord_webhook_malformed);
 #endif
 #if SC_HAS_SLACK
     SC_RUN_TEST(test_slack_create);
@@ -1849,6 +1893,7 @@ void run_channel_all_tests(void) {
     SC_RUN_TEST(test_slack_send_long_message);
     SC_RUN_TEST(test_slack_create_ex);
     SC_RUN_TEST(test_slack_poll_test_mode);
+    SC_RUN_TEST(test_slack_webhook_malformed);
 #endif
 #if SC_HAS_WHATSAPP
     SC_RUN_TEST(test_whatsapp_create);

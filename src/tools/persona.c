@@ -36,11 +36,7 @@ typedef struct {
 
 #if !SC_IS_TEST
 static const char *persona_dir_path(char *buf, size_t cap) {
-    const char *home = getenv("HOME");
-    if (!home || !home[0])
-        home = ".";
-    int n = snprintf(buf, cap, "%s/.seaclaw/personas", home);
-    return (n > 0 && (size_t)n < cap) ? buf : NULL;
+    return sc_persona_base_dir(buf, cap);
 }
 #endif
 

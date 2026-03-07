@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+struct sc_agent;
 struct sc_config;
 struct sc_session_manager;
 struct sc_cron_scheduler;
@@ -29,6 +30,7 @@ typedef struct sc_app_context {
     struct sc_tool *tools;
     size_t tools_count;
     struct sc_push_manager *push;
+    struct sc_agent *agent; /* gateway agent for persona.set; NULL when --with-agent not used */
 } sc_app_context_t;
 
 typedef struct sc_control_protocol {

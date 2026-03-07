@@ -368,6 +368,15 @@ static void test_persona_cli_parse_feedback_apply(void) {
     SC_ASSERT_TRUE(strcmp(args.name, "mypersona") == 0);
 }
 
+static void test_cli_parse_diff(void) {
+    const char *argv[] = {"seaclaw", "persona", "diff", "a", "b"};
+    sc_persona_cli_args_t args = {0};
+    SC_ASSERT_EQ(sc_persona_cli_parse(5, argv, &args), SC_OK);
+    SC_ASSERT_EQ(args.action, SC_PERSONA_ACTION_DIFF);
+    SC_ASSERT_TRUE(strcmp(args.name, "a") == 0);
+    SC_ASSERT_TRUE(strcmp(args.diff_name, "b") == 0);
+}
+
 static void test_persona_cli_run_validate(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_persona_cli_args_t args = {0};
@@ -496,7 +505,8 @@ static void test_cli_parse_merge(void) {
 }
 
 static void test_cli_parse_import(void) {
-    const char *argv[] = {"seaclaw", "persona", "import", "newpersona", "--from-file", "/tmp/p.json"};
+    const char *argv[] = {"seaclaw",    "persona",     "import",
+                          "newpersona", "--from-file", "/tmp/p.json"};
     sc_persona_cli_args_t args = {0};
     SC_ASSERT_EQ(sc_persona_cli_parse(6, argv, &args), SC_OK);
     SC_ASSERT_EQ(args.action, SC_PERSONA_ACTION_IMPORT);
@@ -1518,6 +1528,7 @@ void run_persona_tests(void) {
     SC_RUN_TEST(test_persona_cli_parse_list);
     SC_RUN_TEST(test_persona_cli_parse_validate);
     SC_RUN_TEST(test_persona_cli_parse_feedback_apply);
+    SC_RUN_TEST(test_cli_parse_diff);
     SC_RUN_TEST(test_persona_validate_json_valid);
     SC_RUN_TEST(test_persona_validate_json_missing_name);
     SC_RUN_TEST(test_persona_validate_json_missing_core);

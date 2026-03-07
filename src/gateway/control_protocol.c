@@ -1,4 +1,5 @@
 #include "seaclaw/gateway/control_protocol.h"
+#include "seaclaw/agent.h"
 #include "seaclaw/bus.h"
 #include "seaclaw/channel_catalog.h"
 #include "seaclaw/config.h"
@@ -59,17 +60,15 @@ static sc_error_t build_connect_response(sc_allocator_t *alloc, const sc_app_con
     sc_json_value_t *methods_arr = sc_json_array_new(alloc);
 
     static const char *const methods[] = {
-        "auth.token",      "connect",         "health",
-        "config.get",      "config.schema",   "capabilities",
-        "chat.send",       "chat.history",    "chat.abort",
-        "config.set",      "config.apply",    "sessions.list",
-        "sessions.patch",  "sessions.delete", "tools.catalog",
-        "channels.status", "cron.list",       "cron.add",
-        "cron.remove",     "cron.run",        "skills.list",
-        "skills.install",  "skills.enable",   "skills.disable",
-        "update.check",    "update.run",      "exec.approval.resolve",
-        "usage.summary",   "models.list",     "nodes.list",
-        "push.register",   "push.unregister"};
+        "auth.token",      "connect",         "health",         "config.get",
+        "config.schema",   "capabilities",    "chat.send",      "chat.history",
+        "chat.abort",      "config.set",      "config.apply",   "sessions.list",
+        "sessions.patch",  "sessions.delete", "persona.set",    "tools.catalog",
+        "channels.status", "cron.list",       "cron.add",       "cron.remove",
+        "cron.run",        "skills.list",     "skills.install", "skills.enable",
+        "skills.disable",  "update.check",    "update.run",     "exec.approval.resolve",
+        "usage.summary",   "models.list",     "nodes.list",     "push.register",
+        "push.unregister"};
     for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
         sc_json_value_t *m = sc_json_string_new(alloc, methods[i], strlen(methods[i]));
         if (m)
@@ -475,6 +474,67 @@ static sc_error_t handle_sessions_patch(sc_allocator_t *alloc, sc_app_context_t 
     sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
     sc_json_free(alloc, obj);
     return err;
+}
+
+/* ── persona.set ─────────────────────────────────────────────────────── */
+
+static sc_error_t handle_persona_set(sc_allocator_t *alloc, sc_app_context_t *app,
+                                     const sc_json_value_t *root, char **out, size_t *out_len) {
+    sc_json_value_t *obj = sc_json_object_new(alloc);
+    if (!obj)
+        return SC_ERR_OUT_OF_MEMORY;
+
+    if (!app || !app->agent) {
+        json_set_str(alloc, obj, "error", "no agent (gateway must run with --with-agent)");
+        sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+        sc_json_free(alloc, obj);
+        return err;
+    }
+
+    if (!root) {
+        json_set_str(alloc, obj, "error", "params required");
+        sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+        sc_json_free(alloc, obj);
+        return err;
+    }
+
+    sc_json_value_t *params = sc_json_object_get(root, "params");
+    sc_json_value_t *name_val = params ? sc_json_object_get(params, "name") : NULL;
+
+    if (!name_val) {
+        json_set_str(alloc, obj, "error", "name is required");
+        sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+        sc_json_free(alloc, obj);
+        return err;
+    }
+
+    const char *name = NULL;
+    size_t name_len = 0;
+    if (name_val->type == SC_JSON_NULL) {
+        /* {"name": null} — clear persona */
+    } else if (name_val->type == SC_JSON_STRING) {
+        name = name_val->data.string.ptr;
+        name_len = name_val->data.string.len;
+    } else {
+        json_set_str(alloc, obj, "error", "name must be string or null");
+        sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+        sc_json_free(alloc, obj);
+        return err;
+    }
+
+    sc_error_t err = sc_agent_set_persona(app->agent, name, name_len);
+    if (err != SC_OK) {
+        const char *emsg = sc_error_string(err);
+        json_set_str(alloc, obj, "error", emsg ? emsg : "failed to set persona");
+        sc_error_t serr = sc_json_stringify(alloc, obj, out, out_len);
+        sc_json_free(alloc, obj);
+        return serr;
+    }
+
+    sc_json_object_set(alloc, obj, "ok", sc_json_bool_new(alloc, true));
+    sc_error_t serr = sc_json_stringify(alloc, obj, out, out_len);
+    sc_json_free(alloc, obj);
+    return serr;
 }
 
 /* ── sessions.delete ─────────────────────────────────────────────────── */
@@ -1238,6 +1298,8 @@ static sc_error_t build_method_response(sc_allocator_t *alloc, const char *metho
         return handle_sessions_patch(alloc, app, root, payload_out, payload_len_out);
     if (strcmp(method, "sessions.delete") == 0)
         return handle_sessions_delete(alloc, app, root, payload_out, payload_len_out);
+    if (strcmp(method, "persona.set") == 0)
+        return handle_persona_set(alloc, app, root, payload_out, payload_len_out);
     if (strcmp(method, "tools.catalog") == 0)
         return handle_tools_catalog(alloc, app, payload_out, payload_len_out);
     if (strcmp(method, "channels.status") == 0)
