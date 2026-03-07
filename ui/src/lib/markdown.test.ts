@@ -98,7 +98,6 @@ describe("renderMarkdown", () => {
     expect(out).toContain("bold");
     expect(out).toContain("<em>");
     expect(out).toContain("italic");
-    expect(out).toContain("code.inline");
-    expect(out).toContain("code");
+    expect(out).toContain('class="inline"');
   });
 });

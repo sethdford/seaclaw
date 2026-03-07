@@ -125,7 +125,7 @@ jfail:
 
 static void google_rcs_queue_push(sc_google_rcs_ctx_t *c, const char *from, size_t from_len,
                                   const char *body, size_t body_len) {
-    if (c->queue_count >= SC_RCS_QUEUE_MAX)
+    if (!c || !from || !body || c->queue_count >= SC_RCS_QUEUE_MAX)
         return;
     sc_google_rcs_queued_msg_t *slot = &c->queue[c->queue_tail];
     size_t sk = from_len < SC_RCS_SESSION_KEY_MAX ? from_len : SC_RCS_SESSION_KEY_MAX;
