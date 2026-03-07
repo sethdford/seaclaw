@@ -317,11 +317,12 @@ sc_error_t sc_whatsapp_create(sc_allocator_t *alloc, const char *phone_number_id
 void sc_whatsapp_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_whatsapp_ctx_t *c = (sc_whatsapp_ctx_t *)ch->ctx;
+        sc_allocator_t *a = c->alloc;
         if (c->phone_number_id)
             free(c->phone_number_id);
         if (c->token)
             free(c->token);
-        free(c);
+        a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

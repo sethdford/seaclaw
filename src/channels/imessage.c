@@ -230,7 +230,7 @@ sc_error_t sc_imessage_create(sc_allocator_t *alloc, const char *default_target,
     if (default_target && default_target_len > 0) {
         c->default_target = (char *)malloc(default_target_len + 1);
         if (!c->default_target) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->default_target, default_target, default_target_len);
@@ -276,9 +276,10 @@ bool sc_imessage_is_configured(sc_channel_t *ch) {
 void sc_imessage_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_imessage_ctx_t *c = (sc_imessage_ctx_t *)ch->ctx;
+        sc_allocator_t *a = c->alloc;
         if (c->default_target)
             free(c->default_target);
-        free(ch->ctx);
+        a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;
     }
