@@ -581,6 +581,43 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
 #ifdef SC_HAS_CRON
     fprintf(stderr, "[%s] %zu channel(s) active, cron enabled\n", SC_CODENAME,
             app_ctx.channel_count);
+
+    /* Register proactive engagement cron jobs from persona contacts */
+#ifdef SC_HAS_PERSONA
+    if (app_ctx.agent && app_ctx.agent->persona && app_ctx.agent->scheduler) {
+        const sc_persona_t *persona = app_ctx.agent->persona;
+        for (size_t ci = 0; ci < persona->contacts_count; ci++) {
+            const sc_contact_profile_t *cp = &persona->contacts[ci];
+            if (!cp->proactive_checkin || !cp->proactive_channel)
+                continue;
+            const char *sched = cp->proactive_schedule ? cp->proactive_schedule : "0 10 * * *";
+
+            char prompt[512];
+            snprintf(prompt, sizeof(prompt),
+                     "You are checking in with %s (%s). Based on your relationship and "
+                     "recent conversations, send a brief, natural check-in message. "
+                     "Follow the NOTICE>WAIT>BRIDGE>OFFER>INVITE pattern: notice something "
+                     "relevant, bridge to a shared interest, optionally offer or invite. "
+                     "Keep it 1-2 sentences. If you have nothing meaningful to say, respond "
+                     "with exactly 'SKIP' and nothing else.",
+                     cp->name ? cp->name : cp->contact_id, cp->contact_id);
+
+            char job_name[128];
+            snprintf(job_name, sizeof(job_name), "proactive:%s",
+                     cp->name ? cp->name : cp->contact_id);
+
+            uint64_t job_id = 0;
+            sc_error_t jerr =
+                sc_cron_add_agent_job((sc_cron_scheduler_t *)app_ctx.agent->scheduler, alloc, sched,
+                                      prompt, cp->proactive_channel, job_name, &job_id);
+            if (jerr == SC_OK) {
+                fprintf(stderr, "[%s] proactive check-in registered for %s (id=%llu sched=%s)\n",
+                        SC_CODENAME, cp->name ? cp->name : cp->contact_id,
+                        (unsigned long long)job_id, sched);
+            }
+        }
+    }
+#endif
 #else
     fprintf(stderr, "[%s] %zu channel(s) active\n", SC_CODENAME, app_ctx.channel_count);
 #endif
