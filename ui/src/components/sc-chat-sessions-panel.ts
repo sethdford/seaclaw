@@ -284,6 +284,13 @@ export class ScChatSessionsPanel extends LitElement {
       font-family: var(--sc-font);
     }
 
+    @media (prefers-reduced-transparency: reduce) {
+      .panel {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: var(--sc-bg-surface);
+      }
+    }
     @media (prefers-reduced-motion: reduce) {
       :host {
         transition: none;

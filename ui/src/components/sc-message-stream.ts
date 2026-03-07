@@ -14,14 +14,14 @@ export class ScMessageStream extends LitElement {
   @property({ type: String }) role: MessageRole = "assistant";
 
   static override styles = css`
-    @keyframes sc-blink {
-      0%,
-      50% {
-        opacity: 1;
-      }
-      51%,
-      100% {
+    @keyframes sc-slide-up {
+      from {
         opacity: 0;
+        transform: translateY(var(--sc-space-sm));
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
       }
     }
 
@@ -36,6 +36,7 @@ export class ScMessageStream extends LitElement {
       padding: var(--sc-space-md) var(--sc-space-lg);
       border-radius: var(--sc-radius-xl);
       max-width: 85%;
+      animation: sc-slide-up var(--sc-duration-fast) var(--sc-ease-out) both;
     }
 
     .bubble.role-user {
@@ -191,12 +192,15 @@ export class ScMessageStream extends LitElement {
       width: 2px;
       height: 1em;
       background: var(--sc-accent);
-      margin-left: 2px;
+      margin-left: var(--sc-space-2xs);
       vertical-align: text-bottom;
-      animation: sc-blink 1s step-end infinite;
+      animation: sc-pulse var(--sc-duration-slow) var(--sc-ease-in-out) infinite;
     }
 
     @media (prefers-reduced-motion: reduce) {
+      .bubble {
+        animation: none;
+      }
       .cursor {
         animation: none;
       }
