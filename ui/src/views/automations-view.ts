@@ -16,6 +16,8 @@ import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
 import "../components/sc-automation-card.js";
 import "../components/sc-schedule-builder.js";
+import "../components/sc-form-group.js";
+import "../components/sc-chart.js";
 
 interface CronJob {
   id: number;
@@ -79,6 +81,11 @@ const TEMPLATES = [
     icon: "backup",
   },
 ];
+
+function isValidCron(expr: string): boolean {
+  const parts = expr.trim().split(/\s+/);
+  return parts.length >= 5;
+}
 
 function cronToHuman(expr: string): string {
   const parts = expr.trim().split(/\s+/);
@@ -338,7 +345,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
           try {
             const runsRes = await gw.request<{ runs?: CronRun[] }>("cron.runs", {
               id: job.id,
-              limit: 7,
+              limit: 100,
             });
             const jobRuns = runsRes?.runs ?? [];
             runs.set(job.id, Array.isArray(jobRuns) ? jobRuns : []);
@@ -390,6 +397,27 @@ export class ScAutomationsView extends GatewayAwareLitElement {
 
   private get failedCount(): number {
     return this.jobs.filter((j) => j.last_status === "failed").length;
+  }
+
+  private get runChartData(): { labels: string[]; datasets: { label: string; data: number[] }[] } {
+    const byDay = new Map<string, { success: number; failure: number }>();
+    for (const runs of this.runsMap.values()) {
+      for (const run of runs) {
+        const day = new Date(run.started_at * 1000).toISOString().slice(0, 10);
+        const entry = byDay.get(day) ?? { success: 0, failure: 0 };
+        if (run.status === "completed") entry.success += 1;
+        else entry.failure += 1;
+        byDay.set(day, entry);
+      }
+    }
+    const days = [...byDay.keys()].sort();
+    return {
+      labels: days,
+      datasets: [
+        { label: "Success", data: days.map((d) => byDay.get(d)!.success) },
+        { label: "Failure", data: days.map((d) => byDay.get(d)!.failure) },
+      ],
+    };
   }
 
   private _openNewAutomation(): void {
@@ -518,15 +546,24 @@ export class ScAutomationsView extends GatewayAwareLitElement {
   }
 
   private async _saveAgent(): Promise<void> {
+    const name = this.agentName.trim();
     const prompt = this.agentPrompt.trim();
     const oneShot = this.agentOneShot;
     const schedule = oneShot ? "0 0 1 1 *" : this.agentSchedule.trim();
+    if (!name) {
+      this.formError = "Name is required";
+      return;
+    }
     if (!prompt) {
       this.formError = "Prompt is required";
       return;
     }
     if (!oneShot && !schedule) {
       this.formError = "Schedule is required";
+      return;
+    }
+    if (!oneShot && !isValidCron(schedule)) {
+      this.formError = "Invalid cron expression (need 5 parts: min hour day month weekday)";
       return;
     }
     const gw = this.gateway;
@@ -546,7 +583,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
           prompt,
           channel: this.agentChannel || undefined,
           expression: schedule,
-          name: this.agentName.trim() || "Agent task",
+          name: name || "Agent task",
           one_shot: oneShot,
         });
         ScToast.show({ message: "Automation created", variant: "success" });
@@ -562,15 +599,24 @@ export class ScAutomationsView extends GatewayAwareLitElement {
   }
 
   private async _saveShell(): Promise<void> {
+    const name = this.shellName.trim();
     const cmd = this.shellCommand.trim();
     const oneShot = this.shellOneShot;
     const schedule = oneShot ? "0 0 1 1 *" : this.shellSchedule.trim();
+    if (!name) {
+      this.formError = "Name is required";
+      return;
+    }
     if (!cmd) {
       this.formError = "Command is required";
       return;
     }
     if (!oneShot && !schedule) {
       this.formError = "Schedule is required";
+      return;
+    }
+    if (!oneShot && !isValidCron(schedule)) {
+      this.formError = "Invalid cron expression (need 5 parts: min hour day month weekday)";
       return;
     }
     const gw = this.gateway;
@@ -588,7 +634,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
         const res = await gw.request<{ id?: number }>("cron.add", {
           expression: schedule,
           command: cmd,
-          name: this.shellName.trim() || cmd,
+          name: name || cmd,
           one_shot: oneShot,
         });
         ScToast.show({ message: "Shell job created", variant: "success" });
@@ -719,72 +765,75 @@ export class ScAutomationsView extends GatewayAwareLitElement {
         ?open=${this.showAgentModal}
         @close=${this._closeAgentModal}
       >
-        <div class="form-group">
-          <sc-input
-            label="Name"
-            placeholder="My daily summary"
-            .value=${this.agentName}
-            @sc-input=${(e: CustomEvent<{ value: string }>) => (this.agentName = e.detail.value)}
-          ></sc-input>
-        </div>
-        <div class="form-group">
-          <label for="agent-prompt">Prompt</label>
-          <textarea
-            id="agent-prompt"
-            class="form-textarea"
-            placeholder="Summarize my unread messages..."
-            .value=${this.agentPrompt}
-            @input=${(e: Event) => (this.agentPrompt = (e.target as HTMLTextAreaElement).value)}
-          ></textarea>
-        </div>
-        <div class="form-group">
-          <label>Mode</label>
-          <div class="mode-toggle">
-            <sc-button
-              variant=${!this.agentOneShot ? "primary" : "secondary"}
-              @click=${() => (this.agentOneShot = false)}
-            >
-              Recurring
-            </sc-button>
-            <sc-button
-              variant=${this.agentOneShot ? "primary" : "secondary"}
-              @click=${() => (this.agentOneShot = true)}
-            >
-              Run Once
-            </sc-button>
+        <sc-form-group title="Job details" description="Name, prompt, and schedule">
+          <div class="form-group">
+            <sc-input
+              label="Name"
+              placeholder="My daily summary"
+              .value=${this.agentName}
+              @sc-input=${(e: CustomEvent<{ value: string }>) => (this.agentName = e.detail.value)}
+            ></sc-input>
           </div>
-        </div>
-        ${this.agentOneShot
-          ? html`
-              <div class="form-group">
-                <div class="run-once-message">Run immediately on save</div>
-              </div>
-            `
-          : html`
-              <div class="form-group">
-                <label>Schedule</label>
-                <sc-schedule-builder
-                  .value=${this.agentSchedule}
-                  @sc-schedule-change=${(e: CustomEvent<{ value: string }>) =>
-                    (this.agentSchedule = e.detail.value)}
-                ></sc-schedule-builder>
-              </div>
-            `}
-        <div class="form-group">
-          <label for="agent-channel">Channel</label>
-          <select
-            id="agent-channel"
-            class="form-select"
-            .value=${this.agentChannel}
-            @change=${(e: Event) => (this.agentChannel = (e.target as HTMLSelectElement).value)}
-          >
-            <option value="">— Gateway (default) —</option>
-            ${this.channels.map(
-              (ch) => html`<option value=${ch.key} ?disabled=${!ch.configured}>${ch.name}</option>`,
-            )}
-          </select>
-        </div>
-        ${this.formError ? html`<p class="form-error">${this.formError}</p>` : nothing}
+          <div class="form-group">
+            <label for="agent-prompt">Prompt</label>
+            <textarea
+              id="agent-prompt"
+              class="form-textarea"
+              placeholder="Summarize my unread messages..."
+              .value=${this.agentPrompt}
+              @input=${(e: Event) => (this.agentPrompt = (e.target as HTMLTextAreaElement).value)}
+            ></textarea>
+          </div>
+          <div class="form-group">
+            <label>Mode</label>
+            <div class="mode-toggle">
+              <sc-button
+                variant=${!this.agentOneShot ? "primary" : "secondary"}
+                @click=${() => (this.agentOneShot = false)}
+              >
+                Recurring
+              </sc-button>
+              <sc-button
+                variant=${this.agentOneShot ? "primary" : "secondary"}
+                @click=${() => (this.agentOneShot = true)}
+              >
+                Run Once
+              </sc-button>
+            </div>
+          </div>
+          ${this.agentOneShot
+            ? html`
+                <div class="form-group">
+                  <div class="run-once-message">Run immediately on save</div>
+                </div>
+              `
+            : html`
+                <div class="form-group">
+                  <label>Schedule</label>
+                  <sc-schedule-builder
+                    .value=${this.agentSchedule}
+                    @sc-schedule-change=${(e: CustomEvent<{ value: string }>) =>
+                      (this.agentSchedule = e.detail.value)}
+                  ></sc-schedule-builder>
+                </div>
+              `}
+          <div class="form-group">
+            <label for="agent-channel">Channel</label>
+            <select
+              id="agent-channel"
+              class="form-select"
+              .value=${this.agentChannel}
+              @change=${(e: Event) => (this.agentChannel = (e.target as HTMLSelectElement).value)}
+            >
+              <option value="">— Gateway (default) —</option>
+              ${this.channels.map(
+                (ch) =>
+                  html`<option value=${ch.key} ?disabled=${!ch.configured}>${ch.name}</option>`,
+              )}
+            </select>
+          </div>
+          ${this.formError ? html`<p class="form-error">${this.formError}</p>` : nothing}
+        </sc-form-group>
         <div class="modal-footer">
           <sc-button variant="secondary" @click=${this._closeAgentModal}>Cancel</sc-button>
           <sc-button variant="primary" @click=${this._saveAgent}>Save</sc-button>
@@ -800,56 +849,59 @@ export class ScAutomationsView extends GatewayAwareLitElement {
         ?open=${this.showShellModal}
         @close=${this._closeShellModal}
       >
-        <div class="form-group">
-          <sc-input
-            label="Name"
-            placeholder="My backup script"
-            .value=${this.shellName}
-            @sc-input=${(e: CustomEvent<{ value: string }>) => (this.shellName = e.detail.value)}
-          ></sc-input>
-        </div>
-        <div class="form-group mono-input">
-          <sc-input
-            label="Command"
-            placeholder="echo 'hello world'"
-            .value=${this.shellCommand}
-            @sc-input=${(e: CustomEvent<{ value: string }>) => (this.shellCommand = e.detail.value)}
-          ></sc-input>
-        </div>
-        <div class="form-group">
-          <label>Mode</label>
-          <div class="mode-toggle">
-            <sc-button
-              variant=${!this.shellOneShot ? "primary" : "secondary"}
-              @click=${() => (this.shellOneShot = false)}
-            >
-              Recurring
-            </sc-button>
-            <sc-button
-              variant=${this.shellOneShot ? "primary" : "secondary"}
-              @click=${() => (this.shellOneShot = true)}
-            >
-              Run Once
-            </sc-button>
+        <sc-form-group title="Job details" description="Name, command, and schedule">
+          <div class="form-group">
+            <sc-input
+              label="Name"
+              placeholder="My backup script"
+              .value=${this.shellName}
+              @sc-input=${(e: CustomEvent<{ value: string }>) => (this.shellName = e.detail.value)}
+            ></sc-input>
           </div>
-        </div>
-        ${this.shellOneShot
-          ? html`
-              <div class="form-group">
-                <div class="run-once-message">Run immediately on save</div>
-              </div>
-            `
-          : html`
-              <div class="form-group">
-                <label>Schedule</label>
-                <sc-schedule-builder
-                  .value=${this.shellSchedule}
-                  @sc-schedule-change=${(e: CustomEvent<{ value: string }>) =>
-                    (this.shellSchedule = e.detail.value)}
-                ></sc-schedule-builder>
-              </div>
-            `}
-        ${this.formError ? html`<p class="form-error">${this.formError}</p>` : nothing}
+          <div class="form-group mono-input">
+            <sc-input
+              label="Command"
+              placeholder="echo 'hello world'"
+              .value=${this.shellCommand}
+              @sc-input=${(e: CustomEvent<{ value: string }>) =>
+                (this.shellCommand = e.detail.value)}
+            ></sc-input>
+          </div>
+          <div class="form-group">
+            <label>Mode</label>
+            <div class="mode-toggle">
+              <sc-button
+                variant=${!this.shellOneShot ? "primary" : "secondary"}
+                @click=${() => (this.shellOneShot = false)}
+              >
+                Recurring
+              </sc-button>
+              <sc-button
+                variant=${this.shellOneShot ? "primary" : "secondary"}
+                @click=${() => (this.shellOneShot = true)}
+              >
+                Run Once
+              </sc-button>
+            </div>
+          </div>
+          ${this.shellOneShot
+            ? html`
+                <div class="form-group">
+                  <div class="run-once-message">Run immediately on save</div>
+                </div>
+              `
+            : html`
+                <div class="form-group">
+                  <label>Schedule</label>
+                  <sc-schedule-builder
+                    .value=${this.shellSchedule}
+                    @sc-schedule-change=${(e: CustomEvent<{ value: string }>) =>
+                      (this.shellSchedule = e.detail.value)}
+                  ></sc-schedule-builder>
+                </div>
+              `}
+          ${this.formError ? html`<p class="form-error">${this.formError}</p>` : nothing}
+        </sc-form-group>
         <div class="modal-footer">
           <sc-button variant="secondary" @click=${this._closeShellModal}>Cancel</sc-button>
           <sc-button variant="primary" @click=${this._saveShell}>Save</sc-button>
@@ -894,6 +946,18 @@ export class ScAutomationsView extends GatewayAwareLitElement {
       </sc-page-hero>
 
       ${this._renderStats()}
+      ${this.runChartData.labels.length > 0
+        ? html`
+            <sc-card style="margin-bottom: var(--sc-space-xl);">
+              <h3
+                style="margin: 0 0 var(--sc-space-md); font-size: var(--sc-text-base); font-weight: var(--sc-weight-semibold); color: var(--sc-text);"
+              >
+                Run outcomes over time
+              </h3>
+              <sc-chart type="line" .data=${this.runChartData} height=${200}></sc-chart>
+            </sc-card>
+          `
+        : nothing}
 
       <sc-tabs
         .tabs=${[

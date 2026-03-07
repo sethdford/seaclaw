@@ -3,6 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import { icons } from "../icons.js";
 import "./sc-card.js";
 import "./sc-button.js";
+import "./sc-data-table-v2.js";
 
 interface CronJob {
   id: number;
@@ -292,6 +293,19 @@ export class ScAutomationCard extends LitElement {
       color: var(--sc-error);
     }
 
+    .run-history-section {
+      margin-top: var(--sc-space-md);
+      padding-top: var(--sc-space-md);
+      border-top: 1px solid var(--sc-border-subtle);
+    }
+
+    .run-history-label {
+      font-size: var(--sc-text-sm);
+      font-weight: var(--sc-weight-medium);
+      color: var(--sc-text-muted);
+      margin-bottom: var(--sc-space-sm);
+    }
+
     .run-history {
       display: flex;
       gap: var(--sc-space-xs);
@@ -414,7 +428,19 @@ export class ScAutomationCard extends LitElement {
     const nextRunStr = job.next_run > 0 ? relativeTime(job.next_run) : "—";
     const lastStatusClass =
       job.last_status === "completed" ? "completed" : job.last_status === "failed" ? "failed" : "";
-    const displayRuns = this.runs.slice(-7);
+    const runRows = this.runs
+      .map((r) => ({
+        time: new Date(r.started_at * 1000).toLocaleString(undefined, {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        status: r.status,
+        duration:
+          r.finished_at > r.started_at ? `${Math.round(r.finished_at - r.started_at)}s` : "—",
+      }))
+      .reverse();
     const createdStr =
       job.created_at > 0
         ? new Date(job.created_at * 1000).toLocaleDateString(undefined, {
@@ -474,21 +500,23 @@ export class ScAutomationCard extends LitElement {
               </span>
             </div>
 
-            <div class="run-history" role="img" aria-label="Last 7 run statuses">
-              ${Array.from({ length: 7 }, (_, i) => {
-                const run = displayRuns[i];
-                const status =
-                  run?.status === "completed"
-                    ? "completed"
-                    : run?.status === "failed"
-                      ? "failed"
-                      : "empty";
-                return html`<span
-                  class="run-dot ${status}"
-                  title=${run ? `Run ${run.id}: ${run.status}` : "No run"}
-                ></span>`;
-              })}
-            </div>
+            ${this.runs.length > 0
+              ? html`
+                  <div class="run-history-section">
+                    <div class="run-history-label">Run history</div>
+                    <sc-data-table-v2
+                      .columns=${[
+                        { key: "time", label: "Time", sortable: true },
+                        { key: "status", label: "Status", sortable: true },
+                        { key: "duration", label: "Duration", align: "right" as const },
+                      ]}
+                      .rows=${runRows}
+                      .pageSize=${5}
+                      paginated
+                    ></sc-data-table-v2>
+                  </div>
+                `
+              : nothing}
 
             <div class="footer-row">
               <div class="footer-actions">
