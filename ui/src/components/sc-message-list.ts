@@ -271,6 +271,15 @@ export class ScMessageList extends LitElement {
       gap: var(--sc-space-md);
       padding: var(--sc-space-lg) 0;
     }
+    .skeleton-row {
+      display: flex;
+    }
+    .skeleton-right {
+      justify-content: flex-end;
+    }
+    .skeleton-left {
+      justify-content: flex-start;
+    }
     @media (max-width: 640px) {
       .message.user {
         max-width: 95%;
@@ -280,6 +289,9 @@ export class ScMessageList extends LitElement {
       }
     }
     @media (prefers-reduced-motion: reduce) {
+      .messages {
+        scroll-behavior: auto;
+      }
       .message,
       .scroll-bottom-pill {
         animation: none !important;
@@ -316,7 +328,8 @@ export class ScMessageList extends LitElement {
   scrollToItem(idx: number): void {
     this.updateComplete.then(() => {
       const el = this.scrollContainer?.querySelector(`#msg-${idx}`) as HTMLElement;
-      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      el?.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
     });
   }
 
@@ -464,9 +477,38 @@ export class ScMessageList extends LitElement {
         ${this.historyLoading
           ? html`
               <div class="history-skeleton">
-                <sc-skeleton variant="line" width="60%"></sc-skeleton>
-                <sc-skeleton variant="line" width="80%"></sc-skeleton>
-                <sc-skeleton variant="line" width="45%"></sc-skeleton>
+                <div class="skeleton-row skeleton-right">
+                  <sc-skeleton
+                    variant="line"
+                    width="55%"
+                    height="40px"
+                    style="border-radius: var(--sc-radius-lg) var(--sc-radius-lg) var(--sc-radius-sm) var(--sc-radius-lg); overflow: hidden;"
+                  ></sc-skeleton>
+                </div>
+                <div class="skeleton-row skeleton-left">
+                  <sc-skeleton
+                    variant="line"
+                    width="70%"
+                    height="56px"
+                    style="border-radius: var(--sc-radius-lg) var(--sc-radius-lg) var(--sc-radius-lg) var(--sc-radius-sm); overflow: hidden;"
+                  ></sc-skeleton>
+                </div>
+                <div class="skeleton-row skeleton-right">
+                  <sc-skeleton
+                    variant="line"
+                    width="45%"
+                    height="36px"
+                    style="border-radius: var(--sc-radius-lg) var(--sc-radius-lg) var(--sc-radius-sm) var(--sc-radius-lg); overflow: hidden;"
+                  ></sc-skeleton>
+                </div>
+                <div class="skeleton-row skeleton-left">
+                  <sc-skeleton
+                    variant="line"
+                    width="65%"
+                    height="48px"
+                    style="border-radius: var(--sc-radius-lg) var(--sc-radius-lg) var(--sc-radius-lg) var(--sc-radius-sm); overflow: hidden;"
+                  ></sc-skeleton>
+                </div>
               </div>
             `
           : html`

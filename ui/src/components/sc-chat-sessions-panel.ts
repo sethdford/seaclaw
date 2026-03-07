@@ -264,6 +264,26 @@ export class ScChatSessionsPanel extends LitElement {
       font-family: var(--sc-font);
     }
 
+    .empty-sessions {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--sc-space-xs);
+      padding: var(--sc-space-xl) var(--sc-space-md);
+      text-align: center;
+    }
+    .empty-sessions .empty-text {
+      font-size: var(--sc-text-sm);
+      color: var(--sc-text-muted);
+      font-family: var(--sc-font);
+    }
+    .empty-sessions .empty-hint {
+      font-size: var(--sc-text-xs);
+      color: var(--sc-text-faint);
+      font-family: var(--sc-font);
+    }
+
     @media (prefers-reduced-motion: reduce) {
       :host {
         transition: none;
@@ -422,7 +442,14 @@ export class ScChatSessionsPanel extends LitElement {
           @keydown=${this._onListKeydown}
         >
           ${filteredGroups.length === 0
-            ? html`<div class="empty-state">No sessions found</div>`
+            ? this.sessions.length === 0 && !this._searchQuery
+              ? html`
+                  <div class="empty-sessions">
+                    <span class="empty-text">No conversations yet</span>
+                    <span class="empty-hint">Start a new chat to begin</span>
+                  </div>
+                `
+              : html`<div class="empty-state">No sessions found</div>`
             : groupsWithIndices.map((group) => {
                 return html`
                   <div class="session-group">
