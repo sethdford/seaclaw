@@ -6,23 +6,10 @@
 #include <string.h>
 
 #ifndef SC_IS_TEST
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 #include <dirent.h>
-#include <sys/stat.h>
-#endif
-#ifdef __APPLE__
-#include <dirent.h>
-#include <sys/stat.h>
-#endif
-#endif
-
-#ifndef SC_IS_TEST
-#ifdef __linux__
 #include <fcntl.h>
-#include <unistd.h>
-#endif
-#ifdef __APPLE__
-#include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #endif
 #endif

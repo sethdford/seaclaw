@@ -4,12 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef _WIN32
 #define getenv_safe(n) getenv(n)
-#else
-#include <stdlib.h>
-#define getenv_safe(n) getenv(n)
-#endif
 
 static void trim(const char *s, size_t len, size_t *start_out, size_t *end_out) {
     size_t start = 0, end = len;
