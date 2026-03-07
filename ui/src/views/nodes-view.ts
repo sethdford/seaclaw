@@ -2,12 +2,14 @@ import { html, css, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
-import "../components/sc-page-hero.js";
-import "../components/sc-section-header.js";
+import type { DataTableColumnV2 } from "../components/sc-data-table-v2.js";
 import "../components/sc-badge.js";
 import "../components/sc-button.js";
-import "../components/sc-card.js";
+import "../components/sc-data-table-v2.js";
 import "../components/sc-empty-state.js";
+import "../components/sc-page-hero.js";
+import "../components/sc-section-header.js";
+import "../components/sc-sheet.js";
 import "../components/sc-skeleton.js";
 
 interface NodeItem {
@@ -15,6 +17,21 @@ interface NodeItem {
   type?: string;
   status?: string;
   ws_connections?: number;
+  uptime_secs?: number;
+  hostname?: string;
+  version?: string;
+}
+
+function formatUptime(secs: number | undefined): string {
+  if (secs == null || secs <= 0) return "-";
+  const d = Math.floor(secs / 86400);
+  const h = Math.floor((secs % 86400) / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const parts: string[] = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0 || parts.length === 0) parts.push(`${m}m`);
+  return parts.join(" ");
 }
 
 @customElement("sc-nodes-view")
@@ -24,110 +41,57 @@ export class ScNodesView extends GatewayAwareLitElement {
   static override styles = css`
     :host {
       display: block;
-      color: var(--sc-text);
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: var(--sc-space-xl);
-      flex-wrap: wrap;
-      gap: var(--sc-space-sm);
-    }
-    .nodes-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: var(--sc-space-xl);
-      margin-bottom: var(--sc-space-2xl);
+      max-width: 1200px;
     }
     .header-actions {
       display: flex;
       align-items: center;
-      gap: var(--sc-space-sm);
+      gap: var(--sc-space-md);
+      margin-bottom: var(--sc-space-lg);
     }
     .staleness {
-      font-size: var(--sc-text-xs);
-      color: var(--sc-text-muted);
-    }
-    .node-header {
-      display: flex;
-      align-items: center;
-      gap: var(--sc-space-sm);
-      margin-bottom: var(--sc-space-sm);
-    }
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .status-dot.green {
-      background: var(--sc-success);
-    }
-    .status-dot.yellow {
-      background: var(--sc-warning);
-    }
-    .status-dot.red {
-      background: var(--sc-error);
-    }
-    .node-id {
-      font-family: var(--sc-font-mono);
-      font-size: var(--sc-text-base);
-      font-weight: var(--sc-weight-semibold);
-      color: var(--sc-text);
-      word-break: break-all;
-    }
-    .node-type {
-      display: inline-block;
-      padding: var(--sc-space-xs) var(--sc-space-sm);
-      font-size: var(--sc-text-xs);
-      font-weight: var(--sc-weight-medium);
-      text-transform: lowercase;
-      background: var(--sc-bg-elevated);
-      color: var(--sc-text-muted);
-      border-radius: var(--sc-radius-sm);
-      margin-bottom: var(--sc-space-sm);
-    }
-    .node-info {
       font-size: var(--sc-text-sm);
       color: var(--sc-text-muted);
     }
-    .health-section {
+    .table-section {
       margin-top: var(--sc-space-md);
     }
-    .health-title {
-      font-size: var(--sc-text-base);
-      font-weight: var(--sc-weight-semibold);
-      color: var(--sc-text);
-      margin-bottom: var(--sc-space-sm);
+    .sheet-detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--sc-space-sm) 0;
+      border-bottom: 1px solid var(--sc-border-subtle);
     }
-    .health-status {
+    .sheet-detail-row:last-child {
+      border-bottom: none;
+    }
+    .sheet-detail-label {
       font-size: var(--sc-text-sm);
       color: var(--sc-text-muted);
     }
-    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
-      .nodes-grid {
-        grid-template-columns: 1fr 1fr;
-      }
+    .sheet-detail-value {
+      font-size: var(--sc-text-sm);
+      color: var(--sc-text);
+      font-family: var(--sc-font-mono);
     }
-    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
-      .nodes-grid {
-        grid-template-columns: 1fr;
-      }
+    .sheet-title {
+      font-weight: var(--sc-weight-semibold);
+      font-size: var(--sc-text-lg);
+      color: var(--sc-text);
+      margin-bottom: var(--sc-space-lg);
+      font-family: var(--sc-font-mono);
     }
     @media (prefers-reduced-motion: reduce) {
       * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
+        animation-duration: 0s !important;
       }
     }
   `;
 
   @state() private nodes: NodeItem[] = [];
-  @state() private healthStatus = "";
   @state() private loading = false;
   @state() private error = "";
+  @state() private _sheetNode: NodeItem | null = null;
 
   protected override async load(): Promise<void> {
     const gw = this.gateway;
@@ -135,86 +99,79 @@ export class ScNodesView extends GatewayAwareLitElement {
     this.loading = true;
     this.error = "";
     try {
-      const [nodesPayload, healthPayload] = await Promise.all([
+      const [nodesPayload] = await Promise.all([
         gw.request<{ nodes?: NodeItem[] }>("nodes.list", {}),
-        gw.request<{ status?: string }>("health", {}),
       ]);
       this.nodes = nodesPayload?.nodes ?? [];
-      this.healthStatus = healthPayload?.status ?? "unknown";
+      this.lastLoadedAt = Date.now();
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Failed to load";
       this.nodes = [];
-      this.healthStatus = "";
     } finally {
       this.loading = false;
     }
   }
 
-  private statusDotClass(status: string | undefined): string {
+  private statusVariant(status: string | undefined): "success" | "warning" | "error" | "neutral" {
     const s = (status ?? "").toLowerCase();
-    if (s === "ok" || s === "healthy" || s === "connected" || s === "online") return "green";
-    if (s === "degraded" || s === "warning") return "yellow";
-    return "red";
+    if (s === "ok" || s === "healthy" || s === "connected" || s === "online") return "success";
+    if (s === "degraded" || s === "warning") return "warning";
+    return "neutral";
   }
 
-  private typeLabel(type: string | undefined): string {
-    const t = (type ?? "").toLowerCase();
-    if (t === "gateway" || t === "device" || t === "peripheral") return t;
-    return t || "unknown";
+  private get tableRows(): Record<string, unknown>[] {
+    return this.nodes.map((n) => ({
+      id: n.id ?? "—",
+      status: n.status ?? "unknown",
+      statusVariant: this.statusVariant(n.status),
+      wsCount: n.ws_connections ?? 0,
+      uptime: formatUptime(n.uptime_secs),
+      _node: n,
+    }));
+  }
+
+  private readonly columns: DataTableColumnV2[] = [
+    { key: "id", label: "Node ID", sortable: true },
+    {
+      key: "status",
+      label: "Status",
+      render: (_v, row) => {
+        const variant = row.statusVariant as "success" | "warning" | "neutral";
+        const label = String(row.status ?? "");
+        return html`<sc-badge variant=${variant}>${label}</sc-badge>`;
+      },
+    },
+    {
+      key: "wsCount",
+      label: "WebSocket Count",
+      align: "right",
+      sortable: true,
+      render: (v) => String(v ?? 0),
+    },
+    { key: "uptime", label: "Uptime" },
+  ];
+
+  private _onRowClick(e: CustomEvent<{ row: Record<string, unknown>; index: number }>): void {
+    const node = e.detail.row._node as NodeItem;
+    this._sheetNode = node ?? null;
+  }
+
+  private _onSheetClose(): void {
+    this._sheetNode = null;
   }
 
   private _renderSkeleton(): TemplateResult {
     return html`
-      <sc-skeleton variant="card" height="160px"></sc-skeleton>
-      <sc-skeleton variant="card" height="160px"></sc-skeleton>
-    `;
-  }
-
-  private _renderGrid(): TemplateResult {
-    if (this.loading && this.nodes.length === 0) return this._renderSkeleton();
-    if (this.nodes.length === 0) {
-      return html`
-        <sc-empty-state
-          .icon=${icons.monitor}
-          heading="No nodes connected"
-          description="Connected devices and gateways will appear here."
-        ></sc-empty-state>
-      `;
-    }
-    return html`
-      <div class="nodes-grid">
-        ${this.nodes.map(
-          (n) => html`
-            <sc-card>
-              <div class="node-header">
-                <span class="status-dot ${this.statusDotClass(n.status)}" aria-hidden="true"></span>
-                <span class="node-id">${n.id ?? "—"}</span>
-              </div>
-              <div class="node-type">${this.typeLabel(n.type)}</div>
-              <div class="node-info">WebSocket connections: ${n.ws_connections ?? 0}</div>
-            </sc-card>
-          `,
-        )}
+      <sc-page-hero>
+        <sc-section-header heading="Nodes" description="Loading..."></sc-section-header>
+      </sc-page-hero>
+      <div class="table-section">
+        <sc-skeleton variant="card" height="200px"></sc-skeleton>
       </div>
     `;
   }
 
-  private _renderHealth(): TemplateResult {
-    return html`
-      <div class="health-section">
-        <div class="health-title">Gateway health</div>
-        <div class="health-status">
-          ${this.loading && !this.healthStatus
-            ? html`<span class="staleness">Loading...</span>`
-            : html`<sc-badge variant=${this.healthStatus === "ok" ? "success" : "neutral"}
-                >${this.healthStatus || "—"}</sc-badge
-              >`}
-        </div>
-      </div>
-    `;
-  }
-
-  override render() {
+  private _renderContent(): TemplateResult {
     return html`
       <sc-page-hero>
         <sc-section-header
@@ -222,29 +179,91 @@ export class ScNodesView extends GatewayAwareLitElement {
           description="Connected node instances and their status"
         ></sc-section-header>
       </sc-page-hero>
-      <div class="header">
-        <div class="header-actions">
-          ${this.lastLoadedAt
-            ? html`<span class="staleness">Updated ${this.stalenessLabel}</span>`
-            : nothing}
-          <sc-button
-            size="sm"
-            .loading=${this.loading}
-            @click=${() => this.load()}
-            aria-label="Refresh nodes"
-            >Refresh</sc-button
-          >
-        </div>
+      <div class="header-actions">
+        ${this.lastLoadedAt
+          ? html`<span class="staleness">Last updated ${this.stalenessLabel}</span>`
+          : nothing}
+        <sc-button
+          size="sm"
+          .loading=${this.loading}
+          @click=${() => this.load()}
+          aria-label="Refresh nodes"
+        >
+          Refresh
+        </sc-button>
       </div>
-
       ${this.error
         ? html`<sc-empty-state
             .icon=${icons.warning}
             heading="Error"
             .description=${this.error}
           ></sc-empty-state>`
-        : ""}
-      ${!this.error ? this._renderGrid() : ""} ${this._renderHealth()}
+        : nothing}
+      <div class="table-section" role="region" aria-label="Nodes table">
+        ${this.nodes.length === 0 && !this.loading
+          ? html`
+              <sc-empty-state
+                .icon=${icons.monitor}
+                heading="No nodes connected"
+                description="Connected devices and gateways will appear here."
+              ></sc-empty-state>
+            `
+          : this.nodes.length > 0
+            ? html`
+                <sc-data-table-v2
+                  .columns=${this.columns}
+                  .rows=${this.tableRows}
+                  @sc-row-click=${this._onRowClick}
+                ></sc-data-table-v2>
+              `
+            : nothing}
+      </div>
+      <sc-sheet ?open=${this._sheetNode != null} @close=${this._onSheetClose}>
+        ${this._sheetNode
+          ? html`
+              <div class="sheet-title">${this._sheetNode.id ?? "Node"}</div>
+              <div class="sheet-detail-row">
+                <span class="sheet-detail-label">Status</span>
+                <span class="sheet-detail-value">${this._sheetNode.status ?? "-"}</span>
+              </div>
+              <div class="sheet-detail-row">
+                <span class="sheet-detail-label">Type</span>
+                <span class="sheet-detail-value">${this._sheetNode.type ?? "-"}</span>
+              </div>
+              <div class="sheet-detail-row">
+                <span class="sheet-detail-label">WebSocket connections</span>
+                <span class="sheet-detail-value">${this._sheetNode.ws_connections ?? 0}</span>
+              </div>
+              <div class="sheet-detail-row">
+                <span class="sheet-detail-label">Uptime</span>
+                <span class="sheet-detail-value">${formatUptime(this._sheetNode.uptime_secs)}</span>
+              </div>
+              ${this._sheetNode.hostname
+                ? html`
+                    <div class="sheet-detail-row">
+                      <span class="sheet-detail-label">Hostname</span>
+                      <span class="sheet-detail-value">${this._sheetNode.hostname}</span>
+                    </div>
+                  `
+                : nothing}
+              ${this._sheetNode.version
+                ? html`
+                    <div class="sheet-detail-row">
+                      <span class="sheet-detail-label">Version</span>
+                      <span class="sheet-detail-value">${this._sheetNode.version}</span>
+                    </div>
+                  `
+                : nothing}
+            `
+          : nothing}
+      </sc-sheet>
     `;
+  }
+
+  override render() {
+    if (this.loading && this.nodes.length === 0) {
+      return this._renderSkeleton();
+    }
+    return this._renderContent();
   }
 }
