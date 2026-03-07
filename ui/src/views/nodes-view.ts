@@ -105,12 +105,12 @@ export class ScNodesView extends GatewayAwareLitElement {
       font-size: var(--sc-text-sm);
       color: var(--sc-text-muted);
     }
-    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
+    @media (max-width: 768px) {
       .nodes-grid {
         grid-template-columns: 1fr 1fr;
       }
     }
-    @media (max-width: 480px) /* --sc-breakpoint-sm */ {
+    @media (max-width: 480px) {
       .nodes-grid {
         grid-template-columns: 1fr;
       }

@@ -51,25 +51,54 @@ describe("views", () => {
 });
 
 describe("sc-chat-view", () => {
-  it("renders sc-chat-composer when no messages", async () => {
+  it("renders sc-composer when no messages", async () => {
     const el = document.createElement("sc-chat-view") as HTMLElement & {
       updateComplete: Promise<boolean>;
     };
     document.body.appendChild(el);
     await el.updateComplete;
-    const composer = el.shadowRoot?.querySelector("sc-chat-composer");
+    const composer = el.shadowRoot?.querySelector("sc-composer");
     expect(composer).toBeTruthy();
     el.remove();
   });
 
-  it("renders message thread component", async () => {
+  it("has suggested bento cards in composer when empty", async () => {
     const el = document.createElement("sc-chat-view") as HTMLElement & {
       updateComplete: Promise<boolean>;
     };
     document.body.appendChild(el);
     await el.updateComplete;
-    const thread = el.shadowRoot?.querySelector("sc-message-thread");
-    expect(thread).toBeTruthy();
+    const composer = el.shadowRoot?.querySelector("sc-composer");
+    const cards = composer?.shadowRoot?.querySelectorAll(".bento-card") ?? [];
+    expect(cards.length).toBeGreaterThanOrEqual(1);
+    el.remove();
+  });
+
+  it("renders message list component", async () => {
+    const el = document.createElement("sc-chat-view") as HTMLElement & {
+      updateComplete: Promise<boolean>;
+    };
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const messageList = el.shadowRoot?.querySelector("sc-message-list");
+    expect(messageList).toBeTruthy();
+    el.remove();
+  });
+
+  it("composer has drag-over class during drag", async () => {
+    const el = document.createElement("sc-chat-view") as HTMLElement & {
+      updateComplete: Promise<boolean>;
+    };
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const composer = el.shadowRoot?.querySelector("sc-composer") as HTMLElement & {
+      updateComplete: Promise<boolean>;
+    };
+    const inputWrap = composer?.shadowRoot?.querySelector(".input-wrap");
+    expect(inputWrap?.classList.contains("drag-over")).toBe(false);
+    inputWrap?.dispatchEvent(new DragEvent("dragover", { bubbles: true }));
+    await composer?.updateComplete;
+    expect(inputWrap?.classList.contains("drag-over")).toBe(true);
     el.remove();
   });
 });
@@ -313,31 +342,20 @@ describe("view accessibility", () => {
 /* ── Deep view-specific tests ─────────────────────────────── */
 
 describe("sc-overview-view deep", () => {
-  it("renders bento grid or skeleton on load", async () => {
+  it("renders page hero or skeleton on load", async () => {
     const el = createView("sc-overview-view");
     await el.updateComplete;
-    const bento = el.shadowRoot?.querySelector(".bento");
+    const hero = el.shadowRoot?.querySelector("sc-page-hero");
     const skel = el.shadowRoot?.querySelector("sc-skeleton");
-    expect(bento || skel).toBeTruthy();
+    expect(hero || skel).toBeTruthy();
     el.remove();
   });
 
-  it("renders stat cells or skeleton", async () => {
+  it("renders stat cards or skeleton", async () => {
     const el = createView("sc-overview-view");
     await el.updateComplete;
-    const cards = el.shadowRoot?.querySelectorAll("sc-card, sc-skeleton");
-    expect(cards?.length).toBeGreaterThanOrEqual(1);
-    el.remove();
-  });
-
-  it("skeleton mirrors bento grid areas", async () => {
-    const el = createView("sc-overview-view");
-    await el.updateComplete;
-    const skeletonBento = el.shadowRoot?.querySelector(".skeleton-bento");
-    if (skeletonBento) {
-      const cells = skeletonBento.querySelectorAll("sc-skeleton");
-      expect(cells.length).toBe(8);
-    }
+    const stats = el.shadowRoot?.querySelectorAll("sc-stat-card, sc-skeleton");
+    expect(stats?.length).toBeGreaterThanOrEqual(1);
     el.remove();
   });
 });

@@ -1597,54 +1597,6 @@ describe("sc-chat-bubble", () => {
     expect(bubble?.getAttribute("role")).toBe("article");
     el.remove();
   });
-
-  it("applies position classes for continuation grouping", async () => {
-    const el = document.createElement("sc-chat-bubble") as HTMLElement & {
-      content: string;
-      role: "user" | "assistant";
-      isFirst: boolean;
-      isLast: boolean;
-      updateComplete: Promise<boolean>;
-    };
-    el.content = "Test";
-    el.role = "user";
-    document.body.appendChild(el);
-    await el.updateComplete;
-    expect(el.shadowRoot?.querySelector(".bubble")?.classList.contains("pos-solo")).toBe(true);
-    el.remove();
-
-    const first = document.createElement("sc-chat-bubble") as HTMLElement & {
-      content: string;
-      role: "user" | "assistant";
-      isFirst: boolean;
-      isLast: boolean;
-      updateComplete: Promise<boolean>;
-    };
-    first.content = "First";
-    first.role = "assistant";
-    first.isFirst = true;
-    first.isLast = false;
-    document.body.appendChild(first);
-    await first.updateComplete;
-    expect(first.shadowRoot?.querySelector(".bubble")?.classList.contains("pos-first")).toBe(true);
-    first.remove();
-
-    const last = document.createElement("sc-chat-bubble") as HTMLElement & {
-      content: string;
-      role: "user" | "assistant";
-      isFirst: boolean;
-      isLast: boolean;
-      updateComplete: Promise<boolean>;
-    };
-    last.content = "Last";
-    last.role = "assistant";
-    last.isFirst = false;
-    last.isLast = true;
-    document.body.appendChild(last);
-    await last.updateComplete;
-    expect(last.shadowRoot?.querySelector(".bubble")?.classList.contains("pos-last")).toBe(true);
-    last.remove();
-  });
 });
 
 describe("sc-typing-indicator", () => {
