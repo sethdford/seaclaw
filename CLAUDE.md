@@ -1,6 +1,6 @@
 # seaclaw
 
-C11 autonomous AI assistant runtime. ~561 KB binary, <6 MB RAM, <30 ms startup.
+C11 autonomous AI assistant runtime. ~511 KB binary, <6 MB RAM, <30 ms startup.
 Zero dependencies beyond libc (optional SQLite and libcurl).
 
 Read `AGENTS.md` for the full engineering protocol. This file is the quick reference.
@@ -66,7 +66,7 @@ Types: `feat fix refactor test docs chore perf ci build style`
 
 | Path               | What                                           |
 | ------------------ | ---------------------------------------------- |
-| `src/`             | All C source (~597 files, ~104K lines)         |
+| `src/`             | All C source (~597 files, ~105K lines)         |
 | `include/seaclaw/` | Public headers                                 |
 | `tests/`           | 101 test files, 3199+ tests                    |
 | `fuzz/`            | libFuzzer harnesses                            |

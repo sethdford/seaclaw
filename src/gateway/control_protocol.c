@@ -1,5 +1,6 @@
 #include "seaclaw/gateway/control_protocol.h"
 #include "seaclaw/agent.h"
+#include "seaclaw/agent/awareness.h"
 #include "seaclaw/bus.h"
 #include "seaclaw/channel_catalog.h"
 #include "seaclaw/config.h"
@@ -60,16 +61,18 @@ static sc_error_t build_connect_response(sc_allocator_t *alloc, const sc_app_con
     sc_json_value_t *methods_arr = sc_json_array_new(alloc);
 
     static const char *const methods[] = {
-        "auth.token",      "connect",         "health",         "config.get",
-        "config.schema",   "capabilities",    "chat.send",      "chat.history",
-        "chat.abort",      "config.set",      "config.apply",   "sessions.list",
-        "sessions.patch",  "sessions.delete", "persona.set",    "tools.catalog",
-        "channels.status", "cron.list",       "cron.add",       "cron.remove",
-        "cron.run",        "cron.update",     "cron.runs",      "skills.list",
-        "skills.install",  "skills.enable",
-        "skills.disable",  "update.check",    "update.run",     "exec.approval.resolve",
-        "usage.summary",   "models.list",     "nodes.list",     "push.register",
-        "push.unregister"};
+        "auth.token",      "connect",         "health",
+        "config.get",      "config.schema",   "capabilities",
+        "chat.send",       "chat.history",    "chat.abort",
+        "config.set",      "config.apply",    "sessions.list",
+        "sessions.patch",  "sessions.delete", "persona.set",
+        "tools.catalog",   "channels.status", "cron.list",
+        "cron.add",        "cron.remove",     "cron.run",
+        "cron.update",     "cron.runs",       "skills.list",
+        "skills.install",  "skills.enable",   "skills.disable",
+        "update.check",    "update.run",      "exec.approval.resolve",
+        "usage.summary",   "models.list",     "nodes.list",
+        "activity.recent", "push.register",   "push.unregister"};
     for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
         sc_json_value_t *m = sc_json_string_new(alloc, methods[i], strlen(methods[i]));
         if (m)
@@ -680,14 +683,11 @@ static sc_error_t handle_cron_list(sc_allocator_t *alloc, const sc_app_context_t
                                sc_json_number_new(alloc, (double)jobs[i].next_run_secs));
             sc_json_object_set(alloc, j, "last_run",
                                sc_json_number_new(alloc, (double)jobs[i].last_run_secs));
-            json_set_str(alloc, j, "type",
-                         jobs[i].type == SC_CRON_JOB_AGENT ? "agent" : "shell");
+            json_set_str(alloc, j, "type", jobs[i].type == SC_CRON_JOB_AGENT ? "agent" : "shell");
             json_set_str(alloc, j, "channel", jobs[i].channel);
             json_set_str(alloc, j, "last_status", jobs[i].last_status);
-            sc_json_object_set(alloc, j, "paused",
-                               sc_json_bool_new(alloc, jobs[i].paused));
-            sc_json_object_set(alloc, j, "one_shot",
-                               sc_json_bool_new(alloc, jobs[i].one_shot));
+            sc_json_object_set(alloc, j, "paused", sc_json_bool_new(alloc, jobs[i].paused));
+            sc_json_object_set(alloc, j, "one_shot", sc_json_bool_new(alloc, jobs[i].one_shot));
             sc_json_object_set(alloc, j, "created_at",
                                sc_json_number_new(alloc, (double)jobs[i].created_at_s));
             sc_json_array_push(alloc, arr, j);
@@ -718,8 +718,8 @@ static sc_error_t handle_cron_add(sc_allocator_t *alloc, sc_app_context_t *app,
             const char *channel = sc_json_get_string(params, "channel");
             bool one_shot = sc_json_get_bool(params, "one_shot", false);
             if (expr && type_str && strcmp(type_str, "agent") == 0 && prompt) {
-                sc_error_t e = sc_cron_add_agent_job(app->cron, app->alloc, expr, prompt,
-                                                     channel, name ? name : "Agent task", &new_id);
+                sc_error_t e = sc_cron_add_agent_job(app->cron, app->alloc, expr, prompt, channel,
+                                                     name ? name : "Agent task", &new_id);
                 added = (e == SC_OK);
                 if (added && one_shot)
                     sc_cron_set_job_one_shot(app->cron, new_id, true);
@@ -823,14 +823,11 @@ static sc_error_t handle_cron_run(sc_allocator_t *alloc, sc_app_context_t *app,
                     if (job->type == SC_CRON_JOB_AGENT && app->agent) {
                         char *reply = NULL;
                         size_t reply_len = 0;
-                        app->agent->active_channel =
-                            job->channel ? job->channel : "gateway";
-                        app->agent->active_channel_len =
-                            strlen(app->agent->active_channel);
+                        app->agent->active_channel = job->channel ? job->channel : "gateway";
+                        app->agent->active_channel_len = strlen(app->agent->active_channel);
                         app->agent->active_job_id = job_id;
-                        sc_error_t run_err =
-                            sc_agent_turn(app->agent, job->command, strlen(job->command),
-                                          &reply, &reply_len);
+                        sc_error_t run_err = sc_agent_turn(
+                            app->agent, job->command, strlen(job->command), &reply, &reply_len);
                         app->agent->active_job_id = 0;
                         started = (run_err == SC_OK);
                         sc_cron_add_run(app->cron, app->alloc, job_id, (int64_t)time(NULL),
@@ -902,8 +899,7 @@ static sc_error_t handle_cron_update(sc_allocator_t *alloc, sc_app_context_t *ap
                     en = en_val->data.boolean;
                     en_ptr = &en;
                 }
-                sc_error_t e =
-                    sc_cron_update_job(app->cron, app->alloc, job_id, expr, cmd, en_ptr);
+                sc_error_t e = sc_cron_update_job(app->cron, app->alloc, job_id, expr, cmd, en_ptr);
                 updated = (e == SC_OK);
             }
         }
@@ -937,8 +933,7 @@ static sc_error_t handle_cron_runs(sc_allocator_t *alloc, const sc_app_context_t
                 sc_cron_list_runs(app->cron, (uint64_t)id_num, (size_t)limit_num, &count);
             for (size_t i = 0; i < count; i++) {
                 sc_json_value_t *r = sc_json_object_new(alloc);
-                sc_json_object_set(alloc, r, "id",
-                                   sc_json_number_new(alloc, (double)runs[i].id));
+                sc_json_object_set(alloc, r, "id", sc_json_number_new(alloc, (double)runs[i].id));
                 sc_json_object_set(alloc, r, "started_at",
                                    sc_json_number_new(alloc, (double)runs[i].started_at_s));
                 sc_json_object_set(alloc, r, "finished_at",
@@ -1244,6 +1239,81 @@ static sc_error_t handle_exec_approval(sc_allocator_t *alloc, const sc_app_conte
     return err;
 }
 
+/* ── activity.recent ─────────────────────────────────────────────────── */
+
+static sc_error_t handle_activity_recent(sc_allocator_t *alloc, const sc_app_context_t *app,
+                                         char **out, size_t *out_len) {
+    sc_json_value_t *obj = sc_json_object_new(alloc);
+    if (!obj)
+        return SC_ERR_OUT_OF_MEMORY;
+
+    sc_json_value_t *events_arr = sc_json_array_new(alloc);
+    if (!events_arr) {
+        sc_json_free(alloc, obj);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+
+    int64_t now_ms = (int64_t)time(NULL) * 1000;
+
+    if (app && app->agent) {
+        const sc_awareness_t *aw = sc_agent_get_awareness(app->agent);
+        if (aw) {
+            const sc_awareness_state_t *s = &aw->state;
+
+            if (s->total_errors > 0) {
+                size_t nerr = s->total_errors < SC_AWARENESS_MAX_RECENT_ERRORS
+                                  ? s->total_errors
+                                  : SC_AWARENESS_MAX_RECENT_ERRORS;
+                for (size_t i = 0; i < nerr; i++) {
+                    size_t idx = (s->error_write_idx + SC_AWARENESS_MAX_RECENT_ERRORS - nerr + i) %
+                                 SC_AWARENESS_MAX_RECENT_ERRORS;
+                    sc_json_value_t *ev = sc_json_object_new(alloc);
+                    if (!ev)
+                        continue;
+                    json_set_str(alloc, ev, "type", "error");
+                    json_set_str(alloc, ev, "message", s->recent_errors[idx].text);
+                    int64_t ts = s->recent_errors[idx].timestamp_ms > 0
+                                     ? (int64_t)s->recent_errors[idx].timestamp_ms
+                                     : now_ms;
+                    sc_json_object_set(alloc, ev, "time", sc_json_number_new(alloc, (double)ts));
+                    sc_json_array_push(alloc, events_arr, ev);
+                }
+            }
+
+            if (s->messages_received > 0) {
+                sc_json_value_t *ev = sc_json_object_new(alloc);
+                if (ev) {
+                    json_set_str(alloc, ev, "type", "system");
+                    char msg[128];
+                    snprintf(msg, sizeof(msg), "%llu messages received, %llu tool calls",
+                             (unsigned long long)s->messages_received,
+                             (unsigned long long)s->tool_calls);
+                    json_set_str(alloc, ev, "message", msg);
+                    sc_json_object_set(alloc, ev, "time",
+                                       sc_json_number_new(alloc, (double)now_ms));
+                    sc_json_array_push(alloc, events_arr, ev);
+                }
+            }
+
+            if (s->health_degraded) {
+                sc_json_value_t *ev = sc_json_object_new(alloc);
+                if (ev) {
+                    json_set_str(alloc, ev, "type", "error");
+                    json_set_str(alloc, ev, "message", "System health is degraded");
+                    sc_json_object_set(alloc, ev, "time",
+                                       sc_json_number_new(alloc, (double)now_ms));
+                    sc_json_array_push(alloc, events_arr, ev);
+                }
+            }
+        }
+    }
+
+    sc_json_object_set(alloc, obj, "events", events_arr);
+    sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+    sc_json_free(alloc, obj);
+    return err;
+}
+
 /* ── usage.summary ───────────────────────────────────────────────────── */
 
 static sc_error_t handle_usage_summary(sc_allocator_t *alloc, const sc_app_context_t *app,
@@ -1497,6 +1567,8 @@ static sc_error_t build_method_response(sc_allocator_t *alloc, const char *metho
         return handle_models_list(alloc, app, payload_out, payload_len_out);
     if (strcmp(method, "nodes.list") == 0)
         return handle_nodes_list(alloc, app, payload_out, payload_len_out);
+    if (strcmp(method, "activity.recent") == 0)
+        return handle_activity_recent(alloc, app, payload_out, payload_len_out);
 #ifdef SC_HAS_PUSH
     if (strcmp(method, "push.register") == 0)
         return handle_push_register(alloc, app, root, payload_out, payload_len_out);

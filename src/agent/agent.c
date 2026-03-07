@@ -416,6 +416,10 @@ void sc_agent_set_awareness(sc_agent_t *agent, struct sc_awareness *awareness) {
     agent->awareness = awareness;
 }
 
+const struct sc_awareness *sc_agent_get_awareness(const sc_agent_t *agent) {
+    return agent ? agent->awareness : NULL;
+}
+
 void sc_agent_set_outcomes(sc_agent_t *agent, struct sc_outcome_tracker *tracker) {
     if (!agent)
         return;

@@ -185,6 +185,9 @@ void sc_agent_set_retrieval_engine(sc_agent_t *agent, sc_retrieval_engine_t *eng
 struct sc_awareness;
 void sc_agent_set_awareness(sc_agent_t *agent, struct sc_awareness *awareness);
 
+/* Get the agent's awareness (may be NULL). */
+const struct sc_awareness *sc_agent_get_awareness(const sc_agent_t *agent);
+
 /* Optional: set outcome tracker for continuous learning. Caller owns tracker lifecycle. */
 struct sc_outcome_tracker;
 void sc_agent_set_outcomes(sc_agent_t *agent, struct sc_outcome_tracker *tracker);
