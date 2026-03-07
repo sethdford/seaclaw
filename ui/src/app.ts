@@ -99,6 +99,21 @@ export class ScApp extends LitElement {
       height: 100vh;
       font-family: var(--sc-font);
     }
+    .sc-skip-link {
+      position: absolute;
+      top: -100%;
+      left: var(--sc-space-md, 1rem);
+      z-index: 9999;
+      padding: var(--sc-space-xs) var(--sc-space-md);
+      background: var(--sc-accent);
+      color: var(--sc-on-accent);
+      border-radius: var(--sc-radius-sm);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .sc-skip-link:focus {
+      top: var(--sc-space-md, 1rem);
+    }
 
     .layout {
       display: grid;
@@ -532,6 +547,15 @@ export class ScApp extends LitElement {
 
   override render() {
     return html`
+      <a
+        href="#main-content"
+        class="sc-skip-link"
+        @click=${(e: Event) => {
+          e.preventDefault();
+          this.shadowRoot?.getElementById("main-content")?.focus();
+        }}
+        >Skip to content</a
+      >
       ${this.connectionStatus === "disconnected"
         ? html`<div class="disconnect-banner" role="alert">
             Disconnected from server
@@ -547,7 +571,7 @@ export class ScApp extends LitElement {
           @toggle-collapse=${() => this._toggleSidebar()}
         ></sc-sidebar>
 
-        <main tabindex="0">
+        <main id="main-content" tabindex="0">
           <div class="view-enter">
             <sc-error-boundary .error=${this._viewError} @retry=${this._onViewRetry}>
               ${this._renderWrappedView()}
