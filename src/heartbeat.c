@@ -90,9 +90,10 @@ sc_error_t sc_heartbeat_parse_tasks(sc_allocator_t *alloc, const char *content, 
         if (strncmp(trimmed, "- ", 2) == 0) {
             const char *task = trim_left(trimmed + 2);
             if (*task) {
-                char *dup = alloc->alloc(alloc->ctx, strlen(task) + 1);
+                size_t tlen = strlen(task);
+                char *dup = alloc->alloc(alloc->ctx, tlen + 1);
                 if (dup) {
-                    strcpy(dup, task);
+                    memcpy(dup, task, tlen + 1);
                     if (count >= cap) {
                         char **n = alloc->realloc(alloc->ctx, list, cap * sizeof(char *),
                                                   cap * 2 * sizeof(char *));

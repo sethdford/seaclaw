@@ -88,9 +88,8 @@ static const char *schema_params(void *ctx) {
     return SCHEMA_PARAMS;
 }
 static void schema_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)ctx;
-    (void)alloc;
-    free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, 1);
 }
 
 static const sc_tool_vtable_t schema_vtable = {
@@ -104,9 +103,10 @@ static const sc_tool_vtable_t schema_vtable = {
 sc_error_t sc_schema_create(sc_allocator_t *alloc, sc_tool_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    void *ctx = calloc(1, 1);
+    void *ctx = alloc->alloc(alloc->ctx, 1);
     if (!ctx)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(ctx, 0, 1);
     out->ctx = ctx;
     out->vtable = &schema_vtable;
     return SC_OK;

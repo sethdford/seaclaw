@@ -89,8 +89,8 @@ static const char *broadcast_params(void *ctx) {
     return TOOL_PARAMS;
 }
 static void broadcast_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, sizeof(broadcast_ctx_t));
 }
 
 static const sc_tool_vtable_t broadcast_vtable = {
@@ -102,10 +102,12 @@ static const sc_tool_vtable_t broadcast_vtable = {
 };
 
 sc_error_t sc_broadcast_create(sc_allocator_t *alloc, sc_tool_t *out) {
-    (void)alloc;
-    void *ctx = calloc(1, sizeof(broadcast_ctx_t));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    void *ctx = alloc->alloc(alloc->ctx, sizeof(broadcast_ctx_t));
     if (!ctx)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(ctx, 0, sizeof(broadcast_ctx_t));
     out->ctx = ctx;
     out->vtable = &broadcast_vtable;
     return SC_OK;

@@ -274,7 +274,8 @@ static void shell_deinit(void *ctx, sc_allocator_t *alloc) {
     sc_shell_ctx_t *s = (sc_shell_ctx_t *)ctx;
     if (s->workspace_dir && alloc)
         alloc->free(alloc->ctx, (void *)s->workspace_dir, s->workspace_dir_len + 1);
-    free(s);
+    if (alloc)
+        alloc->free(alloc->ctx, s, sizeof(*s));
 }
 
 static const sc_tool_vtable_t shell_vtable = {
@@ -287,14 +288,15 @@ static const sc_tool_vtable_t shell_vtable = {
 
 sc_error_t sc_shell_create(sc_allocator_t *alloc, const char *workspace_dir,
                            size_t workspace_dir_len, sc_security_policy_t *policy, sc_tool_t *out) {
-    sc_shell_ctx_t *s = (sc_shell_ctx_t *)calloc(1, sizeof(*s));
+    sc_shell_ctx_t *s = (sc_shell_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*s));
     if (!s)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(s, 0, sizeof(*s));
 
     if (workspace_dir && workspace_dir_len > 0) {
         s->workspace_dir = sc_strndup(alloc, workspace_dir, workspace_dir_len);
         if (!s->workspace_dir) {
-            free(s);
+            alloc->free(alloc->ctx, s, sizeof(*s));
             return SC_ERR_OUT_OF_MEMORY;
         }
         s->workspace_dir_len = workspace_dir_len;

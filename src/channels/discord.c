@@ -486,15 +486,16 @@ sc_error_t sc_discord_create_ex(sc_allocator_t *alloc, const char *token, size_t
     if (channel_ids_count > DISCORD_MAX_CHANNELS)
         return SC_ERR_INVALID_ARGUMENT;
 
-    sc_discord_ctx_t *c = (sc_discord_ctx_t *)calloc(1, sizeof(*c));
+    sc_discord_ctx_t *c = (sc_discord_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
 
     if (token && token_len > 0) {
-        c->token = (char *)malloc(token_len + 1);
+        c->token = (char *)alloc->alloc(alloc->ctx, token_len + 1);
         if (!c->token) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->token, token, token_len);
@@ -503,33 +504,36 @@ sc_error_t sc_discord_create_ex(sc_allocator_t *alloc, const char *token, size_t
     }
 
     if (channel_ids && channel_ids_count > 0) {
-        c->channel_ids = (char **)calloc(channel_ids_count, sizeof(char *));
+        c->channel_ids = (char **)alloc->alloc(alloc->ctx, channel_ids_count * sizeof(char *));
         if (!c->channel_ids) {
             if (c->token)
-                free(c->token);
-            free(c);
+                alloc->free(alloc->ctx, c->token, token_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
-        c->last_message_ids = (char **)calloc(channel_ids_count, sizeof(char *));
+        memset(c->channel_ids, 0, channel_ids_count * sizeof(char *));
+        c->last_message_ids = (char **)alloc->alloc(alloc->ctx, channel_ids_count * sizeof(char *));
         if (!c->last_message_ids) {
-            free(c->channel_ids);
+            alloc->free(alloc->ctx, c->channel_ids, channel_ids_count * sizeof(char *));
             if (c->token)
-                free(c->token);
-            free(c);
+                alloc->free(alloc->ctx, c->token, token_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
+        memset(c->last_message_ids, 0, channel_ids_count * sizeof(char *));
         for (size_t i = 0; i < channel_ids_count; i++) {
             if (channel_ids[i]) {
                 size_t len = strlen(channel_ids[i]);
-                c->channel_ids[i] = (char *)malloc(len + 1);
+                c->channel_ids[i] = (char *)alloc->alloc(alloc->ctx, len + 1);
                 if (!c->channel_ids[i]) {
                     for (size_t j = 0; j < i; j++)
-                        free(c->channel_ids[j]);
-                    free(c->channel_ids);
-                    free(c->last_message_ids);
+                        alloc->free(alloc->ctx, c->channel_ids[j], strlen(c->channel_ids[j]) + 1);
+                    alloc->free(alloc->ctx, c->channel_ids, channel_ids_count * sizeof(char *));
+                    alloc->free(alloc->ctx, c->last_message_ids,
+                                channel_ids_count * sizeof(char *));
                     if (c->token)
-                        free(c->token);
-                    free(c);
+                        alloc->free(alloc->ctx, c->token, token_len + 1);
+                    alloc->free(alloc->ctx, c, sizeof(*c));
                     return SC_ERR_OUT_OF_MEMORY;
                 }
                 memcpy(c->channel_ids[i], channel_ids[i], len + 1);
@@ -539,7 +543,7 @@ sc_error_t sc_discord_create_ex(sc_allocator_t *alloc, const char *token, size_t
     }
 
     if (bot_id && bot_id_len > 0) {
-        c->bot_id = (char *)malloc(bot_id_len + 1);
+        c->bot_id = (char *)alloc->alloc(alloc->ctx, bot_id_len + 1);
         if (!c->bot_id) {
             sc_channel_t tmp = {.ctx = c, .vtable = &discord_vtable};
             sc_discord_destroy(&tmp);
@@ -561,28 +565,31 @@ void sc_discord_destroy(sc_channel_t *ch) {
 #if !SC_IS_TEST
         discord_stream_clear(c);
 #endif
-        if (c->token)
-            free(c->token);
-        if (c->bot_id)
-            free(c->bot_id);
-        if (c->channel_ids) {
-            for (size_t i = 0; i < c->channel_ids_count; i++) {
-                if (c->channel_ids[i])
-                    free(c->channel_ids[i]);
+        if (c->alloc) {
+            if (c->token)
+                c->alloc->free(c->alloc->ctx, c->token, c->token_len + 1);
+            if (c->bot_id)
+                c->alloc->free(c->alloc->ctx, c->bot_id, c->bot_id_len + 1);
+            if (c->channel_ids) {
+                for (size_t i = 0; i < c->channel_ids_count; i++) {
+                    if (c->channel_ids[i])
+                        c->alloc->free(c->alloc->ctx, c->channel_ids[i],
+                                       strlen(c->channel_ids[i]) + 1);
+                }
+                c->alloc->free(c->alloc->ctx, c->channel_ids,
+                               c->channel_ids_count * sizeof(char *));
             }
-            free(c->channel_ids);
-        }
-        if (c->last_message_ids) {
-            if (c->alloc && c->alloc->free) {
+            if (c->last_message_ids) {
                 for (size_t i = 0; i < c->channel_ids_count; i++) {
                     if (c->last_message_ids[i])
                         c->alloc->free(c->alloc->ctx, c->last_message_ids[i],
                                        strlen(c->last_message_ids[i]) + 1);
                 }
+                c->alloc->free(c->alloc->ctx, c->last_message_ids,
+                               c->channel_ids_count * sizeof(char *));
             }
-            free(c->last_message_ids);
+            c->alloc->free(c->alloc->ctx, c, sizeof(*c));
         }
-        free(c);
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

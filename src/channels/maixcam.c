@@ -108,15 +108,16 @@ sc_error_t sc_maixcam_create(sc_allocator_t *alloc, const char *host, size_t hos
                              uint16_t port, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_maixcam_ctx_t *c = (sc_maixcam_ctx_t *)calloc(1, sizeof(*c));
+    sc_maixcam_ctx_t *c = (sc_maixcam_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     c->port = port;
     if (host && host_len > 0) {
-        c->host = (char *)malloc(host_len + 1);
+        c->host = (char *)alloc->alloc(alloc->ctx, host_len + 1);
         if (!c->host) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->host, host, host_len);
@@ -124,7 +125,7 @@ sc_error_t sc_maixcam_create(sc_allocator_t *alloc, const char *host, size_t hos
     } else {
         c->host = sc_strndup(alloc, "0.0.0.0", 7);
         if (!c->host) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
     }
@@ -136,9 +137,10 @@ sc_error_t sc_maixcam_create(sc_allocator_t *alloc, const char *host, size_t hos
 void sc_maixcam_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_maixcam_ctx_t *c = (sc_maixcam_ctx_t *)ch->ctx;
-        if (c->host)
-            free(c->host);
-        free(c);
+        if (c->alloc && c->host)
+            c->alloc->free(c->alloc->ctx, c->host, strlen(c->host) + 1);
+        if (c->alloc)
+            c->alloc->free(c->alloc->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

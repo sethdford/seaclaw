@@ -865,16 +865,16 @@ static const sc_provider_vtable_t gemini_vtable = {
 
 sc_error_t sc_gemini_create(sc_allocator_t *alloc, const char *api_key, size_t api_key_len,
                             const char *base_url, size_t base_url_len, sc_provider_t *out) {
-    (void)alloc;
     (void)base_url;
     (void)base_url_len;
-    sc_gemini_ctx_t *gc = (sc_gemini_ctx_t *)calloc(1, sizeof(*gc));
+    sc_gemini_ctx_t *gc = (sc_gemini_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*gc));
     if (!gc)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(gc, 0, sizeof(*gc));
     if (api_key && api_key_len > 0) {
         gc->api_key = (char *)malloc(api_key_len + 1);
         if (!gc->api_key) {
-            free(gc);
+            alloc->free(alloc->ctx, gc, sizeof(*gc));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(gc->api_key, api_key, api_key_len);

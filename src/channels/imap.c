@@ -140,17 +140,18 @@ sc_error_t sc_imap_create(sc_allocator_t *alloc, const sc_imap_config_t *config,
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
 
-    sc_imap_ctx_t *c = (sc_imap_ctx_t *)calloc(1, sizeof(*c));
+    sc_imap_ctx_t *c = (sc_imap_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     c->imap_port = config && config->imap_port > 0 ? config->imap_port : 993;
     c->imap_use_tls = config ? config->imap_use_tls : true;
 
     if (config && config->imap_host && config->imap_host_len > 0) {
-        c->imap_host = (char *)malloc(config->imap_host_len + 1);
+        c->imap_host = (char *)alloc->alloc(alloc->ctx, config->imap_host_len + 1);
         if (!c->imap_host) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->imap_host, config->imap_host, config->imap_host_len);
@@ -158,11 +159,11 @@ sc_error_t sc_imap_create(sc_allocator_t *alloc, const sc_imap_config_t *config,
         c->imap_host_len = config->imap_host_len;
     }
     if (config && config->imap_username && config->imap_username_len > 0) {
-        c->imap_username = (char *)malloc(config->imap_username_len + 1);
+        c->imap_username = (char *)alloc->alloc(alloc->ctx, config->imap_username_len + 1);
         if (!c->imap_username) {
             if (c->imap_host)
-                free(c->imap_host);
-            free(c);
+                alloc->free(alloc->ctx, c->imap_host, config->imap_host_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->imap_username, config->imap_username, config->imap_username_len);
@@ -170,13 +171,13 @@ sc_error_t sc_imap_create(sc_allocator_t *alloc, const sc_imap_config_t *config,
         c->imap_username_len = config->imap_username_len;
     }
     if (config && config->imap_password && config->imap_password_len > 0) {
-        c->imap_password = (char *)malloc(config->imap_password_len + 1);
+        c->imap_password = (char *)alloc->alloc(alloc->ctx, config->imap_password_len + 1);
         if (!c->imap_password) {
             if (c->imap_host)
-                free(c->imap_host);
+                alloc->free(alloc->ctx, c->imap_host, config->imap_host_len + 1);
             if (c->imap_username)
-                free(c->imap_username);
-            free(c);
+                alloc->free(alloc->ctx, c->imap_username, config->imap_username_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->imap_password, config->imap_password, config->imap_password_len);
@@ -184,15 +185,15 @@ sc_error_t sc_imap_create(sc_allocator_t *alloc, const sc_imap_config_t *config,
         c->imap_password_len = config->imap_password_len;
     }
     if (config && config->imap_folder && config->imap_folder_len > 0) {
-        c->imap_folder = (char *)malloc(config->imap_folder_len + 1);
+        c->imap_folder = (char *)alloc->alloc(alloc->ctx, config->imap_folder_len + 1);
         if (!c->imap_folder) {
             if (c->imap_host)
-                free(c->imap_host);
+                alloc->free(alloc->ctx, c->imap_host, config->imap_host_len + 1);
             if (c->imap_username)
-                free(c->imap_username);
+                alloc->free(alloc->ctx, c->imap_username, config->imap_username_len + 1);
             if (c->imap_password)
-                free(c->imap_password);
-            free(c);
+                alloc->free(alloc->ctx, c->imap_password, config->imap_password_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->imap_folder, config->imap_folder, config->imap_folder_len);
@@ -212,21 +213,24 @@ void sc_imap_destroy(sc_channel_t *ch) {
     if (!ch || !ch->ctx)
         return;
     sc_imap_ctx_t *c = (sc_imap_ctx_t *)ch->ctx;
-    for (size_t i = 0; i < c->outbox_count; i++) {
-        if (c->outbox[i].target)
-            free(c->outbox[i].target);
-        if (c->outbox[i].message)
-            free(c->outbox[i].message);
+    if (c->alloc) {
+        for (size_t i = 0; i < c->outbox_count; i++) {
+            if (c->outbox[i].target)
+                c->alloc->free(c->alloc->ctx, c->outbox[i].target, strlen(c->outbox[i].target) + 1);
+            if (c->outbox[i].message)
+                c->alloc->free(c->alloc->ctx, c->outbox[i].message,
+                               strlen(c->outbox[i].message) + 1);
+        }
+        if (c->imap_host)
+            c->alloc->free(c->alloc->ctx, c->imap_host, c->imap_host_len + 1);
+        if (c->imap_username)
+            c->alloc->free(c->alloc->ctx, c->imap_username, c->imap_username_len + 1);
+        if (c->imap_password)
+            c->alloc->free(c->alloc->ctx, c->imap_password, c->imap_password_len + 1);
+        if (c->imap_folder)
+            c->alloc->free(c->alloc->ctx, c->imap_folder, c->imap_folder_len + 1);
+        c->alloc->free(c->alloc->ctx, c, sizeof(*c));
     }
-    if (c->imap_host)
-        free(c->imap_host);
-    if (c->imap_username)
-        free(c->imap_username);
-    if (c->imap_password)
-        free(c->imap_password);
-    if (c->imap_folder)
-        free(c->imap_folder);
-    free(c);
     ch->ctx = NULL;
     ch->vtable = NULL;
 }

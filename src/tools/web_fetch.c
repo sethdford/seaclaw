@@ -307,9 +307,8 @@ static const char *web_fetch_parameters_json(void *ctx) {
     return SC_WEB_FETCH_PARAMS;
 }
 static void web_fetch_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    if (ctx)
-        free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, sizeof(sc_web_fetch_ctx_t));
 }
 
 static const sc_tool_vtable_t web_fetch_vtable = {
@@ -321,10 +320,10 @@ static const sc_tool_vtable_t web_fetch_vtable = {
 };
 
 sc_error_t sc_web_fetch_create(sc_allocator_t *alloc, uint32_t max_chars, sc_tool_t *out) {
-    (void)alloc;
-    sc_web_fetch_ctx_t *c = (sc_web_fetch_ctx_t *)calloc(1, sizeof(*c));
+    sc_web_fetch_ctx_t *c = (sc_web_fetch_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->max_chars = max_chars > 0 ? max_chars : SC_WEB_FETCH_DEFAULT_MAX;
     out->ctx = c;
     out->vtable = &web_fetch_vtable;

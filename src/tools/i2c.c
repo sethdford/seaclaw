@@ -22,6 +22,7 @@
     "{\"type\":\"integer\"}},\"required\":[\"action\"]}"
 
 typedef struct sc_i2c_ctx {
+    sc_allocator_t *alloc;
     const char *serial_port;
     size_t serial_port_len;
 } sc_i2c_ctx_t;
@@ -258,8 +259,12 @@ static const char *i2c_parameters_json(void *ctx) {
 }
 static void i2c_deinit(void *ctx, sc_allocator_t *alloc) {
     (void)alloc;
-    if (ctx)
-        free(ctx);
+    sc_i2c_ctx_t *c = (sc_i2c_ctx_t *)ctx;
+    if (c && c->alloc) {
+        if (c->serial_port)
+            c->alloc->free(c->alloc->ctx, (void *)c->serial_port, c->serial_port_len + 1);
+        c->alloc->free(c->alloc->ctx, c, sizeof(*c));
+    }
 }
 
 static const sc_tool_vtable_t i2c_vtable = {
@@ -272,13 +277,17 @@ static const sc_tool_vtable_t i2c_vtable = {
 
 sc_error_t sc_i2c_create(sc_allocator_t *alloc, const char *serial_port, size_t serial_port_len,
                          sc_tool_t *out) {
-    sc_i2c_ctx_t *c = (sc_i2c_ctx_t *)calloc(1, sizeof(*c));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    sc_i2c_ctx_t *c = (sc_i2c_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
+    c->alloc = alloc;
     if (serial_port && serial_port_len > 0) {
         c->serial_port = sc_strndup(alloc, serial_port, serial_port_len);
         if (!c->serial_port) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         c->serial_port_len = serial_port_len;

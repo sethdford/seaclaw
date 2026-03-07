@@ -214,14 +214,15 @@ sc_error_t sc_google_rcs_create(sc_allocator_t *alloc, const char *agent_id, siz
                                 const char *token, size_t token_len, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_google_rcs_ctx_t *c = (sc_google_rcs_ctx_t *)calloc(1, sizeof(*c));
+    sc_google_rcs_ctx_t *c = (sc_google_rcs_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (agent_id && agent_id_len > 0) {
-        c->agent_id = (char *)malloc(agent_id_len + 1);
+        c->agent_id = (char *)alloc->alloc(alloc->ctx, agent_id_len + 1);
         if (!c->agent_id) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->agent_id, agent_id, agent_id_len);
@@ -229,11 +230,11 @@ sc_error_t sc_google_rcs_create(sc_allocator_t *alloc, const char *agent_id, siz
         c->agent_id_len = agent_id_len;
     }
     if (token && token_len > 0) {
-        c->token = (char *)malloc(token_len + 1);
+        c->token = (char *)alloc->alloc(alloc->ctx, token_len + 1);
         if (!c->token) {
             if (c->agent_id)
-                free(c->agent_id);
-            free(c);
+                alloc->free(alloc->ctx, c->agent_id, agent_id_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->token, token, token_len);
@@ -248,11 +249,13 @@ sc_error_t sc_google_rcs_create(sc_allocator_t *alloc, const char *agent_id, siz
 void sc_google_rcs_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_google_rcs_ctx_t *c = (sc_google_rcs_ctx_t *)ch->ctx;
-        if (c->agent_id)
-            free(c->agent_id);
-        if (c->token)
-            free(c->token);
-        free(c);
+        if (c->alloc) {
+            if (c->agent_id)
+                c->alloc->free(c->alloc->ctx, c->agent_id, c->agent_id_len + 1);
+            if (c->token)
+                c->alloc->free(c->alloc->ctx, c->token, c->token_len + 1);
+            c->alloc->free(c->alloc->ctx, c, sizeof(*c));
+        }
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

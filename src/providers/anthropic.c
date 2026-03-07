@@ -769,7 +769,6 @@ static const char *anthropic_get_name(void *ctx) {
 }
 
 static void anthropic_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     sc_anthropic_ctx_t *ac = (sc_anthropic_ctx_t *)ctx;
     if (!ac)
         return;
@@ -777,7 +776,7 @@ static void anthropic_deinit(void *ctx, sc_allocator_t *alloc) {
         free(ac->api_key);
     if (ac->base_url)
         free(ac->base_url);
-    free(ac);
+    alloc->free(alloc->ctx, ac, sizeof(*ac));
 }
 
 static const sc_provider_vtable_t anthropic_vtable = {

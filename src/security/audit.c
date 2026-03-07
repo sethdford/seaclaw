@@ -621,7 +621,7 @@ sc_audit_logger_t *sc_audit_logger_create(sc_allocator_t *alloc, const sc_audit_
         alloc->free(alloc->ctx, logger, sizeof(sc_audit_logger_t));
         return NULL;
     }
-    strcpy(logger->log_path, path);
+    memcpy(logger->log_path, path, strlen(path) + 1);
 
     logger->key_path = (char *)alloc->alloc(alloc->ctx, strlen(key_path) + 1);
     if (!logger->key_path) {
@@ -629,7 +629,7 @@ sc_audit_logger_t *sc_audit_logger_create(sc_allocator_t *alloc, const sc_audit_
         alloc->free(alloc->ctx, logger, sizeof(sc_audit_logger_t));
         return NULL;
     }
-    strcpy(logger->key_path, key_path);
+    memcpy(logger->key_path, key_path, strlen(key_path) + 1);
 
     sc_error_t err = load_or_create_audit_key(key_path, logger->audit_key, alloc);
     if (err != SC_OK) {

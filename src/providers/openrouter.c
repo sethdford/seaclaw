@@ -366,13 +366,12 @@ static const char *openrouter_get_name(void *ctx) {
     return "openrouter";
 }
 static void openrouter_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     sc_openrouter_ctx_t *orc = (sc_openrouter_ctx_t *)ctx;
     if (!orc)
         return;
     if (orc->api_key)
         free(orc->api_key);
-    free(orc);
+    alloc->free(alloc->ctx, orc, sizeof(*orc));
 }
 
 static const sc_provider_vtable_t openrouter_vtable;
@@ -457,16 +456,16 @@ static const sc_provider_vtable_t openrouter_vtable = {
 
 sc_error_t sc_openrouter_create(sc_allocator_t *alloc, const char *api_key, size_t api_key_len,
                                 const char *base_url, size_t base_url_len, sc_provider_t *out) {
-    (void)alloc;
     (void)base_url;
     (void)base_url_len;
-    sc_openrouter_ctx_t *orc = (sc_openrouter_ctx_t *)calloc(1, sizeof(*orc));
+    sc_openrouter_ctx_t *orc = (sc_openrouter_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*orc));
     if (!orc)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(orc, 0, sizeof(*orc));
     if (api_key && api_key_len > 0) {
         orc->api_key = (char *)malloc(api_key_len + 1);
         if (!orc->api_key) {
-            free(orc);
+            alloc->free(alloc->ctx, orc, sizeof(*orc));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(orc->api_key, api_key, api_key_len);

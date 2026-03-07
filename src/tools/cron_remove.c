@@ -95,9 +95,8 @@ static const char *cron_remove_parameters_json(void *ctx) {
     return SC_CRON_REMOVE_PARAMS;
 }
 static void cron_remove_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     if (ctx)
-        free(ctx);
+        alloc->free(alloc->ctx, ctx, sizeof(sc_cron_tool_ctx_t));
 }
 
 static const sc_tool_vtable_t cron_remove_vtable = {

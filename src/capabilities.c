@@ -132,11 +132,11 @@ sc_error_t sc_capabilities_build_summary_text(sc_allocator_t *alloc, const sc_co
         }
     }
     if (en_len == 0)
-        strcpy(en, "(none)");
+        snprintf(en, sizeof(en), "%s", "(none)");
     if (dis_len == 0)
-        strcpy(dis, "(none)");
+        snprintf(dis, sizeof(dis), "%s", "(none)");
     if (cfg_len == 0)
-        strcpy(cfg, "(none)");
+        snprintf(cfg, sizeof(cfg), "%s", "(none)");
 
     const char *backend =
         cfg_opt && cfg_opt->memory_backend ? cfg_opt->memory_backend : "(unknown)";

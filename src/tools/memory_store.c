@@ -85,9 +85,8 @@ static const char *memory_store_parameters_json(void *ctx) {
     return SC_MEMORY_STORE_PARAMS;
 }
 static void memory_store_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     if (ctx)
-        free(ctx);
+        alloc->free(alloc->ctx, ctx, sizeof(sc_memory_store_ctx_t));
 }
 
 static const sc_tool_vtable_t memory_store_vtable = {
@@ -99,10 +98,10 @@ static const sc_tool_vtable_t memory_store_vtable = {
 };
 
 sc_error_t sc_memory_store_create(sc_allocator_t *alloc, sc_memory_t *memory, sc_tool_t *out) {
-    (void)alloc;
-    sc_memory_store_ctx_t *c = (sc_memory_store_ctx_t *)calloc(1, sizeof(*c));
+    sc_memory_store_ctx_t *c = (sc_memory_store_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->memory = memory;
     out->ctx = c;
     out->vtable = &memory_store_vtable;

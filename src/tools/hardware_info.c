@@ -139,9 +139,8 @@ static const char *hardware_info_parameters_json(void *ctx) {
     return SC_HARDWARE_INFO_PARAMS;
 }
 static void hardware_info_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     if (ctx)
-        free(ctx);
+        alloc->free(alloc->ctx, ctx, sizeof(sc_hardware_info_ctx_t));
 }
 
 static const sc_tool_vtable_t hardware_info_vtable = {
@@ -153,10 +152,10 @@ static const sc_tool_vtable_t hardware_info_vtable = {
 };
 
 sc_error_t sc_hardware_info_create(sc_allocator_t *alloc, bool enabled, sc_tool_t *out) {
-    (void)alloc;
-    sc_hardware_info_ctx_t *c = (sc_hardware_info_ctx_t *)calloc(1, sizeof(*c));
+    sc_hardware_info_ctx_t *c = (sc_hardware_info_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->enabled = enabled;
     out->ctx = c;
     out->vtable = &hardware_info_vtable;

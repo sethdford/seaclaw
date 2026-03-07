@@ -277,8 +277,8 @@ static const char *jira_params(void *ctx) {
     return TOOL_PARAMS;
 }
 static void jira_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, sizeof(jira_ctx_t));
 }
 
 static const sc_tool_vtable_t jira_vtable = {
@@ -290,10 +290,12 @@ static const sc_tool_vtable_t jira_vtable = {
 };
 
 sc_error_t sc_jira_create(sc_allocator_t *alloc, sc_tool_t *out) {
-    (void)alloc;
-    void *ctx = calloc(1, sizeof(jira_ctx_t));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    void *ctx = alloc->alloc(alloc->ctx, sizeof(jira_ctx_t));
     if (!ctx)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(ctx, 0, sizeof(jira_ctx_t));
     out->ctx = ctx;
     out->vtable = &jira_vtable;
     return SC_OK;

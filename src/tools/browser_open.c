@@ -170,13 +170,16 @@ static const char *browser_open_params(void *ctx) {
 }
 static void browser_open_deinit(void *ctx, sc_allocator_t *alloc) {
     sc_browser_open_ctx_t *c = (sc_browser_open_ctx_t *)ctx;
-    if (c && c->allowed_domains) {
-        for (size_t i = 0; i < c->allowed_count; i++)
-            if (c->allowed_domains[i])
-                alloc->free(alloc->ctx, c->allowed_domains[i], strlen(c->allowed_domains[i]) + 1);
-        alloc->free(alloc->ctx, c->allowed_domains, c->allowed_count * sizeof(char *));
+    if (c && alloc) {
+        if (c->allowed_domains) {
+            for (size_t i = 0; i < c->allowed_count; i++)
+                if (c->allowed_domains[i])
+                    alloc->free(alloc->ctx, c->allowed_domains[i],
+                                strlen(c->allowed_domains[i]) + 1);
+            alloc->free(alloc->ctx, c->allowed_domains, c->allowed_count * sizeof(char *));
+        }
+        alloc->free(alloc->ctx, c, sizeof(*c));
     }
-    free(ctx);
 }
 
 static const sc_tool_vtable_t browser_open_vtable = {
@@ -192,16 +195,17 @@ sc_error_t sc_browser_open_create(sc_allocator_t *alloc, const char *const *allo
                                   sc_tool_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_browser_open_ctx_t *c = (sc_browser_open_ctx_t *)calloc(1, sizeof(*c));
+    sc_browser_open_ctx_t *c = (sc_browser_open_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     c->policy = policy;
     c->allowed_count = allowed_count;
     if (allowed_domains && allowed_count > 0) {
         c->allowed_domains = (char **)alloc->alloc(alloc->ctx, allowed_count * sizeof(char *));
         if (!c->allowed_domains) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memset(c->allowed_domains, 0, allowed_count * sizeof(char *));
@@ -213,7 +217,7 @@ sc_error_t sc_browser_open_create(sc_allocator_t *alloc, const char *const *allo
                     alloc->free(alloc->ctx, c->allowed_domains[j],
                                 strlen(c->allowed_domains[j]) + 1);
                 alloc->free(alloc->ctx, c->allowed_domains, allowed_count * sizeof(char *));
-                free(c);
+                alloc->free(alloc->ctx, c, sizeof(*c));
                 return SC_ERR_OUT_OF_MEMORY;
             }
             memcpy(c->allowed_domains[i], allowed_domains[i], len + 1);

@@ -260,9 +260,8 @@ static const char *schedule_params(void *ctx) {
     return SCHEDULE_PARAMS;
 }
 static void schedule_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)ctx;
-    (void)alloc;
-    free(ctx);
+    if (ctx)
+        alloc->free(alloc->ctx, ctx, sizeof(sc_schedule_tool_ctx_t));
 }
 
 static const sc_tool_vtable_t schedule_vtable = {
@@ -277,9 +276,10 @@ sc_error_t sc_schedule_create(sc_allocator_t *alloc, sc_cron_scheduler_t *sched,
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
     sc_schedule_tool_ctx_t *ctx =
-        (sc_schedule_tool_ctx_t *)calloc(1, sizeof(sc_schedule_tool_ctx_t));
+        (sc_schedule_tool_ctx_t *)alloc->alloc(alloc->ctx, sizeof(sc_schedule_tool_ctx_t));
     if (!ctx)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(ctx, 0, sizeof(sc_schedule_tool_ctx_t));
     ctx->sched = sched;
     out->ctx = ctx;
     out->vtable = &schedule_vtable;

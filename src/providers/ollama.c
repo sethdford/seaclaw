@@ -350,13 +350,12 @@ static const char *ollama_get_name(void *ctx) {
     return "ollama";
 }
 static void ollama_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     sc_ollama_ctx_t *oc = (sc_ollama_ctx_t *)ctx;
     if (!oc)
         return;
     if (oc->base_url)
         free(oc->base_url);
-    free(oc);
+    alloc->free(alloc->ctx, oc, sizeof(*oc));
 }
 
 static const sc_provider_vtable_t ollama_vtable;
@@ -440,16 +439,16 @@ static const sc_provider_vtable_t ollama_vtable = {
 
 sc_error_t sc_ollama_create(sc_allocator_t *alloc, const char *api_key, size_t api_key_len,
                             const char *base_url, size_t base_url_len, sc_provider_t *out) {
-    (void)alloc;
     (void)api_key;
     (void)api_key_len;
-    sc_ollama_ctx_t *oc = (sc_ollama_ctx_t *)calloc(1, sizeof(*oc));
+    sc_ollama_ctx_t *oc = (sc_ollama_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*oc));
     if (!oc)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(oc, 0, sizeof(*oc));
     if (base_url && base_url_len > 0) {
         oc->base_url = (char *)malloc(base_url_len + 1);
         if (!oc->base_url) {
-            free(oc);
+            alloc->free(alloc->ctx, oc, sizeof(*oc));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(oc->base_url, base_url, base_url_len);
@@ -458,7 +457,7 @@ sc_error_t sc_ollama_create(sc_allocator_t *alloc, const char *api_key, size_t a
     } else {
         oc->base_url = (char *)malloc(sizeof(SC_OLLAMA_DEFAULT_URL));
         if (!oc->base_url) {
-            free(oc);
+            alloc->free(alloc->ctx, oc, sizeof(*oc));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(oc->base_url, SC_OLLAMA_DEFAULT_URL, sizeof(SC_OLLAMA_DEFAULT_URL));

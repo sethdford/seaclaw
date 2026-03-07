@@ -17,6 +17,7 @@
 #define SC_PUSHOVER_MSG_MAX 1024
 
 typedef struct sc_pushover_ctx {
+    sc_allocator_t *alloc;
     char *api_token;
     size_t api_token_len;
     char *user_key;
@@ -146,12 +147,12 @@ static const char *pushover_parameters_json(void *ctx) {
 static void pushover_deinit(void *ctx, sc_allocator_t *alloc) {
     (void)alloc;
     sc_pushover_ctx_t *c = (sc_pushover_ctx_t *)ctx;
-    if (c) {
+    if (c && c->alloc) {
         if (c->api_token)
-            free(c->api_token);
+            c->alloc->free(c->alloc->ctx, c->api_token, c->api_token_len + 1);
         if (c->user_key)
-            free(c->user_key);
-        free(c);
+            c->alloc->free(c->alloc->ctx, c->user_key, c->user_key_len + 1);
+        c->alloc->free(c->alloc->ctx, c, sizeof(*c));
     }
 }
 
@@ -165,14 +166,17 @@ static const sc_tool_vtable_t pushover_vtable = {
 
 sc_error_t sc_pushover_create(sc_allocator_t *alloc, const char *api_token, size_t api_token_len,
                               const char *user_key, size_t user_key_len, sc_tool_t *out) {
-    (void)alloc;
-    sc_pushover_ctx_t *c = (sc_pushover_ctx_t *)calloc(1, sizeof(*c));
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    sc_pushover_ctx_t *c = (sc_pushover_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
+    c->alloc = alloc;
     if (api_token && api_token_len > 0) {
-        c->api_token = (char *)malloc(api_token_len + 1);
+        c->api_token = (char *)alloc->alloc(alloc->ctx, api_token_len + 1);
         if (!c->api_token) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->api_token, api_token, api_token_len);
@@ -180,11 +184,11 @@ sc_error_t sc_pushover_create(sc_allocator_t *alloc, const char *api_token, size
         c->api_token_len = api_token_len;
     }
     if (user_key && user_key_len > 0) {
-        c->user_key = (char *)malloc(user_key_len + 1);
+        c->user_key = (char *)alloc->alloc(alloc->ctx, user_key_len + 1);
         if (!c->user_key) {
             if (c->api_token)
-                free(c->api_token);
-            free(c);
+                alloc->free(alloc->ctx, c->api_token, api_token_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->user_key, user_key, user_key_len);

@@ -257,15 +257,15 @@ static const char *composio_params(void *ctx) {
 }
 static void composio_deinit(void *ctx, sc_allocator_t *alloc) {
     sc_composio_ctx_t *c = (sc_composio_ctx_t *)ctx;
-    if (c) {
+    if (c && alloc) {
         if (c->api_key) {
             alloc->free(alloc->ctx, c->api_key, strlen(c->api_key) + 1);
         }
         if (c->entity_id) {
             alloc->free(alloc->ctx, c->entity_id, strlen(c->entity_id) + 1);
         }
+        alloc->free(alloc->ctx, c, sizeof(*c));
     }
-    free(ctx);
 }
 
 static const sc_tool_vtable_t composio_vtable = {
@@ -280,14 +280,15 @@ sc_error_t sc_composio_create(sc_allocator_t *alloc, const char *api_key, size_t
                               const char *entity_id, size_t entity_id_len, sc_tool_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_composio_ctx_t *c = (sc_composio_ctx_t *)calloc(1, sizeof(*c));
+    sc_composio_ctx_t *c = (sc_composio_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (api_key && api_key_len > 0) {
         c->api_key = (char *)alloc->alloc(alloc->ctx, api_key_len + 1);
         if (!c->api_key) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->api_key, api_key, api_key_len);
@@ -298,7 +299,7 @@ sc_error_t sc_composio_create(sc_allocator_t *alloc, const char *api_key, size_t
         if (!c->entity_id) {
             if (c->api_key)
                 alloc->free(alloc->ctx, c->api_key, api_key_len + 1);
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->entity_id, entity_id, entity_id_len);

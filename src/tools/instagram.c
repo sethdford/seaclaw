@@ -222,9 +222,8 @@ static const char *instagram_parameters_json(void *ctx) {
     return SC_INSTAGRAM_PARAMS;
 }
 static void instagram_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    if (ctx)
-        free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, sizeof(sc_instagram_ctx_t));
 }
 
 static const sc_tool_vtable_t instagram_vtable = {
@@ -238,9 +237,10 @@ static const sc_tool_vtable_t instagram_vtable = {
 sc_error_t sc_instagram_tool_create(sc_allocator_t *alloc, sc_tool_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_instagram_ctx_t *c = (sc_instagram_ctx_t *)calloc(1, sizeof(*c));
+    sc_instagram_ctx_t *c = (sc_instagram_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     out->ctx = c;
     out->vtable = &instagram_vtable;
     return SC_OK;

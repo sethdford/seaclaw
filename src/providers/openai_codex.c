@@ -291,7 +291,6 @@ static const char *openai_codex_get_name(void *ctx) {
     return "openai-codex";
 }
 static void openai_codex_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     sc_openai_codex_ctx_t *oc = (sc_openai_codex_ctx_t *)ctx;
     if (!oc)
         return;
@@ -299,7 +298,7 @@ static void openai_codex_deinit(void *ctx, sc_allocator_t *alloc) {
         free(oc->api_key);
     if (oc->base_url)
         free(oc->base_url);
-    free(oc);
+    alloc->free(alloc->ctx, oc, sizeof(*oc));
 }
 
 static const sc_provider_vtable_t openai_codex_vtable = {
@@ -318,14 +317,14 @@ static const sc_provider_vtable_t openai_codex_vtable = {
 
 sc_error_t sc_openai_codex_create(sc_allocator_t *alloc, const char *api_key, size_t api_key_len,
                                   const char *base_url, size_t base_url_len, sc_provider_t *out) {
-    (void)alloc;
-    sc_openai_codex_ctx_t *oc = (sc_openai_codex_ctx_t *)calloc(1, sizeof(*oc));
+    sc_openai_codex_ctx_t *oc = (sc_openai_codex_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*oc));
     if (!oc)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(oc, 0, sizeof(*oc));
     if (api_key && api_key_len > 0) {
         oc->api_key = (char *)malloc(api_key_len + 1);
         if (!oc->api_key) {
-            free(oc);
+            alloc->free(alloc->ctx, oc, sizeof(*oc));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(oc->api_key, api_key, api_key_len);
@@ -337,7 +336,7 @@ sc_error_t sc_openai_codex_create(sc_allocator_t *alloc, const char *api_key, si
         if (!oc->base_url) {
             if (oc->api_key)
                 free(oc->api_key);
-            free(oc);
+            alloc->free(alloc->ctx, oc, sizeof(*oc));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(oc->base_url, base_url, base_url_len);

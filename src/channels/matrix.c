@@ -256,14 +256,15 @@ sc_error_t sc_matrix_create(sc_allocator_t *alloc, const char *homeserver, size_
                             const char *access_token, size_t access_token_len, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_matrix_ctx_t *c = (sc_matrix_ctx_t *)calloc(1, sizeof(*c));
+    sc_matrix_ctx_t *c = (sc_matrix_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (homeserver && homeserver_len > 0) {
-        c->homeserver = (char *)malloc(homeserver_len + 1);
+        c->homeserver = (char *)alloc->alloc(alloc->ctx, homeserver_len + 1);
         if (!c->homeserver) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->homeserver, homeserver, homeserver_len);
@@ -271,11 +272,11 @@ sc_error_t sc_matrix_create(sc_allocator_t *alloc, const char *homeserver, size_
         c->homeserver_len = homeserver_len;
     }
     if (access_token && access_token_len > 0) {
-        c->access_token = (char *)malloc(access_token_len + 1);
+        c->access_token = (char *)alloc->alloc(alloc->ctx, access_token_len + 1);
         if (!c->access_token) {
             if (c->homeserver)
-                free(c->homeserver);
-            free(c);
+                alloc->free(alloc->ctx, c->homeserver, homeserver_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->access_token, access_token, access_token_len);
@@ -290,15 +291,17 @@ sc_error_t sc_matrix_create(sc_allocator_t *alloc, const char *homeserver, size_
 void sc_matrix_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_matrix_ctx_t *c = (sc_matrix_ctx_t *)ch->ctx;
-        if (c->homeserver)
-            free(c->homeserver);
-        if (c->access_token)
-            free(c->access_token);
-        if (c->since_token && c->alloc)
-            c->alloc->free(c->alloc->ctx, c->since_token, strlen(c->since_token) + 1);
-        if (c->user_id && c->alloc)
-            c->alloc->free(c->alloc->ctx, c->user_id, strlen(c->user_id) + 1);
-        free(c);
+        if (c->alloc) {
+            if (c->homeserver)
+                c->alloc->free(c->alloc->ctx, c->homeserver, c->homeserver_len + 1);
+            if (c->access_token)
+                c->alloc->free(c->alloc->ctx, c->access_token, c->access_token_len + 1);
+            if (c->since_token)
+                c->alloc->free(c->alloc->ctx, c->since_token, strlen(c->since_token) + 1);
+            if (c->user_id)
+                c->alloc->free(c->alloc->ctx, c->user_id, strlen(c->user_id) + 1);
+            c->alloc->free(c->alloc->ctx, c, sizeof(*c));
+        }
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

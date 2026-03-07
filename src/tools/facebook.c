@@ -168,9 +168,8 @@ static const char *facebook_parameters_json(void *ctx) {
     return SC_FACEBOOK_PARAMS;
 }
 static void facebook_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    if (ctx)
-        free(ctx);
+    if (ctx && alloc)
+        alloc->free(alloc->ctx, ctx, sizeof(sc_facebook_ctx_t));
 }
 
 static const sc_tool_vtable_t facebook_vtable = {
@@ -184,9 +183,10 @@ static const sc_tool_vtable_t facebook_vtable = {
 sc_error_t sc_facebook_tool_create(sc_allocator_t *alloc, sc_tool_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_facebook_ctx_t *c = (sc_facebook_ctx_t *)calloc(1, sizeof(*c));
+    sc_facebook_ctx_t *c = (sc_facebook_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     out->ctx = c;
     out->vtable = &facebook_vtable;
     return SC_OK;

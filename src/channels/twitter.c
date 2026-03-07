@@ -216,14 +216,15 @@ sc_error_t sc_twitter_create(sc_allocator_t *alloc, const char *bearer_token,
                              size_t bearer_token_len, sc_channel_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
-    sc_twitter_ctx_t *c = (sc_twitter_ctx_t *)calloc(1, sizeof(*c));
+    sc_twitter_ctx_t *c = (sc_twitter_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (bearer_token && bearer_token_len > 0) {
         c->bearer_token = sc_strndup(alloc, bearer_token, bearer_token_len);
         if (!c->bearer_token) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         c->bearer_token_len = bearer_token_len;
@@ -236,9 +237,11 @@ sc_error_t sc_twitter_create(sc_allocator_t *alloc, const char *bearer_token,
 void sc_twitter_destroy(sc_channel_t *ch) {
     if (ch && ch->ctx) {
         sc_twitter_ctx_t *c = (sc_twitter_ctx_t *)ch->ctx;
-        if (c->alloc && c->bearer_token)
-            sc_str_free(c->alloc, c->bearer_token);
-        free(c);
+        if (c->alloc) {
+            if (c->bearer_token)
+                sc_str_free(c->alloc, c->bearer_token);
+            c->alloc->free(c->alloc->ctx, c, sizeof(*c));
+        }
         ch->ctx = NULL;
         ch->vtable = NULL;
     }

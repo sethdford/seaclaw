@@ -133,8 +133,8 @@ static const char *analytics_params(void *ctx) {
     return TOOL_PARAMS;
 }
 static void analytics_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
-    free(ctx);
+    if (ctx)
+        alloc->free(alloc->ctx, ctx, sizeof(analytics_ctx_t));
 }
 
 static const sc_tool_vtable_t analytics_vtable = {

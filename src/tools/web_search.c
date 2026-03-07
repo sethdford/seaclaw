@@ -230,26 +230,27 @@ static const sc_tool_vtable_t web_search_vtable = {
 
 sc_error_t sc_web_search_create(sc_allocator_t *alloc, const sc_config_t *config,
                                 const char *api_key, size_t api_key_len, sc_tool_t *out) {
-    (void)alloc;
-    sc_web_search_ctx_t *c = (sc_web_search_ctx_t *)calloc(1, sizeof(*c));
+    sc_web_search_ctx_t *c = (sc_web_search_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     const char *prov = config ? sc_config_get_web_search_provider(config) : "duckduckgo";
     size_t prov_len = strlen(prov);
     if (prov_len > 0) {
-        c->provider = (char *)malloc(prov_len + 1);
+        c->provider = (char *)alloc->alloc(alloc->ctx, prov_len + 1);
         if (!c->provider) {
-            free(c);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->provider, prov, prov_len + 1);
         c->provider_len = prov_len;
     }
     if (api_key && api_key_len > 0) {
-        c->api_key = (char *)malloc(api_key_len + 1);
+        c->api_key = (char *)alloc->alloc(alloc->ctx, api_key_len + 1);
         if (!c->api_key) {
-            free(c->provider);
-            free(c);
+            if (c->provider)
+                alloc->free(alloc->ctx, c->provider, prov_len + 1);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->api_key, api_key, api_key_len);

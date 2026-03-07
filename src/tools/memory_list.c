@@ -92,10 +92,10 @@ static const sc_tool_vtable_t memory_list_vtable = {
 };
 
 sc_error_t sc_memory_list_create(sc_allocator_t *alloc, sc_memory_t *memory, sc_tool_t *out) {
-    (void)alloc;
-    sc_memory_list_ctx_t *c = (sc_memory_list_ctx_t *)calloc(1, sizeof(*c));
+    sc_memory_list_ctx_t *c = (sc_memory_list_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(c, 0, sizeof(*c));
     c->memory = memory;
     out->ctx = c;
     out->vtable = &memory_list_vtable;

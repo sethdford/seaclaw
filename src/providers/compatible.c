@@ -381,7 +381,6 @@ static const char *compatible_get_name(void *ctx) {
     return "compatible";
 }
 static void compatible_deinit(void *ctx, sc_allocator_t *alloc) {
-    (void)alloc;
     sc_compatible_ctx_t *cc = (sc_compatible_ctx_t *)ctx;
     if (!cc)
         return;
@@ -389,7 +388,7 @@ static void compatible_deinit(void *ctx, sc_allocator_t *alloc) {
         free(cc->api_key);
     if (cc->base_url)
         free(cc->base_url);
-    free(cc);
+    alloc->free(alloc->ctx, cc, sizeof(*cc));
 }
 
 static const sc_provider_vtable_t compatible_vtable;
@@ -474,14 +473,14 @@ static const sc_provider_vtable_t compatible_vtable = {
 
 sc_error_t sc_compatible_create(sc_allocator_t *alloc, const char *api_key, size_t api_key_len,
                                 const char *base_url, size_t base_url_len, sc_provider_t *out) {
-    (void)alloc;
-    sc_compatible_ctx_t *cc = (sc_compatible_ctx_t *)calloc(1, sizeof(*cc));
+    sc_compatible_ctx_t *cc = (sc_compatible_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*cc));
     if (!cc)
         return SC_ERR_OUT_OF_MEMORY;
+    memset(cc, 0, sizeof(*cc));
     if (api_key && api_key_len > 0) {
         cc->api_key = (char *)malloc(api_key_len + 1);
         if (!cc->api_key) {
-            free(cc);
+            alloc->free(alloc->ctx, cc, sizeof(*cc));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(cc->api_key, api_key, api_key_len);
@@ -493,7 +492,7 @@ sc_error_t sc_compatible_create(sc_allocator_t *alloc, const char *api_key, size
         if (!cc->base_url) {
             if (cc->api_key)
                 free(cc->api_key);
-            free(cc);
+            alloc->free(alloc->ctx, cc, sizeof(*cc));
             return SC_ERR_OUT_OF_MEMORY;
         }
         memcpy(cc->base_url, base_url, base_url_len);
