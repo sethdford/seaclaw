@@ -8,7 +8,7 @@ import { formatTime } from "../utils.js";
 import { icons } from "../icons.js";
 import { ScToast } from "../components/sc-toast.js";
 import { ChatController, type ChatItem, type GatewayLike } from "../controllers/chat-controller.js";
-import "../components/sc-empty-state.js";
+import "../components/sc-composer.js";
 import "../components/sc-thinking.js";
 import "../components/sc-tool-result.js";
 import "../components/sc-message-stream.js";
@@ -68,11 +68,6 @@ export class ScChatView extends GatewayAwareLitElement {
       flex-direction: column;
       gap: var(--sc-space-md);
     }
-    .messages.drag-over {
-      outline: 2px dashed var(--sc-accent);
-      outline-offset: -4px;
-      background: color-mix(in srgb, var(--sc-accent) 4%, transparent);
-    }
     .message {
       max-width: 85%;
       padding: var(--sc-space-md) var(--sc-space-md);
@@ -112,34 +107,6 @@ export class ScChatView extends GatewayAwareLitElement {
       background: var(--sc-bg-elevated);
       padding: var(--sc-space-2xs) var(--sc-space-xs);
       border-radius: var(--sc-radius-sm);
-    }
-    .suggested-prompts {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--sc-space-sm);
-      justify-content: center;
-      margin-top: var(--sc-space-md);
-    }
-    .prompt-pill {
-      background: var(--sc-bg-surface);
-      border: 1px solid var(--sc-border);
-      border-radius: var(--sc-radius-full);
-      padding: var(--sc-space-xs) var(--sc-space-md);
-      font-family: var(--sc-font);
-      font-size: var(--sc-text-sm);
-      color: var(--sc-text);
-      cursor: pointer;
-      transition: all var(--sc-duration-fast) var(--sc-ease-out);
-      white-space: nowrap;
-    }
-    .prompt-pill:hover {
-      background: var(--sc-bg-elevated);
-      border-color: var(--sc-accent);
-      color: var(--sc-accent);
-    }
-    .prompt-pill:focus-visible {
-      outline: 2px solid var(--sc-accent);
-      outline-offset: 2px;
     }
     .scroll-bottom-pill {
       position: absolute;
@@ -203,63 +170,6 @@ export class ScChatView extends GatewayAwareLitElement {
     }
     .message a:hover {
       color: var(--sc-accent-hover);
-    }
-    .input-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: var(--sc-space-xs);
-      padding: var(--sc-space-md);
-      background: var(--sc-bg-surface);
-      border-top: 1px solid var(--sc-border);
-    }
-    .input-bar {
-      display: flex;
-      gap: var(--sc-space-sm);
-      align-items: flex-end;
-    }
-    .input-bar textarea {
-      flex: 1;
-      min-height: 44px;
-      max-height: 120px;
-      padding: var(--sc-space-sm) var(--sc-space-md);
-      background: var(--sc-bg);
-      border: 1px solid var(--sc-border);
-      border-radius: var(--sc-radius);
-      color: var(--sc-text);
-      font-family: var(--sc-font);
-      font-size: var(--sc-text-base);
-      resize: none;
-      line-height: 1.5;
-    }
-    .input-bar textarea:focus {
-      outline: none;
-      border-color: var(--sc-accent);
-      box-shadow: 0 0 0 3px var(--sc-accent-subtle);
-    }
-    .input-bar textarea::placeholder {
-      color: var(--sc-text-muted);
-    }
-    .char-count {
-      font-size: var(--sc-text-xs);
-      color: var(--sc-text-muted);
-    }
-    .send-btn {
-      padding: var(--sc-space-sm) var(--sc-space-lg);
-      min-height: 44px;
-      background: var(--sc-accent);
-      color: var(--sc-bg);
-      border: none;
-      border-radius: var(--sc-radius);
-      font-weight: var(--sc-weight-medium);
-      cursor: pointer;
-      font-size: var(--sc-text-base);
-    }
-    .send-btn:hover:not(:disabled) {
-      background: var(--sc-accent-hover);
-    }
-    .send-btn:disabled {
-      opacity: var(--sc-opacity-disabled, 0.5);
-      cursor: not-allowed;
     }
     .thinking {
       display: flex;
@@ -349,13 +259,6 @@ export class ScChatView extends GatewayAwareLitElement {
       .message {
         max-width: 95%;
       }
-      .input-bar {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      .send-btn {
-        min-height: 40px;
-      }
     }
     .history-skeleton {
       display: flex;
@@ -383,7 +286,6 @@ export class ScChatView extends GatewayAwareLitElement {
   @state() private _searchOpen = false;
   @state() private _searchQuery = "";
   @state() private _searchCurrentMatch = 0;
-  @state() private _dragOver = false;
   @state() private _contextMenu: {
     open: boolean;
     x: number;
@@ -391,7 +293,6 @@ export class ScChatView extends GatewayAwareLitElement {
     items: ContextMenuItem[];
   } = { open: false, x: 0, y: 0, items: [] };
   @query("#message-list") private messageList!: HTMLElement;
-  @query("#chat-input") private inputEl!: HTMLTextAreaElement;
 
   private messageHandler = (e: Event) => this.onGatewayMessage(e);
   private statusHandler = (e: Event) => {
@@ -432,24 +333,6 @@ export class ScChatView extends GatewayAwareLitElement {
       const msgEl = this.messageList?.querySelector(`#msg-${itemIdx}`) as HTMLElement;
       msgEl?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     });
-  }
-
-  private _handleDragOver(e: DragEvent): void {
-    e.preventDefault();
-    this._dragOver = true;
-  }
-
-  private _handleDragLeave(): void {
-    this._dragOver = false;
-  }
-
-  private _handleDrop(e: DragEvent): void {
-    e.preventDefault();
-    this._dragOver = false;
-    const files = Array.from(e.dataTransfer?.files ?? []);
-    if (files.length > 0) {
-      this._handleFiles(files);
-    }
   }
 
   private _handleFiles(files: File[]): void {
@@ -531,23 +414,6 @@ export class ScChatView extends GatewayAwareLitElement {
     });
   }
 
-  private resizeTextarea(): void {
-    const el = this.inputEl;
-    if (!el) return;
-    el.style.height = "auto";
-    const lineHeight = parseInt(getComputedStyle(el).lineHeight, 10) || 24;
-    const maxHeight = lineHeight * 5;
-    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
-  }
-
-  private _useSuggestion(text: string): void {
-    this.inputValue = text;
-    this.requestUpdate();
-    this.updateComplete.then(() => {
-      this.inputEl?.focus();
-    });
-  }
-
   private async _retry(): Promise<void> {
     try {
       await this.chat.retry(this.sessionKey);
@@ -565,8 +431,7 @@ export class ScChatView extends GatewayAwareLitElement {
 
   private _retryMessage(item: Extract<ChatItem, { type: "message" }>): void {
     if (item.role !== "user") return;
-    this.inputValue = item.content;
-    this.send();
+    this._handleSend(item.content);
   }
 
   private _onMessageContextMenu(e: MouseEvent, item: ChatItem): void {
@@ -592,30 +457,16 @@ export class ScChatView extends GatewayAwareLitElement {
     };
   }
 
-  private async send(): Promise<void> {
-    const text = this.inputValue.trim();
-    if (!text || !this.gateway) return;
+  private async _handleSend(message: string): Promise<void> {
+    if (!message || !this.gateway) return;
     this.inputValue = "";
-    this.resizeTextarea();
     try {
-      await this.chat.send(text, this.sessionKey);
+      await this.chat.send(message, this.sessionKey);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to send message";
       ScToast.show({ message: msg, variant: "error" });
     }
     this.scrollToBottom();
-  }
-
-  private handleKeyDown(e: KeyboardEvent): void {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      this.send();
-    }
-  }
-
-  private handleInput(): void {
-    this.inputValue = (this.inputEl?.value ?? "") as string;
-    this.resizeTextarea();
   }
 
   override render() {
@@ -624,20 +475,32 @@ export class ScChatView extends GatewayAwareLitElement {
         ${this._renderStatusBar()} ${this._renderErrorBanner()}
         <div
           id="message-list"
-          class="messages ${this._dragOver ? "drag-over" : ""}"
+          class="messages"
           role="log"
           aria-live="polite"
-          aria-label="${this._dragOver ? "Drop files to attach" : "Chat messages"}"
-          aria-dropeffect=${this._dragOver ? "copy" : "none"}
-          @dragover=${this._handleDragOver}
-          @dragleave=${this._handleDragLeave}
-          @drop=${this._handleDrop}
+          aria-label="Chat messages"
         >
-          ${this._renderSearch()}
-          ${this.chat.items.length === 0 ? this._renderEmptyState() : nothing}
-          ${this._renderMessages()} ${this.chat.isWaiting ? this._renderThinking() : nothing}
+          ${this._renderSearch()} ${this._renderMessages()}
+          ${this.chat.isWaiting ? this._renderThinking() : nothing}
         </div>
-        ${this._renderScrollPill()} ${this._renderRetryButton()} ${this._renderInputBar()}
+        ${this._renderScrollPill()} ${this._renderRetryButton()}
+        <sc-composer
+          .value=${this.inputValue}
+          .waiting=${this.chat.isWaiting}
+          .disabled=${this.connectionStatus === "disconnected"}
+          .showSuggestions=${this.chat.items.length === 0}
+          .streamElapsed=${this.chat.streamElapsed}
+          .placeholder=${this.connectionStatus === "disconnected"
+            ? "Disconnected — reconnect to send messages"
+            : "Type a message... (Enter to send, Shift+Enter for newline)"}
+          @sc-send=${(e: CustomEvent<{ message: string }>) => this._handleSend(e.detail.message)}
+          @sc-files=${(e: CustomEvent<{ files: File[] }>) => this._handleFiles(e.detail.files)}
+          @sc-use-suggestion=${(e: CustomEvent<{ text: string }>) =>
+            this._handleSend(e.detail.text)}
+          @sc-input-change=${(e: CustomEvent<{ value: string }>) => {
+            this.inputValue = e.detail.value;
+          }}
+        ></sc-composer>
         ${this._contextMenu.open
           ? html`
               <sc-context-menu
@@ -715,37 +578,6 @@ export class ScChatView extends GatewayAwareLitElement {
           this._searchCurrentMatch = 0;
         }}
       ></sc-chat-search>
-    `;
-  }
-
-  private _renderEmptyState() {
-    return html`
-      <sc-empty-state
-        .icon=${icons["chat-circle"]}
-        heading="Start a conversation"
-        description="Ask SeaClaw anything — write code, answer questions, use tools."
-      >
-        <div class="suggested-prompts">
-          <button
-            class="prompt-pill"
-            @click=${() => this._useSuggestion("Explain how this project is architected")}
-          >
-            Explain how this project is architected
-          </button>
-          <button
-            class="prompt-pill"
-            @click=${() => this._useSuggestion("Write a Python web scraper")}
-          >
-            Write a Python web scraper
-          </button>
-          <button class="prompt-pill" @click=${() => this._useSuggestion("Help me debug an issue")}>
-            Help me debug an issue
-          </button>
-          <button class="prompt-pill" @click=${() => this._useSuggestion("What can you do?")}>
-            What can you do?
-          </button>
-        </div>
-      </sc-empty-state>
     `;
   }
 
@@ -838,35 +670,5 @@ export class ScChatView extends GatewayAwareLitElement {
     return html`<button class="retry-btn" @click=${this._retry} aria-label="Retry last message">
       Retry last message
     </button>`;
-  }
-
-  private _renderInputBar() {
-    return html`
-      <div class="input-wrap">
-        <div class="input-bar">
-          <textarea
-            id="chat-input"
-            placeholder=${this.connectionStatus === "disconnected"
-              ? "Disconnected \u2014 reconnect to send messages"
-              : "Type a message... (Enter to send, Shift+Enter for newline)"}
-            .value=${this.inputValue}
-            ?disabled=${this.connectionStatus === "disconnected"}
-            @input=${this.handleInput}
-            @keydown=${this.handleKeyDown}
-          ></textarea>
-          <button
-            class="send-btn"
-            ?disabled=${!this.inputValue.trim() ||
-            this.chat.isWaiting ||
-            this.connectionStatus === "disconnected"}
-            @click=${() => this.send()}
-            aria-label="Send"
-          >
-            Send
-          </button>
-        </div>
-        <span class="char-count">${this.inputValue.length} characters</span>
-      </div>
-    `;
   }
 }

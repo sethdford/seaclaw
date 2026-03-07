@@ -64,6 +64,7 @@
       <a href="#sc-slider">sc-slider</a>
       <a href="#sc-search">sc-search</a>
       <a href="#sc-chat-search">sc-chat-search</a>
+      <a href="#sc-composer">sc-composer</a>
       <a href="#sc-segmented-control">sc-segmented-control</a>
       <a href="#sc-data-table">sc-data-table</a>
       <a href="#sc-date-picker">sc-date-picker</a>
@@ -616,6 +617,22 @@
         <div class="code-snippet"><pre><code>&lt;sc-chat-search .open=${true} .query=${"test"} .matchCount=${3} .currentMatch=${1}&gt;&lt;/sc-chat-search&gt;</code></pre></div>
       </section>
 
+      <section class="component-section" id="sc-composer">
+        <h2>sc-composer</h2>
+        <p style="margin-bottom: var(--sc-space-md); color: var(--sc-text-muted);">Chat input bar with textarea, file attachment, send button, and optional prompt suggestions.</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; min-width: 320px;">
+            <sc-composer id="composer-preview" placeholder="Type a message..." show-suggestions></sc-composer>
+          </div>
+          <div class="controls">
+            <label><input type="checkbox" data-target="composer-preview" data-prop="showSuggestions" checked /> Show suggestions</label>
+            <label><input type="checkbox" data-target="composer-preview" data-prop="waiting" /> Waiting</label>
+            <label><input type="checkbox" data-target="composer-preview" data-prop="disabled" /> Disabled</label>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-composer .value=${""} .waiting=${false} .showSuggestions=${true} placeholder="Type a message..."&gt;&lt;/sc-composer&gt;</code></pre></div>
+      </section>
+
       <section class="component-section" id="sc-segmented-control">
         <h2>sc-segmented-control</h2>
         <div class="playground">
@@ -944,6 +961,7 @@
       import "/src/components/sc-slider.js";
       import "/src/components/sc-search.js";
       import "/src/components/sc-chat-search.js";
+      import "/src/components/sc-composer.js";
       import "/src/components/sc-segmented-control.js";
       import "/src/components/sc-data-table.js";
       import "/src/components/sc-date-picker.js";

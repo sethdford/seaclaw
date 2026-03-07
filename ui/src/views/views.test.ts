@@ -51,24 +51,25 @@ describe("views", () => {
 });
 
 describe("sc-chat-view", () => {
-  it("renders sc-empty-state when no messages", async () => {
+  it("renders sc-composer when no messages", async () => {
     const el = document.createElement("sc-chat-view") as HTMLElement & {
       updateComplete: Promise<boolean>;
     };
     document.body.appendChild(el);
     await el.updateComplete;
-    const emptyState = el.shadowRoot?.querySelector("sc-empty-state");
-    expect(emptyState).toBeTruthy();
+    const composer = el.shadowRoot?.querySelector("sc-composer");
+    expect(composer).toBeTruthy();
     el.remove();
   });
 
-  it("has suggested prompt pills", async () => {
+  it("has suggested prompt pills in composer when empty", async () => {
     const el = document.createElement("sc-chat-view") as HTMLElement & {
       updateComplete: Promise<boolean>;
     };
     document.body.appendChild(el);
     await el.updateComplete;
-    const pills = el.shadowRoot?.querySelectorAll(".prompt-pill") ?? [];
+    const composer = el.shadowRoot?.querySelector("sc-composer");
+    const pills = composer?.shadowRoot?.querySelectorAll(".prompt-pill") ?? [];
     expect(pills.length).toBeGreaterThanOrEqual(1);
     el.remove();
   });
@@ -85,17 +86,20 @@ describe("sc-chat-view", () => {
     el.remove();
   });
 
-  it("applies drag-over class during drag", async () => {
+  it("composer has drag-over class during drag", async () => {
     const el = document.createElement("sc-chat-view") as HTMLElement & {
       updateComplete: Promise<boolean>;
     };
     document.body.appendChild(el);
     await el.updateComplete;
-    const messageList = el.shadowRoot?.querySelector("#message-list");
-    expect(messageList?.classList.contains("drag-over")).toBe(false);
-    messageList?.dispatchEvent(new DragEvent("dragover", { bubbles: true }));
-    await el.updateComplete;
-    expect(messageList?.classList.contains("drag-over")).toBe(true);
+    const composer = el.shadowRoot?.querySelector("sc-composer") as HTMLElement & {
+      updateComplete: Promise<boolean>;
+    };
+    const inputWrap = composer?.shadowRoot?.querySelector(".input-wrap");
+    expect(inputWrap?.classList.contains("drag-over")).toBe(false);
+    inputWrap?.dispatchEvent(new DragEvent("dragover", { bubbles: true }));
+    await composer?.updateComplete;
+    expect(inputWrap?.classList.contains("drag-over")).toBe(true);
     el.remove();
   });
 });

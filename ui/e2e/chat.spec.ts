@@ -22,10 +22,13 @@ test.describe("Chat View", () => {
     }
   });
 
-  test("empty state shows prompt", async ({ page }) => {
+  test("composer is visible with input and send", async ({ page }) => {
     const chatView = page.locator("sc-app >> sc-chat-view");
-    const emptyText = chatView.getByText("Start a conversation");
-    await expect(emptyText).toBeVisible({ timeout: 5000 });
+    await expect(chatView).toBeAttached({ timeout: 5000 });
+    const input = chatView.locator("textarea, input[type='text'], [contenteditable]").first();
+    await expect(input).toBeVisible({ timeout: 5000 });
+    const sendBtn = chatView.getByRole("button", { name: "Send" });
+    await expect(sendBtn).toBeVisible({ timeout: 5000 });
   });
 
   test("typing in chat input works", async ({ page }) => {
