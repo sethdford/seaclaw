@@ -1561,7 +1561,8 @@ static sc_error_t handle_oauth_start(sc_allocator_t *alloc, const sc_control_pro
         sc_json_free(alloc, obj);
         return err;
     }
-    if (ctx->config.provider && strcmp(ctx->config.provider, provider) != 0) {
+    const char *ctx_provider = sc_oauth_get_provider(ctx);
+    if (ctx_provider && strcmp(ctx_provider, provider) != 0) {
         sc_json_value_t *obj = sc_json_object_new(alloc);
         if (!obj)
             return SC_ERR_OUT_OF_MEMORY;

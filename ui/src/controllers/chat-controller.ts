@@ -134,17 +134,29 @@ export class ChatController implements ReactiveController {
   async retry(sessionKey: string): Promise<void> {
     const msg = this.lastFailedMessage || this._findLastFailedContent();
     if (!msg) return;
+    const failedIdx = this._findLastFailedIndex();
+    if (failedIdx >= 0) {
+      this.items = [...this.items.slice(0, failedIdx), ...this.items.slice(failedIdx + 1)];
+    }
+    this.lastFailedMessage = "";
     await this.send(msg, sessionKey);
   }
 
   private _findLastFailedContent(): string {
+    const idx = this._findLastFailedIndex();
+    if (idx < 0) return "";
+    const item = this.items[idx];
+    return item.type === "message" ? item.content : "";
+  }
+
+  private _findLastFailedIndex(): number {
     for (let i = this.items.length - 1; i >= 0; i--) {
       const item = this.items[i];
       if (item.type === "message" && item.role === "user" && item.status === "failed") {
-        return item.content;
+        return i;
       }
     }
-    return "";
+    return -1;
   }
 
   async loadHistory(sessionKey: string): Promise<void> {

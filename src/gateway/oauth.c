@@ -345,3 +345,9 @@ bool sc_oauth_session_valid(const sc_oauth_session_t *session) {
         return false;
     return (int64_t)time(NULL) < session->expires_at;
 }
+
+const char *sc_oauth_get_provider(sc_oauth_ctx_t *ctx) {
+    if (!ctx)
+        return NULL;
+    return ctx->config.provider;
+}

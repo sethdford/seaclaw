@@ -33,15 +33,7 @@
 #include <string.h>
 #include <time.h>
 
-#define SC_OBS_SAFE_RECORD_EVENT(agent, ev)                                   \
-    do {                                                                      \
-        if ((agent)->observer) {                                              \
-            (ev)->trace_id = (agent)->trace_id[0] ? (agent)->trace_id : NULL; \
-            sc_observer_record_event(*(agent)->observer, (ev));               \
-        }                                                                     \
-    } while (0)
-
-static void generate_trace_id(char *buf) {
+void sc_agent_internal_generate_trace_id(char *buf) {
     static uint32_t counter = 0;
     uint64_t t = (uint64_t)clock();
     counter++;

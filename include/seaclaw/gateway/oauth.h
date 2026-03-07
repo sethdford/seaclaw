@@ -46,4 +46,6 @@ sc_error_t sc_oauth_refresh_token(sc_oauth_ctx_t *ctx, sc_oauth_session_t *sessi
 
 bool sc_oauth_session_valid(const sc_oauth_session_t *session);
 
+const char *sc_oauth_get_provider(sc_oauth_ctx_t *ctx);
+
 #endif
