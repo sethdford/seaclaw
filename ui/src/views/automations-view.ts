@@ -20,6 +20,18 @@ import "../components/sc-chart.js";
 import { TEMPLATES, cronToHuman } from "../components/sc-automation-form.js";
 import type { AutomationFormData } from "../components/sc-automation-form.js";
 
+function friendlyError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes("timeout")) return "Request timed out. Please try again.";
+  if (msg.includes("WebSocket")) return "Connection lost. Reconnecting...";
+  if (msg.includes("404")) return "Resource not found.";
+  if (msg.includes("401") || msg.includes("unauthorized"))
+    return "Authentication failed. Please check your credentials.";
+  if (msg.includes("403") || msg.includes("forbidden")) return "Access denied.";
+  if (msg.includes("network")) return "Network error. Please check your connection.";
+  return "Something went wrong. Please try again.";
+}
+
 interface CronJob {
   id: number;
   name: string;
@@ -190,7 +202,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
         this.channels = [];
       }
     } catch (e) {
-      this.error = e instanceof Error ? e.message : "Failed to load automations";
+      this.error = friendlyError(e);
       this.jobs = [];
       this.runsMap = new Map();
     } finally {

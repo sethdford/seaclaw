@@ -15,7 +15,20 @@ import "../components/sc-empty-state.js";
 import "../components/sc-search.js";
 import "../components/sc-chart.js";
 import "../components/sc-combobox.js";
+import "../components/sc-button.js";
 import type { ChartData } from "../components/sc-chart.js";
+
+function friendlyError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes("timeout")) return "Request timed out. Please try again.";
+  if (msg.includes("WebSocket")) return "Connection lost. Reconnecting...";
+  if (msg.includes("404")) return "Resource not found.";
+  if (msg.includes("401") || msg.includes("unauthorized"))
+    return "Authentication failed. Please check your credentials.";
+  if (msg.includes("403") || msg.includes("forbidden")) return "Access denied.";
+  if (msg.includes("network")) return "Network error. Please check your connection.";
+  return "Something went wrong. Please try again.";
+}
 
 interface ProviderItem {
   name?: string;
@@ -169,6 +182,7 @@ export class ScModelsView extends GatewayAwareLitElement {
   @state() private filter = "";
   @state() private usageByProvider: ProviderUsage[] = [];
   @state() private settingDefault = false;
+  @state() private _refreshing = false;
 
   private get filteredProviders(): ProviderItem[] {
     const q = this.filter.toLowerCase().trim();
@@ -201,7 +215,8 @@ export class ScModelsView extends GatewayAwareLitElement {
       this.loading = false;
       return;
     }
-    this.loading = true;
+    this._refreshing = this.providers.length > 0;
+    this.loading = this.providers.length === 0;
     try {
       const [modelsRes, configRes, usageRes] = await Promise.all([
         gw.request<ModelsListRes>("models.list", {}).catch((): Partial<ModelsListRes> => ({})),
@@ -217,9 +232,10 @@ export class ScModelsView extends GatewayAwareLitElement {
       this.defaultModel = "";
       this.defaultProvider = "";
       this.usageByProvider = [];
-      this.error = e instanceof Error ? e.message : "Failed to load models";
+      this.error = friendlyError(e);
     } finally {
       this.loading = false;
+      this._refreshing = false;
     }
   }
 
@@ -295,6 +311,15 @@ export class ScModelsView extends GatewayAwareLitElement {
               @sc-clear=${() => (this.filter = "")}
             ></sc-search>
           </div>
+          <sc-button
+            variant="ghost"
+            size="sm"
+            ?disabled=${this._refreshing}
+            @click=${() => this.load()}
+            aria-label="Refresh models"
+          >
+            ${icons.refresh} ${this._refreshing ? "Refreshing..." : "Refresh"}
+          </sc-button>
         </sc-section-header>
       </sc-page-hero>
       <sc-stats-row>

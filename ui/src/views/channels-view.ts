@@ -12,8 +12,21 @@ import "../components/sc-section-header.js";
 import "../components/sc-sheet.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-segmented-control.js";
+import "../components/sc-button.js";
 import "../components/sc-stat-card.js";
 import "../components/sc-stats-row.js";
+
+function friendlyError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes("timeout")) return "Request timed out. Please try again.";
+  if (msg.includes("WebSocket")) return "Connection lost. Reconnecting...";
+  if (msg.includes("404")) return "Resource not found.";
+  if (msg.includes("401") || msg.includes("unauthorized"))
+    return "Authentication failed. Please check your credentials.";
+  if (msg.includes("403") || msg.includes("forbidden")) return "Access denied.";
+  if (msg.includes("network")) return "Network error. Please check your connection.";
+  return "Something went wrong. Please try again.";
+}
 
 interface ChannelStatus {
   key?: string;
@@ -79,6 +92,7 @@ export class ScChannelsView extends GatewayAwareLitElement {
   @state() private error = "";
   @state() private filter: FilterValue = "all";
   @state() private _sheetChannel: ChannelStatus | null = null;
+  @state() private _refreshing = false;
 
   private readonly filterOptions: SegmentOption[] = [
     { value: "all", label: "All" },
@@ -95,7 +109,8 @@ export class ScChannelsView extends GatewayAwareLitElement {
       this.loading = false;
       return;
     }
-    this.loading = true;
+    this._refreshing = this.channels.length > 0;
+    this.loading = this.channels.length === 0;
     try {
       const payload = await this.gateway.request<{
         channels?: ChannelStatus[];
@@ -103,9 +118,10 @@ export class ScChannelsView extends GatewayAwareLitElement {
       this.channels = payload?.channels ?? [];
     } catch (e) {
       this.channels = [];
-      this.error = e instanceof Error ? e.message : "Failed to load channels";
+      this.error = friendlyError(e);
     } finally {
       this.loading = false;
+      this._refreshing = false;
     }
   }
 
@@ -197,7 +213,17 @@ export class ScChannelsView extends GatewayAwareLitElement {
         <sc-section-header
           heading="Channels"
           description="Messaging integrations and their connection status"
-        ></sc-section-header>
+        >
+          <sc-button
+            variant="ghost"
+            size="sm"
+            ?disabled=${this._refreshing}
+            @click=${() => this.loadChannels()}
+            aria-label="Refresh channels"
+          >
+            ${icons.refresh} ${this._refreshing ? "Refreshing..." : "Refresh"}
+          </sc-button>
+        </sc-section-header>
       </sc-page-hero>
       <sc-stats-row>
         <sc-stat-card

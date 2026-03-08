@@ -1021,11 +1021,11 @@ export class DemoGatewayClient extends EventTarget {
           ],
         };
       case "memory.store":
-        return { ok: true, id: "mem_new_" + Date.now() };
+        return { stored: true };
       case "memory.forget":
-        return { ok: true, deleted: true };
+        return { deleted: true };
       case "memory.ingest":
-        return { ok: true, entries_created: 1 };
+        return { stored: true };
       case "memory.consolidate":
         return {
           ok: true,

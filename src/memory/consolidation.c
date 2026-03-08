@@ -3,6 +3,7 @@
 #include "seaclaw/core/string.h"
 #include "seaclaw/memory/connections.h"
 #include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -212,7 +213,11 @@ sc_error_t sc_memory_consolidate(sc_allocator_t *alloc, sc_memory_t *memory,
     for (size_t i = 0; i < count; i++) {
         if (to_forget[i] && entries[i].key) {
             bool deleted = false;
-            (void)memory->vtable->forget(memory->ctx, entries[i].key, entries[i].key_len, &deleted);
+            sc_error_t ferr =
+                memory->vtable->forget(memory->ctx, entries[i].key, entries[i].key_len, &deleted);
+            if (ferr != SC_OK)
+                fprintf(stderr, "[consolidation] forget key '%.*s' failed: %d\n",
+                        (int)entries[i].key_len, entries[i].key, (int)ferr);
         }
     }
 
@@ -250,7 +255,11 @@ sc_error_t sc_memory_consolidate(sc_allocator_t *alloc, sc_memory_t *memory,
     for (size_t i = 0; i < to_remove && i < count; i++) {
         if (entries[i].key) {
             bool deleted = false;
-            (void)memory->vtable->forget(memory->ctx, entries[i].key, entries[i].key_len, &deleted);
+            sc_error_t ferr =
+                memory->vtable->forget(memory->ctx, entries[i].key, entries[i].key_len, &deleted);
+            if (ferr != SC_OK)
+                fprintf(stderr, "[consolidation] evict key '%.*s' failed: %d\n",
+                        (int)entries[i].key_len, entries[i].key, (int)ferr);
         }
     }
 

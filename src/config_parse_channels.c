@@ -448,6 +448,36 @@ static void parse_twitter_channel(sc_allocator_t *a, sc_config_t *cfg, const sc_
     }
 }
 
+static void parse_tiktok_channel(sc_allocator_t *a, sc_config_t *cfg, const sc_json_value_t *obj) {
+    if (!obj)
+        return;
+    sc_tiktok_channel_config_t *tk = &cfg->channels.tiktok;
+    const sc_json_value_t *val = obj;
+    if (obj->type == SC_JSON_ARRAY && obj->data.array.len > 0 && obj->data.array.items &&
+        obj->data.array.items[0])
+        val = obj->data.array.items[0];
+    if (!val || val->type != SC_JSON_OBJECT)
+        return;
+    const char *s = sc_json_get_string(val, "client_key");
+    if (s) {
+        if (tk->client_key)
+            a->free(a->ctx, tk->client_key, strlen(tk->client_key) + 1);
+        tk->client_key = sc_strdup(a, s);
+    }
+    s = sc_json_get_string(val, "client_secret");
+    if (s) {
+        if (tk->client_secret)
+            a->free(a->ctx, tk->client_secret, strlen(tk->client_secret) + 1);
+        tk->client_secret = sc_strdup(a, s);
+    }
+    s = sc_json_get_string(val, "access_token");
+    if (s) {
+        if (tk->access_token)
+            a->free(a->ctx, tk->access_token, strlen(tk->access_token) + 1);
+        tk->access_token = sc_strdup(a, s);
+    }
+}
+
 static void parse_google_rcs_channel(sc_allocator_t *a, sc_config_t *cfg,
                                      const sc_json_value_t *obj) {
     if (!obj)

@@ -67,6 +67,9 @@
 #if SC_HAS_TWITTER
 #include "seaclaw/channels/twitter.h"
 #endif
+#if SC_HAS_TIKTOK
+#include "seaclaw/channels/tiktok.h"
+#endif
 #if SC_HAS_GOOGLE_RCS
 #include "seaclaw/channels/google_rcs.h"
 #endif
@@ -199,6 +202,13 @@ static void destroy_instagram_wrap(sc_channel_t *ch, sc_allocator_t *a) {
 static void destroy_twitter_wrap(sc_channel_t *ch, sc_allocator_t *a) {
     (void)a;
     sc_twitter_destroy(ch);
+    (void)ch;
+}
+#endif
+#if SC_HAS_TIKTOK
+static void destroy_tiktok_wrap(sc_channel_t *ch, sc_allocator_t *a) {
+    (void)a;
+    sc_tiktok_destroy(ch);
     (void)ch;
 }
 #endif
@@ -871,6 +881,28 @@ sc_error_t sc_app_bootstrap(sc_app_ctx_t *ctx, sc_allocator_t *alloc, const char
                 bi->channels[ch_count].interval_ms = 1000;
                 bi->channels[ch_count].last_poll_ms = 0;
                 bi->channel_destroys[ch_count] = destroy_twitter_wrap;
+                ch_count++;
+            }
+        }
+#endif
+
+#if SC_HAS_TIKTOK
+        if (cfg->channels.tiktok.access_token && ch_count < SC_BOOTSTRAP_CHANNELS_MAX) {
+            err = sc_tiktok_create(
+                alloc, cfg->channels.tiktok.client_key,
+                cfg->channels.tiktok.client_key ? strlen(cfg->channels.tiktok.client_key) : 0,
+                cfg->channels.tiktok.client_secret,
+                cfg->channels.tiktok.client_secret ? strlen(cfg->channels.tiktok.client_secret) : 0,
+                cfg->channels.tiktok.access_token, strlen(cfg->channels.tiktok.access_token),
+                &bi->channel_slots[ch_count]);
+            if (err == SC_OK) {
+                bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;
+                bi->channels[ch_count].channel = &bi->channel_slots[ch_count];
+                bi->channels[ch_count].poll_fn = sc_tiktok_poll;
+                bi->channels[ch_count].webhook_fn = sc_tiktok_on_webhook;
+                bi->channels[ch_count].interval_ms = 1000;
+                bi->channels[ch_count].last_poll_ms = 0;
+                bi->channel_destroys[ch_count] = destroy_tiktok_wrap;
                 ch_count++;
             }
         }

@@ -260,6 +260,13 @@ export class ScLogsView extends GatewayAwareLitElement {
     }, 10_000);
   }
 
+  override updated(): void {
+    // Auto-scroll to bottom when new log entries are added
+    if (!this._paused && this.filteredLogs.length > 0) {
+      this.scrollToBottom();
+    }
+  }
+
   override disconnectedCallback(): void {
     this.gateway?.removeEventListener(GatewayClient.EVENT_STATUS, this._logsStatusHandler);
     if (this._tsInterval) {
@@ -363,7 +370,9 @@ export class ScLogsView extends GatewayAwareLitElement {
   private scrollToBottom(): void {
     this.updateComplete.then(() => {
       const el = this.shadowRoot?.querySelector(".log-area");
-      if (el) el.scrollTop = el.scrollHeight;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
     });
   }
 

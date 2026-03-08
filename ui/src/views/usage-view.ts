@@ -14,6 +14,18 @@ import "../components/sc-chart.js";
 import type { ChartData } from "../components/sc-chart.js";
 import "../components/sc-segmented-control.js";
 
+function friendlyError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes("timeout")) return "Request timed out. Please try again.";
+  if (msg.includes("WebSocket")) return "Connection lost. Reconnecting...";
+  if (msg.includes("404")) return "Resource not found.";
+  if (msg.includes("401") || msg.includes("unauthorized"))
+    return "Authentication failed. Please check your credentials.";
+  if (msg.includes("403") || msg.includes("forbidden")) return "Access denied.";
+  if (msg.includes("network")) return "Network error. Please check your connection.";
+  return "Something went wrong. Please try again.";
+}
+
 interface DailyCost {
   date: string;
   cost: number;
@@ -181,7 +193,7 @@ export class ScUsageView extends GatewayAwareLitElement {
         (res && "session_cost_usd" in res ? (res as UsageSummary) : {}) ||
         {};
     } catch (e) {
-      this.error = e instanceof Error ? e.message : "Failed to load usage";
+      this.error = friendlyError(e);
       this.summary = {};
     } finally {
       this.loading = false;

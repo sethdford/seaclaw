@@ -13,10 +13,46 @@ import "../components/sc-stats-row.js";
 import "../components/sc-skeleton.js";
 import "../components/sc-empty-state.js";
 
+function friendlyError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes("timeout")) return "Request timed out. Please try again.";
+  if (msg.includes("WebSocket")) return "Connection lost. Reconnecting...";
+  if (msg.includes("404")) return "Resource not found.";
+  if (msg.includes("401") || msg.includes("unauthorized"))
+    return "Authentication failed. Please check your credentials.";
+  if (msg.includes("403") || msg.includes("forbidden")) return "Access denied.";
+  if (msg.includes("network")) return "Network error. Please check your connection.";
+  return "Something went wrong. Please try again.";
+}
+
 interface ToolDef {
   name?: string;
   description?: string;
   parameters?: unknown;
+}
+
+function resolveParams(raw: unknown): Record<string, unknown> | null {
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === "object" && parsed !== null) return parsed as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+    return null;
+  }
+  if (typeof raw === "object") return raw as Record<string, unknown>;
+  return null;
+}
+
+function countParams(raw: unknown): number {
+  const obj = resolveParams(raw);
+  if (!obj) return 0;
+  const props = obj.properties;
+  if (props && typeof props === "object" && !Array.isArray(props))
+    return Object.keys(props as object).length;
+  return Object.keys(obj).length;
 }
 
 @customElement("sc-tools-view")
@@ -73,7 +109,7 @@ export class ScToolsView extends GatewayAwareLitElement {
       this.tools = payload?.tools ?? [];
     } catch (e) {
       this.tools = [];
-      this.error = e instanceof Error ? e.message : "Failed to load tools";
+      this.error = friendlyError(e);
     } finally {
       this.loading = false;
     }
@@ -83,12 +119,8 @@ export class ScToolsView extends GatewayAwareLitElement {
     return this.tools.map((t) => ({
       name: t.name ?? "unnamed",
       description: t.description ?? "",
-      paramsCount: Array.isArray(t.parameters)
-        ? t.parameters.length
-        : t.parameters != null && typeof t.parameters === "object"
-          ? Object.keys(t.parameters as Record<string, unknown>).length
-          : 0,
-      parameters: t.parameters,
+      paramsCount: countParams(t.parameters),
+      parameters: resolveParams(t.parameters) ?? t.parameters,
     }));
   }
 
@@ -157,11 +189,7 @@ export class ScToolsView extends GatewayAwareLitElement {
           style="--sc-stagger-delay: 0ms"
         ></sc-stat-card>
         <sc-stat-card
-          .value=${this.tools.filter((t) => {
-            const p = t.parameters;
-            if (!p) return false;
-            return Array.isArray(p) ? p.length > 0 : Object.keys(p as object).length > 0;
-          }).length}
+          .value=${this.tools.filter((t) => countParams(t.parameters) > 0).length}
           label="With Parameters"
           style="--sc-stagger-delay: 50ms"
         ></sc-stat-card>
