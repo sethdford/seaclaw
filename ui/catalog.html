@@ -108,6 +108,8 @@
       <a href="#sc-typing-indicator">sc-typing-indicator</a>
       <a href="#sc-delivery-status">sc-delivery-status</a>
       <a href="#sc-link-preview">sc-link-preview</a>
+      <a href="#sc-message-thread">sc-message-thread</a>
+      <a href="#sc-message-group">sc-message-group</a>
       <a href="#sc-skill-card">sc-skill-card</a>
       <a href="#sc-skill-detail">sc-skill-detail</a>
       <a href="#sc-skill-registry">sc-skill-registry</a>
@@ -1245,6 +1247,34 @@
         <div class="code-snippet"><code>&lt;sc-link-preview url="https://example.com" title="Title" description="Description"&gt;&lt;/sc-link-preview&gt;</code></div>
       </section>
 
+      <section class="component-section" id="sc-message-thread">
+        <h2>sc-message-thread</h2>
+        <p>Scrollable message thread with user/assistant bubbles, tool results, typing indicator, and load-earlier support.</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 480px; height: 280px; flex-direction: column;">
+            <sc-message-thread id="catalog-message-thread"></sc-message-thread>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-message-thread .items=${items} .isWaiting=${false} .hasEarlierMessages=${false}&gt;&lt;/sc-message-thread&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-message-group">
+        <h2>sc-message-group</h2>
+        <p>Groups consecutive messages from the same role with avatar and optional timestamp slot.</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 480px; flex-direction: column; gap: var(--sc-space-md); align-items: flex-start;">
+            <sc-message-group role="assistant">
+              <sc-chat-bubble content="Hello! How can I help?" role="assistant" show-tail></sc-chat-bubble>
+              <sc-chat-bubble content="Here's more context." role="assistant"></sc-chat-bubble>
+            </sc-message-group>
+            <sc-message-group role="user">
+              <sc-chat-bubble content="Can you explain that?" role="user" show-tail></sc-chat-bubble>
+            </sc-message-group>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-message-group role="assistant"&gt;&lt;sc-chat-bubble content="..." role="assistant"&gt;&lt;/sc-chat-bubble&gt;&lt;/sc-message-group&gt;</code></pre></div>
+      </section>
+
       <section class="component-section" id="sc-skill-card">
         <h2>sc-skill-card</h2>
         <p style="margin-bottom: var(--sc-space-md); color: var(--sc-text-muted);">Card for displaying installed or registry skills with toggle, install button, and tags.</p>
@@ -1531,6 +1561,8 @@
       import "/src/components/sc-typing-indicator.js";
       import "/src/components/sc-delivery-status.js";
       import "/src/components/sc-link-preview.js";
+      import "/src/components/sc-message-thread.js";
+      import "/src/components/sc-message-group.js";
       import "/src/components/sc-skill-card.js";
       import "/src/components/sc-skill-detail.js";
       import "/src/components/sc-skill-registry.js";
@@ -1982,6 +2014,18 @@
           { time: "2m ago", message: "Test suite passed", status: "success" },
           { time: "15m ago", message: "Deployment started", status: "info" },
           { time: "1h ago", message: "Build failed", status: "error", detail: "Exit code 1" },
+        ];
+      }
+
+      // sc-message-thread
+      const catalogMessageThread = document.getElementById("catalog-message-thread");
+      if (catalogMessageThread) {
+        const now = Date.now();
+        catalogMessageThread.items = [
+          { type: "message", role: "user", content: "What is SeaClaw?", ts: now - 60000 },
+          { type: "message", role: "assistant", content: "SeaClaw is a C11 autonomous AI assistant runtime with minimal binary size and zero dependencies beyond libc.", ts: now - 55000 },
+          { type: "message", role: "user", content: "How do I build it?", ts: now - 30000 },
+          { type: "message", role: "assistant", content: "Run `cmake -B build && cmake --build build` from the project root.", ts: now - 25000 },
         ];
       }
 
