@@ -75,7 +75,7 @@ static sc_error_t file_append_execute(void *ctx, sc_allocator_t *alloc, const sc
         memcpy(resolved + n, path, plen + 1);
         open_path = resolved;
     }
-    if (c->policy && !sc_security_path_allowed(c->policy, open_path, strlen(open_path))) {
+    if (!c->policy || !sc_security_path_allowed(c->policy, open_path, strlen(open_path))) {
         *out = sc_tool_result_fail("path not allowed by policy", 26);
         return SC_OK;
     }

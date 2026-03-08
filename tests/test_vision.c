@@ -131,6 +131,17 @@ static void vision_describe_image_no_vision_vtable_null(void) {
     SC_ASSERT_NULL(desc);
 }
 
+static void vision_describe_image_null_vtable(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_provider_t provider = {.ctx = NULL, .vtable = NULL};
+    char *desc = NULL;
+    size_t desc_len = 0;
+    sc_error_t err = sc_vision_describe_image(&alloc, &provider, "test.png", 8, "gpt-4o", 6,
+                                              &desc, &desc_len);
+    SC_ASSERT_EQ(err, SC_ERR_NOT_SUPPORTED);
+    SC_ASSERT_NULL(desc);
+}
+
 /* ── Suite ──────────────────────────────────────────────────────────────── */
 
 void run_vision_tests(void) {
@@ -142,4 +153,5 @@ void run_vision_tests(void) {
     SC_RUN_TEST(vision_read_image_mock_in_test);
     SC_RUN_TEST(vision_describe_image_no_vision_support);
     SC_RUN_TEST(vision_describe_image_no_vision_vtable_null);
+    SC_RUN_TEST(vision_describe_image_null_vtable);
 }

@@ -853,7 +853,7 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
 #ifdef SC_HAS_CRON
     time_t last_cron_minute = 0;
 #endif
-#ifdef SC_HAS_PERSONA
+#if defined(SC_HAS_PERSONA) && defined(SC_HAS_CRON)
     time_t proactive_due_at = 0;
 #endif
 

@@ -671,6 +671,16 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         return SC_ERR_INVALID_ARGUMENT;
     memset(out, 0, sizeof(*out));
 
+    bool oom_on_optional = false;
+
+    /* Safe strdup for optional fields: sets target and flags OOM on failure */
+#define PERSONA_STRDUP_OPT(target, src) \
+    do {                                \
+        (target) = sc_strdup(alloc, (src)); \
+        if (!(target))                  \
+            oom_on_optional = true;     \
+    } while (0)
+
     sc_json_value_t *root = NULL;
     sc_error_t err = sc_json_parse(alloc, json, json_len, &root);
     if (err != SC_OK || !root || root->type != SC_JSON_OBJECT)

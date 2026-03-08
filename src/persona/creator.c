@@ -330,6 +330,78 @@ sc_error_t sc_persona_creator_synthesize(sc_allocator_t *alloc, const sc_persona
         sc_persona_deinit(alloc, out);
         return err;
     }
+
+    /* Merge deep fields: first non-null wins */
+    for (size_t i = 0; i < count; i++) {
+        if (partials[i].biography && !out->biography)
+            out->biography = sc_strdup(alloc, partials[i].biography);
+        if (partials[i].core_anchor && !out->core_anchor)
+            out->core_anchor = sc_strdup(alloc, partials[i].core_anchor);
+
+        if (partials[i].motivation.primary_drive && !out->motivation.primary_drive)
+            out->motivation.primary_drive = sc_strdup(alloc, partials[i].motivation.primary_drive);
+        if (partials[i].motivation.protecting && !out->motivation.protecting)
+            out->motivation.protecting = sc_strdup(alloc, partials[i].motivation.protecting);
+        if (partials[i].motivation.avoiding && !out->motivation.avoiding)
+            out->motivation.avoiding = sc_strdup(alloc, partials[i].motivation.avoiding);
+        if (partials[i].motivation.wanting && !out->motivation.wanting)
+            out->motivation.wanting = sc_strdup(alloc, partials[i].motivation.wanting);
+
+        if (partials[i].humor.type && !out->humor.type)
+            out->humor.type = sc_strdup(alloc, partials[i].humor.type);
+        if (partials[i].humor.frequency && !out->humor.frequency)
+            out->humor.frequency = sc_strdup(alloc, partials[i].humor.frequency);
+        if (partials[i].humor.timing && !out->humor.timing)
+            out->humor.timing = sc_strdup(alloc, partials[i].humor.timing);
+
+        if (partials[i].conflict_style.pushback_response &&
+            !out->conflict_style.pushback_response)
+            out->conflict_style.pushback_response =
+                sc_strdup(alloc, partials[i].conflict_style.pushback_response);
+        if (partials[i].conflict_style.apology_style && !out->conflict_style.apology_style)
+            out->conflict_style.apology_style =
+                sc_strdup(alloc, partials[i].conflict_style.apology_style);
+        if (partials[i].conflict_style.confrontation_comfort &&
+            !out->conflict_style.confrontation_comfort)
+            out->conflict_style.confrontation_comfort =
+                sc_strdup(alloc, partials[i].conflict_style.confrontation_comfort);
+        if (partials[i].conflict_style.boundary_assertion &&
+            !out->conflict_style.boundary_assertion)
+            out->conflict_style.boundary_assertion =
+                sc_strdup(alloc, partials[i].conflict_style.boundary_assertion);
+        if (partials[i].conflict_style.repair_behavior && !out->conflict_style.repair_behavior)
+            out->conflict_style.repair_behavior =
+                sc_strdup(alloc, partials[i].conflict_style.repair_behavior);
+
+        if (partials[i].emotional_range.ceiling && !out->emotional_range.ceiling)
+            out->emotional_range.ceiling = sc_strdup(alloc, partials[i].emotional_range.ceiling);
+        if (partials[i].emotional_range.floor && !out->emotional_range.floor)
+            out->emotional_range.floor = sc_strdup(alloc, partials[i].emotional_range.floor);
+        if (partials[i].emotional_range.withdrawal_conditions &&
+            !out->emotional_range.withdrawal_conditions)
+            out->emotional_range.withdrawal_conditions =
+                sc_strdup(alloc, partials[i].emotional_range.withdrawal_conditions);
+        if (partials[i].emotional_range.recovery_style && !out->emotional_range.recovery_style)
+            out->emotional_range.recovery_style =
+                sc_strdup(alloc, partials[i].emotional_range.recovery_style);
+
+        if (partials[i].voice_rhythm.sentence_pattern && !out->voice_rhythm.sentence_pattern)
+            out->voice_rhythm.sentence_pattern =
+                sc_strdup(alloc, partials[i].voice_rhythm.sentence_pattern);
+        if (partials[i].voice_rhythm.paragraph_cadence && !out->voice_rhythm.paragraph_cadence)
+            out->voice_rhythm.paragraph_cadence =
+                sc_strdup(alloc, partials[i].voice_rhythm.paragraph_cadence);
+        if (partials[i].voice_rhythm.response_tempo && !out->voice_rhythm.response_tempo)
+            out->voice_rhythm.response_tempo =
+                sc_strdup(alloc, partials[i].voice_rhythm.response_tempo);
+        if (partials[i].voice_rhythm.emphasis_style && !out->voice_rhythm.emphasis_style)
+            out->voice_rhythm.emphasis_style =
+                sc_strdup(alloc, partials[i].voice_rhythm.emphasis_style);
+        if (partials[i].voice_rhythm.pause_behavior && !out->voice_rhythm.pause_behavior)
+            out->voice_rhythm.pause_behavior =
+                sc_strdup(alloc, partials[i].voice_rhythm.pause_behavior);
+    }
+
     return SC_OK;
 }
 
@@ -463,7 +535,315 @@ sc_error_t sc_persona_creator_write(sc_allocator_t *alloc, const sc_persona_t *p
             goto fail;
         fputs("]\n    }", f);
     }
-    fputs("\n  }\n}\n", f);
+    fputs("\n  }", f);
+
+    /* Biography */
+    if (persona->biography) {
+        fputs(",\n  \"biography\": ", f);
+        write_json_string(f, persona->biography);
+    }
+
+    /* Motivation */
+    if (persona->motivation.primary_drive || persona->motivation.protecting ||
+        persona->motivation.avoiding || persona->motivation.wanting) {
+        fputs(",\n  \"motivation\": {", f);
+        bool first = true;
+        if (persona->motivation.primary_drive) {
+            fputs("\n    \"primary_drive\": ", f);
+            write_json_string(f, persona->motivation.primary_drive);
+            first = false;
+        }
+        if (persona->motivation.protecting) {
+            if (!first) fputc(',', f);
+            fputs("\n    \"protecting\": ", f);
+            write_json_string(f, persona->motivation.protecting);
+            first = false;
+        }
+        if (persona->motivation.avoiding) {
+            if (!first) fputc(',', f);
+            fputs("\n    \"avoiding\": ", f);
+            write_json_string(f, persona->motivation.avoiding);
+            first = false;
+        }
+        if (persona->motivation.wanting) {
+            if (!first) fputc(',', f);
+            fputs("\n    \"wanting\": ", f);
+            write_json_string(f, persona->motivation.wanting);
+        }
+        fputs("\n  }", f);
+    }
+
+    /* Humor */
+    if (persona->humor.type || persona->humor.frequency) {
+        fputs(",\n  \"humor\": {", f);
+        bool first = true;
+        if (persona->humor.type) {
+            fputs("\n    \"type\": ", f);
+            write_json_string(f, persona->humor.type);
+            first = false;
+        }
+        if (persona->humor.frequency) {
+            if (!first) fputc(',', f);
+            fputs("\n    \"frequency\": ", f);
+            write_json_string(f, persona->humor.frequency);
+            first = false;
+        }
+        if (persona->humor.targets_count > 0) {
+            if (!first) fputc(',', f);
+            fputs("\n    \"targets\": [", f);
+            write_json_string_array(f, persona->humor.targets, persona->humor.targets_count);
+            fputc(']', f);
+            first = false;
+        }
+        if (persona->humor.boundaries_count > 0) {
+            if (!first) fputc(',', f);
+            fputs("\n    \"boundaries\": [", f);
+            write_json_string_array(f, persona->humor.boundaries, persona->humor.boundaries_count);
+            fputc(']', f);
+            first = false;
+        }
+        if (persona->humor.timing) {
+            if (!first) fputc(',', f);
+            fputs("\n    \"timing\": ", f);
+            write_json_string(f, persona->humor.timing);
+        }
+        fputs("\n  }", f);
+    }
+
+    /* Conflict style */
+    if (persona->conflict_style.pushback_response || persona->conflict_style.apology_style) {
+        fputs(",\n  \"conflict_style\": {", f);
+        bool first = true;
+        const char *cs_fields[] = {"pushback_response", "confrontation_comfort", "apology_style",
+                                   "boundary_assertion", "repair_behavior"};
+        const char *cs_vals[] = {
+            persona->conflict_style.pushback_response,
+            persona->conflict_style.confrontation_comfort,
+            persona->conflict_style.apology_style,
+            persona->conflict_style.boundary_assertion,
+            persona->conflict_style.repair_behavior,
+        };
+        for (int ci = 0; ci < 5; ci++) {
+            if (cs_vals[ci]) {
+                if (!first) fputc(',', f);
+                fprintf(f, "\n    \"%s\": ", cs_fields[ci]);
+                write_json_string(f, cs_vals[ci]);
+                first = false;
+            }
+        }
+        fputs("\n  }", f);
+    }
+
+    /* Emotional range */
+    if (persona->emotional_range.ceiling || persona->emotional_range.floor) {
+        fputs(",\n  \"emotional_range\": {", f);
+        bool first = true;
+        if (persona->emotional_range.ceiling) {
+            fputs("\n    \"ceiling\": ", f);
+            write_json_string(f, persona->emotional_range.ceiling);
+            first = false;
+        }
+        if (persona->emotional_range.floor) {
+            if (!first) fputc(',', f);
+            fputs("\n    \"floor\": ", f);
+            write_json_string(f, persona->emotional_range.floor);
+            first = false;
+        }
+        if (persona->emotional_range.escalation_triggers_count > 0) {
+            if (!first) fputc(',', f);
+            fputs("\n    \"escalation_triggers\": [", f);
+            write_json_string_array(f, persona->emotional_range.escalation_triggers,
+                                    persona->emotional_range.escalation_triggers_count);
+            fputc(']', f);
+            first = false;
+        }
+        if (persona->emotional_range.de_escalation_count > 0) {
+            if (!first) fputc(',', f);
+            fputs("\n    \"de_escalation\": [", f);
+            write_json_string_array(f, persona->emotional_range.de_escalation,
+                                    persona->emotional_range.de_escalation_count);
+            fputc(']', f);
+            first = false;
+        }
+        if (persona->emotional_range.withdrawal_conditions) {
+            if (!first) fputc(',', f);
+            fputs("\n    \"withdrawal_conditions\": ", f);
+            write_json_string(f, persona->emotional_range.withdrawal_conditions);
+            first = false;
+        }
+        if (persona->emotional_range.recovery_style) {
+            if (!first) fputc(',', f);
+            fputs("\n    \"recovery_style\": ", f);
+            write_json_string(f, persona->emotional_range.recovery_style);
+        }
+        fputs("\n  }", f);
+    }
+
+    /* Voice rhythm */
+    if (persona->voice_rhythm.sentence_pattern || persona->voice_rhythm.response_tempo) {
+        fputs(",\n  \"voice_rhythm\": {", f);
+        bool first = true;
+        const char *vr_fields[] = {"sentence_pattern", "paragraph_cadence", "response_tempo",
+                                   "emphasis_style", "pause_behavior"};
+        const char *vr_vals[] = {
+            persona->voice_rhythm.sentence_pattern,
+            persona->voice_rhythm.paragraph_cadence,
+            persona->voice_rhythm.response_tempo,
+            persona->voice_rhythm.emphasis_style,
+            persona->voice_rhythm.pause_behavior,
+        };
+        for (int vi = 0; vi < 5; vi++) {
+            if (vr_vals[vi]) {
+                if (!first) fputc(',', f);
+                fprintf(f, "\n    \"%s\": ", vr_fields[vi]);
+                write_json_string(f, vr_vals[vi]);
+                first = false;
+            }
+        }
+        fputs("\n  }", f);
+    }
+
+    /* Inner world */
+    if (persona->inner_world.contradictions_count > 0 ||
+        persona->inner_world.embodied_memories_count > 0) {
+        fputs(",\n  \"inner_world\": {", f);
+        bool first = true;
+        struct {
+            const char *key;
+            char **arr;
+            size_t count;
+        } iw[] = {
+            {"contradictions", persona->inner_world.contradictions,
+             persona->inner_world.contradictions_count},
+            {"embodied_memories", persona->inner_world.embodied_memories,
+             persona->inner_world.embodied_memories_count},
+            {"emotional_flashpoints", persona->inner_world.emotional_flashpoints,
+             persona->inner_world.emotional_flashpoints_count},
+            {"unfinished_business", persona->inner_world.unfinished_business,
+             persona->inner_world.unfinished_business_count},
+            {"secret_self", persona->inner_world.secret_self,
+             persona->inner_world.secret_self_count},
+        };
+        for (int wi = 0; wi < 5; wi++) {
+            if (iw[wi].count > 0) {
+                if (!first) fputc(',', f);
+                fprintf(f, "\n    \"%s\": [", iw[wi].key);
+                write_json_string_array(f, iw[wi].arr, iw[wi].count);
+                fputc(']', f);
+                first = false;
+            }
+        }
+        fputs("\n  }", f);
+    }
+
+    /* Directors notes */
+    if (persona->directors_notes_count > 0) {
+        fputs(",\n  \"directors_notes\": [", f);
+        write_json_string_array(f, persona->directors_notes, persona->directors_notes_count);
+        fputc(']', f);
+    }
+
+    /* Character invariants */
+    if (persona->character_invariants_count > 0) {
+        fputs(",\n  \"character_invariants\": [", f);
+        write_json_string_array(f, persona->character_invariants,
+                                persona->character_invariants_count);
+        fputc(']', f);
+    }
+
+    /* Core anchor */
+    if (persona->core_anchor) {
+        fputs(",\n  \"core_anchor\": ", f);
+        write_json_string(f, persona->core_anchor);
+    }
+
+    /* Example banks */
+    if (persona->example_banks_count > 0) {
+        fputs(",\n  \"example_banks\": {\n", f);
+        for (size_t bi = 0; bi < persona->example_banks_count; bi++) {
+            const sc_persona_example_bank_t *bank = &persona->example_banks[bi];
+            if (!bank->channel)
+                continue;
+            if (bi > 0)
+                fputs(",\n", f);
+            fputs("    ", f);
+            write_json_string(f, bank->channel);
+            fputs(": [\n", f);
+            for (size_t ei = 0; ei < bank->examples_count; ei++) {
+                if (ei > 0)
+                    fputs(",\n", f);
+                fputs("      {\"context\": ", f);
+                write_json_string(f, bank->examples[ei].context);
+                fputs(", \"incoming\": ", f);
+                write_json_string(f, bank->examples[ei].incoming);
+                fputs(", \"response\": ", f);
+                write_json_string(f, bank->examples[ei].response);
+                fputc('}', f);
+            }
+            fputs("\n    ]", f);
+        }
+        fputs("\n  }", f);
+    }
+
+    /* Contacts */
+    if (persona->contacts_count > 0) {
+        fputs(",\n  \"contacts\": [\n", f);
+        for (size_t ci = 0; ci < persona->contacts_count; ci++) {
+            const sc_contact_profile_t *c = &persona->contacts[ci];
+            if (ci > 0)
+                fputs(",\n", f);
+            fputs("    {\n", f);
+            if (c->contact_id) {
+                fputs("      \"contact_id\": ", f);
+                write_json_string(f, c->contact_id);
+            }
+            if (c->name) {
+                fputs(",\n      \"name\": ", f);
+                write_json_string(f, c->name);
+            }
+            if (c->relationship) {
+                fputs(",\n      \"relationship\": ", f);
+                write_json_string(f, c->relationship);
+            }
+            if (c->relationship_stage) {
+                fputs(",\n      \"relationship_stage\": ", f);
+                write_json_string(f, c->relationship_stage);
+            }
+            if (c->warmth_level) {
+                fputs(",\n      \"warmth_level\": ", f);
+                write_json_string(f, c->warmth_level);
+            }
+            if (c->dynamic) {
+                fputs(",\n      \"dynamic\": ", f);
+                write_json_string(f, c->dynamic);
+            }
+            if (c->greeting_style) {
+                fputs(",\n      \"greeting_style\": ", f);
+                write_json_string(f, c->greeting_style);
+            }
+            if (c->closing_style) {
+                fputs(",\n      \"closing_style\": ", f);
+                write_json_string(f, c->closing_style);
+            }
+            fprintf(f, ",\n      \"texts_in_bursts\": %s", c->texts_in_bursts ? "true" : "false");
+            fprintf(f, ",\n      \"prefers_short_texts\": %s",
+                    c->prefers_short_texts ? "true" : "false");
+            fprintf(f, ",\n      \"uses_emoji\": %s", c->uses_emoji ? "true" : "false");
+            fprintf(f, ",\n      \"sends_links_often\": %s",
+                    c->sends_links_often ? "true" : "false");
+            if (c->proactive_checkin) {
+                fputs(",\n      \"proactive_checkin\": true", f);
+                if (c->proactive_channel) {
+                    fputs(",\n      \"proactive_channel\": ", f);
+                    write_json_string(f, c->proactive_channel);
+                }
+            }
+            fputs("\n    }", f);
+        }
+        fputs("\n  ]", f);
+    }
+
+    fputs("\n}\n", f);
 
     if (ferror(f)) {
         fclose(f);

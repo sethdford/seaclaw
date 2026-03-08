@@ -167,6 +167,43 @@ static void egraph_query_unknown_topic(void) {
     sc_egraph_deinit(&g);
 }
 
+static void egraph_populate_from_stm_with_data(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_stm_buffer_t buf;
+    sc_stm_init(&buf, alloc, "sess", 4);
+
+    /* Record a turn with topic and emotion */
+    uint64_t ts = 1000000;
+    SC_ASSERT_EQ(sc_stm_record_turn(&buf, "user", 4, "I love hiking in the mountains", 30, ts),
+                SC_OK);
+    size_t idx = sc_stm_count(&buf) - 1;
+    (void)sc_stm_turn_set_primary_topic(&buf, idx, "hiking", 6);
+    (void)sc_stm_turn_add_emotion(&buf, idx, SC_EMOTION_JOY, 0.8);
+
+    /* Build egraph from STM */
+    sc_emotional_graph_t egraph;
+    sc_egraph_init(&egraph, alloc);
+    sc_error_t err = sc_egraph_populate_from_stm(&egraph, &buf);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    /* Verify the egraph has the topic-emotion association */
+    double avg = 0.0;
+    sc_emotion_tag_t dominant = sc_egraph_query(&egraph, "hiking", 6, &avg);
+    SC_ASSERT_EQ(dominant, SC_EMOTION_JOY);
+    SC_ASSERT_TRUE(avg > 0.5);
+
+    /* Build context and verify it mentions hiking */
+    size_t ctx_len = 0;
+    char *ctx = sc_egraph_build_context(&alloc, &egraph, &ctx_len);
+    SC_ASSERT_NOT_NULL(ctx);
+    SC_ASSERT_TRUE(ctx_len > 0);
+    SC_ASSERT_TRUE(strstr(ctx, "hiking") != NULL);
+
+    alloc.free(alloc.ctx, ctx, ctx_len + 1);
+    sc_egraph_deinit(&egraph);
+    sc_stm_deinit(&buf);
+}
+
 static void egraph_populate_from_stm_empty(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_stm_buffer_t buf;
@@ -236,6 +273,7 @@ void run_emotional_graph_tests(void) {
     SC_RUN_TEST(egraph_build_context_with_data);
     SC_RUN_TEST(egraph_build_context_empty);
     SC_RUN_TEST(egraph_populate_from_stm);
+    SC_RUN_TEST(egraph_populate_from_stm_with_data);
     SC_RUN_TEST(egraph_case_insensitive);
     SC_RUN_TEST(egraph_populate_from_stm_topic_entities);
     SC_RUN_TEST(egraph_query_unknown_topic);
