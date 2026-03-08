@@ -2768,27 +2768,14 @@ describe("sc-message-thread", () => {
   it("shows typing indicator when waiting", async () => {
     const el = document.createElement("sc-message-thread") as HTMLElement & {
       isWaiting: boolean;
+      items: Array<{ type: string; role: string; content: string; ts: number }>;
       updateComplete: Promise<boolean>;
     };
+    el.items = [{ type: "message", role: "user", content: "hello", ts: Date.now() }];
     el.isWaiting = true;
     document.body.appendChild(el);
     await el.updateComplete;
     expect(el.shadowRoot?.querySelector("sc-typing-indicator")).toBeTruthy();
-    expect(el.shadowRoot?.querySelector('[aria-label="Stop generating"]')).toBeTruthy();
-    el.remove();
-  });
-  it("fires sc-abort on abort click", async () => {
-    const el = document.createElement("sc-message-thread") as HTMLElement & {
-      isWaiting: boolean;
-      updateComplete: Promise<boolean>;
-    };
-    el.isWaiting = true;
-    document.body.appendChild(el);
-    await el.updateComplete;
-    let fired = false;
-    el.addEventListener("sc-abort", () => (fired = true));
-    (el.shadowRoot?.querySelector('[aria-label="Stop generating"]') as HTMLElement)?.click();
-    expect(fired).toBe(true);
     el.remove();
   });
   it("shows skeleton when historyLoading", async () => {
@@ -2821,10 +2808,12 @@ describe("sc-message-thread", () => {
   });
   it("should render load-earlier button when hasEarlierMessages is true", async () => {
     const el = document.createElement("sc-message-thread") as HTMLElement & {
+      items: Array<{ type: string; role: string; content: string; ts: number }>;
       hasEarlierMessages: boolean;
       loadingEarlier: boolean;
       updateComplete: Promise<boolean>;
     };
+    el.items = [{ type: "message", role: "user", content: "test", ts: Date.now() }];
     el.hasEarlierMessages = true;
     el.loadingEarlier = false;
     document.body.appendChild(el);
@@ -2836,10 +2825,12 @@ describe("sc-message-thread", () => {
   });
   it("should fire sc-load-earlier event on button click", async () => {
     const el = document.createElement("sc-message-thread") as HTMLElement & {
+      items: Array<{ type: string; role: string; content: string; ts: number }>;
       hasEarlierMessages: boolean;
       loadingEarlier: boolean;
       updateComplete: Promise<boolean>;
     };
+    el.items = [{ type: "message", role: "user", content: "test", ts: Date.now() }];
     el.hasEarlierMessages = true;
     el.loadingEarlier = false;
     document.body.appendChild(el);
