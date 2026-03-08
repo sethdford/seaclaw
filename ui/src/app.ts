@@ -28,6 +28,7 @@ type TabId =
   | "voice"
   | "nodes"
   | "usage"
+  | "metrics"
   | "security"
   | "logs";
 
@@ -45,6 +46,7 @@ const VALID_TABS: TabId[] = [
   "voice",
   "nodes",
   "usage",
+  "metrics",
   "security",
   "logs",
 ];
@@ -65,6 +67,7 @@ const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   voice: () => import("./views/voice-view.js"),
   nodes: () => import("./views/nodes-view.js"),
   usage: () => import("./views/usage-view.js"),
+  metrics: () => import("./views/metrics-view.js"),
   security: () => import("./views/security-view.js"),
   logs: () => import("./views/logs-view.js"),
 };
@@ -87,6 +90,7 @@ const MORE_TABS: { id: TabId; label: string; icon: ReturnType<typeof html> }[] =
   { id: "voice", label: "Voice", icon: icons.mic },
   { id: "nodes", label: "Nodes", icon: icons.server },
   { id: "usage", label: "Usage", icon: icons["bar-chart"] },
+  { id: "metrics", label: "Observability", icon: icons["chart-line"] },
   { id: "security", label: "Security", icon: icons.shield },
   { id: "logs", label: "Logs", icon: icons.terminal },
 ];
@@ -772,6 +776,8 @@ export class ScApp extends LitElement {
         return html`<sc-nodes-view></sc-nodes-view>`;
       case "usage":
         return html`<sc-usage-view></sc-usage-view>`;
+      case "metrics":
+        return html`<sc-metrics-view></sc-metrics-view>`;
       case "security":
         return html`<sc-security-view></sc-security-view>`;
       case "logs":

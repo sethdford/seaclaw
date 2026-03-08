@@ -10,12 +10,16 @@
 #include "seaclaw/core/string.h"
 #include "seaclaw/cost.h"
 #include "seaclaw/gateway/oauth.h"
+#include "seaclaw/health.h"
+#include "seaclaw/observability/bth_metrics.h"
+#include "seaclaw/observability/metrics_observer.h"
 #include "seaclaw/security.h"
 #include "seaclaw/session.h"
 #include "seaclaw/tool.h"
 #include "seaclaw/version.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
@@ -584,6 +588,94 @@ sc_error_t cp_admin_usage_summary(sc_allocator_t *alloc, sc_app_context_t *app, 
         sc_json_object_set(alloc, obj, "monthly_cost_usd", sc_json_number_new(alloc, 0));
         sc_json_object_set(alloc, obj, "total_tokens", sc_json_number_new(alloc, 0));
         sc_json_object_set(alloc, obj, "request_count", sc_json_number_new(alloc, 0));
+    }
+
+    sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+    sc_json_free(alloc, obj);
+    return err;
+}
+
+/* ── metrics.snapshot ─────────────────────────────────────────────────── */
+
+sc_error_t cp_admin_metrics_snapshot(sc_allocator_t *alloc, sc_app_context_t *app,
+                                     sc_ws_conn_t *conn, const sc_control_protocol_t *proto,
+                                     const sc_json_value_t *root, char **out, size_t *out_len) {
+    (void)conn;
+    (void)proto;
+    (void)root;
+    sc_json_value_t *obj = sc_json_object_new(alloc);
+    if (!obj)
+        return SC_ERR_OUT_OF_MEMORY;
+
+    /* health: uptime_seconds, pid */
+    sc_health_snapshot_t health;
+    sc_health_snapshot(&health);
+    sc_json_value_t *health_obj = sc_json_object_new(alloc);
+    if (health_obj) {
+        sc_json_object_set(alloc, health_obj, "uptime_seconds",
+                           sc_json_number_new(alloc, (double)health.uptime_seconds));
+        sc_json_object_set(alloc, health_obj, "pid", sc_json_number_new(alloc, (double)health.pid));
+        sc_json_object_set(alloc, obj, "health", health_obj);
+    }
+    if (health.components)
+        free(health.components);
+
+    /* metrics: total_requests, total_tokens, total_tool_calls, total_errors,
+     * avg_latency_ms, active_sessions */
+    sc_metrics_snapshot_t metrics = {0};
+    if (app && app->agent && app->agent->observer)
+        sc_metrics_observer_snapshot(*app->agent->observer, &metrics);
+    sc_json_value_t *metrics_obj = sc_json_object_new(alloc);
+    if (metrics_obj) {
+        sc_json_object_set(alloc, metrics_obj, "total_requests",
+                           sc_json_number_new(alloc, (double)metrics.total_requests));
+        sc_json_object_set(alloc, metrics_obj, "total_tokens",
+                           sc_json_number_new(alloc, (double)metrics.total_tokens));
+        sc_json_object_set(alloc, metrics_obj, "total_tool_calls",
+                           sc_json_number_new(alloc, (double)metrics.total_tool_calls));
+        sc_json_object_set(alloc, metrics_obj, "total_errors",
+                           sc_json_number_new(alloc, (double)metrics.total_errors));
+        sc_json_object_set(alloc, metrics_obj, "avg_latency_ms",
+                           sc_json_number_new(alloc, metrics.avg_latency_ms));
+        sc_json_object_set(alloc, metrics_obj, "active_sessions",
+                           sc_json_number_new(alloc, (double)metrics.active_sessions));
+        sc_json_object_set(alloc, obj, "metrics", metrics_obj);
+    }
+
+    /* bth: all 22 BTH counters */
+    sc_json_value_t *bth_obj = sc_json_object_new(alloc);
+    if (bth_obj) {
+        const sc_bth_metrics_t *m =
+            (app && app->agent && app->agent->bth_metrics) ? app->agent->bth_metrics : NULL;
+        uint32_t v;
+#define BTH_SET(field)    \
+    v = m ? m->field : 0; \
+    sc_json_object_set(alloc, bth_obj, #field, sc_json_number_new(alloc, (double)v))
+        BTH_SET(emotions_surfaced);
+        BTH_SET(facts_extracted);
+        BTH_SET(commitment_followups);
+        BTH_SET(pattern_insights);
+        BTH_SET(emotions_promoted);
+        BTH_SET(events_extracted);
+        BTH_SET(mood_contexts_built);
+        BTH_SET(silence_checkins);
+        BTH_SET(event_followups);
+        BTH_SET(starters_built);
+        BTH_SET(typos_applied);
+        BTH_SET(corrections_sent);
+        BTH_SET(thinking_responses);
+        BTH_SET(callbacks_triggered);
+        BTH_SET(reactions_sent);
+        BTH_SET(link_contexts);
+        BTH_SET(attachment_contexts);
+        BTH_SET(ab_evaluations);
+        BTH_SET(ab_alternates_chosen);
+        BTH_SET(replay_analyses);
+        BTH_SET(egraph_contexts);
+        BTH_SET(vision_descriptions);
+        BTH_SET(total_turns);
+#undef BTH_SET
+        sc_json_object_set(alloc, obj, "bth", bth_obj);
     }
 
     sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);

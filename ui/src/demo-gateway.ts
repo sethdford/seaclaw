@@ -841,6 +841,44 @@ export class DemoGatewayClient extends EventTarget {
       case "skills.update":
         return { ok: true };
 
+      case "metrics.snapshot":
+        return {
+          health: { uptime_seconds: 14523, pid: 12345 },
+          metrics: {
+            total_requests: 847,
+            total_tokens: 1247832,
+            total_tool_calls: 156,
+            total_errors: 3,
+            avg_latency_ms: 842,
+            active_sessions: 2,
+          },
+          bth: {
+            emotions_surfaced: 43,
+            facts_extracted: 218,
+            commitment_followups: 12,
+            pattern_insights: 67,
+            emotions_promoted: 31,
+            events_extracted: 89,
+            mood_contexts_built: 156,
+            silence_checkins: 8,
+            event_followups: 34,
+            starters_built: 22,
+            typos_applied: 15,
+            corrections_sent: 7,
+            thinking_responses: 45,
+            callbacks_triggered: 19,
+            reactions_sent: 28,
+            link_contexts: 41,
+            attachment_contexts: 13,
+            ab_evaluations: 52,
+            ab_alternates_chosen: 11,
+            replay_analyses: 38,
+            egraph_contexts: 67,
+            vision_descriptions: 9,
+            total_turns: 847,
+          },
+        };
+
       case "usage.summary":
         return {
           total_tokens: 1_247_832,

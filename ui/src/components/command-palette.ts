@@ -26,6 +26,7 @@ const NAV_ICON_MAP: Record<string, TemplateResult> = {
   security: icons.shield,
   nodes: icons.server,
   usage: icons["bar-chart"],
+  metrics: icons["chart-line"],
   logs: icons.terminal,
 };
 
@@ -44,6 +45,7 @@ const NAV_ITEMS: { id: string; label: string }[] = [
   { id: "security", label: "Security" },
   { id: "nodes", label: "Nodes" },
   { id: "usage", label: "Usage" },
+  { id: "metrics", label: "Observability" },
   { id: "logs", label: "Logs" },
 ];
 

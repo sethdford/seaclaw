@@ -82,6 +82,9 @@ sc_error_t cp_admin_nodes_list(sc_allocator_t *alloc, sc_app_context_t *app, sc_
 sc_error_t cp_admin_usage_summary(sc_allocator_t *alloc, sc_app_context_t *app, sc_ws_conn_t *conn,
                                   const sc_control_protocol_t *proto, const sc_json_value_t *root,
                                   char **out, size_t *out_len);
+sc_error_t cp_admin_metrics_snapshot(sc_allocator_t *alloc, sc_app_context_t *app,
+                                     sc_ws_conn_t *conn, const sc_control_protocol_t *proto,
+                                     const sc_json_value_t *root, char **out, size_t *out_len);
 sc_error_t cp_admin_activity_recent(sc_allocator_t *alloc, sc_app_context_t *app,
                                     sc_ws_conn_t *conn, const sc_control_protocol_t *proto,
                                     const sc_json_value_t *root, char **out, size_t *out_len);

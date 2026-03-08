@@ -16,6 +16,7 @@ import "./skills-view.js";
 import "./voice-view.js";
 import "./nodes-view.js";
 import "./usage-view.js";
+import "./metrics-view.js";
 import "./security-view.js";
 import "./logs-view.js";
 
@@ -33,6 +34,7 @@ const VIEW_TAGS = [
   "sc-voice-view",
   "sc-nodes-view",
   "sc-usage-view",
+  "sc-metrics-view",
   "sc-security-view",
   "sc-logs-view",
 ];

@@ -48,6 +48,7 @@ const SECTIONS: NavSection[] = [
       { id: "security", label: "Security", icon: icons.shield },
       { id: "nodes", label: "Nodes", icon: icons.server },
       { id: "usage", label: "Usage", icon: icons["bar-chart"] },
+      { id: "metrics", label: "Observability", icon: icons["chart-line"] },
       { id: "logs", label: "Logs", icon: icons.terminal },
     ],
   },

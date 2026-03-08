@@ -154,6 +154,7 @@ export const VIEW_TAGS: Record<string, string> = {
   voice: "sc-voice-view",
   nodes: "sc-nodes-view",
   usage: "sc-usage-view",
+  metrics: "sc-metrics-view",
   security: "sc-security-view",
   logs: "sc-logs-view",
 };

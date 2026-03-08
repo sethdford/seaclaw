@@ -66,6 +66,7 @@ static const sc_rpc_entry_t s_rpc_table[] = {
 #endif
     {"exec.approval.resolve", cp_admin_exec_approval},
     {"usage.summary", cp_admin_usage_summary},
+    {"metrics.snapshot", cp_admin_metrics_snapshot},
     {"activity.recent", cp_admin_activity_recent},
 #ifdef SC_HAS_PUSH
     {"push.register", cp_admin_push_register},
