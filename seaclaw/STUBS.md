@@ -1,6 +1,6 @@
 # SeaClaw (Swift/SeaClawKit) — Project Status
 
-This file documents the **Swift/SeaClawKit** module — a Swift wrapper around the C core. Metrics below are for the Swift codebase; the main C codebase has different scale (~597 source files, ~104K lines of C, 3726 tests, ~1506 KB binary).
+This file documents the **Swift/SeaClawKit** module — a Swift wrapper around the C core. Metrics below are for the Swift codebase; the main C codebase has different scale (~715 source files, ~136K lines of C, 3726 tests, ~1506 KB binary).
 
 Last updated: 2026-03-08
 
@@ -10,7 +10,7 @@ Last updated: 2026-03-08
 | ------------------------------ | -------------------- |
 | Source files (src/ + include/) | **~594**             |
 | Lines of C/H code              | **~101,017**         |
-| Test files                     | 128                  |
+| Test files                     | 145                  |
 | Tests passing                  | **3726/3726 (100%)** |
 | Binary size (MinSizeRel+LTO)   | **~528 KB (full)**   |
 | Core binary (no curl/channels) | **463 KB**           |
@@ -87,7 +87,8 @@ Last updated: 2026-03-08
 
 ## What's Stubbed (Interface Defined, Returns SC_ERR_NOT_SUPPORTED)
 
-- **postgres.c, redis.c, lancedb.c, lucid.c**: Memory engines — stubs present, need external libs for real backend (api.c is real — HTTP API with in-memory mock for tests)
+- **postgres.c, redis.c**: Memory engines — stubs present, need external libs for real backend
+- **lancedb.c, lucid.c**: SQLite-backed memory engines — real when `SC_ENABLE_SQLITE=ON`, including `store_ex` with source attribution; stub path when SQLite unavailable
 - **store_pgvector.c**: Vector store stub (needs libpq + pgvector)
 - **Self-update**: Interface defined, no download/replace mechanism
 
@@ -113,13 +114,13 @@ Previously stubbed, now **real**:
 
 Source file counts verified against `src/` and `include/`:
 
-| Category         | Files | Notes                                                                                                                                                                                                  |
-| ---------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Providers        | 18    | anthropic, claude_cli, codex_cli, compatible, gemini, ollama, openai, openai_codex, openrouter, reliable, router + factory/helpers                                                                     |
-| Channels         | 24    | cli, web, discord, mattermost, google_chat, dingtalk, irc, email, teams, slack, onebot, matrix, whatsapp, nostr, imessage, line, signal, telegram, maixcam, qq, lark, twilio, dispatch, thread_binding |
-| Tools            | 66    | 56 tool impls + factory + 9 web_search_providers (exa, brave, etc.)                                                                                                                                    |
-| Memory engines   | 10    | none, markdown, memory_lru, sqlite, postgres, api, redis, lucid, lancedb, registry                                                                                                                     |
-| Peripherals      | 4     | arduino, stm32, rpi, factory                                                                                                                                                                           |
-| Runtime adapters | 5     | native, docker, cloudflare, wasm_rt, factory                                                                                                                                                           |
-| Sandbox backends | 11    | bubblewrap, firejail, landlock, landlock_seccomp, seccomp, firecracker, appcontainer, seatbelt, docker, wasi, noop_sandbox                                                                             |
-| Observability    | 4     | log_observer, metrics_observer, otel, multi_observer                                                                                                                                                   |
+| Category         | Files | Notes                                                                                                                                                                                                                                                                                                    |
+| ---------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Providers        | 18    | anthropic, claude_cli, codex_cli, compatible, gemini, ollama, openai, openai_codex, openrouter, reliable, router + factory/helpers                                                                                                                                                                       |
+| Channels         | 35    | cli, web, discord, mattermost, google_chat, google_rcs, dingtalk, irc, email, teams, slack, onebot, matrix, whatsapp, nostr, imessage, instagram, line, signal, telegram, maixcam, qq, lark, twilio, dispatch, thread_binding, facebook, tiktok, twitter, mqtt, voice_channel, gmail, gmail_base64, imap |
+| Tools            | 68    | 58 tool impls + factory + 9 web_search_providers (exa, brave, etc.)                                                                                                                                                                                                                                      |
+| Memory engines   | 10    | none, markdown, memory_lru, sqlite, postgres, api, redis, lucid, lancedb, registry                                                                                                                                                                                                                       |
+| Peripherals      | 4     | arduino, stm32, rpi, factory                                                                                                                                                                                                                                                                             |
+| Runtime adapters | 5     | native, docker, cloudflare, wasm_rt, factory                                                                                                                                                                                                                                                             |
+| Sandbox backends | 11    | bubblewrap, firejail, landlock, landlock_seccomp, seccomp, firecracker, appcontainer, seatbelt, docker, wasi, noop_sandbox                                                                                                                                                                               |
+| Observability    | 4     | log_observer, metrics_observer, otel, multi_observer                                                                                                                                                                                                                                                     |

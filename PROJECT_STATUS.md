@@ -8,9 +8,9 @@ Last updated: 2026-03-08
 | ------------------------------ | -------------------- |
 | Source files (src/ + include/) | **715**              |
 | Lines of C/H/ASM code          | **~136K**            |
-| Test files                     | 128                  |
+| Test files                     | 145                  |
 | Tests passing                  | **3726/3726 (100%)** |
-| Binary size (MinSizeRel+LTO)   | **~1506 KB**          |
+| Binary size (MinSizeRel+LTO)   | **~1506 KB**         |
 | Peak RSS (test suite)          | **~5.9 MB**          |
 
 ## Channels — Honest Status
@@ -59,7 +59,7 @@ Last updated: 2026-03-08
 | -------- | ------------------------ |
 | Dispatch | Forwards to sub-channels |
 
-## Tools — All 67 Real (with all feature flags)
+## Tools — All 68 Real (with all feature flags)
 
 Every tool has a real implementation. In test mode (`SC_IS_TEST`), they return mock
 data to avoid side effects. Highlights:
@@ -140,6 +140,17 @@ Sub-agent spawning is **fully implemented**:
 - **Vector stores**: in-memory, pgvector (optional), qdrant (optional)
 - **Retrieval engine**: hybrid FTS5 + vector + semantic cache
 
+## Memory Advanced Features
+
+| Feature              | Implementation                                                   | Notes                                                    |
+| -------------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| Source citations     | `source` field persisted across SQLite, LanceDB, Lucid, Markdown | Gateway returns source in memory.list / memory.recall    |
+| Connection discovery | `src/memory/connections.c` — LLM-powered insight generation      | Finds links between memory entries                       |
+| Consolidation        | `src/memory/consolidation.c` — periodic dedup, decay, insights   | Configurable via `sc_consolidation_config_t`             |
+| Multimodal ingest    | `src/memory/ingest.c` — text, PDF, image with LLM extraction     | Images use multimodal provider chat                      |
+| File watching        | `src/memory/inbox.c` — directory poll for new files              | Path traversal + symlink protection                      |
+| REST API             | `src/gateway/cp_memory.c` — 7 WebSocket methods                  | store, recall, list, forget, ingest, status, consolidate |
+
 ## Gateway — 27+ Methods + K8s Health
 
 All real (backed by app context):
@@ -180,24 +191,27 @@ Nothing. All subsystems have real implementations, gated by build flags where ex
 
 ## Web UI Dashboard
 
-14 views, all connected to the gateway via WebSocket:
+17 views, all connected to the gateway via WebSocket:
 
-| View     | Data Source                              | Interactive?                       |
-| -------- | ---------------------------------------- | ---------------------------------- |
-| Overview | health, capabilities, channels, sessions | Refresh                            |
-| Chat     | chat.send/history, events                | Full: type, send, streaming, abort |
-| Sessions | sessions.list/patch/delete, chat.history | Select, rename, delete, resume     |
-| Agents   | config.get, sessions.list, capabilities  | Navigate to config                 |
-| Models   | models.list, config.get                  | Display only                       |
-| Voice    | chat.send + browser STT                  | Mic button, speech-to-text         |
-| Tools    | tools.catalog                            | Search, expand params              |
-| Channels | channels.status                          | Display only                       |
-| Skills   | skills.list/install/enable/disable       | Install, toggle                    |
-| Cron     | cron.list/add/remove/run                 | Add, run, delete jobs              |
-| Config   | config.get/set/schema                    | Edit fields, raw JSON, save        |
-| Nodes    | nodes.list, health                       | Display only                       |
-| Usage    | usage.summary                            | Display only                       |
-| Logs     | WebSocket events                         | Filter, clear                      |
+| View        | Data Source                              | Interactive?                                |
+| ----------- | ---------------------------------------- | ------------------------------------------- |
+| Overview    | health, capabilities, channels, sessions | Refresh                                     |
+| Chat        | chat.send/history, events                | Full: type, send, streaming, abort          |
+| Sessions    | sessions.list/patch/delete, chat.history | Select, rename, delete, resume              |
+| Agents      | config.get, sessions.list, capabilities  | Navigate to config                          |
+| Models      | models.list, config.get                  | Display only                                |
+| Voice       | chat.send + browser STT                  | Mic button, speech-to-text                  |
+| Tools       | tools.catalog                            | Search, expand params                       |
+| Channels    | channels.status                          | Display only                                |
+| Skills      | skills.list/install/enable/disable       | Install, toggle                             |
+| Cron        | cron.list/add/remove/run                 | Add, run, delete jobs                       |
+| Config      | config.get/set/schema                    | Edit fields, raw JSON, save                 |
+| Nodes       | nodes.list, health                       | Display only                                |
+| Usage       | usage.summary                            | Display only                                |
+| Logs        | WebSocket events                         | Filter, clear                               |
+| Memory      | memory.status/list/consolidate/forget    | Browse, search, filter, consolidate, forget |
+| Automations | automations config                       | Display only                                |
+| Security    | security status                          | Display only                                |
 
 ## External Dependencies
 

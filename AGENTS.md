@@ -26,7 +26,7 @@ Key extension points:
 - `src/peripherals/` (`sc_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **715 source + header files, ~136K lines of C, ~59K lines of tests, 3726 tests, 34 channels**.
+Current scale: **715 source + header files, ~136K lines of C, ~59K lines of tests, 3726 tests, 35 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -138,10 +138,10 @@ Required:
 src/
   main.c                CLI entrypoint and command routing
   agent/                agent loop, context, planner, compaction, dispatcher
-  channels/             34 channel implementations (cli, telegram, discord, slack, ...)
+  channels/             35 channel implementations (cli, telegram, discord, slack, ...)
   providers/            50+ AI provider implementations (9 core + 41 compatible services)
-  tools/                67 tool implementations
-  memory/               SQLite + markdown + LRU backends, embeddings, vector search
+  tools/                68 tool implementations
+  memory/               SQLite + markdown + LRU + LanceDB + Lucid backends, embeddings, vector search, connections, consolidation, multimodal ingest
   security/             policy, pairing, secrets, sandbox backends (landlock, firejail, bwrap)
   runtime/              runtime adapters (native, docker, wasm, cloudflare)
   core/                 allocator, arena, error, json, http, string, slice
@@ -156,7 +156,7 @@ src/
 
 include/seaclaw/       public C headers
 
-tests/                 128 test files, 3726+ tests
+tests/                 145 test files, 3726+ tests
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 

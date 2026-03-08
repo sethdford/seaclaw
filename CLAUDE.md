@@ -68,7 +68,7 @@ Types: `feat fix refactor test docs chore perf ci build style`
 
 | Workflow        | What it checks                                                                                                                                  |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ci.yml`        | C build + 3207 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
+| `ci.yml`        | C build + 3726 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
 | `benchmark.yml` | Performance regression (binary size, startup time, RSS)                                                                                         |
 | `codeql.yml`    | Static analysis security scanning                                                                                                               |
 | `security.yml`  | Dependency audit, SBOM generation                                                                                                               |
@@ -93,7 +93,7 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 | `src/`                                | All C source (~715 files, ~136K lines)                      |
 | `include/seaclaw/`                    | Public headers                                              |
 | `docs/cross-platform-ci-readiness.md` | Platform support, build flags, known platform-specific code |
-| `tests/`                              | 128 test files, 3726+ tests                                 |
+| `tests/`                              | 145 test files, 3726+ tests                                 |
 | `fuzz/`                               | libFuzzer harnesses                                         |
 | `ui/`                                 | LitElement web dashboard                                    |
 | `website/`                            | Astro marketing site                                        |
