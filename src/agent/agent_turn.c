@@ -16,6 +16,8 @@
 #include "seaclaw/context_tokens.h"
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
+#include "seaclaw/memory/fast_capture.h"
+#include "seaclaw/memory/stm.h"
 #ifdef SC_HAS_PERSONA
 #include "seaclaw/persona.h"
 #endif
@@ -68,6 +70,31 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     if (err != SC_OK) {
         sc_agent_clear_current_for_tools();
         return err;
+    }
+
+    /* Fast-capture and STM: extract entities/emotions, record turn, populate last turn */
+    {
+        sc_fc_result_t fc_result;
+        memset(&fc_result, 0, sizeof(fc_result));
+        (void)sc_fast_capture(agent->alloc, msg, msg_len, &fc_result);
+
+        uint64_t ts_ms = (uint64_t)time(NULL) * 1000;
+        err = sc_stm_record_turn(&agent->stm, "user", 4, msg, msg_len, ts_ms);
+        if (err == SC_OK) {
+            size_t last_idx = sc_stm_count(&agent->stm) - 1;
+            for (size_t i = 0; i < fc_result.entity_count; i++) {
+                const sc_fc_entity_match_t *e = &fc_result.entities[i];
+                uint32_t mention = 1;
+                (void)sc_stm_turn_add_entity(&agent->stm, last_idx, e->name, e->name_len,
+                                             e->type ? e->type : "entity",
+                                             e->type ? e->type_len : 6, mention);
+            }
+            for (size_t i = 0; i < fc_result.emotion_count; i++) {
+                (void)sc_stm_turn_add_emotion(&agent->stm, last_idx, fc_result.emotions[i].tag,
+                                              fc_result.emotions[i].intensity);
+            }
+        }
+        sc_fc_result_deinit(&fc_result, agent->alloc);
     }
 
     /* Detect preferences from user corrections and store them */
@@ -160,6 +187,11 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         (void)sc_memory_loader_load(&loader, msg, msg_len, "", 0, &memory_ctx, &memory_ctx_len);
     }
 
+    /* Build STM context for this turn */
+    char *stm_ctx = NULL;
+    size_t stm_ctx_len = 0;
+    (void)sc_stm_build_context(&agent->stm, agent->alloc, &stm_ctx, &stm_ctx_len);
+
     /* Build situational awareness context */
     char *awareness_ctx = NULL;
     size_t awareness_ctx_len = 0;
@@ -200,12 +232,16 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     char *system_prompt = NULL;
     size_t system_prompt_len = 0;
     if (agent->cached_static_prompt && !pref_ctx && !tone_hint && !persona_prompt &&
-        !awareness_ctx) {
+        !awareness_ctx && !stm_ctx) {
         err = sc_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
                                          agent->cached_static_prompt_len, memory_ctx,
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
         if (memory_ctx)
             agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
+        if (stm_ctx) {
+            agent->alloc->free(agent->alloc->ctx, stm_ctx, stm_ctx_len + 1);
+            stm_ctx = NULL;
+        }
         if (err != SC_OK) {
             if (pref_ctx)
                 agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
@@ -224,6 +260,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             .tools_count = agent->tools_count,
             .memory_context = memory_ctx,
             .memory_context_len = memory_ctx_len,
+            .stm_context = stm_ctx,
+            .stm_context_len = stm_ctx_len,
             .autonomy_level = agent->autonomy_level,
             .custom_instructions = agent->custom_instructions,
             .custom_instructions_len = agent->custom_instructions_len,
@@ -251,6 +289,10 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         persona_prompt = NULL;
         if (memory_ctx)
             agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
+        if (stm_ctx) {
+            agent->alloc->free(agent->alloc->ctx, stm_ctx, stm_ctx_len + 1);
+            stm_ctx = NULL;
+        }
         if (awareness_ctx)
             agent->alloc->free(agent->alloc->ctx, awareness_ctx, awareness_ctx_len + 1);
         if (outcome_ctx)
@@ -262,6 +304,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             return err;
         }
     }
+    if (stm_ctx)
+        agent->alloc->free(agent->alloc->ctx, stm_ctx, stm_ctx_len + 1);
     if (pref_ctx)
         agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
 

@@ -14,6 +14,7 @@
 #include "seaclaw/cost.h"
 #include "seaclaw/memory.h"
 #include "seaclaw/memory/retrieval.h"
+#include "seaclaw/memory/stm.h"
 #include "seaclaw/observer.h"
 #ifdef SC_HAS_PERSONA
 #include "seaclaw/persona.h"
@@ -161,6 +162,8 @@ struct sc_agent {
     uint64_t active_job_id;
 
     char trace_id[37]; /* UUID v4 hex string + NUL, regenerated per conversation turn */
+
+    sc_stm_buffer_t stm; /* short-term memory buffer for session context */
 
 #ifdef SC_HAS_PERSONA
     sc_persona_t *persona; /* loaded from config; owned */

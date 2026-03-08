@@ -20,6 +20,7 @@
 #include "seaclaw/context_tokens.h"
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
+#include "seaclaw/memory/stm.h"
 #include "seaclaw/observer.h"
 #ifdef SC_HAS_PERSONA
 #include "seaclaw/persona.h"
@@ -254,6 +255,13 @@ sc_error_t sc_agent_from_config(
         return SC_ERR_OUT_OF_MEMORY;
     }
 
+    {
+        const char *session_id = "default";
+        sc_error_t serr = sc_stm_init(&out->stm, *alloc, session_id, 7);
+        if (serr != SC_OK)
+            return serr;
+    }
+
     return SC_OK;
 }
 
@@ -417,6 +425,7 @@ void sc_agent_deinit(sc_agent_t *agent) {
         agent->alloc->free(agent->alloc->ctx, agent->persona_prompt, agent->persona_prompt_len + 1);
         agent->persona_prompt = NULL;
     }
+    sc_stm_deinit(&agent->stm);
     if (agent->provider.vtable && agent->provider.vtable->deinit) {
         agent->provider.vtable->deinit(agent->provider.ctx, agent->alloc);
     }
