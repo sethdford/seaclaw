@@ -1758,7 +1758,8 @@ static void test_persona_load_json_rich_persona(void) {
         "    \"wanting\": \"Genuine connection\""
         "  },"
         "  \"situational_directions\": ["
-        "    { \"trigger\": \"user is grieving\", \"instruction\": \"slow down, shorter sentences\" },"
+        "    { \"trigger\": \"user is grieving\", \"instruction\": \"slow down, shorter "
+        "sentences\" },"
         "    { \"trigger\": \"celebrating\", \"instruction\": \"match their energy\" }"
         "  ],"
         "  \"humor\": {"
@@ -2179,6 +2180,316 @@ static void test_persona_validate_accepts_rich_persona(void) {
     SC_ASSERT_NULL(err);
 }
 
+/* --- Research-backed persona element tests --- */
+
+static void test_persona_prompt_includes_relational(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *bids[] = {"sharing interesting finds", "asking how their day went"};
+    sc_persona_t p = {0};
+    p.name = "reltest";
+    p.name_len = 7;
+    p.identity = "Test";
+    p.relational.bid_response_style = "always turn toward bids with genuine engagement";
+    p.relational.emotional_bids = bids;
+    p.relational.emotional_bids_count = 2;
+    p.relational.attachment_style = "secure";
+    p.relational.attachment_awareness =
+        "detect anxious patterns and provide consistent reassurance";
+    p.relational.dunbar_awareness = "invest deeply in inner circle, warmly in acquaintances";
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Relational Intelligence"));
+    SC_ASSERT_NOT_NULL(strstr(out, "secure"));
+    SC_ASSERT_NOT_NULL(strstr(out, "turn toward"));
+    SC_ASSERT_NOT_NULL(strstr(out, "sharing interesting finds"));
+    SC_ASSERT_NOT_NULL(strstr(out, "anxious"));
+    SC_ASSERT_NOT_NULL(strstr(out, "inner circle"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_listening(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *techniques[] = {"open questions", "affirmations", "reflective listening",
+                          "summary reflections"};
+    sc_persona_t p = {0};
+    p.name = "listest";
+    p.name_len = 7;
+    p.identity = "Test";
+    p.listening.default_response_type = "support (never shift)";
+    p.listening.reflective_techniques = techniques;
+    p.listening.reflective_techniques_count = 4;
+    p.listening.nvc_style =
+        "observe without judgment, name feelings, identify needs, make requests";
+    p.listening.validation_style = "validate feelings before offering solutions";
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Listening"));
+    SC_ASSERT_NOT_NULL(strstr(out, "support"));
+    SC_ASSERT_NOT_NULL(strstr(out, "reflective listening"));
+    SC_ASSERT_NOT_NULL(strstr(out, "observe without judgment"));
+    SC_ASSERT_NOT_NULL(strstr(out, "validate feelings"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_repair(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *phrases[] = {"I think I misread that", "let me try again", "I hear you"};
+    sc_persona_t p = {0};
+    p.name = "reptest";
+    p.name_len = 7;
+    p.identity = "Test";
+    p.repair.rupture_detection = "notice tone shifts, shorter replies, or sudden topic changes";
+    p.repair.repair_approach = "name the disconnect directly and take ownership";
+    p.repair.face_saving_style = "offer face-saving exits, never corner someone";
+    p.repair.repair_phrases = phrases;
+    p.repair.repair_phrases_count = 3;
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Repair Protocol"));
+    SC_ASSERT_NOT_NULL(strstr(out, "tone shifts"));
+    SC_ASSERT_NOT_NULL(strstr(out, "take ownership"));
+    SC_ASSERT_NOT_NULL(strstr(out, "face-saving"));
+    SC_ASSERT_NOT_NULL(strstr(out, "I think I misread that"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_mirroring(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *adapts[] = {"message_length", "formality", "emoji_usage", "pacing"};
+    sc_persona_t p = {0};
+    p.name = "mirtest";
+    p.name_len = 7;
+    p.identity = "Test";
+    p.mirroring.mirroring_level = "moderate";
+    p.mirroring.adapts_to = adapts;
+    p.mirroring.adapts_to_count = 4;
+    p.mirroring.convergence_speed = "gradual";
+    p.mirroring.power_dynamic = "mirror more with higher-status contacts";
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Linguistic Mirroring"));
+    SC_ASSERT_NOT_NULL(strstr(out, "moderate"));
+    SC_ASSERT_NOT_NULL(strstr(out, "message_length"));
+    SC_ASSERT_NOT_NULL(strstr(out, "gradual"));
+    SC_ASSERT_NOT_NULL(strstr(out, "higher-status"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_social(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *bonding[] = {"remembering small details", "checking in without agenda"};
+    char *anti[] = {"shift responses", "unsolicited advice", "one-upping"};
+    sc_persona_t p = {0};
+    p.name = "soctest";
+    p.name_len = 7;
+    p.identity = "Test";
+    p.social.default_ego_state = "adult with nurturing-parent warmth";
+    p.social.phatic_style = "values small talk as genuine bonding, not filler";
+    p.social.bonding_behaviors = bonding;
+    p.social.bonding_behaviors_count = 2;
+    p.social.anti_patterns = anti;
+    p.social.anti_patterns_count = 3;
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Social Dynamics"));
+    SC_ASSERT_NOT_NULL(strstr(out, "adult with nurturing"));
+    SC_ASSERT_NOT_NULL(strstr(out, "small talk"));
+    SC_ASSERT_NOT_NULL(strstr(out, "remembering small details"));
+    SC_ASSERT_NOT_NULL(strstr(out, "NEVER"));
+    SC_ASSERT_NOT_NULL(strstr(out, "shift responses"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_load_json_research_fields(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json = "{\"version\":1,\"name\":\"research\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"empathic\"]},"
+                       "\"relational\":{\"bid_response_style\":\"turn toward\","
+                       "\"emotional_bids\":[\"sharing\",\"asking\"],"
+                       "\"attachment_style\":\"secure\","
+                       "\"attachment_awareness\":\"detect anxious\","
+                       "\"dunbar_awareness\":\"invest deeply\"},"
+                       "\"listening\":{\"default_response_type\":\"support\","
+                       "\"reflective_techniques\":[\"OARS\",\"NVC\"],"
+                       "\"nvc_style\":\"observe then feel\","
+                       "\"validation_style\":\"validate first\"},"
+                       "\"repair\":{\"rupture_detection\":\"tone shifts\","
+                       "\"repair_approach\":\"name it\","
+                       "\"face_saving_style\":\"offer exits\","
+                       "\"repair_phrases\":[\"my bad\",\"let me rephrase\"]},"
+                       "\"mirroring\":{\"mirroring_level\":\"moderate\","
+                       "\"adapts_to\":[\"length\",\"formality\"],"
+                       "\"convergence_speed\":\"gradual\","
+                       "\"power_dynamic\":\"mirror more up\"},"
+                       "\"social\":{\"default_ego_state\":\"adult\","
+                       "\"phatic_style\":\"warm opener\","
+                       "\"bonding_behaviors\":[\"remembering details\"],"
+                       "\"anti_patterns\":[\"shift responses\",\"one-upping\"]}}";
+    sc_persona_t p = {0};
+    sc_error_t err = sc_persona_load_json(&alloc, json, strlen(json), &p);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    SC_ASSERT_NOT_NULL(p.relational.bid_response_style);
+    SC_ASSERT_STR_EQ(p.relational.bid_response_style, "turn toward");
+    SC_ASSERT_EQ(p.relational.emotional_bids_count, 2);
+    SC_ASSERT_STR_EQ(p.relational.attachment_style, "secure");
+    SC_ASSERT_STR_EQ(p.relational.attachment_awareness, "detect anxious");
+    SC_ASSERT_STR_EQ(p.relational.dunbar_awareness, "invest deeply");
+
+    SC_ASSERT_STR_EQ(p.listening.default_response_type, "support");
+    SC_ASSERT_EQ(p.listening.reflective_techniques_count, 2);
+    SC_ASSERT_STR_EQ(p.listening.nvc_style, "observe then feel");
+    SC_ASSERT_STR_EQ(p.listening.validation_style, "validate first");
+
+    SC_ASSERT_STR_EQ(p.repair.rupture_detection, "tone shifts");
+    SC_ASSERT_STR_EQ(p.repair.repair_approach, "name it");
+    SC_ASSERT_STR_EQ(p.repair.face_saving_style, "offer exits");
+    SC_ASSERT_EQ(p.repair.repair_phrases_count, 2);
+
+    SC_ASSERT_STR_EQ(p.mirroring.mirroring_level, "moderate");
+    SC_ASSERT_EQ(p.mirroring.adapts_to_count, 2);
+    SC_ASSERT_STR_EQ(p.mirroring.convergence_speed, "gradual");
+    SC_ASSERT_STR_EQ(p.mirroring.power_dynamic, "mirror more up");
+
+    SC_ASSERT_STR_EQ(p.social.default_ego_state, "adult");
+    SC_ASSERT_STR_EQ(p.social.phatic_style, "warm opener");
+    SC_ASSERT_EQ(p.social.bonding_behaviors_count, 1);
+    SC_ASSERT_EQ(p.social.anti_patterns_count, 2);
+
+    sc_persona_deinit(&alloc, &p);
+}
+
+static void test_persona_validate_rejects_bad_relational_type(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json = "{\"version\":1,\"name\":\"test\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"a\"]},"
+                       "\"relational\":\"not an object\"}";
+    char *err = NULL;
+    size_t err_len = 0;
+    sc_error_t e = sc_persona_validate_json(&alloc, json, strlen(json), &err, &err_len);
+    SC_ASSERT_EQ(e, SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_NOT_NULL(err);
+    SC_ASSERT_NOT_NULL(strstr(err, "relational"));
+    alloc.free(alloc.ctx, err, err_len + 1);
+}
+
+static void test_persona_validate_rejects_bad_listening_type(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json = "{\"version\":1,\"name\":\"test\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"a\"]},"
+                       "\"listening\":42}";
+    char *err = NULL;
+    size_t err_len = 0;
+    sc_error_t e = sc_persona_validate_json(&alloc, json, strlen(json), &err, &err_len);
+    SC_ASSERT_EQ(e, SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_NOT_NULL(err);
+    SC_ASSERT_NOT_NULL(strstr(err, "listening"));
+    alloc.free(alloc.ctx, err, err_len + 1);
+}
+
+static void test_persona_validate_rejects_bad_repair_type(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json = "{\"version\":1,\"name\":\"test\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"a\"]},"
+                       "\"repair\":[1,2,3]}";
+    char *err = NULL;
+    size_t err_len = 0;
+    sc_error_t e = sc_persona_validate_json(&alloc, json, strlen(json), &err, &err_len);
+    SC_ASSERT_EQ(e, SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_NOT_NULL(err);
+    SC_ASSERT_NOT_NULL(strstr(err, "repair"));
+    alloc.free(alloc.ctx, err, err_len + 1);
+}
+
+static void test_persona_validate_rejects_bad_mirroring_type(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json = "{\"version\":1,\"name\":\"test\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"a\"]},"
+                       "\"mirroring\":true}";
+    char *err = NULL;
+    size_t err_len = 0;
+    sc_error_t e = sc_persona_validate_json(&alloc, json, strlen(json), &err, &err_len);
+    SC_ASSERT_EQ(e, SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_NOT_NULL(err);
+    SC_ASSERT_NOT_NULL(strstr(err, "mirroring"));
+    alloc.free(alloc.ctx, err, err_len + 1);
+}
+
+static void test_persona_validate_rejects_bad_social_type(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json = "{\"version\":1,\"name\":\"test\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"a\"]},"
+                       "\"social\":\"not an object\"}";
+    char *err = NULL;
+    size_t err_len = 0;
+    sc_error_t e = sc_persona_validate_json(&alloc, json, strlen(json), &err, &err_len);
+    SC_ASSERT_EQ(e, SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_NOT_NULL(err);
+    SC_ASSERT_NOT_NULL(strstr(err, "social"));
+    alloc.free(alloc.ctx, err, err_len + 1);
+}
+
+static void test_persona_validate_accepts_research_persona(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json = "{\"version\":1,\"name\":\"rp\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"a\"]},"
+                       "\"relational\":{\"bid_response_style\":\"turn toward\"},"
+                       "\"listening\":{\"default_response_type\":\"support\"},"
+                       "\"repair\":{\"rupture_detection\":\"tone shifts\"},"
+                       "\"mirroring\":{\"mirroring_level\":\"moderate\"},"
+                       "\"social\":{\"default_ego_state\":\"adult\"}}";
+    char *err = NULL;
+    size_t err_len = 0;
+    sc_error_t e = sc_persona_validate_json(&alloc, json, strlen(json), &err, &err_len);
+    SC_ASSERT_EQ(e, SC_OK);
+    SC_ASSERT_NULL(err);
+}
+
+static void test_persona_deinit_research_fields(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json = "{\"version\":1,\"name\":\"deinit_research\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"a\"]},"
+                       "\"relational\":{\"bid_response_style\":\"turn toward\","
+                       "\"emotional_bids\":[\"sharing\",\"asking\"],"
+                       "\"attachment_style\":\"secure\","
+                       "\"attachment_awareness\":\"detect anxious\","
+                       "\"dunbar_awareness\":\"invest deeply\"},"
+                       "\"listening\":{\"default_response_type\":\"support\","
+                       "\"reflective_techniques\":[\"OARS\"],"
+                       "\"nvc_style\":\"observe\",\"validation_style\":\"validate\"},"
+                       "\"repair\":{\"rupture_detection\":\"tone\","
+                       "\"repair_approach\":\"name it\","
+                       "\"face_saving_style\":\"offer exits\","
+                       "\"repair_phrases\":[\"my bad\"]},"
+                       "\"mirroring\":{\"mirroring_level\":\"moderate\","
+                       "\"adapts_to\":[\"length\"],\"convergence_speed\":\"gradual\","
+                       "\"power_dynamic\":\"mirror up\"},"
+                       "\"social\":{\"default_ego_state\":\"adult\","
+                       "\"phatic_style\":\"warm\","
+                       "\"bonding_behaviors\":[\"details\"],"
+                       "\"anti_patterns\":[\"shift\",\"one-up\"]}}";
+    sc_persona_t p = {0};
+    sc_error_t err = sc_persona_load_json(&alloc, json, strlen(json), &p);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_persona_deinit(&alloc, &p);
+    sc_persona_deinit(&alloc, &p);
+}
+
 static void test_persona_deinit_rich_persona(void) {
     sc_allocator_t alloc = sc_system_allocator();
     const char *json =
@@ -2349,4 +2660,17 @@ void run_persona_tests(void) {
     SC_RUN_TEST(test_persona_validate_rejects_bad_humor_type);
     SC_RUN_TEST(test_persona_validate_accepts_rich_persona);
     SC_RUN_TEST(test_persona_deinit_rich_persona);
+    SC_RUN_TEST(test_persona_prompt_includes_relational);
+    SC_RUN_TEST(test_persona_prompt_includes_listening);
+    SC_RUN_TEST(test_persona_prompt_includes_repair);
+    SC_RUN_TEST(test_persona_prompt_includes_mirroring);
+    SC_RUN_TEST(test_persona_prompt_includes_social);
+    SC_RUN_TEST(test_persona_load_json_research_fields);
+    SC_RUN_TEST(test_persona_validate_rejects_bad_relational_type);
+    SC_RUN_TEST(test_persona_validate_rejects_bad_listening_type);
+    SC_RUN_TEST(test_persona_validate_rejects_bad_repair_type);
+    SC_RUN_TEST(test_persona_validate_rejects_bad_mirroring_type);
+    SC_RUN_TEST(test_persona_validate_rejects_bad_social_type);
+    SC_RUN_TEST(test_persona_validate_accepts_research_persona);
+    SC_RUN_TEST(test_persona_deinit_research_fields);
 }

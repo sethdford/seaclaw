@@ -235,7 +235,8 @@ void sc_persona_deinit(sc_allocator_t *alloc, sc_persona_t *persona) {
     free_contact_string(alloc, persona->core_anchor);
 
     /* Intellectual profile */
-    free_string_array(alloc, persona->intellectual.expertise, persona->intellectual.expertise_count);
+    free_string_array(alloc, persona->intellectual.expertise,
+                      persona->intellectual.expertise_count);
     free_string_array(alloc, persona->intellectual.curiosity_areas,
                       persona->intellectual.curiosity_areas_count);
     free_contact_string(alloc, persona->intellectual.thinking_style);
@@ -276,13 +277,11 @@ void sc_persona_deinit(sc_allocator_t *alloc, sc_persona_t *persona) {
     free_contact_string(alloc, persona->repair.rupture_detection);
     free_contact_string(alloc, persona->repair.repair_approach);
     free_contact_string(alloc, persona->repair.face_saving_style);
-    free_string_array(alloc, persona->repair.repair_phrases,
-                      persona->repair.repair_phrases_count);
+    free_string_array(alloc, persona->repair.repair_phrases, persona->repair.repair_phrases_count);
 
     /* Linguistic mirroring */
     free_contact_string(alloc, persona->mirroring.mirroring_level);
-    free_string_array(alloc, persona->mirroring.adapts_to,
-                      persona->mirroring.adapts_to_count);
+    free_string_array(alloc, persona->mirroring.adapts_to, persona->mirroring.adapts_to_count);
     free_contact_string(alloc, persona->mirroring.convergence_speed);
     free_contact_string(alloc, persona->mirroring.power_dynamic);
 
@@ -291,8 +290,7 @@ void sc_persona_deinit(sc_allocator_t *alloc, sc_persona_t *persona) {
     free_contact_string(alloc, persona->social.phatic_style);
     free_string_array(alloc, persona->social.bonding_behaviors,
                       persona->social.bonding_behaviors_count);
-    free_string_array(alloc, persona->social.anti_patterns,
-                      persona->social.anti_patterns_count);
+    free_string_array(alloc, persona->social.anti_patterns, persona->social.anti_patterns_count);
 
     if (persona->overlays) {
         for (size_t i = 0; i < persona->overlays_count; i++)
@@ -815,13 +813,17 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         if (mot && mot->type == SC_JSON_OBJECT) {
             const char *s;
             s = sc_json_get_string(mot, "primary_drive");
-            if (s) out->motivation.primary_drive = sc_strdup(alloc, s);
+            if (s)
+                out->motivation.primary_drive = sc_strdup(alloc, s);
             s = sc_json_get_string(mot, "protecting");
-            if (s) out->motivation.protecting = sc_strdup(alloc, s);
+            if (s)
+                out->motivation.protecting = sc_strdup(alloc, s);
             s = sc_json_get_string(mot, "avoiding");
-            if (s) out->motivation.avoiding = sc_strdup(alloc, s);
+            if (s)
+                out->motivation.avoiding = sc_strdup(alloc, s);
             s = sc_json_get_string(mot, "wanting");
-            if (s) out->motivation.wanting = sc_strdup(alloc, s);
+            if (s)
+                out->motivation.wanting = sc_strdup(alloc, s);
         }
     }
 
@@ -838,11 +840,14 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
                     size_t count = 0;
                     for (size_t i = 0; i < n; i++) {
                         const sc_json_value_t *item = sd_arr->data.array.items[i];
-                        if (!item || item->type != SC_JSON_OBJECT) continue;
+                        if (!item || item->type != SC_JSON_OBJECT)
+                            continue;
                         const char *t = sc_json_get_string(item, "trigger");
                         const char *ins = sc_json_get_string(item, "instruction");
-                        if (t) dirs[count].trigger = sc_strdup(alloc, t);
-                        if (ins) dirs[count].instruction = sc_strdup(alloc, ins);
+                        if (t)
+                            dirs[count].trigger = sc_strdup(alloc, t);
+                        if (ins)
+                            dirs[count].instruction = sc_strdup(alloc, ins);
                         count++;
                     }
                     out->situational_directions = dirs;
@@ -858,16 +863,20 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         if (hum && hum->type == SC_JSON_OBJECT) {
             const char *s;
             s = sc_json_get_string(hum, "type");
-            if (s) out->humor.type = sc_strdup(alloc, s);
+            if (s)
+                out->humor.type = sc_strdup(alloc, s);
             s = sc_json_get_string(hum, "frequency");
-            if (s) out->humor.frequency = sc_strdup(alloc, s);
+            if (s)
+                out->humor.frequency = sc_strdup(alloc, s);
             sc_json_value_t *a = sc_json_object_get(hum, "targets");
-            if (a) parse_string_array(alloc, a, &out->humor.targets, &out->humor.targets_count);
+            if (a)
+                parse_string_array(alloc, a, &out->humor.targets, &out->humor.targets_count);
             a = sc_json_object_get(hum, "boundaries");
-            if (a) parse_string_array(alloc, a, &out->humor.boundaries,
-                                      &out->humor.boundaries_count);
+            if (a)
+                parse_string_array(alloc, a, &out->humor.boundaries, &out->humor.boundaries_count);
             s = sc_json_get_string(hum, "timing");
-            if (s) out->humor.timing = sc_strdup(alloc, s);
+            if (s)
+                out->humor.timing = sc_strdup(alloc, s);
         }
     }
 
@@ -877,15 +886,20 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         if (cs && cs->type == SC_JSON_OBJECT) {
             const char *s;
             s = sc_json_get_string(cs, "pushback_response");
-            if (s) out->conflict_style.pushback_response = sc_strdup(alloc, s);
+            if (s)
+                out->conflict_style.pushback_response = sc_strdup(alloc, s);
             s = sc_json_get_string(cs, "confrontation_comfort");
-            if (s) out->conflict_style.confrontation_comfort = sc_strdup(alloc, s);
+            if (s)
+                out->conflict_style.confrontation_comfort = sc_strdup(alloc, s);
             s = sc_json_get_string(cs, "apology_style");
-            if (s) out->conflict_style.apology_style = sc_strdup(alloc, s);
+            if (s)
+                out->conflict_style.apology_style = sc_strdup(alloc, s);
             s = sc_json_get_string(cs, "boundary_assertion");
-            if (s) out->conflict_style.boundary_assertion = sc_strdup(alloc, s);
+            if (s)
+                out->conflict_style.boundary_assertion = sc_strdup(alloc, s);
             s = sc_json_get_string(cs, "repair_behavior");
-            if (s) out->conflict_style.repair_behavior = sc_strdup(alloc, s);
+            if (s)
+                out->conflict_style.repair_behavior = sc_strdup(alloc, s);
         }
     }
 
@@ -895,19 +909,25 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         if (er && er->type == SC_JSON_OBJECT) {
             const char *s;
             s = sc_json_get_string(er, "ceiling");
-            if (s) out->emotional_range.ceiling = sc_strdup(alloc, s);
+            if (s)
+                out->emotional_range.ceiling = sc_strdup(alloc, s);
             s = sc_json_get_string(er, "floor");
-            if (s) out->emotional_range.floor = sc_strdup(alloc, s);
+            if (s)
+                out->emotional_range.floor = sc_strdup(alloc, s);
             sc_json_value_t *a = sc_json_object_get(er, "escalation_triggers");
-            if (a) parse_string_array(alloc, a, &out->emotional_range.escalation_triggers,
-                                      &out->emotional_range.escalation_triggers_count);
+            if (a)
+                parse_string_array(alloc, a, &out->emotional_range.escalation_triggers,
+                                   &out->emotional_range.escalation_triggers_count);
             a = sc_json_object_get(er, "de_escalation");
-            if (a) parse_string_array(alloc, a, &out->emotional_range.de_escalation,
-                                      &out->emotional_range.de_escalation_count);
+            if (a)
+                parse_string_array(alloc, a, &out->emotional_range.de_escalation,
+                                   &out->emotional_range.de_escalation_count);
             s = sc_json_get_string(er, "withdrawal_conditions");
-            if (s) out->emotional_range.withdrawal_conditions = sc_strdup(alloc, s);
+            if (s)
+                out->emotional_range.withdrawal_conditions = sc_strdup(alloc, s);
             s = sc_json_get_string(er, "recovery_style");
-            if (s) out->emotional_range.recovery_style = sc_strdup(alloc, s);
+            if (s)
+                out->emotional_range.recovery_style = sc_strdup(alloc, s);
         }
     }
 
@@ -917,25 +937,32 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         if (vr && vr->type == SC_JSON_OBJECT) {
             const char *s;
             s = sc_json_get_string(vr, "sentence_pattern");
-            if (s) out->voice_rhythm.sentence_pattern = sc_strdup(alloc, s);
+            if (s)
+                out->voice_rhythm.sentence_pattern = sc_strdup(alloc, s);
             s = sc_json_get_string(vr, "paragraph_cadence");
-            if (s) out->voice_rhythm.paragraph_cadence = sc_strdup(alloc, s);
+            if (s)
+                out->voice_rhythm.paragraph_cadence = sc_strdup(alloc, s);
             s = sc_json_get_string(vr, "response_tempo");
-            if (s) out->voice_rhythm.response_tempo = sc_strdup(alloc, s);
+            if (s)
+                out->voice_rhythm.response_tempo = sc_strdup(alloc, s);
             s = sc_json_get_string(vr, "emphasis_style");
-            if (s) out->voice_rhythm.emphasis_style = sc_strdup(alloc, s);
+            if (s)
+                out->voice_rhythm.emphasis_style = sc_strdup(alloc, s);
             s = sc_json_get_string(vr, "pause_behavior");
-            if (s) out->voice_rhythm.pause_behavior = sc_strdup(alloc, s);
+            if (s)
+                out->voice_rhythm.pause_behavior = sc_strdup(alloc, s);
         }
     }
 
     /* Parse character_invariants + core_anchor */
     {
         sc_json_value_t *ci = sc_json_object_get(root, "character_invariants");
-        if (ci) parse_string_array(alloc, ci, &out->character_invariants,
-                                   &out->character_invariants_count);
+        if (ci)
+            parse_string_array(alloc, ci, &out->character_invariants,
+                               &out->character_invariants_count);
         const char *anchor = sc_json_get_string(root, "core_anchor");
-        if (anchor) out->core_anchor = sc_strdup(alloc, anchor);
+        if (anchor)
+            out->core_anchor = sc_strdup(alloc, anchor);
     }
 
     /* Parse intellectual */
@@ -943,16 +970,20 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         sc_json_value_t *ip = sc_json_object_get(root, "intellectual");
         if (ip && ip->type == SC_JSON_OBJECT) {
             sc_json_value_t *a = sc_json_object_get(ip, "expertise");
-            if (a) parse_string_array(alloc, a, &out->intellectual.expertise,
-                                      &out->intellectual.expertise_count);
+            if (a)
+                parse_string_array(alloc, a, &out->intellectual.expertise,
+                                   &out->intellectual.expertise_count);
             a = sc_json_object_get(ip, "curiosity_areas");
-            if (a) parse_string_array(alloc, a, &out->intellectual.curiosity_areas,
-                                      &out->intellectual.curiosity_areas_count);
+            if (a)
+                parse_string_array(alloc, a, &out->intellectual.curiosity_areas,
+                                   &out->intellectual.curiosity_areas_count);
             const char *s;
             s = sc_json_get_string(ip, "thinking_style");
-            if (s) out->intellectual.thinking_style = sc_strdup(alloc, s);
+            if (s)
+                out->intellectual.thinking_style = sc_strdup(alloc, s);
             s = sc_json_get_string(ip, "metaphor_sources");
-            if (s) out->intellectual.metaphor_sources = sc_strdup(alloc, s);
+            if (s)
+                out->intellectual.metaphor_sources = sc_strdup(alloc, s);
         }
     }
 
@@ -969,11 +1000,14 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
                     size_t count = 0;
                     for (size_t i = 0; i < n; i++) {
                         const sc_json_value_t *item = bb_arr->data.array.items[i];
-                        if (!item || item->type != SC_JSON_OBJECT) continue;
+                        if (!item || item->type != SC_JSON_OBJECT)
+                            continue;
                         const char *beat = sc_json_get_string(item, "backstory_beat");
                         const char *rule = sc_json_get_string(item, "behavioral_rule");
-                        if (beat) bbs[count].backstory_beat = sc_strdup(alloc, beat);
-                        if (rule) bbs[count].behavioral_rule = sc_strdup(alloc, rule);
+                        if (beat)
+                            bbs[count].backstory_beat = sc_strdup(alloc, beat);
+                        if (rule)
+                            bbs[count].behavioral_rule = sc_strdup(alloc, rule);
                         count++;
                     }
                     out->backstory_behaviors = bbs;
@@ -988,12 +1022,15 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         sc_json_value_t *sen = sc_json_object_get(root, "sensory");
         if (sen && sen->type == SC_JSON_OBJECT) {
             const char *s = sc_json_get_string(sen, "dominant_sense");
-            if (s) out->sensory.dominant_sense = sc_strdup(alloc, s);
+            if (s)
+                out->sensory.dominant_sense = sc_strdup(alloc, s);
             sc_json_value_t *a = sc_json_object_get(sen, "metaphor_vocabulary");
-            if (a) parse_string_array(alloc, a, &out->sensory.metaphor_vocabulary,
-                                      &out->sensory.metaphor_vocabulary_count);
+            if (a)
+                parse_string_array(alloc, a, &out->sensory.metaphor_vocabulary,
+                                   &out->sensory.metaphor_vocabulary_count);
             s = sc_json_get_string(sen, "grounding_patterns");
-            if (s) out->sensory.grounding_patterns = sc_strdup(alloc, s);
+            if (s)
+                out->sensory.grounding_patterns = sc_strdup(alloc, s);
         }
     }
 
@@ -1002,16 +1039,21 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         sc_json_value_t *rel = sc_json_object_get(root, "relational");
         if (rel && rel->type == SC_JSON_OBJECT) {
             const char *s = sc_json_get_string(rel, "bid_response_style");
-            if (s) out->relational.bid_response_style = sc_strdup(alloc, s);
+            if (s)
+                out->relational.bid_response_style = sc_strdup(alloc, s);
             sc_json_value_t *a = sc_json_object_get(rel, "emotional_bids");
-            if (a) parse_string_array(alloc, a, &out->relational.emotional_bids,
-                                      &out->relational.emotional_bids_count);
+            if (a)
+                parse_string_array(alloc, a, &out->relational.emotional_bids,
+                                   &out->relational.emotional_bids_count);
             s = sc_json_get_string(rel, "attachment_style");
-            if (s) out->relational.attachment_style = sc_strdup(alloc, s);
+            if (s)
+                out->relational.attachment_style = sc_strdup(alloc, s);
             s = sc_json_get_string(rel, "attachment_awareness");
-            if (s) out->relational.attachment_awareness = sc_strdup(alloc, s);
+            if (s)
+                out->relational.attachment_awareness = sc_strdup(alloc, s);
             s = sc_json_get_string(rel, "dunbar_awareness");
-            if (s) out->relational.dunbar_awareness = sc_strdup(alloc, s);
+            if (s)
+                out->relational.dunbar_awareness = sc_strdup(alloc, s);
         }
     }
 
@@ -1020,14 +1062,18 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         sc_json_value_t *lis = sc_json_object_get(root, "listening");
         if (lis && lis->type == SC_JSON_OBJECT) {
             const char *s = sc_json_get_string(lis, "default_response_type");
-            if (s) out->listening.default_response_type = sc_strdup(alloc, s);
+            if (s)
+                out->listening.default_response_type = sc_strdup(alloc, s);
             sc_json_value_t *a = sc_json_object_get(lis, "reflective_techniques");
-            if (a) parse_string_array(alloc, a, &out->listening.reflective_techniques,
-                                      &out->listening.reflective_techniques_count);
+            if (a)
+                parse_string_array(alloc, a, &out->listening.reflective_techniques,
+                                   &out->listening.reflective_techniques_count);
             s = sc_json_get_string(lis, "nvc_style");
-            if (s) out->listening.nvc_style = sc_strdup(alloc, s);
+            if (s)
+                out->listening.nvc_style = sc_strdup(alloc, s);
             s = sc_json_get_string(lis, "validation_style");
-            if (s) out->listening.validation_style = sc_strdup(alloc, s);
+            if (s)
+                out->listening.validation_style = sc_strdup(alloc, s);
         }
     }
 
@@ -1036,14 +1082,18 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         sc_json_value_t *rep = sc_json_object_get(root, "repair");
         if (rep && rep->type == SC_JSON_OBJECT) {
             const char *s = sc_json_get_string(rep, "rupture_detection");
-            if (s) out->repair.rupture_detection = sc_strdup(alloc, s);
+            if (s)
+                out->repair.rupture_detection = sc_strdup(alloc, s);
             s = sc_json_get_string(rep, "repair_approach");
-            if (s) out->repair.repair_approach = sc_strdup(alloc, s);
+            if (s)
+                out->repair.repair_approach = sc_strdup(alloc, s);
             s = sc_json_get_string(rep, "face_saving_style");
-            if (s) out->repair.face_saving_style = sc_strdup(alloc, s);
+            if (s)
+                out->repair.face_saving_style = sc_strdup(alloc, s);
             sc_json_value_t *a = sc_json_object_get(rep, "repair_phrases");
-            if (a) parse_string_array(alloc, a, &out->repair.repair_phrases,
-                                      &out->repair.repair_phrases_count);
+            if (a)
+                parse_string_array(alloc, a, &out->repair.repair_phrases,
+                                   &out->repair.repair_phrases_count);
         }
     }
 
@@ -1052,14 +1102,18 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         sc_json_value_t *mir = sc_json_object_get(root, "mirroring");
         if (mir && mir->type == SC_JSON_OBJECT) {
             const char *s = sc_json_get_string(mir, "mirroring_level");
-            if (s) out->mirroring.mirroring_level = sc_strdup(alloc, s);
+            if (s)
+                out->mirroring.mirroring_level = sc_strdup(alloc, s);
             sc_json_value_t *a = sc_json_object_get(mir, "adapts_to");
-            if (a) parse_string_array(alloc, a, &out->mirroring.adapts_to,
-                                      &out->mirroring.adapts_to_count);
+            if (a)
+                parse_string_array(alloc, a, &out->mirroring.adapts_to,
+                                   &out->mirroring.adapts_to_count);
             s = sc_json_get_string(mir, "convergence_speed");
-            if (s) out->mirroring.convergence_speed = sc_strdup(alloc, s);
+            if (s)
+                out->mirroring.convergence_speed = sc_strdup(alloc, s);
             s = sc_json_get_string(mir, "power_dynamic");
-            if (s) out->mirroring.power_dynamic = sc_strdup(alloc, s);
+            if (s)
+                out->mirroring.power_dynamic = sc_strdup(alloc, s);
         }
     }
 
@@ -1068,15 +1122,19 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
         sc_json_value_t *soc = sc_json_object_get(root, "social");
         if (soc && soc->type == SC_JSON_OBJECT) {
             const char *s = sc_json_get_string(soc, "default_ego_state");
-            if (s) out->social.default_ego_state = sc_strdup(alloc, s);
+            if (s)
+                out->social.default_ego_state = sc_strdup(alloc, s);
             s = sc_json_get_string(soc, "phatic_style");
-            if (s) out->social.phatic_style = sc_strdup(alloc, s);
+            if (s)
+                out->social.phatic_style = sc_strdup(alloc, s);
             sc_json_value_t *a = sc_json_object_get(soc, "bonding_behaviors");
-            if (a) parse_string_array(alloc, a, &out->social.bonding_behaviors,
-                                      &out->social.bonding_behaviors_count);
+            if (a)
+                parse_string_array(alloc, a, &out->social.bonding_behaviors,
+                                   &out->social.bonding_behaviors_count);
             a = sc_json_object_get(soc, "anti_patterns");
-            if (a) parse_string_array(alloc, a, &out->social.anti_patterns,
-                                      &out->social.anti_patterns_count);
+            if (a)
+                parse_string_array(alloc, a, &out->social.anti_patterns,
+                                   &out->social.anti_patterns_count);
         }
     }
 
@@ -1827,26 +1885,43 @@ sc_error_t sc_persona_build_prompt(sc_allocator_t *alloc, const sc_persona_t *pe
         if (has) {
             static const char mot_hdr[] = "\n--- Motivation (your core drive) ---\n";
             err = append_prompt(alloc, &buf, &len, &cap, mot_hdr, sizeof(mot_hdr) - 1);
-            if (err != SC_OK) goto fail;
+            if (err != SC_OK)
+                goto fail;
             if (m->primary_drive) {
                 char line[512];
                 int w = snprintf(line, sizeof(line), "Why you engage: %s\n", m->primary_drive);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (m->protecting) {
                 char line[512];
                 int w = snprintf(line, sizeof(line), "What you protect: %s\n", m->protecting);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (m->avoiding) {
                 char line[512];
                 int w = snprintf(line, sizeof(line), "What you avoid: %s\n", m->avoiding);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (m->wanting) {
                 char line[512];
                 int w = snprintf(line, sizeof(line), "What you want most: %s\n", m->wanting);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
         }
     }
@@ -1873,16 +1948,20 @@ sc_error_t sc_persona_build_prompt(sc_allocator_t *alloc, const sc_persona_t *pe
 
     /* Situational direction — scene-specific director's notes */
     if (persona->situational_directions_count > 0) {
-        static const char sd_hdr[] =
-            "\n--- Situational Direction (scene-specific notes) ---\n";
+        static const char sd_hdr[] = "\n--- Situational Direction (scene-specific notes) ---\n";
         err = append_prompt(alloc, &buf, &len, &cap, sd_hdr, sizeof(sd_hdr) - 1);
-        if (err != SC_OK) goto fail;
+        if (err != SC_OK)
+            goto fail;
         for (size_t i = 0; i < persona->situational_directions_count; i++) {
             const sc_situational_direction_t *d = &persona->situational_directions[i];
             if (d->trigger && d->instruction) {
                 char line[512];
                 int w = snprintf(line, sizeof(line), "- WHEN %s: %s\n", d->trigger, d->instruction);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
         }
     }
@@ -1894,43 +1973,72 @@ sc_error_t sc_persona_build_prompt(sc_allocator_t *alloc, const sc_persona_t *pe
         if (has) {
             static const char hum_hdr[] = "\n--- Humor ---\n";
             err = append_prompt(alloc, &buf, &len, &cap, hum_hdr, sizeof(hum_hdr) - 1);
-            if (err != SC_OK) goto fail;
+            if (err != SC_OK)
+                goto fail;
             if (h->type) {
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Type: %s\n", h->type);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (h->frequency) {
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Frequency: %s\n", h->frequency);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (h->timing) {
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Timing: %s\n", h->timing);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (h->targets_count > 0) {
                 err = append_prompt(alloc, &buf, &len, &cap, "Targets: ", 9);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
                 for (size_t i = 0; i < h->targets_count; i++) {
-                    if (i > 0) { err = append_prompt(alloc, &buf, &len, &cap, ", ", 2); if (err != SC_OK) goto fail; }
-                    err = append_prompt(alloc, &buf, &len, &cap, h->targets[i], strlen(h->targets[i]));
-                    if (err != SC_OK) goto fail;
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, h->targets[i],
+                                        strlen(h->targets[i]));
+                    if (err != SC_OK)
+                        goto fail;
                 }
                 err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
             }
             if (h->boundaries_count > 0) {
                 err = append_prompt(alloc, &buf, &len, &cap, "Never funny: ", 13);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
                 for (size_t i = 0; i < h->boundaries_count; i++) {
-                    if (i > 0) { err = append_prompt(alloc, &buf, &len, &cap, ", ", 2); if (err != SC_OK) goto fail; }
-                    err = append_prompt(alloc, &buf, &len, &cap, h->boundaries[i], strlen(h->boundaries[i]));
-                    if (err != SC_OK) goto fail;
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, h->boundaries[i],
+                                        strlen(h->boundaries[i]));
+                    if (err != SC_OK)
+                        goto fail;
                 }
                 err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
             }
         }
     }
@@ -1943,26 +2051,53 @@ sc_error_t sc_persona_build_prompt(sc_allocator_t *alloc, const sc_persona_t *pe
         if (has) {
             static const char cs_hdr[] = "\n--- Conflict & Disagreement ---\n";
             err = append_prompt(alloc, &buf, &len, &cap, cs_hdr, sizeof(cs_hdr) - 1);
-            if (err != SC_OK) goto fail;
+            if (err != SC_OK)
+                goto fail;
             if (cs->pushback_response) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Pushback: %s\n", cs->pushback_response);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Pushback: %s\n", cs->pushback_response);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (cs->confrontation_comfort) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Confrontation comfort: %s\n", cs->confrontation_comfort);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Confrontation comfort: %s\n",
+                                 cs->confrontation_comfort);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (cs->apology_style) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Apology style: %s\n", cs->apology_style);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Apology style: %s\n", cs->apology_style);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (cs->boundary_assertion) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Saying no: %s\n", cs->boundary_assertion);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Saying no: %s\n", cs->boundary_assertion);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (cs->repair_behavior) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Repair: %s\n", cs->repair_behavior);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Repair: %s\n", cs->repair_behavior);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
         }
     }
@@ -1975,44 +2110,82 @@ sc_error_t sc_persona_build_prompt(sc_allocator_t *alloc, const sc_persona_t *pe
         if (has) {
             static const char er_hdr[] = "\n--- Emotional Range ---\n";
             err = append_prompt(alloc, &buf, &len, &cap, er_hdr, sizeof(er_hdr) - 1);
-            if (err != SC_OK) goto fail;
+            if (err != SC_OK)
+                goto fail;
             if (er->ceiling) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Ceiling: %s\n", er->ceiling);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Ceiling: %s\n", er->ceiling);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (er->floor) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Floor: %s\n", er->floor);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Floor: %s\n", er->floor);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (er->escalation_triggers_count > 0) {
                 err = append_prompt(alloc, &buf, &len, &cap, "Escalates when: ", 16);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
                 for (size_t i = 0; i < er->escalation_triggers_count; i++) {
-                    if (i > 0) { err = append_prompt(alloc, &buf, &len, &cap, "; ", 2); if (err != SC_OK) goto fail; }
-                    err = append_prompt(alloc, &buf, &len, &cap, er->escalation_triggers[i], strlen(er->escalation_triggers[i]));
-                    if (err != SC_OK) goto fail;
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, "; ", 2);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, er->escalation_triggers[i],
+                                        strlen(er->escalation_triggers[i]));
+                    if (err != SC_OK)
+                        goto fail;
                 }
                 err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
             }
             if (er->de_escalation_count > 0) {
                 err = append_prompt(alloc, &buf, &len, &cap, "Self-regulates by: ", 19);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
                 for (size_t i = 0; i < er->de_escalation_count; i++) {
-                    if (i > 0) { err = append_prompt(alloc, &buf, &len, &cap, "; ", 2); if (err != SC_OK) goto fail; }
-                    err = append_prompt(alloc, &buf, &len, &cap, er->de_escalation[i], strlen(er->de_escalation[i]));
-                    if (err != SC_OK) goto fail;
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, "; ", 2);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, er->de_escalation[i],
+                                        strlen(er->de_escalation[i]));
+                    if (err != SC_OK)
+                        goto fail;
                 }
                 err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
             }
             if (er->withdrawal_conditions) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Withdraws when: %s\n", er->withdrawal_conditions);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w =
+                    snprintf(line, sizeof(line), "Withdraws when: %s\n", er->withdrawal_conditions);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (er->recovery_style) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Recovery: %s\n", er->recovery_style);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Recovery: %s\n", er->recovery_style);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
         }
     }
@@ -2025,26 +2198,54 @@ sc_error_t sc_persona_build_prompt(sc_allocator_t *alloc, const sc_persona_t *pe
         if (has) {
             static const char vr_hdr[] = "\n--- Voice Rhythm ---\n";
             err = append_prompt(alloc, &buf, &len, &cap, vr_hdr, sizeof(vr_hdr) - 1);
-            if (err != SC_OK) goto fail;
+            if (err != SC_OK)
+                goto fail;
             if (vr->sentence_pattern) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Sentence pattern: %s\n", vr->sentence_pattern);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w =
+                    snprintf(line, sizeof(line), "Sentence pattern: %s\n", vr->sentence_pattern);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (vr->paragraph_cadence) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Paragraph cadence: %s\n", vr->paragraph_cadence);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w =
+                    snprintf(line, sizeof(line), "Paragraph cadence: %s\n", vr->paragraph_cadence);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (vr->response_tempo) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Response tempo: %s\n", vr->response_tempo);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Response tempo: %s\n", vr->response_tempo);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (vr->emphasis_style) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Emphasis: %s\n", vr->emphasis_style);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Emphasis: %s\n", vr->emphasis_style);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (vr->pause_behavior) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Pauses: %s\n", vr->pause_behavior);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Pauses: %s\n", vr->pause_behavior);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
         }
     }
@@ -2052,41 +2253,69 @@ sc_error_t sc_persona_build_prompt(sc_allocator_t *alloc, const sc_persona_t *pe
     /* Intellectual profile */
     {
         const sc_intellectual_profile_t *ip = &persona->intellectual;
-        bool has = ip->expertise_count > 0 || ip->curiosity_areas_count > 0 ||
-                   ip->thinking_style || ip->metaphor_sources;
+        bool has = ip->expertise_count > 0 || ip->curiosity_areas_count > 0 || ip->thinking_style ||
+                   ip->metaphor_sources;
         if (has) {
             static const char ip_hdr[] = "\n--- Intellectual Profile ---\n";
             err = append_prompt(alloc, &buf, &len, &cap, ip_hdr, sizeof(ip_hdr) - 1);
-            if (err != SC_OK) goto fail;
+            if (err != SC_OK)
+                goto fail;
             if (ip->expertise_count > 0) {
                 err = append_prompt(alloc, &buf, &len, &cap, "Deep knowledge: ", 16);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
                 for (size_t i = 0; i < ip->expertise_count; i++) {
-                    if (i > 0) { err = append_prompt(alloc, &buf, &len, &cap, ", ", 2); if (err != SC_OK) goto fail; }
-                    err = append_prompt(alloc, &buf, &len, &cap, ip->expertise[i], strlen(ip->expertise[i]));
-                    if (err != SC_OK) goto fail;
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, ip->expertise[i],
+                                        strlen(ip->expertise[i]));
+                    if (err != SC_OK)
+                        goto fail;
                 }
                 err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
             }
             if (ip->curiosity_areas_count > 0) {
                 err = append_prompt(alloc, &buf, &len, &cap, "Genuinely curious about: ", 25);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
                 for (size_t i = 0; i < ip->curiosity_areas_count; i++) {
-                    if (i > 0) { err = append_prompt(alloc, &buf, &len, &cap, ", ", 2); if (err != SC_OK) goto fail; }
-                    err = append_prompt(alloc, &buf, &len, &cap, ip->curiosity_areas[i], strlen(ip->curiosity_areas[i]));
-                    if (err != SC_OK) goto fail;
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, ip->curiosity_areas[i],
+                                        strlen(ip->curiosity_areas[i]));
+                    if (err != SC_OK)
+                        goto fail;
                 }
                 err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
             }
             if (ip->thinking_style) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Thinks by: %s\n", ip->thinking_style);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Thinks by: %s\n", ip->thinking_style);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (ip->metaphor_sources) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Draws metaphors from: %s\n", ip->metaphor_sources);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Draws metaphors from: %s\n",
+                                 ip->metaphor_sources);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
         }
     }
@@ -2095,14 +2324,19 @@ sc_error_t sc_persona_build_prompt(sc_allocator_t *alloc, const sc_persona_t *pe
     if (persona->backstory_behaviors_count > 0) {
         static const char bb_hdr[] = "\n--- Backstory-to-Behavior (why you do what you do) ---\n";
         err = append_prompt(alloc, &buf, &len, &cap, bb_hdr, sizeof(bb_hdr) - 1);
-        if (err != SC_OK) goto fail;
+        if (err != SC_OK)
+            goto fail;
         for (size_t i = 0; i < persona->backstory_behaviors_count; i++) {
             const sc_backstory_behavior_t *b = &persona->backstory_behaviors[i];
             if (b->backstory_beat && b->behavioral_rule) {
                 char line[512];
-                int w = snprintf(line, sizeof(line), "- Because %s → %s\n",
-                                 b->backstory_beat, b->behavioral_rule);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                int w = snprintf(line, sizeof(line), "- Because %s → %s\n", b->backstory_beat,
+                                 b->behavioral_rule);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
         }
     }
@@ -2110,39 +2344,379 @@ sc_error_t sc_persona_build_prompt(sc_allocator_t *alloc, const sc_persona_t *pe
     /* Sensory preferences */
     {
         const sc_sensory_preferences_t *sp = &persona->sensory;
-        bool has = sp->dominant_sense || sp->metaphor_vocabulary_count > 0 || sp->grounding_patterns;
+        bool has =
+            sp->dominant_sense || sp->metaphor_vocabulary_count > 0 || sp->grounding_patterns;
         if (has) {
             static const char sp_hdr[] = "\n--- Sensory Grounding ---\n";
             err = append_prompt(alloc, &buf, &len, &cap, sp_hdr, sizeof(sp_hdr) - 1);
-            if (err != SC_OK) goto fail;
+            if (err != SC_OK)
+                goto fail;
             if (sp->dominant_sense) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Dominant sense: %s\n", sp->dominant_sense);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Dominant sense: %s\n", sp->dominant_sense);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
             }
             if (sp->metaphor_vocabulary_count > 0) {
                 err = append_prompt(alloc, &buf, &len, &cap, "Sensory vocabulary: ", 20);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
                 for (size_t i = 0; i < sp->metaphor_vocabulary_count; i++) {
-                    if (i > 0) { err = append_prompt(alloc, &buf, &len, &cap, ", ", 2); if (err != SC_OK) goto fail; }
-                    err = append_prompt(alloc, &buf, &len, &cap, sp->metaphor_vocabulary[i], strlen(sp->metaphor_vocabulary[i]));
-                    if (err != SC_OK) goto fail;
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, sp->metaphor_vocabulary[i],
+                                        strlen(sp->metaphor_vocabulary[i]));
+                    if (err != SC_OK)
+                        goto fail;
                 }
                 err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
-                if (err != SC_OK) goto fail;
+                if (err != SC_OK)
+                    goto fail;
             }
             if (sp->grounding_patterns) {
-                char line[256]; int w = snprintf(line, sizeof(line), "Grounding: %s\n", sp->grounding_patterns);
-                if (w > 0) { err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w); if (err != SC_OK) goto fail; }
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Grounding: %s\n", sp->grounding_patterns);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+        }
+    }
+
+    /* Relational intelligence (Gottman bids, attachment, Dunbar layers) */
+    {
+        const sc_relational_intelligence_t *ri = &persona->relational;
+        bool has = ri->bid_response_style || ri->emotional_bids_count > 0 || ri->attachment_style ||
+                   ri->attachment_awareness || ri->dunbar_awareness;
+        if (has) {
+            static const char ri_hdr[] = "\n--- Relational Intelligence ---\n";
+            err = append_prompt(alloc, &buf, &len, &cap, ri_hdr, sizeof(ri_hdr) - 1);
+            if (err != SC_OK)
+                goto fail;
+            if (ri->attachment_style) {
+                char line[256];
+                int w =
+                    snprintf(line, sizeof(line), "Attachment style: %s\n", ri->attachment_style);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+            if (ri->bid_response_style) {
+                char line[512];
+                int w = snprintf(line, sizeof(line), "Bid response: %s\n", ri->bid_response_style);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+            if (ri->emotional_bids_count > 0) {
+                err = append_prompt(alloc, &buf, &len, &cap, "Bids you make: ", 15);
+                if (err != SC_OK)
+                    goto fail;
+                for (size_t i = 0; i < ri->emotional_bids_count; i++) {
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, ri->emotional_bids[i],
+                                        strlen(ri->emotional_bids[i]));
+                    if (err != SC_OK)
+                        goto fail;
+                }
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                if (err != SC_OK)
+                    goto fail;
+            }
+            if (ri->attachment_awareness) {
+                char line[512];
+                int w = snprintf(line, sizeof(line), "Attachment awareness: %s\n",
+                                 ri->attachment_awareness);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+            if (ri->dunbar_awareness) {
+                char line[512];
+                int w =
+                    snprintf(line, sizeof(line), "Relationship layers: %s\n", ri->dunbar_awareness);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+        }
+    }
+
+    /* Listening protocol (Derber support/shift, OARS, NVC) */
+    {
+        const sc_listening_protocol_t *lp = &persona->listening;
+        bool has = lp->default_response_type || lp->reflective_techniques_count > 0 ||
+                   lp->nvc_style || lp->validation_style;
+        if (has) {
+            static const char lp_hdr[] = "\n--- Listening & Response Protocol ---\n";
+            err = append_prompt(alloc, &buf, &len, &cap, lp_hdr, sizeof(lp_hdr) - 1);
+            if (err != SC_OK)
+                goto fail;
+            if (lp->default_response_type) {
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Default response type: %s\n",
+                                 lp->default_response_type);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+            if (lp->reflective_techniques_count > 0) {
+                err = append_prompt(alloc, &buf, &len, &cap, "Techniques: ", 12);
+                if (err != SC_OK)
+                    goto fail;
+                for (size_t i = 0; i < lp->reflective_techniques_count; i++) {
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, lp->reflective_techniques[i],
+                                        strlen(lp->reflective_techniques[i]));
+                    if (err != SC_OK)
+                        goto fail;
+                }
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                if (err != SC_OK)
+                    goto fail;
+            }
+            if (lp->nvc_style) {
+                char line[512];
+                int w = snprintf(line, sizeof(line), "NVC approach: %s\n", lp->nvc_style);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+            if (lp->validation_style) {
+                char line[512];
+                int w = snprintf(line, sizeof(line), "Validation: %s\n", lp->validation_style);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+        }
+    }
+
+    /* Repair protocol (rupture-repair, conversational repair, face-saving) */
+    {
+        const sc_repair_protocol_t *rp = &persona->repair;
+        bool has = rp->rupture_detection || rp->repair_approach || rp->face_saving_style ||
+                   rp->repair_phrases_count > 0;
+        if (has) {
+            static const char rp_hdr[] = "\n--- Repair Protocol ---\n";
+            err = append_prompt(alloc, &buf, &len, &cap, rp_hdr, sizeof(rp_hdr) - 1);
+            if (err != SC_OK)
+                goto fail;
+            if (rp->rupture_detection) {
+                char line[512];
+                int w =
+                    snprintf(line, sizeof(line), "Rupture detection: %s\n", rp->rupture_detection);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+            if (rp->repair_approach) {
+                char line[512];
+                int w = snprintf(line, sizeof(line), "Repair approach: %s\n", rp->repair_approach);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+            if (rp->face_saving_style) {
+                char line[512];
+                int w = snprintf(line, sizeof(line), "Face-saving: %s\n", rp->face_saving_style);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+            if (rp->repair_phrases_count > 0) {
+                err = append_prompt(alloc, &buf, &len, &cap, "Repair phrases: ", 16);
+                if (err != SC_OK)
+                    goto fail;
+                for (size_t i = 0; i < rp->repair_phrases_count; i++) {
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, " | ", 3);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, rp->repair_phrases[i],
+                                        strlen(rp->repair_phrases[i]));
+                    if (err != SC_OK)
+                        goto fail;
+                }
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                if (err != SC_OK)
+                    goto fail;
+            }
+        }
+    }
+
+    /* Linguistic mirroring (CAT, accommodation, style matching) */
+    {
+        const sc_linguistic_mirroring_t *lm = &persona->mirroring;
+        bool has = lm->mirroring_level || lm->adapts_to_count > 0 || lm->convergence_speed ||
+                   lm->power_dynamic;
+        if (has) {
+            static const char lm_hdr[] = "\n--- Linguistic Mirroring ---\n";
+            err = append_prompt(alloc, &buf, &len, &cap, lm_hdr, sizeof(lm_hdr) - 1);
+            if (err != SC_OK)
+                goto fail;
+            if (lm->mirroring_level) {
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Mirroring level: %s\n", lm->mirroring_level);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+            if (lm->adapts_to_count > 0) {
+                err = append_prompt(alloc, &buf, &len, &cap, "Adapts to: ", 11);
+                if (err != SC_OK)
+                    goto fail;
+                for (size_t i = 0; i < lm->adapts_to_count; i++) {
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, lm->adapts_to[i],
+                                        strlen(lm->adapts_to[i]));
+                    if (err != SC_OK)
+                        goto fail;
+                }
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                if (err != SC_OK)
+                    goto fail;
+            }
+            if (lm->convergence_speed) {
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Convergence: %s\n", lm->convergence_speed);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+            if (lm->power_dynamic) {
+                char line[256];
+                int w = snprintf(line, sizeof(line), "Power dynamic: %s\n", lm->power_dynamic);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+        }
+    }
+
+    /* Social dynamics (ego states, phatic communication, anti-patterns) */
+    {
+        const sc_social_dynamics_t *sd = &persona->social;
+        bool has = sd->default_ego_state || sd->phatic_style || sd->bonding_behaviors_count > 0 ||
+                   sd->anti_patterns_count > 0;
+        if (has) {
+            static const char sd_hdr[] = "\n--- Social Dynamics ---\n";
+            err = append_prompt(alloc, &buf, &len, &cap, sd_hdr, sizeof(sd_hdr) - 1);
+            if (err != SC_OK)
+                goto fail;
+            if (sd->default_ego_state) {
+                char line[256];
+                int w =
+                    snprintf(line, sizeof(line), "Default ego state: %s\n", sd->default_ego_state);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+            if (sd->phatic_style) {
+                char line[512];
+                int w = snprintf(line, sizeof(line), "Phatic style: %s\n", sd->phatic_style);
+                if (w > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    if (err != SC_OK)
+                        goto fail;
+                }
+            }
+            if (sd->bonding_behaviors_count > 0) {
+                err = append_prompt(alloc, &buf, &len, &cap, "Bonding behaviors: ", 19);
+                if (err != SC_OK)
+                    goto fail;
+                for (size_t i = 0; i < sd->bonding_behaviors_count; i++) {
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, sd->bonding_behaviors[i],
+                                        strlen(sd->bonding_behaviors[i]));
+                    if (err != SC_OK)
+                        goto fail;
+                }
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                if (err != SC_OK)
+                    goto fail;
+            }
+            if (sd->anti_patterns_count > 0) {
+                err = append_prompt(alloc, &buf, &len, &cap, "NEVER do: ", 10);
+                if (err != SC_OK)
+                    goto fail;
+                for (size_t i = 0; i < sd->anti_patterns_count; i++) {
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, " | ", 3);
+                        if (err != SC_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, sd->anti_patterns[i],
+                                        strlen(sd->anti_patterns[i]));
+                    if (err != SC_OK)
+                        goto fail;
+                }
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                if (err != SC_OK)
+                    goto fail;
             }
         }
     }
 
     /* Character invariants — anti-drift anchor at the end */
     if (persona->character_invariants_count > 0) {
-        static const char ci_hdr[] =
-            "\n--- Character Invariants (NEVER break these) ---\n";
+        static const char ci_hdr[] = "\n--- Character Invariants (NEVER break these) ---\n";
         err = append_prompt(alloc, &buf, &len, &cap, ci_hdr, sizeof(ci_hdr) - 1);
-        if (err != SC_OK) goto fail;
+        if (err != SC_OK)
+            goto fail;
         for (size_t i = 0; i < persona->character_invariants_count; i++) {
             err = append_prompt(alloc, &buf, &len, &cap, "- ", 2);
             if (err == SC_OK)
@@ -2150,7 +2724,8 @@ sc_error_t sc_persona_build_prompt(sc_allocator_t *alloc, const sc_persona_t *pe
                                     strlen(persona->character_invariants[i]));
             if (err == SC_OK)
                 err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
-            if (err != SC_OK) goto fail;
+            if (err != SC_OK)
+                goto fail;
         }
     }
 

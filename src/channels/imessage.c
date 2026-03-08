@@ -86,9 +86,10 @@ static void imessage_stop(void *ctx) {
 #if (defined(__APPLE__) && defined(__MACH__)) || SC_IS_TEST
 
 #if !SC_IS_TEST
-/* Remove common AI-sounding phrases from buffer. Modifies in-place.
+/* Safety net: remove AI-sounding phrases that slipped through. Primary mechanism is
+ * prompt-level guidance in sc_conversation_build_awareness. Modifies in-place.
  * Returns new length. Case-insensitive except "Absolutely! " (capital A only). */
-static size_t imessage_strip_ai_phrases(char *buf, size_t len) {
+static size_t imessage_sanitize_output(char *buf, size_t len) {
     if (!buf || len == 0)
         return 0;
 
@@ -172,20 +173,20 @@ static size_t imessage_strip_ai_phrases(char *buf, size_t len) {
 
 const char *sc_imessage_reaction_to_tapback_name(sc_reaction_type_t reaction) {
     switch (reaction) {
-        case SC_REACTION_HEART:
-            return "love";
-        case SC_REACTION_THUMBS_UP:
-            return "like";
-        case SC_REACTION_THUMBS_DOWN:
-            return "dislike";
-        case SC_REACTION_HAHA:
-            return "laugh";
-        case SC_REACTION_EMPHASIS:
-            return "emphasize";
-        case SC_REACTION_QUESTION:
-            return "question";
-        default:
-            return NULL;
+    case SC_REACTION_HEART:
+        return "love";
+    case SC_REACTION_THUMBS_UP:
+        return "like";
+    case SC_REACTION_THUMBS_DOWN:
+        return "dislike";
+    case SC_REACTION_HAHA:
+        return "laugh";
+    case SC_REACTION_EMPHASIS:
+        return "emphasize";
+    case SC_REACTION_QUESTION:
+        return "question";
+    default:
+        return NULL;
     }
 }
 
@@ -280,7 +281,7 @@ static sc_error_t imessage_send(void *ctx, const char *target, size_t target_len
         message_len = out_i;
     }
 
-    message_len = imessage_strip_ai_phrases(clean, message_len);
+    message_len = imessage_sanitize_output(clean, message_len);
 
     /* Hard length cap for iMessage: truncate at sentence boundary near 300 chars */
     if (message_len > 300) {
@@ -618,8 +619,8 @@ static sc_error_t imessage_react(void *ctx, const char *target, size_t target_le
      * Run osascript with 15s timeout via perl alarm wrapper.
      * Avoids hangs if Messages.app is not running or accessibility is denied.
      */
-    const char *argv[] = {"perl", "-e", "alarm 15; exec @ARGV", "osascript", "-l", "JavaScript",
-                         "-e", script, NULL};
+    const char *argv[] = {
+        "perl", "-e", "alarm 15; exec @ARGV", "osascript", "-l", "JavaScript", "-e", script, NULL};
     sc_run_result_t result = {0};
     sc_error_t err = sc_process_run(c->alloc, argv, NULL, 65536, &result);
     c->alloc->free(c->alloc->ctx, script, script_cap);
@@ -635,7 +636,8 @@ static sc_error_t imessage_react(void *ctx, const char *target, size_t target_le
     sc_run_result_free(c->alloc, &result);
     if (!ok) {
         if (getenv("SC_DEBUG"))
-            fprintf(stderr, "[imessage] tapback JXA failed (exit=%d, accessibility may be denied)\n",
+            fprintf(stderr,
+                    "[imessage] tapback JXA failed (exit=%d, accessibility may be denied)\n",
                     exit_code);
         return SC_ERR_NOT_SUPPORTED;
     }
@@ -752,10 +754,9 @@ char *sc_imessage_get_attachment_path(sc_allocator_t *alloc, int64_t message_id)
         return NULL;
     }
 
-    const char *sql =
-        "SELECT a.filename FROM attachment a "
-        "JOIN message_attachment_join maj ON maj.attachment_id = a.ROWID "
-        "WHERE maj.message_id = ?1 LIMIT 1";
+    const char *sql = "SELECT a.filename FROM attachment a "
+                      "JOIN message_attachment_join maj ON maj.attachment_id = a.ROWID "
+                      "WHERE maj.message_id = ?1 LIMIT 1";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
         sqlite3_close(db);
@@ -787,6 +788,18 @@ char *sc_imessage_get_attachment_path(sc_allocator_t *alloc, int64_t message_id)
     }
     sqlite3_finalize(stmt);
     sqlite3_close(db);
+    /* Validate path is within Messages attachments directory */
+    if (path && home) {
+        char allowed_prefix[512];
+        int prefix_len = snprintf(allowed_prefix, sizeof(allowed_prefix),
+                                  "%s/Library/Messages/Attachments/", home);
+        if (prefix_len > 0 && (size_t)prefix_len < sizeof(allowed_prefix)) {
+            if (strncmp(path, allowed_prefix, (size_t)prefix_len) != 0) {
+                alloc->free(alloc->ctx, path, strlen(path) + 1);
+                return NULL; /* Path outside allowed directory */
+            }
+        }
+    }
     return path;
 }
 #else
@@ -799,7 +812,7 @@ char *sc_imessage_get_attachment_path(sc_allocator_t *alloc, int64_t message_id)
 
 #if defined(__APPLE__) && defined(__MACH__) && defined(SC_ENABLE_SQLITE)
 char *sc_imessage_get_latest_attachment_path(sc_allocator_t *alloc, const char *contact_id,
-                                              size_t contact_id_len) {
+                                             size_t contact_id_len) {
     if (!alloc || !contact_id || contact_id_len == 0)
         return NULL;
 
@@ -820,20 +833,20 @@ char *sc_imessage_get_latest_attachment_path(sc_allocator_t *alloc, const char *
     }
 
     /* Get the most recent message with attachment from this contact */
-    const char *sql =
-        "SELECT a.filename FROM attachment a "
-        "JOIN message_attachment_join maj ON maj.attachment_id = a.ROWID "
-        "JOIN message m ON maj.message_id = m.ROWID "
-        "JOIN handle h ON m.handle_id = h.ROWID "
-        "WHERE h.id = ?1 AND m.is_from_me = 0 "
-        "ORDER BY m.date DESC LIMIT 1";
+    const char *sql = "SELECT a.filename FROM attachment a "
+                      "JOIN message_attachment_join maj ON maj.attachment_id = a.ROWID "
+                      "JOIN message m ON maj.message_id = m.ROWID "
+                      "JOIN handle h ON m.handle_id = h.ROWID "
+                      "WHERE h.id = ?1 AND m.is_from_me = 0 "
+                      "ORDER BY m.date DESC LIMIT 1";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
         sqlite3_close(db);
         return NULL;
     }
     char contact_buf[256];
-    size_t clen = contact_id_len < sizeof(contact_buf) - 1 ? contact_id_len : sizeof(contact_buf) - 1;
+    size_t clen =
+        contact_id_len < sizeof(contact_buf) - 1 ? contact_id_len : sizeof(contact_buf) - 1;
     memcpy(contact_buf, contact_id, clen);
     contact_buf[clen] = '\0';
     sqlite3_bind_text(stmt, 1, contact_buf, -1, NULL);
@@ -861,6 +874,18 @@ char *sc_imessage_get_latest_attachment_path(sc_allocator_t *alloc, const char *
     }
     sqlite3_finalize(stmt);
     sqlite3_close(db);
+    /* Validate path is within Messages attachments directory */
+    if (path && home) {
+        char allowed_prefix[512];
+        int prefix_len = snprintf(allowed_prefix, sizeof(allowed_prefix),
+                                  "%s/Library/Messages/Attachments/", home);
+        if (prefix_len > 0 && (size_t)prefix_len < sizeof(allowed_prefix)) {
+            if (strncmp(path, allowed_prefix, (size_t)prefix_len) != 0) {
+                alloc->free(alloc->ctx, path, strlen(path) + 1);
+                return NULL; /* Path outside allowed directory */
+            }
+        }
+    }
     return path;
 }
 #else
@@ -937,7 +962,8 @@ sc_error_t sc_imessage_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel
                 c->last_rowid = sqlite3_column_int64(seed, 0);
             sqlite3_finalize(seed);
         }
-        fprintf(stderr, "[imessage] late-seeded last_rowid=%lld (only new messages will be processed)\n",
+        fprintf(stderr,
+                "[imessage] late-seeded last_rowid=%lld (only new messages will be processed)\n",
                 (long long)c->last_rowid);
         sqlite3_close(db);
         *out_count = 0;

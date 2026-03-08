@@ -1,55 +1,22 @@
+#include "seaclaw/persona/replay.h"
 #include "seaclaw/context/conversation.h"
 #include "seaclaw/core/string.h"
-#include "seaclaw/persona/replay.h"
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-#define SC_REPLAY_LONG_PAUSE_SEC 1800  /* 30 min */
-#define SC_REPLAY_RAPID_WINDOW_SEC 120 /* 2 min for "rapid exchange" */
-
-static bool str_contains_ci(const char *haystack, size_t hlen, const char *needle) {
-    size_t nlen = strlen(needle);
-    if (nlen > hlen)
-        return false;
-    for (size_t i = 0; i + nlen <= hlen; i++) {
-        bool match = true;
-        for (size_t j = 0; j < nlen; j++) {
-            char a = haystack[i + j];
-            char b = needle[j];
-            if (a >= 'A' && a <= 'Z')
-                a += 32;
-            if (b >= 'A' && b <= 'Z')
-                b += 32;
-            if (a != b) {
-                match = false;
-                break;
-            }
-        }
-        if (match)
-            return true;
-    }
-    return false;
-}
-
-static bool str_starts_with_ci(const char *haystack, size_t hlen, const char *prefix) {
-    size_t plen = strlen(prefix);
-    if (plen > hlen)
-        return false;
-    for (size_t i = 0; i < plen; i++) {
-        char a = haystack[i];
-        char b = prefix[i];
-        if (a >= 'A' && a <= 'Z')
-            a += 32;
-        if (b >= 'A' && b <= 'Z')
-            b += 32;
-        if (a != b)
-            return false;
-    }
-    return true;
-}
+#define SC_REPLAY_LONG_PAUSE_SEC        1800 /* 30 min */
+#define SC_REPLAY_RAPID_WINDOW_SEC      120  /* 2 min for rapid reply = engaged */
+#define SC_REPLAY_HIGH_ENGAGEMENT_RATIO 2.0  /* their reply >= 2x our length */
+#define SC_REPLAY_LOW_ENGAGEMENT_RATIO  0.33 /* their reply < 1/3 our length */
+#define SC_REPLAY_ONE_WORD_MAX          15   /* reply <= 15 chars = one-word territory */
+#define SC_REPLAY_ENERGY_EXCLAM_MIN     1    /* 1+ exclamation marks = energy */
+#define SC_REPLAY_GENERIC_RESPONSE_MAX                         \
+    70 /* our msg < 70 chars to long theirs = possible generic \
+        */
 
 /* Parse timestamp to time_t. Returns (time_t)-1 on failure. */
 static time_t parse_timestamp(const char *ts) {
@@ -76,47 +43,53 @@ static time_t parse_timestamp(const char *ts) {
     return (time_t)-1;
 }
 
-/* Positive signals: short enthusiastic replies after our messages */
-static bool is_positive_signal(const char *text, size_t len) {
-    if (len > 80)
+/* Count exclamation marks in text (energy marker) */
+static int count_exclamations(const char *text, size_t len) {
+    int n = 0;
+    for (size_t i = 0; i < len && text[i]; i++)
+        if (text[i] == '!')
+            n++;
+    return n;
+}
+
+/* Check if text contains a question (continuation signal) */
+static bool contains_question(const char *text, size_t len) {
+    for (size_t i = 0; i < len && text[i]; i++)
+        if (text[i] == '?')
+            return true;
+    return false;
+}
+
+/* Check for lengthened words (yesss, loool) — 3+ repeated same char */
+static bool has_lengthened_word(const char *text, size_t len) {
+    int run = 0;
+    char prev = '\0';
+    for (size_t i = 0; i < len && text[i]; i++) {
+        char c = (char)tolower((unsigned char)text[i]);
+        if (c == prev && isalpha((unsigned char)c)) {
+            run++;
+            if (run >= 3)
+                return true;
+        } else {
+            run = 1;
+            prev = c;
+        }
+    }
+    return false;
+}
+
+/* Generic validation heuristic: short our-msg to substantial their-msg, no question */
+static bool looks_generic_response(size_t my_len, size_t their_prev_len, const char *my_text,
+                                   size_t my_text_len) {
+    if (my_len >= SC_REPLAY_GENERIC_RESPONSE_MAX || their_prev_len < 25)
         return false;
-    const char *signals[] = {"haha", "exactly!", "omg", "yes!", "lol", "love it",
-                             "perfect", "nice", "awesome", "great", "yes!!",
-                             "hahaha", "lmao", "yesss", "so true", NULL};
-    for (int i = 0; signals[i]; i++) {
-        if (str_contains_ci(text, len, signals[i]))
-            return true;
-    }
-    return false;
-}
-
-/* Negative signals: short disengaged replies */
-static bool is_negative_signal(const char *text, size_t len) {
-    if (len > 30)
+    if (contains_question(my_text, my_text_len))
         return false;
-    const char *signals[] = {"k", "ok", "sure", "cool", "alright", "fine",
-                             "whatever", "nah", "nope", NULL};
-    for (int i = 0; signals[i]; i++) {
-        if (str_contains_ci(text, len, signals[i]) && len < 15)
-            return true;
-    }
-    return false;
+    return true;
 }
 
-/* Robotic tells: our response starts with these phrases */
-static bool is_robotic_tell(const char *text, size_t len) {
-    const char *tells[] = {"i understand", "that makes sense", "i understand how",
-                            "that makes sense.", "i understand.", NULL};
-    for (int i = 0; tells[i]; i++) {
-        if (str_starts_with_ci(text, len, tells[i]))
-            return true;
-    }
-    return false;
-}
-
-sc_error_t sc_replay_analyze(sc_allocator_t *alloc,
-                             const sc_channel_history_entry_t *entries, size_t entry_count,
-                             uint32_t max_chars, sc_replay_result_t *out) {
+sc_error_t sc_replay_analyze(sc_allocator_t *alloc, const sc_channel_history_entry_t *entries,
+                             size_t entry_count, uint32_t max_chars, sc_replay_result_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
     if (!entries && entry_count > 0)
@@ -129,8 +102,11 @@ sc_error_t sc_replay_analyze(sc_allocator_t *alloc,
 
     int total_quality = 0;
     size_t our_response_count = 0;
-    int positive_count = 0;
-    int negative_count = 0;
+    int high_engagement_count = 0;
+    int low_engagement_count = 0;
+    size_t total_my_len = 0;
+    size_t best_engaged_my_len = 0;
+    size_t worst_engaged_my_len = 0;
 
     for (size_t i = 0; i < entry_count && out->insight_count < SC_REPLAY_MAX_INSIGHTS; i++) {
         if (!entries[i].from_me)
@@ -140,93 +116,129 @@ sc_error_t sc_replay_analyze(sc_allocator_t *alloc,
         if (my_len == 0)
             continue;
 
-        /* Evaluate quality of our response */
-        sc_quality_score_t q = sc_conversation_evaluate_quality(
-            entries[i].text, my_len, entries, i + 1, max_chars);
+        sc_quality_score_t q =
+            sc_conversation_evaluate_quality(entries[i].text, my_len, entries, i + 1, max_chars);
         total_quality += q.total;
         our_response_count++;
+        total_my_len += my_len;
 
-        /* Look at next message (their reply) for positive/negative signals */
+        /* Compute engagement from their reply (next message) */
         if (i + 1 < entry_count && !entries[i + 1].from_me) {
             const char *their = entries[i + 1].text;
             size_t their_len = strlen(their);
-            if (is_positive_signal(their, their_len)) {
-                positive_count++;
-                if (out->insight_count < SC_REPLAY_MAX_INSIGHTS) {
+            double ratio = (my_len > 0) ? (double)their_len / (double)my_len : 0.0;
+            int exclam = count_exclamations(their, their_len);
+            bool has_q = contains_question(their, their_len);
+            bool has_lengthened = has_lengthened_word(their, their_len);
+
+            /* Response speed from timestamps */
+            double gap_sec = -1.0;
+            time_t my_ts = parse_timestamp(entries[i].timestamp);
+            time_t their_ts = parse_timestamp(entries[i + 1].timestamp);
+            if (my_ts != (time_t)-1 && their_ts != (time_t)-1)
+                gap_sec = difftime(their_ts, my_ts);
+            bool rapid_reply = (gap_sec >= 0 && gap_sec < (double)SC_REPLAY_RAPID_WINDOW_SEC);
+
+            /* High engagement: ratio >= 2, or 2+ exclamations, or question, or rapid, or lengthened
+             */
+            bool high = (ratio >= SC_REPLAY_HIGH_ENGAGEMENT_RATIO) ||
+                        (exclam >= SC_REPLAY_ENERGY_EXCLAM_MIN) || has_q || rapid_reply ||
+                        has_lengthened;
+
+            /* Low engagement: one-word reply (<=15 chars) to our longer msg, or ratio < 1/3 */
+            bool low = (their_len <= SC_REPLAY_ONE_WORD_MAX && my_len > 50) ||
+                       (my_len > 0 && ratio < SC_REPLAY_LOW_ENGAGEMENT_RATIO);
+
+            if (high && !low && out->insight_count < SC_REPLAY_MAX_INSIGHTS) {
+                high_engagement_count++;
+                if (best_engaged_my_len == 0 || my_len < best_engaged_my_len)
+                    best_engaged_my_len = my_len;
+                char obs[160];
+                char rec[120];
+                int no;
+                if (exclam >= 1)
+                    no = snprintf(obs, sizeof(obs),
+                                  "Message %zu: your %zu-char message got a %.1fx reply with %d "
+                                  "exclamation mark(s) — high engagement",
+                                  (size_t)(i + 1), my_len, ratio, exclam);
+                else
+                    no = snprintf(obs, sizeof(obs),
+                                  "Message %zu: your %zu-char message got a %.1fx longer reply — "
+                                  "high engagement",
+                                  (size_t)(i + 1), my_len, ratio);
+                int nr = snprintf(rec, sizeof(rec),
+                                  "Short messages (like your %zu-char one) got engaged responses — "
+                                  "keep this tone and brevity",
+                                  my_len);
+                if (no > 0 && (size_t)no < sizeof(obs) && nr > 0 && (size_t)nr < sizeof(rec)) {
                     sc_replay_insight_t *ins = &out->insights[out->insight_count];
-                    ins->observation = sc_strndup(alloc, "Their enthusiastic reply after our message", 43);
-                    ins->observation_len = ins->observation ? 43 : 0;
-                    ins->recommendation = sc_strndup(alloc, "Keep this tone and brevity", 26);
-                    ins->recommendation_len = ins->recommendation ? 26 : 0;
+                    ins->observation = sc_strndup(alloc, obs, (size_t)no);
+                    ins->observation_len = ins->observation ? (size_t)no : 0;
+                    ins->recommendation = sc_strndup(alloc, rec, (size_t)nr);
+                    ins->recommendation_len = ins->recommendation ? (size_t)nr : 0;
                     ins->score_delta = 10;
                     if (ins->observation && ins->recommendation)
                         out->insight_count++;
                     else {
                         if (ins->observation)
-                            alloc->free(alloc->ctx, ins->observation, 44);
+                            alloc->free(alloc->ctx, ins->observation, ins->observation_len + 1);
                         if (ins->recommendation)
-                            alloc->free(alloc->ctx, ins->recommendation, 27);
+                            alloc->free(alloc->ctx, ins->recommendation,
+                                        ins->recommendation_len + 1);
                     }
                 }
-            } else if (is_negative_signal(their, their_len)) {
-                negative_count++;
-                if (out->insight_count < SC_REPLAY_MAX_INSIGHTS) {
+            } else if (low && !high && out->insight_count < SC_REPLAY_MAX_INSIGHTS) {
+                low_engagement_count++;
+                if (worst_engaged_my_len == 0 || my_len > worst_engaged_my_len)
+                    worst_engaged_my_len = my_len;
+                char obs[160];
+                char rec[120];
+                int no = snprintf(obs, sizeof(obs),
+                                  "Message %zu: your %zu-char message got a %zu-char reply",
+                                  (size_t)(i + 1), my_len, their_len);
+                int nr = snprintf(rec, sizeof(rec),
+                                  "Your %zu-char message got a brief reply — try shorter or more "
+                                  "specific follow-ups",
+                                  my_len);
+                if (no > 0 && (size_t)no < sizeof(obs) && nr > 0 && (size_t)nr < sizeof(rec)) {
                     sc_replay_insight_t *ins = &out->insights[out->insight_count];
-                    ins->observation = sc_strndup(alloc, "Short disengaged reply after our message", 40);
-                    ins->observation_len = ins->observation ? 40 : 0;
-                    ins->recommendation = sc_strndup(alloc, "Try shorter or more engaging follow-ups", 37);
-                    ins->recommendation_len = ins->recommendation ? 37 : 0;
+                    ins->observation = sc_strndup(alloc, obs, (size_t)no);
+                    ins->observation_len = ins->observation ? (size_t)no : 0;
+                    ins->recommendation = sc_strndup(alloc, rec, (size_t)nr);
+                    ins->recommendation_len = ins->recommendation ? (size_t)nr : 0;
                     ins->score_delta = -10;
                     if (ins->observation && ins->recommendation)
                         out->insight_count++;
                     else {
                         if (ins->observation)
-                            alloc->free(alloc->ctx, ins->observation, 41);
+                            alloc->free(alloc->ctx, ins->observation, ins->observation_len + 1);
                         if (ins->recommendation)
-                            alloc->free(alloc->ctx, ins->recommendation, 38);
+                            alloc->free(alloc->ctx, ins->recommendation,
+                                        ins->recommendation_len + 1);
                     }
                 }
             }
-        }
 
-        /* Robotic tell: our response starts with "I understand" etc */
-        if (is_robotic_tell(entries[i].text, my_len) &&
-            out->insight_count < SC_REPLAY_MAX_INSIGHTS) {
-            sc_replay_insight_t *ins = &out->insights[out->insight_count];
-            ins->observation = sc_strndup(alloc, "Response started with robotic validation phrase", 46);
-            ins->observation_len = ins->observation ? 46 : 0;
-            ins->recommendation = sc_strndup(alloc, "Use more specific follow-up questions", 37);
-            ins->recommendation_len = ins->recommendation ? 37 : 0;
-            ins->score_delta = -15;
-            if (ins->observation && ins->recommendation)
-                out->insight_count++;
-            else {
-                if (ins->observation)
-                    alloc->free(alloc->ctx, ins->observation, 47);
-                if (ins->recommendation)
-                    alloc->free(alloc->ctx, ins->recommendation, 38);
-            }
-        }
-
-        /* Long pause: gap between our message and their next reply */
-        if (i + 1 < entry_count && !entries[i + 1].from_me) {
-            time_t my_ts = parse_timestamp(entries[i].timestamp);
-            time_t their_ts = parse_timestamp(entries[i + 1].timestamp);
-            if (my_ts != (time_t)-1 && their_ts != (time_t)-1) {
-                double gap = difftime(their_ts, my_ts);
-                if (gap > (double)SC_REPLAY_LONG_PAUSE_SEC &&
-                    out->insight_count < SC_REPLAY_MAX_INSIGHTS) {
+            /* Long pause: gap > 30 min */
+            if (gap_sec > (double)SC_REPLAY_LONG_PAUSE_SEC &&
+                out->insight_count < SC_REPLAY_MAX_INSIGHTS) {
+                char obs[96];
+                int no = snprintf(obs, sizeof(obs),
+                                  "%.0f min pause before their reply after your %zu-char message",
+                                  gap_sec / 60.0, my_len);
+                if (no > 0 && (size_t)no < sizeof(obs)) {
                     sc_replay_insight_t *ins = &out->insights[out->insight_count];
-                    ins->observation = sc_strndup(alloc, "Long pause before their reply", 28);
-                    ins->observation_len = ins->observation ? 28 : 0;
-                    ins->recommendation = sc_strndup(alloc, "Consider shorter or more engaging messages", 41);
+                    ins->observation = sc_strndup(alloc, obs, (size_t)no);
+                    ins->observation_len = ins->observation ? (size_t)no : 0;
+                    ins->recommendation =
+                        sc_strndup(alloc, "Consider shorter or more engaging messages", 41);
                     ins->recommendation_len = ins->recommendation ? 41 : 0;
                     ins->score_delta = -5;
                     if (ins->observation && ins->recommendation)
                         out->insight_count++;
                     else {
                         if (ins->observation)
-                            alloc->free(alloc->ctx, ins->observation, 29);
+                            alloc->free(alloc->ctx, ins->observation, ins->observation_len + 1);
                         if (ins->recommendation)
                             alloc->free(alloc->ctx, ins->recommendation, 42);
                     }
@@ -234,24 +246,61 @@ sc_error_t sc_replay_analyze(sc_allocator_t *alloc,
             }
         }
 
-        /* Our response too long relative to theirs (previous message) */
+        /* Generic validation: short our-msg to long their-msg, no question */
         if (i > 0 && !entries[i - 1].from_me) {
-            size_t their_len = strlen(entries[i - 1].text);
-            if (their_len > 0 && my_len > their_len * 3 && my_len > 150 &&
+            size_t their_prev = strlen(entries[i - 1].text);
+            if (looks_generic_response(my_len, their_prev, entries[i].text, my_len) &&
                 out->insight_count < SC_REPLAY_MAX_INSIGHTS) {
-                sc_replay_insight_t *ins = &out->insights[out->insight_count];
-                ins->observation = sc_strndup(alloc, "Response was much longer than theirs", 35);
-                ins->observation_len = ins->observation ? 35 : 0;
-                ins->recommendation = sc_strndup(alloc, "Mirror their message length more closely", 38);
-                ins->recommendation_len = ins->recommendation ? 38 : 0;
-                ins->score_delta = -8;
-                if (ins->observation && ins->recommendation)
-                    out->insight_count++;
-                else {
-                    if (ins->observation)
-                        alloc->free(alloc->ctx, ins->observation, 36);
-                    if (ins->recommendation)
-                        alloc->free(alloc->ctx, ins->recommendation, 39);
+                char obs[96];
+                int no = snprintf(obs, sizeof(obs),
+                                  "Your %zu-char response to their %zu-char message lacked "
+                                  "specificity or a follow-up question",
+                                  my_len, their_prev);
+                if (no > 0 && (size_t)no < sizeof(obs)) {
+                    sc_replay_insight_t *ins = &out->insights[out->insight_count];
+                    ins->observation = sc_strndup(alloc, obs, (size_t)no);
+                    ins->observation_len = ins->observation ? (size_t)no : 0;
+                    ins->recommendation =
+                        sc_strndup(alloc, "Use more specific follow-up questions", 37);
+                    ins->recommendation_len = ins->recommendation ? 37 : 0;
+                    ins->score_delta = -15;
+                    if (ins->observation && ins->recommendation)
+                        out->insight_count++;
+                    else {
+                        if (ins->observation)
+                            alloc->free(alloc->ctx, ins->observation, ins->observation_len + 1);
+                        if (ins->recommendation)
+                            alloc->free(alloc->ctx, ins->recommendation, 38);
+                    }
+                }
+            }
+        }
+
+        /* Our response too long relative to theirs (previous message) */
+        if (i > 0 && !entries[i - 1].from_me && out->insight_count < SC_REPLAY_MAX_INSIGHTS) {
+            size_t their_len = strlen(entries[i - 1].text);
+            if (their_len > 0 && my_len > their_len * 3 && my_len > 150) {
+                char obs[96];
+                int no =
+                    snprintf(obs, sizeof(obs),
+                             "Your %zu-char response was 3x longer than their %zu-char message",
+                             my_len, their_len);
+                if (no > 0 && (size_t)no < sizeof(obs)) {
+                    sc_replay_insight_t *ins = &out->insights[out->insight_count];
+                    ins->observation = sc_strndup(alloc, obs, (size_t)no);
+                    ins->observation_len = ins->observation ? (size_t)no : 0;
+                    ins->recommendation =
+                        sc_strndup(alloc, "Mirror their message length more closely", 38);
+                    ins->recommendation_len = ins->recommendation ? 38 : 0;
+                    ins->score_delta = -8;
+                    if (ins->observation && ins->recommendation)
+                        out->insight_count++;
+                    else {
+                        if (ins->observation)
+                            alloc->free(alloc->ctx, ins->observation, ins->observation_len + 1);
+                        if (ins->recommendation)
+                            alloc->free(alloc->ctx, ins->recommendation, 39);
+                    }
                 }
             }
         }
@@ -265,18 +314,29 @@ sc_error_t sc_replay_analyze(sc_allocator_t *alloc,
     if (out->overall_score < 0)
         out->overall_score = 0;
 
-    /* Build summary */
+    /* Build data-rich summary */
     {
-        char buf[256];
+        char buf[384];
         int n;
-        if (positive_count > 0 && negative_count == 0)
-            n = snprintf(buf, sizeof(buf), "Conversation was natural; %d response(s) got positive engagement", positive_count);
-        else if (negative_count > 0 && positive_count == 0)
-            n = snprintf(buf, sizeof(buf), "Conversation had %d disengaged or robotic moment(s)", negative_count);
-        else if (positive_count > 0 && negative_count > 0)
-            n = snprintf(buf, sizeof(buf), "Conversation mixed; %d positive, %d negative signal(s)", positive_count, negative_count);
+        size_t avg_len = our_response_count > 0 ? total_my_len / our_response_count : 0;
+        if (high_engagement_count > 0 && low_engagement_count == 0)
+            n = snprintf(buf, sizeof(buf),
+                         "Quality %d/100. %d response(s) got high engagement. "
+                         "Avg message length %zu chars.",
+                         out->overall_score, high_engagement_count, avg_len);
+        else if (low_engagement_count > 0 && high_engagement_count == 0)
+            n = snprintf(buf, sizeof(buf),
+                         "Quality %d/100. %d disengaged moment(s). "
+                         "Avg message length %zu chars.",
+                         out->overall_score, low_engagement_count, avg_len);
+        else if (high_engagement_count > 0 && low_engagement_count > 0)
+            n = snprintf(buf, sizeof(buf),
+                         "Quality %d/100. %d high-engagement, %d low-engagement. "
+                         "Avg message length %zu chars.",
+                         out->overall_score, high_engagement_count, low_engagement_count, avg_len);
         else
-            n = snprintf(buf, sizeof(buf), "Conversation quality score %d/100", out->overall_score);
+            n = snprintf(buf, sizeof(buf), "Quality %d/100. Avg message length %zu chars.",
+                         out->overall_score, avg_len);
         if (n > 0 && (size_t)n < sizeof(buf)) {
             out->summary = sc_strndup(alloc, buf, (size_t)n);
             out->summary_len = out->summary ? (size_t)n : 0;
@@ -331,15 +391,18 @@ char *sc_replay_build_context(sc_allocator_t *alloc, const sc_replay_result_t *r
     int w;
 
     w = snprintf(buf, cap, "### Session Replay Insights\n");
-    if (w > 0 && (size_t)w < cap) pos += (size_t)w;
+    if (w > 0 && (size_t)w < cap)
+        pos += (size_t)w;
 
     if (pos < cap) {
         w = snprintf(buf + pos, cap - pos, "Overall quality: %d/100\n", result->overall_score);
-        if (w > 0 && pos + (size_t)w < cap) pos += (size_t)w;
+        if (w > 0 && pos + (size_t)w < cap)
+            pos += (size_t)w;
     }
     if (result->summary && pos < cap) {
         w = snprintf(buf + pos, cap - pos, "%s\n", result->summary);
-        if (w > 0 && pos + (size_t)w < cap) pos += (size_t)w;
+        if (w > 0 && pos + (size_t)w < cap)
+            pos += (size_t)w;
     }
 
     bool has_positive = false;
@@ -353,21 +416,25 @@ char *sc_replay_build_context(sc_allocator_t *alloc, const sc_replay_result_t *r
 
     if (has_positive && pos < cap) {
         w = snprintf(buf + pos, cap - pos, "What worked:\n");
-        if (w > 0 && pos + (size_t)w < cap) pos += (size_t)w;
+        if (w > 0 && pos + (size_t)w < cap)
+            pos += (size_t)w;
         for (size_t i = 0; i < result->insight_count && pos < cap; i++) {
             if (result->insights[i].score_delta > 0 && result->insights[i].observation) {
                 w = snprintf(buf + pos, cap - pos, "- %s\n", result->insights[i].observation);
-                if (w > 0 && pos + (size_t)w < cap) pos += (size_t)w;
+                if (w > 0 && pos + (size_t)w < cap)
+                    pos += (size_t)w;
             }
         }
     }
     if (has_negative && pos < cap) {
         w = snprintf(buf + pos, cap - pos, "What to improve:\n");
-        if (w > 0 && pos + (size_t)w < cap) pos += (size_t)w;
+        if (w > 0 && pos + (size_t)w < cap)
+            pos += (size_t)w;
         for (size_t i = 0; i < result->insight_count && pos < cap; i++) {
             if (result->insights[i].score_delta <= 0 && result->insights[i].observation) {
                 w = snprintf(buf + pos, cap - pos, "- %s\n", result->insights[i].observation);
-                if (w > 0 && pos + (size_t)w < cap) pos += (size_t)w;
+                if (w > 0 && pos + (size_t)w < cap)
+                    pos += (size_t)w;
             }
         }
     }

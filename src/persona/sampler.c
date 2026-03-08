@@ -3,6 +3,7 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/persona.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -115,6 +116,154 @@ sc_error_t sc_persona_sampler_facebook_parse(const char *json, size_t json_len, 
     sc_json_free(&alloc, root);
     *out = results;
     *out_count = count;
+    return SC_OK;
+}
+
+sc_error_t sc_persona_sampler_imessage_conversation_query(const char *handle_id,
+                                                          size_t handle_id_len, char *buf,
+                                                          size_t cap, size_t *out_len,
+                                                          size_t limit) {
+    if (!handle_id || handle_id_len == 0 || !buf || !out_len || cap < 128)
+        return SC_ERR_INVALID_ARGUMENT;
+    int n = snprintf(buf, cap,
+                     "SELECT m.text, m.is_from_me, m.date "
+                     "FROM message m "
+                     "LEFT JOIN handle h ON m.handle_id = h.ROWID "
+                     "WHERE h.id = '%.*s' AND m.text IS NOT NULL AND m.text != '' "
+                     "ORDER BY m.date ASC LIMIT %zu",
+                     (int)handle_id_len, handle_id, limit);
+    if (n < 0 || (size_t)n >= cap)
+        return SC_ERR_INVALID_ARGUMENT;
+    *out_len = (size_t)n;
+    return SC_OK;
+}
+
+sc_error_t sc_persona_sampler_build_examples(sc_allocator_t *alloc,
+                                             const sc_sampler_raw_msg_t *msgs, size_t msg_count,
+                                             sc_persona_example_t **out, size_t *out_count) {
+    if (!alloc || !out || !out_count)
+        return SC_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+    if (!msgs || msg_count == 0)
+        return SC_OK;
+
+    size_t cap = msg_count < 64 ? msg_count : 64;
+    sc_persona_example_t *examples =
+        (sc_persona_example_t *)alloc->alloc(alloc->ctx, cap * sizeof(sc_persona_example_t));
+    if (!examples)
+        return SC_ERR_OUT_OF_MEMORY;
+    memset(examples, 0, cap * sizeof(sc_persona_example_t));
+    size_t count = 0;
+
+    for (size_t i = 0; i < msg_count && count < cap; i++) {
+        if (msgs[i].is_from_me || !msgs[i].text || msgs[i].text_len == 0)
+            continue;
+
+        const char *incoming = msgs[i].text;
+        size_t incoming_len = msgs[i].text_len;
+        int64_t incoming_ts = msgs[i].timestamp;
+
+        char response_buf[1024];
+        size_t rpos = 0;
+        size_t j = i + 1;
+        while (j < msg_count && msgs[j].is_from_me) {
+            if (msgs[j].text && msgs[j].text_len > 0) {
+                int64_t gap = msgs[j].timestamp - incoming_ts;
+                if (gap > 1800)
+                    break;
+                if (rpos > 0 && rpos < sizeof(response_buf) - 1)
+                    response_buf[rpos++] = '\n';
+                size_t copy = msgs[j].text_len;
+                if (rpos + copy >= sizeof(response_buf))
+                    copy = sizeof(response_buf) - rpos - 1;
+                memcpy(response_buf + rpos, msgs[j].text, copy);
+                rpos += copy;
+            }
+            j++;
+        }
+        if (rpos == 0)
+            continue;
+        response_buf[rpos] = '\0';
+
+        examples[count].context = sc_strndup(alloc, "texting conversation", 20);
+        examples[count].incoming = sc_strndup(alloc, incoming, incoming_len);
+        examples[count].response = sc_strndup(alloc, response_buf, rpos);
+        if (!examples[count].context || !examples[count].incoming || !examples[count].response) {
+            for (size_t k = 0; k <= count; k++) {
+                if (examples[k].context)
+                    alloc->free(alloc->ctx, examples[k].context, strlen(examples[k].context) + 1);
+                if (examples[k].incoming)
+                    alloc->free(alloc->ctx, examples[k].incoming, strlen(examples[k].incoming) + 1);
+                if (examples[k].response)
+                    alloc->free(alloc->ctx, examples[k].response, strlen(examples[k].response) + 1);
+            }
+            alloc->free(alloc->ctx, examples, cap * sizeof(sc_persona_example_t));
+            return SC_ERR_OUT_OF_MEMORY;
+        }
+        count++;
+        i = j > 0 ? j - 1 : i;
+    }
+
+    *out = examples;
+    *out_count = count;
+    return SC_OK;
+}
+
+sc_error_t sc_persona_sampler_detect_contact(sc_allocator_t *alloc,
+                                             const sc_sampler_raw_msg_t *msgs, size_t msg_count,
+                                             sc_sampler_contact_stats_t *out) {
+    if (!out)
+        return SC_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+    (void)alloc;
+    if (!msgs || msg_count == 0)
+        return SC_OK;
+
+    size_t their_count = 0, my_count = 0;
+    size_t total_their_len = 0, total_my_len = 0;
+    size_t emoji_msgs = 0, link_msgs = 0;
+    size_t burst_count = 0;
+
+    for (size_t i = 0; i < msg_count; i++) {
+        if (!msgs[i].text || msgs[i].text_len == 0)
+            continue;
+        if (msgs[i].is_from_me) {
+            my_count++;
+            total_my_len += msgs[i].text_len;
+        } else {
+            their_count++;
+            total_their_len += msgs[i].text_len;
+        }
+        for (size_t c = 0; c < msgs[i].text_len; c++) {
+            unsigned char ch = (unsigned char)msgs[i].text[c];
+            if (ch >= 0xF0) {
+                emoji_msgs++;
+                break;
+            }
+        }
+        if (msgs[i].text_len > 7) {
+            const char *t = msgs[i].text;
+            if (strstr(t, "http://") || strstr(t, "https://"))
+                link_msgs++;
+        }
+        if (i > 0 && !msgs[i].is_from_me && !msgs[i - 1].is_from_me) {
+            int64_t gap = msgs[i].timestamp - msgs[i - 1].timestamp;
+            if (gap < 30)
+                burst_count++;
+        }
+    }
+
+    out->their_msg_count = their_count;
+    out->my_msg_count = my_count;
+    if (their_count > 0)
+        out->avg_their_len = total_their_len / their_count;
+    if (my_count > 0)
+        out->avg_my_len = total_my_len / my_count;
+    out->uses_emoji = (emoji_msgs > msg_count / 5);
+    out->sends_links = (link_msgs > msg_count / 10);
+    out->texts_in_bursts = (burst_count > their_count / 4);
+    out->prefers_short = (out->avg_their_len < 40);
     return SC_OK;
 }
 

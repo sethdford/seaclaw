@@ -35,7 +35,8 @@ static void replay_detects_positive_signal(void) {
         if (result.insights[i].score_delta > 0) {
             found_positive = true;
             SC_ASSERT_TRUE(result.insights[i].observation != NULL);
-            SC_ASSERT_TRUE(strstr(result.insights[i].observation, "enthusiastic") != NULL);
+            SC_ASSERT_TRUE(strstr(result.insights[i].observation, "engagement") != NULL ||
+                           strstr(result.insights[i].observation, "enthusiastic") != NULL);
             break;
         }
     }
@@ -58,8 +59,9 @@ static void replay_detects_robotic_tell(void) {
         if (result.insights[i].score_delta < 0) {
             found_negative = true;
             SC_ASSERT_TRUE(result.insights[i].observation != NULL);
-            SC_ASSERT_TRUE(strstr(result.insights[i].observation, "robotic") != NULL ||
-                          strstr(result.insights[i].observation, "formulaic") != NULL);
+            SC_ASSERT_TRUE(strstr(result.insights[i].observation, "specificity") != NULL ||
+                           strstr(result.insights[i].observation, "follow-up") != NULL ||
+                           strstr(result.insights[i].observation, "robotic") != NULL);
             break;
         }
     }

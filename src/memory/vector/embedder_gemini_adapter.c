@@ -77,7 +77,7 @@ static const sc_embedder_vtable_t gemini_adapter_vtable = {
 };
 
 sc_embedder_t sc_embedder_gemini_adapter_create(sc_allocator_t *alloc,
-                                                 sc_embedding_provider_t provider) {
+                                                sc_embedding_provider_t provider) {
     sc_embedder_t emb = {.ctx = NULL, .vtable = &gemini_adapter_vtable};
     if (!alloc || !provider.vtable)
         return emb;

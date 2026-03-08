@@ -1,24 +1,24 @@
 /* Core turn execution: sc_agent_turn and turn-local helpers */
 #include "agent_internal.h"
 #include "seaclaw/agent/ab_response.h"
-#include "seaclaw/observability/bth_metrics.h"
 #include "seaclaw/agent/awareness.h"
+#include "seaclaw/agent/commands.h"
 #include "seaclaw/agent/commitment.h"
 #include "seaclaw/agent/commitment_store.h"
-#include "seaclaw/agent/commands.h"
 #include "seaclaw/agent/compaction.h"
 #include "seaclaw/agent/dispatcher.h"
 #include "seaclaw/agent/input_guard.h"
 #include "seaclaw/agent/mailbox.h"
 #include "seaclaw/agent/memory_loader.h"
 #include "seaclaw/agent/outcomes.h"
+#include "seaclaw/agent/pattern_radar.h"
 #include "seaclaw/agent/planner.h"
 #include "seaclaw/agent/preferences.h"
-#include "seaclaw/agent/tool_router.h"
-#include "seaclaw/agent/pattern_radar.h"
 #include "seaclaw/agent/proactive.h"
 #include "seaclaw/agent/prompt.h"
 #include "seaclaw/agent/superhuman.h"
+#include "seaclaw/agent/tool_router.h"
+#include "seaclaw/observability/bth_metrics.h"
 #ifdef SC_HAS_PERSONA
 #include "seaclaw/persona/circadian.h"
 #include "seaclaw/persona/relationship.h"
@@ -101,7 +101,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             size_t last_idx = sc_stm_count(&agent->stm) - 1;
             if (fc_result.primary_topic && fc_result.primary_topic[0]) {
                 (void)sc_stm_turn_set_primary_topic(&agent->stm, last_idx, fc_result.primary_topic,
-                                                     strlen(fc_result.primary_topic));
+                                                    strlen(fc_result.primary_topic));
             }
             for (size_t i = 0; i < fc_result.entity_count; i++) {
                 const sc_fc_entity_match_t *e = &fc_result.entities[i];
@@ -119,30 +119,27 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         /* Pattern radar: observe entities as topic recurrence, emotions as emotional trend */
         {
             char ts_buf[32];
-            int ts_n = snprintf(ts_buf, sizeof(ts_buf), "%llu",
-                                (unsigned long long)(ts_ms / 1000));
+            int ts_n = snprintf(ts_buf, sizeof(ts_buf), "%llu", (unsigned long long)(ts_ms / 1000));
             const char *ts = ts_n > 0 ? ts_buf : NULL;
             size_t ts_len = (ts_n > 0 && ts_n < (int)sizeof(ts_buf)) ? (size_t)ts_n : 0;
 
             for (size_t i = 0; i < fc_result.entity_count; i++) {
                 const sc_fc_entity_match_t *e = &fc_result.entities[i];
                 if (e->name && e->name_len > 0) {
-                    (void)sc_pattern_radar_observe(&agent->radar, e->name, e->name_len,
-                                                    SC_PATTERN_TOPIC_RECURRENCE,
-                                                    e->type ? e->type : NULL,
-                                                    e->type ? e->type_len : 0, ts, ts_len);
+                    (void)sc_pattern_radar_observe(
+                        &agent->radar, e->name, e->name_len, SC_PATTERN_TOPIC_RECURRENCE,
+                        e->type ? e->type : NULL, e->type ? e->type_len : 0, ts, ts_len);
                 }
             }
-            static const char *emotion_names[] = {"neutral", "joy", "sadness", "anger", "fear",
-                                                  "surprise", "frustration", "excitement",
-                                                  "anxiety"};
+            static const char *emotion_names[] = {"neutral",     "joy",        "sadness",
+                                                  "anger",       "fear",       "surprise",
+                                                  "frustration", "excitement", "anxiety"};
             for (size_t i = 0; i < fc_result.emotion_count; i++) {
                 sc_emotion_tag_t tag = fc_result.emotions[i].tag;
                 if (tag >= 0 && (size_t)tag < sizeof(emotion_names) / sizeof(emotion_names[0])) {
                     const char *name = emotion_names[tag];
                     (void)sc_pattern_radar_observe(&agent->radar, name, strlen(name),
-                                                    SC_PATTERN_EMOTIONAL_TREND, NULL, 0, ts,
-                                                    ts_len);
+                                                   SC_PATTERN_EMOTIONAL_TREND, NULL, 0, ts, ts_len);
                 }
             }
         }
@@ -153,13 +150,14 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     if (agent->commitment_store) {
         sc_commitment_detect_result_t commit_result;
         memset(&commit_result, 0, sizeof(commit_result));
-        sc_error_t cerr = sc_commitment_detect(agent->alloc, msg, msg_len, "user", 4, &commit_result);
+        sc_error_t cerr =
+            sc_commitment_detect(agent->alloc, msg, msg_len, "user", 4, &commit_result);
         if (cerr == SC_OK && commit_result.count > 0) {
             const char *sess = agent->memory_session_id;
             size_t sess_len = agent->memory_session_id ? agent->memory_session_id_len : 0;
             for (size_t i = 0; i < commit_result.count; i++) {
-                (void)sc_commitment_store_save(agent->commitment_store, &commit_result.commitments[i],
-                                                sess, sess_len);
+                (void)sc_commitment_store_save(agent->commitment_store,
+                                               &commit_result.commitments[i], sess, sess_len);
             }
         }
         sc_commitment_detect_result_deinit(&commit_result, agent->alloc);
@@ -252,11 +250,10 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         sc_memory_loader_t loader;
         sc_memory_loader_init(&loader, agent->alloc, agent->memory, agent->retrieval_engine, 10,
                               4000);
-        (void)sc_memory_loader_load(
-            &loader, msg, msg_len,
-            agent->memory_session_id ? agent->memory_session_id : "",
-            agent->memory_session_id ? agent->memory_session_id_len : 0,
-            &memory_ctx, &memory_ctx_len);
+        (void)sc_memory_loader_load(&loader, msg, msg_len,
+                                    agent->memory_session_id ? agent->memory_session_id : "",
+                                    agent->memory_session_id ? agent->memory_session_id_len : 0,
+                                    &memory_ctx, &memory_ctx_len);
     }
 
     /* Build STM context for this turn */
@@ -273,7 +270,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         const char *sess = agent->memory_session_id;
         size_t sess_len = agent->memory_session_id ? agent->memory_session_id_len : 0;
         (void)sc_commitment_store_build_context(agent->commitment_store, agent->alloc, sess,
-                                                 sess_len, &commitment_ctx, &commitment_ctx_len);
+                                                sess_len, &commitment_ctx, &commitment_ctx_len);
         if (commitment_ctx_len > 0 && agent->bth_metrics)
             agent->bth_metrics->commitment_followups++;
     }
@@ -308,15 +305,15 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         memset(&proactive_result, 0, sizeof(proactive_result));
         sc_commitment_t *commitments = NULL;
         size_t commitment_count = 0;
-        if (agent->commitment_store && agent->memory_session_id && agent->memory_session_id_len > 0) {
-            (void)sc_commitment_store_list_active(agent->commitment_store, agent->alloc,
-                                                  agent->memory_session_id,
-                                                  agent->memory_session_id_len, &commitments,
-                                                  &commitment_count);
+        if (agent->commitment_store && agent->memory_session_id &&
+            agent->memory_session_id_len > 0) {
+            (void)sc_commitment_store_list_active(
+                agent->commitment_store, agent->alloc, agent->memory_session_id,
+                agent->memory_session_id_len, &commitments, &commitment_count);
         }
         sc_error_t proactive_err =
             sc_proactive_check_extended(agent->alloc, session_count, hour, commitments,
-                                         commitment_count, NULL, NULL, 0, &proactive_result);
+                                        commitment_count, NULL, NULL, 0, &proactive_result);
         if (commitments) {
             for (size_t ci = 0; ci < commitment_count; ci++)
                 sc_commitment_deinit(&commitments[ci], agent->alloc);
@@ -333,8 +330,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             char *starter = NULL;
             size_t starter_len = 0;
             if (sc_proactive_build_starter(agent->alloc, agent->memory, agent->memory_session_id,
-                                           agent->memory_session_id_len, &starter, &starter_len) ==
-                    SC_OK &&
+                                           agent->memory_session_id_len, &starter,
+                                           &starter_len) == SC_OK &&
                 starter && starter_len > 0) {
                 if (proactive_ctx && proactive_ctx_len > 0) {
                     size_t merged_len = proactive_ctx_len + 2 + starter_len;
@@ -345,8 +342,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                         merged[proactive_ctx_len + 1] = '\n';
                         memcpy(merged + proactive_ctx_len + 2, starter, starter_len);
                         merged[merged_len] = '\0';
-                        agent->alloc->free(agent->alloc->ctx, proactive_ctx,
-                                           proactive_ctx_len + 1);
+                        agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
                         agent->alloc->free(agent->alloc->ctx, starter, starter_len + 1);
                         proactive_ctx = merged;
                         proactive_ctx_len = merged_len;
@@ -357,6 +353,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                     proactive_ctx = starter;
                     proactive_ctx_len = starter_len;
                 }
+                if (agent->bth_metrics)
+                    agent->bth_metrics->starters_built++;
             }
         }
     }
@@ -368,7 +366,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         agent->superhuman_commitment_ctx.session_id = agent->memory_session_id;
         agent->superhuman_commitment_ctx.session_id_len = agent->memory_session_id_len;
         (void)sc_superhuman_build_context(&agent->superhuman, agent->alloc, &superhuman_ctx,
-                                           &superhuman_ctx_len);
+                                          &superhuman_ctx_len);
     }
 
     /* Build adaptive persona context (circadian + relationship) */
@@ -593,9 +591,10 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     memset(&tool_selection, 0, sizeof(tool_selection));
     if (agent->tool_routing_enabled && agent->tools_count > SC_TOOL_ROUTER_MAX_SELECTED) {
         sc_error_t rerr = sc_tool_router_select(agent->alloc, msg, msg_len, agent->tools,
-                                               agent->tools_count, &tool_selection);
+                                                agent->tools_count, &tool_selection);
         if (rerr == SC_OK && tool_selection.count > 0) {
-            /* Use only selected tools for this turn; tool_specs are pre-built, placeholder for now */
+            /* Use only selected tools for this turn; tool_specs are pre-built, placeholder for now
+             */
             (void)tool_selection.count;
         }
     }
@@ -846,9 +845,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                                    sizeof(alt_suffix) - 1);
                             alt_system[alt_len] = '\0';
                             size_t total = msgs_count;
-                            sc_chat_message_t *alt_all =
-                                (sc_chat_message_t *)agent->alloc->alloc(
-                                    agent->alloc->ctx, total * sizeof(sc_chat_message_t));
+                            sc_chat_message_t *alt_all = (sc_chat_message_t *)agent->alloc->alloc(
+                                agent->alloc->ctx, total * sizeof(sc_chat_message_t));
                             if (alt_all) {
                                 alt_all[0].role = SC_ROLE_SYSTEM;
                                 alt_all[0].content = alt_system;
@@ -868,16 +866,14 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                                 sc_chat_response_t alt_resp;
                                 memset(&alt_resp, 0, sizeof(alt_resp));
                                 sc_error_t alt_err = agent->provider.vtable->chat(
-                                    agent->provider.ctx, agent->alloc, &alt_req,
-                                    agent->model_name, agent->model_name_len, agent->temperature,
-                                    &alt_resp);
+                                    agent->provider.ctx, agent->alloc, &alt_req, agent->model_name,
+                                    agent->model_name_len, agent->temperature, &alt_resp);
                                 if (alt_err == SC_OK && alt_resp.content &&
                                     alt_resp.content_len > 0) {
                                     agent->total_tokens += alt_resp.usage.total_tokens;
                                     turn_tokens += alt_resp.usage.total_tokens;
-                                    ab_result.candidates[1].response =
-                                        sc_strndup(agent->alloc, alt_resp.content,
-                                                   alt_resp.content_len);
+                                    ab_result.candidates[1].response = sc_strndup(
+                                        agent->alloc, alt_resp.content, alt_resp.content_len);
                                     ab_result.candidates[1].response_len = alt_resp.content_len;
                                     ab_result.candidate_count = 2;
                                     sc_chat_response_free(agent->alloc, &alt_resp);
@@ -911,13 +907,13 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                                     sc_chat_response_free(agent->alloc, &alt_resp);
                                 }
                                 agent->alloc->free(agent->alloc->ctx, alt_all,
-                                                  total * sizeof(sc_chat_message_t));
+                                                   total * sizeof(sc_chat_message_t));
                             }
                             agent->alloc->free(agent->alloc->ctx, alt_system, alt_len + 1);
                         }
 
                         if (sc_ab_evaluate(agent->alloc, &ab_result, agent->ab_history_entries,
-                                          agent->ab_history_count, max_chars) == SC_OK) {
+                                           agent->ab_history_count, max_chars) == SC_OK) {
                             if (agent->bth_metrics)
                                 agent->bth_metrics->ab_evaluations++;
                             size_t bi = ab_result.best_idx;
@@ -976,16 +972,16 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                         const sc_extracted_fact_t *f = &de_result.facts[fi];
                         if (!f->subject || !f->predicate || !f->object)
                             continue;
-                        size_t key_len = strlen(f->subject) + 1 + strlen(f->predicate) + 1 +
-                                        strlen(f->object);
+                        size_t key_len =
+                            strlen(f->subject) + 1 + strlen(f->predicate) + 1 + strlen(f->object);
                         char key_buf[256];
                         if (key_len < sizeof(key_buf)) {
                             int n = snprintf(key_buf, sizeof(key_buf), "%s:%s:%s", f->subject,
                                              f->predicate, f->object);
                             if (n > 0 && (size_t)n < sizeof(key_buf)) {
                                 (void)agent->memory->vtable->store(
-                                    agent->memory->ctx, key_buf, (size_t)n,
-                                    f->object, strlen(f->object), &cat, sid ? sid : "", sid_len);
+                                    agent->memory->ctx, key_buf, (size_t)n, f->object,
+                                    strlen(f->object), &cat, sid ? sid : "", sid_len);
                             }
                         }
                     }
@@ -997,13 +993,13 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                 sc_commitment_detect_result_t cr;
                 memset(&cr, 0, sizeof(cr));
                 sc_error_t cerr = sc_commitment_detect(agent->alloc, *response_out,
-                                                        *response_len_out, "assistant", 9, &cr);
+                                                       *response_len_out, "assistant", 9, &cr);
                 if (cerr == SC_OK && cr.count > 0) {
                     const char *sess = agent->memory_session_id;
                     size_t sess_len = sess ? agent->memory_session_id_len : 0;
                     for (size_t ci = 0; ci < cr.count; ci++)
-                        (void)sc_commitment_store_save(agent->commitment_store,
-                                                        &cr.commitments[ci], sess, sess_len);
+                        (void)sc_commitment_store_save(agent->commitment_store, &cr.commitments[ci],
+                                                       sess, sess_len);
                 }
                 sc_commitment_detect_result_deinit(&cr, agent->alloc);
             }
@@ -1057,7 +1053,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
             } else {
                 /* LLMCompiler: when enabled, compile tool calls into a DAG for parallel execution.
-                 * Note: LLMCompiler is opt-in via config; the existing dispatcher handles parallelism. */
+                 * Note: LLMCompiler is opt-in via config; the existing dispatcher handles
+                 * parallelism. */
                 /* Use dispatcher for parallel execution when enabled (Tier 1.3) */
                 sc_dispatcher_t dispatcher;
                 sc_dispatcher_default(&dispatcher);

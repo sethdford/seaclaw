@@ -27,7 +27,8 @@ char *sc_conversation_build_awareness(sc_allocator_t *alloc,
 
 /* Conversation quality score (0-100). Evaluates a draft response for:
  * brevity, validation/reflection, repair/rephrase, and follow-up.
- * Returns a quality score and writes guidance into *feedback (caller owns). */
+ * Qualitative: compares to their average length, energy level; needs_revision
+ * only on gross mismatches. guidance describes the issue for prompt injection. */
 typedef struct sc_quality_score {
     int total;
     int brevity;
@@ -35,6 +36,7 @@ typedef struct sc_quality_score {
     int warmth;
     int naturalness;
     bool needs_revision;
+    char guidance[256]; /* human-readable issue description when mismatched */
 } sc_quality_score_t;
 
 sc_quality_score_t sc_conversation_evaluate_quality(const char *response, size_t response_len,
@@ -90,9 +92,9 @@ sc_emotional_state_t sc_conversation_detect_emotion(const sc_channel_history_ent
  * Returns length of correction (0 if no typo detected or no correction needed).
  * correction_chance is probability 0-100 of generating correction (suggest ~40). */
 size_t sc_conversation_generate_correction(const char *original, size_t original_len,
-                                            const char *typo_applied, size_t typo_applied_len,
-                                            char *out_buf, size_t out_cap,
-                                            uint32_t seed, uint32_t correction_chance);
+                                           const char *typo_applied, size_t typo_applied_len,
+                                           char *out_buf, size_t out_cap, uint32_t seed,
+                                           uint32_t correction_chance);
 
 /* ── Multi-message splitting ──────────────────────────────────────────── */
 
@@ -153,17 +155,17 @@ size_t sc_conversation_apply_typos(char *buf, size_t len, size_t cap, uint32_t s
 /* ── Response action classification ───────────────────────────────────── */
 
 typedef enum sc_response_action {
-    SC_RESPONSE_FULL = 0,  /* generate full response */
-    SC_RESPONSE_BRIEF = 1, /* ultra-short: "yeah", "lol", "nice" */
-    SC_RESPONSE_SKIP = 2,  /* don't respond at all */
-    SC_RESPONSE_DELAY = 3, /* full response but with extra delay */
+    SC_RESPONSE_FULL = 0,     /* generate full response */
+    SC_RESPONSE_BRIEF = 1,    /* ultra-short: "yeah", "lol", "nice" */
+    SC_RESPONSE_SKIP = 2,     /* don't respond at all */
+    SC_RESPONSE_DELAY = 3,    /* full response but with extra delay */
     SC_RESPONSE_THINKING = 4, /* two-phase: send filler first, then real response after delay */
 } sc_response_action_t;
 
 typedef struct sc_thinking_response {
-    char filler[64];      /* "hmm", "that's a good question", "let me think about that" */
+    char filler[64]; /* "hmm", "that's a good question", "let me think about that" */
     size_t filler_len;
-    uint32_t delay_ms;    /* delay before the real response (30000-60000ms) */
+    uint32_t delay_ms; /* delay before the real response (30000-60000ms) */
 } sc_thinking_response_t;
 
 /* Classify whether this message warrants a "thinking" response.
@@ -190,8 +192,8 @@ typedef struct sc_url_extract {
     size_t len;
 } sc_url_extract_t;
 
-size_t sc_conversation_extract_urls(const char *text, size_t text_len,
-                                    sc_url_extract_t *urls, size_t max_urls);
+size_t sc_conversation_extract_urls(const char *text, size_t text_len, sc_url_extract_t *urls,
+                                    size_t max_urls);
 
 /* Detect if a message context suggests sharing a link.
  * Returns true if the LLM should be prompted to find and share a URL.
@@ -207,8 +209,8 @@ bool sc_conversation_should_share_link(const char *msg, size_t msg_len,
  * Scans for [Photo shared], [Attachment shared], [image or attachment], etc.
  * Returns allocated string; caller must free. NULL if no attachments found. */
 char *sc_conversation_attachment_context(sc_allocator_t *alloc,
-                                          const sc_channel_history_entry_t *entries,
-                                          size_t count, size_t *out_len);
+                                         const sc_channel_history_entry_t *entries, size_t count,
+                                         size_t *out_len);
 
 /* ── Anti-repetition detection ───────────────────────────────────────── */
 

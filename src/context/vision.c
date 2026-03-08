@@ -14,8 +14,8 @@
 #endif
 
 sc_error_t sc_vision_read_image(sc_allocator_t *alloc, const char *path, size_t path_len,
-                                char **base64_out, size_t *base64_len,
-                                char **media_type_out, size_t *media_type_len) {
+                                char **base64_out, size_t *base64_len, char **media_type_out,
+                                size_t *media_type_len) {
     if (!alloc || !base64_out || !base64_len || !media_type_out || !media_type_len)
         return SC_ERR_INVALID_ARGUMENT;
     if (!path)
@@ -117,14 +117,15 @@ sc_error_t sc_vision_read_image(sc_allocator_t *alloc, const char *path, size_t 
 
 sc_error_t sc_vision_describe_image(sc_allocator_t *alloc, sc_provider_t *provider,
                                     const char *image_path, size_t image_path_len,
-                                    const char *model, size_t model_len,
-                                    char **description_out, size_t *description_len) {
+                                    const char *model, size_t model_len, char **description_out,
+                                    size_t *description_len) {
     if (!alloc || !provider || !description_out || !description_len)
         return SC_ERR_INVALID_ARGUMENT;
     *description_out = NULL;
     *description_len = 0;
 
-    if (!provider->vtable->supports_vision || !provider->vtable->supports_vision(provider->ctx))
+    if (!provider->vtable || !provider->vtable->supports_vision ||
+        !provider->vtable->supports_vision(provider->ctx))
         return SC_ERR_NOT_SUPPORTED;
     if (provider->vtable->supports_vision_for_model &&
         !provider->vtable->supports_vision_for_model(provider->ctx, model, model_len))
@@ -134,9 +135,8 @@ sc_error_t sc_vision_describe_image(sc_allocator_t *alloc, sc_provider_t *provid
     size_t base64_len = 0;
     char *media_type = NULL;
     size_t media_type_len = 0;
-    sc_error_t err =
-        sc_vision_read_image(alloc, image_path, image_path_len, &base64, &base64_len,
-                             &media_type, &media_type_len);
+    sc_error_t err = sc_vision_read_image(alloc, image_path, image_path_len, &base64, &base64_len,
+                                          &media_type, &media_type_len);
     if (err != SC_OK)
         return err;
 
@@ -144,7 +144,7 @@ sc_error_t sc_vision_describe_image(sc_allocator_t *alloc, sc_provider_t *provid
     sc_content_part_t parts[2];
     parts[0].tag = SC_CONTENT_PART_TEXT;
     parts[0].data.text.ptr = "What is in this image?";
-    parts[0].data.text.len = 20;
+    parts[0].data.text.len = 22;
 
     parts[1].tag = SC_CONTENT_PART_IMAGE_BASE64;
     parts[1].data.image_base64.data = base64;
@@ -154,8 +154,9 @@ sc_error_t sc_vision_describe_image(sc_allocator_t *alloc, sc_provider_t *provid
 
     sc_chat_message_t sys_msg = {
         .role = SC_ROLE_SYSTEM,
-        .content = "Describe this image briefly in 1-2 sentences. Focus on what's visually present.",
-        .content_len = 65,
+        .content =
+            "Describe this image briefly in 1-2 sentences. Focus on what's visually present.",
+        .content_len = 79,
         .name = NULL,
         .name_len = 0,
         .tool_call_id = NULL,
@@ -203,8 +204,10 @@ sc_error_t sc_vision_describe_image(sc_allocator_t *alloc, sc_provider_t *provid
     alloc->free(alloc->ctx, base64, base64_len + 1);
     alloc->free(alloc->ctx, media_type, media_type_len + 1);
 
-    if (err != SC_OK)
+    if (err != SC_OK) {
+        sc_chat_response_free(alloc, &resp);
         return err;
+    }
     if (!resp.content || resp.content_len == 0) {
         sc_chat_response_free(alloc, &resp);
         return SC_ERR_PROVIDER_RESPONSE;
@@ -227,10 +230,9 @@ char *sc_vision_build_context(sc_allocator_t *alloc, const char *description,
         return NULL;
     }
 
-    const char *prefix =
-        "\n### Image Context\nThe user shared an image: ";
-    const char *suffix =
-        "\nRespond naturally to what you see — comment on it, react to it, or reference it in conversation.\n";
+    const char *prefix = "\n### Image Context\nThe user shared an image: ";
+    const char *suffix = "\nRespond naturally to what you see — comment on it, react to it, or "
+                         "reference it in conversation.\n";
 
     size_t prefix_len = strlen(prefix);
     size_t suffix_len = strlen(suffix);

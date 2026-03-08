@@ -27,36 +27,81 @@ static const char *fc_strstr_case(const char *haystack, size_t hay_len, const ch
     return NULL;
 }
 
-static const char *RELATIONSHIP_PATTERNS[] = {
-    "my mom",     "my dad",    "my wife",     "my husband", "my friend", "my sister",
-    "my brother", "my boss",   "my coworker", "my partner", "my son",    "my daughter",
-    "my child",   "my family", "my manager",  NULL};
+/* Structural: "my " + relationship word. Broader than fixed phrases. */
+static const char *RELATIONSHIP_WORDS[] = {
+    "mom",      "dad",     "wife", "husband",  "friend",    "sister", "brother", "boss",
+    "coworker", "partner", "son",  "daughter", "child",     "family", "manager", "mommy",
+    "daddy",    "kid",     "kids", "spouse",   "colleague", NULL};
 
-static const char *EMOTION_JOY_PATTERNS[] = {"I feel great", "I'm so happy", "I'm excited",
-                                             "amazing",      "wonderful",    NULL};
-static const char *EMOTION_SAD_PATTERNS[] = {"I feel sad", "I'm depressed", "I'm down",
-                                             "heartbroken", NULL};
-static const char *EMOTION_ANGER_PATTERNS[] = {"I'm so angry", "I'm furious", "pissed off",
-                                               "infuriating", NULL};
-static const char *EMOTION_FEAR_PATTERNS[] = {"I'm scared", "I'm afraid", "terrified", "frightened",
-                                              NULL};
-static const char *EMOTION_FRUSTRATION_PATTERNS[] = {
-    "I'm frustrated", "I'm so frustrated", "so frustrating", "I can't believe", "fed up", NULL};
-static const char *EMOTION_ANXIETY_PATTERNS[] = {
-    "I'm anxious", "I'm worried", "I'm stressed", "can't stop thinking", "anxious", NULL};
-static const char *EMOTION_EXCITEMENT_PATTERNS[] = {"I'm excited", "so excited", NULL};
+/* Structural: "I feel/I'm feeling/I am/I'm " + adjective. Adjectives map to emotion. */
+static const char *EMOTION_PREFIXES[] = {"I feel ", "I'm feeling ", "I am ", "I'm ", NULL};
+struct emotion_adj {
+    const char *word;
+    size_t word_len;
+    sc_emotion_tag_t tag;
+};
+static const struct emotion_adj EMOTION_ADJECTIVES[] = {
+    {"great", 5, SC_EMOTION_JOY},
+    {"happy", 5, SC_EMOTION_JOY},
+    {"excited", 7, SC_EMOTION_EXCITEMENT},
+    {"wonderful", 9, SC_EMOTION_JOY},
+    {"amazing", 7, SC_EMOTION_JOY},
+    {"sad", 3, SC_EMOTION_SADNESS},
+    {"depressed", 9, SC_EMOTION_SADNESS},
+    {"down", 4, SC_EMOTION_SADNESS},
+    {"heartbroken", 11, SC_EMOTION_SADNESS},
+    {"angry", 5, SC_EMOTION_ANGER},
+    {"furious", 7, SC_EMOTION_ANGER},
+    {"scared", 6, SC_EMOTION_FEAR},
+    {"afraid", 6, SC_EMOTION_FEAR},
+    {"terrified", 9, SC_EMOTION_FEAR},
+    {"frightened", 10, SC_EMOTION_FEAR},
+    {"frustrated", 10, SC_EMOTION_FRUSTRATION},
+    {"frustrating", 11, SC_EMOTION_FRUSTRATION},
+    {"anxious", 7, SC_EMOTION_ANXIETY},
+    {"worried", 7, SC_EMOTION_ANXIETY},
+    {"stressed", 8, SC_EMOTION_ANXIETY},
+    {NULL, 0, 0},
+};
 
-static const char *TOPIC_WORK_PATTERNS[] = {"at work",     "my job",   "the office", "my boss",
-                                            "the project", "deadline", NULL};
-static const char *TOPIC_HEALTH_PATTERNS[] = {"the doctor",   "my health",     "feeling sick",
-                                              "the hospital", "my medication", NULL};
-static const char *TOPIC_RELATIONSHIP_PATTERNS[] = {"my relationship", "my partner", "we broke up",
-                                                    "dating", NULL};
-static const char *TOPIC_FINANCE_PATTERNS[] = {"my budget", "savings", "rent", "bills",
-                                               "debt",      "salary",  NULL};
+/* Structural: "at/the/about/my " + topic word, or standalone topic word. */
+struct topic_pattern {
+    const char *prefix;
+    size_t prefix_len;
+    const char *word;
+    size_t word_len;
+    const char *topic;
+    size_t topic_len;
+};
+static const struct topic_pattern TOPIC_PATTERNS[] = {
+    {"at ", 3, "work", 4, "work", 4},
+    {"at the ", 7, "office", 6, "work", 4},
+    {"my ", 3, "job", 3, "work", 4},
+    {"the ", 4, "office", 6, "work", 4},
+    {"the ", 4, "project", 7, "work", 4},
+    {"my ", 3, "boss", 4, "work", 4},
+    {NULL, 0, "deadline", 8, "work", 4},
+    {"the ", 4, "doctor", 6, "health", 6},
+    {"my ", 3, "health", 6, "health", 6},
+    {"the ", 4, "hospital", 8, "health", 6},
+    {"my ", 3, "medication", 10, "health", 6},
+    {"feeling ", 8, "sick", 4, "health", 6},
+    {"my ", 3, "relationship", 12, "relationship", 12},
+    {"my ", 3, "partner", 7, "relationship", 12},
+    {NULL, 0, "dating", 6, "relationship", 12},
+    {"my ", 3, "budget", 6, "finance", 7},
+    {NULL, 0, "savings", 7, "finance", 7},
+    {NULL, 0, "rent", 4, "finance", 7},
+    {NULL, 0, "bills", 5, "finance", 7},
+    {NULL, 0, "debt", 4, "finance", 7},
+    {NULL, 0, "salary", 6, "finance", 7},
+    {NULL, 0, NULL, 0, NULL, 0},
+};
 
-static const char *COMMITMENT_PATTERNS[] = {
-    "I will ", "I'll ", "I promise", "I'm going to ", "I plan to ", "remind me to ", NULL};
+/* Structural: commitment prefix patterns. */
+static const char *COMMITMENT_PREFIXES[] = {"I will ",       "I'll ",      "I promise",
+                                            "I'm going to ", "I plan to ", "remind me to ",
+                                            "I'm gonna ",    NULL};
 
 static void add_entity(sc_fc_result_t *out, sc_allocator_t *alloc, const char *name,
                        size_t name_len, const char *type, size_t type_len, double confidence,
@@ -92,67 +137,87 @@ static void add_emotion(sc_fc_result_t *out, sc_emotion_tag_t tag, double intens
     out->emotion_count++;
 }
 
+/* Structural: find "my " then check if next word is a relationship word. */
 static void scan_relationships(const char *text, size_t text_len, sc_fc_result_t *out,
                                sc_allocator_t *alloc) {
-    for (int i = 0; RELATIONSHIP_PATTERNS[i]; i++) {
-        const char *pat = RELATIONSHIP_PATTERNS[i];
-        size_t plen = strlen(pat);
-        const char *p = fc_strstr_case(text, text_len, pat, plen);
-        if (!p)
+    const char *prefix = "my ";
+    size_t prefix_len = 3;
+    if (text_len < prefix_len + 1)
+        return;
+    for (size_t i = 0; i <= text_len - prefix_len; i++) {
+        if (fc_strncasecmp(text + i, prefix, prefix_len) != 0)
             continue;
-        size_t offset = (size_t)(p - text);
-        /* "my X" -> extract X (e.g. "mom" from "my mom") */
-        if (plen >= 4 && fc_strncasecmp(pat, "my ", 3) == 0) {
-            const char *name = p + 3;
-            size_t name_len = plen - 3;
-            add_entity(out, alloc, name, name_len, "person", 6, 0.85, offset);
+        size_t word_start = i + prefix_len;
+        size_t word_end = word_start;
+        while (word_end < text_len &&
+               (isalnum((unsigned char)text[word_end]) || text[word_end] == '\''))
+            word_end++;
+        size_t word_len = word_end - word_start;
+        if (word_len == 0)
+            continue;
+        for (int r = 0; RELATIONSHIP_WORDS[r]; r++) {
+            size_t rlen = strlen(RELATIONSHIP_WORDS[r]);
+            if (word_len == rlen &&
+                fc_strncasecmp(text + word_start, RELATIONSHIP_WORDS[r], rlen) == 0) {
+                add_entity(out, alloc, text + word_start, word_len, "person", 6, 0.85, i);
+                return;
+            }
+        }
+        /* "my " + capitalized word (e.g. "my Sarah") — likely a person */
+        if (word_len >= 2 && word_len <= 24 && (unsigned char)text[word_start] >= 'A' &&
+            (unsigned char)text[word_start] <= 'Z') {
+            add_entity(out, alloc, text + word_start, word_len, "person", 6, 0.75, i);
+            return;
         }
     }
 }
 
+/* Structural: find "I feel/I'm feeling/I am/I'm " then look for emotion adjective in remainder. */
 static void scan_emotions(const char *text, size_t text_len, sc_fc_result_t *out) {
-    struct {
-        const char **pats;
-        sc_emotion_tag_t tag;
-    } maps[] = {
-        {EMOTION_JOY_PATTERNS, SC_EMOTION_JOY},
-        {EMOTION_SAD_PATTERNS, SC_EMOTION_SADNESS},
-        {EMOTION_ANGER_PATTERNS, SC_EMOTION_ANGER},
-        {EMOTION_FEAR_PATTERNS, SC_EMOTION_FEAR},
-        {EMOTION_FRUSTRATION_PATTERNS, SC_EMOTION_FRUSTRATION},
-        {EMOTION_ANXIETY_PATTERNS, SC_EMOTION_ANXIETY},
-        {EMOTION_EXCITEMENT_PATTERNS, SC_EMOTION_EXCITEMENT},
-    };
-    for (size_t m = 0; m < sizeof(maps) / sizeof(maps[0]); m++) {
-        for (int i = 0; maps[m].pats[i]; i++) {
-            const char *pat = maps[m].pats[i];
-            size_t plen = strlen(pat);
-            if (fc_strstr_case(text, text_len, pat, plen))
-                add_emotion(out, maps[m].tag, 0.8);
+    for (int p = 0; EMOTION_PREFIXES[p]; p++) {
+        const char *prefix = EMOTION_PREFIXES[p];
+        size_t plen = strlen(prefix);
+        const char *found = fc_strstr_case(text, text_len, prefix, plen);
+        if (!found)
+            continue;
+        size_t rest_start = (size_t)(found - text) + plen;
+        size_t rest_len = text_len - rest_start;
+        if (rest_len == 0)
+            continue;
+        for (int a = 0; EMOTION_ADJECTIVES[a].word; a++) {
+            const char *adj = EMOTION_ADJECTIVES[a].word;
+            size_t alen = EMOTION_ADJECTIVES[a].word_len;
+            if (fc_strstr_case(text + rest_start, rest_len, adj, alen))
+                add_emotion(out, EMOTION_ADJECTIVES[a].tag, 0.8);
         }
     }
 }
 
+/* Structural: match prefix+word or standalone word for topic. */
 static void scan_topics(const char *text, size_t text_len, sc_fc_result_t *out,
                         sc_allocator_t *alloc) {
     if (out->primary_topic)
         return;
-    struct {
-        const char **pats;
-        const char *name;
-        size_t name_len;
-    } maps[] = {
-        {TOPIC_WORK_PATTERNS, "work", 4},
-        {TOPIC_HEALTH_PATTERNS, "health", 6},
-        {TOPIC_RELATIONSHIP_PATTERNS, "relationship", 12},
-        {TOPIC_FINANCE_PATTERNS, "finance", 7},
-    };
-    for (size_t m = 0; m < sizeof(maps) / sizeof(maps[0]); m++) {
-        for (int i = 0; maps[m].pats[i]; i++) {
-            const char *pat = maps[m].pats[i];
-            size_t plen = strlen(pat);
-            if (fc_strstr_case(text, text_len, pat, plen)) {
-                out->primary_topic = sc_strndup(alloc, maps[m].name, maps[m].name_len);
+    for (int t = 0; TOPIC_PATTERNS[t].topic; t++) {
+        const struct topic_pattern *tp = &TOPIC_PATTERNS[t];
+        if (tp->prefix) {
+            if (text_len < tp->prefix_len + tp->word_len)
+                continue;
+            const char *p = fc_strstr_case(text, text_len, tp->prefix, tp->prefix_len);
+            if (!p)
+                continue;
+            size_t after = (size_t)(p - text) + tp->prefix_len;
+            if (after + tp->word_len <= text_len &&
+                fc_strncasecmp(text + after, tp->word, tp->word_len) == 0) {
+                int next = (int)after + (int)tp->word_len;
+                if (next >= (int)text_len || !isalnum((unsigned char)text[(size_t)next])) {
+                    out->primary_topic = sc_strndup(alloc, tp->topic, tp->topic_len);
+                    return;
+                }
+            }
+        } else {
+            if (fc_strstr_case(text, text_len, tp->word, tp->word_len)) {
+                out->primary_topic = sc_strndup(alloc, tp->topic, tp->topic_len);
                 return;
             }
         }
@@ -160,8 +225,8 @@ static void scan_topics(const char *text, size_t text_len, sc_fc_result_t *out,
 }
 
 static void scan_commitments(const char *text, size_t text_len, sc_fc_result_t *out) {
-    for (int i = 0; COMMITMENT_PATTERNS[i]; i++) {
-        const char *pat = COMMITMENT_PATTERNS[i];
+    for (int i = 0; COMMITMENT_PREFIXES[i]; i++) {
+        const char *pat = COMMITMENT_PREFIXES[i];
         size_t plen = strlen(pat);
         if (fc_strstr_case(text, text_len, pat, plen)) {
             out->has_commitment = true;

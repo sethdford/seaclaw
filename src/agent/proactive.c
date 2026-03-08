@@ -4,19 +4,20 @@
 #include "seaclaw/agent/proactive.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/memory.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define SC_PROACTIVE_EVENT_FOLLOW_UP_CAP 3
-#define MS_PER_HOUR (3600ULL * 1000ULL)
-#define HOURS_3_DAYS  72u
-#define HOURS_7_DAYS  168u
-#define HOURS_14_DAYS 336u
+#define MS_PER_HOUR                      (3600ULL * 1000ULL)
+#define HOURS_3_DAYS                     72u
+#define HOURS_7_DAYS                     168u
+#define HOURS_14_DAYS                    336u
 
 sc_error_t sc_proactive_check_silence(sc_allocator_t *alloc, uint64_t last_contact_ms,
-                                       uint64_t now_ms, const sc_silence_config_t *config,
-                                       sc_proactive_result_t *out) {
+                                      uint64_t now_ms, const sc_silence_config_t *config,
+                                      sc_proactive_result_t *out) {
     if (!alloc || !out || !config)
         return SC_ERR_INVALID_ARGUMENT;
     if (!config->enabled || last_contact_ms == 0)
@@ -30,15 +31,31 @@ sc_error_t sc_proactive_check_silence(sc_allocator_t *alloc, uint64_t last_conta
     if (out->count >= SC_PROACTIVE_MAX_ACTIONS)
         return SC_OK;
 
-    const char *msg = NULL;
-    if (elapsed_hours >= HOURS_14_DAYS) {
-        msg = "It's been a while. A warm, low-pressure message would be thoughtful.";
-    } else if (elapsed_hours >= HOURS_7_DAYS) {
-        msg = "It's been about a week. Reach out with something personal from memory.";
+    /* Data-driven: exact elapsed time, contextual guidance for LLM */
+    uint32_t elapsed_days = (uint32_t)(elapsed_hours / 24u);
+    char msg[384];
+    int n;
+    if (elapsed_days == 0) {
+        n = snprintf(msg, sizeof(msg),
+                     "PROACTIVE CHECK-IN: Last conversation: %u hours ago. Generate a natural, "
+                     "warm check-in. Don't say \"I was thinking about you\" or \"just checking "
+                     "in\" — find a specific, genuine reason to reach out based on what you know.",
+                     (unsigned)elapsed_hours);
+    } else if (elapsed_days == 1) {
+        n = snprintf(msg, sizeof(msg),
+                     "PROACTIVE CHECK-IN: Last conversation: 1 day ago. Generate a natural, warm "
+                     "check-in. Don't say \"I was thinking about you\" or \"just checking in\" — "
+                     "find a specific, genuine reason to reach out based on what you know.");
     } else {
-        msg = "It's been a few days since you last talked. A casual check-in would feel natural.";
+        n = snprintf(msg, sizeof(msg),
+                     "PROACTIVE CHECK-IN: Last conversation: %u days ago. Generate a natural, "
+                     "warm check-in. Don't say \"I was thinking about you\" or \"just checking "
+                     "in\" — find a specific, genuine reason to reach out based on what you know.",
+                     (unsigned)elapsed_days);
     }
-    size_t msg_len = strlen(msg);
+    if (n <= 0 || (size_t)n >= sizeof(msg))
+        return SC_OK;
+    size_t msg_len = (size_t)n;
 
     sc_proactive_action_t *act = &out->actions[out->count];
     act->type = SC_PROACTIVE_CHECK_IN;
@@ -62,27 +79,30 @@ static int compare_priority_desc(const void *a, const void *b) {
 }
 
 sc_error_t sc_proactive_check(sc_allocator_t *alloc, uint32_t session_count, uint8_t hour,
-                               sc_proactive_result_t *out) {
+                              sc_proactive_result_t *out) {
     return sc_proactive_check_extended(alloc, session_count, hour, NULL, 0, NULL, NULL, 0, out);
 }
 
 sc_error_t sc_proactive_check_extended(sc_allocator_t *alloc, uint32_t session_count, uint8_t hour,
-                                        const sc_commitment_t *commitments, size_t commitment_count,
-                                        const char *const *pattern_subjects,
-                                        const uint32_t *pattern_counts, size_t pattern_count,
-                                        sc_proactive_result_t *out) {
+                                       const sc_commitment_t *commitments, size_t commitment_count,
+                                       const char *const *pattern_subjects,
+                                       const uint32_t *pattern_counts, size_t pattern_count,
+                                       sc_proactive_result_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
     memset(out, 0, sizeof(*out));
 
-    /* Session count milestones: 10, 25, 50, 100 */
+    /* Session count milestones: 10, 25, 50, 100 — data-driven context */
     static const uint32_t MILESTONES[] = {10, 25, 50, 100};
     for (size_t i = 0; i < sizeof(MILESTONES) / sizeof(MILESTONES[0]); i++) {
         if (session_count == MILESTONES[i] && out->count < SC_PROACTIVE_MAX_ACTIONS) {
-            char msg[128];
+            char msg[320];
             int n = snprintf(msg, sizeof(msg),
-                            "This is session %u together — a meaningful milestone.",
-                            (unsigned)session_count);
+                             "MILESTONE: This is conversation #%u together. Don't announce the "
+                             "number — let it inform your warmth and familiarity naturally. You "
+                             "know them well by now. Show it through specificity, not statements "
+                             "about knowing them.",
+                             (unsigned)session_count);
             if (n > 0 && (size_t)n < sizeof(msg)) {
                 sc_proactive_action_t *act = &out->actions[out->count];
                 act->type = SC_PROACTIVE_MILESTONE;
@@ -97,21 +117,51 @@ sc_error_t sc_proactive_check_extended(sc_allocator_t *alloc, uint32_t session_c
         }
     }
 
-    /* Morning hour (8-10) → MORNING_BRIEFING */
+    /* Morning hour (8-10) → MORNING_BRIEFING — data-driven from commitments */
     if (hour >= 8 && hour <= 10 && out->count < SC_PROACTIVE_MAX_ACTIONS) {
-        static const char BRIEF[] =
-            "Good morning. Consider reviewing any active commitments and plans for today.";
-        sc_proactive_action_t *act = &out->actions[out->count];
-        act->type = SC_PROACTIVE_MORNING_BRIEFING;
-        act->message = sc_strndup(alloc, BRIEF, sizeof(BRIEF) - 1);
-        if (!act->message)
-            return SC_ERR_OUT_OF_MEMORY;
-        act->message_len = sizeof(BRIEF) - 1;
-        act->priority = 0.7;
-        out->count++;
+        char msg[384];
+        size_t pos = 0;
+        int w = snprintf(msg, sizeof(msg), "MORNING CONTEXT: ");
+        if (w > 0 && (size_t)w < sizeof(msg))
+            pos = (size_t)w;
+        bool has_commitments = false;
+        if (commitments && commitment_count > 0 && pos < sizeof(msg)) {
+            for (size_t i = 0; i < commitment_count && pos < sizeof(msg) - 100; i++) {
+                if (commitments[i].status != SC_COMMITMENT_ACTIVE || !commitments[i].summary)
+                    continue;
+                if (!has_commitments) {
+                    w = snprintf(msg + pos, sizeof(msg) - pos, "Active commitments: ");
+                    if (w > 0 && pos + (size_t)w < sizeof(msg)) {
+                        pos += (size_t)w;
+                        has_commitments = true;
+                    }
+                }
+                size_t show = commitments[i].summary_len > 60 ? 60 : commitments[i].summary_len;
+                w = snprintf(msg + pos, sizeof(msg) - pos, "%.*s%s", (int)show,
+                             commitments[i].summary, (i + 1 < commitment_count) ? "; " : ". ");
+                if (w > 0 && pos + (size_t)w < sizeof(msg))
+                    pos += (size_t)w;
+            }
+        }
+        w = snprintf(msg + pos, sizeof(msg) - pos,
+                     "Generate a morning message that naturally references what's relevant "
+                     "today. Don't use the word 'briefing' or list items — weave it into "
+                     "natural conversation.");
+        if (w > 0 && pos + (size_t)w < sizeof(msg))
+            pos += (size_t)w;
+        if (pos > 0 && pos < sizeof(msg)) {
+            sc_proactive_action_t *act = &out->actions[out->count];
+            act->type = SC_PROACTIVE_MORNING_BRIEFING;
+            act->message = sc_strndup(alloc, msg, pos);
+            if (act->message) {
+                act->message_len = pos;
+                act->priority = 0.7;
+                out->count++;
+            }
+        }
     }
 
-    /* COMMITMENT_FOLLOW_UP: up to 2 active commitments with created_at (assume overdue) */
+    /* COMMITMENT_FOLLOW_UP: up to 2 active commitments — data-driven context */
     if (commitments && commitment_count > 0 && out->count < SC_PROACTIVE_MAX_ACTIONS) {
         static const size_t MAX_COMMITMENT_FOLLOW_UPS = 2;
         size_t added = 0;
@@ -119,17 +169,26 @@ sc_error_t sc_proactive_check_extended(sc_allocator_t *alloc, uint32_t session_c
             const sc_commitment_t *c = &commitments[i];
             if (c->status != SC_COMMITMENT_ACTIVE)
                 continue;
-            if (!c->created_at || c->created_at[0] == '\0')
-                continue;
             if (!c->summary || c->summary_len == 0)
                 continue;
             if (out->count >= SC_PROACTIVE_MAX_ACTIONS)
                 break;
-            char msg[256];
-            size_t summary_len = c->summary_len > 200 ? 200 : c->summary_len;
-            int n = snprintf(msg, sizeof(msg),
-                            "You mentioned: '%.*s'. Would you like to follow up on this?",
-                            (int)summary_len, c->summary);
+            char msg[384];
+            size_t summary_len = c->summary_len > 120 ? 120 : c->summary_len;
+            int n;
+            if (c->created_at && c->created_at[0] != '\0') {
+                n = snprintf(msg, sizeof(msg),
+                             "COMMITMENT FOLLOW-UP: They mentioned '%.*s' (created %s). "
+                             "Generate a natural follow-up that shows genuine interest without "
+                             "sounding like a reminder app.",
+                             (int)summary_len, c->summary, c->created_at);
+            } else {
+                n = snprintf(msg, sizeof(msg),
+                             "COMMITMENT FOLLOW-UP: They mentioned '%.*s'. Generate a natural "
+                             "follow-up that shows genuine interest without sounding like a "
+                             "reminder app.",
+                             (int)summary_len, c->summary);
+            }
             if (n > 0 && (size_t)n < sizeof(msg)) {
                 sc_proactive_action_t *act = &out->actions[out->count];
                 act->type = SC_PROACTIVE_COMMITMENT_FOLLOW_UP;
@@ -144,7 +203,7 @@ sc_error_t sc_proactive_check_extended(sc_allocator_t *alloc, uint32_t session_c
         }
     }
 
-    /* PATTERN_INSIGHT: up to 2 patterns with occurrence_count >= 5 */
+    /* PATTERN_INSIGHT: up to 2 patterns with occurrence_count >= 5 — data-driven */
     if (pattern_subjects && pattern_counts && pattern_count > 0 &&
         out->count < SC_PROACTIVE_MAX_ACTIONS) {
         static const size_t MAX_PATTERN_INSIGHTS = 2;
@@ -158,14 +217,15 @@ sc_error_t sc_proactive_check_extended(sc_allocator_t *alloc, uint32_t session_c
                 continue;
             if (out->count >= SC_PROACTIVE_MAX_ACTIONS)
                 break;
-            char msg[256];
+            char msg[320];
             size_t sublen = strlen(subject);
-            if (sublen > 200)
-                sublen = 200;
+            if (sublen > 120)
+                sublen = 120;
             int n = snprintf(msg, sizeof(msg),
-                            "'%.*s' has come up %u times in your conversations. This seems "
-                            "important to you.",
-                            (int)sublen, subject, (unsigned)pattern_counts[i]);
+                             "PATTERN INSIGHT: '%.*s' has come up %u times in your conversations. "
+                             "Generate a message that naturally reflects this importance — don't "
+                             "announce it as a statistic.",
+                             (int)sublen, subject, (unsigned)pattern_counts[i]);
             if (n > 0 && (size_t)n < sizeof(msg)) {
                 sc_proactive_action_t *act = &out->actions[out->count];
                 act->type = SC_PROACTIVE_PATTERN_INSIGHT;
@@ -180,10 +240,11 @@ sc_error_t sc_proactive_check_extended(sc_allocator_t *alloc, uint32_t session_c
         }
     }
 
-    /* Always: CHECK_IN (low priority) */
+    /* Always: CHECK_IN (low priority) — contextual guidance */
     if (out->count < SC_PROACTIVE_MAX_ACTIONS) {
         static const char CHECK[] =
-            "Check in on how the user is feeling. Ask about progress on any ongoing goals.";
+            "CHECK-IN: Consider how the user is feeling. Ask about progress on any ongoing goals. "
+            "Use context from memory and relationship history.";
         sc_proactive_action_t *act = &out->actions[out->count];
         act->type = SC_PROACTIVE_CHECK_IN;
         act->message = sc_strndup(alloc, CHECK, sizeof(CHECK) - 1);
@@ -197,9 +258,8 @@ sc_error_t sc_proactive_check_extended(sc_allocator_t *alloc, uint32_t session_c
     return SC_OK;
 }
 
-sc_error_t sc_proactive_check_events(sc_allocator_t *alloc,
-                                      const sc_extracted_event_t *events, size_t event_count,
-                                      sc_proactive_result_t *out) {
+sc_error_t sc_proactive_check_events(sc_allocator_t *alloc, const sc_extracted_event_t *events,
+                                     size_t event_count, sc_proactive_result_t *out) {
     if (!alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
     if (!events && event_count > 0)
@@ -215,6 +275,8 @@ sc_error_t sc_proactive_check_events(sc_allocator_t *alloc,
 
         const char *desc = ev->description ? ev->description : "something";
         size_t desc_len = ev->description ? ev->description_len : 8;
+        if (desc_len > 80)
+            desc_len = 80;
         const char *temporal = ev->temporal_ref ? ev->temporal_ref : "";
         size_t temporal_len = ev->temporal_ref ? ev->temporal_ref_len : 0;
 
@@ -222,12 +284,16 @@ sc_error_t sc_proactive_check_events(sc_allocator_t *alloc,
         int n;
         if (temporal_len > 0) {
             n = snprintf(msg, sizeof(msg),
-                        "You mentioned '%.*s' (%.*s). Worth checking in about how it went.",
-                        (int)desc_len, desc, (int)temporal_len, temporal);
+                         "EVENT FOLLOW-UP: Event: %.*s on %.*s. They mentioned this recently. "
+                         "Generate a natural follow-up that shows genuine interest without "
+                         "sounding like a reminder app.",
+                         (int)desc_len, desc, (int)temporal_len, temporal);
         } else {
             n = snprintf(msg, sizeof(msg),
-                        "You mentioned '%.*s'. Worth checking in about how it went.",
-                        (int)desc_len, desc);
+                         "EVENT FOLLOW-UP: Event: %.*s. They mentioned this recently. Generate a "
+                         "natural follow-up that shows genuine interest without sounding like a "
+                         "reminder app.",
+                         (int)desc_len, desc);
         }
         if (n <= 0 || (size_t)n >= sizeof(msg))
             continue;
@@ -245,9 +311,8 @@ sc_error_t sc_proactive_check_events(sc_allocator_t *alloc,
     return SC_OK;
 }
 
-sc_error_t sc_proactive_build_context(const sc_proactive_result_t *result,
-                                       sc_allocator_t *alloc, size_t max_actions,
-                                       char **out, size_t *out_len) {
+sc_error_t sc_proactive_build_context(const sc_proactive_result_t *result, sc_allocator_t *alloc,
+                                      size_t max_actions, char **out, size_t *out_len) {
     if (!result || !alloc || !out || !out_len)
         return SC_ERR_INVALID_ARGUMENT;
     *out = NULL;
@@ -314,8 +379,8 @@ sc_error_t sc_proactive_build_context(const sc_proactive_result_t *result,
 }
 
 sc_error_t sc_proactive_build_starter(sc_allocator_t *alloc, sc_memory_t *memory,
-                                       const char *contact_id, size_t contact_id_len,
-                                       char **out, size_t *out_len) {
+                                      const char *contact_id, size_t contact_id_len, char **out,
+                                      size_t *out_len) {
     if (!alloc || !out || !out_len)
         return SC_ERR_INVALID_ARGUMENT;
     *out = NULL;
@@ -351,8 +416,7 @@ sc_error_t sc_proactive_build_starter(sc_allocator_t *alloc, sc_memory_t *memory
     buf[0] = '\0';
 
     static const char HEADER[] =
-        "### Conversation Starter Context\n"
-        "Based on past conversations, consider opening with one of these topics:\n";
+        "Here are some natural conversation starting points based on what you know about them:\n";
     size_t hlen = sizeof(HEADER) - 1;
     while (len + hlen + 1 > cap) {
         size_t new_cap = cap * 2;
@@ -396,7 +460,7 @@ sc_error_t sc_proactive_build_starter(sc_allocator_t *alloc, sc_memory_t *memory
     }
 
     static const char FOOTER[] =
-        "Pick the most natural one. Don't force it — only mention if it flows naturally.\n";
+        "Start with whatever feels most natural right now. Don't force it.\n";
     size_t flen = sizeof(FOOTER) - 1;
     while (len + flen + 1 > cap) {
         size_t new_cap = cap * 2;
@@ -429,8 +493,7 @@ void sc_proactive_result_deinit(sc_proactive_result_t *result, sc_allocator_t *a
         return;
     for (size_t i = 0; i < result->count; i++) {
         if (result->actions[i].message) {
-            alloc->free(alloc->ctx, result->actions[i].message,
-                        result->actions[i].message_len + 1);
+            alloc->free(alloc->ctx, result->actions[i].message, result->actions[i].message_len + 1);
             result->actions[i].message = NULL;
         }
     }

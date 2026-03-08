@@ -99,6 +99,6 @@ char *sc_bth_metrics_summary(sc_allocator_t *alloc, const sc_bth_metrics_t *m, s
     SC_BTH_SUMMARY_LINE(vision_descriptions, "vision_descriptions");
     SC_BTH_SUMMARY_LINE(total_turns, "total_turns");
 
-    *out_len = pos + 1; /* include null terminator for free() */
+    *out_len = cap; /* must match allocation size for free() */
     return buf;
 }
