@@ -771,6 +771,7 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
 #ifndef SC_IS_TEST
     static char replay_insights[2048] = {0};
     static size_t replay_insights_len = 0;
+    static size_t promotion_counter = 0;
 #endif
 
     while (!SC_STOP_FLAG) {
@@ -1746,6 +1747,37 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                     store_conversation_summary(alloc, agent->memory, batch_key, key_len,
                                                combined, combined_len, response, response_len);
                 }
+
+#ifndef SC_IS_TEST
+                /* Episodic: summarize this interaction */
+                if (err == SC_OK && response && response_len > 0 && agent->memory &&
+                    agent->provider.vtable) {
+                    const char *ep_msgs[2] = {combined, response};
+                    size_t ep_lens[2] = {combined_len, response_len};
+                    size_t summary_len = 0;
+                    char *summary =
+                        sc_episodic_summarize_session(alloc, ep_msgs, ep_lens, 2, &summary_len);
+                    if (summary && summary_len > 0) {
+                        sc_episodic_store(agent->memory, alloc, batch_key, key_len, summary,
+                                         summary_len);
+                        alloc->free(alloc->ctx, summary, summary_len + 1);
+                    } else if (summary) {
+                        alloc->free(alloc->ctx, summary, summary_len + 1);
+                    }
+                }
+
+                /* Promote STM entities to persistent memory every 5 turns */
+                if (err == SC_OK && ++promotion_counter % 5 == 0 && agent->stm.turn_count > 0 &&
+                    agent->memory) {
+                    sc_promotion_config_t promo_cfg = {
+                        .min_mention_count = 2,
+                        .min_importance = 0.3,
+                        .max_entities = 10,
+                    };
+                    sc_promotion_run(alloc, &agent->stm, agent->memory, &promo_cfg);
+                    sc_promotion_run_emotions(alloc, &agent->stm, agent->memory, batch_key, key_len);
+                }
+#endif
 
                 /* Emotion promotion: promote emotions from STM to long-term memory */
                 if (err == SC_OK && response && response_len > 0 && agent->stm.turn_count > 0 &&
