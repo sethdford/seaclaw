@@ -369,6 +369,8 @@ set(SC_CORE_SOURCES
     src/agent/awareness.c
     src/agent/outcomes.c
     src/context/conversation.c
+    src/context/mood.c
+    src/context/event_extract.c
     src/agent/episodic.c
     src/agent/reflection.c
     src/agent/input_guard.c
@@ -1400,6 +1402,7 @@ set(SC_TEST_SOURCES
     tests/test_reflection.c
     tests/test_input_guard.c
     tests/test_conversation.c
+    tests/test_event_extract.c
     tests/test_stm.c
     tests/test_fast_capture.c
     tests/test_promotion.c
@@ -1411,6 +1414,8 @@ set(SC_TEST_SOURCES
     tests/test_superhuman.c
     tests/test_tool_router.c
     tests/test_dag.c
+    tests/test_mood.c
+    tests/test_bth_e2e.c
 )
 if(SC_ENABLE_PERSONA)
     list(APPEND SC_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c)
