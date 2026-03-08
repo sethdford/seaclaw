@@ -380,6 +380,7 @@ set(SC_CORE_SOURCES
     src/agent/superhuman_commitment.c
     src/agent/superhuman_predictive.c
     src/agent/superhuman_emotional.c
+    src/agent/superhuman_silence.c
     src/providers/error_classify.c
     src/providers/api_key.c
     src/providers/helpers.c
