@@ -29,6 +29,7 @@ type TabId =
   | "nodes"
   | "usage"
   | "metrics"
+  | "memory"
   | "security"
   | "logs";
 
@@ -47,6 +48,7 @@ const VALID_TABS: TabId[] = [
   "nodes",
   "usage",
   "metrics",
+  "memory",
   "security",
   "logs",
 ];
@@ -68,6 +70,7 @@ const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   nodes: () => import("./views/nodes-view.js"),
   usage: () => import("./views/usage-view.js"),
   metrics: () => import("./views/metrics-view.js"),
+  memory: () => import("./views/memory-view.js"),
   security: () => import("./views/security-view.js"),
   logs: () => import("./views/logs-view.js"),
 };
@@ -438,17 +441,16 @@ export class ScApp extends LitElement {
             return `${proto}//${window.location.host}/ws`;
           })();
 
-    // Auto-fallback: if real gateway doesn't connect within 2.5s, use demo
+    // Auto-fallback: if real gateway doesn't complete handshake within 2.5s, use demo.
+    // A raw WebSocket open (e.g. to Vite's HMR server) is not enough — we need a
+    // successful "connect" handshake proving this is a real seaclaw gateway.
     if (!this._isDemo) {
       this._inFallbackWindow = true;
       this._fallbackTimer = setTimeout(() => {
-        if (this.gateway?.status !== "connected") {
-          this._switchToDemo();
-        }
+        this._switchToDemo();
       }, 2500);
-      // Cancel fallback if real gateway connects in time
-      this.gateway.addEventListener("status", ((e: CustomEvent<string>) => {
-        if (e.detail === "connected" && this._fallbackTimer) {
+      this.gateway.addEventListener("features", (() => {
+        if (this._fallbackTimer) {
           clearTimeout(this._fallbackTimer);
           this._fallbackTimer = null;
           this._inFallbackWindow = false;
@@ -842,6 +844,8 @@ export class ScApp extends LitElement {
         return html`<sc-usage-view></sc-usage-view>`;
       case "metrics":
         return html`<sc-metrics-view></sc-metrics-view>`;
+      case "memory":
+        return html`<sc-memory-view></sc-memory-view>`;
       case "security":
         return html`<sc-security-view></sc-security-view>`;
       case "logs":

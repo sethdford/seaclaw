@@ -29,6 +29,7 @@ const SECTIONS: NavSection[] = [
     items: [
       { id: "agents", label: "Agents", icon: icons.zap },
       { id: "models", label: "Models", icon: icons.cpu },
+      { id: "memory", label: "Memory", icon: icons.brain },
       { id: "voice", label: "Voice", icon: icons.mic },
     ],
   },

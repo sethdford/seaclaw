@@ -562,10 +562,10 @@ export class DemoGatewayClient extends EventTarget {
         event: "chat",
         payload: { channel: "Telegram", user: "Alice", preview: "PR review ready" },
       },
-      { event: "tool_call", payload: { tool: "shell", command: "git status" } },
+      { event: "agent.tool", payload: { tool: "shell", command: "git status" } },
       { event: "health", payload: { status: "operational", uptime_secs: 172800 } },
       { event: "chat", payload: { channel: "Discord", user: "Bob", preview: "Deploy looks good" } },
-      { event: "tool_call", payload: { tool: "web_search", command: "Rust async patterns" } },
+      { event: "agent.tool", payload: { tool: "web_search", command: "Rust async patterns" } },
       { event: "error", payload: { source: "email", message: "SMTP timeout" } },
     ];
     for (const s of seed) {
@@ -973,15 +973,14 @@ export class DemoGatewayClient extends EventTarget {
       case "memory.status":
         return {
           engine: "sqlite",
-          total_entries: 42,
-          categories: { core: 8, daily: 18, conversation: 12, insight: 4 },
+          total_entries: 47,
+          categories: { core: 9, daily: 20, conversation: 12, insight: 6 },
           last_consolidation: "2026-03-07T22:15:00Z",
         };
       case "memory.list":
         return {
           entries: [
             {
-              id: "mem_1",
               key: "user-prefers-dark-mode",
               content: "User prefers dark mode and compact layouts",
               category: "core",
@@ -989,7 +988,6 @@ export class DemoGatewayClient extends EventTarget {
               timestamp: "2026-03-01T10:00:00Z",
             },
             {
-              id: "mem_2",
               key: "project-deadline-march",
               content: "Main project deadline is end of March 2026",
               category: "daily",
@@ -997,12 +995,48 @@ export class DemoGatewayClient extends EventTarget {
               timestamp: "2026-03-05T14:30:00Z",
             },
             {
-              id: "mem_3",
               key: "insight-preference-productivity",
-              content: "User's preference for dark mode correlates with late-night work sessions",
+              content:
+                "User's preference for dark mode correlates with late-night work sessions — productivity peaks between 10 PM and 2 AM",
               category: "insight",
               source: "connection_discovery",
               timestamp: "2026-03-07T22:15:00Z",
+            },
+            {
+              key: "team-standup-time",
+              content: "Daily team standup is at 9:30 AM PST",
+              category: "core",
+              source: "conversation:sess_def",
+              timestamp: "2026-02-20T09:30:00Z",
+            },
+            {
+              key: "coffee-preference",
+              content: "User drinks oat milk lattes, prefers Blue Bottle",
+              category: "daily",
+              source: "conversation:sess_ghi",
+              timestamp: "2026-03-04T08:15:00Z",
+            },
+            {
+              key: "insight-deadline-shipping",
+              content:
+                "Project deadline and team shipping velocity are tightly coupled — sprint capacity should be protected in final 2 weeks",
+              category: "insight",
+              source: "connection_discovery",
+              timestamp: "2026-03-07T22:15:00Z",
+            },
+            {
+              key: "api-key-rotation",
+              content: "API keys rotate on the 1st of each month — set calendar reminder",
+              category: "daily",
+              source: "api-ingest:slack-notes",
+              timestamp: "2026-03-01T12:00:00Z",
+            },
+            {
+              key: "preferred-language",
+              content: "Primary programming language is C, also uses TypeScript for web UIs",
+              category: "core",
+              source: "conversation:sess_jkl",
+              timestamp: "2026-02-15T16:45:00Z",
             },
           ],
         };

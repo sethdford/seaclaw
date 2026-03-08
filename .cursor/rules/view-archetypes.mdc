@@ -15,6 +15,7 @@ Read `docs/ux-patterns.md` before creating or modifying any view.
 |-----------|-----------|-------------------|
 | `overview-view.ts` | Dashboard (Feed) | Compact hero -> scrollable card/bento grid |
 | `usage-view.ts` | Dashboard (Feed) | Compact hero -> scrollable card grid |
+| `memory-view.ts` | Dashboard (Feed) | Compact hero -> stat cards -> searchable card grid |
 | `security-view.ts` | Dashboard (Feed) | Compact hero -> scrollable card grid |
 | `chat-view.ts` | Conversational | Content area `flex: 1`, controls anchored bottom |
 | `voice-view.ts` | Conversational | Content area `flex: 1`, controls anchored bottom |
