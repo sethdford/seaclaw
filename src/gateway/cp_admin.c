@@ -55,12 +55,24 @@ sc_error_t cp_admin_connect(sc_allocator_t *alloc, sc_app_context_t *app, sc_ws_
     cp_json_set_str(alloc, obj, "type", "hello-ok");
 
     sc_json_value_t *server = sc_json_object_new(alloc);
+    if (!server) {
+        sc_json_free(alloc, obj);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
     cp_json_set_str(alloc, server, "version", sc_version_string());
     sc_json_object_set(alloc, obj, "server", server);
     sc_json_object_set(alloc, obj, "protocol", sc_json_number_new(alloc, 1));
 
     sc_json_value_t *features = sc_json_object_new(alloc);
+    if (!features) {
+        sc_json_free(alloc, obj);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
     sc_json_value_t *methods_arr = sc_json_array_new(alloc);
+    if (!methods_arr) {
+        sc_json_free(alloc, obj);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
 
     static const char *const methods[] = {
         "auth.token",      "connect",          "health",
@@ -78,8 +90,11 @@ sc_error_t cp_admin_connect(sc_allocator_t *alloc, sc_app_context_t *app, sc_ws_
         "activity.recent", "push.register",    "push.unregister"};
     for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
         sc_json_value_t *m = sc_json_string_new(alloc, methods[i], strlen(methods[i]));
-        if (m)
-            sc_json_array_push(alloc, methods_arr, m);
+        if (!m) {
+            sc_json_free(alloc, obj);
+            return SC_ERR_OUT_OF_MEMORY;
+        }
+        sc_json_array_push(alloc, methods_arr, m);
     }
     sc_json_object_set(alloc, features, "methods", methods_arr);
 
