@@ -49,14 +49,18 @@ export interface GatewayLike {
   status: string;
 }
 
+const MAX_VISIBLE_ITEMS = 500;
+
 export class ChatController implements ReactiveController {
   items: ChatItem[] = [];
+  trimmedCount = 0;
   isWaiting = false;
   lastFailedMessage = "";
   errorBanner = "";
   streamElapsed = "";
   historyLoading = false;
   historyError = "";
+  loadingEarlier = false;
 
   private _getGateway: () => GatewayLike | null;
   private _streamStartTime = 0;
@@ -70,8 +74,29 @@ export class ChatController implements ReactiveController {
     host.addController(this);
   }
 
+  get hasEarlierMessages(): boolean {
+    return this.trimmedCount > 0;
+  }
+
   hostConnected(): void {
     /* no-op */
+  }
+
+  loadEarlier(): void {
+    this.loadingEarlier = true;
+    this._requestUpdate();
+    (this.host as EventTarget).dispatchEvent(
+      new CustomEvent("sc-load-earlier-request", { bubbles: true, composed: true }),
+    );
+    // Stub: gateway integration will clear loadingEarlier when done
+  }
+
+  private _trimIfNeeded(): void {
+    if (this.items.length > MAX_VISIBLE_ITEMS) {
+      const excess = this.items.length - MAX_VISIBLE_ITEMS;
+      this.items = this.items.slice(excess);
+      this.trimmedCount += excess;
+    }
   }
 
   hostDisconnected(): void {
@@ -94,6 +119,7 @@ export class ChatController implements ReactiveController {
       status: "sending",
     };
     this.items = [...this.items, userMsg];
+    this._trimIfNeeded();
     this.lastFailedMessage = "";
     this.isWaiting = true;
     this._startStreamTimer();
@@ -176,6 +202,7 @@ export class ChatController implements ReactiveController {
           role: m.role as "user" | "assistant",
           content: m.content ?? "",
         }));
+        this._trimIfNeeded();
         this.cacheMessages(sessionKey);
         this._requestUpdate();
         return;
@@ -226,6 +253,7 @@ export class ChatController implements ReactiveController {
     const items = ChatCache.restore(sessionKey);
     if (items.length === 0) return false;
     this.items = items;
+    this._trimIfNeeded();
     return true;
   }
 
@@ -274,6 +302,7 @@ export class ChatController implements ReactiveController {
       );
     } else {
       this.items = [...this.items, { type: "thinking", content, streaming: true, ts: Date.now() }];
+      this._trimIfNeeded();
     }
     this.cacheMessages(sessionKey);
     this._requestUpdate();
@@ -298,6 +327,7 @@ export class ChatController implements ReactiveController {
             ts: Date.now(),
           },
         ];
+        this._trimIfNeeded();
       }
     }
 
@@ -315,6 +345,7 @@ export class ChatController implements ReactiveController {
           ts: Date.now(),
         },
       ];
+      this._trimIfNeeded();
       this.isWaiting = false;
       this._stopStreamTimer();
     }
@@ -344,6 +375,7 @@ export class ChatController implements ReactiveController {
             ts: Date.now(),
           },
         ];
+        this._trimIfNeeded();
       }
     }
 
@@ -382,6 +414,7 @@ export class ChatController implements ReactiveController {
           ts: Date.now(),
         },
       ];
+      this._trimIfNeeded();
     } else {
       const existing = this.items[existingIdx];
       if (existing.type === "tool_call") {

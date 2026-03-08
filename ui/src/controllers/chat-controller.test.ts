@@ -576,6 +576,44 @@ describe("ChatController", () => {
     });
   });
 
+  describe("items cap and load-earlier", () => {
+    it("items_capped_at_max_visible", () => {
+      const host = createMockHost();
+      const getGateway = vi.fn().mockReturnValue(null);
+      const ctrl = new ChatController(host as unknown as ReactiveControllerHost, getGateway);
+
+      for (let i = 0; i < 510; i++) {
+        ctrl.handleEvent("chat", {
+          state: "received",
+          message: `msg-${i}`,
+          id: `id-${i}`,
+        });
+      }
+
+      expect(ctrl.items).toHaveLength(500);
+      expect(ctrl.trimmedCount).toBe(10);
+    });
+
+    it("has_earlier_messages_true_when_trimmed", () => {
+      const host = createMockHost();
+      const getGateway = vi.fn().mockReturnValue(null);
+      const ctrl = new ChatController(host as unknown as ReactiveControllerHost, getGateway);
+
+      expect(ctrl.hasEarlierMessages).toBe(false);
+
+      for (let i = 0; i < 510; i++) {
+        ctrl.handleEvent("chat", {
+          state: "received",
+          message: `msg-${i}`,
+          id: `id-${i}`,
+        });
+      }
+
+      expect(ctrl.hasEarlierMessages).toBe(true);
+      expect(ctrl.trimmedCount).toBe(10);
+    });
+  });
+
   describe("stream timer", () => {
     beforeEach(() => {
       vi.useFakeTimers();
