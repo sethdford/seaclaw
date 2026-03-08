@@ -602,14 +602,19 @@ export class DemoGatewayClient extends EventTarget {
     }, 5000);
   }
 
-  #emitChatResponse(userMessage: string): void {
+  #emitChatResponse(userMessage: string, sessionKey?: string): void {
     const id = "demo-" + Date.now();
     setTimeout(() => {
       this.dispatchEvent(
         new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
           detail: {
             event: "chat",
-            payload: { state: "sent", message: `Demo response to: ${userMessage}`, id },
+            payload: {
+              state: "sent",
+              message: `Demo response to: ${userMessage}`,
+              id,
+              session_key: sessionKey ?? "default",
+            },
           },
         }),
       );
@@ -922,7 +927,8 @@ export class DemoGatewayClient extends EventTarget {
       // --- Chat (emits mock response) ---
       case "chat.send": {
         const msg = (params?.message as string) ?? "";
-        this.#emitChatResponse(msg);
+        const sk = (params?.sessionKey as string) ?? undefined;
+        this.#emitChatResponse(msg, sk);
         return {};
       }
       case "chat.abort":

@@ -39,6 +39,7 @@ _seaclaw() {
                 version:Show version information
                 help:Show help information
                 init:Initialize configuration
+                paperclip:Paperclip agent integration
                 persona:Persona management
                 sandbox:Sandbox management
             )'
@@ -144,6 +145,11 @@ _seaclaw() {
                     _describe 'sandbox subcommand' '(
                         list:List sandbox backends
                         status:Sandbox status
+                    )'
+                    ;;
+                paperclip)
+                    _describe 'paperclip subcommand' '(
+                        heartbeat:Send heartbeat
                     )'
                     ;;
             esac

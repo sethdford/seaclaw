@@ -111,13 +111,13 @@ test.describe("Voice Interactions", () => {
     const result = await page.evaluate(sendVoiceMessage("Session clear test"));
     expect(result).toMatch(/^sent/);
 
+    // Wait for both user message AND demo response before clearing
     await expect(async () => {
       const text: string = await page.evaluate(deepText(VIEW));
-      expect(text).toContain("Session clear test");
-    }).toPass({ timeout: POLL });
+      expect(text).toContain("Demo response to: Session clear test");
+    }).toPass({ timeout: 10000 });
 
     await page.evaluate(clickStatusBarButton("New Session"));
-    await page.waitForTimeout(300);
 
     await expect(async () => {
       const hasEmpty = await page.evaluate(

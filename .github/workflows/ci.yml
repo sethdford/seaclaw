@@ -161,7 +161,7 @@ jobs:
         run: bash scripts/check-bundle-size.sh
       - name: UI test count regression guard
         run: |
-          COUNT=$(npm run test 2>&1 | grep -E "Tests.*passed" | grep -oE '[0-9]+' | head -1)
+          COUNT=$(npm run test 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -E '^\s*Tests\s' | grep -oE '[0-9]+' | head -1)
           echo "UI test count: $COUNT"
           BASELINE=460
           if [ -n "$COUNT" ] && [ "$COUNT" -lt "$BASELINE" ]; then

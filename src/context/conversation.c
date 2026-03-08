@@ -1107,7 +1107,7 @@ size_t sc_conversation_generate_correction(const char *original, size_t original
     int n = snprintf(out_buf, out_cap, "*%.*s", (int)word_len, original + word_start);
     if (n < 0)
         return 0;
-    return (size_t)((n >= (int)out_cap) ? out_cap - 1 : n);
+    return ((size_t)n >= out_cap) ? out_cap - 1 : (size_t)n;
 }
 
 /* ── Multi-message splitting ──────────────────────────────────────────── */

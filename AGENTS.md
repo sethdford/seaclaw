@@ -26,7 +26,7 @@ Key extension points:
 - `src/peripherals/` (`sc_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **683 source + header files, ~129K lines of C, ~57K lines of tests, 3653 tests, 33 channels**.
+Current scale: **689 source + header files, ~130K lines of C, ~58K lines of tests, 3673 tests, 33 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -74,7 +74,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `SC_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 3653+ tests must pass at zero ASan errors**
+5. **All 3673+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `SC_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -140,7 +140,7 @@ src/
   agent/                agent loop, context, planner, compaction, dispatcher
   channels/             33 channel implementations (cli, telegram, discord, slack, ...)
   providers/            50+ AI provider implementations (9 core + 41 compatible services)
-  tools/                66 tool implementations
+  tools/                67 tool implementations
   memory/               SQLite + markdown + LRU backends, embeddings, vector search
   security/             policy, pairing, secrets, sandbox backends (landlock, firejail, bwrap)
   runtime/              runtime adapters (native, docker, wasm, cloudflare)
@@ -156,7 +156,7 @@ src/
 
 include/seaclaw/       public C headers
 
-tests/                 126 test files, 3653+ tests
+tests/                 127 test files, 3673+ tests
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 

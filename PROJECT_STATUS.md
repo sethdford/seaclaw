@@ -6,10 +6,10 @@ Last updated: 2026-03-08
 
 | Metric                         | Value                |
 | ------------------------------ | -------------------- |
-| Source files (src/ + include/) | **683**              |
-| Lines of C/H/ASM code          | **~129K**            |
-| Test files                     | 126                  |
-| Tests passing                  | **3653/3653 (100%)** |
+| Source files (src/ + include/) | **689**              |
+| Lines of C/H/ASM code          | **~130K**            |
+| Test files                     | 127                  |
+| Tests passing                  | **3673/3673 (100%)** |
 | Binary size (MinSizeRel+LTO)   | **~1506 KB**          |
 | Peak RSS (test suite)          | **~5.9 MB**          |
 
@@ -59,7 +59,7 @@ Last updated: 2026-03-08
 | -------- | ------------------------ |
 | Dispatch | Forwards to sub-channels |
 
-## Tools — All 66 Real (with all feature flags)
+## Tools — All 67 Real (with all feature flags)
 
 Every tool has a real implementation. In test mode (`SC_IS_TEST`), they return mock
 data to avoid side effects. Highlights:
