@@ -160,5 +160,78 @@ export const VIEW_TAGS: Record<string, string> = {
 
 export const ALL_VIEWS = Object.keys(VIEW_TAGS);
 
+/** Initial wait after navigation for demo gateway to connect and data to load. */
 export const WAIT = 1800;
+
+/** Poll timeout for expect().toPass() — how long to retry assertions. */
 export const POLL = 8000;
+
+/**
+ * Short wait for animations to settle (e.g. sheet open, theme switch).
+ * Use sparingly — prefer deterministic waits (waitForSelector, expect().toPass).
+ */
+export const ANIMATION_SETTLE_MS = 200;
+
+/**
+ * Deep text extraction that traverses through ALL nested shadow DOMs.
+ * Use when content is inside nested web components (tables, cards, etc.).
+ */
+export function deepText(viewTag: string): string {
+  return `(() => {
+    function collectText(root) {
+      let text = "";
+      if (!root) return text;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) text += walker.currentNode.textContent;
+      for (const el of root.querySelectorAll("*")) {
+        if (el.shadowRoot) text += collectText(el.shadowRoot);
+      }
+      return text;
+    }
+    const app = document.querySelector("sc-app");
+    const view = app?.shadowRoot?.querySelector("${viewTag}");
+    return view?.shadowRoot ? collectText(view.shadowRoot) : "";
+  })()`;
+}
+
+/**
+ * Waits for a view to be attached and have rendered content (LitElement).
+ * Use after navigation instead of waitForTimeout.
+ */
+export async function waitForViewReady(
+  page: import("@playwright/test").Page,
+  viewTag: string,
+  timeout = 5000,
+): Promise<void> {
+  await page.waitForLoadState("domcontentloaded");
+  await page.waitForFunction(
+    (tag) => {
+      const app = document.querySelector("sc-app");
+      const view = app?.shadowRoot?.querySelector(tag);
+      return !!view && (view?.shadowRoot?.children.length ?? 0) > 0;
+    },
+    viewTag,
+    { timeout },
+  );
+}
+
+/**
+ * Waits for a selector inside a view's shadow DOM.
+ * Use for LitElement rendering (e.g. detail sheet, panel).
+ */
+export async function waitForShadowSelector(
+  page: import("@playwright/test").Page,
+  viewTag: string,
+  selector: string,
+  timeout = 5000,
+): Promise<void> {
+  await page.waitForFunction(
+    ([tag, sel]) => {
+      const app = document.querySelector("sc-app");
+      const view = app?.shadowRoot?.querySelector(tag);
+      return !!view?.shadowRoot?.querySelector(sel);
+    },
+    [viewTag, selector] as [string, string],
+    { timeout },
+  );
+}

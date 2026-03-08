@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 /**
  * Test sending a message via gateway client directly (bypasses Shadow DOM input).
@@ -9,7 +9,7 @@ test.describe("Chat via Gateway Direct", () => {
   test("send message via gw.request and capture response", async ({ page }) => {
     await page.goto("/#chat");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
+    await expect(page.locator("sc-app >> sc-chat-view")).toBeAttached({ timeout: 10000 });
 
     const statusBefore = await page.evaluate(() => {
       const app = document.querySelector("sc-app") as { gateway?: { status: string } } | null;
@@ -44,8 +44,15 @@ test.describe("Chat via Gateway Direct", () => {
       `chat.send should succeed: ${(sendResult as { error?: string }).error ?? "unknown"}`,
     ).toBe(true);
 
-    // 4. Wait 15 seconds for Gemini response
-    await page.waitForTimeout(15000);
+    // 4. Wait for assistant response (LLM can take up to 15s)
+    await expect(async () => {
+      const pageText = await page.evaluate(() => document.body.innerText);
+      const hasAssistant =
+        pageText.includes("assistant") ||
+        pageText.includes("SeaClaw") ||
+        pageText.includes("Gemini");
+      expect(hasAssistant).toBe(true);
+    }).toPass({ timeout: 15000 });
 
     // 5. Screenshot
     await page.screenshot({
@@ -53,11 +60,7 @@ test.describe("Chat via Gateway Direct", () => {
       fullPage: true,
     });
 
-    // 6. Assert assistant content appeared
-    const pageText = await page.evaluate(() => document.body.innerText);
-    const hasAssistant =
-      pageText.includes("assistant") || pageText.includes("SeaClaw") || pageText.includes("Gemini");
-    expect(hasAssistant, "Page should contain assistant response content").toBe(true);
+    // 6. Assert assistant content appeared (already verified in step 4)
 
     // 7. Try interacting with chat input (skip if no chat view, e.g. demo mode)
     const chatView = page.locator("sc-app >> sc-chat-view");
@@ -72,7 +75,15 @@ test.describe("Chat via Gateway Direct", () => {
       } else {
         await input.press("Enter");
       }
-      await page.waitForTimeout(3000);
+      await expect(async () => {
+        const hasResponse = await page.evaluate(() => {
+          const app = document.querySelector("sc-app");
+          const view = app?.shadowRoot?.querySelector("sc-chat-view");
+          const text = view?.shadowRoot?.textContent ?? "";
+          return text.includes("assistant") || text.includes("thinking") || text.length > 200;
+        });
+        expect(hasResponse).toBe(true);
+      }).toPass({ timeout: 5000 });
       await page.screenshot({
         path: "test-results/chat-input-interaction.png",
         fullPage: true,

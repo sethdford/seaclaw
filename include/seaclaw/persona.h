@@ -61,6 +61,20 @@ typedef struct sc_contact_profile {
     char *proactive_schedule;
 } sc_contact_profile_t;
 
+/* Inner world — deep personality content surfaced by relationship stage */
+typedef struct sc_inner_world {
+    char **contradictions;
+    size_t contradictions_count;
+    char **embodied_memories;
+    size_t embodied_memories_count;
+    char **emotional_flashpoints;
+    size_t emotional_flashpoints_count;
+    char **unfinished_business;
+    size_t unfinished_business_count;
+    char **secret_self;
+    size_t secret_self_count;
+} sc_inner_world_t;
+
 typedef struct sc_persona {
     char *name;
     size_t name_len;
@@ -78,6 +92,12 @@ typedef struct sc_persona {
     char **values;
     size_t values_count;
     char *decision_style;
+    char *biography;
+    char **directors_notes;
+    size_t directors_notes_count;
+    char **mood_states;
+    size_t mood_states_count;
+    sc_inner_world_t inner_world;
     sc_persona_overlay_t *overlays;
     size_t overlays_count;
     sc_persona_example_bank_t *example_banks;
@@ -123,6 +143,11 @@ const sc_contact_profile_t *sc_persona_find_contact(const sc_persona_t *persona,
 sc_error_t sc_contact_profile_build_context(sc_allocator_t *alloc,
                                             const sc_contact_profile_t *contact, char **out,
                                             size_t *out_len);
+
+/* Build inner world context, stage-gated. Only surfaces for friend+ stages.
+ * Returns NULL if stage is too low or no inner world content. */
+char *sc_persona_build_inner_world_context(sc_allocator_t *alloc, const sc_persona_t *persona,
+                                           const char *relationship_stage, size_t *out_len);
 
 /* Feedback — user corrections for persona learning */
 typedef struct sc_persona_feedback {

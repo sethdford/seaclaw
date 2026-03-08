@@ -7,7 +7,7 @@ import {
   shadowElementText,
   shadowText,
   shadowTextIn,
-  WAIT,
+  waitForViewReady,
   POLL,
 } from "./helpers.js";
 
@@ -17,7 +17,7 @@ import {
 test.describe("Overview (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#overview");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-overview-view");
   });
 
   test("shows stat cards", async ({ page }) => {
@@ -57,7 +57,7 @@ test.describe("Overview (Demo)", () => {
 test.describe("Chat (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#chat");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-chat-view");
   });
 
   test("shows message thread component", async ({ page }) => {
@@ -94,7 +94,7 @@ test.describe("Chat (Demo)", () => {
 test.describe("Agents (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#agents");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-agents-view");
   });
 
   test("shows 4 stat cards", async ({ page }) => {
@@ -134,7 +134,7 @@ test.describe("Agents (Demo)", () => {
 test.describe("Models (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#models");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-models-view");
   });
 
   test("shows 5 provider cards", async ({ page }) => {
@@ -183,10 +183,10 @@ test.describe("Models (Demo)", () => {
         search?.dispatchEvent(new CustomEvent("sc-search", { detail: { value: "ollama" } }));
       })()
     `);
-    await page.waitForTimeout(500);
-
-    const count = await page.evaluate(shadowCount("sc-models-view", ".grid sc-card"));
-    expect(count).toBe(1);
+    await expect(async () => {
+      const count = await page.evaluate(shadowCount("sc-models-view", ".grid sc-card"));
+      expect(count).toBe(1);
+    }).toPass({ timeout: POLL });
   });
 });
 
@@ -196,7 +196,7 @@ test.describe("Models (Demo)", () => {
 test.describe("Tools (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#tools");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-tools-view");
   });
 
   test("shows page hero", async ({ page }) => {
@@ -218,7 +218,7 @@ test.describe("Tools (Demo)", () => {
 test.describe("Channels (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#channels");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-channels-view");
   });
 
   test("shows data table with channels", async ({ page }) => {
@@ -248,7 +248,7 @@ test.describe("Channels (Demo)", () => {
 test.describe("Automations (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#automations");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-automations-view");
   });
 
   test("shows page hero", async ({ page }) => {
@@ -296,7 +296,7 @@ test.describe("Automations (Demo)", () => {
 test.describe("Config (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#config");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-config-view");
   });
 
   test("shows page hero with section header", async ({ page }) => {
@@ -343,7 +343,7 @@ test.describe("Config (Demo)", () => {
 test.describe("Usage (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#usage");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-usage-view");
   });
 
   test("shows page hero", async ({ page }) => {
@@ -389,7 +389,7 @@ test.describe("Usage (Demo)", () => {
 test.describe("Security (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#security");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-security-view");
   });
 
   test("shows page hero", async ({ page }) => {
@@ -438,7 +438,7 @@ test.describe("Security (Demo)", () => {
 test.describe("Nodes (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#nodes");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-nodes-view");
   });
 
   test("shows page hero", async ({ page }) => {
@@ -472,7 +472,7 @@ test.describe("Nodes (Demo)", () => {
 test.describe("Logs (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#logs");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-logs-view");
   });
 
   test("shows page hero", async ({ page }) => {
@@ -515,7 +515,7 @@ test.describe("Logs (Demo)", () => {
 test.describe("Voice (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#voice");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-voice-view");
   });
 
   test("shows Voice hero section", async ({ page }) => {
@@ -565,7 +565,7 @@ test.describe("Voice (Demo)", () => {
 test.describe("Skills (Demo) — extended", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#skills");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-skills-view");
   });
 
   test("shows Install from URL input and button", async ({ page }) => {

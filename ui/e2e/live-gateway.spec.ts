@@ -76,15 +76,16 @@ test.describe("Live Gateway E2E", () => {
     await sendBtn.click();
     const firstReply = chatView.locator("sc-message-list .message.assistant").first();
     await expect(firstReply).toBeVisible({ timeout: 30000 });
-    await page.waitForTimeout(3000);
 
     await textarea.fill("What was the number I just told you? Reply with just the number.");
     await sendBtn.click();
 
-    await page.waitForTimeout(5000);
     const replies = chatView.locator("sc-message-list .message.assistant");
+    await expect(async () => {
+      const count = await replies.count();
+      expect(count).toBeGreaterThanOrEqual(2);
+    }).toPass({ timeout: 30000 });
     const count = await replies.count();
-    expect(count).toBeGreaterThanOrEqual(2);
     const lastReply = replies.nth(count - 1);
     await expect(lastReply).toBeVisible({ timeout: 30000 });
 

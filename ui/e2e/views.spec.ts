@@ -260,7 +260,6 @@ test.describe("Skills View (Demo Mode)", () => {
       const inner = card?.shadowRoot?.querySelector("sc-card") as HTMLElement;
       inner?.click();
     });
-    await page.waitForTimeout(500);
     await expect(async () => {
       const hasDetail = await page.evaluate(() => {
         const app = document.querySelector("sc-app");
@@ -289,7 +288,6 @@ test.describe("Skills View (Demo Mode)", () => {
       const inner = card?.shadowRoot?.querySelector("sc-card") as HTMLElement;
       inner?.click();
     });
-    await page.waitForTimeout(500);
     await expect(async () => {
       const hasName = await page.evaluate(() => {
         const app = document.querySelector("sc-app");
@@ -319,7 +317,6 @@ test.describe("Skills View (Demo Mode)", () => {
       const inner = card?.shadowRoot?.querySelector("sc-card") as HTMLElement;
       inner?.click();
     });
-    await page.waitForTimeout(500);
     await expect(async () => {
       const btnCount = await page.evaluate(() => {
         const app = document.querySelector("sc-app");

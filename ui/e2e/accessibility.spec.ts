@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { shadowInteractiveRects, VIEW_TAGS, WAIT, POLL } from "./helpers.js";
+import { shadowInteractiveRects, waitForViewReady, POLL } from "./helpers.js";
 
 const SHADOW_DOM_EXCLUDED_RULES = [
   "color-contrast",
@@ -72,20 +72,28 @@ test.describe("Accessibility", () => {
 
   test("command palette is keyboard navigable", async ({ page }) => {
     await page.goto("/");
-    await page.keyboard.press("Control+k");
-    await page.waitForTimeout(200);
+    // Use Meta+k on Mac, Control+k elsewhere (app accepts both)
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+k" : "Control+k");
+    await expect(
+      page.locator("sc-command-palette input, sc-command-palette [role='listbox']"),
+    ).toBeVisible({
+      timeout: 5000,
+    });
     await page.keyboard.type("chat");
-    await page.waitForTimeout(100);
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Enter");
   });
 
   test("modal traps focus", async ({ page }) => {
     await page.goto("/?demo");
-    await page.keyboard.press("Control+k");
-    await page.waitForTimeout(200);
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+k" : "Control+k");
+    await expect(
+      page.locator("sc-command-palette input, sc-command-palette [role='listbox']"),
+    ).toBeVisible({
+      timeout: 5000,
+    });
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
+    await expect(page.locator("sc-command-palette input")).not.toBeVisible();
   });
 });
 
@@ -108,7 +116,7 @@ test.describe("Icon-Only Button Audit", () => {
   for (const view of VIEWS_TO_AUDIT) {
     test(`${view.name}: all icon-only buttons have accessible name`, async ({ page }) => {
       await page.goto(`/?demo#${view.hash}`);
-      await page.waitForTimeout(WAIT);
+      await waitForViewReady(page, view.tag);
       await expect(async () => {
         const rects = (await page.evaluate(shadowInteractiveRects(view.tag))) as Array<{
           width: number;
@@ -145,7 +153,7 @@ test.describe("Heading Hierarchy", () => {
   for (const view of HEADING_VIEWS) {
     test(`${view.name}: headings do not skip levels`, async ({ page }) => {
       await page.goto(`/?demo#${view.hash}`);
-      await page.waitForTimeout(WAIT);
+      await waitForViewReady(page, view.tag);
       await expect(async () => {
         const levels = (await page.evaluate(`(() => {
           const app = document.querySelector("sc-app");

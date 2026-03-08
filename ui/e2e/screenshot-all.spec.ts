@@ -1,5 +1,6 @@
-import { test } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import * as fs from "node:fs";
+import { waitForViewReady } from "./helpers.js";
 
 const VIEWS = [
   "overview",
@@ -28,7 +29,8 @@ test.describe("Screenshot All Views (Demo Mode)", () => {
     test(`screenshot ${view}`, async ({ page }) => {
       const hash = view === "overview" ? "" : `#${view}`;
       await page.goto(`/?demo${hash}`);
-      await page.waitForTimeout(2000);
+      const viewTag = view === "overview" ? "sc-overview-view" : `sc-${view}-view`;
+      await waitForViewReady(page, viewTag);
       await page.screenshot({
         path: `e2e-screenshots/${view}.png`,
         fullPage: true,

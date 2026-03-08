@@ -28,13 +28,10 @@ test.describe("Chat Gemini Flow", () => {
     });
     expect(typed).toBe(true);
 
-    await page.waitForTimeout(300);
-
     // Press Enter on the focused textarea to send
     await page.keyboard.press("Enter");
-    await page.waitForTimeout(3000);
 
-    // Verify message thread is present
+    // Verify message thread is present (demo response ~600ms + render)
     const messagesArea = chatView.locator(
       "[role='log'], .messages, .chat-messages, sc-message-thread",
     );

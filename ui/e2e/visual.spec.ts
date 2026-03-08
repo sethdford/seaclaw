@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { waitForViewReady, ANIMATION_SETTLE_MS } from "./helpers.js";
 
 const CROSS_PLATFORM_THRESHOLD = 0.12;
 
@@ -32,7 +33,8 @@ test.describe("Visual Regression — Dark Theme", () => {
       const snapName = `${view.name}-dark-${testInfo.project.name}-${process.platform}.png`;
       const url = view.hash ? `/?demo${view.hash}` : "/?demo";
       await page.goto(url);
-      await page.waitForTimeout(1500);
+      const viewTag = view.hash ? `sc-${view.name}-view` : "sc-overview-view";
+      await waitForViewReady(page, viewTag);
       const updating = testInfo.config.updateSnapshots !== "none";
       if (!updating && !snapshotExists(testInfo, snapName)) {
         test.skip(true, `No baseline for ${process.platform}, run --update-snapshots locally`);
@@ -50,11 +52,13 @@ test.describe("Visual Regression — Light Theme", () => {
       const snapName = `${view.name}-light-${testInfo.project.name}-${process.platform}.png`;
       const url = view.hash ? `/?demo${view.hash}` : "/?demo";
       await page.goto(url);
-      await page.waitForTimeout(1000);
+      const viewTag = view.hash ? `sc-${view.name}-view` : "sc-overview-view";
+      await waitForViewReady(page, viewTag);
       await page.evaluate(() => {
         document.documentElement.setAttribute("data-theme", "light");
       });
-      await page.waitForTimeout(500);
+      // Brief wait for theme CSS variables to propagate
+      await page.waitForTimeout(ANIMATION_SETTLE_MS);
       const updating = testInfo.config.updateSnapshots !== "none";
       if (!updating && !snapshotExists(testInfo, snapName)) {
         test.skip(true, `No baseline for ${process.platform}, run --update-snapshots locally`);
@@ -70,7 +74,8 @@ test.describe("Visual Regression — Catalog", () => {
   test("catalog page screenshot", async ({ page }, testInfo) => {
     const snapName = `catalog-${testInfo.project.name}-${process.platform}.png`;
     await page.goto("/catalog.html");
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState("domcontentloaded");
+    await expect(page.locator("body")).toBeVisible({ timeout: 5000 });
     const updating = testInfo.config.updateSnapshots !== "none";
     if (!updating && !snapshotExists(testInfo, snapName)) {
       test.skip(true, `No baseline for ${process.platform}, run --update-snapshots locally`);

@@ -3,7 +3,8 @@ import { test, expect } from "@playwright/test";
 test.describe("Chat View", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/#chat");
-    await page.waitForTimeout(500);
+    await page.waitForLoadState("domcontentloaded");
+    await expect(page.locator("sc-app >> sc-chat-view")).toBeAttached({ timeout: 5000 });
   });
 
   test("chat view renders", async ({ page }) => {
@@ -74,16 +75,16 @@ test.describe("Chat View", () => {
   test("keyboard shortcut focuses input", async ({ page }) => {
     // Slash key should focus the chat input
     await page.keyboard.press("/");
-    await page.waitForTimeout(200);
-    const focused = await page.evaluate(() => {
-      const active = document.activeElement;
-      if (!active) return null;
-      const shadow = active.shadowRoot;
-      if (!shadow) return active.tagName;
-      const inner = shadow.activeElement;
-      return inner?.tagName ?? active.tagName;
-    });
-    // Should have focused some input element
-    expect(focused).toBeTruthy();
+    await expect(async () => {
+      const focused = await page.evaluate(() => {
+        const active = document.activeElement;
+        if (!active) return null;
+        const shadow = active.shadowRoot;
+        if (!shadow) return active.tagName;
+        const inner = shadow.activeElement;
+        return inner?.tagName ?? active.tagName;
+      });
+      expect(focused).toBeTruthy();
+    }).toPass({ timeout: 3000 });
   });
 });

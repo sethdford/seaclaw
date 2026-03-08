@@ -165,6 +165,21 @@ void sc_persona_deinit(sc_allocator_t *alloc, sc_persona_t *persona) {
         size_t len = strlen(persona->decision_style);
         alloc->free(alloc->ctx, persona->decision_style, len + 1);
     }
+    if (persona->biography) {
+        alloc->free(alloc->ctx, persona->biography, strlen(persona->biography) + 1);
+    }
+    free_string_array(alloc, persona->directors_notes, persona->directors_notes_count);
+    free_string_array(alloc, persona->mood_states, persona->mood_states_count);
+    free_string_array(alloc, persona->inner_world.contradictions,
+                      persona->inner_world.contradictions_count);
+    free_string_array(alloc, persona->inner_world.embodied_memories,
+                      persona->inner_world.embodied_memories_count);
+    free_string_array(alloc, persona->inner_world.emotional_flashpoints,
+                      persona->inner_world.emotional_flashpoints_count);
+    free_string_array(alloc, persona->inner_world.unfinished_business,
+                      persona->inner_world.unfinished_business_count);
+    free_string_array(alloc, persona->inner_world.secret_self,
+                      persona->inner_world.secret_self_count);
 
     if (persona->overlays) {
         for (size_t i = 0; i < persona->overlays_count; i++)
@@ -536,6 +551,45 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
                 sc_json_free(alloc, root);
                 return SC_ERR_OUT_OF_MEMORY;
             }
+        }
+        s = sc_json_get_string(core, "biography");
+        if (s)
+            out->biography = sc_strdup(alloc, s);
+
+        sc_json_value_t *dn = sc_json_object_get(core, "directors_notes");
+        if (dn)
+            parse_string_array(alloc, dn, &out->directors_notes, &out->directors_notes_count);
+
+        sc_json_value_t *ms = sc_json_object_get(core, "mood_states");
+        if (ms)
+            parse_string_array(alloc, ms, &out->mood_states, &out->mood_states_count);
+    }
+
+    /* Parse inner_world */
+    {
+        sc_json_value_t *iw = sc_json_object_get(root, "inner_world");
+        if (iw && iw->type == SC_JSON_OBJECT) {
+            sc_json_value_t *a;
+            a = sc_json_object_get(iw, "contradictions");
+            if (a)
+                parse_string_array(alloc, a, &out->inner_world.contradictions,
+                                   &out->inner_world.contradictions_count);
+            a = sc_json_object_get(iw, "embodied_memories");
+            if (a)
+                parse_string_array(alloc, a, &out->inner_world.embodied_memories,
+                                   &out->inner_world.embodied_memories_count);
+            a = sc_json_object_get(iw, "emotional_flashpoints");
+            if (a)
+                parse_string_array(alloc, a, &out->inner_world.emotional_flashpoints,
+                                   &out->inner_world.emotional_flashpoints_count);
+            a = sc_json_object_get(iw, "unfinished_business");
+            if (a)
+                parse_string_array(alloc, a, &out->inner_world.unfinished_business,
+                                   &out->inner_world.unfinished_business_count);
+            a = sc_json_object_get(iw, "secret_self");
+            if (a)
+                parse_string_array(alloc, a, &out->inner_world.secret_self,
+                                   &out->inner_world.secret_self_count);
         }
     }
 
@@ -1139,9 +1193,60 @@ sc_error_t sc_persona_build_prompt(sc_allocator_t *alloc, const sc_persona_t *pe
             goto fail;
     }
 
+    /* Biography */
+    if (persona->biography && persona->biography[0]) {
+        err = append_prompt(alloc, &buf, &len, &cap, "\n--- Biography ---\n", 19);
+        if (err == SC_OK)
+            err = append_prompt(alloc, &buf, &len, &cap, persona->biography,
+                                strlen(persona->biography));
+        if (err == SC_OK)
+            err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != SC_OK)
+            goto fail;
+    }
+
+    /* Director's Notes */
+    if (persona->directors_notes_count > 0) {
+        err = append_prompt(alloc, &buf, &len, &cap,
+                            "\n--- Director's Notes (performance direction) ---\n", 50);
+        if (err != SC_OK)
+            goto fail;
+        for (size_t i = 0; i < persona->directors_notes_count; i++) {
+            err = append_prompt(alloc, &buf, &len, &cap, "- ", 2);
+            if (err == SC_OK)
+                err = append_prompt(alloc, &buf, &len, &cap, persona->directors_notes[i],
+                                    strlen(persona->directors_notes[i]));
+            if (err == SC_OK)
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+            if (err != SC_OK)
+                goto fail;
+        }
+    }
+
+    /* Mood states */
+    if (persona->mood_states_count > 0) {
+        err = append_prompt(alloc, &buf, &len, &cap,
+                            "\n--- Available mood states ---\n"
+                            "You have moods that shift naturally. Current mood is chosen "
+                            "by the context of the conversation. Available moods:\n",
+                            130);
+        if (err != SC_OK)
+            goto fail;
+        for (size_t i = 0; i < persona->mood_states_count; i++) {
+            err = append_prompt(alloc, &buf, &len, &cap, "- ", 2);
+            if (err == SC_OK)
+                err = append_prompt(alloc, &buf, &len, &cap, persona->mood_states[i],
+                                    strlen(persona->mood_states[i]));
+            if (err == SC_OK)
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+            if (err != SC_OK)
+                goto fail;
+        }
+    }
+
     {
         static const char style_note[] =
-            "Match this style naturally. Don't exaggerate traits — aim for "
+            "\nMatch this style naturally. Don't exaggerate traits — aim for "
             "authenticity, not caricature.\n\n";
         err = append_prompt(alloc, &buf, &len, &cap, style_note, sizeof(style_note) - 1);
     }

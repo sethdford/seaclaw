@@ -17,7 +17,8 @@ import {
   shadowInteractiveRects,
   shadowText,
   VIEW_TAGS,
-  WAIT,
+  waitForViewReady,
+  ANIMATION_SETTLE_MS,
   POLL,
 } from "./helpers.js";
 
@@ -31,7 +32,7 @@ test.describe("Wave 1: Layout Archetypes", () => {
   test.describe("Conversational — Chat", () => {
     test.beforeEach(async ({ page }) => {
       await page.goto("/?demo#chat");
-      await page.waitForTimeout(WAIT);
+      await waitForViewReady(page, "sc-chat-view");
     });
 
     test("message thread appears before composer in DOM order", async ({ page }) => {
@@ -55,7 +56,7 @@ test.describe("Wave 1: Layout Archetypes", () => {
   test.describe("Conversational — Voice", () => {
     test.beforeEach(async ({ page }) => {
       await page.goto("/?demo#voice");
-      await page.waitForTimeout(WAIT);
+      await waitForViewReady(page, "sc-voice-view");
     });
 
     test("conversation area appears before controls in DOM", async ({ page }) => {
@@ -107,7 +108,7 @@ test.describe("Wave 1: Layout Archetypes", () => {
     test.describe(`Dashboard — ${view.name}`, () => {
       test.beforeEach(async ({ page }) => {
         await page.goto(`/?demo#${view.hash}`);
-        await page.waitForTimeout(WAIT);
+        await waitForViewReady(page, view.tag);
       });
 
       test("has page hero or header section", async ({ page }) => {
@@ -125,7 +126,7 @@ test.describe("Wave 1: Layout Archetypes", () => {
   test.describe("Log — Logs", () => {
     test.beforeEach(async ({ page }) => {
       await page.goto("/?demo#logs");
-      await page.waitForTimeout(WAIT);
+      await waitForViewReady(page, "sc-logs-view");
     });
 
     test("log area uses monospace font", async ({ page }) => {
@@ -174,7 +175,8 @@ test.describe("Wave 1: Layout Archetypes", () => {
   for (const hash of ALL_VIEW_HASHES) {
     test(`${hash}: no horizontal overflow`, async ({ page }) => {
       await page.goto(`/?demo#${hash}`);
-      await page.waitForTimeout(WAIT);
+      const tag = VIEW_TAGS[hash] ?? `sc-${hash}-view`;
+      await waitForViewReady(page, tag);
       await expect(async () => {
         const overflow = await page.evaluate(() => {
           return document.documentElement.scrollWidth > document.documentElement.clientWidth;
@@ -211,7 +213,7 @@ test.describe("Wave 2: Touch Targets & Accessibility", () => {
   for (const view of VIEWS_TO_CHECK) {
     test(`${view.hash}: interactive elements meet ${HARD_MIN}px minimum`, async ({ page }) => {
       await page.goto(`/?demo#${view.hash}`);
-      await page.waitForTimeout(WAIT);
+      await waitForViewReady(page, view.tag);
       await expect(async () => {
         const rects = (await page.evaluate(shadowInteractiveRects(view.tag))) as Array<{
           width: number;
@@ -261,7 +263,7 @@ test.describe("Wave 2: Touch Targets & Accessibility", () => {
 
     test(`${view.hash}: icon-only buttons have aria-label`, async ({ page }) => {
       await page.goto(`/?demo#${view.hash}`);
-      await page.waitForTimeout(WAIT);
+      await waitForViewReady(page, view.tag);
       await expect(async () => {
         const rects = (await page.evaluate(shadowInteractiveRects(view.tag))) as Array<{
           width: number;
@@ -307,7 +309,7 @@ test.describe("Wave 3: Loading & Empty States", () => {
           type: "warning",
           description: "Skeleton resolved before check — demo data too fast",
         });
-        await page.waitForTimeout(WAIT);
+        await waitForViewReady(page, view.tag);
         const hasContent = await page.evaluate(`(() => {
           const app = document.querySelector("sc-app");
           const v = app?.shadowRoot?.querySelector("${view.tag}");
@@ -320,7 +322,7 @@ test.describe("Wave 3: Loading & Empty States", () => {
 
   test("voice: shows empty conversation state when no messages", async ({ page }) => {
     await page.goto("/?demo#voice");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-voice-view");
     await expect(async () => {
       const hasConversation = await page.evaluate(
         shadowExists("sc-voice-view", "sc-voice-conversation"),
@@ -341,7 +343,7 @@ test.describe("Wave 4: Reduced Motion", () => {
   test("duration tokens resolve to 0ms under reduced motion", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/?demo#overview");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-overview-view");
 
     const durations = await page.evaluate(() => {
       const style = getComputedStyle(document.documentElement);
@@ -367,7 +369,7 @@ test.describe("Wave 4: Reduced Motion", () => {
     test(`${hash}: no running animations under reduced motion`, async ({ page }) => {
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.goto(`/?demo#${hash}`);
-      await page.waitForTimeout(WAIT);
+      await waitForViewReady(page, VIEW_TAGS[hash]);
 
       await expect(async () => {
         const tag = VIEW_TAGS[hash];
@@ -412,7 +414,7 @@ test.describe("Wave 5: Theme Parity", () => {
       page.on("pageerror", (err) => errors.push(err.message));
 
       await page.goto(`/?demo#${view.hash}`);
-      await page.waitForTimeout(WAIT);
+      await waitForViewReady(page, view.tag);
 
       await expect(async () => {
         const hasContent = await page.evaluate(`(() => {
@@ -431,13 +433,14 @@ test.describe("Wave 5: Theme Parity", () => {
       page.on("pageerror", (err) => errors.push(err.message));
 
       await page.goto(`/?demo#${view.hash}`);
-      await page.waitForTimeout(WAIT);
+      await waitForViewReady(page, view.tag);
 
       // Switch to light theme
       await page.evaluate(() => {
         document.documentElement.setAttribute("data-theme", "light");
       });
-      await page.waitForTimeout(500);
+      // Brief wait for theme CSS variables to propagate
+      await page.waitForTimeout(ANIMATION_SETTLE_MS);
 
       await expect(async () => {
         const hasContent = await page.evaluate(`(() => {
@@ -454,7 +457,7 @@ test.describe("Wave 5: Theme Parity", () => {
 
   test("text is readable in dark mode (not same as background)", async ({ page }) => {
     await page.goto("/?demo#overview");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-overview-view");
 
     const colors = await page.evaluate(() => {
       const style = getComputedStyle(document.documentElement);
@@ -471,11 +474,12 @@ test.describe("Wave 5: Theme Parity", () => {
 
   test("text is readable in light mode (not same as background)", async ({ page }) => {
     await page.goto("/?demo#overview");
-    await page.waitForTimeout(WAIT);
+    await waitForViewReady(page, "sc-overview-view");
     await page.evaluate(() => {
       document.documentElement.setAttribute("data-theme", "light");
     });
-    await page.waitForTimeout(500);
+    // Brief wait for theme CSS variables to propagate
+    await page.waitForTimeout(ANIMATION_SETTLE_MS);
 
     const colors = await page.evaluate(() => {
       const style = getComputedStyle(document.documentElement);
@@ -507,7 +511,7 @@ test.describe("Wave 6: Error States", () => {
   }) => {
     for (const view of ERROR_BOUNDARY_VIEWS) {
       await page.goto(`/?demo#${view.hash}`);
-      await page.waitForTimeout(WAIT);
+      await waitForViewReady(page, view.tag);
 
       await expect(async () => {
         const hasBoundary = await page.evaluate(() => {
@@ -522,8 +526,6 @@ test.describe("Wave 6: Error States", () => {
         app._viewError = new Error("E2E test");
         (app as unknown as { requestUpdate?: () => void }).requestUpdate?.();
       });
-      await page.waitForTimeout(400);
-
       await expect(async () => {
         const hasFallback = await page.evaluate(() => {
           const app = document.querySelector("sc-app");
@@ -540,7 +542,8 @@ test.describe("Wave 6: Error States", () => {
         app._viewError = null;
         (app as unknown as { requestUpdate?: () => void }).requestUpdate?.();
       });
-      await page.waitForTimeout(200);
+      // Brief wait for LitElement to re-render after error clear
+      await page.waitForTimeout(ANIMATION_SETTLE_MS);
     }
   });
 
@@ -553,7 +556,7 @@ test.describe("Wave 6: Error States", () => {
   test("views display error state when gateway is unavailable", async ({ page }) => {
     for (const view of GATEWAY_ERROR_VIEWS) {
       await page.goto(`/?demo#${view.hash}`);
-      await page.waitForTimeout(WAIT);
+      await waitForViewReady(page, view.tag);
 
       await expect(async () => {
         const hasError = await page.evaluate(
@@ -571,7 +574,6 @@ test.describe("Wave 6: Error States", () => {
         expect(hasError).toBe(true);
       }).toPass({ timeout: POLL });
 
-      await page.waitForTimeout(300);
       await expect(async () => {
         const hasErrorUI = await page.evaluate(
           shadowExistsIn(view.tag, "sc-empty-state", ".heading"),

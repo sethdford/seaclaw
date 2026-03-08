@@ -4,6 +4,7 @@
 #include "seaclaw/channel.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -14,5 +15,62 @@
 char *sc_conversation_build_awareness(sc_allocator_t *alloc,
                                       const sc_channel_history_entry_t *entries, size_t count,
                                       size_t *out_len);
+
+/* Conversation quality score (0-100). Evaluates a draft response for:
+ * brevity, validation/reflection, repair/rephrase, and follow-up.
+ * Returns a quality score and writes guidance into *feedback (caller owns). */
+typedef struct sc_quality_score {
+    int total;
+    int brevity;
+    int validation;
+    int warmth;
+    int naturalness;
+    bool needs_revision;
+} sc_quality_score_t;
+
+sc_quality_score_t sc_conversation_evaluate_quality(const char *response, size_t response_len,
+                                                    const sc_channel_history_entry_t *entries,
+                                                    size_t count, uint32_t max_chars);
+
+/* Honesty guardrail: detect "did you do X?" questions and inject honest context.
+ * Returns a context string if an honesty injection is needed, NULL otherwise.
+ * Caller owns returned string. */
+char *sc_conversation_honesty_check(sc_allocator_t *alloc, const char *message, size_t message_len);
+
+/* Narrative arc phase for the conversation.
+ * Adds structure/climax/intervention guidance to the awareness buffer. */
+typedef enum sc_narrative_phase {
+    SC_NARRATIVE_OPENING = 0,
+    SC_NARRATIVE_BUILDING,
+    SC_NARRATIVE_APPROACHING_CLIMAX,
+    SC_NARRATIVE_PEAK,
+    SC_NARRATIVE_RELEASE,
+    SC_NARRATIVE_CLOSING,
+} sc_narrative_phase_t;
+
+sc_narrative_phase_t sc_conversation_detect_narrative(const sc_channel_history_entry_t *entries,
+                                                      size_t count);
+
+/* Engagement level detection */
+typedef enum sc_engagement_level {
+    SC_ENGAGEMENT_HIGH = 0,
+    SC_ENGAGEMENT_MODERATE,
+    SC_ENGAGEMENT_LOW,
+    SC_ENGAGEMENT_DISTRACTED,
+} sc_engagement_level_t;
+
+sc_engagement_level_t sc_conversation_detect_engagement(const sc_channel_history_entry_t *entries,
+                                                        size_t count);
+
+/* Emotional valence from conversation (-1.0 to 1.0, negative=distressed, positive=happy) */
+typedef struct sc_emotional_state {
+    float valence;
+    float intensity;
+    bool concerning;
+    const char *dominant_emotion;
+} sc_emotional_state_t;
+
+sc_emotional_state_t sc_conversation_detect_emotion(const sc_channel_history_entry_t *entries,
+                                                    size_t count);
 
 #endif /* SC_CONTEXT_CONVERSATION_H */

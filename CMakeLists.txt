@@ -288,6 +288,9 @@ set(SC_CORE_SOURCES
     src/config_types.c
     src/config_mutator.c
     src/config_parse.c
+    src/config_parse_channels.c
+    src/config_parse_providers.c
+    src/config_parse_agent.c
     src/capabilities.c
     src/channel_catalog.c
     src/channel_adapters.c
@@ -1531,7 +1534,7 @@ target_compile_options(seaclaw_tests PRIVATE -Wall -Wextra -Wpedantic -Wshadow -
 # Synthetic pressure tests (requires libcurl for real HTTP)
 option(SC_ENABLE_SYNTHETIC "Build Gemini-driven synthetic pressure test harness" OFF)
 if(SC_ENABLE_SYNTHETIC)
-    file(GLOB SC_SYNTH_SOURCES tests/synthetic/*.c)
+    file(GLOB SC_SYNTH_SOURCES tests/synthetic/synthetic_*.c)
     add_executable(seaclaw_synthetic ${SC_SYNTH_SOURCES})
     target_link_libraries(seaclaw_synthetic seaclaw_core)
     target_include_directories(seaclaw_synthetic PRIVATE ${SC_ROOT}/include ${SC_ROOT}/src ${SC_ROOT}/tests/synthetic)
@@ -1545,6 +1548,63 @@ if(SC_ENABLE_SYNTHETIC)
         if(SQLITE3_FOUND)
             target_include_directories(seaclaw_synthetic PRIVATE ${SQLITE3_INCLUDE_DIRS})
         endif()
+    endif()
+endif()
+
+# Channel conversation & chaos tests
+option(SC_ENABLE_CHANNEL_TESTS "Build channel conversation+chaos test harness" OFF)
+if(SC_ENABLE_CHANNEL_TESTS)
+    file(GLOB SC_CHANNEL_TEST_SOURCES tests/synthetic/channel_*.c)
+    list(APPEND SC_CHANNEL_TEST_SOURCES
+        tests/synthetic/synthetic_gemini.c
+        tests/synthetic/synthetic_regression.c
+        tests/synthetic/synthetic_utils.c)
+    add_executable(seaclaw_channel_tests ${SC_CHANNEL_TEST_SOURCES})
+    target_link_libraries(seaclaw_channel_tests seaclaw_core_test)
+    target_include_directories(seaclaw_channel_tests PRIVATE
+        ${SC_ROOT}/include ${SC_ROOT}/src ${SC_ROOT}/tests/synthetic)
+    target_compile_definitions(seaclaw_channel_tests PRIVATE
+        SC_ENABLE_CURL=1 SC_IS_TEST=1)
+    target_compile_options(seaclaw_channel_tests PRIVATE
+        -Wall -Wextra -Wpedantic -Wshadow -Wformat-security
+        -Wno-gnu-zero-variadic-macro-arguments)
+    if(UNIX AND NOT WIN32)
+        target_compile_definitions(seaclaw_channel_tests PRIVATE SC_GATEWAY_POSIX=1)
+    endif()
+    if(SC_ENABLE_SQLITE)
+        target_compile_definitions(seaclaw_channel_tests PRIVATE SC_ENABLE_SQLITE=1)
+        if(SQLITE3_FOUND)
+            target_include_directories(seaclaw_channel_tests PRIVATE ${SQLITE3_INCLUDE_DIRS})
+        endif()
+    endif()
+    # Channel SC_HAS_* defines — enable all channels for the channel test harness
+    if(SC_ENABLE_ALL_CHANNELS)
+        target_compile_definitions(seaclaw_channel_tests PRIVATE
+            SC_HAS_TELEGRAM=1 SC_HAS_DISCORD=1 SC_HAS_SLACK=1 SC_HAS_WHATSAPP=1
+            SC_HAS_FACEBOOK=1 SC_HAS_INSTAGRAM=1 SC_HAS_TWITTER=1 SC_HAS_MATRIX=1
+            SC_HAS_IRC=1 SC_HAS_LINE=1 SC_HAS_LARK=1 SC_HAS_WEB=1 SC_HAS_EMAIL=1
+            SC_HAS_IMAP=1 SC_HAS_IMESSAGE=1 SC_HAS_MATTERMOST=1 SC_HAS_ONEBOT=1
+            SC_HAS_DINGTALK=1 SC_HAS_TEAMS=1 SC_HAS_TWILIO=1 SC_HAS_GOOGLE_CHAT=1
+            SC_HAS_GOOGLE_RCS=1 SC_HAS_SIGNAL=1 SC_HAS_NOSTR=1 SC_HAS_QQ=1
+            SC_HAS_MAIXCAM=1 SC_HAS_MQTT=1 SC_HAS_GMAIL=1 SC_HAS_CLI=1
+            SC_HAS_DISPATCH=1 SC_HAS_PERSONA=1)
+    else()
+        if(SC_ENABLE_TELEGRAM)
+            target_compile_definitions(seaclaw_channel_tests PRIVATE SC_HAS_TELEGRAM=1)
+        endif()
+        if(SC_ENABLE_DISCORD)
+            target_compile_definitions(seaclaw_channel_tests PRIVATE SC_HAS_DISCORD=1)
+        endif()
+        if(SC_ENABLE_SLACK)
+            target_compile_definitions(seaclaw_channel_tests PRIVATE SC_HAS_SLACK=1)
+        endif()
+        if(SC_ENABLE_IMESSAGE)
+            target_compile_definitions(seaclaw_channel_tests PRIVATE SC_HAS_IMESSAGE=1)
+        endif()
+        if(SC_ENABLE_SIGNAL)
+            target_compile_definitions(seaclaw_channel_tests PRIVATE SC_HAS_SIGNAL=1)
+        endif()
+        target_compile_definitions(seaclaw_channel_tests PRIVATE SC_HAS_DISPATCH=1 SC_HAS_PERSONA=1)
     endif()
 endif()
 
