@@ -2,6 +2,11 @@
 #include "seaclaw/agent/awareness.h"
 #include "seaclaw/agent/commitment_store.h"
 #include "seaclaw/agent/pattern_radar.h"
+#include "seaclaw/agent/superhuman.h"
+#include "seaclaw/agent/superhuman_commitment.h"
+#include "seaclaw/agent/superhuman_emotional.h"
+#include "seaclaw/agent/superhuman_predictive.h"
+#include "seaclaw/agent/superhuman_silence.h"
 #ifdef SC_HAS_PERSONA
 #include "seaclaw/persona/circadian.h"
 #include "seaclaw/persona/relationship.h"
@@ -284,6 +289,36 @@ sc_error_t sc_agent_from_config(
             out->commitment_store = NULL;
     } else {
         out->commitment_store = NULL;
+    }
+
+    /* Superhuman services */
+    (void)sc_superhuman_registry_init(&out->superhuman);
+    memset(&out->superhuman_commitment_ctx, 0, sizeof(out->superhuman_commitment_ctx));
+    memset(&out->superhuman_emotional_ctx, 0, sizeof(out->superhuman_emotional_ctx));
+    memset(&out->superhuman_silence_ctx, 0, sizeof(out->superhuman_silence_ctx));
+
+    if (out->commitment_store) {
+        out->superhuman_commitment_ctx.store = out->commitment_store;
+        out->superhuman_commitment_ctx.session_id = NULL;
+        out->superhuman_commitment_ctx.session_id_len = 0;
+        sc_superhuman_service_t svc;
+        (void)sc_superhuman_commitment_service(&out->superhuman_commitment_ctx, &svc);
+        (void)sc_superhuman_register(&out->superhuman, svc);
+    }
+    {
+        sc_superhuman_service_t svc;
+        (void)sc_superhuman_predictive_service(&out->radar, &svc);
+        (void)sc_superhuman_register(&out->superhuman, svc);
+    }
+    {
+        sc_superhuman_service_t svc;
+        (void)sc_superhuman_emotional_service(&out->superhuman_emotional_ctx, &svc);
+        (void)sc_superhuman_register(&out->superhuman, svc);
+    }
+    {
+        sc_superhuman_service_t svc;
+        (void)sc_superhuman_silence_service(&out->superhuman_silence_ctx, &svc);
+        (void)sc_superhuman_register(&out->superhuman, svc);
     }
 
     return SC_OK;

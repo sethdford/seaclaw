@@ -3,6 +3,11 @@
 
 #include "seaclaw/agent/commitment_store.h"
 #include "seaclaw/agent/pattern_radar.h"
+#include "seaclaw/agent/superhuman.h"
+#include "seaclaw/agent/superhuman_commitment.h"
+#include "seaclaw/agent/superhuman_emotional.h"
+#include "seaclaw/agent/superhuman_predictive.h"
+#include "seaclaw/agent/superhuman_silence.h"
 #include "seaclaw/agent/mailbox.h"
 #include "seaclaw/agent/spawn.h"
 #include "seaclaw/agent/task_list.h"
@@ -172,6 +177,11 @@ struct sc_agent {
     sc_commitment_store_t *commitment_store; /* optional; when memory is set */
 
     sc_pattern_radar_t radar; /* pattern observation tracker */
+
+    sc_superhuman_registry_t superhuman;
+    sc_superhuman_commitment_ctx_t superhuman_commitment_ctx;
+    sc_superhuman_emotional_ctx_t superhuman_emotional_ctx;
+    sc_superhuman_silence_ctx_t superhuman_silence_ctx;
 
 #ifdef SC_HAS_PERSONA
     sc_relationship_state_t relationship; /* session-based warmth adaptation */

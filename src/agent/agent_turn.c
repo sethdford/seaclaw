@@ -15,6 +15,7 @@
 #include "seaclaw/agent/pattern_radar.h"
 #include "seaclaw/agent/proactive.h"
 #include "seaclaw/agent/prompt.h"
+#include "seaclaw/agent/superhuman.h"
 #ifdef SC_HAS_PERSONA
 #include "seaclaw/persona/circadian.h"
 #include "seaclaw/persona/relationship.h"
@@ -79,6 +80,9 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         sc_agent_clear_current_for_tools();
         return err;
     }
+
+    /* Superhuman: observe user message (emotional, silence services) */
+    (void)sc_superhuman_observe_all(&agent->superhuman, agent->alloc, msg, msg_len, "user", 4);
 
     /* Fast-capture and STM: extract entities/emotions, record turn, populate last turn */
     {
@@ -290,6 +294,16 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
+    /* Build superhuman context (commitment, predictive, emotional, silence) */
+    char *superhuman_ctx = NULL;
+    size_t superhuman_ctx_len = 0;
+    {
+        agent->superhuman_commitment_ctx.session_id = agent->memory_session_id;
+        agent->superhuman_commitment_ctx.session_id_len = agent->memory_session_id_len;
+        (void)sc_superhuman_build_context(&agent->superhuman, agent->alloc, &superhuman_ctx,
+                                           &superhuman_ctx_len);
+    }
+
     /* Build adaptive persona context (circadian + relationship) */
     char *adaptive_ctx = NULL;
     size_t adaptive_ctx_len = 0;
@@ -375,7 +389,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     size_t system_prompt_len = 0;
     if (agent->cached_static_prompt && !pref_ctx && !tone_hint && !persona_prompt &&
         !awareness_ctx && !stm_ctx && !commitment_ctx && !pattern_ctx && !adaptive_ctx &&
-        !proactive_ctx) {
+        !proactive_ctx && !superhuman_ctx) {
         err = sc_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
                                          agent->cached_static_prompt_len, memory_ctx,
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
@@ -396,6 +410,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, adaptive_ctx, adaptive_ctx_len + 1);
             if (proactive_ctx)
                 agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
+            if (superhuman_ctx)
+                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
             sc_agent_clear_current_for_tools();
             return err;
         }
@@ -421,6 +437,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             .adaptive_persona_context_len = adaptive_ctx_len,
             .proactive_context = proactive_ctx,
             .proactive_context_len = proactive_ctx_len,
+            .superhuman_context = superhuman_ctx,
+            .superhuman_context_len = superhuman_ctx_len,
             .autonomy_level = agent->autonomy_level,
             .custom_instructions = agent->custom_instructions,
             .custom_instructions_len = agent->custom_instructions_len,
@@ -467,6 +485,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, adaptive_ctx, adaptive_ctx_len + 1);
             if (proactive_ctx)
                 agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
+            if (superhuman_ctx)
+                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
             sc_agent_clear_current_for_tools();
             return err;
         }
@@ -481,6 +501,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         agent->alloc->free(agent->alloc->ctx, adaptive_ctx, adaptive_ctx_len + 1);
     if (proactive_ctx)
         agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
+    if (superhuman_ctx)
+        agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
     if (pref_ctx)
         agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
 
