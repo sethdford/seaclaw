@@ -476,6 +476,14 @@ static void test_config_parse_agent_parallel_tools(void) {
     free_config(cfg);
 }
 
+static void test_config_parse_agent_llm_compiler(void) {
+    sc_config_t *cfg = make_config_with_arena();
+    const char *j = "{\"agent\":{\"llm_compiler\":true}}";
+    sc_config_parse_json(cfg, j, strlen(j));
+    SC_ASSERT_TRUE(cfg->agent.llm_compiler_enabled);
+    free_config(cfg);
+}
+
 static void test_config_parse_agent_context_pressure(void) {
     sc_config_t *cfg = make_config_with_arena();
     const char *j = "{\"agent\":{\"context_pressure_warn\":0.9,\"context_pressure_compact\":0.98,"
@@ -1198,6 +1206,7 @@ void run_config_extended_tests(void) {
     SC_RUN_TEST(test_config_parse_agent_max_tool_iterations);
     SC_RUN_TEST(test_config_parse_agent_compact_context);
     SC_RUN_TEST(test_config_parse_agent_parallel_tools);
+    SC_RUN_TEST(test_config_parse_agent_llm_compiler);
     SC_RUN_TEST(test_config_parse_agent_context_pressure);
     SC_RUN_TEST(test_config_persona_per_channel);
     SC_RUN_TEST(test_config_parse_runtime_docker);

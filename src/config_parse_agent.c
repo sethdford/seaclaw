@@ -7,6 +7,8 @@
 sc_error_t parse_agent(sc_allocator_t *a, sc_config_t *cfg, const sc_json_value_t *obj) {
     if (!obj || obj->type != SC_JSON_OBJECT)
         return SC_OK;
+    cfg->agent.llm_compiler_enabled =
+        sc_json_get_bool(obj, "llm_compiler", cfg->agent.llm_compiler_enabled);
     cfg->agent.compact_context =
         sc_json_get_bool(obj, "compact_context", cfg->agent.compact_context);
     double mti = sc_json_get_number(obj, "max_tool_iterations", cfg->agent.max_tool_iterations);
