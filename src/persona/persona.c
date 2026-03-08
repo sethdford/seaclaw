@@ -824,16 +824,16 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
             const char *s;
             s = sc_json_get_string(mot, "primary_drive");
             if (s)
-                out->motivation.primary_drive = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->motivation.primary_drive, s);
             s = sc_json_get_string(mot, "protecting");
             if (s)
-                out->motivation.protecting = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->motivation.protecting, s);
             s = sc_json_get_string(mot, "avoiding");
             if (s)
-                out->motivation.avoiding = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->motivation.avoiding, s);
             s = sc_json_get_string(mot, "wanting");
             if (s)
-                out->motivation.wanting = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->motivation.wanting, s);
         }
     }
 
@@ -855,9 +855,9 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
                         const char *t = sc_json_get_string(item, "trigger");
                         const char *ins = sc_json_get_string(item, "instruction");
                         if (t)
-                            dirs[count].trigger = sc_strdup(alloc, t);
+                            PERSONA_STRDUP_OPT(dirs[count].trigger, t);
                         if (ins)
-                            dirs[count].instruction = sc_strdup(alloc, ins);
+                            PERSONA_STRDUP_OPT(dirs[count].instruction, ins);
                         count++;
                     }
                     out->situational_directions = dirs;
@@ -874,10 +874,10 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
             const char *s;
             s = sc_json_get_string(hum, "type");
             if (s)
-                out->humor.type = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->humor.type, s);
             s = sc_json_get_string(hum, "frequency");
             if (s)
-                out->humor.frequency = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->humor.frequency, s);
             sc_json_value_t *a = sc_json_object_get(hum, "targets");
             if (a)
                 parse_string_array(alloc, a, &out->humor.targets, &out->humor.targets_count);
@@ -886,7 +886,7 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
                 parse_string_array(alloc, a, &out->humor.boundaries, &out->humor.boundaries_count);
             s = sc_json_get_string(hum, "timing");
             if (s)
-                out->humor.timing = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->humor.timing, s);
         }
     }
 
@@ -897,19 +897,19 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
             const char *s;
             s = sc_json_get_string(cs, "pushback_response");
             if (s)
-                out->conflict_style.pushback_response = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->conflict_style.pushback_response, s);
             s = sc_json_get_string(cs, "confrontation_comfort");
             if (s)
-                out->conflict_style.confrontation_comfort = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->conflict_style.confrontation_comfort, s);
             s = sc_json_get_string(cs, "apology_style");
             if (s)
-                out->conflict_style.apology_style = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->conflict_style.apology_style, s);
             s = sc_json_get_string(cs, "boundary_assertion");
             if (s)
-                out->conflict_style.boundary_assertion = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->conflict_style.boundary_assertion, s);
             s = sc_json_get_string(cs, "repair_behavior");
             if (s)
-                out->conflict_style.repair_behavior = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->conflict_style.repair_behavior, s);
         }
     }
 
@@ -920,10 +920,10 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
             const char *s;
             s = sc_json_get_string(er, "ceiling");
             if (s)
-                out->emotional_range.ceiling = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->emotional_range.ceiling, s);
             s = sc_json_get_string(er, "floor");
             if (s)
-                out->emotional_range.floor = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->emotional_range.floor, s);
             sc_json_value_t *a = sc_json_object_get(er, "escalation_triggers");
             if (a)
                 parse_string_array(alloc, a, &out->emotional_range.escalation_triggers,
@@ -934,10 +934,10 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
                                    &out->emotional_range.de_escalation_count);
             s = sc_json_get_string(er, "withdrawal_conditions");
             if (s)
-                out->emotional_range.withdrawal_conditions = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->emotional_range.withdrawal_conditions, s);
             s = sc_json_get_string(er, "recovery_style");
             if (s)
-                out->emotional_range.recovery_style = sc_strdup(alloc, s);
+                PERSONA_STRDUP_OPT(out->emotional_range.recovery_style, s);
         }
     }
 

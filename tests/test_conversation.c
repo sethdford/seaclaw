@@ -1,6 +1,7 @@
 #include "seaclaw/context/conversation.h"
 #include "seaclaw/core/allocator.h"
 #include "test_framework.h"
+#include <stdio.h>
 #include <string.h>
 
 /* ── Helper to build history entries ─────────────────────────────────── */
@@ -402,6 +403,30 @@ static void awareness_detects_excitement(void) {
     SC_ASSERT_NOT_NULL(ctx);
     SC_ASSERT_TRUE(strstr(ctx, "excited") != NULL);
     alloc.free(alloc.ctx, ctx, len + 1);
+}
+
+static void awareness_output_bounded(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+
+    /* Create a large history */
+    sc_channel_history_entry_t entries[50];
+    char texts[50][256];
+    for (int i = 0; i < 50; i++) {
+        snprintf(texts[i], sizeof(texts[i]),
+                 "This is message number %d with some content to fill space and make the "
+                 "awareness builder work with substantial input data for testing purposes",
+                 i);
+        entries[i] = make_entry((i % 2) == 0, texts[i], "2024-01-15T10:00:00");
+    }
+
+    size_t out_len = 0;
+    char *ctx = sc_conversation_build_awareness(&alloc, entries, 50, &out_len);
+    SC_ASSERT_NOT_NULL(ctx);
+    SC_ASSERT_TRUE(out_len > 0);
+    /* Awareness output should be bounded (not grow without limit) */
+    SC_ASSERT_TRUE(out_len < 32768);
+
+    alloc.free(alloc.ctx, ctx, out_len + 1);
 }
 
 /* ── Narrative detection tests ───────────────────────────────────────── */
@@ -1167,6 +1192,7 @@ void run_conversation_tests(void) {
     SC_RUN_TEST(awareness_null_returns_null);
     SC_RUN_TEST(awareness_builds_context);
     SC_RUN_TEST(awareness_detects_excitement);
+    SC_RUN_TEST(awareness_output_bounded);
 
     /* Narrative detection */
     SC_RUN_TEST(narrative_opening_with_few_exchanges);
