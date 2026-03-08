@@ -559,3 +559,4 @@ export class ScSkillsView extends GatewayAwareLitElement {
     ${this._renderDetailSheet()}`;
   }
 }
+

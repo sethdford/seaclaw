@@ -372,6 +372,7 @@ sc_error_t cp_memory_consolidate(sc_allocator_t *alloc, sc_app_context_t *app, s
 
     sc_memory_t *memory = app->agent->memory;
     sc_consolidation_config_t config = SC_CONSOLIDATION_DEFAULTS;
+    config.provider = &app->agent->provider;
     sc_error_t err = sc_memory_consolidate(alloc, memory, &config);
     if (err != SC_OK)
         return err;

@@ -20,15 +20,16 @@
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/process_util.h"
 #include "seaclaw/core/string.h"
-#include <stdlib.h>
 #include "seaclaw/memory/consolidation.h"
 #include "seaclaw/memory/deep_extract.h"
 #include "seaclaw/memory/emotional_graph.h"
 #include "seaclaw/memory/fast_capture.h"
 #include "seaclaw/memory/graph.h"
+#include "seaclaw/memory/inbox.h"
 #include "seaclaw/memory/promotion.h"
 #include "seaclaw/memory/retrieval.h"
 #include "seaclaw/observability/bth_metrics.h"
+#include <stdlib.h>
 #ifdef SC_HAS_PERSONA
 #include "seaclaw/persona.h"
 #include "seaclaw/persona/auto_profile.h"
@@ -197,8 +198,8 @@ static void store_conversation_summary(sc_allocator_t *alloc, sc_memory_t *memor
                                            &src_id) == SC_OK &&
                     sc_graph_upsert_entity(graph, f->object, obj_len, SC_ENTITY_UNKNOWN, NULL,
                                            &tgt_id) == SC_OK) {
-                    sc_error_t rel_err = sc_graph_upsert_relation(
-                        graph, src_id, tgt_id, rel_type, 1.0f, f->object, obj_len);
+                    sc_error_t rel_err = sc_graph_upsert_relation(graph, src_id, tgt_id, rel_type,
+                                                                  1.0f, f->object, obj_len);
                     if (rel_err != SC_OK)
                         fprintf(stderr, "[daemon] graph: relation upsert failed: %d\n",
                                 (int)rel_err);
@@ -223,11 +224,10 @@ static void store_conversation_summary(sc_allocator_t *alloc, sc_memory_t *memor
                                        &src_id) == SC_OK &&
                 sc_graph_upsert_entity(graph, r->entity_b, b_len, SC_ENTITY_UNKNOWN, NULL,
                                        &tgt_id) == SC_OK) {
-                sc_error_t rel_err = sc_graph_upsert_relation(
-                    graph, src_id, tgt_id, rel_type, 1.0f, r->entity_b, b_len);
+                sc_error_t rel_err = sc_graph_upsert_relation(graph, src_id, tgt_id, rel_type, 1.0f,
+                                                              r->entity_b, b_len);
                 if (rel_err != SC_OK)
-                    fprintf(stderr, "[daemon] graph: relation upsert failed: %d\n",
-                            (int)rel_err);
+                    fprintf(stderr, "[daemon] graph: relation upsert failed: %d\n", (int)rel_err);
             }
         }
     }
@@ -922,6 +922,13 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
     sc_bth_metrics_init(&bth_metrics);
     if (agent)
         agent->bth_metrics = &bth_metrics;
+
+    sc_inbox_watcher_t inbox_watcher = {0};
+    static int64_t last_inbox_poll_ms = 0;
+    if (agent && agent->memory) {
+        (void)sc_inbox_init(&inbox_watcher, alloc, agent->memory, NULL, 0);
+        inbox_watcher.provider = &agent->provider;
+    }
 #endif
 
     while (!SC_STOP_FLAG) {
@@ -976,6 +983,7 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                             .decay_factor = 0.5,
                             .dedup_threshold = 70,
                             .max_entries = 5000,
+                            .provider = &agent->provider,
                         };
                         if (sc_memory_consolidate(alloc, agent->memory, &cons_cfg) == SC_OK) {
                             consolidated_today = true;
@@ -1076,11 +1084,10 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
             if (!agent || !ch->channel || !ch->channel->vtable || !ch->channel->vtable->send ||
                 count == 0) {
                 /* Log inbound messages from read-only channels (e.g. Gmail) */
-                if (count > 0 && ch->channel && ch->channel->vtable &&
-                    !ch->channel->vtable->send) {
-                    const char *ch_name =
-                        ch->channel->vtable->name ? ch->channel->vtable->name(ch->channel->ctx)
-                                                  : "?";
+                if (count > 0 && ch->channel && ch->channel->vtable && !ch->channel->vtable->send) {
+                    const char *ch_name = ch->channel->vtable->name
+                                              ? ch->channel->vtable->name(ch->channel->ctx)
+                                              : "?";
                     for (size_t m = 0; m < count; m++) {
                         size_t clen = strlen(msgs[m].content);
                         fprintf(stderr, "[%s] ingest: %.60s%s (from %s)\n", ch_name,
@@ -1488,7 +1495,8 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                                 auto_ov.style_notes[0]) {
                                 size_t note_len = strlen(auto_ov.style_notes[0]);
                                 if (note_len > 0) {
-                                    char *note = sc_strndup(alloc, auto_ov.style_notes[0], note_len);
+                                    char *note =
+                                        sc_strndup(alloc, auto_ov.style_notes[0], note_len);
                                     if (note) {
                                         if (contact_ctx) {
                                             size_t total = contact_ctx_len + note_len + 2;
@@ -1497,7 +1505,8 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                                             if (merged) {
                                                 memcpy(merged, contact_ctx, contact_ctx_len);
                                                 merged[contact_ctx_len] = '\n';
-                                                memcpy(merged + contact_ctx_len + 1, note, note_len);
+                                                memcpy(merged + contact_ctx_len + 1, note,
+                                                       note_len);
                                                 merged[total] = '\0';
                                                 alloc->free(alloc->ctx, contact_ctx,
                                                             contact_ctx_len + 1);
@@ -1686,12 +1695,12 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                             insights_pos = (size_t)w;
 
                         if (narr_meaningful) {
-                            const char *phase_name =
-                                (narr == SC_NARRATIVE_CLOSING)   ? "closing"
-                                : (narr == SC_NARRATIVE_PEAK)     ? "peak"
-                                : (narr == SC_NARRATIVE_RELEASE)  ? "release"
-                                : (narr == SC_NARRATIVE_APPROACHING_CLIMAX) ? "approaching climax"
-                                                     : "building";
+                            const char *phase_name = (narr == SC_NARRATIVE_CLOSING)   ? "closing"
+                                                     : (narr == SC_NARRATIVE_PEAK)    ? "peak"
+                                                     : (narr == SC_NARRATIVE_RELEASE) ? "release"
+                                                     : (narr == SC_NARRATIVE_APPROACHING_CLIMAX)
+                                                         ? "approaching climax"
+                                                         : "building";
                             w = snprintf(insights_buf + insights_pos,
                                          sizeof(insights_buf) - insights_pos,
                                          "- Narrative phase: %s\n", phase_name);
@@ -1699,19 +1708,20 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                                 insights_pos += (size_t)w;
                         }
                         if (eng_meaningful) {
-                            const char *eng_name = (eng == SC_ENGAGEMENT_HIGH)      ? "high"
-                                                    : (eng == SC_ENGAGEMENT_LOW)     ? "low"
-                                                    : (eng == SC_ENGAGEMENT_DISTRACTED)
-                                                        ? "distracted"
-                                                        : "moderate";
+                            const char *eng_name = (eng == SC_ENGAGEMENT_HIGH)  ? "high"
+                                                   : (eng == SC_ENGAGEMENT_LOW) ? "low"
+                                                   : (eng == SC_ENGAGEMENT_DISTRACTED)
+                                                       ? "distracted"
+                                                       : "moderate";
                             w = snprintf(insights_buf + insights_pos,
-                                         sizeof(insights_buf) - insights_pos,
-                                         "- Engagement: %s\n", eng_name);
+                                         sizeof(insights_buf) - insights_pos, "- Engagement: %s\n",
+                                         eng_name);
                             if (w > 0 && (size_t)w < sizeof(insights_buf) - insights_pos)
                                 insights_pos += (size_t)w;
                         }
                         if (emo_meaningful) {
-                            if (emo.dominant_emotion && strcmp(emo.dominant_emotion, "neutral") != 0) {
+                            if (emo.dominant_emotion &&
+                                strcmp(emo.dominant_emotion, "neutral") != 0) {
                                 w = snprintf(insights_buf + insights_pos,
                                              sizeof(insights_buf) - insights_pos,
                                              "- Emotional tone: %s%s\n", emo.dominant_emotion,
@@ -2631,12 +2641,28 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
             }
         }
 
+#ifndef SC_IS_TEST
+        if (inbox_watcher.memory) {
+            struct timespec ts_inbox;
+            clock_gettime(CLOCK_MONOTONIC, &ts_inbox);
+            int64_t inbox_now = (int64_t)ts_inbox.tv_sec * 1000 + ts_inbox.tv_nsec / 1000000;
+            if (inbox_now - last_inbox_poll_ms >= 60000) {
+                size_t ingested = 0;
+                (void)sc_inbox_poll(&inbox_watcher, &ingested);
+                if (ingested > 0)
+                    fprintf(stderr, "[seaclaw] inbox: ingested %zu file(s)\n", ingested);
+                last_inbox_poll_ms = inbox_now;
+            }
+        }
+#endif
+
         struct timespec sleep_ts = {.tv_sec = tick_interval_ms / 1000,
                                     .tv_nsec = (long)(tick_interval_ms % 1000) * 1000000L};
         nanosleep(&sleep_ts, NULL);
     }
 
 #undef SC_STOP_FLAG
+    sc_inbox_deinit(&inbox_watcher);
     if (agent)
         agent->bth_metrics = NULL;
     if (graph)

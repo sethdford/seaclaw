@@ -88,7 +88,12 @@ sc_error_t sc_inbox_poll(sc_inbox_watcher_t *watcher, size_t *processed_count) {
         if (st.st_size > SC_INBOX_MAX_FILE_SIZE)
             continue;
 
-        sc_error_t err = sc_ingest_file(watcher->alloc, watcher->memory, path, (size_t)n);
+        sc_error_t err;
+        if (watcher->provider && watcher->provider->vtable)
+            err = sc_ingest_file_with_provider(watcher->alloc, watcher->memory, watcher->provider,
+                                               path, (size_t)n);
+        else
+            err = sc_ingest_file(watcher->alloc, watcher->memory, path, (size_t)n);
         if (err != SC_OK)
             continue;
 

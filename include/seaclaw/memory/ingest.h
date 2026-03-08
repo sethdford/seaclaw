@@ -4,6 +4,7 @@
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/memory.h"
+#include "seaclaw/provider.h"
 #include <stddef.h>
 
 typedef enum sc_ingest_file_type {
@@ -35,6 +36,9 @@ sc_error_t sc_ingest_file(sc_allocator_t *alloc, sc_memory_t *memory, const char
 sc_error_t sc_ingest_build_extract_prompt(sc_allocator_t *alloc, const char *filename,
                                           size_t filename_len, sc_ingest_file_type_t type,
                                           char **out, size_t *out_len);
+
+sc_error_t sc_ingest_file_with_provider(sc_allocator_t *alloc, sc_memory_t *memory,
+                                        sc_provider_t *provider, const char *path, size_t path_len);
 
 void sc_ingest_result_deinit(sc_ingest_result_t *result, sc_allocator_t *alloc);
 

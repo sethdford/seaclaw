@@ -1,6 +1,8 @@
 #include "seaclaw/memory/ingest.h"
+#include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/memory/inbox.h"
+#include "seaclaw/multimodal.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -199,6 +201,223 @@ sc_error_t sc_ingest_build_extract_prompt(sc_allocator_t *alloc, const char *fil
     *out = buf;
     *out_len = strlen(buf);
     return SC_OK;
+}
+
+static sc_error_t read_binary_file(sc_allocator_t *alloc, const char *path, size_t path_len,
+                                   void **out, size_t *out_len) {
+#ifdef SC_IS_TEST
+    (void)alloc;
+    (void)path;
+    (void)path_len;
+    (void)out;
+    (void)out_len;
+    return SC_ERR_NOT_SUPPORTED;
+#else
+    char path_buf[1024];
+    if (path_len >= sizeof(path_buf))
+        return SC_ERR_INVALID_ARGUMENT;
+    memcpy(path_buf, path, path_len);
+    path_buf[path_len] = '\0';
+
+    FILE *f = fopen(path_buf, "rb");
+    if (!f)
+        return SC_ERR_IO;
+
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if (size <= 0 || size > (long)SC_INBOX_MAX_FILE_SIZE) {
+        fclose(f);
+        return size <= 0 ? SC_ERR_IO : SC_ERR_INVALID_ARGUMENT;
+    }
+
+    void *buf = alloc->alloc(alloc->ctx, (size_t)size);
+    if (!buf) {
+        fclose(f);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+
+    size_t nread = fread(buf, 1, (size_t)size, f);
+    fclose(f);
+    *out = buf;
+    *out_len = nread;
+    return SC_OK;
+#endif
+}
+
+static const char *mime_for_type(sc_ingest_file_type_t type, const char *path, size_t path_len) {
+    (void)path;
+    (void)path_len;
+    switch (type) {
+    case SC_INGEST_IMAGE:
+        return "image/png";
+    case SC_INGEST_AUDIO:
+        return "audio/wav";
+    case SC_INGEST_VIDEO:
+        return "video/mp4";
+    case SC_INGEST_PDF:
+        return "application/pdf";
+    default:
+        return "application/octet-stream";
+    }
+}
+
+static void extract_filename(const char *path, size_t path_len, const char **fname,
+                             size_t *fname_len) {
+    *fname = path;
+    for (size_t i = path_len; i > 0; i--) {
+        if (path[i - 1] == '/' || path[i - 1] == '\\') {
+            *fname = path + i;
+            break;
+        }
+    }
+    *fname_len = (size_t)((path + path_len) - *fname);
+}
+
+static sc_error_t store_extracted(sc_allocator_t *alloc, sc_memory_t *memory, const char *response,
+                                  size_t response_len, const char *path, size_t path_len,
+                                  const char *fname, size_t fname_len) {
+    sc_json_value_t *json = NULL;
+    sc_error_t err = sc_json_parse(alloc, response, response_len, &json);
+    if (err != SC_OK || !json)
+        return SC_ERR_PARSE;
+
+    const char *content = sc_json_get_string(json, "content");
+    if (!content || content[0] == '\0') {
+        sc_json_free(alloc, json);
+        return SC_ERR_PARSE;
+    }
+
+    char *key = sc_sprintf(alloc, "ingest:%.*s", (int)fname_len, fname);
+    char *source = sc_sprintf(alloc, "file://%.*s", (int)path_len, path);
+
+    if (!key || !source) {
+        if (key)
+            sc_str_free(alloc, key);
+        if (source)
+            sc_str_free(alloc, source);
+        sc_json_free(alloc, json);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_DAILY};
+    err = sc_memory_store_with_source(memory, key, strlen(key), content, strlen(content), &cat,
+                                      NULL, 0, source, strlen(source));
+
+    sc_str_free(alloc, source);
+    sc_str_free(alloc, key);
+    sc_json_free(alloc, json);
+    return err;
+}
+
+sc_error_t sc_ingest_file_with_provider(sc_allocator_t *alloc, sc_memory_t *memory,
+                                        sc_provider_t *provider, const char *path,
+                                        size_t path_len) {
+    if (!alloc || !memory || !memory->vtable || !path || path_len == 0)
+        return SC_ERR_INVALID_ARGUMENT;
+
+    sc_ingest_file_type_t type = sc_ingest_detect_type(path, path_len);
+
+    if (type == SC_INGEST_TEXT)
+        return sc_ingest_file(alloc, memory, path, path_len);
+
+    if (!provider || !provider->vtable)
+        return SC_ERR_NOT_SUPPORTED;
+
+    const char *fname = NULL;
+    size_t fname_len = 0;
+    extract_filename(path, path_len, &fname, &fname_len);
+
+    if (type == SC_INGEST_IMAGE && provider->vtable->chat) {
+        void *raw = NULL;
+        size_t raw_len = 0;
+        sc_error_t err = read_binary_file(alloc, path, path_len, &raw, &raw_len);
+        if (err != SC_OK)
+            return err;
+
+        char *b64 = NULL;
+        size_t b64_len = 0;
+        err = sc_multimodal_encode_base64(alloc, raw, raw_len, &b64, &b64_len);
+        alloc->free(alloc->ctx, raw, raw_len);
+        if (err != SC_OK)
+            return err;
+
+        char *prompt = NULL;
+        size_t prompt_len = 0;
+        err = sc_ingest_build_extract_prompt(alloc, fname, fname_len, type, &prompt, &prompt_len);
+        if (err != SC_OK) {
+            alloc->free(alloc->ctx, b64, b64_len + 1);
+            return err;
+        }
+
+        const char *mime = mime_for_type(type, path, path_len);
+
+        sc_content_part_t parts[2] = {
+            {.tag = SC_CONTENT_PART_TEXT, .data.text = {.ptr = prompt, .len = prompt_len}},
+            {.tag = SC_CONTENT_PART_IMAGE_BASE64,
+             .data.image_base64 = {.data = b64,
+                                   .data_len = b64_len,
+                                   .media_type = mime,
+                                   .media_type_len = strlen(mime)}},
+        };
+
+        sc_chat_message_t msg = {.role = SC_ROLE_USER,
+                                 .content = prompt,
+                                 .content_len = prompt_len,
+                                 .content_parts = parts,
+                                 .content_parts_count = 2};
+        sc_chat_request_t req = {
+            .messages = &msg, .messages_count = 1, .temperature = 0.2, .max_tokens = 2048};
+
+        sc_chat_response_t resp = {0};
+        err = provider->vtable->chat(provider->ctx, alloc, &req, NULL, 0, 0.2, &resp);
+
+        alloc->free(alloc->ctx, b64, b64_len + 1);
+        sc_str_free(alloc, prompt);
+
+        if (err != SC_OK)
+            return err;
+
+        if (resp.content && resp.content_len > 0) {
+            err = store_extracted(alloc, memory, resp.content, resp.content_len, path, path_len,
+                                  fname, fname_len);
+        } else {
+            err = SC_ERR_PARSE;
+        }
+        sc_chat_response_free(alloc, &resp);
+        return err;
+    }
+
+    if (provider->vtable->chat_with_system) {
+        char *prompt = NULL;
+        size_t prompt_len = 0;
+        sc_error_t err =
+            sc_ingest_build_extract_prompt(alloc, fname, fname_len, type, &prompt, &prompt_len);
+        if (err != SC_OK)
+            return err;
+
+        char *response = NULL;
+        size_t response_len = 0;
+        const char *sys = "Extract content and return JSON only.";
+        err = provider->vtable->chat_with_system(provider->ctx, alloc, sys, 37, prompt, prompt_len,
+                                                 NULL, 0, 0.2, &response, &response_len);
+        sc_str_free(alloc, prompt);
+
+        if (err != SC_OK)
+            return err;
+
+        if (response && response_len > 0) {
+            err = store_extracted(alloc, memory, response, response_len, path, path_len, fname,
+                                  fname_len);
+            alloc->free(alloc->ctx, response, response_len + 1);
+        } else {
+            err = SC_ERR_PARSE;
+        }
+        return err;
+    }
+
+    return SC_ERR_NOT_SUPPORTED;
 }
 
 void sc_ingest_result_deinit(sc_ingest_result_t *result, sc_allocator_t *alloc) {

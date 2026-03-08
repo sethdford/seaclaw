@@ -1947,8 +1947,17 @@ sc_response_action_t sc_conversation_classify_response(const char *msg, size_t m
     if (is_tapback_reaction(norm, ni))
         return SC_RESPONSE_SKIP;
 
-    /* Skip: very short */
-    if (msg_len <= 2)
+    /* Greetings: always respond even if short */
+    if (ni >= 2 &&
+        (memcmp(norm, "hi", 2) == 0 || memcmp(norm, "hey", 3) == 0 || memcmp(norm, "yo", 2) == 0 ||
+         memcmp(norm, "sup", 3) == 0 || (ni >= 5 && memcmp(norm, "hello", 5) == 0) ||
+         (ni >= 5 && memcmp(norm, "howdy", 5) == 0))) {
+        *delay_extra_ms = 2000;
+        return SC_RESPONSE_BRIEF;
+    }
+
+    /* Skip: very short non-greeting (single char, emoji reactions) */
+    if (msg_len <= 1)
         return SC_RESPONSE_SKIP;
 
     /* ok/k/okay: skip unless answering our question */

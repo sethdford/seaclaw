@@ -1,7 +1,5 @@
 #include "seaclaw/agent.h"
 #include "seaclaw/agent/awareness.h"
-#include "seaclaw/memory/consolidation.h"
-#include "seaclaw/memory/promotion.h"
 #include "seaclaw/agent/commitment_store.h"
 #include "seaclaw/agent/pattern_radar.h"
 #include "seaclaw/agent/superhuman.h"
@@ -9,6 +7,8 @@
 #include "seaclaw/agent/superhuman_emotional.h"
 #include "seaclaw/agent/superhuman_predictive.h"
 #include "seaclaw/agent/superhuman_silence.h"
+#include "seaclaw/memory/consolidation.h"
+#include "seaclaw/memory/promotion.h"
 #ifdef SC_HAS_PERSONA
 #include "seaclaw/persona/circadian.h"
 #include "seaclaw/persona/relationship.h"
@@ -525,6 +525,7 @@ sc_error_t sc_agent_consolidate_memory(sc_agent_t *agent) {
     if (!agent || !agent->memory || !agent->memory->vtable)
         return SC_ERR_INVALID_ARGUMENT;
     sc_consolidation_config_t config = SC_CONSOLIDATION_DEFAULTS;
+    config.provider = &agent->provider;
     return sc_memory_consolidate(agent->alloc, agent->memory, &config);
 }
 

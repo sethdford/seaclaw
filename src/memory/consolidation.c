@@ -1,6 +1,7 @@
 #include "seaclaw/memory/consolidation.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"
+#include "seaclaw/memory/connections.h"
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -141,6 +142,53 @@ sc_error_t sc_memory_consolidate(sc_allocator_t *alloc, sc_memory_t *memory,
             }
         }
     }
+
+#ifndef SC_IS_TEST
+    if (config->provider && config->provider->vtable &&
+        config->provider->vtable->chat_with_system) {
+        size_t surviving = 0;
+        for (size_t i = 0; i < count; i++)
+            if (!to_forget[i])
+                surviving++;
+
+        if (surviving >= 2) {
+            sc_memory_entry_t *surv = (sc_memory_entry_t *)alloc->alloc(
+                alloc->ctx, surviving * sizeof(sc_memory_entry_t));
+            if (surv) {
+                size_t si = 0;
+                for (size_t i = 0; i < count; i++)
+                    if (!to_forget[i])
+                        surv[si++] = entries[i];
+
+                char *prompt = NULL;
+                size_t prompt_len = 0;
+                if (sc_connections_build_prompt(alloc, surv, surviving, &prompt, &prompt_len) ==
+                        SC_OK &&
+                    prompt) {
+                    char *response = NULL;
+                    size_t response_len = 0;
+                    const char *sys = "Return JSON only.";
+                    sc_error_t chat_err = config->provider->vtable->chat_with_system(
+                        config->provider->ctx, alloc, sys, 17, prompt, prompt_len, NULL, 0, 0.2,
+                        &response, &response_len);
+                    alloc->free(alloc->ctx, prompt, prompt_len + 1);
+
+                    if (chat_err == SC_OK && response) {
+                        sc_connection_result_t conn_result = {0};
+                        if (sc_connections_parse(alloc, response, response_len, surviving,
+                                                 &conn_result) == SC_OK) {
+                            (void)sc_connections_store_insights(alloc, memory, &conn_result, surv,
+                                                                surviving);
+                            sc_connection_result_deinit(&conn_result, alloc);
+                        }
+                        alloc->free(alloc->ctx, response, response_len + 1);
+                    }
+                }
+                alloc->free(alloc->ctx, surv, surviving * sizeof(sc_memory_entry_t));
+            }
+        }
+    }
+#endif
 
     for (size_t i = 0; i < count; i++) {
         if (to_forget[i] && entries[i].key) {

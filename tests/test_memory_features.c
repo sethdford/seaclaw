@@ -253,6 +253,26 @@ static void test_ingest_build_extract_prompt(void) {
     alloc.free(alloc.ctx, prompt, prompt_len + 1);
 }
 
+static void test_ingest_with_provider_text_fallback(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_memory_t mem = sc_none_memory_create(&alloc);
+    sc_error_t err = sc_ingest_file_with_provider(&alloc, &mem, NULL, "notes.txt", 9);
+    SC_ASSERT_EQ(err, SC_ERR_NOT_SUPPORTED);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_ingest_with_provider_binary_no_provider(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_memory_t mem = sc_none_memory_create(&alloc);
+    sc_error_t err = sc_ingest_file_with_provider(&alloc, &mem, NULL, "photo.png", 9);
+    SC_ASSERT_EQ(err, SC_ERR_NOT_SUPPORTED);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_ingest_with_provider_null_args(void) {
+    SC_ASSERT_EQ(sc_ingest_file_with_provider(NULL, NULL, NULL, NULL, 0), SC_ERR_INVALID_ARGUMENT);
+}
+
 /* ── Feature 4: Inbox watcher ────────────────────────────────────────── */
 
 #ifdef SC_ENABLE_SQLITE
@@ -343,6 +363,9 @@ void run_memory_features_tests(void) {
     SC_RUN_TEST(test_ingest_detect_type_pdf);
     SC_RUN_TEST(test_ingest_detect_type_unknown);
     SC_RUN_TEST(test_ingest_build_extract_prompt);
+    SC_RUN_TEST(test_ingest_with_provider_text_fallback);
+    SC_RUN_TEST(test_ingest_with_provider_binary_no_provider);
+    SC_RUN_TEST(test_ingest_with_provider_null_args);
 
     SC_TEST_SUITE("memory_features — inbox");
 #ifdef SC_ENABLE_SQLITE
