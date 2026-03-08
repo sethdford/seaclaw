@@ -1087,14 +1087,14 @@ sc_error_t sc_app_bootstrap(sc_app_ctx_t *ctx, sc_allocator_t *alloc, const char
 
 #if SC_HAS_TWILIO
         if (cfg->channels.twilio.account_sid && cfg->channels.twilio.auth_token &&
-            cfg->channels.twilio.from_number && cfg->channels.twilio.to_number &&
-            ch_count < SC_BOOTSTRAP_CHANNELS_MAX) {
+            cfg->channels.twilio.from_number && ch_count < SC_BOOTSTRAP_CHANNELS_MAX) {
+            const char *tw_to = cfg->channels.twilio.to_number;
+            size_t tw_to_len = tw_to ? strlen(tw_to) : 0;
             err = sc_twilio_create(
                 alloc, cfg->channels.twilio.account_sid, strlen(cfg->channels.twilio.account_sid),
                 cfg->channels.twilio.auth_token, strlen(cfg->channels.twilio.auth_token),
-                cfg->channels.twilio.from_number, strlen(cfg->channels.twilio.from_number),
-                cfg->channels.twilio.to_number, strlen(cfg->channels.twilio.to_number),
-                &bi->channel_slots[ch_count]);
+                cfg->channels.twilio.from_number, strlen(cfg->channels.twilio.from_number), tw_to,
+                tw_to_len, &bi->channel_slots[ch_count]);
             if (err == SC_OK) {
                 bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;
                 bi->channels[ch_count].channel = &bi->channel_slots[ch_count];
