@@ -87,6 +87,10 @@ sc_error_t sc_hybrid_retrieve(sc_allocator_t *alloc, sc_memory_t *backend, sc_em
 
     size_t limit = opts && opts->limit > 0 ? opts->limit : 10;
 
+#ifndef SC_ENABLE_SQLITE
+    (void)graph;
+#endif
+
     sc_retrieval_result_t keyword_result = {0};
     sc_error_t err = sc_keyword_retrieve(alloc, backend, query, query_len, opts, &keyword_result);
     if (err != SC_OK)
