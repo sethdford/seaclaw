@@ -1,14 +1,18 @@
 #include "seaclaw/daemon.h"
 #include "seaclaw/agent.h"
+#include "seaclaw/observability/bth_metrics.h"
 #include "seaclaw/agent/episodic.h"
 #include "seaclaw/agent/outcomes.h"
 #include "seaclaw/agent/proactive.h"
 #include "seaclaw/memory/consolidation.h"
 #include "seaclaw/memory/deep_extract.h"
+#include "seaclaw/memory/graph.h"
+#include "seaclaw/memory/retrieval.h"
 #include "seaclaw/config.h"
 #include "seaclaw/context/conversation.h"
 #include "seaclaw/context/event_extract.h"
 #include "seaclaw/context/mood.h"
+#include "seaclaw/context/vision.h"
 #include "seaclaw/memory/emotional_graph.h"
 #include "seaclaw/memory/promotion.h"
 #include "seaclaw/core/error.h"
@@ -22,12 +26,17 @@
 #include "seaclaw/cron.h"
 #include "seaclaw/crontab.h"
 #endif
+#if defined(SC_ENABLE_IMESSAGE) && !defined(SC_IS_TEST)
+#include "seaclaw/channels/imessage.h"
+#endif
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
+
 
 /* sqlite3.h no longer needed in daemon — moved to channel vtable implementations */
 
@@ -116,8 +125,11 @@ static char *build_callback_context(sc_allocator_t *alloc, sc_memory_t *memory,
 
 /* Store a conversation summary as long-term memory.
  * Concatenates the user message and agent response, runs deep-extract
- * on the full exchange, and stores extracted facts scoped to the contact. */
+ * on the full exchange, and stores extracted facts scoped to the contact.
+ * When graph is non-NULL, also upserts facts and relations into the GraphRAG knowledge graph.
+ * agent may be NULL; when non-NULL and bth_metrics set, increments facts_extracted. */
 static void store_conversation_summary(sc_allocator_t *alloc, sc_memory_t *memory,
+                                       sc_graph_t *graph, sc_agent_t *agent,
                                        const char *session_id, size_t session_id_len,
                                        const char *user_msg, size_t user_msg_len,
                                        const char *response, size_t response_len) {
@@ -143,6 +155,8 @@ static void store_conversation_summary(sc_allocator_t *alloc, sc_memory_t *memor
     memset(&de, 0, sizeof(de));
     sc_error_t err = sc_deep_extract_lightweight(alloc, combined, combined_len, &de);
     if (err == SC_OK && de.fact_count > 0) {
+        if (agent && agent->bth_metrics)
+            agent->bth_metrics->facts_extracted += de.fact_count;
         static const char cat_name[] = "conversation_summary";
         sc_memory_category_t cat = {
             .tag = SC_MEMORY_CATEGORY_CUSTOM,
@@ -161,8 +175,47 @@ static void store_conversation_summary(sc_allocator_t *alloc, sc_memory_t *memor
                                             session_id ? session_id : "",
                                             session_id ? session_id_len : 0);
             }
+#ifdef SC_ENABLE_SQLITE
+            if (graph) {
+                int64_t src_id = 0;
+                int64_t tgt_id = 0;
+                size_t subj_len = strlen(f->subject);
+                size_t obj_len = strlen(f->object);
+                sc_relation_type_t rel_type =
+                    sc_relation_type_from_string(f->predicate, strlen(f->predicate));
+                if (sc_graph_upsert_entity(graph, f->subject, subj_len, SC_ENTITY_UNKNOWN, NULL,
+                                           &src_id) == SC_OK &&
+                    sc_graph_upsert_entity(graph, f->object, obj_len, SC_ENTITY_UNKNOWN, NULL,
+                                           &tgt_id) == SC_OK) {
+                    (void)sc_graph_upsert_relation(graph, src_id, tgt_id, rel_type, 1.0f,
+                                                   f->object, obj_len);
+                }
+            }
+#endif
         }
     }
+#ifdef SC_ENABLE_SQLITE
+    if (graph && err == SC_OK && de.relation_count > 0) {
+        for (size_t i = 0; i < de.relation_count; i++) {
+            const sc_extracted_relation_t *r = &de.relations[i];
+            if (!r->entity_a || !r->relation || !r->entity_b)
+                continue;
+            int64_t src_id = 0;
+            int64_t tgt_id = 0;
+            size_t a_len = strlen(r->entity_a);
+            size_t b_len = strlen(r->entity_b);
+            size_t rel_len = strlen(r->relation);
+            sc_relation_type_t rel_type = sc_relation_type_from_string(r->relation, rel_len);
+            if (sc_graph_upsert_entity(graph, r->entity_a, a_len, SC_ENTITY_UNKNOWN, NULL,
+                                       &src_id) == SC_OK &&
+                sc_graph_upsert_entity(graph, r->entity_b, b_len, SC_ENTITY_UNKNOWN, NULL,
+                                       &tgt_id) == SC_OK) {
+                (void)sc_graph_upsert_relation(graph, src_id, tgt_id, rel_type, 1.0f, r->entity_b,
+                                               b_len);
+            }
+        }
+    }
+#endif
     sc_deep_extract_result_deinit(&de, alloc);
     alloc->free(alloc->ctx, combined, total + 1);
 }
@@ -429,7 +482,7 @@ sc_error_t sc_service_run_agent_cron(sc_allocator_t *alloc, sc_agent_t *agent,
                               err == SC_OK ? "success" : "failed", response);
 
         if (response)
-            alloc->free(alloc->ctx, response, response_len + 1);
+            agent->alloc->free(agent->alloc->ctx, response, response_len + 1);
         sc_agent_clear_history(agent);
     }
     return SC_OK;
@@ -448,6 +501,14 @@ static char *proactive_prompt_for_contact(sc_allocator_t *alloc, sc_memory_t *me
     if (memory && cp->contact_id) {
         (void)sc_proactive_build_starter(alloc, memory, cp->contact_id, strlen(cp->contact_id),
                                          &starter, &starter_len);
+    }
+
+    /* Memory-informed topics: recall recent memories about the contact */
+    char *mem_ctx = NULL;
+    size_t mem_ctx_len = 0;
+    if (memory && cp->contact_id) {
+        mem_ctx = build_callback_context(alloc, memory, cp->contact_id, strlen(cp->contact_id),
+                                          "recent conversation topics", 24, &mem_ctx_len);
     }
 
     static const char RULES[] =
@@ -470,11 +531,15 @@ static char *proactive_prompt_for_contact(sc_allocator_t *alloc, sc_memory_t *me
     size_t total = base_len + rules_len;
     if (starter && starter_len > 0)
         total += 2 + starter_len; /* "\n\n" + starter */
+    if (mem_ctx && mem_ctx_len > 0)
+        total += 2 + mem_ctx_len; /* "\n\n" + mem_ctx */
 
     char *result = (char *)alloc->alloc(alloc->ctx, total + 1);
     if (!result) {
         if (starter)
             alloc->free(alloc->ctx, starter, starter_len + 1);
+        if (mem_ctx)
+            alloc->free(alloc->ctx, mem_ctx, mem_ctx_len + 1);
         *out_len = 0;
         return NULL;
     }
@@ -489,6 +554,13 @@ static char *proactive_prompt_for_contact(sc_allocator_t *alloc, sc_memory_t *me
         memcpy(result + pos, starter, starter_len);
         pos += starter_len;
         alloc->free(alloc->ctx, starter, starter_len + 1);
+    }
+    if (mem_ctx && mem_ctx_len > 0) {
+        result[pos++] = '\n';
+        result[pos++] = '\n';
+        memcpy(result + pos, mem_ctx, mem_ctx_len);
+        pos += mem_ctx_len;
+        alloc->free(alloc->ctx, mem_ctx, mem_ctx_len + 1);
     }
 
     memcpy(result + pos, RULES, rules_len);
@@ -555,11 +627,13 @@ void sc_service_run_proactive_checkins(sc_allocator_t *alloc, sc_agent_t *agent,
                 channels[c].channel->ctx, alloc, cp->contact_id, strlen(cp->contact_id), 15,
                 &entries, &entry_count);
 
+            uint64_t last_contact_ms = 0;
             bool should_checkin = true;
             if (entries && entry_count > 0) {
                 struct tm last_tm = {0};
                 if (strptime(entries[entry_count - 1].timestamp, "%Y-%m-%d %H:%M", &last_tm)) {
                     time_t last_time = mktime(&last_tm);
+                    last_contact_ms = (uint64_t)last_time * 1000ULL;
                     double hours_since = difftime(now, last_time) / 3600.0;
                     if (hours_since < 24.0)
                         should_checkin = false;
@@ -589,16 +663,18 @@ void sc_service_run_proactive_checkins(sc_allocator_t *alloc, sc_agent_t *agent,
                 alloc->free(alloc->ctx, entries, entry_count * sizeof(*entries));
 
 #ifndef SC_IS_TEST
-            /* Silence check-in: if channel has been quiet, consider reaching out */
+            /* Silence check-in: per-contact last activity from conversation history */
             {
                 sc_silence_config_t silence_cfg = SC_SILENCE_DEFAULTS;
                 sc_proactive_result_t silence_result;
                 memset(&silence_result, 0, sizeof(silence_result));
                 uint64_t now_ms = (uint64_t)now * 1000ULL;
-                if (sc_proactive_check_silence(alloc, channels[c].last_contact_ms, now_ms,
+                if (sc_proactive_check_silence(alloc, last_contact_ms, now_ms,
                                                &silence_cfg, &silence_result) == SC_OK &&
                     silence_result.count > 0) {
                     should_checkin = true;
+                    if (agent && agent->bth_metrics)
+                        agent->bth_metrics->silence_checkins++;
                     sc_proactive_build_context(&silence_result, alloc, 3, &silence_ctx,
                                               &silence_ctx_len);
                 }
@@ -618,12 +694,16 @@ void sc_service_run_proactive_checkins(sc_allocator_t *alloc, sc_agent_t *agent,
                 memset(&extract_result, 0, sizeof(extract_result));
                 if (sc_event_extract(alloc, combined, combined_len, &extract_result) == SC_OK &&
                     extract_result.event_count > 0) {
+                    if (agent && agent->bth_metrics)
+                        agent->bth_metrics->events_extracted += extract_result.event_count;
                     sc_proactive_result_t event_result;
                     memset(&event_result, 0, sizeof(event_result));
                     if (sc_proactive_check_events(alloc, extract_result.events,
                                                   extract_result.event_count,
                                                   &event_result) == SC_OK &&
                         event_result.count > 0) {
+                        if (agent && agent->bth_metrics)
+                            agent->bth_metrics->event_followups++;
                         sc_proactive_build_context(&event_result, alloc, 3, &event_ctx,
                                                    &event_ctx_len);
                     }
@@ -683,7 +763,7 @@ void sc_service_run_proactive_checkins(sc_allocator_t *alloc, sc_agent_t *agent,
                     }
                 }
                 if (response)
-                    alloc->free(alloc->ctx, response, response_len + 1);
+                    agent->alloc->free(agent->alloc->ctx, response, response_len + 1);
                 alloc->free(alloc->ctx, prompt, prompt_len + 1);
                 sc_agent_clear_history(agent);
             }
@@ -698,6 +778,37 @@ void sc_service_run_proactive_checkins(sc_allocator_t *alloc, sc_agent_t *agent,
 }
 
 #endif /* SC_HAS_PERSONA && !SC_IS_TEST */
+
+#ifndef SC_IS_TEST
+/* Tapback-worthy: very short, emoji-only, or acknowledgment. Used to
+ * sometimes skip responding (simulate "seen" behavior). */
+static bool is_tapback_worthy(const char *msg, size_t len) {
+    if (!msg || len == 0)
+        return false;
+    /* Very short and no spaces: likely single emoji or "k" */
+    if (len <= 8) {
+        for (size_t i = 0; i < len; i++) {
+            if (msg[i] == ' ')
+                return false;
+        }
+        return true;
+    }
+    /* Acknowledgment phrases (case-insensitive) */
+    static const char *acks[] = {"ok", "okay", "k", "lol", "lmao", "haha",
+                                "nice", "thanks", "thx", "cool", "great"};
+    for (size_t a = 0; a < sizeof(acks) / sizeof(acks[0]); a++) {
+        size_t alen = strlen(acks[a]);
+        if (len >= alen && strncasecmp(msg, acks[a], alen) == 0) {
+            if (len == alen || msg[alen] == '.' || msg[alen] == '!' ||
+                msg[alen] == '?' || msg[alen] == ' ')
+                return true;
+        }
+    }
+    if (len <= 20 && strncasecmp(msg, "thanks", 6) == 0)
+        return true;
+    return false;
+}
+#endif
 
 /* ── Signal handling (non-test only) ─────────────────────────────────── */
 
@@ -751,6 +862,23 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
     time_t last_cron_minute = 0;
 #endif
 
+    sc_graph_t *graph = NULL;
+#ifdef SC_ENABLE_SQLITE
+    {
+        const char *home = getenv("HOME");
+        if (home) {
+            char graph_path[SC_MAX_PATH];
+            int np = snprintf(graph_path, sizeof(graph_path), "%s/.seaclaw/graph.db", home);
+            if (np > 0 && (size_t)np < sizeof(graph_path)) {
+                if (sc_graph_open(alloc, graph_path, (size_t)np, &graph) != SC_OK)
+                    fprintf(stderr, "[seaclaw] graph open failed: %.*s\n", np, graph_path);
+            }
+        }
+    }
+    if (graph && agent && agent->retrieval_engine)
+        sc_retrieval_set_graph(agent->retrieval_engine, graph);
+#endif
+
     {
         struct timespec ts_now;
         clock_gettime(CLOCK_MONOTONIC, &ts_now);
@@ -772,6 +900,12 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
     static char replay_insights[2048] = {0};
     static size_t replay_insights_len = 0;
     static size_t promotion_counter = 0;
+    static char community_insights[2048] = {0};
+    static size_t community_insights_len = 0;
+    static sc_bth_metrics_t bth_metrics;
+    sc_bth_metrics_init(&bth_metrics);
+    if (agent)
+        agent->bth_metrics = &bth_metrics;
 #endif
 
     while (!SC_STOP_FLAG) {
@@ -783,16 +917,32 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 run_cron_tick(alloc);
                 sc_service_run_agent_cron(alloc, agent, channels, channel_count);
 #ifdef SC_HAS_PERSONA
-                /* Run proactive check-ins at the top of each hour */
+                /* Run proactive check-ins at the top of each hour.
+                 * Add jitter (0-30 min) to avoid exact scheduling. */
                 if (current_minute % 60 == 0) {
+                    unsigned int jitter_sec = 0;
+#if defined(__APPLE__) || (defined(__linux__) && defined(__GLIBC__))
+                    jitter_sec = (unsigned int)arc4random_uniform(1801);
+#else
+                    {
+                        uint32_t s = (uint32_t)time(NULL);
+                        s = s * 1103515245u + 12345u;
+                        jitter_sec = (unsigned int)((s >> 16u) & 0x7fffu) % 1801u;
+                    }
+#endif
+                    if (jitter_sec > 0)
+                        sleep(jitter_sec);
                     sc_service_run_proactive_checkins(alloc, agent, channels, channel_count);
+                    if (agent && agent->bth_metrics)
+                        sc_bth_metrics_log(agent->bth_metrics);
                 }
 #endif
 #ifndef SC_IS_TEST
                 /* Daily memory consolidation at 3 AM */
                 {
                     static bool consolidated_today = false;
-                    struct tm *lt = localtime(&t);
+                    struct tm tm_buf;
+                    struct tm *lt = localtime_r(&t, &tm_buf);
                     if (lt && lt->tm_hour == 4) {
                         consolidated_today = false;
                     }
@@ -804,11 +954,43 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                             .dedup_threshold = 70,
                             .max_entries = 5000,
                         };
-                        sc_memory_consolidate(alloc, agent->memory, &cons_cfg);
-                        consolidated_today = true;
-                        fprintf(stderr, "[seaclaw] daily memory consolidation completed\n");
+                        if (sc_memory_consolidate(alloc, agent->memory, &cons_cfg) == SC_OK) {
+                            consolidated_today = true;
+                            fprintf(stderr,
+                                    "[seaclaw] daily memory consolidation completed\n");
+                        }
                     }
                 }
+                /* Weekly GraphRAG community detection at Sunday 2 AM */
+#ifdef SC_ENABLE_SQLITE
+                {
+                    static bool communities_built_this_week = false;
+                    struct tm tm_buf2;
+                    struct tm *lt = localtime_r(&t, &tm_buf2);
+                    if (lt && lt->tm_wday == 1 && lt->tm_hour == 9) {
+                        communities_built_this_week = false;
+                    }
+                    if (lt && lt->tm_wday == 0 && lt->tm_hour == 2 && lt->tm_min == 0 && graph &&
+                        !communities_built_this_week) {
+                        char *comm_ctx = NULL;
+                        size_t comm_len = 0;
+                        if (sc_graph_build_communities(graph, alloc, 20, 2047, &comm_ctx,
+                                                       &comm_len) == SC_OK &&
+                            comm_ctx && comm_len > 0) {
+                            size_t copy_len = comm_len < sizeof(community_insights) - 1
+                                                  ? comm_len
+                                                  : sizeof(community_insights) - 1;
+                            memcpy(community_insights, comm_ctx, copy_len);
+                            community_insights[copy_len] = '\0';
+                            community_insights_len = copy_len;
+                            communities_built_this_week = true;
+                            fprintf(stderr, "[seaclaw] weekly GraphRAG community detection completed\n");
+                        }
+                        if (comm_ctx)
+                            alloc->free(alloc->ctx, comm_ctx, comm_len + 1);
+                    }
+                }
+#endif
 #endif
                 last_cron_minute = current_minute;
             }
@@ -880,6 +1062,9 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (combined_len == 0)
                     continue;
 
+                /* Clear STM before each contact batch to avoid cross-contact emotion contamination */
+                sc_stm_clear(&agent->stm);
+
 #ifndef SC_IS_TEST
                 /* Only respond to contacts explicitly listed in persona_contacts */
 #ifdef SC_HAS_PERSONA
@@ -932,9 +1117,24 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                     alloc->free(alloc->ctx, early_history,
                                 early_history_count * sizeof(sc_channel_history_entry_t));
 
-                if (action == SC_RESPONSE_SKIP) {
-                    fprintf(stderr, "[seaclaw] skipping message (no response needed): %.*s\n",
-                            (int)(combined_len > 40 ? 40 : combined_len), combined);
+                /* Tapback-skip: for tapback-worthy messages, 40% chance to not respond */
+                bool tapback_skip = false;
+#ifndef SC_IS_TEST
+                if (action != SC_RESPONSE_SKIP && is_tapback_worthy(combined, combined_len)) {
+                    uint32_t r = (uint32_t)time(NULL);
+                    r = r * 1103515245u + 12345u + (uint32_t)(uintptr_t)combined;
+                    r = (r >> 16u) & 0x7fffu;
+                    if ((r % 100u) < 40u)
+                        tapback_skip = true;
+                }
+#endif
+                if (action == SC_RESPONSE_SKIP || tapback_skip) {
+                    if (tapback_skip)
+                        fprintf(stderr, "[seaclaw] tapback-skip (no response): %.*s\n",
+                                (int)(combined_len > 40 ? 40 : combined_len), combined);
+                    else
+                        fprintf(stderr, "[seaclaw] skipping message (no response needed): %.*s\n",
+                                (int)(combined_len > 40 ? 40 : combined_len), combined);
                     if (agent->session_store && agent->session_store->vtable &&
                         agent->session_store->vtable->save_message) {
                         for (size_t b = batch_start; b <= batch_end; b++) {
@@ -951,9 +1151,65 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* For BRIEF actions, override max_response_chars to force ultra-short */
                 bool brief_mode = (action == SC_RESPONSE_BRIEF);
 
-                /* Adaptive timing based on message type.
-                 * This sleep also serves as the burst accumulation window —
-                 * messages arriving while we "read" get picked up below. */
+#ifndef SC_IS_TEST
+                if (agent && agent->bth_metrics)
+                    agent->bth_metrics->total_turns++;
+#endif
+
+                /* Adaptive timing based on message type. Variable delay with jitter,
+                 * time-of-day awareness, and rare "busy" delay.
+                 * This sleep also serves as the burst accumulation window. */
+#ifndef SC_IS_TEST
+                {
+                    size_t msg_count = batch_end - batch_start + 1;
+                    uint32_t base_delay = 2500 + (uint32_t)(msg_count * 1500);
+                    if (base_delay > 8000)
+                        base_delay = 8000;
+                    base_delay += extra_delay_ms;
+                    if (base_delay > 15000)
+                        base_delay = 15000;
+
+                    /* Add +/- 30% random jitter */
+                    uint32_t jitter_range = base_delay * 30 / 100;
+                    uint32_t jitter = 0;
+#if defined(__APPLE__) || (defined(__linux__) && defined(__GLIBC__))
+                    jitter = (uint32_t)arc4random_uniform(jitter_range * 2 + 1);
+#else
+                    {
+                        uint32_t s = (uint32_t)time(NULL);
+                        s = s * 1103515245u + 12345u;
+                        jitter = (s >> 16u) & 0x7fffu;
+                        jitter = jitter % (jitter_range * 2 + 1);
+                    }
+#endif
+                    int32_t adjusted = (int32_t)base_delay - (int32_t)jitter_range + (int32_t)jitter;
+                    if (adjusted < 1000)
+                        adjusted = 1000;
+
+                    /* Time-of-day awareness: slower 9PM-7AM */
+                    time_t now_t = time(NULL);
+                    struct tm tod_buf;
+                    struct tm *lt = localtime_r(&now_t, &tod_buf);
+                    if (lt && (lt->tm_hour >= 21 || lt->tm_hour < 7))
+                        adjusted = adjusted * 3 / 2;
+
+                    /* Rare "busy" delay: 3% chance of 60-180 second delay */
+#if defined(__APPLE__) || (defined(__linux__) && defined(__GLIBC__))
+                    if (arc4random_uniform(100) < 3)
+#else
+                    if ((((uint32_t)time(NULL) * 1103515245u + 12345u) >> 16u) % 100u < 3u)
+#endif
+                        adjusted += (int32_t)(60000 + (uint32_t)(
+#if defined(__APPLE__) || (defined(__linux__) && defined(__GLIBC__))
+                            arc4random_uniform(120001)
+#else
+                            (((uint32_t)time(NULL) * 1103515245u + 12345u) >> 16u) % 120001u
+#endif
+                        ));
+
+                    usleep((useconds_t)((unsigned int)adjusted * 1000));
+                }
+#else
                 {
                     size_t msg_count = batch_end - batch_start + 1;
                     unsigned int read_ms = 2500 + (unsigned int)(msg_count * 1500);
@@ -964,6 +1220,7 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         read_ms = 15000;
                     usleep(read_ms * 1000);
                 }
+#endif
 
                 /* Burst accumulation: re-poll for messages that arrived during
                  * the read delay. Humans finish their thought in 2-3 messages,
@@ -1089,6 +1346,8 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 char *response = NULL;
                 size_t response_len = 0;
+                /* sc_agent_turn allocates response via agent->alloc; use agent->alloc for
+                 * free/realloc to match. (agent->alloc == alloc at creation time.) */
 
                 /* Build per-turn context via proper architecture:
                  * 1. Contact profile from persona (sc_persona_find_contact)
@@ -1248,13 +1507,96 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (style_ctx)
                     alloc->free(alloc->ctx, style_ctx, style_ctx_len + 1);
 
-                /* 6. Attachment context: guidance when attachments detected in history */
+                /* GraphRAG: inject knowledge graph context (cross-contact synthesis via batch_key) */
+#ifdef SC_ENABLE_SQLITE
+                if (graph) {
+                    char *graph_ctx = NULL;
+                    size_t graph_ctx_len = 0;
+                    sc_error_t gerr = sc_graph_build_contact_context(
+                        graph, alloc, combined, combined_len, batch_key, key_len, 2, 1024,
+                        &graph_ctx, &graph_ctx_len);
+                    if (gerr == SC_OK && graph_ctx && graph_ctx_len > 0) {
+                        if (convo_ctx) {
+                            size_t total = convo_ctx_len + graph_ctx_len + 2;
+                            char *merged = (char *)alloc->alloc(alloc->ctx, total);
+                            if (merged) {
+                                memcpy(merged, convo_ctx, convo_ctx_len);
+                                merged[convo_ctx_len] = '\n';
+                                memcpy(merged + convo_ctx_len + 1, graph_ctx, graph_ctx_len);
+                                merged[total - 1] = '\0';
+                                alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                convo_ctx = merged;
+                                convo_ctx_len = total - 1;
+                            }
+                        } else {
+                            convo_ctx = graph_ctx;
+                            convo_ctx_len = graph_ctx_len;
+                            graph_ctx = NULL;
+                        }
+                        if (graph_ctx)
+                            alloc->free(alloc->ctx, graph_ctx, graph_ctx_len + 1);
+                    }
+                }
+#endif
+
+                /* 6. Attachment context: guidance when attachments detected in history.
+                 * When provider supports vision and channel is iMessage, try to get image
+                 * path and describe it for richer context. */
                 if (history_entries && history_count > 0) {
                     size_t attach_ctx_len = 0;
                     char *attach_ctx =
                         sc_conversation_attachment_context(alloc, history_entries, history_count,
                                                           &attach_ctx_len);
+#ifndef SC_IS_TEST
+#if defined(SC_ENABLE_IMESSAGE)
+                    /* Vision: if provider supports vision and we have iMessage, try to
+                     * get the latest attachment path and describe it. */
+                    if (attach_ctx && attach_ctx_len > 0 && agent->provider.vtable &&
+                        agent->provider.vtable->supports_vision &&
+                        agent->provider.vtable->supports_vision(agent->provider.ctx)) {
+                        const char *ch_name =
+                            ch->channel->vtable->name
+                                ? ch->channel->vtable->name(ch->channel->ctx)
+                                : NULL;
+                        if (ch_name && strcmp(ch_name, "imessage") == 0 && batch_key &&
+                            key_len > 0) {
+                            char *img_path =
+                                sc_imessage_get_latest_attachment_path(alloc, batch_key, key_len);
+                            if (img_path) {
+                                char *desc = NULL;
+                                size_t desc_len = 0;
+                                const char *model =
+                                    agent->model_name ? agent->model_name : "gpt-4o";
+                                size_t model_len =
+                                    agent->model_name_len > 0 ? agent->model_name_len : 6;
+                                sc_error_t verr = sc_vision_describe_image(
+                                    alloc, &agent->provider, img_path, strlen(img_path), model,
+                                    model_len, &desc, &desc_len);
+                                alloc->free(alloc->ctx, img_path, strlen(img_path) + 1);
+                                if (verr == SC_OK && desc && desc_len > 0) {
+                                    size_t vision_ctx_len = 0;
+                                    char *vision_ctx =
+                                        sc_vision_build_context(alloc, desc, desc_len,
+                                                               &vision_ctx_len);
+                                    alloc->free(alloc->ctx, desc, desc_len + 1);
+                                    if (vision_ctx && vision_ctx_len > 0) {
+                                        alloc->free(alloc->ctx, attach_ctx, attach_ctx_len + 1);
+                                        attach_ctx = vision_ctx;
+                                        attach_ctx_len = vision_ctx_len;
+                                    }
+                                } else if (desc) {
+                                    alloc->free(alloc->ctx, desc, desc_len + 1);
+                                }
+                            }
+                        }
+                    }
+#endif
+#endif
                     if (attach_ctx && attach_ctx_len > 0) {
+#ifndef SC_IS_TEST
+                        if (agent && agent->bth_metrics)
+                            agent->bth_metrics->attachment_contexts++;
+#endif
                         if (convo_ctx) {
                             size_t total = convo_ctx_len + attach_ctx_len + 2;
                             char *merged = (char *)alloc->alloc(alloc->ctx, total);
@@ -1332,6 +1674,10 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         convo_ctx = cb_ctx;
                         convo_ctx_len = cb_len;
                     }
+#ifndef SC_IS_TEST
+                    if (cb_len > 0 && agent && agent->bth_metrics)
+                        agent->bth_metrics->callbacks_triggered++;
+#endif
                 }
 
 #ifndef SC_IS_TEST
@@ -1386,6 +1732,31 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                             memcpy(convo_ctx, replay_insights, replay_insights_len);
                             convo_ctx[replay_insights_len] = '\0';
                             convo_ctx_len = replay_insights_len;
+                        }
+                    }
+                }
+                /* GraphRAG community insights: inject topic clusters from weekly detection */
+                if (community_insights_len > 0) {
+                    if (convo_ctx) {
+                        size_t merged_len = convo_ctx_len + community_insights_len + 2;
+                        char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
+                        if (merged) {
+                            memcpy(merged, convo_ctx, convo_ctx_len);
+                            merged[convo_ctx_len] = '\n';
+                            memcpy(merged + convo_ctx_len + 1, community_insights,
+                                   community_insights_len);
+                            merged[merged_len - 1] = '\n';
+                            merged[merged_len] = '\0';
+                            alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                            convo_ctx = merged;
+                            convo_ctx_len = merged_len;
+                        }
+                    } else {
+                        convo_ctx = (char *)alloc->alloc(alloc->ctx, community_insights_len + 1);
+                        if (convo_ctx) {
+                            memcpy(convo_ctx, community_insights, community_insights_len);
+                            convo_ctx[community_insights_len] = '\0';
+                            convo_ctx_len = community_insights_len;
                         }
                     }
                 }
@@ -1529,6 +1900,10 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                     char *egraph_ctx = sc_egraph_build_context(alloc, &egraph, &egraph_len);
                     sc_egraph_deinit(&egraph);
                     if (egraph_ctx && egraph_len > 0) {
+#ifndef SC_IS_TEST
+                        if (agent && agent->bth_metrics)
+                            agent->bth_metrics->egraph_contexts++;
+#endif
                         if (convo_ctx) {
                             size_t total = convo_ctx_len + egraph_len + 2;
                             char *merged = (char *)alloc->alloc(alloc->ctx, total);
@@ -1559,6 +1934,10 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         sc_mood_build_context(alloc, agent->memory, batch_key, key_len,
                                               &mood_ctx, &mood_ctx_len) == SC_OK &&
                         mood_ctx && mood_ctx_len > 0) {
+#ifndef SC_IS_TEST
+                        if (agent->bth_metrics)
+                            agent->bth_metrics->mood_contexts_built++;
+#endif
                         if (convo_ctx) {
                             size_t total = convo_ctx_len + mood_ctx_len + 2;
                             char *merged = (char *)alloc->alloc(alloc->ctx, total);
@@ -1630,36 +2009,88 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (msg_id > 0) {
                             ch->channel->vtable->react(ch->channel->ctx, batch_key, key_len,
                                                         msg_id, reaction);
+#ifndef SC_IS_TEST
+                            if (agent->bth_metrics)
+                                agent->bth_metrics->reactions_sent++;
+#endif
                         }
                     }
                 }
 #endif
 
-                sc_error_t err =
-                    sc_agent_turn(agent, combined, combined_len, &response, &response_len);
+                bool retried = false;
+                sc_error_t err = SC_OK;
+                do {
+                    if (response) {
+                        agent->alloc->free(agent->alloc->ctx, response, response_len + 1);
+                        response = NULL;
+                        response_len = 0;
+                    }
+                    err = sc_agent_turn(agent, combined, combined_len, &response, &response_len);
+                    if (err != SC_OK)
+                        fprintf(stderr, "[seaclaw] agent turn failed for %.*s: %d\n",
+                                (int)key_len, batch_key, (int)err);
 
 #ifndef SC_IS_TEST
-                /* Stop typing indicator after LLM call */
-                if (ch->channel->vtable->stop_typing) {
-                    ch->channel->vtable->stop_typing(ch->channel->ctx, batch_key, key_len);
-                }
-
-                /* Quality gate: check response for unnatural patterns.
-                 * Run before freeing history so the evaluator has full context.
-                 * If needs_revision, log it — the reflection system inside
-                 * agent_turn handles retries, this catches what slips through. */
-                if (err == SC_OK && response && response_len > 0 && history_entries) {
-                    sc_quality_score_t qscore = sc_conversation_evaluate_quality(
-                        response, response_len, history_entries, history_count, max_chars);
-                    if (qscore.needs_revision) {
-                        fprintf(stderr,
-                                "[seaclaw] quality warning: score=%d (b=%d v=%d w=%d n=%d) "
-                                "for %.40s...\n",
-                                qscore.total, qscore.brevity, qscore.validation, qscore.warmth,
-                                qscore.naturalness,
-                                response_len > 40 ? response : response);
+                    /* Stop typing indicator after LLM call */
+                    if (ch->channel->vtable->stop_typing) {
+                        ch->channel->vtable->stop_typing(ch->channel->ctx, batch_key, key_len);
                     }
-                }
+
+                    /* Quality gate: check response for unnatural patterns.
+                     * If needs_revision, retry once with hint. */
+                    if (err == SC_OK && response && response_len > 0 && history_entries) {
+                        sc_quality_score_t qscore = sc_conversation_evaluate_quality(
+                            response, response_len, history_entries, history_count, max_chars);
+                        if (qscore.needs_revision && !retried) {
+                            retried = true;
+                            fprintf(stderr,
+                                    "[seaclaw] quality retry: score=%d (b=%d v=%d w=%d n=%d) "
+                                    "for %.40s...\n",
+                                    qscore.total, qscore.brevity, qscore.validation, qscore.warmth,
+                                    qscore.naturalness,
+                                    response_len > 40 ? response : response);
+                            agent->alloc->free(agent->alloc->ctx, response, response_len + 1);
+                            response = NULL;
+                            response_len = 0;
+                            /* Prepend retry hint to convo_ctx */
+                            if (convo_ctx) {
+                                static const char RETRY_HINT[] =
+                                    "Your previous response sounded robotic. Be more casual, "
+                                    "shorter, and natural. Text like a real person.";
+                                size_t hint_len = sizeof(RETRY_HINT) - 1;
+                                size_t new_len = hint_len + 1 + convo_ctx_len + 1;
+                                char *new_convo =
+                                    (char *)alloc->alloc(alloc->ctx, new_len);
+                                if (new_convo) {
+                                    memcpy(new_convo, RETRY_HINT, hint_len);
+                                    new_convo[hint_len] = '\n';
+                                    memcpy(new_convo + hint_len + 1, convo_ctx,
+                                           convo_ctx_len);
+                                    new_convo[new_len - 1] = '\0';
+                                    alloc->free(alloc->ctx, convo_ctx,
+                                                convo_ctx_len + 1);
+                                    convo_ctx = new_convo;
+                                    convo_ctx_len = new_len - 1;
+                                    agent->conversation_context = convo_ctx;
+                                    agent->conversation_context_len = convo_ctx_len;
+                                }
+                            }
+                            if (ch->channel->vtable->start_typing)
+                                ch->channel->vtable->start_typing(ch->channel->ctx,
+                                                                  batch_key, key_len);
+                            continue;
+                        } else if (qscore.needs_revision) {
+                            fprintf(stderr,
+                                    "[seaclaw] quality warning: score=%d (b=%d v=%d w=%d n=%d) "
+                                    "for %.40s...\n",
+                                    qscore.total, qscore.brevity, qscore.validation, qscore.warmth,
+                                    qscore.naturalness,
+                                    response_len > 40 ? response : response);
+                        }
+                    }
+                    break;
+                } while (1);
 
 #ifdef SC_HAS_PERSONA
                 /* Replay learning: analyze conversation and store insights for future prompts */
@@ -1668,14 +2099,21 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                     sc_error_t rerr =
                         sc_replay_analyze(alloc, history_entries, history_count, 2000, &replay);
                     if (rerr == SC_OK) {
+#ifndef SC_IS_TEST
+                        if (agent->bth_metrics)
+                            agent->bth_metrics->replay_analyses++;
+#endif
                         size_t rctx_len = 0;
                         char *rctx = sc_replay_build_context(alloc, &replay, &rctx_len);
                         if (rctx && rctx_len > 0) {
 #ifndef SC_IS_TEST
-                            if (rctx_len < sizeof(replay_insights)) {
-                                memcpy(replay_insights, rctx, rctx_len);
-                                replay_insights[rctx_len] = '\0';
-                                replay_insights_len = rctx_len;
+                            {
+                                size_t copy_len = rctx_len < sizeof(replay_insights) - 1
+                                                      ? rctx_len
+                                                      : sizeof(replay_insights) - 1;
+                                memcpy(replay_insights, rctx, copy_len);
+                                replay_insights[copy_len] = '\0';
+                                replay_insights_len = copy_len;
                             }
 #endif
                             if (history_count > 2 && agent->memory &&
@@ -1744,22 +2182,23 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* Store conversation summary as long-term memory */
                 if (err == SC_OK && response && response_len > 0 && agent->memory) {
-                    store_conversation_summary(alloc, agent->memory, batch_key, key_len,
-                                               combined, combined_len, response, response_len);
+                    store_conversation_summary(alloc, agent->memory, graph, agent, batch_key,
+                                               key_len, combined, combined_len, response,
+                                               response_len);
                 }
 
 #ifndef SC_IS_TEST
                 /* Episodic: summarize this interaction */
-                if (err == SC_OK && response && response_len > 0 && agent->memory &&
-                    agent->provider.vtable) {
+                if (err == SC_OK && response && response_len > 0 && agent->memory) {
                     const char *ep_msgs[2] = {combined, response};
                     size_t ep_lens[2] = {combined_len, response_len};
                     size_t summary_len = 0;
                     char *summary =
                         sc_episodic_summarize_session(alloc, ep_msgs, ep_lens, 2, &summary_len);
                     if (summary && summary_len > 0) {
-                        sc_episodic_store(agent->memory, alloc, batch_key, key_len, summary,
-                                         summary_len);
+                        if (sc_episodic_store(agent->memory, alloc, batch_key, key_len, summary,
+                                              summary_len) != SC_OK)
+                            fprintf(stderr, "[seaclaw] episodic store failed\n");
                         alloc->free(alloc->ctx, summary, summary_len + 1);
                     } else if (summary) {
                         alloc->free(alloc->ctx, summary, summary_len + 1);
@@ -1774,16 +2213,20 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         .min_importance = 0.3,
                         .max_entities = 10,
                     };
-                    sc_promotion_run(alloc, &agent->stm, agent->memory, &promo_cfg);
-                    sc_promotion_run_emotions(alloc, &agent->stm, agent->memory, batch_key, key_len);
+                    if (sc_promotion_run(alloc, &agent->stm, agent->memory, &promo_cfg) != SC_OK)
+                        fprintf(stderr, "[seaclaw] promotion run failed\n");
                 }
 #endif
 
-                /* Emotion promotion: promote emotions from STM to long-term memory */
+                /* Emotion promotion: promote emotions from STM to long-term memory (every turn) */
                 if (err == SC_OK && response && response_len > 0 && agent->stm.turn_count > 0 &&
                     agent->memory && agent->memory->vtable && agent->memory->vtable->store) {
-                    sc_promotion_run_emotions(alloc, &agent->stm, agent->memory, batch_key,
-                                              key_len);
+                    (void)sc_promotion_run_emotions(alloc, &agent->stm, agent->memory, batch_key,
+                                                    key_len);
+#ifndef SC_IS_TEST
+                    if (agent->bth_metrics)
+                        agent->bth_metrics->emotions_promoted++;
+#endif
                 }
 
                 size_t response_alloc_len = response_len;
@@ -1830,9 +2273,9 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (has_typo_quirk && response && response_len > 0) {
                         size_t cap = response_alloc_len + 1;
                         if (cap <= response_len + 1) {
-                            char *grown = (char *)alloc->realloc(alloc->ctx, response,
-                                                                 response_alloc_len + 1,
-                                                                 response_len + 2);
+                            char *grown = (char *)agent->alloc->realloc(agent->alloc->ctx, response,
+                                                                       response_alloc_len + 1,
+                                                                       response_len + 2);
                             if (grown) {
                                 response = grown;
                                 response_alloc_len = response_len + 1;
@@ -1844,23 +2287,9 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                             size_t new_len =
                                 sc_conversation_apply_typos(response, response_len, cap, typo_seed);
                             response_len = new_len;
+                            if (agent->bth_metrics)
+                                agent->bth_metrics->typos_applied++;
                         }
-                    }
-                    if (original_response) {
-                        if (has_typo_quirk && typo_seed != 0 && response && response_len > 0) {
-                            char correction[128];
-                            size_t corr_len = sc_conversation_generate_correction(
-                                original_response, original_len, response, response_len, correction,
-                                sizeof(correction), typo_seed + 1, 40);
-                            if (corr_len > 0) {
-                                unsigned int delay_ms =
-                                    2500 + (unsigned int)(typo_seed % 2500);
-                                usleep((useconds_t)(delay_ms * 1000));
-                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
-                                                          correction, corr_len, NULL, 0);
-                            }
-                        }
-                        alloc->free(alloc->ctx, original_response, original_len + 1);
                     }
 #endif
                     /* Split response into natural multi-message fragments */
@@ -1884,13 +2313,34 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, response,
                                                   response_len, NULL, 0);
                     }
+#ifdef SC_HAS_PERSONA
+                    /* Send correction after main message (2.5–5s delay) */
+                    if (original_response) {
+                        if (has_typo_quirk && typo_seed != 0 && response && response_len > 0) {
+                            char correction[128];
+                            size_t corr_len = sc_conversation_generate_correction(
+                                original_response, original_len, response, response_len, correction,
+                                sizeof(correction), typo_seed + 1, 40);
+                            if (corr_len > 0) {
+                                unsigned int delay_ms =
+                                    2500 + (unsigned int)(typo_seed % 2500);
+                                usleep((useconds_t)(delay_ms * 1000));
+                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                                          correction, corr_len, NULL, 0);
+                                if (agent->bth_metrics)
+                                    agent->bth_metrics->corrections_sent++;
+                            }
+                        }
+                        alloc->free(alloc->ctx, original_response, original_len + 1);
+                    }
+#endif
 #else
                     ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, response,
                                               response_len, NULL, 0);
 #endif
                 }
                 if (response) {
-                    alloc->free(alloc->ctx, response, response_alloc_len + 1);
+                    agent->alloc->free(agent->alloc->ctx, response, response_alloc_len + 1);
                 }
             }
         }
@@ -1901,6 +2351,10 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
     }
 
 #undef SC_STOP_FLAG
+    if (agent)
+        agent->bth_metrics = NULL;
+    if (graph)
+        sc_graph_close(graph, alloc);
     if (agent && agent->outcomes == &daemon_outcomes)
         agent->outcomes = NULL;
     return SC_OK;

@@ -139,10 +139,26 @@ export class ScPagination extends LitElement {
       color: var(--sc-text-muted);
     }
 
+    .select-wrapper {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+    .select-wrapper .select-arrow {
+      position: absolute;
+      right: var(--sc-space-sm);
+      pointer-events: none;
+      color: var(--sc-text-muted);
+    }
+    .select-wrapper .select-arrow svg {
+      width: 0.75rem;
+      height: 0.75rem;
+    }
     select {
       width: auto;
       min-width: 4rem;
       padding: var(--sc-space-xs) var(--sc-space-sm);
+      padding-right: var(--sc-space-xl);
       font-family: var(--sc-font);
       font-size: var(--sc-text-sm);
       background: var(--sc-bg-surface);
@@ -153,10 +169,6 @@ export class ScPagination extends LitElement {
       appearance: none;
       -webkit-appearance: none;
       -moz-appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 256 256' fill='%23666'%3E%3Cpath d='M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80a8,8,0,0,1,11.32-11.32L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right var(--sc-space-sm) center;
-      padding-right: var(--sc-space-xl);
     }
 
     select:focus-visible {
@@ -243,14 +255,17 @@ export class ScPagination extends LitElement {
         </div>
         <div class="page-size">
           <label for="page-size-select">Per page</label>
-          <select
-            id="page-size-select"
-            aria-label="Items per page"
-            .value=${String(this.pageSize)}
-            @change=${this._onPageSizeChange}
-          >
-            ${this.pageSizes.map((s) => html`<option value=${s}>${s}</option>`)}
-          </select>
+          <div class="select-wrapper">
+            <select
+              id="page-size-select"
+              aria-label="Items per page"
+              .value=${String(this.pageSize)}
+              @change=${this._onPageSizeChange}
+            >
+              ${this.pageSizes.map((s) => html`<option value=${s}>${s}</option>`)}
+            </select>
+            <span class="select-arrow" aria-hidden="true">${icons["caret-down"]}</span>
+          </div>
         </div>
       </div>
     `;

@@ -2,6 +2,7 @@
 #include "seaclaw/memory/emotional_graph.h"
 #include "seaclaw/memory/stm.h"
 #include "test_framework.h"
+#include <stdio.h>
 #include <string.h>
 
 static void egraph_record_and_query(void) {
@@ -153,6 +154,80 @@ static void egraph_populate_from_stm_topic_entities(void) {
     sc_stm_deinit(&buf);
 }
 
+static void egraph_query_unknown_topic(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_emotional_graph_t g;
+    sc_egraph_init(&g, alloc);
+
+    double avg = 0.0;
+    sc_emotion_tag_t tag = sc_egraph_query(&g, "never_recorded", 14, &avg);
+    SC_ASSERT_EQ(tag, SC_EMOTION_NEUTRAL);
+    SC_ASSERT_EQ(avg, 0.0);
+
+    sc_egraph_deinit(&g);
+}
+
+static void egraph_populate_from_stm_empty(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_stm_buffer_t buf;
+    sc_stm_init(&buf, alloc, "sess", 4);
+
+    sc_emotional_graph_t g;
+    sc_egraph_init(&g, alloc);
+    sc_error_t err = sc_egraph_populate_from_stm(&g, &buf);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(g.edge_count, 0);
+
+    sc_egraph_deinit(&g);
+    sc_stm_deinit(&buf);
+}
+
+static void egraph_init_null(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_error_t err = sc_egraph_init(NULL, alloc);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void egraph_record_null_topic(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_emotional_graph_t g;
+    sc_egraph_init(&g, alloc);
+
+    sc_error_t err = sc_egraph_record(&g, NULL, 0, SC_EMOTION_JOY, 0.5);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+
+    sc_egraph_deinit(&g);
+}
+
+static void egraph_at_capacity(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_emotional_graph_t g;
+    sc_egraph_init(&g, alloc);
+
+    char topic[16];
+    for (size_t i = 0; i < SC_EGRAPH_MAX_NODES; i++) {
+        int n = snprintf(topic, sizeof(topic), "topic_%zu", i);
+        SC_ASSERT_TRUE(n > 0 && (size_t)n < sizeof(topic));
+        sc_error_t err = sc_egraph_record(&g, topic, (size_t)n, SC_EMOTION_JOY, 0.5);
+        SC_ASSERT_EQ(err, SC_OK);
+    }
+
+    sc_error_t err = sc_egraph_record(&g, "extra_topic", 11, SC_EMOTION_JOY, 0.5);
+    SC_ASSERT_EQ(err, SC_ERR_OUT_OF_MEMORY);
+
+    sc_egraph_deinit(&g);
+}
+
+static void egraph_deinit_twice(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_emotional_graph_t g;
+    sc_egraph_init(&g, alloc);
+    (void)sc_egraph_record(&g, "work", 4, SC_EMOTION_JOY, 0.8);
+
+    sc_egraph_deinit(&g);
+    sc_egraph_deinit(&g);
+}
+
 void run_emotional_graph_tests(void) {
     SC_TEST_SUITE("emotional_graph");
     SC_RUN_TEST(egraph_record_and_query);
@@ -163,4 +238,10 @@ void run_emotional_graph_tests(void) {
     SC_RUN_TEST(egraph_populate_from_stm);
     SC_RUN_TEST(egraph_case_insensitive);
     SC_RUN_TEST(egraph_populate_from_stm_topic_entities);
+    SC_RUN_TEST(egraph_query_unknown_topic);
+    SC_RUN_TEST(egraph_populate_from_stm_empty);
+    SC_RUN_TEST(egraph_init_null);
+    SC_RUN_TEST(egraph_record_null_topic);
+    SC_RUN_TEST(egraph_at_capacity);
+    SC_RUN_TEST(egraph_deinit_twice);
 }

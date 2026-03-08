@@ -570,11 +570,12 @@ static bool serve_static_file(int fd, const char *base_dir, const char *url_path
 static void handle_http_request(sc_gateway_state_t *gw, int fd, const char *method,
                                 const char *path, const char *body, size_t body_len,
                                 const char *client_ip, const char *sig_header,
-                                const char *cookie_header);
+                                const char *cookie_header, const char *auth_header);
 
 #define SC_HTTP_WORK_ORIGIN_MAX 256
 #define SC_HTTP_WORK_SIG_MAX    128
 #define SC_HTTP_WORK_COOKIE_MAX 512
+#define SC_HTTP_WORK_AUTH_MAX   384
 
 typedef struct {
     sc_gateway_state_t *gw;
@@ -587,6 +588,7 @@ typedef struct {
     char sig_header[SC_HTTP_WORK_SIG_MAX];
     char origin[SC_HTTP_WORK_ORIGIN_MAX];
     char cookie[SC_HTTP_WORK_COOKIE_MAX];
+    char auth_header[SC_HTTP_WORK_AUTH_MAX];
 } sc_http_work_t;
 
 static void http_worker_fn(void *arg) {
@@ -597,7 +599,8 @@ static void http_worker_fn(void *arg) {
     s_request_origin = work->origin[0] != '\0' ? work->origin : NULL;
     handle_http_request(gw, work->fd, work->method, work->path, work->body, work->body_len,
                         work->client_ip, work->sig_header[0] != '\0' ? work->sig_header : NULL,
-                        work->cookie[0] != '\0' ? work->cookie : NULL);
+                        work->cookie[0] != '\0' ? work->cookie : NULL,
+                        work->auth_header[0] != '\0' ? work->auth_header : NULL);
     s_request_origin = NULL;
 
     {
@@ -616,10 +619,28 @@ static void http_worker_fn(void *arg) {
     alloc->free(alloc->ctx, work, sizeof(sc_http_work_t));
 }
 
+/* Returns true if request is authenticated (or auth not required). */
+static bool v1_auth_ok(const sc_gateway_config_t *cfg, const char *auth_header) {
+    if (!cfg->auth_token || !cfg->auth_token[0])
+        return true; /* Auth disabled — allow unauthenticated */
+    if (!auth_header || !auth_header[0])
+        return false;
+    if (strncmp(auth_header, "Bearer ", 7) != 0)
+        return false;
+    const char *tok = auth_header + 7;
+    size_t tok_len = strlen(tok);
+    size_t exp_len = strlen(cfg->auth_token);
+    unsigned char d = (tok_len != exp_len) ? 1 : 0;
+    size_t cmp_len = tok_len < exp_len ? tok_len : exp_len;
+    for (size_t i = 0; i < cmp_len; i++)
+        d |= (unsigned char)tok[i] ^ (unsigned char)cfg->auth_token[i];
+    return d == 0;
+}
+
 static void handle_http_request(sc_gateway_state_t *gw, int fd, const char *method,
                                 const char *path, const char *body, size_t body_len,
                                 const char *client_ip, const char *sig_header,
-                                const char *cookie_header) {
+                                const char *cookie_header, const char *auth_header) {
 
     if (gw->config.test_mode) {
         fprintf(stderr, "[gateway] %s %s %s body=%zu\n", method ? method : "?", path ? path : "/",
@@ -651,8 +672,12 @@ static void handle_http_request(sc_gateway_state_t *gw, int fd, const char *meth
         return;
     }
 
-    /* OpenAI-compatible API */
+    /* OpenAI-compatible API — require auth when auth_token is configured */
     if (path_is(path, "/v1/chat/completions") && method && strcmp(method, "POST") == 0) {
+        if (!v1_auth_ok(&gw->config, auth_header)) {
+            send_json(fd, 401, "{\"error\":\"unauthorized\"}");
+            return;
+        }
         int status = 500;
         char *resp_body = NULL;
         size_t resp_len = 0;
@@ -666,6 +691,10 @@ static void handle_http_request(sc_gateway_state_t *gw, int fd, const char *meth
         return;
     }
     if (path_is(path, "/v1/models") && method && strcmp(method, "GET") == 0) {
+        if (!v1_auth_ok(&gw->config, auth_header)) {
+            send_json(fd, 401, "{\"error\":\"unauthorized\"}");
+            return;
+        }
         int status = 500;
         char *resp_body = NULL;
         size_t resp_len = 0;
@@ -1269,6 +1298,7 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc, const char *host, uint16_t port
             size_t body_len = 0;
             char *sig_header = NULL;
             char cookie_header[SC_HTTP_WORK_COOKIE_MAX] = {0};
+            char auth_header[SC_HTTP_WORK_AUTH_MAX] = {0};
             bool rejected = false;
             while ((line = strtok(NULL, "\n")) != NULL) {
                 trim_crlf(line);
@@ -1314,6 +1344,16 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc, const char *host, uint16_t port
                     memcpy(cookie_header, v, len);
                     cookie_header[len] = '\0';
                 }
+                if (strncasecmp(line, "Authorization:", 14) == 0) {
+                    char *v = line + 14;
+                    while (*v == ' ')
+                        v++;
+                    size_t len = strlen(v);
+                    if (len >= SC_HTTP_WORK_AUTH_MAX)
+                        len = SC_HTTP_WORK_AUTH_MAX - 1;
+                    memcpy(auth_header, v, len);
+                    auth_header[len] = '\0';
+                }
             }
 
             if (rejected)
@@ -1350,6 +1390,9 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc, const char *host, uint16_t port
                         snprintf(work->sig_header, sizeof(work->sig_header), "%.127s", sig_header);
                     if (cookie_header[0])
                         snprintf(work->cookie, sizeof(work->cookie), "%.511s", cookie_header);
+                    if (auth_header[0])
+                        snprintf(work->auth_header, sizeof(work->auth_header), "%.383s",
+                                 auth_header);
                     work->body_len = body_len;
                     if (body_len > 0) {
                         work->body = (char *)alloc->alloc(alloc->ctx, body_len + 1);

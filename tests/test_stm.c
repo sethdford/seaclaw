@@ -222,6 +222,70 @@ static void stm_turn_add_emotion_deduplicates(void) {
     sc_stm_deinit(&buf);
 }
 
+static void stm_set_primary_topic(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_stm_buffer_t buf;
+    sc_stm_init(&buf, alloc, "s", 1);
+    sc_stm_record_turn(&buf, "user", 4, "Hello", 5, 1000);
+
+    sc_error_t err = sc_stm_turn_set_primary_topic(&buf, 0, "work", 4);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    const sc_stm_turn_t *t = sc_stm_get(&buf, 0);
+    SC_ASSERT_NOT_NULL(t);
+    SC_ASSERT_NOT_NULL(t->primary_topic);
+    SC_ASSERT_EQ(strlen(t->primary_topic), 4u);
+    SC_ASSERT_EQ(memcmp(t->primary_topic, "work", 4), 0);
+
+    sc_stm_deinit(&buf);
+}
+
+static void stm_set_primary_topic_out_of_range(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_stm_buffer_t buf;
+    sc_stm_init(&buf, alloc, "s", 1);
+    sc_stm_record_turn(&buf, "user", 4, "Hi", 2, 1000);
+
+    sc_error_t err = sc_stm_turn_set_primary_topic(&buf, 99, "work", 4);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+
+    sc_stm_deinit(&buf);
+}
+
+static void stm_emotion_overflow(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_stm_buffer_t buf;
+    sc_stm_init(&buf, alloc, "s", 1);
+    sc_stm_record_turn(&buf, "user", 4, "Hi", 2, 1000);
+
+    sc_emotion_tag_t tags[] = {SC_EMOTION_JOY, SC_EMOTION_SADNESS, SC_EMOTION_ANGER, SC_EMOTION_FEAR,
+                               SC_EMOTION_SURPRISE};
+    for (size_t i = 0; i < SC_STM_MAX_EMOTIONS; i++) {
+        sc_error_t err = sc_stm_turn_add_emotion(&buf, 0, tags[i], 0.8);
+        SC_ASSERT_EQ(err, SC_OK);
+    }
+
+    sc_error_t err = sc_stm_turn_add_emotion(&buf, 0, SC_EMOTION_FRUSTRATION, 0.8);
+    SC_ASSERT_EQ(err, SC_ERR_OUT_OF_MEMORY);
+
+    sc_stm_deinit(&buf);
+}
+
+static void stm_build_context_null_alloc(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_stm_buffer_t buf;
+    sc_stm_init(&buf, alloc, "s", 1);
+    sc_stm_record_turn(&buf, "user", 4, "Hi", 2, 1000);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_stm_build_context(&buf, NULL, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_NULL(out);
+
+    sc_stm_deinit(&buf);
+}
+
 void run_stm_tests(void) {
     SC_TEST_SUITE("stm");
     SC_RUN_TEST(stm_init_sets_session_id);
@@ -237,4 +301,8 @@ void run_stm_tests(void) {
     SC_RUN_TEST(stm_record_turn_null_content_fails);
     SC_RUN_TEST(stm_turn_add_entity_at_max);
     SC_RUN_TEST(stm_turn_add_emotion_deduplicates);
+    SC_RUN_TEST(stm_set_primary_topic);
+    SC_RUN_TEST(stm_set_primary_topic_out_of_range);
+    SC_RUN_TEST(stm_emotion_overflow);
+    SC_RUN_TEST(stm_build_context_null_alloc);
 }

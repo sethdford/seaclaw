@@ -7,6 +7,7 @@
 #include "seaclaw/core/error.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 sc_error_t sc_imessage_create(sc_allocator_t *alloc, const char *default_target,
                               size_t default_target_len, const char *const *allow_from,
@@ -19,6 +20,21 @@ bool sc_imessage_is_configured(sc_channel_t *ch);
 /** Poll ~/Library/Messages/chat.db for new inbound messages (macOS only). */
 sc_error_t sc_imessage_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel_loop_msg_t *msgs,
                             size_t max_msgs, size_t *out_count);
+
+/** Maps sc_reaction_type_t to iMessage tapback name (love, like, dislike, etc.).
+ * Returns NULL for SC_REACTION_NONE or unknown. */
+const char *sc_imessage_reaction_to_tapback_name(sc_reaction_type_t reaction);
+
+#ifndef SC_IS_TEST
+/** Query the attachment path for a given message ROWID from chat.db.
+ * Returns the attachment file path or NULL if not found. Caller owns. */
+char *sc_imessage_get_attachment_path(sc_allocator_t *alloc, int64_t message_id);
+
+/** Get the attachment path for the most recent message with an attachment from
+ * the given contact. Returns path or NULL. Caller owns. */
+char *sc_imessage_get_latest_attachment_path(sc_allocator_t *alloc, const char *contact_id,
+                                              size_t contact_id_len);
+#endif
 
 #if SC_IS_TEST
 sc_error_t sc_imessage_test_inject_mock(sc_channel_t *ch, const char *session_key,

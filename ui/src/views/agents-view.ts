@@ -276,8 +276,6 @@ export class ScAgentsView extends GatewayAwareLitElement {
   }
 
   private _renderHero() {
-    const provider = this.config.default_provider || "\u2014";
-    const model = this.config.default_model || "\u2014";
     return html`
       <sc-page-hero role="region" aria-label="SeaClaw Agent overview">
         <sc-section-header heading="SeaClaw Agent" description="Monitor autonomous agent instances">

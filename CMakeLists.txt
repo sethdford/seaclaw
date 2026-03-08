@@ -45,6 +45,7 @@ option(SC_ENABLE_WEB "Build Web channel" OFF)
 option(SC_ENABLE_EMAIL "Build Email channel" OFF)
 option(SC_ENABLE_IMAP "Build IMAP channel" OFF)
 option(SC_ENABLE_IMESSAGE "Build iMessage channel" OFF)
+option(SC_IMESSAGE_TAPBACK_ENABLED "Enable iMessage tapback reactions via JXA (requires accessibility)" OFF)
 option(SC_ENABLE_MATTERMOST "Build Mattermost channel" OFF)
 option(SC_ENABLE_ONEBOT "Build OneBot channel" OFF)
 option(SC_ENABLE_DINGTALK "Build DingTalk channel" OFF)
@@ -321,6 +322,7 @@ set(SC_CORE_SOURCES
     src/observability/log_observer.c
     src/observability/metrics_observer.c
     src/observability/multi_observer.c
+    src/observability/bth_metrics.c
     src/tunnel/none.c
     src/tunnel/root.c
     src/gateway/gateway.c
@@ -371,6 +373,7 @@ set(SC_CORE_SOURCES
     src/context/conversation.c
     src/context/mood.c
     src/context/event_extract.c
+    src/context/vision.c
     src/agent/episodic.c
     src/agent/reflection.c
     src/agent/ab_response.c
@@ -416,6 +419,7 @@ set(SC_CORE_SOURCES
     src/memory/promotion.c
     src/memory/consolidation.c
     src/memory/deep_extract.c
+    src/memory/graph.c
     src/memory/lifecycle/cache.c
     src/memory/lifecycle/hygiene.c
     src/memory/lifecycle/snapshot.c
@@ -770,6 +774,9 @@ if(SC_ENABLE_IMAP)
 endif()
 if(SC_ENABLE_IMESSAGE)
     target_compile_definitions(seaclaw_core PRIVATE SC_HAS_IMESSAGE=1)
+    if(SC_IMESSAGE_TAPBACK_ENABLED)
+        target_compile_definitions(seaclaw_core PRIVATE SC_IMESSAGE_TAPBACK_ENABLED=1)
+    endif()
 endif()
 if(SC_ENABLE_MATTERMOST)
     target_compile_definitions(seaclaw_core PRIVATE SC_HAS_MATTERMOST=1)
@@ -999,6 +1006,9 @@ if(SC_ENABLE_EMAIL)
 endif()
 if(SC_ENABLE_IMESSAGE)
     target_compile_definitions(seaclaw PRIVATE SC_HAS_IMESSAGE=1)
+    if(SC_IMESSAGE_TAPBACK_ENABLED)
+        target_compile_definitions(seaclaw PRIVATE SC_IMESSAGE_TAPBACK_ENABLED=1)
+    endif()
 endif()
 if(SC_ENABLE_IMAP)
     target_compile_definitions(seaclaw PRIVATE SC_HAS_IMAP=1)
@@ -1352,6 +1362,7 @@ set(SC_TEST_SOURCES
     tests/test_vector_full.c
     tests/test_lifecycle.c
     tests/test_observer.c
+    tests/test_bth_metrics.c
     tests/test_session.c
     tests/test_bus.c
     tests/test_identity.c
@@ -1406,10 +1417,12 @@ set(SC_TEST_SOURCES
     tests/test_reflection.c
     tests/test_input_guard.c
     tests/test_conversation.c
+    tests/test_vision.c
     tests/test_ab_response.c
     tests/test_event_extract.c
     tests/test_stm.c
     tests/test_emotional_graph.c
+    tests/test_graph.c
     tests/test_fast_capture.c
     tests/test_promotion.c
     tests/test_consolidation.c
@@ -1491,6 +1504,9 @@ if(SC_ENABLE_MQTT)
 endif()
 if(SC_ENABLE_IMESSAGE)
     target_compile_definitions(seaclaw_tests PRIVATE SC_HAS_IMESSAGE=1)
+    if(SC_IMESSAGE_TAPBACK_ENABLED)
+        target_compile_definitions(seaclaw_tests PRIVATE SC_IMESSAGE_TAPBACK_ENABLED=1)
+    endif()
 endif()
 if(SC_ENABLE_MATTERMOST)
     target_compile_definitions(seaclaw_tests PRIVATE SC_HAS_MATTERMOST=1)

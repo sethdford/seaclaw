@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing } from "lit";
+import { LitElement, html, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 export interface ChartDataset {
@@ -34,6 +34,7 @@ export class ScChart extends LitElement {
   private _chart: { destroy: () => void; resize: () => void } | null = null;
   private _resizeObserver: ResizeObserver | null = null;
   private _chartLoadPromise: Promise<unknown> | null = null;
+  private _chartUnavailable = false;
 
   static override styles = css`
     :host {
@@ -69,6 +70,8 @@ export class ScChart extends LitElement {
     super.connectedCallback();
     this._chartLoadPromise = import("https://esm.sh/chart.js@4").catch((err) => {
       console.warn("[sc-chart] Chart.js failed to load:", err);
+      this._chartUnavailable = true;
+      this.requestUpdate();
       return null;
     });
   }
@@ -140,7 +143,11 @@ export class ScChart extends LitElement {
     const ChartModule = (await this._chartLoadPromise) as {
       default?: new (el: HTMLCanvasElement, config: unknown) => { destroy(): void; resize(): void };
     } | null;
-    if (!ChartModule?.default) return;
+    if (!ChartModule?.default) {
+      this._chartUnavailable = true;
+      this.requestUpdate();
+      return;
+    }
 
     const Chart = ChartModule.default;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -217,6 +224,19 @@ export class ScChart extends LitElement {
       return html`
         <div class="empty" style="--height: ${this.height}px" role="status" aria-label="No data">
           No data
+        </div>
+      `;
+    }
+
+    if (this._chartUnavailable) {
+      return html`
+        <div
+          class="empty"
+          style="--height: ${this.height}px"
+          role="status"
+          aria-label="Chart unavailable"
+        >
+          Chart unavailable
         </div>
       `;
     }

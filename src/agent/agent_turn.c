@@ -1,6 +1,7 @@
 /* Core turn execution: sc_agent_turn and turn-local helpers */
 #include "agent_internal.h"
 #include "seaclaw/agent/ab_response.h"
+#include "seaclaw/observability/bth_metrics.h"
 #include "seaclaw/agent/awareness.h"
 #include "seaclaw/agent/commitment.h"
 #include "seaclaw/agent/commitment_store.h"
@@ -262,6 +263,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     char *stm_ctx = NULL;
     size_t stm_ctx_len = 0;
     (void)sc_stm_build_context(&agent->stm, agent->alloc, &stm_ctx, &stm_ctx_len);
+    if (stm_ctx_len > 0 && agent->bth_metrics)
+        agent->bth_metrics->emotions_surfaced++;
 
     /* Build commitment context for this turn */
     char *commitment_ctx = NULL;
@@ -271,6 +274,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         size_t sess_len = agent->memory_session_id ? agent->memory_session_id_len : 0;
         (void)sc_commitment_store_build_context(agent->commitment_store, agent->alloc, sess,
                                                  sess_len, &commitment_ctx, &commitment_ctx_len);
+        if (commitment_ctx_len > 0 && agent->bth_metrics)
+            agent->bth_metrics->commitment_followups++;
     }
 
     /* Build pattern radar context for this turn */
@@ -278,6 +283,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     size_t pattern_ctx_len = 0;
     (void)sc_pattern_radar_build_context(&agent->radar, agent->alloc, &pattern_ctx,
                                          &pattern_ctx_len);
+    if (pattern_ctx_len > 0 && agent->bth_metrics)
+        agent->bth_metrics->pattern_insights++;
 
     /* Build proactive context (milestones, morning briefing, check-in) */
     char *proactive_ctx = NULL;
@@ -911,9 +918,13 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
 
                         if (sc_ab_evaluate(agent->alloc, &ab_result, agent->ab_history_entries,
                                           agent->ab_history_count, max_chars) == SC_OK) {
+                            if (agent->bth_metrics)
+                                agent->bth_metrics->ab_evaluations++;
                             size_t bi = ab_result.best_idx;
                             if (bi < ab_result.candidate_count &&
                                 ab_result.candidates[bi].response) {
+                                if (bi != 0 && agent->bth_metrics)
+                                    agent->bth_metrics->ab_alternates_chosen++;
                                 final_content = ab_result.candidates[bi].response;
                                 final_len = ab_result.candidates[bi].response_len;
                                 ab_result.candidates[bi].response = NULL;

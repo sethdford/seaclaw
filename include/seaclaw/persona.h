@@ -3,7 +3,7 @@
 
 #include "seaclaw/core/allocator.h"
 
-#define SC_PERSONA_PROMPT_MAX_BYTES (8 * 1024) /* 8 KB default cap */
+#define SC_PERSONA_PROMPT_MAX_BYTES (16 * 1024) /* 16 KB cap for rich personas */
 
 #include "seaclaw/core/error.h"
 
@@ -66,6 +66,132 @@ typedef struct sc_contact_profile {
     char *proactive_schedule;
 } sc_contact_profile_t;
 
+/* Motivation — the character's core drive (anti-drift anchor) */
+typedef struct sc_persona_motivation {
+    char *primary_drive;
+    char *protecting;
+    char *avoiding;
+    char *wanting;
+} sc_persona_motivation_t;
+
+/* Situational direction — trigger → behavior pairs (director's scene notes) */
+typedef struct sc_situational_direction {
+    char *trigger;
+    char *instruction;
+} sc_situational_direction_t;
+
+/* Humor profile */
+typedef struct sc_humor_profile {
+    char *type;
+    char *frequency;
+    char **targets;
+    size_t targets_count;
+    char **boundaries;
+    size_t boundaries_count;
+    char *timing;
+} sc_humor_profile_t;
+
+/* Conflict style — how the persona handles disagreement and friction */
+typedef struct sc_conflict_style {
+    char *pushback_response;
+    char *confrontation_comfort;
+    char *apology_style;
+    char *boundary_assertion;
+    char *repair_behavior;
+} sc_conflict_style_t;
+
+/* Emotional range boundaries */
+typedef struct sc_emotional_range {
+    char *ceiling;
+    char *floor;
+    char **escalation_triggers;
+    size_t escalation_triggers_count;
+    char **de_escalation;
+    size_t de_escalation_count;
+    char *withdrawal_conditions;
+    char *recovery_style;
+} sc_emotional_range_t;
+
+/* Voice rhythm — text pacing and cadence */
+typedef struct sc_voice_rhythm {
+    char *sentence_pattern;
+    char *paragraph_cadence;
+    char *response_tempo;
+    char *emphasis_style;
+    char *pause_behavior;
+} sc_voice_rhythm_t;
+
+/* Intellectual profile */
+typedef struct sc_intellectual_profile {
+    char **expertise;
+    size_t expertise_count;
+    char **curiosity_areas;
+    size_t curiosity_areas_count;
+    char *thinking_style;
+    char *metaphor_sources;
+} sc_intellectual_profile_t;
+
+/* Backstory-to-behavior mapping */
+typedef struct sc_backstory_behavior {
+    char *backstory_beat;
+    char *behavioral_rule;
+} sc_backstory_behavior_t;
+
+/* Sensory preferences */
+typedef struct sc_sensory_preferences {
+    char *dominant_sense;
+    char **metaphor_vocabulary;
+    size_t metaphor_vocabulary_count;
+    char *grounding_patterns;
+} sc_sensory_preferences_t;
+
+/* Relational intelligence — Gottman bids, attachment, Dunbar layers (PhD-level) */
+typedef struct sc_relational_intelligence {
+    char *bid_response_style;
+    char **emotional_bids;
+    size_t emotional_bids_count;
+    char *attachment_style;
+    char *attachment_awareness;
+    char *dunbar_awareness;
+} sc_relational_intelligence_t;
+
+/* Listening protocol — Derber support/shift, OARS, NVC, validation (PhD-level) */
+typedef struct sc_listening_protocol {
+    char *default_response_type;
+    char **reflective_techniques;
+    size_t reflective_techniques_count;
+    char *nvc_style;
+    char *validation_style;
+} sc_listening_protocol_t;
+
+/* Repair protocol — rupture-repair, conversational repair, face-saving (PhD-level) */
+typedef struct sc_repair_protocol {
+    char *rupture_detection;
+    char *repair_approach;
+    char *face_saving_style;
+    char **repair_phrases;
+    size_t repair_phrases_count;
+} sc_repair_protocol_t;
+
+/* Linguistic mirroring — CAT, style matching, accommodation (PhD-level) */
+typedef struct sc_linguistic_mirroring {
+    char *mirroring_level;
+    char **adapts_to;
+    size_t adapts_to_count;
+    char *convergence_speed;
+    char *power_dynamic;
+} sc_linguistic_mirroring_t;
+
+/* Social dynamics — ego states, phatic communication, conversation management */
+typedef struct sc_social_dynamics {
+    char *default_ego_state;
+    char *phatic_style;
+    char **bonding_behaviors;
+    size_t bonding_behaviors_count;
+    char **anti_patterns;
+    size_t anti_patterns_count;
+} sc_social_dynamics_t;
+
 /* Inner world — deep personality content surfaced by relationship stage */
 typedef struct sc_inner_world {
     char **contradictions;
@@ -103,6 +229,20 @@ typedef struct sc_persona {
     char **mood_states;
     size_t mood_states_count;
     sc_inner_world_t inner_world;
+    sc_persona_motivation_t motivation;
+    sc_situational_direction_t *situational_directions;
+    size_t situational_directions_count;
+    sc_humor_profile_t humor;
+    sc_conflict_style_t conflict_style;
+    sc_emotional_range_t emotional_range;
+    sc_voice_rhythm_t voice_rhythm;
+    char **character_invariants;
+    size_t character_invariants_count;
+    char *core_anchor;
+    sc_intellectual_profile_t intellectual;
+    sc_backstory_behavior_t *backstory_behaviors;
+    size_t backstory_behaviors_count;
+    sc_sensory_preferences_t sensory;
     sc_persona_overlay_t *overlays;
     size_t overlays_count;
     sc_persona_example_bank_t *example_banks;

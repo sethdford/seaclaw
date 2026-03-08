@@ -39,6 +39,12 @@ static void ab_evaluate_picks_best(void) {
     int best = result.candidates[result.best_idx].quality_score;
     for (size_t i = 0; i < 3; i++)
         SC_ASSERT_TRUE(result.candidates[i].quality_score <= best);
+    /* Natural-sounding response (a) should score highest and be selected */
+    size_t best_idx = 0;
+    for (size_t i = 1; i < 3; i++)
+        if (result.candidates[i].quality_score > result.candidates[best_idx].quality_score)
+            best_idx = i;
+    SC_ASSERT_EQ(result.best_idx, best_idx);
 
     sc_ab_result_deinit(&result, &alloc);
 }

@@ -11,14 +11,23 @@ static sc_error_t embed_impl(void *ctx, sc_allocator_t *alloc, const char *text,
     if (!adapter || !adapter->provider.vtable || !alloc || !out)
         return SC_ERR_INVALID_ARGUMENT;
 
+    if (text_len > 0 && !text)
+        return SC_ERR_INVALID_ARGUMENT;
+
     sc_embedding_provider_result_t result = {0};
     sc_error_t err =
         adapter->provider.vtable->embed(adapter->provider.ctx, alloc, text, text_len, &result);
     if (err != SC_OK)
         return err;
 
-    out->values =
-        (float *)alloc->alloc(alloc->ctx, result.dimensions * sizeof(float));
+    if (result.dimensions == 0) {
+        sc_embedding_provider_free(alloc, &result);
+        out->values = NULL;
+        out->dim = 0;
+        return SC_OK;
+    }
+
+    out->values = (float *)alloc->alloc(alloc->ctx, result.dimensions * sizeof(float));
     if (!out->values) {
         sc_embedding_provider_free(alloc, &result);
         return SC_ERR_OUT_OF_MEMORY;
@@ -31,6 +40,8 @@ static sc_error_t embed_impl(void *ctx, sc_allocator_t *alloc, const char *text,
 
 static sc_error_t embed_batch_impl(void *ctx, sc_allocator_t *alloc, const char **texts,
                                    const size_t *text_lens, size_t count, sc_embedding_t *out) {
+    if (count > 0 && (!texts || !text_lens || !out))
+        return SC_ERR_INVALID_ARGUMENT;
     for (size_t i = 0; i < count; i++) {
         sc_error_t err = embed_impl(ctx, alloc, texts[i], text_lens[i], &out[i]);
         if (err != SC_OK) {
@@ -73,8 +84,11 @@ sc_embedder_t sc_embedder_gemini_adapter_create(sc_allocator_t *alloc,
 
     gemini_adapter_ctx_t *ctx =
         (gemini_adapter_ctx_t *)alloc->alloc(alloc->ctx, sizeof(gemini_adapter_ctx_t));
-    if (!ctx)
+    if (!ctx) {
+        if (provider.vtable && provider.vtable->deinit)
+            provider.vtable->deinit(provider.ctx, alloc);
         return emb;
+    }
     ctx->provider = provider;
 
     emb.ctx = ctx;

@@ -1,6 +1,7 @@
 #include "seaclaw/channels/imessage.h"
 #include "seaclaw/channel_loop.h"
 #include "seaclaw/core/process_util.h"
+#include "seaclaw/core/string.h"
 #ifndef SC_CODENAME
 #define SC_CODENAME "seaclaw"
 #endif
@@ -83,6 +84,111 @@ static void imessage_stop(void *ctx) {
 }
 
 #if (defined(__APPLE__) && defined(__MACH__)) || SC_IS_TEST
+
+#if !SC_IS_TEST
+/* Remove common AI-sounding phrases from buffer. Modifies in-place.
+ * Returns new length. Case-insensitive except "Absolutely! " (capital A only). */
+static size_t imessage_strip_ai_phrases(char *buf, size_t len) {
+    if (!buf || len == 0)
+        return 0;
+
+    static const struct {
+        const char *phrase;
+        size_t phrase_len;
+        bool case_sensitive;
+    } phrases[] = {
+        {"I'd be happy to ", 16, false},
+        {"Great question! ", 16, false},
+        {"That's a great question", 23, false},
+        {"Let me know if you need anything", 32, false},
+        {"Let me know if ", 15, false},
+        {"Feel free to ", 13, false},
+        {"Absolutely! ", 12, true},
+        {"I understand your ", 18, false},
+        {"I appreciate ", 13, false},
+        {"Here's what I think: ", 21, false},
+        {"I hope this helps", 17, false},
+        {"Don't hesitate to ", 18, false},
+        {"I'm here to help", 16, false},
+        {"As an AI", 8, false},
+        {"As a language model", 19, false},
+    };
+
+    for (;;) {
+        bool changed = false;
+        for (size_t p = 0; p < sizeof(phrases) / sizeof(phrases[0]); p++) {
+            const char *needle = phrases[p].phrase;
+            size_t needle_len = phrases[p].phrase_len;
+            if (needle_len > len)
+                continue;
+
+            char *pos = buf;
+            while (pos + needle_len <= buf + len) {
+                bool match = false;
+                if (phrases[p].case_sensitive) {
+                    match = (memcmp(pos, needle, needle_len) == 0);
+                } else {
+                    match = (strncasecmp(pos, needle, needle_len) == 0);
+                }
+                if (match) {
+                    memmove(pos, pos + needle_len, (size_t)((buf + len) - (pos + needle_len)) + 1);
+                    len -= needle_len;
+                    buf[len] = '\0';
+                    changed = true;
+                    break;
+                }
+                pos++;
+            }
+            if (changed)
+                break;
+        }
+        if (!changed)
+            break;
+    }
+
+    /* Collapse double spaces */
+    for (size_t i = 1; i < len; i++) {
+        if (buf[i] == ' ' && buf[i - 1] == ' ') {
+            memmove(buf + i, buf + i + 1, len - i);
+            len--;
+            i--;
+        }
+    }
+
+    /* Trim leading whitespace */
+    while (len > 0 && (buf[0] == ' ' || buf[0] == '\t')) {
+        memmove(buf, buf + 1, len);
+        len--;
+    }
+
+    /* Trim trailing whitespace */
+    while (len > 0 && (buf[len - 1] == ' ' || buf[len - 1] == '\t')) {
+        buf[--len] = '\0';
+    }
+
+    return len;
+}
+#endif /* !SC_IS_TEST */
+
+const char *sc_imessage_reaction_to_tapback_name(sc_reaction_type_t reaction) {
+    switch (reaction) {
+        case SC_REACTION_HEART:
+            return "love";
+        case SC_REACTION_THUMBS_UP:
+            return "like";
+        case SC_REACTION_THUMBS_DOWN:
+            return "dislike";
+        case SC_REACTION_HAHA:
+            return "laugh";
+        case SC_REACTION_EMPHASIS:
+            return "emphasize";
+        case SC_REACTION_QUESTION:
+            return "question";
+        default:
+            return NULL;
+    }
+}
+
 /* Escape " and \ for AppleScript string literal */
 size_t escape_for_applescript(char *out, size_t out_cap, const char *in, size_t in_len) {
     size_t j = 0;
@@ -173,6 +279,8 @@ static sc_error_t imessage_send(void *ctx, const char *target, size_t target_len
         message = clean;
         message_len = out_i;
     }
+
+    message_len = imessage_strip_ai_phrases(clean, message_len);
 
     /* Hard length cap for iMessage: truncate at sentence boundary near 300 chars */
     if (message_len > 300) {
@@ -416,8 +524,8 @@ static sc_error_t imessage_get_response_constraints(void *ctx,
 
 static sc_error_t imessage_react(void *ctx, const char *target, size_t target_len,
                                  int64_t message_id, sc_reaction_type_t reaction) {
-    (void)target;
     (void)target_len;
+    (void)message_id;
 #if SC_IS_TEST
     sc_imessage_ctx_t *c = (sc_imessage_ctx_t *)ctx;
     if (!c)
@@ -426,18 +534,113 @@ static sc_error_t imessage_react(void *ctx, const char *target, size_t target_le
     c->last_reaction_message_id = message_id;
     return SC_OK;
 #else
+#if !defined(__APPLE__) || !defined(__MACH__)
     (void)ctx;
-    (void)message_id;
+    (void)target;
+    (void)target_len;
     (void)reaction;
-#if defined(__APPLE__) && defined(__MACH__)
-    /* Stub: UI scripting for tapbacks requires System Events accessibility
-     * permissions and is fragile. Log the attempt for now. */
+    return SC_ERR_NOT_SUPPORTED;
+#elif !defined(SC_IMESSAGE_TAPBACK_ENABLED)
+    (void)ctx;
+    (void)target;
+    (void)target_len;
+    (void)reaction;
     if (getenv("SC_DEBUG"))
-        fprintf(stderr, "[imessage] tapback stub: message_id=%lld reaction=%d (JXA/UI scripting "
-                        "not implemented)\n",
-                (long long)message_id, (int)reaction);
-#endif
+        fprintf(stderr, "[imessage] tapback disabled (SC_IMESSAGE_TAPBACK_ENABLED=OFF)\n");
+    return SC_ERR_NOT_SUPPORTED;
+#else
+    sc_imessage_ctx_t *c = (sc_imessage_ctx_t *)ctx;
+    if (!c || !c->alloc)
+        return SC_ERR_INVALID_ARGUMENT;
+    const char *tapback = sc_imessage_reaction_to_tapback_name(reaction);
+    if (!tapback)
+        return SC_ERR_INVALID_ARGUMENT;
+    if (!target || target_len == 0)
+        return SC_ERR_INVALID_ARGUMENT;
+
+    /* Escape target for JavaScript string. */
+    size_t tgt_esc_cap = target_len * 2 + 1;
+    if (tgt_esc_cap > 4096)
+        return SC_ERR_INVALID_ARGUMENT;
+    char *tgt_esc = (char *)c->alloc->alloc(c->alloc->ctx, tgt_esc_cap);
+    if (!tgt_esc)
+        return SC_ERR_OUT_OF_MEMORY;
+    {
+        size_t j = 0;
+        for (size_t i = 0; i < target_len && j + 2 < tgt_esc_cap; i++) {
+            if (target[i] == '\\' || target[i] == '"') {
+                tgt_esc[j++] = '\\';
+                tgt_esc[j++] = target[i];
+            } else if (target[i] == '\n') {
+                tgt_esc[j++] = '\\';
+                tgt_esc[j++] = 'n';
+            } else {
+                tgt_esc[j++] = target[i];
+            }
+        }
+        tgt_esc[j] = '\0';
+    }
+
+    /*
+     * JXA script: activate Messages, use System Events to trigger tapback.
+     * Fragile: requires accessibility permissions; UI hierarchy varies by macOS.
+     */
+    static const char *script_tpl =
+        "ObjC.import(\"stdlib\");"
+        "var tapback=\"%s\";var target=\"%s\";"
+        "try{"
+        "var M=Application(\"Messages\");M.activate();delay(0.5);"
+        "var SE=Application(\"System Events\");var p=SE.processes[\"Messages\"];"
+        "if(!p||!p.exists()){$.exit(1);}"
+        "var w=p.windows();if(!w||w.length===0){$.exit(1);}"
+        "var win=w[0];var t=win.tables();"
+        "if(t&&t.length>0){var rows=t[t.length-1].rows();"
+        "if(rows&&rows.length>0){var r=rows[rows.length-1];"
+        "if(r.actions&&r.actions[\"AXShowMenu\"]){r.actions[\"AXShowMenu\"].perform();}"
+        "delay(0.3);}}"
+        "$.exit(0);"
+        "}catch(e){$.exit(1);}";
+
+    size_t script_cap = 256 + strlen(tgt_esc);
+    char *script = (char *)c->alloc->alloc(c->alloc->ctx, script_cap);
+    if (!script) {
+        c->alloc->free(c->alloc->ctx, tgt_esc, tgt_esc_cap);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+    int n = snprintf(script, script_cap, script_tpl, tapback, tgt_esc);
+    c->alloc->free(c->alloc->ctx, tgt_esc, tgt_esc_cap);
+    if (n < 0 || (size_t)n >= script_cap) {
+        c->alloc->free(c->alloc->ctx, script, script_cap);
+        return SC_ERR_INTERNAL;
+    }
+
+    /*
+     * Run osascript with 15s timeout via perl alarm wrapper.
+     * Avoids hangs if Messages.app is not running or accessibility is denied.
+     */
+    const char *argv[] = {"perl", "-e", "alarm 15; exec @ARGV", "osascript", "-l", "JavaScript",
+                         "-e", script, NULL};
+    sc_run_result_t result = {0};
+    sc_error_t err = sc_process_run(c->alloc, argv, NULL, 65536, &result);
+    c->alloc->free(c->alloc->ctx, script, script_cap);
+    if (err != SC_OK) {
+        if (getenv("SC_DEBUG"))
+            fprintf(stderr, "[imessage] tapback osascript failed: sc_process_run err=%d\n",
+                    (int)err);
+        sc_run_result_free(c->alloc, &result);
+        return SC_ERR_NOT_SUPPORTED;
+    }
+    int exit_code = result.exit_code;
+    bool ok = result.success && exit_code == 0;
+    sc_run_result_free(c->alloc, &result);
+    if (!ok) {
+        if (getenv("SC_DEBUG"))
+            fprintf(stderr, "[imessage] tapback JXA failed (exit=%d, accessibility may be denied)\n",
+                    exit_code);
+        return SC_ERR_NOT_SUPPORTED;
+    }
     return SC_OK;
+#endif
 #endif
 }
 
@@ -526,6 +729,150 @@ void sc_imessage_destroy(sc_channel_t *ch) {
         ch->vtable = NULL;
     }
 }
+
+#ifndef SC_IS_TEST
+#if defined(__APPLE__) && defined(__MACH__) && defined(SC_ENABLE_SQLITE)
+char *sc_imessage_get_attachment_path(sc_allocator_t *alloc, int64_t message_id) {
+    if (!alloc || message_id <= 0)
+        return NULL;
+
+    const char *home = getenv("HOME");
+    if (!home)
+        return NULL;
+
+    char db_path[512];
+    int n = snprintf(db_path, sizeof(db_path), "%s/Library/Messages/chat.db", home);
+    if (n < 0 || (size_t)n >= sizeof(db_path))
+        return NULL;
+
+    sqlite3 *db = NULL;
+    if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
+        if (db)
+            sqlite3_close(db);
+        return NULL;
+    }
+
+    const char *sql =
+        "SELECT a.filename FROM attachment a "
+        "JOIN message_attachment_join maj ON maj.attachment_id = a.ROWID "
+        "WHERE maj.message_id = ?1 LIMIT 1";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        sqlite3_close(db);
+        return NULL;
+    }
+    sqlite3_bind_int64(stmt, 1, message_id);
+
+    char *path = NULL;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *filename = (const char *)sqlite3_column_text(stmt, 0);
+        if (filename && filename[0]) {
+            size_t len = strlen(filename);
+            /* Expand ~ to home directory */
+            if (len >= 1 && filename[0] == '~' && (len == 1 || filename[1] == '/')) {
+                size_t home_len = strlen(home);
+                size_t suffix_len = (len > 1) ? len - 1 : 0;
+                size_t total = home_len + suffix_len + 1;
+                path = (char *)alloc->alloc(alloc->ctx, total);
+                if (path) {
+                    memcpy(path, home, home_len);
+                    if (suffix_len > 0)
+                        memcpy(path + home_len, filename + 1, suffix_len);
+                    path[total - 1] = '\0';
+                }
+            } else {
+                path = sc_strndup(alloc, filename, len);
+            }
+        }
+    }
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return path;
+}
+#else
+char *sc_imessage_get_attachment_path(sc_allocator_t *alloc, int64_t message_id) {
+    (void)alloc;
+    (void)message_id;
+    return NULL;
+}
+#endif
+
+#if defined(__APPLE__) && defined(__MACH__) && defined(SC_ENABLE_SQLITE)
+char *sc_imessage_get_latest_attachment_path(sc_allocator_t *alloc, const char *contact_id,
+                                              size_t contact_id_len) {
+    if (!alloc || !contact_id || contact_id_len == 0)
+        return NULL;
+
+    const char *home = getenv("HOME");
+    if (!home)
+        return NULL;
+
+    char db_path[512];
+    int n = snprintf(db_path, sizeof(db_path), "%s/Library/Messages/chat.db", home);
+    if (n < 0 || (size_t)n >= sizeof(db_path))
+        return NULL;
+
+    sqlite3 *db = NULL;
+    if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
+        if (db)
+            sqlite3_close(db);
+        return NULL;
+    }
+
+    /* Get the most recent message with attachment from this contact */
+    const char *sql =
+        "SELECT a.filename FROM attachment a "
+        "JOIN message_attachment_join maj ON maj.attachment_id = a.ROWID "
+        "JOIN message m ON maj.message_id = m.ROWID "
+        "JOIN handle h ON m.handle_id = h.ROWID "
+        "WHERE h.id = ?1 AND m.is_from_me = 0 "
+        "ORDER BY m.date DESC LIMIT 1";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        sqlite3_close(db);
+        return NULL;
+    }
+    char contact_buf[256];
+    size_t clen = contact_id_len < sizeof(contact_buf) - 1 ? contact_id_len : sizeof(contact_buf) - 1;
+    memcpy(contact_buf, contact_id, clen);
+    contact_buf[clen] = '\0';
+    sqlite3_bind_text(stmt, 1, contact_buf, -1, NULL);
+
+    char *path = NULL;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *filename = (const char *)sqlite3_column_text(stmt, 0);
+        if (filename && filename[0]) {
+            size_t len = strlen(filename);
+            if (len >= 1 && filename[0] == '~' && (len == 1 || filename[1] == '/')) {
+                size_t home_len = strlen(home);
+                size_t suffix_len = (len > 1) ? len - 1 : 0;
+                size_t total = home_len + suffix_len + 1;
+                path = (char *)alloc->alloc(alloc->ctx, total);
+                if (path) {
+                    memcpy(path, home, home_len);
+                    if (suffix_len > 0)
+                        memcpy(path + home_len, filename + 1, suffix_len);
+                    path[total - 1] = '\0';
+                }
+            } else {
+                path = sc_strndup(alloc, filename, len);
+            }
+        }
+    }
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return path;
+}
+#else
+char *sc_imessage_get_latest_attachment_path(sc_allocator_t *alloc, const char *contact_id,
+                                             size_t contact_id_len) {
+    (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
+    return NULL;
+}
+#endif
+#endif
 
 /* ── iMessage polling via ~/Library/Messages/chat.db ──────────────────── */
 

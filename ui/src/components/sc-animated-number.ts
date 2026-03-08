@@ -28,6 +28,10 @@ export class ScAnimatedNumber extends LitElement {
 
   private _animate(from: number, to: number): void {
     if (this._raf) cancelAnimationFrame(this._raf);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      this._displayed = to;
+      return;
+    }
     this._from = from;
     this._start = performance.now();
     const tick = (now: number) => {

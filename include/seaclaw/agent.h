@@ -22,6 +22,7 @@
 #include "seaclaw/memory.h"
 #include "seaclaw/memory/retrieval.h"
 #include "seaclaw/memory/stm.h"
+#include "seaclaw/observability/bth_metrics.h"
 #include "seaclaw/observer.h"
 #ifdef SC_HAS_PERSONA
 #include "seaclaw/persona.h"
@@ -87,6 +88,7 @@ struct sc_agent {
     sc_retrieval_engine_t *retrieval_engine; /* optional; when set, memory_loader uses it */
     sc_session_store_t *session_store;       /* optional, may be NULL */
     sc_observer_t *observer;                 /* optional, may be NULL */
+    sc_bth_metrics_t *bth_metrics;            /* optional; set by daemon for BTH observability */
     sc_security_policy_t *policy;            /* optional, may be NULL */
     sc_cost_tracker_t *cost_tracker;         /* optional, may be NULL */
 

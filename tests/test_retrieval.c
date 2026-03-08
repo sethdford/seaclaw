@@ -127,7 +127,7 @@ static void test_rrf_combines_rankings(void) {
         .min_score = 0.0,
     };
     sc_retrieval_result_t res = {0};
-    sc_error_t err = sc_hybrid_retrieve(&alloc, &mem, NULL, NULL, "alpha", 5, &opts, &res);
+    sc_error_t err = sc_hybrid_retrieve(&alloc, &mem, NULL, NULL, NULL, "alpha", 5, &opts, &res);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(res.count, 1);
     SC_ASSERT_STR_EQ(res.entries[0].key, "a");
@@ -275,7 +275,7 @@ static void test_hybrid_empty_backend(void) {
         .min_score = 0.0,
     };
     sc_retrieval_result_t res = {0};
-    sc_error_t err = sc_hybrid_retrieve(&alloc, &mem, NULL, NULL, "query", 5, &opts, &res);
+    sc_error_t err = sc_hybrid_retrieve(&alloc, &mem, NULL, NULL, NULL, "query", 5, &opts, &res);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_EQ(res.count, 0);
     mem.vtable->deinit(mem.ctx);
@@ -518,7 +518,7 @@ static void test_hybrid_retrieve_with_vector(void) {
         .temporal_decay_factor = 0.0,
     };
     sc_retrieval_result_t res = {0};
-    sc_error_t err = sc_hybrid_retrieve(&alloc, &mem, NULL, NULL, "neural", 6, &opts, &res);
+    sc_error_t err = sc_hybrid_retrieve(&alloc, &mem, NULL, NULL, NULL, "neural", 6, &opts, &res);
     SC_ASSERT_TRUE(err == SC_OK || err == SC_ERR_NOT_SUPPORTED || err == SC_ERR_INVALID_ARGUMENT);
     sc_retrieval_result_free(&alloc, &res);
     mem.vtable->deinit(mem.ctx);

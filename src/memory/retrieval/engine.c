@@ -2,6 +2,7 @@
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/memory.h"
+#include "seaclaw/memory/graph.h"
 #include "seaclaw/memory/retrieval.h"
 #include "seaclaw/memory/vector.h"
 #include <math.h>
@@ -13,6 +14,7 @@ typedef struct sc_retrieval_engine_ctx {
     sc_memory_t backend;
     sc_embedder_t *embedder;
     sc_vector_store_t *vector_store;
+    sc_graph_t *graph;
 } sc_retrieval_engine_ctx_t;
 
 sc_error_t sc_semantic_retrieve(sc_allocator_t *alloc, sc_embedder_t *embedder,
@@ -46,8 +48,8 @@ static sc_error_t impl_retrieve(void *ctx, sc_allocator_t *alloc, const char *qu
         err = sc_semantic_retrieve(alloc, e->embedder, e->vector_store, query, query_len, &o, out);
         break;
     case SC_RETRIEVAL_HYBRID:
-        err = sc_hybrid_retrieve(alloc, &e->backend, e->embedder, e->vector_store, query, query_len,
-                                 &o, out);
+        err = sc_hybrid_retrieve(alloc, &e->backend, e->embedder, e->vector_store, e->graph, query,
+                                 query_len, &o, out);
         break;
     default:
         err = sc_keyword_retrieve(alloc, &e->backend, query, query_len, &o, out);
@@ -201,6 +203,7 @@ sc_retrieval_engine_t sc_retrieval_create_with_vector(sc_allocator_t *alloc, sc_
     ctx->backend = *backend;
     ctx->embedder = embedder;
     ctx->vector_store = vector_store;
+    ctx->graph = NULL;
     return (sc_retrieval_engine_t){
         .ctx = ctx,
         .vtable = &engine_vtable,
@@ -226,6 +229,13 @@ sc_error_t sc_retrieval_index_entry(sc_retrieval_engine_t *engine, sc_allocator_
                                           content_len);
     sc_embedding_free(alloc, &emb);
     return err;
+}
+
+void sc_retrieval_set_graph(sc_retrieval_engine_t *engine, sc_graph_t *graph) {
+    if (!engine || !engine->ctx)
+        return;
+    sc_retrieval_engine_ctx_t *e = (sc_retrieval_engine_ctx_t *)engine->ctx;
+    e->graph = graph;
 }
 
 void sc_retrieval_result_free(sc_allocator_t *alloc, sc_retrieval_result_t *r) {

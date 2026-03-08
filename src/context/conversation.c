@@ -2048,6 +2048,8 @@ static bool is_word_char(char c) {
 size_t sc_conversation_apply_typos(char *buf, size_t len, size_t cap, uint32_t seed) {
     if (!buf || len == 0)
         return len;
+    if (len >= cap)
+        return len;
 
     uint32_t s = seed;
     uint32_t val = prng_next(&s);
@@ -2445,9 +2447,20 @@ size_t sc_conversation_extract_urls(const char *text, size_t text_len,
         const char *start = NULL;
         size_t url_len = 0;
 
-        if (p + 8 <= end && (strncmp(p, "https://", 8) == 0 || strncmp(p, "http://", 7) == 0)) {
+        if (p + 8 <= end && strncmp(p, "https://", 8) == 0) {
             start = p;
-            p += (p[4] == 's') ? 8 : 7;
+            p += 8;
+            while (p < end) {
+                char c = *p;
+                if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '>' || c == ')' ||
+                    c == ']' || c == '"' || c == '\'')
+                    break;
+                p++;
+            }
+            url_len = (size_t)(p - start);
+        } else if (p + 7 <= end && strncmp(p, "http://", 7) == 0) {
+            start = p;
+            p += 7;
             while (p < end) {
                 char c = *p;
                 if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '>' || c == ')' ||
@@ -2460,7 +2473,7 @@ size_t sc_conversation_extract_urls(const char *text, size_t text_len,
             p++;
         }
 
-        if (start && url_len > 0) {
+        if (start && url_len > 0 && url_len <= 2048) {
             urls[count].start = start;
             urls[count].len = url_len;
             count++;

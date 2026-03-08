@@ -72,6 +72,54 @@ static void event_extract_null_input(void) {
     sc_event_extract_result_deinit(&out, &alloc);
 }
 
+static void event_extract_null_alloc(void) {
+    sc_event_extract_result_t out;
+    sc_error_t err = sc_event_extract(NULL, "text", 4, &out);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void event_extract_null_out(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_error_t err = sc_event_extract(&alloc, "text", 4, NULL);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void event_extract_multiple_events(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *text = "meeting Tuesday, birthday party next week";
+    sc_event_extract_result_t out;
+    sc_error_t err = sc_event_extract(&alloc, text, strlen(text), &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out.event_count, 2);
+    SC_ASSERT_TRUE(strstr(out.events[0].description, "meeting") != NULL);
+    SC_ASSERT_STR_EQ(out.events[0].temporal_ref, "Tuesday");
+    SC_ASSERT_TRUE(strstr(out.events[1].description, "birthday") != NULL);
+    SC_ASSERT_STR_EQ(out.events[1].temporal_ref, "next week");
+    sc_event_extract_result_deinit(&out, &alloc);
+}
+
+static void event_extract_in_two_weeks(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *text = "I have a meeting in 2 weeks";
+    sc_event_extract_result_t out;
+    sc_error_t err = sc_event_extract(&alloc, text, strlen(text), &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out.event_count, 1);
+    SC_ASSERT_STR_EQ(out.events[0].description, "meeting");
+    SC_ASSERT_STR_EQ(out.events[0].temporal_ref, "in 2 weeks");
+    sc_event_extract_result_deinit(&out, &alloc);
+}
+
+static void event_extract_deinit_partial(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *text = "meeting tomorrow";
+    sc_event_extract_result_t out;
+    sc_error_t err = sc_event_extract(&alloc, text, strlen(text), &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out.event_count, 1);
+    sc_event_extract_result_deinit(&out, &alloc);
+}
+
 void run_event_extract_tests(void) {
     SC_TEST_SUITE("event_extract");
     SC_RUN_TEST(event_extract_day_reference);
@@ -80,4 +128,9 @@ void run_event_extract_tests(void) {
     SC_RUN_TEST(event_extract_date);
     SC_RUN_TEST(event_extract_no_events);
     SC_RUN_TEST(event_extract_null_input);
+    SC_RUN_TEST(event_extract_null_alloc);
+    SC_RUN_TEST(event_extract_null_out);
+    SC_RUN_TEST(event_extract_multiple_events);
+    SC_RUN_TEST(event_extract_in_two_weeks);
+    SC_RUN_TEST(event_extract_deinit_partial);
 }

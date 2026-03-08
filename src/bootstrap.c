@@ -523,7 +523,8 @@ sc_error_t sc_app_bootstrap(sc_app_ctx_t *ctx, sc_allocator_t *alloc, const char
             sc_embedding_provider_t gem_provider =
                 sc_embedding_gemini_create(alloc, gemini_key, NULL, 0);
             bi->embedder = sc_embedder_gemini_adapter_create(alloc, gem_provider);
-        } else {
+        }
+        if (!bi->embedder.ctx) {
             bi->embedder = sc_embedder_local_create(alloc);
         }
         bi->vector_store = sc_vector_store_mem_create(alloc);

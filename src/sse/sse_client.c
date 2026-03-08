@@ -343,6 +343,9 @@ static sc_error_t sc_sse_connect_impl(sc_allocator_t *alloc, const char *url,
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, sse_write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ctx);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 0L); /* no timeout for streaming */
+    /* Detect dead connections: abort if fewer than 1 byte in 120 seconds */
+    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);
+    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 120L);
 
     CURLcode res = curl_easy_perform(curl);
     curl_slist_free_all(headers);

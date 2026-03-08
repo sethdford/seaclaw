@@ -516,8 +516,8 @@ export class ScApp extends LitElement {
     if (!hash) return;
     const [tabPart, ...rest] = hash.split(":");
     const sessionPart = rest.join(":");
-    if (VALID_TABS.includes(tabPart as TabId)) {
-      const targetTab = tabPart as TabId;
+    const targetTab = tabPart as TabId;
+    if (VALID_TABS.includes(targetTab)) {
       if (targetTab === "chat" && sessionPart) {
         this.chatSessionKey = sessionPart;
       }
@@ -535,6 +535,8 @@ export class ScApp extends LitElement {
           return this.updateComplete;
         });
       });
+    } else {
+      window.location.hash = "overview";
     }
   }
 

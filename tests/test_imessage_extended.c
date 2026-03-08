@@ -95,6 +95,18 @@ static void test_imessage_poll_test_mode(void) {
     sc_imessage_destroy(&ch);
 }
 
+static void test_imessage_reaction_to_tapback_mapping(void) {
+    SC_ASSERT_NULL(sc_imessage_reaction_to_tapback_name(SC_REACTION_NONE));
+    SC_ASSERT_STR_EQ(sc_imessage_reaction_to_tapback_name(SC_REACTION_HEART), "love");
+    SC_ASSERT_STR_EQ(sc_imessage_reaction_to_tapback_name(SC_REACTION_THUMBS_UP), "like");
+    SC_ASSERT_STR_EQ(sc_imessage_reaction_to_tapback_name(SC_REACTION_THUMBS_DOWN), "dislike");
+    SC_ASSERT_STR_EQ(sc_imessage_reaction_to_tapback_name(SC_REACTION_HAHA), "laugh");
+    SC_ASSERT_STR_EQ(sc_imessage_reaction_to_tapback_name(SC_REACTION_EMPHASIS), "emphasize");
+    SC_ASSERT_STR_EQ(sc_imessage_reaction_to_tapback_name(SC_REACTION_QUESTION), "question");
+    /* Invalid enum value */
+    SC_ASSERT_NULL(sc_imessage_reaction_to_tapback_name((sc_reaction_type_t)99));
+}
+
 #if SC_IS_TEST
 static void test_imessage_react_test_records(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -133,6 +145,7 @@ void run_imessage_extended_tests(void) {
     SC_RUN_TEST(test_imessage_escape_empty);
     SC_RUN_TEST(test_imessage_escape_truncation);
 #endif
+    SC_RUN_TEST(test_imessage_reaction_to_tapback_mapping);
     SC_RUN_TEST(test_imessage_create_with_allow_from);
     SC_RUN_TEST(test_imessage_create_null_alloc);
     SC_RUN_TEST(test_imessage_health_check);

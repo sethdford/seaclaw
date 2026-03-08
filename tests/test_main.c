@@ -112,10 +112,12 @@ void run_episodic_tests(void);
 void run_reflection_tests(void);
 void run_input_guard_tests(void);
 void run_conversation_tests(void);
+void run_vision_tests(void);
 void run_ab_response_tests(void);
 void run_event_extract_tests(void);
 void run_stm_tests(void);
 void run_emotional_graph_tests(void);
+void run_graph_tests(void);
 void run_fast_capture_tests(void);
 void run_promotion_tests(void);
 void run_consolidation_tests(void);
@@ -128,6 +130,7 @@ void run_tool_router_tests(void);
 void run_dag_tests(void);
 void run_mood_tests(void);
 void run_bth_e2e_tests(void);
+void run_bth_metrics_tests(void);
 
 int main(void) {
     printf("SeaClaw Test Suite\n");
@@ -241,10 +244,12 @@ int main(void) {
     run_reflection_tests();
     run_input_guard_tests();
     run_conversation_tests();
+    run_vision_tests();
     run_ab_response_tests();
     run_event_extract_tests();
     run_stm_tests();
     run_emotional_graph_tests();
+    run_graph_tests();
     run_fast_capture_tests();
     run_promotion_tests();
     run_consolidation_tests();
@@ -257,6 +262,7 @@ int main(void) {
     run_dag_tests();
     run_mood_tests();
     run_bth_e2e_tests();
+    run_bth_metrics_tests();
 
     SC_TEST_REPORT();
     SC_TEST_EXIT();

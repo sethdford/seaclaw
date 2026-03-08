@@ -223,6 +223,11 @@ sc_error_t sc_ws_connect(sc_allocator_t *alloc, const char *url, sc_ws_client_t 
     if (ws_parse_url(url, host, sizeof(host), &port, path, sizeof(path), &use_tls) != 0)
         return SC_ERR_INVALID_ARGUMENT;
 
+    if (!use_tls) {
+        fprintf(stderr, "[websocket] warning: connecting via ws:// (unencrypted). Prefer wss:// for "
+                        "production.\n");
+    }
+
     char port_str[8];
     snprintf(port_str, sizeof(port_str), "%u", (unsigned)port);
     struct addrinfo hints = {0}, *res = NULL;

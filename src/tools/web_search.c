@@ -9,6 +9,7 @@
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/tool.h"
+#include "seaclaw/tools/validation.h"
 #include "seaclaw/tools/web_search_providers.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -185,6 +186,12 @@ static sc_error_t web_search_execute(void *ctx, sc_allocator_t *alloc, const sc_
         (strcmp(provider, "auto") == 0 && get_env("SEARXNG_BASE_URL"))) {
         const char *base = get_env("SEARXNG_BASE_URL");
         if (base && base[0]) {
+            if (sc_tool_validate_url(base) != SC_OK) {
+                *out = sc_tool_result_fail(
+                    "SEARXNG_BASE_URL must be HTTPS and must not resolve to private/loopback IPs",
+                    68);
+                return SC_OK;
+            }
             err = sc_web_search_searxng(alloc, query, qlen, count, base, out);
             if (err == SC_OK)
                 return SC_OK;

@@ -141,6 +141,95 @@ static void lightweight_no_match(void) {
     sc_deep_extract_result_deinit(&out, &alloc);
 }
 
+static void lightweight_extracts_is_a(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *text = "I'm a software engineer";
+    sc_deep_extract_result_t out;
+    sc_error_t err = sc_deep_extract_lightweight(&alloc, text, strlen(text), &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out.fact_count, 1);
+    SC_ASSERT_STR_EQ(out.facts[0].subject, "user");
+    SC_ASSERT_STR_EQ(out.facts[0].predicate, "is_a");
+    SC_ASSERT_STR_EQ(out.facts[0].object, "software engineer");
+    sc_deep_extract_result_deinit(&out, &alloc);
+}
+
+static void lightweight_extracts_loves(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *text = "I love cooking pasta";
+    sc_deep_extract_result_t out;
+    sc_error_t err = sc_deep_extract_lightweight(&alloc, text, strlen(text), &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out.fact_count, 1);
+    SC_ASSERT_STR_EQ(out.facts[0].subject, "user");
+    SC_ASSERT_STR_EQ(out.facts[0].predicate, "loves");
+    SC_ASSERT_STR_EQ(out.facts[0].object, "cooking pasta");
+    sc_deep_extract_result_deinit(&out, &alloc);
+}
+
+static void lightweight_extracts_hates(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *text = "I hate mornings";
+    sc_deep_extract_result_t out;
+    sc_error_t err = sc_deep_extract_lightweight(&alloc, text, strlen(text), &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out.fact_count, 1);
+    SC_ASSERT_STR_EQ(out.facts[0].subject, "user");
+    SC_ASSERT_STR_EQ(out.facts[0].predicate, "hates");
+    SC_ASSERT_STR_EQ(out.facts[0].object, "mornings");
+    sc_deep_extract_result_deinit(&out, &alloc);
+}
+
+static void lightweight_extracts_name(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *text = "my name is Sarah";
+    sc_deep_extract_result_t out;
+    sc_error_t err = sc_deep_extract_lightweight(&alloc, text, strlen(text), &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out.fact_count, 1);
+    SC_ASSERT_STR_EQ(out.facts[0].subject, "user");
+    SC_ASSERT_STR_EQ(out.facts[0].predicate, "name");
+    SC_ASSERT_STR_EQ(out.facts[0].object, "Sarah");
+    sc_deep_extract_result_deinit(&out, &alloc);
+}
+
+static void lightweight_extracts_job(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *text = "my job is teaching";
+    sc_deep_extract_result_t out;
+    sc_error_t err = sc_deep_extract_lightweight(&alloc, text, strlen(text), &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out.fact_count, 1);
+    SC_ASSERT_STR_EQ(out.facts[0].subject, "user");
+    SC_ASSERT_STR_EQ(out.facts[0].predicate, "job");
+    SC_ASSERT_STR_EQ(out.facts[0].object, "teaching");
+    sc_deep_extract_result_deinit(&out, &alloc);
+}
+
+static void lightweight_build_prompt_null_alloc(void) {
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_deep_extract_build_prompt(NULL, "hello", 5, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_NULL(out);
+}
+
+static void lightweight_multiple_facts(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *text = "I work at Google. I live in Austin";
+    sc_deep_extract_result_t out;
+    sc_error_t err = sc_deep_extract_lightweight(&alloc, text, strlen(text), &out);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(out.fact_count, 2);
+    SC_ASSERT_STR_EQ(out.facts[0].subject, "user");
+    SC_ASSERT_STR_EQ(out.facts[0].predicate, "works_at");
+    SC_ASSERT_STR_EQ(out.facts[0].object, "Google");
+    SC_ASSERT_STR_EQ(out.facts[1].subject, "user");
+    SC_ASSERT_STR_EQ(out.facts[1].predicate, "lives_in");
+    SC_ASSERT_STR_EQ(out.facts[1].object, "Austin");
+    sc_deep_extract_result_deinit(&out, &alloc);
+}
+
 void run_deep_extract_tests(void) {
     SC_TEST_SUITE("deep_extract");
     SC_RUN_TEST(deep_extract_build_prompt_includes_conversation);
@@ -154,4 +243,11 @@ void run_deep_extract_tests(void) {
     SC_RUN_TEST(lightweight_extracts_case_insensitive);
     SC_RUN_TEST(lightweight_null_input);
     SC_RUN_TEST(lightweight_no_match);
+    SC_RUN_TEST(lightweight_extracts_is_a);
+    SC_RUN_TEST(lightweight_extracts_loves);
+    SC_RUN_TEST(lightweight_extracts_hates);
+    SC_RUN_TEST(lightweight_extracts_name);
+    SC_RUN_TEST(lightweight_extracts_job);
+    SC_RUN_TEST(lightweight_build_prompt_null_alloc);
+    SC_RUN_TEST(lightweight_multiple_facts);
 }

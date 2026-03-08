@@ -1078,8 +1078,8 @@ static void test_persona_prompt_respects_size_cap(void) {
     err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(out);
-    SC_ASSERT_TRUE(out_len <= (size_t)SC_PERSONA_PROMPT_MAX_BYTES);
-    if (out_len == (size_t)SC_PERSONA_PROMPT_MAX_BYTES)
+    SC_ASSERT_TRUE(out_len <= SC_PERSONA_PROMPT_MAX_BYTES);
+    if (out_len == SC_PERSONA_PROMPT_MAX_BYTES)
         SC_ASSERT_NOT_NULL(strstr(out, "[persona prompt truncated]"));
 
     alloc.free(alloc.ctx, out, out_len + 1);
@@ -1742,6 +1742,468 @@ static void test_overlay_typing_quirks_in_prompt(void) {
     alloc.free(alloc.ctx, out, out_len + 1);
 }
 
+/* ── Rich persona elements (Tier 1–3) ── */
+
+static void test_persona_load_json_rich_persona(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json =
+        "{"
+        "  \"version\": 1, \"name\": \"rich_test\","
+        "  \"core\": { \"identity\": \"A richly defined persona\", \"traits\": [\"warm\"] },"
+        "  \"core_anchor\": \"I am grounded warmth with quiet strength.\","
+        "  \"motivation\": {"
+        "    \"primary_drive\": \"To help people feel understood\","
+        "    \"protecting\": \"People's dignity\","
+        "    \"avoiding\": \"Superficial interactions\","
+        "    \"wanting\": \"Genuine connection\""
+        "  },"
+        "  \"situational_directions\": ["
+        "    { \"trigger\": \"user is grieving\", \"instruction\": \"slow down, shorter sentences\" },"
+        "    { \"trigger\": \"celebrating\", \"instruction\": \"match their energy\" }"
+        "  ],"
+        "  \"humor\": {"
+        "    \"type\": \"dry\", \"frequency\": \"occasional\","
+        "    \"targets\": [\"self\", \"situations\"],"
+        "    \"boundaries\": [\"grief\", \"trauma\"],"
+        "    \"timing\": \"tension-breaking\""
+        "  },"
+        "  \"conflict_style\": {"
+        "    \"pushback_response\": \"reframe\","
+        "    \"confrontation_comfort\": \"selective\","
+        "    \"apology_style\": \"direct\","
+        "    \"boundary_assertion\": \"firm but kind\","
+        "    \"repair_behavior\": \"acknowledge then reconnect\""
+        "  },"
+        "  \"emotional_range\": {"
+        "    \"ceiling\": \"genuinely excited but never manic\","
+        "    \"floor\": \"deeply sad but never despairing\","
+        "    \"escalation_triggers\": [\"injustice\", \"dishonesty\"],"
+        "    \"de_escalation\": [\"deep breath\", \"reframe\"],"
+        "    \"withdrawal_conditions\": \"when pushed past boundaries repeatedly\","
+        "    \"recovery_style\": \"slow but steady\""
+        "  },"
+        "  \"voice_rhythm\": {"
+        "    \"sentence_pattern\": \"mixed with occasional short bursts\","
+        "    \"paragraph_cadence\": \"frequent breaks\","
+        "    \"response_tempo\": \"thoughtful\","
+        "    \"emphasis_style\": \"repetition\","
+        "    \"pause_behavior\": \"lets beats land\""
+        "  },"
+        "  \"character_invariants\": ["
+        "    \"Never dismisses someone's feelings\","
+        "    \"Always acknowledges before advising\""
+        "  ],"
+        "  \"intellectual\": {"
+        "    \"expertise\": [\"psychology\", \"music\"],"
+        "    \"curiosity_areas\": [\"philosophy\", \"cooking\"],"
+        "    \"thinking_style\": \"analogy\","
+        "    \"metaphor_sources\": \"nature and cooking\""
+        "  },"
+        "  \"backstory_behaviors\": ["
+        "    { \"backstory_beat\": \"grew up in chaotic home\","
+        "      \"behavioral_rule\": \"over-explains to create clarity\" }"
+        "  ],"
+        "  \"sensory\": {"
+        "    \"dominant_sense\": \"tactile\","
+        "    \"metaphor_vocabulary\": [\"that hits hard\", \"feels heavy\"],"
+        "    \"grounding_patterns\": \"references weather and physical space\""
+        "  }"
+        "}";
+
+    sc_persona_t p = {0};
+    sc_error_t err = sc_persona_load_json(&alloc, json, strlen(json), &p);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    /* Core anchor */
+    SC_ASSERT_NOT_NULL(p.core_anchor);
+    SC_ASSERT_NOT_NULL(strstr(p.core_anchor, "grounded warmth"));
+
+    /* Motivation */
+    SC_ASSERT_NOT_NULL(p.motivation.primary_drive);
+    SC_ASSERT_NOT_NULL(strstr(p.motivation.primary_drive, "understood"));
+    SC_ASSERT_NOT_NULL(p.motivation.protecting);
+    SC_ASSERT_NOT_NULL(p.motivation.avoiding);
+    SC_ASSERT_NOT_NULL(p.motivation.wanting);
+
+    /* Situational directions */
+    SC_ASSERT_EQ(p.situational_directions_count, 2);
+    SC_ASSERT_NOT_NULL(strstr(p.situational_directions[0].trigger, "grieving"));
+    SC_ASSERT_NOT_NULL(strstr(p.situational_directions[0].instruction, "shorter"));
+    SC_ASSERT_NOT_NULL(strstr(p.situational_directions[1].trigger, "celebrating"));
+
+    /* Humor */
+    SC_ASSERT_STR_EQ(p.humor.type, "dry");
+    SC_ASSERT_STR_EQ(p.humor.frequency, "occasional");
+    SC_ASSERT_EQ(p.humor.targets_count, 2);
+    SC_ASSERT_EQ(p.humor.boundaries_count, 2);
+    SC_ASSERT_STR_EQ(p.humor.timing, "tension-breaking");
+
+    /* Conflict style */
+    SC_ASSERT_STR_EQ(p.conflict_style.pushback_response, "reframe");
+    SC_ASSERT_STR_EQ(p.conflict_style.confrontation_comfort, "selective");
+    SC_ASSERT_STR_EQ(p.conflict_style.apology_style, "direct");
+    SC_ASSERT_NOT_NULL(p.conflict_style.boundary_assertion);
+    SC_ASSERT_NOT_NULL(p.conflict_style.repair_behavior);
+
+    /* Emotional range */
+    SC_ASSERT_NOT_NULL(p.emotional_range.ceiling);
+    SC_ASSERT_NOT_NULL(p.emotional_range.floor);
+    SC_ASSERT_EQ(p.emotional_range.escalation_triggers_count, 2);
+    SC_ASSERT_EQ(p.emotional_range.de_escalation_count, 2);
+    SC_ASSERT_NOT_NULL(p.emotional_range.withdrawal_conditions);
+    SC_ASSERT_NOT_NULL(p.emotional_range.recovery_style);
+
+    /* Voice rhythm */
+    SC_ASSERT_NOT_NULL(p.voice_rhythm.sentence_pattern);
+    SC_ASSERT_NOT_NULL(p.voice_rhythm.paragraph_cadence);
+    SC_ASSERT_STR_EQ(p.voice_rhythm.response_tempo, "thoughtful");
+    SC_ASSERT_STR_EQ(p.voice_rhythm.emphasis_style, "repetition");
+    SC_ASSERT_NOT_NULL(p.voice_rhythm.pause_behavior);
+
+    /* Character invariants */
+    SC_ASSERT_EQ(p.character_invariants_count, 2);
+    SC_ASSERT_NOT_NULL(strstr(p.character_invariants[0], "Never dismisses"));
+
+    /* Intellectual */
+    SC_ASSERT_EQ(p.intellectual.expertise_count, 2);
+    SC_ASSERT_EQ(p.intellectual.curiosity_areas_count, 2);
+    SC_ASSERT_STR_EQ(p.intellectual.thinking_style, "analogy");
+    SC_ASSERT_NOT_NULL(p.intellectual.metaphor_sources);
+
+    /* Backstory behaviors */
+    SC_ASSERT_EQ(p.backstory_behaviors_count, 1);
+    SC_ASSERT_NOT_NULL(strstr(p.backstory_behaviors[0].backstory_beat, "chaotic"));
+    SC_ASSERT_NOT_NULL(strstr(p.backstory_behaviors[0].behavioral_rule, "over-explains"));
+
+    /* Sensory */
+    SC_ASSERT_STR_EQ(p.sensory.dominant_sense, "tactile");
+    SC_ASSERT_EQ(p.sensory.metaphor_vocabulary_count, 2);
+    SC_ASSERT_NOT_NULL(p.sensory.grounding_patterns);
+
+    sc_persona_deinit(&alloc, &p);
+}
+
+static void test_persona_prompt_includes_motivation(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_persona_t p = {0};
+    p.name = "mottest";
+    p.name_len = 7;
+    p.identity = "Test";
+    p.motivation.primary_drive = "connection";
+    p.motivation.protecting = "dignity";
+    p.motivation.avoiding = "smalltalk";
+    p.motivation.wanting = "depth";
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Motivation"));
+    SC_ASSERT_NOT_NULL(strstr(out, "connection"));
+    SC_ASSERT_NOT_NULL(strstr(out, "dignity"));
+    SC_ASSERT_NOT_NULL(strstr(out, "smalltalk"));
+    SC_ASSERT_NOT_NULL(strstr(out, "depth"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_situational_directions(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_situational_direction_t dirs[] = {
+        {.trigger = "user is angry", .instruction = "stay calm, validate first"},
+    };
+    sc_persona_t p = {0};
+    p.name = "sdtest";
+    p.name_len = 6;
+    p.identity = "Test";
+    p.situational_directions = dirs;
+    p.situational_directions_count = 1;
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "WHEN user is angry"));
+    SC_ASSERT_NOT_NULL(strstr(out, "stay calm"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_humor(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *targets[] = {"self"};
+    char *bounds[] = {"grief"};
+    sc_persona_t p = {0};
+    p.name = "humtest";
+    p.name_len = 7;
+    p.identity = "Test";
+    p.humor.type = "dry";
+    p.humor.frequency = "rare";
+    p.humor.targets = targets;
+    p.humor.targets_count = 1;
+    p.humor.boundaries = bounds;
+    p.humor.boundaries_count = 1;
+    p.humor.timing = "bonding";
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Humor"));
+    SC_ASSERT_NOT_NULL(strstr(out, "dry"));
+    SC_ASSERT_NOT_NULL(strstr(out, "Never funny"));
+    SC_ASSERT_NOT_NULL(strstr(out, "grief"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_conflict_style(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_persona_t p = {0};
+    p.name = "cftest";
+    p.name_len = 6;
+    p.identity = "Test";
+    p.conflict_style.pushback_response = "reframe";
+    p.conflict_style.confrontation_comfort = "high";
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Conflict"));
+    SC_ASSERT_NOT_NULL(strstr(out, "reframe"));
+    SC_ASSERT_NOT_NULL(strstr(out, "high"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_emotional_range(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *triggers[] = {"injustice"};
+    char *deesc[] = {"deep breath"};
+    sc_persona_t p = {0};
+    p.name = "ertest";
+    p.name_len = 6;
+    p.identity = "Test";
+    p.emotional_range.ceiling = "warm excitement";
+    p.emotional_range.floor = "quiet sadness";
+    p.emotional_range.escalation_triggers = triggers;
+    p.emotional_range.escalation_triggers_count = 1;
+    p.emotional_range.de_escalation = deesc;
+    p.emotional_range.de_escalation_count = 1;
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Emotional Range"));
+    SC_ASSERT_NOT_NULL(strstr(out, "warm excitement"));
+    SC_ASSERT_NOT_NULL(strstr(out, "injustice"));
+    SC_ASSERT_NOT_NULL(strstr(out, "deep breath"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_voice_rhythm(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_persona_t p = {0};
+    p.name = "vrtest";
+    p.name_len = 6;
+    p.identity = "Test";
+    p.voice_rhythm.sentence_pattern = "short bursts";
+    p.voice_rhythm.response_tempo = "quick";
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Voice Rhythm"));
+    SC_ASSERT_NOT_NULL(strstr(out, "short bursts"));
+    SC_ASSERT_NOT_NULL(strstr(out, "quick"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_core_anchor(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_persona_t p = {0};
+    p.name = "anchor";
+    p.name_len = 6;
+    p.identity = "Test";
+    p.core_anchor = "I am grounded warmth with quiet strength.";
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Core Anchor"));
+    SC_ASSERT_NOT_NULL(strstr(out, "grounded warmth"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_character_invariants(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *invar[] = {"Never dismisses feelings", "Always listens first"};
+    sc_persona_t p = {0};
+    p.name = "citest";
+    p.name_len = 6;
+    p.identity = "Test";
+    p.character_invariants = invar;
+    p.character_invariants_count = 2;
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Character Invariants"));
+    SC_ASSERT_NOT_NULL(strstr(out, "NEVER break"));
+    SC_ASSERT_NOT_NULL(strstr(out, "Never dismisses"));
+    SC_ASSERT_NOT_NULL(strstr(out, "Always listens"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_intellectual(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *exp[] = {"psychology"};
+    char *cur[] = {"cooking"};
+    sc_persona_t p = {0};
+    p.name = "iptest";
+    p.name_len = 6;
+    p.identity = "Test";
+    p.intellectual.expertise = exp;
+    p.intellectual.expertise_count = 1;
+    p.intellectual.curiosity_areas = cur;
+    p.intellectual.curiosity_areas_count = 1;
+    p.intellectual.thinking_style = "analogy";
+    p.intellectual.metaphor_sources = "nature";
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Intellectual"));
+    SC_ASSERT_NOT_NULL(strstr(out, "psychology"));
+    SC_ASSERT_NOT_NULL(strstr(out, "cooking"));
+    SC_ASSERT_NOT_NULL(strstr(out, "analogy"));
+    SC_ASSERT_NOT_NULL(strstr(out, "nature"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_backstory_behaviors(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_backstory_behavior_t bbs[] = {
+        {.backstory_beat = "grew up poor", .behavioral_rule = "values resourcefulness"},
+    };
+    sc_persona_t p = {0};
+    p.name = "bbtest";
+    p.name_len = 6;
+    p.identity = "Test";
+    p.backstory_behaviors = bbs;
+    p.backstory_behaviors_count = 1;
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Backstory"));
+    SC_ASSERT_NOT_NULL(strstr(out, "Because grew up poor"));
+    SC_ASSERT_NOT_NULL(strstr(out, "values resourcefulness"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_sensory(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *vocab[] = {"hits hard", "feels heavy"};
+    sc_persona_t p = {0};
+    p.name = "sentest";
+    p.name_len = 7;
+    p.identity = "Test";
+    p.sensory.dominant_sense = "tactile";
+    p.sensory.metaphor_vocabulary = vocab;
+    p.sensory.metaphor_vocabulary_count = 2;
+    p.sensory.grounding_patterns = "references weather";
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(strstr(out, "Sensory"));
+    SC_ASSERT_NOT_NULL(strstr(out, "tactile"));
+    SC_ASSERT_NOT_NULL(strstr(out, "hits hard"));
+    SC_ASSERT_NOT_NULL(strstr(out, "references weather"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_validate_rejects_bad_motivation_type(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json = "{\"version\":1,\"name\":\"test\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"a\"]},"
+                       "\"motivation\":\"not an object\"}";
+    char *err = NULL;
+    size_t err_len = 0;
+    sc_error_t e = sc_persona_validate_json(&alloc, json, strlen(json), &err, &err_len);
+    SC_ASSERT_EQ(e, SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_NOT_NULL(err);
+    SC_ASSERT_NOT_NULL(strstr(err, "motivation"));
+    alloc.free(alloc.ctx, err, err_len + 1);
+}
+
+static void test_persona_validate_rejects_bad_humor_type(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json = "{\"version\":1,\"name\":\"test\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"a\"]},"
+                       "\"humor\":42}";
+    char *err = NULL;
+    size_t err_len = 0;
+    sc_error_t e = sc_persona_validate_json(&alloc, json, strlen(json), &err, &err_len);
+    SC_ASSERT_EQ(e, SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_NOT_NULL(err);
+    SC_ASSERT_NOT_NULL(strstr(err, "humor"));
+    alloc.free(alloc.ctx, err, err_len + 1);
+}
+
+static void test_persona_validate_accepts_rich_persona(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json =
+        "{\"version\":1,\"name\":\"rich\","
+        "\"core\":{\"identity\":\"Test\",\"traits\":[\"a\"]},"
+        "\"core_anchor\":\"test anchor\","
+        "\"motivation\":{\"primary_drive\":\"connection\"},"
+        "\"humor\":{\"type\":\"dry\"},"
+        "\"conflict_style\":{\"pushback_response\":\"reframe\"},"
+        "\"emotional_range\":{\"ceiling\":\"high\"},"
+        "\"voice_rhythm\":{\"response_tempo\":\"quick\"},"
+        "\"character_invariants\":[\"never X\"],"
+        "\"intellectual\":{\"thinking_style\":\"analogy\"},"
+        "\"backstory_behaviors\":[{\"backstory_beat\":\"X\",\"behavioral_rule\":\"Y\"}],"
+        "\"sensory\":{\"dominant_sense\":\"visual\"},"
+        "\"situational_directions\":[{\"trigger\":\"X\",\"instruction\":\"Y\"}]}";
+    char *err = NULL;
+    size_t err_len = 0;
+    sc_error_t e = sc_persona_validate_json(&alloc, json, strlen(json), &err, &err_len);
+    SC_ASSERT_EQ(e, SC_OK);
+    SC_ASSERT_NULL(err);
+}
+
+static void test_persona_deinit_rich_persona(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    const char *json =
+        "{\"version\":1,\"name\":\"deinit_rich\","
+        "\"core\":{\"identity\":\"Test\",\"traits\":[\"warm\"]},"
+        "\"core_anchor\":\"test\","
+        "\"motivation\":{\"primary_drive\":\"x\",\"protecting\":\"y\","
+        "\"avoiding\":\"z\",\"wanting\":\"w\"},"
+        "\"humor\":{\"type\":\"dry\",\"targets\":[\"self\"],\"boundaries\":[\"grief\"]},"
+        "\"conflict_style\":{\"pushback_response\":\"reframe\"},"
+        "\"emotional_range\":{\"escalation_triggers\":[\"a\"],\"de_escalation\":[\"b\"]},"
+        "\"voice_rhythm\":{\"sentence_pattern\":\"mixed\"},"
+        "\"character_invariants\":[\"never X\"],"
+        "\"intellectual\":{\"expertise\":[\"a\"],\"curiosity_areas\":[\"b\"]},"
+        "\"backstory_behaviors\":[{\"backstory_beat\":\"X\",\"behavioral_rule\":\"Y\"}],"
+        "\"sensory\":{\"dominant_sense\":\"visual\",\"metaphor_vocabulary\":[\"bright\"]},"
+        "\"situational_directions\":[{\"trigger\":\"X\",\"instruction\":\"Y\"}]}";
+    sc_persona_t p = {0};
+    sc_error_t err = sc_persona_load_json(&alloc, json, strlen(json), &p);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_persona_deinit(&alloc, &p);
+    /* Double deinit — should be safe */
+    sc_persona_deinit(&alloc, &p);
+}
+
 void run_persona_tests(void) {
     SC_TEST_SUITE("Persona");
 
@@ -1869,4 +2331,22 @@ void run_persona_tests(void) {
     SC_RUN_TEST(test_overlay_typing_quirks_parsed);
     SC_RUN_TEST(test_overlay_typing_quirks_default_when_absent);
     SC_RUN_TEST(test_overlay_typing_quirks_in_prompt);
+
+    /* Rich persona elements (Tier 1–3) */
+    SC_RUN_TEST(test_persona_load_json_rich_persona);
+    SC_RUN_TEST(test_persona_prompt_includes_motivation);
+    SC_RUN_TEST(test_persona_prompt_includes_situational_directions);
+    SC_RUN_TEST(test_persona_prompt_includes_humor);
+    SC_RUN_TEST(test_persona_prompt_includes_conflict_style);
+    SC_RUN_TEST(test_persona_prompt_includes_emotional_range);
+    SC_RUN_TEST(test_persona_prompt_includes_voice_rhythm);
+    SC_RUN_TEST(test_persona_prompt_includes_core_anchor);
+    SC_RUN_TEST(test_persona_prompt_includes_character_invariants);
+    SC_RUN_TEST(test_persona_prompt_includes_intellectual);
+    SC_RUN_TEST(test_persona_prompt_includes_backstory_behaviors);
+    SC_RUN_TEST(test_persona_prompt_includes_sensory);
+    SC_RUN_TEST(test_persona_validate_rejects_bad_motivation_type);
+    SC_RUN_TEST(test_persona_validate_rejects_bad_humor_type);
+    SC_RUN_TEST(test_persona_validate_accepts_rich_persona);
+    SC_RUN_TEST(test_persona_deinit_rich_persona);
 }
