@@ -125,6 +125,24 @@ sc_error_t sc_persona_sampler_imessage_conversation_query(const char *handle_id,
                                                           size_t limit) {
     if (!handle_id || handle_id_len == 0 || !buf || !out_len || cap < 128)
         return SC_ERR_INVALID_ARGUMENT;
+
+    /* Sanitize handle_id: escape single quotes by doubling them (SQL escaping). */
+    char sanitized[257];
+    size_t out_pos = 0;
+    for (size_t i = 0; i < handle_id_len && out_pos < 256; i++) {
+        if (handle_id[i] == '\'') {
+            if (out_pos + 2 > 256)
+                break;
+            sanitized[out_pos++] = '\'';
+            sanitized[out_pos++] = '\'';
+        } else {
+            if (out_pos + 1 > 256)
+                break;
+            sanitized[out_pos++] = handle_id[i];
+        }
+    }
+    sanitized[out_pos] = '\0';
+
     int n = snprintf(buf, cap,
                      "SELECT m.text, m.is_from_me, m.date "
                      "FROM message m "
@@ -132,9 +150,9 @@ sc_error_t sc_persona_sampler_imessage_conversation_query(const char *handle_id,
                      "JOIN chat c ON c.ROWID = cmj.chat_id "
                      "JOIN chat_handle_join chj ON chj.chat_id = c.ROWID "
                      "JOIN handle h ON h.ROWID = chj.handle_id "
-                     "WHERE h.id = '%.*s' AND m.text IS NOT NULL AND m.text != '' "
+                     "WHERE h.id = '%s' AND m.text IS NOT NULL AND m.text != '' "
                      "ORDER BY m.date ASC LIMIT %zu",
-                     (int)handle_id_len, handle_id, limit);
+                     sanitized, limit);
     if (n < 0 || (size_t)n >= cap)
         return SC_ERR_INVALID_ARGUMENT;
     *out_len = (size_t)n;

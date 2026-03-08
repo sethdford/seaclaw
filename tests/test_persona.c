@@ -1194,8 +1194,8 @@ static void test_persona_extracted_imessage_bank_loads_and_selects(void) {
 
     const sc_persona_example_t *sel[3];
     size_t sel_count = 0;
-    err = sc_persona_select_examples(&p, "imessage", 8, "lunch plans greeting", 20, sel,
-                                     &sel_count, 3);
+    err = sc_persona_select_examples(&p, "imessage", 8, "lunch plans greeting", 20, sel, &sel_count,
+                                     3);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_TRUE(sel_count > 0);
     SC_ASSERT_TRUE(sel_count <= 3);
@@ -1572,6 +1572,20 @@ static void test_sampler_imessage_query_null_buf(void) {
     size_t len = 0;
     sc_error_t err = sc_persona_sampler_imessage_query(NULL, 512, &len, 100);
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+}
+
+static void test_sampler_imessage_query_escapes_quotes(void) {
+    char buf[512];
+    size_t len = 0;
+    const char *handle_id = "o'brien";
+    sc_error_t err = sc_persona_sampler_imessage_conversation_query(handle_id, strlen(handle_id),
+                                                                    buf, sizeof(buf), &len, 50);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(len > 0);
+    /* Single quotes in handle_id must be escaped as '' for SQL safety. */
+    SC_ASSERT_NOT_NULL(strstr(buf, "o''brien"));
+    /* Must not contain unescaped injection pattern. */
+    SC_ASSERT_NULL(strstr(buf, "'; DROP TABLE"));
 }
 
 static void test_sampler_facebook_parse_empty_object(void) {
@@ -2856,8 +2870,8 @@ static void test_e2e_mindy_message_full_pipeline(void) {
 
     /* Step 4: Build inner world context (close_family should pass stage gate) */
     size_t iw_len = 0;
-    char *iw_ctx = sc_persona_build_inner_world_context(&alloc, &p, cp->relationship_stage,
-                                                        &iw_len);
+    char *iw_ctx =
+        sc_persona_build_inner_world_context(&alloc, &p, cp->relationship_stage, &iw_len);
     SC_ASSERT_NOT_NULL(iw_ctx);
     SC_ASSERT_TRUE(iw_len > 0);
     SC_ASSERT_TRUE(strstr(iw_ctx, "Inner World") != NULL);
@@ -2866,11 +2880,14 @@ static void test_e2e_mindy_message_full_pipeline(void) {
 
     /* Step 5: Attach example bank (simulating auto-load from disk) */
     sc_persona_example_t examples[] = {
-        {.context = "Quick check-in greeting", .incoming = "Hey! How's it going?",
+        {.context = "Quick check-in greeting",
+         .incoming = "Hey! How's it going?",
          .response = "Hey there"},
-        {.context = "Teasing sibling banter", .incoming = "You're so annoying",
+        {.context = "Teasing sibling banter",
+         .incoming = "You're so annoying",
          .response = "That's my job as your little brother"},
-        {.context = "Sharing a win", .incoming = "How'd the trip go?",
+        {.context = "Sharing a win",
+         .incoming = "How'd the trip go?",
          .response = "I won 1300! Trip paid for again"},
     };
     sc_persona_example_bank_t bank = {
@@ -2931,8 +2948,8 @@ static void test_e2e_mindy_message_full_pipeline(void) {
 
     /* Example conversations from bank */
     SC_ASSERT_TRUE(strstr(prompt, "Example conversations") != NULL);
-    SC_ASSERT_TRUE(strstr(prompt, "Hey there") != NULL || strstr(prompt, "little brother") != NULL ||
-                   strstr(prompt, "1300") != NULL);
+    SC_ASSERT_TRUE(strstr(prompt, "Hey there") != NULL ||
+                   strstr(prompt, "little brother") != NULL || strstr(prompt, "1300") != NULL);
 
     /* Conflict style */
     SC_ASSERT_TRUE(strstr(prompt, "Gets quiet") != NULL);
@@ -3059,6 +3076,7 @@ void run_persona_tests(void) {
     /* Sampler - additional tests */
     SC_RUN_TEST(test_sampler_imessage_query_basic);
     SC_RUN_TEST(test_sampler_imessage_query_null_buf);
+    SC_RUN_TEST(test_sampler_imessage_query_escapes_quotes);
     SC_RUN_TEST(test_sampler_facebook_parse_empty_object);
     SC_RUN_TEST(test_sampler_gmail_parse_null);
     SC_RUN_TEST(test_sampler_gmail_parse_empty_object);

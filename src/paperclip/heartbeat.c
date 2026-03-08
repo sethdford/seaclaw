@@ -1,32 +1,24 @@
-#include "seaclaw/paperclip/client.h"
+#include "seaclaw/bootstrap.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/json.h"
+#include "seaclaw/paperclip/client.h"
 #include <stdio.h>
 #include <string.h>
 
-#ifdef SC_HAS_PERSONA
-#include "seaclaw/agent.h"
-#include "seaclaw/config.h"
-#include "seaclaw/persona.h"
-#include "seaclaw/provider.h"
-#include "seaclaw/tool.h"
-
-__attribute__((unused))
-static size_t build_task_context(char *buf, size_t cap,
-                                  const sc_paperclip_task_t *task,
-                                  const sc_paperclip_comment_list_t *comments,
-                                  const sc_paperclip_client_t *client) {
+static size_t build_task_context(char *buf, size_t cap, const sc_paperclip_task_t *task,
+                                 const sc_paperclip_comment_list_t *comments,
+                                 const sc_paperclip_client_t *client) {
     size_t pos = 0;
     int w;
 
-#define CTX_APPEND(...)                                                                            \
-    do {                                                                                           \
-        if (pos < cap) {                                                                           \
-            w = snprintf(buf + pos, cap - pos, __VA_ARGS__);                                       \
-            if (w > 0 && pos + (size_t)w < cap)                                                    \
-                pos += (size_t)w;                                                                  \
-        }                                                                                          \
+#define CTX_APPEND(...)                                      \
+    do {                                                     \
+        if (pos < cap) {                                     \
+            w = snprintf(buf + pos, cap - pos, __VA_ARGS__); \
+            if (w > 0 && pos + (size_t)w < cap)              \
+                pos += (size_t)w;                            \
+        }                                                    \
     } while (0)
 
     CTX_APPEND("PAPERCLIP TASK CONTEXT:\n");
@@ -47,10 +39,8 @@ static size_t build_task_context(char *buf, size_t cap,
         size_t start = comments->count > 5 ? comments->count - 5 : 0;
         for (size_t i = start; i < comments->count; i++) {
             const sc_paperclip_comment_t *c = &comments->comments[i];
-            CTX_APPEND("  [%s] %s: %s\n",
-                       c->created_at ? c->created_at : "?",
-                       c->author_name ? c->author_name : "unknown",
-                       c->body ? c->body : "");
+            CTX_APPEND("  [%s] %s: %s\n", c->created_at ? c->created_at : "?",
+                       c->author_name ? c->author_name : "unknown", c->body ? c->body : "");
         }
     }
 
@@ -64,7 +54,6 @@ static size_t build_task_context(char *buf, size_t cap,
 #undef CTX_APPEND
     return pos;
 }
-#endif /* SC_HAS_PERSONA */
 
 sc_error_t sc_paperclip_heartbeat(sc_allocator_t *alloc, int argc, char **argv) {
     (void)argc;
@@ -78,8 +67,8 @@ sc_error_t sc_paperclip_heartbeat(sc_allocator_t *alloc, int argc, char **argv) 
         return err;
     }
 
-    fprintf(stderr, "[paperclip] Heartbeat: agent=%s wake=%s\n",
-            client.agent_id, client.wake_reason ? client.wake_reason : "timer");
+    fprintf(stderr, "[paperclip] Heartbeat: agent=%s wake=%s\n", client.agent_id,
+            client.wake_reason ? client.wake_reason : "timer");
 
     const char *target_task_id = client.task_id;
     sc_paperclip_task_t task = {0};
@@ -110,8 +99,8 @@ sc_error_t sc_paperclip_heartbeat(sc_allocator_t *alloc, int argc, char **argv) 
         memset(&task_list.tasks[0], 0, sizeof(sc_paperclip_task_t));
     }
 
-    fprintf(stderr, "[paperclip] Working on: %s — %s\n",
-            target_task_id, task.title ? task.title : "(untitled)");
+    fprintf(stderr, "[paperclip] Working on: %s — %s\n", target_task_id,
+            task.title ? task.title : "(untitled)");
 
     err = sc_paperclip_checkout_task(&client, target_task_id);
     if (err == SC_ERR_ALREADY_EXISTS) {
@@ -132,10 +121,58 @@ sc_error_t sc_paperclip_heartbeat(sc_allocator_t *alloc, int argc, char **argv) 
     sc_paperclip_comment_list_t comments = {0};
     sc_paperclip_get_comments(&client, target_task_id, &comments);
 
-    /* TODO: re-wire when agent bootstrap API is stabilized */
-    (void)comments;
-    (void)err;
-    fprintf(stderr, "[paperclip] agent integration pending API update\n");
+    char context[4096];
+    size_t ctx_len = build_task_context(context, sizeof(context), &task, &comments, &client);
+
+    fprintf(stderr, "[paperclip] Context built (%zu chars). Bootstrapping agent...\n", ctx_len);
+
+    sc_app_ctx_t app = {0};
+    err = sc_app_bootstrap(&app, alloc, NULL, true, false);
+    if (err != SC_OK || !app.agent_ok) {
+        fprintf(stderr, "[paperclip] Agent bootstrap failed: %d (agent_ok=%d)\n", (int)err,
+                app.agent_ok);
+        if (app.agent_ok)
+            sc_app_teardown(&app);
+        sc_paperclip_comment_list_free(alloc, &comments);
+        sc_paperclip_task_free(alloc, &task);
+        sc_paperclip_task_list_free(alloc, &task_list);
+        sc_paperclip_client_deinit(&client);
+        return err != SC_OK ? err : SC_ERR_NOT_SUPPORTED;
+    }
+
+    app.agent->conversation_context = context;
+    app.agent->conversation_context_len = ctx_len;
+
+    char *response = NULL;
+    size_t response_len = 0;
+    fprintf(stderr, "[paperclip] Running agent turn...\n");
+    err = sc_agent_turn(app.agent, context, ctx_len, &response, &response_len);
+
+    if (err == SC_OK && response && response_len > 0) {
+        fprintf(stderr, "[paperclip] Agent responded (%zu chars). Posting comment...\n",
+                response_len);
+        sc_paperclip_post_comment(&client, target_task_id, response, response_len);
+
+        bool mark_done = true;
+        if (strstr(response, "BLOCKED") || strstr(response, "blocked"))
+            mark_done = false;
+        if (strstr(response, "IN_PROGRESS") || strstr(response, "in progress"))
+            mark_done = false;
+
+        const char *new_status = mark_done ? "done" : "in_progress";
+        sc_paperclip_update_task(&client, target_task_id, new_status);
+        fprintf(stderr, "[paperclip] Task updated to '%s'\n", new_status);
+    } else {
+        fprintf(stderr, "[paperclip] Agent turn failed: %d\n", (int)err);
+        sc_paperclip_post_comment(&client, target_task_id,
+                                  "Agent encountered an error processing this task.",
+                                  strlen("Agent encountered an error processing this task."));
+    }
+
+    if (response)
+        alloc->free(alloc->ctx, response, response_len + 1);
+
+    sc_app_teardown(&app);
 
     sc_paperclip_comment_list_free(alloc, &comments);
     sc_paperclip_task_free(alloc, &task);
