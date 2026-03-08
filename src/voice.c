@@ -41,6 +41,9 @@ sc_error_t sc_voice_stt_file(sc_allocator_t *alloc, const sc_voice_config_t *con
     *out_text = NULL;
     *out_len = 0;
 
+    if (!file_path || file_path[0] == '\0')
+        return SC_ERR_INVALID_ARGUMENT;
+
     if (!config->api_key || config->api_key_len == 0)
         return SC_ERR_PROVIDER_AUTH;
 

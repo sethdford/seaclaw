@@ -414,6 +414,142 @@ static void test_inbox_rejects_dotdot(void) {
     mem.vtable->deinit(mem.ctx);
 }
 
+#ifdef SC_ENABLE_SQLITE
+static void test_consolidation_dedup(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
+
+    mem.vtable->store(mem.ctx, "a", 1, "the quick brown fox jumps over the lazy dog", 44, NULL,
+                      NULL, 0);
+    mem.vtable->store(mem.ctx, "b", 1, "the quick brown fox jumps over the lazy dog", 44, NULL,
+                      NULL, 0);
+    mem.vtable->store(mem.ctx, "c", 1, "something completely different and unique", 40, NULL, NULL,
+                      0);
+
+    size_t before = 0;
+    mem.vtable->count(mem.ctx, &before);
+    SC_ASSERT_EQ(before, 3);
+
+    sc_consolidation_config_t config = SC_CONSOLIDATION_DEFAULTS;
+    config.decay_days = 0;
+    config.dedup_threshold = 80;
+    sc_error_t err = sc_memory_consolidate(&alloc, &mem, &config);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    size_t after = 0;
+    mem.vtable->count(mem.ctx, &after);
+    SC_ASSERT_TRUE(after < before);
+    SC_ASSERT_TRUE(after >= 2);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_consolidation_max_entries(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
+
+    for (int i = 0; i < 10; i++) {
+        char key[16];
+        char content[64];
+        snprintf(key, sizeof(key), "k%d", i);
+        snprintf(content, sizeof(content), "unique content number %d for testing", i);
+        mem.vtable->store(mem.ctx, key, strlen(key), content, strlen(content), NULL, NULL, 0);
+    }
+
+    sc_consolidation_config_t config = SC_CONSOLIDATION_DEFAULTS;
+    config.decay_days = 0;
+    config.max_entries = 5;
+    sc_error_t err = sc_memory_consolidate(&alloc, &mem, &config);
+    SC_ASSERT_EQ(err, SC_OK);
+
+    size_t after = 0;
+    mem.vtable->count(mem.ctx, &after);
+    SC_ASSERT_TRUE(after <= 5);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_connection_pipeline_end_to_end(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
+
+    sc_memory_entry_t entries[3];
+    memset(entries, 0, sizeof(entries));
+    entries[0].key = "project-deadline";
+    entries[0].key_len = 16;
+    entries[0].content = "Main project deadline is end of March";
+    entries[0].content_len = 37;
+    entries[1].key = "meeting-notes";
+    entries[1].key_len = 13;
+    entries[1].content = "Team wants to ship before March deadline";
+    entries[1].content_len = 40;
+    entries[2].key = "user-preference";
+    entries[2].key_len = 15;
+    entries[2].content = "User prefers dark mode for late-night work";
+    entries[2].content_len = 43;
+
+    char *prompt = NULL;
+    size_t prompt_len = 0;
+    sc_error_t err = sc_connections_build_prompt(&alloc, entries, 3, &prompt, &prompt_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(prompt);
+    SC_ASSERT_TRUE(strstr(prompt, "Memory 0") != NULL);
+    SC_ASSERT_TRUE(strstr(prompt, "Memory 2") != NULL);
+    alloc.free(alloc.ctx, prompt, SC_CONN_PROMPT_CAP);
+
+    const char *mock_response =
+        "{\"connections\":[{\"a\":0,\"b\":1,\"relationship\":\"both about March deadline\","
+        "\"strength\":0.9}],\"insights\":[{\"text\":\"Project deadline and team shipping "
+        "goal are tightly coupled\",\"related\":[0,1]}]}";
+    sc_connection_result_t result;
+    err = sc_connections_parse(&alloc, mock_response, strlen(mock_response), 3, &result);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(result.connection_count, 1);
+    SC_ASSERT_EQ(result.insight_count, 1);
+
+    err = sc_connections_store_insights(&alloc, &mem, &result, entries, 3);
+    SC_ASSERT_EQ(err, SC_OK);
+    sc_connection_result_deinit(&result, &alloc);
+
+    size_t count = 0;
+    mem.vtable->count(mem.ctx, &count);
+    SC_ASSERT_TRUE(count >= 1);
+
+    sc_memory_entry_t *listed = NULL;
+    size_t listed_count = 0;
+    sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_INSIGHT};
+    err = mem.vtable->list(mem.ctx, &alloc, &cat, NULL, 0, &listed, &listed_count);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(listed_count, 1);
+    SC_ASSERT_TRUE(strstr(listed[0].content, "tightly coupled") != NULL);
+    SC_ASSERT_NOT_NULL(listed[0].source);
+    SC_ASSERT_TRUE(memcmp(listed[0].source, "connection_discovery", 20) == 0);
+
+    for (size_t i = 0; i < listed_count; i++)
+        sc_memory_entry_free_fields(&alloc, &listed[i]);
+    alloc.free(alloc.ctx, listed, listed_count * sizeof(sc_memory_entry_t));
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_ingest_file_with_provider_unknown_type(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_memory_t mem = sc_sqlite_memory_create(&alloc, ":memory:");
+    sc_error_t err =
+        sc_ingest_file_with_provider(&alloc, &mem, NULL, "data.xyz", 8, NULL, 0);
+    SC_ASSERT_EQ(err, SC_ERR_NOT_SUPPORTED);
+    mem.vtable->deinit(mem.ctx);
+}
+#endif
+
+static void test_similarity_score_basics(void) {
+    SC_ASSERT_EQ(sc_similarity_score(NULL, 0, NULL, 0), 0);
+    SC_ASSERT_EQ(sc_similarity_score("", 0, "", 0), 100);
+    SC_ASSERT_EQ(sc_similarity_score("hello world", 11, "hello world", 11), 100);
+    uint32_t partial = sc_similarity_score("hello world", 11, "hello there", 11);
+    SC_ASSERT_TRUE(partial > 0 && partial < 100);
+    SC_ASSERT_EQ(sc_similarity_score("abc", 3, "xyz", 3), 0);
+}
+
 /* ── Test runner ─────────────────────────────────────────────────────── */
 
 void run_memory_features_tests(void) {
@@ -465,4 +601,13 @@ void run_memory_features_tests(void) {
     SC_RUN_TEST(test_consolidation_iso_decay);
 #endif
     SC_RUN_TEST(test_inbox_rejects_dotdot);
+
+    SC_TEST_SUITE("memory_features — integration hardening");
+#ifdef SC_ENABLE_SQLITE
+    SC_RUN_TEST(test_consolidation_dedup);
+    SC_RUN_TEST(test_consolidation_max_entries);
+    SC_RUN_TEST(test_connection_pipeline_end_to_end);
+    SC_RUN_TEST(test_ingest_file_with_provider_unknown_type);
+#endif
+    SC_RUN_TEST(test_similarity_score_basics);
 }

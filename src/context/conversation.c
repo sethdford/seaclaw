@@ -1969,8 +1969,9 @@ sc_response_action_t sc_conversation_classify_response(const char *msg, size_t m
 
     /* Greetings: always respond even if short */
     if (ni >= 2 &&
-        (memcmp(norm, "hi", 2) == 0 || memcmp(norm, "hey", 3) == 0 || memcmp(norm, "yo", 2) == 0 ||
-         memcmp(norm, "sup", 3) == 0 || (ni >= 5 && memcmp(norm, "hello", 5) == 0) ||
+        (memcmp(norm, "hi", 2) == 0 || (ni >= 3 && memcmp(norm, "hey", 3) == 0) ||
+         memcmp(norm, "yo", 2) == 0 || (ni >= 3 && memcmp(norm, "sup", 3) == 0) ||
+         (ni >= 5 && memcmp(norm, "hello", 5) == 0) ||
          (ni >= 5 && memcmp(norm, "howdy", 5) == 0))) {
         *delay_extra_ms = 2000;
         return SC_RESPONSE_BRIEF;
@@ -2000,22 +2001,105 @@ sc_response_action_t sc_conversation_classify_response(const char *msg, size_t m
         return SC_RESPONSE_SKIP;
     }
 
-    /* Farewells: short response, quick delay (before generic brief) */
-    if (str_contains_ci(msg, msg_len, "goodnight") || str_contains_ci(msg, msg_len, "good night") ||
-        str_contains_ci(msg, msg_len, "gotta go") || str_contains_ci(msg, msg_len, "ttyl") ||
-        str_contains_ci(msg, msg_len, "heading out") ||
-        str_contains_ci(msg, msg_len, "peace out") || str_contains_ci(msg, msg_len, "see ya") ||
-        str_contains_ci(msg, msg_len, "catch you later") ||
-        str_contains_ci(msg, msg_len, "i'm out")) {
-        *delay_extra_ms = 1500;
-        return SC_RESPONSE_BRIEF;
-    }
-    if (msg_len <= 10 &&
-        (str_contains_ci(msg, msg_len, "bye") || str_contains_ci(msg, msg_len, "night") ||
-         str_contains_ci(msg, msg_len, "later") || str_contains_ci(msg, msg_len, "gn") ||
-         str_contains_ci(msg, msg_len, "cya"))) {
-        *delay_extra_ms = 1500;
-        return SC_RESPONSE_BRIEF;
+    /* ── Keep Silent: conversation fade-out detection ────────────────── */
+
+    /* Mutual farewell = SKIP: if our last message was a farewell and they
+     * reply with another farewell, don't have the last word */
+    if (entries && entry_count > 0) {
+        bool incoming_is_farewell =
+            str_contains_ci(msg, msg_len, "goodnight") ||
+            str_contains_ci(msg, msg_len, "good night") ||
+            str_contains_ci(msg, msg_len, "gotta go") || str_contains_ci(msg, msg_len, "ttyl") ||
+            str_contains_ci(msg, msg_len, "heading out") ||
+            str_contains_ci(msg, msg_len, "peace out") ||
+            str_contains_ci(msg, msg_len, "see ya") ||
+            str_contains_ci(msg, msg_len, "catch you later") ||
+            str_contains_ci(msg, msg_len, "i'm out") ||
+            (msg_len <= 10 && (str_contains_ci(msg, msg_len, "bye") ||
+                               str_contains_ci(msg, msg_len, "night") ||
+                               str_contains_ci(msg, msg_len, "later") ||
+                               str_contains_ci(msg, msg_len, "gn") ||
+                               str_contains_ci(msg, msg_len, "cya")));
+
+        if (incoming_is_farewell) {
+            /* Check if our last message was also a farewell */
+            for (size_t i = entry_count; i > 0; i--) {
+                if (entries[i - 1].from_me) {
+                    const char *t = entries[i - 1].text;
+                    size_t tl = strlen(t);
+                    bool our_was_farewell =
+                        str_contains_ci(t, tl, "night") || str_contains_ci(t, tl, "bye") ||
+                        str_contains_ci(t, tl, "later") || str_contains_ci(t, tl, "ttyl") ||
+                        str_contains_ci(t, tl, "see ya") || str_contains_ci(t, tl, "cya") ||
+                        str_contains_ci(t, tl, "gn") || str_contains_ci(t, tl, "peace") ||
+                        str_contains_ci(t, tl, "take care");
+                    if (our_was_farewell)
+                        return SC_RESPONSE_SKIP;
+                    break;
+                }
+            }
+            /* Not mutual — respond briefly */
+            *delay_extra_ms = 1500;
+            return SC_RESPONSE_BRIEF;
+        }
+
+        /* Trailing off = SKIP: if last 2-3 exchanges are all brief acks,
+         * the conversation is fading — don't prolong it */
+        if (entry_count >= 3 && msg_len < 15 && word_count <= 2 && !has_question) {
+            size_t brief_streak = 0;
+            for (size_t i = entry_count; i > 0 && brief_streak < 4; i--) {
+                const char *t = entries[i - 1].text;
+                size_t tl = strlen(t);
+                size_t twc = count_words(t, tl);
+                if (tl < 15 && twc <= 2)
+                    brief_streak++;
+                else
+                    break;
+            }
+            if (brief_streak >= 2)
+                return SC_RESPONSE_SKIP;
+        }
+
+        /* Last-word avoidance: if our last message was a statement (not a question)
+         * and they reply with a minimal acknowledgment, don't pile on */
+        if (msg_len < 15 && word_count <= 2 && !has_question) {
+            for (size_t i = entry_count; i > 0; i--) {
+                if (entries[i - 1].from_me) {
+                    const char *t = entries[i - 1].text;
+                    size_t tl = strlen(t);
+                    bool our_was_question = false;
+                    for (size_t j = 0; j < tl; j++) {
+                        if (t[j] == '?') {
+                            our_was_question = true;
+                            break;
+                        }
+                    }
+                    if (!our_was_question)
+                        return SC_RESPONSE_SKIP;
+                    break;
+                }
+            }
+        }
+    } else {
+        /* No history — use original farewell logic */
+        if (str_contains_ci(msg, msg_len, "goodnight") ||
+            str_contains_ci(msg, msg_len, "good night") ||
+            str_contains_ci(msg, msg_len, "gotta go") || str_contains_ci(msg, msg_len, "ttyl") ||
+            str_contains_ci(msg, msg_len, "heading out") ||
+            str_contains_ci(msg, msg_len, "peace out") ||
+            str_contains_ci(msg, msg_len, "see ya") ||
+            str_contains_ci(msg, msg_len, "catch you later") ||
+            str_contains_ci(msg, msg_len, "i'm out")) {
+            *delay_extra_ms = 1500;
+            return SC_RESPONSE_BRIEF;
+        }
+        if (msg_len <= 10 &&
+            (str_contains_ci(msg, msg_len, "bye") || str_contains_ci(msg, msg_len, "night") ||
+             str_contains_ci(msg, msg_len, "later") || str_contains_ci(msg, msg_len, "gn") ||
+             str_contains_ci(msg, msg_len, "cya"))) {
+            *delay_extra_ms = 1500;
+            return SC_RESPONSE_BRIEF;
+        }
     }
 
     /* Brief: short acknowledgment by properties (length, word count, no question) */

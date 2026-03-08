@@ -3478,8 +3478,10 @@ sc_error_t sc_daemon_uninstall(void) {
 
     char cmd[SC_MAX_PATH * 2];
     n = snprintf(cmd, sizeof(cmd), "launchctl unload \"%s\"", plist);
-    if (n > 0 && (size_t)n < sizeof(cmd))
-        SC_IGNORE_RESULT(system(cmd));
+    if (n > 0 && (size_t)n < sizeof(cmd)) {
+        if (system(cmd) != 0)
+            fprintf(stderr, "[daemon] launchctl unload failed (best-effort)\n");
+    }
 
     remove(plist);
     return SC_OK;
@@ -3518,11 +3520,16 @@ sc_error_t sc_daemon_install(sc_allocator_t *alloc) {
     if (n <= 0 || (size_t)n >= sizeof(dir))
         return SC_ERR_IO;
 
-    char mkdir_cmd[SC_MAX_PATH + 16];
-    n = snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p \"%s\"", dir);
-    if (n <= 0 || (size_t)n >= sizeof(mkdir_cmd))
-        return SC_ERR_IO;
-    SC_IGNORE_RESULT(system(mkdir_cmd));
+    if (mkdir(dir, 0755) != 0 && errno != EEXIST) {
+        char parent[SC_MAX_PATH];
+        snprintf(parent, sizeof(parent), "%s/.config", home);
+        (void)mkdir(parent, 0755);
+        snprintf(parent, sizeof(parent), "%s/.config/systemd", home);
+        (void)mkdir(parent, 0755);
+        snprintf(parent, sizeof(parent), "%s/.config/systemd/user", home);
+        if (mkdir(parent, 0755) != 0 && errno != EEXIST)
+            return SC_ERR_IO;
+    }
 
     char bin[SC_MAX_PATH];
     int found = 0;
@@ -3567,7 +3574,8 @@ sc_error_t sc_daemon_install(sc_allocator_t *alloc) {
             bin, home);
     fclose(f);
 
-    SC_IGNORE_RESULT(system("systemctl --user daemon-reload"));
+    if (system("systemctl --user daemon-reload") != 0)
+        fprintf(stderr, "[daemon] systemctl daemon-reload failed\n");
     if (system("systemctl --user enable --now " SC_SYSTEMD_UNIT) != 0)
         return SC_ERR_IO;
 
@@ -3575,7 +3583,8 @@ sc_error_t sc_daemon_install(sc_allocator_t *alloc) {
 }
 
 sc_error_t sc_daemon_uninstall(void) {
-    SC_IGNORE_RESULT(system("systemctl --user disable --now " SC_SYSTEMD_UNIT));
+    if (system("systemctl --user disable --now " SC_SYSTEMD_UNIT) != 0)
+        fprintf(stderr, "[daemon] systemctl disable failed (best-effort)\n");
 
     const char *home = getenv("HOME");
     if (!home)
@@ -3587,7 +3596,8 @@ sc_error_t sc_daemon_uninstall(void) {
     if (n > 0 && (size_t)n < sizeof(unit_path))
         remove(unit_path);
 
-    SC_IGNORE_RESULT(system("systemctl --user daemon-reload"));
+    if (system("systemctl --user daemon-reload") != 0)
+        fprintf(stderr, "[daemon] systemctl daemon-reload failed (best-effort)\n");
     return SC_OK;
 }
 
