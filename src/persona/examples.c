@@ -28,6 +28,8 @@ sc_error_t sc_persona_examples_load_json(sc_allocator_t *alloc, const char *chan
 
     sc_json_value_t *arr = sc_json_object_get(root, "examples");
     if (!arr || arr->type != SC_JSON_ARRAY || !arr->data.array.items) {
+        alloc->free(alloc->ctx, out->channel, channel_len + 1);
+        out->channel = NULL;
         sc_json_free(alloc, root);
         return SC_OK;
     }
