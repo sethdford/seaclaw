@@ -83,12 +83,11 @@ static void test_gmail_create_null_out(void) {
     SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
 }
 
-static void test_gmail_send_not_supported(void) {
+static void test_gmail_send_is_null(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_channel_t ch;
     sc_gmail_create(&alloc, "client_id", 6, "client_secret", 13, "refresh_token", 13, 60, &ch);
-    sc_error_t err = ch.vtable->send(ch.ctx, "target", 6, "message", 7, NULL, 0);
-    SC_ASSERT_EQ(err, SC_ERR_NOT_SUPPORTED);
+    SC_ASSERT_NULL(ch.vtable->send);
     sc_gmail_destroy(&ch);
 }
 
@@ -146,7 +145,7 @@ void run_gmail_tests(void) {
     SC_RUN_TEST(test_gmail_create_destroy);
     SC_RUN_TEST(test_gmail_create_null_alloc);
     SC_RUN_TEST(test_gmail_create_null_out);
-    SC_RUN_TEST(test_gmail_send_not_supported);
+    SC_RUN_TEST(test_gmail_send_is_null);
     SC_RUN_TEST(test_gmail_health_check_no_token);
     SC_RUN_TEST(test_gmail_poll_test_mode);
     SC_RUN_TEST(test_gmail_start_stop);

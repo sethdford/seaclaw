@@ -74,6 +74,7 @@
 #ifdef SC_HAS_PERSONA
 #include "seaclaw/tools/persona.h"
 #endif
+#include "seaclaw/tools/paperclip.h"
 #include "seaclaw/tools/schema.h"
 #include "seaclaw/tools/send_message.h"
 #include "seaclaw/tools/shell.h"
@@ -112,8 +113,10 @@
 #else
 #define SC_TOOLS_HW_COUNT 0
 #endif
-#define SC_TOOLS_COUNT \
-    (SC_TOOLS_COUNT_BASE + SC_TOOLS_BROWSER_COUNT + SC_TOOLS_ADVANCED_COUNT + SC_TOOLS_HW_COUNT)
+#define SC_TOOLS_PAPERCLIP_COUNT 1
+#define SC_TOOLS_COUNT                                                                             \
+    (SC_TOOLS_COUNT_BASE + SC_TOOLS_BROWSER_COUNT + SC_TOOLS_ADVANCED_COUNT + SC_TOOLS_HW_COUNT +  \
+     SC_TOOLS_PAPERCLIP_COUNT)
 
 static sc_error_t add_tool_ws(sc_allocator_t *alloc, sc_tool_t *tools, size_t *idx, const char *ws,
                               size_t ws_len, sc_security_policy_t *policy,
@@ -473,6 +476,11 @@ sc_error_t sc_tools_create_default(sc_allocator_t *alloc, const char *workspace_
     idx++;
 
     err = sc_workflow_create(alloc, &tools[idx]);
+    if (err != SC_OK)
+        goto fail;
+    idx++;
+
+    err = sc_paperclip_tool_create(alloc, &tools[idx]);
     if (err != SC_OK)
         goto fail;
     idx++;

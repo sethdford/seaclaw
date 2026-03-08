@@ -267,28 +267,22 @@ static void gmail_stop(void *ctx) {
         c->running = false;
 }
 
+#if SC_IS_TEST
 static sc_error_t gmail_send(void *ctx, const char *target, size_t target_len, const char *message,
                              size_t message_len, const char *const *media, size_t media_count) {
     (void)target;
     (void)target_len;
     (void)media;
     (void)media_count;
-#if SC_IS_TEST
-    {
-        sc_gmail_ctx_t *c = (sc_gmail_ctx_t *)ctx;
-        size_t len = message_len > 4095 ? 4095 : message_len;
-        if (message && len > 0)
-            memcpy(c->last_message, message, len);
-        c->last_message[len] = '\0';
-        c->last_message_len = len;
-    }
-#else
-    (void)ctx;
-    (void)message;
-    (void)message_len;
-#endif
-    return SC_ERR_NOT_SUPPORTED; /* read-only channel */
+    sc_gmail_ctx_t *c = (sc_gmail_ctx_t *)ctx;
+    size_t len = message_len > 4095 ? 4095 : message_len;
+    if (message && len > 0)
+        memcpy(c->last_message, message, len);
+    c->last_message[len] = '\0';
+    c->last_message_len = len;
+    return SC_ERR_NOT_SUPPORTED;
 }
+#endif
 
 static const char *gmail_name(void *ctx) {
     (void)ctx;
@@ -473,7 +467,7 @@ static sc_error_t gmail_load_conversation_history(void *ctx, sc_allocator_t *all
 static const sc_channel_vtable_t gmail_vtable = {
     .start = gmail_start,
     .stop = gmail_stop,
-    .send = gmail_send,
+    .send = NULL, /* read-only: daemon skips agent turn when send is NULL */
     .name = gmail_name,
     .health_check = gmail_health_check,
     .send_event = NULL,

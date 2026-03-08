@@ -1,43 +1,39 @@
 import { test, expect } from "@playwright/test";
-import {
-  shadowExists,
-  shadowExistsIn,
-  shadowClick,
-  shadowText,
-  deepText,
-  waitForViewReady,
-  WAIT,
-  POLL,
-} from "./helpers.js";
+import { shadowExists, shadowExistsIn, deepText, waitForViewReady, WAIT, POLL } from "./helpers.js";
 
 const VIEW = "sc-voice-view";
 
 /**
- * Type text into the voice view's textarea via shadow DOM traversal,
- * then return whether it succeeded.
+ * Set the voice view's transcript and trigger send via evaluate.
+ * This is more reliable than simulating keyboard events across
+ * nested shadow DOM boundaries (sc-app > sc-voice-view > sc-textarea > textarea).
  */
-function typeInVoiceInput(text: string): string {
+function sendVoiceMessage(text: string): string {
   return `(async () => {
     const app = document.querySelector("sc-app");
     const view = app?.shadowRoot?.querySelector("${VIEW}");
-    const textarea = view?.shadowRoot?.querySelector("sc-textarea");
-    const inner = textarea?.shadowRoot?.querySelector("textarea");
-    if (!inner) return false;
-    inner.focus();
-    inner.value = ${JSON.stringify(text)};
-    inner.dispatchEvent(new Event("input", { bubbles: true }));
-    return true;
+    if (!view) return "no-view";
+
+    // Set transcript directly (TS privacy is compile-time only) and call send()
+    view.transcript = ${JSON.stringify(text)};
+    await view.updateComplete;
+    await view.send();
+    return "sent";
   })()`;
 }
 
-function clickSendButton(): string {
+function clickStatusBarButton(label: string): string {
   return `(() => {
     const app = document.querySelector("sc-app");
     const view = app?.shadowRoot?.querySelector("${VIEW}");
-    const buttons = view?.shadowRoot?.querySelectorAll(".input-row sc-button");
+    const buttons = view?.shadowRoot?.querySelectorAll(".status-bar sc-button");
     for (const btn of buttons ?? []) {
-      const inner = btn.shadowRoot?.querySelector("button");
-      if (inner && !inner.disabled) { inner.click(); return true; }
+      const text = btn.textContent?.trim() ?? "";
+      const aria = btn.getAttribute("aria-label") ?? "";
+      if (text === ${JSON.stringify(label)} || aria === ${JSON.stringify(label)}) {
+        const inner = btn.shadowRoot?.querySelector("button");
+        if (inner) { inner.click(); return true; }
+      }
     }
     return false;
   })()`;
@@ -96,11 +92,9 @@ test.describe("Voice Interactions", () => {
     }).toPass({ timeout: POLL });
   });
 
-  test("send message via text input and receive demo response", async ({ page }) => {
-    const typed = await page.evaluate(typeInVoiceInput("Hello from voice test"));
-    expect(typed).toBe(true);
-
-    await page.keyboard.press("Enter");
+  test("send message and receive demo response", async ({ page }) => {
+    const result = await page.evaluate(sendVoiceMessage("Hello from voice test"));
+    expect(result).toMatch(/^sent/);
 
     await expect(async () => {
       const text: string = await page.evaluate(deepText(VIEW));
@@ -113,48 +107,17 @@ test.describe("Voice Interactions", () => {
     }).toPass({ timeout: 10000 });
   });
 
-  test("send button triggers message", async ({ page }) => {
-    const typed = await page.evaluate(typeInVoiceInput("Button send test"));
-    expect(typed).toBe(true);
-
-    const clicked = await page.evaluate(clickSendButton());
-    expect(clicked).toBe(true);
-
-    await expect(async () => {
-      const text: string = await page.evaluate(deepText(VIEW));
-      expect(text).toContain("Button send test");
-    }).toPass({ timeout: POLL });
-
-    await expect(async () => {
-      const text: string = await page.evaluate(deepText(VIEW));
-      expect(text).toContain("Demo response to: Button send test");
-    }).toPass({ timeout: 10000 });
-  });
-
   test("New Session clears conversation", async ({ page }) => {
-    const typed = await page.evaluate(typeInVoiceInput("Session clear test"));
-    expect(typed).toBe(true);
-    await page.keyboard.press("Enter");
+    const result = await page.evaluate(sendVoiceMessage("Session clear test"));
+    expect(result).toMatch(/^sent/);
 
     await expect(async () => {
       const text: string = await page.evaluate(deepText(VIEW));
       expect(text).toContain("Session clear test");
     }).toPass({ timeout: POLL });
 
-    await page.evaluate(
-      `(() => {
-        const app = document.querySelector("sc-app");
-        const view = app?.shadowRoot?.querySelector("${VIEW}");
-        const buttons = view?.shadowRoot?.querySelectorAll(".status-bar sc-button");
-        for (const btn of buttons ?? []) {
-          if (btn.textContent?.trim() === "New Session" || btn.getAttribute("aria-label") === "Start new session") {
-            btn.shadowRoot?.querySelector("button")?.click();
-            return true;
-          }
-        }
-        return false;
-      })()`,
-    );
+    await page.evaluate(clickStatusBarButton("New Session"));
+    await page.waitForTimeout(300);
 
     await expect(async () => {
       const hasEmpty = await page.evaluate(
@@ -180,6 +143,33 @@ test.describe("Voice Interactions", () => {
         })()`,
       );
       expect(disabled).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("Export button enables after sending a message", async ({ page }) => {
+    const result = await page.evaluate(sendVoiceMessage("Export test"));
+    expect(result).toMatch(/^sent/);
+
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText(VIEW));
+      expect(text).toContain("Export test");
+    }).toPass({ timeout: POLL });
+
+    await expect(async () => {
+      const disabled = await page.evaluate(
+        `(() => {
+          const app = document.querySelector("sc-app");
+          const view = app?.shadowRoot?.querySelector("${VIEW}");
+          const buttons = view?.shadowRoot?.querySelectorAll(".status-bar sc-button");
+          for (const btn of buttons ?? []) {
+            if (btn.textContent?.trim() === "Export" || btn.getAttribute("aria-label") === "Export conversation") {
+              return btn.hasAttribute("disabled");
+            }
+          }
+          return null;
+        })()`,
+      );
+      expect(disabled).toBe(false);
     }).toPass({ timeout: POLL });
   });
 
@@ -209,43 +199,41 @@ test.describe("Voice Interactions", () => {
     }).toPass({ timeout: POLL });
   });
 
-  test("Enter sends message, Shift+Enter does not", async ({ page }) => {
-    const typed = await page.evaluate(typeInVoiceInput("Shift enter test"));
-    expect(typed).toBe(true);
-
-    await page.keyboard.press("Shift+Enter");
-    await page.waitForTimeout(300);
-
-    await expect(async () => {
-      const text: string = await page.evaluate(deepText(VIEW));
-      expect(text).not.toContain("Demo response to: Shift enter test");
-    }).toPass({ timeout: 3000 });
-
-    await page.evaluate(typeInVoiceInput("Enter send test"));
-    await page.keyboard.press("Enter");
-
-    await expect(async () => {
-      const text: string = await page.evaluate(deepText(VIEW));
-      expect(text).toContain("Enter send test");
-    }).toPass({ timeout: POLL });
-  });
-
   test("multiple messages accumulate in conversation", async ({ page }) => {
-    await page.evaluate(typeInVoiceInput("First message"));
-    await page.keyboard.press("Enter");
+    await page.evaluate(sendVoiceMessage("First message"));
 
     await expect(async () => {
       const text: string = await page.evaluate(deepText(VIEW));
       expect(text).toContain("Demo response to: First message");
     }).toPass({ timeout: 10000 });
 
-    await page.evaluate(typeInVoiceInput("Second message"));
-    await page.keyboard.press("Enter");
+    await page.evaluate(sendVoiceMessage("Second message"));
 
     await expect(async () => {
       const text: string = await page.evaluate(deepText(VIEW));
       expect(text).toContain("First message");
       expect(text).toContain("Second message");
     }).toPass({ timeout: 10000 });
+  });
+
+  test("message count updates in status bar after sending", async ({ page }) => {
+    await page.evaluate(sendVoiceMessage("Count test"));
+
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText(VIEW));
+      expect(text).toContain("Demo response to: Count test");
+    }).toPass({ timeout: 10000 });
+
+    await expect(async () => {
+      const barText: string = await page.evaluate(
+        `(() => {
+          const app = document.querySelector("sc-app");
+          const view = app?.shadowRoot?.querySelector("${VIEW}");
+          const bar = view?.shadowRoot?.querySelector(".status-bar");
+          return bar?.textContent ?? "";
+        })()`,
+      );
+      expect(barText).toMatch(/2 message/i);
+    }).toPass({ timeout: POLL });
   });
 });

@@ -1158,6 +1158,58 @@ static void test_persona_select_examples_max_zero(void) {
     SC_ASSERT_EQ(sel_count, 0);
 }
 
+/* Extracted iMessage example bank integration test */
+static void test_persona_extracted_imessage_bank_loads_and_selects(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+
+    static const char json[] =
+        "{\"examples\":["
+        "{\"context\":\"Friend suggesting plans\","
+        " \"incoming\":\"Want to grab lunch this week?\","
+        " \"response\":\"Let's do it! Wednesday or Thursday evening is great!\"},"
+        "{\"context\":\"Confirming a plan\","
+        " \"incoming\":\"Does noon work?\","
+        " \"response\":\"Sounds good!\"},"
+        "{\"context\":\"Quick check-in greeting\","
+        " \"incoming\":\"Hey! How's it going?\","
+        " \"response\":\"Hey there\"},"
+        "{\"context\":\"Sharing a win or good news\","
+        " \"incoming\":\"How'd the trip go?\","
+        " \"response\":\"I won 1300! Trip paid for again\"},"
+        "{\"context\":\"Teasing sibling banter\","
+        " \"incoming\":\"You're so annoying\","
+        " \"response\":\"That's my job as your little brother\"}"
+        "]}";
+
+    sc_persona_example_bank_t bank = {0};
+    sc_error_t err =
+        sc_persona_examples_load_json(&alloc, "imessage", 8, json, strlen(json), &bank);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(bank.examples_count, 5);
+    SC_ASSERT_STR_EQ(bank.channel, "imessage");
+    SC_ASSERT_STR_EQ(bank.examples[0].context, "Friend suggesting plans");
+    SC_ASSERT_STR_EQ(bank.examples[4].response, "That's my job as your little brother");
+
+    sc_persona_t p = {.example_banks = &bank, .example_banks_count = 1};
+
+    const sc_persona_example_t *sel[3];
+    size_t sel_count = 0;
+    err = sc_persona_select_examples(&p, "imessage", 8, "lunch plans greeting", 20, sel,
+                                     &sel_count, 3);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(sel_count > 0);
+    SC_ASSERT_TRUE(sel_count <= 3);
+
+    const sc_persona_example_t *sel2[3];
+    size_t sel2_count = 0;
+    err = sc_persona_select_examples(&p, "imessage", 8, "sibling teasing banter", 22, sel2,
+                                     &sel2_count, 3);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_TRUE(sel2_count > 0);
+
+    free_example_bank(&alloc, &bank);
+}
+
 /* sc_persona_find_overlay - edge cases */
 static void test_persona_find_overlay_null_channel(void) {
     sc_persona_t p;
@@ -2683,6 +2735,229 @@ static void test_profile_describe_style_null_args(void) {
     SC_ASSERT_NULL(sc_persona_profile_describe_style(&alloc, NULL, NULL, 0, &out_len));
 }
 
+/* E2E dry run: simulate a Mindy message through the full persona pipeline */
+static void test_e2e_mindy_message_full_pipeline(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+
+    static const char json[] =
+        "{\"version\":1,\"name\":\"seth\","
+        "\"core\":{\"identity\":\"Head of Agentic AI at Vanguard. Introverted engineer.\","
+        "\"traits\":[\"direct\",\"warm\",\"playfully teasing\"],"
+        "\"vocabulary\":{\"preferred\":[\"sounds good\",\"let's do it\"],\"avoided\":[\"synergy\"],"
+        "\"slang\":[\"haha\",\"lol\"]},"
+        "\"communication_rules\":[\"Keep messages short\",\"Tease family members\"],"
+        "\"values\":[\"authenticity\",\"family\"],"
+        "\"decision_style\":\"Decides fast\","
+        "\"biography\":\"Grew up in Star Valley Wyoming, third of seven children.\","
+        "\"directors_notes\":[\"Seth teases Mindy relentlessly but lovingly.\","
+        "\"Never sound like an AI assistant.\"]},"
+        "\"motivation\":{\"primary_drive\":\"Building AI systems\","
+        "\"protecting\":\"His kids and family relationships\","
+        "\"avoiding\":\"Corporate BS\",\"wanting\":\"Something meaningful in AI\"},"
+        "\"humor\":{\"type\":\"playful teasing with nerdy undertones\","
+        "\"frequency\":\"high with family\","
+        "\"targets\":[\"his sister Mindy\",\"himself\"],"
+        "\"boundaries\":[\"never mean-spirited\"],"
+        "\"timing\":\"Teasing IS his love language\"},"
+        "\"conflict_style\":{\"pushback_response\":\"Gets quiet first\","
+        "\"confrontation_comfort\":\"Moderate\","
+        "\"apology_style\":\"Straightforward\","
+        "\"boundary_assertion\":\"Calm and clear\","
+        "\"repair_behavior\":\"Reaches out first\"},"
+        "\"emotional_range\":{\"ceiling\":\"Multiple exclamation marks\","
+        "\"floor\":\"Goes quiet\","
+        "\"escalation_triggers\":[\"someone being fake\"],"
+        "\"de_escalation\":[\"codes something\"],"
+        "\"withdrawal_conditions\":\"Extended social drain\","
+        "\"recovery_style\":\"Comes back naturally\"},"
+        "\"voice_rhythm\":{\"sentence_pattern\":\"Short fragments\","
+        "\"paragraph_cadence\":\"Never writes paragraphs in texts\","
+        "\"response_tempo\":\"Fast when excited\","
+        "\"emphasis_style\":\"Caps for excitement\","
+        "\"pause_behavior\":\"Goes silent when thinking\"},"
+        "\"inner_world\":{\"contradictions\":[\"Introverted but texts family constantly\"],"
+        "\"embodied_memories\":[\"Riding the three-wheeler through the Wasatch mountains\"],"
+        "\"emotional_flashpoints\":[\"His kids\"],"
+        "\"unfinished_business\":[\"Wanting more time with his four kids\"],"
+        "\"secret_self\":[\"The nerdy kid from Star Valley never left\"]},"
+        "\"intellectual\":{\"expertise\":[\"Agentic AI\"],"
+        "\"curiosity_areas\":[\"vibe coding\"],"
+        "\"thinking_style\":\"First-principles\","
+        "\"metaphor_sources\":\"Building and engineering\"},"
+        "\"sensory\":{\"dominant_sense\":\"kinesthetic\","
+        "\"metaphor_vocabulary\":[\"dig into that\",\"feels right\"],"
+        "\"grounding_patterns\":\"Goes outside\"},"
+        "\"situational_directions\":["
+        "{\"trigger\":\"Mindy shares something stressful\","
+        "\"instruction\":\"Lead with a quick tease, then pivot to genuine support.\"},"
+        "{\"trigger\":\"Mindy shares good news\","
+        "\"instruction\":\"Genuine excitement first, then teasing follow-up.\"},"
+        "{\"trigger\":\"Making plans with family\","
+        "\"instruction\":\"Suggest specific times, places, activities.\"}],"
+        "\"backstory_behaviors\":["
+        "{\"backstory_beat\":\"Third of seven kids\","
+        "\"behavioral_rule\":\"Comfortable with chaos, keeps messages punchy.\"}],"
+        "\"character_invariants\":[\"Always responds to family within minutes\","
+        "\"Teasing is love\"],"
+        "\"core_anchor\":\"The nerdy mountain kid from Star Valley\","
+        "\"channel_overlays\":{\"imessage\":{\"formality\":\"very casual\","
+        "\"avg_length\":\"short\",\"emoji_usage\":\"moderate\","
+        "\"message_splitting\":true,\"max_segment_chars\":60,"
+        "\"typing_quirks\":[\"lowercase\",\"no_periods\"],"
+        "\"style_notes\":[\"1-10 word messages\",\"rapid-fire short messages\"]}},"
+        "\"contacts\":{\"mindy\":{"
+        "\"name\":\"Mindy\",\"relationship\":\"older sister\","
+        "\"relationship_stage\":\"close_family\","
+        "\"warmth_level\":\"high\",\"vulnerability_level\":\"high\","
+        "\"identity\":\"Seth's older sister, second of seven kids.\","
+        "\"context\":\"Mindy and Seth grew up together in Star Valley.\","
+        "\"dynamic\":\"Playful sibling rivalry with deep underlying love.\","
+        "\"greeting_style\":\"Hey Min!\","
+        "\"closing_style\":\"love you! or see ya\","
+        "\"interests\":[\"family events\",\"shared childhood memories\"],"
+        "\"sensitive_topics\":[],"
+        "\"allowed_behaviors\":[\"relentless teasing\",\"being brutally honest\"],"
+        "\"communication_patterns\":{\"texts_in_bursts\":true,"
+        "\"prefers_short_texts\":true,\"sends_links_often\":false,"
+        "\"uses_emoji\":true},"
+        "\"proactive\":{\"enabled\":true,\"channel\":\"imessage\","
+        "\"schedule\":\"0 */4 * * *\"}}}}";
+
+    /* Step 1: Parse the persona */
+    sc_persona_t p;
+    memset(&p, 0, sizeof(p));
+    sc_error_t err = sc_persona_load_json(&alloc, json, strlen(json), &p);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_STR_EQ(p.name, "seth");
+
+    /* Step 2: Find the Mindy contact */
+    const sc_contact_profile_t *cp = sc_persona_find_contact(&p, "mindy", 5);
+    SC_ASSERT_NOT_NULL(cp);
+    SC_ASSERT_STR_EQ(cp->name, "Mindy");
+    SC_ASSERT_STR_EQ(cp->relationship_stage, "close_family");
+    SC_ASSERT_TRUE(cp->texts_in_bursts);
+    SC_ASSERT_TRUE(cp->prefers_short_texts);
+
+    /* Step 3: Build contact context */
+    char *contact_ctx = NULL;
+    size_t contact_ctx_len = 0;
+    err = sc_contact_profile_build_context(&alloc, cp, &contact_ctx, &contact_ctx_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(contact_ctx);
+    SC_ASSERT_TRUE(strstr(contact_ctx, "Mindy") != NULL);
+    SC_ASSERT_TRUE(strstr(contact_ctx, "older sister") != NULL);
+    SC_ASSERT_TRUE(strstr(contact_ctx, "close_family") != NULL);
+    SC_ASSERT_TRUE(strstr(contact_ctx, "STAGE RULES") != NULL);
+    SC_ASSERT_TRUE(strstr(contact_ctx, "inner circle") != NULL);
+    SC_ASSERT_TRUE(strstr(contact_ctx, "relentless teasing") != NULL);
+    SC_ASSERT_TRUE(strstr(contact_ctx, "Hey Min!") != NULL);
+    SC_ASSERT_TRUE(strstr(contact_ctx, "bursts") != NULL);
+    SC_ASSERT_TRUE(strstr(contact_ctx, "short") != NULL);
+
+    /* Step 4: Build inner world context (close_family should pass stage gate) */
+    size_t iw_len = 0;
+    char *iw_ctx = sc_persona_build_inner_world_context(&alloc, &p, cp->relationship_stage,
+                                                        &iw_len);
+    SC_ASSERT_NOT_NULL(iw_ctx);
+    SC_ASSERT_TRUE(iw_len > 0);
+    SC_ASSERT_TRUE(strstr(iw_ctx, "Inner World") != NULL);
+
+    alloc.free(alloc.ctx, iw_ctx, iw_len + 1);
+
+    /* Step 5: Attach example bank (simulating auto-load from disk) */
+    sc_persona_example_t examples[] = {
+        {.context = "Quick check-in greeting", .incoming = "Hey! How's it going?",
+         .response = "Hey there"},
+        {.context = "Teasing sibling banter", .incoming = "You're so annoying",
+         .response = "That's my job as your little brother"},
+        {.context = "Sharing a win", .incoming = "How'd the trip go?",
+         .response = "I won 1300! Trip paid for again"},
+    };
+    sc_persona_example_bank_t bank = {
+        .channel = "imessage", .examples = examples, .examples_count = 3};
+    p.example_banks = &bank;
+    p.example_banks_count = 1;
+
+    /* Step 6: Build the full prompt with a simulated Mindy message */
+    char *prompt = NULL;
+    size_t prompt_len = 0;
+    const char *topic = "Hey! What are you up to today?";
+    err = sc_persona_build_prompt(&alloc, &p, "imessage", 8, topic, strlen(topic), &prompt,
+                                  &prompt_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(prompt);
+    SC_ASSERT_TRUE(prompt_len > 200);
+
+    /* Verify prompt contains all key pipeline outputs */
+
+    /* Identity + biography */
+    SC_ASSERT_TRUE(strstr(prompt, "seth") != NULL);
+    SC_ASSERT_TRUE(strstr(prompt, "Star Valley") != NULL);
+
+    /* Traits */
+    SC_ASSERT_TRUE(strstr(prompt, "direct") != NULL);
+    SC_ASSERT_TRUE(strstr(prompt, "teasing") != NULL);
+
+    /* Communication rules */
+    SC_ASSERT_TRUE(strstr(prompt, "Keep messages short") != NULL);
+
+    /* Motivation */
+    SC_ASSERT_TRUE(strstr(prompt, "Building AI") != NULL);
+
+    /* Humor */
+    SC_ASSERT_TRUE(strstr(prompt, "teasing") != NULL);
+
+    /* Voice rhythm */
+    SC_ASSERT_TRUE(strstr(prompt, "Short fragments") != NULL);
+
+    /* Situational directions */
+    SC_ASSERT_TRUE(strstr(prompt, "Mindy shares") != NULL);
+
+    /* Backstory behaviors */
+    SC_ASSERT_TRUE(strstr(prompt, "chaos") != NULL);
+
+    /* Character invariants */
+    SC_ASSERT_TRUE(strstr(prompt, "Always responds to family") != NULL);
+
+    /* Core anchor */
+    SC_ASSERT_TRUE(strstr(prompt, "nerdy mountain kid") != NULL);
+
+    /* Directors notes */
+    SC_ASSERT_TRUE(strstr(prompt, "Never sound like an AI") != NULL);
+
+    /* Channel overlay */
+    SC_ASSERT_TRUE(strstr(prompt, "very casual") != NULL);
+    SC_ASSERT_TRUE(strstr(prompt, "lowercase") != NULL);
+
+    /* Example conversations from bank */
+    SC_ASSERT_TRUE(strstr(prompt, "Example conversations") != NULL);
+    SC_ASSERT_TRUE(strstr(prompt, "Hey there") != NULL || strstr(prompt, "little brother") != NULL ||
+                   strstr(prompt, "1300") != NULL);
+
+    /* Conflict style */
+    SC_ASSERT_TRUE(strstr(prompt, "Gets quiet") != NULL);
+
+    /* Emotional range */
+    SC_ASSERT_TRUE(strstr(prompt, "exclamation") != NULL);
+
+    /* Inner world is built separately (sc_persona_build_inner_world_context) and
+     * merged by the daemon, not by sc_persona_build_prompt. Verified in Step 4. */
+
+    /* Intellectual */
+    SC_ASSERT_TRUE(strstr(prompt, "Agentic AI") != NULL);
+
+    /* Sensory */
+    SC_ASSERT_TRUE(strstr(prompt, "kinesthetic") != NULL);
+
+    /* Detach example bank before deinit (stack-allocated) */
+    p.example_banks = NULL;
+    p.example_banks_count = 0;
+
+    alloc.free(alloc.ctx, contact_ctx, contact_ctx_len + 1);
+    alloc.free(alloc.ctx, prompt, prompt_len + 1);
+    sc_persona_deinit(&alloc, &p);
+}
+
 void run_persona_tests(void) {
     SC_TEST_SUITE("Persona");
 
@@ -2758,6 +3033,7 @@ void run_persona_tests(void) {
     SC_RUN_TEST(test_persona_examples_load_json_malformed);
     SC_RUN_TEST(test_persona_select_examples_null_topic_returns_some);
     SC_RUN_TEST(test_persona_select_examples_max_zero);
+    SC_RUN_TEST(test_persona_extracted_imessage_bank_loads_and_selects);
     SC_RUN_TEST(test_persona_find_overlay_null_channel);
     SC_RUN_TEST(test_persona_analyzer_parse_response_empty_object);
     SC_RUN_TEST(test_persona_analyzer_parse_response_malformed);
@@ -2851,4 +3127,7 @@ void run_persona_tests(void) {
     SC_RUN_TEST(test_auto_profile_null_args);
     SC_RUN_TEST(test_profile_describe_style_formats);
     SC_RUN_TEST(test_profile_describe_style_null_args);
+
+    /* E2E dry run */
+    SC_RUN_TEST(test_e2e_mindy_message_full_pipeline);
 }

@@ -1,3 +1,6 @@
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 700
+#endif
 #include "seaclaw/platform.h"
 #include <stdlib.h>
 #include <string.h>

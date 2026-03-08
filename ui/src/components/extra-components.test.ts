@@ -59,6 +59,12 @@ import "./sc-data-table-v2.js";
 import "./sc-checkbox.js";
 import "./sc-combobox.js";
 import "./sc-form-group.js";
+import "./sc-activity-timeline.js";
+import "./sc-overview-stats.js";
+import "./sc-sessions-table.js";
+import "./sc-skill-card.js";
+import "./sc-skill-detail.js";
+import "./sc-skill-registry.js";
 
 describe("sc-checkbox", () => {
   it("should be defined as a custom element", () => {
@@ -2906,5 +2912,71 @@ describe("sc-chart", () => {
     expect(empty).toBeTruthy();
     expect(empty?.textContent).toContain("No data");
     el.remove();
+  });
+});
+
+describe("sc-activity-timeline", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("sc-activity-timeline")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("sc-activity-timeline");
+    expect(el).toBeInstanceOf(HTMLElement);
+  });
+});
+
+describe("sc-overview-stats", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("sc-overview-stats")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("sc-overview-stats");
+    expect(el).toBeInstanceOf(HTMLElement);
+  });
+});
+
+describe("sc-sessions-table", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("sc-sessions-table")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("sc-sessions-table");
+    expect(el).toBeInstanceOf(HTMLElement);
+  });
+});
+
+describe("sc-skill-card", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("sc-skill-card")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("sc-skill-card");
+    expect(el).toBeInstanceOf(HTMLElement);
+  });
+});
+
+describe("sc-skill-detail", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("sc-skill-detail")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("sc-skill-detail");
+    expect(el).toBeInstanceOf(HTMLElement);
+  });
+});
+
+describe("sc-skill-registry", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("sc-skill-registry")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("sc-skill-registry");
+    expect(el).toBeInstanceOf(HTMLElement);
   });
 });

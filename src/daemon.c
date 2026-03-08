@@ -1,3 +1,9 @@
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 700
+#endif
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE
+#endif
 #include "seaclaw/daemon.h"
 #include "seaclaw/agent.h"
 #include "seaclaw/agent/episodic.h"
@@ -11,6 +17,7 @@
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/process_util.h"
 #include "seaclaw/core/string.h"
+#include <stdlib.h>
 #include "seaclaw/memory/consolidation.h"
 #include "seaclaw/memory/deep_extract.h"
 #include "seaclaw/memory/emotional_graph.h"
@@ -1061,8 +1068,21 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 fprintf(stderr, "[seaclaw] poll error on channel %zu: %d\n", i, (int)poll_err);
 
             if (!agent || !ch->channel || !ch->channel->vtable || !ch->channel->vtable->send ||
-                count == 0)
+                count == 0) {
+                /* Log inbound messages from read-only channels (e.g. Gmail) */
+                if (count > 0 && ch->channel && ch->channel->vtable &&
+                    !ch->channel->vtable->send) {
+                    const char *ch_name =
+                        ch->channel->vtable->name ? ch->channel->vtable->name(ch->channel->ctx)
+                                                  : "?";
+                    for (size_t m = 0; m < count; m++) {
+                        size_t clen = strlen(msgs[m].content);
+                        fprintf(stderr, "[%s] ingest: %.60s%s (from %s)\n", ch_name,
+                                msgs[m].content, clen > 60 ? "..." : "", msgs[m].session_key);
+                    }
+                }
                 continue;
+            }
 
             /*
              * Batch consecutive messages from the same sender into one prompt.

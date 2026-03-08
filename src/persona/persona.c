@@ -507,7 +507,8 @@ sc_error_t sc_contact_profile_build_context(sc_allocator_t *alloc, const sc_cont
                 "\nSTAGE RULES: This is a friend. You can be honest, share personal things, "
                 "give direct feedback when asked, and show real concern. "
                 "Warmth level: warm.\n");
-        } else if (strcmp(stage, "trusted_confidant") == 0 || strcmp(stage, "inner_circle") == 0) {
+        } else if (strcmp(stage, "trusted_confidant") == 0 || strcmp(stage, "inner_circle") == 0 ||
+                   strcmp(stage, "close_family") == 0) {
             w = snprintf(buf + pos, cap - pos,
                          "\nSTAGE RULES: This is inner circle. No filters needed. "
                          "You can disagree strongly, express disappointment, share deepest fears, "
@@ -538,12 +539,13 @@ char *sc_persona_build_inner_world_context(sc_allocator_t *alloc, const sc_perso
         return NULL;
     *out_len = 0;
 
-    /* Stage gate: only surface for friend, trusted_confidant, inner_circle */
+    /* Stage gate: only surface for friend, trusted_confidant, inner_circle, close_family */
     if (!relationship_stage)
         return NULL;
     bool allowed = (strcmp(relationship_stage, "friend") == 0 ||
                     strcmp(relationship_stage, "trusted_confidant") == 0 ||
-                    strcmp(relationship_stage, "inner_circle") == 0);
+                    strcmp(relationship_stage, "inner_circle") == 0 ||
+                    strcmp(relationship_stage, "close_family") == 0);
     if (!allowed)
         return NULL;
 

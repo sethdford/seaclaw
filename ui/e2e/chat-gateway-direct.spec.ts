@@ -39,6 +39,12 @@ test.describe("Chat via Gateway Direct", () => {
         return { ok: false, error: String(e) };
       }
     });
+    if (!sendResult.ok) {
+      const errMsg = (sendResult as { error?: string }).error ?? "unknown";
+      if (errMsg.includes("unauthorized") || errMsg.includes("auth")) {
+        test.skip(true, `Gateway requires auth (${errMsg}), skipping live test`);
+      }
+    }
     expect(
       sendResult.ok,
       `chat.send should succeed: ${(sendResult as { error?: string }).error ?? "unknown"}`,

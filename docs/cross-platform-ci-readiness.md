@@ -1,3 +1,7 @@
+---
+title: Cross-Platform CI Readiness
+---
+
 # Cross-Platform CI Readiness
 
 This document tracks platform support, known platform-specific code locations, and build flags for Windows, Linux, and macOS.

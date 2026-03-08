@@ -58,6 +58,8 @@
       <a href="#sc-dropdown">sc-dropdown</a>
       <a href="#sc-dialog">sc-dialog</a>
       <a href="#sc-switch">sc-switch</a>
+      <a href="#sc-checkbox">sc-checkbox</a>
+      <a href="#sc-combobox">sc-combobox</a>
       <a href="#sc-radio">sc-radio</a>
       <a href="#sc-textarea">sc-textarea</a>
       <a href="#sc-popover">sc-popover</a>
@@ -353,6 +355,45 @@
           </div>
         </div>
         <div class="code-snippet"><pre><code>&lt;sc-switch label="Enable" checked&gt;&lt;/sc-switch&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-checkbox">
+        <h2>sc-checkbox</h2>
+        <div class="playground">
+          <div class="preview">
+            <sc-checkbox id="checkbox-preview" label="Accept terms"></sc-checkbox>
+          </div>
+          <div class="controls">
+            <label>checked
+              <input type="checkbox" data-target="checkbox-preview" data-prop="checked">
+            </label>
+            <label>disabled
+              <input type="checkbox" data-target="checkbox-preview" data-prop="disabled">
+            </label>
+            <label>label
+              <input type="text" data-target="checkbox-preview" data-prop="label" value="Accept terms">
+            </label>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-checkbox label="Accept terms"&gt;&lt;/sc-checkbox&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="sc-combobox">
+        <h2>sc-combobox</h2>
+        <div class="playground">
+          <div class="preview" style="width: 100%; min-width: 200px;">
+            <sc-combobox id="combobox-preview" label="Choose option"></sc-combobox>
+          </div>
+          <div class="controls">
+            <label>disabled
+              <input type="checkbox" data-target="combobox-preview" data-prop="disabled">
+            </label>
+            <label>label
+              <input type="text" data-target="combobox-preview" data-prop="label" value="Choose option">
+            </label>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;sc-combobox label="Choose" .options=${'[{value:"a",label:"Alpha"}]'} &gt;&lt;/sc-combobox&gt;</code></pre></div>
       </section>
 
       <section class="component-section" id="sc-radio">
@@ -1511,6 +1552,8 @@
       import "/src/components/sc-dropdown.js";
       import "/src/components/sc-dialog.js";
       import "/src/components/sc-switch.js";
+      import "/src/components/sc-checkbox.js";
+      import "/src/components/sc-combobox.js";
       import "/src/components/sc-radio.js";
       import "/src/components/sc-textarea.js";
       import "/src/components/sc-popover.js";
@@ -1591,6 +1634,14 @@
       setTheme(initialTheme);
       document.getElementById("theme-dark")?.addEventListener("click", () => setTheme("dark"));
       document.getElementById("theme-light")?.addEventListener("click", () => setTheme("light"));
+
+      // sc-combobox demo options
+      customElements.whenDefined("sc-combobox").then(() => {
+        const comboboxPreview = document.getElementById("combobox-preview");
+        if (comboboxPreview) {
+          comboboxPreview.options = [{ value: "a", label: "Alpha" }, { value: "b", label: "Beta" }];
+        }
+      });
 
       // sc-tapback-menu demo
       const tapbackTrigger = document.getElementById("catalog-tapback-trigger");

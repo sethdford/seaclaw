@@ -131,6 +131,7 @@ void run_dag_tests(void);
 void run_mood_tests(void);
 void run_bth_e2e_tests(void);
 void run_bth_metrics_tests(void);
+void run_paperclip_tests(void);
 
 int main(void) {
     printf("SeaClaw Test Suite\n");
@@ -263,6 +264,7 @@ int main(void) {
     run_mood_tests();
     run_bth_e2e_tests();
     run_bth_metrics_tests();
+    run_paperclip_tests();
 
     SC_TEST_REPORT();
     SC_TEST_EXIT();
