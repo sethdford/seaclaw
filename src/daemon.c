@@ -768,6 +768,11 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
 #define SC_STOP_FLAG local_stop
 #endif
 
+#ifndef SC_IS_TEST
+    static char replay_insights[2048] = {0};
+    static size_t replay_insights_len = 0;
+#endif
+
     while (!SC_STOP_FLAG) {
 #ifdef SC_HAS_CRON
         {
@@ -780,6 +785,28 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* Run proactive check-ins at the top of each hour */
                 if (current_minute % 60 == 0) {
                     sc_service_run_proactive_checkins(alloc, agent, channels, channel_count);
+                }
+#endif
+#ifndef SC_IS_TEST
+                /* Daily memory consolidation at 3 AM */
+                {
+                    static bool consolidated_today = false;
+                    struct tm *lt = localtime(&t);
+                    if (lt && lt->tm_hour == 4) {
+                        consolidated_today = false;
+                    }
+                    if (lt && lt->tm_hour == 3 && lt->tm_min == 0 && agent && agent->memory &&
+                        !consolidated_today) {
+                        sc_consolidation_config_t cons_cfg = {
+                            .decay_days = 30,
+                            .decay_factor = 0.5,
+                            .dedup_threshold = 70,
+                            .max_entries = 5000,
+                        };
+                        sc_memory_consolidate(alloc, agent->memory, &cons_cfg);
+                        consolidated_today = true;
+                        fprintf(stderr, "[seaclaw] daily memory consolidation completed\n");
+                    }
                 }
 #endif
                 last_cron_minute = current_minute;
@@ -1335,6 +1362,35 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 
+#ifdef SC_HAS_PERSONA
+#ifndef SC_IS_TEST
+                /* Replay insights: inject stored insights from previous conversation */
+                if (replay_insights_len > 0) {
+                    if (convo_ctx) {
+                        size_t merged_len = convo_ctx_len + replay_insights_len + 2;
+                        char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
+                        if (merged) {
+                            memcpy(merged, convo_ctx, convo_ctx_len);
+                            merged[convo_ctx_len] = '\n';
+                            memcpy(merged + convo_ctx_len + 1, replay_insights, replay_insights_len);
+                            merged[merged_len - 1] = '\n';
+                            merged[merged_len] = '\0';
+                            alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                            convo_ctx = merged;
+                            convo_ctx_len = merged_len;
+                        }
+                    } else {
+                        convo_ctx = (char *)alloc->alloc(alloc->ctx, replay_insights_len + 1);
+                        if (convo_ctx) {
+                            memcpy(convo_ctx, replay_insights, replay_insights_len);
+                            convo_ctx[replay_insights_len] = '\0';
+                            convo_ctx_len = replay_insights_len;
+                        }
+                    }
+                }
+#endif
+#endif
+
                 /* 4. Response constraints via channel vtable */
                 uint32_t max_chars = 0;
                 if (ch->channel->vtable->get_response_constraints) {
@@ -1606,27 +1662,34 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
 
 #ifdef SC_HAS_PERSONA
                 /* Replay learning: analyze conversation and store insights for future prompts */
-                if (history_entries && history_count > 2 && agent->memory &&
-                    agent->memory->vtable && agent->memory->vtable->store) {
-                    sc_replay_result_t replay;
-                    memset(&replay, 0, sizeof(replay));
+                if (history_entries && history_count > 0) {
+                    sc_replay_result_t replay = {0};
                     sc_error_t rerr =
-                        sc_replay_analyze(alloc, history_entries, history_count, max_chars, &replay);
-                    if (rerr == SC_OK && replay.insight_count > 0) {
+                        sc_replay_analyze(alloc, history_entries, history_count, 2000, &replay);
+                    if (rerr == SC_OK) {
                         size_t rctx_len = 0;
                         char *rctx = sc_replay_build_context(alloc, &replay, &rctx_len);
                         if (rctx && rctx_len > 0) {
-                            static const char cat_name[] = "replay_insights";
-                            sc_memory_category_t cat = {
-                                .tag = SC_MEMORY_CATEGORY_CUSTOM,
-                                .data.custom = {.name = cat_name, .name_len = sizeof(cat_name) - 1},
-                            };
-                            agent->memory->vtable->store(agent->memory->ctx, "replay:latest", 13,
-                                                        rctx, rctx_len, &cat, batch_key, key_len);
-                            alloc->free(alloc->ctx, rctx, rctx_len + 1);
-                        } else if (rctx) {
-                            alloc->free(alloc->ctx, rctx, rctx_len + 1);
+#ifndef SC_IS_TEST
+                            if (rctx_len < sizeof(replay_insights)) {
+                                memcpy(replay_insights, rctx, rctx_len);
+                                replay_insights[rctx_len] = '\0';
+                                replay_insights_len = rctx_len;
+                            }
+#endif
+                            if (history_count > 2 && agent->memory &&
+                                agent->memory->vtable && agent->memory->vtable->store) {
+                                static const char cat_name[] = "replay_insights";
+                                sc_memory_category_t cat = {
+                                    .tag = SC_MEMORY_CATEGORY_CUSTOM,
+                                    .data.custom = {.name = cat_name, .name_len = sizeof(cat_name) - 1},
+                                };
+                                agent->memory->vtable->store(agent->memory->ctx, "replay:latest", 13,
+                                                            rctx, rctx_len, &cat, batch_key, key_len);
+                            }
                         }
+                        if (rctx)
+                            alloc->free(alloc->ctx, rctx, rctx_len + 1);
                     }
                     sc_replay_result_deinit(&replay, alloc);
                 }
@@ -1723,13 +1786,12 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 
                     char *original_response = NULL;
-                    size_t original_len = 0;
+                    size_t original_len = response_len;
                     if (has_typo_quirk && response && response_len > 0) {
                         original_response = (char *)alloc->alloc(alloc->ctx, response_len + 1);
                         if (original_response) {
                             memcpy(original_response, response, response_len);
                             original_response[response_len] = '\0';
-                            original_len = response_len;
                         }
                     }
 
