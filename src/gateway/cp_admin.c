@@ -376,7 +376,13 @@ sc_error_t cp_admin_tools_catalog(sc_allocator_t *alloc, sc_app_context_t *app, 
             const char *params =
                 t->vtable->parameters_json ? t->vtable->parameters_json(t->ctx) : NULL;
             if (params) {
-                cp_json_set_str(alloc, tool_obj, "parameters", params);
+                sc_json_value_t *parsed_params = NULL;
+                if (sc_json_parse(alloc, params, strlen(params), &parsed_params) == SC_OK &&
+                    parsed_params) {
+                    sc_json_object_set(alloc, tool_obj, "parameters", parsed_params);
+                } else {
+                    cp_json_set_str(alloc, tool_obj, "parameters", params);
+                }
             }
 
             sc_json_array_push(alloc, arr, tool_obj);
