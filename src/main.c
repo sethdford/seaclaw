@@ -509,18 +509,26 @@ typedef struct webhook_dispatcher_ctx {
     size_t ch_count;
 } webhook_dispatcher_ctx_t;
 
-static void webhook_dispatcher(const char *channel, const char *body, size_t body_len, void *ctx) {
+static bool webhook_dispatcher(const char *channel, const char *body, size_t body_len, void *ctx) {
     webhook_dispatcher_ctx_t *d = (webhook_dispatcher_ctx_t *)ctx;
     if (!d || !channel || !body)
-        return;
+        return false;
     for (size_t i = 0; i < d->ch_count; i++) {
         const char *name = d->channels[i].channel->vtable->name(d->channels[i].channel_ctx);
         if (!name || strcmp(name, channel) != 0)
             continue;
-        if (d->channels[i].webhook_fn)
-            d->channels[i].webhook_fn(d->channels[i].channel_ctx, d->alloc, body, body_len);
-        return;
+        if (d->channels[i].webhook_fn) {
+            sc_error_t err =
+                d->channels[i].webhook_fn(d->channels[i].channel_ctx, d->alloc, body, body_len);
+            if (err != SC_OK) {
+                (void)fprintf(stderr, "[%s] webhook handler failed (channel=%s): %s\n", SC_CODENAME,
+                              channel, sc_error_string(err));
+                return false;
+            }
+        }
+        return true;
     }
+    return true;
 }
 
 static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv) {

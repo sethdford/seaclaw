@@ -22,7 +22,7 @@ typedef struct sc_gateway_config {
     const char *hmac_secret;
     size_t hmac_secret_len;
     bool test_mode;
-    void (*on_webhook)(const char *channel, const char *body, size_t body_len, void *ctx);
+    bool (*on_webhook)(const char *channel, const char *body, size_t body_len, void *ctx);
     void *on_webhook_ctx;
     const char *control_ui_dir;
     const char *const *cors_origins;

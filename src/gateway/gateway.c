@@ -874,8 +874,13 @@ static void handle_http_request(sc_gateway_state_t *gw, int fd, const char *meth
         const char *channel = webhook_path_to_channel(path, ch_buf, sizeof(ch_buf));
         if (gw->config.test_mode)
             (void)fprintf(stderr, "[gateway] webhook received channel=%s\n", channel);
-        if (gw && gw->config.on_webhook)
-            gw->config.on_webhook(channel, body, body_len, gw->config.on_webhook_ctx);
+        if (gw && gw->config.on_webhook) {
+            bool ok = gw->config.on_webhook(channel, body, body_len, gw->config.on_webhook_ctx);
+            if (!ok) {
+                send_json(fd, 500, "{\"error\":\"webhook handler failed\"}");
+                return;
+            }
+        }
         send_json(fd, 200, "{\"received\":true}");
         return;
     }
