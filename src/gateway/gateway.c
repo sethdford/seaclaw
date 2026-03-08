@@ -1210,14 +1210,21 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc, const char *host, uint16_t port
                 sc_ws_conn_t *conn = NULL;
                 sc_error_t ws_err = sc_ws_server_upgrade(&gw->ws, client, req, (size_t)n, &conn);
                 if (ws_err != SC_OK) {
-                    int status = (ws_err == SC_ERR_ALREADY_EXISTS)      ? 429
-                                 : (ws_err == SC_ERR_PERMISSION_DENIED) ? 401
-                                                                        : 503;
-                    const char *msg = (ws_err == SC_ERR_ALREADY_EXISTS)
-                                          ? "{\"error\":\"too many connections\"}"
-                                      : (ws_err == SC_ERR_PERMISSION_DENIED)
-                                          ? "{\"error\":\"unauthorized\"}"
-                                          : "{\"error\":\"websocket upgrade failed\"}";
+                    int status = 503;
+                    const char *msg = "{\"error\":\"websocket upgrade failed\"}";
+                    if (ws_err == SC_ERR_ALREADY_EXISTS) {
+                        status = 429;
+                        msg = "{\"error\":\"too many connections\"}";
+                    } else if (ws_err == SC_ERR_PERMISSION_DENIED) {
+                        status = 401;
+                        msg = "{\"error\":\"unauthorized\"}";
+                    } else if (ws_err == SC_ERR_INVALID_ARGUMENT) {
+                        status = 400;
+                        msg = "{\"error\":\"bad request\"}";
+                    } else if (ws_err == SC_ERR_NOT_SUPPORTED) {
+                        status = 501;
+                        msg = "{\"error\":\"not supported\"}";
+                    }
                     send_json(client, status, msg);
                     close(client);
                 } else {
