@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import type { PropertyValues } from "lit";
 import type { GatewayClient, GatewayStatus } from "./gateway.js";
 import { GatewayClient as GatewayClientClass } from "./gateway.js";
 import { DemoGatewayClient } from "./demo-gateway.js";
@@ -396,6 +397,10 @@ export class ScApp extends LitElement {
   gateway: GatewayClient | null = null;
   private _keyHandler = this._onGlobalKey.bind(this);
   private _hashHandler = this._onHashChange.bind(this);
+  private _moreSheetKeyHandler = this._onMoreSheetKeyDown.bind(this);
+  private _moreSheetPreviousElement: HTMLElement | null = null;
+  private readonly _moreSheetFocusableSelector =
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
   private _statusHandler = ((e: CustomEvent<GatewayStatus>) => {
     this.connectionStatus = e.detail;
   }) as EventListener;
@@ -443,13 +448,67 @@ export class ScApp extends LitElement {
     }) as EventListener);
   }
 
+  override updated(changedProperties: PropertyValues): void {
+    if (changedProperties.has("moreSheetOpen")) {
+      if (this.moreSheetOpen) {
+        this._moreSheetPreviousElement = document.activeElement as HTMLElement | null;
+        document.addEventListener("keydown", this._moreSheetKeyHandler);
+        requestAnimationFrame(() => this._trapMoreSheetFocus());
+      } else {
+        document.removeEventListener("keydown", this._moreSheetKeyHandler);
+        this._restoreMoreSheetFocus();
+      }
+    }
+  }
+
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    document.removeEventListener("keydown", this._moreSheetKeyHandler);
     document.removeEventListener("keydown", this._keyHandler);
     window.removeEventListener("hashchange", this._hashHandler);
     dynamicLight.stop();
     this.gateway?.removeEventListener("status", this._statusHandler);
     this.gateway?.disconnect();
+  }
+
+  private _getMoreSheetFocusable(): HTMLElement[] {
+    const sheet = this.shadowRoot?.querySelector(".more-sheet");
+    if (!sheet) return [];
+    return Array.from(sheet.querySelectorAll<HTMLElement>(this._moreSheetFocusableSelector));
+  }
+
+  private _trapMoreSheetFocus(): void {
+    const focusable = this._getMoreSheetFocusable();
+    if (focusable.length > 0) focusable[0].focus();
+  }
+
+  private _restoreMoreSheetFocus(): void {
+    const btn = this.shadowRoot?.querySelector("#more-tab-btn");
+    if (btn instanceof HTMLElement && btn.focus) btn.focus();
+    else if (this._moreSheetPreviousElement?.focus) this._moreSheetPreviousElement.focus();
+  }
+
+  private _onMoreSheetKeyDown(e: KeyboardEvent): void {
+    if (!this.moreSheetOpen) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      this.moreSheetOpen = false;
+      return;
+    }
+    if (e.key !== "Tab") return;
+    const focusable = this._getMoreSheetFocusable();
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
   }
 
   private _onHashChange(): void {
@@ -600,6 +659,7 @@ export class ScApp extends LitElement {
             `,
           )}
           <button
+            id="more-tab-btn"
             class="mobile-tab ${this.moreSheetOpen ? "active" : ""}"
             @click=${() => (this.moreSheetOpen = !this.moreSheetOpen)}
             aria-label="More"
@@ -612,7 +672,13 @@ export class ScApp extends LitElement {
       ${this.moreSheetOpen
         ? html`
             <div class="more-backdrop" @click=${() => (this.moreSheetOpen = false)}></div>
-            <div class="more-sheet" role="dialog" aria-label="More views">
+            <div
+              class="more-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-label="More views"
+              tabindex="-1"
+            >
               <div class="more-sheet-handle"></div>
               <div class="more-sheet-grid">
                 ${MORE_TABS.map(
