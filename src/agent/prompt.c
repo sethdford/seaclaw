@@ -311,6 +311,17 @@ sc_error_t sc_prompt_build_system(sc_allocator_t *alloc, const sc_prompt_config_
             goto fail;
     }
 
+    /* Adaptive persona (circadian + relationship) */
+    if (config->adaptive_persona_context && config->adaptive_persona_context_len > 0) {
+        err = append(alloc, &buf, &len, &cap, "\n\n", 2);
+        if (err != SC_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->adaptive_persona_context,
+                     config->adaptive_persona_context_len);
+        if (err != SC_OK)
+            goto fail;
+    }
+
     /* Autonomy */
     if (config->autonomy_level == 0) {
         err = append(

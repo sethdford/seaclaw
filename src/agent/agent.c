@@ -2,6 +2,10 @@
 #include "seaclaw/agent/awareness.h"
 #include "seaclaw/agent/commitment_store.h"
 #include "seaclaw/agent/pattern_radar.h"
+#ifdef SC_HAS_PERSONA
+#include "seaclaw/persona/circadian.h"
+#include "seaclaw/persona/relationship.h"
+#endif
 #include "seaclaw/agent/commands.h"
 #include "seaclaw/agent/compaction.h"
 #include "seaclaw/agent/dispatcher.h"
@@ -269,6 +273,10 @@ sc_error_t sc_agent_from_config(
         if (rerr != SC_OK)
             return rerr;
     }
+
+#ifdef SC_HAS_PERSONA
+    memset(&out->relationship, 0, sizeof(out->relationship));
+#endif
 
     if (memory && memory->vtable) {
         sc_error_t cerr = sc_commitment_store_create(alloc, memory, &out->commitment_store);

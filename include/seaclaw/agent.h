@@ -20,6 +20,8 @@
 #include "seaclaw/observer.h"
 #ifdef SC_HAS_PERSONA
 #include "seaclaw/persona.h"
+#include "seaclaw/persona/circadian.h"
+#include "seaclaw/persona/relationship.h"
 #endif
 #include "seaclaw/agent/reflection.h"
 #include "seaclaw/provider.h"
@@ -170,6 +172,10 @@ struct sc_agent {
     sc_commitment_store_t *commitment_store; /* optional; when memory is set */
 
     sc_pattern_radar_t radar; /* pattern observation tracker */
+
+#ifdef SC_HAS_PERSONA
+    sc_relationship_state_t relationship; /* session-based warmth adaptation */
+#endif
 
 #ifdef SC_HAS_PERSONA
     sc_persona_t *persona; /* loaded from config; owned */

@@ -14,6 +14,10 @@
 #include "seaclaw/agent/preferences.h"
 #include "seaclaw/agent/pattern_radar.h"
 #include "seaclaw/agent/prompt.h"
+#ifdef SC_HAS_PERSONA
+#include "seaclaw/persona/circadian.h"
+#include "seaclaw/persona/relationship.h"
+#endif
 #include "seaclaw/agent/reflection.h"
 #include "seaclaw/context.h"
 #include "seaclaw/context_tokens.h"
@@ -258,6 +262,50 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     (void)sc_pattern_radar_build_context(&agent->radar, agent->alloc, &pattern_ctx,
                                          &pattern_ctx_len);
 
+    /* Build adaptive persona context (circadian + relationship) */
+    char *adaptive_ctx = NULL;
+    size_t adaptive_ctx_len = 0;
+#ifdef SC_HAS_PERSONA
+    {
+        uint8_t hour = 10;
+#ifndef SC_IS_TEST
+        {
+            time_t now = time(NULL);
+            struct tm *lt = localtime(&now);
+            if (lt)
+                hour = (uint8_t)(lt->tm_hour & 0xFF);
+        }
+#endif
+        char *circadian_str = NULL;
+        size_t circadian_len = 0;
+        char *rel_str = NULL;
+        size_t rel_len = 0;
+        if (sc_circadian_build_prompt(agent->alloc, hour, &circadian_str, &circadian_len) ==
+                SC_OK &&
+            circadian_str) {
+            if (sc_relationship_build_prompt(agent->alloc, &agent->relationship, &rel_str,
+                                             &rel_len) == SC_OK &&
+                rel_str) {
+                size_t total = circadian_len + rel_len + 1;
+                adaptive_ctx = (char *)agent->alloc->alloc(agent->alloc->ctx, total);
+                if (adaptive_ctx) {
+                    memcpy(adaptive_ctx, circadian_str, circadian_len);
+                    memcpy(adaptive_ctx + circadian_len, rel_str, rel_len);
+                    adaptive_ctx[circadian_len + rel_len] = '\0';
+                    adaptive_ctx_len = circadian_len + rel_len;
+                }
+                agent->alloc->free(agent->alloc->ctx, rel_str, rel_len + 1);
+            }
+            if (adaptive_ctx) {
+                agent->alloc->free(agent->alloc->ctx, circadian_str, circadian_len + 1);
+            } else {
+                adaptive_ctx = circadian_str;
+                adaptive_ctx_len = circadian_len;
+            }
+        }
+    }
+#endif
+
     /* Build situational awareness context */
     char *awareness_ctx = NULL;
     size_t awareness_ctx_len = 0;
@@ -298,7 +346,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     char *system_prompt = NULL;
     size_t system_prompt_len = 0;
     if (agent->cached_static_prompt && !pref_ctx && !tone_hint && !persona_prompt &&
-        !awareness_ctx && !stm_ctx && !commitment_ctx && !pattern_ctx) {
+        !awareness_ctx && !stm_ctx && !commitment_ctx && !pattern_ctx && !adaptive_ctx) {
         err = sc_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
                                          agent->cached_static_prompt_len, memory_ctx,
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
@@ -315,6 +363,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, commitment_ctx, commitment_ctx_len + 1);
             if (pattern_ctx)
                 agent->alloc->free(agent->alloc->ctx, pattern_ctx, pattern_ctx_len + 1);
+            if (adaptive_ctx)
+                agent->alloc->free(agent->alloc->ctx, adaptive_ctx, adaptive_ctx_len + 1);
             sc_agent_clear_current_for_tools();
             return err;
         }
@@ -336,6 +386,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             .commitment_context_len = commitment_ctx_len,
             .pattern_context = pattern_ctx,
             .pattern_context_len = pattern_ctx_len,
+            .adaptive_persona_context = adaptive_ctx,
+            .adaptive_persona_context_len = adaptive_ctx_len,
             .autonomy_level = agent->autonomy_level,
             .custom_instructions = agent->custom_instructions,
             .custom_instructions_len = agent->custom_instructions_len,
@@ -378,6 +430,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, commitment_ctx, commitment_ctx_len + 1);
             if (pattern_ctx)
                 agent->alloc->free(agent->alloc->ctx, pattern_ctx, pattern_ctx_len + 1);
+            if (adaptive_ctx)
+                agent->alloc->free(agent->alloc->ctx, adaptive_ctx, adaptive_ctx_len + 1);
             sc_agent_clear_current_for_tools();
             return err;
         }
@@ -388,6 +442,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         agent->alloc->free(agent->alloc->ctx, commitment_ctx, commitment_ctx_len + 1);
     if (pattern_ctx)
         agent->alloc->free(agent->alloc->ctx, pattern_ctx, pattern_ctx_len + 1);
+    if (adaptive_ctx)
+        agent->alloc->free(agent->alloc->ctx, adaptive_ctx, adaptive_ctx_len + 1);
     if (pref_ctx)
         agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
 
@@ -626,6 +682,9 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             }
             sc_chat_response_free(agent->alloc, &resp);
             sc_agent_clear_current_for_tools();
+#ifdef SC_HAS_PERSONA
+            sc_relationship_update(&agent->relationship, 1);
+#endif
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
             if (agent->turn_arena)
