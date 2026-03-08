@@ -1,5 +1,7 @@
 #include "seaclaw/agent/dag.h"
+#include "seaclaw/agent/dag_executor.h"
 #include "seaclaw/core/allocator.h"
+#include "seaclaw/core/string.h"
 #include "test_framework.h"
 #include <string.h>
 
@@ -130,6 +132,86 @@ static void dag_is_complete_when_all_done(void) {
     sc_dag_deinit(&dag);
 }
 
+static void dag_next_batch_returns_roots_first(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_dag_t dag;
+    sc_dag_init(&dag, alloc);
+
+    sc_dag_add_node(&dag, "t0", "a", "{}", NULL, 0);
+    sc_dag_add_node(&dag, "t1", "b", "{}", NULL, 0);
+    sc_dag_add_node(&dag, "t2", "c", "{}", (const char *[]){"t0", "t1"}, 2);
+
+    sc_dag_batch_t batch;
+    sc_error_t err = sc_dag_next_batch(&dag, &batch);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_EQ(batch.count, 2);
+
+    sc_dag_deinit(&dag);
+}
+
+static void dag_next_batch_returns_dependents_after_roots_done(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_dag_t dag;
+    sc_dag_init(&dag, alloc);
+
+    sc_dag_add_node(&dag, "t0", "a", "{}", NULL, 0);
+    sc_dag_add_node(&dag, "t1", "b", "{}", (const char *[]){"t0"}, 1);
+
+    sc_dag_batch_t batch;
+    sc_dag_next_batch(&dag, &batch);
+    SC_ASSERT_EQ(batch.count, 1);
+    batch.nodes[0]->status = SC_DAG_DONE;
+    batch.nodes[0]->result = sc_strdup(&dag.alloc, "done");
+    batch.nodes[0]->result_len = 4;
+
+    sc_dag_next_batch(&dag, &batch);
+    SC_ASSERT_EQ(batch.count, 1);
+    SC_ASSERT_STR_EQ(batch.nodes[0]->id, "t1");
+
+    sc_dag_deinit(&dag);
+}
+
+static void dag_resolve_vars_substitutes(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_dag_t dag;
+    sc_dag_init(&dag, alloc);
+
+    sc_dag_add_node(&dag, "t1", "a", "{}", NULL, 0);
+    dag.nodes[0].status = SC_DAG_DONE;
+    dag.nodes[0].result = sc_strdup(&alloc, "hello");
+    dag.nodes[0].result_len = 5;
+
+    char *resolved = NULL;
+    size_t resolved_len = 0;
+    const char *args = "prefix $t1 suffix";
+    sc_error_t err = sc_dag_resolve_vars(&alloc, &dag, args, strlen(args), &resolved, &resolved_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(resolved);
+    SC_ASSERT_STR_EQ(resolved, "prefix hello suffix");
+    sc_str_free(&alloc, resolved);
+
+    sc_dag_deinit(&dag);
+}
+
+static void dag_resolve_vars_no_refs(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_dag_t dag;
+    sc_dag_init(&dag, alloc);
+
+    sc_dag_add_node(&dag, "t1", "a", "{}", NULL, 0);
+
+    char *resolved = NULL;
+    size_t resolved_len = 0;
+    const char *args = "no vars here";
+    sc_error_t err = sc_dag_resolve_vars(&alloc, &dag, args, strlen(args), &resolved, &resolved_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(resolved);
+    SC_ASSERT_STR_EQ(resolved, "no vars here");
+    sc_str_free(&alloc, resolved);
+
+    sc_dag_deinit(&dag);
+}
+
 void run_dag_tests(void) {
     SC_TEST_SUITE("dag");
     SC_RUN_TEST(dag_add_node_and_find);
@@ -139,4 +221,8 @@ void run_dag_tests(void) {
     SC_RUN_TEST(dag_validate_detects_duplicate_id);
     SC_RUN_TEST(dag_parse_json_creates_nodes);
     SC_RUN_TEST(dag_is_complete_when_all_done);
+    SC_RUN_TEST(dag_next_batch_returns_roots_first);
+    SC_RUN_TEST(dag_next_batch_returns_dependents_after_roots_done);
+    SC_RUN_TEST(dag_resolve_vars_substitutes);
+    SC_RUN_TEST(dag_resolve_vars_no_refs);
 }
