@@ -1,6 +1,7 @@
 #include "seaclaw/agent.h"
 #include "seaclaw/agent/awareness.h"
 #include "seaclaw/agent/commitment_store.h"
+#include "seaclaw/agent/pattern_radar.h"
 #include "seaclaw/agent/commands.h"
 #include "seaclaw/agent/compaction.h"
 #include "seaclaw/agent/dispatcher.h"
@@ -263,6 +264,12 @@ sc_error_t sc_agent_from_config(
             return serr;
     }
 
+    {
+        sc_error_t rerr = sc_pattern_radar_init(&out->radar, *alloc);
+        if (rerr != SC_OK)
+            return rerr;
+    }
+
     if (memory && memory->vtable) {
         sc_error_t cerr = sc_commitment_store_create(alloc, memory, &out->commitment_store);
         if (cerr != SC_OK)
@@ -435,6 +442,7 @@ void sc_agent_deinit(sc_agent_t *agent) {
         agent->persona_prompt = NULL;
     }
     sc_stm_deinit(&agent->stm);
+    sc_pattern_radar_deinit(&agent->radar);
     if (agent->commitment_store) {
         sc_commitment_store_destroy(agent->commitment_store);
         agent->commitment_store = NULL;

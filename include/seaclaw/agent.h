@@ -2,6 +2,7 @@
 #define SC_AGENT_H
 
 #include "seaclaw/agent/commitment_store.h"
+#include "seaclaw/agent/pattern_radar.h"
 #include "seaclaw/agent/mailbox.h"
 #include "seaclaw/agent/spawn.h"
 #include "seaclaw/agent/task_list.h"
@@ -167,6 +168,8 @@ struct sc_agent {
     sc_stm_buffer_t stm; /* short-term memory buffer for session context */
 
     sc_commitment_store_t *commitment_store; /* optional; when memory is set */
+
+    sc_pattern_radar_t radar; /* pattern observation tracker */
 
 #ifdef SC_HAS_PERSONA
     sc_persona_t *persona; /* loaded from config; owned */

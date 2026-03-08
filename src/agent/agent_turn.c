@@ -12,6 +12,7 @@
 #include "seaclaw/agent/outcomes.h"
 #include "seaclaw/agent/planner.h"
 #include "seaclaw/agent/preferences.h"
+#include "seaclaw/agent/pattern_radar.h"
 #include "seaclaw/agent/prompt.h"
 #include "seaclaw/agent/reflection.h"
 #include "seaclaw/context.h"
@@ -94,6 +95,37 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             for (size_t i = 0; i < fc_result.emotion_count; i++) {
                 (void)sc_stm_turn_add_emotion(&agent->stm, last_idx, fc_result.emotions[i].tag,
                                               fc_result.emotions[i].intensity);
+            }
+        }
+
+        /* Pattern radar: observe entities as topic recurrence, emotions as emotional trend */
+        {
+            char ts_buf[32];
+            int ts_n = snprintf(ts_buf, sizeof(ts_buf), "%llu",
+                                (unsigned long long)(ts_ms / 1000));
+            const char *ts = ts_n > 0 ? ts_buf : NULL;
+            size_t ts_len = (ts_n > 0 && ts_n < (int)sizeof(ts_buf)) ? (size_t)ts_n : 0;
+
+            for (size_t i = 0; i < fc_result.entity_count; i++) {
+                const sc_fc_entity_match_t *e = &fc_result.entities[i];
+                if (e->name && e->name_len > 0) {
+                    (void)sc_pattern_radar_observe(&agent->radar, e->name, e->name_len,
+                                                    SC_PATTERN_TOPIC_RECURRENCE,
+                                                    e->type ? e->type : NULL,
+                                                    e->type ? e->type_len : 0, ts, ts_len);
+                }
+            }
+            static const char *emotion_names[] = {"neutral", "joy", "sadness", "anger", "fear",
+                                                  "surprise", "frustration", "excitement",
+                                                  "anxiety"};
+            for (size_t i = 0; i < fc_result.emotion_count; i++) {
+                sc_emotion_tag_t tag = fc_result.emotions[i].tag;
+                if (tag >= 0 && (size_t)tag < sizeof(emotion_names) / sizeof(emotion_names[0])) {
+                    const char *name = emotion_names[tag];
+                    (void)sc_pattern_radar_observe(&agent->radar, name, strlen(name),
+                                                    SC_PATTERN_EMOTIONAL_TREND, NULL, 0, ts,
+                                                    ts_len);
+                }
             }
         }
         sc_fc_result_deinit(&fc_result, agent->alloc);
@@ -220,6 +252,12 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                                                  sess_len, &commitment_ctx, &commitment_ctx_len);
     }
 
+    /* Build pattern radar context for this turn */
+    char *pattern_ctx = NULL;
+    size_t pattern_ctx_len = 0;
+    (void)sc_pattern_radar_build_context(&agent->radar, agent->alloc, &pattern_ctx,
+                                         &pattern_ctx_len);
+
     /* Build situational awareness context */
     char *awareness_ctx = NULL;
     size_t awareness_ctx_len = 0;
@@ -260,7 +298,7 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
     char *system_prompt = NULL;
     size_t system_prompt_len = 0;
     if (agent->cached_static_prompt && !pref_ctx && !tone_hint && !persona_prompt &&
-        !awareness_ctx && !stm_ctx && !commitment_ctx) {
+        !awareness_ctx && !stm_ctx && !commitment_ctx && !pattern_ctx) {
         err = sc_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
                                          agent->cached_static_prompt_len, memory_ctx,
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
@@ -275,6 +313,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
             if (commitment_ctx)
                 agent->alloc->free(agent->alloc->ctx, commitment_ctx, commitment_ctx_len + 1);
+            if (pattern_ctx)
+                agent->alloc->free(agent->alloc->ctx, pattern_ctx, pattern_ctx_len + 1);
             sc_agent_clear_current_for_tools();
             return err;
         }
@@ -294,6 +334,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             .stm_context_len = stm_ctx_len,
             .commitment_context = commitment_ctx,
             .commitment_context_len = commitment_ctx_len,
+            .pattern_context = pattern_ctx,
+            .pattern_context_len = pattern_ctx_len,
             .autonomy_level = agent->autonomy_level,
             .custom_instructions = agent->custom_instructions,
             .custom_instructions_len = agent->custom_instructions_len,
@@ -334,6 +376,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
             if (commitment_ctx)
                 agent->alloc->free(agent->alloc->ctx, commitment_ctx, commitment_ctx_len + 1);
+            if (pattern_ctx)
+                agent->alloc->free(agent->alloc->ctx, pattern_ctx, pattern_ctx_len + 1);
             sc_agent_clear_current_for_tools();
             return err;
         }
@@ -342,6 +386,8 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
         agent->alloc->free(agent->alloc->ctx, stm_ctx, stm_ctx_len + 1);
     if (commitment_ctx)
         agent->alloc->free(agent->alloc->ctx, commitment_ctx, commitment_ctx_len + 1);
+    if (pattern_ctx)
+        agent->alloc->free(agent->alloc->ctx, pattern_ctx, pattern_ctx_len + 1);
     if (pref_ctx)
         agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
 
