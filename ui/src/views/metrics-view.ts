@@ -24,6 +24,18 @@ interface MetricsSnapshot {
   bth?: Record<string, number>;
 }
 
+function friendlyError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes("timeout")) return "Request timed out. Please try again.";
+  if (msg.includes("WebSocket")) return "Connection lost. Reconnecting...";
+  if (msg.includes("404")) return "Resource not found.";
+  if (msg.includes("401") || msg.includes("unauthorized"))
+    return "Authentication failed. Please check your credentials.";
+  if (msg.includes("403") || msg.includes("forbidden")) return "Access denied.";
+  if (msg.includes("network")) return "Network error. Please check your connection.";
+  return "Something went wrong. Please try again.";
+}
+
 function formatUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -136,7 +148,7 @@ export class ScMetricsView extends GatewayAwareLitElement {
         (res && "health" in res ? (res as MetricsSnapshot) : {}) ||
         {};
     } catch (e) {
-      this.error = e instanceof Error ? e.message : "Failed to load metrics";
+      this.error = friendlyError(e);
       this.snapshot = {};
     } finally {
       this.loading = false;

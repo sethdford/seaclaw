@@ -15,6 +15,18 @@ import "../components/sc-skeleton.js";
 import "../components/sc-stat-card.js";
 import "../components/sc-stats-row.js";
 
+function friendlyError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes("timeout")) return "Request timed out. Please try again.";
+  if (msg.includes("WebSocket")) return "Connection lost. Reconnecting...";
+  if (msg.includes("404")) return "Resource not found.";
+  if (msg.includes("401") || msg.includes("unauthorized"))
+    return "Authentication failed. Please check your credentials.";
+  if (msg.includes("403") || msg.includes("forbidden")) return "Access denied.";
+  if (msg.includes("network")) return "Network error. Please check your connection.";
+  return "Something went wrong. Please try again.";
+}
+
 interface Session {
   key?: string;
   label?: string;
@@ -131,7 +143,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
       const payload = await gw.request<{ sessions?: Session[] }>("sessions.list", {});
       this.sessions = payload?.sessions ?? [];
     } catch (e) {
-      this.error = e instanceof Error ? e.message : "Failed to load sessions";
+      this.error = friendlyError(e);
       this.sessions = [];
     } finally {
       this.loading = false;
