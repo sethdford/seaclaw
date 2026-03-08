@@ -106,8 +106,31 @@ export class ScTapbackMenu extends LitElement {
   }
 
   private _onKeydown = (e: KeyboardEvent) => {
-    if (e.key === "Escape")
+    if (e.key === "Escape") {
       this.dispatchEvent(new CustomEvent("sc-tapback-close", { bubbles: true, composed: true }));
+      return;
+    }
+    if (!this.open) return;
+    const bar = this.shadowRoot?.querySelector(".bar");
+    if (!bar) return;
+    const items = Array.from(bar.querySelectorAll<HTMLElement>(".reaction-btn"));
+    if (items.length === 0) return;
+    const active = this.shadowRoot?.activeElement as HTMLElement | null;
+    const idx = active ? items.indexOf(active) : -1;
+
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      items[(idx + 1) % items.length].focus();
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      items[(idx - 1 + items.length) % items.length].focus();
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      items[0].focus();
+    } else if (e.key === "End") {
+      e.preventDefault();
+      items[items.length - 1].focus();
+    }
   };
 
   override connectedCallback() {
@@ -117,6 +140,14 @@ export class ScTapbackMenu extends LitElement {
   override disconnectedCallback() {
     document.removeEventListener("keydown", this._onKeydown);
     super.disconnectedCallback();
+  }
+  override updated(changed: Map<PropertyKey, unknown>) {
+    if (changed.has("open") && this.open) {
+      requestAnimationFrame(() => {
+        const first = this.shadowRoot?.querySelector<HTMLElement>(".reaction-btn");
+        first?.focus();
+      });
+    }
   }
 
   override render() {

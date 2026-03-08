@@ -71,6 +71,9 @@ static void set_defaults(sc_config_t *cfg, sc_allocator_t *a) {
     cfg->agent.llm_compiler_enabled = false;
     cfg->agent.tool_routing_enabled = false;
     cfg->agent.compact_context = false;
+    cfg->agent.context_pressure_warn = 0.85f;
+    cfg->agent.context_pressure_compact = 0.95f;
+    cfg->agent.context_compact_target = 0.70f;
     cfg->agent.max_tool_iterations = 1000;
     cfg->agent.max_history_messages = 100;
     cfg->agent.parallel_tools = false;

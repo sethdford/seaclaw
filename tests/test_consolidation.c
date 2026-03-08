@@ -5,6 +5,7 @@
 #include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 static void similarity_identical_returns_100(void) {
     const char *a = "hello world";
@@ -33,12 +34,16 @@ static void consolidation_removes_duplicates(void) {
     sc_memory_t mem = sc_memory_lru_create(&alloc, 100);
     sc_memory_category_t cat = {.tag = SC_MEMORY_CATEGORY_CORE, .data = {{0}}};
 
-    const char *content1 = "user likes coffee and tea";
-    const char *content2 = "user likes coffee and tea";
-    sc_error_t err = mem.vtable->store(mem.ctx, "key:a", 5, content1, 25, &cat, NULL, 0);
+    const char *content1 = "user likes coffee and tea every morning";
+    const char *content2 = "user likes coffee and tea every morning";
+    sc_error_t err = mem.vtable->store(mem.ctx, "dup:a", 5, content1, strlen(content1), &cat,
+                                       "sess_cons", 9);
     SC_ASSERT_EQ(err, SC_OK);
 
-    err = mem.vtable->store(mem.ctx, "key:b", 5, content2, 25, &cat, NULL, 0);
+    struct timespec ts = {.tv_sec = 0, .tv_nsec = 2000000};
+    nanosleep(&ts, NULL);
+
+    err = mem.vtable->store(mem.ctx, "dup:b", 5, content2, strlen(content2), &cat, "sess_cons", 9);
     SC_ASSERT_EQ(err, SC_OK);
 
     size_t count_before = 0;
@@ -48,6 +53,7 @@ static void consolidation_removes_duplicates(void) {
 
     sc_consolidation_config_t config = SC_CONSOLIDATION_DEFAULTS;
     config.dedup_threshold = 80;
+    config.max_entries = 100;
 
     err = sc_memory_consolidate(&alloc, &mem, &config);
     SC_ASSERT_EQ(err, SC_OK);
@@ -66,6 +72,6 @@ void run_consolidation_tests(void) {
     SC_RUN_TEST(similarity_identical_returns_100);
     SC_RUN_TEST(similarity_completely_different_returns_0);
     SC_RUN_TEST(similarity_partial_overlap_returns_reasonable);
-    /* consolidation_removes_duplicates skipped: LRU backend timestamp
-       comparison is non-deterministic on some platforms (flaky under ASan) */
+    /* consolidation_removes_duplicates: LRU recall+forget ordering causes
+       intermittent ASan issues — re-enable when SQLite backend is used */
 }

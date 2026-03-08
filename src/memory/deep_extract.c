@@ -62,8 +62,11 @@ sc_error_t sc_deep_extract_parse(sc_allocator_t *alloc, const char *response, si
 
     sc_json_value_t *root = NULL;
     sc_error_t err = sc_json_parse(alloc, response, response_len, &root);
-    if (err != SC_OK || !root || root->type != SC_JSON_OBJECT)
+    if (err != SC_OK || !root || root->type != SC_JSON_OBJECT) {
+        if (root)
+            sc_json_free(alloc, root);
         return err != SC_OK ? err : SC_ERR_JSON_PARSE;
+    }
 
     sc_json_value_t *facts_arr = sc_json_object_get(root, "facts");
     if (facts_arr && facts_arr->type == SC_JSON_ARRAY) {

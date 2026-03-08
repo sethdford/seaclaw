@@ -161,16 +161,24 @@ sc_error_t sc_promotion_run(sc_allocator_t *alloc, const sc_stm_buffer_t *buf, s
 
             if (collected_count >= collected_cap) {
                 size_t new_cap = collected_cap ? collected_cap * 2 : 32;
-                promoted_entity_t *new_arr = (promoted_entity_t *)alloc->realloc(
-                    alloc->ctx, collected, collected_cap * sizeof(promoted_entity_t),
-                    new_cap * sizeof(promoted_entity_t));
+                promoted_entity_t *new_arr;
+                if (collected_cap == 0) {
+                    new_arr = (promoted_entity_t *)alloc->alloc(alloc->ctx,
+                                                                new_cap * sizeof(promoted_entity_t));
+                } else {
+                    new_arr = (promoted_entity_t *)alloc->realloc(
+                        alloc->ctx, collected, collected_cap * sizeof(promoted_entity_t),
+                        new_cap * sizeof(promoted_entity_t));
+                }
                 if (!new_arr) {
                     for (size_t k = 0; k < collected_count; k++) {
                         alloc->free(alloc->ctx, collected[k].name, collected[k].name_len + 1);
                         if (collected[k].type)
                             alloc->free(alloc->ctx, collected[k].type, collected[k].type_len + 1);
                     }
-                    alloc->free(alloc->ctx, collected, collected_cap * sizeof(promoted_entity_t));
+                    if (collected && collected_cap > 0)
+                        alloc->free(alloc->ctx, collected,
+                                    collected_cap * sizeof(promoted_entity_t));
                     return SC_ERR_OUT_OF_MEMORY;
                 }
                 collected = new_arr;

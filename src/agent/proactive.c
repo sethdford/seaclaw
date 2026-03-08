@@ -3,9 +3,51 @@
  */
 #include "seaclaw/agent/proactive.h"
 #include "seaclaw/core/string.h"
+#include "seaclaw/memory.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define SC_PROACTIVE_EVENT_FOLLOW_UP_CAP 3
+#define MS_PER_HOUR (3600ULL * 1000ULL)
+#define HOURS_3_DAYS  72u
+#define HOURS_7_DAYS  168u
+#define HOURS_14_DAYS 336u
+
+sc_error_t sc_proactive_check_silence(sc_allocator_t *alloc, uint64_t last_contact_ms,
+                                       uint64_t now_ms, const sc_silence_config_t *config,
+                                       sc_proactive_result_t *out) {
+    if (!alloc || !out || !config)
+        return SC_ERR_INVALID_ARGUMENT;
+    if (!config->enabled || last_contact_ms == 0)
+        return SC_OK;
+
+    uint64_t elapsed_hours = (now_ms - last_contact_ms) / MS_PER_HOUR;
+    if (elapsed_hours < config->threshold_hours)
+        return SC_OK;
+    if (out->count >= SC_PROACTIVE_MAX_ACTIONS)
+        return SC_OK;
+
+    const char *msg = NULL;
+    if (elapsed_hours >= HOURS_14_DAYS) {
+        msg = "It's been a while. A warm, low-pressure message would be thoughtful.";
+    } else if (elapsed_hours >= HOURS_7_DAYS) {
+        msg = "It's been about a week. Reach out with something personal from memory.";
+    } else {
+        msg = "It's been a few days since you last talked. A casual check-in would feel natural.";
+    }
+    size_t msg_len = strlen(msg);
+
+    sc_proactive_action_t *act = &out->actions[out->count];
+    act->type = SC_PROACTIVE_CHECK_IN;
+    act->message = sc_strndup(alloc, msg, msg_len);
+    if (!act->message)
+        return SC_ERR_OUT_OF_MEMORY;
+    act->message_len = msg_len;
+    act->priority = 0.85;
+    out->count++;
+    return SC_OK;
+}
 
 static int compare_priority_desc(const void *a, const void *b) {
     const sc_proactive_action_t *pa = (const sc_proactive_action_t *)a;
@@ -150,6 +192,54 @@ sc_error_t sc_proactive_check_extended(sc_allocator_t *alloc, uint32_t session_c
     return SC_OK;
 }
 
+sc_error_t sc_proactive_check_events(sc_allocator_t *alloc,
+                                      const sc_extracted_event_t *events, size_t event_count,
+                                      sc_proactive_result_t *out) {
+    if (!alloc || !out)
+        return SC_ERR_INVALID_ARGUMENT;
+    if (!events && event_count > 0)
+        return SC_ERR_INVALID_ARGUMENT;
+
+    size_t added = 0;
+    for (size_t i = 0; i < event_count && added < SC_PROACTIVE_EVENT_FOLLOW_UP_CAP; i++) {
+        const sc_extracted_event_t *ev = &events[i];
+        if (ev->confidence < 0.5)
+            continue;
+        if (out->count >= SC_PROACTIVE_MAX_ACTIONS)
+            break;
+
+        const char *desc = ev->description ? ev->description : "something";
+        size_t desc_len = ev->description ? ev->description_len : 8;
+        const char *temporal = ev->temporal_ref ? ev->temporal_ref : "";
+        size_t temporal_len = ev->temporal_ref ? ev->temporal_ref_len : 0;
+
+        char msg[384];
+        int n;
+        if (temporal_len > 0) {
+            n = snprintf(msg, sizeof(msg),
+                        "You mentioned '%.*s' (%.*s). Worth checking in about how it went.",
+                        (int)desc_len, desc, (int)temporal_len, temporal);
+        } else {
+            n = snprintf(msg, sizeof(msg),
+                        "You mentioned '%.*s'. Worth checking in about how it went.",
+                        (int)desc_len, desc);
+        }
+        if (n <= 0 || (size_t)n >= sizeof(msg))
+            continue;
+
+        sc_proactive_action_t *act = &out->actions[out->count];
+        act->type = SC_PROACTIVE_CHECK_IN;
+        act->message = sc_strndup(alloc, msg, (size_t)n);
+        if (!act->message)
+            return SC_ERR_OUT_OF_MEMORY;
+        act->message_len = (size_t)n;
+        act->priority = ev->confidence;
+        out->count++;
+        added++;
+    }
+    return SC_OK;
+}
+
 sc_error_t sc_proactive_build_context(const sc_proactive_result_t *result,
                                        sc_allocator_t *alloc, size_t max_actions,
                                        char **out, size_t *out_len) {
@@ -212,6 +302,117 @@ sc_error_t sc_proactive_build_context(const sc_proactive_result_t *result,
         buf[len++] = '\n';
     }
     buf[len] = '\0';
+
+    *out = buf;
+    *out_len = len;
+    return SC_OK;
+}
+
+sc_error_t sc_proactive_build_starter(sc_allocator_t *alloc, sc_memory_t *memory,
+                                       const char *contact_id, size_t contact_id_len,
+                                       char **out, size_t *out_len) {
+    if (!alloc || !out || !out_len)
+        return SC_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
+
+    if (!memory || !memory->vtable || !memory->vtable->recall)
+        return SC_ERR_INVALID_ARGUMENT;
+
+    static const char QUERY[] = "recent topics activities interests";
+    sc_memory_entry_t *entries = NULL;
+    size_t count = 0;
+    sc_error_t err = memory->vtable->recall(memory->ctx, alloc, QUERY, sizeof(QUERY) - 1, 5,
+                                            contact_id, contact_id_len, &entries, &count);
+
+    if (err != SC_OK || !entries || count == 0) {
+        if (entries) {
+            for (size_t i = 0; i < count; i++)
+                sc_memory_entry_free_fields(alloc, &entries[i]);
+            alloc->free(alloc->ctx, entries, count * sizeof(sc_memory_entry_t));
+        }
+        return SC_OK; /* caller falls back to generic check-in */
+    }
+
+    size_t cap = 256;
+    char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+    if (!buf) {
+        for (size_t i = 0; i < count; i++)
+            sc_memory_entry_free_fields(alloc, &entries[i]);
+        alloc->free(alloc->ctx, entries, count * sizeof(sc_memory_entry_t));
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+    size_t len = 0;
+    buf[0] = '\0';
+
+    static const char HEADER[] =
+        "### Conversation Starter Context\n"
+        "Based on past conversations, consider opening with one of these topics:\n";
+    size_t hlen = sizeof(HEADER) - 1;
+    while (len + hlen + 1 > cap) {
+        size_t new_cap = cap * 2;
+        char *nb = (char *)alloc->realloc(alloc->ctx, buf, cap, new_cap);
+        if (!nb) {
+            alloc->free(alloc->ctx, buf, cap);
+            for (size_t i = 0; i < count; i++)
+                sc_memory_entry_free_fields(alloc, &entries[i]);
+            alloc->free(alloc->ctx, entries, count * sizeof(sc_memory_entry_t));
+            return SC_ERR_OUT_OF_MEMORY;
+        }
+        buf = nb;
+        cap = new_cap;
+    }
+    memcpy(buf, HEADER, hlen);
+    len = hlen;
+
+    for (size_t i = 0; i < count; i++) {
+        if (!entries[i].content || entries[i].content_len == 0)
+            continue;
+        size_t show = entries[i].content_len > 100 ? 100 : entries[i].content_len;
+        size_t need = len + 2 + show + 2; /* "- " + content + "\n" */
+        while (need > cap) {
+            size_t new_cap = cap * 2;
+            char *nb = (char *)alloc->realloc(alloc->ctx, buf, cap, new_cap);
+            if (!nb) {
+                alloc->free(alloc->ctx, buf, cap);
+                for (size_t j = 0; j < count; j++)
+                    sc_memory_entry_free_fields(alloc, &entries[j]);
+                alloc->free(alloc->ctx, entries, count * sizeof(sc_memory_entry_t));
+                return SC_ERR_OUT_OF_MEMORY;
+            }
+            buf = nb;
+            cap = new_cap;
+        }
+        buf[len++] = '-';
+        buf[len++] = ' ';
+        memcpy(buf + len, entries[i].content, show);
+        len += show;
+        buf[len++] = '\n';
+    }
+
+    static const char FOOTER[] =
+        "Pick the most natural one. Don't force it — only mention if it flows naturally.\n";
+    size_t flen = sizeof(FOOTER) - 1;
+    while (len + flen + 1 > cap) {
+        size_t new_cap = cap * 2;
+        char *nb = (char *)alloc->realloc(alloc->ctx, buf, cap, new_cap);
+        if (!nb) {
+            alloc->free(alloc->ctx, buf, cap);
+            for (size_t i = 0; i < count; i++)
+                sc_memory_entry_free_fields(alloc, &entries[i]);
+            alloc->free(alloc->ctx, entries, count * sizeof(sc_memory_entry_t));
+            return SC_ERR_OUT_OF_MEMORY;
+        }
+        buf = nb;
+        cap = new_cap;
+    }
+    memcpy(buf + len, FOOTER, flen);
+    len += flen;
+    buf[len] = '\0';
+
+    for (size_t i = 0; i < count; i++)
+        sc_memory_entry_free_fields(alloc, &entries[i]);
+    alloc->free(alloc->ctx, entries, count * sizeof(sc_memory_entry_t));
 
     *out = buf;
     *out_len = len;

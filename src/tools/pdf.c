@@ -4,6 +4,7 @@
 #include "seaclaw/core/process_util.h"
 #include "seaclaw/core/string.h"
 #include "seaclaw/tool.h"
+#include "seaclaw/tools/validation.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,6 +32,10 @@ static sc_error_t pdf_execute(void *ctx, sc_allocator_t *alloc, const sc_json_va
     const char *path = sc_json_get_string(args, "path");
     if (!path || strlen(path) == 0) {
         *out = sc_tool_result_fail("missing path", 12);
+        return SC_OK;
+    }
+    if (sc_tool_validate_path(path, NULL, 0) != SC_OK) {
+        *out = sc_tool_result_fail("path not allowed", 16);
         return SC_OK;
     }
 #if SC_IS_TEST

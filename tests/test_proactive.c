@@ -1,7 +1,11 @@
 #include "seaclaw/agent/commitment.h"
 #include "seaclaw/agent/proactive.h"
+#include "seaclaw/context/event_extract.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#include "seaclaw/core/string.h"
+#include "seaclaw/memory.h"
+#include "seaclaw/memory/engines.h"
 #include "test_framework.h"
 #include <string.h>
 
@@ -203,6 +207,215 @@ static void proactive_no_actions_at_normal_time(void) {
     sc_proactive_result_deinit(&result, &alloc);
 }
 
+#define MS_PER_HOUR (3600ULL * 1000ULL)
+
+static void proactive_silence_triggers_after_threshold(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_proactive_result_t result;
+    memset(&result, 0, sizeof(result));
+
+    uint64_t now_ms = 1000000000000ULL;
+    uint64_t last_contact_ms = now_ms - (4 * 24 * MS_PER_HOUR);
+    sc_silence_config_t config = {.threshold_hours = 72, .enabled = true};
+
+    SC_ASSERT_EQ(sc_proactive_check_silence(&alloc, last_contact_ms, now_ms, &config, &result),
+                 SC_OK);
+    SC_ASSERT_EQ(result.count, 1u);
+    SC_ASSERT_EQ(result.actions[0].type, SC_PROACTIVE_CHECK_IN);
+    SC_ASSERT_EQ(result.actions[0].priority, 0.85);
+    SC_ASSERT_NOT_NULL(result.actions[0].message);
+
+    sc_proactive_result_deinit(&result, &alloc);
+}
+
+static void proactive_silence_no_trigger_within_threshold(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_proactive_result_t result;
+    memset(&result, 0, sizeof(result));
+
+    uint64_t now_ms = 1000000000000ULL;
+    uint64_t last_contact_ms = now_ms - (1 * 24 * MS_PER_HOUR);
+    sc_silence_config_t config = {.threshold_hours = 72, .enabled = true};
+
+    SC_ASSERT_EQ(sc_proactive_check_silence(&alloc, last_contact_ms, now_ms, &config, &result),
+                 SC_OK);
+    SC_ASSERT_EQ(result.count, 0u);
+
+    sc_proactive_result_deinit(&result, &alloc);
+}
+
+static void proactive_silence_week_message(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_proactive_result_t result;
+    memset(&result, 0, sizeof(result));
+
+    uint64_t now_ms = 1000000000000ULL;
+    uint64_t last_contact_ms = now_ms - (8 * 24 * MS_PER_HOUR);
+    sc_silence_config_t config = {.threshold_hours = 72, .enabled = true};
+
+    SC_ASSERT_EQ(sc_proactive_check_silence(&alloc, last_contact_ms, now_ms, &config, &result),
+                 SC_OK);
+    SC_ASSERT_EQ(result.count, 1u);
+    SC_ASSERT_NOT_NULL(result.actions[0].message);
+    SC_ASSERT_TRUE(strstr(result.actions[0].message, "week") != NULL);
+
+    sc_proactive_result_deinit(&result, &alloc);
+}
+
+static void proactive_starter_with_memory(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_memory_t mem = sc_memory_lru_create(&alloc, 100);
+    SC_ASSERT_NOT_NULL(mem.ctx);
+
+    static const char topic_cat[] = "conversation";
+    sc_memory_category_t cat = {
+        .tag = SC_MEMORY_CATEGORY_CUSTOM,
+        .data.custom = {.name = topic_cat, .name_len = sizeof(topic_cat) - 1},
+    };
+
+    const char *key1 = "topic:contact_a:1";
+    const char *content1 =
+        "recent topics activities interests: user wanted to try that pasta recipe";
+    static const char CONTACT[] = "contact_a";
+    mem.vtable->store(mem.ctx, key1, strlen(key1), content1, strlen(content1), &cat, CONTACT,
+                      sizeof(CONTACT) - 1);
+
+    const char *key2 = "topic:contact_a:2";
+    const char *content2 = "recent topics activities interests: new apartment move";
+    mem.vtable->store(mem.ctx, key2, strlen(key2), content2, strlen(content2), &cat, CONTACT,
+                      sizeof(CONTACT) - 1);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err =
+        sc_proactive_build_starter(&alloc, &mem, CONTACT, sizeof(CONTACT) - 1, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NOT_NULL(out);
+    SC_ASSERT_TRUE(out_len > 0);
+    SC_ASSERT_TRUE(strstr(out, "Conversation Starter") != NULL);
+    SC_ASSERT_TRUE(strstr(out, "pasta recipe") != NULL || strstr(out, "new apartment") != NULL);
+
+    alloc.free(alloc.ctx, out, out_len + 1);
+    if (mem.vtable->deinit)
+        mem.vtable->deinit(mem.ctx);
+}
+
+static void proactive_starter_empty_memory(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_memory_t mem = sc_memory_lru_create(&alloc, 100);
+    SC_ASSERT_NOT_NULL(mem.ctx);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err =
+        sc_proactive_build_starter(&alloc, &mem, "contact_empty", 13, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_OK);
+    SC_ASSERT_NULL(out);
+    SC_ASSERT_EQ(out_len, 0);
+
+    if (mem.vtable->deinit)
+        mem.vtable->deinit(mem.ctx);
+}
+
+static void proactive_starter_null_memory(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    char *out = NULL;
+    size_t out_len = 0;
+    sc_error_t err = sc_proactive_build_starter(&alloc, NULL, "contact_a", 9, &out, &out_len);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_NULL(out);
+}
+
+static void proactive_silence_disabled(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_proactive_result_t result;
+    memset(&result, 0, sizeof(result));
+
+    uint64_t now_ms = 1000000000000ULL;
+    uint64_t last_contact_ms = now_ms - (4 * 24 * MS_PER_HOUR);
+    sc_silence_config_t config = {.threshold_hours = 72, .enabled = false};
+
+    SC_ASSERT_EQ(sc_proactive_check_silence(&alloc, last_contact_ms, now_ms, &config, &result),
+                 SC_OK);
+    SC_ASSERT_EQ(result.count, 0u);
+
+    sc_proactive_result_deinit(&result, &alloc);
+}
+
+static void proactive_event_follow_up(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_proactive_result_t result;
+    memset(&result, 0, sizeof(result));
+
+    sc_extracted_event_t event;
+    memset(&event, 0, sizeof(event));
+    event.description = sc_strndup(&alloc, "interview", 9);
+    event.description_len = 9;
+    event.temporal_ref = sc_strndup(&alloc, "Tuesday", 7);
+    event.temporal_ref_len = 7;
+    event.confidence = 0.8;
+
+    SC_ASSERT_EQ(sc_proactive_check_events(&alloc, &event, 1, &result), SC_OK);
+    SC_ASSERT_EQ(result.count, 1u);
+    SC_ASSERT_EQ(result.actions[0].type, SC_PROACTIVE_CHECK_IN);
+    SC_ASSERT_NOT_NULL(result.actions[0].message);
+    SC_ASSERT_TRUE(strstr(result.actions[0].message, "interview") != NULL);
+    SC_ASSERT_TRUE(strstr(result.actions[0].message, "Tuesday") != NULL);
+    SC_ASSERT_EQ(result.actions[0].priority, 0.8);
+
+    alloc.free(alloc.ctx, event.description, event.description_len + 1);
+    alloc.free(alloc.ctx, event.temporal_ref, event.temporal_ref_len + 1);
+    sc_proactive_result_deinit(&result, &alloc);
+}
+
+static void proactive_event_low_confidence_skipped(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_proactive_result_t result;
+    memset(&result, 0, sizeof(result));
+
+    sc_extracted_event_t event;
+    memset(&event, 0, sizeof(event));
+    event.description = sc_strndup(&alloc, "meeting", 7);
+    event.description_len = 7;
+    event.temporal_ref = sc_strndup(&alloc, "soon", 4);
+    event.temporal_ref_len = 4;
+    event.confidence = 0.3;
+
+    SC_ASSERT_EQ(sc_proactive_check_events(&alloc, &event, 1, &result), SC_OK);
+    SC_ASSERT_EQ(result.count, 0u);
+
+    alloc.free(alloc.ctx, event.description, event.description_len + 1);
+    alloc.free(alloc.ctx, event.temporal_ref, event.temporal_ref_len + 1);
+    sc_proactive_result_deinit(&result, &alloc);
+}
+
+static void proactive_event_cap_at_three(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_proactive_result_t result;
+    memset(&result, 0, sizeof(result));
+
+    sc_extracted_event_t events[5];
+    memset(events, 0, sizeof(events));
+    const char *descs[] = {"a", "b", "c", "d", "e"};
+    const char *temps[] = {"Mon", "Tue", "Wed", "Thu", "Fri"};
+    for (int i = 0; i < 5; i++) {
+        events[i].description = sc_strndup(&alloc, descs[i], 1);
+        events[i].description_len = 1;
+        events[i].temporal_ref = sc_strndup(&alloc, temps[i], 3);
+        events[i].temporal_ref_len = 3;
+        events[i].confidence = 0.9;
+    }
+
+    SC_ASSERT_EQ(sc_proactive_check_events(&alloc, events, 5, &result), SC_OK);
+    SC_ASSERT_EQ(result.count, 3u);
+
+    for (int i = 0; i < 5; i++) {
+        alloc.free(alloc.ctx, events[i].description, events[i].description_len + 1);
+        alloc.free(alloc.ctx, events[i].temporal_ref, events[i].temporal_ref_len + 1);
+    }
+    sc_proactive_result_deinit(&result, &alloc);
+}
+
 void run_proactive_tests(void) {
     SC_TEST_SUITE("proactive");
     SC_RUN_TEST(proactive_milestone_at_10_sessions);
@@ -215,4 +428,14 @@ void run_proactive_tests(void) {
     SC_RUN_TEST(proactive_check_null_out_fails);
     SC_RUN_TEST(proactive_result_deinit_null_safe);
     SC_RUN_TEST(proactive_no_actions_at_normal_time);
+    SC_RUN_TEST(proactive_silence_triggers_after_threshold);
+    SC_RUN_TEST(proactive_silence_no_trigger_within_threshold);
+    SC_RUN_TEST(proactive_silence_week_message);
+    SC_RUN_TEST(proactive_silence_disabled);
+    SC_RUN_TEST(proactive_starter_with_memory);
+    SC_RUN_TEST(proactive_starter_empty_memory);
+    SC_RUN_TEST(proactive_starter_null_memory);
+    SC_RUN_TEST(proactive_event_follow_up);
+    SC_RUN_TEST(proactive_event_low_confidence_skipped);
+    SC_RUN_TEST(proactive_event_cap_at_three);
 }

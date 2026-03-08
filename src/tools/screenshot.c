@@ -32,6 +32,10 @@ static sc_error_t screenshot_execute(void *ctx, sc_allocator_t *alloc, const sc_
     const char *filename = args ? sc_json_get_string(args, "filename") : NULL;
     if (!filename || filename[0] == '\0')
         filename = SC_SCREENSHOT_DEFAULT;
+    if (sc_tool_validate_path(filename, NULL, 0) != SC_OK) {
+        *out = sc_tool_result_fail("filename not allowed", 20);
+        return SC_OK;
+    }
 #if SC_IS_TEST
     size_t need = 9 + strlen(filename);
     char *msg = (char *)alloc->alloc(alloc->ctx, need + 1);

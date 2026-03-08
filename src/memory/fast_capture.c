@@ -65,8 +65,15 @@ static void add_entity(sc_fc_result_t *out, sc_allocator_t *alloc, const char *n
         return;
     sc_fc_entity_match_t *e = &out->entities[out->entity_count];
     e->name = sc_strndup(alloc, name, name_len);
+    if (!e->name)
+        return;
     e->name_len = name_len;
     e->type = sc_strndup(alloc, type, type_len);
+    if (!e->type) {
+        alloc->free(alloc->ctx, e->name, name_len + 1);
+        e->name = NULL;
+        return;
+    }
     e->type_len = type_len;
     e->confidence = confidence;
     e->offset = offset;

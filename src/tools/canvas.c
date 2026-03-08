@@ -1,6 +1,7 @@
 #include "seaclaw/tools/canvas.h"
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
+#include "seaclaw/tools/validation.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,8 +30,23 @@ typedef struct {
     char persist_dir[512];
 } canvas_ctx_t;
 
+static int canvas_id_is_safe(const char *id) {
+    if (!id || id[0] == '\0')
+        return 0;
+    for (const char *p = id; *p; p++) {
+        unsigned char ch = (unsigned char)*p;
+        if (ch == '/' || ch == '\\' || ch == '\0')
+            return 0;
+    }
+    if (strstr(id, "..") != NULL)
+        return 0;
+    return 1;
+}
+
 static void canvas_persist_doc(canvas_ctx_t *c, canvas_doc_t *doc) {
     if (!c->persist_dir[0] || !doc->id)
+        return;
+    if (!canvas_id_is_safe(doc->id))
         return;
     char path[1024];
     int n = snprintf(path, sizeof(path), "%s/%s.md", c->persist_dir, doc->id);
@@ -46,7 +62,7 @@ static void canvas_persist_doc(canvas_ctx_t *c, canvas_doc_t *doc) {
     fclose(f);
 }
 static void canvas_remove_file(canvas_ctx_t *c, const char *id) {
-    if (!c->persist_dir[0] || !id)
+    if (!c->persist_dir[0] || !id || !canvas_id_is_safe(id))
         return;
     char path[1024];
     int n = snprintf(path, sizeof(path), "%s/%s.md", c->persist_dir, id);

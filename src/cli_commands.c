@@ -264,7 +264,7 @@ sc_error_t cmd_memory(sc_allocator_t *alloc, int argc, char **argv) {
         err = SC_ERR_INVALID_ARGUMENT;
     }
 done:
-    if (mem.vtable->deinit)
+    if (mem.vtable && mem.vtable->deinit)
         mem.vtable->deinit(mem.ctx);
     sc_config_deinit(&cfg);
     return err;

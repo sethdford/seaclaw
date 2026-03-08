@@ -5,6 +5,7 @@
 #include "seaclaw/core/string.h"
 #include "seaclaw/security.h"
 #include "seaclaw/security/sandbox.h"
+#include "seaclaw/tools/validation.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -106,6 +107,8 @@ static sc_error_t run_claude_code(sc_allocator_t *alloc, sc_security_policy_t *p
         close(stdout_fds[1]);
 
         if (working_dir && strlen(working_dir) > 0) {
+            if (sc_tool_validate_path(working_dir, NULL, 0) != SC_OK)
+                _exit(126);
             if (chdir(working_dir) != 0)
                 _exit(126);
         }
