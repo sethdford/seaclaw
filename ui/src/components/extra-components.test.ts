@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-// sc-composer: see sc-composer.test.ts
 
 import "./floating-mic.js";
 import "./sidebar.js";

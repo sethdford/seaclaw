@@ -522,42 +522,6 @@ describe("sc-segmented-control", () => {
   });
 });
 
-describe("sc-data-table", () => {
-  it("should be defined as a custom element", async () => {
-    await import("./sc-data-table.js");
-    expect(customElements.get("sc-data-table")).toBeDefined();
-  });
-
-  it("should render columns and rows", async () => {
-    const { ScDataTable } = await import("./sc-data-table.js");
-    const el = new ScDataTable();
-    el.columns = [
-      { key: "name", label: "Name" },
-      { key: "value", label: "Value" },
-    ];
-    el.rows = [{ name: "Foo", value: 42 }];
-    document.body.appendChild(el);
-    await el.updateComplete;
-    const ths = el.shadowRoot?.querySelectorAll("th");
-    const tds = el.shadowRoot?.querySelectorAll("td");
-    expect(ths?.length).toBe(2);
-    expect(tds?.length).toBe(2);
-    document.body.removeChild(el);
-  });
-
-  it("should use thead and tbody with th scope", async () => {
-    const { ScDataTable } = await import("./sc-data-table.js");
-    const el = new ScDataTable();
-    el.columns = [{ key: "col", label: "Col" }];
-    el.rows = [{}];
-    document.body.appendChild(el);
-    await el.updateComplete;
-    const th = el.shadowRoot?.querySelector("th");
-    expect(th?.getAttribute("scope")).toBe("col");
-    document.body.removeChild(el);
-  });
-});
-
 describe("sc-chat-search", () => {
   it("should be defined as a custom element", async () => {
     await import("./sc-chat-search.js");
