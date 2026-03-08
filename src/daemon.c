@@ -705,6 +705,25 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         sc_persona_find_contact(agent->persona, batch_key, key_len);
                     if (cp) {
                         sc_contact_profile_build_context(alloc, cp, &contact_ctx, &contact_ctx_len);
+
+                        size_t iw_len = 0;
+                        char *iw_ctx = sc_persona_build_inner_world_context(
+                            alloc, agent->persona, cp->relationship_stage, &iw_len);
+                        if (iw_ctx && iw_len > 0 && contact_ctx) {
+                            size_t total = contact_ctx_len + iw_len + 1;
+                            char *merged = (char *)alloc->alloc(alloc->ctx, total);
+                            if (merged) {
+                                memcpy(merged, contact_ctx, contact_ctx_len);
+                                memcpy(merged + contact_ctx_len, iw_ctx, iw_len);
+                                merged[total - 1] = '\0';
+                                alloc->free(alloc->ctx, contact_ctx, contact_ctx_len + 1);
+                                contact_ctx = merged;
+                                contact_ctx_len = total - 1;
+                            }
+                            alloc->free(alloc->ctx, iw_ctx, iw_len + 1);
+                        } else if (iw_ctx) {
+                            alloc->free(alloc->ctx, iw_ctx, iw_len + 1);
+                        }
                     }
                 }
 #endif
@@ -861,6 +880,31 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* Brief mode: force ultra-short response */
                 if (brief_mode && max_chars > 50)
                     max_chars = 50;
+
+                /* Honesty guardrail: inject if they asked "did you do X?" */
+                {
+                    char *honesty = sc_conversation_honesty_check(alloc, combined, combined_len);
+                    if (honesty && convo_ctx) {
+                        size_t h_len = strlen(honesty);
+                        size_t total = convo_ctx_len + h_len + 2;
+                        char *merged = (char *)alloc->alloc(alloc->ctx, total);
+                        if (merged) {
+                            memcpy(merged, convo_ctx, convo_ctx_len);
+                            merged[convo_ctx_len] = '\n';
+                            memcpy(merged + convo_ctx_len + 1, honesty, h_len);
+                            merged[total - 1] = '\0';
+                            alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                            convo_ctx = merged;
+                            convo_ctx_len = total - 1;
+                        }
+                        alloc->free(alloc->ctx, honesty, h_len + 1);
+                    } else if (honesty && !convo_ctx) {
+                        convo_ctx = honesty;
+                        convo_ctx_len = strlen(honesty);
+                    } else if (honesty) {
+                        alloc->free(alloc->ctx, honesty, strlen(honesty) + 1);
+                    }
+                }
 
                 /* Set agent per-turn context fields (prompt builder reads these) */
                 agent->contact_context = contact_ctx;
