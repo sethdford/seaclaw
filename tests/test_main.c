@@ -49,6 +49,8 @@ void run_process_util_tests(void);
 void run_prompt_tests(void);
 #ifdef SC_ENABLE_PERSONA
 void run_persona_tests(void);
+void run_circadian_tests(void);
+void run_relationship_tests(void);
 #endif
 void run_lifecycle_tests(void);
 void run_observer_tests(void);
@@ -166,6 +168,8 @@ int main(void) {
     run_prompt_tests();
 #ifdef SC_ENABLE_PERSONA
     run_persona_tests();
+    run_circadian_tests();
+    run_relationship_tests();
 #endif
     run_lifecycle_tests();
     run_observer_tests();

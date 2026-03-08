@@ -9,6 +9,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 typedef struct sc_persona_overlay {
     char *channel;
@@ -17,6 +18,10 @@ typedef struct sc_persona_overlay {
     char *emoji_usage;
     char **style_notes;
     size_t style_notes_count;
+    bool message_splitting;
+    uint32_t max_segment_chars;
+    char **typing_quirks;
+    size_t typing_quirks_count;
 } sc_persona_overlay_t;
 
 typedef struct sc_persona_example {

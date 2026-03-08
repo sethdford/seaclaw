@@ -575,6 +575,8 @@ if(SC_ENABLE_PERSONA)
         src/persona/creator.c
         src/persona/cli.c
         src/persona/feedback.c
+        src/persona/circadian.c
+        src/persona/relationship.c
         src/tools/persona.c
     )
 endif()
@@ -1130,8 +1132,8 @@ endif()
 if(NOT SC_ENABLE_PERSONA)
     list(APPEND SC_TEST_EXTRA_MODULES
         src/persona/persona.c src/persona/examples.c src/persona/sampler.c
-        src/persona/analyzer.c src/persona/creator.c src/persona/cli.c src/persona/feedback.c
-        src/tools/persona.c)
+        src/persona/analyzer.c src/persona/creator.c         src/persona/cli.c src/persona/feedback.c
+        src/persona/circadian.c src/persona/relationship.c src/tools/persona.c)
 endif()
 add_library(seaclaw_core_test STATIC ${SC_CORE_SOURCES} ${SC_TEST_EXTRA_CHANNELS} ${SC_TEST_EXTRA_MODULES} ${SC_CRYPTO_SOURCES} ${SC_ASM_SOURCES})
 target_include_directories(seaclaw_core_test PUBLIC ${SC_ROOT}/include)
@@ -1397,7 +1399,7 @@ set(SC_TEST_SOURCES
     tests/test_pattern_radar.c
 )
 if(SC_ENABLE_PERSONA)
-    list(APPEND SC_TEST_SOURCES tests/test_persona.c)
+    list(APPEND SC_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c)
 endif()
 
 add_executable(seaclaw_tests ${SC_TEST_SOURCES} wasm/wasm_alloc.c)
