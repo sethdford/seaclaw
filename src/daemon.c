@@ -1365,7 +1365,10 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
                                                               ));
 
+                    fprintf(stderr, "[seaclaw] reading delay: %dms (hour=%d)\n", (int)adjusted,
+                            bth_hour);
                     usleep((useconds_t)((unsigned int)adjusted * 1000));
+                    fprintf(stderr, "[seaclaw] delay done, building context...\n");
                 }
 #else
                 {
@@ -2806,6 +2809,8 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                 bool retried = false;
+                fprintf(stderr, "[seaclaw] calling agent turn for %.*s...\n",
+                        (int)(key_len > 20 ? 20 : key_len), batch_key);
                 sc_error_t err = SC_OK;
                 do {
                     if (response) {

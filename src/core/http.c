@@ -2,6 +2,7 @@
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -587,6 +588,22 @@ sc_error_t sc_http_request(sc_allocator_t *alloc, const char *url, const char *m
     return SC_ERR_NOT_SUPPORTED;
 }
 #endif
+
+sc_error_t sc_http_patch_json(sc_allocator_t *alloc, const char *url, const char *auth_header,
+                              const char *json_body, size_t json_body_len,
+                              sc_http_response_t *out) {
+    char headers[512];
+    size_t n = 0;
+    if (auth_header && auth_header[0]) {
+        n = (size_t)snprintf(headers, sizeof(headers),
+                             "Authorization: %s\nContent-Type: application/json", auth_header);
+    } else {
+        n = (size_t)snprintf(headers, sizeof(headers), "Content-Type: application/json");
+    }
+    if (n >= sizeof(headers))
+        return SC_ERR_INVALID_ARGUMENT;
+    return sc_http_request(alloc, url, "PATCH", headers, json_body, json_body_len, out);
+}
 
 #if defined(SC_HTTP_CURL) && !SC_IS_TEST
 sc_error_t sc_http_post_json_stream(sc_allocator_t *alloc, const char *url, const char *auth_header,
