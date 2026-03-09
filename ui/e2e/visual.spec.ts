@@ -23,6 +23,8 @@ const ALL_VIEWS = [
   { name: "voice", hash: "#voice" },
   { name: "nodes", hash: "#nodes" },
   { name: "usage", hash: "#usage" },
+  { name: "memory", hash: "#memory" },
+  { name: "metrics", hash: "#metrics" },
   { name: "security", hash: "#security" },
   { name: "logs", hash: "#logs" },
 ];

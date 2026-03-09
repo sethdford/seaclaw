@@ -679,3 +679,191 @@ test.describe("Metrics (Demo)", () => {
     }).toPass({ timeout: POLL });
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Security View
+// ─────────────────────────────────────────────────────────────
+test.describe("Security (Demo)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#security");
+    await waitForViewReady(page, "sc-security-view");
+  });
+
+  test("shows stat cards", async ({ page }) => {
+    await expect(async () => {
+      const count = await page.evaluate(shadowCount("sc-security-view", "sc-stat-card"));
+      expect(count).toBeGreaterThanOrEqual(3);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows Autonomy Level section", async ({ page }) => {
+    await expect(async () => {
+      const text = await page.evaluate(deepText("sc-security-view"));
+      expect(text).toContain("Autonomy");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows Sandbox and Network Proxy sections", async ({ page }) => {
+    await expect(async () => {
+      const text = await page.evaluate(deepText("sc-security-view"));
+      expect(text).toContain("Sandbox");
+      expect(text).toContain("Network");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows Pairing section", async ({ page }) => {
+    await expect(async () => {
+      const text = await page.evaluate(deepText("sc-security-view"));
+      expect(text).toContain("Pairing");
+    }).toPass({ timeout: POLL });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Usage View
+// ─────────────────────────────────────────────────────────────
+test.describe("Usage (Demo)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#usage");
+    await waitForViewReady(page, "sc-usage-view");
+  });
+
+  test("shows stat cards", async ({ page }) => {
+    await expect(async () => {
+      const count = await page.evaluate(shadowCount("sc-usage-view", "sc-stat-card"));
+      expect(count).toBeGreaterThanOrEqual(3);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows cost by provider", async ({ page }) => {
+    await expect(async () => {
+      const text = await page.evaluate(deepText("sc-usage-view"));
+      expect(text).toContain("Cost");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("has time range segmented control", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("sc-usage-view", "sc-segmented-control"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("has export button", async ({ page }) => {
+    await expect(async () => {
+      const text = await page.evaluate(deepText("sc-usage-view"));
+      expect(text).toContain("Export");
+    }).toPass({ timeout: POLL });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Config View
+// ─────────────────────────────────────────────────────────────
+test.describe("Config (Demo)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#config");
+    await waitForViewReady(page, "sc-config-view");
+  });
+
+  test("shows page hero", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("sc-config-view", "sc-page-hero"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows form fields for provider and model", async ({ page }) => {
+    await expect(async () => {
+      const count = await page.evaluate(shadowCount("sc-config-view", "sc-combobox"));
+      expect(count).toBeGreaterThanOrEqual(1);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("has Save and Raw JSON toggle buttons", async ({ page }) => {
+    await expect(async () => {
+      const text = await page.evaluate(deepText("sc-config-view"));
+      expect(text).toContain("Save");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows configuration sections", async ({ page }) => {
+    await expect(async () => {
+      const text = await page.evaluate(deepText("sc-config-view"));
+      expect(text).toContain("Configuration");
+    }).toPass({ timeout: POLL });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Automations View
+// ─────────────────────────────────────────────────────────────
+test.describe("Automations (Demo)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#automations");
+    await waitForViewReady(page, "sc-automations-view");
+  });
+
+  test("shows stat cards", async ({ page }) => {
+    await expect(async () => {
+      const count = await page.evaluate(shadowCount("sc-automations-view", "sc-stat-card"));
+      expect(count).toBeGreaterThanOrEqual(3);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("has New Automation button", async ({ page }) => {
+    await expect(async () => {
+      const text = await page.evaluate(deepText("sc-automations-view"));
+      expect(text).toContain("New");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows automation cards", async ({ page }) => {
+    await expect(async () => {
+      const count = await page.evaluate(shadowCount("sc-automations-view", "sc-automation-card"));
+      expect(count).toBeGreaterThanOrEqual(1);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows tabs for Agent Tasks and Shell Jobs", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("sc-automations-view", "sc-tabs"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Channels View
+// ─────────────────────────────────────────────────────────────
+test.describe("Channels (Demo)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#channels");
+    await waitForViewReady(page, "sc-channels-view");
+  });
+
+  test("shows stat cards", async ({ page }) => {
+    await expect(async () => {
+      const count = await page.evaluate(shadowCount("sc-channels-view", "sc-stat-card"));
+      expect(count).toBeGreaterThanOrEqual(3);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows channels data table", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("sc-channels-view", "sc-data-table-v2"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("has filter segmented control", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("sc-channels-view", "sc-segmented-control"))).toBe(
+        true,
+      );
+    }).toPass({ timeout: POLL });
+  });
+
+  test("has Refresh button", async ({ page }) => {
+    await expect(async () => {
+      const text = await page.evaluate(deepText("sc-channels-view"));
+      expect(text).toContain("Refresh");
+    }).toPass({ timeout: POLL });
+  });
+});
