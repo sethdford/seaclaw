@@ -29,6 +29,24 @@ interface MemoryStatus {
   last_consolidation?: string;
 }
 
+interface GraphEntity {
+  id: number;
+  name: string;
+  type: string;
+  recall_count: number;
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+}
+
+interface GraphRelation {
+  source: number;
+  target: number;
+  type: string;
+  weight: number;
+}
+
 const CATEGORY_OPTIONS = [
   { value: "all", label: "All" },
   { value: "core", label: "Core" },
@@ -187,6 +205,8 @@ export class ScMemoryView extends GatewayAwareLitElement {
   @state() private searchQuery = "";
   @state() private categoryFilter = "all";
   @state() private consolidating = false;
+  @state() private graphEntities: GraphEntity[] = [];
+  @state() private graphRelations: GraphRelation[] = [];
 
   protected override autoRefreshInterval = 30_000;
 
@@ -196,16 +216,26 @@ export class ScMemoryView extends GatewayAwareLitElement {
     this.loading = true;
     this.error = "";
     try {
-      const [statusRes, listRes] = await Promise.all([
+      const [statusRes, listRes, graphRes] = await Promise.all([
         gw.request<MemoryStatus>("memory.status"),
         gw.request<{ entries?: MemoryEntry[] }>("memory.list"),
+        gw
+          .request<{ entities?: GraphEntity[]; relations?: GraphRelation[] }>("memory.graph")
+          .catch(() => ({ entities: [], relations: [] })),
       ]);
       this.status = statusRes ?? null;
       this.entries = listRes?.entries ?? [];
+      this.graphEntities = graphRes?.entities ?? [];
+      this.graphRelations = graphRes?.relations ?? [];
+      if (this.graphEntities.length > 0) {
+        this._runGraphSimulation();
+      }
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Failed to load memory data";
       this.status = null;
       this.entries = [];
+      this.graphEntities = [];
+      this.graphRelations = [];
     } finally {
       this.loading = false;
     }
@@ -255,6 +285,111 @@ export class ScMemoryView extends GatewayAwareLitElement {
     } catch (e) {
       this.actionError = e instanceof Error ? e.message : "Failed to forget";
     }
+  }
+
+  private _runGraphSimulation(): void {
+    const entities = this.graphEntities;
+    const relations = this.graphRelations;
+    if (entities.length === 0) return;
+
+    const W = 400;
+    const H = 400;
+    const centerX = W / 2;
+    const centerY = H / 2;
+    const radius = Math.min(W, H) * 0.35;
+
+    // Circle layout init
+    const n = entities.length;
+    for (let i = 0; i < n; i++) {
+      const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+      entities[i].x = centerX + radius * Math.cos(angle);
+      entities[i].y = centerY + radius * Math.sin(angle);
+      entities[i].vx = 0;
+      entities[i].vy = 0;
+    }
+
+    const idToIdx = new Map<number, number>();
+    entities.forEach((e: GraphEntity, i: number) => idToIdx.set(e.id, i));
+
+    const REPULSE = 800;
+    const ATTRACT = 0.02;
+    const CENTER = 0.01;
+    const DAMP = 0.85;
+    const MAX_ITER = 200;
+    const STABLE_THRESH = 0.5;
+
+    let iter = 0;
+    const step = (): void => {
+      let maxDx = 0;
+      let maxDy = 0;
+
+      for (let i = 0; i < n; i++) {
+        let fx = 0;
+        let fy = 0;
+        const xi = entities[i].x ?? centerX;
+        const yi = entities[i].y ?? centerY;
+
+        // Repulsion from other nodes
+        for (let j = 0; j < n; j++) {
+          if (i === j) continue;
+          const xj = entities[j].x ?? centerX;
+          const yj = entities[j].y ?? centerY;
+          const dx = xi - xj;
+          const dy = yi - yj;
+          const d = Math.sqrt(dx * dx + dy * dy) || 0.1;
+          const f = REPULSE / (d * d);
+          fx += (dx / d) * f;
+          fy += (dy / d) * f;
+        }
+
+        // Attraction along edges
+        for (const r of relations) {
+          const si = idToIdx.get(r.source);
+          const ti = idToIdx.get(r.target);
+          if (si == null || ti == null || si === ti) continue;
+          const xs = entities[si].x ?? centerX;
+          const ys = entities[si].y ?? centerY;
+          const xt = entities[ti].x ?? centerX;
+          const yt = entities[ti].y ?? centerY;
+          if (i === si) {
+            const dx = xt - xi;
+            const dy = yt - yi;
+            const d = Math.sqrt(dx * dx + dy * dy) || 0.1;
+            const f = d * ATTRACT * (r.weight || 0.5);
+            fx += (dx / d) * f;
+            fy += (dy / d) * f;
+          } else if (i === ti) {
+            const dx = xs - xi;
+            const dy = ys - yi;
+            const d = Math.sqrt(dx * dx + dy * dy) || 0.1;
+            const f = d * ATTRACT * (r.weight || 0.5);
+            fx += (dx / d) * f;
+            fy += (dy / d) * f;
+          }
+        }
+
+        // Centering
+        fx += (centerX - xi) * CENTER;
+        fy += (centerY - yi) * CENTER;
+
+        const vx = ((entities[i].vx ?? 0) + fx) * DAMP;
+        const vy = ((entities[i].vy ?? 0) + fy) * DAMP;
+        entities[i].vx = vx;
+        entities[i].vy = vy;
+        entities[i].x = Math.max(20, Math.min(W - 20, xi + vx));
+        entities[i].y = Math.max(20, Math.min(H - 20, yi + vy));
+        maxDx = Math.max(maxDx, Math.abs(vx));
+        maxDy = Math.max(maxDy, Math.abs(vy));
+      }
+
+      iter++;
+      this.requestUpdate();
+
+      if (iter < MAX_ITER && (maxDx > STABLE_THRESH || maxDy > STABLE_THRESH)) {
+        requestAnimationFrame(step);
+      }
+    };
+    requestAnimationFrame(step);
   }
 
   override render() {
@@ -379,6 +514,72 @@ export class ScMemoryView extends GatewayAwareLitElement {
               ${filtered.map((entry) => this._renderEntry(entry))}
             </div>
           `}
+      ${this.graphEntities.length > 0
+        ? html`
+            <sc-section-header
+              heading="Knowledge Graph"
+              description="Entities and relations in the knowledge graph"
+            ></sc-section-header>
+            <sc-card>
+              <div class="graph-container" style="background: var(--sc-surface-container)">
+                <svg
+                  part="graph"
+                  viewBox="0 0 400 400"
+                  preserveAspectRatio="xMidYMid meet"
+                  aria-label="Knowledge graph visualization"
+                >
+                  ${this.graphRelations.map((rel: GraphRelation) => {
+                    const src = this.graphEntities.find((e: GraphEntity) => e.id === rel.source);
+                    const tgt = this.graphEntities.find((e: GraphEntity) => e.id === rel.target);
+                    if (
+                      !src ||
+                      !tgt ||
+                      src.x == null ||
+                      src.y == null ||
+                      tgt.x == null ||
+                      tgt.y == null
+                    )
+                      return nothing;
+                    return html`<line
+                      x1=${src.x}
+                      y1=${src.y}
+                      x2=${tgt.x}
+                      y2=${tgt.y}
+                      stroke="var(--sc-border)"
+                      stroke-width="1"
+                    />`;
+                  })}
+                  ${this.graphEntities.map((e: GraphEntity) => {
+                    const x = e.x ?? 200;
+                    const y = e.y ?? 200;
+                    const r = Math.max(10, Math.min(22, 10 + (e.recall_count ?? 0) * 2));
+                    return html`
+                      <g>
+                        <circle
+                          cx=${x}
+                          cy=${y}
+                          r=${r}
+                          fill="var(--sc-accent)"
+                          aria-label=${e.name}
+                        />
+                        <text
+                          x=${x}
+                          y=${y + r + 12}
+                          text-anchor="middle"
+                          fill="var(--sc-text-primary)"
+                          font-size="10"
+                          font-family="var(--sc-font)"
+                        >
+                          ${e.name.length > 14 ? e.name.slice(0, 12) + "…" : e.name}
+                        </text>
+                      </g>
+                    `;
+                  })}
+                </svg>
+              </div>
+            </sc-card>
+          `
+        : nothing}
     `;
   }
 

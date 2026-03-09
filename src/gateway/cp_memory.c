@@ -406,6 +406,28 @@ sc_error_t cp_memory_ingest(sc_allocator_t *alloc, sc_app_context_t *app, sc_ws_
     return err;
 }
 
+sc_error_t cp_memory_graph(sc_allocator_t *alloc, sc_app_context_t *app, sc_ws_conn_t *conn,
+                           const sc_control_protocol_t *proto, const sc_json_value_t *root,
+                           char **out, size_t *out_len) {
+    (void)app;
+    (void)conn;
+    (void)proto;
+    (void)root;
+    /* sc_app_context_t has no graph field yet; return empty placeholder for UI */
+    sc_json_value_t *obj = sc_json_object_new(alloc);
+    if (!obj)
+        return SC_ERR_OUT_OF_MEMORY;
+    sc_json_value_t *entities = sc_json_array_new(alloc);
+    sc_json_value_t *relations = sc_json_array_new(alloc);
+    if (entities)
+        sc_json_object_set(alloc, obj, "entities", entities);
+    if (relations)
+        sc_json_object_set(alloc, obj, "relations", relations);
+    sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
+    sc_json_free(alloc, obj);
+    return err;
+}
+
 sc_error_t cp_memory_consolidate(sc_allocator_t *alloc, sc_app_context_t *app, sc_ws_conn_t *conn,
                                  const sc_control_protocol_t *proto, const sc_json_value_t *root,
                                  char **out, size_t *out_len) {

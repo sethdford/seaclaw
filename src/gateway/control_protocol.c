@@ -76,6 +76,7 @@ static const sc_rpc_entry_t s_rpc_table[] = {
     {"memory.forget", cp_memory_forget},
     {"memory.ingest", cp_memory_ingest},
     {"memory.consolidate", cp_memory_consolidate},
+    {"memory.graph", cp_memory_graph},
 #ifdef SC_HAS_PUSH
     {"push.register", cp_admin_push_register},
     {"push.unregister", cp_admin_push_unregister},

@@ -1588,6 +1588,29 @@ export class DemoGatewayClient extends EventTarget {
         return { stored: true };
       case "memory.consolidate":
         return { consolidated: true };
+      case "memory.graph":
+        return {
+          entities: [
+            { id: 1, name: "Project architecture", type: "concept", recall_count: 5 },
+            { id: 2, name: "SQLite memory", type: "concept", recall_count: 3 },
+            { id: 3, name: "Persona system", type: "concept", recall_count: 4 },
+            { id: 4, name: "Voice I/O", type: "concept", recall_count: 2 },
+            { id: 5, name: "Security policy", type: "concept", recall_count: 6 },
+            { id: 6, name: "Gateway API", type: "concept", recall_count: 3 },
+            { id: 7, name: "Channel manager", type: "concept", recall_count: 2 },
+            { id: 8, name: "Tool execution", type: "concept", recall_count: 4 },
+          ],
+          relations: [
+            { source: 1, target: 2, type: "relates_to", weight: 0.8 },
+            { source: 1, target: 6, type: "relates_to", weight: 0.7 },
+            { source: 2, target: 3, type: "relates_to", weight: 0.5 },
+            { source: 5, target: 6, type: "relates_to", weight: 0.9 },
+            { source: 5, target: 8, type: "constrains", weight: 0.8 },
+            { source: 6, target: 7, type: "relates_to", weight: 0.6 },
+            { source: 8, target: 1, type: "relates_to", weight: 0.4 },
+            { source: 4, target: 7, type: "relates_to", weight: 0.3 },
+          ],
+        };
 
       default:
         return {};
