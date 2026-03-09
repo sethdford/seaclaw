@@ -868,6 +868,8 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
     g_stop_flag = 0;
     signal(SIGTERM, service_signal_handler);
     signal(SIGINT, service_signal_handler);
+    setlinebuf(stderr);
+    setlinebuf(stdout);
 #endif
 
     /* Enable outcome tracking so persona feedback loop works in daemon */
@@ -1100,7 +1102,7 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
             ch->last_poll_ms = tick_now;
             if (count > 0)
                 ch->last_contact_ms = (uint64_t)time(NULL) * 1000ULL;
-            if (poll_err != SC_OK && getenv("SC_DEBUG"))
+            if (poll_err != SC_OK && poll_err != SC_ERR_NOT_SUPPORTED && getenv("SC_DEBUG"))
                 fprintf(stderr, "[seaclaw] poll error on channel %zu: %d\n", i, (int)poll_err);
 
             if (!agent || !ch->channel || !ch->channel->vtable || !ch->channel->vtable->send ||
@@ -1272,7 +1274,7 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         /* 2AM-6AM: very high SKIP chance (sleeping) */
                         uint32_t night_r = (uint32_t)time(NULL) * 1103515245u + 12345u;
                         if (((night_r >> 16u) % 100u) < 85u) {
-                            fprintf(stderr, "[seaclaw] late-night skip (1AM-7AM, hour=%d)\n",
+                            fprintf(stderr, "[seaclaw] late-night skip (2AM-6AM, hour=%d)\n",
                                     bth_hour);
                             action = SC_RESPONSE_SKIP;
                             continue;

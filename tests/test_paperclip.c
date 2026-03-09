@@ -1,20 +1,42 @@
-#include "seaclaw/paperclip/client.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/core/json.h"
 #include "seaclaw/core/string.h"
+#include "seaclaw/paperclip/client.h"
 #include "seaclaw/tools/paperclip.h"
 #include "test_framework.h"
 #include <stdlib.h>
 #include <string.h>
+#if defined(__unix__) || defined(__APPLE__)
+#include <unistd.h>
+#endif
 
 /* ── Client init / deinit ────────────────────────────────────────────── */
+
+static void test_paperclip_client_init_null_args(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_paperclip_client_t c = {0};
+    SC_ASSERT_EQ(sc_paperclip_client_init(NULL, &alloc), SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_EQ(sc_paperclip_client_init(&c, NULL), SC_ERR_INVALID_ARGUMENT);
+}
+
+static void test_paperclip_client_init_no_env(void) {
+#if defined(__unix__) || defined(__APPLE__)
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_paperclip_client_t c = {0};
+    /* Unset required env vars so init fails gracefully */
+    unsetenv("PAPERCLIP_API_URL");
+    unsetenv("PAPERCLIP_AGENT_ID");
+    sc_error_t err = sc_paperclip_client_init(&c, &alloc);
+    SC_ASSERT_EQ(err, SC_ERR_INVALID_ARGUMENT);
+#endif
+}
 
 static void client_init_from_config_ok(void) {
     sc_allocator_t alloc = sc_system_allocator();
     sc_paperclip_client_t c = {0};
-    sc_error_t err = sc_paperclip_client_init_from_config(&c, &alloc,
-        "http://localhost:3100/api", "agent-123", "company-456");
+    sc_error_t err = sc_paperclip_client_init_from_config(&c, &alloc, "http://localhost:3100/api",
+                                                          "agent-123", "company-456");
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NOT_NULL(c.api_url);
     SC_ASSERT_NOT_NULL(c.agent_id);
@@ -39,8 +61,8 @@ static void client_init_from_env_requires_vars(void) {
     sc_paperclip_client_t c = {0};
     /* Without env vars set, this should fail or succeed based on environment.
        We test the explicit path instead. */
-    sc_error_t err = sc_paperclip_client_init_from_config(&c, &alloc,
-        "http://test:3100/api", "test-agent", NULL);
+    sc_error_t err = sc_paperclip_client_init_from_config(&c, &alloc, "http://test:3100/api",
+                                                          "test-agent", NULL);
     SC_ASSERT_EQ(err, SC_OK);
     SC_ASSERT_NULL(c.company_id);
     sc_paperclip_client_deinit(&c);
@@ -53,6 +75,16 @@ static void client_deinit_handles_null(void) {
 }
 
 /* ── Task parsing ────────────────────────────────────────────────────── */
+
+static void test_paperclip_list_tasks_null_args(void) {
+    sc_allocator_t alloc = sc_system_allocator();
+    sc_paperclip_client_t c = {0};
+    sc_paperclip_client_init_from_config(&c, &alloc, "http://test/api", "a1", "c1");
+    sc_paperclip_task_list_t list = {0};
+    SC_ASSERT_EQ(sc_paperclip_list_tasks(NULL, &list), SC_ERR_INVALID_ARGUMENT);
+    SC_ASSERT_EQ(sc_paperclip_list_tasks(&c, NULL), SC_ERR_INVALID_ARGUMENT);
+    sc_paperclip_client_deinit(&c);
+}
 
 static void task_list_empty_returns_ok(void) {
     sc_allocator_t alloc = sc_system_allocator();
@@ -188,7 +220,7 @@ static void paperclip_tool_requires_action(void) {
     SC_ASSERT_NOT_NULL(strstr(result.output, "action"));
 
     if (result.output)
-        alloc.free(alloc.ctx, result.output, result.output_len + 1);
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
     sc_json_free(&alloc, args);
     tool.vtable->deinit(tool.ctx, &alloc);
 }
@@ -211,7 +243,7 @@ static void paperclip_tool_unknown_action(void) {
                    strstr(result.output, "Missing") != NULL);
 
     if (result.output)
-        alloc.free(alloc.ctx, result.output, result.output_len + 1);
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
     sc_json_free(&alloc, args);
     tool.vtable->deinit(tool.ctx, &alloc);
 }
@@ -221,11 +253,14 @@ static void paperclip_tool_unknown_action(void) {
 void run_paperclip_tests(void) {
     SC_TEST_SUITE("paperclip");
 
+    SC_RUN_TEST(test_paperclip_client_init_null_args);
+    SC_RUN_TEST(test_paperclip_client_init_no_env);
     SC_RUN_TEST(client_init_from_config_ok);
     SC_RUN_TEST(client_init_requires_url_and_id);
     SC_RUN_TEST(client_init_from_env_requires_vars);
     SC_RUN_TEST(client_deinit_handles_null);
 
+    SC_RUN_TEST(test_paperclip_list_tasks_null_args);
     SC_RUN_TEST(task_list_empty_returns_ok);
     SC_RUN_TEST(task_free_handles_null_fields);
     SC_RUN_TEST(task_list_free_handles_null);

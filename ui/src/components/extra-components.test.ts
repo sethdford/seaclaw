@@ -53,6 +53,7 @@ import "./sc-tapback-menu.js";
 import "./sc-chat-composer.js";
 import "./sc-message-thread.js";
 import "./sc-branch-tree.js";
+import "./sc-image-viewer.js";
 import "./sc-voice-orb.js";
 import "./sc-voice-conversation.js";
 import "./sc-chart.js";
@@ -68,6 +69,7 @@ import "./sc-sessions-table.js";
 import "./sc-skill-card.js";
 import "./sc-skill-detail.js";
 import "./sc-skill-registry.js";
+import { SPRING_PRESETS, springAnimate } from "../lib/spring.js";
 
 describe("sc-checkbox", () => {
   it("should be defined as a custom element", () => {
@@ -749,6 +751,56 @@ describe("sc-artifact-viewer", () => {
     expect(typeLabel?.textContent).toBe("Document");
     el.remove();
   });
+
+  it("renders markdown content for type=document", async () => {
+    const el = document.createElement("sc-artifact-viewer") as HTMLElement & {
+      type: string;
+      content: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.type = "document";
+    el.content = "# Hello **world**";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const body = el.shadowRoot?.querySelector(".body.md-content");
+    expect(body).toBeTruthy();
+    expect(body?.innerHTML).toContain("Hello");
+    el.remove();
+  });
+
+  it("renders iframe for type=html", async () => {
+    const el = document.createElement("sc-artifact-viewer") as HTMLElement & {
+      type: string;
+      content: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.type = "html";
+    el.content = "<p>Hello</p>";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const iframe = el.shadowRoot?.querySelector("iframe.iframe-wrap");
+    expect(iframe).toBeTruthy();
+    expect((iframe as HTMLIFrameElement).srcdoc).toContain("Hello");
+    el.remove();
+  });
+
+  it("shows copy toolbar", async () => {
+    const el = document.createElement("sc-artifact-viewer") as HTMLElement & {
+      type: string;
+      content: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.type = "code";
+    el.content = "x";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const toolbar = el.shadowRoot?.querySelector(".toolbar");
+    const copyBtn = el.shadowRoot?.querySelector(".copy-btn");
+    expect(toolbar).toBeTruthy();
+    expect(copyBtn).toBeTruthy();
+    expect(copyBtn?.textContent).toContain("Copy");
+    el.remove();
+  });
 });
 
 describe("sc-artifact-panel", () => {
@@ -756,7 +808,7 @@ describe("sc-artifact-panel", () => {
     expect(customElements.get("sc-artifact-panel")).toBeDefined();
   });
 
-  it("renders nothing when artifact is null", async () => {
+  it("renders nothing when no artifact is provided", async () => {
     const el = document.createElement("sc-artifact-panel") as HTMLElement & {
       artifact: unknown;
       open: boolean;
@@ -771,7 +823,7 @@ describe("sc-artifact-panel", () => {
     el.remove();
   });
 
-  it("renders header and content when artifact is provided", async () => {
+  it("renders header with title when artifact is provided", async () => {
     const el = document.createElement("sc-artifact-panel") as HTMLElement & {
       artifact: { id: string; type: string; title: string; content: string; versions: unknown[] };
       open: boolean;
@@ -791,6 +843,101 @@ describe("sc-artifact-panel", () => {
     expect(headerTitle?.textContent).toBe("Test Artifact");
     const viewer = el.shadowRoot?.querySelector("sc-artifact-viewer");
     expect(viewer).toBeTruthy();
+    el.remove();
+  });
+
+  it("shows version navigation when artifact has multiple versions", async () => {
+    const el = document.createElement("sc-artifact-panel") as HTMLElement & {
+      artifact: {
+        id: string;
+        type: string;
+        title: string;
+        content: string;
+        versions: Array<{ content: string; ts: number }>;
+      };
+      open: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.artifact = {
+      id: "a1",
+      type: "code",
+      title: "Multi-version",
+      content: "v1",
+      versions: [
+        { content: "v1", ts: 1000 },
+        { content: "v2", ts: 2000 },
+        { content: "v3", ts: 3000 },
+      ],
+    };
+    el.open = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    await el.updateComplete; // wait for _updatePanelState in updated() to set _currentVersionIndex
+    const versionNav = el.shadowRoot?.querySelector(".version-nav");
+    expect(versionNav).toBeTruthy();
+    expect(versionNav?.textContent).toContain("3 / 3");
+    el.remove();
+  });
+
+  it("dispatches sc-artifact-close event when close button is clicked", async () => {
+    const el = document.createElement("sc-artifact-panel") as HTMLElement & {
+      artifact: {
+        id: string;
+        type: string;
+        title: string;
+        content: string;
+        versions: Array<{ content: string; ts: number }>;
+      };
+      open: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.artifact = {
+      id: "a1",
+      type: "code",
+      title: "Test",
+      content: "x",
+      versions: [{ content: "x", ts: Date.now() }],
+    };
+    el.open = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    let closed = false;
+    el.addEventListener("sc-artifact-close", () => {
+      closed = true;
+    });
+    const closeBtn = el.shadowRoot?.querySelector(".close-btn") as HTMLButtonElement;
+    closeBtn?.click();
+    expect(closed).toBe(true);
+    el.remove();
+  });
+
+  it("copy button exists in footer", async () => {
+    const el = document.createElement("sc-artifact-panel") as HTMLElement & {
+      artifact: {
+        id: string;
+        type: string;
+        title: string;
+        content: string;
+        versions: Array<{ content: string; ts: number }>;
+      };
+      open: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.artifact = {
+      id: "a1",
+      type: "code",
+      title: "Test",
+      content: "x",
+      versions: [{ content: "x", ts: Date.now() }],
+    };
+    el.open = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const footer = el.shadowRoot?.querySelector(".footer");
+    expect(footer).toBeTruthy();
+    const copyBtn = footer?.querySelector("sc-button");
+    expect(copyBtn).toBeTruthy();
+    expect(footer?.textContent).toContain("Copy");
     el.remove();
   });
 });
@@ -2466,7 +2613,7 @@ describe("sc-message-group", () => {
 });
 
 describe("sc-link-preview", () => {
-  it("should be defined", () => {
+  it("is defined as custom element", () => {
     expect(customElements.get("sc-link-preview")).toBeDefined();
   });
   it("renders nothing without url", async () => {
@@ -2520,6 +2667,53 @@ describe("sc-link-preview", () => {
     document.body.appendChild(el);
     await el.updateComplete;
     expect(el.shadowRoot?.querySelector("a.card")?.getAttribute("aria-label")).toBe("My Title");
+    el.remove();
+  });
+  it("shows skeleton loading state when loading=true", async () => {
+    const el = document.createElement("sc-link-preview") as HTMLElement & {
+      url: string;
+      loading: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.url = "https://example.com";
+    el.loading = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const skeleton = el.shadowRoot?.querySelector(".skeleton-card");
+    expect(skeleton).toBeTruthy();
+    expect(el.shadowRoot?.querySelector("[aria-busy='true']")).toBeTruthy();
+    el.remove();
+  });
+  it("shows fallback link when failed=true", async () => {
+    const el = document.createElement("sc-link-preview") as HTMLElement & {
+      url: string;
+      failed: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.url = "https://example.com/page";
+    el.failed = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const fallback = el.shadowRoot?.querySelector(".fallback-link");
+    expect(fallback).toBeTruthy();
+    expect((fallback as HTMLAnchorElement)?.href).toContain("example.com");
+    expect(fallback?.textContent).toContain("example.com");
+    el.remove();
+  });
+  it("renders title and domain when provided", async () => {
+    const el = document.createElement("sc-link-preview") as HTMLElement & {
+      url: string;
+      title: string;
+      domain: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.url = "https://example.com";
+    el.title = "Example Site";
+    el.domain = "example.com";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelector(".title")?.textContent).toBe("Example Site");
+    expect(el.shadowRoot?.querySelector(".domain")?.textContent).toBe("example.com");
     el.remove();
   });
 });
@@ -2798,7 +2992,7 @@ describe("sc-chat-composer", () => {
 });
 
 describe("sc-branch-tree", () => {
-  it("should be defined", () => {
+  it("is defined as custom element", () => {
     expect(customElements.get("sc-branch-tree")).toBeDefined();
   });
   it("has default props", () => {
@@ -2832,6 +3026,108 @@ describe("sc-branch-tree", () => {
     const node = el.shadowRoot?.querySelector(".node-label");
     (node as HTMLElement)?.click();
     expect(receivedId).toBe("a");
+    el.remove();
+  });
+  it("renders nodes from branches array", async () => {
+    const el = document.createElement("sc-branch-tree") as HTMLElement & {
+      branches: Array<{
+        id: string;
+        label: string;
+        children: unknown[];
+        messagePreview: string;
+        active: boolean;
+      }>;
+      updateComplete: Promise<boolean>;
+    };
+    el.branches = [
+      { id: "a", label: "Branch A", children: [], messagePreview: "Preview A", active: false },
+      { id: "b", label: "Branch B", children: [], messagePreview: "Preview B", active: false },
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const nodes = el.shadowRoot?.querySelectorAll(".branch-node");
+    expect(nodes?.length).toBe(2);
+    expect(el.shadowRoot?.textContent).toContain("Branch A");
+    expect(el.shadowRoot?.textContent).toContain("Branch B");
+    el.remove();
+  });
+  it("marks active node with accent styling", async () => {
+    const el = document.createElement("sc-branch-tree") as HTMLElement & {
+      branches: Array<{
+        id: string;
+        label: string;
+        children: unknown[];
+        messagePreview: string;
+        active: boolean;
+      }>;
+      activeId: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.branches = [
+      { id: "a", label: "Branch A", children: [], messagePreview: "A", active: false },
+      { id: "b", label: "Branch B", children: [], messagePreview: "B", active: false },
+    ];
+    el.activeId = "b";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const activeNode = el.shadowRoot?.querySelector(".branch-node.active");
+    expect(activeNode).toBeTruthy();
+    expect(activeNode?.textContent).toContain("Branch B");
+    el.remove();
+  });
+});
+
+describe("sc-image-viewer", () => {
+  it("is defined as custom element", () => {
+    expect(customElements.get("sc-image-viewer")).toBeDefined();
+  });
+
+  it("renders backdrop when open", async () => {
+    const el = document.createElement("sc-image-viewer") as HTMLElement & {
+      src: string;
+      open: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.src = "https://example.com/image.png";
+    el.open = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const backdrop = el.shadowRoot?.querySelector(".backdrop");
+    expect(backdrop).toBeTruthy();
+    el.remove();
+  });
+
+  it("dispatches close event on escape key", async () => {
+    const el = document.createElement("sc-image-viewer") as HTMLElement & {
+      src: string;
+      open: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.src = "https://example.com/image.png";
+    el.open = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    let closed = false;
+    el.addEventListener("close", () => {
+      closed = true;
+    });
+    const backdrop = el.shadowRoot?.querySelector(".backdrop");
+    backdrop?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(closed).toBe(true);
+    el.remove();
+  });
+
+  it("hides when not open", async () => {
+    const el = document.createElement("sc-image-viewer") as HTMLElement & {
+      src: string;
+      open: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.src = "https://example.com/image.png";
+    el.open = false;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelector(".backdrop")).toBeNull();
     el.remove();
   });
 });
@@ -3095,5 +3391,55 @@ describe("sc-skill-registry", () => {
   it("should be creatable", () => {
     const el = document.createElement("sc-skill-registry");
     expect(el).toBeInstanceOf(HTMLElement);
+  });
+});
+
+describe("spring animation library", () => {
+  it("SPRING_PRESETS has expected keys", () => {
+    const expected = ["micro", "standard", "expressive", "dramatic", "gentle", "bounce", "snappy"];
+    for (const key of expected) {
+      expect(SPRING_PRESETS).toHaveProperty(key);
+      expect(SPRING_PRESETS[key as keyof typeof SPRING_PRESETS]).toHaveProperty("stiffness");
+      expect(SPRING_PRESETS[key as keyof typeof SPRING_PRESETS]).toHaveProperty("damping");
+      expect(SPRING_PRESETS[key as keyof typeof SPRING_PRESETS]).toHaveProperty("mass");
+    }
+  });
+
+  it("springAnimate returns stop function and promise", () => {
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+    const result = springAnimate(
+      el,
+      [{ property: "opacity", from: 0, to: 1 }],
+      SPRING_PRESETS.standard,
+    );
+    expect(typeof result.stop).toBe("function");
+    expect(result.promise).toBeInstanceOf(Promise);
+    result.stop();
+    el.remove();
+  });
+
+  it("respects prefers-reduced-motion", async () => {
+    const matchMediaSpy = vi.spyOn(window, "matchMedia").mockImplementation((query: string) => {
+      if (query === "(prefers-reduced-motion: reduce)") {
+        return { matches: true, addListener: vi.fn(), removeListener: vi.fn() } as MediaQueryList;
+      }
+      return window.matchMedia(query);
+    });
+    try {
+      const el = document.createElement("div");
+      document.body.appendChild(el);
+      const result = springAnimate(
+        el,
+        [{ property: "opacity", from: 0, to: 1 }],
+        SPRING_PRESETS.standard,
+      );
+      expect(el.style.opacity).toBe("1");
+      expect(typeof result.stop).toBe("function");
+      await result.promise;
+      el.remove();
+    } finally {
+      matchMediaSpy.mockRestore();
+    }
   });
 });

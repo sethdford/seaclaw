@@ -470,7 +470,7 @@ export class ScMemoryView extends GatewayAwareLitElement {
           value=${String(cats.insight ?? 0)}
           .icon=${icons.zap}
         ></sc-stat-card>
-        <sc-stat-card label="Engine" value=${s?.engine ?? "—"} .icon=${icons.cpu}></sc-stat-card>
+        <sc-stat-card label="Engine" valueStr=${s?.engine ?? "—"} .icon=${icons.cpu}></sc-stat-card>
       </sc-stats-row>
 
       <sc-section-header

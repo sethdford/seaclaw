@@ -1,6 +1,6 @@
 # SeaClaw (Swift/SeaClawKit) — Project Status
 
-This file documents the **Swift/SeaClawKit** module — a Swift wrapper around the C core. Metrics below are for the Swift codebase; the main C codebase has different scale (~715 source files, ~136K lines of C, 3758 tests, ~1506 KB binary).
+This file documents the **Swift/SeaClawKit** module — a Swift wrapper around the C core. Metrics below are for the Swift codebase; the main C codebase has different scale (~715 source files, ~136K lines of C, 3758 tests, ~unknown KB binary).
 
 Last updated: 2026-03-09
 
@@ -8,11 +8,11 @@ Last updated: 2026-03-09
 
 | Metric                         | Value                |
 | ------------------------------ | -------------------- |
-| Source files (src/ + include/) | **~594**             |
-| Lines of C/H code              | **~101,017**         |
-| Test files                     | 128                  |
+| Source files (src/ + include/) | **~715**             |
+| Lines of C/H code              | **~137,162**         |
+| Test files                     | 145                  |
 | Tests passing                  | **3758/3758 (100%)** |
-| Binary size (MinSizeRel+LTO)   | **~528 KB (full)**   |
+| Binary size (MinSizeRel+LTO)   | **~772 KB (full)**   |
 | Core binary (no curl/channels) | **463 KB**           |
 | seaclaw module parity          | **100%**             |
 
@@ -20,9 +20,9 @@ Last updated: 2026-03-09
 
 | Subsystem        | Baseline | SeaClaw | Status                      |
 | ---------------- | -------- | ------- | --------------------------- |
-| Providers        | 18       | 18      | **Full parity**             |
-| Channels         | 22       | 22      | **Full parity**             |
-| Tools            | 54       | 54      | **Full parity**             |
+| Providers        | 20       | 20      | **Full parity**             |
+| Channels         | 35       | 35      | **Full parity**             |
+| Tools            | 68       | 68      | **Full parity**             |
 | Security         | 11       | 13      | **Full parity** (+2 extras) |
 | Agent            | 8        | 11      | **Full parity** (+3 extras) |
 | Memory Engines   | 10       | 10      | **Full parity**             |
@@ -38,9 +38,9 @@ Last updated: 2026-03-09
 
 - **Full agent loop**: `seaclaw agent` — interactive turn-based conversation
 - **Config loading**: JSON config parsing, env var overrides, validation
-- **50+ tools registered** (build-config dependent): All execute with proper vtable dispatch
-- **22 channels** (catalog): CLI fully functional, others have send() via HTTP client
-- **18 providers**: OpenAI, Anthropic, Gemini, Ollama, OpenRouter, Compatible, Claude CLI, Codex CLI, OpenAI Codex + reliable/router wrappers
+- **68 tools registered** (build-config dependent): All execute with proper vtable dispatch
+- **35 channels** (catalog): CLI fully functional, others have send() via HTTP client
+- **20 providers**: OpenAI, Anthropic, Gemini, Ollama, OpenRouter, Compatible, Claude CLI, Codex CLI, OpenAI Codex + reliable/router wrappers
 - **HTTP client**: libcurl-based, with SSE streaming support
 - **WebSocket**: basic `ws://` support; `wss://` TLS via OpenSSL when `SC_ENABLE_TLS=ON`
 
@@ -56,8 +56,15 @@ Last updated: 2026-03-09
 - **Vector store abstraction**: vtable + in-memory (real), pgvector (stub), qdrant (stub) backends — all memory engines have real or stub implementations
 - **Outbox**: Async embedding queue with batch flush
 - **Semantic cache**: Embedding similarity cache with exact-match fallback
-- **Retrieval**: Keyword search, RRF, MMR, QMD, adaptive strategy, query expansion, LLM reranker, temporal decay
+- **Retrieval**: Keyword search, RRF, MMR, QMD, adaptive strategy, query expansion, LLM reranker, temporal decay, FTS5 full-text search (with runtime availability check)
 - **Lifecycle**: Cache, hygiene, snapshot, summarizer, diagnostics, migration, rollout
+- **Consolidation**: LLM-powered memory consolidation with configurable interval (monotonic clock), decay, dedup, and max entries
+- **Connection discovery**: LLM-powered insight extraction from memory entries
+- **Multimodal ingestion**: File ingestion with vision-capable provider support
+- **File watching**: Inbox polling for automatic file ingestion
+- **Knowledge graph**: Entity/relation graph (SQLite-backed), community detection, temporal events, causal links, Ebbinghaus retention
+- **Source attribution**: `store_ex` with source tracking across all backends (SQLite, LanceDB, Lucid, Markdown)
+- **REST API**: Memory status, list, recall, store, forget, ingest, consolidate, graph via WebSocket JSON-RPC
 
 ### Security
 
@@ -110,13 +117,13 @@ Previously stubbed, now **real**:
 | OpenSSL            | Optional (ON)  | WSS, TLS for WebSocket            |
 | math (-lm)         | Linked         | Vector math, retrieval algorithms |
 
-## Audit (2026-03-03)
+## Audit (2026-03-09)
 
 Source file counts verified against `src/` and `include/`:
 
 | Category         | Files | Notes                                                                                                                                                                                                                                                                                                    |
 | ---------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Providers        | 18    | anthropic, claude_cli, codex_cli, compatible, gemini, ollama, openai, openai_codex, openrouter, reliable, router + factory/helpers                                                                                                                                                                       |
+| Providers        | 20    | anthropic, claude_cli, codex_cli, compatible, gemini, ollama, openai, openai_codex, openrouter, reliable, router + factory/helpers                                                                                                                                                                       |
 | Channels         | 35    | cli, web, discord, mattermost, google_chat, google_rcs, dingtalk, irc, email, teams, slack, onebot, matrix, whatsapp, nostr, imessage, instagram, line, signal, telegram, maixcam, qq, lark, twilio, dispatch, thread_binding, facebook, tiktok, twitter, mqtt, voice_channel, gmail, gmail_base64, imap |
 | Tools            | 68    | 58 tool impls + factory + 9 web_search_providers (exa, brave, etc.)                                                                                                                                                                                                                                      |
 | Memory engines   | 10    | none, markdown, memory_lru, sqlite, postgres, api, redis, lucid, lancedb, registry                                                                                                                                                                                                                       |

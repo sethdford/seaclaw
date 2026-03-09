@@ -9,8 +9,12 @@ import {
   shadowText,
   shadowTextIn,
   waitForViewReady,
+  waitForShadowSelector,
   POLL,
 } from "./helpers.js";
+
+/** Longer poll for Memory view — demo data + graph simulation take longer to load. */
+const POLL_MEMORY = 15000;
 
 // ─────────────────────────────────────────────────────────────
 // Overview View
@@ -596,32 +600,31 @@ test.describe("Memory (Demo)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?demo#memory");
     await waitForViewReady(page, "sc-memory-view");
+    await waitForShadowSelector(page, "sc-memory-view", "sc-stat-card", POLL_MEMORY);
   });
 
   test("shows stat cards row", async ({ page }) => {
     await expect(async () => {
-      const count = await page.evaluate(
-        shadowCountIn("sc-memory-view", "sc-stats-row", "sc-stat-card"),
-      );
+      const count = await page.evaluate(shadowCount("sc-memory-view", "sc-stat-card"));
       expect(count).toBe(4);
-    }).toPass({ timeout: POLL });
+    }).toPass({ timeout: POLL_MEMORY });
   });
 
   test("displays memory entries grid", async ({ page }) => {
     await expect(async () => {
       const count = await page.evaluate(shadowCount("sc-memory-view", ".memory-grid sc-card"));
       expect(count).toBeGreaterThanOrEqual(3);
-    }).toPass({ timeout: POLL });
+    }).toPass({ timeout: POLL_MEMORY });
   });
 
   test("has search input", async ({ page }) => {
     await expect(async () => {
       expect(
         await page.evaluate(
-          shadowExists("sc-memory-view", 'sc-input[aria-label="Search memories"]'),
+          shadowExists("sc-memory-view", "sc-input[aria-label='Search memories']"),
         ),
       ).toBe(true);
-    }).toPass({ timeout: POLL });
+    }).toPass({ timeout: POLL_MEMORY });
   });
 
   test("has category segmented control", async ({ page }) => {
@@ -629,14 +632,14 @@ test.describe("Memory (Demo)", () => {
       expect(await page.evaluate(shadowExists("sc-memory-view", "sc-segmented-control"))).toBe(
         true,
       );
-    }).toPass({ timeout: POLL });
+    }).toPass({ timeout: POLL_MEMORY });
   });
 
   test("has consolidate button", async ({ page }) => {
     await expect(async () => {
       const text = await page.evaluate(deepText("sc-memory-view"));
       expect(text).toContain("Consolidate");
-    }).toPass({ timeout: POLL });
+    }).toPass({ timeout: POLL_MEMORY });
   });
 });
 

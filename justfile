@@ -89,13 +89,15 @@ install: release
     set -euo pipefail
     mkdir -p ~/bin
     cp build/seaclaw ~/bin/seaclaw
+    xattr -d com.apple.provenance ~/bin/seaclaw 2>/dev/null || true
+    xattr -d com.apple.quarantine ~/bin/seaclaw 2>/dev/null || true
     # Code-sign so macOS preserves Full Disk Access across rebuilds
     if security find-identity -v -p codesigning 2>/dev/null | grep -q "SeaClaw Local Dev"; then
         codesign -f -s "SeaClaw Local Dev" ~/bin/seaclaw
         echo "Signed with SeaClaw Local Dev identity"
     else
-        echo "WARNING: No 'SeaClaw Local Dev' signing identity found."
-        echo "  FDA will be revoked on each rebuild. Run: just setup-codesign"
+        codesign -f -s - ~/bin/seaclaw
+        echo "Ad-hoc signed (FDA will be revoked on each rebuild. Run: just setup-codesign)"
     fi
     # Restart LaunchAgent if loaded
     if launchctl list 2>/dev/null | grep -q com.seaclaw.agent; then
