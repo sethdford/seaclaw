@@ -133,6 +133,20 @@ export class ScMemoryView extends GatewayAwareLitElement {
       flex-direction: column;
       gap: var(--sc-space-xs);
     }
+    .memory-card .entry-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--sc-space-xs);
+    }
+    .memory-card .entry-header sc-button {
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity var(--sc-duration-fast) var(--sc-ease-out);
+    }
+    .memory-card:hover .entry-header sc-button {
+      opacity: 1;
+    }
     .memory-card .key {
       font-family: var(--sc-font-mono);
       font-size: var(--sc-text-xs);
@@ -583,7 +597,16 @@ export class ScMemoryView extends GatewayAwareLitElement {
     return html`
       <sc-card hoverable class=${isInsight ? "insight-card" : ""} role="listitem">
         <div class="memory-card">
-          <div class="key">${entry.key}</div>
+          <div class="entry-header">
+            <div class="key">${entry.key}</div>
+            <sc-button
+              size="xs"
+              variant="ghost"
+              aria-label="Forget memory"
+              @click=${() => this._forget(entry.key)}
+              >${icons.trash}</sc-button
+            >
+          </div>
           <div class="content">${entry.content}</div>
           <div class="meta">
             <sc-badge variant=${categoryVariant(entry.category)} label=${entry.category}></sc-badge>

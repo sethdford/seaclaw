@@ -202,7 +202,7 @@ sc_error_t cp_memory_recall(sc_allocator_t *alloc, sc_app_context_t *app, sc_ws_
             return SC_ERR_OUT_OF_MEMORY;
         sc_json_value_t *arr = sc_json_array_new(alloc);
         if (arr)
-            sc_json_object_set(alloc, obj, "results", arr);
+            sc_json_object_set(alloc, obj, "entries", arr);
         sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
         sc_json_free(alloc, obj);
         return err;
@@ -234,7 +234,7 @@ sc_error_t cp_memory_recall(sc_allocator_t *alloc, sc_app_context_t *app, sc_ws_
             if (e_obj)
                 sc_json_array_push(alloc, arr, e_obj);
         }
-        sc_json_object_set(alloc, obj, "results", arr);
+        sc_json_object_set(alloc, obj, "entries", arr);
     }
 
     if (entries) {

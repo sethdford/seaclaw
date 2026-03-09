@@ -91,7 +91,7 @@ test.describe("Memory View", () => {
           const view = app?.shadowRoot?.querySelector("${VIEW}");
           const buttons = view?.shadowRoot?.querySelectorAll("sc-button");
           for (const btn of buttons ?? []) {
-            if (btn.getAttribute("label")?.includes("Consolidate")) return true;
+            if (btn.textContent?.trim().includes("Consolidate")) return true;
           }
           return false;
         })()`,
@@ -106,8 +106,7 @@ test.describe("Memory View", () => {
       const view = app?.shadowRoot?.querySelector("${VIEW}");
       const buttons = view?.shadowRoot?.querySelectorAll("sc-button");
       for (const btn of buttons ?? []) {
-        const label = btn.getAttribute("label");
-        if (label && label.includes("Consolidate")) {
+        if (btn.textContent?.trim().includes("Consolidate")) {
           const inner = btn.shadowRoot?.querySelector("button");
           if (inner) { inner.click(); return true; }
         }
