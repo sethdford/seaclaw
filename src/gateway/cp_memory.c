@@ -5,6 +5,7 @@
 #include "seaclaw/core/string.h"
 #include "seaclaw/memory.h"
 #include "seaclaw/memory/consolidation.h"
+#include "seaclaw/memory/graph.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -409,20 +410,64 @@ sc_error_t cp_memory_ingest(sc_allocator_t *alloc, sc_app_context_t *app, sc_ws_
 sc_error_t cp_memory_graph(sc_allocator_t *alloc, sc_app_context_t *app, sc_ws_conn_t *conn,
                            const sc_control_protocol_t *proto, const sc_json_value_t *root,
                            char **out, size_t *out_len) {
-    (void)app;
     (void)conn;
     (void)proto;
     (void)root;
-    /* sc_app_context_t has no graph field yet; return empty placeholder for UI */
+
     sc_json_value_t *obj = sc_json_object_new(alloc);
     if (!obj)
         return SC_ERR_OUT_OF_MEMORY;
-    sc_json_value_t *entities = sc_json_array_new(alloc);
-    sc_json_value_t *relations = sc_json_array_new(alloc);
-    if (entities)
-        sc_json_object_set(alloc, obj, "entities", entities);
-    if (relations)
-        sc_json_object_set(alloc, obj, "relations", relations);
+
+    sc_json_value_t *entities_arr = sc_json_array_new(alloc);
+    sc_json_value_t *relations_arr = sc_json_array_new(alloc);
+
+    if (app && app->graph) {
+        sc_graph_entity_t *entities = NULL;
+        size_t entity_count = 0;
+        if (sc_graph_list_entities(app->graph, alloc, 100, &entities, &entity_count) == SC_OK &&
+            entities) {
+            for (size_t i = 0; i < entity_count; i++) {
+                sc_json_value_t *e = sc_json_object_new(alloc);
+                if (!e)
+                    continue;
+                sc_json_object_set(alloc, e, "id",
+                                   sc_json_number_new(alloc, (double)entities[i].id));
+                cp_json_set_str(alloc, e, "name", entities[i].name ? entities[i].name : "");
+                cp_json_set_str(alloc, e, "type", sc_entity_type_to_string(entities[i].type));
+                sc_json_object_set(alloc, e, "mention_count",
+                                   sc_json_number_new(alloc, (double)entities[i].mention_count));
+                if (entities_arr)
+                    sc_json_array_push(alloc, entities_arr, e);
+            }
+            sc_graph_entities_free(alloc, entities, entity_count);
+        }
+
+        sc_graph_relation_t *relations = NULL;
+        size_t relation_count = 0;
+        if (sc_graph_list_relations(app->graph, alloc, 200, &relations, &relation_count) == SC_OK &&
+            relations) {
+            for (size_t i = 0; i < relation_count; i++) {
+                sc_json_value_t *r = sc_json_object_new(alloc);
+                if (!r)
+                    continue;
+                sc_json_object_set(alloc, r, "source",
+                                   sc_json_number_new(alloc, (double)relations[i].source_id));
+                sc_json_object_set(alloc, r, "target",
+                                   sc_json_number_new(alloc, (double)relations[i].target_id));
+                cp_json_set_str(alloc, r, "type", sc_relation_type_to_string(relations[i].type));
+                sc_json_object_set(alloc, r, "weight",
+                                   sc_json_number_new(alloc, (double)relations[i].weight));
+                if (relations_arr)
+                    sc_json_array_push(alloc, relations_arr, r);
+            }
+            sc_graph_relations_free(alloc, relations, relation_count);
+        }
+    }
+
+    if (entities_arr)
+        sc_json_object_set(alloc, obj, "entities", entities_arr);
+    if (relations_arr)
+        sc_json_object_set(alloc, obj, "relations", relations_arr);
     sc_error_t err = sc_json_stringify(alloc, obj, out, out_len);
     sc_json_free(alloc, obj);
     return err;

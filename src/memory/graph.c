@@ -871,6 +871,145 @@ sc_error_t sc_graph_build_communities(sc_graph_t *g, sc_allocator_t *alloc, size
 
 #endif
 
+#ifdef SC_ENABLE_SQLITE
+
+sc_error_t sc_graph_list_entities(sc_graph_t *g, sc_allocator_t *alloc, size_t limit,
+                                  sc_graph_entity_t **out, size_t *out_count) {
+    if (!g || !g->db || !alloc || !out || !out_count)
+        return SC_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+    if (limit == 0)
+        limit = 100;
+
+    const char *sql = "SELECT id, name, type, first_seen, last_seen, mention_count "
+                      "FROM entities ORDER BY mention_count DESC LIMIT ?";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(g->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return SC_ERR_IO;
+    sqlite3_bind_int64(stmt, 1, (int64_t)limit);
+
+    size_t cap = limit < 64 ? limit : 64;
+    sc_graph_entity_t *arr = alloc->alloc(alloc->ctx, cap * sizeof(sc_graph_entity_t));
+    if (!arr) {
+        sqlite3_finalize(stmt);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+    size_t count = 0;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (count >= cap) {
+            size_t new_cap = cap * 2;
+            sc_graph_entity_t *tmp = alloc->alloc(alloc->ctx, new_cap * sizeof(sc_graph_entity_t));
+            if (!tmp)
+                break;
+            memcpy(tmp, arr, count * sizeof(sc_graph_entity_t));
+            alloc->free(alloc->ctx, arr, cap * sizeof(sc_graph_entity_t));
+            arr = tmp;
+            cap = new_cap;
+        }
+        sc_graph_entity_t *e = &arr[count];
+        memset(e, 0, sizeof(*e));
+        e->id = sqlite3_column_int64(stmt, 0);
+        const char *name = (const char *)sqlite3_column_text(stmt, 1);
+        e->name_len = name ? strlen(name) : 0;
+        e->name = e->name_len ? sc_strndup(alloc, name, e->name_len) : NULL;
+        e->type = (sc_entity_type_t)sqlite3_column_int(stmt, 2);
+        e->first_seen = sqlite3_column_int64(stmt, 3);
+        e->last_seen = sqlite3_column_int64(stmt, 4);
+        e->mention_count = (int32_t)sqlite3_column_int(stmt, 5);
+        e->metadata_json = NULL;
+        count++;
+    }
+    sqlite3_finalize(stmt);
+    *out = arr;
+    *out_count = count;
+    return SC_OK;
+}
+
+sc_error_t sc_graph_list_relations(sc_graph_t *g, sc_allocator_t *alloc, size_t limit,
+                                   sc_graph_relation_t **out, size_t *out_count) {
+    if (!g || !g->db || !alloc || !out || !out_count)
+        return SC_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+    if (limit == 0)
+        limit = 200;
+
+    const char *sql = "SELECT r.id, r.source_id, r.target_id, r.relation_type, r.weight, "
+                      "r.first_seen, r.last_seen, r.context "
+                      "FROM relations r ORDER BY r.weight DESC LIMIT ?";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(g->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return SC_ERR_IO;
+    sqlite3_bind_int64(stmt, 1, (int64_t)limit);
+
+    size_t cap = limit < 64 ? limit : 64;
+    sc_graph_relation_t *arr = alloc->alloc(alloc->ctx, cap * sizeof(sc_graph_relation_t));
+    if (!arr) {
+        sqlite3_finalize(stmt);
+        return SC_ERR_OUT_OF_MEMORY;
+    }
+    size_t count = 0;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (count >= cap) {
+            size_t new_cap = cap * 2;
+            sc_graph_relation_t *tmp =
+                alloc->alloc(alloc->ctx, new_cap * sizeof(sc_graph_relation_t));
+            if (!tmp)
+                break;
+            memcpy(tmp, arr, count * sizeof(sc_graph_relation_t));
+            alloc->free(alloc->ctx, arr, cap * sizeof(sc_graph_relation_t));
+            arr = tmp;
+            cap = new_cap;
+        }
+        sc_graph_relation_t *r = &arr[count];
+        memset(r, 0, sizeof(*r));
+        r->id = sqlite3_column_int64(stmt, 0);
+        r->source_id = sqlite3_column_int64(stmt, 1);
+        r->target_id = sqlite3_column_int64(stmt, 2);
+        r->type = (sc_relation_type_t)sqlite3_column_int(stmt, 3);
+        r->weight = (float)sqlite3_column_double(stmt, 4);
+        r->first_seen = sqlite3_column_int64(stmt, 5);
+        r->last_seen = sqlite3_column_int64(stmt, 6);
+        const char *ctx = (const char *)sqlite3_column_text(stmt, 7);
+        r->context_len = ctx ? strlen(ctx) : 0;
+        r->context = r->context_len ? sc_strndup(alloc, ctx, r->context_len) : NULL;
+        count++;
+    }
+    sqlite3_finalize(stmt);
+    *out = arr;
+    *out_count = count;
+    return SC_OK;
+}
+
+#else
+
+sc_error_t sc_graph_list_entities(sc_graph_t *g, sc_allocator_t *alloc, size_t limit,
+                                  sc_graph_entity_t **out, size_t *out_count) {
+    (void)g;
+    (void)alloc;
+    (void)limit;
+    (void)out;
+    (void)out_count;
+    return SC_ERR_NOT_SUPPORTED;
+}
+
+sc_error_t sc_graph_list_relations(sc_graph_t *g, sc_allocator_t *alloc, size_t limit,
+                                   sc_graph_relation_t **out, size_t *out_count) {
+    (void)g;
+    (void)alloc;
+    (void)limit;
+    (void)out;
+    (void)out_count;
+    return SC_ERR_NOT_SUPPORTED;
+}
+
+#endif
+
 void sc_graph_entities_free(sc_allocator_t *alloc, sc_graph_entity_t *entities, size_t count) {
     if (!alloc || !entities)
         return;

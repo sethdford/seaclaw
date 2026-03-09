@@ -102,6 +102,14 @@ sc_error_t sc_graph_query_temporal(sc_graph_t *g, sc_allocator_t *alloc, int64_t
 sc_error_t sc_graph_query_causal(sc_graph_t *g, sc_allocator_t *alloc, int64_t entity_id,
                                  size_t max_results, char **out, size_t *out_len);
 
+/* List all entities (limited to top N by mention_count) */
+sc_error_t sc_graph_list_entities(sc_graph_t *g, sc_allocator_t *alloc, size_t limit,
+                                  sc_graph_entity_t **out, size_t *out_count);
+
+/* List all relations (limited to top N by weight) */
+sc_error_t sc_graph_list_relations(sc_graph_t *g, sc_allocator_t *alloc, size_t limit,
+                                   sc_graph_relation_t **out, size_t *out_count);
+
 /* Free arrays returned by neighbors */
 void sc_graph_entities_free(sc_allocator_t *alloc, sc_graph_entity_t *entities, size_t count);
 void sc_graph_relations_free(sc_allocator_t *alloc, sc_graph_relation_t *relations, size_t count);

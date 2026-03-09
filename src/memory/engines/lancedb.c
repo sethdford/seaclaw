@@ -335,10 +335,22 @@ sc_memory_t sc_lancedb_memory_create(sc_allocator_t *alloc, const char *db_path)
 
 #include "seaclaw/memory/sql_common.h"
 #include <sqlite3.h>
+#include <stdbool.h>
+
+static bool fts5_available(sqlite3 *db) {
+    int rc = sqlite3_exec(db, "CREATE VIRTUAL TABLE IF NOT EXISTS temp._fts5_check USING fts5(x)",
+                          NULL, NULL, NULL);
+    if (rc == SQLITE_OK) {
+        sqlite3_exec(db, "DROP TABLE IF EXISTS temp._fts5_check", NULL, NULL, NULL);
+        return true;
+    }
+    return false;
+}
 
 typedef struct sc_lancedb_memory_prod {
     sc_allocator_t *alloc;
     sqlite3 *db;
+    bool has_fts5;
 } sc_lancedb_memory_t;
 
 #define SC_SQLITE_BUSY_TIMEOUT_MS 5000
@@ -498,7 +510,6 @@ static sc_error_t impl_recall_prod(void *ctx, sc_allocator_t *alloc, const char 
                                    size_t session_id_len, sc_memory_entry_t **out,
                                    size_t *out_count) {
     sc_lancedb_memory_t *self = (sc_lancedb_memory_t *)ctx;
-    (void)self;
     *out = NULL;
     *out_count = 0;
     if (!query || query_len == 0)
@@ -540,8 +551,8 @@ static sc_error_t impl_recall_prod(void *ctx, sc_allocator_t *alloc, const char 
         }
     }
 
-    /* Try FTS5 first; fall back to LIKE when FTS returns no rows */
-    if (fts_len > 0) {
+    /* Try FTS5 first; fall back to LIKE when FTS unavailable or returns no rows */
+    if (fts_len > 0 && self->has_fts5) {
         const char *sql = "SELECT m.key, m.text, m.category, m.session_id, m.updated_at, m.source, "
                           "bm25(lancedb_memories_fts) as score FROM lancedb_memories_fts f "
                           "JOIN lancedb_memories m ON m.rowid = f.rowid "
@@ -779,32 +790,35 @@ sc_memory_t sc_lancedb_memory_create(sc_allocator_t *alloc, const char *db_path)
         if (alter_err)
             sqlite3_free(alter_err);
     }
-    sqlite3_exec(db,
-                 "CREATE VIRTUAL TABLE IF NOT EXISTS lancedb_memories_fts "
-                 "USING fts5(key, text, content=lancedb_memories, content_rowid=rowid)",
-                 NULL, NULL, NULL);
-    sqlite3_exec(db, "INSERT INTO lancedb_memories_fts(lancedb_memories_fts) VALUES('rebuild')",
-                 NULL, NULL, NULL);
-    sqlite3_exec(
-        db,
-        "CREATE TRIGGER IF NOT EXISTS lancedb_memories_ai AFTER INSERT ON lancedb_memories "
-        "BEGIN INSERT INTO lancedb_memories_fts(rowid, key, text) VALUES "
-        "(new.rowid, new.key, new.text); END",
-        NULL, NULL, NULL);
-    sqlite3_exec(
-        db,
-        "CREATE TRIGGER IF NOT EXISTS lancedb_memories_ad AFTER DELETE ON lancedb_memories "
-        "BEGIN INSERT INTO lancedb_memories_fts(lancedb_memories_fts, rowid, key, text) "
-        "VALUES ('delete', old.rowid, old.key, old.text); END",
-        NULL, NULL, NULL);
-    sqlite3_exec(
-        db,
-        "CREATE TRIGGER IF NOT EXISTS lancedb_memories_au AFTER UPDATE ON lancedb_memories "
-        "BEGIN INSERT INTO lancedb_memories_fts(lancedb_memories_fts, rowid, key, text) "
-        "VALUES ('delete', old.rowid, old.key, old.text); "
-        "INSERT INTO lancedb_memories_fts(rowid, key, text) VALUES "
-        "(new.rowid, new.key, new.text); END",
-        NULL, NULL, NULL);
+    bool has_fts5 = fts5_available(db);
+    if (has_fts5) {
+        sqlite3_exec(db,
+                     "CREATE VIRTUAL TABLE IF NOT EXISTS lancedb_memories_fts "
+                     "USING fts5(key, text, content=lancedb_memories, content_rowid=rowid)",
+                     NULL, NULL, NULL);
+        sqlite3_exec(db, "INSERT INTO lancedb_memories_fts(lancedb_memories_fts) VALUES('rebuild')",
+                     NULL, NULL, NULL);
+        sqlite3_exec(
+            db,
+            "CREATE TRIGGER IF NOT EXISTS lancedb_memories_ai AFTER INSERT ON lancedb_memories "
+            "BEGIN INSERT INTO lancedb_memories_fts(rowid, key, text) VALUES "
+            "(new.rowid, new.key, new.text); END",
+            NULL, NULL, NULL);
+        sqlite3_exec(
+            db,
+            "CREATE TRIGGER IF NOT EXISTS lancedb_memories_ad AFTER DELETE ON lancedb_memories "
+            "BEGIN INSERT INTO lancedb_memories_fts(lancedb_memories_fts, rowid, key, text) "
+            "VALUES ('delete', old.rowid, old.key, old.text); END",
+            NULL, NULL, NULL);
+        sqlite3_exec(
+            db,
+            "CREATE TRIGGER IF NOT EXISTS lancedb_memories_au AFTER UPDATE ON lancedb_memories "
+            "BEGIN INSERT INTO lancedb_memories_fts(lancedb_memories_fts, rowid, key, text) "
+            "VALUES ('delete', old.rowid, old.key, old.text); "
+            "INSERT INTO lancedb_memories_fts(rowid, key, text) VALUES "
+            "(new.rowid, new.key, new.text); END",
+            NULL, NULL, NULL);
+    }
     sc_lancedb_memory_t *self =
         (sc_lancedb_memory_t *)alloc->alloc(alloc->ctx, sizeof(sc_lancedb_memory_t));
     if (!self) {
@@ -814,6 +828,7 @@ sc_memory_t sc_lancedb_memory_create(sc_allocator_t *alloc, const char *db_path)
     memset(self, 0, sizeof(sc_lancedb_memory_t));
     self->alloc = alloc;
     self->db = db;
+    self->has_fts5 = has_fts5;
     return (sc_memory_t){.ctx = self, .vtable = &lancedb_vtable_prod};
 }
 

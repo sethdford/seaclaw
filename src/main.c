@@ -34,6 +34,7 @@
 #include "seaclaw/memory.h"
 #include "seaclaw/memory/engines.h"
 #include "seaclaw/memory/factory.h"
+#include "seaclaw/memory/graph.h"
 #include "seaclaw/memory/retrieval.h"
 #include "seaclaw/memory/vector.h"
 #include "seaclaw/migration.h"
@@ -633,9 +634,22 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
     memset(&gw_config, 0, sizeof(gw_config));
     sc_app_context_t svc_app_ctx;
     memset(&svc_app_ctx, 0, sizeof(svc_app_ctx));
+    sc_graph_t *svc_graph = NULL;
     gw_agent_bridge_t svc_agent_bridge = {0};
     if (with_gateway) {
         sc_gateway_config_from_cfg(&app_ctx.cfg->gateway, &gw_config);
+
+#ifdef SC_ENABLE_SQLITE
+        {
+            const char *home = getenv("HOME");
+            if (home) {
+                char graph_path[1024];
+                int np = snprintf(graph_path, sizeof(graph_path), "%s/.seaclaw/graph.db", home);
+                if (np > 0 && (size_t)np < sizeof(graph_path))
+                    (void)sc_graph_open(alloc, graph_path, (size_t)np, &svc_graph);
+            }
+        }
+#endif
 
         svc_app_ctx.config = app_ctx.cfg;
         svc_app_ctx.alloc = alloc;
@@ -679,6 +693,10 @@ static sc_error_t cmd_service_loop(sc_allocator_t *alloc, int argc, char **argv)
         sc_bus_unsubscribe(&svc_bus, svc_agent_on_message_locked, &svc_agent_bridge);
         if (gw_tid) {
             pthread_join(gw_tid, NULL);
+        }
+        if (svc_graph) {
+            sc_graph_close(svc_graph, alloc);
+            svc_graph = NULL;
         }
     }
 
@@ -1058,6 +1076,19 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
     gw_agent_bridge_t agent_bridge = {0};
     sc_awareness_t gw_awareness = {0};
 
+    sc_graph_t *gw_graph = NULL;
+#ifdef SC_ENABLE_SQLITE
+    {
+        const char *home = getenv("HOME");
+        if (home) {
+            char graph_path[1024];
+            int np = snprintf(graph_path, sizeof(graph_path), "%s/.seaclaw/graph.db", home);
+            if (np > 0 && (size_t)np < sizeof(graph_path))
+                (void)sc_graph_open(alloc, graph_path, (size_t)np, &gw_graph);
+        }
+    }
+#endif
+
     /* ── Gateway app context (sc_app_context_t for RPC handlers) ───────── */
     sc_app_context_t gw_app_ctx = {
         .config = app.cfg,
@@ -1074,6 +1105,7 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
         .tools = app.tools,
         .tools_count = app.tools_count,
         .agent = NULL,
+        .graph = gw_graph,
     };
 
     sc_gateway_config_t gw_config;
@@ -1104,6 +1136,10 @@ static sc_error_t cmd_gateway(sc_allocator_t *alloc, int argc, char **argv) {
     if (with_agent && app.agent_ok && app.agent) {
         sc_awareness_deinit(&gw_awareness);
         sc_bus_unsubscribe(&bus, gw_agent_on_message, &agent_bridge);
+    }
+    if (gw_graph) {
+        sc_graph_close(gw_graph, alloc);
+        gw_graph = NULL;
     }
     if (gw_thread_binding)
         sc_thread_binding_destroy(gw_thread_binding);

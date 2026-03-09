@@ -990,11 +990,14 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
 #ifndef SC_IS_TEST
                 /* Periodic memory consolidation */
                 if (config->consolidation_interval_hours > 0 && agent && agent->memory) {
-                    static time_t last_consolidation = 0;
-                    time_t interval = (time_t)config->consolidation_interval_hours * 3600;
-                    if (last_consolidation == 0)
-                        last_consolidation = t;
-                    if (t - last_consolidation >= interval) {
+                    static int64_t last_consolidation_ms = 0;
+                    int64_t interval_ms = (int64_t)config->consolidation_interval_hours * 3600000LL;
+                    struct timespec ts_cons;
+                    clock_gettime(CLOCK_MONOTONIC, &ts_cons);
+                    int64_t now_ms = (int64_t)ts_cons.tv_sec * 1000 + ts_cons.tv_nsec / 1000000;
+                    if (last_consolidation_ms == 0)
+                        last_consolidation_ms = now_ms;
+                    if (now_ms - last_consolidation_ms >= interval_ms) {
                         sc_consolidation_config_t cons_cfg = {
                             .decay_days = 30,
                             .decay_factor = 0.5,
@@ -1005,7 +1008,7 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                             .model_len = agent->model_name_len,
                         };
                         if (sc_memory_consolidate(alloc, agent->memory, &cons_cfg) == SC_OK) {
-                            last_consolidation = t;
+                            last_consolidation_ms = now_ms;
                             fprintf(stderr, "[seaclaw] periodic memory consolidation completed\n");
                         }
                     }

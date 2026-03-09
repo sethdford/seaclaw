@@ -353,12 +353,24 @@ sc_memory_t sc_lucid_memory_create(sc_allocator_t *alloc, const char *db_path,
 
 #include "seaclaw/memory/sql_common.h"
 #include <sqlite3.h>
+#include <stdbool.h>
+
+static bool fts5_available(sqlite3 *db) {
+    int rc = sqlite3_exec(db, "CREATE VIRTUAL TABLE IF NOT EXISTS temp._fts5_check USING fts5(x)",
+                          NULL, NULL, NULL);
+    if (rc == SQLITE_OK) {
+        sqlite3_exec(db, "DROP TABLE IF EXISTS temp._fts5_check", NULL, NULL, NULL);
+        return true;
+    }
+    return false;
+}
 
 typedef struct sc_lucid_memory_prod {
     sc_allocator_t *alloc;
     sqlite3 *db;
     char *workspace_dir;
     char *lucid_cmd;
+    bool has_fts5;
 } sc_lucid_memory_t;
 
 #define SC_SQLITE_BUSY_TIMEOUT_MS 5000
@@ -588,8 +600,8 @@ static sc_error_t impl_recall_prod(void *ctx, sc_allocator_t *alloc, const char 
         }
     }
 
-    /* Try FTS5 first; fall back to LIKE when FTS returns no rows */
-    if (fts_len > 0) {
+    /* Try FTS5 first; fall back to LIKE when FTS unavailable or returns no rows */
+    if (fts_len > 0 && self->has_fts5) {
         const char *sql =
             "SELECT m.id, m.key, m.content, m.category, m.updated_at, m.session_id, m.source, "
             "bm25(memories_fts) as score FROM memories_fts f "
@@ -832,28 +844,32 @@ sc_memory_t sc_lucid_memory_create(sc_allocator_t *alloc, const char *db_path,
         if (alter_err)
             sqlite3_free(alter_err);
     }
-    sqlite3_exec(db,
-                 "CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts "
-                 "USING fts5(key, content, content=memories, content_rowid=rowid)",
-                 NULL, NULL, NULL);
-    sqlite3_exec(db, "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')", NULL, NULL, NULL);
-    sqlite3_exec(db,
-                 "CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories "
-                 "BEGIN INSERT INTO memories_fts(rowid, key, content) VALUES "
-                 "(new.rowid, new.key, new.content); END",
-                 NULL, NULL, NULL);
-    sqlite3_exec(db,
-                 "CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories "
-                 "BEGIN INSERT INTO memories_fts(memories_fts, rowid, key, content) "
-                 "VALUES ('delete', old.rowid, old.key, old.content); END",
-                 NULL, NULL, NULL);
-    sqlite3_exec(db,
-                 "CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories "
-                 "BEGIN INSERT INTO memories_fts(memories_fts, rowid, key, content) "
-                 "VALUES ('delete', old.rowid, old.key, old.content); "
-                 "INSERT INTO memories_fts(rowid, key, content) VALUES "
-                 "(new.rowid, new.key, new.content); END",
-                 NULL, NULL, NULL);
+    bool has_fts5 = fts5_available(db);
+    if (has_fts5) {
+        sqlite3_exec(db,
+                     "CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts "
+                     "USING fts5(key, content, content=memories, content_rowid=rowid)",
+                     NULL, NULL, NULL);
+        sqlite3_exec(db, "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')", NULL, NULL,
+                     NULL);
+        sqlite3_exec(db,
+                     "CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories "
+                     "BEGIN INSERT INTO memories_fts(rowid, key, content) VALUES "
+                     "(new.rowid, new.key, new.content); END",
+                     NULL, NULL, NULL);
+        sqlite3_exec(db,
+                     "CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories "
+                     "BEGIN INSERT INTO memories_fts(memories_fts, rowid, key, content) "
+                     "VALUES ('delete', old.rowid, old.key, old.content); END",
+                     NULL, NULL, NULL);
+        sqlite3_exec(db,
+                     "CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories "
+                     "BEGIN INSERT INTO memories_fts(memories_fts, rowid, key, content) "
+                     "VALUES ('delete', old.rowid, old.key, old.content); "
+                     "INSERT INTO memories_fts(rowid, key, content) VALUES "
+                     "(new.rowid, new.key, new.content); END",
+                     NULL, NULL, NULL);
+    }
     sc_lucid_memory_t *self =
         (sc_lucid_memory_t *)alloc->alloc(alloc->ctx, sizeof(sc_lucid_memory_t));
     if (!self) {
@@ -863,6 +879,7 @@ sc_memory_t sc_lucid_memory_create(sc_allocator_t *alloc, const char *db_path,
     memset(self, 0, sizeof(sc_lucid_memory_t));
     self->alloc = alloc;
     self->db = db;
+    self->has_fts5 = has_fts5;
     self->workspace_dir = sc_strndup(alloc, workspace_dir, strlen(workspace_dir));
     self->lucid_cmd = sc_strndup(alloc, "lucid", 5);
     return (sc_memory_t){.ctx = self, .vtable = &lucid_vtable_prod};

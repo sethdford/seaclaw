@@ -18,6 +18,7 @@ struct sc_bus;
 struct sc_tool;
 struct sc_push_manager;
 struct sc_pairing_guard;
+struct sc_graph;
 
 typedef struct sc_app_context {
     struct sc_config *config;
@@ -31,6 +32,7 @@ typedef struct sc_app_context {
     size_t tools_count;
     struct sc_push_manager *push;
     struct sc_agent *agent; /* gateway agent for persona.set; NULL when --with-agent not used */
+    struct sc_graph *graph; /* knowledge graph for memory.graph RPC; NULL when not opened */
 } sc_app_context_t;
 
 typedef struct sc_control_protocol {
