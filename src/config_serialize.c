@@ -81,6 +81,8 @@ sc_error_t sc_config_save(const sc_config_t *cfg) {
                 &a, mem, "sqlite_path",
                 sc_json_string_new(&a, cfg->memory.sqlite_path, strlen(cfg->memory.sqlite_path)));
         sc_json_object_set(&a, mem, "auto_save", sc_json_bool_new(&a, cfg->memory.auto_save));
+        sc_json_object_set(&a, mem, "consolidation_interval_hours",
+                           sc_json_number_new(&a, cfg->memory.consolidation_interval_hours));
         sc_json_object_set(&a, root, "memory", mem);
     }
 

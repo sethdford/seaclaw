@@ -49,9 +49,11 @@ static const char *const sc_gateway_keys[] = {
 static const size_t sc_gateway_keys_len = sizeof(sc_gateway_keys) / sizeof(sc_gateway_keys[0]);
 
 static const char *const sc_memory_keys[] = {
-    "profile",          "backend",         "sqlite_path",    "max_entries",    "auto_save",
-    "postgres_url",     "postgres_schema", "postgres_table", "redis_host",     "redis_port",
-    "redis_key_prefix", "api_base_url",    "api_key",        "api_timeout_ms",
+    "profile",      "backend",         "sqlite_path",
+    "max_entries",  "auto_save",       "consolidation_interval_hours",
+    "postgres_url", "postgres_schema", "postgres_table",
+    "redis_host",   "redis_port",      "redis_key_prefix",
+    "api_base_url", "api_key",         "api_timeout_ms",
 };
 static const size_t sc_memory_keys_len = sizeof(sc_memory_keys) / sizeof(sc_memory_keys[0]);
 

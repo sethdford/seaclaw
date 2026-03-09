@@ -343,6 +343,7 @@ typedef struct sc_memory_config {
     char *profile;
     char *backend;
     bool auto_save;
+    uint32_t consolidation_interval_hours; /* 0 = disabled, default 24 */
     char *sqlite_path;
     uint32_t max_entries;
     char *postgres_url;
@@ -455,6 +456,7 @@ typedef struct sc_config {
     uint32_t max_tokens;
     char *memory_backend;
     bool memory_auto_save;
+    uint32_t consolidation_interval_hours; /* 0 = disabled, default 24 */
     bool heartbeat_enabled;
     uint32_t heartbeat_interval_minutes;
     char *gateway_host;

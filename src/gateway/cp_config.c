@@ -104,6 +104,18 @@ sc_error_t cp_config_schema(sc_allocator_t *alloc, sc_app_context_t *app, sc_ws_
     cp_json_set_str(alloc, tp, "description", "Temperature (0.0 - 2.0)");
     sc_json_object_set(alloc, props, "temperature", tp);
 
+    sc_json_value_t *mem = sc_json_object_new(alloc);
+    if (mem) {
+        sc_json_value_t *cih = sc_json_object_new(alloc);
+        if (cih) {
+            cp_json_set_str(alloc, cih, "type", "integer");
+            cp_json_set_str(alloc, cih, "description",
+                            "Memory consolidation interval in hours (0 = disabled, default 24)");
+            sc_json_object_set(alloc, mem, "consolidation_interval_hours", cih);
+        }
+        sc_json_object_set(alloc, props, "memory", mem);
+    }
+
     sc_json_object_set(alloc, schema, "properties", props);
     sc_json_object_set(alloc, obj, "schema", schema);
 

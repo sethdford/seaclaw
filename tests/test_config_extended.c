@@ -602,6 +602,22 @@ static void test_config_parse_memory_auto_save(void) {
     free_config(cfg);
 }
 
+static void test_config_parse_memory_consolidation_interval_hours(void) {
+    sc_config_t *cfg = make_config_with_arena();
+    const char *j = "{\"memory\":{\"consolidation_interval_hours\":12}}";
+    sc_config_parse_json(cfg, j, strlen(j));
+    SC_ASSERT_EQ(cfg->memory.consolidation_interval_hours, 12u);
+    free_config(cfg);
+}
+
+static void test_config_parse_memory_consolidation_interval_disabled(void) {
+    sc_config_t *cfg = make_config_with_arena();
+    const char *j = "{\"memory\":{\"consolidation_interval_hours\":0}}";
+    sc_config_parse_json(cfg, j, strlen(j));
+    SC_ASSERT_EQ(cfg->memory.consolidation_interval_hours, 0u);
+    free_config(cfg);
+}
+
 static void test_config_parse_cron_interval(void) {
     sc_config_t *cfg = make_config_with_arena();
     const char *j = "{\"cron\":{\"interval_minutes\":10,\"max_run_history\":20}}";
@@ -1226,6 +1242,8 @@ void run_config_extended_tests(void) {
     SC_RUN_TEST(test_config_parse_gateway_allow_public_bind);
     SC_RUN_TEST(test_config_parse_memory_profile);
     SC_RUN_TEST(test_config_parse_memory_auto_save);
+    SC_RUN_TEST(test_config_parse_memory_consolidation_interval_hours);
+    SC_RUN_TEST(test_config_parse_memory_consolidation_interval_disabled);
     SC_RUN_TEST(test_config_parse_cron_interval);
     SC_RUN_TEST(test_config_parse_diagnostics_log_tool_calls);
     SC_RUN_TEST(test_config_parse_reliability_retries);

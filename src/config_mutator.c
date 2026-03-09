@@ -11,9 +11,11 @@
 #endif
 
 static const char *ALLOWED_EXACT[] = {
-    "default_temperature", "reasoning_effort", "memory.backend",
-    "memory.profile",      "memory.auto_save", "gateway.host",
-    "gateway.port",        "tunnel.provider",  "agents.defaults.model.primary",
+    "default_temperature", "reasoning_effort",
+    "memory.backend",      "memory.profile",
+    "memory.auto_save",    "memory.consolidation_interval_hours",
+    "gateway.host",        "gateway.port",
+    "tunnel.provider",     "agents.defaults.model.primary",
 };
 #define N_EXACT (sizeof(ALLOWED_EXACT) / sizeof(ALLOWED_EXACT[0]))
 

@@ -127,6 +127,7 @@ static void set_defaults(sc_config_t *cfg, sc_allocator_t *a) {
     if (!cfg->memory.backend)
         return;
     cfg->memory.auto_save = true;
+    cfg->memory.consolidation_interval_hours = 24;
     cfg->memory.sqlite_path = NULL;
     cfg->memory.max_entries = 0;
     cfg->heartbeat.enabled = false;
@@ -259,6 +260,7 @@ static void sync_flat_fields(sc_config_t *cfg) {
     if (cfg->memory.backend)
         cfg->memory_backend = cfg->memory.backend;
     cfg->memory_auto_save = cfg->memory.auto_save;
+    cfg->consolidation_interval_hours = cfg->memory.consolidation_interval_hours;
     cfg->heartbeat_enabled = cfg->heartbeat.enabled;
     cfg->heartbeat_interval_minutes = cfg->heartbeat.interval_minutes;
     if (cfg->gateway.host)

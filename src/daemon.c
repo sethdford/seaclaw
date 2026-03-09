@@ -988,20 +988,13 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 #ifndef SC_IS_TEST
-                /* Daily memory consolidation at 3 AM */
-                {
-                    static bool consolidated_today = false;
-                    struct tm tm_buf;
-#if defined(_WIN32) && !defined(__CYGWIN__)
-                    struct tm *lt = (localtime_s(&tm_buf, &t) == 0) ? &tm_buf : NULL;
-#else
-                    struct tm *lt = localtime_r(&t, &tm_buf);
-#endif
-                    if (lt && lt->tm_hour == 4) {
-                        consolidated_today = false;
-                    }
-                    if (lt && lt->tm_hour == 3 && lt->tm_min == 0 && agent && agent->memory &&
-                        !consolidated_today) {
+                /* Periodic memory consolidation */
+                if (config->consolidation_interval_hours > 0 && agent && agent->memory) {
+                    static time_t last_consolidation = 0;
+                    time_t interval = (time_t)config->consolidation_interval_hours * 3600;
+                    if (last_consolidation == 0)
+                        last_consolidation = t;
+                    if (t - last_consolidation >= interval) {
                         sc_consolidation_config_t cons_cfg = {
                             .decay_days = 30,
                             .decay_factor = 0.5,
@@ -1012,8 +1005,8 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                             .model_len = agent->model_name_len,
                         };
                         if (sc_memory_consolidate(alloc, agent->memory, &cons_cfg) == SC_OK) {
-                            consolidated_today = true;
-                            fprintf(stderr, "[seaclaw] daily memory consolidation completed\n");
+                            last_consolidation = t;
+                            fprintf(stderr, "[seaclaw] periodic memory consolidation completed\n");
                         }
                     }
                 }
@@ -2819,6 +2812,9 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         response_len = 0;
                     }
                     err = sc_agent_turn(agent, combined, combined_len, &response, &response_len);
+                    fprintf(stderr,
+                            "[seaclaw] agent turn result: err=%d response_len=%zu for %.*s\n",
+                            (int)err, response_len, (int)(key_len > 20 ? 20 : key_len), batch_key);
                     if (err != SC_OK)
                         fprintf(stderr, "[seaclaw] agent turn failed for %.*s: %d\n", (int)key_len,
                                 batch_key, (int)err);

@@ -220,6 +220,10 @@ static sc_error_t parse_memory(sc_allocator_t *a, sc_config_t *cfg, const sc_jso
     if (max_ent >= 0 && max_ent <= 1000000)
         cfg->memory.max_entries = (uint32_t)max_ent;
     cfg->memory.auto_save = sc_json_get_bool(obj, "auto_save", cfg->memory.auto_save);
+    double cih = sc_json_get_number(obj, "consolidation_interval_hours",
+                                    cfg->memory.consolidation_interval_hours);
+    if (cih >= 0 && cih <= 8760)
+        cfg->memory.consolidation_interval_hours = (uint32_t)cih;
 
     const char *pg_url = sc_json_get_string(obj, "postgres_url");
     if (pg_url) {
