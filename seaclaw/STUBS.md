@@ -10,8 +10,8 @@ Last updated: 2026-03-09
 | ------------------------------ | -------------------- |
 | Source files (src/ + include/) | **~715**             |
 | Lines of C/H code              | **~137,162**         |
-| Test files                     | 145                  |
-| Tests passing                  | **3758/3758 (100%)** |
+| Test files                     | 128                  |
+| Tests passing                  | **3779/3779 (100%)** |
 | Binary size (MinSizeRel+LTO)   | **~772 KB (full)**   |
 | Core binary (no curl/channels) | **463 KB**           |
 | seaclaw module parity          | **100%**             |
