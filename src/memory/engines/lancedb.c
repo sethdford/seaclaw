@@ -414,7 +414,10 @@ static sc_error_t read_entry_from_row(sqlite3_stmt *stmt, sc_allocator_t *alloc,
     out->session_id_len = session_id_len;
     out->source = source_p ? sc_strndup(alloc, source_p, source_len) : NULL;
     out->source_len = source_len;
-    out->score = NAN;
+    if (sqlite3_column_count(stmt) > 6)
+        out->score = sqlite3_column_double(stmt, 6);
+    else
+        out->score = NAN;
     return SC_OK;
 }
 
@@ -500,6 +503,83 @@ static sc_error_t impl_recall_prod(void *ctx, sc_allocator_t *alloc, const char 
     *out_count = 0;
     if (!query || query_len == 0)
         return SC_OK;
+
+    /* FTS5 BM25 search - build query from words (escape quotes, wrap in "", join with OR) */
+    char fts_buf[512];
+    size_t fts_len = 0;
+    const char *p = query;
+    const char *end = query + query_len;
+    bool first = true;
+    while (p < end && fts_len < sizeof(fts_buf) - 10) {
+        while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r'))
+            p++;
+        if (p >= end)
+            break;
+        const char *word_start = p;
+        while (p < end && *p != ' ' && *p != '\t' && *p != '\n' && *p != '\r')
+            p++;
+        if (p > word_start) {
+            char escaped_word[256];
+            size_t ew_len = 0;
+            for (const char *c = word_start; c < p && ew_len < sizeof(escaped_word) - 2; c++) {
+                if (*c == '"') {
+                    if (ew_len < sizeof(escaped_word) - 3) {
+                        escaped_word[ew_len++] = '"';
+                        escaped_word[ew_len++] = '"';
+                    }
+                } else {
+                    escaped_word[ew_len++] = *c;
+                }
+            }
+            escaped_word[ew_len] = '\0';
+            if (!first)
+                fts_len += (size_t)snprintf(fts_buf + fts_len, sizeof(fts_buf) - fts_len, " OR ");
+            fts_len += (size_t)snprintf(fts_buf + fts_len, sizeof(fts_buf) - fts_len, "\"%s\"",
+                                        escaped_word);
+            first = false;
+        }
+    }
+
+    /* Try FTS5 first; fall back to LIKE when FTS returns no rows */
+    if (fts_len > 0) {
+        const char *sql = "SELECT m.key, m.text, m.category, m.session_id, m.updated_at, m.source, "
+                          "bm25(lancedb_memories_fts) as score FROM lancedb_memories_fts f "
+                          "JOIN lancedb_memories m ON m.rowid = f.rowid "
+                          "WHERE lancedb_memories_fts MATCH ?1 ORDER BY score LIMIT ?2";
+        sqlite3_stmt *stmt = NULL;
+        int rc = sqlite3_prepare_v2(self->db, sql, -1, &stmt, NULL);
+        if (rc == SQLITE_OK) {
+            sqlite3_bind_text(stmt, 1, fts_buf, (int)fts_len, SQLITE_STATIC);
+            sqlite3_bind_int64(stmt, 2, (sqlite3_int64)limit);
+            sc_memory_entry_t *entries =
+                (sc_memory_entry_t *)alloc->alloc(alloc->ctx, limit * sizeof(sc_memory_entry_t));
+            if (!entries) {
+                sqlite3_finalize(stmt);
+                return SC_ERR_OUT_OF_MEMORY;
+            }
+            size_t count = 0;
+            while (sqlite3_step(stmt) == SQLITE_ROW && count < limit) {
+                read_entry_from_row(stmt, alloc, &entries[count]);
+                if (session_id && session_id_len > 0 && entries[count].session_id &&
+                    (entries[count].session_id_len != session_id_len ||
+                     memcmp(entries[count].session_id, session_id, session_id_len) != 0)) {
+                    sc_memory_entry_free_fields(alloc, &entries[count]);
+                    continue;
+                }
+                count++;
+            }
+            sqlite3_finalize(stmt);
+            if (count > 0) {
+                *out = entries;
+                *out_count = count;
+                return SC_OK;
+            }
+            alloc->free(alloc->ctx, entries, limit * sizeof(sc_memory_entry_t));
+        } else if (stmt)
+            sqlite3_finalize(stmt);
+    }
+
+    /* Fallback: LIKE search */
     char *like_pattern = (char *)alloc->alloc(alloc->ctx, query_len + 3);
     if (!like_pattern)
         return SC_ERR_OUT_OF_MEMORY;
@@ -699,6 +779,32 @@ sc_memory_t sc_lancedb_memory_create(sc_allocator_t *alloc, const char *db_path)
         if (alter_err)
             sqlite3_free(alter_err);
     }
+    sqlite3_exec(db,
+                 "CREATE VIRTUAL TABLE IF NOT EXISTS lancedb_memories_fts "
+                 "USING fts5(key, text, content=lancedb_memories, content_rowid=rowid)",
+                 NULL, NULL, NULL);
+    sqlite3_exec(db, "INSERT INTO lancedb_memories_fts(lancedb_memories_fts) VALUES('rebuild')",
+                 NULL, NULL, NULL);
+    sqlite3_exec(
+        db,
+        "CREATE TRIGGER IF NOT EXISTS lancedb_memories_ai AFTER INSERT ON lancedb_memories "
+        "BEGIN INSERT INTO lancedb_memories_fts(rowid, key, text) VALUES "
+        "(new.rowid, new.key, new.text); END",
+        NULL, NULL, NULL);
+    sqlite3_exec(
+        db,
+        "CREATE TRIGGER IF NOT EXISTS lancedb_memories_ad AFTER DELETE ON lancedb_memories "
+        "BEGIN INSERT INTO lancedb_memories_fts(lancedb_memories_fts, rowid, key, text) "
+        "VALUES ('delete', old.rowid, old.key, old.text); END",
+        NULL, NULL, NULL);
+    sqlite3_exec(
+        db,
+        "CREATE TRIGGER IF NOT EXISTS lancedb_memories_au AFTER UPDATE ON lancedb_memories "
+        "BEGIN INSERT INTO lancedb_memories_fts(lancedb_memories_fts, rowid, key, text) "
+        "VALUES ('delete', old.rowid, old.key, old.text); "
+        "INSERT INTO lancedb_memories_fts(rowid, key, text) VALUES "
+        "(new.rowid, new.key, new.text); END",
+        NULL, NULL, NULL);
     sc_lancedb_memory_t *self =
         (sc_lancedb_memory_t *)alloc->alloc(alloc->ctx, sizeof(sc_lancedb_memory_t));
     if (!self) {
