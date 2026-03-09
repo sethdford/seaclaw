@@ -283,6 +283,8 @@ bool sc_gateway_is_webhook_path(const char *path) {
 bool sc_gateway_is_allowed_origin(const char *origin, const char *const *allowed, size_t n) {
     if (!origin || !origin[0])
         return true;
+    if (strchr(origin, '\r') || strchr(origin, '\n') || strlen(origin) > 256)
+        return false;
     if (strstr(origin, "://localhost") != NULL || strstr(origin, "://127.0.0.1") != NULL ||
         strstr(origin, "://[::1]") != NULL)
         return true;
@@ -822,11 +824,26 @@ static void handle_http_request(sc_gateway_state_t *gw, int fd, const char *meth
         {
             static const char b64[] =
                 "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-            unsigned int seed = (unsigned int)time(NULL) ^ (unsigned int)(uintptr_t)oauth_ctx;
-            for (int i = 0; i < 43; i++) {
-                seed = seed * 1103515245u + 12345u;
-                state[i] = b64[(seed >> 16) & 63];
+            unsigned char rand_bytes[43];
+#if defined(__APPLE__) || defined(__FreeBSD__)
+            arc4random_buf(rand_bytes, sizeof(rand_bytes));
+#elif defined(__linux__)
+            if (getentropy(rand_bytes, sizeof(rand_bytes)) != 0) {
+                send_json(fd, 500, "{\"error\":\"entropy failure\"}");
+                return;
             }
+#else
+            FILE *urand = fopen("/dev/urandom", "rb");
+            if (!urand || fread(rand_bytes, 1, sizeof(rand_bytes), urand) != sizeof(rand_bytes)) {
+                if (urand)
+                    fclose(urand);
+                send_json(fd, 500, "{\"error\":\"entropy failure\"}");
+                return;
+            }
+            fclose(urand);
+#endif
+            for (int i = 0; i < 43; i++)
+                state[i] = b64[rand_bytes[i] & 63];
             state[43] = '\0';
         }
         oauth_pending_store(gw, state, verifier);
@@ -1117,7 +1134,9 @@ sc_error_t sc_gateway_run(sc_allocator_t *alloc, const char *host, uint16_t port
         if (gw->pairing_guard) {
             const char *code = sc_pairing_guard_pairing_code(gw->pairing_guard);
             if (code)
-                fprintf(stderr, "[gateway] Pairing code: %s\n", code);
+                fprintf(stderr,
+                        "[gateway] Pairing code ready (use /pair endpoint or UI to view)\n");
+            (void)code;
         }
     }
     sc_control_set_auth(ctrl, cfg.require_pairing, gw->pairing_guard, cfg.auth_token);

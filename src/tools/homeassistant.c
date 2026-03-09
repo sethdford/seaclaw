@@ -71,9 +71,15 @@ static sc_error_t homeassistant_execute(void *ctx, sc_allocator_t *alloc,
             "missing url or token — configure Home Assistant URL and long-lived access token", 72);
         return SC_OK;
     }
-    if (strncmp(url, "https://", 8) != 0 && strncmp(url, "http://", 7) != 0) {
-        *out = sc_tool_result_fail("url must use http:// or https://", 34);
-        return SC_OK;
+    if (strncmp(url, "https://", 8) != 0) {
+        if (strncmp(url, "http://localhost", 16) == 0 ||
+            strncmp(url, "http://127.0.0.1", 16) == 0 || strncmp(url, "http://[::1]", 12) == 0) {
+            /* Allow HTTP for local Home Assistant instances only */
+        } else {
+            *out = sc_tool_result_fail("url must use https:// (http:// only allowed for localhost)",
+                                       58);
+            return SC_OK;
+        }
     }
     if (strlen(url) > 400) {
         *out = sc_tool_result_fail("url too long", 12);
