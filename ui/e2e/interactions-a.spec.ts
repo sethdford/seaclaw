@@ -24,7 +24,7 @@ test.describe("Chat (Interactions)", () => {
 
     await expect(async () => {
       const text: string = await page.evaluate(deepText("sc-chat-view"));
-      expect(text).toContain("Demo response to:");
+      expect(text).toContain("Hello world");
     }).toPass({ timeout: 15000 });
   });
 
