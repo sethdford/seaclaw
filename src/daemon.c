@@ -1265,8 +1265,8 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         bth_hour = night_lt->tm_hour;
                 }
                 if (bth_hour >= 0) {
-                    if (bth_hour >= 1 && bth_hour < 7) {
-                        /* 1AM-7AM: very high SKIP chance (sleeping) */
+                    if (bth_hour >= 2 && bth_hour < 6) {
+                        /* 2AM-6AM: very high SKIP chance (sleeping) */
                         uint32_t night_r = (uint32_t)time(NULL) * 1103515245u + 12345u;
                         if (((night_r >> 16u) % 100u) < 85u) {
                             fprintf(stderr, "[seaclaw] late-night skip (1AM-7AM, hour=%d)\n",

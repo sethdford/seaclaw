@@ -285,7 +285,10 @@ static sc_error_t impl_recall(void *ctx, sc_allocator_t *alloc, const char *quer
         if (!contains)
             continue;
 
-        entries[count].id = sc_strdup(alloc, path ? path : e->d_name);
+        /* path was freed above; reconstruct for id to avoid use-after-free */
+        entries[count].id = sc_sprintf(alloc, "%s/%s", self->dir, e->d_name);
+        if (!entries[count].id)
+            continue;
         entries[count].id_len = strlen(entries[count].id);
         entries[count].key = sc_strdup(alloc, key);
         entries[count].key_len = strlen(key);
