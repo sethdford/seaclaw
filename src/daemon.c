@@ -2649,6 +2649,54 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 
+                /* F17: First-time vulnerability detection — extra care when they share
+                 * something personal for the first time. */
+                {
+                    hu_vulnerability_state_t vuln =
+                        hu_conversation_detect_first_time_vulnerability(
+                            combined, combined_len,
+                            agent ? agent->memory : NULL,
+                            batch_key, key_len);
+                    if (vuln.first_time && vuln.topic_category) {
+                        char vuln_buf[512];
+                        size_t vuln_len = hu_conversation_build_vulnerability_directive(
+                            &vuln, vuln_buf, sizeof(vuln_buf));
+                        if (vuln_len > 0) {
+                            if (convo_ctx) {
+                                size_t total = convo_ctx_len + vuln_len + 3;
+                                char *merged = (char *)alloc->alloc(alloc->ctx, total);
+                                if (merged) {
+                                    memcpy(merged, convo_ctx, convo_ctx_len);
+                                    merged[convo_ctx_len] = '\n';
+                                    memcpy(merged + convo_ctx_len + 1, vuln_buf, vuln_len);
+                                    merged[convo_ctx_len + 1 + vuln_len] = '\n';
+                                    merged[total - 1] = '\0';
+                                    alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                    convo_ctx = merged;
+                                    convo_ctx_len = total - 1;
+                                }
+                            } else {
+                                convo_ctx = (char *)alloc->alloc(alloc->ctx, vuln_len + 2);
+                                if (convo_ctx) {
+                                    memcpy(convo_ctx, vuln_buf, vuln_len);
+                                    convo_ctx[vuln_len] = '\n';
+                                    convo_ctx[vuln_len + 1] = '\0';
+                                    convo_ctx_len = vuln_len + 1;
+                                }
+                            }
+#ifndef HU_IS_TEST
+                            /* Record so future calls return first_time=false */
+                            if (agent && agent->memory) {
+                                size_t tl = strlen(vuln.topic_category);
+                                (void)hu_emotional_moment_record(
+                                    alloc, agent->memory, batch_key, key_len,
+                                    vuln.topic_category, tl, "vulnerable", 9, vuln.intensity);
+                            }
+#endif
+                        }
+                    }
+                }
+
                 /* GraphRAG: inject knowledge graph context (cross-contact synthesis via batch_key)
                  */
 #ifdef HU_ENABLE_SQLITE

@@ -3,6 +3,11 @@
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
 #endif
+#ifdef HU_ENABLE_SQLITE
+#include "human/memory.h"
+#include "human/memory/emotional_moments.h"
+#include <sqlite3.h>
+#endif
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -1279,6 +1284,145 @@ size_t hu_conversation_build_comfort_directive(const char *response_type, size_t
         return 0;
     int n = snprintf(buf, cap, "[COMFORT: This contact responds well to %.*s when %.*s.]",
                      (int)type_len, response_type, (int)emotion_len, emotion);
+    if (n <= 0 || (size_t)n >= cap)
+        return 0;
+    return (size_t)n;
+}
+
+/* ── First-time vulnerability detection (F17) ─────────────────────────── */
+
+typedef struct {
+    const char *category;
+    const char *keywords[16];
+} hu_vuln_category_t;
+
+/* Order matters: loss before family_issue (so "my dad passed away" → loss);
+ * family_issue before illness (so "my mom is sick" → family_issue). */
+static const hu_vuln_category_t vuln_categories[] = {
+    {"job_loss",
+     {"fired", "laid off", "lost my job", "getting let go", "downsized", NULL}},
+    {"divorce",
+     {"divorce", "separating", "custody", "ex-wife", "ex-husband", NULL}},
+    {"mental_health",
+     {"depression", "therapy", "therapist", "medication", "anxiety disorder", "panic attacks",
+      NULL}},
+    {"loss",
+     {"died", "passed away", "funeral", "lost my", "grieving", NULL}},
+    {"family_issue",
+     {"my mom", "my dad", "my parents", "my brother", "my sister", NULL}},
+    {"illness",
+     {"diagnosis", "cancer", "sick", "hospital", "surgery", "chemo", NULL}},
+};
+
+static const char *vuln_family_negative[] = {
+    "sick", "hospital", "problem", "issue", "fighting", "worried", "died", "passed away",
+    "cancer", "diagnosis", "divorce", "custody", "struggling", "stress", NULL,
+};
+
+static bool family_issue_has_negative_context(const char *msg, size_t msg_len) {
+    for (const char *const *kw = vuln_family_negative; *kw; kw++) {
+        if (str_contains_ci(msg, msg_len, *kw))
+            return true;
+    }
+    return false;
+}
+
+const char *hu_conversation_extract_vulnerability_topic(const char *msg, size_t msg_len) {
+    if (!msg || msg_len == 0)
+        return NULL;
+
+    for (size_t c = 0; c < sizeof(vuln_categories) / sizeof(vuln_categories[0]); c++) {
+        const hu_vuln_category_t *cat = &vuln_categories[c];
+        bool found = false;
+        for (const char *const *kw = cat->keywords; *kw && !found; kw++) {
+            if (str_contains_ci(msg, msg_len, *kw))
+                found = true;
+        }
+        if (found) {
+            if (strcmp(cat->category, "family_issue") == 0 &&
+                !family_issue_has_negative_context(msg, msg_len))
+                continue;
+            return cat->category;
+        }
+    }
+    return NULL;
+}
+
+#ifdef HU_ENABLE_SQLITE
+bool hu_conversation_is_first_time_topic(hu_memory_t *memory,
+                                         const char *contact_id, size_t contact_id_len,
+                                         const char *topic, size_t topic_len) {
+    if (!memory || !contact_id || contact_id_len == 0 || !topic || topic_len == 0)
+        return true;
+
+    sqlite3 *db = hu_sqlite_memory_get_db(memory);
+    if (!db)
+        return true;
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db,
+                                "SELECT COUNT(*) FROM emotional_moments "
+                                "WHERE contact_id=? AND topic LIKE ?",
+                                -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        if (stmt)
+            sqlite3_finalize(stmt);
+        return true;
+    }
+
+    sqlite3_bind_text(stmt, 1, contact_id, (int)contact_id_len, SQLITE_STATIC);
+    char pattern[272];
+    int pn = snprintf(pattern, sizeof(pattern), "%%%.*s%%", (int)topic_len, topic);
+    if (pn <= 0 || (size_t)pn >= sizeof(pattern)) {
+        sqlite3_finalize(stmt);
+        return true;
+    }
+    sqlite3_bind_text(stmt, 2, pattern, -1, SQLITE_STATIC);
+
+    int count = 0;
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+        count = sqlite3_column_int(stmt, 0);
+    sqlite3_finalize(stmt);
+
+    return count == 0;
+}
+#endif
+
+hu_vulnerability_state_t hu_conversation_detect_first_time_vulnerability(
+    const char *msg, size_t msg_len,
+    hu_memory_t *memory, const char *contact_id, size_t contact_id_len) {
+    hu_vulnerability_state_t out = {false, NULL, 0.5f};
+
+    const char *topic = hu_conversation_extract_vulnerability_topic(msg, msg_len);
+    if (!topic)
+        return out;
+
+    out.topic_category = topic;
+    out.intensity = 0.7f;
+
+#ifdef HU_ENABLE_SQLITE
+    size_t topic_len = strlen(topic);
+    out.first_time = hu_conversation_is_first_time_topic(memory, contact_id, contact_id_len,
+                                                        topic, topic_len);
+#else
+    out.first_time = true;
+#endif
+
+    return out;
+}
+
+size_t hu_conversation_build_vulnerability_directive(const hu_vulnerability_state_t *state,
+                                                     char *buf, size_t cap) {
+    if (!state || !buf || cap == 0)
+        return 0;
+    if (!state->first_time || !state->topic_category)
+        return 0;
+
+    int n = snprintf(buf, cap,
+                     "[VULNERABILITY: First time they've shared about %s. Extra care. "
+                     "Acknowledge weight. Don't pivot to advice. "
+                     "\"that's huge. thanks for telling me.\" energy.]",
+                     state->topic_category);
     if (n <= 0 || (size_t)n >= cap)
         return 0;
     return (size_t)n;

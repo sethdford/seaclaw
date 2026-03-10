@@ -4,6 +4,7 @@
 #include "human/channel.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/memory.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
 #else
@@ -138,6 +139,33 @@ size_t hu_conversation_build_deescalation_directive(char *buf, size_t cap);
 size_t hu_conversation_build_comfort_directive(const char *response_type, size_t type_len,
                                                const char *emotion, size_t emotion_len, char *buf,
                                                size_t cap);
+
+/* ── First-time vulnerability detection (F17) ─────────────────────────────── */
+
+/* Extract vulnerability topic category from message. Returns static string
+ * (e.g. "illness", "job_loss") or NULL if none detected. */
+const char *hu_conversation_extract_vulnerability_topic(const char *msg, size_t msg_len);
+
+/* Check if contact has ever had an emotional_moment with this topic before.
+ * Returns true if count == 0 (first time). If memory/db NULL, returns true. */
+#ifdef HU_ENABLE_SQLITE
+bool hu_conversation_is_first_time_topic(hu_memory_t *memory,
+                                         const char *contact_id, size_t contact_id_len,
+                                         const char *topic, size_t topic_len);
+#endif
+
+typedef struct hu_vulnerability_state {
+    bool first_time;
+    const char *topic_category; /* static string, do not free */
+    float intensity;
+} hu_vulnerability_state_t;
+
+hu_vulnerability_state_t hu_conversation_detect_first_time_vulnerability(
+    const char *msg, size_t msg_len,
+    hu_memory_t *memory, const char *contact_id, size_t contact_id_len);
+
+size_t hu_conversation_build_vulnerability_directive(const hu_vulnerability_state_t *state,
+                                                    char *buf, size_t cap);
 
 /* ── Context modifiers (F16) ─────────────────────────────────────────────── */
 
