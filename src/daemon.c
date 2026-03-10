@@ -725,6 +725,16 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
     if (hour < 9 || hour > 21)
         return;
 
+    /* F53: Deduplication — don't send same important_date to same contact twice per day */
+    static char g_sent_important_date_contacts[8][64];
+    static int g_sent_important_date_count = 0;
+    static int g_sent_important_date_ymd = -1;
+    int today_ymd = (tm_now.tm_year + 1900) * 10000 + (tm_now.tm_mon + 1) * 100 + tm_now.tm_mday;
+    if (g_sent_important_date_ymd != today_ymd) {
+        g_sent_important_date_ymd = today_ymd;
+        g_sent_important_date_count = 0;
+    }
+
 #ifndef HU_IS_TEST
     /* F25: Emotional check-ins — due moments from 1–3 days ago */
     if (agent->memory) {
@@ -974,10 +984,64 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
             }
 #endif
 
+            /* F53: Birthday/holiday awareness — important_dates from persona */
+            char *important_date_ctx = NULL;
+            size_t important_date_ctx_len = 0;
+            bool had_important_date = false;
+            char important_date_msg[256];
+            char important_date_type[32];
+            bool important_date_sent_today = false;
+            for (int di = 0; di < g_sent_important_date_count; di++) {
+                if (strcmp(g_sent_important_date_contacts[di], cp->contact_id) == 0) {
+                    important_date_sent_today = true;
+                    break;
+                }
+            }
+            if (!important_date_sent_today &&
+                hu_proactive_check_important_dates(agent->persona, cp->contact_id,
+                                                   strlen(cp->contact_id), tm_now.tm_mon + 1,
+                                                   tm_now.tm_mday, important_date_msg,
+                                                   sizeof(important_date_msg), important_date_type,
+                                                   sizeof(important_date_type))) {
+                char ctx_buf[384];
+                int n = snprintf(ctx_buf, sizeof(ctx_buf),
+                                 "IMPORTANT DATE (%s): %s",
+                                 important_date_type, important_date_msg);
+                if (n > 0 && (size_t)n < sizeof(ctx_buf)) {
+                    if (strcmp(important_date_type, "birthday") == 0)
+                        n += snprintf(ctx_buf + n, sizeof(ctx_buf) - (size_t)n,
+                                      " Use confetti effect when sending.");
+                    if (n > 0 && (size_t)n < sizeof(ctx_buf)) {
+                        important_date_ctx =
+                            (char *)alloc->alloc(alloc->ctx, (size_t)n + 1);
+                        if (important_date_ctx) {
+                            memcpy(important_date_ctx, ctx_buf, (size_t)n);
+                            important_date_ctx[(size_t)n] = '\0';
+                            important_date_ctx_len = (size_t)n;
+                            had_important_date = true;
+                        }
+                    }
+                }
+            }
+
             /* Build and send the check-in */
             size_t prompt_len = 0;
             char *prompt =
                 proactive_prompt_for_contact(alloc, agent, agent->memory, cp, &prompt_len);
+            if (prompt && important_date_ctx && important_date_ctx_len > 0) {
+                size_t merged_len = prompt_len + 1 + important_date_ctx_len + 1;
+                char *merged = (char *)alloc->alloc(alloc->ctx, merged_len);
+                if (merged) {
+                    memcpy(merged, prompt, prompt_len);
+                    merged[prompt_len] = '\n';
+                    memcpy(merged + prompt_len + 1, important_date_ctx, important_date_ctx_len);
+                    merged[prompt_len + 1 + important_date_ctx_len] = '\0';
+                    alloc->free(alloc->ctx, prompt, prompt_len + 1);
+                    prompt = merged;
+                    prompt_len = merged_len - 1;
+                }
+                alloc->free(alloc->ctx, important_date_ctx, important_date_ctx_len + 1);
+            }
 #ifdef HU_ENABLE_SQLITE
             if (prompt && commitment_ctx && commitment_ctx_len > 0) {
                 size_t merged_len = prompt_len + 1 + commitment_ctx_len + 1;
@@ -1070,6 +1134,17 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                                                           0);
                         fprintf(stderr, "[human] proactive check-in sent to %s: %.*s\n",
                                 cp->name ? cp->name : cp->contact_id, (int)response_len, response);
+                        if (had_important_date &&
+                            strcmp(important_date_type, "birthday") == 0)
+                            fprintf(stderr, "[human] F53: birthday message — use confetti effect\n");
+                        if (had_important_date && g_sent_important_date_count < 8) {
+                            size_t cid_len = strlen(cp->contact_id);
+                            if (cid_len < 64) {
+                                memcpy(g_sent_important_date_contacts[g_sent_important_date_count],
+                                       cp->contact_id, cid_len + 1);
+                                g_sent_important_date_count++;
+                            }
+                        }
                         if (joke_id_to_reference >= 0 && agent->memory)
                             (void)hu_superhuman_inside_joke_reference(agent->memory,
                                                                       joke_id_to_reference);
@@ -2497,6 +2572,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         convo_ctx = hu_conversation_build_awareness(
                             alloc, ctx_entries, ctx_count,
                             (agent && agent->persona) ? agent->persona : NULL, &convo_ctx_len);
+
+                        /* F21: Avoidance pattern detection — topic change within same session */
+                        if (agent->memory && ctx_count >= 2) {
+                            char topic_before[64], topic_after[64];
+                            if (hu_conversation_detect_topic_change(ctx_entries, ctx_count,
+                                                                   topic_before,
+                                                                   sizeof(topic_before),
+                                                                   topic_after,
+                                                                   sizeof(topic_after))) {
+                                size_t tb_len = strlen(topic_before);
+                                if (tb_len > 0)
+                                    (void)hu_superhuman_avoidance_record(agent->memory, batch_key,
+                                                                         key_len, topic_before,
+                                                                         tb_len, true);
+                            }
+                        }
                     }
                     if (merged_history)
                         alloc->free(alloc->ctx, merged_history,
@@ -3043,6 +3134,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* Episodic: load recent sessions for context */
                 char *episodic_ctx = NULL;
                 size_t episodic_ctx_len = 0;
+                char *avoidance_json = NULL;
+                size_t avoidance_len = 0;
                 if (agent->memory) {
                     hu_episodic_load(agent->memory, alloc, &episodic_ctx, &episodic_ctx_len);
                 }
@@ -3098,6 +3191,86 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                     hu_superhuman_inside_joke_free(alloc, jokes_ctx, jokes_count);
+                }
+                /* F18: Micro-moments — inject notable details for natural reference */
+                char *mm_json = NULL;
+                size_t mm_len = 0;
+                if (agent->memory &&
+                    hu_superhuman_micro_moment_list(agent->memory, alloc, batch_key, key_len,
+                                                    10, &mm_json, &mm_len) == HU_OK &&
+                    mm_json && mm_len > 0) {
+                    char mm_buf[1024];
+                    int mb = snprintf(mm_buf, sizeof(mm_buf),
+                                      "Notable details about this contact: %.*s "
+                                      "Reference naturally when relevant.",
+                                      (int)(mm_len < 900 ? mm_len : 900), mm_json);
+                    if (mb > 0 && (size_t)mb < sizeof(mm_buf)) {
+                        char *mm_str = (char *)alloc->alloc(alloc->ctx, (size_t)mb + 1);
+                        if (mm_str) {
+                            memcpy(mm_str, mm_buf, (size_t)mb);
+                            mm_str[mb] = '\0';
+                            if (convo_ctx) {
+                                size_t total = convo_ctx_len + (size_t)mb + 3;
+                                char *merged = (char *)alloc->alloc(alloc->ctx, total);
+                                if (merged) {
+                                    memcpy(merged, convo_ctx, convo_ctx_len);
+                                    merged[convo_ctx_len] = '\n';
+                                    memcpy(merged + convo_ctx_len + 1, mm_str, (size_t)mb);
+                                    merged[convo_ctx_len + 1 + (size_t)mb] = '\n';
+                                    merged[total - 1] = '\0';
+                                    alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                    convo_ctx = merged;
+                                    convo_ctx_len = total - 1;
+                                }
+                                alloc->free(alloc->ctx, mm_str, (size_t)mb + 1);
+                            } else {
+                                convo_ctx = mm_str;
+                                convo_ctx_len = (size_t)mb;
+                            }
+                        }
+                    }
+                    alloc->free(alloc->ctx, mm_json, mm_len);
+                }
+                /* F21: Avoidance patterns — inject for context, don't push */
+                if (agent->memory &&
+                    hu_superhuman_avoidance_list(agent->memory, alloc, batch_key, key_len,
+                                                 &avoidance_json, &avoidance_len) == HU_OK &&
+                    avoidance_json && avoidance_len > 0 &&
+                    strstr(avoidance_json, "- ") != NULL) {
+                    char avoid_buf[512];
+                    int ab = snprintf(avoid_buf, sizeof(avoid_buf),
+                                     "Topics they may avoid: %.*s Don't push; use for context.",
+                                     (int)(avoidance_len < 400 ? avoidance_len : 400), avoidance_json);
+                    if (ab > 0 && (size_t)ab < sizeof(avoid_buf)) {
+                        char *avoid_str = (char *)alloc->alloc(alloc->ctx, (size_t)ab + 1);
+                        if (avoid_str) {
+                            memcpy(avoid_str, avoid_buf, (size_t)ab);
+                            avoid_str[ab] = '\0';
+                            if (convo_ctx) {
+                                size_t total = convo_ctx_len + (size_t)ab + 3;
+                                char *merged = (char *)alloc->alloc(alloc->ctx, total);
+                                if (merged) {
+                                    memcpy(merged, convo_ctx, convo_ctx_len);
+                                    merged[convo_ctx_len] = '\n';
+                                    memcpy(merged + convo_ctx_len + 1, avoid_str, (size_t)ab);
+                                    merged[convo_ctx_len + 1 + (size_t)ab] = '\n';
+                                    merged[total - 1] = '\0';
+                                    alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                    convo_ctx = merged;
+                                    convo_ctx_len = total - 1;
+                                }
+                                alloc->free(alloc->ctx, avoid_str, (size_t)ab + 1);
+                            } else {
+                                convo_ctx = avoid_str;
+                                convo_ctx_len = (size_t)ab;
+                            }
+                        } else if (avoid_str) {
+                            alloc->free(alloc->ctx, avoid_str, (size_t)ab + 1);
+                        }
+                    }
+                    alloc->free(alloc->ctx, avoidance_json, avoidance_len);
+                    avoidance_json = NULL;
+                    avoidance_len = 0;
                 }
                 if (episodic_ctx && episodic_ctx_len > 0) {
                     if (convo_ctx) {

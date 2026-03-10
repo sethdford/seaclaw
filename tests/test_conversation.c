@@ -2332,6 +2332,47 @@ static void vulnerability_directive_null_topic_returns_zero(void) {
     HU_ASSERT_EQ(n, 0u);
 }
 
+/* ── Micro-moment extraction (F18) ────────────────────────────────────────── */
+
+static void micro_moment_dog_name_extracts_pet(void) {
+    char facts[3][256];
+    char sigs[3][128];
+    const char *msg = "my dog's name is Max";
+    int n = hu_conversation_extract_micro_moments(msg, strlen(msg), facts, sigs, 3);
+    HU_ASSERT_EQ(n, 1);
+    HU_ASSERT_TRUE(strstr(facts[0], "Max") != NULL);
+    HU_ASSERT_TRUE(strstr(facts[0], "dog") != NULL);
+    HU_ASSERT_STR_EQ(sigs[0], "pet");
+}
+
+static void micro_moment_i_love_extracts_preference(void) {
+    char facts[3][256];
+    char sigs[3][128];
+    const char *msg = "i love hiking in the mountains";
+    int n = hu_conversation_extract_micro_moments(msg, strlen(msg), facts, sigs, 3);
+    HU_ASSERT_EQ(n, 1);
+    HU_ASSERT_TRUE(strstr(facts[0], "hiking") != NULL);
+    HU_ASSERT_STR_EQ(sigs[0], "preference");
+}
+
+static void micro_moment_moved_to_extracts_location(void) {
+    char facts[3][256];
+    char sigs[3][128];
+    const char *msg = "just moved to Seattle";
+    int n = hu_conversation_extract_micro_moments(msg, strlen(msg), facts, sigs, 3);
+    HU_ASSERT_EQ(n, 1);
+    HU_ASSERT_TRUE(strstr(facts[0], "Seattle") != NULL);
+    HU_ASSERT_STR_EQ(sigs[0], "location");
+}
+
+static void micro_moment_nice_weather_extracts_zero(void) {
+    char facts[3][256];
+    char sigs[3][128];
+    const char *msg = "nice weather today";
+    int n = hu_conversation_extract_micro_moments(msg, strlen(msg), facts, sigs, 3);
+    HU_ASSERT_EQ(n, 0);
+}
+
 #ifdef HU_ENABLE_SQLITE
 static void vulnerability_cancer_no_prior_first_time(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -2501,6 +2542,13 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(vulnerability_directive_produces_vulnerability_string);
     HU_RUN_TEST(vulnerability_directive_not_first_time_returns_zero);
     HU_RUN_TEST(vulnerability_directive_null_topic_returns_zero);
+
+    /* Micro-moment extraction (F18) */
+    HU_RUN_TEST(micro_moment_dog_name_extracts_pet);
+    HU_RUN_TEST(micro_moment_i_love_extracts_preference);
+    HU_RUN_TEST(micro_moment_moved_to_extracts_location);
+    HU_RUN_TEST(micro_moment_nice_weather_extracts_zero);
+
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(vulnerability_cancer_no_prior_first_time);
     HU_RUN_TEST(vulnerability_cancer_with_prior_not_first_time);

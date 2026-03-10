@@ -128,6 +128,15 @@ hu_energy_level_t hu_conversation_detect_energy(const char *msg, size_t msg_len,
 
 size_t hu_conversation_build_energy_directive(hu_energy_level_t energy, char *buf, size_t cap);
 
+/* ── Micro-moment extraction (F18) ─────────────────────────────────────────── */
+
+/* Extract small but significant details from a message. Returns count (0–3).
+ * Heuristic extraction: named entities, places, preferences, life events.
+ * Caller provides facts[][256] and significances[][128], max_facts typically 3. */
+int hu_conversation_extract_micro_moments(const char *msg, size_t msg_len,
+                                         char facts[][256], char significances[][128],
+                                         size_t max_facts);
+
 /* ── Inside joke detection (F19) ────────────────────────────────────────── */
 
 /* Returns true if message suggests an inside joke: "remember when", "that time we",
@@ -135,6 +144,15 @@ size_t hu_conversation_build_energy_directive(hu_energy_level_t energy, char *bu
  * or shared phrase from history. */
 bool hu_conversation_detect_inside_joke(const char *msg, size_t msg_len,
                                         const hu_channel_history_entry_t *entries, size_t count);
+
+/* ── Avoidance pattern detection (F21) ─────────────────────────────────── */
+
+/* Detect when last 2 user messages have different topics. Simple topic extraction:
+ * first 2-3 significant words (skip "i", "the", "a", etc.). Returns true if
+ * topic change detected; fills topic_before (older) and topic_after (newer). */
+bool hu_conversation_detect_topic_change(const hu_channel_history_entry_t *entries, size_t count,
+                                         char *topic_before, size_t before_cap,
+                                         char *topic_after, size_t after_cap);
 
 /* ── Emotional escalation detection (F14) ────────────────────────────────── */
 

@@ -76,6 +76,225 @@ static bool str_contains_ci(const char *haystack, size_t hlen, const char *needl
     return false;
 }
 
+/* Return pointer to start of needle match, or NULL. */
+static const char *strstr_ci(const char *haystack, size_t hlen, const char *needle) {
+    if (!haystack || !needle)
+        return NULL;
+    size_t nlen = strlen(needle);
+    if (nlen > hlen)
+        return NULL;
+    for (size_t i = 0; i + nlen <= hlen; i++) {
+        bool match = true;
+        for (size_t j = 0; j < nlen; j++) {
+            char a = haystack[i + j];
+            char b = needle[j];
+            if (a >= 'A' && a <= 'Z')
+                a += 32;
+            if (b >= 'A' && b <= 'Z')
+                b += 32;
+            if (a != b) {
+                match = false;
+                break;
+            }
+        }
+        if (match)
+            return haystack + i;
+    }
+    return NULL;
+}
+
+/* Extract value after pattern: skip spaces, copy until ., !, ?, , or end. Cap at max_len-1. */
+static size_t extract_value_after(const char *msg, size_t msg_len, const char *after,
+                                  char *out, size_t max_len) {
+    if (!msg || !after || !out || max_len == 0)
+        return 0;
+    const char *p = after;
+    const char *end = msg + msg_len;
+    while (p < end && (*p == ' ' || *p == '\t'))
+        p++;
+    size_t n = 0;
+    while (p < end && n < max_len - 1) {
+        char c = *p;
+        if (c == '.' || c == '!' || c == '?' || c == ',' || c == '\n')
+            break;
+        out[n++] = c;
+        p++;
+    }
+    out[n] = '\0';
+    /* Trim trailing space */
+    while (n > 0 && (out[n - 1] == ' ' || out[n - 1] == '\t'))
+        out[--n] = '\0';
+    return n;
+}
+
+/* ── Micro-moment extraction (F18) ───────────────────────────────────── */
+
+int hu_conversation_extract_micro_moments(const char *msg, size_t msg_len,
+                                         char facts[][256], char significances[][128],
+                                         size_t max_facts) {
+    if (!msg || msg_len == 0 || !facts || !significances || max_facts == 0)
+        return 0;
+
+    int count = 0;
+    char fact_buf[256];
+
+    /* Named entities: pet names */
+    static const char *dog_patterns[] = {
+        "my dog's name is ", "my dogs name is ", "my dog ", "our dog's name is ",
+        NULL
+    };
+    for (const char **pat = dog_patterns; *pat && count < (int)max_facts; pat++) {
+        const char *m = strstr_ci(msg, msg_len, *pat);
+        if (m) {
+            size_t vlen = extract_value_after(msg, msg_len, m + strlen(*pat), fact_buf, 256);
+            if (vlen > 0 && vlen < 64) {
+                int n = snprintf(facts[count], 256, "Their dog's name is %s", fact_buf);
+                if (n > 0 && n < 256) {
+                    snprintf(significances[count], 128, "pet");
+                    count++;
+                }
+            }
+            break;
+        }
+    }
+
+    /* Named entities: friend, kid */
+    if (count < (int)max_facts && str_contains_ci(msg, msg_len, "my friend ")) {
+        const char *m = strstr_ci(msg, msg_len, "my friend ");
+        if (m) {
+            size_t vlen = extract_value_after(msg, msg_len, m + 10, fact_buf, 256);
+            if (vlen > 0 && vlen < 64) {
+                int n = snprintf(facts[count], 256, "Their friend is %s", fact_buf);
+                if (n > 0 && n < 256) {
+                    snprintf(significances[count], 128, "relationship");
+                    count++;
+                }
+            }
+        }
+    }
+    if (count < (int)max_facts && (str_contains_ci(msg, msg_len, "my kid ") ||
+                                  str_contains_ci(msg, msg_len, "my kid's name is "))) {
+        const char *m = strstr_ci(msg, msg_len, "my kid's name is ");
+        if (m) {
+            size_t vlen = extract_value_after(msg, msg_len, m + 17, fact_buf, 256);
+            if (vlen > 0 && vlen < 64) {
+                int n = snprintf(facts[count], 256, "Their kid's name is %s", fact_buf);
+                if (n > 0 && n < 256) {
+                    snprintf(significances[count], 128, "family");
+                    count++;
+                }
+            }
+        } else {
+            m = strstr_ci(msg, msg_len, "my kid ");
+            if (m) {
+                size_t vlen = extract_value_after(msg, msg_len, m + 7, fact_buf, 256);
+                if (vlen > 0 && vlen < 64) {
+                    int n = snprintf(facts[count], 256, "Their kid is %s", fact_buf);
+                    if (n > 0 && n < 256) {
+                        snprintf(significances[count], 128, "family");
+                        count++;
+                    }
+                }
+            }
+        }
+    }
+
+    /* Places: moved to, live in, from */
+    if (count < (int)max_facts) {
+        const char *m = strstr_ci(msg, msg_len, "moved to ");
+        if (m) {
+            size_t vlen = extract_value_after(msg, msg_len, m + 9, fact_buf, 256);
+            if (vlen > 0 && vlen < 80) {
+                int n = snprintf(facts[count], 256, "They moved to %s", fact_buf);
+                if (n > 0 && n < 256) {
+                    snprintf(significances[count], 128, "location");
+                    count++;
+                }
+            }
+        } else if ((m = strstr_ci(msg, msg_len, "live in ")) != NULL) {
+            size_t vlen = extract_value_after(msg, msg_len, m + 8, fact_buf, 256);
+            if (vlen > 0 && vlen < 80) {
+                int n = snprintf(facts[count], 256, "They live in %s", fact_buf);
+                if (n > 0 && n < 256) {
+                    snprintf(significances[count], 128, "location");
+                    count++;
+                }
+            }
+        } else if ((m = strstr_ci(msg, msg_len, "i'm from ")) != NULL ||
+                   (m = strstr_ci(msg, msg_len, "im from ")) != NULL) {
+            size_t skip = (m[1] == '\'' || m[1] == 'm') ? 9 : 8;
+            size_t vlen = extract_value_after(msg, msg_len, m + skip, fact_buf, 256);
+            if (vlen > 0 && vlen < 80) {
+                int n = snprintf(facts[count], 256, "They are from %s", fact_buf);
+                if (n > 0 && n < 256) {
+                    snprintf(significances[count], 128, "location");
+                    count++;
+                }
+            }
+        }
+    }
+
+    /* Preferences: i love, i hate, my favorite */
+    if (count < (int)max_facts) {
+        const char *m = strstr_ci(msg, msg_len, "i love ");
+        if (m) {
+            size_t vlen = extract_value_after(msg, msg_len, m + 7, fact_buf, 256);
+            if (vlen > 0 && vlen < 120) {
+                int n = snprintf(facts[count], 256, "They love %s", fact_buf);
+                if (n > 0 && n < 256) {
+                    snprintf(significances[count], 128, "preference");
+                    count++;
+                }
+            }
+        } else if ((m = strstr_ci(msg, msg_len, "i hate ")) != NULL) {
+            size_t vlen = extract_value_after(msg, msg_len, m + 7, fact_buf, 256);
+            if (vlen > 0 && vlen < 120) {
+                int n = snprintf(facts[count], 256, "They hate %s", fact_buf);
+                if (n > 0 && n < 256) {
+                    snprintf(significances[count], 128, "preference");
+                    count++;
+                }
+            }
+        } else if ((m = strstr_ci(msg, msg_len, "my favorite ")) != NULL) {
+            size_t vlen = extract_value_after(msg, msg_len, m + 11, fact_buf, 256);
+            if (vlen > 0 && vlen < 120) {
+                int n = snprintf(facts[count], 256, "Their favorite is %s", fact_buf);
+                if (n > 0 && n < 256) {
+                    snprintf(significances[count], 128, "preference");
+                    count++;
+                }
+            }
+        }
+    }
+
+    /* Life events */
+    if (count < (int)max_facts) {
+        if (str_contains_ci(msg, msg_len, "got married")) {
+            snprintf(facts[count], 256, "They got married");
+            snprintf(significances[count], 128, "life_event");
+            count++;
+        } else if (str_contains_ci(msg, msg_len, "had a baby")) {
+            snprintf(facts[count], 256, "They had a baby");
+            snprintf(significances[count], 128, "life_event");
+            count++;
+        } else if (str_contains_ci(msg, msg_len, "new job at ")) {
+            const char *m = strstr_ci(msg, msg_len, "new job at ");
+            if (m) {
+                size_t vlen = extract_value_after(msg, msg_len, m + 11, fact_buf, 256);
+                if (vlen > 0 && vlen < 80) {
+                    int n = snprintf(facts[count], 256, "New job at %s", fact_buf);
+                    if (n > 0 && n < 256) {
+                        snprintf(significances[count], 128, "career");
+                        count++;
+                    }
+                }
+            }
+        }
+    }
+
+    return count;
+}
+
 #define HU_CALLBACK_MAX_TOPICS 32
 #define HU_CALLBACK_TOPIC_BUF  64
 #define HU_CALLBACK_SCORE_MIN  3
@@ -1365,6 +1584,110 @@ bool hu_conversation_detect_inside_joke(const char *msg, size_t msg_len,
     }
 
     return false;
+}
+
+/* ── Avoidance pattern detection (F21) ─────────────────────────────────── */
+
+static const char *const topic_stopwords[] = {
+    "i", "the", "a", "is", "was", "that", "this", "it", "to", "and", "but", "so",
+    "just", "really", "what", "how", "why", "when", "where", "who", "can", "will",
+    "would", "could", "should", "have", "has", "had", "do", "does", "did", "am",
+    "are", "were", "be", "been", "being", "of", "in", "on", "at", "for", "with",
+    "about", "from", "as", "or", "if", "not", "no", "yes", "oh", "um", "like",
+    NULL,
+};
+
+static bool is_stopword(const char *word, size_t len) {
+    for (const char *const *sw = topic_stopwords; *sw; sw++) {
+        size_t swlen = strlen(*sw);
+        if (len == swlen && strncasecmp(word, *sw, len) == 0)
+            return true;
+    }
+    return false;
+}
+
+/* Extract first 2-3 significant words (skip stopwords) into out. Returns length. */
+static size_t extract_significant_topic(const char *text, size_t text_len, char *out, size_t cap) {
+    if (!text || text_len == 0 || !out || cap == 0)
+        return 0;
+    size_t pos = 0;
+    int word_count = 0;
+    const char *p = text;
+    const char *end = text + text_len;
+    while (p < end && word_count < 3) {
+        while (p < end && !isalnum((unsigned char)*p))
+            p++;
+        if (p >= end)
+            break;
+        const char *start = p;
+        while (p < end && (isalnum((unsigned char)*p) || *p == '\'' || *p == '-'))
+            p++;
+        size_t wlen = (size_t)(p - start);
+        if (wlen >= 2 && !is_stopword(start, wlen)) {
+            if (pos > 0 && pos + 1 < cap) {
+                out[pos++] = ' ';
+            }
+            size_t copy = wlen < cap - pos ? wlen : cap - pos - 1;
+            if (copy > 0) {
+                for (size_t i = 0; i < copy; i++)
+                    out[pos + i] = (char)tolower((unsigned char)start[i]);
+                pos += copy;
+                word_count++;
+            }
+        }
+    }
+    if (pos < cap)
+        out[pos] = '\0';
+    else if (cap > 0)
+        out[cap - 1] = '\0';
+    return pos;
+}
+
+bool hu_conversation_detect_topic_change(const hu_channel_history_entry_t *entries, size_t count,
+                                         char *topic_before, size_t before_cap,
+                                         char *topic_after, size_t after_cap) {
+    if (!entries || count < 2 || !topic_before || before_cap == 0 || !topic_after ||
+        after_cap == 0)
+        return false;
+
+    /* Find last 2 user messages (from_me=false), newest first */
+    const hu_channel_history_entry_t *msg_after = NULL;
+    const hu_channel_history_entry_t *msg_before = NULL;
+    for (size_t i = count; i > 0; i--) {
+        if (!entries[i - 1].from_me) {
+            if (!msg_after) {
+                msg_after = &entries[i - 1];
+            } else if (!msg_before) {
+                msg_before = &entries[i - 1];
+                break;
+            }
+        }
+    }
+    if (!msg_after || !msg_before)
+        return false;
+
+    size_t after_len = strlen(msg_after->text);
+    size_t before_len = strlen(msg_before->text);
+    if (after_len == 0 || before_len == 0)
+        return false;
+
+    char t_after[64];
+    char t_before[64];
+    size_t ta_len = extract_significant_topic(msg_after->text, after_len, t_after, sizeof(t_after));
+    size_t tb_len = extract_significant_topic(msg_before->text, before_len, t_before, sizeof(t_before));
+    if (ta_len == 0 || tb_len == 0)
+        return false;
+
+    if (strcasecmp(t_after, t_before) == 0)
+        return false;
+
+    size_t copy_after = ta_len < after_cap ? ta_len : after_cap - 1;
+    size_t copy_before = tb_len < before_cap ? tb_len : before_cap - 1;
+    memcpy(topic_after, t_after, copy_after);
+    topic_after[copy_after] = '\0';
+    memcpy(topic_before, t_before, copy_before);
+    topic_before[copy_before] = '\0';
+    return true;
 }
 
 /* ── Emotional escalation detection (F14) ───────────────────────────────── */
