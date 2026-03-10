@@ -1278,6 +1278,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         (int)(combined_len > 60 ? 60 : combined_len), combined,
                         (int)msgs[batch_start].is_group);
 
+                /* Preload channel history early so the group classifier can use it */
+                hu_channel_history_entry_t *early_history = NULL;
+                size_t early_history_count = 0;
+                if (ch->channel->vtable->load_conversation_history) {
+                    ch->channel->vtable->load_conversation_history(
+                        ch->channel->ctx, alloc, batch_key, key_len, 10, &early_history,
+                        &early_history_count);
+                }
+
                 /* Group chat gating: use group classifier to decide engagement */
                 if (msgs[batch_start].is_group) {
                     const char *persona_name = NULL;
@@ -1285,9 +1294,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (agent->persona && agent->persona->identity)
                         persona_name = agent->persona->identity;
 #endif
-                    hu_group_response_t gr = hu_conversation_classify_group(
-                        combined, combined_len, persona_name,
-                        persona_name ? strlen(persona_name) : 0, NULL, 0);
+                    hu_group_response_t gr =
+                        hu_conversation_classify_group(combined, combined_len, persona_name,
+                                                       persona_name ? strlen(persona_name) : 0,
+                                                       early_history, early_history_count);
                     if (gr == HU_GROUP_SKIP) {
                         fprintf(stderr, "[human] group: skipping (not addressed): %.*s\n",
                                 (int)(combined_len > 40 ? 40 : combined_len), combined);
@@ -1297,15 +1307,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* Response decision using conversation-aware classifier */
                 uint32_t extra_delay_ms = 0;
-
-                /* Preload channel history early so the classifier can use it */
-                hu_channel_history_entry_t *early_history = NULL;
-                size_t early_history_count = 0;
-                if (ch->channel->vtable->load_conversation_history) {
-                    ch->channel->vtable->load_conversation_history(
-                        ch->channel->ctx, alloc, batch_key, key_len, 10, &early_history,
-                        &early_history_count);
-                }
 
                 hu_response_action_t action = hu_conversation_classify_response(
                     combined, combined_len, early_history, early_history_count, &extra_delay_ms);
