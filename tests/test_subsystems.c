@@ -319,6 +319,34 @@ static void test_service_run_null_agent(void) {
     HU_ASSERT_EQ(err, HU_OK);
 }
 
+static void test_missed_message_ack_delay_45_min_returns_phrase(void) {
+    int64_t delay_secs = 45 * 60;
+    const char *phrase = hu_missed_message_acknowledgment(delay_secs, 14, 14, 0);
+    HU_ASSERT_NOT_NULL(phrase);
+    HU_ASSERT_TRUE(strcmp(phrase, "sorry just saw this") == 0 ||
+                   strcmp(phrase, "oh man missed this") == 0 ||
+                   strcmp(phrase, "ha my bad just saw this") == 0);
+}
+
+static void test_missed_message_ack_delay_5_min_returns_null(void) {
+    int64_t delay_secs = 5 * 60;
+    const char *phrase = hu_missed_message_acknowledgment(delay_secs, 14, 14, 0);
+    HU_ASSERT_NULL(phrase);
+}
+
+static void test_missed_message_ack_receive_2am_respond_8am_just_woke_up(void) {
+    int64_t delay_secs = 6 * 60 * 60;
+    const char *phrase = hu_missed_message_acknowledgment(delay_secs, 2, 8, 0);
+    HU_ASSERT_NOT_NULL(phrase);
+    HU_ASSERT_TRUE(strstr(phrase, "just woke up") != NULL);
+}
+
+static void test_missed_message_ack_receive_11pm_respond_1105pm_returns_null(void) {
+    int64_t delay_secs = 5 * 60;
+    const char *phrase = hu_missed_message_acknowledgment(delay_secs, 23, 23, 0);
+    HU_ASSERT_NULL(phrase);
+}
+
 static void test_daemon_photo_viewing_delay_no_attachment_returns_zero(void) {
     hu_channel_loop_msg_t msgs[2];
     memset(msgs, 0, sizeof(msgs));
@@ -426,6 +454,10 @@ void run_subsystems_tests(void) {
     HU_RUN_TEST(test_service_run_null_agent);
     HU_RUN_TEST(test_daemon_photo_viewing_delay_no_attachment_returns_zero);
     HU_RUN_TEST(test_daemon_photo_viewing_delay_with_attachment_includes_range);
+    HU_RUN_TEST(test_missed_message_ack_delay_45_min_returns_phrase);
+    HU_RUN_TEST(test_missed_message_ack_delay_5_min_returns_null);
+    HU_RUN_TEST(test_missed_message_ack_receive_2am_respond_8am_just_woke_up);
+    HU_RUN_TEST(test_missed_message_ack_receive_11pm_respond_1105pm_returns_null);
     HU_RUN_TEST(test_daemon_video_viewing_delay_no_video_returns_zero);
     HU_RUN_TEST(test_daemon_video_viewing_delay_with_video_includes_range);
     HU_RUN_TEST(test_service_run_null_alloc);
