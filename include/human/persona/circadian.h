@@ -18,5 +18,7 @@ typedef enum hu_time_phase {
 hu_time_phase_t hu_circadian_phase(uint8_t hour);
 hu_error_t hu_circadian_build_prompt(hu_allocator_t *alloc, uint8_t hour,
                                       char **out, size_t *out_len);
+hu_error_t hu_circadian_data_init(hu_allocator_t *alloc);
+void hu_circadian_data_cleanup(hu_allocator_t *alloc);
 
 #endif

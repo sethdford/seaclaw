@@ -24,6 +24,32 @@ static uint32_t g_participation_pct = 40;
 static uint32_t g_max_response_chars = 300;
 static uint32_t g_min_response_chars = 15;
 
+/* Configurable keyword/phrase lists — when NULL/0, DEFAULT_* fallbacks are used */
+static const char **s_crisis_keywords = NULL;
+static size_t s_crisis_keywords_len = 0;
+static const char **s_personal_sharing_phrases = NULL;
+static size_t s_personal_sharing_phrases_len = 0;
+static const char **s_starters = NULL;
+static size_t s_starters_len = 0;
+static const char **s_emotional_words = NULL;
+static size_t s_emotional_words_len = 0;
+static const char **s_backchannel_phrases = NULL;
+static size_t s_backchannel_phrases_len = 0;
+static const char **s_engage_words = NULL;
+static size_t s_engage_words_len = 0;
+static const char **s_filler_words = NULL;
+static size_t s_filler_words_len = 0;
+static const hu_conversation_contraction_t *s_contractions = NULL;
+static size_t s_contractions_len = 0;
+static const char **s_positive_words = NULL;
+static size_t s_positive_words_len = 0;
+static const char **s_negative_words = NULL;
+static size_t s_negative_words_len = 0;
+static const char **s_conversation_intros = NULL;
+static size_t s_conversation_intros_len = 0;
+static const char **s_ai_disclosure_patterns = NULL;
+static size_t s_ai_disclosure_patterns_len = 0;
+
 void hu_conversation_set_thresholds(uint32_t consecutive_limit, uint32_t participation_pct,
                                     uint32_t max_response_chars, uint32_t min_response_chars) {
     if (consecutive_limit > 0)
@@ -1643,6 +1669,117 @@ static size_t extract_significant_topic(const char *text, size_t text_len, char 
     return pos;
 }
 
+/* ── Emotional tone classification (F22) ───────────────────────────────── */
+
+static size_t count_exclamations_tone(const char *msg, size_t msg_len) {
+    size_t n = 0;
+    for (size_t i = 0; i < msg_len; i++)
+        if (msg[i] == '!')
+            n++;
+    return n;
+}
+
+const char *hu_conversation_classify_emotional_tone(const char *msg, size_t msg_len) {
+    if (!msg || msg_len == 0)
+        return "neutral";
+
+    /* Neutral: short acknowledgments */
+    if (str_contains_ci(msg, msg_len, "ok sounds good") ||
+        str_contains_ci(msg, msg_len, "sounds good") ||
+        (msg_len <= 4 &&
+         (str_contains_ci(msg, msg_len, "ok") || str_contains_ci(msg, msg_len, "k"))))
+        return "neutral";
+
+    /* Stressed: overwhelmed, burnt out */
+    if (str_contains_ci(msg, msg_len, "stressed") ||
+        str_contains_ci(msg, msg_len, "overwhelmed") ||
+        str_contains_ci(msg, msg_len, "burnt out") ||
+        str_contains_ci(msg, msg_len, "burned out"))
+        return "stressed";
+
+    /* Excited: omg, amazing, love, so happy, yay, 3+ exclamations */
+    if (str_contains_ci(msg, msg_len, "omg") || str_contains_ci(msg, msg_len, "amazing") ||
+        str_contains_ci(msg, msg_len, "love") || str_contains_ci(msg, msg_len, "so happy") ||
+        str_contains_ci(msg, msg_len, "yay") || str_contains_ci(msg, msg_len, "excited") ||
+        count_exclamations_tone(msg, msg_len) >= 3)
+        return "excited";
+
+    /* Sad: depressed, hurt, lonely, crying, broken */
+    if (str_contains_ci(msg, msg_len, "sad") || str_contains_ci(msg, msg_len, "depressed") ||
+        str_contains_ci(msg, msg_len, "hurt") || str_contains_ci(msg, msg_len, "lonely") ||
+        str_contains_ci(msg, msg_len, "crying") || str_contains_ci(msg, msg_len, "cry") ||
+        str_contains_ci(msg, msg_len, "miss you") || str_contains_ci(msg, msg_len, "broken"))
+        return "sad";
+
+    /* Anxious: worried, nervous, scared */
+    if (str_contains_ci(msg, msg_len, "anxious") || str_contains_ci(msg, msg_len, "worried") ||
+        str_contains_ci(msg, msg_len, "nervous") || str_contains_ci(msg, msg_len, "scared") ||
+        str_contains_ci(msg, msg_len, "freaking out"))
+        return "anxious";
+
+    /* Frustrated: angry, ugh, damn, hate */
+    if (str_contains_ci(msg, msg_len, "frustrated") || str_contains_ci(msg, msg_len, "angry") ||
+        str_contains_ci(msg, msg_len, "ugh") || str_contains_ci(msg, msg_len, "damn") ||
+        str_contains_ci(msg, msg_len, "hate"))
+        return "frustrated";
+
+    /* Happy: great, awesome, lol, haha */
+    if (str_contains_ci(msg, msg_len, "happy") || str_contains_ci(msg, msg_len, "great") ||
+        str_contains_ci(msg, msg_len, "awesome") || str_contains_ci(msg, msg_len, "lol") ||
+        str_contains_ci(msg, msg_len, "haha") || str_contains_ci(msg, msg_len, "lmao"))
+        return "happy";
+
+    return "neutral";
+}
+
+size_t hu_conversation_extract_topic(const char *msg, size_t msg_len, char *out, size_t cap) {
+    return extract_significant_topic(msg, msg_len, out, cap);
+}
+
+/* ── Growth celebration detection (F24) ─────────────────────────────────── */
+
+static const char *const growth_phrases[] = {
+    "it went great", "i got the job", "nailed it", "crushed it",
+    "i passed", "got promoted", "it worked out", "turned out well",
+    NULL,
+};
+
+bool hu_conversation_detect_growth_opportunity(const char *msg, size_t msg_len,
+                                                char *topic_out, size_t topic_cap,
+                                                char *after_state_out, size_t after_cap) {
+    if (!msg || msg_len == 0 || !topic_out || topic_cap == 0 || !after_state_out || after_cap == 0)
+        return false;
+
+    const char *matched = NULL;
+    for (const char *const *p = growth_phrases; *p; p++) {
+        if (str_contains_ci(msg, msg_len, *p)) {
+            matched = *p;
+            break;
+        }
+    }
+    if (!matched)
+        return false;
+
+    /* Extract topic from message using significant words */
+    size_t topic_len = extract_significant_topic(msg, msg_len, topic_out, topic_cap);
+    if (topic_len == 0) {
+        /* Fallback: use generic topic */
+        const char *fallback = "outcome";
+        size_t flen = strlen(fallback);
+        size_t copy = flen < topic_cap ? flen : topic_cap - 1;
+        memcpy(topic_out, fallback, copy);
+        topic_out[copy] = '\0';
+    }
+
+    /* After state: short success indicator */
+    const char *after = "success";
+    size_t alen = strlen(after);
+    size_t acopy = alen < after_cap ? alen : after_cap - 1;
+    memcpy(after_state_out, after, acopy);
+    after_state_out[acopy] = '\0';
+    return true;
+}
+
 bool hu_conversation_detect_topic_change(const hu_channel_history_entry_t *entries, size_t count,
                                          char *topic_before, size_t before_cap,
                                          char *topic_after, size_t after_cap) {
@@ -1944,17 +2081,22 @@ size_t hu_conversation_build_vulnerability_directive(const hu_vulnerability_stat
 static bool detect_heavy_topic(const hu_channel_history_entry_t *entries, size_t count) {
     if (!entries || count == 0)
         return false;
-    static const char *keywords[] = {
+    static const char *DEFAULT_KEYWORDS[] = {
         "died",      "passed away", "passed",  "cancer",      "divorce",  "fired",    "laid off",
-        "diagnosis", "funeral",     "breakup", "lost my job", "terminal", "hospital", NULL,
+        "diagnosis", "funeral",     "breakup", "lost my job", "terminal", "hospital",
     };
+    static const size_t DEFAULT_KEYWORDS_LEN = sizeof(DEFAULT_KEYWORDS) / sizeof(DEFAULT_KEYWORDS[0]);
+
+    const char **keywords = s_crisis_keywords_len > 0 ? s_crisis_keywords : DEFAULT_KEYWORDS;
+    size_t keywords_len = s_crisis_keywords_len > 0 ? s_crisis_keywords_len : DEFAULT_KEYWORDS_LEN;
+
     for (size_t i = 0; i < count; i++) {
         if (entries[i].from_me)
             continue;
         const char *t = entries[i].text;
         size_t tl = strlen(t);
-        for (const char **kw = keywords; *kw; kw++) {
-            if (str_contains_ci(t, tl, *kw))
+        for (size_t k = 0; k < keywords_len; k++) {
+            if (keywords[k] && str_contains_ci(t, tl, keywords[k]))
                 return true;
         }
     }
@@ -1964,7 +2106,7 @@ static bool detect_heavy_topic(const hu_channel_history_entry_t *entries, size_t
 static bool detect_personal_sharing(const hu_channel_history_entry_t *entries, size_t count) {
     if (!entries || count == 0)
         return false;
-    static const char *phrases[] = {
+    static const char *DEFAULT_PHRASES[] = {
         "i need to tell you",
         "can i be honest",
         "don't judge me",
@@ -1975,15 +2117,19 @@ static bool detect_personal_sharing(const hu_channel_history_entry_t *entries, s
         "dont judge me",
         "first time im saying",
         "ive been meaning to tell",
-        NULL,
     };
+    static const size_t DEFAULT_PHRASES_LEN = sizeof(DEFAULT_PHRASES) / sizeof(DEFAULT_PHRASES[0]);
+
+    const char **phrases = s_personal_sharing_phrases_len > 0 ? s_personal_sharing_phrases : DEFAULT_PHRASES;
+    size_t phrases_len = s_personal_sharing_phrases_len > 0 ? s_personal_sharing_phrases_len : DEFAULT_PHRASES_LEN;
+
     for (size_t i = 0; i < count; i++) {
         if (entries[i].from_me)
             continue;
         const char *t = entries[i].text;
         size_t tl = strlen(t);
-        for (const char **p = phrases; *p; p++) {
-            if (str_contains_ci(t, tl, *p))
+        for (size_t p = 0; p < phrases_len; p++) {
+            if (phrases[p] && str_contains_ci(t, tl, phrases[p]))
                 return true;
         }
     }
@@ -2136,12 +2282,19 @@ size_t hu_conversation_generate_correction(const char *original, size_t original
 static bool is_split_starter(const char *s, size_t len) {
     if (len < 2)
         return false;
-    /* Starters that signal a new thought bubble */
-    static const char *starters[] = {
+    /* Starters that signal a new thought bubble (loaded from JSON or fallback) */
+    static const char *DEFAULT_STARTERS[] = {
         "oh ",  "but ", "and ", "like ",   "also ", "wait ", "haha", "lol", "omg",
-        "ngl ", "tbh ", "btw ", "anyway ", "ok ",   "so ",   "yeah", "nah", NULL,
+        "ngl ", "tbh ", "btw ", "anyway ", "ok ",   "so ",   "yeah", "nah",
     };
-    for (int i = 0; starters[i]; i++) {
+    static const size_t DEFAULT_STARTERS_LEN = sizeof(DEFAULT_STARTERS) / sizeof(DEFAULT_STARTERS[0]);
+
+    const char **starters = s_starters_len > 0 ? s_starters : DEFAULT_STARTERS;
+    size_t starters_len = s_starters_len > 0 ? s_starters_len : DEFAULT_STARTERS_LEN;
+
+    for (size_t i = 0; i < starters_len; i++) {
+        if (!starters[i])
+            continue;
         size_t sl = strlen(starters[i]);
         if (len >= sl) {
             bool match = true;
@@ -3179,12 +3332,19 @@ hu_response_action_t hu_conversation_classify_response(const char *msg, size_t m
     }
 
     /* Emotional/heavy messages: full response but delayed (showing you're thinking) */
-    static const char *emotional[] = {
+    static const char *DEFAULT_EMOTIONAL[] = {
         "miss",    "love",     "hurt",   "stress",    "depress",   "lonely",     "scared",
         "worried", "sorry",    "afraid", "giving up", "feel like", "don't know", "can't",
-        "help me", "need you", "cry",    "sad",       NULL,
+        "help me", "need you", "cry",    "sad",
     };
-    for (int i = 0; emotional[i]; i++) {
+    static const size_t DEFAULT_EMOTIONAL_LEN = sizeof(DEFAULT_EMOTIONAL) / sizeof(DEFAULT_EMOTIONAL[0]);
+
+    const char **emotional = s_emotional_words_len > 0 ? s_emotional_words : DEFAULT_EMOTIONAL;
+    size_t emotional_len = s_emotional_words_len > 0 ? s_emotional_words_len : DEFAULT_EMOTIONAL_LEN;
+
+    for (size_t i = 0; i < emotional_len; i++) {
+        if (!emotional[i])
+            continue;
         size_t elen = strlen(emotional[i]);
         for (size_t j = 0; j + elen <= msg_len; j++) {
             bool match = true;
@@ -3308,16 +3468,23 @@ bool hu_conversation_should_backchannel(const char *msg, size_t msg_len,
     return roll < (uint32_t)(probability * 100.0f);
 }
 
-static const char *const hu_backchannel_phrases[] = {
+static const char *const DEFAULT_BACKCHANNEL_PHRASES[] = {
     "yeah", "totally", "right", "100%", "for real", "mmhm", "mhm", "oh wow", "damn",
 };
-#define HU_BACKCHANNEL_COUNT (sizeof(hu_backchannel_phrases) / sizeof(hu_backchannel_phrases[0]))
+#define DEFAULT_BACKCHANNEL_COUNT (sizeof(DEFAULT_BACKCHANNEL_PHRASES) / sizeof(DEFAULT_BACKCHANNEL_PHRASES[0]))
 
 size_t hu_conversation_pick_backchannel(uint32_t seed, char *buf, size_t cap) {
     if (!buf || cap == 0)
         return 0;
-    size_t idx = (size_t)(seed % (uint32_t)HU_BACKCHANNEL_COUNT);
-    const char *phrase = hu_backchannel_phrases[idx];
+    const char **phrases = s_backchannel_phrases_len > 0 ? s_backchannel_phrases : DEFAULT_BACKCHANNEL_PHRASES;
+    size_t phrase_count = s_backchannel_phrases_len > 0 ? s_backchannel_phrases_len : DEFAULT_BACKCHANNEL_COUNT;
+
+    if (phrase_count == 0)
+        return 0;
+    size_t idx = (size_t)(seed % (uint32_t)phrase_count);
+    const char *phrase = phrases[idx];
+    if (!phrase)
+        phrase = phrases[0];
     size_t len = strlen(phrase);
     if (len >= cap)
         len = cap - 1;
@@ -3961,11 +4128,16 @@ hu_group_response_t hu_conversation_classify_group(const char *msg, size_t msg_l
     }
 
     /* Emotional content or someone asking for help → respond */
-    static const char *engage_words[] = {
-        "help", "anyone", "thoughts?", "what do you", "need", "advice", "opinion", NULL,
+    static const char *DEFAULT_ENGAGE_WORDS[] = {
+        "help", "anyone", "thoughts?", "what do you", "need", "advice", "opinion",
     };
-    for (int i = 0; engage_words[i]; i++) {
-        if (str_contains_ci(msg, msg_len, engage_words[i]))
+    static const size_t DEFAULT_ENGAGE_WORDS_LEN = sizeof(DEFAULT_ENGAGE_WORDS) / sizeof(DEFAULT_ENGAGE_WORDS[0]);
+
+    const char **engage_words = s_engage_words_len > 0 ? s_engage_words : DEFAULT_ENGAGE_WORDS;
+    size_t engage_words_len = s_engage_words_len > 0 ? s_engage_words_len : DEFAULT_ENGAGE_WORDS_LEN;
+
+    for (size_t i = 0; i < engage_words_len; i++) {
+        if (engage_words[i] && str_contains_ci(msg, msg_len, engage_words[i]))
             return HU_GROUP_RESPOND;
     }
 
@@ -4522,14 +4694,25 @@ size_t hu_conversation_apply_fillers(char *buf, size_t len, size_t cap, uint32_t
     if (filler_lcg(&s) % 5 != 0)
         return len;
 
-    static const char *fillers[] = {"haha ", "lol ", "yeah ", "honestly ", "tbh ",
-                                    "ngl ",  "hmm ", "oh ",   "ah ",       "like "};
-    static const size_t filler_count = 10;
-    static const size_t filler_lens[] = {5, 4, 5, 9, 4, 4, 4, 3, 3, 5};
+    static const char *DEFAULT_FILLERS[] = {
+        "haha ", "lol ", "yeah ", "honestly ", "tbh ",
+        "ngl ",  "hmm ", "oh ",   "ah ",       "like "
+    };
+    static const size_t DEFAULT_FILLER_COUNT = 10;
+    static const size_t DEFAULT_FILLER_LENS[] = {5, 4, 5, 9, 4, 4, 4, 3, 3, 5};
+
+    const char **fillers = s_filler_words_len > 0 ? s_filler_words : DEFAULT_FILLERS;
+    size_t filler_count = s_filler_words_len > 0 ? s_filler_words_len : DEFAULT_FILLER_COUNT;
+
+    if (filler_count == 0)
+        return len;
 
     size_t pick = filler_lcg(&s) % filler_count;
     const char *filler = fillers[pick];
-    size_t filler_len = filler_lens[pick];
+    if (!filler)
+        filler = fillers[0];
+
+    size_t filler_len = strlen(filler);
 
     if (len + filler_len >= cap)
         return len;
@@ -4553,12 +4736,9 @@ size_t hu_conversation_vary_complexity(char *buf, size_t len, uint32_t seed) {
 
     /* Apply common contractions with ~40% probability each */
     uint32_t s = seed;
-    struct {
-        const char *from;
-        size_t from_len;
-        const char *to;
-        size_t to_len;
-    } contractions[] = {
+
+    /* Default contractions (fallback) */
+    static const hu_conversation_contraction_t DEFAULT_CONTRACTIONS[] = {
         {"I am ", 5, "I'm ", 4},
         {"it is ", 6, "it's ", 5},
         {"do not ", 7, "don't ", 6},
@@ -4578,11 +4758,17 @@ size_t hu_conversation_vary_complexity(char *buf, size_t len, uint32_t seed) {
         {"we are ", 7, "we're ", 6},
         {"cannot ", 7, "can't ", 6},
     };
-    size_t n_contractions = sizeof(contractions) / sizeof(contractions[0]);
+    static const size_t DEFAULT_CONTRACTIONS_LEN = sizeof(DEFAULT_CONTRACTIONS) / sizeof(DEFAULT_CONTRACTIONS[0]);
+
+    const hu_conversation_contraction_t *contractions = s_contractions_len > 0 ? s_contractions : DEFAULT_CONTRACTIONS;
+    size_t n_contractions = s_contractions_len > 0 ? s_contractions_len : DEFAULT_CONTRACTIONS_LEN;
 
     for (size_t c = 0; c < n_contractions && len > 0; c++) {
         s = s * 1103515245u + 12345u;
         if (((s >> 16) & 0x7fff) % 100 >= 40)
+            continue;
+
+        if (contractions[c].from_len == 0)
             continue;
 
         /* Case-insensitive search for the contraction source */
@@ -4628,13 +4814,22 @@ char *hu_conversation_build_sentiment_momentum(hu_allocator_t *alloc,
     if (!alloc || !out_len || !entries || count < 3)
         return NULL;
 
-    static const char *pos_words[] = {"happy",   "great", "awesome", "love",      "good", "nice",
-                                      "excited", "glad",  "amazing", "wonderful", "lol",  "haha",
-                                      "yay",     "sweet", "perfect", "thanks"};
-    static const char *neg_words[] = {
+    static const char *DEFAULT_POS_WORDS[] = {
+        "happy",   "great", "awesome", "love",      "good", "nice",
+        "excited", "glad",  "amazing", "wonderful", "lol",  "haha",
+        "yay",     "sweet", "perfect", "thanks"
+    };
+    static const char *DEFAULT_NEG_WORDS[] = {
         "sad",      "angry", "frustrated",   "annoyed", "terrible", "awful", "hate", "worried",
-        "stressed", "upset", "disappointed", "ugh",     "sucks",    "rough", "hard", "sorry"};
-    size_t n_pos = 16, n_neg = 16;
+        "stressed", "upset", "disappointed", "ugh",     "sucks",    "rough", "hard", "sorry"
+    };
+    static const size_t DEFAULT_POS_LEN = sizeof(DEFAULT_POS_WORDS) / sizeof(DEFAULT_POS_WORDS[0]);
+    static const size_t DEFAULT_NEG_LEN = sizeof(DEFAULT_NEG_WORDS) / sizeof(DEFAULT_NEG_WORDS[0]);
+
+    const char **pos_words = s_positive_words_len > 0 ? s_positive_words : DEFAULT_POS_WORDS;
+    const char **neg_words = s_negative_words_len > 0 ? s_negative_words : DEFAULT_NEG_WORDS;
+    size_t n_pos = s_positive_words_len > 0 ? s_positive_words_len : DEFAULT_POS_LEN;
+    size_t n_neg = s_negative_words_len > 0 ? s_negative_words_len : DEFAULT_NEG_LEN;
 
     float momentum = 0.0f;
     size_t user_msgs = 0;
@@ -4650,11 +4845,11 @@ char *hu_conversation_build_sentiment_momentum(hu_allocator_t *alloc,
         user_msgs++;
         int score = 0;
         for (size_t w = 0; w < n_pos; w++) {
-            if (str_contains_ci(text, tl, pos_words[w]))
+            if (pos_words[w] && str_contains_ci(text, tl, pos_words[w]))
                 score++;
         }
         for (size_t w = 0; w < n_neg; w++) {
-            if (str_contains_ci(text, tl, neg_words[w]))
+            if (neg_words[w] && str_contains_ci(text, tl, neg_words[w]))
                 score--;
         }
         float weight = (float)(i - (count - window) + 1) / (float)window;
@@ -4791,20 +4986,32 @@ char *hu_conversation_build_tangent_callback(hu_allocator_t *alloc,
         return NULL;
 
     char buf[256];
-    static const char *intros[] = {
+    static const char *DEFAULT_INTROS[] = {
         "oh btw, about ", "that reminds me of when we talked about ",
         "going back to ", "hey also re: ",
         "oh and about ",
     };
+    static const size_t DEFAULT_INTROS_LEN = sizeof(DEFAULT_INTROS) / sizeof(DEFAULT_INTROS[0]);
+
+    const char **intros = s_conversation_intros_len > 0 ? s_conversation_intros : DEFAULT_INTROS;
+    size_t intros_len = s_conversation_intros_len > 0 ? s_conversation_intros_len : DEFAULT_INTROS_LEN;
+
+    if (intros_len == 0)
+        return NULL;
+
     s = s * 1103515245u + 12345u;
-    size_t intro_pick = ((s >> 16) & 0x7fff) % 5;
+    size_t intro_pick = ((s >> 16) & 0x7fff) % intros_len;
+
+    const char *chosen_intro = intros[intro_pick];
+    if (!chosen_intro)
+        chosen_intro = intros[0];
 
     int w =
         snprintf(buf, sizeof(buf),
                  "\nTANGENT: Consider naturally circling back to \"%.*s\" from earlier. "
                  "You could use something like: \"%s%.*s...\" — only if it fits naturally. "
                  "Don't force it.\n",
-                 (int)t->phrase_len, t->phrase, intros[intro_pick], (int)t->phrase_len, t->phrase);
+                 (int)t->phrase_len, t->phrase, chosen_intro, (int)t->phrase_len, t->phrase);
     if (w <= 0 || (size_t)w >= sizeof(buf))
         return NULL;
 
@@ -4822,7 +5029,7 @@ bool hu_conversation_check_ai_disclosure(const char *response, size_t response_l
     if (!response || response_len == 0)
         return false;
 
-    static const char *patterns[] = {
+    static const char *DEFAULT_PATTERNS[] = {
         "i'm an ai",
         "i am an ai",
         "as an ai",
@@ -4849,9 +5056,14 @@ bool hu_conversation_check_ai_disclosure(const char *response, size_t response_l
         "i'm just a bot",
         "i am just a bot",
     };
-    size_t n = sizeof(patterns) / sizeof(patterns[0]);
+    static const size_t DEFAULT_PATTERNS_LEN = sizeof(DEFAULT_PATTERNS) / sizeof(DEFAULT_PATTERNS[0]);
+
+    const char **patterns = s_ai_disclosure_patterns_len > 0 ? s_ai_disclosure_patterns : DEFAULT_PATTERNS;
+    size_t n = s_ai_disclosure_patterns_len > 0 ? s_ai_disclosure_patterns_len : DEFAULT_PATTERNS_LEN;
 
     for (size_t p = 0; p < n; p++) {
+        if (!patterns[p])
+            continue;
         size_t plen = strlen(patterns[p]);
         if (plen > response_len)
             continue;

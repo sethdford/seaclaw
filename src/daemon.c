@@ -53,6 +53,7 @@
 #if defined(HU_ENABLE_IMESSAGE) && !defined(HU_IS_TEST)
 #include "human/channels/imessage.h"
 #endif
+#include <ctype.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -179,6 +180,73 @@ static void classify_comfort_response_type(const char *response, size_t response
     }
     snprintf(out_type, out_cap, "empathy");
 }
+
+#ifdef HU_ENABLE_SQLITE
+/* F23: Extract significant topic keywords from user text and record baselines.
+ * Skips stopwords, records each significant word (3–32 chars) via topic_baselines. */
+#define HU_DAEMON_TOPIC_BASELINE_MAX 8
+#define HU_DAEMON_TOPIC_BUF 32
+
+static void record_topic_baselines_from_text(hu_memory_t *memory, const char *contact_id,
+                                              size_t contact_id_len, const char *text,
+                                              size_t text_len) {
+    if (!memory || !contact_id || contact_id_len == 0 || !text || text_len == 0)
+        return;
+    static const char *const stop[] = {
+        "i", "the", "a", "is", "was", "that", "this", "it", "to", "and", "but", "so",
+        "just", "really", "what", "how", "why", "when", "where", "who", "can", "will",
+        "would", "could", "should", "have", "has", "had", "do", "does", "did", "am",
+        "are", "were", "be", "been", "being", "of", "in", "on", "at", "for", "with",
+        "about", "from", "as", "or", "if", "not", "no", "yes", "oh", "um", "like",
+        NULL,
+    };
+    char topics[HU_DAEMON_TOPIC_BASELINE_MAX][HU_DAEMON_TOPIC_BUF];
+    size_t topic_count = 0;
+    memset(topics, 0, sizeof(topics));
+
+    const char *p = text;
+    const char *end = text + text_len;
+    while (p < end && topic_count < HU_DAEMON_TOPIC_BASELINE_MAX) {
+        while (p < end && !isalnum((unsigned char)*p))
+            p++;
+        if (p >= end)
+            break;
+        const char *start = p;
+        while (p < end && (isalnum((unsigned char)*p) || *p == '\'' || *p == '-'))
+            p++;
+        size_t wlen = (size_t)(p - start);
+        if (wlen < 3 || wlen >= HU_DAEMON_TOPIC_BUF - 1)
+            continue;
+        bool is_stop = false;
+        for (const char *const *sw = stop; *sw; sw++) {
+            size_t swlen = strlen(*sw);
+            if (wlen == swlen && strncasecmp(start, *sw, wlen) == 0) {
+                is_stop = true;
+                break;
+            }
+        }
+        if (is_stop)
+            continue;
+        /* Dedupe */
+        bool dup = false;
+        for (size_t k = 0; k < topic_count; k++) {
+            if (strncasecmp(topics[k], start, wlen) == 0 && topics[k][wlen] == '\0') {
+                dup = true;
+                break;
+            }
+        }
+        if (dup)
+            continue;
+        memcpy(topics[topic_count], start, wlen);
+        topics[topic_count][wlen] = '\0';
+        for (size_t i = 0; i < wlen; i++)
+            topics[topic_count][i] = (char)tolower((unsigned char)topics[topic_count][i]);
+        (void)hu_superhuman_topic_baseline_record(memory, contact_id, contact_id_len,
+                                                  topics[topic_count], wlen);
+        topic_count++;
+    }
+}
+#endif
 
 /* F27: Score engagement from their reply. reply_len>20 + positive words -> 0.8;
  * brief thanks -> 0.4; very short -> 0.2. */
@@ -912,6 +980,22 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
             }
 #endif
 
+#ifdef HU_ENABLE_SQLITE
+            /* F26: Temporal pattern — reduce proactive probability during quiet hours */
+            if (agent && agent->memory && cp->contact_id) {
+                int qday = 0, qstart = 0, qend = 1;
+                if (hu_superhuman_temporal_get_quiet_hours(agent->memory, alloc, cp->contact_id,
+                        strlen(cp->contact_id), &qday, &qstart, &qend) == HU_OK) {
+                    if (tm_now.tm_wday == qday && tm_now.tm_hour >= qstart && tm_now.tm_hour < qend) {
+                        uint32_t seed = (uint32_t)now * 1103515245u + 12345u +
+                            (uint32_t)(uintptr_t)cp->contact_id;
+                        if ((seed >> 16u) % 100u < 50u)
+                            should_checkin = false;
+                    }
+                }
+            }
+#endif
+
             if (!should_checkin)
                 break;
 
@@ -1054,6 +1138,76 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     alloc->free(alloc->ctx, prompt, prompt_len + 1);
                     prompt = merged;
                     prompt_len = prompt_len + 1 + commitment_ctx_len;
+                }
+            }
+            /* F23: Topic absence — 20% chance to inject when they haven't mentioned usual topics */
+            {
+                char *topic_absence_json = NULL;
+                size_t topic_absence_len = 0;
+                int64_t now_ts = (int64_t)now;
+                size_t cid_len = strlen(cp->contact_id);
+                if (agent->memory &&
+                    hu_superhuman_topic_absence_list(agent->memory, alloc, cp->contact_id, cid_len,
+                                                    now_ts, 14, &topic_absence_json,
+                                                    &topic_absence_len) == HU_OK &&
+                    topic_absence_json && topic_absence_len > 0 &&
+                    strstr(topic_absence_json, "- ") != NULL &&
+                    ((uint32_t)((uintptr_t)cp + (uintptr_t)now) % 100) < 20) {
+                    const char *hint =
+                        "Topics they usually mention but haven't recently: [see above]. "
+                        "Gentle check-in if appropriate.";
+                    size_t hint_len = strlen(hint);
+                    size_t merged_len = prompt_len + 1 + topic_absence_len + 1 + hint_len + 2;
+                    char *merged = (char *)alloc->alloc(alloc->ctx, merged_len);
+                    if (merged) {
+                        size_t pos = 0;
+                        memcpy(merged, prompt, prompt_len);
+                        pos += prompt_len;
+                        merged[pos++] = '\n';
+                        memcpy(merged + pos, topic_absence_json, topic_absence_len);
+                        pos += topic_absence_len;
+                        merged[pos++] = '\n';
+                        memcpy(merged + pos, hint, hint_len);
+                        pos += hint_len;
+                        merged[pos++] = '\n';
+                        merged[pos] = '\0';
+                        alloc->free(alloc->ctx, prompt, prompt_len + 1);
+                        prompt = merged;
+                        prompt_len = pos;
+                    }
+                    alloc->free(alloc->ctx, topic_absence_json, topic_absence_len);
+                } else if (topic_absence_json) {
+                    alloc->free(alloc->ctx, topic_absence_json, topic_absence_len);
+                }
+            }
+            /* F24: Growth celebration — 15% chance, inject milestone to celebrate */
+            {
+                char *growth_pro = NULL;
+                size_t growth_pro_len = 0;
+                size_t cid_len = strlen(cp->contact_id);
+                if (agent->memory && (uint32_t)((uintptr_t)cp + (uintptr_t)now) % 100 < 15 &&
+                    hu_superhuman_growth_list_recent(agent->memory, alloc, cp->contact_id, cid_len,
+                                                    1, &growth_pro, &growth_pro_len) == HU_OK &&
+                    growth_pro && growth_pro_len > 0 && strstr(growth_pro, "(none)") == NULL) {
+                    char celebrate_buf[512];
+                    int cb = snprintf(celebrate_buf, sizeof(celebrate_buf),
+                                      "CELEBRATE: %.*s Acknowledge their progress.",
+                                      (int)(growth_pro_len < 450 ? growth_pro_len : 450),
+                                      growth_pro);
+                    if (cb > 0 && (size_t)cb < sizeof(celebrate_buf) && prompt) {
+                        size_t merged_len = prompt_len + 1 + (size_t)cb + 1;
+                        char *merged = (char *)alloc->alloc(alloc->ctx, merged_len);
+                        if (merged) {
+                            memcpy(merged, prompt, prompt_len);
+                            merged[prompt_len] = '\n';
+                            memcpy(merged + prompt_len + 1, celebrate_buf, (size_t)cb);
+                            merged[prompt_len + 1 + (size_t)cb] = '\0';
+                            alloc->free(alloc->ctx, prompt, prompt_len + 1);
+                            prompt = merged;
+                            prompt_len = merged_len - 1;
+                        }
+                    }
+                    alloc->free(alloc->ctx, growth_pro, growth_pro_len);
                 }
             }
 #endif
@@ -1724,6 +1878,24 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         (int)(combined_len > 60 ? 60 : combined_len), combined,
                         (int)msgs[batch_start].is_group);
 
+#ifdef HU_ENABLE_SQLITE
+                /* F23: Topic absence detection — record topic baselines from user message */
+                if (agent->memory && combined_len > 0)
+                    record_topic_baselines_from_text(agent->memory, batch_key, key_len,
+                                                    combined, combined_len);
+                /* F26: Temporal pattern learning — record message frequency by day/hour */
+                if (agent->memory && batch_key && key_len > 0) {
+                    time_t now_t = time(NULL);
+                    struct tm lt_buf;
+                    struct tm *lt = localtime_r(&now_t, &lt_buf);
+                    if (lt) {
+                        int64_t response_time_ms = 0; /* not available from poll pipeline */
+                        (void)hu_superhuman_temporal_record(agent->memory, batch_key, key_len,
+                            lt->tm_wday, lt->tm_hour, response_time_ms);
+                    }
+                }
+#endif
+
                 /* Preload channel history early so the group classifier can use it */
                 hu_channel_history_entry_t *early_history = NULL;
                 size_t early_history_count = 0;
@@ -2163,6 +2335,42 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                             key_len, desc_buf,
                                                             (size_t)strlen(desc_buf), who_buf,
                                                             (size_t)strlen(who_buf), deadline);
+                    }
+                    /* F24: Growth celebration — detect positive outcomes, store for later reference */
+                    {
+                        char topic_buf[128];
+                        char after_buf[64];
+                        if (hu_conversation_detect_growth_opportunity(combined, combined_len,
+                                                                      topic_buf, sizeof(topic_buf),
+                                                                      after_buf, sizeof(after_buf))) {
+                            (void)hu_superhuman_growth_store(agent->memory, alloc, batch_key,
+                                                             key_len, topic_buf,
+                                                             (size_t)strlen(topic_buf),
+                                                             "worried/stressed", 15, after_buf,
+                                                             (size_t)strlen(after_buf));
+                        }
+                    }
+                    /* F22: Pattern mirror — record topic + emotional tone for behavioral patterns */
+                    {
+                        char topic_buf[64];
+                        size_t topic_len =
+                            hu_conversation_extract_topic(combined, combined_len, topic_buf,
+                                                          sizeof(topic_buf));
+                        if (topic_len > 0) {
+                            const char *tone =
+                                hu_conversation_classify_emotional_tone(combined, combined_len);
+                            size_t tone_len = tone ? strlen(tone) : 0;
+                            if (tone_len > 0) {
+                                time_t now = time(NULL);
+                                struct tm tm_buf;
+                                struct tm *tm = hu_platform_localtime_r(&now, &tm_buf);
+                                int dow = tm ? tm->tm_wday : 0;
+                                int hour = tm ? tm->tm_hour : 0;
+                                (void)hu_superhuman_pattern_record(agent->memory, batch_key,
+                                                                    key_len, topic_buf, topic_len,
+                                                                    tone, tone_len, dow, hour);
+                            }
+                        }
                     }
                 }
 #endif
@@ -3271,6 +3479,89 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     alloc->free(alloc->ctx, avoidance_json, avoidance_len);
                     avoidance_json = NULL;
                     avoidance_len = 0;
+                }
+                /* F22: Pattern mirror — inject behavioral patterns for friend+ surfacing */
+                {
+                    char *pattern_json = NULL;
+                    size_t pattern_len = 0;
+                    if (agent->memory &&
+                        hu_superhuman_pattern_list(agent->memory, alloc, batch_key, key_len, 5,
+                                                   &pattern_json, &pattern_len) == HU_OK &&
+                        pattern_json && pattern_len > 0 && strstr(pattern_json, "(none)") == NULL) {
+                        char pattern_buf[1024];
+                        int pb = snprintf(pattern_buf, sizeof(pattern_buf),
+                                         "Behavioral patterns observed: %.*s "
+                                         "Surface naturally for friend+ contacts.",
+                                         (int)(pattern_len < 900 ? pattern_len : 900), pattern_json);
+                        if (pb > 0 && (size_t)pb < sizeof(pattern_buf)) {
+                            char *pattern_str = (char *)alloc->alloc(alloc->ctx, (size_t)pb + 1);
+                            if (pattern_str) {
+                                memcpy(pattern_str, pattern_buf, (size_t)pb);
+                                pattern_str[pb] = '\0';
+                                if (convo_ctx) {
+                                    size_t total = convo_ctx_len + (size_t)pb + 3;
+                                    char *merged = (char *)alloc->alloc(alloc->ctx, total);
+                                    if (merged) {
+                                        memcpy(merged, convo_ctx, convo_ctx_len);
+                                        merged[convo_ctx_len] = '\n';
+                                        memcpy(merged + convo_ctx_len + 1, pattern_str,
+                                               (size_t)pb);
+                                        merged[convo_ctx_len + 1 + (size_t)pb] = '\n';
+                                        merged[total - 1] = '\0';
+                                        alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                        convo_ctx = merged;
+                                        convo_ctx_len = total - 1;
+                                    }
+                                    alloc->free(alloc->ctx, pattern_str, (size_t)pb + 1);
+                                } else {
+                                    convo_ctx = pattern_str;
+                                    convo_ctx_len = (size_t)pb;
+                                }
+                            }
+                        }
+                        alloc->free(alloc->ctx, pattern_json, pattern_len);
+                    }
+                }
+                /* F24: Growth celebration — inject recent milestones for natural celebration */
+                {
+                    char *growth_json = NULL;
+                    size_t growth_len = 0;
+                    if (agent->memory &&
+                        hu_superhuman_growth_list_recent(agent->memory, alloc, batch_key, key_len,
+                                                         3, &growth_json, &growth_len) == HU_OK &&
+                        growth_json && growth_len > 0 && strstr(growth_json, "(none)") == NULL) {
+                        char growth_buf[1024];
+                        int gb = snprintf(growth_buf, sizeof(growth_buf),
+                                         "Recent growth to celebrate: %.*s "
+                                         "Reference naturally when relevant.",
+                                         (int)(growth_len < 900 ? growth_len : 900), growth_json);
+                        if (gb > 0 && (size_t)gb < sizeof(growth_buf)) {
+                            char *growth_str = (char *)alloc->alloc(alloc->ctx, (size_t)gb + 1);
+                            if (growth_str) {
+                                memcpy(growth_str, growth_buf, (size_t)gb);
+                                growth_str[gb] = '\0';
+                                if (convo_ctx) {
+                                    size_t total = convo_ctx_len + (size_t)gb + 3;
+                                    char *merged = (char *)alloc->alloc(alloc->ctx, total);
+                                    if (merged) {
+                                        memcpy(merged, convo_ctx, convo_ctx_len);
+                                        merged[convo_ctx_len] = '\n';
+                                        memcpy(merged + convo_ctx_len + 1, growth_str, (size_t)gb);
+                                        merged[convo_ctx_len + 1 + (size_t)gb] = '\n';
+                                        merged[total - 1] = '\0';
+                                        alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                        convo_ctx = merged;
+                                        convo_ctx_len = total - 1;
+                                    }
+                                    alloc->free(alloc->ctx, growth_str, (size_t)gb + 1);
+                                } else {
+                                    convo_ctx = growth_str;
+                                    convo_ctx_len = (size_t)gb;
+                                }
+                            }
+                        }
+                        alloc->free(alloc->ctx, growth_json, growth_len);
+                    }
                 }
                 if (episodic_ctx && episodic_ctx_len > 0) {
                     if (convo_ctx) {

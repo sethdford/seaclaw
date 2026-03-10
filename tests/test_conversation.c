@@ -589,6 +589,58 @@ static void energy_directive_neutral_returns_zero(void) {
     HU_ASSERT_EQ(len, 0u);
 }
 
+/* ── Emotional tone classification tests (F22) ─────────────────────────── */
+
+static void tone_stressed_returns_stressed(void) {
+    const char *tone = hu_conversation_classify_emotional_tone("i'm so stressed about work", 28);
+    HU_ASSERT_NOT_NULL(tone);
+    HU_ASSERT_STR_EQ(tone, "stressed");
+}
+
+static void tone_excited_returns_excited(void) {
+    const char *tone = hu_conversation_classify_emotional_tone("omg that's amazing!!!", 20);
+    HU_ASSERT_NOT_NULL(tone);
+    HU_ASSERT_STR_EQ(tone, "excited");
+}
+
+static void tone_sad_returns_sad(void) {
+    const char *tone = hu_conversation_classify_emotional_tone("i'm really sad today", 19);
+    HU_ASSERT_NOT_NULL(tone);
+    HU_ASSERT_STR_EQ(tone, "sad");
+}
+
+static void tone_anxious_returns_anxious(void) {
+    const char *tone = hu_conversation_classify_emotional_tone("i'm worried about the exam", 27);
+    HU_ASSERT_NOT_NULL(tone);
+    HU_ASSERT_STR_EQ(tone, "anxious");
+}
+
+static void tone_happy_returns_happy(void) {
+    const char *tone = hu_conversation_classify_emotional_tone("that's great news!", 17);
+    HU_ASSERT_NOT_NULL(tone);
+    HU_ASSERT_STR_EQ(tone, "happy");
+}
+
+static void tone_frustrated_returns_frustrated(void) {
+    const char *tone = hu_conversation_classify_emotional_tone("ugh this is so frustrating", 26);
+    HU_ASSERT_NOT_NULL(tone);
+    HU_ASSERT_STR_EQ(tone, "frustrated");
+}
+
+static void tone_neutral_returns_neutral(void) {
+    const char *tone = hu_conversation_classify_emotional_tone("ok sounds good", 14);
+    HU_ASSERT_NOT_NULL(tone);
+    HU_ASSERT_STR_EQ(tone, "neutral");
+}
+
+static void tone_extract_topic_returns_significant_words(void) {
+    char buf[64];
+    size_t len = hu_conversation_extract_topic("i was thinking about the project deadline", 42,
+                                               buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "project") != NULL || strstr(buf, "deadline") != NULL);
+}
+
 /* ── Escalation detection tests (F14) ─────────────────────────────────── */
 
 static void escalation_three_negative_escalating(void) {
@@ -779,6 +831,100 @@ static void detect_commitment_nice_weather_false(void) {
     const char *msg = "nice weather today";
     bool ok = hu_conversation_detect_commitment(msg, strlen(msg), desc, sizeof(desc),
                                                 who, sizeof(who), false);
+    HU_ASSERT_TRUE(!ok);
+}
+
+/* ── Growth celebration detection (F24) ───────────────────────────────── */
+
+static void detect_growth_it_went_great_true(void) {
+    char topic[128];
+    char after[64];
+    const char *msg = "the presentation went well — it went great actually";
+    bool ok = hu_conversation_detect_growth_opportunity(msg, strlen(msg), topic, sizeof(topic),
+                                                        after, sizeof(after));
+    HU_ASSERT_TRUE(ok);
+    HU_ASSERT_STR_EQ(after, "success");
+    HU_ASSERT_TRUE(strlen(topic) > 0);
+}
+
+static void detect_growth_i_got_the_job_true(void) {
+    char topic[128];
+    char after[64];
+    const char *msg = "i got the job!";
+    bool ok = hu_conversation_detect_growth_opportunity(msg, strlen(msg), topic, sizeof(topic),
+                                                        after, sizeof(after));
+    HU_ASSERT_TRUE(ok);
+    HU_ASSERT_STR_EQ(after, "success");
+}
+
+static void detect_growth_nailed_it_true(void) {
+    char topic[128];
+    char after[64];
+    const char *msg = "nailed it on the exam";
+    bool ok = hu_conversation_detect_growth_opportunity(msg, strlen(msg), topic, sizeof(topic),
+                                                        after, sizeof(after));
+    HU_ASSERT_TRUE(ok);
+}
+
+static void detect_growth_crushed_it_true(void) {
+    char topic[128];
+    char after[64];
+    const char *msg = "you were worried about that interview — sounds like you crushed it!";
+    bool ok = hu_conversation_detect_growth_opportunity(msg, strlen(msg), topic, sizeof(topic),
+                                                        after, sizeof(after));
+    HU_ASSERT_TRUE(ok);
+}
+
+static void detect_growth_i_passed_true(void) {
+    char topic[128];
+    char after[64];
+    const char *msg = "i passed the driving test";
+    bool ok = hu_conversation_detect_growth_opportunity(msg, strlen(msg), topic, sizeof(topic),
+                                                        after, sizeof(after));
+    HU_ASSERT_TRUE(ok);
+}
+
+static void detect_growth_got_promoted_true(void) {
+    char topic[128];
+    char after[64];
+    const char *msg = "got promoted last week";
+    bool ok = hu_conversation_detect_growth_opportunity(msg, strlen(msg), topic, sizeof(topic),
+                                                        after, sizeof(after));
+    HU_ASSERT_TRUE(ok);
+}
+
+static void detect_growth_it_worked_out_true(void) {
+    char topic[128];
+    char after[64];
+    const char *msg = "it worked out in the end";
+    bool ok = hu_conversation_detect_growth_opportunity(msg, strlen(msg), topic, sizeof(topic),
+                                                        after, sizeof(after));
+    HU_ASSERT_TRUE(ok);
+}
+
+static void detect_growth_turned_out_well_true(void) {
+    char topic[128];
+    char after[64];
+    const char *msg = "the meeting turned out well";
+    bool ok = hu_conversation_detect_growth_opportunity(msg, strlen(msg), topic, sizeof(topic),
+                                                        after, sizeof(after));
+    HU_ASSERT_TRUE(ok);
+}
+
+static void detect_growth_ordinary_message_false(void) {
+    char topic[128];
+    char after[64];
+    const char *msg = "hey what are you up to";
+    bool ok = hu_conversation_detect_growth_opportunity(msg, strlen(msg), topic, sizeof(topic),
+                                                        after, sizeof(after));
+    HU_ASSERT_TRUE(!ok);
+}
+
+static void detect_growth_null_input_returns_false(void) {
+    char topic[128];
+    char after[64];
+    bool ok = hu_conversation_detect_growth_opportunity(NULL, 0, topic, sizeof(topic),
+                                                        after, sizeof(after));
     HU_ASSERT_TRUE(!ok);
 }
 
@@ -2520,6 +2666,16 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(energy_directive_calm_nonempty);
     HU_RUN_TEST(energy_directive_neutral_returns_zero);
 
+    /* Emotional tone classification (F22) */
+    HU_RUN_TEST(tone_stressed_returns_stressed);
+    HU_RUN_TEST(tone_excited_returns_excited);
+    HU_RUN_TEST(tone_sad_returns_sad);
+    HU_RUN_TEST(tone_anxious_returns_anxious);
+    HU_RUN_TEST(tone_happy_returns_happy);
+    HU_RUN_TEST(tone_frustrated_returns_frustrated);
+    HU_RUN_TEST(tone_neutral_returns_neutral);
+    HU_RUN_TEST(tone_extract_topic_returns_significant_words);
+
     /* Inside joke detection (F19) */
     HU_RUN_TEST(detect_inside_joke_remember_when_true);
     HU_RUN_TEST(detect_inside_joke_whats_for_dinner_false);
@@ -2581,6 +2737,18 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(parse_deadline_whats_up_returns_zero);
     HU_RUN_TEST(detect_commitment_ill_call_dentist);
     HU_RUN_TEST(detect_commitment_nice_weather_false);
+
+    /* Growth celebration detection (F24) */
+    HU_RUN_TEST(detect_growth_it_went_great_true);
+    HU_RUN_TEST(detect_growth_i_got_the_job_true);
+    HU_RUN_TEST(detect_growth_nailed_it_true);
+    HU_RUN_TEST(detect_growth_crushed_it_true);
+    HU_RUN_TEST(detect_growth_i_passed_true);
+    HU_RUN_TEST(detect_growth_got_promoted_true);
+    HU_RUN_TEST(detect_growth_it_worked_out_true);
+    HU_RUN_TEST(detect_growth_turned_out_well_true);
+    HU_RUN_TEST(detect_growth_ordinary_message_false);
+    HU_RUN_TEST(detect_growth_null_input_returns_false);
 
     /* Length + tone calibration */
     HU_RUN_TEST(calibrate_greeting_short);

@@ -145,6 +145,26 @@ int hu_conversation_extract_micro_moments(const char *msg, size_t msg_len,
 bool hu_conversation_detect_inside_joke(const char *msg, size_t msg_len,
                                         const hu_channel_history_entry_t *entries, size_t count);
 
+/* ── Emotional tone classification (F22) ───────────────────────────────── */
+
+/* Classify emotional tone of a message using keyword heuristics.
+ * Returns one of: "stressed", "excited", "neutral", "sad", "anxious", "happy", "frustrated".
+ * Static string; do not free. */
+const char *hu_conversation_classify_emotional_tone(const char *msg, size_t msg_len);
+
+/* Extract first 2-3 significant words (skip stopwords) as topic. Writes into out, returns length. */
+size_t hu_conversation_extract_topic(const char *msg, size_t msg_len, char *out, size_t cap);
+
+/* ── Growth celebration detection (F24) ─────────────────────────────────── */
+
+/* Detect when message contains positive outcome keywords (it went great, i got the job,
+ * nailed it, crushed it, i passed, got promoted, it worked out, turned out well).
+ * Extracts topic from context. Returns true if growth opportunity detected.
+ * Fills topic_out and after_state_out for storage. */
+bool hu_conversation_detect_growth_opportunity(const char *msg, size_t msg_len,
+                                                char *topic_out, size_t topic_cap,
+                                                char *after_state_out, size_t after_cap);
+
 /* ── Avoidance pattern detection (F21) ─────────────────────────────────── */
 
 /* Detect when last 2 user messages have different topics. Simple topic extraction:
