@@ -278,6 +278,20 @@ hu_reaction_type_t hu_conversation_classify_reaction(const char *msg, size_t msg
                                                      const hu_channel_history_entry_t *entries,
                                                      size_t entry_count, uint32_t seed);
 
+/* Classify photo reaction from vision description. When the message is a photo (with vision
+ * description), decide: heart tapback for sunset/family/selfie, haha for funny, etc.
+ * Returns HU_REACTION_NONE if text response preferred (e.g. food, screenshot, error).
+ * Use seed for probabilistic variation. */
+hu_reaction_type_t hu_conversation_classify_photo_reaction(const char *vision_description,
+                                                           size_t desc_len,
+                                                           const struct hu_contact_profile *contact,
+                                                           uint32_t seed);
+
+/* Extract vision description from combined content containing "[They sent a photo: {desc}]".
+ * If found, sets *out_start and *out_len. Returns false if not found. */
+bool hu_conversation_extract_vision_description(const char *combined, size_t combined_len,
+                                                const char **out_start, size_t *out_len);
+
 /* ── Filler word injection (Rime-research placement) ──────────────────── */
 
 /* Probabilistically inject context-appropriate fillers into a response.

@@ -977,6 +977,18 @@ static void group_empty_skips(void) {
     HU_ASSERT_EQ(r, HU_GROUP_SKIP);
 }
 
+static void classify_group_consecutive_2_skips_with_history(void) {
+    hu_channel_history_entry_t entries[4] = {
+        make_entry(false, "yo what's up", "12:00"),
+        make_entry(false, "anyone wanna grab food?", "12:01"),
+        make_entry(true, "sounds good", "12:02"),
+        make_entry(true, "i'm free around 7", "12:03"),
+    };
+    /* With 2 consecutive from_me entries, group classifier should skip */
+    hu_group_response_t r = hu_conversation_classify_group("yeah same", 9, "bot", 3, entries, 4);
+    HU_ASSERT_EQ(r, HU_GROUP_SKIP);
+}
+
 /* ── Thread callback tests ──────────────────────────────────────────── */
 
 static void callback_finds_dropped_topic(void) {
@@ -1100,6 +1112,61 @@ static void reaction_from_me_no_reaction(void) {
     /* from_me=true → always NONE */
     hu_reaction_type_t r = hu_conversation_classify_reaction("love you", 8, true, NULL, 0, 0u);
     HU_ASSERT_EQ(r, HU_REACTION_NONE);
+}
+
+/* ── Photo reaction classifier tests ───────────────────────────────────── */
+
+static void photo_reaction_sunset_heart(void) {
+    hu_reaction_type_t r =
+        hu_conversation_classify_photo_reaction("A beautiful sunset over the ocean", 34, NULL, 0u);
+    HU_ASSERT_EQ(r, HU_REACTION_HEART);
+}
+
+static void photo_reaction_funny_meme_haha(void) {
+    hu_reaction_type_t r =
+        hu_conversation_classify_photo_reaction("A funny meme with text overlay", 30, NULL, 0u);
+    HU_ASSERT_EQ(r, HU_REACTION_HAHA);
+}
+
+static void photo_reaction_screenshot_none(void) {
+    hu_reaction_type_t r =
+        hu_conversation_classify_photo_reaction("A screenshot of an error message", 31, NULL, 0u);
+    HU_ASSERT_EQ(r, HU_REACTION_NONE);
+}
+
+static void photo_reaction_family_heart(void) {
+    hu_reaction_type_t r =
+        hu_conversation_classify_photo_reaction("A family photo at the park", 26, NULL, 0u);
+    HU_ASSERT_EQ(r, HU_REACTION_HEART);
+}
+
+static void photo_reaction_food_none(void) {
+    hu_reaction_type_t r =
+        hu_conversation_classify_photo_reaction("A plate of delicious pasta", 26, NULL, 0u);
+    HU_ASSERT_EQ(r, HU_REACTION_NONE);
+}
+
+static void photo_reaction_extract_vision_description(void) {
+    const char *combined = "hello\n[They sent a photo: A beautiful sunset]";
+    const char *desc = NULL;
+    size_t desc_len = 0;
+    bool ok =
+        hu_conversation_extract_vision_description(combined, strlen(combined), &desc, &desc_len);
+    HU_ASSERT_TRUE(ok);
+    HU_ASSERT_NOT_NULL(desc);
+    HU_ASSERT_EQ(desc_len, 18u);
+    HU_ASSERT_TRUE(memcmp(desc, "A beautiful sunset", 17) == 0);
+}
+
+static void photo_reaction_extract_no_vision_returns_false(void) {
+    const char *combined = "just a normal message";
+    const char *desc = NULL;
+    size_t desc_len = 0;
+    bool ok =
+        hu_conversation_extract_vision_description(combined, strlen(combined), &desc, &desc_len);
+    HU_ASSERT_FALSE(ok);
+    HU_ASSERT_NULL(desc);
+    HU_ASSERT_EQ(desc_len, 0u);
 }
 
 /* ── URL extraction tests ────────────────────────────────────────────── */
@@ -1485,6 +1552,7 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(group_short_no_prompt_skips);
     HU_RUN_TEST(group_too_many_responses_skips);
     HU_RUN_TEST(group_empty_skips);
+    HU_RUN_TEST(classify_group_consecutive_2_skips_with_history);
 
     /* Tapback-vs-text decision */
     HU_RUN_TEST(tapback_decision_lol_tapback_or_both);
@@ -1499,6 +1567,13 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(reaction_loving_message);
     HU_RUN_TEST(reaction_normal_message_no_reaction);
     HU_RUN_TEST(reaction_from_me_no_reaction);
+    HU_RUN_TEST(photo_reaction_sunset_heart);
+    HU_RUN_TEST(photo_reaction_funny_meme_haha);
+    HU_RUN_TEST(photo_reaction_screenshot_none);
+    HU_RUN_TEST(photo_reaction_family_heart);
+    HU_RUN_TEST(photo_reaction_food_none);
+    HU_RUN_TEST(photo_reaction_extract_vision_description);
+    HU_RUN_TEST(photo_reaction_extract_no_vision_returns_false);
 
     /* Time-of-day */
     HU_RUN_TEST(calibrate_length_runs_without_crash);

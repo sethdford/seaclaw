@@ -2903,6 +2903,101 @@ hu_reaction_type_t hu_conversation_classify_reaction(const char *msg, size_t msg
     return HU_REACTION_NONE;
 }
 
+/* ── Photo reaction classifier (vision-based) ──────────────────────────── */
+
+bool hu_conversation_extract_vision_description(const char *combined, size_t combined_len,
+                                                const char **out_start, size_t *out_len) {
+    if (!combined || combined_len == 0 || !out_start || !out_len) {
+        if (out_start)
+            *out_start = NULL;
+        if (out_len)
+            *out_len = 0;
+        return false;
+    }
+    const char *prefix = "[They sent a photo: ";
+    const size_t prefix_len = 20;
+    if (combined_len < prefix_len + 1)
+        return false;
+    for (size_t i = 0; i + prefix_len <= combined_len; i++) {
+        if (memcmp(combined + i, prefix, prefix_len) != 0)
+            continue;
+        const char *desc_start = combined + i + prefix_len;
+        const char *end =
+            (const char *)memchr(desc_start, ']', combined_len - (size_t)(desc_start - combined));
+        if (!end || end <= desc_start) {
+            if (out_start)
+                *out_start = NULL;
+            if (out_len)
+                *out_len = 0;
+            return false;
+        }
+        *out_start = desc_start;
+        *out_len = (size_t)(end - desc_start);
+        return true;
+    }
+    *out_start = NULL;
+    *out_len = 0;
+    return false;
+}
+
+hu_reaction_type_t hu_conversation_classify_photo_reaction(const char *vision_description,
+                                                           size_t desc_len,
+                                                           const struct hu_contact_profile *contact,
+                                                           uint32_t seed) {
+    (void)contact;
+
+    if (!vision_description || desc_len == 0)
+        return HU_REACTION_NONE;
+
+    uint32_t s = seed;
+
+    /* Text-preferred: food, screenshot, error, code → NONE */
+    if (str_contains_ci(vision_description, desc_len, "food") ||
+        str_contains_ci(vision_description, desc_len, "meal") ||
+        str_contains_ci(vision_description, desc_len, "dinner") ||
+        str_contains_ci(vision_description, desc_len, "lunch") ||
+        str_contains_ci(vision_description, desc_len, "pasta") ||
+        str_contains_ci(vision_description, desc_len, "screenshot") ||
+        str_contains_ci(vision_description, desc_len, "error") ||
+        str_contains_ci(vision_description, desc_len, "code"))
+        return HU_REACTION_NONE;
+
+    /* Funny → HAHA (probabilistic) */
+    if (str_contains_ci(vision_description, desc_len, "funny") ||
+        str_contains_ci(vision_description, desc_len, "meme") ||
+        str_contains_ci(vision_description, desc_len, "silly") ||
+        str_contains_ci(vision_description, desc_len, "hilarious") ||
+        str_contains_ci(vision_description, desc_len, "comic")) {
+        uint32_t roll = reaction_prng_next(&s) % 100u;
+        if (roll < 85u)
+            return HU_REACTION_HAHA;
+        return HU_REACTION_NONE;
+    }
+
+    /* Sunset/landscape/nature/family/selfie → HEART (probabilistic) */
+    if (str_contains_ci(vision_description, desc_len, "sunset") ||
+        str_contains_ci(vision_description, desc_len, "landscape") ||
+        str_contains_ci(vision_description, desc_len, "nature") ||
+        str_contains_ci(vision_description, desc_len, "beach") ||
+        str_contains_ci(vision_description, desc_len, "mountain") ||
+        str_contains_ci(vision_description, desc_len, "sky") ||
+        str_contains_ci(vision_description, desc_len, "beautiful") ||
+        str_contains_ci(vision_description, desc_len, "family") ||
+        str_contains_ci(vision_description, desc_len, "baby") ||
+        str_contains_ci(vision_description, desc_len, "kids") ||
+        str_contains_ci(vision_description, desc_len, "selfie") ||
+        str_contains_ci(vision_description, desc_len, "portrait") ||
+        str_contains_ci(vision_description, desc_len, "couple") ||
+        str_contains_ci(vision_description, desc_len, "wedding")) {
+        uint32_t roll = reaction_prng_next(&s) % 100u;
+        if (roll < 85u)
+            return HU_REACTION_HEART;
+        return HU_REACTION_NONE;
+    }
+
+    return HU_REACTION_NONE;
+}
+
 /* ── Filler word injection ────────────────────────────────────────────── */
 
 static uint32_t filler_lcg(uint32_t *s) {
