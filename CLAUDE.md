@@ -91,7 +91,7 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 
 | Path                                  | What                                                        |
 | ------------------------------------- | ----------------------------------------------------------- |
-| `src/`                                | All C source (~715 files, ~137K lines)                      |
+| `src/`                                | All C source (~715 files, ~138K lines)                      |
 | `include/seaclaw/`                    | Public headers                                              |
 | `docs/cross-platform-ci-readiness.md` | Platform support, build flags, known platform-specific code |
 | `tests/`                              | 128 test files, 3788+ tests                                 |

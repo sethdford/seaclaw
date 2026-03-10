@@ -54,8 +54,9 @@ static void integration_full_agent_turn_with_memory_context(void) {
     SC_ASSERT_NOT_NULL(mem.ctx);
 
     sc_agent_t agent;
-    err = sc_agent_from_config(&agent, &alloc, prov, NULL, 0, &mem, NULL, NULL, NULL, "llama2", 6,
-                               "ollama", 6, 0.7, "/tmp", 4, 5, 50, false, 1, NULL, 0, NULL, 0, NULL);
+    err =
+        sc_agent_from_config(&agent, &alloc, prov, NULL, 0, &mem, NULL, NULL, NULL, "llama2", 6,
+                             "ollama", 6, 0.7, "/tmp", 4, 5, 50, false, 1, NULL, 0, NULL, 0, NULL);
     SC_ASSERT_EQ(err, SC_OK);
 
     char *resp = NULL;
@@ -105,7 +106,8 @@ static void integration_proactive_check_in_with_memory(void) {
                  SC_OK);
     SC_ASSERT_NOT_NULL(starter);
     SC_ASSERT_TRUE(starter_len > 0);
-    SC_ASSERT_TRUE(strstr(starter, "starting points") != NULL || strstr(starter, "conversation") != NULL);
+    SC_ASSERT_TRUE(strstr(starter, "starting points") != NULL ||
+                   strstr(starter, "conversation") != NULL);
     SC_ASSERT_TRUE(strstr(starter, "new city") != NULL || strstr(starter, "moving") != NULL);
 
     alloc.free(alloc.ctx, starter, starter_len + 1);
@@ -163,7 +165,8 @@ static void integration_quality_evaluation_needs_revision(void) {
         sc_conversation_evaluate_quality(long_response, long_len, entries, 4, 300);
     SC_ASSERT_TRUE(score.needs_revision);
     SC_ASSERT_TRUE(score.guidance[0] != '\0');
-    SC_ASSERT_TRUE(strstr(score.guidance, "chars") != NULL || strstr(score.guidance, "Tighten") != NULL ||
+    SC_ASSERT_TRUE(strstr(score.guidance, "chars") != NULL ||
+                   strstr(score.guidance, "Tighten") != NULL ||
                    strstr(score.guidance, "Match") != NULL);
 }
 
@@ -199,14 +202,15 @@ static void integration_fast_capture_deep_extract_memory_store(void) {
 
     if (fc.primary_topic) {
         const char *key2 = "topic:user:1";
-        mem.vtable->store(mem.ctx, key2, strlen(key2), fc.primary_topic,
-                         strlen(fc.primary_topic), &cat, "user", 4);
+        mem.vtable->store(mem.ctx, key2, strlen(key2), fc.primary_topic, strlen(fc.primary_topic),
+                          &cat, "user", 4);
     }
 
     sc_memory_entry_t *recalled = NULL;
     size_t recalled_count = 0;
-    SC_ASSERT_EQ(mem.vtable->recall(mem.ctx, &alloc, "Acme", 4, 5, "user", 4, &recalled, &recalled_count),
-                 SC_OK);
+    SC_ASSERT_EQ(
+        mem.vtable->recall(mem.ctx, &alloc, "Acme", 4, 5, "user", 4, &recalled, &recalled_count),
+        SC_OK);
     SC_ASSERT_TRUE(recalled_count >= 1);
     SC_ASSERT_NOT_NULL(recalled);
 
@@ -279,9 +283,9 @@ static void integration_commitment_detection_storage_followup(void) {
 
     sc_proactive_result_t result;
     memset(&result, 0, sizeof(result));
-    SC_ASSERT_EQ(sc_proactive_check_extended(&alloc, 5, 14, active, active_count, NULL, NULL, 0,
-                                             &result),
-                 SC_OK);
+    SC_ASSERT_EQ(
+        sc_proactive_check_extended(&alloc, 5, 14, active, active_count, NULL, NULL, 0, &result),
+        SC_OK);
 
     bool has_followup = false;
     for (size_t i = 0; i < result.count; i++) {
@@ -356,7 +360,7 @@ static void integration_pattern_radar_accumulation(void) {
         int n = snprintf(ts_buf, sizeof(ts_buf), "%llu", (unsigned long long)(1000 + i));
         size_t ts_len = (n > 0 && n < (int)sizeof(ts_buf)) ? (size_t)n : 0;
         (void)sc_pattern_radar_observe(&radar, topic, strlen(topic), SC_PATTERN_TOPIC_RECURRENCE,
-                                        "topic", 5, ts_buf, ts_len);
+                                       "topic", 5, ts_buf, ts_len);
     }
 
     char *ctx = NULL;
@@ -377,7 +381,8 @@ static void integration_awareness_builder_realistic_data(void) {
     sc_channel_history_entry_t entries[8] = {
         make_entry(false, "hey!", "2025-01-15T09:00:00"),
         make_entry(true, "hi whats up", "2025-01-15T09:00:30"),
-        make_entry(false, "not much, just finished a long meeting about the Q4 roadmap", "2025-01-15T09:01:00"),
+        make_entry(false, "not much, just finished a long meeting about the Q4 roadmap",
+                   "2025-01-15T09:01:00"),
         make_entry(true, "ugh meetings", "2025-01-15T09:01:15"),
         make_entry(false, "right? anyway how's your day going?", "2025-01-15T09:02:00"),
         make_entry(true, "pretty good! got some coding done", "2025-01-15T09:02:30"),
@@ -386,13 +391,13 @@ static void integration_awareness_builder_realistic_data(void) {
     };
 
     size_t len = 0;
-    char *ctx = sc_conversation_build_awareness(&alloc, entries, 8, &len);
+    char *ctx = sc_conversation_build_awareness(&alloc, entries, 8, NULL, &len);
     SC_ASSERT_NOT_NULL(ctx);
     SC_ASSERT_TRUE(len > 0);
 
     bool has_metric = (strstr(ctx, "thread") != NULL || strstr(ctx, "Thread") != NULL ||
-                      strstr(ctx, "conversation") != NULL || strstr(ctx, "pace") != NULL ||
-                      strstr(ctx, "length") != NULL || strstr(ctx, "question") != NULL);
+                       strstr(ctx, "conversation") != NULL || strstr(ctx, "pace") != NULL ||
+                       strstr(ctx, "length") != NULL || strstr(ctx, "question") != NULL);
     SC_ASSERT_TRUE(has_metric);
 
     alloc.free(alloc.ctx, ctx, len + 1);

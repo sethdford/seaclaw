@@ -295,6 +295,18 @@ void sc_persona_deinit(sc_allocator_t *alloc, sc_persona_t *persona) {
                       persona->social.bonding_behaviors_count);
     free_string_array(alloc, persona->social.anti_patterns, persona->social.anti_patterns_count);
 
+    /* Externalized prompt content */
+    free_string_array(alloc, persona->immersive_reinforcement,
+                      persona->immersive_reinforcement_count);
+    free_contact_string(alloc, persona->identity_reinforcement);
+    free_string_array(alloc, persona->anti_patterns, persona->anti_patterns_count);
+    free_string_array(alloc, persona->style_rules, persona->style_rules_count);
+    free_contact_string(alloc, persona->proactive_rules);
+    free_contact_string(alloc, persona->time_overlay_late_night);
+    free_contact_string(alloc, persona->time_overlay_early_morning);
+    free_contact_string(alloc, persona->time_overlay_afternoon);
+    free_contact_string(alloc, persona->time_overlay_evening);
+
     if (persona->overlays) {
         for (size_t i = 0; i < persona->overlays_count; i++)
             free_overlay(alloc, &persona->overlays[i]);
@@ -1173,6 +1185,41 @@ sc_error_t sc_persona_load_json(sc_allocator_t *alloc, const char *json, size_t 
             if (a)
                 parse_string_array(alloc, a, &out->social.anti_patterns,
                                    &out->social.anti_patterns_count);
+        }
+    }
+
+    /* Parse externalized prompt content (root level) */
+    {
+        sc_json_value_t *ir = sc_json_object_get(root, "immersive_reinforcement");
+        if (ir)
+            parse_string_array(alloc, ir, &out->immersive_reinforcement,
+                               &out->immersive_reinforcement_count);
+        const char *s = sc_json_get_string(root, "identity_reinforcement");
+        if (s)
+            PERSONA_STRDUP_OPT(out->identity_reinforcement, s);
+        sc_json_value_t *ap = sc_json_object_get(root, "anti_patterns");
+        if (ap)
+            parse_string_array(alloc, ap, &out->anti_patterns, &out->anti_patterns_count);
+        sc_json_value_t *sr = sc_json_object_get(root, "style_rules");
+        if (sr)
+            parse_string_array(alloc, sr, &out->style_rules, &out->style_rules_count);
+        s = sc_json_get_string(root, "proactive_rules");
+        if (s)
+            PERSONA_STRDUP_OPT(out->proactive_rules, s);
+        sc_json_value_t *to = sc_json_object_get(root, "time_overlays");
+        if (to && to->type == SC_JSON_OBJECT) {
+            s = sc_json_get_string(to, "late_night");
+            if (s)
+                PERSONA_STRDUP_OPT(out->time_overlay_late_night, s);
+            s = sc_json_get_string(to, "early_morning");
+            if (s)
+                PERSONA_STRDUP_OPT(out->time_overlay_early_morning, s);
+            s = sc_json_get_string(to, "afternoon");
+            if (s)
+                PERSONA_STRDUP_OPT(out->time_overlay_afternoon, s);
+            s = sc_json_get_string(to, "evening");
+            if (s)
+                PERSONA_STRDUP_OPT(out->time_overlay_evening, s);
         }
     }
 

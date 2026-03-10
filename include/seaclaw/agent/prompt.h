@@ -4,8 +4,11 @@
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
 #include "seaclaw/tool.h"
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+struct sc_persona; /* forward declaration; avoid circular deps */
 
 /* ──────────────────────────────────────────────────────────────────────────
  * System prompt builder — identity, tools, memory, datetime, constraints
@@ -53,7 +56,14 @@ typedef struct sc_prompt_config {
     size_t contact_context_len;
     const char *conversation_context; /* conversation history + awareness (from channel history) */
     size_t conversation_context_len;
-    uint32_t max_response_chars; /* 0 = unlimited */
+    uint32_t max_response_chars;      /* 0 = unlimited */
+    const struct sc_persona *persona; /* persona struct for externalized prompt fields */
+    const char *safety_rules;
+    size_t safety_rules_len;
+    const char *autonomy_rules;
+    size_t autonomy_rules_len;
+    const char *reasoning_instruction;
+    size_t reasoning_instruction_len;
 } sc_prompt_config_t;
 
 /* Build the full system prompt. Caller owns returned string; free with alloc. */

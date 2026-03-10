@@ -103,7 +103,7 @@ static void split_inter_message_delay_nonzero_for_later_fragments(void) {
 
 static void style_null_returns_null(void) {
     size_t len = 0;
-    char *s = sc_conversation_analyze_style(NULL, NULL, 0, &len);
+    char *s = sc_conversation_analyze_style(NULL, NULL, 0, NULL, &len);
     SC_ASSERT_NULL(s);
 }
 
@@ -114,7 +114,7 @@ static void style_too_few_messages_returns_null(void) {
         make_entry(true, "hi", "12:01"),
     };
     size_t len = 0;
-    char *s = sc_conversation_analyze_style(&alloc, entries, 2, &len);
+    char *s = sc_conversation_analyze_style(&alloc, entries, 2, NULL, &len);
     SC_ASSERT_NULL(s);
 }
 
@@ -129,7 +129,7 @@ static void style_detects_all_lowercase(void) {
         make_entry(false, "so wild right", "12:05"),
     };
     size_t len = 0;
-    char *s = sc_conversation_analyze_style(&alloc, entries, 6, &len);
+    char *s = sc_conversation_analyze_style(&alloc, entries, 6, NULL, &len);
     SC_ASSERT_NOT_NULL(s);
     SC_ASSERT_TRUE(len > 0);
     SC_ASSERT_TRUE(strstr(s, "lowercase") != NULL || strstr(s, "capitalize") != NULL);
@@ -147,7 +147,7 @@ static void style_detects_no_periods(void) {
         make_entry(false, "wanna come", "12:05"),
     };
     size_t len = 0;
-    char *s = sc_conversation_analyze_style(&alloc, entries, 6, &len);
+    char *s = sc_conversation_analyze_style(&alloc, entries, 6, NULL, &len);
     SC_ASSERT_NOT_NULL(s);
     SC_ASSERT_TRUE(strstr(s, "period") != NULL);
     alloc.free(alloc.ctx, s, len + 1);
@@ -164,7 +164,7 @@ static void style_includes_anti_patterns(void) {
         make_entry(false, "wanna hang", "12:05"),
     };
     size_t len = 0;
-    char *s = sc_conversation_analyze_style(&alloc, entries, 6, &len);
+    char *s = sc_conversation_analyze_style(&alloc, entries, 6, NULL, &len);
     SC_ASSERT_NOT_NULL(s);
     SC_ASSERT_TRUE(strstr(s, "Anti-pattern") != NULL || strstr(s, "NEVER") != NULL);
     alloc.free(alloc.ctx, s, len + 1);
@@ -371,7 +371,7 @@ static void quality_good_casual_scores_high(void) {
 
 static void awareness_null_returns_null(void) {
     size_t len = 0;
-    char *ctx = sc_conversation_build_awareness(NULL, NULL, 0, &len);
+    char *ctx = sc_conversation_build_awareness(NULL, NULL, 0, NULL, &len);
     SC_ASSERT_NULL(ctx);
     SC_ASSERT_EQ(len, 0u);
 }
@@ -385,7 +385,7 @@ static void awareness_builds_context(void) {
         make_entry(true, "me too!", "12:03"),
     };
     size_t len = 0;
-    char *ctx = sc_conversation_build_awareness(&alloc, entries, 4, &len);
+    char *ctx = sc_conversation_build_awareness(&alloc, entries, 4, NULL, &len);
     SC_ASSERT_NOT_NULL(ctx);
     SC_ASSERT_TRUE(len > 0);
     SC_ASSERT_TRUE(strstr(ctx, "thread") != NULL || strstr(ctx, "Thread") != NULL ||
@@ -400,7 +400,7 @@ static void awareness_detects_excitement(void) {
         make_entry(true, "wait what", "12:01"),
     };
     size_t len = 0;
-    char *ctx = sc_conversation_build_awareness(&alloc, entries, 2, &len);
+    char *ctx = sc_conversation_build_awareness(&alloc, entries, 2, NULL, &len);
     SC_ASSERT_NOT_NULL(ctx);
     SC_ASSERT_TRUE(strstr(ctx, "excited") != NULL);
     alloc.free(alloc.ctx, ctx, len + 1);
@@ -421,7 +421,7 @@ static void awareness_output_bounded(void) {
     }
 
     size_t out_len = 0;
-    char *ctx = sc_conversation_build_awareness(&alloc, entries, 50, &out_len);
+    char *ctx = sc_conversation_build_awareness(&alloc, entries, 50, NULL, &out_len);
     SC_ASSERT_NOT_NULL(ctx);
     SC_ASSERT_TRUE(out_len > 0);
     /* Awareness output should be bounded (not grow without limit) */

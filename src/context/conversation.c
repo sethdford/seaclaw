@@ -1,5 +1,8 @@
 #include "seaclaw/context/conversation.h"
 #include "seaclaw/core/string.h"
+#ifdef SC_HAS_PERSONA
+#include "seaclaw/persona.h"
+#endif
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -402,7 +405,7 @@ static const char *day_name(int wday) {
 
 char *sc_conversation_build_awareness(sc_allocator_t *alloc,
                                       const sc_channel_history_entry_t *entries, size_t count,
-                                      size_t *out_len) {
+                                      const sc_persona_t *persona, size_t *out_len) {
     if (!alloc || !out_len)
         return NULL;
     *out_len = 0;
@@ -599,14 +602,30 @@ char *sc_conversation_build_awareness(sc_allocator_t *alloc,
         POS_ADVANCE(w, pos, CTX_BUF_CAP);
     }
 
-    /* Anti-AI style: prompt-level guidance so LLM produces natural output the first time */
-    w = snprintf(buf + pos, CTX_BUF_CAP - pos,
-                 "\n--- CRITICAL STYLE RULES ---\n"
-                 "Never start with \"I'd be happy to\", \"Great question!\", \"That's a great "
-                 "question\", \"Feel free to\", \"Don't hesitate to\", \"I appreciate\", "
-                 "\"Let me know if\", or similar AI-sounding openers. Never say \"As an AI\" or "
-                 "\"As a language model\". Just respond naturally like a real person texting.\n");
-    POS_ADVANCE(w, pos, CTX_BUF_CAP);
+    /* Anti-AI style: prompt-level guidance so LLM produces natural output the first time.
+     * Use persona style_rules when available; otherwise fallback to built-in rules. */
+#ifdef SC_HAS_PERSONA
+    if (persona && persona->style_rules && persona->style_rules_count > 0) {
+        w = snprintf(buf + pos, CTX_BUF_CAP - pos, "\n--- CRITICAL STYLE RULES ---\n");
+        POS_ADVANCE(w, pos, CTX_BUF_CAP);
+        for (size_t i = 0; i < persona->style_rules_count && pos < CTX_BUF_CAP; i++) {
+            if (persona->style_rules[i]) {
+                w = snprintf(buf + pos, CTX_BUF_CAP - pos, "%s\n", persona->style_rules[i]);
+                POS_ADVANCE(w, pos, CTX_BUF_CAP);
+            }
+        }
+    } else
+#endif
+    {
+        w = snprintf(
+            buf + pos, CTX_BUF_CAP - pos,
+            "\n--- CRITICAL STYLE RULES ---\n"
+            "Never start with \"I'd be happy to\", \"Great question!\", \"That's a great "
+            "question\", \"Feel free to\", \"Don't hesitate to\", \"I appreciate\", "
+            "\"Let me know if\", or similar AI-sounding openers. Never say \"As an AI\" or "
+            "\"As a language model\". Just respond naturally like a real person texting.\n");
+        POS_ADVANCE(w, pos, CTX_BUF_CAP);
+    }
 
     /* Situational length calibration from the last incoming message */
     if (entries && count > 0) {
@@ -1393,7 +1412,7 @@ size_t sc_conversation_calibrate_length(const char *last_msg, size_t last_msg_le
 
 char *sc_conversation_analyze_style(sc_allocator_t *alloc,
                                     const sc_channel_history_entry_t *entries, size_t count,
-                                    size_t *out_len) {
+                                    const sc_persona_t *persona, size_t *out_len) {
     if (!alloc || !entries || count == 0 || !out_len)
         return NULL;
     *out_len = 0;
@@ -1532,22 +1551,37 @@ char *sc_conversation_analyze_style(sc_allocator_t *alloc,
         POS_ADVANCE(w, pos, STYLE_BUF_CAP);
     }
 
-    /* Anti-AI warnings */
-    w = snprintf(
-        buf + pos, STYLE_BUF_CAP - pos,
-        "\n--- Anti-patterns (NEVER do these in texts) ---\n"
-        "- Never use semicolons or em-dashes in texts\n"
-        "- Never use \"certainly\", \"absolutely\", \"I'd be happy to\", "
-        "\"let me know if\", \"feel free\"\n"
-        "- Never start with their name (siblings don't address each other by name)\n"
-        "- Never use perfect grammar if they don't\n"
-        "- Never write more than 2x their average message length\n"
-        "- Never use numbered lists or bullet points\n"
-        "- Never use \"!\" on every message — save it for when you mean it\n"
-        "- Never give unsolicited advice unless they explicitly ask\n"
-        "- It's ok to be blunt, sarcastic, or tease — that's how siblings talk\n"
-        "- It's ok to just say \"lol\" or \"yeah\" — not everything needs a real response\n");
-    POS_ADVANCE(w, pos, STYLE_BUF_CAP);
+    /* Anti-AI warnings: use persona anti_patterns when available; otherwise fallback. */
+#ifdef SC_HAS_PERSONA
+    if (persona && persona->anti_patterns && persona->anti_patterns_count > 0) {
+        w = snprintf(buf + pos, STYLE_BUF_CAP - pos,
+                     "\n--- Anti-patterns (NEVER do these in texts) ---\n");
+        POS_ADVANCE(w, pos, STYLE_BUF_CAP);
+        for (size_t i = 0; i < persona->anti_patterns_count && pos < STYLE_BUF_CAP; i++) {
+            if (persona->anti_patterns[i]) {
+                w = snprintf(buf + pos, STYLE_BUF_CAP - pos, "- %s\n", persona->anti_patterns[i]);
+                POS_ADVANCE(w, pos, STYLE_BUF_CAP);
+            }
+        }
+    } else
+#endif
+    {
+        w = snprintf(
+            buf + pos, STYLE_BUF_CAP - pos,
+            "\n--- Anti-patterns (NEVER do these in texts) ---\n"
+            "- Never use semicolons or em-dashes in texts\n"
+            "- Never use \"certainly\", \"absolutely\", \"I'd be happy to\", "
+            "\"let me know if\", \"feel free\"\n"
+            "- Never start with their name (siblings don't address each other by name)\n"
+            "- Never use perfect grammar if they don't\n"
+            "- Never write more than 2x their average message length\n"
+            "- Never use numbered lists or bullet points\n"
+            "- Never use \"!\" on every message — save it for when you mean it\n"
+            "- Never give unsolicited advice unless they explicitly ask\n"
+            "- It's ok to be blunt, sarcastic, or tease — that's how siblings talk\n"
+            "- It's ok to just say \"lol\" or \"yeah\" — not everything needs a real response\n");
+        POS_ADVANCE(w, pos, STYLE_BUF_CAP);
+    }
 
     buf[pos] = '\0';
     *out_len = pos;

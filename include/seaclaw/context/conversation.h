@@ -4,6 +4,11 @@
 #include "seaclaw/channel.h"
 #include "seaclaw/core/allocator.h"
 #include "seaclaw/core/error.h"
+#ifdef SC_HAS_PERSONA
+#include "seaclaw/persona.h"
+#else
+struct sc_persona; /* opaque when persona not available */
+#endif
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -20,10 +25,11 @@ char *sc_conversation_build_callback(sc_allocator_t *alloc,
 /* Build a complete conversation awareness context string from channel history.
  * Includes: conversation thread, emotional analysis, verbosity mirroring,
  * conversation phase, time-of-day triggers, detected user states.
+ * When persona is non-NULL and has style_rules, uses those; otherwise uses built-in rules.
  * Caller owns returned string. Returns NULL if no entries. */
 char *sc_conversation_build_awareness(sc_allocator_t *alloc,
                                       const sc_channel_history_entry_t *entries, size_t count,
-                                      size_t *out_len);
+                                      const struct sc_persona *persona, size_t *out_len);
 
 /* Conversation quality score (0-100). Evaluates a draft response for:
  * brevity, validation/reflection, repair/rephrase, and follow-up.
@@ -130,10 +136,11 @@ size_t sc_conversation_calibrate_length(const char *last_msg, size_t last_msg_le
 /* Analyze the other person's texting style from conversation history.
  * Produces a style context string for the prompt with capitalization,
  * punctuation, fragmentation, and abbreviation patterns.
+ * When persona is non-NULL and has anti_patterns, uses those; otherwise uses built-in rules.
  * Caller owns returned string. Returns NULL if insufficient data. */
 char *sc_conversation_analyze_style(sc_allocator_t *alloc,
                                     const sc_channel_history_entry_t *entries, size_t count,
-                                    size_t *out_len);
+                                    const struct sc_persona *persona, size_t *out_len);
 
 /* ── Typing quirk post-processing ─────────────────────────────────────── */
 

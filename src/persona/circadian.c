@@ -11,13 +11,16 @@ static const char *PHASE_NAMES[] = {
     "early morning", "morning", "afternoon", "evening", "night", "late night",
 };
 
+/* Default guidance per phase. Persona-specific overrides via time_overlays; future config can
+ * externalize. */
 static const char *PHASE_GUIDANCE[] = {
     "Be gentle and warm. The user is starting their day. Keep responses calm and encouraging.",
     "Be energetic and productive. The user is at peak mental clarity. Be direct and efficient.",
     "Be steady and focused. Energy may be dipping. Keep things clear and structured.",
     "Be relaxed and reflective. The day is winding down. Allow for deeper conversation.",
     "Be calm and intimate. The user is in a quieter headspace. Slow your pace, be thoughtful.",
-    "Be present and unhurried. Late night conversations often carry more weight. Be a quiet companion.",
+    "Be present and unhurried. Late night conversations often carry more weight. Be a quiet "
+    "companion.",
 };
 
 sc_time_phase_t sc_circadian_phase(uint8_t hour) {

@@ -534,6 +534,13 @@ sc_error_t sc_agent_turn(sc_agent_t *agent, const char *msg, size_t msg_len, cha
             .outcome_context = outcome_ctx,
             .outcome_context_len = outcome_ctx_len,
             .persona_immersive = (persona_prompt && persona_prompt_len > 0),
+            .persona =
+#ifdef SC_HAS_PERSONA
+                agent->persona
+#else
+                NULL
+#endif
+            ,
             .contact_context = agent->contact_context,
             .contact_context_len = agent->contact_context_len,
             .conversation_context = agent->conversation_context,

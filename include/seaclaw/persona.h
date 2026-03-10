@@ -257,6 +257,20 @@ typedef struct sc_persona {
     size_t example_banks_count;
     sc_contact_profile_t *contacts;
     size_t contacts_count;
+    /* Externalized prompt content (loaded from JSON, avoids hardcoding in C) */
+    char **immersive_reinforcement;
+    size_t immersive_reinforcement_count;
+    char *identity_reinforcement;
+    char **anti_patterns;
+    size_t anti_patterns_count;
+    char **style_rules;
+    size_t style_rules_count;
+    char *proactive_rules;
+    /* Time-of-day overlays */
+    char *time_overlay_late_night;
+    char *time_overlay_early_morning;
+    char *time_overlay_afternoon;
+    char *time_overlay_evening;
 } sc_persona_t;
 
 /* Returns persona base directory path in buf (either SC_PERSONA_DIR or ~/.seaclaw/personas).

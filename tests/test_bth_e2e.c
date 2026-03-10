@@ -63,7 +63,8 @@ static void bth_conversation_intelligence_pipeline(void) {
     entries[3] = make_entry(true, "that sucks, what's going on?", "2025-01-01 10:03");
     entries[4] = make_entry(false, "my boss keeps piling on deadlines", "2025-01-01 10:04");
     entries[5] = make_entry(true, "ugh that sounds rough", "2025-01-01 10:05");
-    entries[6] = make_entry(false, "yeah it's a lot. anyway how was your weekend?", "2025-01-01 10:06");
+    entries[6] =
+        make_entry(false, "yeah it's a lot. anyway how was your weekend?", "2025-01-01 10:06");
     entries[7] = make_entry(true, "pretty chill, went hiking", "2025-01-01 10:07");
     entries[8] = make_entry(false, "nice! where'd you go?", "2025-01-01 10:08");
     entries[9] = make_entry(true, "up to the lake, it was beautiful", "2025-01-01 10:09");
@@ -71,19 +72,18 @@ static void bth_conversation_intelligence_pipeline(void) {
     entries[11] = make_entry(true, "same, we should go sometime", "2025-01-01 10:11");
 
     size_t len = 0;
-    char *awareness = sc_conversation_build_awareness(&alloc, entries, 12, &len);
+    char *awareness = sc_conversation_build_awareness(&alloc, entries, 12, NULL, &len);
     SC_ASSERT_NOT_NULL(awareness);
     alloc.free(alloc.ctx, awareness, len + 1);
 
     char cal_buf[512];
-    size_t cal_len = sc_conversation_calibrate_length(
-        entries[11].text, strlen(entries[11].text), entries, 12, cal_buf, sizeof(cal_buf));
+    size_t cal_len = sc_conversation_calibrate_length(entries[11].text, strlen(entries[11].text),
+                                                      entries, 12, cal_buf, sizeof(cal_buf));
     SC_ASSERT_TRUE(cal_len > 0);
 
     uint32_t delay = 0;
-    sc_response_action_t action =
-        sc_conversation_classify_response(entries[11].text, strlen(entries[11].text), entries, 12,
-                                         &delay);
+    sc_response_action_t action = sc_conversation_classify_response(
+        entries[11].text, strlen(entries[11].text), entries, 12, &delay);
     SC_ASSERT_TRUE(action >= SC_RESPONSE_FULL && action <= SC_RESPONSE_THINKING);
 
     sc_narrative_phase_t phase = sc_conversation_detect_narrative(entries, 12);
@@ -167,9 +167,8 @@ static void bth_typo_correction_pipeline(void) {
     SC_ASSERT_TRUE(typo_seed < 500);
 
     char corr_buf[64];
-    size_t corr_len = sc_conversation_generate_correction(original, orig_len, typo_buf,
-                                                          strlen(typo_buf), corr_buf,
-                                                          sizeof(corr_buf), 12345u, 100u);
+    size_t corr_len = sc_conversation_generate_correction(
+        original, orig_len, typo_buf, strlen(typo_buf), corr_buf, sizeof(corr_buf), 12345u, 100u);
     SC_ASSERT_TRUE(corr_len > 0);
     SC_ASSERT_EQ(corr_buf[0], '*');
     SC_ASSERT_TRUE(strstr(original, corr_buf + 1) != NULL);
@@ -193,8 +192,7 @@ static void bth_event_to_proactive_pipeline(void) {
     SC_ASSERT_TRUE(result.count >= 1);
     bool found_interview = false;
     for (size_t i = 0; i < result.count; i++) {
-        if (result.actions[i].message &&
-            strstr(result.actions[i].message, "interview") != NULL) {
+        if (result.actions[i].message && strstr(result.actions[i].message, "interview") != NULL) {
             found_interview = true;
             break;
         }
@@ -237,7 +235,8 @@ static void bth_replay_analysis_pipeline(void) {
 
     sc_channel_history_entry_t entries[4];
     entries[0] = make_entry(false, "how was your day?", "2025-01-01 12:00");
-    entries[1] = make_entry(true, "I understand how you feel. That must be difficult.", "2025-01-01 12:01");
+    entries[1] =
+        make_entry(true, "I understand how you feel. That must be difficult.", "2025-01-01 12:01");
     entries[2] = make_entry(true, "that's so funny", "2025-01-01 12:02");
     entries[3] = make_entry(false, "haha exactly!", "2025-01-01 12:03");
 
@@ -337,8 +336,8 @@ static void bth_pipeline_full_conversation(void) {
         for (size_t i = 0; i < fc.entity_count; i++) {
             const sc_fc_entity_match_t *e = &fc.entities[i];
             (void)sc_stm_turn_add_entity(&stm, last_idx, e->name, e->name_len,
-                                         e->type ? e->type : "entity",
-                                         e->type ? e->type_len : 6, 1);
+                                         e->type ? e->type : "entity", e->type ? e->type_len : 6,
+                                         1);
         }
         for (size_t i = 0; i < fc.emotion_count; i++) {
             (void)sc_stm_turn_add_emotion(&stm, last_idx, fc.emotions[i].tag,
@@ -353,10 +352,9 @@ static void bth_pipeline_full_conversation(void) {
         for (size_t i = 0; i < fc.entity_count; i++) {
             const sc_fc_entity_match_t *e = &fc.entities[i];
             if (e->name && e->name_len > 0) {
-                (void)sc_pattern_radar_observe(&radar, e->name, e->name_len,
-                                               SC_PATTERN_TOPIC_RECURRENCE,
-                                               e->type ? e->type : NULL,
-                                               e->type ? e->type_len : 0, ts_str, ts_len);
+                (void)sc_pattern_radar_observe(
+                    &radar, e->name, e->name_len, SC_PATTERN_TOPIC_RECURRENCE,
+                    e->type ? e->type : NULL, e->type ? e->type_len : 0, ts_str, ts_len);
             }
         }
 
@@ -412,7 +410,7 @@ static void bth_pipeline_full_conversation(void) {
         char *ctx = NULL;
         size_t ctx_len = 0;
         SC_ASSERT_EQ(sc_commitment_store_build_context(commit_store, &alloc, "test-session", 12,
-                                                        &ctx, &ctx_len),
+                                                       &ctx, &ctx_len),
                      SC_OK);
         SC_ASSERT_NOT_NULL(ctx);
         SC_ASSERT_TRUE(ctx_len > 10);
@@ -526,9 +524,9 @@ static void bth_pipeline_full_conversation(void) {
         /* Variable resolution */
         char *resolved = NULL;
         size_t resolved_len = 0;
-        SC_ASSERT_EQ(sc_dag_resolve_vars(&alloc, &dag, "{\"text\":\"$t1\"}", 15, &resolved,
-                                         &resolved_len),
-                     SC_OK);
+        SC_ASSERT_EQ(
+            sc_dag_resolve_vars(&alloc, &dag, "{\"text\":\"$t1\"}", 15, &resolved, &resolved_len),
+            SC_OK);
         SC_ASSERT_NOT_NULL(resolved);
         SC_ASSERT_TRUE(strstr(resolved, "news content") != NULL);
         sc_str_free(&alloc, resolved);

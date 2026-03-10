@@ -515,8 +515,9 @@ sc_error_t sc_service_run_agent_cron(sc_allocator_t *alloc, sc_agent_t *agent,
 
 #if defined(SC_HAS_PERSONA) && !defined(SC_IS_TEST)
 
-static char *proactive_prompt_for_contact(sc_allocator_t *alloc, sc_memory_t *memory,
-                                          const sc_contact_profile_t *cp, size_t *out_len) {
+static char *proactive_prompt_for_contact(sc_allocator_t *alloc, sc_agent_t *agent,
+                                          sc_memory_t *memory, const sc_contact_profile_t *cp,
+                                          size_t *out_len) {
     char *starter = NULL;
     size_t starter_len = 0;
     if (memory && cp->contact_id) {
@@ -532,7 +533,7 @@ static char *proactive_prompt_for_contact(sc_allocator_t *alloc, sc_memory_t *me
                                          "recent conversation topics", 24, &mem_ctx_len);
     }
 
-    static const char RULES[] =
+    static const char SC_DEFAULT_PROACTIVE_RULES[] =
         "\nRules: "
         "1. One short natural message (not 'hey how are you' — too generic). "
         "2. Reference something specific you know about them or ask about "
@@ -541,7 +542,12 @@ static char *proactive_prompt_for_contact(sc_allocator_t *alloc, sc_memory_t *me
         "4. If you have nothing specific, share something you saw/did "
         "that made you think of them. "
         "5. Reply SKIP if you genuinely have nothing natural to say.";
-    size_t rules_len = sizeof(RULES) - 1;
+    const char *rules = (agent && agent->persona && agent->persona->proactive_rules)
+                            ? agent->persona->proactive_rules
+                            : SC_DEFAULT_PROACTIVE_RULES;
+    size_t rules_len = (agent && agent->persona && agent->persona->proactive_rules)
+                           ? strlen(rules)
+                           : sizeof(SC_DEFAULT_PROACTIVE_RULES) - 1;
 
     char base_buf[256];
     int w = snprintf(base_buf, sizeof(base_buf), "You're initiating a casual check-in text to %s. ",
@@ -583,7 +589,7 @@ static char *proactive_prompt_for_contact(sc_allocator_t *alloc, sc_memory_t *me
         alloc->free(alloc->ctx, mem_ctx, mem_ctx_len + 1);
     }
 
-    memcpy(result + pos, RULES, rules_len);
+    memcpy(result + pos, rules, rules_len);
     pos += rules_len;
     result[pos] = '\0';
     *out_len = pos;
@@ -737,7 +743,8 @@ void sc_service_run_proactive_checkins(sc_allocator_t *alloc, sc_agent_t *agent,
 
             /* Build and send the check-in */
             size_t prompt_len = 0;
-            char *prompt = proactive_prompt_for_contact(alloc, agent->memory, cp, &prompt_len);
+            char *prompt =
+                proactive_prompt_for_contact(alloc, agent, agent->memory, cp, &prompt_len);
             if (prompt && event_ctx && event_ctx_len > 0) {
                 size_t merged_len = prompt_len + 1 + event_ctx_len + 1;
                 char *merged = (char *)alloc->alloc(alloc->ctx, merged_len);
@@ -1830,8 +1837,9 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                                        : history_entries ? history_count
                                                          : cross_count;
                     if (ctx_entries && ctx_count > 0) {
-                        convo_ctx = sc_conversation_build_awareness(alloc, ctx_entries, ctx_count,
-                                                                    &convo_ctx_len);
+                        convo_ctx = sc_conversation_build_awareness(
+                            alloc, ctx_entries, ctx_count,
+                            (agent && agent->persona) ? agent->persona : NULL, &convo_ctx_len);
                     }
                     if (merged_history)
                         alloc->free(alloc->ctx, merged_history,
@@ -1859,8 +1867,9 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 char *style_ctx = NULL;
                 size_t style_ctx_len = 0;
                 if (history_entries && history_count > 0) {
-                    style_ctx = sc_conversation_analyze_style(alloc, history_entries, history_count,
-                                                              &style_ctx_len);
+                    style_ctx = sc_conversation_analyze_style(
+                        alloc, history_entries, history_count,
+                        (agent && agent->persona) ? agent->persona : NULL, &style_ctx_len);
                 }
 
                 /* Merge style context into conversation context */
@@ -2693,20 +2702,32 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                 {
                     const char *tod_overlay = NULL;
                     size_t tod_len = 0;
-                    static const char NIGHT_OV[] =
+                    static const char SC_DEFAULT_TIME_OV_LATE_NIGHT[] =
                         "\nIt's late at night. You can be more relaxed, introspective, "
                         "slightly more open than during the day. If it feels natural, share "
                         "something personal or vulnerable. Late-night texts are more intimate.";
-                    static const char MORNING_OV[] =
+                    static const char SC_DEFAULT_TIME_OV_EARLY_MORNING[] =
                         "\nIt's early morning — you just woke up. Keep responses brief, "
                         "practical, slightly groggy. Short sentences. No deep philosophical "
                         "conversations yet.";
                     if (bth_hour >= 22 || (bth_hour >= 0 && bth_hour < 1)) {
-                        tod_overlay = NIGHT_OV;
-                        tod_len = sizeof(NIGHT_OV) - 1;
+                        tod_overlay =
+                            (agent && agent->persona && agent->persona->time_overlay_late_night)
+                                ? agent->persona->time_overlay_late_night
+                                : SC_DEFAULT_TIME_OV_LATE_NIGHT;
+                        tod_len =
+                            (agent && agent->persona && agent->persona->time_overlay_late_night)
+                                ? strlen(tod_overlay)
+                                : sizeof(SC_DEFAULT_TIME_OV_LATE_NIGHT) - 1;
                     } else if (bth_hour >= 7 && bth_hour < 9) {
-                        tod_overlay = MORNING_OV;
-                        tod_len = sizeof(MORNING_OV) - 1;
+                        tod_overlay =
+                            (agent && agent->persona && agent->persona->time_overlay_early_morning)
+                                ? agent->persona->time_overlay_early_morning
+                                : SC_DEFAULT_TIME_OV_EARLY_MORNING;
+                        tod_len =
+                            (agent && agent->persona && agent->persona->time_overlay_early_morning)
+                                ? strlen(tod_overlay)
+                                : sizeof(SC_DEFAULT_TIME_OV_EARLY_MORNING) - 1;
                     }
                     if (tod_overlay && tod_len > 0) {
                         if (convo_ctx) {
@@ -3269,17 +3290,25 @@ sc_error_t sc_service_run(sc_allocator_t *alloc, uint32_t tick_interval_ms,
                         agent->alloc->free(agent->alloc->ctx, response, response_len + 1);
                         response = NULL;
                         response_len = 0;
-                        static const char NO_AI[] =
+                        static const char SC_DEFAULT_IDENTITY_REINFORCEMENT[] =
                             "\nCRITICAL: You are NOT an AI. You ARE the person described in "
                             "your persona. Never say you're an AI, a bot, a language model, "
                             "or anything non-human. Respond as yourself.\n";
+                        const char *identity_reinforcement =
+                            (agent && agent->persona && agent->persona->identity_reinforcement)
+                                ? agent->persona->identity_reinforcement
+                                : SC_DEFAULT_IDENTITY_REINFORCEMENT;
+                        size_t identity_len =
+                            (agent && agent->persona && agent->persona->identity_reinforcement)
+                                ? strlen(identity_reinforcement)
+                                : sizeof(SC_DEFAULT_IDENTITY_REINFORCEMENT) - 1;
                         if (convo_ctx) {
-                            size_t total = convo_ctx_len + sizeof(NO_AI) - 1 + 1;
+                            size_t total = convo_ctx_len + identity_len + 1;
                             char *merged = (char *)alloc->alloc(alloc->ctx, total + 1);
                             if (merged) {
-                                memcpy(merged, NO_AI, sizeof(NO_AI) - 1);
-                                merged[sizeof(NO_AI) - 1] = '\n';
-                                memcpy(merged + sizeof(NO_AI), convo_ctx, convo_ctx_len);
+                                memcpy(merged, identity_reinforcement, identity_len);
+                                merged[identity_len] = '\n';
+                                memcpy(merged + identity_len + 1, convo_ctx, convo_ctx_len);
                                 merged[total] = '\0';
                                 alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
                                 convo_ctx = merged;

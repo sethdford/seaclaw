@@ -9,6 +9,8 @@
 
 static const char *STAGE_NAMES[] = {"new", "familiar", "trusted", "deep"};
 
+/* Default guidance per stage. Persona-specific overrides via time_overlays; future config can
+ * externalize. */
 static const char *STAGE_GUIDANCE[] = {
     "This is a newer relationship. Be helpful, clear, and professional. Build trust through "
     "reliability.",
@@ -39,9 +41,8 @@ void sc_relationship_update(sc_relationship_state_t *state, uint32_t turn_count)
     state->total_turns += turn_count;
 }
 
-sc_error_t sc_relationship_build_prompt(sc_allocator_t *alloc,
-                                         const sc_relationship_state_t *state,
-                                         char **out, size_t *out_len) {
+sc_error_t sc_relationship_build_prompt(sc_allocator_t *alloc, const sc_relationship_state_t *state,
+                                        char **out, size_t *out_len) {
     if (!alloc || !state || !out || !out_len)
         return SC_ERR_INVALID_ARGUMENT;
 
@@ -53,9 +54,9 @@ sc_error_t sc_relationship_build_prompt(sc_allocator_t *alloc,
     if (!buf)
         return SC_ERR_OUT_OF_MEMORY;
 
-    int n = snprintf(buf, SC_REL_BUF_CAP,
-                     "\n### Relationship Context\nStage: %s. Sessions: %u. %s\n", stage_name,
-                     state->session_count, guidance);
+    int n =
+        snprintf(buf, SC_REL_BUF_CAP, "\n### Relationship Context\nStage: %s. Sessions: %u. %s\n",
+                 stage_name, state->session_count, guidance);
     if (n <= 0 || (size_t)n >= SC_REL_BUF_CAP) {
         alloc->free(alloc->ctx, buf, SC_REL_BUF_CAP);
         return SC_ERR_INVALID_ARGUMENT;
