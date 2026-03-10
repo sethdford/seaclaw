@@ -254,6 +254,19 @@ int hu_conversation_classify_dropoff(const char *message, size_t message_len,
                                      const hu_channel_history_entry_t *entries, size_t entry_count,
                                      uint32_t seed);
 
+/* ── Active listening backchannels (F29) ───────────────────────────────── */
+
+/* Returns true if message is narrative/venting AND probability roll passes (seed-based).
+ * Narrative: length > 80 chars, no question, contains "and then", "so i", "anyway",
+ * "long story", or first person ("i ", "my ", "me "). Or: last 2–3 their messages
+ * are long and we haven't replied yet. */
+bool hu_conversation_should_backchannel(const char *msg, size_t msg_len,
+                                        const hu_channel_history_entry_t *entries, size_t count,
+                                        uint32_t seed, float probability);
+
+/* Pick a backchannel phrase at random using seed. Returns length written. */
+size_t hu_conversation_pick_backchannel(uint32_t seed, char *buf, size_t cap);
+
 /* ── URL extraction and link-sharing detection ───────────────────────── */
 
 /* Extract URLs from a text message. Returns count of URLs found.
@@ -364,6 +377,16 @@ hu_reaction_type_t hu_conversation_classify_photo_reaction(const char *vision_de
  * If found, sets *out_start and *out_len. Returns false if not found. */
 bool hu_conversation_extract_vision_description(const char *combined, size_t combined_len,
                                                 const char **out_start, size_t *out_len);
+
+/* ── Text disfluency (F33) ───────────────────────────────────────────── */
+
+/* Apply natural text imperfections: "i mean", "like", "you know", trailing "...",
+ * self-correction "wait no", "actually". Casual conversations only.
+ * Skip if contact has relationship_type "coworker" or formality "formal".
+ * frequency: 0.0–1.0 (default 0.15). Only one disfluency per call. */
+size_t hu_conversation_apply_disfluency(char *buf, size_t len, size_t cap, uint32_t seed,
+                                        float frequency, const struct hu_contact_profile *contact,
+                                        const char *formality, size_t formality_len);
 
 /* ── Filler word injection (Rime-research placement) ──────────────────── */
 

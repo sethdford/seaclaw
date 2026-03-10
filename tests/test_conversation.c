@@ -1122,6 +1122,63 @@ static void typo_never_exceeds_cap(void) {
     HU_ASSERT_TRUE(out <= cap - 1);
 }
 
+/* ── Text disfluency (F33) tests ───────────────────────────────────────── */
+
+static void disfluency_frequency_one_applies(void) {
+    /* frequency 1.0, no contact (casual) → at least one disfluency applied */
+    char buf[128];
+    const char *input = "that sounds good to me";
+    size_t len = strlen(input);
+    memcpy(buf, input, len + 1);
+    size_t out = hu_conversation_apply_disfluency(buf, len, sizeof(buf), 0, 1.0f, NULL, NULL, 0);
+    HU_ASSERT_TRUE(out != len || memcmp(buf, input, len + 1) != 0);
+}
+
+static void disfluency_frequency_zero_unchanged(void) {
+    char buf[128];
+    const char *input = "that sounds good to me";
+    size_t len = strlen(input);
+    memcpy(buf, input, len + 1);
+    size_t out = hu_conversation_apply_disfluency(buf, len, sizeof(buf), 0, 0.0f, NULL, NULL, 0);
+    HU_ASSERT_EQ(out, len);
+    HU_ASSERT_STR_EQ(buf, input);
+}
+
+static void disfluency_formal_contact_unchanged(void) {
+    hu_contact_profile_t contact = {0};
+    contact.relationship_type = (char *)"coworker";
+    char buf[128];
+    const char *input = "that sounds good";
+    size_t len = strlen(input);
+    memcpy(buf, input, len + 1);
+    size_t out =
+        hu_conversation_apply_disfluency(buf, len, sizeof(buf), 0, 1.0f, &contact, NULL, 0);
+    HU_ASSERT_EQ(out, len);
+    HU_ASSERT_STR_EQ(buf, input);
+}
+
+static void disfluency_formality_formal_unchanged(void) {
+    const char *formality = "formal";
+    char buf[128];
+    const char *input = "that sounds good";
+    size_t len = strlen(input);
+    memcpy(buf, input, len + 1);
+    size_t out =
+        hu_conversation_apply_disfluency(buf, len, sizeof(buf), 0, 1.0f, NULL, formality, 6);
+    HU_ASSERT_EQ(out, len);
+    HU_ASSERT_STR_EQ(buf, input);
+}
+
+static void disfluency_small_buffer_unchanged(void) {
+    char buf[20];
+    const char *input = "hello";
+    size_t len = strlen(input);
+    memcpy(buf, input, len + 1);
+    size_t cap = len + 2;
+    size_t out = hu_conversation_apply_disfluency(buf, len, cap, 0, 1.0f, NULL, NULL, 0);
+    HU_ASSERT_TRUE(out <= cap - 1);
+}
+
 /* ── Anti-repetition detection tests ──────────────────────────────────── */
 
 static void repetition_detects_repeated_opener(void) {
@@ -1833,6 +1890,46 @@ static void inline_reply_null_last_msg_returns_false(void) {
     HU_ASSERT_FALSE(r);
 }
 
+/* ── Active listening backchannels (F29) ───────────────────────────────── */
+
+static void backchannel_long_narrative_prob_one_returns_true(void) {
+    /* >80 chars, first person, no question, probability 1.0 */
+    const char *msg =
+        "so i was at the store yesterday and then this crazy thing happened and my car broke down "
+        "and anyway it was a long story";
+    bool r = hu_conversation_should_backchannel(msg, strlen(msg), NULL, 0, 42u, 1.0f);
+    HU_ASSERT_TRUE(r);
+}
+
+static void backchannel_short_k_returns_false(void) {
+    bool r = hu_conversation_should_backchannel("k", 1, NULL, 0, 42u, 1.0f);
+    HU_ASSERT_FALSE(r);
+}
+
+static void backchannel_narrative_prob_zero_returns_false(void) {
+    const char *msg =
+        "so i was at the store yesterday and then this crazy thing happened and my car broke down "
+        "and anyway it was a long story";
+    bool r = hu_conversation_should_backchannel(msg, strlen(msg), NULL, 0, 42u, 0.0f);
+    HU_ASSERT_FALSE(r);
+}
+
+static void backchannel_pick_returns_nonempty(void) {
+    char buf[64];
+    size_t len = hu_conversation_pick_backchannel(12345u, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(buf[0] != '\0');
+    HU_ASSERT_TRUE(len == strlen(buf));
+}
+
+static void backchannel_pick_deterministic(void) {
+    char buf1[64], buf2[64];
+    size_t len1 = hu_conversation_pick_backchannel(99u, buf1, sizeof(buf1));
+    size_t len2 = hu_conversation_pick_backchannel(99u, buf2, sizeof(buf2));
+    HU_ASSERT_EQ(len1, len2);
+    HU_ASSERT_STR_EQ(buf1, buf2);
+}
+
 /* ── Test suite registration ─────────────────────────────────────────── */
 
 void run_conversation_tests(void) {
@@ -1979,6 +2076,13 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(typo_deterministic);
     HU_RUN_TEST(typo_never_exceeds_cap);
 
+    /* Text disfluency (F33) */
+    HU_RUN_TEST(disfluency_frequency_one_applies);
+    HU_RUN_TEST(disfluency_frequency_zero_unchanged);
+    HU_RUN_TEST(disfluency_formal_contact_unchanged);
+    HU_RUN_TEST(disfluency_formality_formal_unchanged);
+    HU_RUN_TEST(disfluency_small_buffer_unchanged);
+
     /* Typing quirk post-processing */
     HU_RUN_TEST(quirks_lowercase_applies);
     HU_RUN_TEST(quirks_no_periods_strips_sentence_end);
@@ -2096,4 +2200,11 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(inline_reply_multiple_questions_returns_true);
     HU_RUN_TEST(inline_reply_single_topic_returns_false);
     HU_RUN_TEST(inline_reply_null_last_msg_returns_false);
+
+    /* Active listening backchannels (F29) */
+    HU_RUN_TEST(backchannel_long_narrative_prob_one_returns_true);
+    HU_RUN_TEST(backchannel_short_k_returns_false);
+    HU_RUN_TEST(backchannel_narrative_prob_zero_returns_false);
+    HU_RUN_TEST(backchannel_pick_returns_nonempty);
+    HU_RUN_TEST(backchannel_pick_deterministic);
 }

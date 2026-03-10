@@ -1343,6 +1343,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* Preload channel history early so the group classifier can use it */
                 hu_channel_history_entry_t *early_history = NULL;
                 size_t early_history_count = 0;
+                bool use_backchannel = false;
+                char backchannel_buf[32];
+                size_t backchannel_len = 0;
                 if (ch->channel->vtable->load_conversation_history) {
                     ch->channel->vtable->load_conversation_history(
                         ch->channel->ctx, alloc, batch_key, key_len, 10, &early_history,
@@ -1419,10 +1422,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         (int)action, (unsigned)extra_delay_ms, (int)(key_len > 20 ? 20 : key_len),
                         batch_key);
 
-                if (early_history)
-                    alloc->free(alloc->ctx, early_history,
-                                early_history_count * sizeof(hu_channel_history_entry_t));
-
                 /* Consecutive response limiter: if Human has responded to
                  * this contact 3+ times in a row without the real user
                  * stepping in, stay silent so we don't run away. */
@@ -1472,8 +1471,33 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     msgs[b].content, blen);
                         }
                     }
+                    if (early_history)
+                        alloc->free(alloc->ctx, early_history,
+                                    early_history_count * sizeof(hu_channel_history_entry_t));
                     continue;
                 }
+
+                /* F29: Active listening backchannels — send brief cue instead of LLM when
+                 * narrative/venting detected and probability roll passes. */
+                {
+                    float bc_prob = 0.3f;
+#ifdef HU_HAS_PERSONA
+                    if (agent && agent->persona)
+                        bc_prob = agent->persona->humanization.backchannel_probability;
+#endif
+                    uint32_t bc_seed =
+                        (uint32_t)time(NULL) * 1103515245u + 12345u + (uint32_t)(uintptr_t)combined;
+                    if (hu_conversation_should_backchannel(combined, combined_len, early_history,
+                                                           early_history_count, bc_seed, bc_prob)) {
+                        backchannel_len = hu_conversation_pick_backchannel(
+                            bc_seed + 1, backchannel_buf, sizeof(backchannel_buf));
+                        if (backchannel_len > 0)
+                            use_backchannel = true;
+                    }
+                }
+                if (early_history)
+                    alloc->free(alloc->ctx, early_history,
+                                early_history_count * sizeof(hu_channel_history_entry_t));
 
                 /* ── BTH: Late-night mode (b1c) ────────────────────────────── */
                 int bth_hour = -1;
@@ -3229,6 +3253,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     agent->memory->current_session_id_len = key_len;
                 }
 
+                /* F29: Backchannel — send brief cue and skip LLM when narrative detected */
+                if (use_backchannel && backchannel_len > 0 && ch->channel->vtable->send) {
+                    ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, backchannel_buf,
+                                              backchannel_len, NULL, 0);
+                    fprintf(stderr, "[human] backchannel: %.*s\n", (int)backchannel_len,
+                            backchannel_buf);
+                    goto skip_llm_this_batch;
+                }
+
                 /* Start typing indicator before LLM call */
                 if (ch->channel->vtable->start_typing) {
                     ch->channel->vtable->start_typing(ch->channel->ctx, batch_key, key_len);
@@ -3798,6 +3831,34 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         response_len = hu_conversation_apply_fillers(
                             response, response_len, filler_cap, (uint32_t)time(NULL), ch_name,
                             ch_name_len);
+                    }
+
+                    /* BTH: Text disfluency (F33) — natural imperfections, casual only */
+                    {
+                        size_t disfluency_cap = response_alloc_len + 1;
+                        if (disfluency_cap < response_len + 16) {
+                            char *grown = (char *)agent->alloc->realloc(agent->alloc->ctx, response,
+                                                                        response_alloc_len + 1,
+                                                                        response_len + 16);
+                            if (grown) {
+                                response = grown;
+                                response_alloc_len = response_len + 15;
+                                disfluency_cap = response_len + 16;
+                            }
+                        }
+                        const hu_contact_profile_t *contact_profile =
+                            (agent->persona && batch_key && key_len > 0)
+                                ? hu_persona_find_contact(agent->persona, batch_key, key_len)
+                                : NULL;
+                        const char *formality =
+                            (overlay && overlay->formality) ? overlay->formality : NULL;
+                        size_t formality_len = formality ? strlen(formality) : 0;
+                        float disfluency_freq =
+                            agent->persona ? agent->persona->humanization.disfluency_frequency
+                                           : 0.15f;
+                        response_len = hu_conversation_apply_disfluency(
+                            response, response_len, disfluency_cap, (uint32_t)time(NULL),
+                            disfluency_freq, contact_profile, formality, formality_len);
                     }
 
                     /* Typo simulation: requires "occasional_typos" quirk and buffer capacity */

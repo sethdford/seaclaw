@@ -2588,6 +2588,77 @@ hu_response_action_t hu_conversation_classify_response(const char *msg, size_t m
     return HU_RESPONSE_FULL;
 }
 
+/* ── Active listening backchannels (F29) ───────────────────────────────── */
+
+static bool is_narrative_or_venting(const char *msg, size_t msg_len,
+                                    const hu_channel_history_entry_t *entries, size_t count) {
+    if (!msg || msg_len < 80)
+        return false;
+    if (memchr(msg, '?', msg_len) != NULL)
+        return false;
+    bool has_narrative_phrase =
+        str_contains_ci(msg, msg_len, "and then") || str_contains_ci(msg, msg_len, "so i") ||
+        str_contains_ci(msg, msg_len, "anyway") || str_contains_ci(msg, msg_len, "long story");
+    bool has_first_person = str_contains_ci(msg, msg_len, "i ") ||
+                            str_contains_ci(msg, msg_len, "my ") ||
+                            str_contains_ci(msg, msg_len, "me ");
+    if (has_narrative_phrase || has_first_person)
+        return true;
+    /* Last 2–3 their messages are long and we haven't replied yet (they're in flow) */
+    if (entries && count >= 2) {
+        size_t their_long = 0;
+        bool saw_ours = false;
+        for (size_t i = count; i > 0 && their_long < 3; i--) {
+            const hu_channel_history_entry_t *e = &entries[i - 1];
+            size_t tl = strlen(e->text);
+            if (e->from_me) {
+                saw_ours = true;
+                break;
+            }
+            if (tl >= 60)
+                their_long++;
+            else
+                break;
+        }
+        if (their_long >= 2 && !saw_ours)
+            return true;
+    }
+    return false;
+}
+
+bool hu_conversation_should_backchannel(const char *msg, size_t msg_len,
+                                        const hu_channel_history_entry_t *entries, size_t count,
+                                        uint32_t seed, float probability) {
+    if (!msg || msg_len == 0)
+        return false;
+    if (!is_narrative_or_venting(msg, msg_len, entries, count))
+        return false;
+    if (probability <= 0.0f)
+        return false;
+    if (probability >= 1.0f)
+        return true;
+    uint32_t roll = (seed % 100u);
+    return roll < (uint32_t)(probability * 100.0f);
+}
+
+static const char *const hu_backchannel_phrases[] = {
+    "yeah", "totally", "right", "100%", "for real", "mmhm", "mhm", "oh wow", "damn",
+};
+#define HU_BACKCHANNEL_COUNT (sizeof(hu_backchannel_phrases) / sizeof(hu_backchannel_phrases[0]))
+
+size_t hu_conversation_pick_backchannel(uint32_t seed, char *buf, size_t cap) {
+    if (!buf || cap == 0)
+        return 0;
+    size_t idx = (size_t)(seed % (uint32_t)HU_BACKCHANNEL_COUNT);
+    const char *phrase = hu_backchannel_phrases[idx];
+    size_t len = strlen(phrase);
+    if (len >= cap)
+        len = cap - 1;
+    memcpy(buf, phrase, len);
+    buf[len] = '\0';
+    return len;
+}
+
 /* ── Natural conversation drop-off classifier (F11) ──────────────────── */
 
 static bool is_farewell_text(const char *t, size_t tl) {
@@ -3469,6 +3540,150 @@ hu_reaction_type_t hu_conversation_classify_photo_reaction(const char *vision_de
     }
 
     return HU_REACTION_NONE;
+}
+
+/* ── Text disfluency (F33) ──────────────────────────────────────────── */
+
+static bool str_eq_ci(const char *a, size_t a_len, const char *b) {
+    size_t b_len = strlen(b);
+    if (a_len != b_len)
+        return false;
+    for (size_t i = 0; i < a_len; i++) {
+        char ca =
+            (char)((unsigned char)a[i] >= 'A' && (unsigned char)a[i] <= 'Z' ? a[i] + 32
+                                                                            : (unsigned char)a[i]);
+        char cb =
+            (char)((unsigned char)b[i] >= 'A' && (unsigned char)b[i] <= 'Z' ? b[i] + 32
+                                                                            : (unsigned char)b[i]);
+        if (ca != cb)
+            return false;
+    }
+    return true;
+}
+
+size_t hu_conversation_apply_disfluency(char *buf, size_t len, size_t cap, uint32_t seed,
+                                        float frequency, const struct hu_contact_profile *contact,
+                                        const char *formality, size_t formality_len) {
+#ifdef HU_HAS_PERSONA
+    if (!buf || len == 0 || cap <= len)
+        return len;
+
+    /* Skip for formal contexts: coworker or formality "formal" */
+    if (contact && contact->relationship_type) {
+        size_t rt_len = strlen(contact->relationship_type);
+        if (str_eq_ci(contact->relationship_type, rt_len, "coworker"))
+            return len;
+    }
+    if (formality && formality_len > 0 && str_eq_ci(formality, formality_len, "formal"))
+        return len;
+
+    /* Probability roll: (seed % 100) < frequency*100 */
+    uint32_t roll = seed % 100u;
+    uint32_t threshold = (uint32_t)(frequency * 100.0f);
+    if (threshold > 100u)
+        threshold = 100u;
+    if (roll >= threshold)
+        return len;
+
+    /* Type selection: 40% prepend, 30% append, 20% insert actually, 10% self-correction */
+    uint32_t type_roll = (seed / 100u) % 100u;
+    size_t add_len = 0;
+    const char *add = NULL;
+    bool prepend = false;
+    bool append = false;
+    size_t insert_pos = (size_t)-1;
+
+    if (type_roll < 40u) {
+        /* 40%: prepend "i mean " or "like " */
+        prepend = true;
+        if (((seed / 10000u) % 2u) == 0) {
+            add = "i mean ";
+            add_len = 7;
+        } else {
+            add = "like ";
+            add_len = 5;
+        }
+    } else if (type_roll < 70u) {
+        /* 30%: append "..." or " you know" (before final period) */
+        append = true;
+        if (((seed / 10000u) % 2u) == 0) {
+            add = "...";
+            add_len = 3;
+        } else {
+            add = " you know";
+            add_len = 9;
+        }
+    } else if (type_roll < 90u) {
+        /* 20%: insert "actually " after first space/clause */
+        add = "actually ";
+        add_len = 9;
+        for (size_t i = 0; i < len; i++) {
+            if (buf[i] == ' ' || buf[i] == ',' || buf[i] == '.') {
+                insert_pos = i + 1;
+                break;
+            }
+        }
+        if (insert_pos == (size_t)-1)
+            insert_pos = len;
+    } else {
+        /* 10%: self-correction " wait no " or " *meant it" */
+        if (((seed / 10000u) % 2u) == 0) {
+            add = " wait no ";
+            add_len = 9;
+            for (size_t i = 0; i < len; i++) {
+                if (buf[i] == ' ' || buf[i] == ',') {
+                    insert_pos = i + 1;
+                    break;
+                }
+            }
+            if (insert_pos == (size_t)-1)
+                insert_pos = len;
+        } else {
+            append = true;
+            add = " *meant it";
+            add_len = 10;
+        }
+    }
+
+    if (len + add_len >= cap)
+        return len;
+
+    if (prepend) {
+        memmove(buf + add_len, buf, len);
+        memcpy(buf, add, add_len);
+        if (add_len < len + add_len && buf[add_len] >= 'A' && buf[add_len] <= 'Z')
+            buf[add_len] += 32;
+        len += add_len;
+    } else if (append) {
+        /* Insert before final period if present */
+        size_t period_pos = len;
+        for (size_t i = len; i > 0; i--) {
+            if (buf[i - 1] == '.') {
+                period_pos = i - 1;
+                break;
+            }
+        }
+        memmove(buf + period_pos + add_len, buf + period_pos, len - period_pos);
+        memcpy(buf + period_pos, add, add_len);
+        len += add_len;
+    } else if (insert_pos != (size_t)-1) {
+        memmove(buf + insert_pos + add_len, buf + insert_pos, len - insert_pos);
+        memcpy(buf + insert_pos, add, add_len);
+        len += add_len;
+    }
+    buf[len] = '\0';
+    return len;
+#else
+    (void)buf;
+    (void)len;
+    (void)cap;
+    (void)seed;
+    (void)frequency;
+    (void)contact;
+    (void)formality;
+    (void)formality_len;
+    return len;
+#endif
 }
 
 /* ── Filler word injection ────────────────────────────────────────────── */
