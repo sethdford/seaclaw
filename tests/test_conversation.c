@@ -532,6 +532,8 @@ static void calibrate_greeting_short(void) {
     HU_ASSERT_TRUE(len > 0);
     HU_ASSERT_NOT_NULL(strstr(buf, "calibration"));
     HU_ASSERT_TRUE(strstr(buf, "brief") || strstr(buf, "Match"));
+    /* Ratio-based: short message should include numeric char target */
+    HU_ASSERT_NOT_NULL(strstr(buf, "chars"));
 }
 
 static void calibrate_yes_no_question(void) {
@@ -688,6 +690,48 @@ static void calibrate_emoji_present_in_general(void) {
 static void calibrate_null_returns_zero(void) {
     char buf[64];
     HU_ASSERT_EQ(hu_conversation_calibrate_length(NULL, 0, NULL, 0, buf, sizeof(buf)), 0u);
+}
+
+/* ── max_response_chars ratio-based calibration ───────────────────────── */
+
+static void max_response_chars_single_char_returns_min(void) {
+    int max = hu_conversation_max_response_chars(1);
+    HU_ASSERT_EQ(max, 15);
+}
+
+static void max_response_chars_medium_message_proportional(void) {
+    const char *msg = "what are you up to tonight?";
+    int max = hu_conversation_max_response_chars(strlen(msg));
+    HU_ASSERT_TRUE(max >= 50 && max <= 60);
+}
+
+static void max_response_chars_long_paragraph_capped(void) {
+    int max = hu_conversation_max_response_chars(200);
+    HU_ASSERT_EQ(max, 300);
+}
+
+static void max_response_chars_zero_returns_min(void) {
+    int max = hu_conversation_max_response_chars(0);
+    HU_ASSERT_EQ(max, 15);
+}
+
+static void max_response_chars_medium_range(void) {
+    int max = hu_conversation_max_response_chars(75);
+    HU_ASSERT_EQ(max, 150);
+}
+
+static void quality_penalizes_length_mismatch(void) {
+    hu_quality_score_t score = hu_conversation_evaluate_quality(
+        "Well, I think that's a really interesting question and I'd be happy to elaborate "
+        "on my thoughts in more detail if you'd like.",
+        120, NULL, 0, 60);
+    HU_ASSERT_TRUE(score.brevity < 25);
+}
+
+static void quality_rewards_length_match(void) {
+    hu_quality_score_t score =
+        hu_conversation_evaluate_quality("yeah that sounds good", 21, NULL, 0, 60);
+    HU_ASSERT_TRUE(score.brevity >= 20);
 }
 
 static void calibrate_rapid_fire_momentum(void) {
@@ -1287,6 +1331,50 @@ static void classify_consecutive_2_ours_still_responds(void) {
     HU_ASSERT_EQ(a, HU_RESPONSE_FULL);
 }
 
+/* ── Drop-off classifier tests ──────────────────────────────────────── */
+
+static void dropoff_mutual_farewell_night_night(void) {
+    hu_channel_history_entry_t entries[2] = {
+        make_entry(false, "night", "12:00"),
+        make_entry(true, "night", "12:01"),
+    };
+    int p = hu_conversation_classify_dropoff("night", 5, entries, 2, 0);
+    HU_ASSERT_EQ(p, 90);
+}
+
+static void dropoff_low_energy_yeah(void) {
+    hu_channel_history_entry_t entries[1] = {
+        make_entry(false, "yeah", "12:00"),
+    };
+    int p = hu_conversation_classify_dropoff("yeah", 4, entries, 1, 0);
+    HU_ASSERT_EQ(p, 60);
+}
+
+static void dropoff_emoji_only_thumbs_up(void) {
+    /* UTF-8 thumbs up: U+1F44D — no alphanumeric, so emoji-only */
+    const char emoji[] = "\xf0\x9f\x91\x8d";
+    int p = hu_conversation_classify_dropoff(emoji, sizeof(emoji) - 1, NULL, 0, 0);
+    HU_ASSERT_EQ(p, 70);
+}
+
+static void dropoff_our_farewell_their_k(void) {
+    hu_channel_history_entry_t entries[2] = {
+        make_entry(true, "bye", "12:00"),
+        make_entry(false, "k", "12:01"),
+    };
+    int p = hu_conversation_classify_dropoff("k", 1, entries, 2, 0);
+    HU_ASSERT_EQ(p, 100);
+}
+
+static void dropoff_normal_conversation_zero(void) {
+    hu_channel_history_entry_t entries[2] = {
+        make_entry(false, "what are you up to tonight?", "12:00"),
+        make_entry(true, "just chilling", "12:01"),
+    };
+    int p = hu_conversation_classify_dropoff("wanna grab dinner?", 17, entries, 2, 0);
+    HU_ASSERT_EQ(p, 0);
+}
+
 static void classify_narrative_no_question_is_brief(void) {
     uint32_t delay = 0;
     hu_response_action_t a = hu_conversation_classify_response(
@@ -1511,6 +1599,13 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(calibrate_emoji_present_in_general);
     HU_RUN_TEST(calibrate_null_returns_zero);
     HU_RUN_TEST(calibrate_rapid_fire_momentum);
+    HU_RUN_TEST(max_response_chars_single_char_returns_min);
+    HU_RUN_TEST(max_response_chars_medium_message_proportional);
+    HU_RUN_TEST(max_response_chars_long_paragraph_capped);
+    HU_RUN_TEST(max_response_chars_zero_returns_min);
+    HU_RUN_TEST(max_response_chars_medium_range);
+    HU_RUN_TEST(quality_penalizes_length_mismatch);
+    HU_RUN_TEST(quality_rewards_length_match);
 
     /* Typo correction fragment */
     HU_RUN_TEST(correction_detects_typo);
@@ -1596,6 +1691,13 @@ void run_conversation_tests(void) {
     /* Consecutive response limit */
     HU_RUN_TEST(classify_consecutive_3_ours_skips);
     HU_RUN_TEST(classify_consecutive_2_ours_still_responds);
+
+    /* Drop-off classifier (F11) */
+    HU_RUN_TEST(dropoff_mutual_farewell_night_night);
+    HU_RUN_TEST(dropoff_low_energy_yeah);
+    HU_RUN_TEST(dropoff_emoji_only_thumbs_up);
+    HU_RUN_TEST(dropoff_our_farewell_their_k);
+    HU_RUN_TEST(dropoff_normal_conversation_zero);
 
     /* Narrative/statement classification (post-tightening) */
     HU_RUN_TEST(classify_narrative_no_question_is_brief);

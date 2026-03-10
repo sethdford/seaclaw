@@ -41,6 +41,7 @@ typedef struct hu_imessage_ctx {
         char session_key[128];
         char content[4096];
         bool has_attachment;
+        bool has_video;
     } mock_msgs[8];
     size_t mock_count;
     hu_reaction_type_t last_reaction;
@@ -1153,6 +1154,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
                 memcpy(msgs[i].content, c->mock_msgs[i].content, 4096);
                 msgs[i].message_id = (int64_t)(i + 1);
                 msgs[i].has_attachment = c->mock_msgs[i].has_attachment;
+                msgs[i].has_video = c->mock_msgs[i].has_video;
             }
             *out_count = n;
             c->mock_count = 0;
@@ -1206,11 +1208,19 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         return HU_OK;
     }
 
-    /* Include text messages and photo-only messages (text NULL but image attachment).
-     * Use COALESCE(m.text, '[Photo]') for content. has_image: subquery checks attachment
-     * table for image extensions. */
+    /* Include text messages, photo-only, and video-only messages.
+     * COALESCE: when text is NULL, use '[Video]' if video attachment else '[Photo]'.
+     * has_image/has_video: subqueries check attachment table for extensions. */
     const char *sql =
-        "SELECT m.ROWID, COALESCE(m.text, '[Photo]') AS text, h.id, "
+        "SELECT m.ROWID, "
+        "  COALESCE(m.text, "
+        "    (SELECT CASE "
+        "       WHEN (SELECT COUNT(*) FROM message_attachment_join majv "
+        "             JOIN attachment av ON majv.attachment_id = av.ROWID "
+        "             WHERE majv.message_id = m.ROWID AND av.filename IS NOT NULL "
+        "             AND (LOWER(av.filename) LIKE '%.mov' OR LOWER(av.filename) LIKE '%.mp4' "
+        "               OR LOWER(av.filename) LIKE '%.m4v')) > 0 "
+        "       THEN '[Video]' ELSE '[Photo]' END)) AS text, h.id, "
         "  COALESCE("
         "    (SELECT COUNT(DISTINCT chj2.handle_id) FROM chat_message_join cmj "
         "     JOIN chat_handle_join chj2 ON chj2.chat_id = cmj.chat_id "
@@ -1221,7 +1231,12 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         "   AND (LOWER(a.filename) LIKE '%.jpg' OR LOWER(a.filename) LIKE '%.jpeg' "
         "     OR LOWER(a.filename) LIKE '%.png' OR LOWER(a.filename) LIKE '%.heic' "
         "     OR LOWER(a.filename) LIKE '%.gif' OR LOWER(a.filename) LIKE '%.webp')) "
-        "   > 0 AS has_image "
+        "   > 0 AS has_image, "
+        "  (SELECT COUNT(*) FROM message_attachment_join maj2 "
+        "   JOIN attachment a2 ON maj2.attachment_id = a2.ROWID "
+        "   WHERE maj2.message_id = m.ROWID AND a2.filename IS NOT NULL "
+        "   AND (LOWER(a2.filename) LIKE '%.mov' OR LOWER(a2.filename) LIKE '%.mp4' "
+        "     OR LOWER(a2.filename) LIKE '%.m4v')) > 0 AS has_video "
         "FROM message m "
         "JOIN handle h ON m.handle_id = h.ROWID "
         "WHERE m.is_from_me = 0 AND m.associated_message_type = 0 "
@@ -1230,9 +1245,11 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         "     OR (EXISTS (SELECT 1 FROM message_attachment_join maj "
         "         JOIN attachment a ON maj.attachment_id = a.ROWID "
         "         WHERE maj.message_id = m.ROWID AND a.filename IS NOT NULL "
-        "         AND (LOWER(a.filename) LIKE '%.jpg' OR LOWER(a.filename) LIKE '%.jpeg' "
+        "         AND ((LOWER(a.filename) LIKE '%.jpg' OR LOWER(a.filename) LIKE '%.jpeg' "
         "           OR LOWER(a.filename) LIKE '%.png' OR LOWER(a.filename) LIKE '%.heic' "
-        "           OR LOWER(a.filename) LIKE '%.gif' OR LOWER(a.filename) LIKE '%.webp')))) "
+        "           OR LOWER(a.filename) LIKE '%.gif' OR LOWER(a.filename) LIKE '%.webp') "
+        "           OR (LOWER(a.filename) LIKE '%.mov' OR LOWER(a.filename) LIKE '%.mp4' "
+        "             OR LOWER(a.filename) LIKE '%.m4v'))))) "
         "ORDER BY m.ROWID ASC LIMIT ?";
 
     sqlite3_stmt *stmt = NULL;
@@ -1253,6 +1270,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         const char *handle = (const char *)sqlite3_column_text(stmt, 2);
         int participant_count = sqlite3_column_int(stmt, 3);
         int has_image = sqlite3_column_int(stmt, 4);
+        int has_video = sqlite3_column_int(stmt, 5);
 
         if (!text || !handle)
             continue;
@@ -1296,6 +1314,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         msgs[count].message_id = rowid;
         msgs[count].is_group = (participant_count > 2);
         msgs[count].has_attachment = (has_image != 0);
+        msgs[count].has_video = (has_video != 0);
 
         c->last_rowid = rowid;
         count++;
@@ -1327,6 +1346,14 @@ hu_error_t hu_imessage_test_inject_mock(hu_channel_t *ch, const char *session_ke
 hu_error_t hu_imessage_test_inject_mock_ex(hu_channel_t *ch, const char *session_key,
                                            size_t session_key_len, const char *content,
                                            size_t content_len, bool has_attachment) {
+    return hu_imessage_test_inject_mock_ex2(ch, session_key, session_key_len, content,
+                                            content_len, has_attachment, false);
+}
+
+hu_error_t hu_imessage_test_inject_mock_ex2(hu_channel_t *ch, const char *session_key,
+                                            size_t session_key_len, const char *content,
+                                            size_t content_len, bool has_attachment,
+                                            bool has_video) {
     if (!ch || !ch->ctx)
         return HU_ERR_INVALID_ARGUMENT;
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ch->ctx;
@@ -1342,6 +1369,7 @@ hu_error_t hu_imessage_test_inject_mock_ex(hu_channel_t *ch, const char *session
         memcpy(c->mock_msgs[i].content, content, ct);
     c->mock_msgs[i].content[ct] = '\0';
     c->mock_msgs[i].has_attachment = has_attachment;
+    c->mock_msgs[i].has_video = has_video;
     return HU_OK;
 }
 

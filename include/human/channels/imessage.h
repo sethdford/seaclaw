@@ -49,6 +49,10 @@ hu_error_t hu_imessage_test_inject_mock(hu_channel_t *ch, const char *session_ke
 hu_error_t hu_imessage_test_inject_mock_ex(hu_channel_t *ch, const char *session_key,
                                            size_t session_key_len, const char *content,
                                            size_t content_len, bool has_attachment);
+hu_error_t hu_imessage_test_inject_mock_ex2(hu_channel_t *ch, const char *session_key,
+                                            size_t session_key_len, const char *content,
+                                            size_t content_len, bool has_attachment,
+                                            bool has_video);
 const char *hu_imessage_test_get_last_message(hu_channel_t *ch, size_t *out_len);
 void hu_imessage_test_get_last_reaction(hu_channel_t *ch, hu_reaction_type_t *out_reaction,
                                         int64_t *out_message_id);

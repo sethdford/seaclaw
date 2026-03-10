@@ -862,12 +862,55 @@ static uint32_t photo_viewing_delay_ms(const hu_channel_loop_msg_t *msgs, size_t
     return 0;
 }
 
+/* ── Video viewing delay (F7) ────────────────────────────────────────────── */
+#define HU_VIDEO_VIEWING_DELAY_MIN_MS   2000
+#define HU_VIDEO_VIEWING_DELAY_RANGE_MS 8001 /* 0..8000 → 2–10 s inclusive */
+
+/* Returns 2–10 s (ms) if any message in batch has video, else 0. */
+static uint32_t video_viewing_delay_ms(const hu_channel_loop_msg_t *msgs, size_t batch_start,
+                                       size_t batch_end, uint32_t seed) {
+    for (size_t b = batch_start; b <= batch_end; b++) {
+        if (msgs[b].has_video)
+            return HU_VIDEO_VIEWING_DELAY_MIN_MS + (seed % HU_VIDEO_VIEWING_DELAY_RANGE_MS);
+    }
+    return 0;
+}
+
 #ifdef HU_IS_TEST
 uint32_t hu_daemon_photo_viewing_delay_ms(const hu_channel_loop_msg_t *msgs, size_t batch_start,
                                           size_t batch_end, uint32_t seed) {
     return photo_viewing_delay_ms(msgs, batch_start, batch_end, seed);
 }
+uint32_t hu_daemon_video_viewing_delay_ms(const hu_channel_loop_msg_t *msgs, size_t batch_start,
+                                          size_t batch_end, uint32_t seed) {
+    return video_viewing_delay_ms(msgs, batch_start, batch_end, seed);
+}
 #endif
+
+/* ── Missed-message acknowledgment (F10) ─────────────────────────────────── */
+#define HU_MISSED_MSG_THRESHOLD_SEC (30 * 60)
+
+/* Returns acknowledgment phrase or NULL if none needed.
+ * delay_secs: time between receive and send.
+ * receive_hour, current_hour: 0–23 from localtime.
+ * seed: for deterministic phrase selection. */
+const char *hu_missed_message_acknowledgment(int64_t delay_secs, int receive_hour, int current_hour,
+                                             uint32_t seed) {
+    if (delay_secs <= HU_MISSED_MSG_THRESHOLD_SEC)
+        return NULL;
+
+    /* Natural gap: received 2AM–6AM, responding 8AM+ → "just woke up" style */
+    if (receive_hour >= 2 && receive_hour < 6 && current_hour >= 8) {
+        static const char *const woke[] = {"ha just woke up", "omg just woke up",
+                                           "oof just woke up"};
+        return woke[seed % 3];
+    }
+
+    /* Default: missed/saw-this phrases */
+    static const char *const missed[] = {"sorry just saw this", "oh man missed this",
+                                         "ha my bad just saw this"};
+    return missed[seed % 3];
+}
 
 /* ── Service loop ──────────────────────────────────────────────────────── */
 
@@ -1138,8 +1181,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
             size_t count = 0;
             hu_error_t poll_err = ch->poll_fn(ch->channel_ctx, alloc, msgs, 16, &count);
             ch->last_poll_ms = tick_now;
-            if (count > 0)
+            time_t poll_receive_time = 0;
+            if (count > 0) {
                 ch->last_contact_ms = (uint64_t)time(NULL) * 1000ULL;
+                poll_receive_time = time(NULL);
+            }
             if (poll_err != HU_OK && poll_err != HU_ERR_NOT_SUPPORTED && getenv("HU_DEBUG"))
                 fprintf(stderr, "[human] poll error on channel %zu: %d\n", i, (int)poll_err);
 
@@ -1230,6 +1276,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     alloc->free(alloc->ctx, desc, desc_len + 1);
                                 }
                             }
+                        }
+                    }
+                    /* F7: Video context — no vision in Phase 1; inject "[They sent a video]" */
+                    else if (msgs[m].has_video) {
+                        static char video_augmented[4096];
+                        int n;
+                        if (mlen > 0 && strcmp(content_to_add, "[Video]") != 0) {
+                            n = snprintf(video_augmented, sizeof(video_augmented),
+                                         "%.*s\n[They sent a video]", (int)mlen, content_to_add);
+                        } else {
+                            n = snprintf(video_augmented, sizeof(video_augmented),
+                                         "[They sent a video]");
+                        }
+                        if (n > 0 && (size_t)n < sizeof(video_augmented)) {
+                            content_to_add = video_augmented;
+                            mlen = (size_t)n;
                         }
                     }
 #endif
@@ -1329,6 +1391,24 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                     /* "normal" = no change */
                 }
+
+                /* Natural drop-off: when FULL/BRIEF, probabilistic skip for mutual farewell,
+                 * low-energy acks, emoji-only, or our farewell + their minimal reply. */
+#ifndef HU_IS_TEST
+                if ((action == HU_RESPONSE_FULL || action == HU_RESPONSE_BRIEF) && early_history &&
+                    early_history_count > 0) {
+                    uint32_t dropoff_seed =
+                        (uint32_t)time(NULL) * 1103515245u + 12345u + (uint32_t)(uintptr_t)combined;
+                    int dropoff_prob = hu_conversation_classify_dropoff(
+                        combined, combined_len, early_history, early_history_count, dropoff_seed);
+                    if (dropoff_prob > 0 &&
+                        ((dropoff_seed >> 16u) % 100u) < (uint32_t)dropoff_prob) {
+                        action = HU_RESPONSE_SKIP;
+                        fprintf(stderr, "[human] drop-off skip (prob=%d%%): %.*s\n", dropoff_prob,
+                                (int)(combined_len > 40 ? 40 : combined_len), combined);
+                    }
+                }
+#endif
 
                 fprintf(stderr, "[human] classify result: action=%d delay=%u for %.*s\n",
                         (int)action, (unsigned)extra_delay_ms, (int)(key_len > 20 ? 20 : key_len),
@@ -1458,6 +1538,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         seed = ((uint32_t)time(NULL) * 1103515245u + 12345u) % 5001u;
 #endif
                         base_delay += photo_viewing_delay_ms(msgs, batch_start, batch_end, seed);
+                    }
+                    /* F7: Video viewing delay — 2–10 s when batch has video */
+                    {
+                        uint32_t vseed = 0;
+#if defined(__APPLE__) || (defined(__linux__) && defined(__GLIBC__))
+                        vseed = (uint32_t)arc4random_uniform(8001);
+#else
+                        vseed = ((uint32_t)time(NULL) * 2654435769u + 54321u) % 8001u;
+#endif
+                        base_delay += video_viewing_delay_ms(msgs, batch_start, batch_end, vseed);
                     }
 
                     /* Add +/- 30% random jitter */
@@ -3631,17 +3721,44 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 #endif
+                    /* F10: Missed-message acknowledgment — prepend if delay > 30 min */
+                    const char *send_ptr = response;
+                    size_t send_len = response_len;
+                    char *send_buf_ack = NULL;
+                    {
+                        time_t now_ts = time(NULL);
+                        int64_t delay_secs = (int64_t)(now_ts - poll_receive_time);
+                        struct tm tm_recv, tm_now;
+                        struct tm *pr = localtime_r(&poll_receive_time, &tm_recv);
+                        struct tm *pn = localtime_r(&now_ts, &tm_now);
+                        int recv_hr = pr ? pr->tm_hour : 0;
+                        int curr_hr = pn ? pn->tm_hour : 0;
+                        const char *ack = hu_missed_message_acknowledgment(
+                            delay_secs, recv_hr, curr_hr, (uint32_t)now_ts);
+                        if (ack) {
+                            size_t ack_len = strlen(ack);
+                            send_buf_ack =
+                                (char *)alloc->alloc(alloc->ctx, ack_len + 2 + response_len + 1);
+                            if (send_buf_ack) {
+                                memcpy(send_buf_ack, ack, ack_len);
+                                send_buf_ack[ack_len] = '\n';
+                                send_buf_ack[ack_len + 1] = '\n';
+                                memcpy(send_buf_ack + ack_len + 2, response, response_len + 1);
+                                send_ptr = send_buf_ack;
+                                send_len = ack_len + 2 + response_len;
+                            }
+                        }
+                    }
                     /* Split response into natural multi-message fragments */
                     hu_message_fragment_t fragments[4];
                     size_t frag_count =
-                        hu_conversation_split_response(alloc, response, response_len, fragments, 4);
+                        hu_conversation_split_response(alloc, send_ptr, send_len, fragments, 4);
                     if (frag_count > 0) {
                         /* Stephanie2 active waiting: thinking + typing time per fragment */
                         for (size_t f = 0; f < frag_count; f++) {
                             if (f > 0) {
                                 /* Thinking time: 500-1500ms between fragments */
-                                uint32_t think_ms =
-                                    500 + ((uint32_t)(f * 397 + response_len) % 1000);
+                                uint32_t think_ms = 500 + ((uint32_t)(f * 397 + send_len) % 1000);
                                 /* Typing time: ~60 WPM -> ~5 chars/sec */
                                 uint32_t type_ms = (uint32_t)(fragments[f].text_len * 200);
                                 if (type_ms > 3000)
@@ -3668,9 +3785,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             fragments[f].text_len + 1);
                         }
                     } else {
-                        ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, response,
-                                                  response_len, NULL, 0);
+                        ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, send_ptr,
+                                                  send_len, NULL, 0);
                     }
+                    if (send_buf_ack)
+                        alloc->free(alloc->ctx, send_buf_ack, send_len + 1);
 #ifdef HU_HAS_PERSONA
                     /* Send correction after main message (2.5–5s delay) */
                     if (original_response) {
@@ -3692,9 +3811,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 #endif
 #else
-                        ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, response,
-                                                  response_len, NULL, 0);
+                        ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, send_ptr,
+                                                  send_len, NULL, 0);
 #endif
+                    if (send_buf_ack)
+                        alloc->free(alloc->ctx, send_buf_ack, send_len + 1);
                 }
 #if defined(HU_ENABLE_IMESSAGE) && !defined(HU_IS_TEST)
             skip_send:

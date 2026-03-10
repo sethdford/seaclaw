@@ -1306,6 +1306,18 @@ size_t hu_conversation_split_response(hu_allocator_t *alloc, const char *respons
 
 /* ── Situational length calibration ───────────────────────────────────── */
 
+int hu_conversation_max_response_chars(size_t incoming_len) {
+    if (incoming_len == 0)
+        return 15;
+    double scaled = (double)incoming_len * 2.0;
+    int result = (int)scaled;
+    if (result < 15)
+        result = 15;
+    if (result > 300)
+        result = 300;
+    return result;
+}
+
 /*
  * Instead of "keep under 50 chars", tell the model WHY a certain length
  * is right. Humans calibrate response length by message type, not by
@@ -1357,16 +1369,22 @@ size_t hu_conversation_calibrate_length(const char *last_msg, size_t last_msg_le
         }
     }
 
-    /* Last message length (structural) */
+    /* Last message length (structural) + numeric char limit for prompt */
+    int max_chars = hu_conversation_max_response_chars(last_msg_len);
     w = snprintf(buf + pos, cap - pos, "Their last message: %zu chars. ", last_msg_len);
     POS_ADVANCE(w, pos, cap);
     if (last_msg_len < 15) {
-        w = snprintf(buf + pos, cap - pos, "Very brief — match that brevity.\n");
+        w = snprintf(buf + pos, cap - pos, "Very brief — match that brevity. Target: 1-%d chars.\n",
+                     max_chars);
     } else if (last_msg_len > 100) {
         w = snprintf(buf + pos, cap - pos,
-                     "Substantial — you can respond with more depth, but don't over-match.\n");
+                     "Substantial — you can respond with more depth, but don't over-match. "
+                     "Max %d chars.\n",
+                     max_chars);
     } else {
-        w = snprintf(buf + pos, cap - pos, "Moderate length — match their energy and length.\n");
+        w = snprintf(buf + pos, cap - pos,
+                     "Moderate length — match their energy and length. Target: ~%d chars max.\n",
+                     max_chars);
     }
     POS_ADVANCE(w, pos, cap);
 
@@ -2242,6 +2260,96 @@ hu_response_action_t hu_conversation_classify_response(const char *msg, size_t m
         return HU_RESPONSE_BRIEF;
 
     return HU_RESPONSE_FULL;
+}
+
+/* ── Natural conversation drop-off classifier (F11) ──────────────────── */
+
+static bool is_farewell_text(const char *t, size_t tl) {
+    return str_contains_ci(t, tl, "night") || str_contains_ci(t, tl, "sleep well") ||
+           str_contains_ci(t, tl, "bye") || str_contains_ci(t, tl, "goodnight") ||
+           str_contains_ci(t, tl, "good night") || str_contains_ci(t, tl, "later") ||
+           str_contains_ci(t, tl, "ttyl") || str_contains_ci(t, tl, "see ya") ||
+           str_contains_ci(t, tl, "cya") || str_contains_ci(t, tl, "gn") ||
+           str_contains_ci(t, tl, "peace") || str_contains_ci(t, tl, "take care") ||
+           str_contains_ci(t, tl, "gotta go") || str_contains_ci(t, tl, "heading out");
+}
+
+static bool is_low_energy_ack(const char *t, size_t tl) {
+    if (tl > 8)
+        return false;
+    char norm[16];
+    size_t ni = 0;
+    for (size_t i = 0; i < tl && ni < sizeof(norm) - 1; i++) {
+        char c = t[i];
+        if (c >= 'A' && c <= 'Z')
+            c += 32;
+        if (c != ' ' && c != '\n' && c != '\r')
+            norm[ni++] = c;
+    }
+    norm[ni] = '\0';
+    return (ni == 1 && norm[0] == 'k') || (ni == 2 && memcmp(norm, "ok", 2) == 0) ||
+           (ni == 4 && memcmp(norm, "okay", 4) == 0) || (ni == 4 && memcmp(norm, "yeah", 4) == 0) ||
+           (ni == 4 && memcmp(norm, "cool", 4) == 0) || (ni == 3 && memcmp(norm, "yep", 3) == 0) ||
+           (ni == 4 && memcmp(norm, "nope", 4) == 0) || (ni == 2 && memcmp(norm, "ya", 2) == 0) ||
+           (ni == 4 && memcmp(norm, "sure", 4) == 0) || (ni == 4 && memcmp(norm, "nice", 4) == 0);
+}
+
+static bool is_emoji_only(const char *msg, size_t msg_len) {
+    if (!msg || msg_len == 0)
+        return false;
+    bool has_alpha = false;
+    for (size_t i = 0; i < msg_len; i++) {
+        unsigned char c = (unsigned char)msg[i];
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
+            has_alpha = true;
+    }
+    return !has_alpha && msg_len > 0;
+}
+
+int hu_conversation_classify_dropoff(const char *message, size_t message_len,
+                                     const hu_channel_history_entry_t *entries, size_t entry_count,
+                                     uint32_t seed) {
+    (void)seed; /* Caller uses seed for roll: (seed % 100) < prob → SKIP */
+    if (!message || message_len == 0)
+        return 0;
+
+    if (!entries || entry_count == 0) {
+        /* No history: only emoji-only applies */
+        if (is_emoji_only(message, message_len))
+            return 70;
+        return 0;
+    }
+
+    /* Find our last message */
+    const char *our_last = NULL;
+    size_t our_last_len = 0;
+    for (size_t i = entry_count; i > 0; i--) {
+        if (entries[i - 1].from_me) {
+            our_last = entries[i - 1].text;
+            our_last_len = strlen(our_last);
+            break;
+        }
+    }
+
+    /* Our farewell, they gave minimal reply (k, ok, yeah) → 100% SKIP */
+    if (our_last && our_last_len > 0 && is_farewell_text(our_last, our_last_len) &&
+        is_low_energy_ack(message, message_len))
+        return 100;
+
+    /* Mutual farewell: both said goodbye → 90% SKIP */
+    if (our_last && our_last_len > 0 && is_farewell_text(our_last, our_last_len) &&
+        is_farewell_text(message, message_len))
+        return 90;
+
+    /* Emoji-only from them → 70% SKIP */
+    if (is_emoji_only(message, message_len))
+        return 70;
+
+    /* Low-energy: yeah, cool, ok from them → 60% SKIP */
+    if (is_low_energy_ack(message, message_len))
+        return 60;
+
+    return 0;
 }
 
 /* ── URL extraction ──────────────────────────────────────────────────── */

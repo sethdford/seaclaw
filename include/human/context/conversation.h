@@ -123,6 +123,11 @@ size_t hu_conversation_split_response(hu_allocator_t *alloc, const char *respons
 
 /* ── Situational length calibration ───────────────────────────────────── */
 
+/* Return max response characters based on incoming message length.
+ * Formula: incoming_len * 2.0, capped at 300, minimum 15.
+ * Use for max_response_chars to match response length within ~1.5x ratio. */
+int hu_conversation_max_response_chars(size_t incoming_len);
+
 /* Classify the last incoming message and produce human-level length guidance.
  * Analyzes message type (question, emotional, greeting, logistics, etc.) and
  * produces a short directive string for the prompt like:
@@ -189,6 +194,12 @@ hu_response_action_t hu_conversation_classify_response(const char *msg, size_t m
                                                        const hu_channel_history_entry_t *entries,
                                                        size_t entry_count,
                                                        uint32_t *delay_extra_ms);
+
+/* Natural conversation drop-off: returns skip probability 0-100.
+ * Caller rolls (seed % 100) < prob to decide SKIP. Used when action is FULL/BRIEF. */
+int hu_conversation_classify_dropoff(const char *message, size_t message_len,
+                                     const hu_channel_history_entry_t *entries, size_t entry_count,
+                                     uint32_t seed);
 
 /* ── URL extraction and link-sharing detection ───────────────────────── */
 
