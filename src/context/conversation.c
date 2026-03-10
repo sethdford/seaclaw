@@ -1,5 +1,7 @@
 #include "human/context/conversation.h"
+#include "human/core/json.h"
 #include "human/core/string.h"
+#include "human/data/loader.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
 #endif
@@ -39,7 +41,13 @@ static const char **s_engage_words = NULL;
 static size_t s_engage_words_len = 0;
 static const char **s_filler_words = NULL;
 static size_t s_filler_words_len = 0;
-static const hu_conversation_contraction_t *s_contractions = NULL;
+typedef struct {
+    const char *from;
+    size_t from_len;
+    const char *to;
+    size_t to_len;
+} hu_conversation_contraction_t;
+static hu_conversation_contraction_t *s_contractions = NULL;
 static size_t s_contractions_len = 0;
 static const char **s_positive_words = NULL;
 static size_t s_positive_words_len = 0;
@@ -60,6 +68,344 @@ void hu_conversation_set_thresholds(uint32_t consecutive_limit, uint32_t partici
         g_max_response_chars = max_response_chars;
     if (min_response_chars > 0)
         g_min_response_chars = min_response_chars;
+}
+
+/* ── Data initialization (word lists from embedded JSON) ─────────────────── */
+
+static hu_allocator_t *s_conv_alloc = NULL;
+
+/* Load a string array from JSON. Field name is expected to be an array of strings. */
+static hu_error_t load_string_array(const hu_json_value_t *obj, const char *field_name,
+                                     const char ***out_array, size_t *out_len) {
+    if (!obj || !field_name || !out_array || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    hu_json_value_t *field = hu_json_object_get(obj, field_name);
+    if (!field || field->type != HU_JSON_ARRAY)
+        return HU_ERR_NOT_FOUND;
+
+    size_t arr_len = field->data.array.len;
+    if (arr_len == 0)
+        return HU_OK;
+
+    const char **result =
+        (const char **)s_conv_alloc->alloc(s_conv_alloc->ctx, arr_len * sizeof(const char *));
+    if (!result)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    for (size_t i = 0; i < arr_len; i++) {
+        hu_json_value_t *item = field->data.array.items[i];
+        if (item && item->type == HU_JSON_STRING) {
+            result[i] = item->data.string.ptr;
+        } else {
+            result[i] = "";
+        }
+    }
+
+    *out_array = result;
+    *out_len = arr_len;
+    return HU_OK;
+}
+
+/* Load contractions from JSON. Expected format: {"contractions": [{"from": "X", "to": "Y"}, ...]} */
+static hu_error_t load_contractions(const hu_json_value_t *obj) {
+    hu_json_value_t *field = hu_json_object_get(obj, "contractions");
+    if (!field || field->type != HU_JSON_ARRAY)
+        return HU_ERR_NOT_FOUND;
+
+    size_t arr_len = field->data.array.len;
+    if (arr_len == 0)
+        return HU_OK;
+
+    hu_conversation_contraction_t *result =
+        (hu_conversation_contraction_t *)s_conv_alloc->alloc(s_conv_alloc->ctx, arr_len * sizeof(hu_conversation_contraction_t));
+    if (!result)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    for (size_t i = 0; i < arr_len; i++) {
+        hu_json_value_t *item = field->data.array.items[i];
+        if (!item || item->type != HU_JSON_OBJECT)
+            continue;
+
+        const char *from = hu_json_get_string(item, "from");
+        const char *to = hu_json_get_string(item, "to");
+
+        if (from && to) {
+            result[i].from = from;
+            result[i].from_len = strlen(from);
+            result[i].to = to;
+            result[i].to_len = strlen(to);
+        } else {
+            result[i].from = "";
+            result[i].from_len = 0;
+            result[i].to = "";
+            result[i].to_len = 0;
+        }
+    }
+
+    s_contractions = result;
+    s_contractions_len = arr_len;
+    return HU_OK;
+}
+
+hu_error_t hu_conversation_data_init(hu_allocator_t *alloc) {
+    if (!alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    s_conv_alloc = alloc;
+
+    /* Load AI disclosure patterns */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t err = hu_data_load(alloc, "conversation/ai_disclosure_patterns.json", &json_data, &json_len);
+        if (err == HU_OK) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            if (err == HU_OK && root) {
+                load_string_array(root, "patterns", &s_ai_disclosure_patterns, &s_ai_disclosure_patterns_len);
+                hu_json_free(alloc, root);
+            }
+            if (json_data)
+                alloc->free(alloc->ctx, json_data, json_len);
+        }
+    }
+
+    /* Load filler words */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t err = hu_data_load(alloc, "conversation/filler_words.json", &json_data, &json_len);
+        if (err == HU_OK) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            if (err == HU_OK && root) {
+                load_string_array(root, "fillers", &s_filler_words, &s_filler_words_len);
+                hu_json_free(alloc, root);
+            }
+            if (json_data)
+                alloc->free(alloc->ctx, json_data, json_len);
+        }
+    }
+
+    /* Load contractions */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t err = hu_data_load(alloc, "conversation/contractions.json", &json_data, &json_len);
+        if (err == HU_OK) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            if (err == HU_OK && root) {
+                load_contractions(root);
+                hu_json_free(alloc, root);
+            }
+            if (json_data)
+                alloc->free(alloc->ctx, json_data, json_len);
+        }
+    }
+
+    /* Load conversation intros */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t err = hu_data_load(alloc, "conversation/conversation_intros.json", &json_data, &json_len);
+        if (err == HU_OK) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            if (err == HU_OK && root) {
+                load_string_array(root, "intros", &s_conversation_intros, &s_conversation_intros_len);
+                hu_json_free(alloc, root);
+            }
+            if (json_data)
+                alloc->free(alloc->ctx, json_data, json_len);
+        }
+    }
+
+    /* Load starters */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t err = hu_data_load(alloc, "conversation/starters.json", &json_data, &json_len);
+        if (err == HU_OK) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            if (err == HU_OK && root) {
+                load_string_array(root, "starters", &s_starters, &s_starters_len);
+                hu_json_free(alloc, root);
+            }
+            if (json_data)
+                alloc->free(alloc->ctx, json_data, json_len);
+        }
+    }
+
+    /* Load backchannel phrases */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t err = hu_data_load(alloc, "conversation/backchannel_phrases.json", &json_data, &json_len);
+        if (err == HU_OK) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            if (err == HU_OK && root) {
+                load_string_array(root, "phrases", &s_backchannel_phrases, &s_backchannel_phrases_len);
+                hu_json_free(alloc, root);
+            }
+            if (json_data)
+                alloc->free(alloc->ctx, json_data, json_len);
+        }
+    }
+
+    /* Load emotional words */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t err = hu_data_load(alloc, "conversation/emotional_words.json", &json_data, &json_len);
+        if (err == HU_OK) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            if (err == HU_OK && root) {
+                load_string_array(root, "emotional", &s_emotional_words, &s_emotional_words_len);
+                load_string_array(root, "positive", &s_positive_words, &s_positive_words_len);
+                load_string_array(root, "negative", &s_negative_words, &s_negative_words_len);
+                hu_json_free(alloc, root);
+            }
+            if (json_data)
+                alloc->free(alloc->ctx, json_data, json_len);
+        }
+    }
+
+    /* Load crisis keywords */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t err = hu_data_load(alloc, "conversation/crisis_keywords.json", &json_data, &json_len);
+        if (err == HU_OK) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            if (err == HU_OK && root) {
+                load_string_array(root, "keywords", &s_crisis_keywords, &s_crisis_keywords_len);
+                hu_json_free(alloc, root);
+            }
+            if (json_data)
+                alloc->free(alloc->ctx, json_data, json_len);
+        }
+    }
+
+    /* Load personal sharing phrases */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t err = hu_data_load(alloc, "conversation/personal_sharing.json", &json_data, &json_len);
+        if (err == HU_OK) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            if (err == HU_OK && root) {
+                load_string_array(root, "phrases", &s_personal_sharing_phrases, &s_personal_sharing_phrases_len);
+                hu_json_free(alloc, root);
+            }
+            if (json_data)
+                alloc->free(alloc->ctx, json_data, json_len);
+        }
+    }
+
+    /* Load engage words */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t err = hu_data_load(alloc, "conversation/engage_words.json", &json_data, &json_len);
+        if (err == HU_OK) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            if (err == HU_OK && root) {
+                load_string_array(root, "words", &s_engage_words, &s_engage_words_len);
+                hu_json_free(alloc, root);
+            }
+            if (json_data)
+                alloc->free(alloc->ctx, json_data, json_len);
+        }
+    }
+
+    return HU_OK;
+}
+
+void hu_conversation_data_cleanup(void) {
+    if (!s_conv_alloc)
+        return;
+
+    if (s_ai_disclosure_patterns) {
+        s_conv_alloc->free(s_conv_alloc->ctx, s_ai_disclosure_patterns, s_ai_disclosure_patterns_len * sizeof(const char *));
+        s_ai_disclosure_patterns = NULL;
+        s_ai_disclosure_patterns_len = 0;
+    }
+
+    if (s_filler_words) {
+        s_conv_alloc->free(s_conv_alloc->ctx, s_filler_words, s_filler_words_len * sizeof(const char *));
+        s_filler_words = NULL;
+        s_filler_words_len = 0;
+    }
+
+    if (s_contractions) {
+        s_conv_alloc->free(s_conv_alloc->ctx, s_contractions, s_contractions_len * sizeof(hu_conversation_contraction_t));
+        s_contractions = NULL;
+        s_contractions_len = 0;
+    }
+
+    if (s_conversation_intros) {
+        s_conv_alloc->free(s_conv_alloc->ctx, s_conversation_intros, s_conversation_intros_len * sizeof(const char *));
+        s_conversation_intros = NULL;
+        s_conversation_intros_len = 0;
+    }
+
+    if (s_starters) {
+        s_conv_alloc->free(s_conv_alloc->ctx, s_starters, s_starters_len * sizeof(const char *));
+        s_starters = NULL;
+        s_starters_len = 0;
+    }
+
+    if (s_backchannel_phrases) {
+        s_conv_alloc->free(s_conv_alloc->ctx, s_backchannel_phrases, s_backchannel_phrases_len * sizeof(const char *));
+        s_backchannel_phrases = NULL;
+        s_backchannel_phrases_len = 0;
+    }
+
+    if (s_emotional_words) {
+        s_conv_alloc->free(s_conv_alloc->ctx, s_emotional_words, s_emotional_words_len * sizeof(const char *));
+        s_emotional_words = NULL;
+        s_emotional_words_len = 0;
+    }
+
+    if (s_positive_words) {
+        s_conv_alloc->free(s_conv_alloc->ctx, s_positive_words, s_positive_words_len * sizeof(const char *));
+        s_positive_words = NULL;
+        s_positive_words_len = 0;
+    }
+
+    if (s_negative_words) {
+        s_conv_alloc->free(s_conv_alloc->ctx, s_negative_words, s_negative_words_len * sizeof(const char *));
+        s_negative_words = NULL;
+        s_negative_words_len = 0;
+    }
+
+    if (s_crisis_keywords) {
+        s_conv_alloc->free(s_conv_alloc->ctx, s_crisis_keywords, s_crisis_keywords_len * sizeof(const char *));
+        s_crisis_keywords = NULL;
+        s_crisis_keywords_len = 0;
+    }
+
+    if (s_personal_sharing_phrases) {
+        s_conv_alloc->free(s_conv_alloc->ctx, s_personal_sharing_phrases, s_personal_sharing_phrases_len * sizeof(const char *));
+        s_personal_sharing_phrases = NULL;
+        s_personal_sharing_phrases_len = 0;
+    }
+
+    if (s_engage_words) {
+        s_conv_alloc->free(s_conv_alloc->ctx, s_engage_words, s_engage_words_len * sizeof(const char *));
+        s_engage_words = NULL;
+        s_engage_words_len = 0;
+    }
+
+    s_conv_alloc = NULL;
 }
 
 /* Safe pos advance: snprintf returns the would-be length even when truncated.
@@ -2087,7 +2433,7 @@ static bool detect_heavy_topic(const hu_channel_history_entry_t *entries, size_t
     };
     static const size_t DEFAULT_KEYWORDS_LEN = sizeof(DEFAULT_KEYWORDS) / sizeof(DEFAULT_KEYWORDS[0]);
 
-    const char **keywords = s_crisis_keywords_len > 0 ? s_crisis_keywords : DEFAULT_KEYWORDS;
+    const char **keywords = s_crisis_keywords_len > 0 ? (const char **)s_crisis_keywords : (const char **)DEFAULT_KEYWORDS;
     size_t keywords_len = s_crisis_keywords_len > 0 ? s_crisis_keywords_len : DEFAULT_KEYWORDS_LEN;
 
     for (size_t i = 0; i < count; i++) {
@@ -2120,7 +2466,7 @@ static bool detect_personal_sharing(const hu_channel_history_entry_t *entries, s
     };
     static const size_t DEFAULT_PHRASES_LEN = sizeof(DEFAULT_PHRASES) / sizeof(DEFAULT_PHRASES[0]);
 
-    const char **phrases = s_personal_sharing_phrases_len > 0 ? s_personal_sharing_phrases : DEFAULT_PHRASES;
+    const char **phrases = s_personal_sharing_phrases_len > 0 ? (const char **)s_personal_sharing_phrases : (const char **)DEFAULT_PHRASES;
     size_t phrases_len = s_personal_sharing_phrases_len > 0 ? s_personal_sharing_phrases_len : DEFAULT_PHRASES_LEN;
 
     for (size_t i = 0; i < count; i++) {
@@ -2289,7 +2635,7 @@ static bool is_split_starter(const char *s, size_t len) {
     };
     static const size_t DEFAULT_STARTERS_LEN = sizeof(DEFAULT_STARTERS) / sizeof(DEFAULT_STARTERS[0]);
 
-    const char **starters = s_starters_len > 0 ? s_starters : DEFAULT_STARTERS;
+    const char **starters = s_starters_len > 0 ? (const char **)s_starters : (const char **)DEFAULT_STARTERS;
     size_t starters_len = s_starters_len > 0 ? s_starters_len : DEFAULT_STARTERS_LEN;
 
     for (size_t i = 0; i < starters_len; i++) {
@@ -3339,7 +3685,7 @@ hu_response_action_t hu_conversation_classify_response(const char *msg, size_t m
     };
     static const size_t DEFAULT_EMOTIONAL_LEN = sizeof(DEFAULT_EMOTIONAL) / sizeof(DEFAULT_EMOTIONAL[0]);
 
-    const char **emotional = s_emotional_words_len > 0 ? s_emotional_words : DEFAULT_EMOTIONAL;
+    const char **emotional = s_emotional_words_len > 0 ? (const char **)s_emotional_words : (const char **)DEFAULT_EMOTIONAL;
     size_t emotional_len = s_emotional_words_len > 0 ? s_emotional_words_len : DEFAULT_EMOTIONAL_LEN;
 
     for (size_t i = 0; i < emotional_len; i++) {
@@ -3476,7 +3822,7 @@ static const char *const DEFAULT_BACKCHANNEL_PHRASES[] = {
 size_t hu_conversation_pick_backchannel(uint32_t seed, char *buf, size_t cap) {
     if (!buf || cap == 0)
         return 0;
-    const char **phrases = s_backchannel_phrases_len > 0 ? s_backchannel_phrases : DEFAULT_BACKCHANNEL_PHRASES;
+    const char *const *phrases = s_backchannel_phrases_len > 0 ? (const char *const *)s_backchannel_phrases : (const char *const *)(const char **)DEFAULT_BACKCHANNEL_PHRASES;
     size_t phrase_count = s_backchannel_phrases_len > 0 ? s_backchannel_phrases_len : DEFAULT_BACKCHANNEL_COUNT;
 
     if (phrase_count == 0)
@@ -4133,7 +4479,7 @@ hu_group_response_t hu_conversation_classify_group(const char *msg, size_t msg_l
     };
     static const size_t DEFAULT_ENGAGE_WORDS_LEN = sizeof(DEFAULT_ENGAGE_WORDS) / sizeof(DEFAULT_ENGAGE_WORDS[0]);
 
-    const char **engage_words = s_engage_words_len > 0 ? s_engage_words : DEFAULT_ENGAGE_WORDS;
+    const char **engage_words = s_engage_words_len > 0 ? (const char **)s_engage_words : (const char **)DEFAULT_ENGAGE_WORDS;
     size_t engage_words_len = s_engage_words_len > 0 ? s_engage_words_len : DEFAULT_ENGAGE_WORDS_LEN;
 
     for (size_t i = 0; i < engage_words_len; i++) {
@@ -4699,9 +5045,8 @@ size_t hu_conversation_apply_fillers(char *buf, size_t len, size_t cap, uint32_t
         "ngl ",  "hmm ", "oh ",   "ah ",       "like "
     };
     static const size_t DEFAULT_FILLER_COUNT = 10;
-    static const size_t DEFAULT_FILLER_LENS[] = {5, 4, 5, 9, 4, 4, 4, 3, 3, 5};
 
-    const char **fillers = s_filler_words_len > 0 ? s_filler_words : DEFAULT_FILLERS;
+    const char **fillers = s_filler_words_len > 0 ? (const char **)s_filler_words : (const char **)DEFAULT_FILLERS;
     size_t filler_count = s_filler_words_len > 0 ? s_filler_words_len : DEFAULT_FILLER_COUNT;
 
     if (filler_count == 0)
@@ -4826,8 +5171,8 @@ char *hu_conversation_build_sentiment_momentum(hu_allocator_t *alloc,
     static const size_t DEFAULT_POS_LEN = sizeof(DEFAULT_POS_WORDS) / sizeof(DEFAULT_POS_WORDS[0]);
     static const size_t DEFAULT_NEG_LEN = sizeof(DEFAULT_NEG_WORDS) / sizeof(DEFAULT_NEG_WORDS[0]);
 
-    const char **pos_words = s_positive_words_len > 0 ? s_positive_words : DEFAULT_POS_WORDS;
-    const char **neg_words = s_negative_words_len > 0 ? s_negative_words : DEFAULT_NEG_WORDS;
+    const char **pos_words = s_positive_words_len > 0 ? (const char **)s_positive_words : (const char **)DEFAULT_POS_WORDS;
+    const char **neg_words = s_negative_words_len > 0 ? (const char **)s_negative_words : (const char **)DEFAULT_NEG_WORDS;
     size_t n_pos = s_positive_words_len > 0 ? s_positive_words_len : DEFAULT_POS_LEN;
     size_t n_neg = s_negative_words_len > 0 ? s_negative_words_len : DEFAULT_NEG_LEN;
 
@@ -4993,7 +5338,7 @@ char *hu_conversation_build_tangent_callback(hu_allocator_t *alloc,
     };
     static const size_t DEFAULT_INTROS_LEN = sizeof(DEFAULT_INTROS) / sizeof(DEFAULT_INTROS[0]);
 
-    const char **intros = s_conversation_intros_len > 0 ? s_conversation_intros : DEFAULT_INTROS;
+    const char **intros = s_conversation_intros_len > 0 ? (const char **)s_conversation_intros : (const char **)DEFAULT_INTROS;
     size_t intros_len = s_conversation_intros_len > 0 ? s_conversation_intros_len : DEFAULT_INTROS_LEN;
 
     if (intros_len == 0)
@@ -5058,7 +5403,7 @@ bool hu_conversation_check_ai_disclosure(const char *response, size_t response_l
     };
     static const size_t DEFAULT_PATTERNS_LEN = sizeof(DEFAULT_PATTERNS) / sizeof(DEFAULT_PATTERNS[0]);
 
-    const char **patterns = s_ai_disclosure_patterns_len > 0 ? s_ai_disclosure_patterns : DEFAULT_PATTERNS;
+    const char **patterns = s_ai_disclosure_patterns_len > 0 ? (const char **)s_ai_disclosure_patterns : (const char **)DEFAULT_PATTERNS;
     size_t n = s_ai_disclosure_patterns_len > 0 ? s_ai_disclosure_patterns_len : DEFAULT_PATTERNS_LEN;
 
     for (size_t p = 0; p < n; p++) {
