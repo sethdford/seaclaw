@@ -56,4 +56,4 @@ const unsigned char data_persona_relationship_stages_json[] = {
   0x0a, 0x20, 0x20, 0x20, 0x20, 0x7d, 0x0a, 0x20, 0x20, 0x5d, 0x0a, 0x7d,
   0x0a
 };
-static const size_t data_persona_relationship_stages_json_len = 637;
+const size_t data_persona_relationship_stages_json_len = 637;

@@ -2267,6 +2267,125 @@ size_t hu_conversation_build_deescalation_directive(char *buf, size_t cap) {
     return len;
 }
 
+/* ── Call escalation (F49) ─────────────────────────────────────────────── */
+
+#define HU_CALL_ESCALATION_THRESHOLD 0.6f
+
+static bool is_logistics_or_casual(const char *msg, size_t msg_len) {
+    if (!msg || msg_len == 0)
+        return true;
+    /* Logistics: quick scheduling, where, when, etc. */
+    if (str_contains_ci(msg, msg_len, "what time") || str_contains_ci(msg, msg_len, "meet at") ||
+        str_contains_ci(msg, msg_len, "where are") || str_contains_ci(msg, msg_len, "when are") ||
+        str_contains_ci(msg, msg_len, "pick up") || str_contains_ci(msg, msg_len, "pickup"))
+        return true;
+    /* Quick questions / casual: "what's for dinner", short greetings */
+    if (str_contains_ci(msg, msg_len, "what's for dinner") ||
+        str_contains_ci(msg, msg_len, "whats for dinner"))
+        return true;
+    if (msg_len < 25 && (str_contains_ci(msg, msg_len, "hey") ||
+                         str_contains_ci(msg, msg_len, "hi ") ||
+                         str_contains_ci(msg, msg_len, "lol") ||
+                         str_contains_ci(msg, msg_len, "nice")))
+        return true;
+    return false;
+}
+
+hu_call_escalation_t hu_conversation_should_escalate_to_call(
+    const char *msg, size_t msg_len,
+    const hu_channel_history_entry_t *entries, size_t count) {
+    hu_call_escalation_t out = {false, 0.0f};
+    (void)entries;
+    (void)count;
+
+    if (!msg)
+        return out;
+    if (msg_len == 0)
+        return out;
+
+    /* Never escalate for logistics, quick questions, casual chat. Prefer false negatives. */
+    if (is_logistics_or_casual(msg, msg_len))
+        return out;
+
+    /* Crisis keywords (weight 0.4): → 1.0 if any match */
+    float crisis = 0.0f;
+    if (str_contains_ci(msg, msg_len, "i need you") || str_contains_ci(msg, msg_len, "help me") ||
+        str_contains_ci(msg, msg_len, "can't deal") || str_contains_ci(msg, msg_len, "cant deal") ||
+        str_contains_ci(msg, msg_len, "breaking down") ||
+        str_contains_ci(msg, msg_len, "i can't do this") ||
+        str_contains_ci(msg, msg_len, "i cant do this") ||
+        str_contains_ci(msg, msg_len, "please call") ||
+        str_contains_ci(msg, msg_len, "end of my rope"))
+        crisis = 1.0f;
+
+    /* Complexity (weight 0.3): length > 200 → 0.6, > 400 → 1.0;
+     * multiple questions → 0.3 per question; "it's complicated" → 0.5 */
+    float complexity = 0.0f;
+    if (msg_len > 400)
+        complexity = 1.0f;
+    else if (msg_len > 200)
+        complexity = 0.6f;
+    size_t qcount = 0;
+    for (size_t i = 0; i < msg_len; i++)
+        if (msg[i] == '?')
+            qcount++;
+    float q_score = (float)qcount * 0.3f;
+    if (q_score > complexity)
+        complexity = q_score;
+    if (str_contains_ci(msg, msg_len, "it's complicated") ||
+        str_contains_ci(msg, msg_len, "its complicated") ||
+        str_contains_ci(msg, msg_len, "really complicated")) {
+        if (0.5f > complexity)
+            complexity = 0.5f;
+    }
+    if (complexity > 1.0f)
+        complexity = 1.0f;
+
+    /* Emotional intensity (weight 0.3): emotional words + exclamation marks */
+    float emotion = 0.0f;
+    size_t excl = 0;
+    for (size_t i = 0; i < msg_len; i++)
+        if (msg[i] == '!')
+            excl++;
+    if (str_contains_ci(msg, msg_len, "crying") || str_contains_ci(msg, msg_len, "freaking out") ||
+        str_contains_ci(msg, msg_len, "losing it") ||
+        str_contains_ci(msg, msg_len, "don't know what to do"))
+        emotion = 0.8f;
+    else if (str_contains_ci(msg, msg_len, "sad") || str_contains_ci(msg, msg_len, "overwhelmed") ||
+             str_contains_ci(msg, msg_len, "stressed") || str_contains_ci(msg, msg_len, "anxious") ||
+             str_contains_ci(msg, msg_len, "scared") || str_contains_ci(msg, msg_len, "hurt") ||
+             str_contains_ci(msg, msg_len, "depressed") || str_contains_ci(msg, msg_len, "lonely"))
+        emotion = 0.5f;
+    if (excl >= 2)
+        emotion = (emotion > 0.6f) ? emotion : 0.6f;
+    else if (excl >= 1 && emotion < 0.3f)
+        emotion = 0.3f;
+    if (emotion > 1.0f)
+        emotion = 1.0f;
+
+    float score = crisis * 0.4f + complexity * 0.3f + emotion * 0.3f;
+    out.score = score;
+    out.should_suggest = (score >= HU_CALL_ESCALATION_THRESHOLD);
+    return out;
+}
+
+size_t hu_conversation_build_call_directive(const char *msg, size_t msg_len, char *buf, size_t cap) {
+    if (!buf || cap == 0)
+        return 0;
+    size_t sample_len = msg_len > 80 ? 80 : msg_len;
+    int n;
+    if (msg && msg_len > 0) {
+        n = snprintf(buf, cap,
+                     "[CALL: This may be better as a call. Suggest they call when appropriate: \"%.*s%s\"]",
+                     (int)sample_len, msg, msg_len > 80 ? "..." : "");
+    } else {
+        n = snprintf(buf, cap, "[CALL: This may be better as a call. Suggest they call when appropriate.]");
+    }
+    if (n <= 0 || (size_t)n >= cap)
+        return 0;
+    return (size_t)n;
+}
+
 /* ── Comfort pattern directive (F27) ───────────────────────────────────── */
 
 size_t hu_conversation_build_comfort_directive(const char *response_type, size_t type_len,

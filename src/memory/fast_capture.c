@@ -84,9 +84,72 @@ static hu_emotion_tag_t emotion_tag_from_string(const char *str) {
     return 0;
 }
 
+/* Structural: "at/the/about/my " + topic word, or standalone topic word. */
+struct topic_pattern {
+    const char *prefix;
+    size_t prefix_len;
+    const char *word;
+    size_t word_len;
+    const char *topic;
+    size_t topic_len;
+};
+
+/* Structural: commitment prefix patterns. */
+static const char *COMMITMENT_PREFIXES[] = {"I will ",       "I'll ",      "I promise",
+                                            "I'm going to ", "I plan to ", "remind me to ",
+                                            "I'm gonna ",    NULL};
+
+/* Topic patterns — loaded from JSON or use defaults */
+static struct topic_pattern *s_topic_patterns = NULL;
+static size_t s_topic_patterns_count = 0;
+
+/* Commitment prefixes — loaded from JSON or use defaults */
+static const char **s_commitment_prefixes = NULL;
+static size_t s_commitment_prefixes_count = 0;
+
+/* Emotion prefixes — loaded from JSON or use defaults */
+static const char **s_emotion_prefixes = NULL;
+static size_t s_emotion_prefixes_count = 0;
+
+/* Default topic patterns */
+static const struct topic_pattern TOPIC_PATTERNS[] = {
+    {"at ", 3, "work", 4, "work", 4},
+    {"at the ", 7, "office", 6, "work", 4},
+    {"my ", 3, "job", 3, "work", 4},
+    {"the ", 4, "office", 6, "work", 4},
+    {"the ", 4, "project", 7, "work", 4},
+    {"my ", 3, "boss", 4, "work", 4},
+    {NULL, 0, "deadline", 8, "work", 4},
+    {"the ", 4, "doctor", 6, "health", 6},
+    {"my ", 3, "health", 6, "health", 6},
+    {"the ", 4, "hospital", 8, "health", 6},
+    {"my ", 3, "medication", 10, "health", 6},
+    {"feeling ", 8, "sick", 4, "health", 6},
+    {"my ", 3, "relationship", 12, "relationship", 12},
+    {"my ", 3, "partner", 7, "relationship", 12},
+    {NULL, 0, "dating", 6, "relationship", 12},
+    {"my ", 3, "budget", 6, "finance", 7},
+    {NULL, 0, "savings", 7, "finance", 7},
+    {NULL, 0, "rent", 4, "finance", 7},
+    {NULL, 0, "bills", 5, "finance", 7},
+    {NULL, 0, "debt", 4, "finance", 7},
+    {NULL, 0, "salary", 6, "finance", 7},
+    {NULL, 0, NULL, 0, NULL, 0},
+};
+
 hu_error_t hu_fast_capture_data_init(hu_allocator_t *alloc) {
     if (!alloc)
         return HU_ERR_INVALID_ARGUMENT;
+
+    /* Initialize with defaults first */
+    if (!s_topic_patterns) {
+        s_topic_patterns = (struct topic_pattern *)TOPIC_PATTERNS;
+        s_topic_patterns_count = 22;
+    }
+    if (!s_commitment_prefixes) {
+        s_commitment_prefixes = (const char **)COMMITMENT_PREFIXES;
+        s_commitment_prefixes_count = 7;
+    }
 
     /* Load relationship words */
     char *json_rel = NULL;
@@ -120,9 +183,10 @@ hu_error_t hu_fast_capture_data_init(hu_allocator_t *alloc) {
     }
 
     /* Load emotion adjectives */
-    char *json_emo = NULL;
-    size_t json_emo_len = 0;
-    err = hu_data_load(alloc, "memory/emotion_adjectives.json", &json_emo, &json_emo_len);
+    {
+        char *json_emo = NULL;
+        size_t json_emo_len = 0;
+        err = hu_data_load(alloc, "memory/emotion_adjectives.json", &json_emo, &json_emo_len);
     if (err == HU_OK && json_emo) {
         hu_json_value_t *root_emo = NULL;
         err = hu_json_parse(alloc, json_emo, json_emo_len, &root_emo);
@@ -158,6 +222,124 @@ hu_error_t hu_fast_capture_data_init(hu_allocator_t *alloc) {
             hu_json_free(alloc, root_emo);
         }
     }
+    }
+
+    /* Load topic patterns */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        err = hu_data_load(alloc, "memory/topic_patterns.json", &json_data, &json_len);
+        if (err == HU_OK && json_data) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            alloc->free(alloc->ctx, json_data, json_len);
+            if (err == HU_OK && root) {
+                hu_json_value_t *arr = hu_json_object_get(root, "patterns");
+                if (arr && arr->type == HU_JSON_ARRAY) {
+                    size_t count = arr->data.array.len;
+                    if (count > 0) {
+                        struct topic_pattern *patterns = (struct topic_pattern *)alloc->alloc(alloc->ctx, (count + 1) * sizeof(struct topic_pattern));
+                        if (patterns) {
+                            memset(patterns, 0, (count + 1) * sizeof(struct topic_pattern));
+                            for (size_t i = 0; i < count; i++) {
+                                hu_json_value_t *item = arr->data.array.items[i];
+                                if (item && item->type == HU_JSON_OBJECT) {
+                                    const char *prefix = hu_json_get_string(item, "prefix");
+                                    const char *word = hu_json_get_string(item, "word");
+                                    const char *topic = hu_json_get_string(item, "topic");
+                                    if (prefix && word && topic) {
+                                        patterns[i].prefix = hu_strndup(alloc, prefix, strlen(prefix));
+                                        patterns[i].prefix_len = strlen(patterns[i].prefix);
+                                        patterns[i].word = hu_strndup(alloc, word, strlen(word));
+                                        patterns[i].word_len = strlen(patterns[i].word);
+                                        patterns[i].topic = hu_strndup(alloc, topic, strlen(topic));
+                                        patterns[i].topic_len = strlen(patterns[i].topic);
+                                    }
+                                }
+                            }
+                            patterns[count].prefix = NULL;
+                            patterns[count].prefix_len = 0;
+                            patterns[count].word = NULL;
+                            patterns[count].word_len = 0;
+                            patterns[count].topic = NULL;
+                            patterns[count].topic_len = 0;
+                            s_topic_patterns = patterns;
+                            s_topic_patterns_count = count;
+                        }
+                    }
+                }
+                hu_json_free(alloc, root);
+            }
+        }
+    }
+
+    /* Load commitment prefixes */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        err = hu_data_load(alloc, "memory/commitment_prefixes.json", &json_data, &json_len);
+        if (err == HU_OK && json_data) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            alloc->free(alloc->ctx, json_data, json_len);
+            if (err == HU_OK && root) {
+                hu_json_value_t *arr = hu_json_object_get(root, "prefixes");
+                if (arr && arr->type == HU_JSON_ARRAY) {
+                    size_t count = arr->data.array.len;
+                    if (count > 0) {
+                        const char **prefixes = (const char **)alloc->alloc(alloc->ctx, (count + 1) * sizeof(const char *));
+                        if (prefixes) {
+                            memset(prefixes, 0, (count + 1) * sizeof(const char *));
+                            for (size_t i = 0; i < count; i++) {
+                                hu_json_value_t *item = arr->data.array.items[i];
+                                if (item && item->type == HU_JSON_STRING) {
+                                    prefixes[i] = hu_strndup(alloc, item->data.string.ptr, item->data.string.len);
+                                }
+                            }
+                            prefixes[count] = NULL;
+                            s_commitment_prefixes = prefixes;
+                            s_commitment_prefixes_count = count;
+                        }
+                    }
+                }
+                hu_json_free(alloc, root);
+            }
+        }
+    }
+
+    /* Load emotion prefixes */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t load_err = hu_data_load(alloc, "memory/emotion_prefixes.json", &json_data, &json_len);
+        if (load_err == HU_OK && json_data) {
+            hu_json_value_t *root = NULL;
+            load_err = hu_json_parse(alloc, json_data, json_len, &root);
+            alloc->free(alloc->ctx, json_data, json_len);
+            if (load_err == HU_OK && root) {
+                hu_json_value_t *arr = hu_json_object_get(root, "prefixes");
+                if (arr && arr->type == HU_JSON_ARRAY) {
+                    size_t count = arr->data.array.len;
+                    if (count > 0) {
+                        const char **prefixes = (const char **)alloc->alloc(alloc->ctx, (count + 1) * sizeof(const char *));
+                        if (prefixes) {
+                            memset(prefixes, 0, (count + 1) * sizeof(const char *));
+                            for (size_t i = 0; i < count; i++) {
+                                hu_json_value_t *item = arr->data.array.items[i];
+                                if (item && item->type == HU_JSON_STRING) {
+                                    prefixes[i] = hu_strndup(alloc, item->data.string.ptr, item->data.string.len);
+                                }
+                            }
+                            prefixes[count] = NULL;
+                            s_emotion_prefixes = prefixes;
+                            s_emotion_prefixes_count = count;
+                        }
+                    }
+                }
+                hu_json_free(alloc, root);
+            }
+        }
+    }
 
     return HU_OK;
 }
@@ -190,45 +372,6 @@ void hu_fast_capture_data_cleanup(hu_allocator_t *alloc) {
     s_emotion_adjectives = (struct emotion_adj *)DEFAULT_EMOTION_ADJECTIVES;
     s_emotion_adj_count = 20;
 }
-
-/* Structural: "at/the/about/my " + topic word, or standalone topic word. */
-struct topic_pattern {
-    const char *prefix;
-    size_t prefix_len;
-    const char *word;
-    size_t word_len;
-    const char *topic;
-    size_t topic_len;
-};
-static const struct topic_pattern TOPIC_PATTERNS[] = {
-    {"at ", 3, "work", 4, "work", 4},
-    {"at the ", 7, "office", 6, "work", 4},
-    {"my ", 3, "job", 3, "work", 4},
-    {"the ", 4, "office", 6, "work", 4},
-    {"the ", 4, "project", 7, "work", 4},
-    {"my ", 3, "boss", 4, "work", 4},
-    {NULL, 0, "deadline", 8, "work", 4},
-    {"the ", 4, "doctor", 6, "health", 6},
-    {"my ", 3, "health", 6, "health", 6},
-    {"the ", 4, "hospital", 8, "health", 6},
-    {"my ", 3, "medication", 10, "health", 6},
-    {"feeling ", 8, "sick", 4, "health", 6},
-    {"my ", 3, "relationship", 12, "relationship", 12},
-    {"my ", 3, "partner", 7, "relationship", 12},
-    {NULL, 0, "dating", 6, "relationship", 12},
-    {"my ", 3, "budget", 6, "finance", 7},
-    {NULL, 0, "savings", 7, "finance", 7},
-    {NULL, 0, "rent", 4, "finance", 7},
-    {NULL, 0, "bills", 5, "finance", 7},
-    {NULL, 0, "debt", 4, "finance", 7},
-    {NULL, 0, "salary", 6, "finance", 7},
-    {NULL, 0, NULL, 0, NULL, 0},
-};
-
-/* Structural: commitment prefix patterns. */
-static const char *COMMITMENT_PREFIXES[] = {"I will ",       "I'll ",      "I promise",
-                                            "I'm going to ", "I plan to ", "remind me to ",
-                                            "I'm gonna ",    NULL};
 
 static void add_entity(hu_fc_result_t *out, hu_allocator_t *alloc, const char *name,
                        size_t name_len, const char *type, size_t type_len, double confidence,
@@ -301,9 +444,11 @@ static void scan_relationships(const char *text, size_t text_len, hu_fc_result_t
 
 /* Structural: find "I feel/I'm feeling/I am/I'm " then look for emotion adjective in remainder. */
 static void scan_emotions(const char *text, size_t text_len, hu_fc_result_t *out) {
-    static const char *EMOTION_PREFIXES[] = {"I feel ", "I'm feeling ", "I am ", "I'm ", NULL};
-    for (size_t p = 0; EMOTION_PREFIXES[p]; p++) {
-        const char *prefix = EMOTION_PREFIXES[p];
+    static const char *DEFAULT_EMOTION_PREFIXES[] = {"I feel ", "I'm feeling ", "I am ", "I'm ", NULL};
+    const char **prefixes = s_emotion_prefixes ? s_emotion_prefixes : DEFAULT_EMOTION_PREFIXES;
+    size_t count = s_emotion_prefixes ? s_emotion_prefixes_count : 4;
+    for (size_t p = 0; p < count && prefixes[p]; p++) {
+        const char *prefix = prefixes[p];
         size_t plen = strlen(prefix);
         const char *found = fc_strstr_case(text, text_len, prefix, plen);
         if (!found)
@@ -326,8 +471,8 @@ static void scan_topics(const char *text, size_t text_len, hu_fc_result_t *out,
                         hu_allocator_t *alloc) {
     if (out->primary_topic)
         return;
-    for (size_t t = 0; TOPIC_PATTERNS[t].topic; t++) {
-        const struct topic_pattern *tp = &TOPIC_PATTERNS[t];
+    for (size_t t = 0; t < s_topic_patterns_count && s_topic_patterns[t].topic; t++) {
+        const struct topic_pattern *tp = &s_topic_patterns[t];
         if (tp->prefix) {
             if (text_len < tp->prefix_len + tp->word_len)
                 continue;
@@ -353,8 +498,8 @@ static void scan_topics(const char *text, size_t text_len, hu_fc_result_t *out,
 }
 
 static void scan_commitments(const char *text, size_t text_len, hu_fc_result_t *out) {
-    for (size_t i = 0; COMMITMENT_PREFIXES[i]; i++) {
-        const char *pat = COMMITMENT_PREFIXES[i];
+    for (size_t i = 0; i < s_commitment_prefixes_count && s_commitment_prefixes[i]; i++) {
+        const char *pat = s_commitment_prefixes[i];
         size_t plen = strlen(pat);
         if (fc_strstr_case(text, text_len, pat, plen)) {
             out->has_commitment = true;

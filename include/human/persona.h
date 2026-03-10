@@ -195,11 +195,31 @@ typedef struct hu_social_dynamics {
     size_t anti_patterns_count;
 } hu_social_dynamics_t;
 
-/* Humanization config — disfluency, backchannels, burst messages */
+/* Follow-up style — delayed follow-ups, double-texting */
+typedef struct hu_follow_up_style {
+    float delayed_follow_up_probability; /* default 0.15 */
+    int16_t min_delay_minutes;           /* default 20 */
+    int16_t max_delay_hours;             /* default 4 */
+} hu_follow_up_style_t;
+
+/* Bookend messages — morning/evening check-ins */
+typedef struct hu_bookend_config {
+    bool enabled;                   /* default false */
+    uint8_t morning_window[2];       /* default {7, 9} */
+    uint8_t evening_window[2];       /* default {22, 23} */
+    float frequency_per_week;        /* default 2.5 */
+    char phrases_morning[8][64];    /* fixed-size arrays */
+    size_t phrases_morning_count;
+    char phrases_evening[8][64];
+    size_t phrases_evening_count;
+} hu_bookend_config_t;
+
+/* Humanization config — disfluency, backchannels, burst messages, double-text */
 typedef struct hu_humanization_config {
     float disfluency_frequency;      /* default 0.15 */
     float backchannel_probability;   /* default 0.3 */
     float burst_message_probability; /* default 0.03 */
+    float double_text_probability;  /* default 0.08 */
 } hu_humanization_config_t;
 
 /* Context modifiers — topic/emotion/turn-based boosts */
@@ -217,9 +237,14 @@ typedef struct hu_important_date {
     char message[256]; /* "happy birthday min!" */
 } hu_important_date_t;
 
-/* Context awareness — calendar and situational context */
+/* Context awareness — calendar, weather, sports, news */
 typedef struct hu_context_awareness {
     bool calendar_enabled;
+    bool weather_enabled;
+    char sports_teams[8][64];
+    size_t sports_teams_count;
+    char news_topics[8][64];
+    size_t news_topics_count;
 } hu_context_awareness_t;
 
 /* Inner world — deep personality content surfaced by relationship stage */
@@ -303,6 +328,12 @@ typedef struct hu_persona {
     hu_important_date_t *important_dates;
     size_t important_dates_count;
     hu_context_awareness_t context_awareness;
+    /* Phase 4 — follow-ups, bookends, timezone, location, group behavior */
+    hu_follow_up_style_t follow_up_style;
+    hu_bookend_config_t bookend_messages;
+    char timezone[64];
+    char location[128];
+    float group_response_rate; /* default 0.1 */
 } hu_persona_t;
 
 /* Returns persona base directory path in buf (either HU_PERSONA_DIR or ~/.human/personas).

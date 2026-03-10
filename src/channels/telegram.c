@@ -11,6 +11,7 @@
 #include "human/core/json.h"
 #include "human/core/process_util.h"
 #include "human/core/string.h"
+#include "human/data/loader.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -25,17 +26,40 @@
 #define TELEGRAM_MARKDOWN_V2_SPECIAL_LEN 18
 
 /* Bot command help text — used for /help or agent slash dispatch */
-static const char TELEGRAM_COMMANDS_HELP[] = "/start - Start a conversation\n"
-                                             "/help - Show available commands\n"
-                                             "/status - Show model and stats\n"
-                                             "/model - Switch model\n"
-                                             "/think - Set thinking level\n"
-                                             "/verbose - Set verbose level\n"
-                                             "/tts - Set TTS mode\n"
-                                             "/memory - Memory tools and diagnostics\n"
-                                             "/stop - Stop active background task\n"
-                                             "/restart - Restart current session\n"
-                                             "/compact - Compact context now";
+static const char TELEGRAM_COMMANDS_HELP_DEFAULT[] = "/start - Start a conversation\n"
+                                                     "/help - Show available commands\n"
+                                                     "/status - Show model and stats\n"
+                                                     "/model - Switch model\n"
+                                                     "/think - Set thinking level\n"
+                                                     "/verbose - Set verbose level\n"
+                                                     "/tts - Set TTS mode\n"
+                                                     "/memory - Memory tools and diagnostics\n"
+                                                     "/stop - Stop active background task\n"
+                                                     "/restart - Restart current session\n"
+                                                     "/compact - Compact context now";
+
+/* Loaded commands text */
+static char *g_telegram_commands_help = NULL;
+static size_t g_telegram_commands_help_len = 0;
+
+static hu_error_t hu_telegram_data_init(hu_allocator_t *alloc) {
+    if (!alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    /* Load telegram commands help text */
+    char *data = NULL;
+    size_t data_len = 0;
+    hu_error_t err = hu_data_load(alloc, "channels/telegram_commands.txt", &data, &data_len);
+    if (err == HU_OK && data && data_len > 0) {
+        g_telegram_commands_help = hu_strndup(alloc, data, data_len);
+        if (g_telegram_commands_help) {
+            g_telegram_commands_help_len = data_len;
+        }
+        alloc->free(alloc->ctx, data, data_len);
+    }
+
+    return HU_OK;
+}
 
 typedef struct hu_telegram_ctx {
     hu_allocator_t *alloc;
@@ -785,6 +809,10 @@ hu_error_t hu_telegram_create_ex(hu_allocator_t *alloc, const char *token, size_
                                  hu_channel_t *out) {
     if (!alloc || !out)
         return HU_ERR_INVALID_ARGUMENT;
+
+    /* Initialize telegram data (commands help, etc.) */
+    hu_telegram_data_init(alloc);
+
     hu_telegram_ctx_t *c = (hu_telegram_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return HU_ERR_OUT_OF_MEMORY;
@@ -832,7 +860,7 @@ void hu_telegram_set_allowlist(hu_channel_t *ch, const char *const *allow_from,
 }
 
 const char *hu_telegram_commands_help(void) {
-    return TELEGRAM_COMMANDS_HELP;
+    return g_telegram_commands_help ? g_telegram_commands_help : TELEGRAM_COMMANDS_HELP_DEFAULT;
 }
 
 /* ─── Long-polling (getUpdates) for channel_loop ─────────────────────────── */

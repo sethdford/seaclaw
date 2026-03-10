@@ -13,4 +13,4 @@ const unsigned char data_conversation_engage_words_json[] = {
   0x6f, 0x70, 0x69, 0x6e, 0x69, 0x6f, 0x6e, 0x22, 0x0a, 0x20, 0x20, 0x5d,
   0x0a, 0x7d, 0x0a
 };
-static const size_t data_conversation_engage_words_json_len = 123;
+const size_t data_conversation_engage_words_json_len = 123;

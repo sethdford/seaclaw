@@ -174,6 +174,25 @@ bool hu_conversation_detect_topic_change(const hu_channel_history_entry_t *entri
                                          char *topic_before, size_t before_cap,
                                          char *topic_after, size_t after_cap);
 
+/* ── Call escalation (F49) ───────────────────────────────────────────────── */
+
+/* Classify if message complexity + emotional intensity suggest a call would be better.
+ * Score components: crisis keywords (0.4), complexity (0.3), emotional intensity (0.3).
+ * should_suggest when score >= 0.6. Prefer false negatives; never escalate for
+ * logistics, quick questions, or casual chat. */
+typedef struct hu_call_escalation {
+    bool should_suggest;
+    float score;
+} hu_call_escalation_t;
+
+hu_call_escalation_t hu_conversation_should_escalate_to_call(
+    const char *msg, size_t msg_len,
+    const hu_channel_history_entry_t *entries, size_t count);
+
+/* Build [CALL: ...] directive for prompt injection when classifier triggers.
+ * Writes into buf (up to cap bytes). Returns bytes written (0 if invalid args). */
+size_t hu_conversation_build_call_directive(const char *msg, size_t msg_len, char *buf, size_t cap);
+
 /* ── Emotional escalation detection (F14) ────────────────────────────────── */
 
 /* Track emotional trajectory across multiple messages. When 3+ messages show

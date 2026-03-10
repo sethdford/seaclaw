@@ -19,6 +19,7 @@
 #include "human/config.h"
 #include "human/context/conversation.h"
 #include "human/context/event_extract.h"
+#include "human/context/style_tracker.h"
 #include "human/context/mood.h"
 #include "human/context/vision.h"
 #include "human/core/error.h"
@@ -2876,6 +2877,43 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         (agent && agent->persona) ? agent->persona : NULL, &style_ctx_len);
                 }
 
+                /* F32: Style fingerprint — our texting style with this contact (haha vs lol, etc.) */
+                if (agent->memory && batch_key && key_len > 0) {
+                    hu_style_fingerprint_t fp;
+                    memset(&fp, 0, sizeof(fp));
+                    if (hu_style_fingerprint_get(agent->memory, alloc, batch_key, key_len, &fp) ==
+                            HU_OK) {
+                        char fp_buf[256];
+                        size_t fp_len =
+                            hu_style_fingerprint_build_directive(&fp, fp_buf, sizeof(fp_buf));
+                        if (fp_len > 0) {
+                            if (style_ctx && style_ctx_len > 0) {
+                                size_t merged_len = style_ctx_len + fp_len + 2;
+                                char *merged =
+                                    (char *)alloc->alloc(alloc->ctx, merged_len + 1);
+                                if (merged) {
+                                    memcpy(merged, style_ctx, style_ctx_len);
+                                    merged[style_ctx_len] = '\n';
+                                    memcpy(merged + style_ctx_len + 1, fp_buf, fp_len);
+                                    merged[merged_len - 1] = '\n';
+                                    merged[merged_len] = '\0';
+                                    alloc->free(alloc->ctx, style_ctx, style_ctx_len + 1);
+                                    style_ctx = merged;
+                                    style_ctx_len = merged_len;
+                                }
+                            } else {
+                                style_ctx = (char *)alloc->alloc(alloc->ctx, fp_len + 2);
+                                if (style_ctx) {
+                                    memcpy(style_ctx, fp_buf, fp_len);
+                                    style_ctx[fp_len] = '\n';
+                                    style_ctx[fp_len + 1] = '\0';
+                                    style_ctx_len = fp_len + 1;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 /* Merge style context into conversation context */
                 if (style_ctx && convo_ctx) {
                     size_t merged_len = convo_ctx_len + style_ctx_len + 2;
@@ -3208,6 +3246,41 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     vuln.topic_category, tl, "vulnerable", 9, vuln.intensity);
                             }
 #endif
+                        }
+                    }
+                }
+
+                /* F49: Call escalation — when text isn't enough, suggest a call. */
+                if (combined_len > 0) {
+                    hu_call_escalation_t call_esc = hu_conversation_should_escalate_to_call(
+                        combined, combined_len, history_entries, history_count);
+                    if (call_esc.should_suggest) {
+                        char call_buf[512];
+                        size_t call_len = hu_conversation_build_call_directive(
+                            combined, combined_len, call_buf, sizeof(call_buf));
+                        if (call_len > 0) {
+                            if (convo_ctx) {
+                                size_t total = convo_ctx_len + call_len + 3;
+                                char *merged = (char *)alloc->alloc(alloc->ctx, total);
+                                if (merged) {
+                                    memcpy(merged, convo_ctx, convo_ctx_len);
+                                    merged[convo_ctx_len] = '\n';
+                                    memcpy(merged + convo_ctx_len + 1, call_buf, call_len);
+                                    merged[convo_ctx_len + 1 + call_len] = '\n';
+                                    merged[total - 1] = '\0';
+                                    alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                    convo_ctx = merged;
+                                    convo_ctx_len = total - 1;
+                                }
+                            } else {
+                                convo_ctx = (char *)alloc->alloc(alloc->ctx, call_len + 2);
+                                if (convo_ctx) {
+                                    memcpy(convo_ctx, call_buf, call_len);
+                                    convo_ctx[call_len] = '\n';
+                                    convo_ctx[call_len + 1] = '\0';
+                                    convo_ctx_len = call_len + 1;
+                                }
+                            }
                         }
                     }
                 }
@@ -5313,6 +5386,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (send_buf_ack)
                         alloc->free(alloc->ctx, send_buf_ack, send_len + 1);
                 }
+
+                /* F32: Update style fingerprint with our sent response */
+                if (agent->memory && batch_key && key_len > 0 && response && response_len > 0)
+                    (void)hu_style_fingerprint_update(agent->memory, alloc, batch_key, key_len,
+                                                      response, response_len);
+
 #if defined(HU_ENABLE_IMESSAGE) && !defined(HU_IS_TEST)
             skip_send:
 #endif

@@ -1863,6 +1863,95 @@ static void test_persona_load_json_important_dates_context_awareness_defaults(vo
     hu_persona_deinit(&alloc, &p);
 }
 
+static void test_persona_load_json_phase4_all_fields(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json =
+        "{\"version\":1,\"name\":\"phase4_test\","
+        "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
+        "\"follow_up_style\":{\"delayed_follow_up_probability\":0.15,\"min_delay_minutes\":20,"
+        "\"max_delay_hours\":4},"
+        "\"bookend_messages\":{\"enabled\":true,\"morning_window\":[7,9],\"evening_window\":[22,23],"
+        "\"frequency_per_week\":2.5,\"phrases_morning\":[\"morning min\"],\"phrases_evening\":[\"night\"]},"
+        "\"context_awareness\":{\"calendar_enabled\":false,\"weather_enabled\":false,"
+        "\"sports_teams\":[\"Lakers\"],\"news_topics\":[\"tech\"]},"
+        "\"humanization\":{\"double_text_probability\":0.08},"
+        "\"timezone\":\"America/Denver\",\"location\":\"Denver, CO\",\"group_response_rate\":0.1}";
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_FLOAT_EQ(p.follow_up_style.delayed_follow_up_probability, 0.15f, 0.001f);
+    HU_ASSERT_EQ(p.follow_up_style.min_delay_minutes, 20);
+    HU_ASSERT_EQ(p.follow_up_style.max_delay_hours, 4);
+    HU_ASSERT_TRUE(p.bookend_messages.enabled);
+    HU_ASSERT_EQ(p.bookend_messages.morning_window[0], 7);
+    HU_ASSERT_EQ(p.bookend_messages.morning_window[1], 9);
+    HU_ASSERT_EQ(p.bookend_messages.evening_window[0], 22);
+    HU_ASSERT_EQ(p.bookend_messages.evening_window[1], 23);
+    HU_ASSERT_FLOAT_EQ(p.bookend_messages.frequency_per_week, 2.5f, 0.001f);
+    HU_ASSERT_EQ(p.bookend_messages.phrases_morning_count, 1);
+    HU_ASSERT_STR_EQ(p.bookend_messages.phrases_morning[0], "morning min");
+    HU_ASSERT_EQ(p.bookend_messages.phrases_evening_count, 1);
+    HU_ASSERT_STR_EQ(p.bookend_messages.phrases_evening[0], "night");
+    HU_ASSERT_FALSE(p.context_awareness.calendar_enabled);
+    HU_ASSERT_FALSE(p.context_awareness.weather_enabled);
+    HU_ASSERT_EQ(p.context_awareness.sports_teams_count, 1);
+    HU_ASSERT_STR_EQ(p.context_awareness.sports_teams[0], "Lakers");
+    HU_ASSERT_EQ(p.context_awareness.news_topics_count, 1);
+    HU_ASSERT_STR_EQ(p.context_awareness.news_topics[0], "tech");
+    HU_ASSERT_FLOAT_EQ(p.humanization.double_text_probability, 0.08f, 0.001f);
+    HU_ASSERT_STR_EQ(p.timezone, "America/Denver");
+    HU_ASSERT_STR_EQ(p.location, "Denver, CO");
+    HU_ASSERT_FLOAT_EQ(p.group_response_rate, 0.1f, 0.001f);
+    hu_persona_deinit(&alloc, &p);
+}
+
+static void test_persona_load_json_phase4_defaults_when_absent(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"version\":1,\"name\":\"no_phase4\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]}}";
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_FLOAT_EQ(p.follow_up_style.delayed_follow_up_probability, 0.15f, 0.001f);
+    HU_ASSERT_EQ(p.follow_up_style.min_delay_minutes, 20);
+    HU_ASSERT_EQ(p.follow_up_style.max_delay_hours, 4);
+    HU_ASSERT_FALSE(p.bookend_messages.enabled);
+    HU_ASSERT_EQ(p.bookend_messages.morning_window[0], 7);
+    HU_ASSERT_EQ(p.bookend_messages.morning_window[1], 9);
+    HU_ASSERT_EQ(p.bookend_messages.evening_window[0], 22);
+    HU_ASSERT_EQ(p.bookend_messages.evening_window[1], 23);
+    HU_ASSERT_FLOAT_EQ(p.bookend_messages.frequency_per_week, 2.5f, 0.001f);
+    HU_ASSERT_EQ(p.bookend_messages.phrases_morning_count, 0);
+    HU_ASSERT_EQ(p.bookend_messages.phrases_evening_count, 0);
+    HU_ASSERT_EQ(p.context_awareness.sports_teams_count, 0);
+    HU_ASSERT_EQ(p.context_awareness.news_topics_count, 0);
+    HU_ASSERT_FLOAT_EQ(p.humanization.double_text_probability, 0.08f, 0.001f);
+    HU_ASSERT_EQ(p.timezone[0], '\0');
+    HU_ASSERT_EQ(p.location[0], '\0');
+    HU_ASSERT_FLOAT_EQ(p.group_response_rate, 0.1f, 0.001f);
+    hu_persona_deinit(&alloc, &p);
+}
+
+static void test_persona_load_json_bookend_phrases_morning_array(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json =
+        "{\"version\":1,\"name\":\"bookend_phrases\","
+        "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
+        "\"bookend_messages\":{\"enabled\":true,\"phrases_morning\":[\"morning min\",\"hey\",\"gm\"],"
+        "\"phrases_evening\":[\"night\",\"gn\"]}}";
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(p.bookend_messages.phrases_morning_count, 3);
+    HU_ASSERT_STR_EQ(p.bookend_messages.phrases_morning[0], "morning min");
+    HU_ASSERT_STR_EQ(p.bookend_messages.phrases_morning[1], "hey");
+    HU_ASSERT_STR_EQ(p.bookend_messages.phrases_morning[2], "gm");
+    HU_ASSERT_EQ(p.bookend_messages.phrases_evening_count, 2);
+    HU_ASSERT_STR_EQ(p.bookend_messages.phrases_evening[0], "night");
+    HU_ASSERT_STR_EQ(p.bookend_messages.phrases_evening[1], "gn");
+    hu_persona_deinit(&alloc, &p);
+}
+
 static void test_overlay_typing_quirks_in_prompt(void) {
     hu_allocator_t alloc = hu_system_allocator();
     char *quirks[] = {"lowercase", "no_periods"};
@@ -3361,6 +3450,11 @@ void run_persona_tests(void) {
     HU_RUN_TEST(test_persona_load_json_important_dates_parses);
     HU_RUN_TEST(test_persona_load_json_context_awareness_calendar_enabled);
     HU_RUN_TEST(test_persona_load_json_important_dates_context_awareness_defaults);
+
+    /* Phase 4 — follow-ups, bookends, timezone, weather, groups */
+    HU_RUN_TEST(test_persona_load_json_phase4_all_fields);
+    HU_RUN_TEST(test_persona_load_json_phase4_defaults_when_absent);
+    HU_RUN_TEST(test_persona_load_json_bookend_phrases_morning_array);
 
     /* Rich persona elements (Tier 1–3) */
     HU_RUN_TEST(test_persona_load_json_rich_persona);

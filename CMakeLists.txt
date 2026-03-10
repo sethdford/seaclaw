@@ -387,6 +387,7 @@ set(HU_CORE_SOURCES
     src/agent/awareness.c
     src/agent/outcomes.c
     src/context/conversation.c
+    src/context/style_tracker.c
     src/context/mood.c
     src/context/event_extract.c
     src/context/vision.c
@@ -711,12 +712,19 @@ list(APPEND HU_CORE_SOURCES
     src/data/data_conversation_filler_words_json.c
     src/data/data_conversation_personal_sharing_json.c
     src/data/data_conversation_starters_json.c
+    src/data/data_conversation_time_gap_phrases_json.c
+    src/data/data_conversation_vulnerability_keywords_json.c
     src/data/data_persona_circadian_phases_json.c
     src/data/data_persona_relationship_stages_json.c
     src/data/data_security_command_lists_json.c
     src/data/data_agent_commitment_patterns_json.c
     src/data/data_memory_emotion_adjectives_json.c
     src/data/data_memory_relationship_words_json.c
+    src/data/data_memory_topic_patterns_json.c
+    src/data/data_memory_commitment_prefixes_json.c
+    src/data/data_memory_emotion_prefixes_json.c
+    src/data/data_prompts_tone_hints_json.c
+    src/data/data_channels_telegram_commands_txt.c
 )
 
 # Crypto sources (generic C fallbacks + dispatch)
@@ -1520,6 +1528,7 @@ set(HU_TEST_SOURCES
     tests/test_dag.c
     tests/test_mood.c
     tests/test_bth_e2e.c
+    tests/test_style_tracker.c
 )
 if(HU_ENABLE_PERSONA)
     list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c)

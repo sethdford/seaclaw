@@ -2355,6 +2355,42 @@ static void leave_on_read_ok_seed_over_2_returns_false(void) {
     HU_ASSERT_FALSE(r);
 }
 
+/* ── Call escalation (F49) ────────────────────────────────────────────────── */
+
+static void call_escalation_crisis_keywords_returns_true(void) {
+    const char *msg = "i need you right now please help";
+    hu_call_escalation_t r = hu_conversation_should_escalate_to_call(msg, strlen(msg), NULL, 0);
+    HU_ASSERT_TRUE(r.should_suggest);
+}
+
+static void call_escalation_whats_for_dinner_returns_false(void) {
+    const char *msg = "what's for dinner";
+    hu_call_escalation_t r = hu_conversation_should_escalate_to_call(msg, strlen(msg), NULL, 0);
+    HU_ASSERT_FALSE(r.should_suggest);
+}
+
+static void call_escalation_long_emotional_returns_true(void) {
+    const char *msg =
+        "this is really complicated and I don't know what to do anymore. I've been trying for "
+        "weeks and nothing works. I'm at the end of my rope";
+    hu_call_escalation_t r = hu_conversation_should_escalate_to_call(msg, strlen(msg), NULL, 0);
+    HU_ASSERT_TRUE(r.should_suggest);
+}
+
+static void call_escalation_null_input_returns_false_score_zero(void) {
+    hu_call_escalation_t r = hu_conversation_should_escalate_to_call(NULL, 0, NULL, 0);
+    HU_ASSERT_FALSE(r.should_suggest);
+    HU_ASSERT_EQ((int)(r.score * 1000), 0);
+}
+
+static void call_escalation_build_directive_writes_nonempty(void) {
+    char buf[512];
+    size_t n = hu_conversation_build_call_directive("hey can you call me?", 20, buf, sizeof(buf));
+    HU_ASSERT_TRUE(n > 0);
+    HU_ASSERT_TRUE(strstr(buf, "[CALL:") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "call") != NULL);
+}
+
 /* ── Inside joke detection (F19) ───────────────────────────────────────────── */
 
 static void detect_inside_joke_remember_when_true(void) {
@@ -2949,4 +2985,11 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(leave_on_read_short_ok_seed_under_2_returns_true);
     HU_RUN_TEST(leave_on_read_whatever_seed_under_2_returns_true);
     HU_RUN_TEST(leave_on_read_ok_seed_over_2_returns_false);
+
+    /* Call escalation (F49) */
+    HU_RUN_TEST(call_escalation_crisis_keywords_returns_true);
+    HU_RUN_TEST(call_escalation_whats_for_dinner_returns_false);
+    HU_RUN_TEST(call_escalation_long_emotional_returns_true);
+    HU_RUN_TEST(call_escalation_null_input_returns_false_score_zero);
+    HU_RUN_TEST(call_escalation_build_directive_writes_nonempty);
 }

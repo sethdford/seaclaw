@@ -132,6 +132,7 @@ void run_superhuman_tests(void);
 void run_tool_router_tests(void);
 void run_dag_tests(void);
 void run_mood_tests(void);
+void run_style_tracker_tests(void);
 void run_bth_e2e_tests(void);
 void run_bth_metrics_tests(void);
 void run_memory_features_tests(void);
@@ -271,6 +272,7 @@ int main(void) {
     run_tool_router_tests();
     run_dag_tests();
     run_mood_tests();
+    run_style_tracker_tests();
     run_bth_e2e_tests();
     run_bth_metrics_tests();
     run_memory_features_tests();

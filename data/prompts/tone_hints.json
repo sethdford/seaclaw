@@ -1,0 +1,5 @@
+{
+  "casual": "The user communicates casually. Match their tone.",
+  "technical": "The user is discussing technical details. Be precise and specific.",
+  "formal": "The user communicates formally. Use clear, professional language."
+}

@@ -1,0 +1,109 @@
+{
+  "patterns": [
+    {
+      "prefix": "at ",
+      "word": "work",
+      "topic": "work"
+    },
+    {
+      "prefix": "at the ",
+      "word": "office",
+      "topic": "work"
+    },
+    {
+      "prefix": "my ",
+      "word": "job",
+      "topic": "work"
+    },
+    {
+      "prefix": "the ",
+      "word": "office",
+      "topic": "work"
+    },
+    {
+      "prefix": "the ",
+      "word": "project",
+      "topic": "work"
+    },
+    {
+      "prefix": "my ",
+      "word": "boss",
+      "topic": "work"
+    },
+    {
+      "prefix": "",
+      "word": "deadline",
+      "topic": "work"
+    },
+    {
+      "prefix": "the ",
+      "word": "doctor",
+      "topic": "health"
+    },
+    {
+      "prefix": "my ",
+      "word": "health",
+      "topic": "health"
+    },
+    {
+      "prefix": "the ",
+      "word": "hospital",
+      "topic": "health"
+    },
+    {
+      "prefix": "my ",
+      "word": "medication",
+      "topic": "health"
+    },
+    {
+      "prefix": "feeling ",
+      "word": "sick",
+      "topic": "health"
+    },
+    {
+      "prefix": "my ",
+      "word": "relationship",
+      "topic": "relationship"
+    },
+    {
+      "prefix": "my ",
+      "word": "partner",
+      "topic": "relationship"
+    },
+    {
+      "prefix": "",
+      "word": "dating",
+      "topic": "relationship"
+    },
+    {
+      "prefix": "my ",
+      "word": "budget",
+      "topic": "finance"
+    },
+    {
+      "prefix": "",
+      "word": "savings",
+      "topic": "finance"
+    },
+    {
+      "prefix": "",
+      "word": "rent",
+      "topic": "finance"
+    },
+    {
+      "prefix": "",
+      "word": "bills",
+      "topic": "finance"
+    },
+    {
+      "prefix": "",
+      "word": "debt",
+      "topic": "finance"
+    },
+    {
+      "prefix": "",
+      "word": "salary",
+      "topic": "finance"
+    }
+  ]
+}

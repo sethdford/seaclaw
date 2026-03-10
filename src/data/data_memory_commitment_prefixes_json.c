@@ -15,4 +15,4 @@ const unsigned char data_memory_commitment_prefixes_json[] = {
   0x67, 0x6f, 0x6e, 0x6e, 0x61, 0x20, 0x22, 0x0a, 0x20, 0x20, 0x5d, 0x0a,
   0x7d, 0x0a
 };
-static const size_t data_memory_commitment_prefixes_json_len = 146;
+const size_t data_memory_commitment_prefixes_json_len = 146;

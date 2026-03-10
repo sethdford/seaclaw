@@ -1,0 +1,11 @@
+/start - Start a conversation
+/help - Show available commands
+/status - Show model and stats
+/model - Switch model
+/think - Set thinking level
+/verbose - Set verbose level
+/tts - Set TTS mode
+/memory - Memory tools and diagnostics
+/stop - Stop active background task
+/restart - Restart current session
+/compact - Compact context now

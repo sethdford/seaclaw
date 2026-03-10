@@ -138,6 +138,15 @@ static const char *const schema_parts[] = {
     "hour INTEGER,"
     "observed_at INTEGER NOT NULL)",
     "CREATE INDEX IF NOT EXISTS idx_pattern_observations_contact ON pattern_observations(contact_id)",
+    "CREATE TABLE IF NOT EXISTS style_fingerprints("
+    "contact_id TEXT NOT NULL PRIMARY KEY,"
+    "uses_lowercase INTEGER DEFAULT 0,"
+    "uses_periods INTEGER DEFAULT 0,"
+    "laugh_style TEXT,"
+    "avg_message_length INTEGER,"
+    "common_phrases TEXT,"
+    "distinctive_words TEXT,"
+    "updated_at INTEGER)",
     NULL};
 
 static void get_timestamp(char *buf, size_t buf_size) {

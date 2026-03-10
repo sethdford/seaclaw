@@ -2,6 +2,7 @@
  * System prompt builder — identity, tools, memory, constraints.
  */
 #include "human/agent/prompt.h"
+#include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/data/loader.h"
 #include "human/persona.h"
@@ -11,6 +12,53 @@
 #include <time.h>
 
 #define HU_PROMPT_INIT_CAP 8192
+
+/* Tone hint strings — loaded from data or use defaults */
+static const char *g_tone_hints[3] = {NULL, NULL, NULL}; /* casual, technical, formal */
+static size_t g_tone_hints_len[3] = {0, 0, 0};
+
+/* Default fallbacks */
+static const char *DEFAULT_TONE_HINTS[3] = {
+    "The user communicates casually. Match their tone.",
+    "The user is discussing technical details. Be precise and specific.",
+    "The user communicates formally. Use clear, professional language."
+};
+static const size_t DEFAULT_TONE_HINTS_LEN[3] = {49, 66, 65};
+
+static hu_error_t hu_prompt_data_init(hu_allocator_t *alloc) {
+    if (!alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    /* Load tone hints */
+    char *json_data = NULL;
+    size_t json_len = 0;
+    hu_error_t err = hu_data_load(alloc, "prompts/tone_hints.json", &json_data, &json_len);
+    if (err == HU_OK && json_data) {
+        hu_json_value_t *root = NULL;
+        err = hu_json_parse(alloc, json_data, json_len, &root);
+        alloc->free(alloc->ctx, json_data, json_len);
+        if (err == HU_OK && root) {
+            const char *casual = hu_json_get_string(root, "casual");
+            const char *technical = hu_json_get_string(root, "technical");
+            const char *formal = hu_json_get_string(root, "formal");
+            if (casual) {
+                g_tone_hints[0] = hu_strndup(alloc, casual, strlen(casual));
+                g_tone_hints_len[0] = strlen(g_tone_hints[0]);
+            }
+            if (technical) {
+                g_tone_hints[1] = hu_strndup(alloc, technical, strlen(technical));
+                g_tone_hints_len[1] = strlen(g_tone_hints[1]);
+            }
+            if (formal) {
+                g_tone_hints[2] = hu_strndup(alloc, formal, strlen(formal));
+                g_tone_hints_len[2] = strlen(g_tone_hints[2]);
+            }
+            hu_json_free(alloc, root);
+        }
+    }
+
+    return HU_OK;
+}
 
 static hu_error_t append(hu_allocator_t *alloc, char **buf, size_t *len, size_t *cap, const char *s,
                          size_t slen) {
@@ -32,6 +80,9 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
                                   char **out, size_t *out_len) {
     if (!alloc || !config || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
+
+    /* Initialize prompt data (tone hints, etc.) */
+    hu_prompt_data_init(alloc);
 
     size_t cap = HU_PROMPT_INIT_CAP;
     char *buf = (char *)alloc->alloc(alloc->ctx, cap);
@@ -690,16 +741,16 @@ const char *hu_tone_hint_string(hu_tone_t tone, size_t *out_len) {
     size_t len = 0;
     switch (tone) {
     case HU_TONE_CASUAL:
-        s = "The user communicates casually. Match their tone.";
-        len = 49;
+        s = g_tone_hints[0] ? g_tone_hints[0] : DEFAULT_TONE_HINTS[0];
+        len = g_tone_hints[0] ? g_tone_hints_len[0] : DEFAULT_TONE_HINTS_LEN[0];
         break;
     case HU_TONE_TECHNICAL:
-        s = "The user is discussing technical details. Be precise and specific.";
-        len = 66;
+        s = g_tone_hints[1] ? g_tone_hints[1] : DEFAULT_TONE_HINTS[1];
+        len = g_tone_hints[1] ? g_tone_hints_len[1] : DEFAULT_TONE_HINTS_LEN[1];
         break;
     case HU_TONE_FORMAL:
-        s = "The user communicates formally. Use clear, professional language.";
-        len = 65;
+        s = g_tone_hints[2] ? g_tone_hints[2] : DEFAULT_TONE_HINTS[2];
+        len = g_tone_hints[2] ? g_tone_hints_len[2] : DEFAULT_TONE_HINTS_LEN[2];
         break;
     default:
         break;

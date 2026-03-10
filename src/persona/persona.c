@@ -695,6 +695,27 @@ static hu_error_t parse_string_array(hu_allocator_t *a, const hu_json_value_t *a
     return HU_OK;
 }
 
+/* Parse string array into fixed-size buffer (max max_count items, each max 63 chars + null). */
+static void parse_string_array_fixed(const hu_json_value_t *arr, char (*dest)[64], size_t max_count,
+                                     size_t *out_count) {
+    *out_count = 0;
+    if (!arr || arr->type != HU_JSON_ARRAY || !arr->data.array.items)
+        return;
+    size_t n = arr->data.array.len;
+    if (n > max_count)
+        n = max_count;
+    for (size_t i = 0; i < n; i++) {
+        const hu_json_value_t *item = arr->data.array.items[i];
+        if (!item || item->type != HU_JSON_STRING || !item->data.string.ptr)
+            continue;
+        size_t len = item->data.string.len;
+        if (len >= 64)
+            len = 63;
+        (void)snprintf(dest[*out_count], 64, "%.*s", (int)len, item->data.string.ptr);
+        (*out_count)++;
+    }
+}
+
 static hu_error_t parse_overlay(hu_allocator_t *a, const char *channel_name,
                                 const hu_json_value_t *obj, hu_persona_overlay_t *ov) {
     if (!obj || obj->type != HU_JSON_OBJECT)
@@ -1249,6 +1270,7 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
     out->humanization.disfluency_frequency = 0.15f;
     out->humanization.backchannel_probability = 0.3f;
     out->humanization.burst_message_probability = 0.03f;
+    out->humanization.double_text_probability = 0.08f;
     hu_json_value_t *hum = hu_json_object_get(root, "humanization");
     if (hum && hum->type == HU_JSON_OBJECT) {
         out->humanization.disfluency_frequency =
@@ -1257,6 +1279,8 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
             (float)hu_json_get_number(hum, "backchannel_probability", 0.3);
         out->humanization.burst_message_probability =
             (float)hu_json_get_number(hum, "burst_message_probability", 0.03);
+        out->humanization.double_text_probability =
+            (float)hu_json_get_number(hum, "double_text_probability", 0.08);
     }
 
     /* Context modifiers (defaults applied when block absent) */
@@ -1311,11 +1335,93 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
 
     /* Context awareness (default: calendar_enabled=false) */
     out->context_awareness.calendar_enabled = false;
+    out->context_awareness.weather_enabled = false;
+    out->context_awareness.sports_teams_count = 0;
+    out->context_awareness.news_topics_count = 0;
     hu_json_value_t *ctx_aw = hu_json_object_get(root, "context_awareness");
     if (ctx_aw && ctx_aw->type == HU_JSON_OBJECT) {
         out->context_awareness.calendar_enabled =
             hu_json_get_bool(ctx_aw, "calendar_enabled", false);
+        out->context_awareness.weather_enabled =
+            hu_json_get_bool(ctx_aw, "weather_enabled", false);
+        hu_json_value_t *teams = hu_json_object_get(ctx_aw, "sports_teams");
+        if (teams)
+            parse_string_array_fixed(teams, out->context_awareness.sports_teams, 8,
+                                    &out->context_awareness.sports_teams_count);
+        hu_json_value_t *topics = hu_json_object_get(ctx_aw, "news_topics");
+        if (topics)
+            parse_string_array_fixed(topics, out->context_awareness.news_topics, 8,
+                                    &out->context_awareness.news_topics_count);
     }
+
+    /* Phase 4: follow_up_style (defaults applied when block absent) */
+    out->follow_up_style.delayed_follow_up_probability = 0.15f;
+    out->follow_up_style.min_delay_minutes = 20;
+    out->follow_up_style.max_delay_hours = 4;
+    hu_json_value_t *fus = hu_json_object_get(root, "follow_up_style");
+    if (fus && fus->type == HU_JSON_OBJECT) {
+        out->follow_up_style.delayed_follow_up_probability =
+            (float)hu_json_get_number(fus, "delayed_follow_up_probability", 0.15);
+        out->follow_up_style.min_delay_minutes =
+            (int16_t)hu_json_get_number(fus, "min_delay_minutes", 20);
+        out->follow_up_style.max_delay_hours =
+            (int16_t)hu_json_get_number(fus, "max_delay_hours", 4);
+    }
+
+    /* Phase 4: bookend_messages (defaults applied when block absent) */
+    out->bookend_messages.enabled = false;
+    out->bookend_messages.morning_window[0] = 7;
+    out->bookend_messages.morning_window[1] = 9;
+    out->bookend_messages.evening_window[0] = 22;
+    out->bookend_messages.evening_window[1] = 23;
+    out->bookend_messages.frequency_per_week = 2.5f;
+    out->bookend_messages.phrases_morning_count = 0;
+    out->bookend_messages.phrases_evening_count = 0;
+    hu_json_value_t *bookend = hu_json_object_get(root, "bookend_messages");
+    if (bookend && bookend->type == HU_JSON_OBJECT) {
+        out->bookend_messages.enabled = hu_json_get_bool(bookend, "enabled", false);
+        out->bookend_messages.frequency_per_week =
+            (float)hu_json_get_number(bookend, "frequency_per_week", 2.5);
+        hu_json_value_t *mw = hu_json_object_get(bookend, "morning_window");
+        if (mw && mw->type == HU_JSON_ARRAY && mw->data.array.len >= 2 &&
+            mw->data.array.items) {
+            const hu_json_value_t *v0 = mw->data.array.items[0];
+            const hu_json_value_t *v1 = mw->data.array.items[1];
+            if (v0 && v0->type == HU_JSON_NUMBER)
+                out->bookend_messages.morning_window[0] = (uint8_t)v0->data.number;
+            if (v1 && v1->type == HU_JSON_NUMBER)
+                out->bookend_messages.morning_window[1] = (uint8_t)v1->data.number;
+        }
+        hu_json_value_t *ew = hu_json_object_get(bookend, "evening_window");
+        if (ew && ew->type == HU_JSON_ARRAY && ew->data.array.len >= 2 &&
+            ew->data.array.items) {
+            const hu_json_value_t *v0 = ew->data.array.items[0];
+            const hu_json_value_t *v1 = ew->data.array.items[1];
+            if (v0 && v0->type == HU_JSON_NUMBER)
+                out->bookend_messages.evening_window[0] = (uint8_t)v0->data.number;
+            if (v1 && v1->type == HU_JSON_NUMBER)
+                out->bookend_messages.evening_window[1] = (uint8_t)v1->data.number;
+        }
+        hu_json_value_t *pm = hu_json_object_get(bookend, "phrases_morning");
+        if (pm)
+            parse_string_array_fixed(pm, out->bookend_messages.phrases_morning, 8,
+                                    &out->bookend_messages.phrases_morning_count);
+        hu_json_value_t *pe = hu_json_object_get(bookend, "phrases_evening");
+        if (pe)
+            parse_string_array_fixed(pe, out->bookend_messages.phrases_evening, 8,
+                                    &out->bookend_messages.phrases_evening_count);
+    }
+
+    /* Phase 4: timezone, location, group_response_rate (persona-level) */
+    {
+        const char *tz = hu_json_get_string(root, "timezone");
+        if (tz)
+            (void)snprintf(out->timezone, sizeof(out->timezone), "%.63s", tz);
+        const char *loc = hu_json_get_string(root, "location");
+        if (loc)
+            (void)snprintf(out->location, sizeof(out->location), "%.127s", loc);
+    }
+    out->group_response_rate = (float)hu_json_get_number(root, "group_response_rate", 0.1);
 
     /* Parse contacts */
     hu_json_value_t *contacts_obj = hu_json_object_get(root, "contacts");
