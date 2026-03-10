@@ -1,9 +1,11 @@
+#include "human/channel_loop.h"
 #include "human/core/allocator.h"
 #include "human/daemon.h"
 #include "human/migration.h"
 #include "human/onboard.h"
 #include "human/skillforge.h"
 #include "test_framework.h"
+#include <string.h>
 #include <time.h>
 
 static void test_skillforge_create_destroy(void) {
@@ -317,6 +319,36 @@ static void test_service_run_null_agent(void) {
     HU_ASSERT_EQ(err, HU_OK);
 }
 
+static void test_daemon_photo_viewing_delay_no_attachment_returns_zero(void) {
+    hu_channel_loop_msg_t msgs[2];
+    memset(msgs, 0, sizeof(msgs));
+    strncpy(msgs[0].session_key, "sess", sizeof(msgs[0].session_key) - 1);
+    strncpy(msgs[0].content, "hello", sizeof(msgs[0].content) - 1);
+    msgs[0].has_attachment = false;
+    strncpy(msgs[1].session_key, "sess", sizeof(msgs[1].session_key) - 1);
+    strncpy(msgs[1].content, "world", sizeof(msgs[1].content) - 1);
+    msgs[1].has_attachment = false;
+    uint32_t delay = hu_daemon_photo_viewing_delay_ms(msgs, 0, 1, 123);
+    HU_ASSERT_EQ(delay, 0u);
+}
+
+static void test_daemon_photo_viewing_delay_with_attachment_includes_range(void) {
+    hu_channel_loop_msg_t msgs[2];
+    memset(msgs, 0, sizeof(msgs));
+    strncpy(msgs[0].session_key, "sess", sizeof(msgs[0].session_key) - 1);
+    strncpy(msgs[0].content, "hello", sizeof(msgs[0].content) - 1);
+    msgs[0].has_attachment = false;
+    strncpy(msgs[1].session_key, "sess", sizeof(msgs[1].session_key) - 1);
+    strncpy(msgs[1].content, "photo", sizeof(msgs[1].content) - 1);
+    msgs[1].has_attachment = true;
+    uint32_t delay = hu_daemon_photo_viewing_delay_ms(msgs, 0, 1, 0);
+    HU_ASSERT_EQ(delay, 3000u); /* seed=0 → 3000 + 0 */
+    delay = hu_daemon_photo_viewing_delay_ms(msgs, 0, 1, 5000);
+    HU_ASSERT_EQ(delay, 8000u); /* seed=5000 → 3000 + 5000 */
+    delay = hu_daemon_photo_viewing_delay_ms(msgs, 0, 1, 2500);
+    HU_ASSERT_TRUE(delay >= 3000u && delay <= 8000u);
+}
+
 static void test_service_run_null_alloc(void) {
     hu_error_t err = hu_service_run(NULL, 0, NULL, 0, NULL, NULL);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
@@ -362,5 +394,7 @@ void run_subsystems_tests(void) {
     HU_RUN_TEST(test_cron_match_large_numbers);
     HU_RUN_TEST(test_cron_match_negative_step);
     HU_RUN_TEST(test_service_run_null_agent);
+    HU_RUN_TEST(test_daemon_photo_viewing_delay_no_attachment_returns_zero);
+    HU_RUN_TEST(test_daemon_photo_viewing_delay_with_attachment_includes_range);
     HU_RUN_TEST(test_service_run_null_alloc);
 }

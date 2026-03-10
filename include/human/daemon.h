@@ -70,4 +70,10 @@ hu_error_t hu_daemon_install(hu_allocator_t *alloc);
 hu_error_t hu_daemon_uninstall(void);
 hu_error_t hu_daemon_logs(void);
 
+#ifdef HU_IS_TEST
+/* Test hook: compute photo viewing delay for batch (3–8 s when has_attachment). */
+uint32_t hu_daemon_photo_viewing_delay_ms(const hu_channel_loop_msg_t *msgs, size_t batch_start,
+                                          size_t batch_end, uint32_t seed);
+#endif
+
 #endif /* HU_DAEMON_H */

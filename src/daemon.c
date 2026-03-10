@@ -848,6 +848,27 @@ static void service_signal_handler(int sig) {
 
 /* ── Streaming callback for channels with send_event ─────────────────────── */
 
+/* ── Photo viewing delay (F6) ────────────────────────────────────────────── */
+#define HU_PHOTO_VIEWING_DELAY_MIN_MS   3000
+#define HU_PHOTO_VIEWING_DELAY_RANGE_MS 5001 /* 0..5000 → 3–8 s inclusive */
+
+/* Returns 3–8 s (ms) if any message in batch has attachment, else 0. */
+static uint32_t photo_viewing_delay_ms(const hu_channel_loop_msg_t *msgs, size_t batch_start,
+                                       size_t batch_end, uint32_t seed) {
+    for (size_t b = batch_start; b <= batch_end; b++) {
+        if (msgs[b].has_attachment)
+            return HU_PHOTO_VIEWING_DELAY_MIN_MS + (seed % HU_PHOTO_VIEWING_DELAY_RANGE_MS);
+    }
+    return 0;
+}
+
+#ifdef HU_IS_TEST
+uint32_t hu_daemon_photo_viewing_delay_ms(const hu_channel_loop_msg_t *msgs, size_t batch_start,
+                                          size_t batch_end, uint32_t seed) {
+    return photo_viewing_delay_ms(msgs, batch_start, batch_end, seed);
+}
+#endif
+
 /* ── Service loop ──────────────────────────────────────────────────────── */
 
 hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
@@ -1423,6 +1444,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     base_delay += extra_delay_ms;
                     if (base_delay > 15000)
                         base_delay = 15000;
+
+                    /* F6: Photo viewing delay — 3–8 s when batch has attachment */
+                    {
+                        uint32_t seed = 0;
+#if defined(__APPLE__) || (defined(__linux__) && defined(__GLIBC__))
+                        seed = (uint32_t)arc4random_uniform(5001);
+#else
+                        seed = ((uint32_t)time(NULL) * 1103515245u + 12345u) % 5001u;
+#endif
+                        base_delay += photo_viewing_delay_ms(msgs, batch_start, batch_end, seed);
+                    }
 
                     /* Add +/- 30% random jitter */
                     uint32_t jitter_range = base_delay * 30 / 100;
@@ -2999,9 +3031,26 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 
                     if (tapback_decision == HU_TAPBACK_ONLY && ch->channel->vtable->react) {
-                        hu_reaction_type_t reaction = hu_conversation_classify_reaction(
-                            combined, combined_len, false, history_entries, history_count,
-                            (uint32_t)time(NULL));
+                        hu_reaction_type_t reaction = HU_REACTION_NONE;
+                        const char *vision_desc = NULL;
+                        size_t vision_desc_len = 0;
+                        if (hu_conversation_extract_vision_description(
+                                combined, combined_len, &vision_desc, &vision_desc_len) &&
+                            vision_desc && vision_desc_len > 0) {
+                            reaction = hu_conversation_classify_photo_reaction(
+                                vision_desc, vision_desc_len,
+#ifdef HU_HAS_PERSONA
+                                contact_for_tapback,
+#else
+                                NULL,
+#endif
+                                (uint32_t)time(NULL));
+                        }
+                        if (reaction == HU_REACTION_NONE) {
+                            reaction = hu_conversation_classify_reaction(
+                                combined, combined_len, false, history_entries, history_count,
+                                (uint32_t)time(NULL));
+                        }
                         if (reaction != HU_REACTION_NONE) {
                             int64_t msg_id = msgs[batch_end].message_id;
                             if (msg_id > 0) {
@@ -3017,9 +3066,26 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 
                     if (tapback_decision == HU_TAPBACK_AND_TEXT && ch->channel->vtable->react) {
-                        hu_reaction_type_t reaction = hu_conversation_classify_reaction(
-                            combined, combined_len, false, history_entries, history_count,
-                            (uint32_t)time(NULL));
+                        hu_reaction_type_t reaction = HU_REACTION_NONE;
+                        const char *vision_desc_txt = NULL;
+                        size_t vision_desc_txt_len = 0;
+                        if (hu_conversation_extract_vision_description(
+                                combined, combined_len, &vision_desc_txt, &vision_desc_txt_len) &&
+                            vision_desc_txt && vision_desc_txt_len > 0) {
+                            reaction = hu_conversation_classify_photo_reaction(
+                                vision_desc_txt, vision_desc_txt_len,
+#ifdef HU_HAS_PERSONA
+                                contact_for_tapback,
+#else
+                                NULL,
+#endif
+                                (uint32_t)time(NULL));
+                        }
+                        if (reaction == HU_REACTION_NONE) {
+                            reaction = hu_conversation_classify_reaction(
+                                combined, combined_len, false, history_entries, history_count,
+                                (uint32_t)time(NULL));
+                        }
                         if (reaction != HU_REACTION_NONE) {
                             int64_t msg_id = msgs[batch_end].message_id;
                             if (msg_id > 0) {
