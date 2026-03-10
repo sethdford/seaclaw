@@ -9,6 +9,10 @@
 #include "human/persona.h"
 #include "test_framework.h"
 #include <string.h>
+#ifdef HU_ENABLE_SQLITE
+#include "human/memory/superhuman.h"
+#include <time.h>
+#endif
 
 static void proactive_milestone_at_10_sessions(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -682,8 +686,49 @@ static void proactive_backoff_hours_returns_correct_thresholds(void) {
     HU_ASSERT_EQ(hu_proactive_backoff_hours(10), UINT32_MAX);
 }
 
+static void proactive_build_context_handles_new_action_types(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_proactive_result_t result;
+    memset(&result, 0, sizeof(result));
+
+    static const struct {
+        hu_proactive_action_type_t type;
+        const char *msg;
+    } actions[] = {
+        {HU_PROACTIVE_INSIDE_JOKE, "INSIDE JOKE: reference the pasta meme"},
+        {HU_PROACTIVE_TOPIC_ABSENCE, "TOPIC ABSENCE: they haven't mentioned work in weeks"},
+        {HU_PROACTIVE_GROWTH_CELEBRATION, "GROWTH: they went from couch to 5k"},
+        {HU_PROACTIVE_CURIOSITY, "CURIOSITY: they seemed curious about X"},
+        {HU_PROACTIVE_CALLBACK, "CALLBACK: follow up on their question about Y"},
+    };
+
+    for (size_t i = 0; i < sizeof(actions) / sizeof(actions[0]) && result.count < HU_PROACTIVE_MAX_ACTIONS; i++) {
+        result.actions[result.count].type = actions[i].type;
+        result.actions[result.count].message = hu_strndup(&alloc, actions[i].msg, strlen(actions[i].msg));
+        result.actions[result.count].message_len = strlen(actions[i].msg);
+        result.actions[result.count].priority = 0.7;
+        result.count++;
+    }
+
+    char *ctx = NULL;
+    size_t ctx_len = 0;
+    HU_ASSERT_EQ(hu_proactive_build_context(&result, &alloc, 8, &ctx, &ctx_len), HU_OK);
+    HU_ASSERT_NOT_NULL(ctx);
+    HU_ASSERT_TRUE(ctx_len > 0);
+    HU_ASSERT_TRUE(strstr(ctx, "### Proactive Awareness") != NULL);
+    HU_ASSERT_TRUE(strstr(ctx, "INSIDE JOKE") != NULL);
+    HU_ASSERT_TRUE(strstr(ctx, "TOPIC ABSENCE") != NULL);
+    HU_ASSERT_TRUE(strstr(ctx, "GROWTH") != NULL);
+    HU_ASSERT_TRUE(strstr(ctx, "CURIOSITY") != NULL);
+    HU_ASSERT_TRUE(strstr(ctx, "CALLBACK") != NULL);
+
+    alloc.free(alloc.ctx, ctx, ctx_len + 1);
+    hu_proactive_result_deinit(&result, &alloc);
+}
+
 void run_proactive_tests(void) {
     HU_TEST_SUITE("proactive");
+    HU_RUN_TEST(proactive_build_context_handles_new_action_types);
     HU_RUN_TEST(proactive_milestone_at_10_sessions);
     HU_RUN_TEST(proactive_milestone_50_reflects_deep_familiarity);
     HU_RUN_TEST(proactive_morning_briefing_at_9am);
@@ -716,4 +761,10 @@ void run_proactive_tests(void) {
     HU_RUN_TEST(proactive_important_dates_match_returns_true_and_message);
     HU_RUN_TEST(proactive_important_dates_no_match_returns_false);
     HU_RUN_TEST(proactive_important_dates_empty_returns_false);
+#ifdef HU_ENABLE_SQLITE
+    HU_RUN_TEST(proactive_curiosity_returns_message_from_micro_moment);
+    HU_RUN_TEST(proactive_curiosity_returns_false_without_micro_moments);
+    HU_RUN_TEST(proactive_callbacks_returns_delayed_followup);
+    HU_RUN_TEST(proactive_callbacks_returns_false_without_due_items);
+#endif
 }

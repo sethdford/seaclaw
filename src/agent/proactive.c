@@ -753,9 +753,6 @@ bool hu_proactive_check_callbacks(hu_allocator_t *alloc, hu_memory_t *memory,
         return false;
 
     int64_t now_ts = (int64_t)time(NULL);
-    size_t cid_len = strlen(contact_id);
-    if (cid_len != contact_id_len)
-        cid_len = contact_id_len;
 
     /* Try delayed follow-ups first */
     hu_delayed_followup_t *followups = NULL;
@@ -765,8 +762,9 @@ bool hu_proactive_check_callbacks(hu_allocator_t *alloc, hu_memory_t *memory,
         followups && followup_count > 0) {
         /* Filter by contact_id and pick one */
         for (size_t i = 0; i < followup_count; i++) {
-            if (strlen(followups[i].contact_id) != cid_len ||
-                memcmp(followups[i].contact_id, contact_id, cid_len) != 0)
+            size_t slen = strnlen(followups[i].contact_id, sizeof(followups[i].contact_id) - 1);
+            if (slen != contact_id_len ||
+                memcmp(followups[i].contact_id, contact_id, contact_id_len) != 0)
                 continue;
             size_t topic_len = strnlen(followups[i].topic, sizeof(followups[i].topic) - 1);
             if (topic_len == 0)
@@ -791,8 +789,10 @@ bool hu_proactive_check_callbacks(hu_allocator_t *alloc, hu_memory_t *memory,
                                           &commitment_count) == HU_OK &&
         commitments && commitment_count > 0) {
         for (size_t i = 0; i < commitment_count; i++) {
-            if (strlen(commitments[i].contact_id) != cid_len ||
-                memcmp(commitments[i].contact_id, contact_id, cid_len) != 0)
+            size_t slen =
+                strnlen(commitments[i].contact_id, sizeof(commitments[i].contact_id) - 1);
+            if (slen != contact_id_len ||
+                memcmp(commitments[i].contact_id, contact_id, contact_id_len) != 0)
                 continue;
             size_t desc_len = strnlen(commitments[i].description,
                                       sizeof(commitments[i].description) - 1);
