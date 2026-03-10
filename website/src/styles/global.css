@@ -7,7 +7,7 @@
   src: url("/fonts/avenir/Avenir-Light.woff2") format("woff2");
   font-weight: 300;
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
 }
 @font-face {
   font-family: "Avenir";
@@ -481,7 +481,47 @@
     font-family: var(--font-serif);
   }
 
+  /* ── Hero fade-in (CSS-only LCP optimization — visible before JS loads) ── */
+  .hero-fade-in {
+    animation: sc-hero-fade 0.8s var(--sc-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+  .hero-logo {
+    animation: sc-hero-fade 0.6s var(--sc-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+  @keyframes sc-hero-fade {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   /* ── Ambient gradients ── */
+  .ambient-coral {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--sc-accent-secondary, #f59e0b) 15%, transparent) 0%,
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .ambient-blue {
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--sc-accent-tertiary, #6366f1) 12%, transparent) 0%,
+      transparent 70%
+    );
+    pointer-events: none;
+    z-index: -1;
+  }
+
   .ambient-accent {
     position: absolute;
     width: 600px;
@@ -529,6 +569,9 @@
     box-shadow:
       0 1px 2px color-mix(in srgb, var(--sc-web-text) 10%, transparent),
       inset 0 1px 0 color-mix(in srgb, white 15%, transparent);
+  }
+  .btn-primary:hover,
+  .btn-primary:focus-visible {
     will-change: transform, box-shadow;
   }
 
@@ -750,6 +793,7 @@
   .hero-headline,
   .hero-desc,
   .hero-buttons,
+  .hero-fade-in,
   .bloat-title,
   .bloat-card,
   .bloat-answer,

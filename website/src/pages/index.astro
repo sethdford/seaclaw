@@ -94,6 +94,13 @@ const tools = [
       type="font/woff2"
       crossorigin
     />
+    <link
+      rel="preload"
+      href="/fonts/avenir/Avenir-Black.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <title>SeaClaw — Bring AI to every device on Earth</title>
     <meta
       name="description"
@@ -218,17 +225,17 @@ const tools = [
             alt="SeaClaw logo"
             width="512"
             height="512"
-            class="hero-logo w-20 h-20 md:w-24 md:h-24 mx-auto mb-10 opacity-0"
+            class="hero-logo w-20 h-20 md:w-24 md:h-24 mx-auto mb-10"
             style={`filter: drop-shadow(0 0 40px var(--color-accent-glow)); animation: float 6s ease-in-out infinite;`}
           />
           <h1
-            class="hero-headline font-sans font-black text-[clamp(2.5rem,7vw,4.5rem)] leading-[1.05] mb-6 opacity-0"
+            class="hero-headline font-sans font-black text-[clamp(2.5rem,7vw,4.5rem)] leading-[1.05] mb-6 hero-fade-in"
             style="color: var(--color-text); letter-spacing: -0.04em; font-weight: 900;"
           >
             Bring AI to <span class="text-gradient">every</span> device on&nbsp;Earth.
           </h1>
           <p
-            class="hero-desc text-[clamp(1.05rem,2.2vw,1.3rem)] leading-relaxed mb-10 opacity-0 max-w-2xl mx-auto"
+            class="hero-desc text-[clamp(1.05rem,2.2vw,1.3rem)] leading-relaxed mb-10 hero-fade-in max-w-2xl mx-auto"
             style="color: var(--color-text-secondary)"
           >
             A complete autonomous AI agent runtime in <strong
@@ -237,7 +244,7 @@ const tools = [
             One static binary. Zero dependencies. Boots in under 2&nbsp;milliseconds.
           </p>
           <div
-            class="hero-buttons flex flex-col sm:flex-row gap-4 justify-center opacity-0"
+            class="hero-buttons flex flex-col sm:flex-row gap-4 justify-center hero-fade-in"
           >
             <a href={`${base}getting-started/installation/`} class="btn-primary"
               >Get Started</a
@@ -427,7 +434,10 @@ const tools = [
           <svg
             id="arch-diagram"
             viewBox="0 0 600 600"
+            width="600"
+            height="600"
             class="w-full max-w-lg mx-auto"
+            style="aspect-ratio: 1;"
             xmlns="http://www.w3.org/2000/svg"
             role="img"
             aria-label="SeaClaw architecture diagram showing 8 swappable subsystems"
@@ -1088,7 +1098,12 @@ const tools = [
           // ═══ HERO ═══
           const heroTl = gsap.timeline({ defaults: { ease: "power3.out" } });
           heroTl
-            .to(".hero-logo", { opacity: 1, duration: 0.9 }, 0.2)
+            .fromTo(
+              ".hero-logo",
+              { opacity: 0, scale: 0.9 },
+              { opacity: 1, scale: 1, duration: 0.9 },
+              0.2,
+            )
             .fromTo(
               ".hero-headline",
               { opacity: 0, y: 30 },
