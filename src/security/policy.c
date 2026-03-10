@@ -1,5 +1,8 @@
 #include "human/core/error.h"
+#include "human/core/string.h"
 #include "human/security.h"
+#include "human/data/loader.h"
+#include "human/core/json.h"
 #include <ctype.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -26,16 +29,107 @@ hu_command_risk_level_t hu_tool_risk_level(const char *tool_name) {
     return HU_RISK_MEDIUM; /* unknown tools default to medium */
 }
 
-static const char *high_risk_commands[] = {
+/* Default fallback command lists */
+static const char *DEFAULT_HIGH_RISK_COMMANDS[] = {
     "rm",     "mkfs",     "dd",    "shutdown",     "reboot",  "halt",    "poweroff", "sudo",
     "su",     "chown",    "chmod", "useradd",      "userdel", "usermod", "passwd",   "mount",
     "umount", "iptables", "ufw",   "firewall-cmd", "curl",    "wget",    "nc",       "ncat",
     "netcat", "scp",      "ssh",   "ftp",          "telnet"};
-static const size_t high_risk_count = sizeof(high_risk_commands) / sizeof(high_risk_commands[0]);
+static const size_t DEFAULT_HIGH_RISK_COUNT = sizeof(DEFAULT_HIGH_RISK_COMMANDS) / sizeof(DEFAULT_HIGH_RISK_COMMANDS[0]);
 
-static const char *default_allowed[] = {"git",  "npm",  "cargo", "ls", "cat",  "grep",
+static const char *DEFAULT_ALLOWED[] = {"git",  "npm",  "cargo", "ls", "cat",  "grep",
                                         "find", "echo", "pwd",   "wc", "head", "tail"};
-static const size_t default_allowed_count = sizeof(default_allowed) / sizeof(default_allowed[0]);
+static const size_t DEFAULT_ALLOWED_COUNT = sizeof(DEFAULT_ALLOWED) / sizeof(DEFAULT_ALLOWED[0]);
+
+/* Runtime loaded command lists */
+static const char **s_high_risk_commands = (const char **)DEFAULT_HIGH_RISK_COMMANDS;
+static size_t s_high_risk_count = sizeof(DEFAULT_HIGH_RISK_COMMANDS) / sizeof(DEFAULT_HIGH_RISK_COMMANDS[0]);
+
+static const char **s_default_allowed = (const char **)DEFAULT_ALLOWED;
+static size_t s_default_allowed_count = sizeof(DEFAULT_ALLOWED) / sizeof(DEFAULT_ALLOWED[0]);
+
+hu_error_t hu_policy_data_init(hu_allocator_t *alloc) {
+    if (!alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char *json_data = NULL;
+    size_t json_len = 0;
+    hu_error_t err = hu_data_load(alloc, "security/command_lists.json", &json_data, &json_len);
+    if (err != HU_OK)
+        return HU_OK; /* Fail gracefully, keep defaults */
+
+    hu_json_value_t *root = NULL;
+    err = hu_json_parse(alloc, json_data, json_len, &root);
+    alloc->free(alloc->ctx, json_data, json_len);
+    if (err != HU_OK || !root)
+        return HU_OK; /* Fail gracefully, keep defaults */
+
+    /* Load high_risk commands */
+    hu_json_value_t *high_risk_arr = hu_json_object_get(root, "high_risk");
+    if (high_risk_arr && high_risk_arr->type == HU_JSON_ARRAY) {
+        size_t count = high_risk_arr->data.array.len;
+        if (count > 0) {
+            const char **cmds = (const char **)alloc->alloc(alloc->ctx, count * sizeof(const char *));
+            if (cmds) {
+                memset(cmds, 0, count * sizeof(const char *));
+                for (size_t i = 0; i < count; i++) {
+                    hu_json_value_t *item = high_risk_arr->data.array.items[i];
+                    if (item && item->type == HU_JSON_STRING) {
+                        cmds[i] = hu_strndup(alloc, item->data.string.ptr, item->data.string.len);
+                    }
+                }
+                s_high_risk_commands = cmds;
+                s_high_risk_count = count;
+            }
+        }
+    }
+
+    /* Load default_allowed commands */
+    hu_json_value_t *allowed_arr = hu_json_object_get(root, "default_allowed");
+    if (allowed_arr && allowed_arr->type == HU_JSON_ARRAY) {
+        size_t count = allowed_arr->data.array.len;
+        if (count > 0) {
+            const char **cmds = (const char **)alloc->alloc(alloc->ctx, count * sizeof(const char *));
+            if (cmds) {
+                memset(cmds, 0, count * sizeof(const char *));
+                for (size_t i = 0; i < count; i++) {
+                    hu_json_value_t *item = allowed_arr->data.array.items[i];
+                    if (item && item->type == HU_JSON_STRING) {
+                        cmds[i] = hu_strndup(alloc, item->data.string.ptr, item->data.string.len);
+                    }
+                }
+                s_default_allowed = cmds;
+                s_default_allowed_count = count;
+            }
+        }
+    }
+
+    hu_json_free(alloc, root);
+    return HU_OK;
+}
+
+void hu_policy_data_cleanup(hu_allocator_t *alloc) {
+    if (!alloc)
+        return;
+    if (s_high_risk_commands != (const char **)DEFAULT_HIGH_RISK_COMMANDS) {
+        for (size_t i = 0; i < s_high_risk_count; i++) {
+            if (s_high_risk_commands[i])
+                alloc->free(alloc->ctx, (char *)s_high_risk_commands[i], strlen(s_high_risk_commands[i]) + 1);
+        }
+        alloc->free(alloc->ctx, s_high_risk_commands, s_high_risk_count * sizeof(const char *));
+    }
+    if (s_default_allowed != (const char **)DEFAULT_ALLOWED) {
+        for (size_t i = 0; i < s_default_allowed_count; i++) {
+            if (s_default_allowed[i])
+                alloc->free(alloc->ctx, (char *)s_default_allowed[i], strlen(s_default_allowed[i]) + 1);
+        }
+        alloc->free(alloc->ctx, s_default_allowed, s_default_allowed_count * sizeof(const char *));
+    }
+    s_high_risk_commands = (const char **)DEFAULT_HIGH_RISK_COMMANDS;
+    s_high_risk_count = DEFAULT_HIGH_RISK_COUNT;
+    s_default_allowed = (const char **)DEFAULT_ALLOWED;
+    s_default_allowed_count = DEFAULT_ALLOWED_COUNT;
+}
 
 /* ── Rate tracker ───────────────────────────────────────────────── */
 
@@ -146,8 +240,8 @@ static const char *basename_ptr(const char *path) {
 }
 
 static bool is_high_risk_command(const char *base) {
-    for (size_t i = 0; i < high_risk_count; i++) {
-        if (strcasecmp(base, high_risk_commands[i]) == 0)
+    for (size_t i = 0; i < s_high_risk_count; i++) {
+        if (strcasecmp(base, s_high_risk_commands[i]) == 0)
             return true;
     }
     return false;
@@ -370,8 +464,8 @@ bool hu_policy_is_command_allowed(const hu_security_policy_t *policy, const char
     const char **allowed = policy->allowed_commands;
     size_t allowed_len = policy->allowed_commands_len;
     if (!allowed || allowed_len == 0) {
-        allowed = default_allowed;
-        allowed_len = default_allowed_count;
+        allowed = s_default_allowed;
+        allowed_len = s_default_allowed_count;
     }
 
     size_t cmd_len = strlen(command);

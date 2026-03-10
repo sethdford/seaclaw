@@ -85,6 +85,9 @@ bool hu_policy_record_action(hu_security_policy_t *policy);
 
 bool hu_policy_is_rate_limited(const hu_security_policy_t *policy);
 
+hu_error_t hu_policy_data_init(hu_allocator_t *alloc);
+void hu_policy_data_cleanup(hu_allocator_t *alloc);
+
 /* ── Pairing guard ──────────────────────────────────────────────── */
 
 typedef struct hu_pairing_guard hu_pairing_guard_t;
