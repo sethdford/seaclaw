@@ -7,10 +7,10 @@
       "description": "Default build — CLI channel, core tools, SQLite memory. ~398 KB release binary.",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "SC_ENABLE_CLI": "ON",
-        "SC_ENABLE_SQLITE": "ON",
-        "SC_ENABLE_CURL": "ON",
-        "SC_ENABLE_TLS": "ON"
+        "HU_ENABLE_CLI": "ON",
+        "HU_ENABLE_SQLITE": "ON",
+        "HU_ENABLE_CURL": "ON",
+        "HU_ENABLE_TLS": "ON"
       }
     },
     {
@@ -20,25 +20,25 @@
       "binaryDir": "${sourceDir}/build-minimal",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "MinSizeRel",
-        "SC_ENABLE_LTO": "ON",
-        "SC_ENABLE_CLI": "ON",
-        "SC_ENABLE_SQLITE": "ON",
-        "SC_ENABLE_CURL": "ON",
-        "SC_ENABLE_TLS": "ON",
-        "SC_ENABLE_PERIPHERALS": "OFF",
-        "SC_ENABLE_TUNNELS": "OFF",
-        "SC_ENABLE_RUNTIME_EXOTIC": "OFF",
-        "SC_ENABLE_TOOLS_BROWSER": "OFF",
-        "SC_ENABLE_TOOLS_ADVANCED": "OFF",
-        "SC_ENABLE_OTEL": "OFF",
-        "SC_ENABLE_CRON": "OFF",
-        "SC_ENABLE_PUSH": "OFF",
-        "SC_ENABLE_UPDATE": "OFF",
-        "SC_ENABLE_SKILLS": "OFF",
-        "SC_ENABLE_NONE_ENGINE": "OFF",
-        "SC_ENABLE_MARKDOWN_ENGINE": "OFF",
-        "SC_ENABLE_LUCID_ENGINE": "OFF",
-        "SC_ENABLE_LANCEDB_ENGINE": "OFF"
+        "HU_ENABLE_LTO": "ON",
+        "HU_ENABLE_CLI": "ON",
+        "HU_ENABLE_SQLITE": "ON",
+        "HU_ENABLE_CURL": "ON",
+        "HU_ENABLE_TLS": "ON",
+        "HU_ENABLE_PERIPHERALS": "OFF",
+        "HU_ENABLE_TUNNELS": "OFF",
+        "HU_ENABLE_RUNTIME_EXOTIC": "OFF",
+        "HU_ENABLE_TOOLS_BROWSER": "OFF",
+        "HU_ENABLE_TOOLS_ADVANCED": "OFF",
+        "HU_ENABLE_OTEL": "OFF",
+        "HU_ENABLE_CRON": "OFF",
+        "HU_ENABLE_PUSH": "OFF",
+        "HU_ENABLE_UPDATE": "OFF",
+        "HU_ENABLE_SKILLS": "OFF",
+        "HU_ENABLE_NONE_ENGINE": "OFF",
+        "HU_ENABLE_MARKDOWN_ENGINE": "OFF",
+        "HU_ENABLE_LUCID_ENGINE": "OFF",
+        "HU_ENABLE_LANCEDB_ENGINE": "OFF"
       }
     },
     {
@@ -47,25 +47,25 @@
       "description": "Everything enabled — all channels, all tools, all engines, peripherals, tunnels.",
       "binaryDir": "${sourceDir}/build-full",
       "cacheVariables": {
-        "SC_ENABLE_ALL_CHANNELS": "ON",
-        "SC_ENABLE_SQLITE": "ON",
-        "SC_ENABLE_CURL": "ON",
-        "SC_ENABLE_TLS": "ON",
-        "SC_ENABLE_PERIPHERALS": "ON",
-        "SC_ENABLE_TUNNELS": "ON",
-        "SC_ENABLE_RUNTIME_EXOTIC": "ON",
-        "SC_ENABLE_TOOLS_BROWSER": "ON",
-        "SC_ENABLE_TOOLS_ADVANCED": "ON",
-        "SC_ENABLE_OTEL": "ON",
-        "SC_ENABLE_CRON": "ON",
-        "SC_ENABLE_PUSH": "ON",
-        "SC_ENABLE_UPDATE": "ON",
-        "SC_ENABLE_SKILLS": "ON",
-        "SC_ENABLE_NONE_ENGINE": "ON",
-        "SC_ENABLE_MARKDOWN_ENGINE": "ON",
-        "SC_ENABLE_MEMORY_LRU_ENGINE": "ON",
-        "SC_ENABLE_LUCID_ENGINE": "ON",
-        "SC_ENABLE_LANCEDB_ENGINE": "ON"
+        "HU_ENABLE_ALL_CHANNELS": "ON",
+        "HU_ENABLE_SQLITE": "ON",
+        "HU_ENABLE_CURL": "ON",
+        "HU_ENABLE_TLS": "ON",
+        "HU_ENABLE_PERIPHERALS": "ON",
+        "HU_ENABLE_TUNNELS": "ON",
+        "HU_ENABLE_RUNTIME_EXOTIC": "ON",
+        "HU_ENABLE_TOOLS_BROWSER": "ON",
+        "HU_ENABLE_TOOLS_ADVANCED": "ON",
+        "HU_ENABLE_OTEL": "ON",
+        "HU_ENABLE_CRON": "ON",
+        "HU_ENABLE_PUSH": "ON",
+        "HU_ENABLE_UPDATE": "ON",
+        "HU_ENABLE_SKILLS": "ON",
+        "HU_ENABLE_NONE_ENGINE": "ON",
+        "HU_ENABLE_MARKDOWN_ENGINE": "ON",
+        "HU_ENABLE_MEMORY_LRU_ENGINE": "ON",
+        "HU_ENABLE_LUCID_ENGINE": "ON",
+        "HU_ENABLE_LANCEDB_ENGINE": "ON"
       }
     },
     {
@@ -75,11 +75,11 @@
       "binaryDir": "${sourceDir}/build-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "MinSizeRel",
-        "SC_ENABLE_LTO": "ON",
-        "SC_ENABLE_CLI": "ON",
-        "SC_ENABLE_SQLITE": "ON",
-        "SC_ENABLE_CURL": "ON",
-        "SC_ENABLE_TLS": "ON"
+        "HU_ENABLE_LTO": "ON",
+        "HU_ENABLE_CLI": "ON",
+        "HU_ENABLE_SQLITE": "ON",
+        "HU_ENABLE_CURL": "ON",
+        "HU_ENABLE_TLS": "ON"
       }
     },
     {
@@ -88,17 +88,17 @@
       "description": "Development build with AddressSanitizer and all channels for testing.",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "SC_ENABLE_ASAN": "ON",
-        "SC_ENABLE_ALL_CHANNELS": "ON",
-        "SC_ENABLE_SQLITE": "ON",
-        "SC_ENABLE_CURL": "ON",
-        "SC_ENABLE_TLS": "ON",
-        "SC_ENABLE_PERIPHERALS": "ON",
-        "SC_ENABLE_TUNNELS": "ON",
-        "SC_ENABLE_RUNTIME_EXOTIC": "ON",
-        "SC_ENABLE_TOOLS_BROWSER": "ON",
-        "SC_ENABLE_TOOLS_ADVANCED": "ON",
-        "SC_ENABLE_OTEL": "ON"
+        "HU_ENABLE_ASAN": "ON",
+        "HU_ENABLE_ALL_CHANNELS": "ON",
+        "HU_ENABLE_SQLITE": "ON",
+        "HU_ENABLE_CURL": "ON",
+        "HU_ENABLE_TLS": "ON",
+        "HU_ENABLE_PERIPHERALS": "ON",
+        "HU_ENABLE_TUNNELS": "ON",
+        "HU_ENABLE_RUNTIME_EXOTIC": "ON",
+        "HU_ENABLE_TOOLS_BROWSER": "ON",
+        "HU_ENABLE_TOOLS_ADVANCED": "ON",
+        "HU_ENABLE_OTEL": "ON"
       }
     }
   ],

@@ -5,7 +5,7 @@ Fuzz testing for security-critical parsers and input handling.
 ## Commands
 
 ```bash
-cmake -B build-fuzz -DSC_ENABLE_FUZZ=ON -DCMAKE_C_COMPILER=clang
+cmake -B build-fuzz -DHU_ENABLE_FUZZ=ON -DCMAKE_C_COMPILER=clang
 cmake --build build-fuzz -j$(nproc)
 ./build-fuzz/fuzz_json_parse corpus/json -max_total_time=60
 ```

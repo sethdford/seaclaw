@@ -71,7 +71,7 @@ mkdir -p "$BUILD_DIR"
 info "Running benchmark and saving to history..."
 RELEASE_BUILD_DIR="build-release"
 mkdir -p "$RELEASE_BUILD_DIR"
-(cd "$RELEASE_BUILD_DIR" && cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON -DSC_ENABLE_ALL_CHANNELS=ON 2>/dev/null && cmake --build . -j"$JOBS" 2>&1 | tail -1)
+(cd "$RELEASE_BUILD_DIR" && cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON 2>/dev/null && cmake --build . -j"$JOBS" 2>&1 | tail -1)
 if [ -x "$RELEASE_BUILD_DIR/human" ]; then
     "$ROOT/scripts/benchmark.sh" "$RELEASE_BUILD_DIR/human" --save-history 2>&1 | grep -E "Appended|Created|Results saved"
 else

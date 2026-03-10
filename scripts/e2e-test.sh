@@ -51,7 +51,7 @@ echo ""
 # Build
 echo -e "${DIM}Building...${RESET}"
 mkdir -p "$BUILD"
-(cd "$BUILD" && cmake "$ROOT" -DSC_ENABLE_ALL_CHANNELS=ON -DCMAKE_BUILD_TYPE=Debug >/dev/null 2>&1)
+(cd "$BUILD" && cmake "$ROOT" -DHU_ENABLE_ALL_CHANNELS=ON -DCMAKE_BUILD_TYPE=Debug >/dev/null 2>&1)
 (cd "$BUILD" && cmake --build . -j"$(sysctl -n hw.ncpu 2>/dev/null || nproc)" >/dev/null 2>&1)
 echo ""
 
@@ -82,7 +82,7 @@ echo ""
 echo "--- Release build ---"
 RELEASE_BUILD="$ROOT/build-e2e-release"
 mkdir -p "$RELEASE_BUILD"
-(cd "$RELEASE_BUILD" && cmake "$ROOT" -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON -DSC_ENABLE_ALL_CHANNELS=ON >/dev/null 2>&1)
+(cd "$RELEASE_BUILD" && cmake "$ROOT" -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON >/dev/null 2>&1)
 (cd "$RELEASE_BUILD" && cmake --build . -j"$(sysctl -n hw.ncpu 2>/dev/null || nproc)" >/dev/null 2>&1)
 
 RELEASE_BIN="$RELEASE_BUILD/human"

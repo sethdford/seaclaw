@@ -47,6 +47,17 @@ static const char *const schema_parts[] = {
     "content TEXT NOT NULL,created_at TEXT DEFAULT(datetime('now')))",
     "CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id)",
     "CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY,value TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS emotional_moments("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "contact_id TEXT NOT NULL,"
+    "topic TEXT NOT NULL,"
+    "emotion TEXT NOT NULL,"
+    "intensity REAL,"
+    "created_at INTEGER NOT NULL,"
+    "follow_up_date INTEGER,"
+    "followed_up INTEGER DEFAULT 0)",
+    "CREATE INDEX IF NOT EXISTS idx_emotional_moments_contact ON emotional_moments(contact_id)",
+    "CREATE INDEX IF NOT EXISTS idx_emotional_moments_follow_up ON emotional_moments(follow_up_date)",
     NULL};
 
 static void get_timestamp(char *buf, size_t buf_size) {
@@ -672,6 +683,15 @@ hu_session_store_t hu_sqlite_memory_get_session_store(hu_memory_t *mem) {
         .ctx = mem->ctx,
         .vtable = &sqlite_session_vtable,
     };
+}
+
+sqlite3 *hu_sqlite_memory_get_db(hu_memory_t *mem) {
+    if (!mem || !mem->ctx || !mem->vtable)
+        return NULL;
+    const char *n = mem->vtable->name(mem->ctx);
+    if (!n || strcmp(n, "sqlite") != 0)
+        return NULL;
+    return ((hu_sqlite_memory_t *)mem->ctx)->db;
 }
 
 #else /* !HU_ENABLE_SQLITE */

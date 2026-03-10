@@ -9,12 +9,12 @@ default:
 
 # Dev build (ASan enabled)
 build:
-    cmake -B build -DSC_ENABLE_ALL_CHANNELS=ON -DSC_ENABLE_SQLITE=ON
+    cmake -B build -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_SQLITE=ON
     cmake --build build -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
 
 # Release build (MinSizeRel + LTO)
 release:
-    cmake -B build -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON -DSC_ENABLE_ALL_CHANNELS=ON
+    cmake -B build -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON
     cmake --build build -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
     @ls -lh build/human
 
@@ -40,7 +40,7 @@ test-grep pattern: build
 
 # Run full benchmark suite
 bench:
-    cmake -B build -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON -DSC_ENABLE_ALL_CHANNELS=ON -DSC_ENABLE_BENCH=ON
+    cmake -B build -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_BENCH=ON
     cmake --build build -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
     scripts/benchmark.sh build/human
     @echo "---"
@@ -57,7 +57,7 @@ fuzz duration="30":
     #!/usr/bin/env bash
     set -euo pipefail
     CC="${FUZZ_CC:-$(command -v /opt/homebrew/opt/llvm/bin/clang || echo clang)}"
-    cmake -B build-fuzz -DSC_ENABLE_FUZZ=ON -DSC_ENABLE_FUZZING=ON -DCMAKE_C_COMPILER="$CC"
+    cmake -B build-fuzz -DHU_ENABLE_FUZZ=ON -DHU_ENABLE_FUZZING=ON -DCMAKE_C_COMPILER="$CC"
     cmake --build build-fuzz -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
     for harness in fuzz_json_parse fuzz_config_load fuzz_tool_params fuzz_base64 fuzz_json fuzz_config fuzz_url_encode fuzz_persona_json fuzz_sse fuzz_http_parse; do
         if [ -f "build-fuzz/$harness" ]; then

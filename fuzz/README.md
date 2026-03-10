@@ -12,7 +12,7 @@ Security-critical parsing paths are exercised by LibFuzzer harnesses. These harn
 Build and run fuzz targets:
 
 ```bash
-cmake -B build-fuzz -DCMAKE_C_COMPILER=clang -DSC_ENABLE_FUZZ=ON -DSC_ENABLE_ALL_CHANNELS=ON
+cmake -B build-fuzz -DCMAKE_C_COMPILER=clang -DHU_ENABLE_FUZZ=ON -DHU_ENABLE_ALL_CHANNELS=ON
 cmake --build build-fuzz -j$(nproc)
 
 # Run a fuzzer (Ctrl+C to stop):
@@ -27,7 +27,7 @@ Each fuzzer creates a `crash-*` or `timeout-*` file for reproducible bugs.
 On macOS ARM64 with Homebrew LLVM:
 
 ```bash
-cmake -B build-fuzz -DSC_ENABLE_FUZZ=ON -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DSC_ENABLE_ALL_CHANNELS=ON
+cmake -B build-fuzz -DHU_ENABLE_FUZZ=ON -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DHU_ENABLE_ALL_CHANNELS=ON
 cmake --build build-fuzz -j$(nproc)
 ```
 
@@ -45,7 +45,7 @@ Each harness is a standalone executable. Run with a corpus directory to fuzz, or
 # Fuzz URL encoder
 ./fuzz_url_encode corpus/url/
 
-# Fuzz base64url decoder (requires SC_ENABLE_GMAIL or SC_ENABLE_ALL_CHANNELS)
+# Fuzz base64url decoder (requires HU_ENABLE_GMAIL or HU_ENABLE_ALL_CHANNELS)
 ./fuzz_base64 corpus/base64/
 
 # Fuzz config parser
@@ -93,21 +93,21 @@ echo 'SGVsbG8gV29ybGQ' > corpus/base64/simple.txt
 
 | Harness            | Target                      | Description                                                          |
 | ------------------ | --------------------------- | -------------------------------------------------------------------- |
-| `fuzz_json`        | `sc_json_parse`             | Parses bytes as JSON                                                 |
-| `fuzz_json_parse`  | `sc_json_parse` + accessors | Parses bytes as JSON, exercises object/array/string/number accessors |
-| `fuzz_url_encode`  | `sc_web_search_url_encode`  | URL-encodes arbitrary bytes                                          |
+| `fuzz_json`        | `hu_json_parse`             | Parses bytes as JSON                                                 |
+| `fuzz_json_parse`  | `hu_json_parse` + accessors | Parses bytes as JSON, exercises object/array/string/number accessors |
+| `fuzz_url_encode`  | `hu_web_search_url_encode`  | URL-encodes arbitrary bytes                                          |
 | `fuzz_base64`      | `base64url_decode`          | Decodes base64url (Gmail body format)                                |
-| `fuzz_config`      | `sc_config_parse_json`      | Parses bytes as config JSON in-memory                                |
-| `fuzz_config_load` | `sc_config_parse_json`      | Same as fuzz_config (arena-based)                                    |
+| `fuzz_config`      | `hu_config_parse_json`      | Parses bytes as config JSON in-memory                                |
+| `fuzz_config_load` | `hu_config_parse_json`      | Same as fuzz_config (arena-based)                                    |
 | `fuzz_tool_params` | `report` tool `execute`     | Parses JSON, passes to report tool (no I/O)                          |
 
 ## Expected Behavior
 
 - **No crashes** on any input (including malformed JSON, truncated data, huge inputs).
-- **No ASan leaks** — all allocations freed. Harnesses use `sc_system_allocator()` and ensure `sc_json_free`, `sc_config_deinit`, `sc_tool_result_free`, and tool deinit are called.
+- **No ASan leaks** — all allocations freed. Harnesses use `hu_system_allocator()` and ensure `hu_json_free`, `hu_config_deinit`, `hu_tool_result_free`, and tool deinit are called.
 - **Graceful failure** — parse errors return without crashing.
 - Inputs larger than 64 KiB are rejected by harness size limit to avoid OOM.
 
 ## CI / OSS-Fuzz
 
-For continuous fuzzing, run harnesses in CI with a timeout and corpus. To integrate with OSS-Fuzz, add a `Dockerfile` and `build.sh` that build with `-DSC_ENABLE_FUZZ=ON` and run the harnesses.
+For continuous fuzzing, run harnesses in CI with a timeout and corpus. To integrate with OSS-Fuzz, add a `Dockerfile` and `build.sh` that build with `-DHU_ENABLE_FUZZ=ON` and run the harnesses.

@@ -25,10 +25,10 @@
 
           cmakeFlags = [
             "-DCMAKE_BUILD_TYPE=MinSizeRel"
-            "-DSC_ENABLE_LTO=ON"
-            "-DSC_ENABLE_CURL=ON"
-            "-DSC_ENABLE_SQLITE=ON"
-            "-DSC_ENABLE_ALL_CHANNELS=ON"
+            "-DHU_ENABLE_LTO=ON"
+            "-DHU_ENABLE_CURL=ON"
+            "-DHU_ENABLE_SQLITE=ON"
+            "-DHU_ENABLE_ALL_CHANNELS=ON"
           ];
 
           meta = with pkgs.lib; {

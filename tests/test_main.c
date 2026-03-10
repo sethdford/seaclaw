@@ -117,6 +117,7 @@ void run_ab_response_tests(void);
 void run_event_extract_tests(void);
 void run_stm_tests(void);
 void run_emotional_graph_tests(void);
+void run_emotional_moments_tests(void);
 void run_graph_tests(void);
 void run_fast_capture_tests(void);
 void run_promotion_tests(void);
@@ -253,6 +254,7 @@ int main(void) {
     run_event_extract_tests();
     run_stm_tests();
     run_emotional_graph_tests();
+    run_emotional_moments_tests();
     run_graph_tests();
     run_fast_capture_tests();
     run_promotion_tests();

@@ -14,7 +14,7 @@ COPY vendor/ vendor/
 COPY cmake/ cmake/
 
 RUN mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON -DSC_ENABLE_CURL=ON -DSC_BUILD_TESTS=OFF && \
+    cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_CURL=ON -DHU_BUILD_TESTS=OFF && \
     make -j$(nproc)
 
 # ── Stage 2: Config Prep ─────────────────────────────────────

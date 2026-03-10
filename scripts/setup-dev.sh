@@ -50,6 +50,6 @@ fi
 echo ""
 echo "Setup complete. Build with:"
 echo "  mkdir -p build && cd build"
-echo "  cmake .. -DSC_ENABLE_ALL_CHANNELS=ON"
+echo "  cmake .. -DHU_ENABLE_ALL_CHANNELS=ON"
 echo "  cmake --build . -j\$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
 echo "  ./human_tests"

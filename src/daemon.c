@@ -611,6 +611,82 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
     if (hour < 9 || hour > 21)
         return;
 
+#ifndef HU_IS_TEST
+    /* F25: Emotional check-ins — due moments from 1–3 days ago */
+    if (agent->memory) {
+        hu_emotional_moment_t *due = NULL;
+        size_t due_count = 0;
+        if (hu_emotional_moment_get_due(alloc, agent->memory, (int64_t)now, &due, &due_count) ==
+                HU_OK &&
+            due && due_count > 0) {
+            for (size_t d = 0; d < due_count; d++) {
+                const hu_emotional_moment_t *m = &due[d];
+                /* Find contact and channel for this contact_id */
+                for (size_t i = 0; i < agent->persona->contacts_count; i++) {
+                    const hu_contact_profile_t *cp = &agent->persona->contacts[i];
+                    if (!cp->proactive_checkin || !cp->proactive_channel || !cp->contact_id)
+                        continue;
+                    bool match = (strcmp(cp->contact_id, m->contact_id) == 0);
+                    if (!match) {
+                        const char *colon = strchr(cp->proactive_channel, ':');
+                        if (colon && strcmp(colon + 1, m->contact_id) == 0)
+                            match = true;
+                        else if (strcmp(cp->proactive_channel, m->contact_id) == 0)
+                            match = true;
+                    }
+                    if (!match)
+                        continue;
+
+                    const char *ch_part = cp->proactive_channel;
+                    const char *target_part = cp->contact_id;
+                    size_t target_len = strlen(target_part);
+                    char ch_buf[64] = {0};
+                    const char *colon = strchr(cp->proactive_channel, ':');
+                    if (colon) {
+                        size_t ch_len = (size_t)(colon - cp->proactive_channel);
+                        if (ch_len < sizeof(ch_buf)) {
+                            memcpy(ch_buf, cp->proactive_channel, ch_len);
+                            ch_buf[ch_len] = '\0';
+                            ch_part = ch_buf;
+                            target_part = colon + 1;
+                            target_len = strlen(target_part);
+                        }
+                    }
+
+                    for (size_t c = 0; c < channel_count; c++) {
+                        if (!channels[c].channel || !channels[c].channel->vtable ||
+                            !channels[c].channel->vtable->name)
+                            continue;
+                        const char *ch_name =
+                            channels[c].channel->vtable->name(channels[c].channel->ctx);
+                        if (!ch_name || strcmp(ch_name, ch_part) != 0)
+                            continue;
+                        if (!channels[c].channel->vtable->send)
+                            break;
+
+                        char msg_buf[384];
+                        int w = snprintf(msg_buf, sizeof(msg_buf),
+                                         "hey how are you doing with %s?", m->topic);
+                        if (w > 0 && (size_t)w < sizeof(msg_buf)) {
+                            hu_error_t send_err = channels[c].channel->vtable->send(
+                                channels[c].channel->ctx, target_part, target_len, msg_buf,
+                                (size_t)w, NULL, 0);
+                            if (send_err == HU_OK) {
+                                (void)hu_emotional_moment_mark_followed_up(agent->memory, m->id);
+                                fprintf(stderr, "[human] F25 emotional check-in sent to %s: %s\n",
+                                        cp->name ? cp->name : cp->contact_id, msg_buf);
+                            }
+                        }
+                        break;
+                    }
+                    break;
+                }
+            }
+            alloc->free(alloc->ctx, due, due_count * sizeof(hu_emotional_moment_t));
+        }
+    }
+#endif
+
     for (size_t i = 0; i < agent->persona->contacts_count; i++) {
         const hu_contact_profile_t *cp = &agent->persona->contacts[i];
         if (!cp->proactive_checkin || !cp->proactive_channel || !cp->contact_id)
@@ -2857,13 +2933,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 (fc_pre.primary_topic && fc_pre.primary_topic[0])
                                     ? fc_pre.primary_topic
                                     : (combined_len > 0 ? combined : "something you shared");
-                            size_t topic_len =
-                                (fc_pre.primary_topic && fc_pre.primary_topic[0])
-                                    ? strlen(fc_pre.primary_topic)
-                                    : (combined_len > 0 ? (combined_len > 200 ? 200 : combined_len)
-                                                        : 20);
-                            if (topic_len > 255)
-                                topic_len = 255;
+                            size_t topic_len;
+                            if (fc_pre.primary_topic && fc_pre.primary_topic[0]) {
+                                topic_len = strlen(fc_pre.primary_topic);
+                            } else if (combined_len > 0) {
+                                topic_len = combined_len > 255 ? 255 : combined_len;
+                            } else {
+                                topic_len = 20; /* "something you shared" */
+                            }
                             const char *emotion_str =
                                 emo_rec.dominant_emotion && emo_rec.dominant_emotion[0]
                                     ? emo_rec.dominant_emotion

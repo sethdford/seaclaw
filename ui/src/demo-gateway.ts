@@ -77,7 +77,7 @@ function makeSessions() {
       updated_at: Date.now() - 172800000,
       turn_count: 3,
       messages_count: 3,
-      last_message: "Yes, use sc_arena_alloc for that.",
+      last_message: "Yes, use hu_arena_alloc for that.",
       status: "archived",
     },
   ];
@@ -1145,7 +1145,7 @@ export class DemoGatewayClient extends EventTarget {
       {
         title: "Helper Function",
         content:
-          "sc_error_t sc_thing_init(sc_thing_t *ctx) {\n  if (!ctx) return SC_ERR_INVALID;\n  memset(ctx, 0, sizeof(*ctx));\n  return SC_OK;\n}",
+          "hu_error_t hu_thing_init(hu_thing_t *ctx) {\n  if (!ctx) return HU_ERR_INVALID;\n  memset(ctx, 0, sizeof(*ctx));\n  return HU_OK;\n}",
         language: "c",
       },
       {
@@ -1177,9 +1177,9 @@ export class DemoGatewayClient extends EventTarget {
 
     const DEMO_RESPONSES = [
       `That's a great question about "${userMessage}". Here's what I think — the key insight is that **well-designed systems** tend to be modular and composable. Each piece does one thing well, and the connections between them are clean and predictable.`,
-      `Interesting! For "${userMessage}", I'd suggest starting with a minimal implementation. For example:\n\n\`\`\`c\nsc_error_t rc = sc_thing_init(&ctx);\nif (rc != SC_OK) return rc;\n\`\`\`\n\nThen iterate from there. The vtable pattern works well for extensibility.`,
+      `Interesting! For "${userMessage}", I'd suggest starting with a minimal implementation. For example:\n\n\`\`\`c\nhu_error_t rc = hu_thing_init(&ctx);\nif (rc != HU_OK) return rc;\n\`\`\`\n\nThen iterate from there. The vtable pattern works well for extensibility.`,
       `Good question. The short answer: **yes**, with some caveats. See the [docs](https://docs.human.dev) for the full picture. The main gotcha is memory ownership — make sure you \`free()\` what you \`malloc()\`.`,
-      `Let me break that down. For "${userMessage}":\n\n1. **Modularity** — keep concerns separated.\n2. **Explicit errors** — no silent failures.\n3. **Testability** — \`SC_IS_TEST\` guards for side effects.\n\nThat's the human way.`,
+      `Let me break that down. For "${userMessage}":\n\n1. **Modularity** — keep concerns separated.\n2. **Explicit errors** — no silent failures.\n3. **Testability** — \`HU_IS_TEST\` guards for side effects.\n\nThat's the human way.`,
     ];
     const fullResponse =
       DEMO_RESPONSES[Math.floor(Math.random() * DEMO_RESPONSES.length)] ?? DEMO_RESPONSES[0]!;
@@ -1303,7 +1303,7 @@ export class DemoGatewayClient extends EventTarget {
             {
               role: "assistant",
               content:
-                "Of course! Let me analyze the code. I'll start by checking the allocation patterns in the hot path.\n\nI found the issue — there's a missing `free()` call in the error branch of `sc_json_parse`. The allocated buffer leaks when parsing fails halfway through.",
+                "Of course! Let me analyze the code. I'll start by checking the allocation patterns in the hot path.\n\nI found the issue — there's a missing `free()` call in the error branch of `hu_json_parse`. The allocated buffer leaks when parsing fails halfway through.",
             },
             { role: "user", content: "Great catch! Can you fix it?" },
             {

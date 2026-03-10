@@ -28,7 +28,7 @@ In `tests/test_conversation.c`, add to `run_conversation_tests()`:
 
 ```c
 static void classify_group_consecutive_2_skips_with_history(void) {
-    sc_channel_history_entry_t entries[5] = {
+    hu_channel_history_entry_t entries[5] = {
         make_entry(false, "yo what's up", "12:00"),
         make_entry(false, "anyone wanna grab food?", "12:01"),
         make_entry(true,  "sounds good", "12:02"),
@@ -38,11 +38,11 @@ static void classify_group_consecutive_2_skips_with_history(void) {
     /* With 2 consecutive from_me entries, group classifier should skip */
     hu_group_response_t r = hu_conversation_classify_group(
         "yeah same", 9, "bot", 3, entries, 4);
-    SC_ASSERT_EQ(r, HU_GROUP_SKIP);
+    HU_ASSERT_EQ(r, HU_GROUP_SKIP);
 }
 ```
 
-Run: `./build/seaclaw_tests 2>&1 | grep classify_group_consecutive`
+Run: `./build/human_tests 2>&1 | grep classify_group_consecutive`
 Expected: PASS (this tests the classifier in isolation — it already works correctly, confirming the bug is in the daemon call site).
 
 **Step 3: Fix the daemon — move history load up**
@@ -87,7 +87,7 @@ Then remove the duplicate history load that currently appears a few lines later 
 
 ```bash
 cmake --build build -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
-./build/seaclaw_tests 2>&1 | tail -3
+./build/human_tests 2>&1 | tail -3
 ```
 
 Expected: `--- Results: 3788/3788 passed ---`
@@ -101,7 +101,7 @@ git commit -m "fix(group): pass conversation history to group classifier"
 
 ---
 
-### Task 2: Map SC_GROUP_BRIEF to brief_mode
+### Task 2: Map HU_GROUP_BRIEF to brief_mode
 
 **Files:**
 
@@ -115,14 +115,14 @@ In `tests/test_conversation.c`, add:
 
 ```c
 static void classify_group_medium_message_is_brief(void) {
-    /* 30–100 char message with no question and no engage word → SC_GROUP_BRIEF */
+    /* 30–100 char message with no question and no engage word → HU_GROUP_BRIEF */
     hu_group_response_t r = hu_conversation_classify_group(
         "just got back from the gym, pretty tired", 40, "bot", 3, NULL, 0);
-    SC_ASSERT_EQ(r, HU_GROUP_BRIEF);
+    HU_ASSERT_EQ(r, HU_GROUP_BRIEF);
 }
 ```
 
-Run: `./build/seaclaw_tests 2>&1 | grep classify_group_medium`
+Run: `./build/human_tests 2>&1 | grep classify_group_medium`
 Expected: PASS (classifier already returns BRIEF here; this documents the expectation).
 
 **Step 2: Fix the daemon — capture group result and apply brief_mode**
@@ -175,7 +175,7 @@ The `|| msgs[batch_start].is_group` ensures even `HU_GROUP_RESPOND` produces sho
 
 ```bash
 cmake --build build -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
-./build/seaclaw_tests 2>&1 | tail -3
+./build/human_tests 2>&1 | tail -3
 ```
 
 Expected: `--- Results: 3789/3789 passed ---`
@@ -206,8 +206,8 @@ static void group_prompt_injection_contains_group_hint(void) {
     /* Verify the group instruction string exists and is non-empty.
      * This is a compile-time check — the constant must be defined. */
     const char *hint = HU_GROUP_CHAT_PROMPT_HINT;
-    SC_ASSERT_NOT_NULL(hint);
-    SC_ASSERT_TRUE(strlen(hint) > 10);
+    HU_ASSERT_NOT_NULL(hint);
+    HU_ASSERT_TRUE(strlen(hint) > 10);
 }
 ```
 
@@ -222,7 +222,7 @@ And in `include/human/context/conversation.h` (or a new `group.h`), add:
     "Match the group's energy. Don't dominate.\n\n"
 ```
 
-Run: `./build/seaclaw_tests 2>&1 | grep group_prompt`
+Run: `./build/human_tests 2>&1 | grep group_prompt`
 Expected: PASS after adding the define.
 
 **Step 2: Inject the hint into conversation_context in daemon.c**
@@ -260,7 +260,7 @@ if (msgs[batch_start].is_group) {
 
 ```bash
 cmake --build build -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
-./build/seaclaw_tests 2>&1 | tail -3
+./build/human_tests 2>&1 | tail -3
 ```
 
 Expected: `--- Results: 3790/3790 passed ---`
@@ -279,7 +279,7 @@ git commit -m "feat(group): inject group-chat prompt hint into conversation cont
 **Step 1: Run the full test suite**
 
 ```bash
-./build/seaclaw_tests 2>&1 | tail -5
+./build/human_tests 2>&1 | tail -5
 ```
 
 Expected: all tests pass, 0 failures.
@@ -292,7 +292,7 @@ Grep for the history load pattern to make sure it only appears once (no leftover
 grep -n "load_conversation_history" src/daemon.c
 ```
 
-Expected: exactly one call site in `sc_service_run`.
+Expected: exactly one call site in `hu_service_run`.
 
 **Step 3: Commit docs sync if CLAUDE.md updated**
 

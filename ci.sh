@@ -11,7 +11,7 @@ echo "Jobs: $NPROC"
 echo ""
 echo "--- Debug build + test ---"
 mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Debug -DSC_ENABLE_ALL_CHANNELS=ON -DSC_ENABLE_ASAN=ON
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_ASAN=ON
 make -j"$NPROC"
 ./human_tests
 cd ..
@@ -19,7 +19,7 @@ cd ..
 echo ""
 echo "--- Release (MinSizeRel + LTO) build ---"
 mkdir -p build-release && cd build-release
-cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON
+cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON
 make -j"$NPROC"
 ls -lh human
 cd ..

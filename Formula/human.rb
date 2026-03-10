@@ -19,10 +19,10 @@ class Human < Formula
   def install
     args = %w[
       -DCMAKE_BUILD_TYPE=MinSizeRel
-      -DSC_ENABLE_LTO=ON
-      -DSC_ENABLE_SQLITE=ON
+      -DHU_ENABLE_LTO=ON
+      -DHU_ENABLE_SQLITE=ON
     ]
-    args << "-DSC_ENABLE_CURL=#{build.with?("curl") ? "ON" : "OFF"}"
+    args << "-DHU_ENABLE_CURL=#{build.with?("curl") ? "ON" : "OFF"}"
 
     system "cmake", "-S", ".", "-B", "build", *args, *std_cmake_args
     system "cmake", "--build", "build"

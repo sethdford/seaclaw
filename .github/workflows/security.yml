@@ -21,7 +21,7 @@ jobs:
           extra-cmake-flags: >-
             -DCMAKE_C_FLAGS="-fsanitize=undefined -fno-sanitize-recover=all -g"
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=undefined"
-            -DSC_ENABLE_SQLITE=ON
+            -DHU_ENABLE_SQLITE=ON
       - name: Run tests with UBSan
         run: UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1" ./build-ubsan/human_tests
 
@@ -137,5 +137,5 @@ jobs:
       - uses: ./.github/actions/setup-build
         with:
           extra-apt: libssl-dev
-          extra-cmake-flags: -DSC_ENABLE_FIPS_CRYPTO=ON
+          extra-cmake-flags: -DHU_ENABLE_FIPS_CRYPTO=ON
       - uses: ./.github/actions/run-tests

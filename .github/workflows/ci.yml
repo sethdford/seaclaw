@@ -56,9 +56,9 @@ jobs:
           cmake -B build-arm64 \
             -DCMAKE_TOOLCHAIN_FILE=cmake/aarch64-linux-gnu.cmake \
             -DCMAKE_BUILD_TYPE=MinSizeRel \
-            -DSC_ENABLE_CURL=OFF \
-            -DSC_ENABLE_TLS=OFF \
-            -DSC_ENABLE_SQLITE=OFF
+            -DHU_ENABLE_CURL=OFF \
+            -DHU_ENABLE_TLS=OFF \
+            -DHU_ENABLE_SQLITE=OFF
       - name: Build (ARM64)
         run: cmake --build build-arm64 -j$(nproc)
       - name: Verify binary
@@ -180,7 +180,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
       - name: Build gateway
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DSC_BUILD_TESTS=OFF
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DHU_BUILD_TESTS=OFF
           cmake --build build -j$(nproc)
       - name: Start gateway
         run: |
@@ -286,7 +286,7 @@ jobs:
           build-type: MinSizeRel
           enable-lto: "true"
           enable-all-channels: "true"
-          extra-cmake-flags: -DSC_ENABLE_BENCH=ON
+          extra-cmake-flags: -DHU_ENABLE_BENCH=ON
       - name: Run benchmark
         run: scripts/benchmark.sh build/human --save-history
       - name: Run core benchmarks
@@ -433,7 +433,7 @@ jobs:
         run: ollama pull tinyllama
       - name: Build
         run: |
-          cmake -B build -DSC_ENABLE_ALL_CHANNELS=ON -DSC_ENABLE_CURL=ON
+          cmake -B build -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_CURL=ON
           cmake --build build -j$(nproc)
       - name: Run integration tests
         run: ./build/human_tests
@@ -487,8 +487,8 @@ jobs:
           cmake -B build-fuzz \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
-            -DSC_ENABLE_FUZZ=ON \
-            -DSC_ENABLE_ALL_CHANNELS=ON
+            -DHU_ENABLE_FUZZ=ON \
+            -DHU_ENABLE_ALL_CHANNELS=ON
       - name: Build (fuzz)
         run: cmake --build build-fuzz -j$(nproc)
       - name: Run fuzz harnesses

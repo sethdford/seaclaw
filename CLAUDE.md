@@ -1,6 +1,6 @@
 # human
 
-C11 autonomous AI assistant runtime. ~1679 KB binary, <6 MB RAM, <30 ms startup.
+C11 autonomous AI assistant runtime. ~1696 KB binary, <6 MB RAM, <30 ms startup.
 Zero dependencies beyond libc (optional SQLite and libcurl).
 
 Read `AGENTS.md` for the full engineering protocol. This file is the quick reference.
@@ -12,7 +12,7 @@ Read `AGENTS.md` for the full engineering protocol. This file is the quick refer
 cmake -B build -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_SQLITE=ON -DHU_ENABLE_PERSONA=ON -DHU_ENABLE_SKILLS=ON
 cmake --build build -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
 
-# Run tests (3795+ tests, must be 0 failures, 0 ASan errors)
+# Run tests (3,849+ tests, must be 0 failures, 0 ASan errors)
 ./build/human_tests
 
 # Release build
@@ -91,10 +91,10 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 
 | Path                                  | What                                                        |
 | ------------------------------------- | ----------------------------------------------------------- |
-| `src/`                                | All C source (~715 files, ~138K lines)                      |
+| `src/`                                | All C source (~715 files, ~139K lines)                      |
 | `include/human/`                    | Public headers                                              |
 | `docs/cross-platform-ci-readiness.md` | Platform support, build flags, known platform-specific code |
-| `tests/`                              | 128 test files, 3795+ tests                                 |
+| `tests/`                              | 128 test files, 3,849+ tests                                 |
 | `fuzz/`                               | libFuzzer harnesses                                         |
 | `ui/`                                 | LitElement web dashboard                                    |
 | `website/`                            | Astro marketing site                                        |

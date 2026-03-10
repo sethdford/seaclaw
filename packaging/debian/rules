@@ -6,8 +6,8 @@ override_dh_auto_configure:
 	cmake -B build \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX=/usr \
-		-DSC_ENABLE_ALL_CHANNELS=ON \
-		-DSC_ENABLE_LTO=ON
+		-DHU_ENABLE_ALL_CHANNELS=ON \
+		-DHU_ENABLE_LTO=ON
 
 override_dh_auto_build:
 	cmake --build build -j$$(nproc)

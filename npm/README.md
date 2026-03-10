@@ -23,7 +23,7 @@ human agent -m "hello"       # send a message
 ```bash
 git clone https://github.com/sethdford/human.git
 cd human && mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DSC_ENABLE_LTO=ON
+cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON
 cmake --build .
 ```
 

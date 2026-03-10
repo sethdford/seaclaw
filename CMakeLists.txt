@@ -433,6 +433,7 @@ set(HU_CORE_SOURCES
     src/memory/util.c
     src/memory/stm.c
     src/memory/emotional_graph.c
+    src/memory/emotional_moments.c
     src/memory/fast_capture.c
     src/memory/promotion.c
     src/memory/consolidation.c
@@ -1469,6 +1470,7 @@ set(HU_TEST_SOURCES
     tests/test_event_extract.c
     tests/test_stm.c
     tests/test_emotional_graph.c
+    tests/test_emotional_moments.c
     tests/test_graph.c
     tests/test_fast_capture.c
     tests/test_promotion.c

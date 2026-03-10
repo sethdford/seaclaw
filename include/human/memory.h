@@ -139,6 +139,10 @@ hu_error_t hu_memory_store_with_source(hu_memory_t *mem, const char *key, size_t
 hu_memory_t hu_none_memory_create(hu_allocator_t *alloc);
 hu_memory_t hu_sqlite_memory_create(hu_allocator_t *alloc, const char *db_path);
 hu_session_store_t hu_sqlite_memory_get_session_store(hu_memory_t *mem);
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+sqlite3 *hu_sqlite_memory_get_db(hu_memory_t *mem);
+#endif
 hu_memory_t hu_markdown_memory_create(hu_allocator_t *alloc, const char *dir_path);
 
 #endif /* HU_MEMORY_H */
