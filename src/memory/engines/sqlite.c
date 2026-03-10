@@ -57,7 +57,15 @@ static const char *const schema_parts[] = {
     "follow_up_date INTEGER,"
     "followed_up INTEGER DEFAULT 0)",
     "CREATE INDEX IF NOT EXISTS idx_emotional_moments_contact ON emotional_moments(contact_id)",
-    "CREATE INDEX IF NOT EXISTS idx_emotional_moments_follow_up ON emotional_moments(follow_up_date)",
+    "CREATE INDEX IF NOT EXISTS idx_emotional_moments_follow_up ON "
+    "emotional_moments(follow_up_date)",
+    "CREATE TABLE IF NOT EXISTS comfort_patterns("
+    "contact_id TEXT NOT NULL,"
+    "emotion TEXT NOT NULL,"
+    "response_type TEXT NOT NULL,"
+    "engagement_score REAL,"
+    "sample_count INTEGER DEFAULT 0,"
+    "PRIMARY KEY (contact_id, emotion, response_type))",
     NULL};
 
 static void get_timestamp(char *buf, size_t buf_size) {
