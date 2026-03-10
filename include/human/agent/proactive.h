@@ -6,6 +6,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/memory.h"
+#include "human/persona.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -19,6 +20,7 @@ typedef enum hu_proactive_action_type {
     HU_PROACTIVE_MORNING_BRIEFING,
     HU_PROACTIVE_PATTERN_INSIGHT,
     HU_PROACTIVE_REMINDER,
+    HU_PROACTIVE_IMPORTANT_DATE,
 } hu_proactive_action_type_t;
 
 typedef struct hu_proactive_action {
@@ -63,5 +65,10 @@ hu_error_t hu_proactive_build_starter(hu_allocator_t *alloc, hu_memory_t *memory
                                       const char *contact_id, size_t contact_id_len, char **out,
                                       size_t *out_len);
 void hu_proactive_result_deinit(hu_proactive_result_t *result, hu_allocator_t *alloc);
+
+bool hu_proactive_check_important_dates(const hu_persona_t *persona, const char *contact_id,
+                                        size_t contact_id_len, int month, int day,
+                                        char *message_out, size_t msg_cap, char *type_out,
+                                        size_t type_cap);
 
 #endif /* HU_PROACTIVE_H */

@@ -610,3 +610,42 @@ void hu_proactive_result_deinit(hu_proactive_result_t *result, hu_allocator_t *a
     }
     result->count = 0;
 }
+
+bool hu_proactive_check_important_dates(const hu_persona_t *persona, const char *contact_id,
+                                        size_t contact_id_len, int month, int day,
+                                        char *message_out, size_t msg_cap, char *type_out,
+                                        size_t type_cap) {
+    (void)contact_id;
+    (void)contact_id_len;
+    if (!persona || !message_out || msg_cap == 0)
+        return false;
+    if (!persona->important_dates || persona->important_dates_count == 0)
+        return false;
+
+    char expect[8];
+    int n = snprintf(expect, sizeof(expect), "%02d-%02d", month, day);
+    if (n <= 0 || (size_t)n >= sizeof(expect))
+        return false;
+
+    for (size_t i = 0; i < persona->important_dates_count; i++) {
+        const hu_important_date_t *d = &persona->important_dates[i];
+        if (strcmp(d->date, expect) != 0)
+            continue;
+        size_t msg_len = strnlen(d->message, sizeof(d->message) - 1);
+        if (msg_len == 0)
+            continue;
+        if (msg_len >= msg_cap)
+            msg_len = msg_cap - 1;
+        memcpy(message_out, d->message, msg_len);
+        message_out[msg_len] = '\0';
+        if (type_out && type_cap > 0) {
+            size_t type_len = strnlen(d->type, sizeof(d->type) - 1);
+            if (type_len >= type_cap)
+                type_len = type_cap - 1;
+            memcpy(type_out, d->type, type_len);
+            type_out[type_len] = '\0';
+        }
+        return true;
+    }
+    return false;
+}
