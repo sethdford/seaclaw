@@ -1192,8 +1192,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         hu_persona_find_contact(agent->persona, batch_key, key_len);
                     if (!cp_gate) {
                         if (getenv("HU_DEBUG"))
-                            fprintf(stderr,
-                                    "[human] ignoring message from unknown contact: %.*s\n",
+                            fprintf(stderr, "[human] ignoring message from unknown contact: %.*s\n",
                                     (int)(key_len > 20 ? 20 : key_len), batch_key);
                         continue;
                     }
@@ -1397,31 +1396,34 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         adjusted = adjusted * 3;
                         adjusted += 90000 + (int32_t)(
 #if defined(__APPLE__) || (defined(__linux__) && defined(__GLIBC__))
-                            arc4random_uniform(90001)
+                                                arc4random_uniform(90001)
 #else
-                            (((uint32_t)time(NULL) * 2654435769u) >> 16u) % 90001u
+                                                (((uint32_t)time(NULL) * 2654435769u) >> 16u) %
+                                                90001u
 #endif
-                        );
+                                            );
                     } else if (bth_hour >= 0 && bth_hour < 1) {
                         /* midnight-1 AM: winding down, slow to respond */
                         adjusted = adjusted * 2;
                         adjusted += 45000 + (int32_t)(
 #if defined(__APPLE__) || (defined(__linux__) && defined(__GLIBC__))
-                            arc4random_uniform(75001)
+                                                arc4random_uniform(75001)
 #else
-                            (((uint32_t)time(NULL) * 2654435769u) >> 16u) % 75001u
+                                                (((uint32_t)time(NULL) * 2654435769u) >> 16u) %
+                                                75001u
 #endif
-                        );
+                                            );
                     } else if (bth_hour >= 22) {
                         /* 10 PM+: getting sleepy */
                         adjusted = adjusted * 2;
                         adjusted += 20000 + (int32_t)(
 #if defined(__APPLE__) || (defined(__linux__) && defined(__GLIBC__))
-                            arc4random_uniform(40001)
+                                                arc4random_uniform(40001)
 #else
-                            (((uint32_t)time(NULL) * 2654435769u) >> 16u) % 40001u
+                                                (((uint32_t)time(NULL) * 2654435769u) >> 16u) %
+                                                40001u
 #endif
-                        );
+                                            );
                     } else if (bth_hour >= 21) {
                         /* 9-10 PM: evening, slower than daytime */
                         adjusted = adjusted * 3 / 2;
@@ -1624,6 +1626,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 char *response = NULL;
                 size_t response_len = 0;
+                hu_error_t err = HU_OK;
                 /* hu_agent_turn allocates response via agent->alloc; use agent->alloc for
                  * free/realloc to match. (agent->alloc == alloc at creation time.) */
 
@@ -1639,6 +1642,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 size_t convo_ctx_len = 0;
                 hu_channel_history_entry_t *history_entries = NULL;
                 size_t history_count = 0;
+#ifdef HU_HAS_PERSONA
+                const hu_contact_profile_t *contact_for_tapback = NULL;
+#endif
 
 #ifndef HU_IS_TEST
                 /* 1. Per-contact profile via persona struct */
@@ -1647,6 +1653,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     const hu_contact_profile_t *cp =
                         hu_persona_find_contact(agent->persona, batch_key, key_len);
                     if (cp) {
+                        contact_for_tapback = cp;
                         hu_contact_profile_build_context(alloc, cp, &contact_ctx, &contact_ctx_len);
 
                         size_t iw_len = 0;
@@ -2920,20 +2927,54 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* Tapback reactions: check if reaction is more appropriate before text */
-                if (ch->channel->vtable->react) {
-                    hu_reaction_type_t reaction = hu_conversation_classify_reaction(
-                        combined, combined_len, false, history_entries, history_count,
-                        (uint32_t)time(NULL));
-                    if (reaction != HU_REACTION_NONE) {
-                        int64_t msg_id = msgs[batch_end].message_id;
-                        if (msg_id > 0) {
-                            ch->channel->vtable->react(ch->channel->ctx, batch_key, key_len, msg_id,
-                                                       reaction);
-#ifndef HU_IS_TEST
-                            if (agent->bth_metrics)
-                                agent->bth_metrics->reactions_sent++;
+                /* Tapback-vs-text decision: gate reaction and/or LLM flow */
+                {
+                    hu_tapback_decision_t tapback_decision =
+                        hu_conversation_classify_tapback_decision(combined, combined_len,
+                                                                  history_entries, history_count,
+#ifdef HU_HAS_PERSONA
+                                                                  contact_for_tapback,
+#else
+                                                                  NULL,
 #endif
+                                                                  (uint32_t)time(NULL));
+
+                    if (tapback_decision == HU_NO_RESPONSE) {
+                        fprintf(stderr, "[human] tapback decision: no response for %.*s\n",
+                                (int)(combined_len > 40 ? 40 : combined_len), combined);
+                        goto skip_llm_this_batch;
+                    }
+
+                    if (tapback_decision == HU_TAPBACK_ONLY && ch->channel->vtable->react) {
+                        hu_reaction_type_t reaction = hu_conversation_classify_reaction(
+                            combined, combined_len, false, history_entries, history_count,
+                            (uint32_t)time(NULL));
+                        if (reaction != HU_REACTION_NONE) {
+                            int64_t msg_id = msgs[batch_end].message_id;
+                            if (msg_id > 0) {
+                                ch->channel->vtable->react(ch->channel->ctx, batch_key, key_len,
+                                                           msg_id, reaction);
+                                if (agent->bth_metrics)
+                                    agent->bth_metrics->reactions_sent++;
+                            }
+                        }
+                        fprintf(stderr, "[human] tapback only (no text) for %.*s\n",
+                                (int)(combined_len > 40 ? 40 : combined_len), combined);
+                        goto skip_llm_this_batch;
+                    }
+
+                    if (tapback_decision == HU_TAPBACK_AND_TEXT && ch->channel->vtable->react) {
+                        hu_reaction_type_t reaction = hu_conversation_classify_reaction(
+                            combined, combined_len, false, history_entries, history_count,
+                            (uint32_t)time(NULL));
+                        if (reaction != HU_REACTION_NONE) {
+                            int64_t msg_id = msgs[batch_end].message_id;
+                            if (msg_id > 0) {
+                                ch->channel->vtable->react(ch->channel->ctx, batch_key, key_len,
+                                                           msg_id, reaction);
+                                if (agent->bth_metrics)
+                                    agent->bth_metrics->reactions_sent++;
+                            }
                         }
                     }
                 }
@@ -2942,7 +2983,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 bool retried = false;
                 fprintf(stderr, "[human] calling agent turn for %.*s...\n",
                         (int)(key_len > 20 ? 20 : key_len), batch_key);
-                hu_error_t err = HU_OK;
                 do {
                     if (response) {
                         agent->alloc->free(agent->alloc->ctx, response, response_len + 1);
@@ -2950,8 +2990,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         response_len = 0;
                     }
                     err = hu_agent_turn(agent, combined, combined_len, &response, &response_len);
-                    fprintf(stderr,
-                            "[human] agent turn result: err=%d response_len=%zu for %.*s\n",
+                    fprintf(stderr, "[human] agent turn result: err=%d response_len=%zu for %.*s\n",
                             (int)err, response_len, (int)(key_len > 20 ? 20 : key_len), batch_key);
                     if (err != HU_OK)
                         fprintf(stderr, "[human] agent turn failed for %.*s: %d\n", (int)key_len,
@@ -3220,6 +3259,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 
+            skip_llm_this_batch:
                 /* Clear per-turn context and free */
 #ifndef HU_IS_TEST
                 agent->contact_context = NULL;

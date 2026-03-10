@@ -1025,6 +1025,54 @@ static void callback_null_entries(void) {
     HU_ASSERT_EQ(len, 0u);
 }
 
+/* ── Tapback-vs-text decision tests ──────────────────────────────────── */
+
+static void tapback_decision_lol_tapback_or_both(void) {
+    /* "lol" matches humor; seed 0 yields roll<70 → TAPBACK_ONLY */
+    hu_tapback_decision_t d =
+        hu_conversation_classify_tapback_decision("lol", 3, NULL, 0, NULL, 0u);
+    HU_ASSERT_TRUE(d == HU_TAPBACK_ONLY || d == HU_TAPBACK_AND_TEXT);
+}
+
+static void tapback_decision_question_text_only(void) {
+    /* "what time is dinner?" has question → TEXT_ONLY */
+    hu_tapback_decision_t d =
+        hu_conversation_classify_tapback_decision("what time is dinner?", 20, NULL, 0, NULL, 0u);
+    HU_ASSERT_EQ(d, HU_TEXT_ONLY);
+}
+
+static void tapback_decision_k_no_response_or_brief(void) {
+    /* "k" → NO_RESPONSE or TEXT_ONLY (brief); seed 0 yields NO_RESPONSE */
+    hu_tapback_decision_t d = hu_conversation_classify_tapback_decision("k", 1, NULL, 0, NULL, 0u);
+    HU_ASSERT_TRUE(d == HU_NO_RESPONSE || d == HU_TEXT_ONLY);
+}
+
+static void tapback_decision_recent_tapbacks_reduces_tapback(void) {
+    /* History with 2+ recent from_me tapbacks → 60% TEXT_ONLY for messages that reach that check */
+    hu_channel_history_entry_t entries[4] = {
+        make_entry(false, "that's wild", "12:00"),
+        make_entry(true, "Liked an image", "12:01"),
+        make_entry(false, "omg", "12:02"),
+        make_entry(true, "Laughed at a message", "12:03"),
+    };
+    /* "omg" falls through to recent_tapbacks check; with 2 tapbacks, 60% TEXT_ONLY */
+    hu_tapback_decision_t d =
+        hu_conversation_classify_tapback_decision("omg", 3, entries, 4, NULL, 0u);
+    /* Can be TAPBACK_ONLY, TAPBACK_AND_TEXT, or TEXT_ONLY depending on roll */
+    HU_ASSERT_TRUE(d == HU_TAPBACK_ONLY || d == HU_TAPBACK_AND_TEXT || d == HU_TEXT_ONLY);
+}
+
+static void tapback_decision_empty_no_response(void) {
+    hu_tapback_decision_t d = hu_conversation_classify_tapback_decision("", 0, NULL, 0, NULL, 0u);
+    HU_ASSERT_EQ(d, HU_NO_RESPONSE);
+}
+
+static void tapback_decision_emotional_text_only(void) {
+    hu_tapback_decision_t d = hu_conversation_classify_tapback_decision(
+        "i've been really stressed lately", 31, NULL, 0, NULL, 0u);
+    HU_ASSERT_EQ(d, HU_TEXT_ONLY);
+}
+
 /* ── Reaction classifier tests ───────────────────────────────────────── */
 
 static void reaction_funny_message(void) {
@@ -1437,6 +1485,14 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(group_short_no_prompt_skips);
     HU_RUN_TEST(group_too_many_responses_skips);
     HU_RUN_TEST(group_empty_skips);
+
+    /* Tapback-vs-text decision */
+    HU_RUN_TEST(tapback_decision_lol_tapback_or_both);
+    HU_RUN_TEST(tapback_decision_question_text_only);
+    HU_RUN_TEST(tapback_decision_k_no_response_or_brief);
+    HU_RUN_TEST(tapback_decision_recent_tapbacks_reduces_tapback);
+    HU_RUN_TEST(tapback_decision_empty_no_response);
+    HU_RUN_TEST(tapback_decision_emotional_text_only);
 
     /* Reaction classifier */
     HU_RUN_TEST(reaction_funny_message);

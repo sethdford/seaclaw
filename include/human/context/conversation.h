@@ -7,7 +7,8 @@
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
 #else
-struct hu_persona; /* opaque when persona not available */
+struct hu_persona;         /* opaque when persona not available */
+struct hu_contact_profile; /* opaque when persona not available */
 #endif
 #include <stdbool.h>
 #include <stddef.h>
@@ -251,11 +252,28 @@ hu_group_response_t hu_conversation_classify_group(const char *msg, size_t msg_l
                                                    const hu_channel_history_entry_t *entries,
                                                    size_t count);
 
+/* ── Tapback-vs-text decision engine ─────────────────────────────────────── */
+
+/* Decide whether to send tapback only, text only, both, or no response.
+ * Runs before hu_conversation_classify_reaction; only call classify_reaction
+ * when decision is TAPBACK_ONLY or TAPBACK_AND_TEXT. */
+typedef enum hu_tapback_decision {
+    HU_TAPBACK_ONLY,     /* send tapback, no text */
+    HU_TEXT_ONLY,        /* send text, no tapback */
+    HU_TAPBACK_AND_TEXT, /* both */
+    HU_NO_RESPONSE,      /* neither */
+} hu_tapback_decision_t;
+
+hu_tapback_decision_t hu_conversation_classify_tapback_decision(
+    const char *message, size_t message_len, const hu_channel_history_entry_t *entries,
+    size_t entry_count, const struct hu_contact_profile *contact, uint32_t seed);
+
 /* ── Reaction classifier ───────────────────────────────────────────────── */
 
 /* Classify whether to send a reaction instead of (or in addition to) a text reply.
  * Returns HU_REACTION_NONE if a text reply is more appropriate.
- * Takes into account message content, conversation flow, and randomness via seed. */
+ * Takes into account message content, conversation flow, and randomness via seed.
+ * Only call when tapback decision is TAPBACK_ONLY or TAPBACK_AND_TEXT. */
 hu_reaction_type_t hu_conversation_classify_reaction(const char *msg, size_t msg_len, bool from_me,
                                                      const hu_channel_history_entry_t *entries,
                                                      size_t entry_count, uint32_t seed);

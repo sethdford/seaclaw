@@ -2664,6 +2664,142 @@ hu_group_response_t hu_conversation_classify_group(const char *msg, size_t msg_l
     return HU_GROUP_BRIEF;
 }
 
+/* ── Tapback-vs-text decision engine ────────────────────────────────────── */
+
+static uint32_t tapback_prng_next(uint32_t *s) {
+    *s = *s * 1103515245u + 12345u;
+    return (*s >> 16u) & 0x7fffu;
+}
+
+/* Count recent from_me entries that look like tapback reactions (Loved, Liked, etc.) */
+static size_t count_recent_tapbacks_from_me(const hu_channel_history_entry_t *entries,
+                                            size_t entry_count) {
+    if (!entries || entry_count == 0)
+        return 0;
+    size_t n = 0;
+    for (size_t i = entry_count; i > 0 && n < 5; i--) {
+        const hu_channel_history_entry_t *e = &entries[i - 1];
+        if (!e->from_me)
+            continue;
+        char norm[64];
+        size_t ni = 0;
+        const char *t = e->text;
+        size_t tl = strlen(t);
+        for (size_t j = 0; j < tl && ni < sizeof(norm) - 1; j++) {
+            char c = t[j];
+            if (c >= 'A' && c <= 'Z')
+                c += 32;
+            if (c != ' ' && c != '\n' && c != '\r')
+                norm[ni++] = c;
+        }
+        norm[ni] = '\0';
+        if (is_tapback_reaction(norm, ni))
+            n++;
+    }
+    return n;
+}
+
+hu_tapback_decision_t hu_conversation_classify_tapback_decision(
+    const char *message, size_t message_len, const hu_channel_history_entry_t *entries,
+    size_t entry_count, const struct hu_contact_profile *contact, uint32_t seed) {
+    (void)contact; /* tapback_style.frequency future; use defaults for now */
+
+    if (!message || message_len == 0)
+        return HU_NO_RESPONSE;
+
+    uint32_t s = seed;
+
+    /* Normalize for comparison */
+    char norm[128];
+    size_t ni = 0;
+    for (size_t i = 0; i < message_len && ni < sizeof(norm) - 1; i++) {
+        char c = message[i];
+        if (c >= 'A' && c <= 'Z')
+            c += 32;
+        if (c != ' ' && c != '\n' && c != '\r')
+            norm[ni++] = c;
+    }
+    norm[ni] = '\0';
+
+    size_t word_count = count_words(message, message_len);
+    bool has_question = (memchr(message, '?', message_len) != NULL);
+
+    /* Skip: tapbacks (system vocabulary) — never respond */
+    if (is_tapback_reaction(norm, ni))
+        return HU_NO_RESPONSE;
+
+    /* Question → text preferred (need to answer) */
+    if (has_question)
+        return HU_TEXT_ONLY;
+
+    /* Emotional/heavy content → text preferred */
+    if (str_contains_ci(message, message_len, "passed away") ||
+        str_contains_ci(message, message_len, "got fired") ||
+        str_contains_ci(message, message_len, "broke up") ||
+        str_contains_ci(message, message_len, "bad news") ||
+        str_contains_ci(message, message_len, "didn't make it") ||
+        str_contains_ci(message, message_len, "stressed") ||
+        str_contains_ci(message, message_len, "worried") ||
+        str_contains_ci(message, message_len, "sad") ||
+        str_contains_ci(message, message_len, "angry"))
+        return HU_TEXT_ONLY;
+
+    /* k/ok/okay: NO_RESPONSE with ~60% prob, else brief TEXT_ONLY */
+    if ((ni == 1 && norm[0] == 'k') || (ni == 2 && memcmp(norm, "ok", 2) == 0) ||
+        (ni == 4 && memcmp(norm, "okay", 4) == 0)) {
+        uint32_t roll = tapback_prng_next(&s) % 100u;
+        if (roll < 60u)
+            return HU_NO_RESPONSE;
+        return HU_TEXT_ONLY;
+    }
+
+    /* Humor (lol, haha, lmao) → TAPBACK_ONLY ~70%, else TAPBACK_AND_TEXT */
+    if (str_contains_ci(message, message_len, "lol") ||
+        str_contains_ci(message, message_len, "haha") ||
+        str_contains_ci(message, message_len, "lmao") ||
+        str_contains_ci(message, message_len, "😂")) {
+        uint32_t roll = tapback_prng_next(&s) % 100u;
+        if (roll < 70u)
+            return HU_TAPBACK_ONLY;
+        return HU_TAPBACK_AND_TEXT;
+    }
+
+    /* Agreement/affirmation (yeah, nice, cool, etc.) → TAPBACK_ONLY ~70% */
+    if (str_contains_ci(message, message_len, "yeah") ||
+        str_contains_ci(message, message_len, "nice") ||
+        str_contains_ci(message, message_len, "cool") ||
+        str_contains_ci(message, message_len, "sure") ||
+        str_contains_ci(message, message_len, "ok") ||
+        str_contains_ci(message, message_len, "👍") ||
+        (message_len <= 8 && str_contains_ci(message, message_len, "yes"))) {
+        uint32_t roll = tapback_prng_next(&s) % 100u;
+        if (roll < 70u)
+            return HU_TAPBACK_ONLY;
+        return HU_TAPBACK_AND_TEXT;
+    }
+
+    /* Recent tapbacks from us → reduce tapback probability, prefer text */
+    size_t recent_tapbacks = count_recent_tapbacks_from_me(entries, entry_count);
+    if (recent_tapbacks >= 2) {
+        uint32_t roll = tapback_prng_next(&s) % 100u;
+        if (roll < 60u)
+            return HU_TEXT_ONLY;
+    }
+
+    /* Short message (<15 chars, no question) → tapback more likely */
+    if (message_len < 15 && word_count <= 2) {
+        uint32_t roll = tapback_prng_next(&s) % 100u;
+        if (roll < 50u)
+            return HU_TAPBACK_ONLY;
+        if (roll < 80u)
+            return HU_TAPBACK_AND_TEXT;
+        return HU_TEXT_ONLY;
+    }
+
+    /* Default: substantive message → text */
+    return HU_TEXT_ONLY;
+}
+
 /* ── Reaction classifier ───────────────────────────────────────────────── */
 
 static uint32_t reaction_prng_next(uint32_t *s) {
