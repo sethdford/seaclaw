@@ -50,4 +50,4 @@ const unsigned char data_security_command_lists_json[] = {
   0x20, 0x22, 0x74, 0x61, 0x69, 0x6c, 0x22, 0x0a, 0x20, 0x20, 0x5d, 0x0a,
   0x7d, 0x0a
 };
-const size_t data_security_command_lists_json_len = 566;
+static const size_t data_security_command_lists_json_len = 566;

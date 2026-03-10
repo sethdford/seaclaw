@@ -16,4 +16,4 @@ const unsigned char data_prompts_reasoning_instruction_txt[] = {
   0x77, 0x65, 0x72, 0x20, 0x64, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6c, 0x79,
   0x2e, 0x0a, 0x0a
 };
-const size_t data_prompts_reasoning_instruction_txt_len = 159;
+static const size_t data_prompts_reasoning_instruction_txt_len = 159;

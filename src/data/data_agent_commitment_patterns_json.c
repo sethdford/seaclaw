@@ -27,4 +27,4 @@ const unsigned char data_agent_commitment_patterns_json[] = {
   0x20, 0x22, 0x6e, 0x65, 0x76, 0x65, 0x72, 0x20, 0x22, 0x5d, 0x0a, 0x7d,
   0x0a
 };
-const size_t data_agent_commitment_patterns_json_len = 289;
+static const size_t data_agent_commitment_patterns_json_len = 289;
