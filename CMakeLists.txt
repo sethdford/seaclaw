@@ -686,6 +686,13 @@ if(HU_ENABLE_UPDATE)
     list(APPEND HU_CORE_SOURCES src/update.c)
 endif()
 
+# Data loader (always compiled)
+list(APPEND HU_CORE_SOURCES
+    src/data/loader.c
+    src/data/embedded_registry.c
+    src/data/data_prompts_group_chat_hint_txt.c
+)
+
 # Crypto sources (generic C fallbacks + dispatch)
 set(HU_CRYPTO_SOURCES
     asm/generic/chacha20.c
@@ -1369,6 +1376,7 @@ set(HU_TEST_SOURCES
     tests/test_crypto.c
     tests/test_wasm.c
     tests/test_allocator.c
+    tests/test_data_loader.c
     tests/test_json.c
     tests/test_string.c
     tests/test_slice.c

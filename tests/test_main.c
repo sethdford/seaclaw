@@ -6,6 +6,7 @@ int hu__failed = 0;
 jmp_buf hu__jmp;
 
 void run_allocator_tests(void);
+void run_data_loader_tests(void);
 void run_agent_modules_tests(void);
 void run_agent_subsystems_tests(void);
 void run_crypto_tests(void);
@@ -144,6 +145,7 @@ int main(void) {
     printf("==================\n");
 
     run_allocator_tests();
+    run_data_loader_tests();
     run_agent_modules_tests();
     run_agent_subsystems_tests();
     run_crypto_tests();
