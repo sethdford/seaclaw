@@ -2853,7 +2853,7 @@ size_t hu_conversation_build_burst_prompt(char *buf, size_t cap) {
         "Each 2-10 words. Rapid-fire thoughts, not one split message.]";
     size_t len = sizeof(BURST_DIRECTIVE) - 1;
     if (!buf || cap == 0)
-        return len;
+        return 0;
     if (len >= cap)
         len = cap - 1;
     memcpy(buf, BURST_DIRECTIVE, len);
@@ -2863,7 +2863,7 @@ size_t hu_conversation_build_burst_prompt(char *buf, size_t cap) {
 
 int hu_conversation_parse_burst_response(const char *response, size_t resp_len,
                                          char messages[][256], size_t max_messages) {
-    if (!response || max_messages == 0)
+    if (!response || !messages || max_messages == 0)
         return 0;
     const char *p = response;
     const char *end = response + resp_len;
