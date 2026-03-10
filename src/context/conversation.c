@@ -2749,6 +2749,68 @@ int hu_conversation_classify_dropoff(const char *message, size_t message_len,
     return 0;
 }
 
+/* ── Leave-on-read classifier (F46) ────────────────────────────────────── */
+
+bool hu_conversation_should_leave_on_read(const char *msg, size_t msg_len,
+                                          const hu_channel_history_entry_t *entries, size_t count,
+                                          uint32_t seed) {
+    if (!msg || msg_len == 0)
+        return false;
+
+    /* Never for direct questions */
+    if (memchr(msg, '?', msg_len) != NULL)
+        return false;
+
+    /* Never for emotional crisis */
+    if (str_contains_ci(msg, msg_len, "help me") || str_contains_ci(msg, msg_len, "i need you"))
+        return false;
+
+    /* Never for concerning emotion in recent history */
+    if (entries && count > 0) {
+        hu_emotional_state_t emo = hu_conversation_detect_emotion(entries, count);
+        if (emo.concerning)
+            return false;
+    }
+
+    /* Never for high emotional content in message itself */
+    if (str_contains_ci(msg, msg_len, "emergency") || str_contains_ci(msg, msg_len, "urgent"))
+        return false;
+
+    bool trigger = false;
+
+    /* Disagreement */
+    if (str_contains_ci(msg, msg_len, "agree to disagree") ||
+        str_contains_ci(msg, msg_len, "whatever") || str_contains_ci(msg, msg_len, "fine.") ||
+        str_contains_ci(msg, msg_len, "i don't agree") ||
+        str_contains_ci(msg, msg_len, "you're wrong") ||
+        str_contains_ci(msg, msg_len, "youre wrong"))
+        trigger = true;
+
+    /* Space request */
+    if (!trigger && (str_contains_ci(msg, msg_len, "i need space") ||
+                     str_contains_ci(msg, msg_len, "give me a minute") ||
+                     str_contains_ci(msg, msg_len, "can we talk later") ||
+                     str_contains_ci(msg, msg_len, "leave me alone")))
+        trigger = true;
+
+    /* Low-content: ok, cool, sure, k (1-4 chars, no question) — exact match */
+    if (!trigger && msg_len >= 1 && msg_len <= 4) {
+        if (msg_len == 1 && (msg[0] == 'k' || msg[0] == 'K'))
+            trigger = true;
+        else if (msg_len == 2 && strncasecmp(msg, "ok", 2) == 0)
+            trigger = true;
+        else if (msg_len == 4 &&
+                 (strncasecmp(msg, "cool", 4) == 0 || strncasecmp(msg, "sure", 4) == 0))
+            trigger = true;
+    }
+
+    if (!trigger)
+        return false;
+
+    /* 2% probability roll */
+    return (seed % 100u) < 2u;
+}
+
 /* ── URL extraction ──────────────────────────────────────────────────── */
 
 /* Utility for future use. Not currently wired into production; link-sharing

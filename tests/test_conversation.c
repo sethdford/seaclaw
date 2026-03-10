@@ -1930,6 +1930,67 @@ static void backchannel_pick_deterministic(void) {
     HU_ASSERT_STR_EQ(buf1, buf2);
 }
 
+/* ── Leave-on-read classifier (F46) tests ────────────────────────────── */
+
+static void leave_on_read_agree_to_disagree_seed_under_2_returns_true(void) {
+    /* seed % 100 < 2 → true when trigger matches */
+    hu_channel_history_entry_t entries[1] = {
+        make_entry(false, "agree to disagree", "12:00"),
+    };
+    bool r = hu_conversation_should_leave_on_read("agree to disagree", 17, entries, 1, 0u);
+    HU_ASSERT_TRUE(r);
+}
+
+static void leave_on_read_question_never_true(void) {
+    hu_channel_history_entry_t entries[1] = {
+        make_entry(false, "what do you think?", "12:00"),
+    };
+    bool r = hu_conversation_should_leave_on_read("what do you think?", 18, entries, 1, 0u);
+    HU_ASSERT_FALSE(r);
+}
+
+static void leave_on_read_help_me_never_true(void) {
+    hu_channel_history_entry_t entries[1] = {
+        make_entry(false, "help me", "12:00"),
+    };
+    bool r = hu_conversation_should_leave_on_read("help me", 7, entries, 1, 0u);
+    HU_ASSERT_FALSE(r);
+}
+
+static void leave_on_read_normal_message_seed_over_2_returns_false(void) {
+    const char *msg = "i just got back from the store";
+    hu_channel_history_entry_t entries[1] = {
+        make_entry(false, msg, "12:00"),
+    };
+    /* seed 50: 50 % 100 = 50 >= 2; normal message has no trigger; so false */
+    bool r = hu_conversation_should_leave_on_read(msg, strlen(msg), entries, 1, 50u);
+    HU_ASSERT_FALSE(r);
+}
+
+static void leave_on_read_short_ok_seed_under_2_returns_true(void) {
+    hu_channel_history_entry_t entries[1] = {
+        make_entry(false, "ok", "12:00"),
+    };
+    bool r = hu_conversation_should_leave_on_read("ok", 2, entries, 1, 1u);
+    HU_ASSERT_TRUE(r);
+}
+
+static void leave_on_read_whatever_seed_under_2_returns_true(void) {
+    hu_channel_history_entry_t entries[1] = {
+        make_entry(false, "whatever", "12:00"),
+    };
+    bool r = hu_conversation_should_leave_on_read("whatever", 8, entries, 1, 0u);
+    HU_ASSERT_TRUE(r);
+}
+
+static void leave_on_read_ok_seed_over_2_returns_false(void) {
+    hu_channel_history_entry_t entries[1] = {
+        make_entry(false, "ok", "12:00"),
+    };
+    bool r = hu_conversation_should_leave_on_read("ok", 2, entries, 1, 42u);
+    HU_ASSERT_FALSE(r);
+}
+
 /* ── Test suite registration ─────────────────────────────────────────── */
 
 void run_conversation_tests(void) {
@@ -2207,4 +2268,13 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(backchannel_narrative_prob_zero_returns_false);
     HU_RUN_TEST(backchannel_pick_returns_nonempty);
     HU_RUN_TEST(backchannel_pick_deterministic);
+
+    /* Leave-on-read classifier (F46) */
+    HU_RUN_TEST(leave_on_read_agree_to_disagree_seed_under_2_returns_true);
+    HU_RUN_TEST(leave_on_read_question_never_true);
+    HU_RUN_TEST(leave_on_read_help_me_never_true);
+    HU_RUN_TEST(leave_on_read_normal_message_seed_over_2_returns_false);
+    HU_RUN_TEST(leave_on_read_short_ok_seed_under_2_returns_true);
+    HU_RUN_TEST(leave_on_read_whatever_seed_under_2_returns_true);
+    HU_RUN_TEST(leave_on_read_ok_seed_over_2_returns_false);
 }

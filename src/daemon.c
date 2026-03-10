@@ -27,6 +27,7 @@
 #include "human/memory/consolidation.h"
 #include "human/memory/deep_extract.h"
 #include "human/memory/emotional_graph.h"
+#include "human/memory/emotional_moments.h"
 #include "human/memory/fast_capture.h"
 #include "human/memory/graph.h"
 #include "human/memory/inbox.h"
@@ -1023,6 +1024,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     static char consec_contact_keys[HU_CONSEC_MAX_CONTACTS][64];
     static size_t consec_contact_count = 0;
 
+#define HU_LEAVE_ON_READ_MAX 32
+    static struct {
+        char key[64];
+        time_t until;
+    } leave_on_read_entries[HU_LEAVE_ON_READ_MAX];
+
     static hu_bth_metrics_t bth_metrics;
     hu_bth_metrics_init(&bth_metrics);
     if (agent)
@@ -1454,7 +1461,65 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         tapback_skip = true;
                 }
 #endif
-                if (action == HU_RESPONSE_SKIP || tapback_skip) {
+
+                /* F46: Leave-on-read — deliberate non-response as social signal (<2%).
+                 * Never in group chats. Skip if we're in active leave-on-read period, or
+                 * if classifier says leave-on-read and we store 2–24h timer. */
+                bool leave_on_read_skip = false;
+#ifndef HU_IS_TEST
+                if (!msgs[batch_start].is_group) {
+                    time_t now_ts = time(NULL);
+                    size_t lor_slot = SIZE_MAX;
+                    for (size_t lor_i = 0; lor_i < HU_LEAVE_ON_READ_MAX; lor_i++) {
+                        if (leave_on_read_entries[lor_i].key[0] == '\0')
+                            continue;
+                        if (key_len < sizeof(leave_on_read_entries[lor_i].key) &&
+                            memcmp(leave_on_read_entries[lor_i].key, batch_key, key_len) == 0 &&
+                            leave_on_read_entries[lor_i].key[key_len] == '\0') {
+                            if (leave_on_read_entries[lor_i].until > now_ts) {
+                                leave_on_read_skip = true;
+                                fprintf(stderr, "[human] leave-on-read: still in period for %.*s\n",
+                                        (int)(key_len > 20 ? 20 : key_len), batch_key);
+                            } else {
+                                lor_slot = lor_i; /* expired, can reuse */
+                            }
+                            break;
+                        }
+                    }
+                    if (!leave_on_read_skip && action != HU_RESPONSE_SKIP && !tapback_skip) {
+                        uint32_t lor_seed =
+                            (uint32_t)now_ts * 1103515245u + 12345u + (uint32_t)(uintptr_t)combined;
+                        if (hu_conversation_should_leave_on_read(combined, combined_len,
+                                                                 early_history, early_history_count,
+                                                                 lor_seed)) {
+                            leave_on_read_skip = true;
+                            /* Store leave_on_read_until: now + random 2–24 hours */
+                            uint32_t hrs = 7200u + ((lor_seed >> 16u) % (86400u - 7200u + 1u));
+                            time_t until = now_ts + (time_t)hrs;
+                            if (lor_slot == SIZE_MAX) {
+                                for (size_t lor_j = 0; lor_j < HU_LEAVE_ON_READ_MAX; lor_j++) {
+                                    if (leave_on_read_entries[lor_j].key[0] == '\0' ||
+                                        leave_on_read_entries[lor_j].until <= now_ts) {
+                                        lor_slot = lor_j;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (lor_slot != SIZE_MAX &&
+                                key_len < sizeof(leave_on_read_entries[0].key)) {
+                                memcpy(leave_on_read_entries[lor_slot].key, batch_key, key_len);
+                                leave_on_read_entries[lor_slot].key[key_len] = '\0';
+                                leave_on_read_entries[lor_slot].until = until;
+                                fprintf(stderr,
+                                        "[human] leave-on-read: skipping for %.*s until %ld\n",
+                                        (int)(key_len > 20 ? 20 : key_len), batch_key, (long)until);
+                            }
+                        }
+                    }
+                }
+#endif
+
+                if (action == HU_RESPONSE_SKIP || tapback_skip || leave_on_read_skip) {
                     if (tapback_skip)
                         fprintf(stderr, "[human] tapback-skip (no response): %.*s\n",
                                 (int)(combined_len > 40 ? 40 : combined_len), combined);
@@ -2770,6 +2835,45 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                           fc_pre.emotions[ei].intensity);
                         }
                     }
+#ifndef HU_IS_TEST
+                    /* F25: Record emotional moments for 1–3 day check-ins */
+                    if (agent->memory && history_entries && history_count > 0) {
+                        hu_emotional_state_t emo_rec =
+                            hu_conversation_detect_emotion(history_entries, history_count);
+                        hu_escalation_state_t esc_rec =
+                            hu_conversation_detect_escalation(history_entries, history_count);
+                        hu_energy_level_t energy_rec = hu_conversation_detect_energy(
+                            combined, combined_len, history_entries, history_count);
+                        bool should_record = emo_rec.concerning || esc_rec.escalating ||
+                                             energy_rec == HU_ENERGY_SAD ||
+                                             energy_rec == HU_ENERGY_ANXIOUS ||
+                                             (emo_rec.dominant_emotion &&
+                                              (strcmp(emo_rec.dominant_emotion, "sad") == 0 ||
+                                               strcmp(emo_rec.dominant_emotion, "stressed") == 0 ||
+                                               strcmp(emo_rec.dominant_emotion, "anxious") == 0 ||
+                                               strcmp(emo_rec.dominant_emotion, "worried") == 0));
+                        if (should_record) {
+                            const char *topic_str =
+                                (fc_pre.primary_topic && fc_pre.primary_topic[0])
+                                    ? fc_pre.primary_topic
+                                    : (combined_len > 0 ? combined : "something you shared");
+                            size_t topic_len =
+                                (fc_pre.primary_topic && fc_pre.primary_topic[0])
+                                    ? strlen(fc_pre.primary_topic)
+                                    : (combined_len > 0 ? (combined_len > 200 ? 200 : combined_len)
+                                                        : 20);
+                            if (topic_len > 255)
+                                topic_len = 255;
+                            const char *emotion_str =
+                                emo_rec.dominant_emotion && emo_rec.dominant_emotion[0]
+                                    ? emo_rec.dominant_emotion
+                                    : (esc_rec.escalating ? "escalating" : "concerning");
+                            (void)hu_emotional_moment_record(
+                                alloc, agent->memory, batch_key, key_len, topic_str, topic_len,
+                                emotion_str, strlen(emotion_str), emo_rec.intensity);
+                        }
+                    }
+#endif
                     hu_fc_result_deinit(&fc_pre, alloc);
                 }
 

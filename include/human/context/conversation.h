@@ -226,6 +226,7 @@ typedef enum hu_response_action {
     HU_RESPONSE_SKIP = 2,     /* don't respond at all */
     HU_RESPONSE_DELAY = 3,    /* full response but with extra delay */
     HU_RESPONSE_THINKING = 4, /* two-phase: send filler first, then real response after delay */
+    HU_RESPONSE_LEAVE_ON_READ = 5, /* deliberate non-response as social signal (<2%) */
 } hu_response_action_t;
 
 typedef struct hu_thinking_response {
@@ -247,6 +248,14 @@ hu_response_action_t hu_conversation_classify_response(const char *msg, size_t m
                                                        const hu_channel_history_entry_t *entries,
                                                        size_t entry_count,
                                                        uint32_t *delay_extra_ms);
+
+/* Leave-on-read classifier (F46): intentionally not responding as a social signal.
+ * Returns true when: disagreement/space/low-content AND seed%100 < 2.
+ * Never for: direct questions (?), emotional crisis ("help me"), concerning emotion, group chats.
+ * Caller must pass is_group=false; never call for group chats. */
+bool hu_conversation_should_leave_on_read(const char *msg, size_t msg_len,
+                                          const hu_channel_history_entry_t *entries, size_t count,
+                                          uint32_t seed);
 
 /* Natural conversation drop-off: returns skip probability 0-100.
  * Caller rolls (seed % 100) < prob to decide SKIP. Used when action is FULL/BRIEF. */
