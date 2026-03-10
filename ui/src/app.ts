@@ -109,7 +109,7 @@ export class ScApp extends LitElement {
     .sc-skip-link {
       position: absolute;
       top: -100%;
-      left: var(--sc-space-md, 1rem);
+      left: var(--sc-space-md);
       z-index: 9999;
       padding: var(--sc-space-xs) var(--sc-space-md);
       background: var(--sc-accent);
@@ -119,7 +119,7 @@ export class ScApp extends LitElement {
       font-weight: 600;
     }
     .sc-skip-link:focus {
-      top: var(--sc-space-md, 1rem);
+      top: var(--sc-space-md);
     }
 
     .layout {
@@ -210,7 +210,7 @@ export class ScApp extends LitElement {
     @keyframes sc-view-enter {
       from {
         opacity: 0;
-        transform: translateY(8px) scale(0.995);
+        transform: translateY(var(--sc-space-sm)) scale(0.995);
       }
       to {
         opacity: 1;
@@ -262,7 +262,7 @@ export class ScApp extends LitElement {
       display: none;
     }
 
-    @media (max-width: 768px) /* --sc-breakpoint-lg */ {
+    @media (max-width: var(--sc-breakpoint-lg)) /* --sc-breakpoint-lg */ {
       .layout {
         grid-template-columns: 1fr;
         grid-template-rows: 1fr auto;
@@ -309,9 +309,9 @@ export class ScApp extends LitElement {
         color: var(--sc-accent-text, var(--sc-accent));
       }
       .mobile-tab .icon {
-        width: 1.25rem;
-        height: 1.25rem;
-        line-height: 1;
+        width: var(--sc-icon-md);
+        height: var(--sc-icon-md);
+        line-height: var(--sc-leading-none);
       }
       .mobile-tab .icon svg {
         width: 100%;

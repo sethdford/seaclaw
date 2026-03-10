@@ -1292,7 +1292,11 @@ export class DemoGatewayClient extends EventTarget {
 
       case "update.check":
         return { available: false, current_version: "0.42.0" };
-      case "chat.history":
+      case "chat.history": {
+        const sk = (params?.sessionKey as string) ?? "default";
+        if (sk === "default") {
+          return { messages: [] };
+        }
         return {
           messages: [
             { role: "user", content: "Can you help me debug this memory leak?" },
@@ -1309,6 +1313,7 @@ export class DemoGatewayClient extends EventTarget {
             },
           ],
         };
+      }
       case "activity.recent":
         return { events: DEMO_EVENTS };
       case "agents.list":

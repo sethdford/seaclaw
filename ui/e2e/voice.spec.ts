@@ -1,5 +1,13 @@
 import { test, expect } from "@playwright/test";
-import { shadowExists, shadowExistsIn, deepText, waitForViewReady, WAIT, POLL } from "./helpers.js";
+import {
+  shadowExists,
+  shadowExistsIn,
+  deepText,
+  waitForViewReady,
+  WAIT,
+  POLL,
+  ANIMATION_SETTLE_MS,
+} from "./helpers.js";
 
 const VIEW = "sc-voice-view";
 
@@ -118,6 +126,7 @@ test.describe("Voice Interactions", () => {
     }).toPass({ timeout: 15000 });
 
     await page.evaluate(clickStatusBarButton("New Session"));
+    await page.waitForTimeout(ANIMATION_SETTLE_MS);
 
     await expect(async () => {
       const hasEmpty = await page.evaluate(

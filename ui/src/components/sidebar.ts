@@ -149,7 +149,7 @@ export class ScSidebar extends LitElement {
     .section-title {
       font-size: var(--sc-text-xs);
       font-weight: var(--sc-weight-medium);
-      letter-spacing: 0.02em;
+      letter-spacing: var(--sc-tracking-xs);
       text-transform: uppercase;
       color: var(--sc-text-muted);
       padding: var(--sc-space-xs) var(--sc-space-md);
@@ -195,8 +195,8 @@ export class ScSidebar extends LitElement {
     }
 
     .nav-item:focus-visible {
-      outline: 2px solid var(--sc-accent);
-      outline-offset: -2px;
+      outline: var(--sc-focus-ring-width) solid var(--sc-accent);
+      outline-offset: calc(-1 * var(--sc-focus-ring-width));
       border-radius: var(--sc-radius);
     }
 
@@ -282,8 +282,8 @@ export class ScSidebar extends LitElement {
     }
 
     .theme-toggle .icon {
-      width: 16px;
-      height: 16px;
+      width: var(--sc-icon-sm);
+      height: var(--sc-icon-sm);
       flex-shrink: 0;
     }
 

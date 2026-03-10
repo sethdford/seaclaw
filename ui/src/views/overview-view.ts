@@ -97,11 +97,11 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
     .hero-title {
       margin: 0;
-      font-size: clamp(1.5rem, 2.5vw, 2rem);
-      font-weight: var(--sc-weight-bold, 700);
-      letter-spacing: -0.03em;
+      font-size: var(--sc-text-3xl);
+      font-weight: var(--sc-weight-bold);
+      letter-spacing: var(--sc-tracking-hero);
       color: var(--sc-text);
-      line-height: 1.1;
+      line-height: var(--sc-leading-tight);
     }
 
     .hero-meta {
@@ -138,7 +138,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
     .details {
       display: flex;
       flex-direction: column;
-      gap: var(--sc-space-xl, 1.5rem);
+      gap: var(--sc-space-xl);
     }
 
     .bento {
@@ -164,8 +164,8 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
     .section-label {
       font-size: var(--sc-text-xs);
-      font-weight: var(--sc-weight-semibold, 600);
-      letter-spacing: 0.08em;
+      font-weight: var(--sc-weight-semibold);
+      letter-spacing: var(--sc-tracking-xs);
       text-transform: uppercase;
       color: var(--sc-accent-text, var(--sc-accent));
       margin-bottom: var(--sc-space-sm);
@@ -183,7 +183,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
     .channels-inner {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(var(--sc-sidebar-width), 1fr));
       gap: var(--sc-space-sm);
       flex: 1;
       min-width: 0;
@@ -205,14 +205,14 @@ export class ScOverviewView extends GatewayAwareLitElement {
     /* ── Skeleton ─────────────────────────────────────── */
 
     .skeleton-hero {
-      margin-bottom: var(--sc-space-2xl, 2rem);
+      margin-bottom: var(--sc-space-2xl);
     }
 
     .skeleton-metrics {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: var(--sc-space-lg);
-      margin-bottom: var(--sc-space-2xl, 2rem);
+      margin-bottom: var(--sc-space-2xl);
     }
 
     .skeleton-bento {
@@ -238,7 +238,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
     /* ── Responsive ───────────────────────────────────── */
 
-    @media (max-width: 40rem) /* --sc-breakpoint-md */ {
+    @media (max-width: var(--sc-breakpoint-md)) /* --sc-breakpoint-md */ {
       .bento {
         grid-template-columns: 1fr;
         grid-template-areas:
@@ -261,7 +261,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
       }
     }
 
-    @media (max-width: 30rem) /* --sc-breakpoint-sm */ {
+    @media (max-width: var(--sc-breakpoint-sm)) /* --sc-breakpoint-sm */ {
       :host {
         padding: var(--sc-space-md) var(--sc-space-lg);
       }
@@ -289,20 +289,20 @@ export class ScOverviewView extends GatewayAwareLitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 2.5rem;
-      height: 2.5rem;
+      width: var(--sc-icon-2xl);
+      height: var(--sc-icon-2xl);
       color: var(--sc-accent);
     }
     .quick-action-card .icon-wrap svg {
-      width: 1.5rem;
-      height: 1.5rem;
+      width: var(--sc-icon-lg);
+      height: var(--sc-icon-lg);
     }
     .quick-action-card .label {
       font-size: var(--sc-text-sm);
       font-weight: var(--sc-weight-medium);
       color: var(--sc-text);
     }
-    @media (max-width: 40rem) /* --sc-breakpoint-md */ {
+    @media (max-width: var(--sc-breakpoint-md)) /* --sc-breakpoint-md */ {
       .quick-actions {
         grid-template-columns: 1fr;
       }

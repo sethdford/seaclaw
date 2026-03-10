@@ -1,10 +1,11 @@
 package ai.seaclaw.app.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +50,7 @@ import ai.seaclaw.app.ui.SCTokens
 import ai.seaclaw.app.GatewayClient
 import ai.seaclaw.app.GatewayManager
 import androidx.compose.runtime.collectAsState
+import kotlin.math.sqrt
 import kotlinx.coroutines.launch
 
 @Composable
@@ -60,6 +62,9 @@ fun ChatScreen(gatewayManager: GatewayManager) {
     val isConnected by gatewayManager.isConnected.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val expressiveDampingRatio = remember {
+        SCTokens.springExpressiveDamping / (2 * sqrt(SCTokens.springExpressiveStiffness * SCTokens.springExpressiveMass))
+    }
 
     LaunchedEffect(Unit) {
         gatewayManager.connect()
@@ -189,9 +194,10 @@ fun ChatScreen(gatewayManager: GatewayManager) {
             itemsIndexed(messages, key = { index, _ -> "msg_$index" }) { _, msg ->
                 AnimatedVisibility(
                     visible = true,
-                    enter = fadeIn(animationSpec = tween(SCTokens.durationNormal.toInt())) +
-                        slideInVertically(animationSpec = tween(SCTokens.durationNormal.toInt()), initialOffsetY = { it }),
-                    exit = fadeOut(animationSpec = tween(SCTokens.durationFast.toInt()))
+                    enter = fadeIn(animationSpec = spring(dampingRatio = expressiveDampingRatio, stiffness = SCTokens.springExpressiveStiffness)) +
+                        slideInVertically(animationSpec = spring(dampingRatio = expressiveDampingRatio, stiffness = SCTokens.springExpressiveStiffness), initialOffsetY = { it }),
+                    exit = fadeOut(animationSpec = spring(dampingRatio = expressiveDampingRatio, stiffness = SCTokens.springExpressiveStiffness)) +
+                        slideOutVertically(animationSpec = spring(dampingRatio = expressiveDampingRatio, stiffness = SCTokens.springExpressiveStiffness), targetOffsetY = { it })
                 ) {
                     ChatBubble(
                         text = msg.text,
@@ -200,12 +206,20 @@ fun ChatScreen(gatewayManager: GatewayManager) {
                 }
             }
             itemsIndexed(toolCalls, key = { index, _ -> "tc_$index" }) { _, tc ->
-                ToolCallCard(
-                    name = tc.name,
-                    arguments = tc.arguments,
-                    status = tc.status,
-                    result = tc.result
-                )
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(animationSpec = spring(dampingRatio = expressiveDampingRatio, stiffness = SCTokens.springExpressiveStiffness)) +
+                        slideInVertically(animationSpec = spring(dampingRatio = expressiveDampingRatio, stiffness = SCTokens.springExpressiveStiffness), initialOffsetY = { it }),
+                    exit = fadeOut(animationSpec = spring(dampingRatio = expressiveDampingRatio, stiffness = SCTokens.springExpressiveStiffness)) +
+                        slideOutVertically(animationSpec = spring(dampingRatio = expressiveDampingRatio, stiffness = SCTokens.springExpressiveStiffness), targetOffsetY = { it })
+                ) {
+                    ToolCallCard(
+                        name = tc.name,
+                        arguments = tc.arguments,
+                        status = tc.status,
+                        result = tc.result
+                    )
+                }
             }
         }
 

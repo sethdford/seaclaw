@@ -53,15 +53,15 @@ test.describe("Chat Streaming Choreography (demo mode)", () => {
       });
     });
 
-    await page.waitForTimeout(200);
-
-    const hasIndicator = await page.evaluate(() => {
-      const app = document.querySelector("sc-app");
-      const view = app?.shadowRoot?.querySelector("sc-chat-view");
-      const thread = view?.shadowRoot?.querySelector("sc-message-thread");
-      return !!thread?.shadowRoot?.querySelector("sc-typing-indicator");
-    });
-    expect(hasIndicator).toBe(true);
+    await expect(async () => {
+      const hasIndicator = await page.evaluate(() => {
+        const app = document.querySelector("sc-app");
+        const view = app?.shadowRoot?.querySelector("sc-chat-view");
+        const thread = view?.shadowRoot?.querySelector("sc-message-thread");
+        return !!thread?.shadowRoot?.querySelector("sc-typing-indicator");
+      });
+      expect(hasIndicator).toBe(true);
+    }).toPass({ timeout: 5000 });
 
     await page.screenshot({
       path: "test-results/chat-streaming-choreography.png",
