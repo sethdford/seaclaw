@@ -1764,13 +1764,13 @@ static void classify_selective_is_default(void) {
     uint32_t delay = 0;
     /* Use a question which always classifies as FULL */
     hu_response_action_t action =
-        hu_conversation_classify_response("are you free tomorrow?", 21, NULL, 0, &delay);
+        hu_conversation_classify_response("are you free tomorrow?", 22, NULL, 0, &delay);
     HU_ASSERT_EQ(action, HU_RESPONSE_FULL);
 
     /* Simulate default (NULL) mode override = selective behavior */
     const char *rmode = NULL;
     const char *combined = "are you free tomorrow?";
-    size_t combined_len = 21;
+    size_t combined_len = 22;
 
     if (!rmode || !rmode[0] || strcmp(rmode, "selective") == 0) {
         if (action == HU_RESPONSE_FULL && !memchr(combined, '?', combined_len))

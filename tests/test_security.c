@@ -884,7 +884,7 @@ static void test_sandbox_wasi_no_apply(void) {
 /* --- Firecracker sandbox tests --- */
 static void test_sandbox_firecracker_vtable_wiring(void) {
     hu_firecracker_ctx_t ctx;
-    hu_firecracker_sandbox_init(&ctx, "/tmp/workspace");
+    hu_firecracker_sandbox_init(&ctx, "/tmp/workspace", NULL);
     hu_sandbox_t sb = hu_firecracker_sandbox_get(&ctx);
     HU_ASSERT(sb.ctx != NULL);
     HU_ASSERT(sb.vtable != NULL);
@@ -894,14 +894,14 @@ static void test_sandbox_firecracker_vtable_wiring(void) {
 
 static void test_sandbox_firecracker_not_available_in_test(void) {
     hu_firecracker_ctx_t ctx;
-    hu_firecracker_sandbox_init(&ctx, "/tmp");
+    hu_firecracker_sandbox_init(&ctx, "/tmp", NULL);
     hu_sandbox_t sb = hu_firecracker_sandbox_get(&ctx);
     HU_ASSERT_FALSE(hu_sandbox_is_available(&sb));
 }
 
 static void test_sandbox_firecracker_defaults(void) {
     hu_firecracker_ctx_t ctx;
-    hu_firecracker_sandbox_init(&ctx, "/tmp/ws");
+    hu_firecracker_sandbox_init(&ctx, "/tmp/ws", NULL);
     HU_ASSERT_EQ(ctx.vcpu_count, 1u);
     HU_ASSERT_EQ(ctx.mem_size_mib, 128u);
     HU_ASSERT(strcmp(ctx.workspace_dir, "/tmp/ws") == 0);
@@ -912,7 +912,7 @@ static void test_sandbox_firecracker_defaults(void) {
 static void test_sandbox_firecracker_wrap_non_linux(void) {
 #ifndef __linux__
     hu_firecracker_ctx_t ctx;
-    hu_firecracker_sandbox_init(&ctx, "/tmp");
+    hu_firecracker_sandbox_init(&ctx, "/tmp", NULL);
     hu_sandbox_t sb = hu_firecracker_sandbox_get(&ctx);
     const char *argv[] = {"echo", "x"};
     const char *out[16];
@@ -1220,7 +1220,7 @@ static void test_docker_sandbox_has_methods(void) {
 static void test_sandbox_firecracker_wrap_on_linux(void) {
 #ifdef __linux__
     hu_firecracker_ctx_t ctx;
-    hu_firecracker_sandbox_init(&ctx, "/tmp/ws");
+    hu_firecracker_sandbox_init(&ctx, "/tmp/ws", NULL);
     hu_sandbox_t sb = hu_firecracker_sandbox_get(&ctx);
     const char *argv[] = {"echo", "hello"};
     const char *out[16];
@@ -1238,7 +1238,7 @@ static void test_sandbox_firecracker_wrap_on_linux(void) {
 static void test_sandbox_firecracker_wrap_buffer_too_small(void) {
 #ifdef __linux__
     hu_firecracker_ctx_t ctx;
-    hu_firecracker_sandbox_init(&ctx, "/tmp/ws");
+    hu_firecracker_sandbox_init(&ctx, "/tmp/ws", NULL);
     hu_sandbox_t sb = hu_firecracker_sandbox_get(&ctx);
     const char *argv[] = {"echo"};
     const char *out[2];

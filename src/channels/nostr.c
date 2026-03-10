@@ -1,6 +1,7 @@
 #include "human/channels/nostr.h"
 #include "human/core/json.h"
 #include "human/core/process_util.h"
+#include "human/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -94,7 +95,14 @@ static hu_error_t nostr_send(void *ctx, const char *target, size_t target_len, c
     if (!message || message_len > HU_NOSTR_MAX_MSG)
         return HU_ERR_INVALID_ARGUMENT;
 
-    char tmppath[] = "/tmp/hu_nostr_XXXXXX";
+    char *tmp_dir = hu_platform_get_temp_dir(c->alloc);
+    if (!tmp_dir)
+        return HU_ERR_IO;
+    char tmppath[256];
+    int n_path = snprintf(tmppath, sizeof(tmppath), "%s/hu_nostr_XXXXXX", tmp_dir);
+    c->alloc->free(c->alloc->ctx, tmp_dir, strlen(tmp_dir) + 1);
+    if (n_path < 0 || (size_t)n_path >= sizeof(tmppath))
+        return HU_ERR_IO;
     int fd = mkstemp(tmppath);
     if (fd < 0)
         return HU_ERR_IO;

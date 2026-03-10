@@ -1,6 +1,7 @@
 #include "human/core/error.h"
 #include "human/security/sandbox.h"
 #include "human/security/sandbox_internal.h"
+#include "human/platform.h"
 #include <stdio.h>
 #include <string.h>
 #if defined(__unix__) || defined(__APPLE__)
@@ -190,7 +191,8 @@ hu_sandbox_t hu_firecracker_sandbox_get(hu_firecracker_ctx_t *ctx) {
     return sb;
 }
 
-void hu_firecracker_sandbox_init(hu_firecracker_ctx_t *ctx, const char *workspace_dir) {
+void hu_firecracker_sandbox_init(hu_firecracker_ctx_t *ctx, const char *workspace_dir,
+                                 const hu_sandbox_alloc_t *alloc) {
     memset(ctx, 0, sizeof(*ctx));
     ctx->vcpu_count = 1;
     ctx->mem_size_mib = 128;
@@ -203,7 +205,32 @@ void hu_firecracker_sandbox_init(hu_firecracker_ctx_t *ctx, const char *workspac
         ctx->workspace_dir[len] = '\0';
     }
 
-    snprintf(ctx->socket_path, sizeof(ctx->socket_path), "/tmp/hu_fc_%d.sock", (int)getpid());
+    /* Build socket path using platform temp directory */
+    if (alloc && alloc->alloc) {
+        hu_allocator_t hu_alloc = {
+            .ctx = alloc->ctx,
+            .alloc = alloc->alloc,
+            .free = alloc->free,
+        };
+        char *tmp_dir = hu_platform_get_temp_dir(&hu_alloc);
+        if (tmp_dir) {
+            int n = snprintf(ctx->socket_path, sizeof(ctx->socket_path), "%s/hu_fc_%d.sock", tmp_dir,
+                             (int)getpid());
+            hu_alloc.free(hu_alloc.ctx, tmp_dir, strlen(tmp_dir) + 1);
+            if (n < 0 || (size_t)n >= sizeof(ctx->socket_path)) {
+                /* Fallback on error */
+                snprintf(ctx->socket_path, sizeof(ctx->socket_path), "/tmp/hu_fc_%d.sock",
+                         (int)getpid());
+            }
+        } else {
+            /* Fallback if temp dir unavailable */
+            snprintf(ctx->socket_path, sizeof(ctx->socket_path), "/tmp/hu_fc_%d.sock", (int)getpid());
+        }
+    } else {
+        /* Fallback if no allocator provided */
+        snprintf(ctx->socket_path, sizeof(ctx->socket_path), "/tmp/hu_fc_%d.sock", (int)getpid());
+    }
+
     memcpy(ctx->kernel_path, "/var/lib/firecracker/vmlinux", 29);
     memcpy(ctx->rootfs_path, "/var/lib/firecracker/rootfs.ext4", 33);
 }

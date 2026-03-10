@@ -1,5 +1,6 @@
 #include "human/channels/email.h"
 #include "human/core/process_util.h"
+#include "human/platform.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -122,7 +123,14 @@ static hu_error_t email_send(void *ctx, const char *target, size_t target_len, c
     const char *from = email_from(c);
 
     /* Write email to temp file (MIME plain text) */
-    char tmppath[] = "/tmp/hu_email_XXXXXX";
+    char *tmp_dir = hu_platform_get_temp_dir(c->alloc);
+    if (!tmp_dir)
+        return HU_ERR_IO;
+    char tmppath[256];
+    int n_path = snprintf(tmppath, sizeof(tmppath), "%s/hu_email_XXXXXX", tmp_dir);
+    c->alloc->free(c->alloc->ctx, tmp_dir, strlen(tmp_dir) + 1);
+    if (n_path < 0 || (size_t)n_path >= sizeof(tmppath))
+        return HU_ERR_IO;
     int fd = mkstemp(tmppath);
     if (fd < 0)
         return HU_ERR_IO;

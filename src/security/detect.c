@@ -118,7 +118,7 @@ hu_sandbox_t hu_sandbox_create(hu_sandbox_backend_t backend, const char *workspa
         break;
     }
     case HU_SANDBOX_FIRECRACKER: {
-        hu_firecracker_sandbox_init(&st->firecracker, ws);
+        hu_firecracker_sandbox_init(&st->firecracker, ws, alloc);
         result = hu_firecracker_sandbox_get(&st->firecracker);
         if (!result.vtable->is_available(result.ctx))
             result = hu_noop_sandbox_get(&st->noop);

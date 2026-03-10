@@ -491,7 +491,7 @@ hu_error_t hu_voice_stt_gemini(hu_allocator_t *alloc, const hu_voice_config_t *c
     fclose(f);
     alloc->free(alloc->ctx, json, json_cap);
 
-    /* Build curl data-file arg: @/tmp/human_gemini_stt_XXX.json */
+    /* Build curl data-file arg: @<temp_dir>/human_gemini_stt_XXX.json */
     char data_arg[280];
     n = snprintf(data_arg, sizeof(data_arg), "@%s", tmp_path);
     if (n < 0 || (size_t)n >= sizeof(data_arg)) {

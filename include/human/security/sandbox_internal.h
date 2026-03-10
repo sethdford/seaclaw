@@ -99,7 +99,8 @@ typedef struct {
     uint32_t vcpu_count;
     uint32_t mem_size_mib;
 } hu_firecracker_ctx_t;
-void hu_firecracker_sandbox_init(hu_firecracker_ctx_t *ctx, const char *workspace_dir);
+void hu_firecracker_sandbox_init(hu_firecracker_ctx_t *ctx, const char *workspace_dir,
+                                 const hu_sandbox_alloc_t *alloc);
 hu_sandbox_t hu_firecracker_sandbox_get(hu_firecracker_ctx_t *ctx);
 
 #endif /* HU_SANDBOX_INTERNAL_H */

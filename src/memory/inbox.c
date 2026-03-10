@@ -1,6 +1,7 @@
 #include "human/memory/inbox.h"
 #include "human/core/string.h"
 #include "human/memory/ingest.h"
+#include "human/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,14 +25,34 @@ hu_error_t hu_inbox_init(hu_inbox_watcher_t *watcher, hu_allocator_t *alloc, hu_
         watcher->inbox_dir_len = inbox_dir_len;
     } else {
 #ifdef HU_IS_TEST
-        watcher->inbox_dir = hu_strndup(alloc, "/tmp/human-test-inbox", 23);
-        watcher->inbox_dir_len = 23;
+        char *tmp_dir = hu_platform_get_temp_dir(alloc);
+        if (tmp_dir) {
+            char buf[1024];
+            int n = snprintf(buf, sizeof(buf), "%s/human-test-inbox", tmp_dir);
+            alloc->free(alloc->ctx, tmp_dir, strlen(tmp_dir) + 1);
+            if (n > 0 && (size_t)n < sizeof(buf)) {
+                watcher->inbox_dir = hu_strndup(alloc, buf, (size_t)n);
+                watcher->inbox_dir_len = (size_t)n;
+            } else {
+                return HU_ERR_INVALID_ARGUMENT;
+            }
+        } else {
+            /* Fallback to /tmp if platform temp dir fails */
+            watcher->inbox_dir = hu_strndup(alloc, "/tmp/human-test-inbox", 23);
+            watcher->inbox_dir_len = 23;
+        }
 #else
         const char *home = getenv("HOME");
-        if (!home)
-            home = "/tmp";
+        const char *tmp_dir_owned = NULL;
+        if (!home) {
+            tmp_dir_owned = hu_platform_get_temp_dir(alloc);
+            home = tmp_dir_owned ? tmp_dir_owned : "/tmp";
+        }
         char buf[1024];
         int n = snprintf(buf, sizeof(buf), "%s/" HU_INBOX_DEFAULT_DIR, home);
+        if (tmp_dir_owned) {
+            alloc->free(alloc->ctx, (char *)tmp_dir_owned, strlen(tmp_dir_owned) + 1);
+        }
         if (n <= 0 || (size_t)n >= sizeof(buf))
             return HU_ERR_INVALID_ARGUMENT;
         watcher->inbox_dir = hu_strndup(alloc, buf, (size_t)n);
