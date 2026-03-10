@@ -1,7 +1,7 @@
 /*
  * SHA-256 — x86_64 with SHA-NI (Intel SHA Extensions).
  * Called only when CPUID indicates SHA-NI support; otherwise dispatch
- * uses sc_sha256_generic.
+ * uses hu_sha256_generic.
  * System V AMD64 ABI: rdi=data, rsi=len, rdx=out
  *
  * Uses sha256rnds2, sha256msg1, sha256msg2 for full block processing.
@@ -11,11 +11,11 @@
 .text
 
 #if defined(__APPLE__)
-#define sc_sha256_x86_64 _sc_sha256_x86_64
-#define sc_sha256_generic _sc_sha256_generic
+#define hu_sha256_x86_64 _hu_sha256_x86_64
+#define hu_sha256_generic _hu_sha256_generic
 #endif
 
-.globl sc_sha256_x86_64
+.globl hu_sha256_x86_64
 
 /* pshufb mask: byteswap each dword (LE -> BE for SHA-256) */
 .Lbswap_mask:
@@ -61,7 +61,7 @@
      .long 0xbef9a3f7, 0xc67178f2
 
 .align 16
-sc_sha256_x86_64:
+hu_sha256_x86_64:
     pushq %rbp
     movq %rsp, %rbp
     subq $256, %rsp
@@ -385,7 +385,7 @@ sc_sha256_x86_64:
     popq %r12
     popq %rbx
     leave
-    jmp sc_sha256_generic
+    jmp hu_sha256_generic
 
 #if !defined(__APPLE__)
 .section .note.GNU-stack,"",@progbits

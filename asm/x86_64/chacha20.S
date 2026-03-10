@@ -5,12 +5,12 @@
 .text
 
 #if defined(__APPLE__)
-#define sc_chacha20_encrypt_x86_64 _sc_chacha20_encrypt_x86_64
-#define sc_chacha20_decrypt_x86_64 _sc_chacha20_decrypt_x86_64
+#define hu_chacha20_encrypt_x86_64 _hu_chacha20_encrypt_x86_64
+#define hu_chacha20_decrypt_x86_64 _hu_chacha20_decrypt_x86_64
 #endif
 
-.globl sc_chacha20_encrypt_x86_64
-.globl sc_chacha20_decrypt_x86_64
+.globl hu_chacha20_encrypt_x86_64
+.globl hu_chacha20_decrypt_x86_64
 
 .section .note.GNU-stack,"",@progbits
 
@@ -46,7 +46,7 @@
     movl %r11d, b_off(%rsp)
 
 .align 16
-sc_chacha20_encrypt_x86_64:
+hu_chacha20_encrypt_x86_64:
     pushq %rbp
     movq %rsp, %rbp
     subq $128, %rsp
@@ -195,6 +195,6 @@ sc_chacha20_encrypt_x86_64:
     leave
     ret
 
-sc_chacha20_decrypt_x86_64:
+hu_chacha20_decrypt_x86_64:
     /* ChaCha20 decrypt = encrypt (XOR stream cipher) */
-    jmp sc_chacha20_encrypt_x86_64
+    jmp hu_chacha20_encrypt_x86_64

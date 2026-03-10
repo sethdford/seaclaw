@@ -5,12 +5,12 @@
 .text
 
 #if defined(__APPLE__)
-#define sc_chacha20_encrypt_aarch64 _sc_chacha20_encrypt_aarch64
-#define sc_chacha20_decrypt_aarch64 _sc_chacha20_decrypt_aarch64
+#define hu_chacha20_encrypt_aarch64 _hu_chacha20_encrypt_aarch64
+#define hu_chacha20_decrypt_aarch64 _hu_chacha20_decrypt_aarch64
 #endif
 
-.globl sc_chacha20_encrypt_aarch64
-.globl sc_chacha20_decrypt_aarch64
+.globl hu_chacha20_encrypt_aarch64
+.globl hu_chacha20_decrypt_aarch64
 
 .align 4
 
@@ -49,7 +49,7 @@
     str     w10, [x8, #\b]
 .endm
 
-sc_chacha20_encrypt_aarch64:
+hu_chacha20_encrypt_aarch64:
     stp     x19, x20, [sp, #-64]!
     stp     x21, x22, [sp, #16]
     stp     x23, x24, [sp, #32]
@@ -163,5 +163,5 @@ sc_chacha20_encrypt_aarch64:
     ldr     x25, [sp], #16
     ret
 
-sc_chacha20_decrypt_aarch64:
-    b       sc_chacha20_encrypt_aarch64
+hu_chacha20_decrypt_aarch64:
+    b       hu_chacha20_encrypt_aarch64
