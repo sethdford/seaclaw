@@ -436,6 +436,7 @@ set(HU_CORE_SOURCES
     src/memory/emotional_graph.c
     src/memory/comfort_patterns.c
     src/memory/emotional_moments.c
+    src/memory/superhuman.c
     src/memory/fast_capture.c
     src/memory/promotion.c
     src/memory/consolidation.c

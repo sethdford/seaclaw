@@ -6,7 +6,9 @@
 #include <string.h>
 #ifdef HU_ENABLE_SQLITE
 #include "human/memory.h"
+#include "human/memory/superhuman.h"
 #include <sqlite3.h>
+#include <stdint.h>
 #endif
 
 static hu_error_t mock_build_a(void *ctx, hu_allocator_t *alloc, char **out, size_t *out_len) {
@@ -180,6 +182,255 @@ static void superhuman_phase3_tables_exist(void) {
     sqlite3_finalize(stmt);
     mem.vtable->deinit(mem.ctx);
 }
+
+static void superhuman_inside_joke_store_and_list(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    HU_ASSERT_EQ(hu_superhuman_inside_joke_store(&mem, &alloc, "contact_a", 9,
+        "remember when we laughed at X", 27, "that meme", 9), HU_OK);
+
+    hu_inside_joke_t *jokes = NULL;
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_superhuman_inside_joke_list(&mem, &alloc, "contact_a", 9, 10, &jokes, &count),
+        HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_NOT_NULL(jokes);
+    HU_ASSERT_TRUE(strstr(jokes[0].context, "remember when") != NULL);
+    HU_ASSERT_TRUE(strstr(jokes[0].punchline, "that meme") != NULL);
+
+    hu_superhuman_inside_joke_free(&alloc, jokes, count);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void superhuman_inside_joke_reference_updates(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    HU_ASSERT_EQ(hu_superhuman_inside_joke_store(&mem, &alloc, "c", 1, "ctx", 3, "pl", 2), HU_OK);
+
+    hu_inside_joke_t *jokes = NULL;
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_superhuman_inside_joke_list(&mem, &alloc, "c", 1, 10, &jokes, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    int64_t id = jokes[0].id;
+    uint32_t ref_count = jokes[0].reference_count;
+    hu_superhuman_inside_joke_free(&alloc, jokes, count);
+
+    HU_ASSERT_EQ(hu_superhuman_inside_joke_reference(&mem, id), HU_OK);
+
+    jokes = NULL;
+    count = 0;
+    HU_ASSERT_EQ(hu_superhuman_inside_joke_list(&mem, &alloc, "c", 1, 10, &jokes, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_EQ(jokes[0].reference_count, ref_count + 1u);
+
+    hu_superhuman_inside_joke_free(&alloc, jokes, count);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void superhuman_commitment_store_and_list_due(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    int64_t past = 1000000; /* past deadline */
+    HU_ASSERT_EQ(hu_superhuman_commitment_store(&mem, &alloc, "contact_a", 9,
+        "call the dentist", 16, "self", 4, past), HU_OK);
+
+    hu_superhuman_commitment_t *list = NULL;
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_superhuman_commitment_list_due(&mem, &alloc, past + 1000, 10, &list, &count),
+        HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_NOT_NULL(list);
+    HU_ASSERT_TRUE(strstr(list[0].description, "dentist") != NULL);
+
+    hu_superhuman_commitment_free(&alloc, list, count);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void superhuman_commitment_mark_followed_up(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    int64_t past = 1000000;
+    HU_ASSERT_EQ(hu_superhuman_commitment_store(&mem, &alloc, "c", 1, "task", 4, "self", 4, past),
+        HU_OK);
+
+    hu_superhuman_commitment_t *list = NULL;
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_superhuman_commitment_list_due(&mem, &alloc, past + 1, 10, &list, &count),
+        HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    int64_t id = list[0].id;
+    hu_superhuman_commitment_free(&alloc, list, count);
+
+    HU_ASSERT_EQ(hu_superhuman_commitment_mark_followed_up(&mem, id), HU_OK);
+
+    list = NULL;
+    count = 0;
+    HU_ASSERT_EQ(hu_superhuman_commitment_list_due(&mem, &alloc, past + 1, 10, &list, &count),
+        HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void superhuman_temporal_record_and_quiet_hours(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    HU_ASSERT_EQ(hu_superhuman_temporal_record(&mem, "contact_a", 9, 1, 14, 5000), HU_OK);
+    HU_ASSERT_EQ(hu_superhuman_temporal_record(&mem, "contact_a", 9, 3, 9, 2000), HU_OK);
+    HU_ASSERT_EQ(hu_superhuman_temporal_record(&mem, "contact_a", 9, 3, 9, 3000), HU_OK);
+
+    int out_day = -1, out_start = -1, out_end = -1;
+    HU_ASSERT_EQ(hu_superhuman_temporal_get_quiet_hours(&mem, &alloc, "contact_a", 9,
+        &out_day, &out_start, &out_end), HU_OK);
+    HU_ASSERT_EQ(out_day, 1);
+    HU_ASSERT_EQ(out_start, 14);
+    HU_ASSERT_EQ(out_end, 15);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void superhuman_delayed_followup_lifecycle(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    int64_t past = 1000000;
+    HU_ASSERT_EQ(hu_superhuman_delayed_followup_schedule(&mem, &alloc, "c", 1, "project X", 9, past),
+        HU_OK);
+
+    hu_delayed_followup_t *list = NULL;
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_superhuman_delayed_followup_list_due(&mem, &alloc, past + 1, &list, &count),
+        HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_TRUE(strstr(list[0].topic, "project X") != NULL);
+    int64_t id = list[0].id;
+    hu_superhuman_delayed_followup_free(&alloc, list, count);
+
+    HU_ASSERT_EQ(hu_superhuman_delayed_followup_mark_sent(&mem, id), HU_OK);
+
+    list = NULL;
+    count = 0;
+    HU_ASSERT_EQ(hu_superhuman_delayed_followup_list_due(&mem, &alloc, past + 1, &list, &count),
+        HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void superhuman_micro_moment_store_and_list(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    const char *contact = "contact_mm";
+    const char *fact = "loves hiking";
+    const char *sig = "outdoor enthusiast";
+    HU_ASSERT_EQ(hu_superhuman_micro_moment_store(&mem, &alloc, contact, 10, fact, 11, sig, 18),
+        HU_OK);
+
+    char *json = NULL;
+    size_t len = 0;
+    HU_ASSERT_EQ(hu_superhuman_micro_moment_list(&mem, &alloc, contact, 10, 10, &json, &len),
+        HU_OK);
+    HU_ASSERT_NOT_NULL(json);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(json, "Micro-moments") != NULL);
+    HU_ASSERT_TRUE(strstr(json, "loves") != NULL);
+
+    alloc.free(alloc.ctx, json, len);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void superhuman_avoidance_record_and_list(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    HU_ASSERT_EQ(hu_superhuman_avoidance_record(&mem, "c", 1, "work", 4, true), HU_OK);
+    HU_ASSERT_EQ(hu_superhuman_avoidance_record(&mem, "c", 1, "work", 4, false), HU_OK);
+
+    char *json = NULL;
+    size_t len = 0;
+    HU_ASSERT_EQ(hu_superhuman_avoidance_list(&mem, &alloc, "c", 1, &json, &len), HU_OK);
+    HU_ASSERT_NOT_NULL(json);
+    HU_ASSERT_TRUE(strstr(json, "work") != NULL);
+
+    alloc.free(alloc.ctx, json, len);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void superhuman_topic_baseline_and_absence(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    HU_ASSERT_EQ(hu_superhuman_topic_baseline_record(&mem, "c", 1, "pets", 4), HU_OK);
+
+    /* now_ts far in future, absence_days=100: cutoff is now_ts - 8640000.
+     * last_mentioned from record is ~current time, so it will be < cutoff. */
+    int64_t now_ts = 3000000000;
+    int64_t absence_days = 100;
+    char *json = NULL;
+    size_t len = 0;
+    HU_ASSERT_EQ(hu_superhuman_topic_absence_list(&mem, &alloc, "c", 1, now_ts, absence_days,
+        &json, &len), HU_OK);
+    HU_ASSERT_NOT_NULL(json);
+    HU_ASSERT_TRUE(strstr(json, "pets") != NULL || strstr(json, "absent") != NULL ||
+        strstr(json, "days") != NULL);
+
+    alloc.free(alloc.ctx, json, len);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void superhuman_growth_store_and_list(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    HU_ASSERT_EQ(hu_superhuman_growth_store(&mem, &alloc, "c", 1, "fitness", 7,
+        "sedentary", 9, "active runner", 12), HU_OK);
+
+    char *json = NULL;
+    size_t len = 0;
+    HU_ASSERT_EQ(hu_superhuman_growth_list_recent(&mem, &alloc, "c", 1, 10, &json, &len), HU_OK);
+    HU_ASSERT_NOT_NULL(json);
+    HU_ASSERT_TRUE(strstr(json, "fitness") != NULL);
+    HU_ASSERT_TRUE(strstr(json, "sedentary") != NULL);
+    HU_ASSERT_TRUE(strstr(json, "active") != NULL);
+
+    alloc.free(alloc.ctx, json, len);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void superhuman_pattern_record_and_list(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    HU_ASSERT_EQ(hu_superhuman_pattern_record(&mem, "c", 1, "weekend", 7, "casual", 6, 5, 18),
+        HU_OK);
+
+    char *json = NULL;
+    size_t len = 0;
+    HU_ASSERT_EQ(hu_superhuman_pattern_list(&mem, &alloc, "c", 1, 10, &json, &len), HU_OK);
+    HU_ASSERT_NOT_NULL(json);
+    HU_ASSERT_TRUE(strstr(json, "weekend") != NULL);
+    HU_ASSERT_TRUE(strstr(json, "casual") != NULL);
+
+    alloc.free(alloc.ctx, json, len);
+    mem.vtable->deinit(mem.ctx);
+}
 #endif
 
 void run_superhuman_tests(void) {
@@ -191,5 +442,16 @@ void run_superhuman_tests(void) {
     HU_RUN_TEST(superhuman_build_context_empty);
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(superhuman_phase3_tables_exist);
+    HU_RUN_TEST(superhuman_inside_joke_store_and_list);
+    HU_RUN_TEST(superhuman_inside_joke_reference_updates);
+    HU_RUN_TEST(superhuman_commitment_store_and_list_due);
+    HU_RUN_TEST(superhuman_commitment_mark_followed_up);
+    HU_RUN_TEST(superhuman_temporal_record_and_quiet_hours);
+    HU_RUN_TEST(superhuman_delayed_followup_lifecycle);
+    HU_RUN_TEST(superhuman_micro_moment_store_and_list);
+    HU_RUN_TEST(superhuman_avoidance_record_and_list);
+    HU_RUN_TEST(superhuman_topic_baseline_and_absence);
+    HU_RUN_TEST(superhuman_growth_store_and_list);
+    HU_RUN_TEST(superhuman_pattern_record_and_list);
 #endif
 }
