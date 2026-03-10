@@ -142,4 +142,11 @@ hu_error_t hu_superhuman_memory_build_context(void *sqlite_ctx, hu_allocator_t *
     const char *contact_id, size_t contact_id_len, bool include_avoidance,
     char **out, size_t *out_len);
 
+/* Extraction pipeline — post-turn storage (Task 18) */
+hu_error_t hu_superhuman_extract_and_store(void *sqlite_ctx, hu_allocator_t *alloc,
+    const char *contact_id, size_t contact_id_len,
+    const char *user_msg, size_t user_len,
+    const char *assistant_msg, size_t assistant_len,
+    const char *history, size_t history_len);
+
 #endif /* HU_MEMORY_SUPERHUMAN_H */

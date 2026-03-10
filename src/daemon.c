@@ -4892,6 +4892,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                response_len);
                 }
 
+#ifdef HU_ENABLE_SQLITE
+                /* Task 18: Extraction pipeline — post-turn storage */
+                if (err == HU_OK && response && response_len > 0 && agent->memory) {
+                    (void)hu_superhuman_extract_and_store(agent->memory, alloc, batch_key, key_len,
+                        combined, combined_len, response, response_len, NULL, 0);
+                }
+#endif
+
 #ifndef HU_IS_TEST
                 /* F27: If we responded to negative emotion, set pending to record engagement
                  * when we get their next reply. */

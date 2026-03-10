@@ -1,5 +1,6 @@
 #ifdef HU_ENABLE_SQLITE
 
+#include "human/context/conversation.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/memory.h"
@@ -1069,6 +1070,105 @@ hu_error_t hu_superhuman_pattern_list(void *sqlite_ctx, hu_allocator_t *alloc,
     }
     *out_json = buf;
     *out_len = buf_cap; /* allocated size for caller to free */
+    return HU_OK;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Extraction pipeline — post-turn storage (Task 18)
+ * ────────────────────────────────────────────────────────────────────────── */
+
+hu_error_t hu_superhuman_extract_and_store(void *sqlite_ctx, hu_allocator_t *alloc,
+    const char *contact_id, size_t contact_id_len,
+    const char *user_msg, size_t user_len,
+    const char *assistant_msg, size_t assistant_len,
+    const char *history, size_t history_len) {
+    (void)assistant_msg;
+    (void)assistant_len;
+    (void)history;
+    (void)history_len;
+
+    if (!sqlite_ctx || !alloc || !contact_id || contact_id_len == 0 || !user_msg || user_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    /* Commitments: detect and store with deadline */
+    {
+        char desc_buf[512];
+        char who_buf[64];
+        if (hu_conversation_detect_commitment(user_msg, user_len, desc_buf, sizeof(desc_buf),
+                who_buf, sizeof(who_buf), false)) {
+            int64_t deadline = hu_conversation_parse_deadline(user_msg, user_len,
+                (int64_t)time(NULL));
+            (void)hu_superhuman_commitment_store(sqlite_ctx, alloc, contact_id, contact_id_len,
+                desc_buf, strlen(desc_buf), who_buf, strlen(who_buf), deadline);
+        }
+    }
+
+    /* Inside jokes: detect via keywords (history entries not available in this API) */
+    if (hu_conversation_detect_inside_joke(user_msg, user_len, NULL, 0)) {
+        const char *ctx = user_msg;
+        size_t ctx_len = user_len < 512 ? user_len : 512;
+        const char *pl = "";
+        size_t pl_len = 0;
+        (void)hu_superhuman_inside_joke_store(sqlite_ctx, alloc, contact_id, contact_id_len,
+            ctx, ctx_len, pl, pl_len);
+    }
+
+    /* Micro-moments: extract and store each */
+    {
+        char facts[3][256];
+        char sigs[3][128];
+        int n = hu_conversation_extract_micro_moments(user_msg, user_len, facts, sigs, 3);
+        for (int i = 0; i < n; i++) {
+            (void)hu_superhuman_micro_moment_store(sqlite_ctx, alloc, contact_id, contact_id_len,
+                facts[i], strlen(facts[i]), sigs[i], strlen(sigs[i]));
+        }
+    }
+
+    /* Growth: detect positive outcomes */
+    {
+        char topic_buf[128];
+        char after_buf[64];
+        if (hu_conversation_detect_growth_opportunity(user_msg, user_len, topic_buf,
+                sizeof(topic_buf), after_buf, sizeof(after_buf))) {
+            (void)hu_superhuman_growth_store(sqlite_ctx, alloc, contact_id, contact_id_len,
+                topic_buf, strlen(topic_buf), "worried/stressed", 15, after_buf, strlen(after_buf));
+        }
+    }
+
+    /* Topic baselines: extract topic and record */
+    {
+        char topic_buf[64];
+        size_t topic_len = hu_conversation_extract_topic(user_msg, user_len, topic_buf,
+            sizeof(topic_buf));
+        if (topic_len > 0)
+            (void)hu_superhuman_topic_baseline_record(sqlite_ctx, contact_id, contact_id_len,
+                topic_buf, topic_len);
+    }
+
+    /* Pattern: classify tone and record with day/hour */
+    {
+        char topic_buf[64];
+        size_t topic_len = hu_conversation_extract_topic(user_msg, user_len, topic_buf,
+            sizeof(topic_buf));
+        if (topic_len > 0) {
+            const char *tone = hu_conversation_classify_emotional_tone(user_msg, user_len);
+            size_t tone_len = tone ? strlen(tone) : 0;
+            if (tone_len > 0) {
+                time_t now = time(NULL);
+                struct tm tm_buf;
+#if defined(_WIN32) && !defined(__CYGWIN__)
+                struct tm *tm = (localtime_s(&tm_buf, &now) == 0) ? &tm_buf : NULL;
+#else
+                struct tm *tm = localtime_r(&now, &tm_buf);
+#endif
+                int dow = tm ? tm->tm_wday : 0;
+                int hour = tm ? tm->tm_hour : 0;
+                (void)hu_superhuman_pattern_record(sqlite_ctx, contact_id, contact_id_len,
+                    topic_buf, topic_len, tone, tone_len, dow, hour);
+            }
+        }
+    }
+
     return HU_OK;
 }
 

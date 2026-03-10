@@ -568,6 +568,84 @@ static void superhuman_memory_build_context_empty_contact_returns_ok(void) {
 
     mem.vtable->deinit(mem.ctx);
 }
+
+/* ── Task 18: Extraction pipeline (extract_and_store) ───────────────────── */
+
+#ifdef HU_IS_TEST
+static void superhuman_extract_and_store_detects_commitment(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    const char *user_msg = "i'll call the dentist tomorrow";
+    const char *contact = "contact_commit";
+    HU_ASSERT_EQ(hu_superhuman_extract_and_store(&mem, &alloc, contact, 13,
+        user_msg, strlen(user_msg), "ok sounds good", 14, NULL, 0), HU_OK);
+
+    hu_superhuman_commitment_t *list = NULL;
+    size_t count = 0;
+    int64_t now_ts = (int64_t)time(NULL) + 86400 * 2; /* past tomorrow */
+    HU_ASSERT_EQ(hu_superhuman_commitment_list_due(&mem, &alloc, now_ts, 10, &list, &count),
+        HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_NOT_NULL(list);
+    HU_ASSERT_TRUE(strstr(list[0].description, "dentist") != NULL ||
+        strstr(list[0].description, "call") != NULL);
+
+    hu_superhuman_commitment_free(&alloc, list, count);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void superhuman_extract_and_store_detects_inside_joke(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    const char *user_msg = "remember when we did that thing";
+    const char *contact = "contact_joke";
+    HU_ASSERT_EQ(hu_superhuman_extract_and_store(&mem, &alloc, contact, 12,
+        user_msg, strlen(user_msg), "lol yeah", 8, NULL, 0), HU_OK);
+
+    hu_inside_joke_t *jokes = NULL;
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_superhuman_inside_joke_list(&mem, &alloc, contact, 12, 10, &jokes, &count),
+        HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_NOT_NULL(jokes);
+    HU_ASSERT_TRUE(strstr(jokes[0].context, "remember when") != NULL);
+
+    hu_superhuman_inside_joke_free(&alloc, jokes, count);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void superhuman_extract_and_store_no_extraction_for_plain_text(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    const char *user_msg = "nice weather";
+    const char *contact = "contact_plain";
+    HU_ASSERT_EQ(hu_superhuman_extract_and_store(&mem, &alloc, contact, 12,
+        user_msg, strlen(user_msg), "yeah", 4, NULL, 0), HU_OK);
+
+    /* No commitments */
+    hu_superhuman_commitment_t *commit_list = NULL;
+    size_t commit_count = 0;
+    int64_t now_ts = (int64_t)time(NULL) + 86400 * 365;
+    HU_ASSERT_EQ(hu_superhuman_commitment_list_due(&mem, &alloc, now_ts, 10,
+        &commit_list, &commit_count), HU_OK);
+    HU_ASSERT_EQ(commit_count, 0u);
+
+    /* No inside jokes */
+    hu_inside_joke_t *joke_list = NULL;
+    size_t joke_count = 0;
+    HU_ASSERT_EQ(hu_superhuman_inside_joke_list(&mem, &alloc, contact, 12, 10,
+        &joke_list, &joke_count), HU_OK);
+    HU_ASSERT_EQ(joke_count, 0u);
+
+    mem.vtable->deinit(mem.ctx);
+}
+#endif
 #endif
 
 void run_superhuman_tests(void) {
@@ -596,5 +674,10 @@ void run_superhuman_tests(void) {
     HU_RUN_TEST(superhuman_pattern_record_and_list);
     HU_RUN_TEST(superhuman_memory_build_context_aggregates_sections);
     HU_RUN_TEST(superhuman_memory_build_context_empty_contact_returns_ok);
+#ifdef HU_IS_TEST
+    HU_RUN_TEST(superhuman_extract_and_store_detects_commitment);
+    HU_RUN_TEST(superhuman_extract_and_store_detects_inside_joke);
+    HU_RUN_TEST(superhuman_extract_and_store_no_extraction_for_plain_text);
+#endif
 #endif
 }
