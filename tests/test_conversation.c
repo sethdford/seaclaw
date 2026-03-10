@@ -1040,6 +1040,12 @@ static void classify_group_medium_message_is_brief(void) {
     HU_ASSERT_EQ(r, HU_GROUP_BRIEF);
 }
 
+static void group_prompt_hint_macro_is_defined(void) {
+    const char *hint = HU_GROUP_CHAT_PROMPT_HINT;
+    HU_ASSERT_NOT_NULL(hint);
+    HU_ASSERT_TRUE(strlen(hint) > 10);
+}
+
 /* ── Thread callback tests ──────────────────────────────────────────── */
 
 static void callback_finds_dropped_topic(void) {
@@ -1396,6 +1402,60 @@ static void classify_question_still_full(void) {
     HU_ASSERT_EQ(a, HU_RESPONSE_FULL);
 }
 
+/* ── iMessage effect classifier tests ──────────────────────────────────── */
+
+static void effect_happy_birthday_confetti(void) {
+    const char *eff = hu_conversation_classify_effect("Happy birthday!", 15);
+    HU_ASSERT_NOT_NULL(eff);
+    HU_ASSERT_STR_EQ(eff, "confetti");
+}
+
+static void effect_congratulations_balloons(void) {
+    const char *eff = hu_conversation_classify_effect("Congratulations on the promotion!", 34);
+    HU_ASSERT_NOT_NULL(eff);
+    HU_ASSERT_STR_EQ(eff, "balloons");
+}
+
+static void effect_congrats_balloons(void) {
+    const char *eff = hu_conversation_classify_effect("congrats dude", 13);
+    HU_ASSERT_NOT_NULL(eff);
+    HU_ASSERT_STR_EQ(eff, "balloons");
+}
+
+static void effect_pew_pew_lasers(void) {
+    const char *eff = hu_conversation_classify_effect("pew pew", 7);
+    HU_ASSERT_NOT_NULL(eff);
+    HU_ASSERT_STR_EQ(eff, "lasers");
+}
+
+static void effect_happy_new_year_fireworks(void) {
+    const char *eff = hu_conversation_classify_effect("Happy new year!", 15);
+    HU_ASSERT_NOT_NULL(eff);
+    HU_ASSERT_STR_EQ(eff, "fireworks");
+}
+
+static void effect_normal_message_returns_null(void) {
+    const char *eff = hu_conversation_classify_effect("hey what's up", 12);
+    HU_ASSERT_NULL(eff);
+}
+
+static void effect_null_input_returns_null(void) {
+    const char *eff = hu_conversation_classify_effect(NULL, 0);
+    HU_ASSERT_NULL(eff);
+}
+
+static void effect_empty_returns_null(void) {
+    const char *eff = hu_conversation_classify_effect("", 0);
+    HU_ASSERT_NULL(eff);
+}
+
+static void effect_substring_in_sentence(void) {
+    const char *eff =
+        hu_conversation_classify_effect("I just wanted to say happy birthday to you!", 47);
+    HU_ASSERT_NOT_NULL(eff);
+    HU_ASSERT_STR_EQ(eff, "confetti");
+}
+
 /* ── Banned AI phrases expansion tests ──────────────────────────────── */
 
 static void strip_feel_free_to(void) {
@@ -1507,6 +1567,57 @@ static void awareness_uses_persona_style_rules(void) {
     HU_ASSERT_NOT_NULL(s);
     HU_ASSERT_TRUE(strstr(s, "MY_STYLE_RULE") != NULL);
     alloc.free(alloc.ctx, s, len + 1);
+}
+
+/* ── Inline reply classifier (F40) ────────────────────────────────────── */
+
+static void inline_reply_you_said_returns_true(void) {
+    hu_channel_history_entry_t entries[2] = {
+        make_entry(true, "let's meet at 5", "12:00"),
+        make_entry(false, "you said we'd meet at 5 - can we make it 6?", "12:01"),
+    };
+    bool r = hu_conversation_should_inline_reply(entries, 2,
+                                                 "you said we'd meet at 5 - can we make it 6?", 42);
+    HU_ASSERT_TRUE(r);
+}
+
+static void inline_reply_earlier_returns_true(void) {
+    hu_channel_history_entry_t entries[1] = {
+        make_entry(false, "earlier you mentioned pizza", "12:00")};
+    bool r = hu_conversation_should_inline_reply(entries, 1, "earlier you mentioned pizza", 26);
+    HU_ASSERT_TRUE(r);
+}
+
+static void inline_reply_what_about_returns_true(void) {
+    hu_channel_history_entry_t entries[1] = {make_entry(false, "what about the meeting?", "12:00")};
+    bool r = hu_conversation_should_inline_reply(entries, 1, "what about the meeting?", 21);
+    HU_ASSERT_TRUE(r);
+}
+
+static void inline_reply_multiple_questions_returns_true(void) {
+    hu_channel_history_entry_t entries[4] = {
+        make_entry(false, "when are we meeting?", "12:00"),
+        make_entry(true, "how about 3pm?", "12:01"),
+        make_entry(false, "where?", "12:02"),
+        make_entry(false, "and who's coming?", "12:03"),
+    };
+    bool r = hu_conversation_should_inline_reply(entries, 4, "and who's coming?", 16);
+    HU_ASSERT_TRUE(r);
+}
+
+static void inline_reply_single_topic_returns_false(void) {
+    hu_channel_history_entry_t entries[2] = {
+        make_entry(false, "hey how are you", "12:00"),
+        make_entry(true, "good you?", "12:01"),
+    };
+    bool r = hu_conversation_should_inline_reply(entries, 2, "doing well thanks", 16);
+    HU_ASSERT_FALSE(r);
+}
+
+static void inline_reply_null_last_msg_returns_false(void) {
+    hu_channel_history_entry_t entries[1] = {make_entry(false, "hello", "12:00")};
+    bool r = hu_conversation_should_inline_reply(entries, 1, NULL, 0);
+    HU_ASSERT_FALSE(r);
 }
 
 /* ── Test suite registration ─────────────────────────────────────────── */
@@ -1656,6 +1767,7 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(group_empty_skips);
     HU_RUN_TEST(classify_group_consecutive_2_skips_with_history);
     HU_RUN_TEST(classify_group_medium_message_is_brief);
+    HU_RUN_TEST(group_prompt_hint_macro_is_defined);
 
     /* Tapback-vs-text decision */
     HU_RUN_TEST(tapback_decision_lol_tapback_or_both);
@@ -1711,6 +1823,17 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(classify_narrative_no_question_is_brief);
     HU_RUN_TEST(classify_question_still_full);
 
+    /* iMessage effect classifier */
+    HU_RUN_TEST(effect_happy_birthday_confetti);
+    HU_RUN_TEST(effect_congratulations_balloons);
+    HU_RUN_TEST(effect_congrats_balloons);
+    HU_RUN_TEST(effect_pew_pew_lasers);
+    HU_RUN_TEST(effect_happy_new_year_fireworks);
+    HU_RUN_TEST(effect_normal_message_returns_null);
+    HU_RUN_TEST(effect_null_input_returns_null);
+    HU_RUN_TEST(effect_empty_returns_null);
+    HU_RUN_TEST(effect_substring_in_sentence);
+
     /* Expanded banned AI phrases */
     HU_RUN_TEST(strip_feel_free_to);
     HU_RUN_TEST(strip_dont_hesitate);
@@ -1723,4 +1846,12 @@ void run_conversation_tests(void) {
     /* Persona-driven style/anti-patterns */
     HU_RUN_TEST(style_uses_persona_anti_patterns);
     HU_RUN_TEST(awareness_uses_persona_style_rules);
+
+    /* Inline reply classifier (F40) */
+    HU_RUN_TEST(inline_reply_you_said_returns_true);
+    HU_RUN_TEST(inline_reply_earlier_returns_true);
+    HU_RUN_TEST(inline_reply_what_about_returns_true);
+    HU_RUN_TEST(inline_reply_multiple_questions_returns_true);
+    HU_RUN_TEST(inline_reply_single_topic_returns_false);
+    HU_RUN_TEST(inline_reply_null_last_msg_returns_false);
 }

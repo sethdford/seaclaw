@@ -1155,6 +1155,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
                 msgs[i].message_id = (int64_t)(i + 1);
                 msgs[i].has_attachment = c->mock_msgs[i].has_attachment;
                 msgs[i].has_video = c->mock_msgs[i].has_video;
+                msgs[i].guid[0] = '\0';
             }
             *out_count = n;
             c->mock_count = 0;
@@ -1210,9 +1211,10 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
 
     /* Include text messages, photo-only, and video-only messages.
      * COALESCE: when text is NULL, use '[Video]' if video attachment else '[Photo]'.
-     * has_image/has_video: subqueries check attachment table for extensions. */
+     * has_image/has_video: subqueries check attachment table for extensions.
+     * m.guid: message GUID for inline reply (associated_message_guid) tracking. */
     const char *sql =
-        "SELECT m.ROWID, "
+        "SELECT m.ROWID, m.guid, "
         "  COALESCE(m.text, "
         "    (SELECT CASE "
         "       WHEN (SELECT COUNT(*) FROM message_attachment_join majv "
@@ -1266,11 +1268,12 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
     size_t count = 0;
     while (sqlite3_step(stmt) == SQLITE_ROW && count < max_msgs) {
         int64_t rowid = sqlite3_column_int64(stmt, 0);
-        const char *text = (const char *)sqlite3_column_text(stmt, 1);
-        const char *handle = (const char *)sqlite3_column_text(stmt, 2);
-        int participant_count = sqlite3_column_int(stmt, 3);
-        int has_image = sqlite3_column_int(stmt, 4);
-        int has_video = sqlite3_column_int(stmt, 5);
+        const char *guid = (const char *)sqlite3_column_text(stmt, 1);
+        const char *text = (const char *)sqlite3_column_text(stmt, 2);
+        const char *handle = (const char *)sqlite3_column_text(stmt, 3);
+        int participant_count = sqlite3_column_int(stmt, 4);
+        int has_image = sqlite3_column_int(stmt, 5);
+        int has_video = sqlite3_column_int(stmt, 6);
 
         if (!text || !handle)
             continue;
@@ -1315,6 +1318,15 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         msgs[count].is_group = (participant_count > 2);
         msgs[count].has_attachment = (has_image != 0);
         msgs[count].has_video = (has_video != 0);
+        if (guid && strlen(guid) > 0) {
+            size_t g_len = strlen(guid);
+            if (g_len >= sizeof(msgs[count].guid))
+                g_len = sizeof(msgs[count].guid) - 1;
+            memcpy(msgs[count].guid, guid, g_len);
+            msgs[count].guid[g_len] = '\0';
+        } else {
+            msgs[count].guid[0] = '\0';
+        }
 
         c->last_rowid = rowid;
         count++;
@@ -1346,8 +1358,8 @@ hu_error_t hu_imessage_test_inject_mock(hu_channel_t *ch, const char *session_ke
 hu_error_t hu_imessage_test_inject_mock_ex(hu_channel_t *ch, const char *session_key,
                                            size_t session_key_len, const char *content,
                                            size_t content_len, bool has_attachment) {
-    return hu_imessage_test_inject_mock_ex2(ch, session_key, session_key_len, content,
-                                            content_len, has_attachment, false);
+    return hu_imessage_test_inject_mock_ex2(ch, session_key, session_key_len, content, content_len,
+                                            has_attachment, false);
 }
 
 hu_error_t hu_imessage_test_inject_mock_ex2(hu_channel_t *ch, const char *session_key,

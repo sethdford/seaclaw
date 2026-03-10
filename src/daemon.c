@@ -3704,6 +3704,35 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 #endif
+                    /* ── F40: Inline reply (quoted text fallback) ─────────────
+                     * When classifier says inline reply, prepend "> {quoted}\n\n"
+                     * to response. iMessage AppleScript has no native reply API. */
+#if defined(HU_ENABLE_IMESSAGE) && !defined(HU_IS_TEST)
+                    {
+                        const char *chn = ch->channel->vtable->name
+                                              ? ch->channel->vtable->name(ch->channel->ctx)
+                                              : NULL;
+                        if (chn && strcmp(chn, "imessage") == 0 && response && response_len > 0 &&
+                            hu_conversation_should_inline_reply(history_entries, history_count,
+                                                                combined, combined_len)) {
+                            size_t quote_len = combined_len > 80 ? 80 : combined_len;
+                            size_t prefix_len = 2 + quote_len + 2; /* "> " + quote + "\n\n" */
+                            size_t total_len = prefix_len + response_len;
+                            char *prefixed = (char *)alloc->alloc(alloc->ctx, total_len + 1);
+                            if (prefixed) {
+                                memcpy(prefixed, "> ", 2);
+                                memcpy(prefixed + 2, combined, quote_len);
+                                prefixed[2 + quote_len] = '\n';
+                                prefixed[2 + quote_len + 1] = '\n';
+                                memcpy(prefixed + prefix_len, response, response_len + 1);
+                                alloc->free(alloc->ctx, response, response_alloc_len + 1);
+                                response = prefixed;
+                                response_len = total_len;
+                                response_alloc_len = total_len;
+                            }
+                        }
+                    }
+#endif
                     /* ── Pre-send re-check: abort if real user responded while
                      * we were generating.  Prevents piling onto a conversation
                      * the user is actively handling. ─────────────────────────── */
@@ -3781,6 +3810,18 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     total_ms = total_ms * 2;
                                 usleep((useconds_t)(total_ms * 1000));
                             }
+#ifndef HU_IS_TEST
+                            {
+                                const char *eff = hu_conversation_classify_effect(
+                                    fragments[f].text, fragments[f].text_len);
+                                if (eff)
+                                    fprintf(stderr, "[human] imessage effect: %s (%.*s)\n", eff,
+                                            (int)(fragments[f].text_len > 60
+                                                      ? 60
+                                                      : fragments[f].text_len),
+                                            fragments[f].text);
+                            }
+#endif
                             ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
                                                       fragments[f].text, fragments[f].text_len,
                                                       NULL, 0);
@@ -3791,6 +3832,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             fragments[f].text_len + 1);
                         }
                     } else {
+#ifndef HU_IS_TEST
+                        {
+                            const char *eff = hu_conversation_classify_effect(send_ptr, send_len);
+                            if (eff)
+                                fprintf(stderr, "[human] imessage effect: %s (%.*s)\n", eff,
+                                        (int)(send_len > 60 ? 60 : send_len), send_ptr);
+                        }
+#endif
                         ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, send_ptr,
                                                   send_len, NULL, 0);
                     }
@@ -3817,6 +3866,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 #endif
 #else
+#ifndef HU_IS_TEST
+                        {
+                            const char *eff = hu_conversation_classify_effect(send_ptr, send_len);
+                            if (eff)
+                                fprintf(stderr, "[human] imessage effect: %s (%.*s)\n", eff,
+                                        (int)(send_len > 60 ? 60 : send_len), send_ptr);
+                        }
+#endif
                         ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, send_ptr,
                                                   send_len, NULL, 0);
 #endif

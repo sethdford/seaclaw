@@ -14,6 +14,14 @@ struct hu_contact_profile; /* opaque when persona not available */
 #include <stddef.h>
 #include <stdint.h>
 
+/* Group chat prompt hint — prepended to conversation_context when is_group is true */
+#define HU_GROUP_CHAT_PROMPT_HINT                     \
+    "[GROUP CHAT] You are in a group conversation. "  \
+    "Keep responses to 1-2 sentences. "               \
+    "Don't explain — react. "                         \
+    "Don't try to be helpful unless asked directly. " \
+    "Match the group's energy. Don't dominate.\n\n"
+
 /* Thread callback detection: identify opportunities to naturally return to
  * a topic from earlier in the conversation or from a previous session.
  * Scans history for topic transitions and identifies the best callback candidate.
@@ -263,6 +271,15 @@ hu_group_response_t hu_conversation_classify_group(const char *msg, size_t msg_l
                                                    const hu_channel_history_entry_t *entries,
                                                    size_t count);
 
+/* ── Inline reply classifier (iMessage quoted text fallback) ───────────────── */
+
+/* Decide whether to use quoted-text inline reply: "> {original}\n\n{response}".
+ * Returns true when: multiple questions pending, conversation diverged topics,
+ * or they referenced something from earlier ("you said", "earlier", "what about").
+ * Returns false for single-topic conversations. */
+bool hu_conversation_should_inline_reply(const hu_channel_history_entry_t *entries, size_t count,
+                                         const char *last_msg, size_t last_msg_len);
+
 /* ── Tapback-vs-text decision engine ─────────────────────────────────────── */
 
 /* Decide whether to send tapback only, text only, both, or no response.
@@ -356,6 +373,13 @@ bool hu_conversation_check_ai_disclosure(const char *response, size_t response_l
  * "Great question" -> removed, "crucial" -> "important", etc.
  * Modifies buf in-place. Returns new length. */
 size_t hu_conversation_strip_ai_phrases(char *buf, size_t len);
+
+/* ── iMessage effect classifier (keyword-triggered, client-side) ───────── */
+
+/* Classify if a message contains iMessage effect trigger phrases.
+ * Returns effect name (static string) or NULL. Effect is applied automatically
+ * on recipient's device when the trigger phrase is sent as plain text. */
+const char *hu_conversation_classify_effect(const char *msg, size_t msg_len);
 
 /* ── Media-type awareness ─────────────────────────────────────────────── */
 

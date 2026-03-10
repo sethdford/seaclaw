@@ -2772,6 +2772,45 @@ hu_group_response_t hu_conversation_classify_group(const char *msg, size_t msg_l
     return HU_GROUP_BRIEF;
 }
 
+/* ── Inline reply classifier (iMessage quoted text fallback) ────────────── */
+
+bool hu_conversation_should_inline_reply(const hu_channel_history_entry_t *entries, size_t count,
+                                         const char *last_msg, size_t last_msg_len) {
+    if (!last_msg || last_msg_len == 0)
+        return false;
+
+    /* Heuristic: "you said" / "earlier" / "what about" in their message → inline reply */
+    if (str_contains_ci(last_msg, last_msg_len, "you said") ||
+        str_contains_ci(last_msg, last_msg_len, "earlier") ||
+        str_contains_ci(last_msg, last_msg_len, "what about") ||
+        str_contains_ci(last_msg, last_msg_len, "that thing you") ||
+        str_contains_ci(last_msg, last_msg_len, "the one you"))
+        return true;
+
+    /* Heuristic: multiple questions pending in recent history */
+    if (entries && count > 0) {
+        int question_count = 0;
+        size_t recent = count < 8 ? count : 8;
+        for (size_t i = count - recent; i < count; i++) {
+            if (entries[i].from_me)
+                continue;
+            const char *t = entries[i].text;
+            size_t tl = strlen(t);
+            for (size_t j = 0; j < tl; j++) {
+                if (t[j] == '?') {
+                    question_count++;
+                    break;
+                }
+            }
+        }
+        if (question_count > 1)
+            return true;
+    }
+
+    /* Single-topic conversation: no inline reply */
+    return false;
+}
+
 /* ── Tapback-vs-text decision engine ────────────────────────────────────── */
 
 static uint32_t tapback_prng_next(uint32_t *s) {
@@ -3575,6 +3614,29 @@ size_t hu_conversation_strip_ai_phrases(char *buf, size_t len) {
         buf[0] -= 32;
 
     return len;
+}
+
+/* ── iMessage effect classifier (keyword-triggered, client-side) ───────── */
+
+/* Classify if a message contains iMessage effect trigger phrases.
+ * Returns effect name (static string) or NULL. Effect is applied automatically
+ * on recipient's device when the trigger phrase is sent as plain text.
+ * Order: longer phrases first to avoid partial matches. */
+const char *hu_conversation_classify_effect(const char *msg, size_t msg_len) {
+    if (!msg || msg_len == 0)
+        return NULL;
+
+    if (str_contains_ci(msg, msg_len, "happy birthday"))
+        return "confetti";
+    if (str_contains_ci(msg, msg_len, "happy new year"))
+        return "fireworks";
+    if (str_contains_ci(msg, msg_len, "congratulations") ||
+        str_contains_ci(msg, msg_len, "congrats"))
+        return "balloons";
+    if (str_contains_ci(msg, msg_len, "pew pew"))
+        return "lasers";
+
+    return NULL;
 }
 
 /* ── Media-type awareness ─────────────────────────────────────────────── */
