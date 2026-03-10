@@ -805,7 +805,9 @@ sc_error_t sc_imessage_create(sc_allocator_t *alloc, const char *default_target,
         c->default_target[default_target_len] = '\0';
         c->default_target_len = default_target_len;
     }
-    /* Seed last_rowid to current max so we only pick up NEW messages */
+    /* Seed last_rowid to current max so we only pick up NEW messages.
+     * SC_IMESSAGE_LOOKBACK env var: if set, look back N messages from max
+     * to pick up recently missed messages on restart. */
 #if !SC_IS_TEST && defined(__APPLE__) && defined(__MACH__) && defined(SC_ENABLE_SQLITE)
     {
         const char *home_env = getenv("HOME");
@@ -821,6 +823,12 @@ sc_error_t sc_imessage_create(sc_allocator_t *alloc, const char *default_target,
                         if (sqlite3_step(stmt) == SQLITE_ROW)
                             c->last_rowid = sqlite3_column_int64(stmt, 0);
                         sqlite3_finalize(stmt);
+                    }
+                    const char *lookback_env = getenv("SC_IMESSAGE_LOOKBACK");
+                    if (lookback_env) {
+                        long lb = strtol(lookback_env, NULL, 10);
+                        if (lb > 0 && lb < 100 && c->last_rowid > lb)
+                            c->last_rowid -= lb;
                     }
                     sqlite3_close(db);
                 }
@@ -1138,6 +1146,10 @@ sc_error_t sc_imessage_poll(void *channel_ctx, sc_allocator_t *alloc, sc_channel
                 const char *a = c->allow_from[i];
                 if (!a)
                     continue;
+                if (a[0] == '*' && a[1] == '\0') {
+                    allowed = true;
+                    break;
+                }
                 size_t a_len = strlen(a);
                 if (a_len == handle_len && strncasecmp(handle, a, a_len) == 0) {
                     allowed = true;

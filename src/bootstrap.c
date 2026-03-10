@@ -649,6 +649,11 @@ sc_error_t sc_app_bootstrap(sc_app_ctx_t *ctx, sc_allocator_t *alloc, const char
                 ch_count++;
             }
         }
+#else
+        if (cfg->channels.imessage.default_target)
+            fprintf(stderr,
+                    "[bootstrap] WARNING: iMessage configured in config but binary was built "
+                    "without SC_ENABLE_IMESSAGE — rebuild with -DSC_ENABLE_IMESSAGE=ON\n");
 #endif
 
 #if SC_HAS_GMAIL

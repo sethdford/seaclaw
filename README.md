@@ -18,7 +18,7 @@
 The smallest fully autonomous AI assistant infrastructure — a static C binary that fits on any $5 board, boots in milliseconds, and requires nothing but libc.
 
 ```
-~1679 KB binary · <30 ms startup · 3,788+ tests · 50+ providers · 34 channels · 67+ tools · Pluggable everything
+~1679 KB binary · <30 ms startup · 3788+ tests · 50+ providers · 34 channels · 67+ tools · Pluggable everything
 ```
 
 ### Features
@@ -57,7 +57,7 @@ SeaClaw's verified numbers (measured on macOS arm64, March 2026):
 Binary size:   ~1679 KB (MinSizeRel + LTO, all channels)
 Peak RSS:      ~5.7 MB (--version), ~5.9 MB (test suite)
 Startup:       6–27 ms avg (Apple Silicon M4 Max)
-Tests:         3,788 passing, 0 ASan errors
+Tests:         3788 passing, 0 ASan errors
 ```
 
 ### Why Switch from OpenClaw?
@@ -611,7 +611,7 @@ Build and tests require a C11 compiler and CMake 3.16+. One-time setup:
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Debug -DSC_ENABLE_ALL_CHANNELS=ON
 cmake --build .                            # Dev build
-./seaclaw_tests                             # 3,788+ tests
+./seaclaw_tests                             # 3788+ tests
 cd ..
 ```
 
@@ -649,7 +649,7 @@ Language: C11 + ASM (aarch64, x86_64)
 Source files: 715
 Lines of code: ~137K
 Test files: 128
-Tests: 3,788
+Tests: 3788
 Binary: ~1679 KB (MinSizeRel + LTO, all channels)
 Peak RSS: ~5.7 MB
 Startup: 6–27 ms avg (Apple Silicon)
@@ -678,7 +678,7 @@ config.c Config loading/merging (~/.seaclaw/config.json)
 ...
 
 include/seaclaw/ Public C headers
-tests/ 128 test files, 3,788 tests
+tests/ 128 test files, 3788 tests
 asm/ Platform-specific assembly (aarch64, x86_64, generic C)
 
 ui/ Web UI (LitElement + Vite)
