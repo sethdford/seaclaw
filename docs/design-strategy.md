@@ -271,3 +271,64 @@ in a comment: `@media (max-width: 768px) /* --sc-breakpoint-md */`.
 - **Lint enforcement**: `ui/scripts/lint-raw-values.sh` flags violations
 - **CI check**: `npm run check` includes token drift lint
 - **Agent guidance**: `AGENTS.md` section 12 + `.cursor/rules/design-system.mdc`
+
+## Competitive Dominance Metrics
+
+SeaClaw doesn't benchmark against industry averages — it sets the ceiling others measure
+against. See `docs/competitive-benchmarks.md` for named competitors and scores.
+
+| Metric                 | Category Status Quo    | SeaClaw Target | Competitive Edge                                |
+| ---------------------- | ---------------------- | -------------- | ----------------------------------------------- |
+| Lighthouse Performance | 90-95                  | **99+**        | Astro static + zero JS in critical path         |
+| LCP                    | 0.8-2.0s               | **< 0.5s**     | Inline critical CSS + prerendered content       |
+| CLS                    | 0.01-0.1               | **0.00**       | Explicit dimensions on every element            |
+| INP                    | 80-200ms               | **< 50ms**     | Event handler audit + web workers               |
+| UI entry bundle        | 200-500KB              | **< 100KB**    | Lit (no framework bloat) + aggressive splitting |
+| TTI (dashboard)        | 2-4s                   | **< 1s**       | Minimal JS + streaming render                   |
+| C runtime binary       | N/A (Electron: 100MB+) | **< 1.5MB**    | C11 + LTO (competitors can't match)             |
+| C runtime startup      | N/A (Electron: 2-5s)   | **< 30ms**     | No VM, no GC, pure native (100x faster)         |
+| C runtime RSS          | N/A (Electron: 100MB+) | **< 6MB**      | Zero-allocation hot paths                       |
+
+### Competitive Advantages Nobody Can Match
+
+These are structural advantages from the C11 architecture that web-only competitors
+cannot replicate:
+
+1. **Binary size**: 1.5MB vs 100MB+ Electron — runs on embedded devices
+2. **Startup time**: <30ms vs seconds — feels instant on any hardware
+3. **Memory**: <6MB vs 100MB+ — runs alongside other apps without resource contention
+4. **No runtime dependency**: libc only — no Node.js, no V8, no JVM
+5. **Cross-platform native**: Same C core on every platform, native UI per platform
+
+## Design Innovation Pipeline
+
+Every quarter, evaluate and adopt one emerging web platform feature before competitors.
+
+### Q1 2026 (Current)
+
+- CSS `@starting-style` for entry animations (shipped in Chrome 117+, Safari 17.5+)
+- `popover` attribute for lightweight overlays (shipped in all browsers)
+
+### Q2 2026
+
+- Anchor Positioning API for contextual UI (Chrome 125+)
+- `scrollbar-color` and `scrollbar-width` for branded scrollbars
+
+### Q3 2026
+
+- View Transitions API level 2 (cross-document transitions)
+- CSS `scroll-timeline` for scroll-driven animations
+
+### Q4 2026
+
+- CSS `@container` style queries for component-level theming
+- `content-visibility: auto` for off-screen rendering optimization
+
+### Evaluation Criteria
+
+Each feature is evaluated on:
+
+1. **Browser support**: Must be in 2+ major engines or have clean fallback
+2. **Performance impact**: Must not regress any Core Web Vital
+3. **Design value**: Must enable a pattern competitors don't have yet
+4. **Implementation cost**: Must be achievable within a single sprint

@@ -12,7 +12,7 @@ Read `AGENTS.md` for the full engineering protocol. This file is the quick refer
 cmake -B build -DSC_ENABLE_ALL_CHANNELS=ON -DSC_ENABLE_SQLITE=ON -DSC_ENABLE_PERSONA=ON -DSC_ENABLE_SKILLS=ON
 cmake --build build -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
 
-# Run tests (3,788+ tests, must be 0 failures, 0 ASan errors)
+# Run tests (3788+ tests, must be 0 failures, 0 ASan errors)
 ./build/seaclaw_tests
 
 # Release build
@@ -66,13 +66,14 @@ Types: `feat fix refactor test docs chore perf ci build style`
 
 ## CI Pipeline
 
-| Workflow        | What it checks                                                                                                                                  |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ci.yml`        | C build + 3726 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
-| `benchmark.yml` | Performance regression (binary size, startup time, RSS)                                                                                         |
-| `codeql.yml`    | Static analysis security scanning                                                                                                               |
-| `security.yml`  | Dependency audit, SBOM generation                                                                                                               |
-| `release.yml`   | Build release artifacts, .deb packages, cross-ARM64                                                                                             |
+| Workflow                    | What it checks                                                                                                                                  |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`                    | C build + 3726 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
+| `benchmark.yml`             | Performance regression (binary size, startup time, RSS)                                                                                         |
+| `codeql.yml`                | Static analysis security scanning                                                                                                               |
+| `security.yml`              | Dependency audit, SBOM generation                                                                                                               |
+| `release.yml`               | Build release artifacts, .deb packages, cross-ARM64                                                                                             |
+| `competitive-benchmark.yml` | Weekly PageSpeed competitive analysis (15 brands, 7 scoring dimensions)                                                                         |
 
 Rule: if CI will catch it, run the equivalent locally first.
 
@@ -93,7 +94,7 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 | `src/`                                | All C source (~715 files, ~137K lines)                      |
 | `include/seaclaw/`                    | Public headers                                              |
 | `docs/cross-platform-ci-readiness.md` | Platform support, build flags, known platform-specific code |
-| `tests/`                              | 128 test files, 3,788+ tests                                 |
+| `tests/`                              | 128 test files, 3788+ tests                                 |
 | `fuzz/`                               | libFuzzer harnesses                                         |
 | `ui/`                                 | LitElement web dashboard                                    |
 | `website/`                            | Astro marketing site                                        |

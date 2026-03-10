@@ -26,7 +26,7 @@ Key extension points:
 - `src/peripherals/` (`sc_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **715 source + header files, ~137K lines of C, ~59K lines of tests, 3,788 tests, 34 channels**.
+Current scale: **715 source + header files, ~137K lines of C, ~59K lines of tests, 3788 tests, 34 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -74,7 +74,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `SC_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 3,788+ tests must pass at zero ASan errors**
+5. **All 3788+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `SC_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -156,7 +156,7 @@ src/
 
 include/seaclaw/       public C headers
 
-tests/                 128 test files, 3,788+ tests
+tests/                 128 test files, 3788+ tests
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 
@@ -334,15 +334,17 @@ The design system is grounded in SOTA references from industry leaders.
 The SeaClaw design system synthesizes principles from these authoritative sources.
 Agents **must** consult the relevant reference docs before creating or modifying any UI:
 
-| Source                         | What We Take                                                        | SeaClaw Doc                |
-| ------------------------------ | ------------------------------------------------------------------- | -------------------------- |
-| **Apple HIG**                  | Spring-first motion, clarity/deference/depth, spatial hierarchy     | `docs/motion-design.md`    |
-| **Material Design 3**          | Canonical layouts, easing taxonomy, elevation, dynamic color        | `docs/ux-patterns.md`      |
-| **Disney/Pixar 12 Principles** | Squash & stretch, anticipation, staging, timing, follow-through     | `docs/motion-design.md`    |
-| **Edward Tufte**               | Data-ink ratio, chartjunk elimination, small multiples              | `docs/visual-standards.md` |
-| **Dieter Rams**                | Less is more, honest design, long-lasting quality                   | `docs/visual-standards.md` |
-| **Gestalt Psychology**         | Proximity, similarity, continuity, closure, figure-ground           | `docs/ux-patterns.md`      |
-| **Nielsen Norman Group**       | F-pattern scanning, progressive disclosure, recognition over recall | `docs/ux-patterns.md`      |
+| Source                         | What We Take                                                           | SeaClaw Doc                      |
+| ------------------------------ | ---------------------------------------------------------------------- | -------------------------------- |
+| **Apple HIG**                  | Spring-first motion, clarity/deference/depth, spatial hierarchy        | `docs/motion-design.md`          |
+| **Material Design 3**          | Canonical layouts, easing taxonomy, elevation, dynamic color           | `docs/ux-patterns.md`            |
+| **Disney/Pixar 12 Principles** | Squash & stretch, anticipation, staging, timing, follow-through        | `docs/motion-design.md`          |
+| **Edward Tufte**               | Data-ink ratio, chartjunk elimination, small multiples                 | `docs/visual-standards.md`       |
+| **Dieter Rams**                | Less is more, honest design, long-lasting quality                      | `docs/visual-standards.md`       |
+| **Gestalt Psychology**         | Proximity, similarity, continuity, closure, figure-ground              | `docs/ux-patterns.md`            |
+| **Nielsen Norman Group**       | F-pattern scanning, progressive disclosure, recognition over recall    | `docs/ux-patterns.md`            |
+| **Competitive Benchmarks**     | Named brand targets, quantified quality deltas, category-defining bars | `docs/competitive-benchmarks.md` |
+| **Quality Scorecard**          | Per-surface scoring (7 dimensions), quarterly tracking                 | `docs/quality-scorecard.md`      |
 
 **Mandatory document consultation before UI work:**
 
@@ -529,12 +531,26 @@ Required:
 
 Required:
 
-- Lighthouse targets: Performance >90, Accessibility >95, Best Practices >95.
+- Lighthouse targets: Performance ≥95, Accessibility ≥98, Best Practices ≥95, SEO ≥95.
 - Animate only compositor properties (`transform`, `opacity`, `filter`). Never animate `width`, `height`, `top`, `left`, `margin`, `padding` — these cause layout thrashing.
 - Lazy-load views not in the initial viewport.
 - Breakpoint annotations: every `@media (max-width: Xpx)` must include `/* --sc-breakpoint-* */`.
 - Alpha transparency: use `color-mix(in srgb, var(--sc-token) XX%, transparent)` — never `rgba()`.
 - Run `npm run lint:tokens` and `bash scripts/lint-raw-colors.sh --all` before UI commits.
+
+### 12.13 Competitive Benchmarking (Required)
+
+Required:
+
+- All UI work must be evaluated against the competitive benchmark registry (`docs/competitive-benchmarks.md`).
+- Quality scorecard (`docs/quality-scorecard.md`) updated quarterly for all surfaces.
+- Lighthouse CI thresholds: Performance ≥95, Accessibility ≥98, Best Practices ≥95, SEO ≥95.
+- Core Web Vitals targets: LCP <1.5s (warn), CLS <0.05 (warn), TTI <2s (warn).
+- Category-defining stretch targets: LCP <0.5s, CLS 0.00, INP <50ms (tracked, not yet enforced in CI).
+- Run `scripts/benchmark-competitive.sh` before major website releases.
+- New design patterns must reference which competitor inspired them and how SeaClaw exceeds them.
+- Benchmark brands: Linear, Vercel, Raycast, Stripe, Figma, Superhuman, Apple, Spotify + Awwwards winners.
+- Every quarter, evaluate and adopt one emerging web platform feature before competitors (see `docs/design-strategy.md` §Design Innovation Pipeline).
 
 ## 13) Vibe Coding Guardrails
 

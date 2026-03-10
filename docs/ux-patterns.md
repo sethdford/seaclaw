@@ -284,6 +284,68 @@ Errors follow a severity hierarchy:
 | Page     | `sc-error-boundary` fallback     | Render crash           |
 | System   | Top-level disconnect banner      | WebSocket disconnected |
 
+### 3.7 Category-Defining Interaction Principles
+
+#### Anticipatory UX
+
+Beyond "fast interactions" — build UX that predicts what you need. The user should never
+wait. Not "fast" — instant.
+
+Rules:
+
+- Prefetch the top 3 most likely next navigation targets on every view load
+- Pre-render command palette results for the 20 most common commands
+- Preload detail pane data on list item hover (200ms debounce)
+- Use `requestIdleCallback` for speculative prefetching during idle time
+
+#### Information Theater
+
+Data presentation so clear that understanding is involuntary. No legends needed. No
+explanation text. The chart IS the explanation. From Tufte, weaponized.
+
+Rules:
+
+- Direct labels on all chart elements (no separate legend unless >5 series)
+- Sparklines for trend context on every numeric metric
+- Color encodes one dimension only — never overload color with multiple meanings
+- Annotations directly on data points, not in footnotes
+
+#### Keyboard-First Design
+
+Every view has a complete keyboard interaction model. Command palette is primary
+navigation, not a nice-to-have. From Linear and Superhuman.
+
+Rules:
+
+- Every action reachable via keyboard shortcut
+- Shortcuts discoverable through contextual hints (shown on hover + in command palette)
+- Vim-style navigation (j/k for lists, h/l for panes) as opt-in power user mode
+- Focus management: every view change moves focus to the primary content area
+
+#### Platform Transcendence
+
+Each platform surface must feel native to that platform, not ported from web.
+
+Rules:
+
+- iOS: Apple HIG spring animations, haptic feedback, swipe gestures natively
+- Android: Material 3 motion, adaptive icons, predictive back gesture
+- macOS: Native menu bar integration, trackpad gestures, Quick Look support
+- Web: Progressive enhancement, offline support, installable PWA
+- Never share animation code between platforms — each gets native-feeling motion
+
+#### Interaction Latency Contract
+
+Every interaction type has an explicit latency budget, measured and enforced.
+
+| Interaction                  | Budget           | Measurement Method              |
+| ---------------------------- | ---------------- | ------------------------------- |
+| Key press to visual feedback | < 16ms (1 frame) | Playwright + performance.now()  |
+| Button tap to state change   | < 50ms           | Playwright interaction timing   |
+| View transition complete     | < 200ms          | View Transitions API timing     |
+| Search results populated     | < 100ms          | Playwright + performance.mark() |
+| Command palette response     | < 80ms           | Playwright + performance.mark() |
+
 ---
 
 ## 4. Navigation Patterns

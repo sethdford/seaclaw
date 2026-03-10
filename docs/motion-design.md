@@ -1,6 +1,7 @@
 ---
 title: SeaClaw Motion Design System
 ---
+
 # SeaClaw Motion Design System
 
 > Normative reference for all animation and motion in SeaClaw UI surfaces.
@@ -507,6 +508,101 @@ durations inherit reduced motion automatically.
 - Loading states must work without animation (skeleton shapes visible without shimmer)
 - Focus rings must be visible without transition animation
 - Auto-playing ambient animations pause under reduced motion
+
+## 6.5 Category-Defining Motion Capabilities
+
+These capabilities push beyond industry standards. They define the motion quality ceiling
+that other developer tools measure against.
+
+### Real Spring Physics
+
+Move beyond cubic-bezier approximations. Use `linear()` with 60+ keyframes for true damped
+harmonic oscillator curves. Springs must be indistinguishable from native iOS/macOS animations.
+
+Implementation:
+
+- Generate `linear()` curves from spring parameters (mass, stiffness, damping) at build time
+- 60+ steps per curve for smooth 60fps playback
+- Store curves in `design-tokens/motion.tokens.json` alongside cubic-bezier fallbacks
+- Use Web Animations API `spring()` timing function when browsers ship it
+- Test: record screen at 120fps, compare frame-by-frame with native SwiftUI spring
+
+### Scroll-Driven Narratives
+
+CSS `scroll-timeline` and `view-timeline` enable animation driven by scroll position rather
+than time. The marketing website should rival Awwwards winners for scroll experience.
+
+Patterns:
+
+- **Parallax headers**: Background layers move at different scroll rates using `scroll-timeline`
+- **Progressive reveal**: Elements fade in and translate as they enter viewport using `view-timeline`
+- **Section entrance choreography**: Staggered element entrance triggered by scroll position
+- **Progress indicators**: Reading progress bars driven by scroll position
+
+Rules:
+
+- Always provide a static fallback for browsers without `scroll-timeline` support
+- Never hijack scroll behavior — scroll-driven animations enhance, not replace, natural scrolling
+- Performance: scroll-driven animations run on the compositor thread — keep them to transform/opacity
+- Reduced motion: replace with immediate visibility (no scroll-triggered animation)
+
+### Ambient Intelligence
+
+Subtle motion that responds to environmental context. Not decoration — communication
+through motion.
+
+Patterns:
+
+- **Glass blur density**: Backdrop blur intensity shifts subtly with scroll depth
+- **Gradient response**: Background gradients shift hue slightly based on pointer proximity
+- **Status breathing**: Status indicator pulse rate correlates with system health metrics
+- **Time-aware theming**: Subtle color temperature shift based on time of day
+
+Rules:
+
+- Ambient effects must be imperceptible as individual changes — only the cumulative effect is felt
+- CPU budget: ambient animations must use <1% CPU when idle
+- All ambient effects disabled under `prefers-reduced-motion: reduce`
+- Never animate ambient effects on mobile (battery impact)
+
+### Transition Orchestration
+
+View Transitions API enables seamless cross-route morphs. Elements have spatial memory —
+a card that expands to detail view morphs, never fade-and-replaces.
+
+Implementation:
+
+- Assign `view-transition-name` to persistent elements (nav, sidebar, selected card)
+- Shared elements morph between views (position, size, border-radius)
+- Non-shared elements crossfade with stagger
+- Duration: `--sc-duration-moderate` (300ms) with `--sc-ease-spring-gentle`
+- Fallback: standard fade transition for browsers without View Transitions API
+
+Rules:
+
+- Maximum 5 elements with `view-transition-name` per view (performance)
+- Morphing elements must have compatible aspect ratios (no extreme stretching)
+- Test with network throttling — transitions must degrade gracefully on slow connections
+- `::view-transition-*` pseudo-elements use SeaClaw easing tokens, not raw curves
+
+### Narrative Motion
+
+Animation that tells a story. Staggered data reveals that build understanding
+incrementally. Inspired by Spotify Wrapped.
+
+Patterns:
+
+- **Data cascade**: Chart data points appear sequentially, building the picture over 500ms
+- **Metric reveal**: Hero numbers count up from 0 to value with deceleration curve
+- **Timeline playback**: Historical data animates through time, showing progression
+- **Connection drawing**: Lines between related elements draw on as relationships become visible
+
+Rules:
+
+- Narrative sequences must be skippable (click to complete instantly)
+- Total narrative duration: max 2 seconds for any sequence
+- Each step must be meaningful — remove any step that doesn't add understanding
+- Reduced motion: show final state immediately, no animation
 
 ---
 

@@ -74,6 +74,83 @@ Rules:
 - Low-emphasis elements should not compete with medium or high
 - Never use high emphasis for decorative or non-interactive elements
 
+### 1.5 Category-Defining Principles
+
+These principles go beyond industry standards. They define the ceiling other developer tools
+measure against. See `docs/competitive-benchmarks.md` for the named brands we benchmark against.
+
+#### Zero-Compromise Aesthetics
+
+Stripe proved beauty elevates utility by 20%. SeaClaw goes further: every pixel must
+simultaneously be the most functional AND the most beautiful version of that element in the
+developer tools space. No trade-off mentality. If a design choice requires choosing between
+craft and function, the design is wrong — find the third option.
+
+Rules:
+
+- Every component must pass both a usability audit AND a visual craft review
+- "Good enough" is not acceptable for shipping UI — only "best in class"
+- Study Linear, Stripe, and Figma quarterly for craft inspiration
+
+#### Perceptual Performance
+
+Beyond actual metrics, visual design must _feel_ faster than it is. The competitive
+ceiling isn't "fast loading" — it's "I never noticed it loaded."
+
+Rules:
+
+- Skeleton loading must perfectly mirror final layout (shape, position, size)
+- Optimistic UI for all user-initiated actions (show result before confirmation)
+- Instant visual feedback (<16ms) for every interaction, even if data hasn't arrived
+- Transition from loading to loaded must be imperceptible (crossfade, not replace)
+
+#### Depth as Language
+
+Our glass system (3 tiers + Apple visionOS materials + choreography) exceeds what
+competitors offer. Depth conveys information hierarchy, not just decoration.
+
+Rules:
+
+- Elevation changes must carry semantic meaning (higher = more important/interactive)
+- Glass blur density correlates with content focus (sharper = primary, blurrier = ambient)
+- Never use depth for decoration alone — every shadow, blur, and layer must communicate
+
+#### Monochrome Confidence
+
+The UI must work beautifully in near-monochrome. Accent color is a surgical instrument,
+not a theme. Linear and Superhuman prove that restraint is power.
+
+Rules:
+
+- Every screen must pass a grayscale squint test — hierarchy must be clear without color
+- Accent color used for exactly ONE primary action per viewport
+- Maximum 10% of any viewport should use accent color (60-30-10 rule)
+- Test all views in grayscale as part of design review
+
+#### Calm Technology
+
+Powerful functionality that doesn't demand attention. Subtle animations that guide
+without distracting. From Stripe's design philosophy.
+
+Rules:
+
+- Three-tier quality litmus for every component: utility, usability, beauty
+- All three addressed simultaneously, never sequentially
+- Animations must guide attention, not compete for it
+- Information surfaces gradually through progressive disclosure, not all at once
+
+#### Typographic Confidence
+
+Type as a primary design element, not just for reading. Award winners (Malvah, Lando
+Norris, Immersive Garden) use type as hero.
+
+Rules:
+
+- Mathematically perfect type scale with modular ratio baked into tokens
+- Display type (hero, page titles) may use letter-spacing as texture
+- Maximum 3 type sizes per viewport section (existing rule, now enforced as category-defining)
+- Type hierarchy alone must communicate page structure — test without icons or color
+
 ---
 
 ## 2. Color Application
@@ -398,6 +475,9 @@ Before shipping any visual change, verify:
 - [ ] **Icons**: Phosphor Regular only? No emoji?
 - [ ] **Spacing**: Token-based? Consistent rhythm?
 - [ ] **Dark + Light**: Works in both themes?
+- [ ] **Perceptual speed**: Does the transition from loading to loaded feel instantaneous?
+- [ ] **Monochrome test**: Does the screen pass the grayscale squint test?
+- [ ] **Competitive ceiling**: Would this screen hold up next to Linear, Stripe, or Vercel?
 
 ---
 
