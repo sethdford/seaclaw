@@ -267,6 +267,7 @@ find_package(Threads QUIET)
 # Channels and memory engines are conditionally added above
 set(HU_CORE_SOURCES
     src/platform.c
+    src/platform/calendar_macos.c
     src/terminal.c
     src/util.c
     src/json_util.c

@@ -1,6 +1,7 @@
 #include "human/context/conversation.h"
 #include "human/core/allocator.h"
 #include "human/memory.h"
+#include "human/platform/calendar.h"
 #include "human/memory/emotional_moments.h"
 #include "human/persona.h"
 #include "test_framework.h"
@@ -737,6 +738,48 @@ static void honesty_null_for_normal_message(void) {
     hu_allocator_t alloc = hu_system_allocator();
     char *result = hu_conversation_honesty_check(&alloc, "what are you up to", 18);
     HU_ASSERT_NULL(result);
+}
+
+/* ── Commitment detection and deadline parsing (F20) ──────────────────── */
+
+static void parse_deadline_tomorrow(void) {
+    int64_t now = (int64_t)time(NULL);
+    int64_t d = hu_conversation_parse_deadline("call me tomorrow", 16, now);
+    HU_ASSERT_TRUE(d > 0);
+    HU_ASSERT_TRUE(d >= now + 86300 && d <= now + 86500);
+}
+
+static void parse_deadline_in_three_days(void) {
+    int64_t now = (int64_t)time(NULL);
+    int64_t d = hu_conversation_parse_deadline("in 3 days we should meet", 24, now);
+    HU_ASSERT_TRUE(d > 0);
+    HU_ASSERT_TRUE(d >= now + 259100 && d <= now + 259300);
+}
+
+static void parse_deadline_whats_up_returns_zero(void) {
+    int64_t now = (int64_t)time(NULL);
+    int64_t d = hu_conversation_parse_deadline("what's up", 9, now);
+    HU_ASSERT_EQ(d, (int64_t)0);
+}
+
+static void detect_commitment_ill_call_dentist(void) {
+    char desc[256];
+    char who[64];
+    const char *msg = "i'll call the dentist";
+    bool ok = hu_conversation_detect_commitment(msg, strlen(msg), desc, sizeof(desc),
+                                                who, sizeof(who), false);
+    HU_ASSERT_TRUE(ok);
+    HU_ASSERT_TRUE(strstr(desc, "call") != NULL || strstr(desc, "dentist") != NULL);
+    HU_ASSERT_STR_EQ(who, "them");
+}
+
+static void detect_commitment_nice_weather_false(void) {
+    char desc[256];
+    char who[64];
+    const char *msg = "nice weather today";
+    bool ok = hu_conversation_detect_commitment(msg, strlen(msg), desc, sizeof(desc),
+                                                who, sizeof(who), false);
+    HU_ASSERT_TRUE(!ok);
 }
 
 /* ── Length calibration tests ──────────────────────────────────────── */
@@ -2338,6 +2381,20 @@ static void vulnerability_whats_for_dinner_no_topic_first_time_false(void) {
 }
 #endif
 
+/* ── Calendar awareness (F50) ─────────────────────────────────────────── */
+
+static void calendar_macos_get_events_returns_empty_array_in_test_mode(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char *events_json = NULL;
+    size_t events_len = 0;
+    hu_error_t err = hu_calendar_macos_get_events(&alloc, 24, &events_json, &events_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(events_json);
+    HU_ASSERT_EQ(events_len, 2u);
+    HU_ASSERT_STR_EQ(events_json, "[]");
+    alloc.free(alloc.ctx, events_json, events_len + 1);
+}
+
 /* ── Test suite registration ─────────────────────────────────────────── */
 
 void run_conversation_tests(void) {
@@ -2428,6 +2485,9 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(detect_inside_joke_energy_pattern_true);
     HU_RUN_TEST(detect_inside_joke_classic_true);
     HU_RUN_TEST(detect_inside_joke_shared_phrase_from_history_true);
+
+    /* Calendar awareness (F50) */
+    HU_RUN_TEST(calendar_macos_get_events_returns_empty_array_in_test_mode);
 
     /* First-time vulnerability detection (F17) */
     HU_RUN_TEST(vulnerability_cancer_extracts_illness);
