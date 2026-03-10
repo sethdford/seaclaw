@@ -1,0 +1,182 @@
+[
+  {
+    "name": "SeaClaw",
+    "url": "https://seaclaw.dev",
+    "timestamp": "2026-03-10T02:36:42Z",
+    "error": "fetch failed"
+  },
+  {
+    "name": "Linear",
+    "url": "https://linear.app",
+    "timestamp": "2026-03-10T02:37:16Z",
+    "performance": 27,
+    "accessibility": 79,
+    "best_practices": 88,
+    "seo": 100,
+    "lcp_ms": 26123,
+    "cls": 0.00,
+    "tbt_ms": 2308,
+    "ttfb_ms": 48
+  },
+  {
+    "name": "Vercel",
+    "url": "https://vercel.com",
+    "timestamp": "2026-03-10T02:37:38Z",
+    "performance": 57,
+    "accessibility": 89,
+    "best_practices": 96,
+    "seo": 92,
+    "lcp_ms": 11985,
+    "cls": 0.00,
+    "tbt_ms": 412,
+    "ttfb_ms": 20
+  },
+  {
+    "name": "Raycast",
+    "url": "https://raycast.com",
+    "timestamp": "2026-03-10T02:39:39Z",
+    "error": "fetch failed"
+  },
+  {
+    "name": "Warp",
+    "url": "https://warp.dev",
+    "timestamp": "2026-03-10T02:40:22Z",
+    "performance": 45,
+    "accessibility": 79,
+    "best_practices": 96,
+    "seo": 100,
+    "lcp_ms": 13613,
+    "cls": 0.06,
+    "tbt_ms": 716,
+    "ttfb_ms": 68
+  },
+  {
+    "name": "Cursor",
+    "url": "https://cursor.com",
+    "timestamp": "2026-03-10T02:41:04Z",
+    "performance": 36,
+    "accessibility": 93,
+    "best_practices": 92,
+    "seo": 92,
+    "lcp_ms": 13351,
+    "cls": 0.00,
+    "tbt_ms": 1331,
+    "ttfb_ms": 43
+  },
+  {
+    "name": "Stripe",
+    "url": "https://stripe.com",
+    "timestamp": "2026-03-10T02:41:32Z",
+    "performance": 53,
+    "accessibility": 100,
+    "best_practices": 54,
+    "seo": 92,
+    "lcp_ms": 5477,
+    "cls": 0.00,
+    "tbt_ms": 790,
+    "ttfb_ms": 85
+  },
+  {
+    "name": "Notion",
+    "url": "https://notion.so",
+    "timestamp": "2026-03-10T02:42:17Z",
+    "performance": 38,
+    "accessibility": 97,
+    "best_practices": 73,
+    "seo": 100,
+    "lcp_ms": 8070,
+    "cls": 0.00,
+    "tbt_ms": 1776,
+    "ttfb_ms": 99
+  },
+  {
+    "name": "Figma",
+    "url": "https://figma.com",
+    "timestamp": "2026-03-10T02:42:55Z",
+    "performance": 38,
+    "accessibility": 94,
+    "best_practices": 69,
+    "seo": 100,
+    "lcp_ms": 7232,
+    "cls": 0.03,
+    "tbt_ms": 1368,
+    "ttfb_ms": 74
+  },
+  {
+    "name": "Superhuman",
+    "url": "https://superhuman.com",
+    "timestamp": "2026-03-10T02:43:53Z",
+    "performance": 63,
+    "accessibility": 100,
+    "best_practices": 77,
+    "seo": 100,
+    "lcp_ms": 12786,
+    "cls": 0.00,
+    "tbt_ms": 368,
+    "ttfb_ms": 8
+  },
+  {
+    "name": "Apple Dev",
+    "url": "https://developer.apple.com",
+    "timestamp": "2026-03-10T02:44:27Z",
+    "performance": 55,
+    "accessibility": 86,
+    "best_practices": 96,
+    "seo": 100,
+    "lcp_ms": 22601,
+    "cls": 0.00,
+    "tbt_ms": 0,
+    "ttfb_ms": 62
+  },
+  {
+    "name": "Spotify",
+    "url": "https://spotify.com",
+    "timestamp": "2026-03-10T02:45:08Z",
+    "performance": 28,
+    "accessibility": 77,
+    "best_practices": 96,
+    "seo": 100,
+    "lcp_ms": 23592,
+    "cls": 0.05,
+    "tbt_ms": 1614,
+    "ttfb_ms": 2
+  },
+  {
+    "name": "Lando Norris",
+    "url": "https://landonorris.com",
+    "timestamp": "2026-03-10T02:47:10Z",
+    "error": "fetch failed"
+  },
+  {
+    "name": "Scout Motors",
+    "url": "https://scoutmotors.com",
+    "timestamp": "2026-03-10T02:47:37Z",
+    "performance": 46,
+    "accessibility": 83,
+    "best_practices": 92,
+    "seo": 92,
+    "lcp_ms": 46225,
+    "cls": 0.06,
+    "tbt_ms": 459,
+    "ttfb_ms": 3
+  },
+  {
+    "name": "Immersive Garden",
+    "url": "https://immersive-g.com",
+    "timestamp": "2026-03-10T02:49:38Z",
+    "error": "fetch failed"
+  },
+  {
+    "name": "Malvah",
+    "url": "https://malvah.com",
+    "timestamp": "2026-03-10T02:50:37Z",
+    "performance": 57,
+    "accessibility": 94,
+    "best_practices": 100,
+    "seo": 100,
+    "lcp_ms": 10613,
+    "cls": 0.00,
+    "tbt_ms": 368,
+    "ttfb_ms": 41
+  }
+]
