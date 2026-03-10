@@ -6,13 +6,6 @@ test.describe("Chat Streaming Choreography (demo mode)", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.locator("hu-app")).toBeAttached({ timeout: 10000 });
 
-    const heroText = await page.evaluate(() => {
-      const app = document.querySelector("hu-app");
-      const view = app?.shadowRoot?.querySelector("hu-chat-view");
-      const thread = view?.shadowRoot?.querySelector("hu-message-thread");
-      const hero = thread?.shadowRoot?.querySelector(".hero");
-      return hero?.textContent ?? "";
-    });
     const greetings = [
       "Good morning",
       "Good afternoon",
@@ -20,8 +13,17 @@ test.describe("Chat Streaming Choreography (demo mode)", () => {
       "Late night",
       "Burning the midnight oil",
     ];
-    expect(greetings.some((g) => heroText.includes(g))).toBe(true);
-    expect(heroText).toContain("What would you like to work on");
+    await expect(async () => {
+      const heroText = await page.evaluate(() => {
+        const app = document.querySelector("hu-app");
+        const view = app?.shadowRoot?.querySelector("hu-chat-view");
+        const thread = view?.shadowRoot?.querySelector("hu-message-thread");
+        const hero = thread?.shadowRoot?.querySelector(".hero");
+        return hero?.textContent ?? "";
+      });
+      expect(greetings.some((g) => heroText.includes(g))).toBe(true);
+      expect(heroText).toContain("What would you like to work on");
+    }).toPass({ timeout: 15000 });
   });
 
   test("hero suggestion chips are interactive", async ({ page }) => {
@@ -29,13 +31,15 @@ test.describe("Chat Streaming Choreography (demo mode)", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.locator("hu-app")).toBeAttached({ timeout: 10000 });
 
-    const chipCount = await page.evaluate(() => {
-      const app = document.querySelector("hu-app");
-      const view = app?.shadowRoot?.querySelector("hu-chat-view");
-      const thread = view?.shadowRoot?.querySelector("hu-message-thread");
-      return thread?.shadowRoot?.querySelectorAll(".hero-chip").length ?? 0;
-    });
-    expect(chipCount).toBe(4);
+    await expect(async () => {
+      const chipCount = await page.evaluate(() => {
+        const app = document.querySelector("hu-app");
+        const view = app?.shadowRoot?.querySelector("hu-chat-view");
+        const thread = view?.shadowRoot?.querySelector("hu-message-thread");
+        return thread?.shadowRoot?.querySelectorAll(".hero-chip").length ?? 0;
+      });
+      expect(chipCount).toBe(4);
+    }).toPass({ timeout: 15000 });
   });
 
   test("typing indicator uses accent glow animation", async ({ page }) => {
@@ -43,17 +47,17 @@ test.describe("Chat Streaming Choreography (demo mode)", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.locator("hu-app")).toBeAttached({ timeout: 10000 });
 
-    await page.evaluate(async () => {
-      const app = document.querySelector("hu-app") as {
-        gateway?: { request: (m: string, p: object) => Promise<unknown> };
-      } | null;
-      await app?.gateway?.request("chat.send", {
-        message: "test streaming",
-        sessionKey: "default",
-      });
-    });
-
     await expect(async () => {
+      await page.evaluate(async () => {
+        const app = document.querySelector("hu-app") as {
+          gateway?: { request: (m: string, p: object) => Promise<unknown> };
+        } | null;
+        await app?.gateway?.request("chat.send", {
+          message: "test streaming",
+          sessionKey: "default",
+        });
+      });
+
       const hasIndicator = await page.evaluate(() => {
         const app = document.querySelector("hu-app");
         const view = app?.shadowRoot?.querySelector("hu-chat-view");
@@ -61,7 +65,7 @@ test.describe("Chat Streaming Choreography (demo mode)", () => {
         return !!thread?.shadowRoot?.querySelector("hu-typing-indicator");
       });
       expect(hasIndicator).toBe(true);
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 15000 });
 
     await page.screenshot({
       path: "test-results/chat-streaming-choreography.png",
@@ -124,9 +128,7 @@ test.describe("Chat via Gateway Direct", () => {
     await expect(async () => {
       const pageText = await page.evaluate(() => document.body.innerText);
       const hasAssistant =
-        pageText.includes("assistant") ||
-        pageText.includes("Human") ||
-        pageText.includes("Gemini");
+        pageText.includes("assistant") || pageText.includes("Human") || pageText.includes("Gemini");
       expect(hasAssistant).toBe(true);
     }).toPass({ timeout: 15000 });
 

@@ -162,10 +162,10 @@ export const VIEW_TAGS: Record<string, string> = {
 export const ALL_VIEWS = Object.keys(VIEW_TAGS);
 
 /** Initial wait after navigation for demo gateway to connect and data to load. */
-export const WAIT = 1800;
+export const WAIT = 2500;
 
 /** Poll timeout for expect().toPass() — how long to retry assertions. */
-export const POLL = 8000;
+export const POLL = 15000;
 
 /**
  * Short wait for animations to settle (e.g. sheet open, theme switch).

@@ -1274,7 +1274,7 @@ hu_error_t hu_superhuman_memory_build_context(void *sqlite_ctx, hu_allocator_t *
     }
 
     *out = buf;
-    *out_len = buf_len;
+    *out_len = buf_cap; /* allocated size for caller to free */
     return HU_OK;
 }
 

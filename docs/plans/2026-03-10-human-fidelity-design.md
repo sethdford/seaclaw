@@ -1320,18 +1320,18 @@ Having a genuinely bad interaction and then making it right:
 
 ## New C Modules
 
-| Module                 | Files                                                                                | Purpose                             |
-| ---------------------- | ------------------------------------------------------------------------------------ | ----------------------------------- |
-| Cartesia TTS           | `src/tts/cartesia.c`, `include/human/tts/cartesia.h`                                 | TTS API integration                 |
-| Voice Decision         | Inline in `daemon.c`                                                                 | When to send voice vs text          |
-| Superhuman Memory      | Extensions to `src/memory/sqlite.c`                                                  | New tables + queries for F18-27     |
-| Emotional Intelligence | Extensions to `src/context/conversation.c`                                           | F13-17 classifiers                  |
-| Style Tracker          | `src/context/style_tracker.c`, `include/human/context/style_tracker.h`               | F32 style fingerprinting            |
-| Life Simulator         | `src/persona/life_sim.c`, `include/human/persona/life_sim.h`                         | F59 parallel life simulation        |
-| Theory of Mind         | `src/context/theory_of_mind.c`, `include/human/context/theory_of_mind.h`             | F58 behavioral baseline + deviation |
-| Mood Engine            | `src/persona/mood.c`, `include/human/persona/mood.h`                                 | F60 global mood state               |
-| Self-Awareness         | `src/context/self_awareness.c`, `include/human/context/self_awareness.h`             | F62-63 meta-cognition + reciprocity |
-| Protective Gate        | `src/context/protective.c`, `include/human/context/protective.h`                     | F68 restraint intelligence          |
+| Module                 | Files                                                                              | Purpose                             |
+| ---------------------- | ---------------------------------------------------------------------------------- | ----------------------------------- |
+| Cartesia TTS           | `src/tts/cartesia.c`, `include/human/tts/cartesia.h`                               | TTS API integration                 |
+| Voice Decision         | Inline in `daemon.c`                                                               | When to send voice vs text          |
+| Superhuman Memory      | Extensions to `src/memory/sqlite.c`                                                | New tables + queries for F18-27     |
+| Emotional Intelligence | Extensions to `src/context/conversation.c`                                         | F13-17 classifiers                  |
+| Style Tracker          | `src/context/style_tracker.c`, `include/human/context/style_tracker.h`             | F32 style fingerprinting            |
+| Life Simulator         | `src/persona/life_sim.c`, `include/human/persona/life_sim.h`                       | F59 parallel life simulation        |
+| Theory of Mind         | `src/context/theory_of_mind.c`, `include/human/context/theory_of_mind.h`           | F58 behavioral baseline + deviation |
+| Mood Engine            | `src/persona/mood.c`, `include/human/persona/mood.h`                               | F60 global mood state               |
+| Self-Awareness         | `src/context/self_awareness.c`, `include/human/context/self_awareness.h`           | F62-63 meta-cognition + reciprocity |
+| Protective Gate        | `src/context/protective.c`, `include/human/context/protective.h`                   | F68 restraint intelligence          |
 | Feed Processor         | `src/feeds/processor.c`, `include/human/feeds/processor.h`                         | F93 external data ingestion         |
 | Social API             | `src/feeds/social.c`, `include/human/feeds/social.h`                               | F83-84 Facebook/Instagram API       |
 | Apple Integration      | `src/feeds/apple.c`, `include/human/feeds/apple.h`                                 | F85,87-88,91 Photos/Contacts/Health |
@@ -1629,6 +1629,7 @@ Each phase has its own detailed implementation plan:
 - `2026-03-10-human-fidelity-phase7-deep-memory.md`
 - `2026-03-10-human-fidelity-phase8-skill-acquisition.md`
 - `2026-03-10-human-fidelity-phase9-authentic-existence.md`
+- `2026-03-10-human-fidelity-missing-seven.md` — 28 cross-cutting features (F116–F143) across 7 new pillars: Visual Content Pipeline, Proactive Governor, Contact Knowledge State, Collaborative Planning, Context Arbitration, Relationship Dynamics, Shared Experience Compression
 
 ## Success Criteria
 

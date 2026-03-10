@@ -2397,6 +2397,9 @@ hu_vulnerability_state_t hu_conversation_detect_first_time_vulnerability(
     out.first_time = hu_conversation_is_first_time_topic(memory, contact_id, contact_id_len,
                                                         topic, topic_len);
 #else
+    (void)memory;
+    (void)contact_id;
+    (void)contact_id_len;
     out.first_time = true;
 #endif
 

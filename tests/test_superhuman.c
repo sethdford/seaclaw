@@ -90,7 +90,7 @@ static void superhuman_build_context_calls_all(void) {
     HU_ASSERT_TRUE(strstr(ctx, "#### service_b") != NULL);
     HU_ASSERT_TRUE(strstr(ctx, "ctx_b") != NULL);
 
-    alloc.free(alloc.ctx, ctx, ctx_len + 1);
+    alloc.free(alloc.ctx, ctx, ctx_len); /* ctx_len is allocated size */
 }
 
 static void superhuman_register_at_max(void) {
@@ -550,7 +550,7 @@ static void superhuman_memory_build_context_aggregates_sections(void) {
     HU_ASSERT_TRUE(strstr(ctx, "Inside jokes") != NULL || strstr(ctx, "remember when") != NULL);
     HU_ASSERT_TRUE(strstr(ctx, "Growth") != NULL || strstr(ctx, "fitness") != NULL);
 
-    alloc.free(alloc.ctx, ctx, ctx_len + 1);
+    alloc.free(alloc.ctx, ctx, ctx_len); /* ctx_len is allocated size */
     mem.vtable->deinit(mem.ctx);
 }
 

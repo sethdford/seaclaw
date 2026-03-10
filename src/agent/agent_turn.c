@@ -384,27 +384,28 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     &memory_sh_ctx, &memory_sh_len) == HU_OK &&
                 memory_sh_ctx && memory_sh_len > 0) {
                 if (superhuman_ctx && superhuman_ctx_len > 0) {
-                    size_t merged_len = superhuman_ctx_len + 2 + memory_sh_len;
-                    char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, merged_len + 1);
+                    size_t merged_len = superhuman_ctx_len + 2 + strlen(memory_sh_ctx) + 1;
+                    char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, merged_len);
                     if (merged) {
                         memcpy(merged, superhuman_ctx, superhuman_ctx_len);
                         merged[superhuman_ctx_len] = '\n';
                         merged[superhuman_ctx_len + 1] = '\n';
-                        memcpy(merged + superhuman_ctx_len + 2, memory_sh_ctx, memory_sh_len + 1);
+                        memcpy(merged + superhuman_ctx_len + 2, memory_sh_ctx,
+                            strlen(memory_sh_ctx) + 1);
                         agent->alloc->free(agent->alloc->ctx, superhuman_ctx,
-                            superhuman_ctx_len + 1);
-                        agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len + 1);
+                            superhuman_ctx_len);
+                        agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len);
                         superhuman_ctx = merged;
                         superhuman_ctx_len = merged_len;
                     } else {
-                        agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len + 1);
+                        agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len);
                     }
                 } else {
                     superhuman_ctx = memory_sh_ctx;
                     superhuman_ctx_len = memory_sh_len;
                 }
             } else if (memory_sh_ctx) {
-                agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len + 1);
+                agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len);
             }
         }
         /* F26: If they're quiet and it's during their usual quiet hours, inject hint */
@@ -421,15 +422,16 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     static const char hint[] =
                         "\nThey're often quiet at this time. Don't worry if no reply.";
                     size_t hint_len = sizeof(hint) - 1;
-                    size_t new_len = superhuman_ctx_len + hint_len + 1;
+                    size_t ctx_str_len = strlen(superhuman_ctx);
+                    size_t new_len = ctx_str_len + hint_len + 1;
                     char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len);
                     if (merged) {
-                        memcpy(merged, superhuman_ctx, superhuman_ctx_len);
-                        memcpy(merged + superhuman_ctx_len, hint, hint_len + 1);
+                        memcpy(merged, superhuman_ctx, ctx_str_len);
+                        memcpy(merged + ctx_str_len, hint, hint_len + 1);
                         agent->alloc->free(agent->alloc->ctx, superhuman_ctx,
-                            superhuman_ctx_len + 1);
+                            superhuman_ctx_len);
                         superhuman_ctx = merged;
-                        superhuman_ctx_len = superhuman_ctx_len + hint_len;
+                        superhuman_ctx_len = new_len;
                     }
                 }
             }
@@ -517,7 +519,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             if (proactive_ctx)
                 agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
             if (superhuman_ctx)
-                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
+                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
             if (adaptive_ctx)
                 agent->alloc->free(agent->alloc->ctx, adaptive_ctx, adaptive_ctx_len + 1);
             if (awareness_ctx)
@@ -557,7 +559,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             if (proactive_ctx)
                 agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
             if (superhuman_ctx)
-                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
+                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
             if (outcome_ctx)
                 agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
             hu_agent_clear_current_for_tools();
@@ -641,7 +643,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             if (proactive_ctx)
                 agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
             if (superhuman_ctx)
-                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
+                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
             hu_agent_clear_current_for_tools();
             return err;
         }
@@ -657,7 +659,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     if (proactive_ctx)
         agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
     if (superhuman_ctx)
-        agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
+        agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
     if (pref_ctx)
         agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
 

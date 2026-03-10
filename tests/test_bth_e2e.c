@@ -457,7 +457,7 @@ static void bth_pipeline_full_conversation(void) {
         size_t sh_ctx_len = 0;
         (void)hu_superhuman_build_context(&superhuman, &alloc, &sh_ctx, &sh_ctx_len);
         if (sh_ctx)
-            alloc.free(alloc.ctx, sh_ctx, sh_ctx_len + 1);
+            alloc.free(alloc.ctx, sh_ctx, sh_ctx_len);
     }
 
     /* V10. Promotion works (promote STM entities to persistent memory) */

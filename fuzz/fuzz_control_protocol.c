@@ -28,7 +28,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     (void)hu_json_get_string(root, "id");
     (void)hu_json_get_string(root, "method");
 
-    const hu_json_value_t *params = hu_json_get(root, "params");
+    const hu_json_value_t *params = hu_json_object_get(root, "params");
     if (params) {
         (void)hu_json_get_string(params, "session_key");
         (void)hu_json_get_string(params, "message");

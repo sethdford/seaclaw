@@ -3520,8 +3520,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 convo_ctx = avoid_str;
                                 convo_ctx_len = (size_t)ab;
                             }
-                        } else if (avoid_str) {
-                            alloc->free(alloc->ctx, avoid_str, (size_t)ab + 1);
                         }
                     }
                     alloc->free(alloc->ctx, avoidance_json, avoidance_len);
