@@ -531,7 +531,7 @@ static void calibrate_greeting_short(void) {
     size_t len = sc_conversation_calibrate_length("hey", 3, NULL, 0, buf, sizeof(buf));
     SC_ASSERT_TRUE(len > 0);
     SC_ASSERT_NOT_NULL(strstr(buf, "calibration"));
-    SC_ASSERT_NOT_NULL(strstr(buf, "brief") || strstr(buf, "Match"));
+    SC_ASSERT_TRUE(strstr(buf, "brief") || strstr(buf, "Match"));
 }
 
 static void calibrate_yes_no_question(void) {
@@ -548,7 +548,7 @@ static void calibrate_emotional_message(void) {
                                                   NULL, 0, buf, sizeof(buf));
     SC_ASSERT_TRUE(len > 0);
     SC_ASSERT_NOT_NULL(strstr(buf, "calibration"));
-    SC_ASSERT_NOT_NULL(strstr(buf, "Match") || strstr(buf, "match"));
+    SC_ASSERT_TRUE(strstr(buf, "Match") || strstr(buf, "match"));
 }
 
 static void calibrate_logistics(void) {
@@ -563,7 +563,7 @@ static void calibrate_short_react(void) {
     char buf[1024];
     size_t len = sc_conversation_calibrate_length("lol", 3, NULL, 0, buf, sizeof(buf));
     SC_ASSERT_TRUE(len > 0);
-    SC_ASSERT_NOT_NULL(strstr(buf, "brief") || strstr(buf, "Very brief"));
+    SC_ASSERT_TRUE(strstr(buf, "brief") || strstr(buf, "Very brief"));
 }
 
 static void calibrate_link_share(void) {
@@ -589,7 +589,7 @@ static void calibrate_long_story(void) {
     char buf[1024];
     size_t len = sc_conversation_calibrate_length(msg, 200, NULL, 0, buf, sizeof(buf));
     SC_ASSERT_TRUE(len > 0);
-    SC_ASSERT_NOT_NULL(strstr(buf, "Substantial") || strstr(buf, "depth"));
+    SC_ASSERT_TRUE(strstr(buf, "Substantial") || strstr(buf, "depth"));
 }
 
 static void calibrate_good_news(void) {
@@ -598,7 +598,7 @@ static void calibrate_good_news(void) {
     size_t len = sc_conversation_calibrate_length(msg, strlen(msg), NULL, 0, buf, sizeof(buf));
     SC_ASSERT_TRUE(len > 0);
     SC_ASSERT_NOT_NULL(strstr(buf, "calibration"));
-    SC_ASSERT_NOT_NULL(strstr(buf, "Match") || strstr(buf, "match"));
+    SC_ASSERT_TRUE(strstr(buf, "Match") || strstr(buf, "match"));
 }
 
 static void calibrate_bad_news(void) {
@@ -607,7 +607,7 @@ static void calibrate_bad_news(void) {
     size_t len = sc_conversation_calibrate_length(msg, strlen(msg), NULL, 0, buf, sizeof(buf));
     SC_ASSERT_TRUE(len > 0);
     SC_ASSERT_NOT_NULL(strstr(buf, "calibration"));
-    SC_ASSERT_NOT_NULL(strstr(buf, "Match") || strstr(buf, "match"));
+    SC_ASSERT_TRUE(strstr(buf, "Match") || strstr(buf, "match"));
 }
 
 static void calibrate_teasing(void) {
@@ -616,7 +616,7 @@ static void calibrate_teasing(void) {
     size_t len = sc_conversation_calibrate_length(msg, strlen(msg), NULL, 0, buf, sizeof(buf));
     SC_ASSERT_TRUE(len > 0);
     SC_ASSERT_NOT_NULL(strstr(buf, "calibration"));
-    SC_ASSERT_NOT_NULL(strstr(buf, "Match") || strstr(buf, "match"));
+    SC_ASSERT_TRUE(strstr(buf, "Match") || strstr(buf, "match"));
 }
 
 static void calibrate_vulnerable(void) {
@@ -625,7 +625,7 @@ static void calibrate_vulnerable(void) {
     size_t len = sc_conversation_calibrate_length(msg, strlen(msg), NULL, 0, buf, sizeof(buf));
     SC_ASSERT_TRUE(len > 0);
     SC_ASSERT_NOT_NULL(strstr(buf, "calibration"));
-    SC_ASSERT_NOT_NULL(strstr(buf, "Match") || strstr(buf, "match"));
+    SC_ASSERT_TRUE(strstr(buf, "Match") || strstr(buf, "match"));
 }
 
 static void calibrate_tone_present_in_greeting(void) {
@@ -650,7 +650,7 @@ static void calibrate_farewell_goodnight(void) {
     size_t len = sc_conversation_calibrate_length(msg, strlen(msg), NULL, 0, buf, sizeof(buf));
     SC_ASSERT_TRUE(len > 0);
     SC_ASSERT_NOT_NULL(strstr(buf, "calibration"));
-    SC_ASSERT_NOT_NULL(strstr(buf, "Match") || strstr(buf, "match"));
+    SC_ASSERT_TRUE(strstr(buf, "Match") || strstr(buf, "match"));
 }
 
 static void calibrate_farewell_short_bye(void) {
