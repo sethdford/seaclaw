@@ -184,6 +184,44 @@ static void superhuman_phase3_tables_exist(void) {
     mem.vtable->deinit(mem.ctx);
 }
 
+#ifdef HU_ENABLE_SQLITE
+static void superhuman_phase6_tables_exist(void) {
+    static const char *const expected[] = {
+        "contact_baselines", "mood_log", "reciprocity_scores", "opinions",
+        "life_chapters", "emotional_predictions", "boundaries",
+    };
+    static const size_t expected_count = sizeof(expected) / sizeof(expected[0]);
+
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, "SELECT name FROM sqlite_master WHERE type='table'", -1,
+                                &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+
+    for (size_t i = 0; i < expected_count; i++) {
+        bool found = false;
+        sqlite3_reset(stmt);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            const char *name = (const char *)sqlite3_column_text(stmt, 0);
+            if (name && strcmp(name, expected[i]) == 0) {
+                found = true;
+                break;
+            }
+        }
+        HU_ASSERT_TRUE(found);
+    }
+
+    sqlite3_finalize(stmt);
+    mem.vtable->deinit(mem.ctx);
+}
+#endif
+
 static void superhuman_inside_joke_store_and_list(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
@@ -657,6 +695,7 @@ void run_superhuman_tests(void) {
     HU_RUN_TEST(superhuman_build_context_empty);
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(superhuman_phase3_tables_exist);
+    HU_RUN_TEST(superhuman_phase6_tables_exist);
     HU_RUN_TEST(superhuman_inside_joke_store_and_list);
     HU_RUN_TEST(superhuman_inside_joke_reference_updates);
     HU_RUN_TEST(superhuman_commitment_store_and_list_due);

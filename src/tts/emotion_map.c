@@ -57,7 +57,7 @@ const char *hu_cartesia_emotion_from_context(
 
     /* Playful: "lol", "haha", teasing in incoming or response → joking/comedic */
     if ((incoming_msg && msg_len > 0) || (response && resp_len > 0)) {
-        static const char *playful[] = {"lol", "haha", "hahaha", "lmao", "😂"};
+        static const char *playful[] = {"lol", "haha", "hahaha", "lmao"};
         const char *text = incoming_msg ? incoming_msg : response;
         size_t text_len = incoming_msg ? msg_len : resp_len;
         if (text) {
@@ -70,7 +70,8 @@ const char *hu_cartesia_emotion_from_context(
 
     /* Serious/heavy topic: "death", "funeral", "cancer" in incoming or response → contemplative */
     if ((incoming_msg && msg_len > 0) || (response && resp_len > 0)) {
-        static const char *serious[] = {"death", "funeral", "cancer", "terminal", "died"};
+        static const char *serious[] = {"death", "funeral", "cancer", "terminal", "died",
+                                       "passed away"};
         const char *text = incoming_msg ? incoming_msg : response;
         size_t text_len = incoming_msg ? msg_len : resp_len;
         if (text) {

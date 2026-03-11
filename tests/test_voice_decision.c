@@ -112,6 +112,19 @@ static void test_voice_decision_where_returns_text(void) {
     HU_ASSERT_EQ(r, HU_VOICE_SEND_TEXT);
 }
 
+static void test_voice_decision_max_duration_exceeded_returns_text(void) {
+    hu_voice_messages_config_t cfg = config_enabled_frequent();
+    cfg.max_duration_sec = 5;
+    /* 38 chars → est 7 sec > 5 → TEXT (checked before prefer_for boost) */
+    const char *response = "I'm so sorry you're going through this.";
+    const char *incoming = "I'm really upset";
+    hu_voice_decision_t r = hu_voice_decision_classify(
+        response, 38,
+        incoming, 15,
+        &cfg, true, 23, 0);
+    HU_ASSERT_EQ(r, HU_VOICE_SEND_TEXT);
+}
+
 void run_voice_decision_tests(void) {
     HU_TEST_SUITE("Voice decision");
     HU_RUN_TEST(test_voice_decision_question_returns_text);
@@ -122,6 +135,7 @@ void run_voice_decision_tests(void) {
     HU_RUN_TEST(test_voice_decision_late_night_long_may_be_voice);
     HU_RUN_TEST(test_voice_decision_logistics_returns_text);
     HU_RUN_TEST(test_voice_decision_where_returns_text);
+    HU_RUN_TEST(test_voice_decision_max_duration_exceeded_returns_text);
 }
 
 #else

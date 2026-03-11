@@ -204,10 +204,10 @@ void hu_persona_deinit(hu_allocator_t *alloc, hu_persona_t *persona) {
 
     /* Humor */
     free_contact_string(alloc, persona->humor.type);
+    free_contact_string(alloc, persona->humor.timing);
     free_contact_string(alloc, persona->humor.frequency);
     free_string_array(alloc, persona->humor.targets, persona->humor.targets_count);
     free_string_array(alloc, persona->humor.boundaries, persona->humor.boundaries_count);
-    free_contact_string(alloc, persona->humor.timing);
 
     /* Conflict style */
     free_contact_string(alloc, persona->conflict_style.pushback_response);
@@ -971,26 +971,102 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
         }
     }
 
-    /* Parse humor */
+    /* Parse humor (Phase 6 — fixed arrays) */
     {
         hu_json_value_t *hum = hu_json_object_get(root, "humor");
         if (hum && hum->type == HU_JSON_OBJECT) {
             const char *s;
-            s = hu_json_get_string(hum, "type");
-            if (s)
-                PERSONA_STRDUP_OPT(out->humor.type, s);
+            hu_json_value_t *a = hu_json_object_get(hum, "style");
+            if (a && a->type == HU_JSON_ARRAY) {
+                size_t n = a->data.array.len;
+                for (size_t i = 0; i < n && i < 8; i++) {
+                    s = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING) ? a->data.array.items[i]->data.string.ptr : NULL;
+                    if (s)
+                        snprintf(out->humor.style[i], sizeof(out->humor.style[i]), "%.31s", s);
+                }
+                out->humor.style_count = (n > 8) ? 8 : n;
+            }
             s = hu_json_get_string(hum, "frequency");
             if (s)
-                PERSONA_STRDUP_OPT(out->humor.frequency, s);
-            hu_json_value_t *a = hu_json_object_get(hum, "targets");
-            if (a)
-                parse_string_array(alloc, a, &out->humor.targets, &out->humor.targets_count);
-            a = hu_json_object_get(hum, "boundaries");
-            if (a)
-                parse_string_array(alloc, a, &out->humor.boundaries, &out->humor.boundaries_count);
+                out->humor.frequency = hu_strdup(alloc, s);
+            a = hu_json_object_get(hum, "never_during");
+            if (a && a->type == HU_JSON_ARRAY) {
+                size_t n = a->data.array.len;
+                for (size_t i = 0; i < n && i < 8; i++) {
+                    s = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING) ? a->data.array.items[i]->data.string.ptr : NULL;
+                    if (s)
+                        snprintf(out->humor.never_during[i], sizeof(out->humor.never_during[i]),
+                                 "%.31s", s);
+                }
+                out->humor.never_during_count = (n > 8) ? 8 : n;
+            }
+            a = hu_json_object_get(hum, "signature_phrases");
+            if (a && a->type == HU_JSON_ARRAY) {
+                size_t n = a->data.array.len;
+                for (size_t i = 0; i < n && i < 8; i++) {
+                    s = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING) ? a->data.array.items[i]->data.string.ptr : NULL;
+                    if (s)
+                        snprintf(out->humor.signature_phrases[i],
+                                 sizeof(out->humor.signature_phrases[i]), "%.63s", s);
+                }
+                out->humor.signature_phrases_count = (n > 8) ? 8 : n;
+            }
+            a = hu_json_object_get(hum, "self_deprecation_topics");
+            if (a && a->type == HU_JSON_ARRAY) {
+                size_t n = a->data.array.len;
+                for (size_t i = 0; i < n && i < 8; i++) {
+                    s = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING) ? a->data.array.items[i]->data.string.ptr : NULL;
+                    if (s)
+                        snprintf(out->humor.self_deprecation_topics[i],
+                                 sizeof(out->humor.self_deprecation_topics[i]), "%.63s", s);
+                }
+                out->humor.self_deprecation_count = (n > 8) ? 8 : n;
+            }
+            /* Backward compat: populate old pointer fields from JSON */
+            s = hu_json_get_string(hum, "type");
+            if (s) {
+                out->humor.type = hu_strdup(alloc, s);
+                if (out->humor.style_count == 0) {
+                    snprintf(out->humor.style[0], sizeof(out->humor.style[0]), "%.31s", s);
+                    out->humor.style_count = 1;
+                }
+            }
             s = hu_json_get_string(hum, "timing");
             if (s)
-                PERSONA_STRDUP_OPT(out->humor.timing, s);
+                out->humor.timing = hu_strdup(alloc, s);
+            a = hu_json_object_get(hum, "targets");
+            if (a && a->type == HU_JSON_ARRAY) {
+                size_t n = a->data.array.len;
+                out->humor.targets = alloc->alloc(alloc->ctx, n * sizeof(char *));
+                if (out->humor.targets) {
+                    for (size_t i = 0; i < n; i++) {
+                        const char *ts = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING) ? a->data.array.items[i]->data.string.ptr : NULL;
+                        out->humor.targets[i] = ts ? hu_strdup(alloc, ts) : NULL;
+                    }
+                    out->humor.targets_count = n;
+                }
+            }
+            a = hu_json_object_get(hum, "boundaries");
+            if (a && a->type == HU_JSON_ARRAY) {
+                size_t n = a->data.array.len;
+                out->humor.boundaries = alloc->alloc(alloc->ctx, n * sizeof(char *));
+                if (out->humor.boundaries) {
+                    for (size_t i = 0; i < n; i++) {
+                        const char *bs = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING) ? a->data.array.items[i]->data.string.ptr : NULL;
+                        out->humor.boundaries[i] = bs ? hu_strdup(alloc, bs) : NULL;
+                    }
+                    out->humor.boundaries_count = n;
+                }
+                if (out->humor.never_during_count == 0) {
+                    for (size_t i = 0; i < n && i < 8; i++) {
+                        if (out->humor.boundaries[i])
+                            snprintf(out->humor.never_during[i],
+                                     sizeof(out->humor.never_during[i]), "%.31s",
+                                     out->humor.boundaries[i]);
+                    }
+                    out->humor.never_during_count = (n > 8) ? 8 : n;
+                }
+            }
         }
     }
 
@@ -1495,6 +1571,126 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
         if (nf)
             parse_string_array_32(nf, out->voice_messages.never_for, 8,
                                  &out->voice_messages.never_for_count);
+    }
+
+    /* Phase 6: daily_routine, current_chapter, memory_degradation_rate, core_values, relationships */
+    out->daily_routine.weekday_count = 0;
+    out->daily_routine.weekend_count = 0;
+    out->daily_routine.routine_variance = 0.15f;
+    out->memory_degradation_rate = 0.10f;
+    out->core_values_count = 0;
+    out->relationships_count = 0;
+    memset(&out->current_chapter, 0, sizeof(out->current_chapter));
+
+    hu_json_value_t *dr = hu_json_object_get(root, "daily_routine");
+    if (dr && dr->type == HU_JSON_OBJECT) {
+        out->daily_routine.routine_variance =
+            (float)hu_json_get_number(dr, "routine_variance", 0.15);
+        hu_json_value_t *wd = hu_json_object_get(dr, "weekday");
+        if (wd && wd->type == HU_JSON_ARRAY && wd->data.array.items) {
+            size_t n = wd->data.array.len;
+            for (size_t i = 0; i < n && i < 24; i++) {
+                hu_json_value_t *blk = wd->data.array.items[i];
+                if (blk && blk->type == HU_JSON_OBJECT) {
+                    const char *s = hu_json_get_string(blk, "time");
+                    if (s)
+                        snprintf(out->daily_routine.weekday[i].time,
+                                 sizeof(out->daily_routine.weekday[i].time), "%.7s", s);
+                    s = hu_json_get_string(blk, "activity");
+                    if (s)
+                        snprintf(out->daily_routine.weekday[i].activity,
+                                 sizeof(out->daily_routine.weekday[i].activity), "%.63s", s);
+                    s = hu_json_get_string(blk, "availability");
+                    if (s)
+                        snprintf(out->daily_routine.weekday[i].availability,
+                                 sizeof(out->daily_routine.weekday[i].availability), "%.15s", s);
+                    s = hu_json_get_string(blk, "mood_modifier");
+                    if (s)
+                        snprintf(out->daily_routine.weekday[i].mood_modifier,
+                                 sizeof(out->daily_routine.weekday[i].mood_modifier), "%.31s", s);
+                }
+            }
+            out->daily_routine.weekday_count = (n > 24) ? 24 : n;
+        }
+        hu_json_value_t *we = hu_json_object_get(dr, "weekend");
+        if (we && we->type == HU_JSON_ARRAY && we->data.array.items) {
+            size_t n = we->data.array.len;
+            for (size_t i = 0; i < n && i < 24; i++) {
+                hu_json_value_t *blk = we->data.array.items[i];
+                if (blk && blk->type == HU_JSON_OBJECT) {
+                    const char *s = hu_json_get_string(blk, "time");
+                    if (s)
+                        snprintf(out->daily_routine.weekend[i].time,
+                                 sizeof(out->daily_routine.weekend[i].time), "%.7s", s);
+                    s = hu_json_get_string(blk, "activity");
+                    if (s)
+                        snprintf(out->daily_routine.weekend[i].activity,
+                                 sizeof(out->daily_routine.weekend[i].activity), "%.63s", s);
+                    s = hu_json_get_string(blk, "availability");
+                    if (s)
+                        snprintf(out->daily_routine.weekend[i].availability,
+                                 sizeof(out->daily_routine.weekend[i].availability), "%.15s", s);
+                    s = hu_json_get_string(blk, "mood_modifier");
+                    if (s)
+                        snprintf(out->daily_routine.weekend[i].mood_modifier,
+                                 sizeof(out->daily_routine.weekend[i].mood_modifier), "%.31s", s);
+                }
+            }
+            out->daily_routine.weekend_count = (n > 24) ? 24 : n;
+        }
+    }
+
+    hu_json_value_t *ch = hu_json_object_get(root, "current_chapter");
+    if (ch && ch->type == HU_JSON_OBJECT) {
+        const char *s = hu_json_get_string(ch, "theme");
+        if (s)
+            snprintf(out->current_chapter.theme, sizeof(out->current_chapter.theme), "%.255s", s);
+        s = hu_json_get_string(ch, "mood");
+        if (s)
+            snprintf(out->current_chapter.mood, sizeof(out->current_chapter.mood), "%.63s", s);
+        out->current_chapter.started_at = (int64_t)hu_json_get_number(ch, "started_at", 0);
+        hu_json_value_t *kt = hu_json_object_get(ch, "key_threads");
+        if (kt && kt->type == HU_JSON_ARRAY && kt->data.array.items) {
+            size_t n = kt->data.array.len;
+            for (size_t i = 0; i < n && i < 8; i++) {
+                hu_json_value_t *item = kt->data.array.items[i];
+                if (item && item->type == HU_JSON_STRING && item->data.string.ptr)
+                    snprintf(out->current_chapter.key_threads[i],
+                             sizeof(out->current_chapter.key_threads[i]), "%.127s",
+                             item->data.string.ptr);
+            }
+            out->current_chapter.key_threads_count = (n > 8) ? 8 : n;
+        }
+    }
+
+    out->memory_degradation_rate =
+        (float)hu_json_get_number(root, "memory_degradation_rate", 0.10);
+
+    hu_json_value_t *cv = hu_json_object_get(root, "core_values");
+    if (cv)
+        parse_string_array_fixed(cv, out->core_values, 8, &out->core_values_count);
+
+    hu_json_value_t *rels = hu_json_object_get(root, "relationships");
+    if (rels && rels->type == HU_JSON_ARRAY && rels->data.array.items) {
+        size_t n = rels->data.array.len;
+        for (size_t i = 0; i < n && i < 16; i++) {
+            hu_json_value_t *r = rels->data.array.items[i];
+            if (r && r->type == HU_JSON_OBJECT) {
+                const char *s = hu_json_get_string(r, "name");
+                if (s)
+                    snprintf(out->relationships[i].name, sizeof(out->relationships[i].name),
+                             "%.63s", s);
+                s = hu_json_get_string(r, "role");
+                if (s)
+                    snprintf(out->relationships[i].role, sizeof(out->relationships[i].role),
+                             "%.31s", s);
+                s = hu_json_get_string(r, "notes");
+                if (s)
+                    snprintf(out->relationships[i].notes, sizeof(out->relationships[i].notes),
+                             "%.255s", s);
+            }
+        }
+        out->relationships_count = (n > 16) ? 16 : n;
     }
 
     /* Parse contacts */
@@ -2321,7 +2517,7 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
     }
 
     /* Situational direction — scene-specific director's notes */
-    if (persona->situational_directions_count > 0) {
+    if (persona->situational_directions && persona->situational_directions_count > 0) {
         static const char sd_hdr[] = "\n--- Situational Direction (scene-specific notes) ---\n";
         err = append_prompt(alloc, &buf, &len, &cap, sd_hdr, sizeof(sd_hdr) - 1);
         if (err != HU_OK)
@@ -2340,26 +2536,49 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
         }
     }
 
-    /* Humor profile */
+    /* Humor profile (Phase 6 — style, frequency, never_during; legacy: type, targets, boundaries, timing) */
     {
         const hu_humor_profile_t *h = &persona->humor;
-        bool has = h->type || h->frequency || h->timing;
+        bool has = h->style_count > 0 || (h->frequency && h->frequency[0]) ||
+                   h->never_during_count > 0 ||
+                   h->signature_phrases_count > 0 || h->self_deprecation_count > 0 ||
+                   (h->type && h->type[0]) || (h->targets && h->targets_count > 0) ||
+                   (h->boundaries && h->boundaries_count > 0) || (h->timing && h->timing[0]);
         if (has) {
             static const char hum_hdr[] = "\n--- Humor ---\n";
             err = append_prompt(alloc, &buf, &len, &cap, hum_hdr, sizeof(hum_hdr) - 1);
             if (err != HU_OK)
                 goto fail;
-            if (h->type) {
-                char line[256];
-                int w = snprintf(line, sizeof(line), "Type: %s\n", h->type);
+            /* Style (Phase 6) or legacy type */
+            if (h->style_count > 0) {
+                err = append_prompt(alloc, &buf, &len, &cap, "Style: ", 7);
+                if (err != HU_OK)
+                    goto fail;
+                for (size_t i = 0; i < h->style_count; i++) {
+                    if (i > 0) {
+                        err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                        if (err != HU_OK)
+                            goto fail;
+                    }
+                    err = append_prompt(alloc, &buf, &len, &cap, h->style[i],
+                                        strlen(h->style[i]));
+                    if (err != HU_OK)
+                        goto fail;
+                }
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                if (err != HU_OK)
+                    goto fail;
+            } else if (h->type && h->type[0]) {
+                char line[64];
+                int w = snprintf(line, sizeof(line), "Style: %s\n", h->type);
                 if (w > 0) {
                     err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
                     if (err != HU_OK)
                         goto fail;
                 }
             }
-            if (h->frequency) {
-                char line[256];
+            if (h->frequency && h->frequency[0]) {
+                char line[64];
                 int w = snprintf(line, sizeof(line), "Frequency: %s\n", h->frequency);
                 if (w > 0) {
                     err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
@@ -2367,27 +2586,53 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                         goto fail;
                 }
             }
-            if (h->timing) {
-                char line[256];
-                int w = snprintf(line, sizeof(line), "Timing: %s\n", h->timing);
-                if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
-                    if (err != HU_OK)
-                        goto fail;
-                }
-            }
-            if (h->targets_count > 0) {
-                err = append_prompt(alloc, &buf, &len, &cap, "Targets: ", 9);
+            if (h->never_during_count > 0 || (h->boundaries && h->boundaries_count > 0)) {
+                err = append_prompt(alloc, &buf, &len, &cap, "Never funny: ", 13);
                 if (err != HU_OK)
                     goto fail;
-                for (size_t i = 0; i < h->targets_count; i++) {
+                if (h->never_during_count > 0) {
+                    for (size_t i = 0; i < h->never_during_count; i++) {
+                        if (i > 0) {
+                            err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                            if (err != HU_OK)
+                                goto fail;
+                        }
+                        err = append_prompt(alloc, &buf, &len, &cap, h->never_during[i],
+                                            strlen(h->never_during[i]));
+                        if (err != HU_OK)
+                            goto fail;
+                    }
+                } else {
+                    for (size_t i = 0; i < h->boundaries_count; i++) {
+                        if (h->boundaries[i]) {
+                            if (i > 0) {
+                                err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                                if (err != HU_OK)
+                                    goto fail;
+                            }
+                            err = append_prompt(alloc, &buf, &len, &cap, h->boundaries[i],
+                                                strlen(h->boundaries[i]));
+                            if (err != HU_OK)
+                                goto fail;
+                        }
+                    }
+                }
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                if (err != HU_OK)
+                    goto fail;
+            }
+            if (h->signature_phrases_count > 0) {
+                err = append_prompt(alloc, &buf, &len, &cap, "Signature phrases: ", 19);
+                if (err != HU_OK)
+                    goto fail;
+                for (size_t i = 0; i < h->signature_phrases_count; i++) {
                     if (i > 0) {
                         err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
                         if (err != HU_OK)
                             goto fail;
                     }
-                    err = append_prompt(alloc, &buf, &len, &cap, h->targets[i],
-                                        strlen(h->targets[i]));
+                    err = append_prompt(alloc, &buf, &len, &cap, h->signature_phrases[i],
+                                        strlen(h->signature_phrases[i]));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -2395,18 +2640,18 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 if (err != HU_OK)
                     goto fail;
             }
-            if (h->boundaries_count > 0) {
-                err = append_prompt(alloc, &buf, &len, &cap, "Never funny: ", 13);
+            if (h->self_deprecation_count > 0) {
+                err = append_prompt(alloc, &buf, &len, &cap, "Self-deprecation topics: ", 24);
                 if (err != HU_OK)
                     goto fail;
-                for (size_t i = 0; i < h->boundaries_count; i++) {
+                for (size_t i = 0; i < h->self_deprecation_count; i++) {
                     if (i > 0) {
                         err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
                         if (err != HU_OK)
                             goto fail;
                     }
-                    err = append_prompt(alloc, &buf, &len, &cap, h->boundaries[i],
-                                        strlen(h->boundaries[i]));
+                    err = append_prompt(alloc, &buf, &len, &cap, h->self_deprecation_topics[i],
+                                        strlen(h->self_deprecation_topics[i]));
                     if (err != HU_OK)
                         goto fail;
                 }

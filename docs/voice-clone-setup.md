@@ -1,3 +1,8 @@
+---
+title: Cartesia Voice Clone Setup
+date: 2026-03-11
+---
+
 # Cartesia Voice Clone Setup
 
 This guide explains how to create and configure a cloned voice for use with Human's Cartesia TTS integration.

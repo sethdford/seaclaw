@@ -63,7 +63,7 @@ static void test_emotion_map_playful_lol_returns_joking_comedic(void) {
 }
 
 static void test_emotion_map_serious_death_returns_contemplative(void) {
-    const char *incoming = "My grandfather passed away";
+    const char *incoming = "We had a funeral last week";
     const char *response = "I'm so sorry for your loss.";
     const char *r = hu_cartesia_emotion_from_context(
         incoming, strlen(incoming), response, strlen(response), 14);

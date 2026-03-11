@@ -332,6 +332,7 @@ set(HU_CORE_SOURCES
     src/security/noop_sandbox.c
     src/security/docker.c
     src/security/detect.c
+    src/security/adversarial.c
     src/security/sandbox.c
     src/observability.c
     src/observability/log_observer.c
@@ -389,6 +390,7 @@ set(HU_CORE_SOURCES
     src/agent/outcomes.c
     src/context/conversation.c
     src/context/style_tracker.c
+    src/context/theory_of_mind.c
     src/context/mood.c
     src/context/event_extract.c
     src/context/vision.c
@@ -400,10 +402,13 @@ set(HU_CORE_SOURCES
     src/agent/commitment_store.c
     src/agent/pattern_radar.c
     src/agent/proactive.c
+    src/agent/proactive_ext.c
     src/agent/timing.c
     src/agent/governor.c
     src/agent/arbitrator.c
     src/agent/planning.c
+    src/agent/rel_dynamics.c
+    src/agent/conv_goals.c
     src/agent/superhuman.c
     src/agent/superhuman_commitment.c
     src/agent/superhuman_predictive.c
@@ -469,6 +474,8 @@ set(HU_CORE_SOURCES
     src/memory/retrieval/engine.c
     src/memory/connections.c
     src/memory/knowledge.c
+    src/memory/compression.c
+    src/visual/content.c
     src/memory/ingest.c
     src/memory/inbox.c
     src/memory/vector/circuit_breaker.c
@@ -634,7 +641,17 @@ if(HU_ENABLE_PERSONA)
         src/persona/auto_tune.c
         src/persona/voice_maturity.c
         src/persona/style_clone.c
+        src/persona/life_sim.c
+        src/persona/mood.c
         src/tools/persona.c
+        src/context/theory_of_mind.c
+        src/context/self_awareness.c
+        src/context/anticipatory.c
+        src/context/protective.c
+        src/context/humor.c
+        src/memory/degradation.c
+        src/memory/opinions.c
+        src/memory/life_chapters.c
     )
 endif()
 
@@ -1270,9 +1287,13 @@ endif()
 if(NOT HU_ENABLE_PERSONA)
     list(APPEND HU_TEST_EXTRA_MODULES
         src/persona/persona.c src/persona/examples.c src/persona/sampler.c
-        src/persona/analyzer.c src/persona/creator.c         src/persona/cli.c src/persona/feedback.c
+        src/persona/analyzer.c src/persona/creator.c src/persona/cli.c src/persona/feedback.c
         src/persona/replay.c src/persona/circadian.c src/persona/relationship.c
-        src/persona/auto_profile.c src/persona/auto_tune.c src/persona/voice_maturity.c src/persona/style_clone.c src/tools/persona.c)
+        src/persona/auto_profile.c src/persona/auto_tune.c src/persona/voice_maturity.c
+        src/persona/style_clone.c src/persona/life_sim.c src/persona/mood.c src/tools/persona.c
+        src/context/theory_of_mind.c src/context/self_awareness.c src/context/anticipatory.c
+        src/context/protective.c src/context/humor.c
+        src/memory/degradation.c src/memory/opinions.c src/memory/life_chapters.c)
 endif()
 if(NOT HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_EXTRA_MODULES
@@ -1464,6 +1485,7 @@ set(HU_TEST_SOURCES
     tests/test_config_parse.c
     tests/test_config_migrate.c
     tests/test_adversarial.c
+    tests/test_adversarial_detect.c
     tests/test_gateway_http.c
     tests/test_memory_full.c
     tests/test_tools_all.c
@@ -1561,16 +1583,24 @@ set(HU_TEST_SOURCES
     tests/test_governor.c
     tests/test_arbitrator.c
     tests/test_planning.c
+    tests/test_rel_dynamics.c
+    tests/test_conv_goals.c
     tests/test_knowledge.c
+    tests/test_compression.c
+    tests/test_proactive_ext.c
+    tests/test_degradation.c
+    tests/test_self_awareness.c
     tests/test_superhuman.c
     tests/test_tool_router.c
     tests/test_dag.c
     tests/test_mood.c
     tests/test_bth_e2e.c
     tests/test_style_tracker.c
+    tests/test_theory_of_mind.c
+    tests/test_visual_content.c
 )
 if(HU_ENABLE_PERSONA)
-    list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c)
+    list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c)
 endif()
 if(HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_SOURCES tests/test_cartesia.c tests/test_audio_pipeline.c tests/test_voice_decision.c tests/test_emotion_map.c)

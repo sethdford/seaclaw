@@ -399,13 +399,8 @@ hu_error_t hu_persona_cli_run(hu_allocator_t *alloc, const hu_persona_cli_args_t
         diff_scalar("motivation.avoiding", a.motivation.avoiding, b.motivation.avoiding);
         diff_scalar("motivation.wanting", a.motivation.wanting, b.motivation.wanting);
 
-        diff_scalar("humor.type", a.humor.type, b.humor.type);
         diff_scalar("humor.frequency", a.humor.frequency, b.humor.frequency);
-        diff_scalar("humor.timing", a.humor.timing, b.humor.timing);
-        diff_arr("humor.targets", a.humor.targets, a.humor.targets_count, b.humor.targets,
-                 b.humor.targets_count);
-        diff_arr("humor.boundaries", a.humor.boundaries, a.humor.boundaries_count,
-                 b.humor.boundaries, b.humor.boundaries_count);
+        diff_scalar("humor.style[0]", a.humor.style[0], b.humor.style[0]);
 
         diff_scalar("conflict_style.pushback_response", a.conflict_style.pushback_response,
                     b.conflict_style.pushback_response);

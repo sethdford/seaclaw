@@ -76,9 +76,10 @@ hu_error_t hu_audio_mp3_to_caf(hu_allocator_t *alloc,
     };
     hu_run_result_t result = {0};
     hu_error_t run_err = hu_process_run(alloc, argv, NULL, 4096, &result);
+    bool ok = (run_err == HU_OK && result.success);
     hu_run_result_free(alloc, &result);
 
-    if (run_err == HU_OK && result.success) {
+    if (ok) {
         /* 5. Success: copy caf_path to out, unlink mp3 */
         unlink(mp3_path);
         int n_out = snprintf(out_audio_path, out_path_cap, "%s", caf_path);

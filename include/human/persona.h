@@ -83,16 +83,58 @@ typedef struct hu_situational_direction {
     char *instruction;
 } hu_situational_direction_t;
 
+/* Phase 6 — daily routine block (time, activity, availability, mood modifier) */
+typedef struct hu_routine_block {
+    char time[8];         /* "05:30" */
+    char activity[64];
+    char availability[16]; /* "brief","unavailable","slow","available" */
+    char mood_modifier[32];
+} hu_routine_block_t;
+
+/* Phase 6 — daily routine (weekday/weekend blocks, variance) */
+typedef struct hu_daily_routine {
+    hu_routine_block_t weekday[24];
+    size_t weekday_count;
+    hu_routine_block_t weekend[24];
+    size_t weekend_count;
+    float routine_variance; /* default 0.15 */
+} hu_daily_routine_t;
+
+/* Phase 6 — life chapter (theme, mood, key threads) */
+typedef struct hu_life_chapter {
+    char theme[256];
+    char mood[64];
+    int64_t started_at;
+    char key_threads[8][128];
+    size_t key_threads_count;
+} hu_life_chapter_t;
+
 /* Humor profile */
 typedef struct hu_humor_profile {
     char *type;
-    char *frequency;
+    char *timing;
     char **targets;
     size_t targets_count;
     char **boundaries;
     size_t boundaries_count;
-    char *timing;
+    char *frequency;
+    /* Phase 6 additions — fixed-size arrays */
+    char style[8][32];
+    size_t style_count;
+    char never_during[8][32];
+    size_t never_during_count;
+    char signature_phrases[8][64];
+    size_t signature_phrases_count;
+    char self_deprecation_topics[8][64];
+    size_t self_deprecation_count;
 } hu_humor_profile_t;
+
+/* Phase 6 — relationship entry */
+typedef struct hu_relationship {
+    char name[64];
+    char role[32];
+    char notes[256];
+} hu_relationship_t;
 
 /* Conflict style — how the persona handles disagreement and friction */
 typedef struct hu_conflict_style {
@@ -358,6 +400,14 @@ typedef struct hu_persona {
     /* Phase 5 — voice config (Cartesia TTS, cloned voice) */
     hu_persona_voice_config_t voice;
     hu_voice_messages_config_t voice_messages;
+    /* Phase 6 — daily routine, life chapter, humor (extended), memory, values, relationships */
+    hu_daily_routine_t daily_routine;
+    hu_life_chapter_t current_chapter;
+    float memory_degradation_rate; /* default 0.10 */
+    char core_values[8][64];
+    size_t core_values_count;
+    hu_relationship_t relationships[16];
+    size_t relationships_count;
 } hu_persona_t;
 
 /* Returns persona base directory path in buf (either HU_PERSONA_DIR or ~/.human/personas).

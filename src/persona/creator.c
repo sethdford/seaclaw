@@ -347,12 +347,22 @@ hu_error_t hu_persona_creator_synthesize(hu_allocator_t *alloc, const hu_persona
         if (partials[i].motivation.wanting && !out->motivation.wanting)
             out->motivation.wanting = hu_strdup(alloc, partials[i].motivation.wanting);
 
-        if (partials[i].humor.type && !out->humor.type)
-            out->humor.type = hu_strdup(alloc, partials[i].humor.type);
-        if (partials[i].humor.frequency && !out->humor.frequency)
+        if (partials[i].humor.style_count > 0 && out->humor.style_count == 0) {
+            for (size_t j = 0; j < partials[i].humor.style_count && j < 8; j++)
+                (void)snprintf(out->humor.style[j], sizeof(out->humor.style[j]), "%.31s",
+                               partials[i].humor.style[j]);
+            out->humor.style_count = partials[i].humor.style_count;
+        }
+        if (partials[i].humor.frequency && partials[i].humor.frequency[0] &&
+            (!out->humor.frequency || !out->humor.frequency[0]))
             out->humor.frequency = hu_strdup(alloc, partials[i].humor.frequency);
-        if (partials[i].humor.timing && !out->humor.timing)
-            out->humor.timing = hu_strdup(alloc, partials[i].humor.timing);
+        if (partials[i].humor.never_during_count > 0 && out->humor.never_during_count == 0) {
+            for (size_t j = 0; j < partials[i].humor.never_during_count && j < 8; j++)
+                (void)snprintf(out->humor.never_during[j],
+                              sizeof(out->humor.never_during[j]), "%.31s",
+                              partials[i].humor.never_during[j]);
+            out->humor.never_during_count = partials[i].humor.never_during_count;
+        }
 
         if (partials[i].conflict_style.pushback_response &&
             !out->conflict_style.pushback_response)
@@ -488,6 +498,8 @@ static hu_error_t write_json_string(FILE *f, const char *s) {
 }
 
 static hu_error_t write_json_string_array(FILE *f, char **arr, size_t count) {
+    if (!arr)
+        count = 0;
     for (size_t i = 0; i < count; i++) {
         if (i > 0)
             fputc(',', f);
@@ -564,7 +576,7 @@ hu_error_t hu_persona_creator_write(hu_allocator_t *alloc, const hu_persona_t *p
         goto fail;
 
     fputs("\n  },\n  \"channel_overlays\": {\n", f);
-    for (size_t i = 0; i < persona->overlays_count; i++) {
+    for (size_t i = 0; persona->overlays && i < persona->overlays_count; i++) {
         const hu_persona_overlay_t *ov = &persona->overlays[i];
         if (!ov->channel)
             continue;
@@ -625,39 +637,63 @@ hu_error_t hu_persona_creator_write(hu_allocator_t *alloc, const hu_persona_t *p
         fputs("\n  }", f);
     }
 
-    /* Humor */
-    if (persona->humor.type || persona->humor.frequency) {
+    /* Humor (Phase 6 — style, frequency, never_during, signature_phrases, self_deprecation) */
+    if (persona->humor.style_count > 0 || (persona->humor.frequency && persona->humor.frequency[0]) ||
+        persona->humor.never_during_count > 0 || persona->humor.signature_phrases_count > 0 ||
+        persona->humor.self_deprecation_count > 0) {
         fputs(",\n  \"humor\": {", f);
         bool first = true;
-        if (persona->humor.type) {
-            fputs("\n    \"type\": ", f);
-            write_json_string(f, persona->humor.type);
+        if (persona->humor.style_count > 0) {
+            fputs("\n    \"style\": [", f);
+            for (size_t i = 0; i < persona->humor.style_count; i++) {
+                if (i > 0)
+                    fputs(", ", f);
+                write_json_string(f, persona->humor.style[i]);
+            }
+            fputc(']', f);
             first = false;
         }
-        if (persona->humor.frequency) {
-            if (!first) fputc(',', f);
+        if (persona->humor.frequency && persona->humor.frequency[0]) {
+            if (!first)
+                fputc(',', f);
             fputs("\n    \"frequency\": ", f);
             write_json_string(f, persona->humor.frequency);
             first = false;
         }
-        if (persona->humor.targets_count > 0) {
-            if (!first) fputc(',', f);
-            fputs("\n    \"targets\": [", f);
-            write_json_string_array(f, persona->humor.targets, persona->humor.targets_count);
+        if (persona->humor.never_during_count > 0) {
+            if (!first)
+                fputc(',', f);
+            fputs("\n    \"never_during\": [", f);
+            for (size_t i = 0; i < persona->humor.never_during_count; i++) {
+                if (i > 0)
+                    fputs(", ", f);
+                write_json_string(f, persona->humor.never_during[i]);
+            }
             fputc(']', f);
             first = false;
         }
-        if (persona->humor.boundaries_count > 0) {
-            if (!first) fputc(',', f);
-            fputs("\n    \"boundaries\": [", f);
-            write_json_string_array(f, persona->humor.boundaries, persona->humor.boundaries_count);
+        if (persona->humor.signature_phrases_count > 0) {
+            if (!first)
+                fputc(',', f);
+            fputs("\n    \"signature_phrases\": [", f);
+            for (size_t i = 0; i < persona->humor.signature_phrases_count; i++) {
+                if (i > 0)
+                    fputs(", ", f);
+                write_json_string(f, persona->humor.signature_phrases[i]);
+            }
             fputc(']', f);
             first = false;
         }
-        if (persona->humor.timing) {
-            if (!first) fputc(',', f);
-            fputs("\n    \"timing\": ", f);
-            write_json_string(f, persona->humor.timing);
+        if (persona->humor.self_deprecation_count > 0) {
+            if (!first)
+                fputc(',', f);
+            fputs("\n    \"self_deprecation_topics\": [", f);
+            for (size_t i = 0; i < persona->humor.self_deprecation_count; i++) {
+                if (i > 0)
+                    fputs(", ", f);
+                write_json_string(f, persona->humor.self_deprecation_topics[i]);
+            }
+            fputc(']', f);
         }
         fputs("\n  }", f);
     }
@@ -789,14 +825,14 @@ hu_error_t hu_persona_creator_write(hu_allocator_t *alloc, const hu_persona_t *p
     }
 
     /* Directors notes */
-    if (persona->directors_notes_count > 0) {
+    if (persona->directors_notes && persona->directors_notes_count > 0) {
         fputs(",\n  \"directors_notes\": [", f);
         write_json_string_array(f, persona->directors_notes, persona->directors_notes_count);
         fputc(']', f);
     }
 
     /* Character invariants */
-    if (persona->character_invariants_count > 0) {
+    if (persona->character_invariants && persona->character_invariants_count > 0) {
         fputs(",\n  \"character_invariants\": [", f);
         write_json_string_array(f, persona->character_invariants,
                                 persona->character_invariants_count);
@@ -868,7 +904,7 @@ hu_error_t hu_persona_creator_write(hu_allocator_t *alloc, const hu_persona_t *p
     }
 
     /* Backstory behaviors */
-    if (persona->backstory_behaviors_count > 0) {
+    if (persona->backstory_behaviors && persona->backstory_behaviors_count > 0) {
         fputs(",\n  \"backstory_behaviors\": [", f);
         for (size_t i = 0; i < persona->backstory_behaviors_count; i++) {
             if (i > 0) fputc(',', f);
@@ -882,7 +918,7 @@ hu_error_t hu_persona_creator_write(hu_allocator_t *alloc, const hu_persona_t *p
     }
 
     /* Situational directions */
-    if (persona->situational_directions_count > 0) {
+    if (persona->situational_directions && persona->situational_directions_count > 0) {
         fputs(",\n  \"situational_directions\": [", f);
         for (size_t i = 0; i < persona->situational_directions_count; i++) {
             if (i > 0) fputc(',', f);
@@ -1074,7 +1110,7 @@ hu_error_t hu_persona_creator_write(hu_allocator_t *alloc, const hu_persona_t *p
     }
 
     /* Example banks */
-    if (persona->example_banks_count > 0) {
+    if (persona->example_banks && persona->example_banks_count > 0) {
         fputs(",\n  \"example_banks\": {\n", f);
         for (size_t bi = 0; bi < persona->example_banks_count; bi++) {
             const hu_persona_example_bank_t *bank = &persona->example_banks[bi];

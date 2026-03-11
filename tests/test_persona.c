@@ -148,6 +148,98 @@ static void test_persona_load_json_empty(void) {
     hu_persona_deinit(&alloc, &p);
 }
 
+static void test_persona_load_json_phase6_fields(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{"
+                       "  \"version\": 1,"
+                       "  \"name\": \"phase6-test\","
+                       "  \"core\": {\"identity\": \"Test\"},"
+                       "  \"daily_routine\": {"
+                       "    \"routine_variance\": 0.2,"
+                       "    \"weekday\": [{\"time\": \"07:00\", \"activity\": \"walk\", \"availability\": \"brief\"}],"
+                       "    \"weekend\": [{\"time\": \"09:00\", \"activity\": \"sleep\", \"availability\": \"available\"}]"
+                       "  },"
+                       "  \"current_chapter\": {"
+                       "    \"theme\": \"new job\","
+                       "    \"mood\": \"excited\","
+                       "    \"started_at\": 1700000000,"
+                       "    \"key_threads\": [\"career\", \"work-life\"]"
+                       "  },"
+                       "  \"humor\": {"
+                       "    \"style\": [\"dry\", \"wit\"],"
+                       "    \"frequency\": \"moderate\","
+                       "    \"never_during\": [\"crisis\"],"
+                       "    \"signature_phrases\": [\"that tracks\"]"
+                       "  },"
+                       "  \"memory_degradation_rate\": 0.0,"
+                       "  \"core_values\": [\"honesty\", \"kindness\"],"
+                       "  \"relationships\": ["
+                       "    {\"name\": \"Alice\", \"role\": \"friend\", \"notes\": \"close\"}"
+                       "  ]"
+                       "}";
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(p.name, "phase6-test");
+
+    HU_ASSERT_EQ(p.daily_routine.routine_variance, 0.2f);
+    HU_ASSERT_EQ(p.daily_routine.weekday_count, 1u);
+    HU_ASSERT_STR_EQ(p.daily_routine.weekday[0].time, "07:00");
+    HU_ASSERT_STR_EQ(p.daily_routine.weekday[0].activity, "walk");
+    HU_ASSERT_STR_EQ(p.daily_routine.weekday[0].availability, "brief");
+    HU_ASSERT_EQ(p.daily_routine.weekend_count, 1u);
+    HU_ASSERT_STR_EQ(p.daily_routine.weekend[0].time, "09:00");
+    HU_ASSERT_STR_EQ(p.daily_routine.weekend[0].activity, "sleep");
+
+    HU_ASSERT_STR_EQ(p.current_chapter.theme, "new job");
+    HU_ASSERT_STR_EQ(p.current_chapter.mood, "excited");
+    HU_ASSERT_EQ(p.current_chapter.started_at, 1700000000);
+    HU_ASSERT_EQ(p.current_chapter.key_threads_count, 2u);
+    HU_ASSERT_TRUE(strstr(p.current_chapter.key_threads[0], "career") != NULL);
+    HU_ASSERT_TRUE(strstr(p.current_chapter.key_threads[1], "work-life") != NULL);
+
+    HU_ASSERT_EQ(p.humor.style_count, 2u);
+    HU_ASSERT_STR_EQ(p.humor.style[0], "dry");
+    HU_ASSERT_STR_EQ(p.humor.style[1], "wit");
+    HU_ASSERT_STR_EQ(p.humor.frequency, "moderate");
+    HU_ASSERT_EQ(p.humor.never_during_count, 1u);
+    HU_ASSERT_STR_EQ(p.humor.never_during[0], "crisis");
+    HU_ASSERT_EQ(p.humor.signature_phrases_count, 1u);
+    HU_ASSERT_STR_EQ(p.humor.signature_phrases[0], "that tracks");
+
+    HU_ASSERT_EQ(p.memory_degradation_rate, 0.0f);
+    HU_ASSERT_EQ(p.core_values_count, 2u);
+    HU_ASSERT_STR_EQ(p.core_values[0], "honesty");
+    HU_ASSERT_STR_EQ(p.core_values[1], "kindness");
+
+    HU_ASSERT_EQ(p.relationships_count, 1u);
+    HU_ASSERT_STR_EQ(p.relationships[0].name, "Alice");
+    HU_ASSERT_STR_EQ(p.relationships[0].role, "friend");
+    HU_ASSERT_STR_EQ(p.relationships[0].notes, "close");
+
+    hu_persona_deinit(&alloc, &p);
+}
+
+static void test_persona_load_json_minimal_phase6_defaults(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"version\": 1, \"name\": \"min\", \"core\": {\"identity\": \"x\"}}";
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(p.name, "min");
+
+    HU_ASSERT_EQ(p.daily_routine.weekday_count, 0u);
+    HU_ASSERT_EQ(p.daily_routine.weekend_count, 0u);
+    HU_ASSERT_EQ(p.daily_routine.routine_variance, 0.15f);
+    HU_ASSERT_EQ(p.memory_degradation_rate, 0.10f);
+    HU_ASSERT_EQ(p.core_values_count, 0u);
+    HU_ASSERT_EQ(p.relationships_count, 0u);
+    HU_ASSERT_EQ(p.humor.style_count, 0u);
+    HU_ASSERT_EQ(p.humor.never_during_count, 0u);
+
+    hu_persona_deinit(&alloc, &p);
+}
+
 static void test_persona_load_not_found(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_persona_t p = {0};
@@ -3396,6 +3488,8 @@ void run_persona_tests(void) {
     HU_RUN_TEST(test_persona_deinit_null_safe);
     HU_RUN_TEST(test_persona_load_json_basic);
     HU_RUN_TEST(test_persona_load_json_empty);
+    HU_RUN_TEST(test_persona_load_json_phase6_fields);
+    HU_RUN_TEST(test_persona_load_json_minimal_phase6_defaults);
     HU_RUN_TEST(test_persona_load_not_found);
     HU_RUN_TEST(test_agent_persona_prompt_injected);
     HU_RUN_TEST(test_spawn_config_has_persona);

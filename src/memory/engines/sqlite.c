@@ -147,6 +147,64 @@ static const char *const schema_parts[] = {
     "common_phrases TEXT,"
     "distinctive_words TEXT,"
     "updated_at INTEGER)",
+    "CREATE TABLE IF NOT EXISTS contact_baselines("
+    "contact_id TEXT PRIMARY KEY,"
+    "avg_message_length REAL,"
+    "avg_response_time_ms REAL,"
+    "emoji_frequency REAL,"
+    "topic_diversity REAL,"
+    "sentiment_baseline REAL,"
+    "messages_sampled INTEGER,"
+    "updated_at INTEGER)",
+    "CREATE TABLE IF NOT EXISTS mood_log("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "mood TEXT,"
+    "intensity REAL,"
+    "cause TEXT,"
+    "set_at INTEGER,"
+    "decayed_at INTEGER)",
+    "CREATE INDEX IF NOT EXISTS idx_mood_log_set_at ON mood_log(set_at)",
+    "CREATE TABLE IF NOT EXISTS reciprocity_scores("
+    "contact_id TEXT NOT NULL,"
+    "metric TEXT NOT NULL,"
+    "value REAL,"
+    "updated_at INTEGER,"
+    "PRIMARY KEY (contact_id, metric))",
+    "CREATE TABLE IF NOT EXISTS opinions("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "topic TEXT,"
+    "position TEXT,"
+    "confidence REAL,"
+    "first_expressed INTEGER,"
+    "last_expressed INTEGER,"
+    "superseded_by INTEGER)",
+    "CREATE INDEX IF NOT EXISTS idx_opinions_topic ON opinions(topic)",
+    "CREATE TABLE IF NOT EXISTS life_chapters("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "theme TEXT,"
+    "mood TEXT,"
+    "started_at INTEGER,"
+    "ended_at INTEGER,"
+    "key_threads TEXT,"
+    "active INTEGER)",
+    "CREATE INDEX IF NOT EXISTS idx_life_chapters_active ON life_chapters(active)",
+    "CREATE TABLE IF NOT EXISTS emotional_predictions("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "contact_id TEXT,"
+    "predicted_emotion TEXT,"
+    "confidence REAL,"
+    "basis TEXT,"
+    "target_date INTEGER,"
+    "verified INTEGER)",
+    "CREATE INDEX IF NOT EXISTS idx_emotional_predictions_contact ON emotional_predictions(contact_id)",
+    "CREATE TABLE IF NOT EXISTS boundaries("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "contact_id TEXT,"
+    "topic TEXT,"
+    "type TEXT DEFAULT 'avoid',"
+    "set_at INTEGER,"
+    "source TEXT)",
+    "CREATE INDEX IF NOT EXISTS idx_boundaries_contact ON boundaries(contact_id)",
     NULL};
 
 static void get_timestamp(char *buf, size_t buf_size) {

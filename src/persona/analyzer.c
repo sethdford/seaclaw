@@ -240,26 +240,42 @@ hu_error_t hu_persona_analyzer_parse_response(hu_allocator_t *alloc, const char 
         }
     }
 
-    /* Humor profile */
+    /* Humor profile (Phase 6 — fixed arrays) */
     hu_json_value_t *humor = hu_json_object_get(root, "humor");
     if (humor && humor->type == HU_JSON_OBJECT) {
         const char *ht = hu_json_get_string(humor, "type");
-        if (ht)
-            out->humor.type = hu_strdup(alloc, ht);
+        if (ht) {
+            (void)snprintf(out->humor.style[0], sizeof(out->humor.style[0]), "%.31s", ht);
+            out->humor.style_count = 1;
+        }
         const char *hf = hu_json_get_string(humor, "frequency");
         if (hf)
-            out->humor.frequency = hu_strdup(alloc, hf);
-        const char *htm = hu_json_get_string(humor, "timing");
-        if (htm)
-            out->humor.timing = hu_strdup(alloc, htm);
-        hu_json_value_t *ht_arr = hu_json_object_get(humor, "targets");
-        if (ht_arr)
-            (void)parse_string_array_from_json(alloc, ht_arr, &out->humor.targets,
-                                               &out->humor.targets_count);
-        hu_json_value_t *hb_arr = hu_json_object_get(humor, "boundaries");
-        if (hb_arr)
-            (void)parse_string_array_from_json(alloc, hb_arr, &out->humor.boundaries,
-                                               &out->humor.boundaries_count);
+            (void)snprintf(out->humor.frequency, sizeof(out->humor.frequency), "%.15s", hf);
+        hu_json_value_t *style_arr = hu_json_object_get(humor, "style");
+        if (style_arr && style_arr->type == HU_JSON_ARRAY && style_arr->data.array.items) {
+            size_t n = style_arr->data.array.len;
+            for (size_t i = 0; i < n && i < 8; i++) {
+                hu_json_value_t *item = style_arr->data.array.items[i];
+                if (item && item->type == HU_JSON_STRING && item->data.string.ptr)
+                    (void)snprintf(out->humor.style[i], sizeof(out->humor.style[i]), "%.31s",
+                                   item->data.string.ptr);
+            }
+            out->humor.style_count = (n > 8) ? 8 : n;
+        }
+        hu_json_value_t *nd_arr = hu_json_object_get(humor, "never_during");
+        if (!nd_arr)
+            nd_arr = hu_json_object_get(humor, "boundaries");
+        if (nd_arr && nd_arr->type == HU_JSON_ARRAY && nd_arr->data.array.items) {
+            size_t n = nd_arr->data.array.len;
+            for (size_t i = 0; i < n && i < 8; i++) {
+                hu_json_value_t *item = nd_arr->data.array.items[i];
+                if (item && item->type == HU_JSON_STRING && item->data.string.ptr)
+                    (void)snprintf(out->humor.never_during[i],
+                                  sizeof(out->humor.never_during[i]), "%.31s",
+                                  item->data.string.ptr);
+            }
+            out->humor.never_during_count = (n > 8) ? 8 : n;
+        }
     }
 
     /* Conflict style */
