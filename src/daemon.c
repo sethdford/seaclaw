@@ -43,6 +43,13 @@
 #include "human/memory/retrieval.h"
 #include "human/memory/superhuman.h"
 #include "human/observability/bth_metrics.h"
+#include "human/agent/governor.h"
+#include "human/agent/timing.h"
+#include "human/context/context_ext.h"
+#include "human/memory/rag_pipeline.h"
+#include "human/memory/knowledge.h"
+#include "human/memory/compression.h"
+#include "human/visual/content.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/intelligence/reflection.h"
 #include "human/intelligence/skills.h"
@@ -861,6 +868,22 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
     if (hour < 9 || hour > 21)
         return;
 
+    /* F119 (Pillar 19): Proactive volume governor — check budget before proceeding */
+    static hu_proactive_budget_t gov_budget;
+    static bool gov_inited = false;
+    if (!gov_inited) {
+        hu_proactive_budget_config_t gcfg = {
+            .daily_max = 6, .weekly_max = 15,
+            .relationship_multiplier = 1.0,
+            .cool_off_after_unanswered = 2, .cool_off_hours = 72
+        };
+        hu_governor_init(&gcfg, &gov_budget);
+        gov_inited = true;
+    }
+    uint64_t gov_now_ms = (uint64_t)now * 1000ULL;
+    if (!hu_governor_has_budget(&gov_budget, gov_now_ms))
+        return;
+
     /* F53: Deduplication — don't send same important_date to same contact twice per day */
     static char g_sent_important_date_contacts[8][64];
     static int g_sent_important_date_count = 0;
@@ -1445,6 +1468,7 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                                                           0);
                         fprintf(stderr, "[human] proactive check-in sent to %s: %.*s\n",
                                 cp->name ? cp->name : cp->contact_id, (int)response_len, response);
+                        hu_governor_record_sent(&gov_budget, (uint64_t)time(NULL) * 1000ULL);
                         if (had_important_date &&
                             strcmp(important_date_type, "birthday") == 0)
                             fprintf(stderr, "[human] F53: birthday message — use confetti effect\n");
@@ -2508,6 +2532,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             adjusted = 1000;
                     }
 #endif
+                    /* F157 (Pillar 31): Statistical timing model overlay */
+                    {
+                        uint32_t tm_seed = (uint32_t)((uintptr_t)batch_key ^ (uint32_t)time(NULL));
+                        uint64_t stm_delay = hu_timing_model_sample_default(
+                            (uint8_t)bth_hour, tm_seed);
+                        if (stm_delay > 0 && stm_delay < 120000) {
+                            uint64_t blended = ((uint64_t)adjusted + stm_delay) / 2;
+                            adjusted = (int32_t)blended;
+                        }
+                    }
                     fprintf(stderr, "[human] reading delay: %dms (hour=%d)\n", (int)adjusted,
                             bth_hour);
                     usleep((useconds_t)((unsigned int)adjusted * 1000));
@@ -3334,6 +3368,112 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         }
                                     }
                                     hu_episode_free(alloc, episodes, ep_count);
+                                }
+                            }
+                        }
+                    }
+#endif
+
+                    /* F148 (Pillar 29): On-device message classification */
+                    if (batch_key && key_len > 0) {
+                        double cls_conf = 0.0;
+                        hu_classify_result_t cls = hu_classify_message(batch_key, key_len, &cls_conf);
+                        if (cls_conf > 0.5) {
+                            char *cls_dir = NULL;
+                            size_t cls_len = 0;
+                            if (hu_classifier_build_prompt(alloc, cls, cls_conf, &cls_dir, &cls_len) == HU_OK &&
+                                cls_dir && cls_len > 0)
+                                PHASE6_APPEND(cls_dir, cls_len);
+                            else if (cls_dir)
+                                alloc->free(alloc->ctx, cls_dir, cls_len + 1);
+                        }
+                    }
+
+                    /* F125-F127 (Pillar 20): Contact knowledge state */
+#ifdef HU_ENABLE_SQLITE
+                    if (agent->memory && batch_key && key_len > 0) {
+                        sqlite3 *kdb = hu_sqlite_memory_get_db(agent->memory);
+                        if (kdb) {
+                            char ksql[512];
+                            size_t ksql_len = 0;
+                            if (hu_knowledge_query_sql(batch_key, key_len, 0.5,
+                                    ksql, sizeof(ksql), &ksql_len) == HU_OK) {
+                                sqlite3_stmt *kstmt = NULL;
+                                if (sqlite3_prepare_v2(kdb, ksql, (int)ksql_len, &kstmt, NULL) == SQLITE_OK) {
+                                    hu_knowledge_entry_t kentries[8];
+                                    size_t kcount = 0;
+                                    while (sqlite3_step(kstmt) == SQLITE_ROW && kcount < 8) {
+                                        hu_knowledge_entry_t *ke = &kentries[kcount];
+                                        memset(ke, 0, sizeof(*ke));
+                                        const char *kt = (const char *)sqlite3_column_text(kstmt, 0);
+                                        if (kt) {
+                                            ke->topic_len = (size_t)sqlite3_column_bytes(kstmt, 0);
+                                            ke->topic = hu_strndup(alloc, kt, ke->topic_len);
+                                        }
+                                        ke->confidence = sqlite3_column_double(kstmt, 1);
+                                        kcount++;
+                                    }
+                                    sqlite3_finalize(kstmt);
+                                    if (kcount > 0) {
+                                        hu_knowledge_summary_t ksummary = {0};
+                                        if (hu_knowledge_build_summary(alloc, kentries, kcount,
+                                                batch_key, key_len, NULL, 0, &ksummary) == HU_OK) {
+                                            char *kprompt = NULL;
+                                            size_t kprompt_len = 0;
+                                            if (hu_knowledge_summary_to_prompt(alloc, &ksummary,
+                                                    &kprompt, &kprompt_len) == HU_OK &&
+                                                kprompt && kprompt_len > 0)
+                                                PHASE6_APPEND(kprompt, kprompt_len);
+                                            else if (kprompt)
+                                                alloc->free(alloc->ctx, kprompt, kprompt_len + 1);
+                                            hu_knowledge_summary_deinit(alloc, &ksummary);
+                                        }
+                                        for (size_t ki = 0; ki < kcount; ki++)
+                                            hu_knowledge_entry_deinit(alloc, &kentries[ki]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+#endif
+
+                    /* F135-F137 (Pillar 24): Shared experience compression */
+#ifdef HU_ENABLE_SQLITE
+                    if (agent->memory && batch_key && key_len > 0) {
+                        sqlite3 *cdb = hu_sqlite_memory_get_db(agent->memory);
+                        if (cdb) {
+                            char csql[512];
+                            size_t csql_len = 0;
+                            if (hu_compression_query_sql(batch_key, key_len,
+                                    csql, sizeof(csql), &csql_len) == HU_OK) {
+                                sqlite3_stmt *cstmt = NULL;
+                                if (sqlite3_prepare_v2(cdb, csql, (int)csql_len, &cstmt, NULL) == SQLITE_OK) {
+                                    hu_shared_ref_t crefs[8];
+                                    size_t ccount = 0;
+                                    while (sqlite3_step(cstmt) == SQLITE_ROW && ccount < 8) {
+                                        hu_shared_ref_t *cr = &crefs[ccount];
+                                        memset(cr, 0, sizeof(*cr));
+                                        const char *ck = (const char *)sqlite3_column_text(cstmt, 0);
+                                        if (ck) {
+                                            cr->compressed_form_len = (size_t)sqlite3_column_bytes(cstmt, 0);
+                                            cr->compressed_form = hu_strndup(alloc, ck, cr->compressed_form_len);
+                                        }
+                                        cr->strength = sqlite3_column_double(cstmt, 1);
+                                        ccount++;
+                                    }
+                                    sqlite3_finalize(cstmt);
+                                    if (ccount > 0) {
+                                        char *cprompt = NULL;
+                                        size_t cprompt_len = 0;
+                                        if (hu_compression_build_prompt(alloc, crefs, ccount,
+                                                &cprompt, &cprompt_len) == HU_OK &&
+                                            cprompt && cprompt_len > 0)
+                                            PHASE6_APPEND(cprompt, cprompt_len);
+                                        else if (cprompt)
+                                            alloc->free(alloc->ctx, cprompt, cprompt_len + 1);
+                                        for (size_t ci = 0; ci < ccount; ci++)
+                                            hu_shared_ref_deinit(alloc, &crefs[ci]);
+                                    }
                                 }
                             }
                         }
@@ -5561,6 +5701,39 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 #endif
+#endif
+#endif
+
+                /* F144-F146 (Pillar 25): LoRA training sample collection */
+#ifdef HU_ENABLE_SQLITE
+#ifdef HU_HAS_PERSONA
+                if (err == HU_OK && response && response_len > 0 && agent->memory &&
+                    batch_key && key_len > 0) {
+                    sqlite3 *lora_db = hu_sqlite_memory_get_db(agent->memory);
+                    if (lora_db) {
+                        char lsql[1024];
+                        size_t lsql_len = 0;
+                        if (hu_lora_insert_training_sample_sql(response, response_len,
+                                combined, combined_len, (uint64_t)time(NULL),
+                                lsql, sizeof(lsql), &lsql_len) == HU_OK) {
+                            sqlite3_stmt *ls = NULL;
+                            if (sqlite3_prepare_v2(lora_db, lsql, (int)lsql_len, &ls, NULL) == SQLITE_OK) {
+                                sqlite3_step(ls);
+                                sqlite3_finalize(ls);
+                            }
+                        }
+                    }
+                }
+
+                /* F160-F161 (Pillar 32): Behavioral feedback from response outcomes */
+                if (err == HU_OK && response && response_len > 0 && agent->memory &&
+                    batch_key && key_len > 0) {
+                    sqlite3 *fb_db = hu_sqlite_memory_get_db(agent->memory);
+                    if (fb_db)
+                        hu_feedback_record(fb_db, "response_style", 14, batch_key, key_len,
+                                           "generated", 9, response, response_len,
+                                           (int64_t)time(NULL));
+                }
 #endif
 #endif
 

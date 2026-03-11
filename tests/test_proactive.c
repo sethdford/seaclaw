@@ -1,6 +1,8 @@
 #include "human/agent/collab_planning.h"
 #include "human/agent/commitment.h"
+#include "human/agent/governor.h"
 #include "human/agent/proactive.h"
+#include "human/agent/timing.h"
 #include "human/context/authentic.h"
 #include "human/context/behavioral.h"
 #include "human/context/event_extract.h"
@@ -10,7 +12,10 @@
 #include "human/core/error.h"
 #include "human/core/string.h"
 #include "human/memory.h"
+#include "human/memory/compression.h"
 #include "human/memory/engines.h"
+#include "human/memory/knowledge.h"
+#include "human/memory/rag_pipeline.h"
 #include "human/persona.h"
 #include "test_framework.h"
 #include <string.h>
@@ -934,8 +939,68 @@ static void daemon_timezone_compute_and_build_directive_work(void) {
     hu_str_free(&alloc, out);
 }
 
+static void daemon_governor_init_has_budget_and_record_sent(void) {
+    hu_proactive_budget_t budget;
+    hu_proactive_budget_config_t cfg = {
+        .daily_max = 3, .weekly_max = 10,
+        .relationship_multiplier = 1.0,
+        .cool_off_after_unanswered = 2, .cool_off_hours = 72
+    };
+    HU_ASSERT_EQ(hu_governor_init(&cfg, &budget), HU_OK);
+    uint64_t now_ms = 1700000000ULL * 1000;
+    HU_ASSERT_TRUE(hu_governor_has_budget(&budget, now_ms));
+    HU_ASSERT_EQ(hu_governor_record_sent(&budget, now_ms), HU_OK);
+    HU_ASSERT_TRUE(hu_governor_has_budget(&budget, now_ms + 1000));
+    HU_ASSERT_EQ(hu_governor_record_sent(&budget, now_ms + 1000), HU_OK);
+    HU_ASSERT_EQ(hu_governor_record_sent(&budget, now_ms + 2000), HU_OK);
+    HU_ASSERT_TRUE(!hu_governor_has_budget(&budget, now_ms + 3000));
+}
+
+static void daemon_timing_model_sample_default_returns_nonzero(void) {
+    uint64_t delay = hu_timing_model_sample_default(14, 42);
+    HU_ASSERT_TRUE(delay > 0);
+    HU_ASSERT_TRUE(delay < 120000);
+}
+
+static void daemon_classify_message_returns_valid_result(void) {
+    double conf = 0.0;
+    hu_classify_result_t cls = hu_classify_message("how are you?", 12, &conf);
+    (void)cls;
+    HU_ASSERT_TRUE(conf >= 0.0);
+    HU_ASSERT_TRUE(conf <= 1.0);
+    const char *name = hu_classify_result_str(cls);
+    HU_ASSERT_NOT_NULL(name);
+    HU_ASSERT_TRUE(strlen(name) > 0);
+}
+
+static void daemon_compression_build_prompt_empty_refs(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_compression_build_prompt(&alloc, NULL, 0, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    if (out)
+        hu_str_free(&alloc, out);
+}
+
+static void daemon_knowledge_summary_to_prompt_empty(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_knowledge_summary_t summary = {0};
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_knowledge_summary_to_prompt(&alloc, &summary, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    if (out)
+        hu_str_free(&alloc, out);
+}
+
 void run_proactive_tests(void) {
     HU_TEST_SUITE("proactive");
+    HU_RUN_TEST(daemon_governor_init_has_budget_and_record_sent);
+    HU_RUN_TEST(daemon_timing_model_sample_default_returns_nonzero);
+    HU_RUN_TEST(daemon_classify_message_returns_valid_result);
+    HU_RUN_TEST(daemon_compression_build_prompt_empty_refs);
+    HU_RUN_TEST(daemon_knowledge_summary_to_prompt_empty);
     HU_RUN_TEST(daemon_authentic_select_and_build_directive_produces_valid_string);
     HU_RUN_TEST(daemon_cognitive_compute_load_and_build_directive_work_together);
     HU_RUN_TEST(daemon_rel_velocity_compute_and_build_prompt_produce_context);
