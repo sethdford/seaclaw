@@ -4702,6 +4702,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
+                /* F15: Apply ratio-based length calibration */
                 {
                     int calibrated = hu_conversation_max_response_chars(combined_len);
                     if (calibrated > 0 && (max_chars == 0 || (uint32_t)calibrated < max_chars))
