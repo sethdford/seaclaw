@@ -1,3 +1,8 @@
+---
+title: Phase 3 Superhuman Memory — Code Audit Report
+date: 2026-03-10
+---
+
 # Phase 3 Superhuman Memory — Code Audit Report
 
 **Date:** 2026-03-10  

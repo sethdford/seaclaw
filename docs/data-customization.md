@@ -1,3 +1,8 @@
+---
+title: Data Customization Guide
+date: 2026-03-10
+---
+
 # Data Customization Guide
 
 The runtime includes configurable data files that control prompt behavior, conversation patterns, memory analysis, security rules, and more. Users can customize any data file by placing an override in `~/.human/data/`.
