@@ -1708,6 +1708,8 @@ set(HU_TEST_SOURCES
     tests/test_feeds.c
     tests/test_feed_processor.c
     tests/test_forgetting_curve.c
+    tests/test_weather_fetch.c
+    tests/test_save_for_later.c
     tests/test_news_health_email.c
     tests/test_intelligence_reflection.c
     tests/test_feedback.c

@@ -185,6 +185,8 @@ void run_music_feeds_tests(void);
 #endif
 void run_feed_processor_tests(void);
 void run_forgetting_curve_tests(void);
+int run_weather_fetch_tests(void);
+int run_save_for_later_tests(void);
 void run_intelligence_reflection_tests(void);
 void run_intelligence_skills_tests(void);
 void run_reflection_advanced_tests(void);
@@ -390,6 +392,8 @@ int main(void) {
 #endif
     run_feed_processor_tests();
     run_forgetting_curve_tests();
+    run_weather_fetch_tests();
+    run_save_for_later_tests();
     run_intelligence_reflection_tests();
     run_intelligence_skills_tests();
     run_reflection_advanced_tests();
