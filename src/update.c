@@ -28,8 +28,8 @@
 #include <stdlib.h>
 #endif
 
-#define GITHUB_API_URL "https://api.github.com/repos/sethdford/human/releases/latest"
-#define RELEASE_BASE   "https://github.com/sethdford/human/releases/latest/download/"
+#define GITHUB_API_URL "https://api.github.com/repos/sethdford/h-uman/releases/latest"
+#define RELEASE_BASE   "https://github.com/sethdford/h-uman/releases/latest/download/"
 
 typedef enum {
     INSTALL_NIX,
@@ -108,7 +108,7 @@ static void print_package_instructions(install_method_t method) {
         break;
     case INSTALL_DOCKER:
         printf("Detected installation via: Docker\nTo update, run:\n  docker pull "
-               "ghcr.io/sethdford/human:latest\n");
+               "ghcr.io/sethdford/h-uman:latest\n");
         break;
     case INSTALL_DEV:
         printf("Development installation detected.\nTo update, run:\n  git pull && cmake --build "
@@ -193,7 +193,7 @@ hu_error_t hu_update_apply(void) {
     const char *asset = get_platform_asset();
     if (!asset) {
         printf("Unsupported platform for auto-update. Please download manually from:\n  %s\n",
-               "https://github.com/sethdford/human/releases/latest");
+               "https://github.com/sethdford/h-uman/releases/latest");
         alloc.free(alloc.ctx, exe_path, strlen(exe_path) + 1);
         return HU_ERR_NOT_SUPPORTED;
     }

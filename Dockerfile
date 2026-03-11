@@ -41,7 +41,7 @@ RUN chown -R 65534:65534 /human-data
 # ── Stage 3: Runtime Base (shared) ────────────────────────────
 FROM alpine:3.23 AS release-base
 
-LABEL org.opencontainers.image.source=https://github.com/sethdford/human
+LABEL org.opencontainers.image.source=https://github.com/sethdford/h-uman
 
 RUN apk add --no-cache ca-certificates curl tzdata sqlite-libs
 

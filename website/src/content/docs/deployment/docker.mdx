@@ -11,7 +11,7 @@ Human can run in Docker for isolated, reproducible deployments. The official Doc
 docker run -it --rm \
   -v ~/.human:/human-data/.human \
   -p 3000:3000 \
-  ghcr.io/sethdford/human:latest \
+  ghcr.io/sethdford/h-uman:latest \
   gateway
 ```
 
@@ -23,7 +23,7 @@ Mount your config directory so the container uses your existing config and data.
 version: "3.8"
 services:
   human:
-    image: ghcr.io/sethdford/human:latest
+    image: ghcr.io/sethdford/h-uman:latest
     ports:
       - "3000:3000"
     volumes:

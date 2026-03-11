@@ -10,7 +10,7 @@ This guide walks you through migrating from [OpenClaw](https://github.com/opencl
 
 ## Why migrate?
 
-| Benefit          | OpenClaw                                                                       | Human                                         |
+| Benefit          | OpenClaw                                                                       | Human                                           |
 | ---------------- | ------------------------------------------------------------------------------ | ----------------------------------------------- |
 | **Cost**         | $599+ setup (typical M-series Mac), $300+/mo API overhead from bloated runtime | $5 hardware—runs on ARM SBCs, Raspberry Pi Zero |
 | **Binary size**  | ~28 MB (npm dist)                                                              | **~528 KB** core binary                         |
@@ -26,7 +26,7 @@ This guide walks you through migrating from [OpenClaw](https://github.com/opencl
    - **Build from source** (recommended for your platform):
 
      ```bash
-     git clone https://github.com/sethdford/human.git
+     git clone https://github.com/sethdford/h-uman.git
      cd human
      mkdir -p build && cd build
      cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON
@@ -37,7 +37,7 @@ This guide walks you through migrating from [OpenClaw](https://github.com/opencl
    - **Download release** (when available):
      ```bash
      # Check releases for your platform
-     curl -Lo human https://github.com/sethdford/human/releases/latest/download/human-$(uname -m)
+     curl -Lo human https://github.com/sethdford/h-uman/releases/latest/download/human-$(uname -m)
      chmod +x human
      sudo mv human /usr/local/bin/
      ```
@@ -72,7 +72,7 @@ Human uses the **same config structure** as OpenClaw (snake_case). Most keys map
 
 ### Key mappings
 
-| OpenClaw                             | Human                              | Notes                                |
+| OpenClaw                             | Human                                | Notes                                |
 | ------------------------------------ | ------------------------------------ | ------------------------------------ |
 | `providers` (top-level)              | `providers` (top-level array)        | Same structure                       |
 | `default_provider` / `default_model` | `default_provider` / `default_model` | Same top-level keys                  |
@@ -166,7 +166,7 @@ OpenClaw skills are npm packages or local JSON/TS modules. Human uses a **curate
 
 ### Finding equivalents
 
-| OpenClaw skill type     | Human equivalent                     |
+| OpenClaw skill type     | Human equivalent                       |
 | ----------------------- | -------------------------------------- |
 | npm `@openclaw/skill-*` | Registry skill with same purpose       |
 | Custom/local skills     | Convert to `*.skill.json` + `SKILL.md` |

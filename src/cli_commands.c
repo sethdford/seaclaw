@@ -536,7 +536,7 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv) {
     char latest[64];
     hu_error_t err = hu_update_check(latest, sizeof(latest));
     if (err != HU_OK) {
-        printf("Could not check for updates. Check https://github.com/sethdford/human/releases\n");
+        printf("Could not check for updates. Check https://github.com/sethdford/h-uman/releases\n");
         return HU_OK;
     }
 
@@ -556,7 +556,7 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv) {
     err = hu_update_apply();
     if (err != HU_OK)
         printf(
-            "Update failed. Download manually from https://github.com/sethdford/human/releases\n");
+            "Update failed. Download manually from https://github.com/sethdford/h-uman/releases\n");
     return HU_OK;
 #else
     (void)alloc;

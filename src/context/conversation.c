@@ -2107,6 +2107,63 @@ size_t hu_conversation_extract_followup_topic(const char *msg, size_t msg_len,
     return extract_significant_topic(msg, msg_len, topic_out, cap);
 }
 
+/* ── Double-text decision (F9) ──────────────────────────────────────────── */
+
+static const char *const farewell_phrases[] = {
+    "bye", "goodbye", "good night", "goodnight", "gn", "gotta go",
+    "ttyl", "talk later", "see ya", "see you", "cya", "later",
+    "night", "nite", "heading out", "heading off", NULL,
+};
+
+bool hu_conversation_should_double_text(const char *last_response, size_t resp_len,
+    const hu_channel_history_entry_t *entries, size_t count,
+    uint8_t hour_local, uint32_t seed, float probability) {
+    if (!last_response || resp_len == 0 || probability <= 0.0f)
+        return false;
+
+    if (hour_local >= 23 || hour_local < 5)
+        return false;
+
+    for (const char *const *p = farewell_phrases; *p; p++) {
+        if (str_contains_ci(last_response, resp_len, *p))
+            return false;
+    }
+
+    float adjusted = probability;
+    bool high_energy = false;
+    for (size_t i = 0; i < resp_len; i++) {
+        if (last_response[i] == '!') { high_energy = true; break; }
+    }
+    if (!high_energy) {
+        static const char *const energy_words[] = {
+            "lol", "omg", "haha", "lmao", "no way", NULL,
+        };
+        for (const char *const *w = energy_words; *w; w++) {
+            if (str_contains_ci(last_response, resp_len, *w)) {
+                high_energy = true;
+                break;
+            }
+        }
+    }
+    if (high_energy)
+        adjusted *= 1.5f;
+
+    if (count >= 2) {
+        size_t recent_from_me = 0;
+        size_t check = count < 4 ? count : 4;
+        for (size_t i = count - check; i < count; i++) {
+            if (entries[i].from_me) recent_from_me++;
+        }
+        if (recent_from_me >= 3)
+            return false;
+    }
+
+    uint32_t s = seed;
+    s = s * 1103515245u + 12345u;
+    double roll = (double)(s >> 16) / 65536.0;
+    return roll < (double)adjusted;
+}
+
 /* ── Growth celebration detection (F24) ─────────────────────────────────── */
 
 static const char *const growth_phrases[] = {

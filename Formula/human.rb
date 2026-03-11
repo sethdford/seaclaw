@@ -7,10 +7,10 @@ class Human < Formula
   license "MIT"
 
   # Tagged releases: uncomment when publishing v0.2.0+ tarballs to GitHub.
-  # url "https://github.com/sethdford/human/archive/refs/tags/v0.2.0.tar.gz"
+  # url "https://github.com/sethdford/h-uman/archive/refs/tags/v0.2.0.tar.gz"
   # sha256 "..."  # Run: curl -sL <url> | sha256sum
 
-  head "https://github.com/sethdford/human.git", branch: "main"
+  head "https://github.com/sethdford/h-uman.git", branch: "main"
 
   depends_on "cmake" => :build
   depends_on "sqlite"

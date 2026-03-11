@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sethdford/human/actions/workflows/ci.yml"><img src="https://github.com/sethdford/human/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/sethdford/h-uman/actions/workflows/ci.yml"><img src="https://github.com/sethdford/h-uman/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://sethdford.github.io/human"><img src="https://img.shields.io/badge/docs-sethdford.github.io/human-informational" alt="Documentation" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
 </p>
@@ -42,7 +42,7 @@ The smallest fully autonomous AI assistant infrastructure — a static C binary 
 
 Similar projects in the autonomous AI assistant space (data sourced from each project's own documentation):
 
-|                   | [OpenClaw](https://github.com/openclaw/openclaw) | [NanoBot](https://github.com/HKUDS/nanobot) | [PicoClaw](https://github.com/sipeed/picoclaw) | [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) | **Human**       |
+|                   | [OpenClaw](https://github.com/openclaw/openclaw) | [NanoBot](https://github.com/HKUDS/nanobot) | [PicoClaw](https://github.com/sipeed/picoclaw) | [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) | **Human**         |
 | ----------------- | ------------------------------------------------ | ------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------- | ----------------- |
 | **Language**      | TypeScript                                       | Python                                      | Go                                             | Rust                                                  | **C**             |
 | **RAM** ¹         | —                                                | —                                           | < 10 MB                                        | < 5 MB                                                | **< 6 MB**        |
@@ -94,21 +94,21 @@ brew install --HEAD ./Formula/human.rb --with-curl
 ### Docker
 
 ```bash
-docker pull ghcr.io/sethdford/human:latest
-docker run --rm ghcr.io/sethdford/human:latest --version
+docker pull ghcr.io/sethdford/h-uman:latest
+docker run --rm ghcr.io/sethdford/h-uman:latest --version
 ```
 
 ### Nix
 
 ```bash
-nix run github:sethdford/human
+nix run github:sethdford/h-uman
 # Or add to flake inputs
-nix build github:sethdford/human
+nix build github:sethdford/h-uman
 ```
 
 ### Debian / Ubuntu
 
-Download the `.deb` from [Releases](https://github.com/sethdford/human/releases):
+Download the `.deb` from [Releases](https://github.com/sethdford/h-uman/releases):
 
 ```bash
 sudo dpkg -i human_*.deb
@@ -117,7 +117,7 @@ sudo dpkg -i human_*.deb
 ### Install Script
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sethdford/human/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sethdford/h-uman/main/install.sh | bash
 ```
 
 ### From Source
@@ -136,7 +136,7 @@ sudo cp human /usr/local/bin/
 > Linux: `sudo apt-get install cmake libsqlite3-dev libcurl4-openssl-dev`
 
 ```bash
-git clone https://github.com/sethdford/human.git
+git clone https://github.com/sethdford/h-uman.git
 cd human
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON
@@ -247,15 +247,15 @@ All custom, zero external dependencies:
 
 Data-driven personality cloning — human can adopt a user's real communication style by analyzing their message history.
 
-| Component            | Description                                                                                                |
-| -------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Component            | Description                                                                                              |
+| -------------------- | -------------------------------------------------------------------------------------------------------- |
 | **Profile**          | JSON persona file (`~/.human/personas/<name>.json`) with traits, vocabulary, communication rules, values |
-| **Channel Overlays** | Per-channel style overrides (formality, message length, emoji usage, style notes)                          |
-| **Example Banks**    | Curated message examples per channel for few-shot style matching                                           |
-| **Prompt Builder**   | Generates system prompt injection from persona + overlay + examples                                        |
-| **Sampler**          | Extracts messages from iMessage (`chat.db`), Gmail, or Facebook exports                                    |
-| **Analyzer**         | Sends message batches to AI provider for personality extraction                                            |
-| **Creator**          | Orchestrates the full pipeline: sample → analyze → synthesize → write                                      |
+| **Channel Overlays** | Per-channel style overrides (formality, message length, emoji usage, style notes)                        |
+| **Example Banks**    | Curated message examples per channel for few-shot style matching                                         |
+| **Prompt Builder**   | Generates system prompt injection from persona + overlay + examples                                      |
+| **Sampler**          | Extracts messages from iMessage (`chat.db`), Gmail, or Facebook exports                                  |
+| **Analyzer**         | Sends message batches to AI provider for personality extraction                                          |
+| **Creator**          | Orchestrates the full pipeline: sample → analyze → synthesize → write                                    |
 
 ```bash
 # Create a persona from your iMessage history
@@ -783,7 +783,7 @@ MIT — see [LICENSE](LICENSE)
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=sethdford/human&type=date&legend=top-left)](https://www.star-history.com/#sethdford/human&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/svg?repos=sethdford/h-uman&type=date&legend=top-left)](https://www.star-history.com/#sethdford/h-uman&type=date&legend=top-left)
 
 ```
 

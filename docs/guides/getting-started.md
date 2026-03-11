@@ -18,7 +18,7 @@ Get from zero to your first AI chat in under 5 minutes.
 - **Linux:** `sudo apt-get install cmake libsqlite3-dev libcurl4-openssl-dev`
 
 ```bash
-git clone https://github.com/sethdford/human.git
+git clone https://github.com/sethdford/h-uman.git
 cd human
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON
@@ -33,7 +33,7 @@ sudo cp build/human /usr/local/bin/
 
 ### Option B: Download binary (when available)
 
-Check [releases](https://github.com/sethdford/human/releases) for your platform. Download and place `human` in your PATH.
+Check [releases](https://github.com/sethdford/h-uman/releases) for your platform. Download and place `human` in your PATH.
 
 ## 2. Quick setup
 

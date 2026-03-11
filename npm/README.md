@@ -21,7 +21,7 @@ human agent -m "hello"       # send a message
 ## Build from source
 
 ```bash
-git clone https://github.com/sethdford/human.git
+git clone https://github.com/sethdford/h-uman.git
 cd human && mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON
 cmake --build .
@@ -30,7 +30,7 @@ cmake --build .
 ## Links
 
 - [Documentation](https://sethdford.github.io/human/)
-- [GitHub](https://github.com/sethdford/human)
+- [GitHub](https://github.com/sethdford/h-uman)
 
 ## License
 

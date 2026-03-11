@@ -6,7 +6,7 @@ description: Build Human from source on macOS and Linux.
 Human can be installed via pre-built binaries or built from source with CMake.
 
 :::tip Pre-built binaries
-Pre-built binaries are available via **Homebrew** (`brew install --HEAD ./Formula/human.rb`), **Docker** (`docker pull ghcr.io/sethdford/human:latest`), **Nix** (`nix run github:sethdford/human`), and **Debian** (`.deb` from [Releases](https://github.com/sethdford/human/releases)). See the main [README](https://github.com/sethdford/human#installation) for details.
+Pre-built binaries are available via **Homebrew** (`brew install --HEAD ./Formula/human.rb`), **Docker** (`docker pull ghcr.io/sethdford/h-uman:latest`), **Nix** (`nix run github:sethdford/h-uman`), and **Debian** (`.deb` from [Releases](https://github.com/sethdford/h-uman/releases)). See the main [README](https://github.com/sethdford/h-uman#installation) for details.
 :::
 
 ## Prerequisites
@@ -43,7 +43,7 @@ sudo dnf install -y cmake sqlite-devel libcurl-devel
 Clone the repository, then build:
 
 ```bash
-git clone https://github.com/sethdford/human.git
+git clone https://github.com/sethdford/h-uman.git
 cd human
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_CURL=ON

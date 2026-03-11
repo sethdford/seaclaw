@@ -82,4 +82,4 @@ See `AGENTS.md` for detailed playbooks.
 
 ## Questions
 
-[GitHub Issues](https://github.com/sethdford/human/issues) — use for bugs, feature requests, or questions.
+[GitHub Issues](https://github.com/sethdford/h-uman/issues) — use for bugs, feature requests, or questions.

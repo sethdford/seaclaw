@@ -9,7 +9,7 @@ const os = require("os");
 const { execSync } = require("child_process");
 
 const VERSION = require("./package.json").version;
-const REPO = "sethdford/human";
+const REPO = "sethdford/h-uman";
 
 function getPlatformKey() {
   const platform = os.platform();

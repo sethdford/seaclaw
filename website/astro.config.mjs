@@ -23,7 +23,7 @@ export default defineConfig({
         {
           icon: "github",
           label: "GitHub",
-          href: "https://github.com/sethdford/human",
+          href: "https://github.com/sethdford/h-uman",
         },
       ],
       customCss: ["./src/styles/global.css"],

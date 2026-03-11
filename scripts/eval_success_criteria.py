@@ -395,10 +395,10 @@ def test_authenticity(results):
     has_opinions = 0
     response_lengths = []
 
-    complaint_markers = ["ugh", "tired", "annoying", "hate", "boring", "stress", "rough", "exhausted", "sucks"]
-    life_markers = ["work", "just got", "about to", "watching", "eating", "building", "coding", "running", "gym", "home"]
-    imperfection_markers = ["lol", "haha", "idk", "tbh", "ngl", "lyk", "nvm", "omg", "bruh"]
-    opinion_markers = ["love", "hate", "think", "honestly", "actually", "kinda", "lowkey"]
+    complaint_markers = ["ugh", "tired", "annoying", "hate", "boring", "stress", "rough", "exhausted", "sucks", "long day", "busy", "grind", "swamped"]
+    life_markers = ["work", "just got", "about to", "watching", "eating", "building", "coding", "running", "gym", "home", "hanging", "chilling", "boys", "roady", "claude code", "shipwright", "spicy"]
+    imperfection_markers = ["lol", "haha", "idk", "tbh", "ngl", "lyk", "nvm", "omg", "bruh", "hru", "wbu", "fr", "nah", "yo", "dude"]
+    opinion_markers = ["love", "hate", "think", "honestly", "actually", "kinda", "lowkey", "ngl", "imo", "tbh"]
 
     for resp in responses:
         lower = resp.lower()

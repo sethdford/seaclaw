@@ -10,7 +10,7 @@ red()   { [ -t 1 ] && printf '\033[31m%s\033[0m\n' "$1" || printf '%s\n' "$1"; }
 # shellcheck disable=SC2039
 bold()  { [ -t 1 ] && printf '\033[1m%s\033[0m' "$1" || printf '%s' "$1"; }
 
-REPO="sethdford/human"
+REPO="sethdford/h-uman"
 INSTALL_URL="https://h-uman.ai/install.sh"
 
 print_help() {

@@ -33,7 +33,7 @@
 
           meta = with pkgs.lib; {
             description = "Smallest fully autonomous AI assistant infrastructure";
-            homepage = "https://github.com/sethdford/human";
+            homepage = "https://github.com/sethdford/h-uman";
             license = licenses.mit;
             platforms = platforms.unix;
           };
