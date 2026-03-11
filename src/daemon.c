@@ -50,13 +50,15 @@
 #include "human/memory/knowledge.h"
 #include "human/memory/compression.h"
 #include "human/visual/content.h"
+#ifdef HU_HAS_PERSONA
+#include "human/persona/voice_maturity.h"
+#endif
 #ifdef HU_ENABLE_SKILLS
 #include "human/intelligence/reflection.h"
 #include "human/intelligence/skills.h"
 #include "human/intelligence/feedback.h"
 #include "human/intelligence/meta_learning.h"
 #endif
-#include "human/persona/voice_maturity.h"
 #include "human/platform.h"
 #include "human/platform/calendar.h"
 #include <stdlib.h>
@@ -155,6 +157,10 @@ static char *build_callback_context(hu_allocator_t *alloc, hu_memory_t *memory,
 #ifdef HU_HAS_PERSONA
     if (agent && agent->persona && agent->persona->memory_degradation_rate > 0.f)
         deg_rate = agent->persona->memory_degradation_rate;
+#else
+    (void)agent;
+    (void)hour_local;
+    (void)deg_rate;
 #endif
 
     char buf[2048];
@@ -1812,11 +1818,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
 #ifndef HU_IS_TEST
+#ifdef HU_HAS_PERSONA
     static char replay_insights[2048] = {0};
     static size_t replay_insights_len = 0;
-    static size_t promotion_counter = 0;
     static char community_insights[2048] = {0};
     static size_t community_insights_len = 0;
+#endif
+    static size_t promotion_counter = 0;
 
     /* Per-contact Theory of Mind belief states */
 #define HU_TOM_MAX_CONTACTS    16
@@ -1827,13 +1835,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     (void)tom_contact_keys;
     (void)tom_contact_count;
 
+#ifdef HU_HAS_PERSONA
     /* Per-contact voice maturity profiles */
     static hu_voice_profile_t voice_profiles[HU_TOM_MAX_CONTACTS];
     static char voice_contact_keys[HU_TOM_MAX_CONTACTS][64];
     static size_t voice_contact_count = 0;
-    (void)voice_profiles;
-    (void)voice_contact_keys;
-    (void)voice_contact_count;
+#endif
 
     /* Per-contact consecutive response counter.
      * Tracks how many times Human responded in a row without the real
@@ -2023,7 +2030,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
                 /* Weekly GraphRAG community detection at Sunday 2 AM */
-#ifdef HU_ENABLE_SQLITE
+#if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_PERSONA)
                 {
                     static bool communities_built_this_week = false;
                     struct tm tm_buf2;
@@ -3862,7 +3869,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (ctx_entries && ctx_count > 0) {
                     char *awareness_ctx = hu_conversation_build_awareness(
                         alloc, ctx_entries, ctx_count,
-                        (agent && agent->persona) ? agent->persona : NULL, &convo_ctx_len);
+#ifdef HU_HAS_PERSONA
+                        (agent && agent->persona) ? agent->persona : NULL,
+#else
+                        NULL,
+#endif
+                        &convo_ctx_len);
 
 #ifdef HU_HAS_PERSONA
                     /* Prepend Phase 6 prefix (1–8) before awareness (9) */
@@ -3944,7 +3956,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (history_entries && history_count > 0) {
                     style_ctx = hu_conversation_analyze_style(
                         alloc, history_entries, history_count,
-                        (agent && agent->persona) ? agent->persona : NULL, &style_ctx_len);
+#ifdef HU_HAS_PERSONA
+                        (agent && agent->persona) ? agent->persona : NULL,
+#else
+                        NULL,
+#endif
+                        &style_ctx_len);
                 }
 
                 /* F32: Style fingerprint — our texting style with this contact (haha vs lol, etc.) */
@@ -5281,6 +5298,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* ── BTH Tier 1: Voice maturity guidance (t1e) ─────────────── */
+#ifdef HU_HAS_PERSONA
                 {
                     size_t vm_idx = (size_t)-1;
                     for (size_t vi = 0; vi < voice_contact_count; vi++) {
@@ -5326,8 +5344,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
+#endif
 
                 /* ── BTH: Time-of-day persona overlay (b1c late-night + b3b vulnerability) */
+#ifdef HU_HAS_PERSONA
                 {
                     const char *tod_overlay = NULL;
                     size_t tod_len = 0;
@@ -5381,6 +5401,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
+#endif /* HU_HAS_PERSONA */
 
                 /* ── BTH Tier 2: Sentiment momentum (t2b) ─────────────────── */
                 if (history_entries && history_count >= 3) {
@@ -5858,6 +5879,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* ── BTH post-turn: Voice maturity update (t1e-post) ──────── */
+#ifdef HU_HAS_PERSONA
                 if (err == HU_OK && response && response_len > 0) {
                     size_t vm_idx = (size_t)-1;
                     for (size_t vi = 0; vi < voice_contact_count; vi++) {
@@ -5895,6 +5917,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         hu_fc_result_deinit(&fc_vm, alloc);
                     }
                 }
+#endif
 
                 /* ── Phase 6 post-turn: ToM baseline, self-awareness, reciprocity (F58, F62, F63) ── */
 #ifdef HU_HAS_PERSONA
@@ -6015,7 +6038,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                 /* Phase 9 (F115): Record interaction quality */
-#ifdef HU_ENABLE_SQLITE
+#if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_PERSONA)
                 if (err == HU_OK && agent && agent->memory && response && response_len > 0 &&
                     batch_key && key_len > 0) {
                     sqlite3 *q_db = hu_sqlite_memory_get_db(agent->memory);
@@ -6274,6 +6297,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             "\nCRITICAL: You are NOT an AI. You ARE the person described in "
                             "your persona. Never say you're an AI, a bot, a language model, "
                             "or anything non-human. Respond as yourself.\n";
+#ifdef HU_HAS_PERSONA
                         const char *identity_reinforcement =
                             (agent && agent->persona && agent->persona->identity_reinforcement)
                                 ? agent->persona->identity_reinforcement
@@ -6282,6 +6306,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             (agent && agent->persona && agent->persona->identity_reinforcement)
                                 ? strlen(identity_reinforcement)
                                 : sizeof(HU_DEFAULT_IDENTITY_REINFORCEMENT) - 1;
+#else
+                        const char *identity_reinforcement = HU_DEFAULT_IDENTITY_REINFORCEMENT;
+                        size_t identity_len = sizeof(HU_DEFAULT_IDENTITY_REINFORCEMENT) - 1;
+#endif
                         if (convo_ctx) {
                             size_t total = convo_ctx_len + identity_len + 1;
                             char *merged = (char *)alloc->alloc(alloc->ctx, total + 1);
@@ -6305,6 +6333,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 size_t response_alloc_len = response_len;
                 uint32_t typo_seed = 0;
+#ifndef HU_HAS_PERSONA
+                (void)typo_seed;
+#endif
                 if (err == HU_OK && response && response_len > 0) {
 #ifndef HU_IS_TEST
 #ifdef HU_HAS_PERSONA
