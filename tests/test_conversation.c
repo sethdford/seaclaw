@@ -1980,10 +1980,10 @@ static void classify_selective_mode_downgrades_full_to_brief_for_no_question(voi
     }
     /* Verify the logic: if original was FULL, it should become BRIEF (no '?' present) */
     if (action == HU_RESPONSE_BRIEF) {
-        HU_ASSERT_TRUE(1); /* Pass - logic correctly applied */
+        HU_ASSERT_TRUE(action == HU_RESPONSE_BRIEF);
     } else {
-        /* If it didn't classify as FULL, that's OK - just verify no crash */
-        HU_ASSERT_TRUE(1);
+        HU_ASSERT_TRUE(action == HU_RESPONSE_FULL || action == HU_RESPONSE_BRIEF ||
+                       action == HU_RESPONSE_SKIP);
     }
 }
 
@@ -2686,6 +2686,64 @@ static void calendar_macos_get_events_returns_empty_array_in_test_mode(void) {
     alloc.free(alloc.ctx, events_json, events_len + 1);
 }
 
+/* ── F57: Multi-thread energy management tests ──────────────────────── */
+
+static void thread_energy_init_zeroes_count(void) {
+    hu_thread_energy_tracker_t t;
+    hu_thread_energy_init(&t);
+    HU_ASSERT_EQ(t.count, 0u);
+}
+
+static void thread_energy_update_and_get(void) {
+    hu_thread_energy_tracker_t t;
+    hu_thread_energy_init(&t);
+    hu_thread_energy_update(&t, "alice", 5, HU_ENERGY_EXCITED, 1000);
+    HU_ASSERT_EQ(hu_thread_energy_get(&t, "alice", 5), HU_ENERGY_EXCITED);
+}
+
+static void thread_energy_get_unknown_returns_neutral(void) {
+    hu_thread_energy_tracker_t t;
+    hu_thread_energy_init(&t);
+    HU_ASSERT_EQ(hu_thread_energy_get(&t, "bob", 3), HU_ENERGY_NEUTRAL);
+}
+
+static void thread_energy_update_overwrites_existing(void) {
+    hu_thread_energy_tracker_t t;
+    hu_thread_energy_init(&t);
+    hu_thread_energy_update(&t, "alice", 5, HU_ENERGY_SAD, 1000);
+    hu_thread_energy_update(&t, "alice", 5, HU_ENERGY_PLAYFUL, 2000);
+    HU_ASSERT_EQ(hu_thread_energy_get(&t, "alice", 5), HU_ENERGY_PLAYFUL);
+}
+
+static void thread_energy_isolation_no_conflict(void) {
+    hu_thread_energy_tracker_t t;
+    hu_thread_energy_init(&t);
+    hu_thread_energy_update(&t, "alice", 5, HU_ENERGY_EXCITED, 1000);
+    hu_thread_energy_update(&t, "bob", 3, HU_ENERGY_EXCITED, 1000);
+    char buf[256];
+    size_t len = hu_thread_energy_build_isolation_hint(&t, "alice", 5, buf, sizeof(buf));
+    HU_ASSERT_EQ(len, 0u);
+}
+
+static void thread_energy_isolation_with_conflict(void) {
+    hu_thread_energy_tracker_t t;
+    hu_thread_energy_init(&t);
+    hu_thread_energy_update(&t, "alice", 5, HU_ENERGY_EXCITED, 1000);
+    hu_thread_energy_update(&t, "bob", 3, HU_ENERGY_SAD, 1000);
+    char buf[256];
+    size_t len = hu_thread_energy_build_isolation_hint(&t, "alice", 5, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "ISOLATION") != NULL);
+}
+
+static void thread_energy_null_safety(void) {
+    hu_thread_energy_init(NULL);
+    hu_thread_energy_update(NULL, "x", 1, HU_ENERGY_SAD, 0);
+    HU_ASSERT_EQ(hu_thread_energy_get(NULL, "x", 1), HU_ENERGY_NEUTRAL);
+    char buf[128];
+    HU_ASSERT_EQ(hu_thread_energy_build_isolation_hint(NULL, "x", 1, buf, sizeof(buf)), 0u);
+}
+
 /* ── Test suite registration ─────────────────────────────────────────── */
 
 void run_conversation_tests(void) {
@@ -2769,6 +2827,15 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(energy_directive_anxious_nonempty);
     HU_RUN_TEST(energy_directive_calm_nonempty);
     HU_RUN_TEST(energy_directive_neutral_returns_zero);
+
+    /* F57: Multi-thread energy management */
+    HU_RUN_TEST(thread_energy_init_zeroes_count);
+    HU_RUN_TEST(thread_energy_update_and_get);
+    HU_RUN_TEST(thread_energy_get_unknown_returns_neutral);
+    HU_RUN_TEST(thread_energy_update_overwrites_existing);
+    HU_RUN_TEST(thread_energy_isolation_no_conflict);
+    HU_RUN_TEST(thread_energy_isolation_with_conflict);
+    HU_RUN_TEST(thread_energy_null_safety);
 
     /* Emotional tone classification (F22) */
     HU_RUN_TEST(tone_stressed_returns_stressed);

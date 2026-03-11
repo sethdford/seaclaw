@@ -627,4 +627,29 @@ bool hu_conversation_is_media_message(const char *msg, size_t msg_len,
 size_t hu_conversation_inject_nonverbals(char *buf, size_t len, size_t cap,
                                          uint32_t seed, bool enabled);
 
+/* F57: Multi-thread energy management — track per-conversation energy to
+   prevent tone leakage across simultaneous chats. */
+#define HU_MAX_CONCURRENT_CHATS 16
+
+typedef struct hu_thread_energy_entry {
+    char contact_id[128];
+    hu_energy_level_t energy;
+    uint64_t last_updated_ms;
+} hu_thread_energy_entry_t;
+
+typedef struct hu_thread_energy_tracker {
+    hu_thread_energy_entry_t entries[HU_MAX_CONCURRENT_CHATS];
+    size_t count;
+} hu_thread_energy_tracker_t;
+
+void hu_thread_energy_init(hu_thread_energy_tracker_t *tracker);
+void hu_thread_energy_update(hu_thread_energy_tracker_t *tracker,
+                             const char *contact_id, size_t cid_len,
+                             hu_energy_level_t energy, uint64_t now_ms);
+hu_energy_level_t hu_thread_energy_get(const hu_thread_energy_tracker_t *tracker,
+                                        const char *contact_id, size_t cid_len);
+size_t hu_thread_energy_build_isolation_hint(const hu_thread_energy_tracker_t *tracker,
+                                             const char *contact_id, size_t cid_len,
+                                             char *buf, size_t cap);
+
 #endif /* HU_CONTEXT_CONVERSATION_H */

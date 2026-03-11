@@ -1704,6 +1704,8 @@ set(HU_TEST_SOURCES
     tests/test_social_graph.c
     tests/test_skill_system.c
     tests/test_feeds.c
+    tests/test_feed_processor.c
+    tests/test_forgetting_curve.c
     tests/test_news_health_email.c
     tests/test_intelligence_reflection.c
     tests/test_feedback.c

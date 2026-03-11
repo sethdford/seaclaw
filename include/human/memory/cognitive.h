@@ -36,6 +36,7 @@ hu_error_t hu_opinions_build_prompt(hu_allocator_t *alloc, const hu_opinion_t *o
 void hu_opinion_deinit(hu_allocator_t *alloc, hu_opinion_t *op);
 
 /* --- F66 Life Chapters --- */
+#ifndef HU_COGNITIVE_SKIP_LIFE_CHAPTER
 typedef struct hu_life_chapter {
     int64_t id;
     char *theme;
@@ -58,6 +59,8 @@ hu_error_t hu_chapters_close_sql(int64_t id, uint64_t ended_at,
 hu_error_t hu_chapters_build_prompt(hu_allocator_t *alloc, const hu_life_chapter_t *chapters,
                                    size_t count, char **out, size_t *out_len);
 void hu_chapter_deinit(hu_allocator_t *alloc, hu_life_chapter_t *ch);
+
+#endif /* HU_COGNITIVE_SKIP_LIFE_CHAPTER */
 
 /* --- F67 Social Graph --- */
 typedef enum hu_social_rel_type {

@@ -372,6 +372,32 @@ static const char *const schema_parts[] = {
     "expressed_a_count INTEGER DEFAULT 0,"
     "expressed_b_count INTEGER DEFAULT 0,"
     "created_at INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS visual_content("
+    "id INTEGER PRIMARY KEY,"
+    "source TEXT NOT NULL,"
+    "path TEXT NOT NULL,"
+    "description TEXT,"
+    "tags TEXT,"
+    "location TEXT,"
+    "captured_at INTEGER NOT NULL,"
+    "indexed_at INTEGER NOT NULL,"
+    "shared_with TEXT,"
+    "share_count INTEGER DEFAULT 0)",
+    "CREATE TABLE IF NOT EXISTS shareable_content("
+    "id INTEGER PRIMARY KEY,"
+    "content TEXT NOT NULL,"
+    "source TEXT NOT NULL,"
+    "topic TEXT,"
+    "received_at INTEGER NOT NULL,"
+    "share_score REAL DEFAULT 0,"
+    "shared INTEGER DEFAULT 0)",
+    "CREATE TABLE IF NOT EXISTS current_events("
+    "id INTEGER PRIMARY KEY,"
+    "topic TEXT NOT NULL,"
+    "summary TEXT NOT NULL,"
+    "source TEXT,"
+    "published_at INTEGER NOT NULL,"
+    "relevance REAL DEFAULT 0.5)",
     NULL};
 
 static void get_timestamp(char *buf, size_t buf_size) {

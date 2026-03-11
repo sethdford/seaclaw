@@ -5872,3 +5872,86 @@ bool hu_conversation_is_media_message(const char *msg, size_t msg_len,
     }
     return false;
 }
+
+/* ── F57: Multi-thread energy management ─────────────────────────────── */
+
+void hu_thread_energy_init(hu_thread_energy_tracker_t *tracker) {
+    if (!tracker)
+        return;
+    memset(tracker, 0, sizeof(*tracker));
+}
+
+void hu_thread_energy_update(hu_thread_energy_tracker_t *tracker,
+                             const char *contact_id, size_t cid_len,
+                             hu_energy_level_t energy, uint64_t now_ms) {
+    if (!tracker || !contact_id || cid_len == 0)
+        return;
+    if (cid_len >= sizeof(tracker->entries[0].contact_id))
+        cid_len = sizeof(tracker->entries[0].contact_id) - 1;
+    for (size_t i = 0; i < tracker->count; i++) {
+        if (strncmp(tracker->entries[i].contact_id, contact_id, cid_len) == 0 &&
+            tracker->entries[i].contact_id[cid_len] == '\0') {
+            tracker->entries[i].energy = energy;
+            tracker->entries[i].last_updated_ms = now_ms;
+            return;
+        }
+    }
+    if (tracker->count < HU_MAX_CONCURRENT_CHATS) {
+        hu_thread_energy_entry_t *e = &tracker->entries[tracker->count];
+        memcpy(e->contact_id, contact_id, cid_len);
+        e->contact_id[cid_len] = '\0';
+        e->energy = energy;
+        e->last_updated_ms = now_ms;
+        tracker->count++;
+    } else {
+        size_t oldest = 0;
+        for (size_t i = 1; i < tracker->count; i++) {
+            if (tracker->entries[i].last_updated_ms <
+                tracker->entries[oldest].last_updated_ms)
+                oldest = i;
+        }
+        hu_thread_energy_entry_t *e = &tracker->entries[oldest];
+        memset(e->contact_id, 0, sizeof(e->contact_id));
+        memcpy(e->contact_id, contact_id, cid_len);
+        e->contact_id[cid_len] = '\0';
+        e->energy = energy;
+        e->last_updated_ms = now_ms;
+    }
+}
+
+hu_energy_level_t hu_thread_energy_get(const hu_thread_energy_tracker_t *tracker,
+                                        const char *contact_id, size_t cid_len) {
+    if (!tracker || !contact_id || cid_len == 0)
+        return HU_ENERGY_NEUTRAL;
+    for (size_t i = 0; i < tracker->count; i++) {
+        if (strncmp(tracker->entries[i].contact_id, contact_id, cid_len) == 0 &&
+            tracker->entries[i].contact_id[cid_len] == '\0')
+            return tracker->entries[i].energy;
+    }
+    return HU_ENERGY_NEUTRAL;
+}
+
+size_t hu_thread_energy_build_isolation_hint(const hu_thread_energy_tracker_t *tracker,
+                                             const char *contact_id, size_t cid_len,
+                                             char *buf, size_t cap) {
+    if (!tracker || !contact_id || !buf || cap < 128)
+        return 0;
+    hu_energy_level_t current = hu_thread_energy_get(tracker, contact_id, cid_len);
+    bool has_conflicting = false;
+    for (size_t i = 0; i < tracker->count; i++) {
+        if (strncmp(tracker->entries[i].contact_id, contact_id, cid_len) == 0 &&
+            tracker->entries[i].contact_id[cid_len] == '\0')
+            continue;
+        if (tracker->entries[i].energy != current &&
+            tracker->entries[i].energy != HU_ENERGY_NEUTRAL) {
+            has_conflicting = true;
+            break;
+        }
+    }
+    if (!has_conflicting)
+        return 0;
+    int n = snprintf(buf, cap,
+        "[ENERGY ISOLATION]: You have other active conversations at different "
+        "energy levels. Stay in THIS conversation's tone — don't leak.");
+    return (n > 0 && (size_t)n < cap) ? (size_t)n : 0;
+}

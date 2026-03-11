@@ -183,7 +183,8 @@ void run_news_health_email_tests(void);
 void run_google_feeds_tests(void);
 void run_music_feeds_tests(void);
 #endif
-/* feed_processor tests excluded — types not yet in processor.h */
+void run_feed_processor_tests(void);
+void run_forgetting_curve_tests(void);
 void run_intelligence_reflection_tests(void);
 void run_intelligence_skills_tests(void);
 void run_reflection_advanced_tests(void);
@@ -387,7 +388,8 @@ int main(void) {
     run_google_feeds_tests();
     run_music_feeds_tests();
 #endif
-    /* feed_processor tests excluded — types not yet in processor.h */
+    run_feed_processor_tests();
+    run_forgetting_curve_tests();
     run_intelligence_reflection_tests();
     run_intelligence_skills_tests();
     run_reflection_advanced_tests();

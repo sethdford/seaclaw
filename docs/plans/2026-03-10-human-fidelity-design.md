@@ -593,7 +593,7 @@ Unsend a recently sent message:
 | --- | ------------------------------ | ---------- | ----------------- |
 | 45  | **Burst messaging**            | Medium     | ✅ Implemented    |
 | 46  | **Leave on read** (deliberate) | Low        | ✅ Implemented    |
-| 47  | **Content forwarding**         | Medium     | ⚠️ Partial        |
+| 47  | **Content forwarding**         | Medium     | ✅ Implemented    |
 | 48  | **Meme/image sharing**         | High       | 🔧 Platform limit |
 | 49  | **"Call me" escalation**       | Low        | ✅ Implemented    |
 
@@ -650,7 +650,7 @@ Know when text isn't enough:
 | --- | ------------------------------- | ---------- | -------------- |
 | 50  | **Calendar/schedule awareness** | High       | ✅ Implemented |
 | 51  | **Weather/location context**    | Medium     | ⚠️ Partial     |
-| 52  | **Sports/current events**       | Medium     | ⚠️ Partial     |
+| 52  | **Sports/current events**       | Medium     | ✅ Implemented |
 | 53  | **Birthday/holiday awareness**  | Medium     | ✅ Implemented |
 | 54  | **Time zone awareness**         | Low        | ✅ Implemented |
 
@@ -1614,12 +1614,12 @@ CREATE TABLE IF NOT EXISTS held_contradictions (
 
 ### Phase 7 & 8 Feature Status (Audit)
 
-| Feature range               | Status         |
-| --------------------------- | -------------- |
-| F70-F76 (Deep Memory)       | ❌ Not started |
-| F77-F82 (Skill Acquisition) | ❌ Not started |
-| F83-F93 (External Feeds)    | ❌ Not started |
-| F94-F101 (Skill Lifecycle)  | ❌ Not started |
+| Feature range               | Status                               |
+| --------------------------- | ------------------------------------ |
+| F70-F76 (Deep Memory)       | ✅ Implemented (all modules + tests) |
+| F77-F82 (Skill Acquisition) | ✅ Implemented (all modules + tests) |
+| F83-F93 (External Feeds)    | ✅ Implemented (daemon wired)        |
+| F94-F101 (Skill Lifecycle)  | ✅ Implemented (F101 gateway added)  |
 
 ## Implementation Plans
 
@@ -1634,7 +1634,7 @@ Each phase has its own detailed implementation plan:
 - `2026-03-10-human-fidelity-phase7-deep-memory.md`
 - `2026-03-10-human-fidelity-phase8-skill-acquisition.md`
 - `2026-03-10-human-fidelity-phase9-authentic-existence.md`
-- `2026-03-10-human-fidelity-missing-seven.md` — 28 cross-cutting features (F116–F143) across 7 new pillars: Visual Content Pipeline, Proactive Governor, Contact Knowledge State, Collaborative Planning, Context Arbitration, Relationship Dynamics, Shared Experience Compression. **Daemon wired:** Pillars 19 (Governor), 20 (Knowledge State), 24 (Shared Compression). Extended pillars 25 (Persona Fine-Tuning), 29 (On-Device Classification), 31 (Statistical Timing), 32 (Behavioral Cloning) also wired in `daemon.c`.
+- `2026-03-10-human-fidelity-missing-seven.md` — 28 cross-cutting features (F116–F143) across 7 new pillars: Visual Content Pipeline, Proactive Governor, Contact Knowledge State, Collaborative Planning, Context Arbitration, Relationship Dynamics, Shared Experience Compression. **Daemon wired:** All pillars — 18 (Visual Content), 19 (Governor), 20 (Knowledge State), 21 (Collaborative Planning), 22 (Context Arbitration — token budget), 23 (Relationship Dynamics), 24 (Shared Compression). Extended: F25 (Persona Fine-Tuning), F29 (On-Device Classification), F31 (Statistical Timing), F32 (Behavioral Cloning).
 
 ## Success Criteria
 

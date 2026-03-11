@@ -50,6 +50,12 @@
 #include "human/memory/knowledge.h"
 #include "human/memory/compression.h"
 #include "human/visual/content.h"
+#include "human/feeds/processor.h"
+#include "human/agent/arbitrator.h"
+#define HU_COGNITIVE_SKIP_LIFE_CHAPTER 1
+#include "human/memory/cognitive.h"
+#undef HU_COGNITIVE_SKIP_LIFE_CHAPTER
+#include "human/context/context_ext.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona/voice_maturity.h"
 #endif
@@ -3861,6 +3867,239 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 
+                    /* F65: Opinion evolution — inject current opinions for topic relevance */
+#ifdef HU_ENABLE_SQLITE
+                    if (agent->memory && batch_key && key_len > 0) {
+                        sqlite3 *op_db = hu_sqlite_memory_get_db(agent->memory);
+                        if (op_db) {
+                            char op_sql[512];
+                            size_t op_sql_len = 0;
+                            if (hu_opinions_query_current_sql(batch_key, key_len,
+                                    op_sql, sizeof(op_sql), &op_sql_len) == HU_OK) {
+                                sqlite3_stmt *op_stmt = NULL;
+                                if (sqlite3_prepare_v2(op_db, op_sql, (int)op_sql_len,
+                                        &op_stmt, NULL) == SQLITE_OK) {
+                                    hu_opinion_t ops[8];
+                                    size_t op_count = 0;
+                                    while (sqlite3_step(op_stmt) == SQLITE_ROW && op_count < 8) {
+                                        hu_opinion_t *o = &ops[op_count];
+                                        memset(o, 0, sizeof(*o));
+                                        const char *t = (const char *)sqlite3_column_text(op_stmt, 1);
+                                        const char *p = (const char *)sqlite3_column_text(op_stmt, 2);
+                                        if (t) {
+                                            o->topic_len = (size_t)sqlite3_column_bytes(op_stmt, 1);
+                                            o->topic = hu_strndup(alloc, t, o->topic_len);
+                                        }
+                                        if (p) {
+                                            o->position_len = (size_t)sqlite3_column_bytes(op_stmt, 2);
+                                            o->position = hu_strndup(alloc, p, o->position_len);
+                                        }
+                                        o->confidence = sqlite3_column_double(op_stmt, 3);
+                                        op_count++;
+                                    }
+                                    sqlite3_finalize(op_stmt);
+                                    if (op_count > 0) {
+                                        char *op_prompt = NULL;
+                                        size_t op_prompt_len = 0;
+                                        if (hu_opinions_build_prompt(alloc, ops, op_count,
+                                                &op_prompt, &op_prompt_len) == HU_OK &&
+                                            op_prompt && op_prompt_len > 0)
+                                            PHASE6_APPEND(op_prompt, op_prompt_len);
+                                        else if (op_prompt)
+                                            alloc->free(alloc->ctx, op_prompt, op_prompt_len + 1);
+                                        for (size_t oi = 0; oi < op_count; oi++)
+                                            hu_opinion_deinit(alloc, &ops[oi]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+#endif
+
+                    /* F83-F93: Feed context — inject recent relevant feed items */
+#ifdef HU_ENABLE_SQLITE
+                    if (agent->memory && batch_key && key_len > 0) {
+                        hu_feed_item_stored_t *fitems = NULL;
+                        size_t fcount = 0;
+                        sqlite3 *fdb = hu_sqlite_memory_get_db(agent->memory);
+                        if (fdb && hu_feed_processor_get_for_contact(
+                                alloc, fdb, batch_key, key_len, 5,
+                                &fitems, &fcount) == HU_OK &&
+                            fitems && fcount > 0) {
+                            hu_feed_item_t *conv_items = (hu_feed_item_t *)alloc->alloc(
+                                alloc->ctx, fcount * sizeof(hu_feed_item_t));
+                            if (conv_items) {
+                                memset(conv_items, 0, fcount * sizeof(hu_feed_item_t));
+                                for (size_t fi = 0; fi < fcount; fi++) {
+                                    conv_items[fi].content = fitems[fi].content;
+                                    conv_items[fi].content_len = fitems[fi].content_len;
+                                    conv_items[fi].source = fitems[fi].source;
+                                    conv_items[fi].source_len = strlen(fitems[fi].source);
+                                }
+                                char *feed_prompt = NULL;
+                                size_t feed_prompt_len = 0;
+                                if (hu_feeds_build_prompt(alloc, conv_items, fcount,
+                                        &feed_prompt, &feed_prompt_len) == HU_OK &&
+                                    feed_prompt && feed_prompt_len > 0)
+                                    PHASE6_APPEND(feed_prompt, feed_prompt_len);
+                                else if (feed_prompt)
+                                    alloc->free(alloc->ctx, feed_prompt, feed_prompt_len + 1);
+                                alloc->free(alloc->ctx, conv_items, fcount * sizeof(hu_feed_item_t));
+                            }
+                            hu_feed_items_free(alloc, fitems, fcount);
+                        }
+                    }
+#endif
+
+                    /* F116-F120: Visual content pipeline — check for shareable visual content */
+#ifdef HU_ENABLE_SQLITE
+                    if (agent->memory && batch_key && key_len > 0) {
+                        sqlite3 *vdb = hu_sqlite_memory_get_db(agent->memory);
+                        if (vdb) {
+                            hu_visual_entry_t *ventries = NULL;
+                            size_t vcount = 0;
+                            if (hu_visual_match_for_contact(alloc, vdb, batch_key, key_len,
+                                    combined, combined_len,
+                                    &ventries, &vcount) == HU_OK &&
+                                ventries && vcount > 0) {
+                                bool should_share = false;
+                                double vconf = 0.0;
+                                hu_visual_should_share(&ventries[0], combined, combined_len,
+                                                       &should_share, &vconf);
+                                if (should_share) {
+                                    hu_visual_candidate_t vc = {0};
+                                    vc.path = ventries[0].path;
+                                    vc.path_len = strlen(ventries[0].path);
+                                    vc.description = ventries[0].description;
+                                    vc.description_len = strlen(ventries[0].description);
+                                    vc.relevance_score = vconf;
+                                    char *vprompt = NULL;
+                                    size_t vprompt_len = 0;
+                                    if (hu_visual_build_prompt(alloc, &vc, 1,
+                                            &vprompt, &vprompt_len) == HU_OK &&
+                                        vprompt && vprompt_len > 0)
+                                        PHASE6_APPEND(vprompt, vprompt_len);
+                                    else if (vprompt)
+                                        alloc->free(alloc->ctx, vprompt, vprompt_len + 1);
+                                }
+                                hu_visual_entries_free(alloc, ventries, vcount);
+                            }
+                        }
+                    }
+#endif
+
+                    /* F47: Content forwarding — check for shareable content from other sources */
+#ifdef HU_ENABLE_SQLITE
+                    if (agent->memory && batch_key && key_len > 0) {
+                        sqlite3 *fwd_db = hu_sqlite_memory_get_db(agent->memory);
+                        if (fwd_db) {
+                            char fwd_sql[512];
+                            size_t fwd_sql_len = 0;
+                            if (hu_forwarding_query_for_contact_sql(batch_key, key_len,
+                                    fwd_sql, sizeof(fwd_sql), &fwd_sql_len) == HU_OK) {
+                                sqlite3_stmt *fwd_stmt = NULL;
+                                if (sqlite3_prepare_v2(fwd_db, fwd_sql, (int)fwd_sql_len,
+                                        &fwd_stmt, NULL) == SQLITE_OK) {
+                                    if (sqlite3_step(fwd_stmt) == SQLITE_ROW) {
+                                        const char *fc = (const char *)sqlite3_column_text(fwd_stmt, 1);
+                                        const char *fs = (const char *)sqlite3_column_text(fwd_stmt, 2);
+                                        if (fc && fs) {
+                                            size_t fc_len = (size_t)sqlite3_column_bytes(fwd_stmt, 1);
+                                            char fwd_buf[512];
+                                            int fw = snprintf(fwd_buf, sizeof(fwd_buf),
+                                                "[SHAREABLE CONTENT from %s]: %.*s — "
+                                                "Share this naturally if relevant.",
+                                                fs, (int)(fc_len > 300 ? 300 : fc_len), fc);
+                                            if (fw > 0 && (size_t)fw < sizeof(fwd_buf)) {
+                                                char *fwd_str = (char *)alloc->alloc(
+                                                    alloc->ctx, (size_t)fw + 1);
+                                                if (fwd_str) {
+                                                    memcpy(fwd_str, fwd_buf, (size_t)fw + 1);
+                                                    PHASE6_APPEND(fwd_str, (size_t)fw);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    sqlite3_finalize(fwd_stmt);
+                                }
+                            }
+                        }
+                    }
+#endif
+
+                    /* F52: Sports/current events — inject relevant events matching persona interests */
+#ifdef HU_ENABLE_SQLITE
+                    if (agent->memory && agent->persona) {
+                        sqlite3 *ev_db = hu_sqlite_memory_get_db(agent->memory);
+                        if (ev_db && agent->persona->context_awareness.news_topics_count > 0) {
+                            for (size_t ni = 0;
+                                 ni < agent->persona->context_awareness.news_topics_count && ni < 3;
+                                 ni++) {
+                                const char *topic =
+                                    agent->persona->context_awareness.news_topics[ni];
+                                if (!topic || !topic[0])
+                                    continue;
+                                size_t tlen = strlen(topic);
+                                char ev_sql[512];
+                                size_t ev_sql_len = 0;
+                                if (hu_events_create_table_sql(ev_sql, sizeof(ev_sql),
+                                        &ev_sql_len) != HU_OK)
+                                    break;
+                                /* Query events by topic */
+                                char eq_sql[512];
+                                size_t eq_len = 0;
+                                int qn = snprintf(eq_sql, sizeof(eq_sql),
+                                    "SELECT topic, summary, source FROM current_events "
+                                    "WHERE topic LIKE '%%%.*s%%' ORDER BY published_at DESC LIMIT 3",
+                                    (int)tlen, topic);
+                                if (qn <= 0 || (size_t)qn >= sizeof(eq_sql))
+                                    continue;
+                                eq_len = (size_t)qn;
+                                sqlite3_stmt *ev_stmt = NULL;
+                                if (sqlite3_prepare_v2(ev_db, eq_sql, (int)eq_len,
+                                        &ev_stmt, NULL) == SQLITE_OK) {
+                                    if (sqlite3_step(ev_stmt) == SQLITE_ROW) {
+                                        const char *summary =
+                                            (const char *)sqlite3_column_text(ev_stmt, 1);
+                                        if (summary) {
+                                            size_t slen = (size_t)sqlite3_column_bytes(ev_stmt, 1);
+                                            char ev_buf[384];
+                                            int ew = snprintf(ev_buf, sizeof(ev_buf),
+                                                "[CURRENT EVENT — %.*s]: %.*s",
+                                                (int)tlen, topic,
+                                                (int)(slen > 250 ? 250 : slen), summary);
+                                            if (ew > 0 && (size_t)ew < sizeof(ev_buf)) {
+                                                char *ev_str = (char *)alloc->alloc(
+                                                    alloc->ctx, (size_t)ew + 1);
+                                                if (ev_str) {
+                                                    memcpy(ev_str, ev_buf, (size_t)ew + 1);
+                                                    PHASE6_APPEND(ev_str, (size_t)ew);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    sqlite3_finalize(ev_stmt);
+                                }
+                            }
+                        }
+                    }
+#endif
+
+                    /* F134-F137: Context arbitration — trim phase6 prefix to token budget */
+                    if (phase6_prefix && phase6_len > 0) {
+                        size_t est_tokens = hu_directive_estimate_tokens(phase6_prefix, phase6_len);
+                        const size_t max_tokens = 1500;
+                        if (est_tokens > max_tokens) {
+                            size_t target_chars = max_tokens * 4;
+                            if (target_chars < phase6_len) {
+                                phase6_prefix[target_chars] = '\0';
+                                phase6_len = target_chars;
+                                fprintf(stderr, "[human] arbitrator: trimmed phase6 directives "
+                                        "from %zu to %zu tokens\n", est_tokens, max_tokens);
+                            }
+                        }
+                    }
+
 #undef PHASE6_APPEND
                 }
 #endif /* HU_HAS_PERSONA */
@@ -4160,9 +4399,18 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* F13: Energy matching — detect emotional energy of incoming message,
                  * inject [ENERGY: ...] directive when not neutral. De-escalation overrides. */
+                /* F57: Multi-thread energy tracking — record per-conversation energy */
+                static hu_thread_energy_tracker_t g_energy_tracker;
+                static bool g_energy_tracker_inited = false;
+                if (!g_energy_tracker_inited) {
+                    hu_thread_energy_init(&g_energy_tracker);
+                    g_energy_tracker_inited = true;
+                }
                 if (!use_escalation && combined_len > 0) {
                     hu_energy_level_t energy = hu_conversation_detect_energy(
                         combined, combined_len, history_entries, history_count);
+                    hu_thread_energy_update(&g_energy_tracker, batch_key, key_len,
+                                            energy, (uint64_t)time(NULL) * 1000ULL);
                     if (energy != HU_ENERGY_NEUTRAL) {
                         char energy_buf[128];
                         size_t energy_len = hu_conversation_build_energy_directive(
@@ -4192,6 +4440,26 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             }
                             if (agent && agent->bth_metrics)
                                 agent->bth_metrics->emotions_surfaced++;
+                        }
+                    }
+                }
+
+                /* F57: Multi-thread energy isolation hint */
+                {
+                    char iso_buf[256];
+                    size_t iso_len = hu_thread_energy_build_isolation_hint(
+                        &g_energy_tracker, batch_key, key_len, iso_buf, sizeof(iso_buf));
+                    if (iso_len > 0 && convo_ctx) {
+                        size_t total = convo_ctx_len + iso_len + 2;
+                        char *merged = (char *)alloc->alloc(alloc->ctx, total);
+                        if (merged) {
+                            memcpy(merged, convo_ctx, convo_ctx_len);
+                            merged[convo_ctx_len] = '\n';
+                            memcpy(merged + convo_ctx_len + 1, iso_buf, iso_len);
+                            merged[total - 1] = '\0';
+                            alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                            convo_ctx = merged;
+                            convo_ctx_len = total - 1;
                         }
                     }
                 }
