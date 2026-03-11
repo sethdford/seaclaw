@@ -1,7 +1,7 @@
 ---
 title: "Human Fidelity Phase 1 — Foundation: Fix & Wire"
 created: 2026-03-10
-status: implemented
+status: in-progress
 scope: iMessage channel, daemon, conversation intelligence
 phase: 1
 features: [F1, F2, F4, F5, F6, F7, F10, F11, F15, F40, F41, F42, F43, F44]

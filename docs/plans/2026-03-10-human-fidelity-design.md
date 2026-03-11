@@ -151,7 +151,7 @@ Same as F4 but for video attachments (`.mov`, `.mp4`, `.m4v`). Options:
 | #   | Feature                           | Status      | Complexity |
 | --- | --------------------------------- | ----------- | ---------- |
 | 8   | **Delayed follow-up engine**      | Implemented | High       |
-| 9   | **Double-text pattern**           | Implemented | Medium     |
+| 9   | **Double-text pattern**           | ⚠️ Partial   | Medium     |
 | 10  | **Missed-message acknowledgment** | Implemented | Low        |
 | 11  | **Natural conversation drop-off** | Implemented | Low        |
 | 12  | **Morning/evening bookends**      | Implemented | Medium     |
