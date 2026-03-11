@@ -1,3 +1,8 @@
+---
+title: Phase 6 Privacy Firewall Audit
+date: 2026-03-11
+---
+
 # Phase 6 Privacy Firewall Audit
 
 **Date:** 2026-03-11  

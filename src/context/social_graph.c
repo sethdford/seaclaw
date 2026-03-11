@@ -1,3 +1,5 @@
+typedef int hu_social_graph_unused_;
+
 #ifdef HU_ENABLE_SQLITE
 
 #include "human/context/social_graph.h"
