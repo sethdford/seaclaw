@@ -528,7 +528,7 @@ Inject nonverbal cues into transcript before TTS:
 | #   | Feature                      | Complexity | Status            |
 | --- | ---------------------------- | ---------- | ----------------- |
 | 40  | **Inline replies**           | High       | ⚠️ Partial        |
-| 41  | **Message editing**          | Medium     | 🚫 Not feasible  |
+| 41  | **Message editing**          | Medium     | 🚫 Not feasible   |
 | 42  | **Screen & bubble effects**  | Low        | ⚠️ Partial        |
 | 43  | **Abandoned typing pattern** | Medium     | 🔧 Platform limit |
 | 44  | **Unsend**                   | Low        | 🔧 Platform limit |
@@ -593,7 +593,7 @@ Unsend a recently sent message:
 | --- | ------------------------------ | ---------- | ----------------- |
 | 45  | **Burst messaging**            | Medium     | ✅ Implemented    |
 | 46  | **Leave on read** (deliberate) | Low        | ✅ Implemented    |
-| 47  | **Content forwarding**         | Medium     | ✅ Implemented    |
+| 47  | **Content forwarding**         | Medium     | ⚠️ Partial        |
 | 48  | **Meme/image sharing**         | High       | 🔧 Platform limit |
 | 49  | **"Call me" escalation**       | Low        | ✅ Implemented    |
 
@@ -649,8 +649,8 @@ Know when text isn't enough:
 | #   | Feature                         | Complexity | Status         |
 | --- | ------------------------------- | ---------- | -------------- |
 | 50  | **Calendar/schedule awareness** | High       | ✅ Implemented |
-| 51  | **Weather/location context**    | Medium     | ✅ Implemented |
-| 52  | **Sports/current events**       | Medium     | ✅ Implemented |
+| 51  | **Weather/location context**    | Medium     | ⚠️ Partial     |
+| 52  | **Sports/current events**       | Medium     | ⚠️ Partial     |
 | 53  | **Birthday/holiday awareness**  | Medium     | ✅ Implemented |
 | 54  | **Time zone awareness**         | Low        | ✅ Implemented |
 
@@ -1611,6 +1611,15 @@ CREATE TABLE IF NOT EXISTS held_contradictions (
 | 8         | Skill Acquisition & Continuous Learning | F77-F82, F94-F101                               | ~1600                 |
 | 9         | Authentic Existence                     | F102-F115                                       | ~1200                 |
 | **Total** |                                         | **115 features**                                | **~11000 lines**      |
+
+### Phase 7 & 8 Feature Status (Audit)
+
+| Feature range               | Status         |
+| --------------------------- | -------------- |
+| F70-F76 (Deep Memory)       | ❌ Not started |
+| F77-F82 (Skill Acquisition) | ❌ Not started |
+| F83-F93 (External Feeds)    | ❌ Not started |
+| F94-F101 (Skill Lifecycle)  | ❌ Not started |
 
 ## Implementation Plans
 
