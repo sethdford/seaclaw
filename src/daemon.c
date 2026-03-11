@@ -50,7 +50,7 @@
 #include "human/memory/knowledge.h"
 #include "human/memory/compression.h"
 #include "human/visual/content.h"
-#ifdef HU_ENABLE_SQLITE
+#ifdef HU_ENABLE_SKILLS
 #include "human/intelligence/reflection.h"
 #include "human/intelligence/skills.h"
 #include "human/intelligence/feedback.h"
@@ -1815,7 +1815,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
-#ifdef HU_ENABLE_SQLITE
+#ifdef HU_ENABLE_SKILLS
                 /* Phase 8 (F77-F82): Scheduled reflection engine */
                 {
                     static bool reflection_done_today = false;
@@ -3481,7 +3481,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                     /* Phase 8 (F96): Skill trigger matching */
-#ifdef HU_ENABLE_SQLITE
+#ifdef HU_ENABLE_SKILLS
                     if (agent->memory && batch_key && key_len > 0) {
                         sqlite3 *skill_db = hu_sqlite_memory_get_db(agent->memory);
                         if (skill_db) {
@@ -3498,7 +3498,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         ? matched[si].strategy_len
                                         : strlen(matched[si].strategy);
                                     if (strat_len > 0 && strat_len < 500) {
-                                        fprintf(stderr, "[human] Phase 8: applying skill '%s'\n",
+                                        fprintf(stderr, "[human] skill: %s\n",
                                                 matched[si].name);
                                         char skill_buf[512];
                                         int sb = snprintf(skill_buf, sizeof(skill_buf),
@@ -5726,6 +5726,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* F160-F161 (Pillar 32): Behavioral feedback from response outcomes */
+#ifdef HU_ENABLE_SKILLS
                 if (err == HU_OK && response && response_len > 0 && agent->memory &&
                     batch_key && key_len > 0) {
                     sqlite3 *fb_db = hu_sqlite_memory_get_db(agent->memory);
@@ -5734,6 +5735,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                            "generated", 9, response, response_len,
                                            (int64_t)time(NULL));
                 }
+#endif
 #endif
 #endif
 

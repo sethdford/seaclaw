@@ -564,13 +564,8 @@ hu_error_t hu_reflection_daily(hu_reflection_engine_t *engine, int64_t now_ts) {
     if (rc != SQLITE_OK)
         return HU_OK;
 
-    char *val_copy = (char *)engine->alloc->alloc(engine->alloc->ctx, (size_t)val_n + 1);
-    if (val_copy) {
-        memcpy(val_copy, val_buf, (size_t)val_n + 1);
-        sqlite3_bind_text(kv_stmt, 1, val_copy, val_n, SQLITE_STATIC);
-        sqlite3_step(kv_stmt);
-        engine->alloc->free(engine->alloc->ctx, val_copy, (size_t)val_n + 1);
-    }
+    sqlite3_bind_text(kv_stmt, 1, val_buf, val_n, SQLITE_STATIC);
+    sqlite3_step(kv_stmt);
     sqlite3_finalize(kv_stmt);
 
     return HU_OK;
