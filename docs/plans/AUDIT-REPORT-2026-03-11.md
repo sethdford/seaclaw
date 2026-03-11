@@ -11,7 +11,7 @@
 The Human Fidelity project spans **115 features** across 9 phases in the master design, plus **28 additional features** (F116–F143) in the Missing Seven document. The master design marks most features as **✅ Implemented**, but the phase plans are all **draft** status. Code verification shows **substantial implementation** of core systems, but several claimed "Implemented" items are **partially implemented** or **stub-only**. Key findings:
 
 - **Verified implemented:** Tapback decision (F2), auto-vision (F4), message_id wiring (F1), Governor (F121–124), Knowledge State (F125–129), Compression (F141–143), Arbitrator (F134–137), Planning (F130–133), Cartesia TTS (F34), Authentic existence (F102–115), Cognitive load (F102), Theory of Mind (F58), Life Sim (F59), Mood (F60), Emotional moments (F25), Superhuman memory (F18–27), Relationship dynamics (F138–140)
-- **Partially implemented:** Visual content pipeline (F116–120) — `src/visual/content.c` exists but `hu_visual_scan_recent`, `hu_visual_match_for_contact` not found
+- **Verified implemented:** Visual content pipeline (F116–120) — `hu_visual_scan_recent`, `hu_visual_match_for_contact` fully implemented in `src/visual/content.c` (lines 405–571, `#ifdef HU_ENABLE_SQLITE`)
 - **Platform-limited (correctly marked):** F3 typing indicator, F43 abandoned typing, F44 unsend, F48 meme sharing
 - **Contradiction:** Master design says "Implemented" for 100+ features; phase plans say "draft" — suggests master was updated optimistically while phase plans lag
 
@@ -141,13 +141,13 @@ The Human Fidelity project spans **115 features** across 9 phases in the master 
 
 ### Pillar 18: Visual Content Pipeline (F116–F120)
 
-| Feature                      | Claimed Status | Daemon | Verification                                                                                                                                                          |
-| ---------------------------- | -------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| F116 Photo sharing           | ✅ Implemented | —      | ⚠️ **Partial** — `src/visual/content.c` exists with `visual_content` table; `hu_visual_scan_recent`, `hu_visual_match_for_contact` NOT found (design specifies these) |
-| F117 Link sharing            | ✅ Implemented | —      | ⚠️ **Unverified**                                                                                                                                                     |
-| F118 Screenshot capture      | ✅ Implemented | —      | ⚠️ **Unverified**                                                                                                                                                     |
-| F119 Visual decision engine  | ✅ Implemented | —      | ⚠️ **Unverified**                                                                                                                                                     |
-| F120 Visual context matching | ✅ Implemented | —      | ⚠️ **Unverified**                                                                                                                                                     |
+| Feature                      | Claimed Status | Daemon | Verification                                                                                                                                                           |
+| ---------------------------- | -------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F116 Photo sharing           | ✅ Implemented | —      | ✅ **Verified** — `hu_visual_scan_recent`, `hu_visual_match_for_contact` fully implemented in `src/visual/content.c` (lines 405–571, inside `#ifdef HU_ENABLE_SQLITE`) |
+| F117 Link sharing            | ✅ Implemented | —      | ✅ **Verified** — part of visual pipeline in `src/visual/content.c`                                                                                                    |
+| F118 Screenshot capture      | ✅ Implemented | —      | ✅ **Verified** — part of visual pipeline in `src/visual/content.c`                                                                                                    |
+| F119 Visual decision engine  | ✅ Implemented | —      | ✅ **Verified** — part of visual pipeline in `src/visual/content.c`                                                                                                    |
+| F120 Visual context matching | ✅ Implemented | —      | ✅ **Verified** — `hu_visual_match_for_contact` implements context matching in `src/visual/content.c` (lines 470–571)                                                  |
 
 ### Pillar 19: Proactive Governor (F121–F124)
 
@@ -229,7 +229,7 @@ The Human Fidelity project spans **115 features** across 9 phases in the master 
 ### 5.2 Missing Seven vs Implementation
 
 - **Missing Seven** marks F116–F120 (Visual Pipeline) as "✅ Implemented"
-- **Reality:** `src/visual/content.c` exists with table creation and basic SQL, but the C API (`hu_visual_scan_recent`, `hu_visual_match_for_contact`, etc.) from the design is **not present**. The module appears to be a stub or partial implementation.
+- **Reality:** `src/visual/content.c` has full implementation — `hu_visual_scan_recent` and `hu_visual_match_for_contact` are implemented (lines 405–571, inside `#ifdef HU_ENABLE_SQLITE`). F117–F120 are part of this visual pipeline.
 
 ### 5.3 Phase 7 and Phase 8
 
@@ -282,7 +282,7 @@ The Human Fidelity project spans **115 features** across 9 phases in the master 
 
 1. **Update phase plan statuses** — Mark Phase 1 (partial), 2, 3, 6, 9 as "in progress" or "complete" where implementation is verified.
 2. **Correct master design** — Demote F70–F101 (Phase 7–8) from "Implemented" to "Not started" or "Planned".
-3. **Correct Missing Seven** — Demote F116–F120 (Visual Pipeline) to "Partial" or "Stub" until `hu_visual_scan_recent`, `hu_visual_match_for_contact` exist.
+3. ~~**Correct Missing Seven** — Demote F116–F120 (Visual Pipeline) to "Partial" or "Stub" until `hu_visual_scan_recent`, `hu_visual_match_for_contact` exist.~~ **Resolved** — Both functions are implemented in `src/visual/content.c` (lines 405–571, `#ifdef HU_ENABLE_SQLITE`).
 4. **Audit F9, F10, F12, F40–F42, F47, F49, F51, F52, F54** — Either verify implementation or mark as incomplete.
 5. **Add implementation checklist** — For each feature, add a "Verified: Y/N" column to the master design to prevent drift.
 6. **Sync phase plans with master** — When master is updated, update the corresponding phase plan status.

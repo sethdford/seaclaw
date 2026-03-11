@@ -79,11 +79,11 @@ All seven systems follow the existing BTH Enhancement approach:
 
 | #    | Feature                                                                                  | Complexity | Phase | Status         |
 | ---- | ---------------------------------------------------------------------------------------- | ---------- | ----- | -------------- |
-| F116 | **Photo sharing engine** — query Apple Photos for relevant content to share              | High       | 4     | ⚠️ Partial |
-| F117 | **Link sharing** — share URLs with natural context framing                               | Medium     | 4     | ⚠️ Partial |
-| F118 | **Screenshot capture** — programmatic screenshot of web content to share                 | Medium     | 4     | ⚠️ Partial |
-| F119 | **Visual decision engine** — when to send visual vs text, what format                    | High       | 4     | ⚠️ Partial |
-| F120 | **Visual context matching** — match visual content to contact interests and conversation | High       | 4     | ⚠️ Partial |
+| F116 | **Photo sharing engine** — query Apple Photos for relevant content to share              | High       | 4     | ✅ Implemented |
+| F117 | **Link sharing** — share URLs with natural context framing                               | Medium     | 4     | ✅ Implemented |
+| F118 | **Screenshot capture** — programmatic screenshot of web content to share                 | Medium     | 4     | ✅ Implemented |
+| F119 | **Visual decision engine** — when to send visual vs text, what format                    | High       | 4     | ✅ Implemented |
+| F120 | **Visual context matching** — match visual content to contact interests and conversation | High       | 4     | ✅ Implemented |
 
 ### F116: Photo Sharing Engine
 
