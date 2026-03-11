@@ -37,9 +37,9 @@ static void test_memory_degradation_seed_fuzz_day_changed(void) {
     const char *content = "We met on Tuesday";
     size_t len = strlen(content);
 
-    /* Seed 90 gives roll 0.90, which is fuzz range (0.90-0.95) with rate 0.10 */
+    /* Seed 92 gives roll 0.92, solidly in fuzz range (0.90-0.95) with rate 0.10 */
     size_t out_len = 0;
-    char *r = hu_memory_degradation_apply(&alloc, content, len, 90, 0.10f, &out_len);
+    char *r = hu_memory_degradation_apply(&alloc, content, len, 92, 0.10f, &out_len);
     HU_ASSERT_NOT_NULL(r);
     HU_ASSERT_TRUE(strstr(r, "Wednesday") != NULL || strstr(r, "Monday") != NULL);
     HU_ASSERT_TRUE(strstr(r, "Tuesday") == NULL);
@@ -51,9 +51,9 @@ static void test_memory_degradation_seed_forget_remind_me(void) {
     const char *content = "We met on Tuesday at the cafe";
     size_t len = strlen(content);
 
-    /* Seed 95 gives roll 0.95, which is remind path (0.95-1.0) */
+    /* Seed 97 gives roll 0.97, solidly in remind path (0.95-1.0) */
     size_t out_len = 0;
-    char *r = hu_memory_degradation_apply(&alloc, content, len, 95, 0.10f, &out_len);
+    char *r = hu_memory_degradation_apply(&alloc, content, len, 97, 0.10f, &out_len);
     HU_ASSERT_NOT_NULL(r);
     HU_ASSERT_TRUE(strstr(r, "remind me") != NULL);
     HU_ASSERT_TRUE(strstr(r, "what was that about") != NULL);

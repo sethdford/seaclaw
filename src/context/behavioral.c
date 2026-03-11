@@ -1,0 +1,321 @@
+/* Behavioral polish: F9 double-text, F12 bookends, F28 mirroring, F54 timezone */
+#include "human/context/behavioral.h"
+#include "human/core/string.h"
+#include <ctype.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+
+#define LCG_MUL 1103515245u
+#define LCG_ADD 12345u
+
+static uint32_t lcg_next(uint32_t *state) {
+    *state = *state * LCG_MUL + LCG_ADD;
+    return *state;
+}
+
+/* --- F9: Double-text --- */
+static const hu_double_text_config_t hu_double_text_default = {
+    .probability = 0.15,
+    .min_gap_seconds = 30,
+    .max_gap_seconds = 300,
+    .only_close_friends = true,
+};
+
+bool hu_should_double_text(double closeness, uint64_t last_msg_ms, uint64_t now_ms,
+                           const hu_double_text_config_t *config, uint32_t seed) {
+    const hu_double_text_config_t *c = config ? config : &hu_double_text_default;
+
+    if (c->only_close_friends && closeness < 0.6)
+        return false;
+
+    uint64_t gap_ms = (last_msg_ms <= now_ms) ? (now_ms - last_msg_ms) : 0;
+    uint32_t gap_sec = (uint32_t)(gap_ms / 1000u);
+    if (gap_sec < c->min_gap_seconds || gap_sec > c->max_gap_seconds)
+        return false;
+
+    uint32_t s = seed;
+    double roll = (double)(lcg_next(&s) >> 16) / 65536.0;
+    return roll < c->probability;
+}
+
+hu_error_t hu_double_text_build_prompt(hu_allocator_t *alloc, char **out, size_t *out_len) {
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    const char *msg =
+        "[DOUBLE-TEXT OK] You just sent a message. You can add a follow-up thought if natural.";
+    char *dup = hu_strndup(alloc, msg, strlen(msg));
+    if (!dup)
+        return HU_ERR_OUT_OF_MEMORY;
+    *out = dup;
+    *out_len = strlen(msg);
+    return HU_OK;
+}
+
+/* --- F12: Bookends --- */
+hu_bookend_type_t hu_bookend_check(uint32_t hour, bool contact_is_close,
+                                   bool already_sent_today, uint32_t seed) {
+    (void)seed;
+    if (!contact_is_close || already_sent_today)
+        return HU_BOOKEND_NONE;
+
+    if (hour >= 6 && hour <= 9)
+        return HU_BOOKEND_MORNING;
+    if (hour >= 21 && hour < 23)
+        return HU_BOOKEND_EVENING;
+    if (hour >= 23 || hour < 6)
+        return HU_BOOKEND_GOODNIGHT;
+
+    return HU_BOOKEND_NONE;
+}
+
+const char *hu_bookend_type_str(hu_bookend_type_t t) {
+    switch (t) {
+    case HU_BOOKEND_NONE:
+        return "none";
+    case HU_BOOKEND_MORNING:
+        return "morning";
+    case HU_BOOKEND_EVENING:
+        return "evening";
+    case HU_BOOKEND_GOODNIGHT:
+        return "goodnight";
+    default:
+        return "none";
+    }
+}
+
+hu_error_t hu_bookend_build_prompt(hu_allocator_t *alloc, hu_bookend_type_t type,
+                                   char **out, size_t *out_len) {
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const char *msg;
+    switch (type) {
+    case HU_BOOKEND_MORNING:
+        msg = "[BOOKEND: morning] Start the day with a casual greeting.";
+        break;
+    case HU_BOOKEND_EVENING:
+        msg = "[BOOKEND: evening] Wind down with a brief check-in.";
+        break;
+    case HU_BOOKEND_GOODNIGHT:
+        msg = "[BOOKEND: goodnight] Say goodnight if appropriate.";
+        break;
+    default:
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    char *dup = hu_strndup(alloc, msg, strlen(msg));
+    if (!dup)
+        return HU_ERR_OUT_OF_MEMORY;
+    *out = dup;
+    *out_len = strlen(msg);
+    return HU_OK;
+}
+
+/* --- F28: Linguistic Mirroring --- */
+static bool is_emoji_char(unsigned char c) {
+    return c > 127;
+}
+
+static bool contains_abbrev(const char *msg, size_t len) {
+    if (len < 2)
+        return false;
+    /* "u " " ur " " rn" */
+    for (size_t i = 0; i + 2 <= len; i++) {
+        if (msg[i] == 'u' && (i + 1 >= len || msg[i + 1] == ' ' || msg[i + 1] == '\0'))
+            return true;
+        if (i + 3 <= len && msg[i] == ' ' && msg[i + 1] == 'u' && msg[i + 2] == 'r')
+            return true;
+        if (i + 3 <= len && msg[i] == ' ' && msg[i + 1] == 'r' && msg[i + 2] == 'n')
+            return true;
+        if (i + 2 <= len && msg[i] == 'u' && msg[i + 1] == 'r')
+            return true;
+        if (i + 2 <= len && msg[i] == 'r' && msg[i + 1] == 'n')
+            return true;
+    }
+    return false;
+}
+
+static bool is_all_lowercase(const char *msg, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        if (isalpha((unsigned char)msg[i]) && !islower((unsigned char)msg[i]))
+            return false;
+    }
+    return true;
+}
+
+static size_t count_char(const char *msg, size_t len, char ch) {
+    size_t n = 0;
+    for (size_t i = 0; i < len; i++)
+        if (msg[i] == ch)
+            n++;
+    return n;
+}
+
+static bool has_emoji(const char *msg, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        if (is_emoji_char((unsigned char)msg[i]))
+            return true;
+    }
+    return false;
+}
+
+hu_error_t hu_mirror_analyze(const char *const *messages, const size_t *msg_lens,
+                             size_t count, hu_mirror_analysis_t *out) {
+    if (!messages || !msg_lens || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    memset(out, 0, sizeof(*out));
+    if (count == 0)
+        return HU_OK;
+
+    size_t lowercase_count = 0;
+    size_t abbrev_count = 0;
+    size_t exclaim_count = 0;
+    size_t ellipsis_count = 0;
+    size_t emoji_count = 0;
+    uint64_t total_len = 0;
+
+    for (size_t i = 0; i < count; i++) {
+        const char *m = messages[i];
+        size_t len = msg_lens[i];
+        if (!m)
+            continue;
+
+        total_len += len;
+        if (len > 0 && is_all_lowercase(m, len))
+            lowercase_count++;
+        if (contains_abbrev(m, len))
+            abbrev_count++;
+        if (count_char(m, len, '!') >= 2)
+            exclaim_count++;
+        if (len >= 3) {
+            for (size_t j = 0; j + 3 <= len; j++) {
+                if (m[j] == '.' && m[j + 1] == '.' && m[j + 2] == '.') {
+                    ellipsis_count++;
+                    break;
+                }
+            }
+        }
+        if (has_emoji(m, len))
+            emoji_count++;
+    }
+
+    out->uses_lowercase = (lowercase_count * 2 >= count);
+    out->uses_abbreviations = (abbrev_count > 0);
+    out->uses_exclamation = (exclaim_count * 2 >= count);
+    out->uses_ellipsis = (ellipsis_count * 2 >= count);
+    out->uses_emoji = (emoji_count * 2 >= count);
+    out->avg_msg_length = (count > 0) ? (double)total_len / (double)count : 0.0;
+
+    return HU_OK;
+}
+
+hu_error_t hu_mirror_build_directive(hu_allocator_t *alloc, const hu_mirror_analysis_t *analysis,
+                                     char **out, size_t *out_len) {
+    if (!alloc || !analysis || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char buf[512];
+    size_t pos = 0;
+    const char *prefix = "[LINGUISTIC MIRROR]: ";
+    size_t prefix_len = strlen(prefix);
+    if (pos + prefix_len < sizeof(buf)) {
+        memcpy(buf + pos, prefix, prefix_len + 1);
+        pos += prefix_len;
+    }
+
+    int first = 1;
+    if (analysis->uses_lowercase) {
+        if (!first)
+            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " ");
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
+                               "They type in lowercase — match their style.");
+        first = 0;
+    }
+    if (analysis->uses_abbreviations) {
+        if (!first)
+            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " ");
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
+                               "They use abbreviations — ok to use 'u' and 'rn'.");
+        first = 0;
+    }
+    if (analysis->avg_msg_length > 0.0) {
+        int n = (int)(analysis->avg_msg_length + 0.5);
+        if (n < 1)
+            n = 1;
+        if (!first)
+            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " ");
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
+                               "Keep messages around %d chars.", n);
+        first = 0;
+    }
+
+    if (pos == prefix_len) {
+        *out = NULL;
+        *out_len = 0;
+        return HU_OK;
+    }
+
+    char *dup = hu_strndup(alloc, buf, pos);
+    if (!dup)
+        return HU_ERR_OUT_OF_MEMORY;
+    *out = dup;
+    *out_len = pos;
+    return HU_OK;
+}
+
+/* --- F54: Timezone --- */
+hu_timezone_info_t hu_timezone_compute(int offset_hours, uint64_t utc_now_ms) {
+    hu_timezone_info_t tz = {
+        .offset_hours = offset_hours,
+        .local_hour = 0,
+        .is_sleeping_hours = false,
+        .is_work_hours = false,
+    };
+
+    uint64_t sec = utc_now_ms / 1000u;
+    uint32_t utc_hour = (uint32_t)((sec / 3600u) % 24u);
+    int local = (int)utc_hour + offset_hours;
+    while (local < 0)
+        local += 24;
+    while (local >= 24)
+        local -= 24;
+    tz.local_hour = (uint32_t)local;
+    tz.is_sleeping_hours = (tz.local_hour >= 23 || tz.local_hour < 7);
+    tz.is_work_hours = (tz.local_hour >= 9 && tz.local_hour <= 17);
+
+    return tz;
+}
+
+hu_error_t hu_timezone_build_directive(hu_allocator_t *alloc, const hu_timezone_info_t *tz,
+                                       const char *contact_name, size_t name_len,
+                                       char **out, size_t *out_len) {
+    if (!alloc || !tz || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *out = NULL;
+    *out_len = 0;
+
+    if (!tz->is_sleeping_hours)
+        return HU_OK;
+
+    const char *name = (contact_name && name_len > 0) ? contact_name : "contact";
+    size_t nlen = (contact_name && name_len > 0) ? name_len : 7;
+
+    uint32_t h12 = tz->local_hour % 12;
+    if (h12 == 0)
+        h12 = 12;
+    const char *ampm = (tz->local_hour < 12) ? "am" : "pm";
+
+    char *dup = hu_sprintf(alloc,
+                           "[TIMEZONE: %.*s is likely sleeping (%u%s their time). "
+                           "Do not send proactive messages.]",
+                           (int)nlen, name, (unsigned)h12, ampm);
+    if (!dup)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    *out = dup;
+    *out_len = strlen(dup);
+    return HU_OK;
+}

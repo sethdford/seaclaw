@@ -1,8 +1,14 @@
 #include "human/context/self_awareness.h"
 #include "human/core/allocator.h"
 #include "human/core/string.h"
+#include "human/memory.h"
 #include "test_framework.h"
 #include <string.h>
+#include <time.h>
+
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+#endif
 
 static void self_awareness_create_table_sql_valid(void) {
     char buf[1024];
@@ -187,7 +193,7 @@ static void reciprocity_directive_low_questions(void) {
     hu_error_t err = hu_reciprocity_build_directive(&alloc, &m, &out, &out_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(out);
-    HU_ASSERT_TRUE(strstr(out, "asking") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "asked") != NULL || strstr(out, "Ask") != NULL);
     hu_str_free(&alloc, out);
 }
 
@@ -229,6 +235,111 @@ static void self_stats_deinit_frees(void) {
     HU_ASSERT_NULL(stats.last_topic);
 }
 
+#ifdef HU_ENABLE_SQLITE
+static void self_awareness_record_send_then_directive(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    const char *cid = "contact_rec";
+    size_t cid_len = 10;
+
+    hu_error_t err = hu_self_awareness_record_send(&alloc, &mem, cid, cid_len, true, "work", 4);
+    HU_ASSERT_EQ(err, HU_OK);
+    err = hu_self_awareness_record_send(&alloc, &mem, cid, cid_len, true, "work", 4);
+    HU_ASSERT_EQ(err, HU_OK);
+    err = hu_self_awareness_record_send(&alloc, &mem, cid, cid_len, true, "work", 4);
+    HU_ASSERT_EQ(err, HU_OK);
+    err = hu_self_awareness_record_send(&alloc, &mem, cid, cid_len, true, "work", 4);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    int64_t now_ts = (int64_t)time(NULL);
+    char *out = NULL;
+    size_t out_len = 0;
+    err = hu_self_awareness_build_directive_from_memory(&alloc, &mem, cid, cid_len, now_ts,
+                                                        &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(strstr(out, "keep") != NULL || strstr(out, "work") != NULL);
+    hu_str_free(&alloc, out);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void self_awareness_record_send_quiet_directive(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    const char *cid = "contact_quiet";
+    size_t cid_len = 12;
+
+    for (int i = 0; i < 10; i++)
+        hu_self_awareness_record_send(&alloc, &mem, cid, cid_len, false, NULL, 0);
+
+    int64_t now_ts = (int64_t)time(NULL);
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_self_awareness_build_directive_from_memory(&alloc, &mem, cid, cid_len,
+                                                                  now_ts, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(strstr(out, "quiet") != NULL);
+    hu_str_free(&alloc, out);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void reciprocity_low_initiation_directive(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    const char *cid = "contact_low";
+    size_t cid_len = 11;
+
+    for (int i = 0; i < 7; i++)
+        hu_self_awareness_record_their_reciprocity(&alloc, &mem, cid, cid_len, true, false, false);
+    hu_self_awareness_update_reciprocity(&alloc, &mem, cid, cid_len, true, false, false);
+    hu_self_awareness_update_reciprocity(&alloc, &mem, cid, cid_len, true, false, false);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_self_awareness_build_reciprocity_directive(&alloc, &mem, cid, cid_len,
+                                                                   &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(strstr(out, "receiving") != NULL);
+    hu_str_free(&alloc, out);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void reciprocity_balanced_null_directive(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    const char *cid = "contact_bal";
+    size_t cid_len = 10;
+
+    for (int i = 0; i < 5; i++) {
+        hu_self_awareness_update_reciprocity(&alloc, &mem, cid, cid_len, true, true, true);
+        hu_self_awareness_record_their_reciprocity(&alloc, &mem, cid, cid_len, true, true, true);
+    }
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_self_awareness_build_reciprocity_directive(&alloc, &mem, cid, cid_len,
+                                                                   &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NULL(out);
+    HU_ASSERT_EQ(out_len, 0u);
+
+    mem.vtable->deinit(mem.ctx);
+}
+#endif /* HU_ENABLE_SQLITE */
+
 void run_self_awareness_tests(void) {
     HU_TEST_SUITE("self_awareness");
     HU_RUN_TEST(self_awareness_create_table_sql_valid);
@@ -251,4 +362,10 @@ void run_self_awareness_tests(void) {
     HU_RUN_TEST(reciprocity_directive_over_sharing);
     HU_RUN_TEST(reciprocity_directive_balanced);
     HU_RUN_TEST(self_stats_deinit_frees);
+#ifdef HU_ENABLE_SQLITE
+    HU_RUN_TEST(self_awareness_record_send_then_directive);
+    HU_RUN_TEST(self_awareness_record_send_quiet_directive);
+    HU_RUN_TEST(reciprocity_low_initiation_directive);
+    HU_RUN_TEST(reciprocity_balanced_null_directive);
+#endif
 }

@@ -245,12 +245,13 @@ hu_error_t hu_persona_analyzer_parse_response(hu_allocator_t *alloc, const char 
     if (humor && humor->type == HU_JSON_OBJECT) {
         const char *ht = hu_json_get_string(humor, "type");
         if (ht) {
+            out->humor.type = hu_strdup(alloc, ht);
             (void)snprintf(out->humor.style[0], sizeof(out->humor.style[0]), "%.31s", ht);
             out->humor.style_count = 1;
         }
         const char *hf = hu_json_get_string(humor, "frequency");
         if (hf)
-            (void)snprintf(out->humor.frequency, sizeof(out->humor.frequency), "%.15s", hf);
+            out->humor.frequency = hu_strdup(alloc, hf);
         hu_json_value_t *style_arr = hu_json_object_get(humor, "style");
         if (style_arr && style_arr->type == HU_JSON_ARRAY && style_arr->data.array.items) {
             size_t n = style_arr->data.array.len;

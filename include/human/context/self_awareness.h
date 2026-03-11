@@ -3,6 +3,7 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/memory.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -75,5 +76,46 @@ hu_error_t hu_reciprocity_build_directive(hu_allocator_t *alloc,
                                           char **out, size_t *out_len);
 
 void hu_self_stats_deinit(hu_allocator_t *alloc, hu_self_stats_t *stats);
+
+#ifdef HU_ENABLE_SQLITE
+/* Record a send event. Upserts self_awareness_stats. */
+hu_error_t hu_self_awareness_record_send(hu_allocator_t *alloc, hu_memory_t *memory,
+                                         const char *contact_id, size_t contact_id_len,
+                                         bool we_initiated, const char *topic_hint,
+                                         size_t topic_len);
+
+/* Build directive from DB. Returns NULL if nothing notable. */
+hu_error_t hu_self_awareness_build_directive_from_memory(hu_allocator_t *alloc,
+                                                         hu_memory_t *memory,
+                                                         const char *contact_id,
+                                                         size_t contact_id_len,
+                                                         int64_t now_ts, char **out,
+                                                         size_t *out_len);
+
+/* Get reciprocity metrics from reciprocity_scores. */
+hu_error_t hu_self_awareness_get_reciprocity(hu_allocator_t *alloc, hu_memory_t *memory,
+                                            const char *contact_id, size_t contact_id_len,
+                                            double *initiation_ratio, double *question_balance,
+                                            double *share_balance);
+
+/* Update reciprocity counts (increments our counts based on flags). */
+hu_error_t hu_self_awareness_update_reciprocity(hu_allocator_t *alloc, hu_memory_t *memory,
+                                               const char *contact_id, size_t contact_id_len,
+                                               bool we_initiated, bool we_asked_question,
+                                               bool we_shared);
+
+/* Record their reciprocity actions (call when processing their messages). */
+hu_error_t hu_self_awareness_record_their_reciprocity(hu_allocator_t *alloc, hu_memory_t *memory,
+                                                     const char *contact_id, size_t contact_id_len,
+                                                     bool they_initiated, bool they_asked_question,
+                                                     bool they_shared);
+
+/* Build reciprocity directive from DB. Returns NULL if balanced. */
+hu_error_t hu_self_awareness_build_reciprocity_directive(hu_allocator_t *alloc,
+                                                        hu_memory_t *memory,
+                                                        const char *contact_id,
+                                                        size_t contact_id_len,
+                                                        char **out, size_t *out_len);
+#endif /* HU_ENABLE_SQLITE */
 
 #endif /* HU_CONTEXT_SELF_AWARENESS_H */

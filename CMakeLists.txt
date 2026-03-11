@@ -394,6 +394,9 @@ set(HU_CORE_SOURCES
     src/context/mood.c
     src/context/event_extract.c
     src/context/vision.c
+    src/context/intelligence.c
+    src/context/behavioral.c
+    src/context/context_ext.c
     src/agent/episodic.c
     src/agent/reflection.c
     src/agent/ab_response.c
@@ -474,6 +477,7 @@ set(HU_CORE_SOURCES
     src/memory/retrieval/engine.c
     src/memory/connections.c
     src/memory/knowledge.c
+    src/memory/cognitive.c
     src/memory/compression.c
     src/visual/content.c
     src/memory/ingest.c
@@ -1521,7 +1525,6 @@ set(HU_TEST_SOURCES
     tests/test_channel_integration.c
     tests/test_gmail.c
     tests/test_imessage_extended.c
-    tests/test_intelligence.c
     tests/test_config_extended.c
     tests/test_config_getters.c
     tests/test_config_validation.c
@@ -1560,6 +1563,9 @@ set(HU_TEST_SOURCES
     tests/test_terminal.c
     tests/test_tavily.c
     tests/test_awareness.c
+    tests/test_intelligence.c
+    tests/test_behavioral.c
+    tests/test_context_ext.c
     tests/test_episodic.c
     tests/test_reflection.c
     tests/test_input_guard.c
@@ -1586,9 +1592,11 @@ set(HU_TEST_SOURCES
     tests/test_rel_dynamics.c
     tests/test_conv_goals.c
     tests/test_knowledge.c
+    tests/test_cognitive.c
     tests/test_compression.c
     tests/test_proactive_ext.c
     tests/test_degradation.c
+    tests/test_memory_degradation.c
     tests/test_self_awareness.c
     tests/test_superhuman.c
     tests/test_tool_router.c
@@ -1597,7 +1605,9 @@ set(HU_TEST_SOURCES
     tests/test_bth_e2e.c
     tests/test_style_tracker.c
     tests/test_theory_of_mind.c
+    tests/test_anticipatory.c
     tests/test_visual_content.c
+    tests/test_opinions.c
 )
 if(HU_ENABLE_PERSONA)
     list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c)

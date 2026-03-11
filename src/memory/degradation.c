@@ -73,15 +73,35 @@ bool hu_degradation_is_protected(const char *content, size_t content_len) {
             return true;
     }
 
-    /* Names: capitalized words NOT at sentence start (after ". " or start) */
+    static const char *skip_caps[] = {
+        "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+        "Saturday", "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
+        "The", "This", "That", "These", "Those", "There", "Then", "But",
+        "And", "For", "Not", "Yet", "So", "Or", "We", "He", "She", "It",
+    };
+    static const size_t skip_caps_count = sizeof(skip_caps) / sizeof(skip_caps[0]);
+
     bool at_sentence_start = true;
     for (size_t i = 0; i < content_len; i++) {
         if (isalpha((unsigned char)content[i]) && isupper((unsigned char)content[i])) {
-            if (!at_sentence_start)
-                return true;
+            size_t word_start = i;
             while (i < content_len && isalpha((unsigned char)content[i]))
                 i++;
-            if (i > 0 && i <= content_len && content[i - 1] == '.')
+            size_t word_len = i - word_start;
+            if (!at_sentence_start) {
+                bool is_common = false;
+                for (size_t s = 0; s < skip_caps_count; s++) {
+                    if (strlen(skip_caps[s]) == word_len &&
+                        strncmp(content + word_start, skip_caps[s], word_len) == 0) {
+                        is_common = true;
+                        break;
+                    }
+                }
+                if (!is_common)
+                    return true;
+            }
+            if (word_start + word_len > 0 && content[word_start + word_len - 1] == '.')
                 at_sentence_start = true;
             else
                 at_sentence_start = false;
@@ -299,17 +319,18 @@ char *hu_memory_degradation_apply(hu_allocator_t *alloc, const char *content, si
         return r;
     }
 
-    double roll = (double)(seed % 100) / 100.0;
-    double unchanged_thresh = 1.0 - (double)rate;
+    /* Integer arithmetic to avoid floating-point boundary issues */
+    int roll_pct = (int)(seed % 100);
+    int unchanged_pct = (int)((1.0 - (double)rate) * 100);
 
-    if (roll < unchanged_thresh) {
+    if (roll_pct < unchanged_pct) {
         char *r = hu_strndup(alloc, content, content_len);
         if (r)
             *out_len = content_len;
         return r;
     }
 
-    if (roll < 0.95) {
+    if (roll_pct < 95) {
         char *r = apply_fuzz(alloc, content, content_len, seed);
         if (r)
             *out_len = strlen(r);

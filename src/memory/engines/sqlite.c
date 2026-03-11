@@ -164,6 +164,13 @@ static const char *const schema_parts[] = {
     "set_at INTEGER,"
     "decayed_at INTEGER)",
     "CREATE INDEX IF NOT EXISTS idx_mood_log_set_at ON mood_log(set_at)",
+    "CREATE TABLE IF NOT EXISTS self_awareness_stats("
+    "contact_id TEXT PRIMARY KEY,"
+    "messages_sent_week INTEGER DEFAULT 0,"
+    "initiations_week INTEGER DEFAULT 0,"
+    "last_topic TEXT,"
+    "topic_repeat_count INTEGER DEFAULT 0,"
+    "updated_at INTEGER)",
     "CREATE TABLE IF NOT EXISTS reciprocity_scores("
     "contact_id TEXT NOT NULL,"
     "metric TEXT NOT NULL,"
