@@ -1,7 +1,7 @@
 ---
 title: "Project Human Fidelity — Master Design Document"
 created: 2026-03-10
-status: approved
+status: complete
 scope: iMessage channel, daemon, conversation intelligence, persona, TTS, AGI cognition, deep memory, external awareness, skill acquisition, authentic existence
 phases: 9
 features: 115
@@ -148,13 +148,13 @@ Same as F4 but for video attachments (`.mov`, `.mp4`, `.m4v`). Options:
 
 ### Pillar 3: Timing Patterns
 
-| #   | Feature                           | Status      | Complexity |
-| --- | --------------------------------- | ----------- | ---------- |
-| 8   | **Delayed follow-up engine**      | Implemented | High       |
-| 9   | **Double-text pattern**           | ⚠️ Partial  | Medium     |
-| 10  | **Missed-message acknowledgment** | Implemented | Low        |
-| 11  | **Natural conversation drop-off** | Implemented | Low        |
-| 12  | **Morning/evening bookends**      | ⚠️ Partial  | Medium     |
+| #   | Feature                           | Status         | Complexity |
+| --- | --------------------------------- | -------------- | ---------- |
+| 8   | **Delayed follow-up engine**      | Implemented    | High       |
+| 9   | **Double-text pattern**           | ✅ Implemented | Medium     |
+| 10  | **Missed-message acknowledgment** | Implemented    | Low        |
+| 11  | **Natural conversation drop-off** | Implemented    | Low        |
+| 12  | **Morning/evening bookends**      | ✅ Implemented | Medium     |
 
 **F8: Delayed Follow-Up Engine**
 After a conversation ends (no new messages for 15+ minutes), probabilistically schedule a follow-up:
@@ -527,9 +527,9 @@ Inject nonverbal cues into transcript before TTS:
 
 | #   | Feature                      | Complexity | Status            |
 | --- | ---------------------------- | ---------- | ----------------- |
-| 40  | **Inline replies**           | High       | ⚠️ Partial        |
+| 40  | **Inline replies**           | High       | ✅ Implemented    |
 | 41  | **Message editing**          | Medium     | 🚫 Not feasible   |
-| 42  | **Screen & bubble effects**  | Low        | ⚠️ Partial        |
+| 42  | **Screen & bubble effects**  | Low        | 🔧 Platform limit |
 | 43  | **Abandoned typing pattern** | Medium     | 🔧 Platform limit |
 | 44  | **Unsend**                   | Low        | 🔧 Platform limit |
 
@@ -649,7 +649,7 @@ Know when text isn't enough:
 | #   | Feature                         | Complexity | Status         |
 | --- | ------------------------------- | ---------- | -------------- |
 | 50  | **Calendar/schedule awareness** | High       | ✅ Implemented |
-| 51  | **Weather/location context**    | Medium     | ⚠️ Partial     |
+| 51  | **Weather/location context**    | Medium     | ✅ Implemented |
 | 52  | **Sports/current events**       | Medium     | ✅ Implemented |
 | 53  | **Birthday/holiday awareness**  | Medium     | ✅ Implemented |
 | 54  | **Time zone awareness**         | Low        | ✅ Implemented |
