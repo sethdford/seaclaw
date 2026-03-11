@@ -211,6 +211,25 @@ hu_error_t hu_opinions_get_superseded(hu_allocator_t *alloc, hu_memory_t *memory
     return opinions_query(alloc, memory, topic, topic_len, true, out, out_count);
 }
 
+void hu_opinions_free(hu_allocator_t *alloc, hu_opinion_t *ops, size_t count) {
+    if (!alloc || !ops)
+        return;
+    for (size_t i = 0; i < count; i++) {
+        if (ops[i].topic)
+            hu_str_free(alloc, ops[i].topic);
+        if (ops[i].position)
+            hu_str_free(alloc, ops[i].position);
+    }
+    alloc->free(alloc->ctx, ops, count * sizeof(hu_opinion_t));
+}
+
+#endif /* HU_ENABLE_SQLITE */
+
+#include <ctype.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+
 bool hu_opinions_is_core_value(const char *topic, size_t topic_len,
                                const char *const *core_values, size_t count) {
     if (!topic || !core_values || count == 0)
@@ -234,17 +253,3 @@ bool hu_opinions_is_core_value(const char *topic, size_t topic_len,
     }
     return false;
 }
-
-void hu_opinions_free(hu_allocator_t *alloc, hu_opinion_t *ops, size_t count) {
-    if (!alloc || !ops)
-        return;
-    for (size_t i = 0; i < count; i++) {
-        if (ops[i].topic)
-            hu_str_free(alloc, ops[i].topic);
-        if (ops[i].position)
-            hu_str_free(alloc, ops[i].position);
-    }
-    alloc->free(alloc->ctx, ops, count * sizeof(hu_opinion_t));
-}
-
-#endif /* HU_ENABLE_SQLITE */
