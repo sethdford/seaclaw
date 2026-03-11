@@ -2,6 +2,7 @@
 #include "human/core/error.h"
 #include "human/core/string.h"
 #include "human/intelligence/reflection.h"
+#include "human/feeds/processor.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -551,6 +552,18 @@ hu_error_t hu_reflection_daily(hu_reflection_engine_t *engine, int64_t now_ts) {
     }
 
     sqlite3_finalize(stmt);
+
+    /* P8 (F82): Load recent feed items as additional context for pattern extraction.
+     * Feed items in the same DB can surface new patterns (shared articles, music, etc.)
+     * that complement behavioral feedback signals. */
+    {
+        hu_feed_item_stored_t *feed_items = NULL;
+        size_t feed_count = 0;
+        hu_error_t ferr = hu_feed_processor_get_recent(engine->alloc, engine->db,
+                                                       NULL, 0, 10, &feed_items, &feed_count);
+        if (ferr == HU_OK && feed_items && feed_count > 0)
+            hu_feed_items_free(engine->alloc, feed_items, feed_count);
+    }
 
     char val_buf[32];
     int val_n = snprintf(val_buf, sizeof(val_buf), "%lld", (long long)now_ts);

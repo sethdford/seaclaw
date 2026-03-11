@@ -1883,6 +1883,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     }
 #endif
 
+#ifdef HU_ENABLE_SKILLS
+    /* P8: Pre-load skill cache at startup */
+    if (agent && agent->memory) {
+        sqlite3 *skill_init_db = hu_sqlite_memory_get_db(agent->memory);
+        if (skill_init_db) {
+            hu_skill_t *preloaded = NULL;
+            size_t preloaded_count = 0;
+            if (hu_skill_load_active(alloc, skill_init_db, NULL, 0, &preloaded,
+                                      &preloaded_count) == HU_OK && preloaded) {
+                fprintf(stderr, "[human] pre-loaded %zu active skills\n", preloaded_count);
+                hu_skill_free(alloc, preloaded, preloaded_count);
+            }
+        }
+    }
+#endif
+
     while (!HU_STOP_FLAG) {
 #ifdef HU_HAS_CRON
         {
@@ -1982,6 +1998,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 /* Decay is applied on read via exponential formula; no separate
                                  * batch call needed — hu_emotional_residue_get_active already
                                  * applies intensity * exp(-decay_rate * days) on every retrieval. */
+
+                                /* P8: Refresh skill cache after reflection (new skills may exist) */
+                                {
+                                    hu_skill_t *refreshed = NULL;
+                                    size_t ref_count = 0;
+                                    if (hu_skill_load_active(alloc, refl_db, NULL, 0, &refreshed,
+                                                              &ref_count) == HU_OK && refreshed)
+                                        hu_skill_free(alloc, refreshed, ref_count);
+                                }
                             }
                         }
                         if (lt_refl->tm_hour == 5)
@@ -3738,11 +3763,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             }
                                         }
                                     }
-                                    /* Record attempt */
+                                    /* Record attempt and update success rate */
                                     int64_t attempt_id = 0;
                                     hu_skill_record_attempt(skill_db, matched[si].id,
                                         batch_key, key_len, (int64_t)time(NULL),
                                         NULL, 0, NULL, 0, NULL, 0, &attempt_id);
+                                    (void)hu_skill_update_success_rate(skill_db,
+                                        matched[si].id, 1, 0);
                                     if (agent->bth_metrics)
                                         agent->bth_metrics->skills_applied++;
                                 }
@@ -6313,10 +6340,26 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (err == HU_OK && response && response_len > 0 && agent->memory &&
                     batch_key && key_len > 0) {
                     sqlite3 *fb_db = hu_sqlite_memory_get_db(agent->memory);
-                    if (fb_db)
+                    if (fb_db) {
+                        bool fb_emoji = false, fb_laugh = false;
+                        if (combined && combined_len > 0) {
+                            for (size_t fi = 0; fi < combined_len; fi++) {
+                                unsigned char fc = (unsigned char)combined[fi];
+                                if (fc >= 0xF0) { fb_emoji = true; break; }
+                            }
+                            static const char *const laugh_words[] = {"lol", "haha", "lmao", "rofl", NULL};
+                            for (const char *const *lw = laugh_words; *lw; lw++) {
+                                if (memmem(combined, combined_len, *lw, strlen(*lw)))
+                                    { fb_laugh = true; break; }
+                            }
+                        }
+                        hu_feedback_class_t fb_class = hu_feedback_classify(
+                            0, combined_len, fb_emoji, false, false, fb_laugh, false, false);
+                        const char *fb_sig = hu_feedback_class_str(fb_class);
                         hu_feedback_record(fb_db, "response_style", 14, batch_key, key_len,
-                                           "generated", 9, response, response_len,
+                                           fb_sig, strlen(fb_sig), response, response_len,
                                            (int64_t)time(NULL));
+                    }
                 }
 #endif
 #endif
