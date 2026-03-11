@@ -219,6 +219,58 @@ static const char *const schema_parts[] = {
     "last_mentioned INTEGER,"
     "notes TEXT,"
     "PRIMARY KEY (contact_id, person_name))",
+    "CREATE TABLE IF NOT EXISTS episodes("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "contact_id TEXT NOT NULL,"
+    "summary TEXT NOT NULL,"
+    "emotional_arc TEXT,"
+    "key_moments TEXT,"
+    "impact_score REAL DEFAULT 0.5,"
+    "salience_score REAL DEFAULT 0.5,"
+    "last_reinforced_at INTEGER,"
+    "source TEXT DEFAULT 'conversation',"
+    "created_at INTEGER NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS idx_episodes_contact ON episodes(contact_id)",
+    "CREATE INDEX IF NOT EXISTS idx_episodes_created ON episodes(created_at)",
+    "CREATE TABLE IF NOT EXISTS prospective_memories("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "trigger_type TEXT NOT NULL,"
+    "trigger_value TEXT NOT NULL,"
+    "action TEXT NOT NULL,"
+    "contact_id TEXT,"
+    "expires_at INTEGER,"
+    "fired INTEGER DEFAULT 0,"
+    "created_at INTEGER NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS idx_prospective_trigger ON prospective_memories(trigger_type, trigger_value)",
+    "CREATE INDEX IF NOT EXISTS idx_prospective_expires ON prospective_memories(expires_at)",
+    "CREATE TABLE IF NOT EXISTS emotional_residue("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "episode_id INTEGER,"
+    "contact_id TEXT NOT NULL,"
+    "valence REAL NOT NULL,"
+    "intensity REAL NOT NULL,"
+    "decay_rate REAL DEFAULT 0.1,"
+    "created_at INTEGER NOT NULL,"
+    "FOREIGN KEY (episode_id) REFERENCES episodes(id))",
+    "CREATE INDEX IF NOT EXISTS idx_emotional_residue_contact ON emotional_residue(contact_id)",
+    "CREATE TABLE IF NOT EXISTS feed_items("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "source TEXT NOT NULL,"
+    "contact_id TEXT,"
+    "content_type TEXT NOT NULL,"
+    "content TEXT NOT NULL,"
+    "url TEXT,"
+    "ingested_at INTEGER NOT NULL,"
+    "referenced INTEGER DEFAULT 0)",
+    "CREATE INDEX IF NOT EXISTS idx_feed_items_source ON feed_items(source)",
+    "CREATE INDEX IF NOT EXISTS idx_feed_items_contact ON feed_items(contact_id)",
+    "CREATE INDEX IF NOT EXISTS idx_feed_items_ingested ON feed_items(ingested_at)",
+    "CREATE TABLE IF NOT EXISTS oauth_tokens("
+    "provider TEXT PRIMARY KEY,"
+    "access_token TEXT NOT NULL,"
+    "refresh_token TEXT,"
+    "expires_at INTEGER,"
+    "scope TEXT)",
     NULL};
 
 static void get_timestamp(char *buf, size_t buf_size) {

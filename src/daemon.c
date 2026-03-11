@@ -62,6 +62,12 @@
 #include "human/context/humor.h"
 #include "human/memory/degradation.h"
 #include "human/context/protective.h"
+#include "human/context/authentic.h"
+#include "human/context/intelligence.h"
+#include "human/context/rel_dynamics.h"
+#include "human/context/behavioral.h"
+#include "human/agent/collab_planning.h"
+#include "human/persona/training.h"
 #endif
 #ifdef HU_HAS_CRON
 #include "human/cron.h"
@@ -3267,6 +3273,83 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 #endif
+
+                    /* 9. Authentic existence (F103-F115) */
+                    {
+                        uint32_t auth_seed = (uint32_t)((uint64_t)time(NULL) ^ (uintptr_t)batch_key);
+                        hu_authentic_config_t auth_cfg = {
+                            .narration_probability = 0.10,
+                            .embodiment_probability = 0.08,
+                            .imperfection_probability = 0.05,
+                            .complaining_probability = 0.07,
+                            .gossip_probability = 0.04,
+                            .random_thought_probability = 0.06,
+                            .medium_awareness_probability = 0.05,
+                            .resistance_probability = 0.03,
+                            .existential_probability = 0.02,
+                            .contradiction_probability = 0.03,
+                            .guilt_probability = 0.04,
+                            .life_thread_probability = 0.05,
+                            .bad_day_active = false,
+                            .bad_day_duration_hours = 8,
+                        };
+                        hu_authentic_behavior_t behavior =
+                            hu_authentic_select(&auth_cfg, 0.5, false, auth_seed);
+                        if (behavior != HU_AUTH_NONE) {
+                            size_t auth_len = 0;
+                            char *auth_dir = NULL;
+                            hu_authentic_build_directive(alloc, behavior, NULL, 0,
+                                                        &auth_dir, &auth_len);
+                            if (auth_dir && auth_len > 0)
+                                PHASE6_APPEND(auth_dir, auth_len);
+                            else if (auth_dir)
+                                alloc->free(alloc->ctx, auth_dir, auth_len + 1);
+                        }
+                    }
+
+                    /* 10. Cognitive load (F102) */
+                    {
+                        double load = hu_cognitive_compute_load(
+                            ctx_count > 0 ? (uint32_t)ctx_count : 1, 1, false);
+                        if (load > 0.5) {
+                            hu_cognitive_state_t cog_state = {
+                                .active_conversations = ctx_count > 0 ? (uint32_t)ctx_count : 1,
+                                .messages_this_hour = 1,
+                                .complex_topic_active = false,
+                                .load_score = load,
+                            };
+                            size_t cog_len = 0;
+                            char *cog_dir = NULL;
+                            hu_cognitive_build_directive(alloc, &cog_state, &cog_dir, &cog_len);
+                            if (cog_dir && cog_len > 0)
+                                PHASE6_APPEND(cog_dir, cog_len);
+                            else if (cog_dir)
+                                alloc->free(alloc->ctx, cog_dir, cog_len + 1);
+                        }
+                    }
+
+                    /* 11. Relationship dynamics velocity (F138-F140) */
+                    {
+                        hu_rel_velocity_t rel_vel = {0};
+                        rel_vel.contact_id = batch_key;
+                        rel_vel.contact_id_len = key_len;
+                        hu_rel_velocity_compute(&rel_vel);
+                        if (rel_vel.velocity > 0.0 || rel_vel.velocity < 0.0) {
+                            hu_drift_signal_t drift = {0};
+                            drift.contact_id = batch_key;
+                            drift.contact_id_len = key_len;
+                            drift.current_velocity = rel_vel.velocity;
+                            hu_repair_state_t repair = {0};
+                            char *rel_dir = NULL;
+                            size_t rel_len = 0;
+                            hu_rel_dynamics_build_prompt(
+                                alloc, &rel_vel, &drift, &repair, &rel_dir, &rel_len);
+                            if (rel_dir && rel_len > 0)
+                                PHASE6_APPEND(rel_dir, rel_len);
+                            else if (rel_dir)
+                                alloc->free(alloc->ctx, rel_dir, rel_len + 1);
+                        }
+                    }
 
 #undef PHASE6_APPEND
                 }
