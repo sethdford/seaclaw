@@ -76,7 +76,9 @@
 #include "human/memory/degradation.h"
 #include "human/context/protective.h"
 #include "human/context/authentic.h"
+#ifdef HU_ENABLE_AUTHENTIC
 #include "human/context/cognitive_load.h"
+#endif
 #include "human/context/intelligence.h"
 #include "human/context/rel_dynamics.h"
 #include "human/context/behavioral.h"
@@ -3562,6 +3564,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     /* Phase 9 (F102-F115): Authentic existence context injection */
                     {
                         time_t t_p9 = time(NULL);
+#ifdef HU_ENABLE_AUTHENTIC
                         /* F102: Cognitive load */
                         hu_cognitive_load_config_t cog_cfg = {
                             .peak_hour_start = 9, .peak_hour_end = 12,
@@ -3572,6 +3575,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         hu_cognitive_load_state_t cog =
                             hu_cognitive_load_calculate(&cog_cfg, 0, t_p9);
                         const char *cog_hint = hu_cognitive_load_prompt_hint(&cog);
+#else
+                        const char *cog_hint = NULL;
+#endif
 
                         /* F104: Physical state */
                         hu_physical_config_t phys_cfg = {
@@ -3586,8 +3592,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         const char *phys_hint = hu_physical_state_prompt_hint(phys);
 
                         if (cog_hint) {
+#ifdef HU_ENABLE_AUTHENTIC
                             fprintf(stderr, "[human] Phase 9: cognitive hint: capacity=%.2f\n",
                                     cog.capacity);
+#endif
                             size_t ch_len = strlen(cog_hint);
                             char *ch_copy = (char *)alloc->alloc(alloc->ctx, ch_len + 1);
                             if (ch_copy) {
