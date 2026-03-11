@@ -1,7 +1,7 @@
 ---
 title: "Human Fidelity Phase 5 — Voice Messages via Cartesia"
 created: 2026-03-10
-status: draft
+status: partial
 scope: TTS, iMessage, daemon, persona, conversation intelligence
 phase: 5
 features: [F34, F35, F36, F37, F38, F39]
@@ -87,7 +87,7 @@ end tell
 | `src/channels/imessage.c`    | `imessage_send` — media array with local paths          |
 | `src/daemon.c`               | Message processing loop, send call                      |
 | `src/context/conversation.c` | Emotion detection, energy classifiers                   |
-| `include/human/persona.h`  | Persona struct, contact profiles                        |
+| `include/human/persona.h`    | Persona struct, contact profiles                        |
 | `src/persona/persona.c`      | JSON parsing                                            |
 
 ### API Key Resolution
@@ -676,7 +676,7 @@ Recommended sequence:
 | Check          | Command / Action                                                                                                           |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | Build          | `cmake -B build -DHU_ENABLE_CARTESIA=ON -DHU_ENABLE_CURL=ON -DHU_ENABLE_ALL_CHANNELS=ON && cmake --build build -j$(nproc)` |
-| Tests          | `./build/human_tests` — 0 failures, 0 ASan errors                                                                        |
+| Tests          | `./build/human_tests` — 0 failures, 0 ASan errors                                                                          |
 | Voice TTS      | Manual: synthesize "Hello" → MP3 bytes                                                                                     |
 | Audio pipeline | Manual: MP3 → CAF → send via iMessage                                                                                      |
 | Voice decision | Unit tests for classifier                                                                                                  |

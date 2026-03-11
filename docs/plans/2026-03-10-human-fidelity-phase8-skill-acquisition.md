@@ -1,7 +1,7 @@
 ---
 title: "Human Fidelity Phase 8 — Skill Acquisition & Continuous Learning"
 created: 2026-03-10
-status: draft
+status: implemented
 scope: skills, reflection, feedback, continuous learning, meta-learning, daemon scheduling
 phase: 8
 features:
@@ -40,20 +40,20 @@ Phase 8 of the Human Fidelity project. Implements the self-programming layer whe
 
 ## File Map
 
-| File                                        | Responsibility                                                                                                      |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `src/memory/engines/sqlite.c`               | Schema (skills, skill_attempts, skill_evolution, behavioral_feedback, self_evaluations, general_lessons), migration |
-| `src/intelligence/skills.c`                 | F94–F101 skill lifecycle (CRUD, apply, evolve, retire, chain, meta)                                                 |
+| File                                      | Responsibility                                                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `src/memory/engines/sqlite.c`             | Schema (skills, skill_attempts, skill_evolution, behavioral_feedback, self_evaluations, general_lessons), migration |
+| `src/intelligence/skills.c`               | F94–F101 skill lifecycle (CRUD, apply, evolve, retire, chain, meta)                                                 |
 | `include/human/intelligence/skills.h`     | API, structs                                                                                                        |
-| `src/intelligence/reflection.c`             | F77–F82 daily/weekly/monthly reflection, LLM synthesis                                                              |
+| `src/intelligence/reflection.c`           | F77–F82 daily/weekly/monthly reflection, LLM synthesis                                                              |
 | `include/human/intelligence/reflection.h` | API                                                                                                                 |
-| `src/intelligence/feedback.c`               | F78–F79 feedback signal detection, heuristic-based                                                                  |
+| `src/intelligence/feedback.c`             | F78–F79 feedback signal detection, heuristic-based                                                                  |
 | `include/human/intelligence/feedback.h`   | API                                                                                                                 |
-| `src/daemon.c`                              | Reflection schedule, skill loading at start                                                                         |
-| `src/agent/agent_turn.c`                    | Skill trigger matching, strategy injection                                                                          |
-| `tests/test_skills.c`                       | Skill lifecycle tests                                                                                               |
-| `tests/test_reflection.c`                   | Reflection schedule, LLM mock tests                                                                                 |
-| `tests/test_feedback.c`                     | Feedback signal detection tests                                                                                     |
+| `src/daemon.c`                            | Reflection schedule, skill loading at start                                                                         |
+| `src/agent/agent_turn.c`                  | Skill trigger matching, strategy injection                                                                          |
+| `tests/test_skills.c`                     | Skill lifecycle tests                                                                                               |
+| `tests/test_reflection.c`                 | Reflection schedule, LLM mock tests                                                                                 |
+| `tests/test_feedback.c`                   | Feedback signal detection tests                                                                                     |
 
 ---
 

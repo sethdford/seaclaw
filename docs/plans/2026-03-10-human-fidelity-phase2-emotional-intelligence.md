@@ -1,7 +1,7 @@
 ---
 title: "Human Fidelity Phase 2 — Emotional Intelligence"
 created: 2026-03-10
-status: draft
+status: implemented
 scope: conversation intelligence, daemon, memory, persona
 phase: 2
 features: [F13, F14, F16, F17, F25, F27, F29, F33, F45, F46]
@@ -22,12 +22,12 @@ Phase 2 of the Human Fidelity project. Makes human detect, respond to, and match
 
 ### Key Files
 
-| File                                     | Purpose                                                                     |
-| ---------------------------------------- | --------------------------------------------------------------------------- |
-| `src/context/conversation.c`             | Conversation classifiers, awareness builder (~2000 lines)                   |
+| File                                   | Purpose                                                                     |
+| -------------------------------------- | --------------------------------------------------------------------------- |
+| `src/context/conversation.c`           | Conversation classifiers, awareness builder (~2000 lines)                   |
 | `include/human/context/conversation.h` | Conversation API declarations                                               |
-| `src/daemon.c`                           | Main service loop (~4000 lines), orchestrates awareness + emotion injection |
-| `src/memory/engines/sqlite.c`            | SQLite memory backend, schema initialization                                |
+| `src/daemon.c`                         | Main service loop (~4000 lines), orchestrates awareness + emotion injection |
+| `src/memory/engines/sqlite.c`          | SQLite memory backend, schema initialization                                |
 | `include/human/persona.h`              | Persona struct, contact profiles                                            |
 
 ### Existing Infrastructure
@@ -706,7 +706,7 @@ CREATE TABLE IF NOT EXISTS comfort_patterns (
 | Check   | Command                                                                                                                              |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Build   | `cmake -B build -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_SQLITE=ON -DHU_ENABLE_PERSONA=ON && cmake --build build -j$(nproc)`          |
-| Tests   | `./build/human_tests`                                                                                                              |
+| Tests   | `./build/human_tests`                                                                                                                |
 | ASan    | 0 errors in test output                                                                                                              |
 | Release | `cmake -B build-release -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON && cmake --build build-release` |
 

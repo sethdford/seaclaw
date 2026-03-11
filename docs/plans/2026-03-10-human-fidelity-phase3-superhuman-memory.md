@@ -1,7 +1,7 @@
 ---
 title: "Human Fidelity Phase 3 — Superhuman Memory & Intelligence"
 created: 2026-03-10
-status: draft
+status: implemented
 scope: memory, daemon, proactive, persona, conversation
 phase: 3
 features: [F18, F19, F20, F21, F22, F23, F24, F26, F30, F31, F50, F53]
@@ -37,18 +37,18 @@ Phase 3 of the Human Fidelity project. Implements BTH (Better Than Human) memory
 
 ## File Map
 
-| File                                  | Responsibility                                                  |
-| ------------------------------------- | --------------------------------------------------------------- |
-| `src/memory/engines/sqlite.c`         | Schema (new tables), migration on open                          |
-| `src/memory/superhuman.c`             | All `hu_superhuman_*` functions                                 |
-| `include/human/memory/superhuman.h` | API declarations, structs                                       |
-| `src/agent/proactive.c`               | New action types, calendar/birthday/inside-joke/callback checks |
-| `src/daemon.c`                        | Proactive cycle: call superhuman queries, merge context         |
-| `src/agent/agent_turn.c`              | Inject micro-moment, inside-joke, pattern, callback context     |
-| `src/persona/persona.c`               | Parse `important_dates`, `context_awareness`                    |
-| `include/human/persona.h`           | `hu_important_date_t`, `hu_context_awareness_t`                 |
-| `scripts/calendar_query.applescript`  | macOS Calendar AppleScript (optional)                           |
-| `tests/test_superhuman.c`             | Unit tests for storage, retrieval, edge cases                   |
+| File                                 | Responsibility                                                  |
+| ------------------------------------ | --------------------------------------------------------------- |
+| `src/memory/engines/sqlite.c`        | Schema (new tables), migration on open                          |
+| `src/memory/superhuman.c`            | All `hu_superhuman_*` functions                                 |
+| `include/human/memory/superhuman.h`  | API declarations, structs                                       |
+| `src/agent/proactive.c`              | New action types, calendar/birthday/inside-joke/callback checks |
+| `src/daemon.c`                       | Proactive cycle: call superhuman queries, merge context         |
+| `src/agent/agent_turn.c`             | Inject micro-moment, inside-joke, pattern, callback context     |
+| `src/persona/persona.c`              | Parse `important_dates`, `context_awareness`                    |
+| `include/human/persona.h`            | `hu_important_date_t`, `hu_context_awareness_t`                 |
+| `scripts/calendar_query.applescript` | macOS Calendar AppleScript (optional)                           |
+| `tests/test_superhuman.c`            | Unit tests for storage, retrieval, edge cases                   |
 
 ---
 
@@ -967,7 +967,7 @@ Before considering Phase 3 complete:
 | Check       | Command / Action                                                                                     |
 | ----------- | ---------------------------------------------------------------------------------------------------- |
 | Build       | `cmake -B build -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_SQLITE=ON && cmake --build build -j$(nproc)` |
-| Tests       | `./build/human_tests` — 0 failures, 0 ASan errors                                                  |
+| Tests       | `./build/human_tests` — 0 failures, 0 ASan errors                                                    |
 | Inside joke | Store → list → proactive action                                                                      |
 | Commitment  | Store with deadline → list_due → follow-up → mark_sent                                               |
 | Temporal    | Record → get_quiet_hours                                                                             |

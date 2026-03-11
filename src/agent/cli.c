@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #if defined(HU_GATEWAY_POSIX) && !defined(HU_IS_TEST)
 #include <poll.h>
@@ -129,13 +130,15 @@ hu_error_t hu_agent_cli_parse_args(const char *const *argv, size_t argc,
 
 /* ── Streaming token callback ────────────────────────────────────────── */
 static volatile sig_atomic_t cli_stream_started = 0;
+static int g_cli_use_ansi = 0;
 
 static void cli_stream_token(const char *delta, size_t len, void *ctx) {
     (void)ctx;
     if (delta && len > 0) {
         if (!cli_stream_started) {
             cli_stream_started = 1;
-            printf(HU_ANSI_SHOW_CURSOR HU_ANSI_CLEAR_LINE);
+            if (g_cli_use_ansi)
+                printf(HU_ANSI_SHOW_CURSOR HU_ANSI_CLEAR_LINE);
         }
         fwrite(delta, 1, len, stdout);
         fflush(stdout);
@@ -171,13 +174,15 @@ static int get_terminal_width(void) {
     return 80;
 }
 
-static void run_spinner_loop(agent_turn_ctx_t *tctx) {
+static void run_spinner_loop(agent_turn_ctx_t *tctx, int use_ansi) {
     int frame = 0;
-    printf(HU_ANSI_HIDE_CURSOR);
-    fflush(stdout);
+    if (use_ansi) {
+        printf(HU_ANSI_HIDE_CURSOR);
+        fflush(stdout);
+    }
 
     while (!tctx->done && !g_cancel) {
-        if (!cli_stream_started) {
+        if (use_ansi && !cli_stream_started) {
             int width = get_terminal_width();
             const char *label = " Thinking...";
             printf(HU_ANSI_CLEAR_LINE HU_COLOR_ACCENT "%s" HU_COLOR_RESET HU_COLOR_DIM
@@ -192,12 +197,14 @@ static void run_spinner_loop(agent_turn_ctx_t *tctx) {
         poll(&pfd, 1, 80);
     }
 
-    if (!cli_stream_started) {
-        printf(HU_ANSI_CLEAR_LINE HU_ANSI_SHOW_CURSOR);
-        fflush(stdout);
-    } else {
-        printf(HU_ANSI_SHOW_CURSOR);
-        fflush(stdout);
+    if (use_ansi) {
+        if (!cli_stream_started) {
+            printf(HU_ANSI_CLEAR_LINE HU_ANSI_SHOW_CURSOR);
+            fflush(stdout);
+        } else {
+            printf(HU_ANSI_SHOW_CURSOR);
+            fflush(stdout);
+        }
     }
 }
 #endif /* HU_CLI_ASYNC */
@@ -549,9 +556,14 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     signal(SIGPIPE, SIG_IGN);
 #endif
 
-    print_banner(prov_name, model, tools_count);
+    int single_message_mode = (parsed_args.message && parsed_args.message[0]);
+    int use_ansi = isatty(STDOUT_FILENO) && !single_message_mode;
+    g_cli_use_ansi = use_ansi;
 
-    int one_shot = (parsed_args.message && parsed_args.message[0]);
+    if (!single_message_mode)
+        print_banner(prov_name, model, tools_count);
+
+    int one_shot = single_message_mode;
     while (1) {
         char *line = NULL;
         size_t line_len = 0;
@@ -603,18 +615,24 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             continue;
         }
 
-        run_spinner_loop(&tctx);
+        run_spinner_loop(&tctx, use_ansi);
 
         if (g_cancel && !tctx.done) {
-            printf(HU_ANSI_CLEAR_LINE HU_ANSI_SHOW_CURSOR HU_COLOR_WARNING
-                   "Cancelled." HU_COLOR_RESET "\n");
+            if (use_ansi)
+                printf(HU_ANSI_CLEAR_LINE HU_ANSI_SHOW_CURSOR HU_COLOR_WARNING
+                       "Cancelled." HU_COLOR_RESET "\n");
+            else
+                printf("Cancelled.\n");
         }
 
         pthread_join(tid, NULL);
         err = tctx.err;
 
         if (err == HU_ERR_CANCELLED) {
-            printf(HU_COLOR_DIM "Turn cancelled by user." HU_COLOR_RESET "\n");
+            if (use_ansi)
+                printf(HU_COLOR_DIM "Turn cancelled by user." HU_COLOR_RESET "\n");
+            else
+                printf("Turn cancelled by user.\n");
         } else if (err != HU_OK) {
             fprintf(stderr, "[error] %s\n", hu_error_string(err));
         } else if (tctx.response && tctx.response_len > 0) {
@@ -630,11 +648,12 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         size_t response_len = 0;
         agent.active_channel = "cli";
         agent.active_channel_len = 3;
-        printf("Thinking...\r");
+        if (use_ansi)
+            printf("Thinking...\r");
         fflush(stdout);
         err = hu_agent_turn_stream(&agent, line, line_len, cli_stream_token, NULL, &response,
                                    &response_len);
-        if (!cli_stream_started) {
+        if (use_ansi && !cli_stream_started) {
             printf("                    \r");
             fflush(stdout);
         }
@@ -655,7 +674,8 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             break;
     }
 
-    printf("\n" HU_COLOR_DIM "Goodbye." HU_COLOR_RESET "\n");
+    if (!single_message_mode)
+        printf("\n" HU_COLOR_DIM "Goodbye." HU_COLOR_RESET "\n");
     g_active_agent = NULL;
     sigaction(SIGINT, &old_sa, NULL);
     hu_agent_deinit(&agent);

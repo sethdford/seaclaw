@@ -1,7 +1,7 @@
 ---
 title: "Human Fidelity Phase 1 — Foundation: Fix & Wire"
 created: 2026-03-10
-status: draft
+status: implemented
 scope: iMessage channel, daemon, conversation intelligence
 phase: 1
 features: [F1, F2, F4, F5, F6, F7, F10, F11, F15, F40, F41, F42, F43, F44]
@@ -607,7 +607,7 @@ Before considering Phase 1 complete:
 | Check          | Command / Action                                                                                     |
 | -------------- | ---------------------------------------------------------------------------------------------------- |
 | Build          | `cmake -B build -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_SQLITE=ON && cmake --build build -j$(nproc)` |
-| Tests          | `./build/human_tests` — 0 failures, 0 ASan errors                                                  |
+| Tests          | `./build/human_tests` — 0 failures, 0 ASan errors                                                    |
 | Tapback        | Manual: send "lol", verify tapback on correct message                                                |
 | Vision         | Manual: send photo, verify description in response                                                   |
 | Length         | "k" → short reply                                                                                    |

@@ -1,7 +1,7 @@
 ---
 title: "Human Fidelity Phase 4 — Behavioral Polish & Context"
 created: 2026-03-10
-status: draft
+status: implemented
 scope: daemon, conversation intelligence, proactive, memory, persona, iMessage
 phase: 4
 features: [F8, F9, F12, F28, F32, F47, F48, F49, F51, F52, F54, F55, F56, F57]
@@ -886,7 +886,7 @@ Recommended sequence (dependencies first):
 | Check             | Command / Action                                                                                                                                |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Build             | `cmake -B build -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_SQLITE=ON -DHU_ENABLE_PERSONA=ON -DHU_ENABLE_CURL=ON && cmake --build build -j$(nproc)` |
-| Tests             | `./build/human_tests` — 0 failures, 0 ASan errors                                                                                             |
+| Tests             | `./build/human_tests` — 0 failures, 0 ASan errors                                                                                               |
 | Release           | `cmake -B build-release -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON && cmake --build build-release`            |
 | F48 Investigation | `docs/investigations/meme-image-sharing-feasibility.md` exists                                                                                  |
 

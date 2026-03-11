@@ -26,7 +26,7 @@ Key extension points:
 - `src/peripherals/` (`hu_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **715 source + header files, ~139K lines of C, ~60K lines of tests, 3,849 tests, 34 channels**.
+Current scale: **715 source + header files, ~139K lines of C, ~60K lines of tests, 4,661 tests, 34 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -74,7 +74,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `HU_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 3,849+ tests must pass at zero ASan errors**
+5. **All 4,661+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `HU_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -156,7 +156,7 @@ src/
 
 include/human/       public C headers
 
-tests/                 128 test files, 3,849+ tests
+tests/                 131 test files, 4,661+ tests
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 
@@ -276,11 +276,11 @@ git config core.hooksPath .githooks
 
 Hooks:
 
-| Hook         | What it does                                                                                    |
-| ------------ | ----------------------------------------------------------------------------------------------- |
-| `pre-commit` | Runs format checks — blocks commit if code is not formatted                                     |
-| `commit-msg` | Enforces conventional commit format (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`, etc.)  |
-| `pre-push`   | Runs `cmake --build build-check && ./build-check/human_tests` — blocks push if any test fails |
+| Hook         | What it does                                                                                   |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `pre-commit` | Runs format checks — blocks commit if code is not formatted                                    |
+| `commit-msg` | Enforces conventional commit format (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`, etc.) |
+| `pre-push`   | Runs `cmake --build build-check && ./build-check/human_tests` — blocks push if any test fails  |
 
 To bypass a hook in an emergency: `git commit --no-verify` / `git push --no-verify`.
 
@@ -334,7 +334,7 @@ The design system is grounded in SOTA references from industry leaders.
 The Human design system synthesizes principles from these authoritative sources.
 Agents **must** consult the relevant reference docs before creating or modifying any UI:
 
-| Source                         | What We Take                                                           | Human Doc                      |
+| Source                         | What We Take                                                           | Human Doc                        |
 | ------------------------------ | ---------------------------------------------------------------------- | -------------------------------- |
 | **Apple HIG**                  | Spring-first motion, clarity/deference/depth, spatial hierarchy        | `docs/motion-design.md`          |
 | **Material Design 3**          | Canonical layouts, easing taxonomy, elevation, dynamic color           | `docs/ux-patterns.md`            |

@@ -543,24 +543,20 @@ Reply to a specific earlier message in the thread:
 - Fallback: if AppleScript reply not possible, prepend `"Re: [quoted text]"` to response
 - Decision classifier: when is inline reply appropriate vs regular message?
 
-**F41: Message Editing**
-Use iOS 16+ message editing instead of `*correction` pattern:
+**F41: Message Editing** 🔧 Platform limitation
+~~Use iOS 16+ message editing instead of `*correction` pattern.~~
 
+- **Status**: Not possible. AppleScript/JXA has no API for editing sent messages. `IMDMessageStore` is a private framework that requires SIP disable.
+- **Mitigation**: Using `*correction` text pattern (e.g., `*you're`) which is the standard human convention.
 - When: typo detected in sent message (within 15 minutes)
-- How: AppleScript or iMessage API to edit sent message
-- Limitation: may not be possible via AppleScript — investigate `NSAppleScript` or `IMDMessageStore` private framework
-- Fallback: keep current `*correction` pattern
-- If editing IS possible: disable typo correction messages, use edit instead
+- Fallback (active): keep current `*correction` pattern
 
-**F42: Screen & Bubble Effects**
-Send messages with iMessage effects:
+**F42: Screen & Bubble Effects** 🔧 Platform limitation
+~~Send messages with iMessage effects.~~
 
-- `"Happy birthday!"` + confetti effect
-- `"Congratulations!"` + balloons
-- `"haha"` + laugh screen effect
-- How: iMessage effects can be triggered by specific keywords or via the invisible-ink/effect API
-- Implementation: append effect trigger to AppleScript or use URL scheme
-- Decision: per-contact `effects_enabled` flag (some people hate them)
+- **Status**: Not possible. iMessage effects (confetti, balloons, slam, etc.) require the Messages.app UI or private `IMDMessageStore` framework. No AppleScript/JXA API exists.
+- **Mitigation**: Natural keyword triggers ("Happy birthday!") may cause the recipient's Messages.app to auto-display effects on their end, which is sufficient.
+- Decision: no explicit effect sending needed — rely on keyword-triggered effects
 
 ```json
 "message_effects": {

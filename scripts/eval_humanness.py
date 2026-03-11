@@ -114,31 +114,14 @@ def get_hu_response(message):
     try:
         result = subprocess.run(
             [HU_BIN, "agent", "-m", message],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, timeout=30,
+            env={**__import__('os').environ, "PATH": __import__('os').path.expanduser("~/bin") + ":" + __import__('os').environ.get("PATH", "")}
         )
-        output = result.stdout
-        lines = output.strip().split("\n")
-        response_lines = []
-        skip_header = True
-        for line in lines:
-            stripped = line.strip()
-            if skip_header:
-                if stripped.startswith("Human") or stripped.startswith("Provider:") or \
-                   stripped.startswith("Type your") or "Thinking..." in stripped or \
-                   stripped == "" or stripped == "Goodbye." or \
-                   "\x1b" in line and not response_lines:
-                    continue
-                skip_header = False
-            if stripped == "Goodbye." or stripped == "":
-                continue
-            clean = stripped
-            while "\x1b[" in clean:
-                start = clean.index("\x1b[")
-                end = clean.index("m", start) + 1 if "m" in clean[start:] else start + 1
-                clean = clean[:start] + clean[end:]
-            if clean.strip():
-                response_lines.append(clean.strip())
-        return " ".join(response_lines) if response_lines else "(empty response)"
+        import re
+        output = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', result.stdout)
+        output = re.sub(r'\x1b\[\?25[hl]', '', output)
+        lines = [l.strip() for l in output.strip().split("\n") if l.strip() and l.strip() != "Goodbye."]
+        return " ".join(lines) if lines else "(empty response)"
     except subprocess.TimeoutExpired:
         return "(timeout)"
     except Exception as e:
