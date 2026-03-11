@@ -379,7 +379,7 @@ void hu_visual_should_share(const hu_visual_entry_t *entry, const char *context,
         rel = entry->relevance;
     }
     *confidence = rel;
-    *should_share = (rel >= 0.5);
+    *should_share = (rel >= 0.3);
 }
 
 void hu_visual_entries_free(hu_allocator_t *alloc, hu_visual_entry_t *entries,
