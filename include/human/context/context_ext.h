@@ -62,6 +62,14 @@ hu_error_t hu_events_build_prompt(hu_allocator_t *alloc, const hu_current_event_
                                  size_t count, char **out, size_t *out_len);
 void hu_current_event_deinit(hu_allocator_t *alloc, hu_current_event_t *e);
 
+/* Fetch current events for given topics via RSS.
+ * HU_IS_TEST: returns mock events without network.
+ * Caller must free each event with hu_current_event_deinit. */
+hu_error_t hu_current_events_fetch(hu_allocator_t *alloc, const char *const *topics,
+                                   size_t topic_count, hu_current_event_t **out,
+                                   size_t *out_count);
+void hu_current_events_free(hu_allocator_t *alloc, hu_current_event_t *events, size_t count);
+
 /* --- F55-F57: Group Chat --- */
 typedef struct hu_group_chat_state {
     uint32_t total_messages;     /* messages in last hour */

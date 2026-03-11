@@ -210,14 +210,41 @@ def main():
     eval_prompt = "".join(eval_prompt_parts)
 
     print(f"  Sending {len(eval_entries)} scenarios to evaluator...")
-    raw = call_gemini(eval_prompt, temperature=0.2)
-
-    if "```json" in raw:
-        raw = raw.split("```json")[1].split("```")[0].strip()
-    elif "```" in raw:
-        raw = raw.split("```")[1].split("```")[0].strip()
-
-    eval_result = json.loads(raw)
+    eval_result = None
+    try:
+        raw = call_gemini(eval_prompt, temperature=0.2)
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        eval_result = json.loads(raw)
+    except Exception as e:
+        print(f"  Gemini evaluator unavailable ({e}). Using local scoring fallback.")
+        eval_result = {"evaluations": []}
+        for entry in eval_entries:
+            scores = {}
+            best_label = None
+            best_score = -1
+            for label in ["X", "Y", "Z"]:
+                resp = entry["labeled_responses"][label]
+                resp_len = len(resp)
+                brevity = 10 if resp_len <= 30 else (8 if resp_len <= 50 else (5 if resp_len <= 100 else 2))
+                ai_count = sum(1 for p in [r"\bcertainly\b", r"\babsolutely\b", r"\bhowever\b", r"\bfurthermore\b"]
+                               if re.search(p, resp, re.IGNORECASE))
+                ai_tells = max(0, 10 - ai_count * 3)
+                human_count = sum(1 for p in [r"\blol\b", r"\btbh\b", r"\bidk\b", r"\bhru\b", r"\blyk\b", r"[😂🔥💀😭]"]
+                                  if re.search(p, resp, re.IGNORECASE))
+                personality = min(10, 5 + human_count * 2)
+                human_likeness = round((brevity + ai_tells + personality) / 3, 1)
+                scores[label] = {"human_likeness": human_likeness, "natural_brevity": brevity,
+                                 "personality": personality, "ai_tells": ai_tells}
+                if human_likeness > best_score:
+                    best_score = human_likeness
+                    best_label = label
+            eval_result["evaluations"].append({
+                "scenario": entry["index"] + 1, "scores": scores,
+                "guess_real_human": best_label, "reasoning": "local scoring"
+            })
 
     # Phase 5: Score and reveal
     print("\n" + "=" * 70)

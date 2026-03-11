@@ -309,6 +309,149 @@ void hu_current_event_deinit(hu_allocator_t *alloc, hu_current_event_t *e) {
     }
 }
 
+void hu_current_events_free(hu_allocator_t *alloc, hu_current_event_t *events, size_t count) {
+    if (!alloc || !events)
+        return;
+    for (size_t i = 0; i < count; i++)
+        hu_current_event_deinit(alloc, &events[i]);
+    alloc->free(alloc->ctx, events, count * sizeof(hu_current_event_t));
+}
+
+#ifdef HU_IS_TEST
+
+hu_error_t hu_current_events_fetch(hu_allocator_t *alloc, const char *const *topics,
+                                   size_t topic_count, hu_current_event_t **out,
+                                   size_t *out_count) {
+    if (!alloc || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+    if (!topics || topic_count == 0)
+        return HU_OK;
+
+    hu_current_event_t *events = (hu_current_event_t *)alloc->alloc(
+        alloc->ctx, sizeof(hu_current_event_t));
+    if (!events)
+        return HU_ERR_OUT_OF_MEMORY;
+    memset(events, 0, sizeof(hu_current_event_t));
+    events[0].topic = hu_strndup(alloc, topics[0], strlen(topics[0]));
+    events[0].topic_len = strlen(topics[0]);
+    events[0].summary = hu_strndup(alloc, "Mock event for testing", 22);
+    events[0].summary_len = 22;
+    events[0].source = hu_strndup(alloc, "test", 4);
+    events[0].source_len = 4;
+    events[0].published_at = 0;
+    events[0].relevance = 0.8;
+    if (!events[0].topic || !events[0].summary || !events[0].source) {
+        hu_current_events_free(alloc, events, 1);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    *out = events;
+    *out_count = 1;
+    return HU_OK;
+}
+
+#elif defined(HU_ENABLE_FEEDS)
+
+#include "human/feeds/news.h"
+
+static const char *topic_to_rss_url(const char *topic) {
+    if (!topic)
+        return NULL;
+    if (strcasecmp(topic, "tech") == 0 || strcasecmp(topic, "technology") == 0)
+        return "https://feeds.arstechnica.com/arstechnica/technology-lab";
+    if (strcasecmp(topic, "sports") == 0)
+        return "https://rss.nytimes.com/services/xml/rss/nyt/Sports.xml";
+    if (strcasecmp(topic, "science") == 0)
+        return "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml";
+    if (strcasecmp(topic, "business") == 0)
+        return "https://feeds.bbci.co.uk/news/business/rss.xml";
+    if (strcasecmp(topic, "world") == 0 || strcasecmp(topic, "news") == 0)
+        return "https://feeds.bbci.co.uk/news/world/rss.xml";
+    return NULL;
+}
+
+hu_error_t hu_current_events_fetch(hu_allocator_t *alloc, const char *const *topics,
+                                   size_t topic_count, hu_current_event_t **out,
+                                   size_t *out_count) {
+    if (!alloc || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+    if (!topics || topic_count == 0)
+        return HU_OK;
+
+    size_t cap = topic_count * 3;
+    if (cap > 20) cap = 20;
+    hu_current_event_t *events = (hu_current_event_t *)alloc->alloc(
+        alloc->ctx, cap * sizeof(hu_current_event_t));
+    if (!events)
+        return HU_ERR_OUT_OF_MEMORY;
+    memset(events, 0, cap * sizeof(hu_current_event_t));
+    size_t count = 0;
+
+    for (size_t t = 0; t < topic_count && count < cap; t++) {
+        const char *url = topic_to_rss_url(topics[t]);
+        if (!url)
+            continue;
+        hu_rss_article_t articles[5];
+        size_t article_count = 0;
+        if (hu_news_fetch_rss(alloc, url, strlen(url), articles, 5, &article_count) != HU_OK)
+            continue;
+        for (size_t a = 0; a < article_count && count < cap; a++) {
+            hu_current_event_t *ev = &events[count];
+            ev->topic = hu_strndup(alloc, topics[t], strlen(topics[t]));
+            ev->topic_len = strlen(topics[t]);
+            size_t dlen = strlen(articles[a].description);
+            if (dlen > 200) dlen = 200;
+            ev->summary = hu_strndup(alloc, articles[a].description, dlen);
+            ev->summary_len = dlen;
+            size_t tlen = strlen(articles[a].title);
+            ev->source = hu_strndup(alloc, articles[a].title, tlen);
+            ev->source_len = tlen;
+            ev->published_at = articles[a].pub_date > 0
+                                   ? (uint64_t)articles[a].pub_date
+                                   : 0;
+            ev->relevance = 0.5;
+            if (!ev->topic || !ev->summary || !ev->source) {
+                hu_current_events_free(alloc, events, count);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            count++;
+        }
+    }
+
+    if (count == 0) {
+        alloc->free(alloc->ctx, events, cap * sizeof(hu_current_event_t));
+        return HU_OK;
+    }
+    if (count < cap) {
+        hu_current_event_t *shrunk = (hu_current_event_t *)alloc->realloc(
+            alloc->ctx, events, cap * sizeof(hu_current_event_t),
+            count * sizeof(hu_current_event_t));
+        if (shrunk)
+            events = shrunk;
+    }
+    *out = events;
+    *out_count = count;
+    return HU_OK;
+}
+
+#else
+
+hu_error_t hu_current_events_fetch(hu_allocator_t *alloc, const char *const *topics,
+                                   size_t topic_count, hu_current_event_t **out,
+                                   size_t *out_count) {
+    (void)alloc;
+    (void)topics;
+    (void)topic_count;
+    if (out) *out = NULL;
+    if (out_count) *out_count = 0;
+    return HU_ERR_NOT_SUPPORTED;
+}
+
+#endif
+
 /* --- F55-F57: Group Chat --- */
 /* LCG: state = (a * state + c) mod m. glibc-style constants. */
 static uint32_t lcg_next(uint32_t *state) {
