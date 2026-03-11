@@ -106,3 +106,7 @@ firebase-debug.log
 human_test_output.txt
 human_test_stderr.txt
 eval_results.json
+
+# Training data and model weights
+data/imessage/
+*.safetensors
