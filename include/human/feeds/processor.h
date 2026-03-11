@@ -96,6 +96,13 @@ hu_error_t hu_feed_processor_get_for_contact(hu_allocator_t *alloc, sqlite3 *db,
 void hu_feed_items_free(hu_allocator_t *alloc, hu_feed_item_stored_t *items,
                         size_t count);
 
+/* Poll all enabled feeds that are due. Stores new items via hu_feed_processor_store_item.
+ * last_poll_ms is array of HU_FEED_COUNT timestamps; updated on successful poll. */
+hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
+                                  const hu_feed_config_t *config,
+                                  uint64_t *last_poll_ms, uint64_t now_ms,
+                                  size_t *items_ingested);
+
 #endif /* HU_ENABLE_SQLITE */
 
 #endif

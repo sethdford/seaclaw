@@ -1,4 +1,7 @@
 #include "human/feeds/processor.h"
+#ifdef HU_ENABLE_FEEDS
+#include "human/feeds/news.h"
+#endif
 #include "human/core/string.h"
 #include <ctype.h>
 #include <stdio.h>
@@ -564,6 +567,48 @@ void hu_feed_items_free(hu_allocator_t *alloc, hu_feed_item_stored_t *items,
     (void)count;
     if (alloc && items)
         alloc->free(alloc->ctx, items, count * sizeof(hu_feed_item_stored_t));
+}
+
+hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
+                                  const hu_feed_config_t *config,
+                                  uint64_t *last_poll_ms, uint64_t now_ms,
+                                  size_t *items_ingested) {
+    if (!proc || !config || !last_poll_ms || !items_ingested)
+        return HU_ERR_INVALID_ARGUMENT;
+    *items_ingested = 0;
+
+    for (int i = 0; i < HU_FEED_COUNT; i++) {
+        hu_feed_type_t type = (hu_feed_type_t)i;
+        if (!hu_feeds_should_poll(type, config, last_poll_ms[i], now_ms))
+            continue;
+
+        /* Mark as polled regardless of fetch outcome to avoid tight retry loops */
+        last_poll_ms[i] = now_ms;
+
+        /* For news RSS, use the existing news fetch path if available */
+        if (type == HU_FEED_NEWS_RSS) {
+#ifdef HU_ENABLE_FEEDS
+            hu_rss_article_t articles[10];
+            size_t article_count = 0;
+            static const char default_feed[] = "https://feeds.bbci.co.uk/news/world/rss.xml";
+            if (hu_news_fetch_rss(proc->alloc, default_feed, sizeof(default_feed) - 1,
+                                  articles, 10, &article_count) == HU_OK) {
+                for (size_t a = 0; a < article_count; a++) {
+                    hu_feed_item_stored_t item = {0};
+                    snprintf(item.source, sizeof(item.source), "rss");
+                    snprintf(item.content_type, sizeof(item.content_type), "article");
+                    snprintf(item.content, sizeof(item.content), "%s", articles[a].title);
+                    item.content_len = strlen(item.content);
+                    snprintf(item.url, sizeof(item.url), "%s", articles[a].link);
+                    item.ingested_at = (int64_t)(now_ms / 1000);
+                    (void)hu_feed_processor_store_item(proc, &item);
+                    (*items_ingested)++;
+                }
+            }
+#endif
+        }
+    }
+    return HU_OK;
 }
 
 #endif /* HU_ENABLE_SQLITE */

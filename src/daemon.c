@@ -1964,6 +1964,24 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 reflection_done_today = true;
                                 if (agent->bth_metrics)
                                     agent->bth_metrics->reflections_daily++;
+
+                                /* P7: Nightly consolidation after daily reflection */
+                                static int64_t last_consol_nightly = 0;
+                                static int64_t last_consol_weekly = 0;
+                                static int64_t last_consol_monthly = 0;
+                                hu_consolidation_engine_t consol = {.alloc = alloc, .db = refl_db};
+                                (void)hu_consolidation_engine_run_scheduled(
+                                    &consol, (int64_t)t, last_consol_nightly,
+                                    last_consol_weekly, last_consol_monthly);
+                                last_consol_nightly = (int64_t)t;
+
+                                /* P7: Forgetting curve batch decay */
+                                (void)hu_forgetting_apply_batch_decay(refl_db, (int64_t)t, 0.1);
+
+                                /* P7: Emotional residue decay (reduce intensity of old entries) */
+                                /* Decay is applied on read via exponential formula; no separate
+                                 * batch call needed — hu_emotional_residue_get_active already
+                                 * applies intensity * exp(-decay_rate * days) on every retrieval. */
                             }
                         }
                         if (lt_refl->tm_hour == 5)
@@ -1998,6 +2016,30 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                         if (lt_refl->tm_mday == 2)
                             reflection_done_month = false;
+                    }
+                }
+#endif
+#ifdef HU_ENABLE_SQLITE
+                /* P7: Feed processor poll — every 6 hours */
+                {
+                    static uint64_t last_feed_poll_types[HU_FEED_COUNT] = {0};
+                    static uint64_t last_feed_poll_global = 0;
+                    uint64_t fp_now = (uint64_t)t * 1000ULL;
+                    if (agent && agent->memory &&
+                        (last_feed_poll_global == 0 || (fp_now - last_feed_poll_global) >= 21600000ULL)) {
+                        sqlite3 *fdb = hu_sqlite_memory_get_db(agent->memory);
+                        if (fdb) {
+                            hu_feed_processor_t fp = {.alloc = alloc, .db = fdb};
+                            hu_feed_config_t fconf;
+                            memset(&fconf, 0, sizeof(fconf));
+                            fconf.enabled[HU_FEED_NEWS_RSS] = true;
+                            fconf.poll_interval_minutes[HU_FEED_NEWS_RSS] = 360;
+                            fconf.max_items_per_poll = 10;
+                            size_t ingested = 0;
+                            (void)hu_feed_processor_poll(&fp, &fconf, last_feed_poll_types,
+                                                         fp_now, &ingested);
+                            last_feed_poll_global = fp_now;
+                        }
                     }
                 }
 #endif
@@ -3547,6 +3589,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             PHASE6_APPEND(ep_str, ep_pos);
                                         }
                                     }
+                                    /* P7: Reinforce referenced episodes */
+                                    for (size_t ei = 0; ei < ep_count; ei++)
+                                        (void)hu_episode_reinforce(db, episodes[ei].id, (int64_t)time(NULL));
                                     hu_episode_free(alloc, episodes, ep_count);
                                 }
                             }
