@@ -1,8 +1,14 @@
 #include "human/core/allocator.h"
 #include "human/core/string.h"
+#include "human/memory.h"
 #include "human/visual/content.h"
 #include "test_framework.h"
 #include <string.h>
+#include <time.h>
+
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+#endif
 
 static void test_visual_create_table_sql_valid(void) {
     char buf[1024];
@@ -223,6 +229,111 @@ static void test_visual_candidate_deinit_frees(void) {
     HU_ASSERT_NULL(c.sharing_context);
 }
 
+static void test_visual_should_share_high_relevance(void) {
+    hu_visual_entry_t entry = {
+        .rowid = 1,
+        .path = "/photos/sunset.jpg",
+        .description = "sunset at the beach",
+        .tags = "vacation, ocean",
+        .timestamp_ms = 1000,
+        .relevance = 0.9,
+    };
+    bool should_share = false;
+    double confidence = 0.0;
+    /* Context overlaps strongly: sunset+beach in description, vacation in tags */
+    const char *context = "sunset beach vacation";
+    hu_visual_should_share(&entry, context, 20, &should_share, &confidence);
+    HU_ASSERT_TRUE(should_share);
+    HU_ASSERT_TRUE(confidence >= 0.5);
+}
+
+static void test_visual_should_share_low_relevance(void) {
+    hu_visual_entry_t entry = {
+        .rowid = 1,
+        .path = "/photos/recipe.png",
+        .description = "chocolate cake recipe",
+        .tags = "food, baking",
+        .timestamp_ms = 1000,
+        .relevance = 0.1,
+    };
+    bool should_share = false;
+    double confidence = 0.0;
+    const char *context = "hiking trails and mountains";
+    hu_visual_should_share(&entry, context, 27, &should_share, &confidence);
+    HU_ASSERT_FALSE(should_share);
+    HU_ASSERT_TRUE(confidence < 0.5);
+}
+
+#ifdef HU_ENABLE_SQLITE
+static void test_visual_scan_recent_empty_returns_zero(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+
+    char create_sql[1024];
+    size_t sql_len = 0;
+    HU_ASSERT_EQ(hu_visual_create_table_sql(create_sql, sizeof(create_sql), &sql_len), HU_OK);
+    char *errmsg = NULL;
+    int rc = sqlite3_exec(db, create_sql, NULL, NULL, &errmsg);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    if (errmsg)
+        sqlite3_free(errmsg);
+
+    hu_visual_entry_t *entries = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_visual_scan_recent(&alloc, db, 0, &entries, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+    HU_ASSERT_NULL(entries);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_visual_match_for_contact_no_match(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+
+    char create_sql[1024];
+    size_t sql_len = 0;
+    HU_ASSERT_EQ(hu_visual_create_table_sql(create_sql, sizeof(create_sql), &sql_len), HU_OK);
+    char *errmsg = NULL;
+    int rc = sqlite3_exec(db, create_sql, NULL, NULL, &errmsg);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    if (errmsg)
+        sqlite3_free(errmsg);
+
+    uint64_t now_ms = (uint64_t)time(NULL) * 1000ULL;
+    uint64_t one_day_ms = 24ULL * 60ULL * 60ULL * 1000ULL;
+    uint64_t recent_ms = (now_ms > one_day_ms) ? (now_ms - one_day_ms) : 1;
+    char ins_buf[512];
+    int n = snprintf(ins_buf, sizeof(ins_buf),
+                     "INSERT INTO visual_content (source, path, description, tags, captured_at, indexed_at) "
+                     "VALUES ('camera', '/sunset.jpg', 'sunset at the lake', 'nature', %llu, %llu)",
+                     (unsigned long long)recent_ms, (unsigned long long)recent_ms);
+    HU_ASSERT_TRUE(n > 0 && (size_t)n < sizeof(ins_buf));
+    rc = sqlite3_exec(db, ins_buf, NULL, NULL, &errmsg);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    if (errmsg)
+        sqlite3_free(errmsg);
+
+    hu_visual_entry_t *entries = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_visual_match_for_contact(&alloc, db, "contact_a", 9,
+                                                 "hiking trails and mountains", 27,
+                                                 &entries, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+    HU_ASSERT_NULL(entries);
+
+    mem.vtable->deinit(mem.ctx);
+}
+#endif
+
 void run_visual_content_tests(void) {
     HU_TEST_SUITE("visual_content");
     HU_RUN_TEST(test_visual_create_table_sql_valid);
@@ -243,4 +354,10 @@ void run_visual_content_tests(void) {
     HU_RUN_TEST(test_visual_build_prompt_empty);
     HU_RUN_TEST(test_visual_type_str_all_types);
     HU_RUN_TEST(test_visual_candidate_deinit_frees);
+    HU_RUN_TEST(test_visual_should_share_high_relevance);
+    HU_RUN_TEST(test_visual_should_share_low_relevance);
+#ifdef HU_ENABLE_SQLITE
+    HU_RUN_TEST(test_visual_scan_recent_empty_returns_zero);
+    HU_RUN_TEST(test_visual_match_for_contact_no_match);
+#endif
 }

@@ -5,6 +5,11 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
+
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+#endif
 
 #define HU_VISUAL_ESCAPE_BUF 1024
 #define HU_VISUAL_SQL_BUF 4096
@@ -348,3 +353,220 @@ void hu_visual_candidate_deinit(hu_allocator_t *alloc, hu_visual_candidate_t *c)
         c->sharing_context_len = 0;
     }
 }
+
+void hu_visual_should_share(const hu_visual_entry_t *entry, const char *context,
+                            size_t context_len, bool *should_share, double *confidence) {
+    if (!entry || !should_share || !confidence) {
+        if (should_share)
+            *should_share = false;
+        if (confidence)
+            *confidence = 0.0;
+        return;
+    }
+    double rel = 0.0;
+    if (context && context_len > 0) {
+        rel = hu_visual_score_relevance(entry->description,
+                                         (size_t)strnlen(entry->description, sizeof(entry->description)),
+                                         context, context_len);
+        if (entry->tags[0] != '\0') {
+            double tag_rel = hu_visual_score_relevance(entry->tags,
+                                                       (size_t)strnlen(entry->tags, sizeof(entry->tags)),
+                                                       context, context_len);
+            if (tag_rel > rel)
+                rel = tag_rel;
+        }
+    } else {
+        rel = entry->relevance;
+    }
+    *confidence = rel;
+    *should_share = (rel >= 0.5);
+}
+
+void hu_visual_entries_free(hu_allocator_t *alloc, hu_visual_entry_t *entries,
+                            size_t count) {
+    if (!alloc || !entries)
+        return;
+    alloc->free(alloc->ctx, entries, count * sizeof(hu_visual_entry_t));
+}
+
+#ifdef HU_ENABLE_SQLITE
+static void copy_str_to_field(char *dst, size_t cap, const char *src, size_t src_len) {
+    if (!src || src_len == 0) {
+        dst[0] = '\0';
+        return;
+    }
+    size_t copy_len = src_len;
+    if (copy_len >= cap)
+        copy_len = cap - 1;
+    memcpy(dst, src, copy_len);
+    dst[copy_len] = '\0';
+}
+
+hu_error_t hu_visual_scan_recent(hu_allocator_t *alloc, sqlite3 *db, uint64_t since_ms,
+                                 hu_visual_entry_t **out, size_t *out_count) {
+    if (!alloc || !db || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *out = NULL;
+    *out_count = 0;
+
+    static const char sql[] =
+        "SELECT id, path, description, tags, captured_at FROM visual_content "
+        "WHERE captured_at > ? ORDER BY captured_at DESC LIMIT 50";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_IO;
+
+    sqlite3_bind_int64(stmt, 1, (int64_t)since_ms);
+
+    hu_visual_entry_t *entries = NULL;
+    size_t count = 0;
+    size_t cap = 0;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (count >= cap) {
+            size_t new_cap = cap == 0 ? 8 : cap * 2;
+            hu_visual_entry_t *tmp =
+                (hu_visual_entry_t *)alloc->alloc(alloc->ctx, new_cap * sizeof(hu_visual_entry_t));
+            if (!tmp) {
+                if (entries)
+                    alloc->free(alloc->ctx, entries, cap * sizeof(hu_visual_entry_t));
+                sqlite3_finalize(stmt);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            if (entries) {
+                memcpy(tmp, entries, count * sizeof(hu_visual_entry_t));
+                alloc->free(alloc->ctx, entries, cap * sizeof(hu_visual_entry_t));
+            }
+            entries = tmp;
+            cap = new_cap;
+        }
+        hu_visual_entry_t *e = &entries[count];
+        memset(e, 0, sizeof(*e));
+
+        e->rowid = sqlite3_column_int64(stmt, 0);
+        const char *p = (const char *)sqlite3_column_text(stmt, 1);
+        size_t pl = p ? (size_t)sqlite3_column_bytes(stmt, 1) : 0;
+        copy_str_to_field(e->path, sizeof(e->path), p, pl);
+
+        p = (const char *)sqlite3_column_text(stmt, 2);
+        pl = p ? (size_t)sqlite3_column_bytes(stmt, 2) : 0;
+        copy_str_to_field(e->description, sizeof(e->description), p, pl);
+
+        p = (const char *)sqlite3_column_text(stmt, 3);
+        pl = p ? (size_t)sqlite3_column_bytes(stmt, 3) : 0;
+        copy_str_to_field(e->tags, sizeof(e->tags), p, pl);
+
+        e->timestamp_ms = (uint64_t)sqlite3_column_int64(stmt, 4);
+        e->relevance = 1.0; /* recency-only; no topic scoring in scan */
+        count++;
+    }
+    sqlite3_finalize(stmt);
+
+    *out = entries;
+    *out_count = count;
+    return HU_OK;
+}
+
+hu_error_t hu_visual_match_for_contact(hu_allocator_t *alloc, sqlite3 *db,
+                                      const char *contact_id, size_t contact_id_len,
+                                      const char *context, size_t context_len,
+                                      hu_visual_entry_t **out, size_t *out_count) {
+    (void)contact_id;
+    (void)contact_id_len;
+    if (!alloc || !db || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *out = NULL;
+    *out_count = 0;
+
+    /* Fetch recent entries (last 7 days). Time window: 7 * 24 * 60 * 60 * 1000 ms */
+    uint64_t seven_days_ms = 7ULL * 24ULL * 60ULL * 60ULL * 1000ULL;
+    uint64_t since_ms = 0;
+    if (context && context_len > 0) {
+        /* Use a fixed recent window; in production could use conversation timestamp */
+        uint64_t now_ms = (uint64_t)time(NULL) * 1000ULL;
+        if (now_ms > seven_days_ms)
+            since_ms = now_ms - seven_days_ms;
+    }
+
+    hu_visual_entry_t *candidates = NULL;
+    size_t cand_count = 0;
+    hu_error_t err = hu_visual_scan_recent(alloc, db, since_ms, &candidates, &cand_count);
+    if (err != HU_OK || cand_count == 0) {
+        if (candidates)
+            hu_visual_entries_free(alloc, candidates, cand_count);
+        return HU_OK;
+    }
+
+    if (!context || context_len == 0) {
+        *out = candidates;
+        *out_count = cand_count;
+        return HU_OK;
+    }
+
+    /* Score each by relevance to context (description + tags) */
+    hu_visual_entry_t *matched = NULL;
+    size_t cap = 0;
+    size_t n = 0;
+
+    for (size_t i = 0; i < cand_count; i++) {
+        hu_visual_entry_t *e = &candidates[i];
+        double desc_rel = hu_visual_score_relevance(
+            e->description, (size_t)strnlen(e->description, sizeof(e->description)),
+            context, context_len);
+        double tag_rel = 0.0;
+        if (e->tags[0] != '\0') {
+            tag_rel = hu_visual_score_relevance(
+                e->tags, (size_t)strnlen(e->tags, sizeof(e->tags)),
+                context, context_len);
+        }
+        double rel = (desc_rel > tag_rel) ? desc_rel : tag_rel;
+        if (rel < 0.1)
+            continue;
+
+        e->relevance = rel;
+        if (n >= cap) {
+            size_t new_cap = cap == 0 ? 4 : cap * 2;
+            hu_visual_entry_t *tmp =
+                (hu_visual_entry_t *)alloc->alloc(alloc->ctx, new_cap * sizeof(hu_visual_entry_t));
+            if (!tmp) {
+                hu_visual_entries_free(alloc, candidates, cand_count);
+                if (matched)
+                    hu_visual_entries_free(alloc, matched, cap);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            if (matched) {
+                memcpy(tmp, matched, n * sizeof(hu_visual_entry_t));
+                alloc->free(alloc->ctx, matched, cap * sizeof(hu_visual_entry_t));
+            }
+            matched = tmp;
+            cap = new_cap;
+        }
+        matched[n++] = *e;
+    }
+
+    hu_visual_entries_free(alloc, candidates, cand_count);
+
+    if (n == 0) {
+        *out = NULL;
+        *out_count = 0;
+        return HU_OK;
+    }
+
+    /* Sort by relevance descending */
+    for (size_t i = 0; i + 1 < n; i++) {
+        for (size_t j = i + 1; j < n; j++) {
+            if (matched[j].relevance > matched[i].relevance) {
+                hu_visual_entry_t tmp = matched[i];
+                matched[i] = matched[j];
+                matched[j] = tmp;
+            }
+        }
+    }
+
+    *out = matched;
+    *out_count = n;
+    return HU_OK;
+}
+#endif /* HU_ENABLE_SQLITE */

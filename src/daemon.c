@@ -783,6 +783,23 @@ static char *proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *age
 #endif
     }
 
+    /* F51: Weather awareness — inject notable weather for proactive context */
+    char *weather_ctx = NULL;
+    size_t weather_ctx_len = 0;
+    if (agent && agent->persona && agent->persona->context_awareness.weather_enabled) {
+        hu_weather_state_t ws = {0};
+        if (ws.condition && ws.is_notable) {
+            char *wdir = NULL;
+            size_t wdir_len = 0;
+            if (hu_weather_build_directive(alloc, &ws, &wdir, &wdir_len) == HU_OK &&
+                wdir && wdir_len > 0) {
+                weather_ctx = wdir;
+                weather_ctx_len = wdir_len;
+            } else if (wdir)
+                alloc->free(alloc->ctx, wdir, wdir_len + 1);
+        }
+    }
+
     static const char HU_DEFAULT_PROACTIVE_RULES[] =
         "\nRules: "
         "1. One short natural message (not 'hey how are you' — too generic). "
@@ -809,6 +826,8 @@ static char *proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *age
         total += 2 + starter_len; /* "\n\n" + starter */
     if (mem_ctx && mem_ctx_len > 0)
         total += 2 + mem_ctx_len; /* "\n\n" + mem_ctx */
+    if (weather_ctx && weather_ctx_len > 0)
+        total += 2 + weather_ctx_len; /* "\n\n" + weather */
     if (calendar_ctx && calendar_ctx_len > 0)
         total += 2 + calendar_ctx_len; /* "\n\n" + calendar_ctx */
 
@@ -818,6 +837,8 @@ static char *proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *age
             alloc->free(alloc->ctx, starter, starter_len + 1);
         if (mem_ctx)
             alloc->free(alloc->ctx, mem_ctx, mem_ctx_len + 1);
+        if (weather_ctx)
+            alloc->free(alloc->ctx, weather_ctx, weather_ctx_len + 1);
         if (calendar_ctx)
             alloc->free(alloc->ctx, calendar_ctx, calendar_ctx_len + 1);
         *out_len = 0;
@@ -841,6 +862,13 @@ static char *proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *age
         memcpy(result + pos, mem_ctx, mem_ctx_len);
         pos += mem_ctx_len;
         alloc->free(alloc->ctx, mem_ctx, mem_ctx_len + 1);
+    }
+    if (weather_ctx && weather_ctx_len > 0) {
+        result[pos++] = '\n';
+        result[pos++] = '\n';
+        memcpy(result + pos, weather_ctx, weather_ctx_len);
+        pos += weather_ctx_len;
+        alloc->free(alloc->ctx, weather_ctx, weather_ctx_len + 1);
     }
     if (calendar_ctx && calendar_ctx_len > 0) {
         result[pos++] = '\n';
@@ -1245,6 +1273,33 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 }
             }
 
+            /* F12: Bookend messages — morning/evening greetings for close contacts */
+            char *bookend_ctx = NULL;
+            size_t bookend_ctx_len = 0;
+            if (!had_important_date && agent->persona) {
+                bool contact_is_close = (cp->dunbar_layer && atoi(cp->dunbar_layer) <= 2);
+                bool bookend_sent_today = false;
+                for (int di = 0; di < g_sent_important_date_count; di++) {
+                    if (strcmp(g_sent_important_date_contacts[di], cp->contact_id) == 0) {
+                        bookend_sent_today = true;
+                        break;
+                    }
+                }
+                uint32_t seed = (uint32_t)((uint64_t)now ^ (uint64_t)(uintptr_t)cp);
+                hu_bookend_type_t btype = hu_bookend_check(
+                    (uint32_t)tm_now.tm_hour, contact_is_close, bookend_sent_today, seed);
+                if (btype != HU_BOOKEND_NONE) {
+                    char *bdir = NULL;
+                    size_t bdir_len = 0;
+                    if (hu_bookend_build_prompt(alloc, btype, &bdir, &bdir_len) == HU_OK &&
+                        bdir && bdir_len > 0) {
+                        bookend_ctx = bdir;
+                        bookend_ctx_len = bdir_len;
+                    } else if (bdir)
+                        alloc->free(alloc->ctx, bdir, bdir_len + 1);
+                }
+            }
+
             /* Build and send the check-in */
             size_t prompt_len = 0;
             char *prompt =
@@ -1262,6 +1317,21 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     prompt_len = merged_len - 1;
                 }
                 alloc->free(alloc->ctx, important_date_ctx, important_date_ctx_len + 1);
+            }
+            if (prompt && bookend_ctx && bookend_ctx_len > 0) {
+                size_t merged_len = prompt_len + 1 + bookend_ctx_len + 1;
+                char *merged = (char *)alloc->alloc(alloc->ctx, merged_len);
+                if (merged) {
+                    memcpy(merged, prompt, prompt_len);
+                    merged[prompt_len] = '\n';
+                    memcpy(merged + prompt_len + 1, bookend_ctx, bookend_ctx_len);
+                    merged[prompt_len + 1 + bookend_ctx_len] = '\0';
+                    alloc->free(alloc->ctx, prompt, prompt_len + 1);
+                    prompt = merged;
+                    prompt_len = prompt_len + 1 + bookend_ctx_len;
+                }
+                alloc->free(alloc->ctx, bookend_ctx, bookend_ctx_len + 1);
+                bookend_ctx = NULL;
             }
 #ifdef HU_ENABLE_SQLITE
             if (prompt && commitment_ctx && commitment_ctx_len > 0) {
@@ -3271,7 +3341,31 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 #endif
 
-                    /* 8. Humor (F69) — only when playful and not concerning */
+                    /* 8. Timezone awareness (F54) — inject local-time context */
+                    if (cp_p6 && agent->persona && agent->persona->timezone[0]) {
+                        const char *tzs = agent->persona->timezone;
+                        int tz_offset = 0;
+                        if (strncasecmp(tzs, "UTC", 3) == 0 || strncasecmp(tzs, "GMT", 3) == 0)
+                            tz_offset = atoi(tzs + 3);
+                        else if (tzs[0] == '+' || tzs[0] == '-')
+                            tz_offset = atoi(tzs);
+                        if (tz_offset != 0) {
+                            uint64_t utc_now_ms = (uint64_t)time(NULL) * 1000ULL;
+                            hu_timezone_info_t tz = hu_timezone_compute(tz_offset, utc_now_ms);
+                            const char *cname_tz = cp_p6->name ? cp_p6->name : batch_key;
+                            size_t cname_tz_len = cp_p6->name ? strlen(cp_p6->name) : key_len;
+                            size_t tz_len = 0;
+                            char *tz_dir = NULL;
+                            if (hu_timezone_build_directive(alloc, &tz, cname_tz, cname_tz_len,
+                                                           &tz_dir, &tz_len) == HU_OK &&
+                                tz_dir && tz_len > 0)
+                                PHASE6_APPEND(tz_dir, tz_len);
+                            else if (tz_dir)
+                                alloc->free(alloc->ctx, tz_dir, tz_len + 1);
+                        }
+                    }
+
+                    /* 9. Humor (F69) — only when playful and not concerning */
                     if (agent->persona->humor.type) {
                         hu_emotional_state_t emo_humor =
                             history_entries && history_count > 0

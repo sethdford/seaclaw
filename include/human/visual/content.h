@@ -35,6 +35,15 @@ typedef struct hu_visual_config {
     uint32_t link_frequency_per_week;     /* default 3 */
 } hu_visual_config_t;
 
+typedef struct hu_visual_entry {
+    int64_t rowid;
+    char path[512];
+    char description[256];
+    char tags[128];
+    uint64_t timestamp_ms;
+    double relevance;
+} hu_visual_entry_t;
+
 /* Build SQL to create the visual_content table */
 hu_error_t hu_visual_create_table_sql(char *buf, size_t cap, size_t *out_len);
 
@@ -83,5 +92,29 @@ hu_error_t hu_visual_build_prompt(hu_allocator_t *alloc,
 const char *hu_visual_type_str(hu_visual_type_t type);
 
 void hu_visual_candidate_deinit(hu_allocator_t *alloc, hu_visual_candidate_t *c);
+
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+
+/* Scan recent visual content (photos, screenshots) for sharing candidates.
+   Returns entries within time window, ordered by recency. Caller frees *out. */
+hu_error_t hu_visual_scan_recent(hu_allocator_t *alloc, sqlite3 *db, uint64_t since_ms,
+                                hu_visual_entry_t **out, size_t *out_count);
+
+/* Find visual content relevant to share with a contact given conversation context.
+   Matches by tags, keywords, or time proximity. Caller frees *out. */
+hu_error_t hu_visual_match_for_contact(hu_allocator_t *alloc, sqlite3 *db,
+                                      const char *contact_id, size_t contact_id_len,
+                                      const char *context, size_t context_len,
+                                      hu_visual_entry_t **out, size_t *out_count);
+#endif
+
+/* Decision: given a visual entry and conversation context, is sharing natural?
+   Returns should_share (bool) and confidence score (0.0-1.0). */
+void hu_visual_should_share(const hu_visual_entry_t *entry, const char *context,
+                             size_t context_len, bool *should_share, double *confidence);
+
+void hu_visual_entries_free(hu_allocator_t *alloc, hu_visual_entry_t *entries,
+                             size_t count);
 
 #endif

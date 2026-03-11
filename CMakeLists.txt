@@ -409,6 +409,7 @@ set(HU_CORE_SOURCES
     src/agent/pattern_radar.c
     src/agent/proactive.c
     src/agent/proactive_ext.c
+    src/agent/weather_awareness.c
     src/agent/timing.c
     src/agent/governor.c
     src/agent/arbitrator.c
@@ -1671,6 +1672,7 @@ set(HU_TEST_SOURCES
     tests/test_commitment.c
     tests/test_pattern_radar.c
     tests/test_proactive.c
+    tests/test_weather_awareness.c
     tests/test_timing.c
     tests/test_governor.c
     tests/test_arbitrator.c
