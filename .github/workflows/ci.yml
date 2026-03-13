@@ -497,6 +497,12 @@ jobs:
           if ! git diff --exit-code docs/icon-inventory.md docs/components.md 2>/dev/null; then
             echo "::warning::Generated docs are stale. Run 'cd ui && npm run docs' to update."
           fi
+      - name: Standards doc index check
+        run: scripts/check-doc-index.sh
+      - name: Standards drift check
+        run: scripts/check-standards-drift.sh
+      - name: Terminology compliance check
+        run: scripts/check-terminology.sh
 
   fuzz:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
