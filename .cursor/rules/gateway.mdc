@@ -7,7 +7,7 @@ globs:
 
 # Gateway Module (High Risk)
 
-The gateway handles external HTTP/WebSocket traffic. Read AGENTS.md sections 3.5 and 7.5 before any change.
+The gateway handles external HTTP/WebSocket traffic. Read `docs/standards/engineering/gateway-api.md` and AGENTS.md sections 3.5 and 7.5 before any change.
 
 ## Threat Model
 

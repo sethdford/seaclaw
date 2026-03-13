@@ -1,0 +1,35 @@
+---
+description: Cross-platform development standards for platform-specific code
+globs:
+  - "src/platform.c"
+  - "include/human/platform.h"
+  - "src/security/sandbox_*.c"
+  - "asm/**"
+---
+
+# Cross-Platform Standards
+
+Read `docs/standards/engineering/cross-platform.md` before writing platform-specific code.
+
+## Platform Guards
+
+```c
+#if defined(__APPLE__) && defined(__MACH__)   // macOS
+#elif defined(_WIN32) || defined(_WIN64)      // Windows
+#elif defined(__linux__)                       // Linux
+#endif
+```
+
+Build-system flags for optional subsystems:
+- `HU_GATEWAY_POSIX` -- fork/exec, signals, cron
+- `HU_BUILD_WASM` -- WASM/WASI target
+- `HU_ENABLE_CURL` -- libcurl HTTP client
+- `HU_ENABLE_SQLITE` -- SQLite memory backend
+
+## Rules
+
+- New platform code MUST go through `platform.h` abstractions when possible
+- Unsupported platforms return `HU_ERR_NOT_SUPPORTED` -- never silent no-ops
+- Never hardcode `/tmp`, `~`, or `/bin/sh` -- use `hu_platform_get_*()` wrappers
+- `HU_IS_TEST` bypasses side effects on ALL platforms
+- Tests must pass on both macOS and Linux

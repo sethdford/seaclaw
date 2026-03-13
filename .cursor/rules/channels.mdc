@@ -1,0 +1,48 @@
+---
+description: Channel implementation standards for the 34+ messaging transports
+globs:
+  - "src/channels/**"
+  - "include/human/channel.h"
+---
+
+# Channel Standards
+
+Read `docs/standards/quality/channel-testing.md` before adding or modifying channels.
+
+## Vtable Contract
+
+Every channel implements `hu_channel_vtable_t`:
+- Required: `start`, `stop`, `send`, `name`, `health_check`
+- Optional: `send_event`, `start_typing`, `stop_typing`, `load_conversation_history`, `get_response_constraints`, `react`
+
+## Create/Destroy Convention
+
+- Create: `hu_<name>_create(hu_allocator_t *alloc, ...) -> hu_channel_t*`
+- Destroy: `void hu_<name>_destroy(hu_channel_t *ch)` -- NULL-safe, frees ctx and all internals
+- Allocator stored in ctx, not passed to destroy
+
+## HU_IS_TEST Mocking
+
+All channels must support test isolation:
+
+```c
+#if HU_IS_TEST
+    char last_message[4096];
+    size_t last_message_len;
+#endif
+```
+
+In `send()`: store to mock buffer under `HU_IS_TEST`, skip real network.
+
+## Required Tests
+
+1. Factory creation with correct name
+2. `health_check` returns false without credentials
+3. `send()` works in test mode (mock buffer)
+4. `send()` rejects NULL target/message
+5. Start/stop cycle without crash or leak
+6. `destroy()` frees all resources (tracking allocator, zero leaks)
+
+## Terminology
+
+Use "channel" (not "platform" or "integration"). See `docs/standards/brand/terminology.md`.
