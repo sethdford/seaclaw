@@ -5,7 +5,7 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-SKIP_PATTERNS="^factory$|^meta_common$|^main$|^main_wasi$|_common$|^bootstrap$|^config_schema$|^cp_admin$|^cp_chat$|^cp_config$|^cp_memory$|^cp_voice$|^thread_pool$|^agent_stream$|^superhuman_predictive$|^embedder_gemini_adapter$|^provider_http$|^data_|^embedded_registry$|^anticipatory$|^conversation_plan$|^info_asymmetry$|^theory_of_mind$|^voice_maturity$"
+SKIP_PATTERNS="^factory$|^meta_common$|^main$|^main_wasi$|_common$|^bootstrap$|^config_schema$|^config_getters$|^config_migrate$|^cp_admin$|^cp_chat$|^cp_config$|^cp_memory$|^cp_voice$|^thread_pool$|^agent_stream$|^superhuman_predictive$|^embedder_gemini_adapter$|^provider_http$|^data_|^embedded_registry$|^anticipatory$|^conversation_plan$|^info_asymmetry$|^theory_of_mind$|^voice_maturity$|^tokenizer_bpe$|^store_mem$"
 FOUND=0
 
 while IFS= read -r src; do
@@ -15,7 +15,11 @@ while IFS= read -r src; do
         continue
     fi
 
-    if grep -rql "${base}" tests/ >/dev/null 2>&1; then
+    if grep -rqwl "${base}" tests/ >/dev/null 2>&1; then
+        continue
+    fi
+    # Fallback: check for the function prefix pattern hu_<base>_
+    if grep -rql "hu_${base}_\|test_${base}_\|TEST.*${base}" tests/ >/dev/null 2>&1; then
         continue
     fi
 

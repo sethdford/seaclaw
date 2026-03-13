@@ -30,6 +30,7 @@ option(HU_ENABLE_SKILLS "Build skill acquisition and continuous learning" OFF)
 option(HU_ENABLE_PERSONA "Enable persona system" ON)
 option(HU_ENABLE_AUTHENTIC "Build authentic existence features" OFF)
 option(HU_ENABLE_CARTESIA "Enable Cartesia TTS for voice messages" OFF)
+option(HU_ENABLE_ML "Build ML training subsystem (BPE tokenizer, dataloader, experiment loop)" OFF)
 
 # WASM build: cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..
 
@@ -772,7 +773,8 @@ if(HU_ENABLE_SOCIAL)
 endif()
 if(HU_ENABLE_FEEDS)
     list(APPEND HU_CORE_SOURCES src/feeds/apple.c src/feeds/google.c src/feeds/music.c
-        src/feeds/news.c src/feeds/email.c)
+        src/feeds/news.c src/feeds/email.c src/feeds/gmail.c src/feeds/imessage.c
+        src/feeds/twitter.c src/feeds/file_ingest.c src/feeds/research.c)
 endif()
 
 # Skillforge + Phase 8 intelligence (skills, reflection, feedback, meta-learning)
@@ -803,6 +805,20 @@ endif()
 # Update check/apply
 if(HU_ENABLE_UPDATE)
     list(APPEND HU_CORE_SOURCES src/update.c)
+endif()
+
+# ML training subsystem (BPE tokenizer, dataloader, experiment loop, GPT model)
+if(HU_ENABLE_ML)
+    list(APPEND HU_CORE_SOURCES
+        src/ml/tokenizer_bpe.c
+        src/ml/dataloader.c
+        src/ml/prepare.c
+        src/ml/evaluator.c
+        src/ml/experiment.c
+        src/ml/gpt.c
+        src/ml/muon_adamw.c
+        src/ml/train.c
+    )
 endif()
 
 # Data loader (always compiled)
@@ -924,6 +940,9 @@ if(HU_ENABLE_PERSONA)
 endif()
 if(HU_ENABLE_CARTESIA)
     target_compile_definitions(human_core PRIVATE HU_ENABLE_CARTESIA=1)
+endif()
+if(HU_ENABLE_ML)
+    target_compile_definitions(human_core PRIVATE HU_ENABLE_ML=1)
 endif()
 
 # --- Compile definitions for enabled channels (for conditional compilation in source) ---
@@ -1365,7 +1384,8 @@ if(NOT HU_ENABLE_SOCIAL)
 endif()
 if(NOT HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_EXTRA_MODULES src/feeds/apple.c src/feeds/google.c src/feeds/music.c
-        src/feeds/news.c src/feeds/email.c)
+        src/feeds/news.c src/feeds/email.c src/feeds/gmail.c src/feeds/imessage.c
+        src/feeds/twitter.c src/feeds/file_ingest.c src/feeds/research.c)
 endif()
 if(NOT HU_ENABLE_PUSH)
     list(APPEND HU_TEST_EXTRA_MODULES src/gateway/push.c)
@@ -1397,6 +1417,12 @@ if(NOT HU_ENABLE_CARTESIA)
         src/tts/cartesia.c src/tts/audio_pipeline.c
         src/context/voice_decision.c src/tts/emotion_map.c)
 endif()
+if(NOT HU_ENABLE_ML)
+    list(APPEND HU_TEST_EXTRA_MODULES
+        src/ml/tokenizer_bpe.c src/ml/dataloader.c src/ml/prepare.c
+        src/ml/evaluator.c src/ml/experiment.c src/ml/gpt.c
+        src/ml/muon_adamw.c src/ml/train.c)
+endif()
 add_library(human_core_test STATIC ${HU_CORE_SOURCES} ${HU_TEST_EXTRA_CHANNELS} ${HU_TEST_EXTRA_MODULES} ${HU_CRYPTO_SOURCES} ${HU_ASM_SOURCES})
 target_include_directories(human_core_test PUBLIC ${HU_ROOT}/include)
 target_include_directories(human_core_test PRIVATE ${HU_ROOT}/asm/generic)
@@ -1408,7 +1434,7 @@ if(HU_ENABLE_CARTESIA)
     target_compile_definitions(human_core_test PRIVATE HU_ENABLE_CARTESIA=1)
 endif()
 # Tests always have all module groups available
-target_compile_definitions(human_core_test PRIVATE HU_HAS_PERIPHERALS=1 HU_HAS_TUNNELS=1 HU_HAS_RUNTIME_EXOTIC=1 HU_HAS_TOOLS_BROWSER=1 HU_HAS_TOOLS_ADVANCED=1 HU_HAS_OTEL=1 HU_HAS_CRON=1 HU_HAS_PUSH=1 HU_HAS_UPDATE=1 HU_HAS_SKILLS=1 HU_HAS_PERSONA=1)
+target_compile_definitions(human_core_test PRIVATE HU_HAS_PERIPHERALS=1 HU_HAS_TUNNELS=1 HU_HAS_RUNTIME_EXOTIC=1 HU_HAS_TOOLS_BROWSER=1 HU_HAS_TOOLS_ADVANCED=1 HU_HAS_OTEL=1 HU_HAS_CRON=1 HU_HAS_PUSH=1 HU_HAS_UPDATE=1 HU_HAS_SKILLS=1 HU_HAS_PERSONA=1 HU_ENABLE_ML=1)
 if(Threads_FOUND)
     target_link_libraries(human_core_test PUBLIC Threads::Threads)
 endif()
@@ -1579,6 +1605,9 @@ set(HU_TEST_SOURCES
     tests/test_channel.c
     tests/test_tool.c
     tests/test_peripheral.c
+    tests/test_peripheral_ctrl.c
+    tests/test_value_learning.c
+    tests/test_goal_engine.c
     tests/test_vtables.c
     tests/test_e2e.c
     tests/test_e2e_conversation.c
@@ -1732,9 +1761,11 @@ set(HU_TEST_SOURCES
     tests/test_reflection_advanced.c
     tests/test_privacy_audit.c
     tests/test_collab_planning.c
+    tests/test_ml.c
 )
 if(HU_ENABLE_FEEDS)
-    list(APPEND HU_TEST_SOURCES tests/test_google_feeds.c tests/test_music_feeds.c)
+    list(APPEND HU_TEST_SOURCES tests/test_google_feeds.c tests/test_music_feeds.c
+        tests/test_research_feeds.c)
 endif()
 if(HU_ENABLE_PERSONA)
     list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c)
@@ -1753,6 +1784,7 @@ endif()
 
 list(APPEND HU_TEST_SOURCES tests/test_memory_features.c)
 list(APPEND HU_TEST_SOURCES tests/test_agi_frontiers.c)
+list(APPEND HU_TEST_SOURCES tests/test_agent_registry.c)
 
 add_executable(human_tests ${HU_TEST_SOURCES} wasm/wasm_alloc.c)
 target_link_libraries(human_tests human_core_test)
@@ -1888,6 +1920,7 @@ endif()
 if(HU_ENABLE_FIPS_CRYPTO)
     target_compile_definitions(human_tests PRIVATE HU_ENABLE_FIPS_CRYPTO=1)
 endif()
+target_compile_definitions(human_tests PRIVATE HU_ENABLE_ML=1)
 
 if(HU_ENABLE_ASAN)
     target_compile_options(human_tests PRIVATE -fsanitize=address -fno-omit-frame-pointer)

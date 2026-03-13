@@ -186,6 +186,7 @@ void run_news_health_email_tests(void);
 #ifdef HU_ENABLE_FEEDS
 void run_google_feeds_tests(void);
 void run_music_feeds_tests(void);
+void run_research_feeds_tests(void);
 #endif
 void run_feed_processor_tests(void);
 void run_forgetting_curve_tests(void);
@@ -203,6 +204,10 @@ void run_bth_e2e_tests(void);
 void run_bth_metrics_tests(void);
 void run_memory_features_tests(void);
 void run_agi_frontiers_tests(void);
+void run_peripheral_ctrl_tests(void);
+void run_value_learning_tests(void);
+void run_goal_engine_tests(void);
+void run_agent_registry_tests(void);
 #ifdef HU_ENABLE_CURL
 void run_paperclip_tests(void);
 #endif
@@ -211,6 +216,9 @@ void run_cartesia_tests(void);
 void run_audio_pipeline_tests(void);
 void run_voice_decision_tests(void);
 void run_emotion_map_tests(void);
+#endif
+#ifdef HU_ENABLE_ML
+void run_ml_tests(void);
 #endif
 
 static void print_usage(const char *prog) {
@@ -264,6 +272,9 @@ int main(int argc, char **argv) {
     run_tool_tests();
     test_vtables_run();
     run_peripheral_tests();
+    run_peripheral_ctrl_tests();
+    run_value_learning_tests();
+    run_goal_engine_tests();
     run_e2e_tests();
     run_subsystems_tests();
     run_config_parse_tests();
@@ -420,6 +431,7 @@ int main(int argc, char **argv) {
     run_news_health_email_tests();
     run_google_feeds_tests();
     run_music_feeds_tests();
+    run_research_feeds_tests();
 #endif
     run_feed_processor_tests();
     run_forgetting_curve_tests();
@@ -438,6 +450,7 @@ int main(int argc, char **argv) {
     run_bth_metrics_tests();
     run_memory_features_tests();
     run_agi_frontiers_tests();
+    run_agent_registry_tests();
 #ifdef HU_ENABLE_CURL
     run_paperclip_tests();
 #endif
@@ -446,6 +459,9 @@ int main(int argc, char **argv) {
     run_audio_pipeline_tests();
     run_voice_decision_tests();
     run_emotion_map_tests();
+#endif
+#ifdef HU_ENABLE_ML
+    run_ml_tests();
 #endif
 
     HU_TEST_REPORT();
