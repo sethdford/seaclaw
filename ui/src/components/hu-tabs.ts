@@ -61,8 +61,8 @@ export class ScTabs extends LitElement {
       background: var(--hu-accent);
       border-radius: var(--hu-radius-sm) var(--hu-radius-sm) 0 0;
       transition:
-        left var(--hu-duration-normal) var(--hu-ease-out),
-        width var(--hu-duration-normal) var(--hu-ease-out);
+        left var(--hu-duration-normal) var(--hu-spring-out, cubic-bezier(0.34, 1.56, 0.64, 1)),
+        width var(--hu-duration-normal) var(--hu-spring-out, cubic-bezier(0.34, 1.56, 0.64, 1));
     }
   `;
 

@@ -131,7 +131,8 @@ export class ScCommandPalette extends LitElement {
       width: 100%;
       margin: 0 var(--hu-space-md);
       box-sizing: border-box;
-      animation: hu-bounce-in var(--hu-duration-moderate) var(--hu-ease-out);
+      animation: hu-bounce-in var(--hu-duration-moderate)
+        var(--hu-spring-out, cubic-bezier(0.34, 1.56, 0.64, 1));
     }
 
     .input-wrap {

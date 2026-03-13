@@ -1,0 +1,89 @@
+/* ─── Scroll-Driven Animations ────────────────────────────────────
+   Progressive enhancement: uses animation-timeline: scroll() where
+   supported, falls back gracefully to static display.
+
+   Import into Lit components via:
+     import scrollCSS from "../styles/scroll-driven.css?inline";
+     static styles = [css`${unsafeCSS(scrollCSS)}`, css`...`];
+   Or apply globally via theme.css.
+──────────────────────────────────────────────────────────────────── */
+
+/* ─── Scroll-triggered entrance ───────────────────────────────────
+   Elements with .hu-scroll-reveal start invisible and fade/slide in
+   as they enter the viewport via scroll timeline.
+─────────────────────────────────────────────────────────────────── */
+@supports (animation-timeline: view()) {
+  .hu-scroll-reveal {
+    animation: hu-scroll-entrance linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 30%;
+  }
+
+  .hu-scroll-reveal-stagger > * {
+    animation: hu-scroll-entrance linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 30%;
+  }
+
+  @keyframes hu-scroll-entrance {
+    from {
+      opacity: 0;
+      transform: translateY(var(--hu-space-md, 16px));
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* ─── Scroll progress indicator ──────────────────────────────────
+   Apply to a fixed/sticky element to show scroll progress as width.
+─────────────────────────────────────────────────────────────────── */
+@supports (animation-timeline: scroll()) {
+  .hu-scroll-progress {
+    animation: hu-scroll-grow linear both;
+    animation-timeline: scroll(nearest block);
+  }
+
+  @keyframes hu-scroll-grow {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
+/* ─── Parallax depth ─────────────────────────────────────────────
+   Subtle vertical parallax for hero sections and background elements.
+─────────────────────────────────────────────────────────────────── */
+@supports (animation-timeline: scroll()) {
+  .hu-parallax-subtle {
+    animation: hu-parallax-shift linear both;
+    animation-timeline: scroll(nearest block);
+    animation-range: cover 0% cover 100%;
+  }
+
+  @keyframes hu-parallax-shift {
+    from {
+      transform: translateY(calc(var(--hu-space-xl, 32px) * -1));
+    }
+    to {
+      transform: translateY(var(--hu-space-xl, 32px));
+    }
+  }
+}
+
+/* ─── Reduced motion: disable all scroll-driven animations ─────── */
+@media (prefers-reduced-motion: reduce) {
+  .hu-scroll-reveal,
+  .hu-scroll-reveal-stagger > *,
+  .hu-scroll-progress,
+  .hu-parallax-subtle {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

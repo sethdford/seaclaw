@@ -49,7 +49,8 @@ export class ScToast extends LitElement {
       pointer-events: auto;
       font-family: var(--hu-font);
       font-size: var(--hu-text-sm);
-      animation: hu-overshoot-in var(--hu-duration-normal) var(--hu-ease-out);
+      animation: hu-overshoot-in var(--hu-duration-normal)
+        var(--hu-spring-out, cubic-bezier(0.34, 1.56, 0.64, 1));
       transition:
         transform var(--hu-duration-normal) var(--hu-ease-out),
         opacity var(--hu-duration-normal);

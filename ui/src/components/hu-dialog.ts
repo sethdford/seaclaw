@@ -61,7 +61,8 @@ export class ScDialog extends LitElement {
       border-radius: var(--hu-radius-xl);
       box-shadow: var(--hu-shadow-xl);
       padding: var(--hu-space-lg);
-      animation: hu-bounce-in var(--hu-duration-normal) var(--hu-ease-out);
+      animation: hu-bounce-in var(--hu-duration-normal)
+        var(--hu-spring-out, cubic-bezier(0.34, 1.56, 0.64, 1));
     }
 
     .panel.closing {

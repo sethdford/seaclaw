@@ -70,12 +70,9 @@
     --hu-web-node-stroke: rgba(0, 0, 0, 0.08);
     --hu-web-line-stroke: #d4d4d8;
 
-    /* ── Typography ── */
-    --font-serif: "Avenir", "Avenir Next", -apple-system, sans-serif;
-    --font-sans:
-      "Avenir", "Avenir Next", -apple-system, BlinkMacSystemFont, system-ui,
-      sans-serif;
-    --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
+    /* ── Typography: alias to shared tokens from _tokens.css ── */
+    --font-sans: var(--hu-font);
+    --font-mono: var(--hu-font-mono);
 
     /* Spacing, radius, shadows, motion, transitions: use --hu-* from _tokens.css */
   }
@@ -483,11 +480,11 @@
 
   /* ── Hero fade-in (CSS-only LCP optimization — visible before JS loads) ── */
   .hero-fade-in {
-    animation: hu-hero-fade 0.8s
+    animation: hu-hero-fade var(--hu-duration-slower, 0.5s)
       var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
   }
   .hero-logo {
-    animation: hu-hero-fade 0.6s
+    animation: hu-hero-fade var(--hu-duration-slow, 0.35s)
       var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
   }
   @keyframes hu-hero-fade {
@@ -506,8 +503,8 @@
     opacity: 0;
     transform: translateY(20px);
     transition:
-      opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-      transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+      opacity var(--hu-duration-slower, 0.5s) var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--hu-duration-slower, 0.5s) var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
   }
   [data-reveal].revealed {
     opacity: 1;

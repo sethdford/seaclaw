@@ -35,7 +35,8 @@ export class ScModal extends LitElement {
       border: 1px solid var(--hu-glass-border-color);
       border-radius: var(--hu-radius-xl);
       box-shadow: var(--hu-shadow-lg);
-      animation: hu-modal-enter var(--hu-duration-normal) var(--hu-ease-out) both;
+      animation: hu-modal-enter var(--hu-duration-normal)
+        var(--hu-spring-out, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
     }
 
     .panel.closing {

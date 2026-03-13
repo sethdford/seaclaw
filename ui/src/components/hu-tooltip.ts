@@ -21,11 +21,16 @@ export class ScTooltip extends LitElement {
     .tip {
       position: absolute;
       white-space: nowrap;
-      background: var(--hu-bg-overlay);
+      background: color-mix(in srgb, var(--hu-bg-overlay) 90%, transparent);
+      backdrop-filter: blur(var(--hu-glass-subtle-blur, 8px))
+        saturate(var(--hu-glass-subtle-saturate, 1.2));
+      -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 8px))
+        saturate(var(--hu-glass-subtle-saturate, 1.2));
       color: var(--hu-text);
       font-size: var(--hu-text-xs);
       padding: var(--hu-space-xs) var(--hu-space-sm);
       border-radius: var(--hu-radius-sm);
+      border: 1px solid var(--hu-glass-border-color, var(--hu-border-subtle));
       box-shadow: var(--hu-shadow-md);
       pointer-events: none;
       opacity: 0;
@@ -67,6 +72,21 @@ export class ScTooltip extends LitElement {
       top: 50%;
       transform: translateY(-50%);
       margin-left: var(--hu-space-xs);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :host(:hover) .tip,
+      :host(:focus-within) .tip {
+        animation: none;
+      }
+    }
+
+    @media (prefers-reduced-transparency: reduce) {
+      .tip {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: var(--hu-bg-overlay);
+      }
     }
   `;
 

@@ -62,7 +62,7 @@ _Last updated: 2026-03-10. Human data from local Lighthouse; competitors from Pa
 
 | Brand            | Perf | A11y | BP  | SEO | LCP   | CLS  | TBT    | TTFB |
 | ---------------- | ---- | ---- | --- | --- | ----- | ---- | ------ | ---- |
-| Human\*        | 96   | 100  | 100 | 100 | 2.6s  | 0.00 | 0ms    | —    |
+| Human\*          | 96   | 100  | 100 | 100 | 2.6s  | 0.00 | 0ms    | —    |
 | Linear           | 27   | 79   | 88  | 100 | 26.1s | 0.00 | 2308ms | 48ms |
 | Vercel           | 57   | 89   | 96  | 92  | 12.0s | 0.00 | 412ms  | 20ms |
 | Raycast          | —    | —    | —   | —   | —     | —    | —      | —    |
@@ -87,7 +87,7 @@ _Last updated: 2026-03-10. Scores based on industry analysis and site evaluation
 
 | Brand            | Perf | Visual | Motion | Density | A11y | Brand | Innovation | Total |
 | ---------------- | ---- | ------ | ------ | ------- | ---- | ----- | ---------- | ----- |
-| Human          | 8    | 7      | 7      | 7       | 9    | 6     | 7          | 51/70 |
+| Human            | 8    | 7      | 7      | 7       | 9    | 6     | 7          | 51/70 |
 | Linear           | 4    | 9      | 9      | 9       | 6    | 9     | 8          | 54/70 |
 | Vercel           | 6    | 8      | 7      | 8       | 7    | 8     | 8          | 52/70 |
 | Raycast          | 7    | 9      | 9      | 9       | 7    | 9     | 8          | 58/70 |
@@ -109,17 +109,18 @@ _Last updated: 2026-03-10. Scores based on industry analysis and site evaluation
 Human's targets vs industry best:
 
 | Metric                 | Industry Best      | Human Target |
-| ---------------------- | ------------------ | -------------- |
-| Lighthouse Performance | 95–97 (Vercel)     | 99+            |
-| LCP                    | 0.8s (Linear)      | < 0.5s         |
-| CLS                    | ~0.02 (Stripe)     | 0.00           |
-| INP                    | ~80ms (Superhuman) | < 50ms         |
-| Accessibility          | 98 (Vercel)        | 100            |
+| ---------------------- | ------------------ | ------------ |
+| Lighthouse Performance | 95–97 (Vercel)     | 99+          |
+| LCP                    | 0.8s (Linear)      | < 0.5s       |
+| CLS                    | ~0.02 (Stripe)     | 0.00         |
+| INP                    | ~80ms (Superhuman) | < 50ms       |
+| Accessibility          | 98 (Vercel)        | 100          |
 
 Human's lightweight C runtime and minimal UI stack (Lit, design tokens) position it to exceed these targets. The dashboard and marketing site are optimized for sub-500ms LCP and zero layout shift.
 
 ## Update History
 
+- **2026-03-13**: Award-winning UI sprint — spring-first motion, scroll-driven animations, glass expansion, brand consistency, LCP optimizations, quality infrastructure
 - **2026-03-10**: First automated + manual audit completed (Q1 2026)
 - **2026-03-09**: Initial benchmark registry created
 
@@ -140,12 +141,29 @@ When assigning manual quality scores, verify:
 
 **Note**: For native-only brands (Raycast, Warp), web metrics apply to their marketing sites. Quality scores may include app impressions where applicable.
 
+## Recent Changes (Q1 2026 Sprint)
+
+Targeted improvements to close the gap with benchmark brands:
+
+- **Lighthouse thresholds tightened**: Performance >= 97, Accessibility >= 99, CLS error at 0.01
+- **Spring-first motion**: Modal, dialog, command palette, toast, tabs indicator, sidebar all upgraded to spring easing
+- **Scroll-driven animations**: New `scroll-driven.css` utility file with `animation-timeline: scroll()` support
+- **View Transitions expanded**: Named shared elements for page-hero and sidebar-indicator
+- **Glass system**: Tooltip upgraded with `backdrop-filter` glass; all overlays now use glass
+- **Brand consistency**: Website font tokens unified with dashboard, hardcoded motion values tokenized
+- **LCP optimizations**: Font preload priority tuning, hero image `loading="eager"`, Astro inline stylesheets
+- **Spring library expanded**: `springModalEnter`, `springModalExit`, `springStagger`, `springFocusRing`
+- **Scroll entrance for all views**: Auto-applied via `GatewayAwareLitElement` base class
+- **Quality infrastructure**: Component audit script, cross-surface token consistency checker, scorecard rubrics with concrete 9/10 criteria
+
 ## Next Steps
 
 - Re-run benchmark with PageSpeed API key to reduce fetch failures (Raycast, Lando Norris, Immersive Garden).
 - Deploy h-uman.ai custom domain to get production PageSpeed data.
 - Schedule Q2 2026 quarterly review.
-- Investigate LCP optimization for sub-1s target (font loading, hero image preload).
+- Measure post-optimization LCP (target: <1.0s, stretch <0.5s).
+- Run component quality audit and fix remaining B-grade components (50 of 111).
+- Add virtual scrolling to chat and log views for large datasets.
 
 ## Related
 

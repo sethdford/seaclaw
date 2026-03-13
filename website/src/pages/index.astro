@@ -94,6 +94,7 @@ const tools = [
       as="font"
       type="font/woff2"
       crossorigin
+      fetchpriority="low"
     />
     <link
       rel="preload"
@@ -101,6 +102,7 @@ const tools = [
       as="font"
       type="font/woff2"
       crossorigin
+      fetchpriority="low"
     />
     <title>Human — Bring AI to every device on Earth</title>
     <meta
@@ -232,6 +234,8 @@ const tools = [
             alt="Human logo"
             width="512"
             height="512"
+            loading="eager"
+            decoding="async"
             fetchpriority="high"
             class="hero-logo w-20 h-20 md:w-24 md:h-24 mx-auto mb-10"
             style={`filter: drop-shadow(0 0 40px var(--color-accent-glow)); animation: float 6s ease-in-out infinite;`}

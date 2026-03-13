@@ -1,5 +1,6 @@
 @import "./_tokens.css";
 @import "./_dynamic-color.css";
+@import "./scroll-driven.css";
 
 :root {
   --hu-surface: var(--hu-bg-surface);
@@ -97,6 +98,42 @@ body {
 ::selection {
   background: var(--hu-accent-subtle);
   color: var(--hu-text);
+}
+
+/* ─── Scroll Entrance (IntersectionObserver fallback) ────────────── */
+.hu-entrance {
+  opacity: 0;
+  transform: translateY(var(--hu-space-sm, 8px));
+  transition:
+    opacity var(--hu-duration-normal) var(--hu-ease-out),
+    transform var(--hu-duration-normal) var(--hu-ease-out);
+}
+
+.hu-entrance.hu-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+hu-card.hu-entrance {
+  opacity: 0;
+  transform: translateY(var(--hu-space-sm, 8px));
+  transition:
+    opacity var(--hu-duration-normal) var(--hu-ease-out),
+    transform var(--hu-duration-normal) var(--hu-ease-out);
+}
+
+hu-card.hu-entrance.hu-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hu-entrance,
+  hu-card.hu-entrance {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 /* ─── Layout Utilities ────────────────────────────────────────────── */
@@ -582,6 +619,23 @@ body {
 
   ::view-transition-new(main-content) {
     animation: var(--hu-duration-normal) var(--hu-spring-out) both hu-slide-up;
+  }
+
+  ::view-transition-old(hu-page-hero) {
+    animation: var(--hu-duration-normal) var(--hu-ease-out) both hu-fade-out;
+  }
+
+  ::view-transition-new(hu-page-hero) {
+    animation: var(--hu-duration-normal) var(--hu-spring-out) both hu-fade-in;
+  }
+
+  ::view-transition-old(hu-sidebar-indicator) {
+    animation: var(--hu-duration-fast) var(--hu-ease-out) both hu-fade-out;
+    height: 100%;
+  }
+
+  ::view-transition-new(hu-sidebar-indicator) {
+    animation: var(--hu-duration-normal) var(--hu-spring-out) both hu-fade-in;
   }
 }
 

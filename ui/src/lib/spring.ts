@@ -262,3 +262,98 @@ export function springRelease(
     config,
   );
 }
+
+/**
+ * Spring-animated modal/sheet entrance: scale from 0.92 + slide up + fade in.
+ */
+export function springModalEnter(
+  element: HTMLElement,
+  config: SpringConfig = SPRING_PRESETS.expressive,
+): SpringAnimation {
+  return springAnimate(
+    element,
+    [
+      { property: "scaleX", from: 0.92, to: 1 },
+      { property: "scaleY", from: 0.92, to: 1 },
+      { property: "translateY", from: 24, to: 0 },
+      { property: "opacity", from: 0, to: 1 },
+    ],
+    config,
+  );
+}
+
+/**
+ * Spring-animated exit: scale down + fade out.
+ */
+export function springModalExit(
+  element: HTMLElement,
+  config: SpringConfig = SPRING_PRESETS.snappy,
+): SpringAnimation {
+  return springAnimate(
+    element,
+    [
+      { property: "scaleX", from: 1, to: 0.95 },
+      { property: "scaleY", from: 1, to: 0.95 },
+      { property: "opacity", from: 1, to: 0 },
+    ],
+    config,
+  );
+}
+
+/**
+ * Stagger spring entrance for a list of elements.
+ * Each element enters with a delay multiplied by its index.
+ */
+export function springStagger(
+  elements: HTMLElement[],
+  delayMs = 50,
+  maxDelayMs = 300,
+  config: SpringConfig = SPRING_PRESETS.expressive,
+): SpringAnimation[] {
+  return elements.map((el, i) => {
+    const delay = Math.min(i * delayMs, maxDelayMs);
+    el.style.opacity = "0";
+    el.style.transform = "translateY(12px) scale(0.97)";
+    let innerAnim: SpringAnimation | null = null;
+    let stopped = false;
+    const promise = new Promise<void>((resolve) => {
+      const timeoutId = setTimeout(() => {
+        if (stopped) {
+          resolve();
+          return;
+        }
+        innerAnim = springEntry(el, 12, config);
+        innerAnim.promise.then(resolve);
+      }, delay);
+      if (stopped) {
+        clearTimeout(timeoutId);
+        resolve();
+      }
+    });
+    return {
+      stop: () => {
+        stopped = true;
+        innerAnim?.stop();
+      },
+      promise,
+    };
+  });
+}
+
+/**
+ * Spring-animated focus ring expansion.
+ * Useful for accessible, animated focus indicators.
+ */
+export function springFocusRing(
+  element: HTMLElement,
+  config: SpringConfig = SPRING_PRESETS.micro,
+): SpringAnimation {
+  return springAnimate(
+    element,
+    [
+      { property: "scaleX", from: 0.98, to: 1 },
+      { property: "scaleY", from: 0.98, to: 1 },
+    ],
+    config,
+  );
+}

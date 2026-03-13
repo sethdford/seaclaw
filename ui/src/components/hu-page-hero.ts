@@ -6,6 +6,7 @@ export class ScPageHero extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      view-transition-name: hu-page-hero;
     }
     .hero {
       position: relative;

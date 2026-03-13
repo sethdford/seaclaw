@@ -606,7 +606,110 @@ Rules:
 
 ---
 
-## 7. Cross-Reference
+## 7. Scroll-Driven Animations
+
+Progressive enhancement using the CSS `animation-timeline` API for scroll-linked effects.
+Falls back gracefully to static display in unsupported browsers.
+
+### 7.1 Scroll Entrance
+
+Cards, list items, and grid children should animate in as they enter the viewport.
+
+CSS utility: `.hu-scroll-reveal`
+
+```css
+@supports (animation-timeline: view()) {
+  .hu-scroll-reveal {
+    animation: hu-scroll-entrance linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 30%;
+  }
+}
+```
+
+Rules:
+
+- Use `animation-range: entry 0% entry 30%` — items fully visible within 30% of viewport entry
+- Combine translateY + opacity for entrance (not scale — scroll entrance should feel lightweight)
+- Apply to cards, stat rows, and bento grid children universally
+- IntersectionObserver fallback not required — static display is acceptable
+
+### 7.2 Scroll Progress
+
+Fixed progress bars that grow with scroll position.
+
+CSS utility: `.hu-scroll-progress`
+
+```css
+@supports (animation-timeline: scroll()) {
+  .hu-scroll-progress {
+    animation: hu-scroll-grow linear both;
+    animation-timeline: scroll(nearest block);
+  }
+}
+```
+
+Use for: long chat histories, log views, documentation pages.
+
+### 7.3 Parallax Depth
+
+Subtle parallax for hero sections and background elements.
+
+CSS utility: `.hu-parallax-subtle`
+
+Rules:
+
+- Maximum parallax shift: `--hu-space-xl` (32px) in each direction
+- Never parallax text — only decorative backgrounds and mesh gradients
+- Disabled under `prefers-reduced-motion: reduce`
+
+### 7.4 Source Files
+
+- Dashboard: `ui/src/styles/scroll-driven.css` (utilities)
+- Website: apply via `global.css` or component-level `<style>` blocks
+
+---
+
+## 8. Platform Innovation Patterns
+
+CSS features for competitive advantage. Adopt when browser support reaches ~90%+.
+
+### 8.1 `@starting-style`
+
+Native entry animations for dynamically inserted elements. Replaces animation workarounds.
+
+```css
+@supports (selector(:popover-open)) {
+  .panel {
+    opacity: 1;
+    transform: scale(1);
+    transition:
+      opacity 200ms,
+      transform 200ms var(--hu-spring-out);
+    @starting-style {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+  }
+}
+```
+
+Use for: modals, popovers, dropdowns, dynamically inserted cards.
+Dashboard utilities: `.hu-entry-fade`, `.hu-entry-slide-up`, `.hu-entry-scale` in `theme.css`.
+
+### 8.2 Native `popover` Attribute
+
+HTML `popover` + `anchor` positioning for tooltips and dropdowns.
+Replace custom JS popover logic when browser support permits.
+
+### 8.3 Anchor Positioning API
+
+CSS-native element positioning relative to trigger elements.
+Eliminates JS positioning logic for tooltips, dropdowns, and context menus.
+
+---
+
+## 9. Cross-Reference
 
 | Document             | Covers                                          |
 | -------------------- | ----------------------------------------------- |

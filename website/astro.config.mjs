@@ -7,6 +7,9 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   site: "https://h-uman.ai",
   base: "/",
+  build: {
+    inlineStylesheets: "auto",
+  },
   prefetch: {
     prefetchAll: true,
     defaultStrategy: "hover",

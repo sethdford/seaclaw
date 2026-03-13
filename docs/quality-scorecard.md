@@ -43,7 +43,7 @@ updated: 2026-03-09
 
 ## Dimension Rubrics
 
-Detailed rubrics for each of the 7 dimensions:
+Detailed rubrics for each of the 7 dimensions, with concrete criteria for achieving a score of 9.
 
 **Performance (automated)**:
 
@@ -53,6 +53,8 @@ Detailed rubrics for each of the 7 dimensions:
 - 9: Lighthouse 98-99, LCP <0.5s, CLS ~0
 - 10: Lighthouse 100, LCP <0.3s, CLS 0.00, INP <50ms
 
+**Criteria for 9**: Lighthouse 98+ on all pages; LCP <0.5s (critical CSS inlined, fonts preloaded, hero images priority-fetched); CLS 0.00 (skeleton dimensions match real content); initial bundle <150KB; all lazy chunks <100KB; `requestIdleCallback` for deferred work.
+
 **Visual Craft (manual audit)**:
 
 - 1-5: Inconsistent spacing, raw hex colors, mixed type scales
@@ -60,6 +62,8 @@ Detailed rubrics for each of the 7 dimensions:
 - 8: Stripe/Linear tier — mathematically precise, dark/light coherent
 - 9: Awwwards nomination quality — every pixel intentional
 - 10: Sets new standard — competitors study your UI for inspiration
+
+**Criteria for 9**: Zero raw hex/px in any component (lint enforced); dark+light pixel-perfect on every view; editorial typography hierarchy with full scale usage (hero/display/heading/body/caption); tonal surfaces for all branded elevation; squint-test passes on every view (primary action and content area identifiable at a glance); 60-30-10 color ratio validated; accent used on <10% of UI surface (restraint like Raycast).
 
 **Motion Quality (manual audit)**:
 
@@ -69,6 +73,8 @@ Detailed rubrics for each of the 7 dimensions:
 - 9: Physics-accurate springs, scroll-driven narratives, ambient intelligence
 - 10: Indistinguishable from native platform animations on every surface
 
+**Criteria for 9**: Spring physics on all interactive elements (buttons, toggles, cards, tabs); scroll-driven entrance animations on every card/list using `animation-timeline: scroll()` with IntersectionObserver fallback; View Transitions API on all route changes with named shared elements; choreographed stagger on all lists (50ms delay, 300ms cap); Disney staging on all modals/sheets (backdrop dim + spring scale); every animation respects `prefers-reduced-motion`.
+
 **Information Density (heuristic evaluation)**:
 
 - 1-5: Cluttered or wastefully sparse, legends required
@@ -76,6 +82,8 @@ Detailed rubrics for each of the 7 dimensions:
 - 8: Tufte-level data-ink ratio, progressive disclosure
 - 9: Information Theater — understanding is involuntary
 - 10: Zero learning curve for any data visualization
+
+**Criteria for 9**: Direct labels preferred over legends on all charts; sparklines and inline metrics for at-a-glance data; progressive disclosure on all complex forms/settings; animated numbers (`hu-animated-number`) for all live values; tabular figures for numeric columns; small multiples for comparative data.
 
 **Accessibility (automated + manual)**:
 
@@ -85,6 +93,8 @@ Detailed rubrics for each of the 7 dimensions:
 - 9: 100 Lighthouse, VoiceOver/TalkBack tested, high contrast mode
 - 10: Exceeds WCAG AAA, cognitive accessibility considered
 
+**Criteria for 9**: Lighthouse Accessibility 100 on all pages; axe-core zero violations in E2E; full keyboard navigation (Tab, Escape, Enter/Space, Arrow keys); animated focus ring with spring expansion; `prefers-contrast: more` fully supported; `prefers-reduced-motion` fully supported; all modals trap focus and support Escape; all tooltips accessible via keyboard.
+
 **Brand Cohesion (cross-platform audit)**:
 
 - 1-5: Inconsistent across surfaces, no design system
@@ -92,6 +102,8 @@ Detailed rubrics for each of the 7 dimensions:
 - 8: Unified system across web + native, platform-appropriate adaptations
 - 9: Each surface feels native AND unmistakably Human
 - 10: Platform Transcendence — best-designed app on every device
+
+**Criteria for 9**: Dashboard and website import from same `design-tokens/` source; identical button/card/input styling between dashboard and website; same spring easing and stagger patterns on both surfaces; Avenir + Phosphor consistent everywhere; 60-30-10 color ratio matches across surfaces; cross-surface visual audit passes (automated screenshot comparison).
 
 **Innovation (feature inventory)**:
 
@@ -101,19 +113,25 @@ Detailed rubrics for each of the 7 dimensions:
 - 9: Features competitors don't have yet (spatial UI, ambient intelligence)
 - 10: Defining new interaction paradigms
 
+**Criteria for 9**: At least 2 platform-leading CSS features adopted (scroll-driven animations via `animation-timeline`, `@starting-style` for enter animations, native `popover` attribute, Anchor Positioning API); at least 1 interaction pattern not seen in benchmark brands; optimistic UI on primary actions (chat send, config save); command palette with glass backdrop and spring-animated items.
+
 ## History
 
-| Quarter | Website | Dashboard | iOS | macOS | Android |
-| ------- | ------- | --------- | --- | ----- | ------- |
-| Q1 2026 | 52      | 52        | 39  | 39    | 34      |
+| Quarter          | Website | Dashboard | iOS | macOS | Android |
+| ---------------- | ------- | --------- | --- | ----- | ------- |
+| Q1 2026          | 52      | 52        | 39  | 39    | 34      |
+| Q1 2026 (sprint) | 55\*    | 57\*      | 39  | 39    | 34      |
+
+\* Estimated after award-winning UI sprint. Needs re-audit to confirm.
 
 ## Action Items from Last Review
 
-- **Website Performance**: Lighthouse 96 — target 99+. Remaining gap: LCP (2.6s local). Investigate font loading and hero image optimization.
-- **Visual Craft (all surfaces)**: 7 — target 9. Invest in editorial typography, mathematically precise spacing, dark/light parity polish.
+- **Website Performance**: Lighthouse 96 — target 99+. LCP optimizations applied: font priority tuning, hero image `loading="eager"`, Astro inline stylesheets, stagger delay tokenization.
+- **Visual Craft (all surfaces)**: 7 → targeting 9. Scroll-driven animation utilities created (`scroll-driven.css`), glass system applied to tooltips, spring easing on modal/dialog/command-palette/toast/sidebar/tabs.
+- **Motion Quality (dashboard)**: Spring expansion complete — `springModalEnter`, `springModalExit`, `springStagger`, `springFocusRing` added. View Transitions expanded with named shared elements (page-hero, sidebar-indicator). Scroll entrance now auto-applied to all views via `GatewayAwareLitElement`.
 - **Motion Quality (native apps)**: 5 — target 8. Implement spring animations in SwiftUI/Compose, add meaningful transitions.
 - **Native App Maturity**: iOS/macOS 39/70, Android 34/70. Priority: bring native apps to feature parity with dashboard.
-- **Brand Cohesion**: 6-7 — target 9. Strengthen cross-surface consistency; native apps need design token integration.
+- **Brand Cohesion**: 6 → targeting 9. Website font tokens unified (`--font-sans` now aliases `--hu-font`), hardcoded motion values replaced with tokens, cross-surface consistency check script created (`scripts/check-token-consistency.sh`).
 
 ## Related
 

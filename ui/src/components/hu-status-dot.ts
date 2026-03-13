@@ -27,6 +27,7 @@ export class ScStatusDot extends LitElement {
     .dot {
       border-radius: 50%;
       background: var(--hu-text-muted);
+      transition: background-color var(--hu-duration-normal) var(--hu-ease-out);
     }
 
     .dot.size-sm {

@@ -1,6 +1,7 @@
 import { LitElement } from "lit";
 import type { GatewayClient } from "./gateway.js";
 import { getGateway, GATEWAY_CHANGED, type GatewayChangedDetail } from "./gateway-provider.js";
+import { observeAllCards, unobserveAllCards } from "./utils/scroll-entrance.js";
 
 /**
  * Base class for views that depend on gateway connectivity.
@@ -73,6 +74,7 @@ export class GatewayAwareLitElement extends LitElement {
     this.gateway?.removeEventListener("status", this._statusHandler);
     document.removeEventListener(GATEWAY_CHANGED, this._gatewayChangedHandler);
     this._stopAutoRefresh();
+    if (this.shadowRoot) unobserveAllCards(this.shadowRoot);
   }
 
   /**
@@ -86,6 +88,9 @@ export class GatewayAwareLitElement extends LitElement {
     try {
       await this.load();
       this.lastLoadedAt = Date.now();
+      this.updateComplete.then(() => {
+        if (this.shadowRoot) observeAllCards(this.shadowRoot);
+      });
     } catch (e) {
       console.warn(`[${this.tagName.toLowerCase()}] load failed:`, e);
     }
