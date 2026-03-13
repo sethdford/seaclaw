@@ -73,7 +73,12 @@ if [ -f "scripts/check-standards-drift.sh" ]; then
   run_check "Standards Drift" bash scripts/check-standards-drift.sh
 fi
 
-# 6. Token lint (raw colors)
+# 6. Terminology compliance
+if [ -f "scripts/check-terminology.sh" ]; then
+  run_check "Terminology" bash scripts/check-terminology.sh
+fi
+
+# 7. Token lint (raw colors)
 if [ -f "scripts/lint-raw-colors.sh" ]; then
   run_check "Token Lint (colors)" bash scripts/lint-raw-colors.sh --all
 fi

@@ -151,7 +151,7 @@ struct hu_agent {
     bool tts_enabled;                /* if true, play responses as audio */
     hu_voice_config_t *voice_config; /* optional; if NULL, TTS is skipped even if enabled */
 
-    hu_arena_t *turn_arena; /* per-turn bump allocator for ephemeral allocations */
+    hu_arena_t *turn_arena; /* per-turn arena for ephemeral allocations */
 
     hu_agent_pool_t *agent_pool;
     hu_mailbox_t *mailbox;

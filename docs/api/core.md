@@ -170,7 +170,7 @@ void hu_http_response_free(hu_allocator_t *alloc, hu_http_response_t *resp);
 
 ## Arena (`core/arena.h`)
 
-Bump allocator for short-lived allocations.
+Arena allocator for short-lived, bulk-freed allocations.
 
 ```c
 hu_arena_t *hu_arena_create(hu_allocator_t backing);
