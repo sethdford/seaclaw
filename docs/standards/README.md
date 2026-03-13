@@ -34,6 +34,13 @@ AGENTS.md                <- Full engineering protocol
 | [evaluation.md](ai/evaluation.md)                             | Quality dimensions, golden-set testing, scoring rubrics, per-provider metrics              | Prompt changes, model upgrades             |
 | [citation-and-sourcing.md](ai/citation-and-sourcing.md)       | Source tiers, attribution patterns, freshness rules, confidence mapping                    | Agent responses that reference data        |
 | [human-in-the-loop.md](ai/human-in-the-loop.md)               | Approval tiers, confirmation flow, security policy integration, escalation triggers        | Tool execution, security-sensitive actions |
+| [disclosure.md](ai/disclosure.md)                             | AI identity disclosure, expertise boundaries, directional language, claims to avoid        | Agent responses, persona design            |
+
+## Brand
+
+| Doc                                    | Covers                                         | Used When                  |
+| -------------------------------------- | ---------------------------------------------- | -------------------------- |
+| [terminology.md](brand/terminology.md) | Canonical product, technical, and UI/CLI terms | Code, docs, UI, CLI naming |
 
 ## Design
 
@@ -47,21 +54,27 @@ AGENTS.md                <- Full engineering protocol
 
 ## Engineering
 
-| Doc                                              | Covers                                                      | Used When                     |
-| ------------------------------------------------ | ----------------------------------------------------------- | ----------------------------- |
-| [principles.md](engineering/principles.md)       | KISS, YAGNI, DRY, fail-fast, secure-by-default, determinism | All code changes              |
-| [naming.md](engineering/naming.md)               | Identifier conventions, type naming, constant naming        | All code changes              |
-| [anti-patterns.md](engineering/anti-patterns.md) | Prohibited patterns with reasons and alternatives           | Code review, design decisions |
-| [testing.md](engineering/testing.md)             | Test structure, naming, mocking, coverage, quality rules    | Writing or modifying tests    |
-| [workflow.md](engineering/workflow.md)           | Branching, commits, versioning, releases, hotfixes          | All development work          |
+| Doc                                                      | Covers                                                      | Used When                     |
+| -------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------- |
+| [principles.md](engineering/principles.md)               | KISS, YAGNI, DRY, fail-fast, secure-by-default, determinism | All code changes              |
+| [naming.md](engineering/naming.md)                       | Identifier conventions, type naming, constant naming        | All code changes              |
+| [anti-patterns.md](engineering/anti-patterns.md)         | Prohibited patterns with reasons and alternatives           | Code review, design decisions |
+| [testing.md](engineering/testing.md)                     | Test structure, naming, mocking, coverage, quality rules    | Writing or modifying tests    |
+| [workflow.md](engineering/workflow.md)                   | Branching, commits, versioning, releases, hotfixes          | All development work          |
+| [memory-management.md](engineering/memory-management.md) | Allocator types, ownership rules, cleanup patterns, ASan    | Allocation and cleanup code   |
+| [performance.md](engineering/performance.md)             | Binary size, RSS, startup time, per-operation budgets       | Performance-sensitive changes |
+| [api-design.md](engineering/api-design.md)               | API surface, stability tiers, versioning, deprecation       | Public API changes            |
+| [gateway-api.md](engineering/gateway-api.md)             | HTTP/WebSocket gateway, REST conventions, security, RPC     | Gateway endpoints, webhooks   |
+| [cross-platform.md](engineering/cross-platform.md)       | Platform detection, abstractions, guards, hardcoded paths   | Platform-specific code        |
 
 ## Quality
 
-| Doc                                      | Covers                                                                       | Used When                     |
-| ---------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------- |
-| [governance.md](quality/governance.md)   | Five principles, gatekeeping mindset, drift prevention, compliance checklist | Every change                  |
-| [ceremonies.md](quality/ceremonies.md)   | Weekly drift audit, PR completion gate, release gate                         | Recurring quality checkpoints |
-| [code-review.md](quality/code-review.md) | Review priorities, risk-adjusted depth, merge criteria                       | Before merging any change     |
+| Doc                                              | Covers                                                                       | Used When                     |
+| ------------------------------------------------ | ---------------------------------------------------------------------------- | ----------------------------- |
+| [governance.md](quality/governance.md)           | Five principles, gatekeeping mindset, drift prevention, compliance checklist | Every change                  |
+| [ceremonies.md](quality/ceremonies.md)           | Weekly drift audit, PR completion gate, release gate                         | Recurring quality checkpoints |
+| [code-review.md](quality/code-review.md)         | Review priorities, risk-adjusted depth, merge criteria                       | Before merging any change     |
+| [channel-testing.md](quality/channel-testing.md) | Channel vtable tests, HU_IS_TEST mocking, memory testing, destroy convention | Adding or modifying channels  |
 
 ## Operations
 
@@ -72,8 +85,9 @@ AGENTS.md                <- Full engineering protocol
 
 ## Security
 
-| Doc                                         | Covers                                                   | Used When                          |
-| ------------------------------------------- | -------------------------------------------------------- | ---------------------------------- |
-| [threat-model.md](security/threat-model.md) | STRIDE threat model, attack surface analysis             | Security-sensitive changes         |
-| [sandbox.md](security/sandbox.md)           | Sandbox isolation system, backend comparison             | Runtime and tool execution changes |
-| [ai-safety.md](security/ai-safety.md)       | Prompt injection, output validation, safe tool execution | AI agent behavior, tool security   |
+| Doc                                         | Covers                                                            | Used When                          |
+| ------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------- |
+| [threat-model.md](security/threat-model.md) | STRIDE threat model, attack surface analysis                      | Security-sensitive changes         |
+| [sandbox.md](security/sandbox.md)           | Sandbox isolation system, backend comparison                      | Runtime and tool execution changes |
+| [ai-safety.md](security/ai-safety.md)       | Prompt injection, output validation, safe tool execution          | AI agent behavior, tool security   |
+| [data-privacy.md](security/data-privacy.md) | Data classification, lifecycle, retention, user rights, isolation | Data handling, memory, logging     |

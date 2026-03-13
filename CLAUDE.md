@@ -125,14 +125,16 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 
 All project standards live in `docs/standards/`. This is the single source of truth -- read the applicable standard before writing code. Full index: `docs/standards/README.md`.
 
-| Area        | Path                          | Covers                                                                                                                                  |
-| ----------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| AI          | `docs/standards/ai/`          | Agent architecture, conversation design, hallucination prevention, prompt engineering, evaluation, citation/sourcing, human-in-the-loop |
-| Quality     | `docs/standards/quality/`     | Governance, ceremonies, code review                                                                                                     |
-| Operations  | `docs/standards/operations/`  | Incident response, monitoring                                                                                                           |
-| Design      | `docs/standards/design/`      | Visual standards, motion, UX patterns, design strategy, design system                                                                   |
-| Engineering | `docs/standards/engineering/` | Principles, naming, anti-patterns                                                                                                       |
-| Security    | `docs/standards/security/`    | Threat model, sandbox                                                                                                                   |
+| Area        | Path                          | Covers                                                                                            |
+| ----------- | ----------------------------- | ------------------------------------------------------------------------------------------------- |
+| AI          | `docs/standards/ai/`          | Agent architecture, conversation, hallucination prevention, prompts, evaluation, disclosure       |
+| Brand       | `docs/standards/brand/`       | Terminology governance                                                                            |
+| Design      | `docs/standards/design/`      | Visual standards, motion, UX patterns, design strategy, design system                             |
+| Engineering | `docs/standards/engineering/` | Principles, naming, testing, workflow, memory management, performance, API design, cross-platform |
+| Operations  | `docs/standards/operations/`  | Incident response, monitoring                                                                     |
+| Quality     | `docs/standards/quality/`     | Governance, ceremonies, code review, channel testing                                              |
+| Security    | `docs/standards/security/`    | Threat model, sandbox, AI safety, data privacy                                                    |
+| Security    | `docs/standards/security/`    | Threat model, sandbox                                                                             |
 
 ## Risk Tiers
 

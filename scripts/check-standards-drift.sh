@@ -47,7 +47,7 @@ fi
 echo ""
 echo "Checking standards directory completeness..."
 
-expected_dirs=("ai" "design" "engineering" "operations" "quality" "security")
+expected_dirs=("ai" "brand" "design" "engineering" "operations" "quality" "security")
 missing=0
 for dir in "${expected_dirs[@]}"; do
   if [ ! -d "docs/standards/$dir" ]; then

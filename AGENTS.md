@@ -130,14 +130,15 @@ Each major `src/` subdirectory has its own `CLAUDE.md` with module-specific arch
 
 All project standards live in `docs/standards/`. This is the single source of truth -- agent config files reference these, never duplicate them.
 
-| Area        | Path                          | Covers                                                                                                                                  |
-| ----------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| AI          | `docs/standards/ai/`          | Agent architecture, conversation design, hallucination prevention, prompt engineering, evaluation, citation/sourcing, human-in-the-loop |
-| Design      | `docs/standards/design/`      | Visual standards, motion design, UX patterns, design strategy, design system                                                            |
-| Engineering | `docs/standards/engineering/` | Principles, naming, anti-patterns, testing, workflow                                                                                    |
-| Operations  | `docs/standards/operations/`  | Incident response, monitoring and observability                                                                                         |
-| Quality     | `docs/standards/quality/`     | Governance, ceremonies, code review                                                                                                     |
-| Security    | `docs/standards/security/`    | Threat model, sandbox, AI safety                                                                                                        |
+| Area        | Path                          | Covers                                                                                                                                              |
+| ----------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AI          | `docs/standards/ai/`          | Agent architecture, conversation design, hallucination prevention, prompt engineering, evaluation, citation/sourcing, human-in-the-loop, disclosure |
+| Brand       | `docs/standards/brand/`       | Terminology governance (canonical product, technical, and UI/CLI terms)                                                                             |
+| Design      | `docs/standards/design/`      | Visual standards, motion design, UX patterns, design strategy, design system                                                                        |
+| Engineering | `docs/standards/engineering/` | Principles, naming, anti-patterns, testing, workflow, memory management, performance budgets, C API design, gateway API, cross-platform             |
+| Operations  | `docs/standards/operations/`  | Incident response, monitoring and observability                                                                                                     |
+| Quality     | `docs/standards/quality/`     | Governance, ceremonies, code review, channel testing                                                                                                |
+| Security    | `docs/standards/security/`    | Threat model, sandbox, AI safety, data privacy and lifecycle                                                                                        |
 
 **Before writing code, read the applicable standard.** Full index: `docs/standards/README.md`.
 
