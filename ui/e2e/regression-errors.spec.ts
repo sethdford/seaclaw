@@ -17,6 +17,9 @@ function isKnownConsoleError(msg: string): boolean {
   return KNOWN_CONSOLE_ERRORS.some((known) => msg.includes(known));
 }
 
+/** Demo gateway seeds these error events intentionally to showcase error handling UI. */
+const KNOWN_DEMO_ERROR_BANNERS = ["SMTP timeout"];
+
 test.describe("Regression: No Unexpected Errors (Demo Mode)", () => {
   for (const view of ALL_VIEWS) {
     const viewTag = VIEW_TAGS[view]!;
@@ -39,14 +42,23 @@ test.describe("Regression: No Unexpected Errors (Demo Mode)", () => {
       expect(errors, `Console errors on ${view} view: ${errors.join("; ")}`).toHaveLength(0);
     });
 
-    test(`${view} — no error banner visible`, async ({ page }) => {
+    test(`${view} — no unexpected error banner`, async ({ page }) => {
       await page.goto(`/?demo#${view}`);
       await waitForViewReady(page, viewTag);
       await page.waitForTimeout(2000);
 
       await expect(async () => {
-        const hasErrorBanner = await page.evaluate(shadowExists(viewTag, ".error-banner"));
-        expect(hasErrorBanner, `${view} view has an unexpected error banner`).toBe(false);
+        const bannerText: string = await page.evaluate(`(() => {
+          const app = document.querySelector("hu-app");
+          const view = app?.shadowRoot?.querySelector("${viewTag}");
+          const banner = view?.shadowRoot?.querySelector(".error-banner");
+          return banner?.textContent?.trim() ?? "";
+        })()`);
+        const isKnown = KNOWN_DEMO_ERROR_BANNERS.some((k) => bannerText.includes(k));
+        expect(
+          bannerText === "" || isKnown,
+          `${view} view has unexpected error banner: "${bannerText}"`,
+        ).toBe(true);
       }).toPass({ timeout: POLL });
     });
 
@@ -92,7 +104,7 @@ test.describe("Regression: Sequential Navigation (Demo Mode)", () => {
     expect(errors, `Console errors during navigation: ${errors.join("; ")}`).toHaveLength(0);
   });
 
-  test("navigating through all views shows no error banners", async ({ page }) => {
+  test("navigating through all views shows no unexpected error banners", async ({ page }) => {
     await page.goto("/?demo#overview");
     await waitForViewReady(page, "hu-overview-view");
     await page.waitForTimeout(1000);
@@ -105,8 +117,14 @@ test.describe("Regression: Sequential Navigation (Demo Mode)", () => {
       await waitForViewReady(page, viewTag);
       await page.waitForTimeout(1500);
 
-      const hasError = await page.evaluate(shadowExists(viewTag, ".error-banner"));
-      if (hasError) viewsWithErrors.push(view);
+      const bannerText: string = await page.evaluate(`(() => {
+        const app = document.querySelector("hu-app");
+        const view = app?.shadowRoot?.querySelector("${viewTag}");
+        const banner = view?.shadowRoot?.querySelector(".error-banner");
+        return banner?.textContent?.trim() ?? "";
+      })()`);
+      const isKnown = KNOWN_DEMO_ERROR_BANNERS.some((k) => bannerText.includes(k));
+      if (bannerText && !isKnown) viewsWithErrors.push(`${view}: "${bannerText}"`);
     }
 
     expect(
