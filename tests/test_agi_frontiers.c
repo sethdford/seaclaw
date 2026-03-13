@@ -97,6 +97,41 @@ static void test_self_improve_prompt_patches(void) {
     close_test_db(db);
 }
 
+static void test_self_improve_prompt_patches_with_data(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = open_test_db();
+    hu_self_improve_t engine;
+    hu_self_improve_create(&alloc, db, &engine);
+    hu_self_improve_init_tables(&engine);
+
+    sqlite3_exec(db,
+        "CREATE TABLE IF NOT EXISTS self_evaluations("
+        "id INTEGER PRIMARY KEY, recommendations TEXT, created_at INTEGER)",
+        NULL, NULL, NULL);
+    sqlite3_exec(db,
+        "INSERT INTO self_evaluations (recommendations, created_at) VALUES "
+        "('Be more concise', 100), ('Use bullet points', 200)",
+        NULL, NULL, NULL);
+
+    HU_ASSERT_EQ(hu_self_improve_apply_reflections(&engine, 300), HU_OK);
+
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_self_improve_active_patch_count(&engine, &count), HU_OK);
+    HU_ASSERT_EQ(count, 2u);
+
+    char *patches = NULL;
+    size_t patches_len = 0;
+    HU_ASSERT_EQ(hu_self_improve_get_prompt_patches(&engine, &patches, &patches_len), HU_OK);
+    HU_ASSERT_NOT_NULL(patches);
+    HU_ASSERT_TRUE(patches_len > 0);
+    HU_ASSERT_NOT_NULL(strstr(patches, "concise"));
+    HU_ASSERT_NOT_NULL(strstr(patches, "bullet"));
+    alloc.free(alloc.ctx, patches, patches_len + 1);
+
+    hu_self_improve_deinit(&engine);
+    close_test_db(db);
+}
+
 /* -- Goal Autonomy --------------------------------------------------- */
 
 static void test_goal_create_null_args(void) {
@@ -288,6 +323,31 @@ static void test_world_model_causal_depth(void) {
     close_test_db(db);
 }
 
+static void test_world_evaluate_options(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = open_test_db();
+    hu_world_model_t model;
+    hu_world_model_create(&alloc, db, &model);
+    hu_world_model_init_tables(&model);
+
+    hu_world_record_outcome(&model, "restart", 7, "recovered", 9, 0.9, 1000);
+    hu_world_record_outcome(&model, "restart", 7, "recovered", 9, 0.85, 1001);
+    hu_world_record_outcome(&model, "ignore", 6, "crashed", 7, 0.8, 1002);
+
+    const char *actions[] = {"restart", "ignore"};
+    size_t action_lens[] = {7, 6};
+    hu_action_option_t opts[2];
+    memset(opts, 0, sizeof(opts));
+    hu_error_t err = hu_world_evaluate_options(&model, actions, action_lens, 2,
+                                               "server down", 11, opts);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(opts[0].score >= 0.0);
+    HU_ASSERT_TRUE(opts[1].score >= 0.0);
+
+    hu_world_model_deinit(&model);
+    close_test_db(db);
+}
+
 /* -- Online Learning ------------------------------------------------- */
 
 static void test_online_learning_create_null(void) {
@@ -372,6 +432,35 @@ static void test_online_learning_response_quality(void) {
 static void test_signal_type_str(void) {
     HU_ASSERT_NOT_NULL(hu_signal_type_str(HU_SIGNAL_TOOL_SUCCESS));
     HU_ASSERT_NOT_NULL(hu_signal_type_str(HU_SIGNAL_USER_CORRECTION));
+}
+
+static void test_online_learning_edge_cases(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = open_test_db();
+    hu_online_learning_t engine;
+    hu_online_learning_create(&alloc, db, 0.1, &engine);
+    hu_online_learning_init_tables(&engine);
+
+    double w = hu_online_learning_get_weight(&engine, "empty", 5);
+    HU_ASSERT_TRUE(w >= 0.99 && w <= 1.01);
+
+    HU_ASSERT_EQ(hu_online_learning_update_weight(&engine, "zeroed", 6, 0.0, 1000), HU_OK);
+    w = hu_online_learning_get_weight(&engine, "zeroed", 6);
+    HU_ASSERT_TRUE(w >= 0.0);
+
+    char *ctx = NULL;
+    size_t ctx_len = 0;
+    HU_ASSERT_EQ(hu_online_learning_build_context(&engine, &ctx, &ctx_len), HU_OK);
+    HU_ASSERT_NOT_NULL(ctx);
+    if (ctx)
+        alloc.free(alloc.ctx, ctx, ctx_len + 1);
+
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_online_learning_signal_count(&engine, &count), HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+
+    hu_online_learning_deinit(&engine);
+    close_test_db(db);
 }
 
 /* -- Value Learning -------------------------------------------------- */
@@ -880,6 +969,7 @@ void run_agi_frontiers_tests(void) {
     HU_RUN_TEST(test_self_improve_init_tables);
     HU_RUN_TEST(test_self_improve_tool_outcome_tracking);
     HU_RUN_TEST(test_self_improve_prompt_patches);
+    HU_RUN_TEST(test_self_improve_prompt_patches_with_data);
 
     HU_RUN_TEST(test_goal_create_null_args);
     HU_RUN_TEST(test_goal_lifecycle);
@@ -893,6 +983,7 @@ void run_agi_frontiers_tests(void) {
     HU_RUN_TEST(test_world_model_record_and_simulate);
     HU_RUN_TEST(test_world_model_counterfactual);
     HU_RUN_TEST(test_world_model_causal_depth);
+    HU_RUN_TEST(test_world_evaluate_options);
 
     HU_RUN_TEST(test_online_learning_create_null);
     HU_RUN_TEST(test_online_learning_record_and_count);
@@ -900,6 +991,7 @@ void run_agi_frontiers_tests(void) {
     HU_RUN_TEST(test_online_learning_build_context);
     HU_RUN_TEST(test_online_learning_response_quality);
     HU_RUN_TEST(test_signal_type_str);
+    HU_RUN_TEST(test_online_learning_edge_cases);
 
     HU_RUN_TEST(test_value_create_null);
     HU_RUN_TEST(test_value_learn_from_correction);
