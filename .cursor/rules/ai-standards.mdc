@@ -1,0 +1,36 @@
+---
+description: AI agent behavior standards for agent loop, persona, provider, and memory code
+globs:
+  - "src/agent/**"
+  - "src/persona/**"
+  - "src/providers/**"
+  - "src/memory/**"
+  - "include/human/agent*.h"
+  - "include/human/persona.h"
+  - "include/human/provider*.h"
+  - "include/human/memory*.h"
+---
+
+# AI Standards
+
+Read the applicable standard from `docs/standards/ai/` before modifying agent, persona, provider, or memory code.
+
+## Key Standards
+
+- **Agent architecture** (`docs/standards/ai/agent-architecture.md`): pipeline design, vtable responsibilities, retry/fallback, temperature guidance
+- **Prompt engineering** (`docs/standards/ai/prompt-engineering.md`): system prompt structure, persona composition, RAG patterns, context window management
+- **Conversation design** (`docs/standards/ai/conversation-design.md`): response patterns, channel-aware behavior, intent routing, error states
+- **Hallucination prevention** (`docs/standards/ai/hallucination-prevention.md`): grounding hierarchy, tool output integrity, memory attribution
+- **Human-in-the-loop** (`docs/standards/ai/human-in-the-loop.md`): approval tiers, security policy integration, confirmation flow
+- **Citation and sourcing** (`docs/standards/ai/citation-and-sourcing.md`): source tiers, freshness rules, confidence mapping
+- **Evaluation** (`docs/standards/ai/evaluation.md`): quality dimensions, golden-set testing, per-provider metrics
+
+## Critical Rules
+
+- Agent loop orchestrates; providers are stateless; tools never call providers directly
+- Every provider invocation is observable via `hu_observer_t` (tokens, latency, model, error)
+- Persona composition: identity + traits + channel overlay + examples + memory context
+- Tool results are highest-trust data; preserve numerical precision, never fabricate output
+- Max 2 retries per provider, then fallback; max depth 10 for tool dispatch loops
+- Never expose system internals to users (error codes, model names, token counts, tool JSON)
+- `HU_IS_TEST` guards for any provider calls or tool executions in tests

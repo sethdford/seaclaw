@@ -83,54 +83,9 @@ These codebase realities should drive every design decision:
 
 These principles are mandatory. They are implementation constraints, not suggestions.
 
-### 3.1 KISS
+Full details: `docs/standards/engineering/principles.md`
 
-Required:
-
-- Prefer straightforward control flow over meta-programming.
-- Prefer explicit `#ifdef` branches and typed structs over hidden dynamic behavior.
-- Keep error paths obvious and localized.
-
-### 3.2 YAGNI
-
-Required:
-
-- Do not add config keys, vtable methods, or feature flags without a concrete caller.
-- Do not introduce speculative abstractions.
-- Keep unsupported paths explicit (`return HU_ERR_NOT_SUPPORTED`) rather than silent no-ops.
-
-### 3.3 DRY + Rule of Three
-
-Required:
-
-- Duplicate small local logic when it preserves clarity.
-- Extract shared helpers only after repeated, stable patterns (rule-of-three).
-- When extracting, preserve module boundaries and avoid hidden coupling.
-
-### 3.4 Fail Fast + Explicit Errors
-
-Required:
-
-- Prefer explicit errors for unsupported or unsafe states.
-- Never silently broaden permissions or capabilities.
-- In tests: `HU_IS_TEST` guards are acceptable to skip side effects (e.g., spawning browsers), but the guard must be explicit and documented.
-
-### 3.5 Secure by Default + Least Privilege
-
-Required:
-
-- Deny-by-default for access and exposure boundaries.
-- Never log secrets, raw tokens, or sensitive payloads.
-- All outbound URLs must be HTTPS. HTTP is rejected at the tool layer.
-- Keep network/filesystem/shell scope as narrow as possible.
-
-### 3.6 Determinism + No Flaky Tests
-
-Required:
-
-- Tests must not spawn real network connections, open browsers, or depend on system state.
-- Use `HU_IS_TEST` to bypass side effects (spawning, opening URLs, real hardware I/O).
-- Tests must be reproducible across macOS and Linux.
+Summary: **KISS** (straightforward control flow, explicit `#ifdef`), **YAGNI** (no speculative flags/methods), **DRY + Rule of Three** (extract after 3 repetitions), **Fail Fast** (explicit errors, `HU_IS_TEST` guards), **Secure by Default** (deny-by-default, HTTPS-only, never log secrets), **Determinism** (no real network/browser/hardware in tests, reproducible across macOS/Linux).
 
 ## 4) Repository Map (High-Level)
 
@@ -175,10 +130,10 @@ All project standards live in `docs/standards/`. This is the single source of tr
 | ----------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | AI          | `docs/standards/ai/`          | Agent architecture, conversation design, hallucination prevention, prompt engineering, evaluation, citation/sourcing, human-in-the-loop |
 | Design      | `docs/standards/design/`      | Visual standards, motion design, UX patterns, design strategy, design system                                                            |
-| Engineering | `docs/standards/engineering/` | Principles (KISS/YAGNI/DRY), naming conventions, anti-patterns                                                                          |
+| Engineering | `docs/standards/engineering/` | Principles, naming, anti-patterns, testing, workflow                                                                                    |
 | Operations  | `docs/standards/operations/`  | Incident response, monitoring and observability                                                                                         |
 | Quality     | `docs/standards/quality/`     | Governance, ceremonies, code review                                                                                                     |
-| Security    | `docs/standards/security/`    | Threat model, sandbox                                                                                                                   |
+| Security    | `docs/standards/security/`    | Threat model, sandbox, AI safety                                                                                                        |
 
 **Before writing code, read the applicable standard.** Full index: `docs/standards/README.md`.
 
@@ -204,21 +159,15 @@ When uncertain, classify as higher risk.
 
 ### 6.1 Code Naming Contract (Required)
 
-Apply these naming rules consistently:
+Full details: `docs/standards/engineering/naming.md`
 
-- All identifiers: `snake_case` for functions, variables, fields, modules, files.
-- Types, structs, enums, unions: `hu_<name>_t` (e.g., `hu_provider_t`, `hu_channel_t`).
-- Constants and macros: `HU_SCREAMING_SNAKE_CASE` (e.g., `HU_OK`, `HU_ERR_NOT_SUPPORTED`).
-- Public functions: `hu_<module>_<action>` (e.g., `hu_provider_create`, `hu_channel_send`).
-- Factory registration keys: stable, lowercase, user-facing (e.g., `"openai"`, `"telegram"`, `"shell"`).
-- Tests: named by behavior (`subject_expected_behavior`), fixtures use neutral names.
+Quick reference: `snake_case` for identifiers, `hu_<name>_t` for types, `HU_SCREAMING_SNAKE` for constants, `hu_<module>_<action>` for public functions, `subject_expected_behavior` for tests.
 
 ### 6.2 Architecture Boundary Contract (Required)
 
-- Extend capabilities by adding vtable implementations + factory wiring first.
-- Keep dependency direction inward to contracts: concrete implementations depend on vtable/config/util, not on each other.
-- Avoid cross-subsystem coupling (provider code importing channel internals, tool code mutating gateway policy).
-- Keep module responsibilities single-purpose: orchestration in `agent/`, transport in `channels/`, model I/O in `providers/`, policy in `security/`, execution in `tools/`.
+Full details: `docs/standards/engineering/principles.md` (Architecture Boundaries section)
+
+Summary: vtable-first extension, inward dependency direction, no cross-subsystem coupling, single-purpose modules.
 
 ## 7) Change Playbooks
 
@@ -332,14 +281,9 @@ To bypass a hook in an emergency: `git commit --no-verify` / `git push --no-veri
 
 ### 8.2 Branch Naming and Git Workflow
 
-Required:
+Full details: `docs/standards/engineering/workflow.md`
 
-- Branch naming: `feat/<name>`, `fix/<name>`, `refactor/<name>`, `docs/<name>`, `test/<name>`, `chore/<name>`.
-- Commit format: `<type>[(<scope>)]: <description>` (enforced by `.githooks/commit-msg`).
-- Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `ci`, `build`, `style`.
-- Pre-push hook runs the full test suite — use `git push --no-verify` only in emergencies.
-- Pre-commit hook runs format check — use `git commit --no-verify` only in emergencies.
-- Keep each commit to a single concern. Don't mix feature + refactor + infra in one commit.
+Quick reference: `<type>/<name>` branches, `<type>[(<scope>)]: <description>` commits (enforced by hooks), one concern per commit, max 3-day branch lifetime.
 
 ## 8.3) Quality Ceremonies
 
@@ -368,15 +312,9 @@ Drift detection scripts:
 
 ## 10) Anti-Patterns (Do Not)
 
-- Do not add C dependencies or large Zig packages without strong justification (binary size impact).
-- Do not return vtable interfaces pointing to temporaries — dangling pointer.
-- Do not silently weaken security policy or access constraints.
-- Do not add speculative config/feature flags "just in case".
-- Do not skip `free()` — every allocation must be freed.
-- Do not modify unrelated modules "while here".
-- Do not include personal identity or sensitive information in tests, examples, docs, or commits.
-- Do not use `SQLITE_TRANSIENT` — use `SQLITE_STATIC` (null) instead.
-- Do not use `-Werror` exceptions — fix warnings at the source.
+Full details: `docs/standards/engineering/anti-patterns.md`
+
+Critical reminders: no vtable pointers to temporaries (dangling), no skipping `free()` (ASan catches), no `SQLITE_TRANSIENT` (use `SQLITE_STATIC`), no cross-subsystem coupling, no speculative flags, one concern per change.
 
 ## 11) Handoff Template (Agent → Agent / Maintainer)
 
@@ -514,45 +452,23 @@ Three glass tiers + choreography + Apple visionOS material densities:
 - Token source: `design-tokens/glass.tokens.json`
 - Visual reference: `docs/design-system-demo.html`
 
-### 12.5 Visual Hierarchy (Required — see `docs/standards/design/visual-standards.md`)
+### 12.5 Visual Hierarchy (Required)
 
-Required:
+Full details: `docs/standards/design/visual-standards.md`
 
-- **Squint test**: primary action and content area must be identifiable at a glance.
-- **Emphasis levels**: exactly ONE high-emphasis element per screen (M3 principle).
-- **60-30-10 color ratio**: 60% background, 30% secondary, 10% accent.
-- **Depth via elevation**: shadow intensity matches elevation level (Apple: Depth, M3: Elevation).
-- **Spacing rhythm**: use token scale consistently. Never skip >2 steps in the spacing scale.
-- **Whitespace**: empty space is a deliberate design choice, not a bug (Tufte: data-ink ratio).
+Key rules: squint test, ONE high-emphasis element per screen, 60-30-10 color ratio, spacing rhythm via token scale, whitespace is deliberate.
 
-### 12.6 Motion & Animation (Required — see `docs/standards/design/motion-design.md`)
+### 12.6 Motion & Animation (Required)
 
-Required — grounded in Disney/Pixar 12 Principles + Apple HIG + Material 3:
+Full details: `docs/standards/design/motion-design.md`
 
-- **Spring-first**: prefer spring easings for interactive elements (Apple HIG).
-- **Squash & stretch**: buttons compress on press, rebound on release (Disney principle 1).
-- **Anticipation**: hover states prepare users for action (Disney principle 2).
-- **Staging**: stagger reveals, dim backgrounds for focus (Disney principle 3).
-- **Timing**: use `--hu-duration-*` tokens. Small = fast, large = slow. Never exceed 700ms.
-- **Follow-through**: child elements complete animation after parent (Disney principle 5).
-- **Easing tokens**: `--hu-ease-out` (enter), `--hu-ease-in` (exit), `--hu-ease-spring` (interact). Never raw `cubic-bezier()`.
-- **Spring tokens**: `--hu-spring-micro`, `--hu-spring-standard`, `--hu-spring-expressive`, `--hu-spring-dramatic`.
-- **Choreography**: `--hu-stagger-delay` (50ms) between items, `--hu-stagger-max` (300ms) cap.
-- **Performance**: animate only compositor properties (transform, opacity, filter). No layout thrashing.
-- Every animation must respect `prefers-reduced-motion: reduce`.
-- Keyframe names use `hu-` prefix.
+Key rules: spring-first easings, `--hu-duration-*` / `--hu-ease-*` / `--hu-spring-*` tokens only, compositor properties only (transform, opacity, filter), `prefers-reduced-motion: reduce` respected, `hu-` prefix for keyframes, never exceed 700ms.
 
-### 12.7 Data Visualization (Required — see `docs/standards/design/visual-standards.md` §9)
+### 12.7 Data Visualization (Required)
 
-Required — grounded in Tufte's principles of analytical design:
+Full details: `docs/standards/design/visual-standards.md` §9
 
-- Maximize data-ink ratio. Remove grid lines, legends, and decoration that don't serve data.
-- Use `--hu-chart-categorical-{1..8}` for multi-series charts (never ad-hoc colors).
-- Use `--hu-chart-sequential-{100..800}` for ordered/heatmap data.
-- Use `--hu-chart-diverging-{positive,neutral,negative}` for positive/negative indicators.
-- Single-metric charts use `--hu-chart-brand`.
-- Prefer direct labels over legends. Prefer small multiples over complex overlapping series.
-- Token definitions live in `design-tokens/data-viz.tokens.json`.
+Key rules: maximize data-ink ratio, use `--hu-chart-*` tokens (categorical, sequential, diverging, brand), direct labels over legends, small multiples over overlapping series. Tokens in `design-tokens/data-viz.tokens.json`.
 
 ### 12.8 Lint Enforcement
 
@@ -562,17 +478,11 @@ Required:
 - Flags raw hex/rgba, hardcoded durations, and raw breakpoints in `.ts` files.
 - Wired into `npm run check` via `npm run lint:tokens`.
 
-### 12.9 Accessibility (Required — see `docs/standards/design/ux-patterns.md` §5)
+### 12.9 Accessibility (Required)
 
-Required:
+Full details: `docs/standards/design/ux-patterns.md` §5
 
-- WCAG 2.1 AA minimum (4.5:1 text contrast, 3:1 UI contrast).
-- All interactive elements: visible focus ring, keyboard operable.
-- Touch targets: minimum 44×44px (Apple HIG).
-- Modals: focus trap, Escape to close, `aria-modal`.
-- `prefers-color-scheme` and `prefers-reduced-motion` both supported.
-- No information conveyed by color alone — always pair with icon, label, or pattern.
-- Semantic HTML: headings follow hierarchy, lists use proper elements, live regions for dynamic content.
+Key rules: WCAG 2.1 AA (4.5:1 text, 3:1 UI), visible focus rings, keyboard operable, 44×44px touch targets, `prefers-color-scheme` + `prefers-reduced-motion` supported, no color-only information.
 
 ### 12.10 Change Playbook: Adding a UI Component
 

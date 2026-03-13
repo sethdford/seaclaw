@@ -52,6 +52,8 @@ AGENTS.md                <- Full engineering protocol
 | [principles.md](engineering/principles.md)       | KISS, YAGNI, DRY, fail-fast, secure-by-default, determinism | All code changes              |
 | [naming.md](engineering/naming.md)               | Identifier conventions, type naming, constant naming        | All code changes              |
 | [anti-patterns.md](engineering/anti-patterns.md) | Prohibited patterns with reasons and alternatives           | Code review, design decisions |
+| [testing.md](engineering/testing.md)             | Test structure, naming, mocking, coverage, quality rules    | Writing or modifying tests    |
+| [workflow.md](engineering/workflow.md)           | Branching, commits, versioning, releases, hotfixes          | All development work          |
 
 ## Quality
 
@@ -70,7 +72,8 @@ AGENTS.md                <- Full engineering protocol
 
 ## Security
 
-| Doc                                         | Covers                                       | Used When                          |
-| ------------------------------------------- | -------------------------------------------- | ---------------------------------- |
-| [threat-model.md](security/threat-model.md) | STRIDE threat model, attack surface analysis | Security-sensitive changes         |
-| [sandbox.md](security/sandbox.md)           | Sandbox isolation system, backend comparison | Runtime and tool execution changes |
+| Doc                                         | Covers                                                   | Used When                          |
+| ------------------------------------------- | -------------------------------------------------------- | ---------------------------------- |
+| [threat-model.md](security/threat-model.md) | STRIDE threat model, attack surface analysis             | Security-sensitive changes         |
+| [sandbox.md](security/sandbox.md)           | Sandbox isolation system, backend comparison             | Runtime and tool execution changes |
+| [ai-safety.md](security/ai-safety.md)       | Prompt injection, output validation, safe tool execution | AI agent behavior, tool security   |
