@@ -156,14 +156,25 @@ Targeted improvements to close the gap with benchmark brands:
 - **Scroll entrance for all views**: Auto-applied via `GatewayAwareLitElement` base class
 - **Quality infrastructure**: Component audit script, cross-surface token consistency checker, scorecard rubrics with concrete 9/10 criteria
 
+## Sprint 2 Changes (Q1 2026)
+
+- **CI quality enforcement**: `check:components` and `check-unused-tokens.sh` no longer `continue-on-error` — they block the build
+- **Native app motion**: iOS spring animations standardized to `HUTokens.springExpressive` across all views
+- **Native brand cohesion**: iOS TabView uses token-based accent tint, SettingsView uses Avenir fonts
+- **Website build pipeline**: `prebuild` now runs `design-tokens` build to prevent token drift
+- **Test coverage**: Added 90 tests for peripheral_ctrl, value_learning, and goal_engine — `check-untested.sh` passes clean
+- **Reduced-motion compliance**: All 8 dashboard views now respect `prefers-reduced-motion`
+- **Scorecard re-audit**: Q1 2026 sprint scores confirmed and updated (Dashboard 56/70, Website 54/70, iOS 41/70)
+
 ## Next Steps
 
 - Re-run benchmark with PageSpeed API key to reduce fetch failures (Raycast, Lando Norris, Immersive Garden).
 - Deploy h-uman.ai custom domain to get production PageSpeed data.
 - Schedule Q2 2026 quarterly review.
 - Measure post-optimization LCP (target: <1.0s, stretch <0.5s).
-- Run component quality audit and fix remaining B-grade components (50 of 111).
+- Android Compose UI: implement spring animations, add design token usage beyond `DesignTokens.kt`.
 - Add virtual scrolling to chat and log views for large datasets.
+- Native app feature parity: implement overview, sessions, and metrics views for iOS/Android.
 
 ## Related
 

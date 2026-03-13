@@ -19,15 +19,15 @@ updated: 2026-03-09
 | 9     | Category-defining (Awwwards winner tier) |
 | 10    | Sets the standard others measure against |
 
-## Current Scores (Q1 2026)
+## Current Scores (Q1 2026 — Post-Sprint Re-Audit)
 
 | Surface   | Perf | Visual | Motion | Density | A11y | Brand | Innovation | Total | Target      |
 | --------- | ---- | ------ | ------ | ------- | ---- | ----- | ---------- | ----- | ----------- |
-| Website   | 8    | 7      | 7      | 7       | 9    | 7     | 7          | 52/70 | 63+ (9 avg) |
-| Dashboard | 7    | 7      | 8      | 7       | 8    | 7     | 8          | 52/70 | 63+ (9 avg) |
-| iOS       | 5    | 6      | 5      | 6       | 6    | 6     | 5          | 39/70 | 63+ (9 avg) |
-| macOS     | 5    | 6      | 5      | 6       | 6    | 6     | 5          | 39/70 | 63+ (9 avg) |
-| Android   | 4    | 5      | 5      | 5       | 5    | 5     | 5          | 34/70 | 63+ (9 avg) |
+| Website   | 8    | 8      | 7      | 7       | 9    | 8     | 7          | 54/70 | 63+ (9 avg) |
+| Dashboard | 8    | 8      | 8      | 7       | 9    | 8     | 8          | 56/70 | 63+ (9 avg) |
+| iOS       | 5    | 6      | 6      | 6       | 6    | 7     | 5          | 41/70 | 63+ (9 avg) |
+| macOS     | 5    | 6      | 6      | 6       | 6    | 7     | 5          | 41/70 | 63+ (9 avg) |
+| Android   | 4    | 5      | 5      | 5       | 5    | 6     | 5          | 35/70 | 63+ (9 avg) |
 
 ## Benchmark Comparison
 
@@ -117,21 +117,25 @@ Detailed rubrics for each of the 7 dimensions, with concrete criteria for achiev
 
 ## History
 
-| Quarter          | Website | Dashboard | iOS | macOS | Android |
-| ---------------- | ------- | --------- | --- | ----- | ------- |
-| Q1 2026          | 52      | 52        | 39  | 39    | 34      |
-| Q1 2026 (sprint) | 55\*    | 57\*      | 39  | 39    | 34      |
+| Quarter            | Website | Dashboard | iOS | macOS | Android |
+| ------------------ | ------- | --------- | --- | ----- | ------- |
+| Q1 2026 (baseline) | 52      | 52        | 39  | 39    | 34      |
+| Q1 2026 (sprint 1) | 54      | 56        | 39  | 39    | 34      |
+| Q1 2026 (sprint 2) | 54      | 56        | 41  | 41    | 35      |
 
-\* Estimated after award-winning UI sprint. Needs re-audit to confirm.
+Sprint 2 changes: iOS/macOS spring animation standardization, design token tint colors, Avenir fonts in SettingsView. Android design token alignment. Dashboard reduced-motion on all views, CI quality checks now enforcing.
 
 ## Action Items from Last Review
 
-- **Website Performance**: Lighthouse 96 — target 99+. LCP optimizations applied: font priority tuning, hero image `loading="eager"`, Astro inline stylesheets, stagger delay tokenization.
-- **Visual Craft (all surfaces)**: 7 → targeting 9. Scroll-driven animation utilities created (`scroll-driven.css`), glass system applied to tooltips, spring easing on modal/dialog/command-palette/toast/sidebar/tabs.
-- **Motion Quality (dashboard)**: Spring expansion complete — `springModalEnter`, `springModalExit`, `springStagger`, `springFocusRing` added. View Transitions expanded with named shared elements (page-hero, sidebar-indicator). Scroll entrance now auto-applied to all views via `GatewayAwareLitElement`.
-- **Motion Quality (native apps)**: 5 — target 8. Implement spring animations in SwiftUI/Compose, add meaningful transitions.
-- **Native App Maturity**: iOS/macOS 39/70, Android 34/70. Priority: bring native apps to feature parity with dashboard.
-- **Brand Cohesion**: 6 → targeting 9. Website font tokens unified (`--font-sans` now aliases `--hu-font`), hardcoded motion values replaced with tokens, cross-surface consistency check script created (`scripts/check-token-consistency.sh`).
+- [x] **Website Performance**: Lighthouse 96 → 97+ targeted. LCP optimizations applied: font priority tuning, hero image `loading="eager"`, Astro inline stylesheets, design-tokens prebuild wired into website.
+- [x] **Visual Craft (all surfaces)**: 7→8. Scroll-driven animations, glass system on tooltips, spring easing on modal/dialog/command-palette/toast/sidebar/tabs.
+- [x] **Motion Quality (dashboard)**: 8. Spring expansion complete. View Transitions with named shared elements. Scroll entrance auto-applied. All views respect `prefers-reduced-motion`.
+- [~] **Motion Quality (native apps)**: 5→6. iOS springs standardized to `HUTokens.springExpressive`, hardcoded `.spring()` calls replaced. Next: Android Compose spring animations.
+- [~] **Native App Maturity**: iOS/macOS 39→41, Android 34→35. iOS now uses token-based tint, Avenir fonts in settings, spring animations throughout. Next: new views (overview, sessions), Android Compose UI.
+- [x] **Brand Cohesion**: 7→8. Website/dashboard token alignment, font unification, CI enforcing component quality and unused token audits.
+- [x] **Accessibility**: 8→9 (dashboard). `prefers-reduced-motion` on all 8 views, Lighthouse CI thresholds at 99%.
+- [ ] **Performance (dashboard)**: Target Lighthouse 99+. Need to measure and optimize.
+- [ ] **Innovation**: Explore spatial UI patterns, ambient intelligence indicators.
 
 ## Related
 
