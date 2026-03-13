@@ -181,7 +181,7 @@ jobs:
       - name: Unused token audit
         run: bash scripts/check-unused-tokens.sh
       - run: npm run build
-      - name: Enforce bundle size budget (350KB)
+      - name: Enforce bundle size budget (300KB)
         run: bash scripts/check-bundle-size.sh
       - name: UI test count regression guard
         run: |
@@ -501,6 +501,25 @@ jobs:
         run: scripts/check-standards-drift.sh
       - name: Terminology compliance check
         run: scripts/check-terminology.sh
+
+  quality-score:
+    runs-on: ubuntu-latest
+    needs: [build-and-test, ui]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install build deps
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev libcurl4-openssl-dev
+      - name: Build
+        run: |
+          cmake -B build -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_SQLITE=ON -DHU_ENABLE_PERSONA=ON -DHU_ENABLE_SKILLS=ON
+          cmake --build build -j$(nproc)
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Install UI deps
+        run: cd ui && npm ci --ignore-scripts
+      - name: Quality score report
+        run: bash scripts/quality-score-report.sh
 
   fuzz:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'

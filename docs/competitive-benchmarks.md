@@ -166,17 +166,43 @@ Targeted improvements to close the gap with benchmark brands:
 - **Reduced-motion compliance**: All 8 dashboard views now respect `prefers-reduced-motion`
 - **Scorecard re-audit**: Q1 2026 sprint scores confirmed and updated (Dashboard 56/70, Website 54/70, iOS 41/70)
 
+## Sprint 3 Changes (Q1 2026)
+
+- **Award-winning quality criteria**: New `docs/standards/quality/award-criteria.md` defines Awwwards, Apple Design Award, Google Play Best App submission checklists with measurable criteria
+- **Lighthouse thresholds tightened**: Performance >= 98, Accessibility = 100, LCP error at 1500ms, CLS error at 0.005, TBT error at 50ms
+- **Bundle size budget reduced**: 350KB → 300KB entry bundle
+- **Component quality check fixed**: Bug where `--sc-*` was checked instead of `--hu-*` tokens — now correctly validates design token usage
+- **Android Compose UI**: Full Compose app created — Overview, Chat, Settings screens with Material 3 + HUTokens theming, spring animations, Avenir typography
+- **macOS design tokens**: SettingsView and HumanApp now use HUTokens (Avenir, accent colors, spring animations, tonal surfaces)
+- **Website token compliance**: All hardcoded hex colors tokenized — terminal chrome uses `--hu-terminal-*` custom properties, transition durations use `--hu-duration-*` tokens
+- **Automated quality scoring**: New `scripts/quality-score-report.sh` runs in CI, measuring component quality, token compliance, test coverage, cross-platform parity, accessibility, motion quality, reduced-motion support
+- **CI quality gate**: New `quality-score` job in CI pipeline aggregates all quality signals
+
+## Award Submission Readiness
+
+| Program                  | Surface   | Status          | Blockers                                                            |
+| ------------------------ | --------- | --------------- | ------------------------------------------------------------------- |
+| **Awwwards**             | Website   | Not ready       | LCP too high (2.6s), missing WebGL hero, no scroll-driven narrative |
+| **CSS Design Awards**    | Website   | Partially ready | Strong CSS innovation, needs production deployment                  |
+| **Webby Awards**         | Dashboard | Partially ready | Strong UX, needs production deployment for judging                  |
+| **Apple Design Awards**  | iOS       | Not ready       | Only 2 views, missing Dynamic Type, Live Activities, App Intents    |
+| **Google Play Best App** | Android   | Not ready       | New Compose UI, needs polish, Accessibility Scanner, Widget         |
+
+See `docs/standards/quality/award-criteria.md` for complete submission checklists.
+
 ## Next Steps
 
-- Re-run benchmark with PageSpeed API key to reduce fetch failures (Raycast, Lando Norris, Immersive Garden).
-- Deploy h-uman.ai custom domain to get production PageSpeed data.
-- Schedule Q2 2026 quarterly review.
-- Measure post-optimization LCP (target: <1.0s, stretch <0.5s).
-- Android Compose UI: implement spring animations, add design token usage beyond `DesignTokens.kt`.
-- Add virtual scrolling to chat and log views for large datasets.
-- Native app feature parity: implement overview, sessions, and metrics views for iOS/Android.
+- Deploy h-uman.ai for production PageSpeed data and award submissions
+- iOS feature parity: add Overview, Sessions views; Dynamic Type; App Intents for Siri
+- Android polish: Accessibility Scanner audit, predictive back, widget
+- Website WebGL hero element for Awwwards visual impact
+- Website scroll-driven narrative sections with parallax
+- Dashboard Lighthouse audit — target 99+ performance
+- Flutter app: build Compose-equivalent screens or sunset decision
+- Schedule Q2 2026 quarterly review with updated scores
 
 ## Related
 
 - [Quality Scorecard](quality-scorecard.md) — detailed audit methodology and scorecard templates
+- [Award-Winning Quality Criteria](standards/quality/award-criteria.md) — concrete criteria for award submissions
 - [Competitive Intelligence Design](plans/2026-03-09-competitive-intelligence-design.md) — design doc for the benchmark framework

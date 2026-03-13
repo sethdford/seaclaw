@@ -1,4 +1,5 @@
 import SwiftUI
+import HumanChatUI
 
 @main
 struct HumanApp: App {
@@ -16,11 +17,15 @@ struct HumanApp: App {
                     }
                 }
                 Button("Start Service") {
-                    status.startService()
+                    withAnimation(HUTokens.springExpressive) {
+                        status.startService()
+                    }
                 }
                 .disabled(status.isServiceRunning)
                 Button("Stop Service") {
-                    status.stopService()
+                    withAnimation(HUTokens.springExpressive) {
+                        status.stopService()
+                    }
                 }
                 .disabled(!status.isServiceRunning)
                 Divider()
@@ -33,11 +38,13 @@ struct HumanApp: App {
                     NSApplication.shared.terminate(nil)
                 }
             }
+            .font(.custom("Avenir-Book", size: HUTokens.textBase))
             .frame(minWidth: 200)
         } label: {
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(status.statusColor)
+                .animation(HUTokens.springExpressive, value: "\(status.isServiceRunning)-\(status.isGatewayConnected)")
         }
     }
 }

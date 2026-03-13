@@ -69,12 +69,13 @@ AGENTS.md                <- Full engineering protocol
 
 ## Quality
 
-| Doc                                              | Covers                                                                       | Used When                     |
-| ------------------------------------------------ | ---------------------------------------------------------------------------- | ----------------------------- |
-| [governance.md](quality/governance.md)           | Five principles, gatekeeping mindset, drift prevention, compliance checklist | Every change                  |
-| [ceremonies.md](quality/ceremonies.md)           | Weekly drift audit, PR completion gate, release gate                         | Recurring quality checkpoints |
-| [code-review.md](quality/code-review.md)         | Review priorities, risk-adjusted depth, merge criteria                       | Before merging any change     |
-| [channel-testing.md](quality/channel-testing.md) | Channel vtable tests, HU_IS_TEST mocking, memory testing, destroy convention | Adding or modifying channels  |
+| Doc                                              | Covers                                                                          | Used When                             |
+| ------------------------------------------------ | ------------------------------------------------------------------------------- | ------------------------------------- |
+| [governance.md](quality/governance.md)           | Five principles, gatekeeping mindset, drift prevention, compliance checklist    | Every change                          |
+| [award-criteria.md](quality/award-criteria.md)   | Award-winning quality criteria, best-in-class benchmarks, submission checklists | UI quality targets, award submissions |
+| [ceremonies.md](quality/ceremonies.md)           | Weekly drift audit, PR completion gate, release gate                            | Recurring quality checkpoints         |
+| [code-review.md](quality/code-review.md)         | Review priorities, risk-adjusted depth, merge criteria                          | Before merging any change             |
+| [channel-testing.md](quality/channel-testing.md) | Channel vtable tests, HU_IS_TEST mocking, memory testing, destroy convention    | Adding or modifying channels          |
 
 ## Operations
 

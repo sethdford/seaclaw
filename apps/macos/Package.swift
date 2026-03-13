@@ -4,9 +4,15 @@ import PackageDescription
 let package = Package(
     name: "Human",
     platforms: [.macOS(.v14)],
+    dependencies: [
+        .package(path: "../shared/HumanKit"),
+    ],
     targets: [
         .executableTarget(
             name: "Human",
+            dependencies: [
+                .product(name: "HumanChatUI", package: "HumanKit"),
+            ],
             path: "Sources/HumanApp"
         ),
     ]

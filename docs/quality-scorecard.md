@@ -19,15 +19,15 @@ updated: 2026-03-09
 | 9     | Category-defining (Awwwards winner tier) |
 | 10    | Sets the standard others measure against |
 
-## Current Scores (Q1 2026 — Post-Sprint Re-Audit)
+## Current Scores (Q1 2026 — Sprint 3 Re-Audit)
 
 | Surface   | Perf | Visual | Motion | Density | A11y | Brand | Innovation | Total | Target      |
 | --------- | ---- | ------ | ------ | ------- | ---- | ----- | ---------- | ----- | ----------- |
 | Website   | 8    | 8      | 7      | 7       | 9    | 8     | 7          | 54/70 | 63+ (9 avg) |
 | Dashboard | 8    | 8      | 8      | 7       | 9    | 8     | 8          | 56/70 | 63+ (9 avg) |
 | iOS       | 5    | 6      | 6      | 6       | 6    | 7     | 5          | 41/70 | 63+ (9 avg) |
-| macOS     | 5    | 6      | 6      | 6       | 6    | 7     | 5          | 41/70 | 63+ (9 avg) |
-| Android   | 4    | 5      | 5      | 5       | 5    | 6     | 5          | 35/70 | 63+ (9 avg) |
+| macOS     | 5    | 7      | 7      | 6       | 6    | 8     | 5          | 44/70 | 63+ (9 avg) |
+| Android   | 5    | 6      | 6      | 6       | 5    | 7     | 6          | 41/70 | 63+ (9 avg) |
 
 ## Benchmark Comparison
 
@@ -122,22 +122,29 @@ Detailed rubrics for each of the 7 dimensions, with concrete criteria for achiev
 | Q1 2026 (baseline) | 52      | 52        | 39  | 39    | 34      |
 | Q1 2026 (sprint 1) | 54      | 56        | 39  | 39    | 34      |
 | Q1 2026 (sprint 2) | 54      | 56        | 41  | 41    | 35      |
+| Q1 2026 (sprint 3) | 54      | 56        | 41  | 44    | 41      |
 
-Sprint 2 changes: iOS/macOS spring animation standardization, design token tint colors, Avenir fonts in SettingsView. Android design token alignment. Dashboard reduced-motion on all views, CI quality checks now enforcing.
+Sprint 3 changes: macOS app fully tokenized (HUTokens, Avenir, spring animations, tonal surfaces). Android Compose UI built from scratch (Overview, Chat, Settings screens with Material 3 + HUTokens, spring animations). Website hardcoded hex replaced with tokens. Lighthouse thresholds tightened (98+ performance, 100 a11y). Bundle budget reduced to 300KB. Automated quality score reporting in CI. Award-winning quality criteria document created. Component quality check bug fixed.
 
 ## Action Items from Last Review
 
 - [x] **Website Performance**: Lighthouse 96 → 97+ targeted. LCP optimizations applied: font priority tuning, hero image `loading="eager"`, Astro inline stylesheets, design-tokens prebuild wired into website.
 - [x] **Visual Craft (all surfaces)**: 7→8. Scroll-driven animations, glass system on tooltips, spring easing on modal/dialog/command-palette/toast/sidebar/tabs.
 - [x] **Motion Quality (dashboard)**: 8. Spring expansion complete. View Transitions with named shared elements. Scroll entrance auto-applied. All views respect `prefers-reduced-motion`.
-- [~] **Motion Quality (native apps)**: 5→6. iOS springs standardized to `HUTokens.springExpressive`, hardcoded `.spring()` calls replaced. Next: Android Compose spring animations.
-- [~] **Native App Maturity**: iOS/macOS 39→41, Android 34→35. iOS now uses token-based tint, Avenir fonts in settings, spring animations throughout. Next: new views (overview, sessions), Android Compose UI.
-- [x] **Brand Cohesion**: 7→8. Website/dashboard token alignment, font unification, CI enforcing component quality and unused token audits.
-- [x] **Accessibility**: 8→9 (dashboard). `prefers-reduced-motion` on all 8 views, Lighthouse CI thresholds at 99%.
+- [x] **Motion Quality (native apps)**: iOS 6, macOS 5→7. iOS springs standardized. macOS now uses `HUTokens.springExpressive` for all state changes.
+- [x] **Native App Maturity**: macOS 41→44 (full token system). Android 35→41 (Compose UI with 3 screens, Material 3 + HUTokens, spring animations).
+- [x] **Brand Cohesion**: macOS 7→8 (Avenir, accent colors, spring animations). Android 6→7 (full theme, token-based colors).
+- [x] **Accessibility**: 8→9 (dashboard). `prefers-reduced-motion` on all views, Lighthouse CI at 100 a11y.
+- [x] **Website Token Compliance**: All hardcoded hex replaced with `--hu-*` tokens. Terminal chrome tokenized.
+- [x] **CI Quality Gates**: Lighthouse 98+ perf, 100 a11y, CLS 0.005, TBT 50ms. Bundle budget 300KB. Automated quality scoring in CI.
 - [ ] **Performance (dashboard)**: Target Lighthouse 99+. Need to measure and optimize.
-- [ ] **Innovation**: Explore spatial UI patterns, ambient intelligence indicators.
+- [ ] **Innovation**: Explore spatial UI patterns, ambient intelligence indicators, WebGL hero.
+- [ ] **iOS feature parity**: Add Overview, Sessions views; Dynamic Type; App Intents for Siri.
+- [ ] **Android polish**: Accessibility Scanner audit, predictive back gesture, widget integration.
+- [ ] **Award submissions**: Deploy to production for Awwwards/Webby judging.
 
 ## Related
 
 - [Competitive Benchmarks](competitive-benchmarks.md)
+- [Award-Winning Quality Criteria](standards/quality/award-criteria.md)
 - [Design doc](plans/2026-03-09-competitive-intelligence-design.md)

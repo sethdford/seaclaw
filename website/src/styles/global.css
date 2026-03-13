@@ -70,6 +70,11 @@
     --hu-web-node-stroke: rgba(0, 0, 0, 0.08);
     --hu-web-line-stroke: #d4d4d8;
 
+    /* ── Terminal chrome (macOS window controls) ── */
+    --hu-terminal-close: #ff5f57;
+    --hu-terminal-minimize: #febc2e;
+    --hu-terminal-maximize: #28c840;
+
     /* ── Typography: alias to shared tokens from _tokens.css ── */
     --font-sans: var(--hu-font);
     --font-mono: var(--hu-font-mono);
@@ -307,13 +312,13 @@
         from 0deg at 50% 50%,
         color-mix(in srgb, var(--hu-accent) 18%, transparent) 0deg,
         transparent 60deg,
-        color-mix(in srgb, var(--hu-accent-tertiary, #6366f1) 14%, transparent)
+        color-mix(in srgb, var(--hu-accent-tertiary) 14%, transparent)
           120deg,
         transparent 180deg,
-        color-mix(in srgb, var(--hu-accent-secondary, #f59e0b) 12%, transparent)
+        color-mix(in srgb, var(--hu-accent-secondary) 12%, transparent)
           240deg,
         transparent 300deg,
-        color-mix(in srgb, var(--hu-accent-tertiary, #6366f1) 10%, transparent)
+        color-mix(in srgb, var(--hu-accent-tertiary) 10%, transparent)
           340deg,
         color-mix(in srgb, var(--hu-accent) 18%, transparent) 360deg
       ),
@@ -324,7 +329,7 @@
       ),
       radial-gradient(
         ellipse at 80% 20%,
-        color-mix(in srgb, var(--hu-accent-tertiary, #6366f1) 10%, transparent)
+        color-mix(in srgb, var(--hu-accent-tertiary) 10%, transparent)
           0%,
         transparent 50%
       );
@@ -532,13 +537,13 @@
   }
   /* Stagger support via CSS custom property */
   [data-reveal][style*="--ri"] {
-    transition-delay: calc(var(--ri, 0) * 50ms);
+    transition-delay: calc(var(--ri, 0) * var(--hu-duration-instant));
   }
-  /* Cap stagger at 300ms */
+  /* Cap stagger at --hu-stagger-max */
   [data-reveal][style*="--ri:7"],
   [data-reveal][style*="--ri:8"],
   [data-reveal][style*="--ri:9"] {
-    transition-delay: 300ms;
+    transition-delay: var(--hu-stagger-max);
   }
 
   /* ── Scroll-driven animation (CSS animation-timeline) ── */
@@ -591,7 +596,7 @@
     border-radius: 50%;
     background: radial-gradient(
       circle,
-      color-mix(in srgb, var(--hu-accent-secondary, #f59e0b) 15%, transparent)
+      color-mix(in srgb, var(--hu-accent-secondary) 15%, transparent)
         0%,
       transparent 70%
     );
@@ -606,7 +611,7 @@
     border-radius: 50%;
     background: radial-gradient(
       circle,
-      color-mix(in srgb, var(--hu-accent-tertiary, #6366f1) 12%, transparent) 0%,
+      color-mix(in srgb, var(--hu-accent-tertiary) 12%, transparent) 0%,
       transparent 70%
     );
     pointer-events: none;
@@ -682,7 +687,7 @@
     transform: translateY(0) scale(0.98);
     box-shadow: 0 1px 2px
       color-mix(in srgb, var(--hu-web-text) 10%, transparent);
-    transition-duration: 50ms;
+    transition-duration: var(--hu-duration-instant);
   }
 
   .btn-outline {
@@ -841,6 +846,11 @@
   #arch-core circle {
     animation: node-pulse 3s ease-in-out infinite;
   }
+}
+
+/* ── Provider pill transition (token-based) ── */
+.provider-pill.transition-all {
+  transition-duration: var(--hu-duration-normal);
 }
 
 /* ── GPU compositing hints — promote animated layers ── */

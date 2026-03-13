@@ -38,7 +38,7 @@ check "Extends LitElement" "extends LitElement"
 check "Has static styles" "static\s+(override\s+)?styles"
 
 # 4. Must use --hu- tokens (at least one)
-check "Uses --hu-* design tokens" "var\(--sc-"
+check "Uses --hu-* design tokens" "var\(--hu-"
 
 # 5. Must NOT have hardcoded hex colors
 if grep -qE '#[0-9a-fA-F]{3,8}' "$FILE" 2>/dev/null; then

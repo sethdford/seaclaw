@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import AppKit
+import HumanChatUI
 
 @MainActor
 class StatusViewModel: ObservableObject {
@@ -10,12 +11,12 @@ class StatusViewModel: ObservableObject {
     var isGatewayConnected: Bool { gatewayClient.isConnected }
     var statusColor: Color {
         if isServiceRunning && isGatewayConnected {
-            return .green
+            return HUTokens.Dark.accent
         }
         if isServiceRunning || isGatewayConnected {
-            return .yellow
+            return HUTokens.Dark.warning
         }
-        return .red
+        return HUTokens.Dark.error
     }
 
     let gatewayClient: GatewayClient
