@@ -62,6 +62,14 @@ conv_goals.c        Conversation goal tracking
 team.c              Multi-agent team coordination
 ```
 
+## Autonomy & Coordination
+
+```
+goals.c             Autonomous goal engine (create, decompose, prioritize, track)
+orchestrator.c      Multi-agent task coordination (register agents, split tasks, assign, merge)
+orchestrator_llm.c  LLM-based goal decomposition into subtasks
+```
+
 ## Key Flow
 
 ```
