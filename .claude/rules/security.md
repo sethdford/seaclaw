@@ -1,0 +1,27 @@
+---
+paths: src/security/**, include/human/security.h, include/human/crypto.h
+---
+
+# Security Module (High Risk)
+
+This is a high-blast-radius area. Read AGENTS.md sections 3.5 and 7.5 before any change.
+
+## Principles
+
+- Deny-by-default for all access and exposure boundaries
+- Never log secrets, raw tokens, or sensitive payloads
+- HTTPS-only for all outbound URLs
+- Every change must include threat/risk notes in the commit message
+
+## Specific Rules
+
+- Pairing: never weaken lockout thresholds or bypass code validation
+- AEAD: use stack buffers for decrypt, then dupe()
+- Secret store: always check encrypt/decrypt return values
+- Policy: never silently broaden permissions or capabilities
+
+## Required Tests
+
+- At least one boundary/failure-mode test per change
+- Test lockout, invalid input, privilege escalation paths
+- Use `HU_IS_TEST` for crypto or network operations

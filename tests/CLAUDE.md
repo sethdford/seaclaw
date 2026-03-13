@@ -1,6 +1,6 @@
 # tests/ — Test Suite
 
-3,127+ C tests using a lightweight custom framework (`test_framework.h`).
+4,640+ C tests using a lightweight custom framework (`test_framework.h`).
 
 ## Framework
 
@@ -26,6 +26,18 @@ void run_example_tests(void) {
 - Free all allocations — ASan catches leaks
 - Never assert tautologies like `HU_ASSERT_TRUE(1)` — use meaningful assertions
 - Use neutral test data: `"test-key"`, `"example.com"`, `"user_a"` — no real credentials or PII
+
+## Running Tests
+
+```bash
+./build/human_tests                          # run all tests
+./build/human_tests --suite=JSON             # run suites matching "JSON"
+./build/human_tests --filter=config_parse    # run tests matching "config_parse"
+./build/human_tests --suite=security --filter=vault  # combine both
+./build/human_tests --help                   # show all options
+```
+
+Use `scripts/what-to-test.sh <changed-files>` to auto-detect relevant suites for changed files.
 
 ## Adding Tests
 

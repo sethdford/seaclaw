@@ -112,4 +112,6 @@ eval_success_criteria.json
 
 # Training data and model weights
 data/imessage/
+data/facebook/
+data/merged/
 *.safetensors

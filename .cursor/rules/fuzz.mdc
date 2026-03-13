@@ -1,0 +1,49 @@
+---
+description: Fuzz harness standards for libFuzzer-based testing
+globs:
+  - "fuzz/**"
+  - "tests/fuzz/**"
+---
+
+# Fuzz Harness Standards
+
+Fuzz harnesses use libFuzzer to find crashes, memory errors, and edge cases in parsers and input handlers.
+
+## Harness Structure
+
+```c
+#include "human/core/json.h"  // or relevant header
+
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    // Parse, validate, or process the fuzzed input
+    // Free all allocations — ASan must stay clean
+    return 0;
+}
+```
+
+## Rules
+
+- One harness per parser or input handler
+- Always free all allocations — ASan runs during fuzzing
+- Never call `exit()`, `abort()`, or `_exit()` from harness code
+- Return 0 from `LLVMFuzzerTestOneInput` on all paths
+- Keep harnesses small and focused — fuzz one thing per harness
+
+## Build Requirements
+
+- Requires Clang (`cmake --preset fuzz` or `-DCMAKE_C_COMPILER=clang -DHU_ENABLE_FUZZ=ON`)
+- Register new harnesses in `CMakeLists.txt` under the `HU_ENABLE_FUZZ` section
+- Each harness compiles to its own binary (e.g., `fuzz_json_parse`)
+
+## Corpus
+
+- Add seed inputs in `fuzz/corpus/<harness_name>/`
+- Seeds should cover: valid input, edge cases, empty input, maximum-length input
+- Corpus directories are committed to the repo
+
+## Running
+
+```bash
+cmake --preset fuzz && cmake --build --preset fuzz
+./build-fuzz/fuzz_json_parse fuzz/corpus/json/ -max_total_time=60
+```

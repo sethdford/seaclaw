@@ -1,0 +1,36 @@
+---
+paths: src/runtime/**, include/human/runtime/**
+---
+
+# Runtime Module (High Risk)
+
+Runtime adapters manage execution environments (native, Docker, WASM, cloud). Read AGENTS.md sections 3.5 and 7.5 before any change.
+
+## Vtable Contract
+
+Implement `hu_runtime_t` vtable. Register in `src/runtime/factory.c`.
+
+## Platform Guards
+
+- Non-supported platforms must return `HU_ERR_NOT_SUPPORTED` — never silent no-ops
+- Use `#ifdef` guards for platform-specific code (POSIX, Linux, macOS, WASM)
+- Test on both macOS and Linux (CI covers both)
+
+## Sandboxing
+
+- Sandbox backends (landlock, firejail, bwrap) must enforce least-privilege
+- Never weaken sandbox policy without explicit justification
+- Docker runtime: validate image names, reject shell metacharacters
+- WASM runtime: validate module paths, enforce memory limits
+
+## Error Handling
+
+- All runtime operations can fail — check return values
+- Clean up resources on error paths (file descriptors, child processes, temp files)
+- Use `HU_IS_TEST` for operations that spawn real processes or containers
+
+## Required Tests
+
+- Test vtable wiring (create, configure, run, cleanup)
+- Test failure modes (unsupported platform, invalid config, resource exhaustion)
+- Test cleanup on error paths — no resource leaks

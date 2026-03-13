@@ -2,6 +2,8 @@
 # pre-push: run the full test suite before pushing.
 # Activate: git config core.hooksPath .githooks
 # Note: ASan and coverage are CI-only (too slow for local hooks).
+#
+# Set HU_FULL_PREPUSH=1 to also run UI typecheck/tests and website build.
 
 JOBS=$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
 BUILD_DIR="build-check"
@@ -28,7 +30,35 @@ if [ -f "CMakeLists.txt" ]; then
     # Auto-sync stats across all docs (AGENTS.md, README.md, CONTRIBUTING.md, etc.)
     if [ -x "scripts/update-stats.sh" ]; then
         echo "Syncing project stats..."
-        bash scripts/update-stats.sh --apply 2>/dev/null || true
+        bash scripts/update-stats.sh --apply 2>/dev/null
+        if [ $? -ne 0 ]; then
+            echo "Warning: stats sync failed. Run 'scripts/update-stats.sh --apply' manually."
+        fi
+    fi
+
+    # Optional: UI and website checks (set HU_FULL_PREPUSH=1 to enable)
+    if [ "${HU_FULL_PREPUSH:-0}" = "1" ]; then
+        if [ -f "ui/package.json" ]; then
+            echo "Running UI checks..."
+            (cd ui && npm run typecheck && npm test) || {
+                echo "UI checks failed. Fix before pushing."
+                exit 1
+            }
+        fi
+        if [ -f "website/package.json" ]; then
+            echo "Running website build..."
+            (cd website && npm run build) || {
+                echo "Website build failed. Fix before pushing."
+                exit 1
+            }
+        fi
+        if [ -x "design-tokens/check-drift.sh" ]; then
+            echo "Checking design token drift..."
+            bash design-tokens/check-drift.sh || {
+                echo "Design token drift detected. Run: cd design-tokens && npm run build"
+                exit 1
+            }
+        fi
     fi
 else
     echo "No build system found. Skipping pre-push tests."

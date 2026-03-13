@@ -36,5 +36,39 @@
       "Bash(git push -f)*",
       "Bash(git reset --hard)*"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=$(jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null); if [ -n \"$file\" ] && echo \"$file\" | grep -qE '\\.(c|h)$'; then fmt=$(command -v clang-format 2>/dev/null || echo /opt/homebrew/opt/llvm/bin/clang-format); if [ -x \"$fmt\" ]; then \"$fmt\" -i \"$file\" 2>/dev/null; fi; fi; exit 0"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(jq -r '.tool_input.command // empty' 2>/dev/null); if echo \"$cmd\" | grep -qiE '(DROP\\s+(TABLE|DATABASE)|TRUNCATE\\s+TABLE|curl\\s.*\\|\\s*sh|curl\\s.*\\|\\s*bash|wget\\s.*\\|\\s*sh|chmod\\s+777|mkfs\\.|dd\\s+if=|:(){ :|:& };:)'; then echo 'BLOCKED: dangerous command pattern detected' >&2; exit 2; fi; exit 0"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f build/human_tests ] && git diff --name-only HEAD 2>/dev/null | grep -qE '\\.(c|h)$'; then echo 'C files changed — verifying build...' >&2; cmake --build build -j$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4) 2>&1 | tail -5; if [ $? -ne 0 ]; then echo 'BUILD FAILED — fix before completing' >&2; exit 1; fi; fi; exit 0"
+          }
+        ]
+      }
+    ]
   }
 }

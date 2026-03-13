@@ -1,0 +1,38 @@
+---
+paths: src/tools/**, include/human/tools/**
+---
+
+# Tools Module (High Risk)
+
+Tools execute actions in the real world (filesystem, network, processes). Read AGENTS.md sections 3.5 and 7.3 before any change.
+
+## Vtable Contract
+
+Every tool implements `hu_tool_t`: `execute`, `name`, `description`, `parameters_json`. Return `hu_tool_result_t`; never crash in the runtime path.
+
+## Input Validation
+
+- Validate and sanitize ALL inputs before use — paths, URLs, commands, parameters
+- Reject path traversal (`../`), null bytes, and command injection sequences
+- Enforce allowlists where applicable (allowed commands, URL schemes, file extensions)
+- Length-limit all string inputs
+
+## Safety Guards
+
+- Add `HU_IS_TEST` guard if the tool spawns processes, opens network connections, or writes to the filesystem
+- Never execute user-supplied strings as shell commands without sanitization
+- URL tools: reject `file://`, `ftp://`, non-HTTPS schemes
+- File tools: validate paths are within allowed directories
+
+## Registration
+
+- Register in `src/tools/factory.c` — add the factory entry and include the header
+- Factory key: stable, lowercase, user-facing (e.g., `"shell"`, `"web_fetch"`)
+- Parameters JSON must match the actual validation logic
+
+## Required Tests
+
+- At least one test for valid input producing expected output
+- At least one boundary/failure test (invalid input, missing params)
+- At least one security test (path traversal, injection, unauthorized access)
+- Use `HU_IS_TEST` mock paths — no real network, no real filesystem writes

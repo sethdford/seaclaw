@@ -122,6 +122,10 @@ archive/zig-reference/ archived Zig source (build.zig, src/)
 
 For a detailed concept-to-file mapping (which source files and test files correspond to each subsystem), see [`docs/CONCEPT_INDEX.md`](docs/CONCEPT_INDEX.md).
 
+For system topology, request flow, and module dependency diagrams, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+Each major `src/` subdirectory has its own `CLAUDE.md` with module-specific architecture, rules, and playbooks. Read the relevant module's `CLAUDE.md` before modifying it.
+
 ## 4.1) Standards Directory
 
 All project standards live in `docs/standards/`. This is the single source of truth -- agent config files reference these, never duplicate them.

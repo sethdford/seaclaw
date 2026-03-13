@@ -3,6 +3,10 @@
 int hu__total = 0;
 int hu__passed = 0;
 int hu__failed = 0;
+int hu__skipped = 0;
+int hu__suite_active = 1;
+const char *hu__suite_filter = NULL;
+const char *hu__test_filter = NULL;
 jmp_buf hu__jmp;
 
 void run_allocator_tests(void);
@@ -198,6 +202,7 @@ void run_collab_planning_tests(void);
 void run_bth_e2e_tests(void);
 void run_bth_metrics_tests(void);
 void run_memory_features_tests(void);
+void run_agi_frontiers_tests(void);
 #ifdef HU_ENABLE_CURL
 void run_paperclip_tests(void);
 #endif
@@ -208,10 +213,36 @@ void run_voice_decision_tests(void);
 void run_emotion_map_tests(void);
 #endif
 
-int main(void) {
+static void print_usage(const char *prog) {
+    printf("Usage: %s [OPTIONS]\n", prog);
+    printf("  --suite=<name>   Run only suites whose name contains <name>\n");
+    printf("  --filter=<name>  Run only tests whose function name contains <name>\n");
+    printf("  --help           Show this help message\n");
+    printf("\nExamples:\n");
+    printf("  %s --suite=config          # run config-related suites\n", prog);
+    printf("  %s --filter=json_parse     # run tests matching 'json_parse'\n", prog);
+    printf("  %s --suite=security --filter=vault  # combine both\n", prog);
+}
+
+int main(int argc, char **argv) {
+    for (int i = 1; i < argc; i++) {
+        if (strncmp(argv[i], "--suite=", 8) == 0) {
+            hu__suite_filter = argv[i] + 8;
+        } else if (strncmp(argv[i], "--filter=", 9) == 0) {
+            hu__test_filter = argv[i] + 9;
+        } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            print_usage(argv[0]);
+            return 0;
+        }
+    }
+
     printf("Human Test Suite\n");
     fflush(stdout);
     printf("==================\n");
+    if (hu__suite_filter)
+        printf("Suite filter: %s\n", hu__suite_filter);
+    if (hu__test_filter)
+        printf("Test filter:  %s\n", hu__test_filter);
 
     run_allocator_tests();
     run_data_loader_tests();
@@ -406,6 +437,7 @@ int main(void) {
     run_e2e_conversation_tests();
     run_bth_metrics_tests();
     run_memory_features_tests();
+    run_agi_frontiers_tests();
 #ifdef HU_ENABLE_CURL
     run_paperclip_tests();
 #endif

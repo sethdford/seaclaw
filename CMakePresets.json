@@ -1,133 +1,109 @@
 {
   "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
   "configurePresets": [
     {
-      "name": "default",
-      "displayName": "Default (CLI only)",
-      "description": "Default build — CLI channel, core tools, SQLite memory. ~398 KB release binary.",
+      "name": "dev",
+      "displayName": "Development (ASan, all features)",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "HU_ENABLE_CLI": "ON",
-        "HU_ENABLE_SQLITE": "ON",
-        "HU_ENABLE_CURL": "ON",
-        "HU_ENABLE_TLS": "ON"
-      }
-    },
-    {
-      "name": "minimal",
-      "displayName": "Minimal (smallest binary)",
-      "description": "Bare minimum — CLI channel, no optional tools, no tunnels, no peripherals.",
-      "binaryDir": "${sourceDir}/build-minimal",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "MinSizeRel",
-        "HU_ENABLE_LTO": "ON",
-        "HU_ENABLE_CLI": "ON",
-        "HU_ENABLE_SQLITE": "ON",
-        "HU_ENABLE_CURL": "ON",
-        "HU_ENABLE_TLS": "ON",
-        "HU_ENABLE_PERIPHERALS": "OFF",
-        "HU_ENABLE_TUNNELS": "OFF",
-        "HU_ENABLE_RUNTIME_EXOTIC": "OFF",
-        "HU_ENABLE_TOOLS_BROWSER": "OFF",
-        "HU_ENABLE_TOOLS_ADVANCED": "OFF",
-        "HU_ENABLE_OTEL": "OFF",
-        "HU_ENABLE_CRON": "OFF",
-        "HU_ENABLE_PUSH": "OFF",
-        "HU_ENABLE_UPDATE": "OFF",
-        "HU_ENABLE_SKILLS": "OFF",
-        "HU_ENABLE_NONE_ENGINE": "OFF",
-        "HU_ENABLE_MARKDOWN_ENGINE": "OFF",
-        "HU_ENABLE_LUCID_ENGINE": "OFF",
-        "HU_ENABLE_LANCEDB_ENGINE": "OFF"
-      }
-    },
-    {
-      "name": "full",
-      "displayName": "Full (all features)",
-      "description": "Everything enabled — all channels, all tools, all engines, peripherals, tunnels.",
-      "binaryDir": "${sourceDir}/build-full",
-      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "HU_ENABLE_ASAN": "ON",
         "HU_ENABLE_ALL_CHANNELS": "ON",
         "HU_ENABLE_SQLITE": "ON",
-        "HU_ENABLE_CURL": "ON",
-        "HU_ENABLE_TLS": "ON",
-        "HU_ENABLE_PERIPHERALS": "ON",
-        "HU_ENABLE_TUNNELS": "ON",
-        "HU_ENABLE_RUNTIME_EXOTIC": "ON",
-        "HU_ENABLE_TOOLS_BROWSER": "ON",
-        "HU_ENABLE_TOOLS_ADVANCED": "ON",
-        "HU_ENABLE_OTEL": "ON",
-        "HU_ENABLE_CRON": "ON",
-        "HU_ENABLE_PUSH": "ON",
-        "HU_ENABLE_UPDATE": "ON",
-        "HU_ENABLE_SKILLS": "ON",
-        "HU_ENABLE_NONE_ENGINE": "ON",
-        "HU_ENABLE_MARKDOWN_ENGINE": "ON",
-        "HU_ENABLE_MEMORY_LRU_ENGINE": "ON",
-        "HU_ENABLE_LUCID_ENGINE": "ON",
-        "HU_ENABLE_LANCEDB_ENGINE": "ON"
+        "HU_ENABLE_PERSONA": "ON",
+        "HU_ENABLE_SKILLS": "ON"
+      }
+    },
+    {
+      "name": "test",
+      "displayName": "Fast iteration (no ASan)",
+      "binaryDir": "${sourceDir}/build-test",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "HU_ENABLE_ALL_CHANNELS": "ON",
+        "HU_ENABLE_SQLITE": "ON",
+        "HU_ENABLE_PERSONA": "ON",
+        "HU_ENABLE_SKILLS": "ON"
       }
     },
     {
       "name": "release",
-      "displayName": "Release (optimized default)",
-      "description": "Default features with MinSizeRel + LTO for production deployment.",
+      "displayName": "Release (MinSizeRel + LTO)",
       "binaryDir": "${sourceDir}/build-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "MinSizeRel",
         "HU_ENABLE_LTO": "ON",
-        "HU_ENABLE_CLI": "ON",
+        "HU_ENABLE_ALL_CHANNELS": "ON",
         "HU_ENABLE_SQLITE": "ON",
-        "HU_ENABLE_CURL": "ON",
-        "HU_ENABLE_TLS": "ON"
+        "HU_ENABLE_PERSONA": "ON",
+        "HU_ENABLE_SKILLS": "ON"
       }
     },
     {
-      "name": "dev",
-      "displayName": "Dev (ASan + all channels)",
-      "description": "Development build with AddressSanitizer and all channels for testing.",
-      "binaryDir": "${sourceDir}/build",
+      "name": "fuzz",
+      "displayName": "Fuzzing (Clang required)",
+      "binaryDir": "${sourceDir}/build-fuzz",
       "cacheVariables": {
-        "HU_ENABLE_ASAN": "ON",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
+        "HU_ENABLE_FUZZ": "ON",
         "HU_ENABLE_ALL_CHANNELS": "ON",
         "HU_ENABLE_SQLITE": "ON",
-        "HU_ENABLE_CURL": "ON",
-        "HU_ENABLE_TLS": "ON",
-        "HU_ENABLE_PERIPHERALS": "ON",
-        "HU_ENABLE_TUNNELS": "ON",
-        "HU_ENABLE_RUNTIME_EXOTIC": "ON",
-        "HU_ENABLE_TOOLS_BROWSER": "ON",
-        "HU_ENABLE_TOOLS_ADVANCED": "ON",
-        "HU_ENABLE_OTEL": "ON"
+        "HU_ENABLE_PERSONA": "ON"
+      }
+    },
+    {
+      "name": "minimal",
+      "displayName": "Minimal (CLI only, no optional deps)",
+      "binaryDir": "${sourceDir}/build-minimal",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "HU_ENABLE_CLI": "ON",
+        "HU_ENABLE_SQLITE": "OFF",
+        "HU_ENABLE_CURL": "OFF",
+        "HU_ENABLE_TLS": "OFF"
       }
     }
   ],
   "buildPresets": [
     {
-      "name": "default",
-      "configurePreset": "default"
+      "name": "dev",
+      "configurePreset": "dev",
+      "jobs": 0
     },
     {
-      "name": "minimal",
-      "configurePreset": "minimal"
-    },
-    {
-      "name": "full",
-      "configurePreset": "full"
+      "name": "test",
+      "configurePreset": "test",
+      "jobs": 0
     },
     {
       "name": "release",
-      "configurePreset": "release"
+      "configurePreset": "release",
+      "jobs": 0
     },
     {
-      "name": "dev",
-      "configurePreset": "dev"
+      "name": "fuzz",
+      "configurePreset": "fuzz",
+      "jobs": 0
+    },
+    {
+      "name": "minimal",
+      "configurePreset": "minimal",
+      "jobs": 0
     }
   ],
   "testPresets": [
     {
       "name": "dev",
       "configurePreset": "dev",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "test",
+      "configurePreset": "test",
       "output": { "outputOnFailure": true }
     }
   ]

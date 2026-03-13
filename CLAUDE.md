@@ -27,6 +27,8 @@ scripts/agent-preflight.sh                   # change-aware validation (auto-det
 
 ## Architecture
 
+See `ARCHITECTURE.md` for diagrams (system topology, request flow, module dependencies).
+
 Vtable-driven and modular. Extend by implementing vtable structs + factory registration:
 
 - `src/providers/` — `hu_provider_t` vtable (AI model providers)
@@ -94,26 +96,30 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 
 ## Key Paths
 
-| Path                           | What                                                                  |
-| ------------------------------ | --------------------------------------------------------------------- |
-| `src/`                         | All C source (~715 files, ~139K lines)                                |
-| `include/human/`               | Public headers                                                        |
-| `tests/`                       | 131 test files, 4,640+ tests                                          |
-| `fuzz/`                        | libFuzzer harnesses                                                   |
-| `ui/`                          | LitElement web dashboard                                              |
-| `website/`                     | Astro marketing site                                                  |
-| `apps/`                        | iOS, macOS, Android, Flutter native apps                              |
-| `design-tokens/`               | W3C design tokens (source of truth for all UI)                        |
-| `docs/`                        | Guides, plans, design docs                                            |
-| `docs/standards/`              | Canonical standards (AI, design, engineering, ops, quality, security) |
-| `docs/CONCEPT_INDEX.md`        | Concept-to-file mapping (find the right file fast)                    |
-| `docs/error-codes.md`          | All `HU_ERR_*` codes with usage guidelines                            |
-| `scripts/`                     | Build, release, benchmark, check scripts                              |
-| `scripts/agent-preflight.sh`   | Change-aware validation for agents                                    |
-| `scripts/what-to-test.sh`      | Maps changed files to relevant test suites                            |
-| `scripts/gen-include-graph.sh` | Module dependency graph (Mermaid or JSON)                             |
-| `CMakePresets.json`            | Named build presets (dev, test, release, fuzz, minimal)               |
-| `.clang-tidy`                  | Static analysis config (matches CI)                                   |
+| Path                              | What                                                                  |
+| --------------------------------- | --------------------------------------------------------------------- |
+| `src/`                            | All C source (~715 files, ~139K lines)                                |
+| `include/human/`                  | Public headers                                                        |
+| `tests/`                          | 131 test files, 4,640+ tests                                          |
+| `fuzz/`                           | libFuzzer harnesses                                                   |
+| `ui/`                             | LitElement web dashboard                                              |
+| `website/`                        | Astro marketing site                                                  |
+| `apps/`                           | iOS, macOS, Android, Flutter native apps                              |
+| `design-tokens/`                  | W3C design tokens (source of truth for all UI)                        |
+| `docs/`                           | Guides, plans, design docs                                            |
+| `docs/standards/`                 | Canonical standards (AI, design, engineering, ops, quality, security) |
+| `docs/CONCEPT_INDEX.md`           | Concept-to-file mapping (find the right file fast)                    |
+| `docs/error-codes.md`             | All `HU_ERR_*` codes with usage guidelines                            |
+| `scripts/`                        | Build, release, benchmark, check scripts                              |
+| `scripts/agent-preflight.sh`      | Change-aware validation for agents                                    |
+| `scripts/what-to-test.sh`         | Maps changed files to relevant test suites                            |
+| `scripts/gen-include-graph.sh`    | Module dependency graph (Mermaid or JSON)                             |
+| `ARCHITECTURE.md`                 | System topology, request flow, module dependency diagrams             |
+| `.claude/rules/`                  | Path-scoped rules for Claude Code agents                              |
+| `.claude/skills/`                 | Executable playbooks (add-provider, add-channel, add-tool, preflight) |
+| `.github/copilot-instructions.md` | GitHub Copilot agent context                                          |
+| `CMakePresets.json`               | Named build presets (dev, test, release, fuzz, minimal)               |
+| `.clang-tidy`                     | Static analysis config (matches CI)                                   |
 
 ## Standards
 
