@@ -24,6 +24,7 @@
 #include "human/agent/planner.h"
 #include "human/agent/preferences.h"
 #include "human/agent/prompt.h"
+#include "human/agent/speculative.h"
 #include "human/agent/reflection.h"
 #include "human/agent/task_list.h"
 #include "human/agent/team.h"
@@ -168,6 +169,14 @@ hu_error_t hu_agent_from_config(
             out->context_compact_target = ctx_cfg->compact_target;
         out->llm_compiler_enabled = ctx_cfg->llm_compiler_enabled;
         out->tool_routing_enabled = ctx_cfg->tool_routing_enabled;
+        out->tree_of_thought_enabled = ctx_cfg->tree_of_thought;
+        out->constitutional_enabled = ctx_cfg->constitutional_ai;
+        if (ctx_cfg->speculative_cache) {
+            hu_speculative_cache_t *cache =
+                (hu_speculative_cache_t *)alloc->alloc(alloc->ctx, sizeof(hu_speculative_cache_t));
+            if (cache && hu_speculative_cache_init(cache, alloc) == HU_OK)
+                out->speculative_cache = cache;
+        }
     }
 
     out->tools_count = tools_count;
@@ -518,6 +527,12 @@ void hu_agent_deinit(hu_agent_t *agent) {
     if (agent->undo_stack) {
         hu_undo_stack_destroy(agent->undo_stack);
         agent->undo_stack = NULL;
+    }
+    if (agent->speculative_cache) {
+        hu_speculative_cache_deinit(agent->speculative_cache);
+        agent->alloc->free(agent->alloc->ctx, agent->speculative_cache,
+                           sizeof(hu_speculative_cache_t));
+        agent->speculative_cache = NULL;
     }
 }
 

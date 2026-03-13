@@ -377,6 +377,19 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
             goto fail;
     }
 
+    /* Intelligence context (goals, values, learning, self-improvement) */
+    if (config->intelligence_context && config->intelligence_context_len > 0) {
+        err = append(alloc, &buf, &len, &cap, "\n## Intelligence\n\n", 18);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->intelligence_context, config->intelligence_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n\n", 2);
+        if (err != HU_OK)
+            goto fail;
+    }
+
     /* Memory context */
     err = append(alloc, &buf, &len, &cap, "## Memory Context\n\n", 19);
     if (err != HU_OK)

@@ -372,7 +372,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     size_t tools_count = 0;
     err = hu_tools_create_default(alloc, ws, strlen(ws), &policy, &cfg,
                                   memory.vtable ? &memory : NULL, cron, cli_agent_pool, cli_mailbox,
-                                  &tools, &tools_count);
+                                  NULL, &tools, &tools_count);
     if (err != HU_OK) {
         fprintf(stderr, "[%s] Tools init failed: %s\n", HU_CODENAME, hu_error_string(err));
         if (cron)
@@ -400,6 +400,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         .pressure_compact = cfg.agent.context_pressure_compact,
         .compact_target = cfg.agent.context_compact_target,
         .llm_compiler_enabled = cfg.agent.llm_compiler_enabled,
+        .tree_of_thought = cfg.agent.tree_of_thought,
+        .constitutional_ai = cfg.agent.constitutional_ai,
+        .speculative_cache = cfg.agent.speculative_cache,
         .tool_routing_enabled = cfg.agent.tool_routing_enabled,
     };
     hu_agent_t agent;

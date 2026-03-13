@@ -69,6 +69,9 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->diagnostics.log_message_payloads = false;
     cfg->diagnostics.log_llm_io = false;
     cfg->agent.llm_compiler_enabled = false;
+    cfg->agent.tree_of_thought = false;
+    cfg->agent.constitutional_ai = false;
+    cfg->agent.speculative_cache = false;
     cfg->agent.tool_routing_enabled = false;
     cfg->agent.compact_context = false;
     cfg->agent.context_pressure_warn = 0.85f;

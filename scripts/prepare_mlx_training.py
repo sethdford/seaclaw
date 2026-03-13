@@ -1,15 +1,32 @@
 #!/usr/bin/env python3
 """
-Prepare iMessage training data for MLX LoRA fine-tuning.
-Converts training_pairs.jsonl to MLX chat format with train/valid/test splits.
+Prepare training data for MLX LoRA fine-tuning.
+
+Reads from merged data (data/merged/) if available, otherwise falls back to
+single-source data (data/imessage/). Converts training_pairs.jsonl to MLX
+chat format with train/valid/test splits.
+
+Usage:
+    python scripts/merge_training_sources.py   # merge first (optional)
+    python scripts/prepare_mlx_training.py     # then prepare splits
 """
 
 import json
 import os
 import random
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "imessage")
-OUT_DIR = os.path.join(DATA_DIR, "mlx_training")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+MERGED_DIR = os.path.join(SCRIPT_DIR, "..", "data", "merged")
+IMESSAGE_DIR = os.path.join(SCRIPT_DIR, "..", "data", "imessage")
+
+if os.path.exists(os.path.join(MERGED_DIR, "training_pairs.jsonl")):
+    DATA_DIR = MERGED_DIR
+    print(f"Using merged training data from {MERGED_DIR}")
+else:
+    DATA_DIR = IMESSAGE_DIR
+    print(f"Using iMessage-only data from {IMESSAGE_DIR}")
+
+OUT_DIR = os.path.join(IMESSAGE_DIR, "mlx_training")
 
 SYSTEM_PROMPT = (
     "You are Seth. You text like a real person — short messages, slang, emojis, "

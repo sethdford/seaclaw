@@ -78,6 +78,9 @@ typedef struct hu_persona_channel_entry {
 typedef struct hu_agent_config {
     bool llm_compiler_enabled;
     bool tool_routing_enabled;
+    bool tree_of_thought;
+    bool constitutional_ai;
+    bool speculative_cache;
     bool compact_context;
     uint32_t max_tool_iterations;
     uint32_t max_history_messages;

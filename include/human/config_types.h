@@ -1,6 +1,7 @@
 #ifndef HU_CONFIG_TYPES_H
 #define HU_CONFIG_TYPES_H
 
+#include "human/core/allocator.h"
 #include "human/security/sandbox.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -70,7 +71,23 @@ typedef struct hu_named_agent_config {
     const char *name;
     const char *provider;
     const char *model;
+    const char *persona;
+    const char *system_prompt;
+    const char **enabled_tools;
+    size_t enabled_tools_count;
+    const char **enabled_skills;
+    size_t enabled_skills_count;
+    const char *role;            /* lead, builder, reviewer, tester */
+    uint8_t autonomy_level;
+    double temperature;
+    double budget_usd;
+    uint32_t max_iterations;
+    const char *description;     /* human-readable, for orchestrator matching */
+    const char *capabilities;    /* comma-sep tags for orchestrator capability matching */
+    bool is_default;
 } hu_named_agent_config_t;
+
+void hu_named_agent_config_free(hu_allocator_t *alloc, hu_named_agent_config_t *cfg);
 
 typedef struct hu_session_config {
     hu_dm_scope_t dm_scope;

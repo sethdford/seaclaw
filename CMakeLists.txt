@@ -380,6 +380,9 @@ set(HU_CORE_SOURCES
     src/agent/dag.c
     src/agent/dag_executor.c
     src/agent/llm_compiler.c
+    src/agent/orchestrator.c
+    src/agent/orchestrator_llm.c
+    src/agent/registry.c
     src/agent/undo.c
     src/agent/cli.c
     src/agent/tui.c
@@ -402,6 +405,8 @@ set(HU_CORE_SOURCES
     src/context/context_ext.c
     src/agent/episodic.c
     src/agent/reflection.c
+    src/agent/tree_of_thought.c
+    src/agent/constitutional.c
     src/agent/ab_response.c
     src/agent/input_guard.c
     src/agent/commitment.c
@@ -429,6 +434,8 @@ set(HU_CORE_SOURCES
     src/agent/info_asymmetry.c
     src/agent/theory_of_mind.c
     src/agent/tool_router.c
+    src/agent/speculative.c
+    src/agent/uncertainty.c
     src/providers/error_classify.c
     src/providers/api_key.c
     src/providers/helpers.c
@@ -481,6 +488,7 @@ set(HU_CORE_SOURCES
     src/memory/retrieval/qmd.c
     src/memory/retrieval/query_expansion.c
     src/memory/retrieval/llm_reranker.c
+    src/memory/retrieval/strategy_learner.c
     src/memory/retrieval/engine.c
     src/memory/connections.c
     src/memory/knowledge.c
@@ -534,6 +542,7 @@ set(HU_CORE_SOURCES
     src/tools/send_message.c
     src/tools/calendar.c
     src/tools/skill_write.c
+    src/tools/skill_run.c
     src/tools/jira.c
     src/tools/social.c
     src/tools/facebook.c
@@ -597,6 +606,7 @@ if(HU_ENABLE_PERIPHERALS)
         src/tools/hardware_info.c
         src/tools/hardware_memory.c
         src/tools/i2c.c
+        src/tools/peripheral_ctrl.c
         src/tools/spi.c
     )
 endif()
@@ -748,6 +758,11 @@ if(HU_ENABLE_SQLITE)
         src/memory/emotional_residue.c
         src/feeds/oauth.c
         src/intelligence/skills.c
+        src/intelligence/self_improve.c
+        src/intelligence/value_learning.c
+        src/intelligence/online_learning.c
+        src/agent/goals.c
+        src/intelligence/world_model.c
     )
 endif()
 
@@ -1300,7 +1315,7 @@ if(NOT HU_ENABLE_PERIPHERALS)
         src/peripherals/arduino.c src/peripherals/stm32.c src/peripherals/rpi.c
         src/peripherals/factory.c src/hardware.c
         src/tools/hardware_info.c src/tools/hardware_memory.c
-        src/tools/i2c.c src/tools/spi.c)
+        src/tools/i2c.c src/tools/peripheral_ctrl.c src/tools/spi.c)
 endif()
 if(NOT HU_ENABLE_TUNNELS)
     list(APPEND HU_TEST_EXTRA_MODULES
@@ -1737,6 +1752,7 @@ if(HU_ENABLE_CURL)
 endif()
 
 list(APPEND HU_TEST_SOURCES tests/test_memory_features.c)
+list(APPEND HU_TEST_SOURCES tests/test_agi_frontiers.c)
 
 add_executable(human_tests ${HU_TEST_SOURCES} wasm/wasm_alloc.c)
 target_link_libraries(human_tests human_core_test)
@@ -2190,4 +2206,6 @@ message(STATUS "Human v0.4.0")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Channels: ${CHANNEL_SOURCES}")
 message(STATUS "Engines: none=${HU_ENABLE_NONE_ENGINE} markdown=${HU_ENABLE_MARKDOWN_ENGINE} sqlite=${HU_ENABLE_SQLITE} postgres=${HU_ENABLE_POSTGRES}")
+message(STATUS "ASan: ${HU_ENABLE_ASAN}")
+
 message(STATUS "ASan: ${HU_ENABLE_ASAN}")

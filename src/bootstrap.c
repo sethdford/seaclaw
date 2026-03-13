@@ -482,7 +482,8 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
 
     err = hu_tools_create_default(alloc, ws, strlen(ws), &bi->policy, &bi->cfg,
                                   (with_agent && bi->memory.vtable) ? &bi->memory : NULL, bi->cron,
-                                  bi->agent_pool, bi->mailbox, &bi->tools, &bi->tools_count);
+                                  bi->agent_pool, bi->mailbox, NULL, &bi->tools,
+                                  &bi->tools_count);
     if (err != HU_OK)
         goto fail;
     ctx->tools = bi->tools;
@@ -563,6 +564,9 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             .pressure_compact = bi->cfg.agent.context_pressure_compact,
             .compact_target = bi->cfg.agent.context_compact_target,
             .llm_compiler_enabled = bi->cfg.agent.llm_compiler_enabled,
+            .tree_of_thought = bi->cfg.agent.tree_of_thought,
+            .constitutional_ai = bi->cfg.agent.constitutional_ai,
+            .speculative_cache = bi->cfg.agent.speculative_cache,
             .tool_routing_enabled = bi->cfg.agent.tool_routing_enabled,
         };
         hu_observer_t *obs = bi->observer.vtable ? &bi->observer : NULL;

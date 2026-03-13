@@ -21,13 +21,15 @@ static void skill_free(hu_allocator_t *a, hu_skill_t *s) {
         a->free(a->ctx, s->name, strlen(s->name) + 1);
     if (s->description)
         a->free(a->ctx, s->description, strlen(s->description) + 1);
+    if (s->command)
+        a->free(a->ctx, s->command, strlen(s->command) + 1);
     if (s->parameters)
         a->free(a->ctx, s->parameters, strlen(s->parameters) + 1);
-    s->name = s->description = s->parameters = NULL;
+    s->name = s->description = s->command = s->parameters = NULL;
 }
 
 static hu_error_t skill_add(hu_skillforge_t *sf, const char *name, const char *desc,
-                            const char *params, bool enabled) {
+                            const char *command, const char *params, bool enabled) {
     if (sf->skills_len >= sf->skills_cap) {
         size_t new_cap = sf->skills_cap ? sf->skills_cap * 2 : HU_SKILLFORGE_INIT_CAP;
         hu_skill_t *n = (hu_skill_t *)sf->alloc->realloc(sf->alloc->ctx, sf->skills,
@@ -41,6 +43,7 @@ static hu_error_t skill_add(hu_skillforge_t *sf, const char *name, const char *d
     hu_skill_t *s = &sf->skills[sf->skills_len];
     s->name = hu_strdup(sf->alloc, name);
     s->description = desc ? hu_strdup(sf->alloc, desc) : hu_strdup(sf->alloc, "");
+    s->command = command ? hu_strdup(sf->alloc, command) : NULL;
     s->parameters = params ? hu_strdup(sf->alloc, params) : NULL;
     s->enabled = enabled;
     if (!s->name || !s->description) {
@@ -53,8 +56,8 @@ static hu_error_t skill_add(hu_skillforge_t *sf, const char *name, const char *d
 
 #if !defined(HU_IS_TEST)
 static hu_error_t parse_skill_json(hu_allocator_t *alloc, const char *json, size_t json_len,
-                                   char **out_name, char **out_desc, char **out_params,
-                                   bool *out_enabled) {
+                                   char **out_name, char **out_desc, char **out_command,
+                                   char **out_params, bool *out_enabled) {
     hu_json_value_t *root = NULL;
     hu_error_t err = hu_json_parse(alloc, json, json_len, &root);
     if (err != HU_OK)
@@ -67,10 +70,12 @@ static hu_error_t parse_skill_json(hu_allocator_t *alloc, const char *json, size
 
     const char *name = hu_json_get_string(root, "name");
     const char *desc = hu_json_get_string(root, "description");
+    const char *cmd = hu_json_get_string(root, "command");
     bool enabled = hu_json_get_bool(root, "enabled", true);
 
     *out_name = name ? hu_strdup(alloc, name) : NULL;
     *out_desc = desc ? hu_strdup(alloc, desc) : hu_strdup(alloc, "");
+    *out_command = cmd ? hu_strdup(alloc, cmd) : NULL;
     *out_params = NULL;
     if (root->data.object.pairs) {
         for (size_t i = 0; i < root->data.object.len; i++) {
@@ -97,6 +102,8 @@ static hu_error_t parse_skill_json(hu_allocator_t *alloc, const char *json, size
             alloc->free(alloc->ctx, *out_name, strlen(*out_name) + 1);
         if (*out_desc)
             alloc->free(alloc->ctx, *out_desc, strlen(*out_desc) + 1);
+        if (*out_command)
+            alloc->free(alloc->ctx, *out_command, strlen(*out_command) + 1);
         if (*out_params)
             alloc->free(alloc->ctx, *out_params, strlen(*out_params) + 1);
         return HU_ERR_JSON_PARSE;
@@ -106,6 +113,53 @@ static hu_error_t parse_skill_json(hu_allocator_t *alloc, const char *json, size
 #endif
 
 #if !defined(HU_IS_TEST)
+static hu_error_t load_skill_file(hu_skillforge_t *sf, const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return HU_ERR_IO;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz <= 0 || sz > 65536) {
+        fclose(f);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    char *buf = (char *)sf->alloc->alloc(sf->alloc->ctx, (size_t)sz + 1);
+    if (!buf) {
+        fclose(f);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    size_t nr = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    buf[nr] = '\0';
+
+    char *name = NULL, *desc = NULL, *command = NULL, *params = NULL;
+    bool enabled = true;
+    hu_error_t err =
+        parse_skill_json(sf->alloc, buf, nr, &name, &desc, &command, &params, &enabled);
+    sf->alloc->free(sf->alloc->ctx, buf, (size_t)sz + 1);
+    if (err != HU_OK || !name) {
+        if (name)
+            sf->alloc->free(sf->alloc->ctx, name, strlen(name) + 1);
+        if (desc)
+            sf->alloc->free(sf->alloc->ctx, desc, strlen(desc) + 1);
+        if (command)
+            sf->alloc->free(sf->alloc->ctx, command, strlen(command) + 1);
+        if (params)
+            sf->alloc->free(sf->alloc->ctx, params, strlen(params) + 1);
+        return err;
+    }
+
+    (void)skill_add(sf, name, desc, command, params, enabled);
+    sf->alloc->free(sf->alloc->ctx, name, strlen(name) + 1);
+    sf->alloc->free(sf->alloc->ctx, desc, strlen(desc) + 1);
+    if (command)
+        sf->alloc->free(sf->alloc->ctx, command, strlen(command) + 1);
+    if (params)
+        sf->alloc->free(sf->alloc->ctx, params, strlen(params) + 1);
+    return HU_OK;
+}
+
 static hu_error_t discover_from_dir(hu_skillforge_t *sf, const char *dir_path) {
 #ifndef _WIN32
     DIR *d = opendir(dir_path);
@@ -117,53 +171,24 @@ static hu_error_t discover_from_dir(hu_skillforge_t *sf, const char *dir_path) {
         if (e->d_name[0] == '.' || e->d_name[0] == '\0')
             continue;
         size_t nlen = strlen(e->d_name);
-        if (nlen < 12 || strcmp(e->d_name + nlen - 11, ".skill.json") != 0)
-            continue;
 
-        char path[1024];
-        int plen = snprintf(path, sizeof(path), "%s/%s", dir_path, e->d_name);
-        if (plen <= 0 || (size_t)plen >= sizeof(path))
-            continue;
-
-        FILE *f = fopen(path, "rb");
-        if (!f)
-            continue;
-
-        fseek(f, 0, SEEK_END);
-        long sz = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        if (sz <= 0 || sz > 65536) {
-            fclose(f);
-            continue;
-        }
-        char *buf = (char *)sf->alloc->alloc(sf->alloc->ctx, (size_t)sz + 1);
-        if (!buf) {
-            fclose(f);
-            continue;
-        }
-        size_t nr = fread(buf, 1, (size_t)sz, f);
-        fclose(f);
-        buf[nr] = '\0';
-
-        char *name = NULL, *desc = NULL, *params = NULL;
-        bool enabled = true;
-        hu_error_t err = parse_skill_json(sf->alloc, buf, nr, &name, &desc, &params, &enabled);
-        sf->alloc->free(sf->alloc->ctx, buf, (size_t)sz + 1);
-        if (err != HU_OK || !name) {
-            if (name)
-                sf->alloc->free(sf->alloc->ctx, name, strlen(name) + 1);
-            if (desc)
-                sf->alloc->free(sf->alloc->ctx, desc, strlen(desc) + 1);
-            if (params)
-                sf->alloc->free(sf->alloc->ctx, params, strlen(params) + 1);
+        /* *.skill.json — flat files */
+        if (nlen >= 12 && strcmp(e->d_name + nlen - 11, ".skill.json") == 0) {
+            char path[1024];
+            int plen = snprintf(path, sizeof(path), "%s/%s", dir_path, e->d_name);
+            if (plen > 0 && (size_t)plen < sizeof(path))
+                load_skill_file(sf, path);
             continue;
         }
 
-        (void)skill_add(sf, name, desc, params, enabled);
-        sf->alloc->free(sf->alloc->ctx, name, strlen(name) + 1);
-        sf->alloc->free(sf->alloc->ctx, desc, strlen(desc) + 1);
-        if (params)
-            sf->alloc->free(sf->alloc->ctx, params, strlen(params) + 1);
+        /* subdirectory/manifest.json — skill_write format */
+        char subpath[1024];
+        int n = snprintf(subpath, sizeof(subpath), "%s/%s/manifest.json", dir_path, e->d_name);
+        if (n > 0 && (size_t)n < sizeof(subpath)) {
+            struct stat st;
+            if (stat(subpath, &st) == 0 && S_ISREG(st.st_mode))
+                load_skill_file(sf, subpath);
+        }
     }
     closedir(d);
 #else
@@ -176,15 +201,15 @@ static hu_error_t discover_from_dir(hu_skillforge_t *sf, const char *dir_path) {
 
 #ifdef HU_IS_TEST
 static hu_error_t discover_test_data(hu_skillforge_t *sf) {
-    /* Add test skills without scanning filesystem */
     hu_error_t err;
-    err = skill_add(sf, "test-skill", "A test skill for unit tests", "{}", true);
+    err = skill_add(sf, "test-skill", "A test skill for unit tests", "echo test", "{}", true);
     if (err != HU_OK)
         return err;
-    err = skill_add(sf, "another-skill", "Another test skill", NULL, false);
+    err = skill_add(sf, "another-skill", "Another test skill", NULL, NULL, false);
     if (err != HU_OK)
         return err;
-    err = skill_add(sf, "cli-helper", "CLI helper skill", "{\"prompt\": \"string\"}", true);
+    err = skill_add(sf, "cli-helper", "CLI helper skill", "human help",
+                    "{\"prompt\": \"string\"}", true);
     if (err != HU_OK)
         return err;
     return HU_OK;

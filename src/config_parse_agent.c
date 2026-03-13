@@ -9,6 +9,12 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
         return HU_OK;
     cfg->agent.llm_compiler_enabled =
         hu_json_get_bool(obj, "llm_compiler", cfg->agent.llm_compiler_enabled);
+    cfg->agent.tree_of_thought =
+        hu_json_get_bool(obj, "tree_of_thought", cfg->agent.tree_of_thought);
+    cfg->agent.constitutional_ai =
+        hu_json_get_bool(obj, "constitutional_ai", cfg->agent.constitutional_ai);
+    cfg->agent.speculative_cache =
+        hu_json_get_bool(obj, "speculative_cache", cfg->agent.speculative_cache);
     cfg->agent.tool_routing_enabled =
         hu_json_get_bool(obj, "tool_routing", cfg->agent.tool_routing_enabled);
     cfg->agent.compact_context =

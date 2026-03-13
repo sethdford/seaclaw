@@ -41,6 +41,7 @@
 #include "human/tools/hardware_info.h"
 #include "human/tools/hardware_memory.h"
 #include "human/tools/i2c.h"
+#include "human/tools/peripheral_ctrl.h"
 #include "human/tools/spi.h"
 #endif
 #include "human/tools/analytics.h"
@@ -81,6 +82,7 @@
 #include "human/tools/schema.h"
 #include "human/tools/send_message.h"
 #include "human/tools/shell.h"
+#include "human/tools/skill_run.h"
 #include "human/tools/skill_write.h"
 #include "human/tools/spawn.h"
 #include "human/tools/web_fetch.h"
@@ -101,8 +103,8 @@
 #define HU_TOOLS_PERSONA_COUNT 0
 #endif
 #define HU_TOOLS_COUNT_BASE         \
-    (44 + HU_TOOLS_CRON_COUNT - 1 + \
-     HU_TOOLS_PERSONA_COUNT) /* 43 base + save_for_later + homeassistant + persona(0|1) + cron */
+    (45 + HU_TOOLS_CRON_COUNT - 1 + \
+     HU_TOOLS_PERSONA_COUNT) /* 44 base + skill_run + save_for_later + homeassistant + persona(0|1) + cron */
 #ifdef HU_HAS_TOOLS_BROWSER
 #define HU_TOOLS_BROWSER_COUNT 3
 #else
@@ -114,7 +116,7 @@
 #define HU_TOOLS_ADVANCED_COUNT 0
 #endif
 #ifdef HU_HAS_PERIPHERALS
-#define HU_TOOLS_HW_COUNT 4
+#define HU_TOOLS_HW_COUNT 5
 #else
 #define HU_TOOLS_HW_COUNT 0
 #endif
@@ -142,8 +144,8 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
                                    size_t workspace_dir_len, hu_security_policy_t *policy,
                                    const hu_config_t *config, hu_memory_t *memory,
                                    hu_cron_scheduler_t *cron, hu_agent_pool_t *agent_pool,
-                                   hu_mailbox_t *mailbox, hu_tool_t **out_tools,
-                                   size_t *out_count) {
+                                   hu_mailbox_t *mailbox, hu_skillforge_t *skillforge,
+                                   hu_tool_t **out_tools, size_t *out_count) {
     if (!alloc || !out_tools || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
 #ifndef HU_HAS_CRON
@@ -348,6 +350,11 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     if (err != HU_OK)
         goto fail;
     idx++;
+
+    err = hu_peripheral_ctrl_tool_create(alloc, NULL, &tools[idx]);
+    if (err != HU_OK)
+        goto fail;
+    idx++;
 #endif
 
 #ifdef HU_HAS_TOOLS_ADVANCED
@@ -435,6 +442,11 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     idx++;
 
     err = hu_skill_write_create(alloc, &tools[idx]);
+    if (err != HU_OK)
+        goto fail;
+    idx++;
+
+    err = hu_skill_run_create(alloc, &tools[idx], skillforge);
     if (err != HU_OK)
         goto fail;
     idx++;

@@ -118,18 +118,6 @@ static hu_error_t skill_write_execute(void *ctx, hu_allocator_t *alloc, const hu
     }
     mkdir(base_dir, 0755);
 
-    char dir_path[512];
-    n = snprintf(dir_path, sizeof(dir_path), "%s/.human/skills/%.*s", home, (int)name_len, name);
-    if (n <= 0 || (size_t)n >= sizeof(dir_path)) {
-        *out = hu_tool_result_fail("path too long", 13);
-        return HU_OK;
-    }
-    if (mkdir(dir_path, 0755) != 0 && errno != EEXIST) {
-        *out = hu_tool_result_fail("failed to create skill directory", 32);
-        return HU_OK;
-    }
-
-    /* Build manifest: {"name":"...","description":"...","command":"...","parameters":...} */
     hu_json_value_t *manifest = hu_json_object_new(alloc);
     if (!manifest) {
         *out = hu_tool_result_fail("out of memory", 13);
@@ -141,6 +129,7 @@ static hu_error_t skill_write_execute(void *ctx, hu_allocator_t *alloc, const hu
                        hu_json_string_new(alloc, description, strlen(description)));
     hu_json_object_set(alloc, manifest, "command",
                        hu_json_string_new(alloc, command, strlen(command)));
+    hu_json_object_set(alloc, manifest, "enabled", hu_json_bool_new(alloc, true));
 
     hu_json_value_t *params_val = NULL;
     if (parameters && parameters[0]) {
@@ -159,31 +148,31 @@ static hu_error_t skill_write_execute(void *ctx, hu_allocator_t *alloc, const hu
     hu_error_t err = hu_json_stringify(alloc, manifest, &json_str, &json_len);
     hu_json_free(alloc, manifest);
     if (err != HU_OK || !json_str) {
-        *out = hu_tool_result_fail("failed to build manifest", 24);
+        *out = hu_tool_result_fail("failed to build skill file", 26);
         return HU_OK;
     }
 
-    char manifest_path[512];
-    n = snprintf(manifest_path, sizeof(manifest_path), "%s/.human/skills/%.*s/manifest.json",
-                 home, (int)name_len, name);
-    if (n <= 0 || (size_t)n >= sizeof(manifest_path)) {
+    char skill_path[512];
+    n = snprintf(skill_path, sizeof(skill_path), "%s/.human/skills/%.*s.skill.json", home,
+                 (int)name_len, name);
+    if (n <= 0 || (size_t)n >= sizeof(skill_path)) {
         alloc->free(alloc->ctx, json_str, json_len + 1);
         *out = hu_tool_result_fail("path too long", 13);
         return HU_OK;
     }
 
-    FILE *f = fopen(manifest_path, "wb");
+    FILE *f = fopen(skill_path, "wb");
     if (!f) {
         alloc->free(alloc->ctx, json_str, json_len + 1);
-        *out = hu_tool_result_fail("failed to write manifest.json", 29);
+        *out = hu_tool_result_fail("failed to write skill file", 26);
         return HU_OK;
     }
     size_t written = fwrite(json_str, 1, json_len, f);
     fclose(f);
     alloc->free(alloc->ctx, json_str, json_len + 1);
     if (written != json_len) {
-        remove(manifest_path);
-        *out = hu_tool_result_fail("failed to write manifest.json", 29);
+        remove(skill_path);
+        *out = hu_tool_result_fail("failed to write skill file", 26);
         return HU_OK;
     }
 

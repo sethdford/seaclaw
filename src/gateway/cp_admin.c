@@ -688,6 +688,22 @@ hu_error_t cp_admin_metrics_snapshot(hu_allocator_t *alloc, hu_app_context_t *ap
         hu_json_object_set(alloc, obj, "bth", bth_obj);
     }
 
+    /* Intelligence metrics */
+    if (app && app->agent) {
+        hu_json_value_t *intel_obj = hu_json_object_new(alloc);
+        if (intel_obj) {
+            hu_json_object_set(alloc, intel_obj, "tree_of_thought",
+                               hu_json_bool_new(alloc, app->agent->tree_of_thought_enabled));
+            hu_json_object_set(alloc, intel_obj, "constitutional_ai",
+                               hu_json_bool_new(alloc, app->agent->constitutional_enabled));
+            hu_json_object_set(alloc, intel_obj, "llm_compiler",
+                               hu_json_bool_new(alloc, app->agent->llm_compiler_enabled));
+            hu_json_object_set(alloc, intel_obj, "speculative_cache",
+                               hu_json_bool_new(alloc, app->agent->speculative_cache != NULL));
+            hu_json_object_set(alloc, obj, "intelligence", intel_obj);
+        }
+    }
+
     hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
     hu_json_free(alloc, obj);
     return err;

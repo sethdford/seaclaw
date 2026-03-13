@@ -84,4 +84,21 @@ typedef struct hu_agent_pool_info {
 hu_error_t hu_agent_pool_list(hu_agent_pool_t *pool, hu_allocator_t *alloc,
                               hu_agent_pool_info_t **out, size_t *out_count);
 
+/* Forward declaration for the agent registry */
+typedef struct hu_agent_registry hu_agent_registry_t;
+
+/* Spawn an agent from a named config in the registry. Looks up the agent
+ * definition by name, builds a spawn config from it, and spawns. */
+hu_error_t hu_agent_pool_spawn_named(hu_agent_pool_t *pool,
+                                     const hu_agent_registry_t *registry,
+                                     const char *agent_name, const char *task,
+                                     size_t task_len, uint64_t *out_id);
+
+/* Build a hu_spawn_config_t from a hu_named_agent_config_t. Caller provides
+ * the spawn_config struct; string pointers reference the named config
+ * (caller must keep the named config alive). */
+struct hu_named_agent_config;
+void hu_spawn_config_from_named(hu_spawn_config_t *out,
+                                const struct hu_named_agent_config *cfg);
+
 #endif /* HU_AGENT_SPAWN_H */

@@ -64,6 +64,10 @@ typedef struct hu_prompt_config {
     size_t autonomy_rules_len;
     const char *reasoning_instruction;
     size_t reasoning_instruction_len;
+    const char *intelligence_context;   /* AGI frontier context: goals, values, learning, self-improvement */
+    size_t intelligence_context_len;
+    const char *skills_context;         /* available SkillForge skills for this agent */
+    size_t skills_context_len;
 } hu_prompt_config_t;
 
 /* Build the full system prompt. Caller owns returned string; free with alloc. */

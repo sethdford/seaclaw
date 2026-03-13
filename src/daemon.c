@@ -66,6 +66,13 @@
 #include "human/intelligence/feedback.h"
 #include "human/intelligence/meta_learning.h"
 #endif
+#ifdef HU_ENABLE_SQLITE
+#include "human/intelligence/self_improve.h"
+#include "human/intelligence/online_learning.h"
+#include "human/intelligence/value_learning.h"
+#include "human/intelligence/world_model.h"
+#include "human/agent/goals.h"
+#endif
 #include "human/platform.h"
 #include "human/platform/calendar.h"
 #include <stdlib.h>

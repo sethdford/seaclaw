@@ -69,6 +69,9 @@ typedef struct hu_agent_context_config {
     float pressure_compact; /* auto-compact at this ratio (default 0.95) */
     float compact_target;   /* compact until below this ratio (default 0.70) */
     bool llm_compiler_enabled;
+    bool tree_of_thought;
+    bool constitutional_ai;
+    bool speculative_cache;
     bool tool_routing_enabled;
 } hu_agent_context_config_t;
 
@@ -193,6 +196,10 @@ struct hu_agent {
 
     bool llm_compiler_enabled;
     bool tool_routing_enabled;
+    bool tree_of_thought_enabled;
+
+    bool constitutional_enabled;
+    struct hu_speculative_cache *speculative_cache;
 
 #ifdef HU_HAS_PERSONA
     hu_relationship_state_t relationship; /* session-based warmth adaptation */

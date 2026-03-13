@@ -10,6 +10,8 @@
 #include "human/agent/outcomes.h"
 #include "human/agent/planner.h"
 #include "human/agent/reflection.h"
+#include "human/agent/tree_of_thought.h"
+#include "human/agent/constitutional.h"
 #include "human/bus.h"
 #include "human/config_types.h"
 #include "human/context_tokens.h"
@@ -353,6 +355,98 @@ static void test_planner_create_plan_init_run(void) {
     hu_plan_free(&alloc, plan);
 }
 
+/* ─── tree_of_thought ───────────────────────────────────────────────────── */
+
+static void test_tot_config_default(void) {
+    hu_tot_config_t cfg = hu_tot_config_default();
+    HU_ASSERT_EQ(cfg.num_branches, 3);
+    HU_ASSERT_EQ(cfg.max_depth, 2);
+    HU_ASSERT_TRUE(cfg.prune_threshold >= 0.0 && cfg.prune_threshold <= 1.0);
+    HU_ASSERT_TRUE(cfg.enabled);
+}
+
+static void test_tot_explore_in_test_mode_returns_mock(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tot_config_t cfg = hu_tot_config_default();
+    hu_tot_result_t result;
+    memset(&result, 0, sizeof(result));
+
+    /* HU_IS_TEST: no provider needed, returns mock branches */
+    hu_error_t err = hu_tot_explore(&alloc, NULL, "gpt-4", 4, "Solve X", 7, &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(result.branches_explored, 3u);
+    HU_ASSERT_TRUE(result.branches_pruned >= 0u);
+    /* Best thought should be "Break into subproblems" (score 0.9) */
+    if (result.best_thought) {
+        HU_ASSERT_TRUE(strstr(result.best_thought, "subproblems") != NULL);
+        HU_ASSERT_TRUE(result.best_score > 0.5);
+    }
+
+    hu_tot_result_free(&alloc, &result);
+}
+
+static void test_tot_result_free_handles_null(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tot_result_t result;
+    memset(&result, 0, sizeof(result));
+    hu_tot_result_free(&alloc, &result);
+    hu_tot_result_free(NULL, &result);
+    hu_tot_result_free(&alloc, NULL);
+}
+
+/* ─── constitutional ───────────────────────────────────────────────────── */
+
+static void test_constitutional_config_default(void) {
+    hu_constitutional_config_t cfg = hu_constitutional_config_default();
+    HU_ASSERT_EQ(cfg.principle_count, 3u);
+    HU_ASSERT_TRUE(cfg.enabled);
+    HU_ASSERT_TRUE(cfg.rewrite_enabled);
+    HU_ASSERT_NOT_NULL(cfg.principles[0].name);
+    HU_ASSERT_TRUE(strstr(cfg.principles[0].description, "address") != NULL);
+}
+
+static void test_constitutional_critique_in_test_mode_returns_pass(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_constitutional_config_t cfg = hu_constitutional_config_default();
+    hu_critique_result_t result;
+    memset(&result, 0, sizeof(result));
+
+    /* HU_IS_TEST: no provider needed, always returns PASS */
+    hu_error_t err = hu_constitutional_critique(&alloc, NULL, "gpt-4", 4, "Hello", 5, "Hi there", 8,
+                                                &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(result.verdict, HU_CRITIQUE_PASS);
+    HU_ASSERT_NULL(result.revised_response);
+    HU_ASSERT_EQ(result.principle_index, -1);
+
+    hu_critique_result_free(&alloc, &result);
+}
+
+static void test_constitutional_critique_disabled_returns_pass(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_constitutional_config_t cfg = hu_constitutional_config_default();
+    cfg.enabled = false;
+    cfg.principle_count = 0;
+    hu_critique_result_t result;
+    memset(&result, 0, sizeof(result));
+
+    hu_error_t err = hu_constitutional_critique(&alloc, NULL, "gpt-4", 4, "Hello", 5, "Hi", 2,
+                                                &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(result.verdict, HU_CRITIQUE_PASS);
+
+    hu_critique_result_free(&alloc, &result);
+}
+
+static void test_critique_result_free_handles_null(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_critique_result_t result;
+    memset(&result, 0, sizeof(result));
+    hu_critique_result_free(&alloc, &result);
+    hu_critique_result_free(NULL, &result);
+    hu_critique_result_free(&alloc, NULL);
+}
+
 void run_agent_modules_tests(void) {
     HU_TEST_SUITE("agent_modules");
 
@@ -374,4 +468,11 @@ void run_agent_modules_tests(void) {
     HU_RUN_TEST(test_reflection_evaluate_needs_retry);
     HU_RUN_TEST(test_reflection_build_critique_prompt);
     HU_RUN_TEST(test_planner_create_plan_init_run);
+    HU_RUN_TEST(test_tot_config_default);
+    HU_RUN_TEST(test_tot_explore_in_test_mode_returns_mock);
+    HU_RUN_TEST(test_tot_result_free_handles_null);
+    HU_RUN_TEST(test_constitutional_config_default);
+    HU_RUN_TEST(test_constitutional_critique_in_test_mode_returns_pass);
+    HU_RUN_TEST(test_constitutional_critique_disabled_returns_pass);
+    HU_RUN_TEST(test_critique_result_free_handles_null);
 }

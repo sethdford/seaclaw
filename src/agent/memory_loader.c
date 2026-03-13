@@ -3,6 +3,11 @@
 #include "human/core/string.h"
 #include "human/memory/retrieval/adaptive.h"
 #include <string.h>
+#include <time.h>
+#ifdef HU_ENABLE_SQLITE
+#include "human/memory/retrieval/strategy_learner.h"
+#include "human/memory.h"
+#endif
 
 static hu_retrieval_mode_t adaptive_to_retrieval_mode(hu_adaptive_strategy_t strategy) {
     switch (strategy) {
@@ -56,6 +61,32 @@ hu_error_t hu_memory_loader_load(hu_memory_loader_t *loader, const char *query, 
             .enabled = true, .keyword_max_tokens = 3, .vector_min_tokens = 5};
         hu_query_analysis_t qa = hu_adaptive_analyze_query(query ? query : "", query_len, &acfg);
 
+#ifdef HU_ENABLE_SQLITE
+        /* Strategy learner: override with learned preference if available */
+        if (loader->memory && loader->memory->ctx) {
+            sqlite3 *sl_db = hu_sqlite_memory_get_db(loader->memory);
+            if (sl_db) {
+                hu_strategy_learner_t sl;
+                if (hu_strategy_learner_create(loader->alloc, sl_db, &sl) == HU_OK) {
+                    hu_query_category_t qcat =
+                        hu_strategy_classify_query(query ? query : "", query_len);
+                    hu_retrieval_strategy_t learned = hu_strategy_learner_recommend(&sl, qcat);
+                    switch (learned) {
+                    case HU_RSTRAT_KEYWORD:
+                        qa.recommended_strategy = HU_ADAPTIVE_KEYWORD_ONLY;
+                        break;
+                    case HU_RSTRAT_VECTOR:
+                        qa.recommended_strategy = HU_ADAPTIVE_VECTOR_ONLY;
+                        break;
+                    default:
+                        break;
+                    }
+                    hu_strategy_learner_deinit(&sl);
+                }
+            }
+        }
+#endif
+
         hu_retrieval_options_t opts = {
             .mode = adaptive_to_retrieval_mode(qa.recommended_strategy),
             .limit = loader->max_entries,
@@ -75,6 +106,35 @@ hu_error_t hu_memory_loader_load(hu_memory_loader_t *loader, const char *query, 
             res.entries = NULL;
             res.count = 0;
             res.scores = NULL;
+
+#ifdef HU_ENABLE_SQLITE
+            if (loader->memory && loader->memory->ctx && count > 0) {
+                sqlite3 *sl_db = hu_sqlite_memory_get_db(loader->memory);
+                if (sl_db) {
+                    hu_strategy_learner_t sl;
+                    if (hu_strategy_learner_create(loader->alloc, sl_db, &sl) == HU_OK) {
+                        hu_strategy_learner_init_tables(&sl);
+                        hu_query_category_t qcat =
+                            hu_strategy_classify_query(query ? query : "", query_len);
+                        hu_retrieval_strategy_t used_strat;
+                        switch (qa.recommended_strategy) {
+                        case HU_ADAPTIVE_KEYWORD_ONLY:
+                            used_strat = HU_RSTRAT_KEYWORD;
+                            break;
+                        case HU_ADAPTIVE_VECTOR_ONLY:
+                            used_strat = HU_RSTRAT_VECTOR;
+                            break;
+                        default:
+                            used_strat = HU_RSTRAT_HYBRID;
+                            break;
+                        }
+                        hu_strategy_learner_record(&sl, qcat, used_strat, count > 0,
+                                                   (int64_t)time(NULL));
+                        hu_strategy_learner_deinit(&sl);
+                    }
+                }
+            }
+#endif
         }
     } else if (loader->memory && loader->memory->vtable && loader->memory->vtable->recall) {
         err = loader->memory->vtable->recall(

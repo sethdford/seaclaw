@@ -12,6 +12,7 @@
 typedef struct hu_skill {
     char *name;
     char *description;
+    char *command;    /* shell command to execute, may be NULL */
     char *parameters; /* JSON string, may be NULL */
     bool enabled;
 } hu_skill_t;

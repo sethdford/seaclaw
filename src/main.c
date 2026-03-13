@@ -910,8 +910,8 @@ static hu_error_t cmd_mcp(hu_allocator_t *alloc, int argc, char **argv) {
 
     hu_tool_t *tools = NULL;
     size_t tool_count = 0;
-    err = hu_tools_create_default(alloc, ".", 1, NULL, &cfg, NULL, NULL, mcp_pool, NULL, &tools,
-                                  &tool_count);
+    err = hu_tools_create_default(alloc, ".", 1, NULL, &cfg, NULL, NULL, mcp_pool, NULL, NULL,
+                                  &tools, &tool_count);
     if (err != HU_OK) {
         fprintf(stderr, "[%s] Tools init error: %s\n", HU_CODENAME, hu_error_string(err));
         if (mcp_pool)

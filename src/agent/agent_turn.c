@@ -6,8 +6,10 @@
 #include "human/agent/commitment.h"
 #include "human/agent/commitment_store.h"
 #include "human/agent/compaction.h"
+#include "human/agent/dag.h"
 #include "human/agent/dispatcher.h"
 #include "human/agent/input_guard.h"
+#include "human/agent/llm_compiler.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/memory_loader.h"
 #include "human/agent/outcomes.h"
@@ -38,6 +40,17 @@
 #endif
 #include "human/provider.h"
 #include "human/voice.h"
+#ifdef HU_ENABLE_SQLITE
+#include "human/intelligence/self_improve.h"
+#include "human/intelligence/online_learning.h"
+#include "human/intelligence/value_learning.h"
+#include "human/intelligence/world_model.h"
+#include "human/agent/goals.h"
+#endif
+#include "human/agent/constitutional.h"
+#include "human/agent/speculative.h"
+#include "human/agent/tree_of_thought.h"
+#include "human/agent/uncertainty.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,6 +65,23 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         *response_len_out = 0;
 
     hu_agent_set_current_for_tools(agent);
+
+    /* Speculative cache: check for pre-computed response */
+    if (agent->speculative_cache) {
+        hu_speculative_config_t spec_cfg = hu_speculative_config_default();
+        hu_prediction_t *hit = NULL;
+        int64_t now = (int64_t)time(NULL);
+        if (hu_speculative_cache_lookup(agent->speculative_cache, msg, msg_len,
+                                         now, &spec_cfg, &hit) == HU_OK && hit) {
+            *response_out = hu_strndup(agent->alloc, hit->response, hit->response_len);
+            if (*response_out) {
+                if (response_len_out)
+                    *response_len_out = hit->response_len;
+                hu_agent_clear_current_for_tools();
+                return HU_OK;
+            }
+        }
+    }
 
     hu_agent_internal_process_mailbox_messages(agent);
 
@@ -496,6 +526,97 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     if (agent->outcomes)
         outcome_ctx = hu_outcome_build_summary(agent->outcomes, agent->alloc, &outcome_ctx_len);
 
+    /* Build AGI frontier intelligence context */
+    char *intelligence_ctx = NULL;
+    size_t intelligence_ctx_len = 0;
+#ifdef HU_ENABLE_SQLITE
+    if (agent->memory) {
+        sqlite3 *intel_db = hu_sqlite_memory_get_db(agent->memory);
+        if (intel_db) {
+            char parts[4096];
+            size_t pos = 0;
+
+            /* Self-improvement: active prompt patches */
+            {
+                hu_self_improve_t si;
+                if (hu_self_improve_create(agent->alloc, intel_db, &si) == HU_OK) {
+                    char *patches = NULL;
+                    size_t patches_len = 0;
+                    if (hu_self_improve_get_prompt_patches(&si, &patches, &patches_len) == HU_OK &&
+                        patches && patches_len > 0) {
+                        int n = snprintf(parts + pos, sizeof(parts) - pos,
+                                         "### Learned Behaviors\n%.*s\n",
+                                         (int)patches_len, patches);
+                        if (n > 0 && pos + (size_t)n < sizeof(parts))
+                            pos += (size_t)n;
+                        agent->alloc->free(agent->alloc->ctx, patches, patches_len + 1);
+                    }
+                    hu_self_improve_deinit(&si);
+                }
+            }
+
+            /* Goals: active goals context */
+            {
+                hu_goal_engine_t ge;
+                if (hu_goal_engine_create(agent->alloc, intel_db, &ge) == HU_OK) {
+                    char *gctx = NULL;
+                    size_t gctx_len = 0;
+                    if (hu_goal_build_context(&ge, &gctx, &gctx_len) == HU_OK &&
+                        gctx && gctx_len > 0) {
+                        int n = snprintf(parts + pos, sizeof(parts) - pos,
+                                         "### %.*s\n", (int)gctx_len, gctx);
+                        if (n > 0 && pos + (size_t)n < sizeof(parts))
+                            pos += (size_t)n;
+                        agent->alloc->free(agent->alloc->ctx, gctx, gctx_len + 1);
+                    }
+                    hu_goal_engine_deinit(&ge);
+                }
+            }
+
+            /* Online learning: strategy preferences */
+            {
+                hu_online_learning_t ol;
+                if (hu_online_learning_create(agent->alloc, intel_db, 0.1, &ol) == HU_OK) {
+                    char *lctx = NULL;
+                    size_t lctx_len = 0;
+                    if (hu_online_learning_build_context(&ol, &lctx, &lctx_len) == HU_OK &&
+                        lctx && lctx_len > 0) {
+                        int n = snprintf(parts + pos, sizeof(parts) - pos,
+                                         "### %.*s\n", (int)lctx_len, lctx);
+                        if (n > 0 && pos + (size_t)n < sizeof(parts))
+                            pos += (size_t)n;
+                        agent->alloc->free(agent->alloc->ctx, lctx, lctx_len + 1);
+                    }
+                    hu_online_learning_deinit(&ol);
+                }
+            }
+
+            /* Value learning: user values */
+            {
+                hu_value_engine_t ve;
+                if (hu_value_engine_create(agent->alloc, intel_db, &ve) == HU_OK) {
+                    char *vctx = NULL;
+                    size_t vctx_len = 0;
+                    if (hu_value_build_prompt(&ve, &vctx, &vctx_len) == HU_OK &&
+                        vctx && vctx_len > 0) {
+                        int n = snprintf(parts + pos, sizeof(parts) - pos,
+                                         "### %.*s\n", (int)vctx_len, vctx);
+                        if (n > 0 && pos + (size_t)n < sizeof(parts))
+                            pos += (size_t)n;
+                        agent->alloc->free(agent->alloc->ctx, vctx, vctx_len + 1);
+                    }
+                    hu_value_engine_deinit(&ve);
+                }
+            }
+
+            if (pos > 0) {
+                intelligence_ctx = hu_strndup(agent->alloc, parts, pos);
+                intelligence_ctx_len = pos;
+            }
+        }
+    }
+#endif
+
     /* Build persona prompt fresh each turn (channel-dependent; no caching) */
     char *persona_prompt = NULL;
     size_t persona_prompt_len = 0;
@@ -526,6 +647,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, awareness_ctx, awareness_ctx_len + 1);
             if (outcome_ctx)
                 agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
+            if (intelligence_ctx)
+                agent->alloc->free(agent->alloc->ctx, intelligence_ctx, intelligence_ctx_len + 1);
             hu_agent_clear_current_for_tools();
             return perr;
         }
@@ -562,6 +685,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
             if (outcome_ctx)
                 agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
+            if (intelligence_ctx)
+                agent->alloc->free(agent->alloc->ctx, intelligence_ctx, intelligence_ctx_len + 1);
             hu_agent_clear_current_for_tools();
             return err;
         }
@@ -616,6 +741,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             .conversation_context = agent->conversation_context,
             .conversation_context_len = agent->conversation_context_len,
             .max_response_chars = agent->max_response_chars,
+            .intelligence_context = intelligence_ctx,
+            .intelligence_context_len = intelligence_ctx_len,
         };
         err = hu_prompt_build_system(agent->alloc, &cfg, &system_prompt, &system_prompt_len);
         if (persona_prompt)
@@ -631,6 +758,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             agent->alloc->free(agent->alloc->ctx, awareness_ctx, awareness_ctx_len + 1);
         if (outcome_ctx)
             agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
+        if (intelligence_ctx)
+            agent->alloc->free(agent->alloc->ctx, intelligence_ctx, intelligence_ctx_len + 1);
         if (err != HU_OK) {
             if (pref_ctx)
                 agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
@@ -808,6 +937,47 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             ev.data.llm_request.messages_count = msgs_count;
             HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
         }
+
+        /* Tree-of-Thought: for complex queries, explore reasoning branches first */
+#ifndef HU_IS_TEST
+        if (agent->tree_of_thought_enabled && iter == 1 && msg_len > 200) {
+            hu_tot_config_t tot_cfg = hu_tot_config_default();
+            hu_tot_result_t tot_result;
+            memset(&tot_result, 0, sizeof(tot_result));
+            if (hu_tot_explore(agent->alloc, &agent->provider, agent->model_name,
+                               agent->model_name_len, msg, msg_len, &tot_cfg, &tot_result) ==
+                    HU_OK &&
+                tot_result.best_thought && tot_result.best_thought_len > 0) {
+                static const char tot_prefix[] = "\n\n[Reasoning approach: ";
+                static const char tot_suffix[] = "]\n";
+                size_t hint_len =
+                    sizeof(tot_prefix) - 1 + tot_result.best_thought_len + sizeof(tot_suffix) - 1;
+                if (hint_len < 2048 && system_prompt) {
+                    size_t new_sys_len = system_prompt_len + hint_len;
+                    char *new_sys =
+                        (char *)agent->alloc->alloc(agent->alloc->ctx, new_sys_len + 1);
+                    if (new_sys) {
+                        memcpy(new_sys, system_prompt, system_prompt_len);
+                        memcpy(new_sys + system_prompt_len, tot_prefix, sizeof(tot_prefix) - 1);
+                        memcpy(new_sys + system_prompt_len + sizeof(tot_prefix) - 1,
+                               tot_result.best_thought, tot_result.best_thought_len);
+                        memcpy(new_sys + system_prompt_len + sizeof(tot_prefix) - 1 +
+                                   tot_result.best_thought_len,
+                               tot_suffix, sizeof(tot_suffix) - 1);
+                        new_sys[new_sys_len] = '\0';
+                        agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+                        system_prompt = new_sys;
+                        system_prompt_len = new_sys_len;
+                        if (msgs && msgs_count > 0) {
+                            msgs[0].content = system_prompt;
+                            msgs[0].content_len = system_prompt_len;
+                        }
+                    }
+                }
+            }
+            hu_tot_result_free(agent->alloc, &tot_result);
+        }
+#endif
 
         clock_t llm_start = clock();
         hu_chat_response_t resp;
@@ -1009,6 +1179,58 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     }
                 }
 
+                /* Uncertainty: evaluate confidence and add hedge if needed */
+                {
+                    hu_uncertainty_signals_t u_signals;
+                    memset(&u_signals, 0, sizeof(u_signals));
+                    hu_uncertainty_extract_signals(final_content, final_len, msg, msg_len,
+                                                   0, 0, &u_signals);
+                    hu_uncertainty_result_t u_result;
+                    memset(&u_result, 0, sizeof(u_result));
+                    if (hu_uncertainty_evaluate(agent->alloc, &u_signals, &u_result) == HU_OK) {
+                        if (u_result.hedge_prefix && u_result.hedge_prefix_len > 0 &&
+                            u_result.level >= HU_CONFIDENCE_MEDIUM) {
+                            size_t new_len = u_result.hedge_prefix_len + final_len;
+                            char *hedged = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
+                            if (hedged) {
+                                memcpy(hedged, u_result.hedge_prefix, u_result.hedge_prefix_len);
+                                memcpy(hedged + u_result.hedge_prefix_len, final_content, final_len);
+                                hedged[new_len] = '\0';
+                                if (ab_owned)
+                                    agent->alloc->free(agent->alloc->ctx, (void *)final_content, final_len + 1);
+                                final_content = hedged;
+                                final_len = new_len;
+                                ab_owned = true;
+                            }
+                        }
+                    }
+                    hu_uncertainty_result_free(agent->alloc, &u_result);
+                }
+
+                /* Constitutional AI: critique response against principles */
+#ifndef HU_IS_TEST
+                if (agent->constitutional_enabled) {
+                    hu_constitutional_config_t const_cfg = hu_constitutional_config_default();
+                    hu_critique_result_t critique;
+                    memset(&critique, 0, sizeof(critique));
+                    if (hu_constitutional_critique(agent->alloc, &agent->provider,
+                                                    agent->model_name, agent->model_name_len,
+                                                    msg, msg_len, final_content, final_len,
+                                                    &const_cfg, &critique) == HU_OK) {
+                        if (critique.verdict == HU_CRITIQUE_REWRITE &&
+                            critique.revised_response && critique.revised_response_len > 0) {
+                            if (ab_owned)
+                                agent->alloc->free(agent->alloc->ctx, (void *)final_content, final_len + 1);
+                            final_content = critique.revised_response;
+                            final_len = critique.revised_response_len;
+                            ab_owned = true;
+                            critique.revised_response = NULL;
+                        }
+                    }
+                    hu_critique_result_free(agent->alloc, &critique);
+                }
+#endif
+
                 (void)hu_agent_internal_append_history(agent, HU_ROLE_ASSISTANT, final_content,
                                                        final_len, NULL, 0, NULL, 0);
                 *response_out = hu_strndup(agent->alloc, final_content, final_len);
@@ -1025,6 +1247,25 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
                 if (response_len_out)
                     *response_len_out = final_len;
+
+                /* Speculative: predict follow-ups and cache them */
+                if (agent->speculative_cache && *response_out) {
+                    char *preds[HU_SPEC_MAX_PREDICTIONS];
+                    size_t pred_lens[HU_SPEC_MAX_PREDICTIONS];
+                    double confs[HU_SPEC_MAX_PREDICTIONS];
+                    size_t pred_count = 0;
+                    memset(preds, 0, sizeof(preds));
+                    if (hu_speculative_predict(agent->alloc, msg, msg_len,
+                                               *response_out, final_len,
+                                               preds, pred_lens, confs,
+                                               HU_SPEC_MAX_PREDICTIONS, &pred_count) == HU_OK) {
+                        for (size_t pi = 0; pi < pred_count; pi++) {
+                            if (preds[pi])
+                                agent->alloc->free(agent->alloc->ctx, preds[pi], pred_lens[pi] + 1);
+                        }
+                    }
+                }
+
                 hu_agent_internal_maybe_tts(agent, *response_out, final_len);
             }
             hu_chat_response_free(agent->alloc, &resp);
@@ -1132,6 +1373,63 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 /* LLMCompiler: when enabled, compile tool calls into a DAG for parallel execution.
                  * Note: LLMCompiler is opt-in via config; the existing dispatcher handles
                  * parallelism. */
+#ifndef HU_IS_TEST
+                /* LLMCompiler: if enabled and 3+ tool calls, use DAG-based execution */
+                if (agent->llm_compiler_enabled && tc_count >= 3) {
+                    const char *tool_names[32];
+                    size_t tn_count = 0;
+                    for (size_t ti = 0; ti < agent->tools_count && tn_count < 32; ti++) {
+                        if (agent->tools[ti].vtable && agent->tools[ti].vtable->name)
+                            tool_names[tn_count++] =
+                                agent->tools[ti].vtable->name(agent->tools[ti].ctx);
+                    }
+                    char *compiler_prompt = NULL;
+                    size_t compiler_prompt_len = 0;
+                    const char *goal_text = msg;
+                    size_t goal_text_len = msg_len;
+                    if (hu_llm_compiler_build_prompt(agent->alloc, goal_text, goal_text_len,
+                                                    tool_names, tn_count, &compiler_prompt,
+                                                    &compiler_prompt_len) == HU_OK) {
+                        hu_chat_message_t compiler_msgs[1] = {{
+                            .role = HU_ROLE_USER,
+                            .content = compiler_prompt,
+                            .content_len = compiler_prompt_len,
+                        }};
+                        hu_chat_request_t compiler_req = {
+                            .messages = compiler_msgs,
+                            .messages_count = 1,
+                            .tools = NULL,
+                            .tools_count = 0,
+                        };
+                        hu_chat_response_t compiler_resp;
+                        memset(&compiler_resp, 0, sizeof(compiler_resp));
+                        hu_error_t cerr = agent->provider.vtable->chat(
+                            agent->provider.ctx, agent->alloc, &compiler_req, agent->model_name,
+                            agent->model_name_len, agent->temperature, &compiler_resp);
+                        hu_str_free(agent->alloc, compiler_prompt);
+                        if (cerr == HU_OK && compiler_resp.content &&
+                            compiler_resp.content_len > 0) {
+                            hu_dag_t dag;
+                            hu_dag_init(&dag, *agent->alloc);
+                            if (hu_llm_compiler_parse_plan(agent->alloc, compiler_resp.content,
+                                                           compiler_resp.content_len,
+                                                           &dag) == HU_OK &&
+                                dag.node_count > 0) {
+                                hu_observer_event_t ev = {
+                                    .tag = HU_OBSERVER_EVENT_TOOL_CALL,
+                                    .data = {{0}},
+                                };
+                                ev.data.tool_call.tool = "llm_compiler";
+                                ev.data.tool_call.duration_ms = 0;
+                                ev.data.tool_call.success = true;
+                                HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
+                            }
+                            hu_dag_deinit(&dag);
+                        }
+                        hu_chat_response_free(agent->alloc, &compiler_resp);
+                    }
+                }
+#endif
                 /* Use dispatcher for parallel execution when enabled (Tier 1.3) */
                 hu_dispatcher_t dispatcher;
                 hu_dispatcher_default(&dispatcher);
@@ -1248,6 +1546,40 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     : (result->error_msg ? result->error_msg : "failed");
                             hu_outcome_record_tool(agent->outcomes, tn_buf, result->success, sum);
                         }
+
+#ifdef HU_ENABLE_SQLITE
+                        /* Online learning: record tool outcome signal */
+                        if (agent->memory) {
+                            sqlite3 *ol_db = hu_sqlite_memory_get_db(agent->memory);
+                            if (ol_db) {
+                                hu_online_learning_t ol;
+                                if (hu_online_learning_create(agent->alloc, ol_db, 0.1, &ol) ==
+                                    HU_OK) {
+                                    hu_learning_signal_t sig = {
+                                        .type = result->success ? HU_SIGNAL_TOOL_SUCCESS
+                                                               : HU_SIGNAL_TOOL_FAILURE,
+                                        .tool_name = {0},
+                                        .tool_name_len =
+                                            tn < sizeof(sig.tool_name) ? tn : sizeof(sig.tool_name) - 1,
+                                        .magnitude = 1.0,
+                                        .timestamp = (int64_t)time(NULL),
+                                    };
+                                    if (tn > 0)
+                                        memcpy(sig.tool_name, tn_buf, sig.tool_name_len);
+                                    hu_online_learning_record(&ol, &sig);
+
+                                    hu_self_improve_t si;
+                                    if (hu_self_improve_create(agent->alloc, ol_db, &si) == HU_OK) {
+                                        hu_self_improve_record_tool_outcome(&si, tn_buf, tn,
+                                                                             result->success,
+                                                                             sig.timestamp);
+                                        hu_self_improve_deinit(&si);
+                                    }
+                                    hu_online_learning_deinit(&ol);
+                                }
+                            }
+                        }
+#endif
 
                         const char *res_content =
                             result->success ? result->output : result->error_msg;

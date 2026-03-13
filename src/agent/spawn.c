@@ -594,3 +594,43 @@ hu_error_t hu_agent_pool_list(hu_agent_pool_t *pool, hu_allocator_t *alloc,
     *out_count = n;
     return HU_OK;
 }
+
+/* ─── Named agent spawn ──────────────────────────────────────────────────── */
+
+#include "human/agent/registry.h"
+#include "human/config_types.h"
+
+void hu_spawn_config_from_named(hu_spawn_config_t *out, const hu_named_agent_config_t *cfg) {
+    if (!out || !cfg)
+        return;
+    memset(out, 0, sizeof(*out));
+    out->provider = cfg->provider;
+    out->provider_len = cfg->provider ? strlen(cfg->provider) : 0;
+    out->model = cfg->model;
+    out->model_len = cfg->model ? strlen(cfg->model) : 0;
+    out->temperature = cfg->temperature;
+    out->system_prompt = cfg->system_prompt;
+    out->system_prompt_len = cfg->system_prompt ? strlen(cfg->system_prompt) : 0;
+    out->persona_name = cfg->persona;
+    out->persona_name_len = cfg->persona ? strlen(cfg->persona) : 0;
+    out->tool_names = cfg->enabled_tools;
+    out->tool_names_count = cfg->enabled_tools_count;
+    out->budget_usd = cfg->budget_usd;
+    out->max_iterations = cfg->max_iterations;
+    out->mode = HU_SPAWN_ONE_SHOT;
+}
+
+hu_error_t hu_agent_pool_spawn_named(hu_agent_pool_t *pool, const hu_agent_registry_t *registry,
+                                     const char *agent_name, const char *task, size_t task_len,
+                                     uint64_t *out_id) {
+    if (!pool || !registry || !agent_name || !task)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const hu_named_agent_config_t *cfg = hu_agent_registry_get(registry, agent_name);
+    if (!cfg)
+        return HU_ERR_NOT_FOUND;
+
+    hu_spawn_config_t spawn_cfg;
+    hu_spawn_config_from_named(&spawn_cfg, cfg);
+    return hu_agent_pool_spawn(pool, &spawn_cfg, task, task_len, agent_name, out_id);
+}
