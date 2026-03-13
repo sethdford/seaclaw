@@ -202,46 +202,8 @@ static hu_error_t ollama_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
         }
         hu_json_array_push(alloc, msgs_arr, obj);
     }
-    if (request->tools && request->tools_count > 0) {
-        hu_json_value_t *tools_arr = hu_json_array_new(alloc);
-        if (tools_arr) {
-            for (size_t i = 0; i < request->tools_count; i++) {
-                hu_json_value_t *tool_obj = hu_json_object_new(alloc);
-                if (!tool_obj) {
-                    hu_json_free(alloc, tools_arr);
-                    hu_json_free(alloc, root);
-                    return HU_ERR_OUT_OF_MEMORY;
-                }
-                hu_json_object_set(alloc, tool_obj, "type",
-                                   hu_json_string_new(alloc, "function", 8));
-                hu_json_value_t *fn_obj = hu_json_object_new(alloc);
-                if (!fn_obj) {
-                    hu_json_free(alloc, tool_obj);
-                    hu_json_free(alloc, tools_arr);
-                    hu_json_free(alloc, root);
-                    return HU_ERR_OUT_OF_MEMORY;
-                }
-                hu_json_object_set(
-                    alloc, fn_obj, "name",
-                    hu_json_string_new(alloc, request->tools[i].name, request->tools[i].name_len));
-                hu_json_object_set(
-                    alloc, fn_obj, "description",
-                    hu_json_string_new(
-                        alloc, request->tools[i].description ? request->tools[i].description : "",
-                        request->tools[i].description_len));
-                if (request->tools[i].parameters_json &&
-                    request->tools[i].parameters_json_len > 0) {
-                    hu_json_value_t *params = NULL;
-                    if (hu_json_parse(alloc, request->tools[i].parameters_json,
-                                      request->tools[i].parameters_json_len, &params) == HU_OK)
-                        hu_json_object_set(alloc, fn_obj, "parameters", params);
-                }
-                hu_json_object_set(alloc, tool_obj, "function", fn_obj);
-                hu_json_array_push(alloc, tools_arr, tool_obj);
-            }
-            hu_json_object_set(alloc, root, "tools", tools_arr);
-        }
-    }
+    /* Ollama: skip native tool definitions since supports_native_tools=false.
+       The agent injects tool descriptions via system prompt instead. */
 
     if (request->response_format && request->response_format_len > 0) {
         hu_json_value_t *rf_obj = hu_json_object_new(alloc);
