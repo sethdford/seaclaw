@@ -1,4 +1,5 @@
 @import "./_tokens.css";
+@import "./_dynamic-color.css";
 @import "tailwindcss";
 @import "@fontsource-variable/geist-mono";
 
@@ -170,7 +171,8 @@
   }
 
   /* ── Liquid Glass tiers ── */
-  .glass-subtle {
+  .glass-subtle,
+  .hu-glass-subtle {
     background: color-mix(
       in srgb,
       var(--hu-web-surface) var(--hu-glass-subtle-bg-opacity, 4%),
@@ -190,7 +192,8 @@
   }
 
   .glass,
-  .glass-standard {
+  .glass-standard,
+  .hu-glass-standard {
     background: color-mix(
       in srgb,
       var(--hu-web-surface) var(--hu-glass-standard-bg-opacity, 6%),
@@ -217,7 +220,8 @@
         );
   }
 
-  .glass-prominent {
+  .glass-prominent,
+  .hu-glass-prominent {
     background: color-mix(
       in srgb,
       var(--hu-web-surface) var(--hu-glass-prominent-bg-opacity, 8%),
@@ -478,28 +482,34 @@
     );
   }
 
-  /* ── Typography ── */
-  .font-serif {
-    font-family: var(--font-serif);
-  }
 
-  /* ── Hero fade-in (CSS-only LCP optimization — visible before JS loads) ── */
-  .hero-fade-in {
-    animation: hu-hero-fade var(--hu-duration-slower, 0.5s)
-      var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
-  }
+  /* ── Hero choreographed entrance (CSS-only — visible before JS loads) ── */
   .hero-logo {
-    animation: hu-hero-fade var(--hu-duration-slow, 0.35s)
-      var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+    animation: hu-hero-rise var(--hu-duration-slowest, 700ms)
+      var(--hu-ease-spring-gentle, cubic-bezier(0.22, 1.2, 0.36, 1)) both;
   }
-  @keyframes hu-hero-fade {
+  .hero-headline {
+    animation: hu-hero-rise var(--hu-duration-slower, 500ms)
+      var(--hu-ease-spring-gentle, cubic-bezier(0.22, 1.2, 0.36, 1)) 120ms both;
+  }
+  .hero-fade-in:nth-child(1),
+  .hero-desc {
+    animation: hu-hero-rise var(--hu-duration-slower, 500ms)
+      var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) 240ms both;
+  }
+  .hero-buttons,
+  .hero-fade-in:nth-child(2) {
+    animation: hu-hero-rise var(--hu-duration-slow, 350ms)
+      var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) 380ms both;
+  }
+  @keyframes hu-hero-rise {
     from {
       opacity: 0;
-      transform: translateY(12px);
+      transform: translateY(24px) scale(0.98);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
     }
   }
 
