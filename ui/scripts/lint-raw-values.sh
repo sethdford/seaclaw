@@ -168,7 +168,7 @@ echo
 if [ "$ERRORS" -gt 0 ]; then
   echo "Found $ERRORS design token drift violations."
   echo "Use --hu-* CSS custom properties instead of raw values."
-  echo "See docs/design-strategy.md for the full token reference."
+  echo "See docs/standards/design/design-strategy.md for the full token reference."
   exit 1
 else
   echo "No design token drift found."

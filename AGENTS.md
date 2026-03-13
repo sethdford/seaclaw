@@ -165,6 +165,23 @@ fuzz/                  libFuzzer harnesses (JSON, base64, URL encode, config)
 archive/zig-reference/ archived Zig source (build.zig, src/)
 ```
 
+For a detailed concept-to-file mapping (which source files and test files correspond to each subsystem), see [`docs/CONCEPT_INDEX.md`](docs/CONCEPT_INDEX.md).
+
+## 4.1) Standards Directory
+
+All project standards live in `docs/standards/`. This is the single source of truth -- agent config files reference these, never duplicate them.
+
+| Area        | Path                          | Covers                                                                                                                                  |
+| ----------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| AI          | `docs/standards/ai/`          | Agent architecture, conversation design, hallucination prevention, prompt engineering, evaluation, citation/sourcing, human-in-the-loop |
+| Design      | `docs/standards/design/`      | Visual standards, motion design, UX patterns, design strategy, design system                                                            |
+| Engineering | `docs/standards/engineering/` | Principles (KISS/YAGNI/DRY), naming conventions, anti-patterns                                                                          |
+| Operations  | `docs/standards/operations/`  | Incident response, monitoring and observability                                                                                         |
+| Quality     | `docs/standards/quality/`     | Governance, ceremonies, code review                                                                                                     |
+| Security    | `docs/standards/security/`    | Threat model, sandbox                                                                                                                   |
+
+**Before writing code, read the applicable standard.** Full index: `docs/standards/README.md`.
+
 ## 5) Risk Tiers by Path (Review Depth Contract)
 
 - **Low risk**: docs, comments, test additions, minor formatting
@@ -179,6 +196,10 @@ When uncertain, classify as higher risk.
 2. **Define scope boundary** — one concern per change; avoid mixed feature+refactor+infra patches.
 3. **Implement minimal patch** — apply KISS/YAGNI/DRY rule-of-three explicitly.
 4. **Validate** — `cmake --build build && ./build/human_tests` must show 0 failures and 0 ASan errors.
+   - During iteration, use `./build/human_tests --suite=<name>` to run targeted tests.
+   - Use `scripts/what-to-test.sh <changed-files>` to find relevant suites.
+   - Use `scripts/agent-preflight.sh` for change-aware validation before committing.
+   - Run full suite (`./build/human_tests` with no args) before final commit.
 5. **Document impact** — update comments/docs for behavior changes, risk, and side effects.
 
 ### 6.1 Code Naming Contract (Required)
@@ -249,13 +270,28 @@ Apply these naming rules consistently:
 Required before any code commit:
 
 ```bash
-cd build && cmake --build . -j$(nproc) && ./human_tests  # all tests must pass, 0 ASan errors
+cmake --build build -j$(nproc) && ./build/human_tests  # all tests must pass, 0 ASan errors
+```
+
+For faster iteration, use targeted tests:
+
+```bash
+./build/human_tests --suite=JSON           # run suites matching "JSON"
+./build/human_tests --filter=config_parse  # run tests matching "config_parse"
+scripts/agent-preflight.sh                 # change-aware validation (auto-detects what changed)
 ```
 
 For release changes:
 
 ```bash
-cd build && cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON && cmake --build . -j$(nproc)  # must compile clean
+cmake --preset release && cmake --build --preset release  # must compile clean
+```
+
+CMake presets (`CMakePresets.json`) are available: `dev`, `test`, `release`, `fuzz`, `minimal`.
+
+```bash
+cmake --preset dev     # configure dev build (ASan, all features, compile_commands.json)
+cmake --build --preset dev
 ```
 
 Additional expectations by change type:
@@ -265,6 +301,16 @@ Additional expectations by change type:
 - **Provider additions**: test vtable wiring + graceful failure without credentials.
 
 If full validation is impractical, document what was run and what was skipped.
+
+### 8.0 Unified Verification
+
+Run the combined verification script to check everything at once:
+
+```bash
+./scripts/verify-all.sh
+```
+
+This runs: C build, C tests, UI check, doc index, standards drift, and token lint. See `docs/standards/quality/ceremonies.md` for the full ceremony schedule.
 
 ### 8.1 Git Hooks
 
@@ -294,6 +340,24 @@ Required:
 - Pre-push hook runs the full test suite — use `git push --no-verify` only in emergencies.
 - Pre-commit hook runs format check — use `git commit --no-verify` only in emergencies.
 - Keep each commit to a single concern. Don't mix feature + refactor + infra in one commit.
+
+## 8.3) Quality Ceremonies
+
+Standards drift is prevented through recurring ceremonies. Full details in `docs/standards/quality/ceremonies.md`.
+
+| Ceremony           | Cadence              | Purpose                                                                     |
+| ------------------ | -------------------- | --------------------------------------------------------------------------- |
+| Weekly Drift Audit | Every Monday, 15 min | Run `./scripts/verify-all.sh`, check plans, scan tokens, find orphaned docs |
+| PR Completion Gate | Every PR             | Author verifies checklist before requesting review                          |
+| Release Gate       | Every release tag    | Full drift audit + CHANGELOG + binary size check                            |
+
+Drift detection scripts:
+
+```bash
+./scripts/verify-all.sh              # Combined verification (build + test + doc index + tokens)
+./scripts/check-doc-index.sh         # Find orphaned docs in docs/standards/
+./scripts/check-standards-drift.sh   # Verify references to standards are current
+```
 
 ## 9) Privacy and Sensitive Data (Required)
 
@@ -334,26 +398,26 @@ The design system is grounded in SOTA references from industry leaders.
 The Human design system synthesizes principles from these authoritative sources.
 Agents **must** consult the relevant reference docs before creating or modifying any UI:
 
-| Source                         | What We Take                                                           | Human Doc                        |
-| ------------------------------ | ---------------------------------------------------------------------- | -------------------------------- |
-| **Apple HIG**                  | Spring-first motion, clarity/deference/depth, spatial hierarchy        | `docs/motion-design.md`          |
-| **Material Design 3**          | Canonical layouts, easing taxonomy, elevation, dynamic color           | `docs/ux-patterns.md`            |
-| **Disney/Pixar 12 Principles** | Squash & stretch, anticipation, staging, timing, follow-through        | `docs/motion-design.md`          |
-| **Edward Tufte**               | Data-ink ratio, chartjunk elimination, small multiples                 | `docs/visual-standards.md`       |
-| **Dieter Rams**                | Less is more, honest design, long-lasting quality                      | `docs/visual-standards.md`       |
-| **Gestalt Psychology**         | Proximity, similarity, continuity, closure, figure-ground              | `docs/ux-patterns.md`            |
-| **Nielsen Norman Group**       | F-pattern scanning, progressive disclosure, recognition over recall    | `docs/ux-patterns.md`            |
-| **Competitive Benchmarks**     | Named brand targets, quantified quality deltas, category-defining bars | `docs/competitive-benchmarks.md` |
-| **Quality Scorecard**          | Per-surface scoring (7 dimensions), quarterly tracking                 | `docs/quality-scorecard.md`      |
+| Source                         | What We Take                                                           | Human Doc                                   |
+| ------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------- |
+| **Apple HIG**                  | Spring-first motion, clarity/deference/depth, spatial hierarchy        | `docs/standards/design/motion-design.md`    |
+| **Material Design 3**          | Canonical layouts, easing taxonomy, elevation, dynamic color           | `docs/standards/design/ux-patterns.md`      |
+| **Disney/Pixar 12 Principles** | Squash & stretch, anticipation, staging, timing, follow-through        | `docs/standards/design/motion-design.md`    |
+| **Edward Tufte**               | Data-ink ratio, chartjunk elimination, small multiples                 | `docs/standards/design/visual-standards.md` |
+| **Dieter Rams**                | Less is more, honest design, long-lasting quality                      | `docs/standards/design/visual-standards.md` |
+| **Gestalt Psychology**         | Proximity, similarity, continuity, closure, figure-ground              | `docs/standards/design/ux-patterns.md`      |
+| **Nielsen Norman Group**       | F-pattern scanning, progressive disclosure, recognition over recall    | `docs/standards/design/ux-patterns.md`      |
+| **Competitive Benchmarks**     | Named brand targets, quantified quality deltas, category-defining bars | `docs/competitive-benchmarks.md`            |
+| **Quality Scorecard**          | Per-surface scoring (7 dimensions), quarterly tracking                 | `docs/quality-scorecard.md`                 |
 
 **Mandatory document consultation before UI work:**
 
-- **Creating or restructuring a view?** → Read `docs/ux-patterns.md` first. Every view must conform to an archetype.
-- **Adding or modifying animation?** → Read `docs/motion-design.md` first. Every animation must follow Disney/Pixar + Apple + M3 principles.
-- **Making any visual change?** → Read `docs/visual-standards.md` first. Verify hierarchy, spacing, color application, and quality checklist.
-- **Token values and specifics?** → Read `docs/design-strategy.md` for the complete token reference.
+- **Creating or restructuring a view?** → Read `docs/standards/design/ux-patterns.md` first. Every view must conform to an archetype.
+- **Adding or modifying animation?** → Read `docs/standards/design/motion-design.md` first. Every animation must follow Disney/Pixar + Apple + M3 principles.
+- **Making any visual change?** → Read `docs/standards/design/visual-standards.md` first. Verify hierarchy, spacing, color application, and quality checklist.
+- **Token values and specifics?** → Read `docs/standards/design/design-strategy.md` for the complete token reference.
 
-### 12.1 Layout Archetypes (Required — see `docs/ux-patterns.md`)
+### 12.1 Layout Archetypes (Required — see `docs/standards/design/ux-patterns.md`)
 
 Every view must conform to one of these canonical archetypes:
 
@@ -381,7 +445,7 @@ Required:
 - Apple native: `Font.custom("Avenir-Book", size:)` / `"Avenir-Medium"` / `"Avenir-Heavy"` / `"Avenir-Black"`.
 - Android: `AvenirFontFamily` from `Theme.kt`.
 - CLI/TUI: terminal font (no control), but use token-derived ANSI colors from `design_tokens.h`.
-- Maximum 3 type sizes visible in any single view section (see `docs/visual-standards.md` §7).
+- Maximum 3 type sizes visible in any single view section (see `docs/standards/design/visual-standards.md` §7).
 
 ### 12.3 Icons
 
@@ -403,9 +467,9 @@ Required:
 - CSS: `--hu-*` namespace. Never use raw hex colors, pixel spacing, or pixel radii.
 - Token categories: color (base + semantic), spacing, radius, shadow, typography, motion, data-viz.
 - Generated outputs: CSS custom properties, Kotlin constants, Swift constants, C `#define` macros.
-- **Centralized design strategy**: see `docs/design-strategy.md` for the full token reference.
+- **Centralized design strategy**: see `docs/standards/design/design-strategy.md` for the full token reference.
 
-Color accent hierarchy (60-30-10 rule — see `docs/visual-standards.md` §2.1):
+Color accent hierarchy (60-30-10 rule — see `docs/standards/design/visual-standards.md` §2.1):
 
 - **Primary**: `--hu-accent` (Fidelity green) — brand identity, primary buttons, links, focus rings.
 - **Secondary**: `--hu-accent-secondary` (amber) — warm highlights, featured content, CTAs needing contrast.
@@ -450,7 +514,7 @@ Three glass tiers + choreography + Apple visionOS material densities:
 - Token source: `design-tokens/glass.tokens.json`
 - Visual reference: `docs/design-system-demo.html`
 
-### 12.5 Visual Hierarchy (Required — see `docs/visual-standards.md`)
+### 12.5 Visual Hierarchy (Required — see `docs/standards/design/visual-standards.md`)
 
 Required:
 
@@ -461,7 +525,7 @@ Required:
 - **Spacing rhythm**: use token scale consistently. Never skip >2 steps in the spacing scale.
 - **Whitespace**: empty space is a deliberate design choice, not a bug (Tufte: data-ink ratio).
 
-### 12.6 Motion & Animation (Required — see `docs/motion-design.md`)
+### 12.6 Motion & Animation (Required — see `docs/standards/design/motion-design.md`)
 
 Required — grounded in Disney/Pixar 12 Principles + Apple HIG + Material 3:
 
@@ -478,7 +542,7 @@ Required — grounded in Disney/Pixar 12 Principles + Apple HIG + Material 3:
 - Every animation must respect `prefers-reduced-motion: reduce`.
 - Keyframe names use `hu-` prefix.
 
-### 12.7 Data Visualization (Required — see `docs/visual-standards.md` §9)
+### 12.7 Data Visualization (Required — see `docs/standards/design/visual-standards.md` §9)
 
 Required — grounded in Tufte's principles of analytical design:
 
@@ -498,7 +562,7 @@ Required:
 - Flags raw hex/rgba, hardcoded durations, and raw breakpoints in `.ts` files.
 - Wired into `npm run check` via `npm run lint:tokens`.
 
-### 12.9 Accessibility (Required — see `docs/ux-patterns.md` §5)
+### 12.9 Accessibility (Required — see `docs/standards/design/ux-patterns.md` §5)
 
 Required:
 
@@ -517,15 +581,15 @@ Required:
 - Add test file for render, accessibility, and keyboard navigation.
 - Register in component catalog (`ui/src/catalog/`).
 - Update `ui/src/icons.ts` if the component needs a new icon.
-- Run the **quality checklist** from `docs/visual-standards.md` §10 before shipping.
+- Run the **quality checklist** from `docs/standards/design/visual-standards.md` §10 before shipping.
 
 ### 12.11 Change Playbook: Adding or Modifying a View
 
 - Identify which **layout archetype** (§12.1) the view conforms to.
-- Follow the archetype's structural rules from `docs/ux-patterns.md` §2.
+- Follow the archetype's structural rules from `docs/standards/design/ux-patterns.md` §2.
 - Implement empty state, loading skeleton, and error state (all three required).
 - Verify responsive behavior at all four breakpoints (compact, medium, expanded, wide).
-- Apply the **quality checklist** from `docs/visual-standards.md` §10.
+- Apply the **quality checklist** from `docs/standards/design/visual-standards.md` §10.
 
 ### 12.12 UI Performance Budgets (Required)
 
@@ -550,7 +614,7 @@ Required:
 - Run `scripts/benchmark-competitive.sh` before major website releases.
 - New design patterns must reference which competitor inspired them and how Human exceeds them.
 - Benchmark brands: Linear, Vercel, Raycast, Stripe, Figma, Superhuman, Apple, Spotify + Awwwards winners.
-- Every quarter, evaluate and adopt one emerging web platform feature before competitors (see `docs/design-strategy.md` §Design Innovation Pipeline).
+- Every quarter, evaluate and adopt one emerging web platform feature before competitors (see `docs/standards/design/design-strategy.md` §Design Innovation Pipeline).
 
 ## 13) Vibe Coding Guardrails
 

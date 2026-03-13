@@ -2,9 +2,9 @@
  * E2E Design Standards Enforcement
  *
  * Programmatically enforces the design standards from:
- *   - docs/ux-patterns.md (layout archetypes, interaction patterns)
- *   - docs/motion-design.md (reduced motion, performance)
- *   - docs/visual-standards.md (touch targets, theme parity, quality checklist)
+ *   - docs/standards/design/ux-patterns.md (layout archetypes, interaction patterns)
+ *   - docs/standards/design/motion-design.md (reduced motion, performance)
+ *   - docs/standards/design/visual-standards.md (touch targets, theme parity, quality checklist)
  *
  * All tests run against demo mode (?demo) for deterministic content.
  */

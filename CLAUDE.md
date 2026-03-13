@@ -8,16 +8,21 @@ Read `AGENTS.md` for the full engineering protocol. This file is the quick refer
 ## Build & Test
 
 ```bash
-# Dev build (ASan enabled, all channels)
-cmake -B build -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_SQLITE=ON -DHU_ENABLE_PERSONA=ON -DHU_ENABLE_SKILLS=ON
-cmake --build build -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
+# Dev build — use CMake presets (recommended)
+cmake --preset dev                 # ASan, all channels, SQLite, persona, skills, compile_commands.json
+cmake --build --preset dev
+
+# Other presets: test (no ASan), release (MinSizeRel+LTO), fuzz (Clang), minimal
+cmake --list-presets               # show all available presets
 
 # Run tests (4,640+ tests, must be 0 failures, 0 ASan errors)
-./build/human_tests
+./build/human_tests                          # full suite
+./build/human_tests --suite=JSON             # run suites matching "JSON"
+./build/human_tests --filter=config_parse    # run tests matching "config_parse"
 
-# Release build
-cmake -B build-release -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON
-cmake --build build-release -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
+# Agent workflow: targeted tests during iteration, full suite before commit
+scripts/what-to-test.sh src/tools/shell.c    # find relevant suites for changed files
+scripts/agent-preflight.sh                   # change-aware validation (auto-detects what changed)
 ```
 
 ## Architecture
@@ -89,20 +94,39 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 
 ## Key Paths
 
-| Path                                  | What                                                        |
-| ------------------------------------- | ----------------------------------------------------------- |
-| `src/`                                | All C source (~715 files, ~139K lines)                      |
-| `include/human/`                      | Public headers                                              |
-| `docs/cross-platform-ci-readiness.md` | Platform support, build flags, known platform-specific code |
-| `tests/`                              | 131 test files, 4,640+ tests                                |
-| `fuzz/`                               | libFuzzer harnesses                                         |
-| `ui/`                                 | LitElement web dashboard                                    |
-| `website/`                            | Astro marketing site                                        |
-| `apps/`                               | iOS, macOS, Android, Flutter native apps                    |
-| `design-tokens/`                      | W3C design tokens (source of truth for all UI)              |
-| `docs/`                               | Guides, plans, design docs                                  |
-| `docs/design-system-demo.html`        | Interactive design system demo                              |
-| `scripts/`                            | Build, release, benchmark, check scripts                    |
+| Path                           | What                                                                  |
+| ------------------------------ | --------------------------------------------------------------------- |
+| `src/`                         | All C source (~715 files, ~139K lines)                                |
+| `include/human/`               | Public headers                                                        |
+| `tests/`                       | 131 test files, 4,640+ tests                                          |
+| `fuzz/`                        | libFuzzer harnesses                                                   |
+| `ui/`                          | LitElement web dashboard                                              |
+| `website/`                     | Astro marketing site                                                  |
+| `apps/`                        | iOS, macOS, Android, Flutter native apps                              |
+| `design-tokens/`               | W3C design tokens (source of truth for all UI)                        |
+| `docs/`                        | Guides, plans, design docs                                            |
+| `docs/standards/`              | Canonical standards (AI, design, engineering, ops, quality, security) |
+| `docs/CONCEPT_INDEX.md`        | Concept-to-file mapping (find the right file fast)                    |
+| `docs/error-codes.md`          | All `HU_ERR_*` codes with usage guidelines                            |
+| `scripts/`                     | Build, release, benchmark, check scripts                              |
+| `scripts/agent-preflight.sh`   | Change-aware validation for agents                                    |
+| `scripts/what-to-test.sh`      | Maps changed files to relevant test suites                            |
+| `scripts/gen-include-graph.sh` | Module dependency graph (Mermaid or JSON)                             |
+| `CMakePresets.json`            | Named build presets (dev, test, release, fuzz, minimal)               |
+| `.clang-tidy`                  | Static analysis config (matches CI)                                   |
+
+## Standards
+
+All project standards live in `docs/standards/`. This is the single source of truth -- read the applicable standard before writing code. Full index: `docs/standards/README.md`.
+
+| Area        | Path                          | Covers                                                                                                                                  |
+| ----------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| AI          | `docs/standards/ai/`          | Agent architecture, conversation design, hallucination prevention, prompt engineering, evaluation, citation/sourcing, human-in-the-loop |
+| Quality     | `docs/standards/quality/`     | Governance, ceremonies, code review                                                                                                     |
+| Operations  | `docs/standards/operations/`  | Incident response, monitoring                                                                                                           |
+| Design      | `docs/standards/design/`      | Visual standards, motion, UX patterns, design strategy, design system                                                                   |
+| Engineering | `docs/standards/engineering/` | Principles, naming, anti-patterns                                                                                                       |
+| Security    | `docs/standards/security/`    | Threat model, sandbox                                                                                                                   |
 
 ## Risk Tiers
 

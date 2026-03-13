@@ -29,7 +29,7 @@ globs:
 
 ## Design Tokens
 
-- **Centralized design strategy**: `docs/design-strategy.md` is the design constitution. Read it first.
+- **Centralized design strategy**: `docs/standards/design/design-strategy.md` is the design constitution. Read it first.
 - All values must reference `--hu-*` CSS custom properties from `design-tokens/`.
 - **Never** use raw hex color values in CSS — use `var(--hu-accent)`, `var(--hu-text)`, etc.
 - **Never** use raw pixel values for spacing — use `var(--hu-space-sm)`, `var(--hu-space-md)`, etc.
