@@ -52,6 +52,9 @@
 #include "human/agent/speculative.h"
 #include "human/agent/tree_of_thought.h"
 #include "human/agent/uncertainty.h"
+#if HU_HAS_PWA
+#include "human/pwa_context.h"
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -520,6 +523,38 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     size_t awareness_ctx_len = 0;
     if (agent->awareness)
         awareness_ctx = hu_awareness_context(agent->awareness, agent->alloc, &awareness_ctx_len);
+
+    /* Build cross-app PWA context */
+#if HU_HAS_PWA
+    {
+        char *pwa_ctx = NULL;
+        size_t pwa_ctx_len = 0;
+        hu_error_t pwa_err = hu_pwa_context_build(agent->alloc, &pwa_ctx, &pwa_ctx_len);
+        if (pwa_err == HU_OK && pwa_ctx && pwa_ctx_len > 0) {
+            if (awareness_ctx) {
+                /* Append PWA context to existing awareness */
+                size_t total = awareness_ctx_len + 1 + pwa_ctx_len;
+                char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, total + 1);
+                if (merged) {
+                    memcpy(merged, awareness_ctx, awareness_ctx_len);
+                    merged[awareness_ctx_len] = '\n';
+                    memcpy(merged + awareness_ctx_len + 1, pwa_ctx, pwa_ctx_len);
+                    merged[total] = '\0';
+                    agent->alloc->free(agent->alloc->ctx, awareness_ctx, awareness_ctx_len + 1);
+                    awareness_ctx = merged;
+                    awareness_ctx_len = total;
+                }
+            } else {
+                /* Use PWA context as the awareness context */
+                awareness_ctx = pwa_ctx;
+                awareness_ctx_len = pwa_ctx_len;
+                pwa_ctx = NULL; /* ownership transferred */
+            }
+        }
+        if (pwa_ctx)
+            agent->alloc->free(agent->alloc->ctx, pwa_ctx, pwa_ctx_len + 1);
+    }
+#endif
 
     /* Build outcome tracking summary */
     char *outcome_ctx = NULL;

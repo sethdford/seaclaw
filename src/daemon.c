@@ -105,6 +105,9 @@
 #include "human/cron.h"
 #include "human/crontab.h"
 #endif
+#if HU_HAS_PWA
+#include "human/pwa_learner.h"
+#endif
 #if defined(HU_ENABLE_IMESSAGE) && !defined(HU_IS_TEST)
 #include "human/channels/imessage.h"
 #endif
@@ -1895,6 +1898,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
         inbox_watcher.model = agent->model_name;
         inbox_watcher.model_len = agent->model_name_len;
     }
+
+#if HU_HAS_PWA
+    hu_pwa_learner_t *pwa_learner = NULL;
+    int64_t pwa_learn_last_ms = 0;
+    int64_t pwa_learn_interval_ms = 60000; /* scan every 60s */
+    if (agent && agent->memory) {
+        static hu_pwa_learner_t daemon_learner;
+        static bool daemon_learner_ok = false;
+        if (!daemon_learner_ok) {
+            hu_error_t lerr = hu_pwa_learner_init(alloc, &daemon_learner, agent->memory);
+            daemon_learner_ok = (lerr == HU_OK);
+        }
+        if (daemon_learner_ok)
+            pwa_learner = &daemon_learner;
+    }
+#endif
 #endif
 
 #ifdef HU_ENABLE_SKILLS
@@ -7144,6 +7163,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 last_inbox_poll_ms = inbox_now;
             }
         }
+#if HU_HAS_PWA
+        if (pwa_learner && tick_now - pwa_learn_last_ms >= pwa_learn_interval_ms) {
+            pwa_learn_last_ms = tick_now;
+            size_t ingested = 0;
+            hu_pwa_learner_scan(pwa_learner, &ingested);
+            if (ingested > 0 && getenv("HU_DEBUG"))
+                fprintf(stderr, "[human] PWA learner ingested %zu items\n", ingested);
+        }
+#endif
 #endif
 
         struct timespec sleep_ts = {.tv_sec = tick_interval_ms / 1000,
