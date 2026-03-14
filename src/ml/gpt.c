@@ -45,6 +45,7 @@ static size_t layer_window_size(const hu_gpt_config_t *cfg, size_t layer_idx)
 typedef struct {
     float *x_pre, *x_norm1, *q, *k, *v, *attn_w, *attn_out;
     float *x_post_attn, *x_norm2, *up_pre;
+    float *q_norm_inv, *k_norm_inv; /* 1/||x|| cached for exact head_norm backward */
 } gpt_lcache_t;
 
 typedef struct {
@@ -198,8 +199,9 @@ static void apply_rope(float *q, float *k, const float *cs, const float *sn,
         }
 }
 
-/* L2-normalize each head vector after RoPE (autoresearch: q, k = norm(q), norm(k)). */
-static void head_norm(float *buf, int B, int S, int nheads, int hd)
+/* L2-normalize each head vector after RoPE (autoresearch: q, k = norm(q), norm(k)).
+ * Stores 1/||x|| per head in inv_out (B*S*nheads) for exact backward pass. */
+static void head_norm(float *buf, float *inv_out, int B, int S, int nheads, int hd)
 {
     for (int b = 0; b < B; b++)
         for (int s = 0; s < S; s++)
@@ -208,23 +210,26 @@ static void head_norm(float *buf, int B, int S, int nheads, int hd)
                 float sq = 0.0f;
                 for (int d = 0; d < hd; d++) sq += v[d] * v[d];
                 float inv = 1.0f / (sqrtf(sq) + 1e-6f);
+                if (inv_out)
+                    inv_out[(b * S + s) * nheads + h] = inv;
                 for (int d = 0; d < hd; d++) v[d] *= inv;
             }
 }
 
 /* Backward for head_norm: for y = x/||x||, dx = (dy - y*(y·dy)) / ||x||.
- * Since y is unit-length, we approximate inv≈1 to avoid numerical instability
- * with small test models. The gradient direction is exact; only magnitude differs. */
-static void head_norm_bw(float *dbuf, const float *y, int B, int S, int nheads, int hd)
+ * inv_norms[B*S*nheads] has pre-cached 1/||x|| from the forward pass. */
+static void head_norm_bw(float *dbuf, const float *y, const float *inv_norms,
+                         int B, int S, int nheads, int hd)
 {
     for (int b = 0; b < B; b++)
         for (int s = 0; s < S; s++)
             for (int h = 0; h < nheads; h++) {
                 float *dv = dbuf + (b * S + s) * (nheads * hd) + h * hd;
                 const float *yv = y + (b * S + s) * (nheads * hd) + h * hd;
+                float inv = inv_norms[(b * S + s) * nheads + h];
                 float dot = 0.0f;
                 for (int d = 0; d < hd; d++) dot += dv[d] * yv[d];
-                for (int d = 0; d < hd; d++) dv[d] = dv[d] - yv[d] * dot;
+                for (int d = 0; d < hd; d++) dv[d] = (dv[d] - yv[d] * dot) * inv;
             }
 }
 
@@ -312,6 +317,7 @@ static void cache_free(hu_gpt_t *g)
         gpt_lcache_t *lc = &c->layers[i];
         CF(lc->x_pre, B*S*E*4); CF(lc->x_norm1, B*S*E*4);
         CF(lc->q, B*nh*S*hd*4); CF(lc->k, B*nkv*S*hd*4); CF(lc->v, B*nkv*S*hd*4);
+        CF(lc->q_norm_inv, B*S*nh*4); CF(lc->k_norm_inv, B*S*nkv*4);
         CF(lc->attn_w, B*nh*S*S*4); CF(lc->attn_out, B*S*E*4);
         CF(lc->x_post_attn, B*S*E*4); CF(lc->x_norm2, B*S*E*4);
         CF(lc->up_pre, B*S*nm*4);
@@ -342,6 +348,7 @@ static hu_error_t cache_alloc(hu_gpt_t *g, size_t B, size_t S)
         gpt_lcache_t *lc = &c->layers[i];
         CA(lc->x_pre, B*S*E*4); CA(lc->x_norm1, B*S*E*4);
         CA(lc->q, B*nh*S*hd*4); CA(lc->k, B*nkv*S*hd*4); CA(lc->v, B*nkv*S*hd*4);
+        CA(lc->q_norm_inv, B*S*nh*4); CA(lc->k_norm_inv, B*S*nkv*4);
         CA(lc->attn_w, B*nh*S*S*4); CA(lc->attn_out, B*S*E*4);
         CA(lc->x_post_attn, B*S*E*4); CA(lc->x_norm2, B*S*E*4);
         CA(lc->up_pre, B*S*nm*4);
@@ -431,10 +438,10 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
         matmul_atb(k_buf, xn, g->akw[li], (int)(B * S), (int)(nkv * hd), (int)E);
         matmul_atb(v_buf, xn, g->avw[li], (int)(B * S), (int)(nkv * hd), (int)E);
 
-        /* d. RoPE + Q/K head normalization */
+        /* d. RoPE + Q/K head normalization (cache 1/||x|| for backward) */
         apply_rope(q_buf, k_buf, g->rcos, g->rsin, (int)B, (int)S, (int)nh, (int)nkv, (int)hd);
-        head_norm(q_buf, (int)B, (int)S, (int)nh, (int)hd);
-        head_norm(k_buf, (int)B, (int)S, (int)nkv, (int)hd);
+        head_norm(q_buf, lc->q_norm_inv, (int)B, (int)S, (int)nh, (int)hd);
+        head_norm(k_buf, lc->k_norm_inv, (int)B, (int)S, (int)nkv, (int)hd);
         memcpy(lc->q, q_buf, B * nh * S * hd * sizeof(float));
         memcpy(lc->k, k_buf, B * nkv * S * hd * sizeof(float));
         memcpy(lc->v, v_buf, B * nkv * S * hd * sizeof(float));
@@ -703,8 +710,8 @@ static hu_error_t gpt_backward(void *ctx, const hu_ml_tensor_t *grad_output)
             }
 
         /* Q/K head norm backward (before RoPE backward — reverse of forward order) */
-        head_norm_bw(d_q, lc->q, (int)B, (int)S, (int)nh, (int)hd);
-        head_norm_bw(d_k, lc->k, (int)B, (int)S, (int)nkv, (int)hd);
+        head_norm_bw(d_q, lc->q, lc->q_norm_inv, (int)B, (int)S, (int)nh, (int)hd);
+        head_norm_bw(d_k, lc->k, lc->k_norm_inv, (int)B, (int)S, (int)nkv, (int)hd);
 
         /* RoPE backward */
         apply_rope_bw(d_q, d_k, g->rcos, g->rsin, (int)B, (int)S, (int)nh, (int)nkv, (int)hd);
@@ -852,12 +859,14 @@ static void gpt_deinit(void *ctx, hu_allocator_t *alloc)
 
 /* ─── RoPE precompute ───────────────────────────────────────────────────── */
 
-static void precompute_rope(float *cos_buf, float *sin_buf, size_t seq_len, size_t head_dim)
+static void precompute_rope(float *cos_buf, float *sin_buf, size_t seq_len,
+                            size_t head_dim, float theta_base)
 {
+    if (theta_base <= 0.0f) theta_base = 10000.0f;
     int half = (int)(head_dim / 2);
     for (size_t pos = 0; pos < seq_len; pos++)
         for (int d = 0; d < half; d++) {
-            float theta = (float)pos * powf(10000.0f, -2.0f * (float)d / (float)head_dim);
+            float theta = (float)pos * powf(theta_base, -2.0f * (float)d / (float)head_dim);
             cos_buf[pos * half + d] = cosf(theta);
             sin_buf[pos * half + d] = sinf(theta);
         }
@@ -945,7 +954,7 @@ hu_error_t hu_gpt_create(hu_allocator_t *alloc, const hu_gpt_config_t *config,
 
     size_t rope_len = config->sequence_len * (hd / 2);
     GA(g->rcos, rope_len); GA(g->rsin, rope_len);
-    precompute_rope(g->rcos, g->rsin, config->sequence_len, hd);
+    precompute_rope(g->rcos, g->rsin, config->sequence_len, hd, config->rope_theta);
 
     g->total_params = V * E * 2;
     g->total_params += L * (nh*hd*E + nkv*hd*E*2 + E*nh*hd);

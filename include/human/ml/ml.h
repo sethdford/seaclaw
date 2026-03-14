@@ -38,6 +38,7 @@ typedef struct hu_gpt_config {
     size_t head_dim;
     char window_pattern[8];
     hu_ml_activation_t activation;
+    float rope_theta;
 } hu_gpt_config_t;
 
 typedef struct hu_optimizer_config {
