@@ -52,7 +52,7 @@ test.describe("Chat Capabilities", () => {
     await page.waitForTimeout(WAIT);
   });
 
-  test.fixme("demo messages render with correct roles", async ({ page }) => {
+  test("demo messages render with correct roles", async ({ page }) => {
     await page.goto("/?demo#chat:sess-c3");
     await page.waitForTimeout(WAIT);
     await expect(async () => {

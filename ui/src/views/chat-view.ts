@@ -191,6 +191,12 @@ export class ScChatView extends GatewayAwareLitElement {
     this._messageThread?.scrollToItem(indices[matchIndex]);
   }
 
+  override willUpdate(changed: Map<string, unknown>): void {
+    if (changed.has("sessionKey") && changed.get("sessionKey") !== undefined) {
+      this.chat.loadHistory(this.sessionKey);
+    }
+  }
+
   override firstUpdated(): void {
     const gw = this.gateway;
     if (gw) {
@@ -272,10 +278,14 @@ export class ScChatView extends GatewayAwareLitElement {
     const detail = ev.detail as { event?: string; payload?: Record<string, unknown> };
     if (!detail?.event) return;
     const payload = detail.payload ?? {};
-    if (detail.event === "health") {
+    if (detail.event === "health" || detail.event === "activity") {
       this.requestUpdate();
       return;
     }
+    const eventSession =
+      (payload.session_key as string | undefined) ?? (payload.sessionKey as string | undefined);
+    if (eventSession && eventSession !== this.sessionKey) return;
+    if (!eventSession && detail.event !== "error") return;
     this.chat.handleEvent(detail.event, payload, this.sessionKey);
     this._messageThread?.scrollToBottom();
   }

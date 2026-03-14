@@ -332,6 +332,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
   private _newSession(): void {
     this._messages = [];
+    this.voiceStatus = "idle";
     this._stopDurationTimer();
     this._cacheMessages();
     this._incrementSessionCount();

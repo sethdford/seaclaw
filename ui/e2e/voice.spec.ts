@@ -115,7 +115,7 @@ test.describe("Voice Interactions", () => {
     }).toPass({ timeout: 15000 });
   });
 
-  test.fixme("New Session clears conversation", async ({ page }) => {
+  test("New Session clears conversation", async ({ page }) => {
     const result = await page.evaluate(sendVoiceMessage("Session clear test"));
     expect(result).toMatch(/^sent/);
 
