@@ -31,9 +31,12 @@ static const hu_pwa_driver_t DRIVER_SLACK = {
         "  msgs.forEach(function(m){"
         "    var sender = m.querySelector('[data-qa=\"message_sender_name\"]');"
         "    var body = m.querySelector('.p-rich_text_section');"
-        "    if(body) out.push((sender?sender.textContent:'?') + ': ' + body.textContent);"
+        "    var txt = body ? body.textContent.trim() : '';"
+        "    if(txt) out.push((sender?sender.textContent.trim():'?') + ': ' + txt);"
         "  });"
-        "  return out.slice(-20).join('\\n');"
+        "  var thread = document.querySelector('[data-qa=\"thread_header\"]');"
+        "  var header = thread ? 'Thread: ' + thread.textContent.trim() + '\\n' : 'Slack:\\n';"
+        "  return header + out.slice(-40).join('\\n');"
         "})()",
 
     .send_message_js =
@@ -86,11 +89,12 @@ static const hu_pwa_driver_t DRIVER_DISCORD = {
         "  var msgs = document.querySelectorAll('[id^=\"chat-messages-\"]');"
         "  var out = [];"
         "  msgs.forEach(function(m){"
-        "    var header = m.querySelector('[class*=\"username\"]');"
+        "    var header = m.querySelector('[class*=\"username\"], [class*=\"author\"]');"
         "    var body = m.querySelector('[id^=\"message-content-\"]');"
-        "    if(body) out.push((header?header.textContent:'?') + ': ' + body.textContent);"
+        "    var txt = body ? body.textContent.trim() : '';"
+        "    if(txt) out.push((header?header.textContent.trim():'?') + ': ' + txt);"
         "  });"
-        "  return out.slice(-20).join('\\n');"
+        "  return 'Discord:\\n' + out.slice(-40).join('\\n');"
         "})()",
 
     .send_message_js =
@@ -129,14 +133,15 @@ static const hu_pwa_driver_t DRIVER_WHATSAPP = {
 
     .read_messages_js =
         "(function(){"
-        "  var msgs = document.querySelectorAll('.message-in, .message-out');"
+        "  var msgs = document.querySelectorAll('.message-in, .message-out, [data-testid=\"msg-container\"]');"
         "  var out = [];"
         "  msgs.forEach(function(m){"
-        "    var body = m.querySelector('.copyable-text');"
+        "    var body = m.querySelector('.copyable-text, [data-testid=\"msg-text\"]');"
         "    var dir = m.classList.contains('message-out') ? 'You' : 'Them';"
-        "    if(body) out.push(dir + ': ' + body.textContent);"
+        "    var txt = body ? body.textContent.trim() : '';"
+        "    if(txt) out.push(dir + ': ' + txt);"
         "  });"
-        "  return out.slice(-20).join('\\n');"
+        "  return 'WhatsApp:\\n' + out.slice(-40).join('\\n');"
         "})()",
 
     .send_message_js =
@@ -185,16 +190,19 @@ static const hu_pwa_driver_t DRIVER_GMAIL = {
 
     .read_messages_js =
         "(function(){"
+        "  var container = document.querySelector('.aeF, [role=\"main\"]');"
+        "  if(container && container.scrollTop !== undefined) container.scrollTop = 0;"
         "  var rows = document.querySelectorAll('tr.zA');"
         "  var out = [];"
         "  rows.forEach(function(r){"
         "    var from = r.querySelector('.yW span');"
-        "    var subj = r.querySelector('.bog span');"
+        "    var subj = r.querySelector('.bog span, .bqe');"
         "    var snip = r.querySelector('.y2');"
         "    var unread = r.classList.contains('zE') ? '[NEW] ' : '';"
-        "    if(subj) out.push(unread + (from?from.textContent:'?') + ' — ' + subj.textContent + (snip?' — '+snip.textContent:''));"
+        "    var s = subj ? subj.textContent.trim() : '';"
+        "    if(s) out.push(unread + (from?from.textContent.trim():'?') + ' — ' + s + (snip?' — '+snip.textContent.trim():''));"
         "  });"
-        "  return out.slice(0, 20).join('\\n');"
+        "  return 'Inbox:\\n' + out.slice(0, 50).join('\\n');"
         "})()",
 
     .send_message_js =
@@ -230,12 +238,15 @@ static const hu_pwa_driver_t DRIVER_CALENDAR = {
 
     .read_messages_js =
         "(function(){"
-        "  var events = document.querySelectorAll('[data-eventchip]');"
+        "  var container = document.querySelector('[role=\"main\"] [role=\"grid\"], .st-dc');"
+        "  if(container && container.scrollTop !== undefined) container.scrollTop = 0;"
+        "  var events = document.querySelectorAll('[data-eventchip], [data-event-id], .event-chip');"
         "  var out = [];"
         "  events.forEach(function(e){"
-        "    out.push(e.textContent.trim());"
+        "    var t = e.textContent.trim();"
+        "    if(t) out.push(t);"
         "  });"
-        "  return out.slice(0, 30).join('\\n') || 'No visible events';"
+        "  return 'Calendar:\\n' + (out.slice(0, 50).join('\\n') || 'No visible events');"
         "})()",
 
     .send_message_js = NULL,
@@ -252,13 +263,18 @@ static const hu_pwa_driver_t DRIVER_NOTION = {
 
     .read_messages_js =
         "(function(){"
+        "  var container = document.querySelector('.notion-scroller, [class*=\"notion-page-content\"]');"
+        "  if(container && container.scrollTop !== undefined) container.scrollTop = 0;"
         "  var blocks = document.querySelectorAll('[data-block-id] .notion-text-block,"
         " [data-block-id] .notion-header-block,"
         " [data-block-id] .notion-sub_header-block,"
         " [data-block-id] .notion-to_do-block');"
         "  var out = [];"
-        "  blocks.forEach(function(b){ out.push(b.textContent.trim()); });"
-        "  return out.slice(0, 40).join('\\n') || 'Empty page';"
+        "  blocks.forEach(function(b){"
+        "    var t = b.textContent.trim();"
+        "    if(t) out.push(t);"
+        "  });"
+        "  return 'Notion:\\n' + (out.slice(0, 50).join('\\n') || 'Empty page');"
         "})()",
 
     .send_message_js =
@@ -299,9 +315,10 @@ static const hu_pwa_driver_t DRIVER_TWITTER = {
         "  tweets.forEach(function(t){"
         "    var user = t.querySelector('[data-testid=\"User-Name\"]');"
         "    var text = t.querySelector('[data-testid=\"tweetText\"]');"
-        "    if(text) out.push((user?user.textContent:'?') + ': ' + text.textContent);"
+        "    var txt = text ? text.textContent.trim() : '';"
+        "    if(txt) out.push((user?user.textContent.trim():'?') + ': ' + txt);"
         "  });"
-        "  return out.slice(0, 15).join('\\n');"
+        "  return 'Twitter/X:\\n' + out.slice(0, 40).join('\\n');"
         "})()",
 
     .send_message_js =
@@ -332,9 +349,10 @@ static const hu_pwa_driver_t DRIVER_TELEGRAM = {
         "  msgs.forEach(function(m){"
         "    var sender = m.querySelector('.message-title');"
         "    var body = m.querySelector('.text-content');"
-        "    if(body) out.push((sender?sender.textContent:'?') + ': ' + body.textContent);"
+        "    var txt = body ? body.textContent.trim() : '';"
+        "    if(txt) out.push((sender?sender.textContent.trim():'?') + ': ' + txt);"
         "  });"
-        "  return out.slice(-20).join('\\n');"
+        "  return 'Telegram:\\n' + out.slice(-40).join('\\n');"
         "})()",
 
     .send_message_js =
@@ -372,14 +390,15 @@ static const hu_pwa_driver_t DRIVER_LINKEDIN = {
 
     .read_messages_js =
         "(function(){"
-        "  var msgs = document.querySelectorAll('.msg-s-event-listitem');"
+        "  var msgs = document.querySelectorAll('.msg-s-event-listitem, [class*=\"msg-s-\"]');"
         "  var out = [];"
         "  msgs.forEach(function(m){"
-        "    var sender = m.querySelector('.msg-s-message-group__name');"
-        "    var body = m.querySelector('.msg-s-event-listitem__body');"
-        "    if(body) out.push((sender?sender.textContent.trim():'?') + ': ' + body.textContent.trim());"
+        "    var sender = m.querySelector('.msg-s-message-group__name, [class*=\"name\"]');"
+        "    var body = m.querySelector('.msg-s-event-listitem__body, [class*=\"body\"]');"
+        "    var txt = body ? body.textContent.trim() : '';"
+        "    if(txt) out.push((sender?sender.textContent.trim():'?') + ': ' + txt);"
         "  });"
-        "  return out.slice(-15).join('\\n');"
+        "  return 'LinkedIn:\\n' + out.slice(-40).join('\\n');"
         "})()",
 
     .send_message_js =
@@ -409,7 +428,7 @@ static const hu_pwa_driver_t DRIVER_FACEBOOK = {
     .read_messages_js =
         "(function(){"
         "  var msgs = document.querySelectorAll('[data-scope=\"messages_table\"] "
-        "[role=\"row\"], [class*=\"__message\"]');"
+        "[role=\"row\"], [class*=\"__message\"], [role=\"main\"] [dir=\"auto\"]');"
         "  if(msgs.length === 0) msgs = document.querySelectorAll("
         "    '[role=\"main\"] [dir=\"auto\"]');"
         "  var out = [];"
@@ -418,7 +437,7 @@ static const hu_pwa_driver_t DRIVER_FACEBOOK = {
         "    if(text && text.length > 0 && text.length < 500)"
         "      out.push(text);"
         "  });"
-        "  return out.slice(-20).join('\\n');"
+        "  return 'Facebook:\\n' + out.slice(-40).join('\\n');"
         "})()",
 
     .send_message_js =

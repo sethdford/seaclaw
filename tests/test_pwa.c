@@ -1,10 +1,13 @@
 #include "test_framework.h"
 #include "human/pwa.h"
+#include "human/pwa_context.h"
+#include "human/pwa_learner.h"
 #ifdef HU_HAS_PWA
 #include "human/channels/pwa.h"
 #endif
 #include "human/tools/pwa.h"
 #include "human/core/json.h"
+#include "human/memory.h"
 #include <string.h>
 
 /* ── Driver Lookup ─────────────────────────────────────────────────── */
@@ -352,6 +355,30 @@ static void test_read_messages_null_args(void) {
                  HU_ERR_INVALID_ARGUMENT);
 }
 
+/* ── PWA Context ───────────────────────────────────────────────────── */
+
+static void test_pwa_context_build_test_mode(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_pwa_context_build(&alloc, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT(strstr(out, "[Calendar] Test event today") != NULL);
+    HU_ASSERT(strstr(out, "[Slack] Test: hello from alice") != NULL);
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_pwa_context_build_not_null(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_pwa_context_build(&alloc, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
 /* ── Tool Vtable ───────────────────────────────────────────────────── */
 
 static void test_pwa_tool_create_destroy(void) {
@@ -494,6 +521,178 @@ static void test_global_registry_resolve_unknown(void) {
     HU_ASSERT_NULL(d);
 }
 
+/* ── PWA Learner ──────────────────────────────────────────────────── */
+
+static void test_pwa_learner_init_destroy(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_pwa_learner_t learner;
+    hu_error_t err = hu_pwa_learner_init(&alloc, &learner, NULL);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT(learner.alloc == &alloc);
+    HU_ASSERT(learner.memory == NULL);
+    HU_ASSERT(learner.content_hashes != NULL);
+    HU_ASSERT(learner.app_count >= 9);
+    HU_ASSERT_EQ(learner.ingest_count, 0);
+    hu_pwa_learner_destroy(&learner);
+    HU_ASSERT(learner.content_hashes == NULL);
+}
+
+typedef struct pwa_learner_mock_memory {
+    bool stored;
+    char stored_key[128];
+    char stored_content[256];
+} pwa_learner_mock_memory_t;
+
+static const char *mock_memory_name(void *ctx) {
+    (void)ctx;
+    return "mock";
+}
+
+static hu_error_t mock_memory_store(void *ctx, const char *key, size_t key_len,
+                                    const char *content, size_t content_len,
+                                    const hu_memory_category_t *category,
+                                    const char *session_id, size_t session_id_len) {
+    (void)category;
+    (void)session_id;
+    (void)session_id_len;
+    pwa_learner_mock_memory_t *m = (pwa_learner_mock_memory_t *)ctx;
+    m->stored = true;
+    size_t klen = key_len < sizeof(m->stored_key) - 1 ? key_len : sizeof(m->stored_key) - 1;
+    memcpy(m->stored_key, key, klen);
+    m->stored_key[klen] = '\0';
+    size_t clen = content_len < sizeof(m->stored_content) - 1 ? content_len
+                                                             : sizeof(m->stored_content) - 1;
+    memcpy(m->stored_content, content, clen);
+    m->stored_content[clen] = '\0';
+    return HU_OK;
+}
+
+static hu_error_t mock_memory_store_ex(void *ctx, const char *key, size_t key_len,
+                                       const char *content, size_t content_len,
+                                       const hu_memory_category_t *category,
+                                       const char *session_id, size_t session_id_len,
+                                       const hu_memory_store_opts_t *opts) {
+    (void)opts;
+    return mock_memory_store(ctx, key, key_len, content, content_len, category,
+                             session_id, session_id_len);
+}
+
+static hu_error_t mock_memory_recall(void *ctx, hu_allocator_t *alloc, const char *query,
+                                    size_t query_len, size_t limit,
+                                    const char *session_id, size_t session_id_len,
+                                    hu_memory_entry_t **out, size_t *out_count) {
+    (void)ctx;
+    (void)alloc;
+    (void)query;
+    (void)query_len;
+    (void)limit;
+    (void)session_id;
+    (void)session_id_len;
+    *out = NULL;
+    *out_count = 0;
+    return HU_OK;
+}
+
+static hu_error_t mock_memory_get(void *ctx, hu_allocator_t *alloc, const char *key,
+                                 size_t key_len, hu_memory_entry_t *out, bool *found) {
+    (void)ctx;
+    (void)alloc;
+    (void)key;
+    (void)key_len;
+    *out = (hu_memory_entry_t){0};
+    *found = false;
+    return HU_OK;
+}
+
+static hu_error_t mock_memory_list(void *ctx, hu_allocator_t *alloc,
+                                   const hu_memory_category_t *category,
+                                   const char *session_id, size_t session_id_len,
+                                   hu_memory_entry_t **out, size_t *out_count) {
+    (void)ctx;
+    (void)alloc;
+    (void)category;
+    (void)session_id;
+    (void)session_id_len;
+    *out = NULL;
+    *out_count = 0;
+    return HU_OK;
+}
+
+static hu_error_t mock_memory_forget(void *ctx, const char *key, size_t key_len,
+                                    bool *deleted) {
+    (void)ctx;
+    (void)key;
+    (void)key_len;
+    *deleted = false;
+    return HU_OK;
+}
+
+static hu_error_t mock_memory_count(void *ctx, size_t *out) {
+    (void)ctx;
+    *out = 0;
+    return HU_OK;
+}
+
+static bool mock_memory_health_check(void *ctx) {
+    (void)ctx;
+    return true;
+}
+
+static void mock_memory_deinit(void *ctx) {
+    (void)ctx;
+}
+
+static const hu_memory_vtable_t MOCK_MEMORY_VTABLE = {
+    .name = mock_memory_name,
+    .store = mock_memory_store,
+    .store_ex = mock_memory_store_ex,
+    .recall = mock_memory_recall,
+    .get = mock_memory_get,
+    .list = mock_memory_list,
+    .forget = mock_memory_forget,
+    .count = mock_memory_count,
+    .health_check = mock_memory_health_check,
+    .deinit = mock_memory_deinit,
+};
+
+static void test_pwa_learner_scan_test_mode_returns_zero(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_none_memory_create(&alloc);
+    hu_pwa_learner_t learner;
+    HU_ASSERT_EQ(hu_pwa_learner_init(&alloc, &learner, &mem), HU_OK);
+
+    size_t ingested = 99;
+    hu_error_t err = hu_pwa_learner_scan(&learner, &ingested);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(ingested, 0);
+
+    mem.vtable->deinit(mem.ctx);
+    hu_pwa_learner_destroy(&learner);
+}
+
+static void test_pwa_learner_store_with_memory(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    pwa_learner_mock_memory_t mock = {0};
+    hu_memory_t mem = {
+        .ctx = &mock,
+        .vtable = &MOCK_MEMORY_VTABLE,
+        .current_session_id = NULL,
+        .current_session_id_len = 0,
+    };
+
+    hu_pwa_learner_t learner;
+    HU_ASSERT_EQ(hu_pwa_learner_init(&alloc, &learner, &mem), HU_OK);
+
+    hu_error_t err = hu_pwa_learner_store(&learner, "slack", "alice: Hey there!", 17);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(mock.stored);
+    HU_ASSERT(strncmp(mock.stored_key, "pwa:slack:", 10) == 0);
+    HU_ASSERT_STR_EQ(mock.stored_content, "alice: Hey there!");
+    HU_ASSERT_EQ(learner.ingest_count, 1);
+
+    hu_pwa_learner_destroy(&learner);
+}
+
 /* ── Channel (requires PWA channel compiled in) ───────────────────── */
 
 #ifdef HU_HAS_PWA
@@ -619,6 +818,10 @@ void run_pwa_tests(void) {
     HU_RUN_TEST(test_send_message_unknown_app);
     HU_RUN_TEST(test_read_messages_null_args);
 
+    HU_TEST_SUITE("pwa_context");
+    HU_RUN_TEST(test_pwa_context_build_test_mode);
+    HU_RUN_TEST(test_pwa_context_build_not_null);
+
     HU_TEST_SUITE("pwa_tool");
     HU_RUN_TEST(test_pwa_tool_create_destroy);
     HU_RUN_TEST(test_pwa_tool_list_apps);
@@ -630,6 +833,11 @@ void run_pwa_tests(void) {
     HU_RUN_TEST(test_global_registry_resolve_builtin);
     HU_RUN_TEST(test_global_registry_resolve_custom_override);
     HU_RUN_TEST(test_global_registry_resolve_unknown);
+
+    HU_TEST_SUITE("pwa_learner");
+    HU_RUN_TEST(test_pwa_learner_init_destroy);
+    HU_RUN_TEST(test_pwa_learner_scan_test_mode_returns_zero);
+    HU_RUN_TEST(test_pwa_learner_store_with_memory);
 
 #ifdef HU_HAS_PWA
     HU_TEST_SUITE("pwa_channel");
