@@ -24,7 +24,7 @@ let package = Package(
             ],
             path: "Sources/HumaniOS",
             resources: [
-                .process("Resources"),
+                .process("Resources", exclude: ["Info.plist"]),
             ]
         ),
     ]

@@ -100,16 +100,16 @@ export class ScOverviewView extends GatewayAwareLitElement {
       gap: var(--hu-space-sm);
       font-size: var(--hu-text-xs);
       color: var(--hu-text-muted);
-    }
 
-    .hero-meta .update-link {
-      color: var(--hu-accent-text, var(--hu-accent));
-      text-decoration: none;
-      font-weight: var(--hu-weight-medium);
-    }
+      & .update-link {
+        color: var(--hu-accent-text, var(--hu-accent));
+        text-decoration: none;
+        font-weight: var(--hu-weight-medium);
 
-    .hero-meta .update-link:hover {
-      text-decoration: underline;
+        &:hover {
+          text-decoration: underline;
+        }
+      }
     }
 
     .hero-actions {
@@ -283,23 +283,26 @@ export class ScOverviewView extends GatewayAwareLitElement {
       align-items: center;
       gap: var(--hu-space-sm);
       padding: var(--hu-space-lg);
-    }
-    .quick-action-card .icon-wrap {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: var(--hu-icon-2xl);
-      height: var(--hu-icon-2xl);
-      color: var(--hu-accent);
-    }
-    .quick-action-card .icon-wrap svg {
-      width: var(--hu-icon-lg);
-      height: var(--hu-icon-lg);
-    }
-    .quick-action-card .label {
-      font-size: var(--hu-text-sm);
-      font-weight: var(--hu-weight-medium);
-      color: var(--hu-text);
+
+      & .icon-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--hu-icon-2xl);
+        height: var(--hu-icon-2xl);
+        color: var(--hu-accent);
+
+        & svg {
+          width: var(--hu-icon-lg);
+          height: var(--hu-icon-lg);
+        }
+      }
+
+      & .label {
+        font-size: var(--hu-text-sm);
+        font-weight: var(--hu-weight-medium);
+        color: var(--hu-text);
+      }
     }
     .show-more-btn {
       margin-top: var(--hu-space-sm);

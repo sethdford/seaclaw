@@ -15,7 +15,7 @@
   src: url("/fonts/avenir/Avenir-Book.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
 }
 @font-face {
   font-family: "Avenir";
@@ -36,7 +36,7 @@
   src: url("/fonts/avenir/Avenir-Black.woff2") format("woff2");
   font-weight: 900;
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
 }
 
 /* ── Native View Transitions (cross-document, no JS needed) ── */
@@ -494,65 +494,65 @@
   /* ── Card glow on hover (uses --hu-glow-opacity @property for smooth interpolation) ── */
   .card-glow {
     position: relative;
-  }
 
-  .card-glow::before {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    background: linear-gradient(
-      var(--hu-gradient-angle, 135deg),
-      var(--hu-accent-subtle),
-      transparent 50%,
-      var(--hu-accent-tertiary-subtle)
-    );
-    --hu-glow-opacity: 0;
-    opacity: var(--hu-glow-opacity);
-    transition:
-      --hu-glow-opacity var(--hu-duration-slow) var(--hu-ease-out),
-      --hu-gradient-angle var(--hu-duration-slow) var(--hu-ease-out);
-    z-index: -1;
-  }
+    &::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      background: linear-gradient(
+        var(--hu-gradient-angle, 135deg),
+        var(--hu-accent-subtle),
+        transparent 50%,
+        var(--hu-accent-tertiary-subtle)
+      );
+      --hu-glow-opacity: 0;
+      opacity: var(--hu-glow-opacity);
+      transition:
+        --hu-glow-opacity var(--hu-duration-slow) var(--hu-ease-out),
+        --hu-gradient-angle var(--hu-duration-slow) var(--hu-ease-out);
+      z-index: -1;
+    }
 
-  .card-glow:hover::before {
-    --hu-glow-opacity: 1;
-    --hu-gradient-angle: 165deg;
+    &:hover::before {
+      --hu-glow-opacity: 1;
+      --hu-gradient-angle: 165deg;
+    }
   }
 
   /* ── Spotlight card effect ── */
   .card-spotlight {
     position: relative;
     overflow: hidden;
-  }
 
-  .card-spotlight::after {
-    content: "";
-    position: absolute;
-    top: var(--mouse-y, 50%);
-    left: var(--mouse-x, 50%);
-    width: 300px;
-    height: 300px;
-    background: radial-gradient(
-      circle,
-      var(--hu-accent-subtle) 0%,
-      transparent 70%
-    );
-    transform: translate(-50%, -50%);
-    --hu-glow-opacity: 0;
-    opacity: var(--hu-glow-opacity);
-    transition: --hu-glow-opacity var(--hu-duration-slow) var(--hu-ease-out);
-    pointer-events: none;
-    z-index: 0;
-  }
+    &::after {
+      content: "";
+      position: absolute;
+      top: var(--mouse-y, 50%);
+      left: var(--mouse-x, 50%);
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(
+        circle,
+        var(--hu-accent-subtle) 0%,
+        transparent 70%
+      );
+      transform: translate(-50%, -50%);
+      --hu-glow-opacity: 0;
+      opacity: var(--hu-glow-opacity);
+      transition: --hu-glow-opacity var(--hu-duration-slow) var(--hu-ease-out);
+      pointer-events: none;
+      z-index: 0;
+    }
 
-  .card-spotlight:hover::after {
-    --hu-glow-opacity: 1;
-  }
+    &:hover::after {
+      --hu-glow-opacity: 1;
+    }
 
-  .card-spotlight > * {
-    position: relative;
-    z-index: 1;
+    & > * {
+      position: relative;
+      z-index: 1;
+    }
   }
 
   /* ── Glass entrance choreography ── */
@@ -1543,4 +1543,46 @@ figcaption {
   & .card-title {
     text-wrap: balance;
   }
+}
+
+/* 6. :has() — contextual styling based on child state */
+.feature-card:has(img) {
+  grid-template-rows: auto 1fr;
+}
+.feature-card:has(.badge) {
+  border-color: var(--hu-web-accent);
+}
+.nav-item:has(> .active) {
+  color: var(--hu-web-accent);
+}
+
+/* 7. field-sizing — auto-growing textareas and inputs */
+textarea,
+input[type="text"],
+input[type="email"] {
+  field-sizing: content;
+  min-height: 2.5rem;
+}
+
+/* 8. Anchor Positioning — tooltip/popover placement */
+[data-tooltip] {
+  anchor-name: --tooltip-anchor;
+}
+.tooltip-content {
+  position: fixed;
+  position-anchor: --tooltip-anchor;
+  inset-area: top;
+  margin-bottom: 0.5rem;
+  position-try-fallbacks: --bottom;
+}
+@position-try --bottom {
+  inset-area: bottom;
+  margin-top: 0.5rem;
+}
+
+/* 9. text-wrap: balance — headings wrap evenly */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
 }

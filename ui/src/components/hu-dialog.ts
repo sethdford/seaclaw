@@ -182,7 +182,11 @@ export class ScDialog extends LitElement {
       if (this.open) {
         this._closing = false;
         this._closedByConfirm = false;
-        dialog.showModal();
+        try {
+          dialog.showModal();
+        } catch {
+          dialog.setAttribute("open", "");
+        }
       } else if (changedProperties.get("open") === true) {
         this._startClosing(dialog);
       }
