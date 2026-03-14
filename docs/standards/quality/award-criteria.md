@@ -94,13 +94,13 @@ updated: 2026-03-13
 ### Apple Design Award Checklist (iOS/macOS)
 
 - [x] Uses platform conventions (NavigationStack, TabView, .sheet)
-- [ ] Dynamic Type support (all text scales)
+- [x] Dynamic Type support (all text scales)
 - [x] VoiceOver labels on every interactive element
 - [x] Haptic feedback on meaningful interactions
 - [x] Spring animations (UISpringTimingParameters or SwiftUI .spring)
 - [x] Widget / Live Activity / App Intent integration
 - [x] Proper light/dark/tinted appearance support
-- [ ] Keyboard/trackpad support (macOS)
+- [x] Keyboard/trackpad support (macOS)
 - [x] Avenir custom font with proper weight mapping
 
 ### Google Play Best App Checklist (Android)
@@ -109,7 +109,7 @@ updated: 2026-03-13
 - [x] Compose-first UI
 - [x] Edge-to-edge with proper insets
 - [x] Predictive back gesture support
-- [ ] Accessibility Scanner zero issues
+- [x] Accessibility Scanner zero issues
 - [x] Spring animations (Compose animation-core)
 - [x] Widget integration
 - [x] Proper dark theme
