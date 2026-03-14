@@ -11,7 +11,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-VENV_PYTHON="$HOME/.human/scraper-venv/bin/python3"
 INGEST_DIR="$HOME/.human/feeds/ingest"
 LOG_DIR="$HOME/.human/logs"
 LOG_FILE="$LOG_DIR/daily-scrape-$(date +%Y%m%d).log"
@@ -20,31 +19,18 @@ mkdir -p "$INGEST_DIR" "$LOG_DIR"
 
 log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
-if [ ! -x "$VENV_PYTHON" ]; then
-    log "ERROR: venv not found at $VENV_PYTHON — run scripts/setup_automation.sh first"
-    exit 1
-fi
-
 FILTER="${1:-all}"
 
-log "=== Daily Feed Scrape started ==="
-
-# Refresh cookies from Chrome/PWA before scraping
-log "Extracting fresh cookies from Chrome..."
-if "$VENV_PYTHON" "$SCRIPT_DIR/extract_chrome_cookies.py" >> "$LOG_FILE" 2>&1; then
-    log "Cookie extraction complete"
-else
-    log "WARNING: Cookie extraction failed — scrapers will use cached state"
-fi
+log "=== Daily Feed Scrape started (direct PWA, no new browsers) ==="
 
 run_scraper() {
     local name="$1" script="$2"; shift 2
     if [ "$FILTER" != "all" ] && [ "$FILTER" != "$name" ]; then return 0; fi
     log "--- $name ---"
-    if "$VENV_PYTHON" "$SCRIPT_DIR/$script" "$@" >> "$LOG_FILE" 2>&1; then
+    if python3 "$SCRIPT_DIR/$script" "$@" >> "$LOG_FILE" 2>&1; then
         log "$name scrape complete"
     else
-        log "WARNING: $name scrape failed (exit $?) — may need re-login"
+        log "WARNING: $name scrape failed (exit $?) — is the PWA running?"
     fi
 }
 

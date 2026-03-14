@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Scrape Twitter/X home timeline using Playwright with Chrome cookies.
-Outputs JSONL to ~/.human/feeds/ingest/twitter_YYYYMMDD.jsonl.
+Scrape Twitter/X home timeline from the already-running PWA window.
+Uses Chrome's AppleScript bridge — zero new browser windows.
 
-Cookies are extracted from the local Chrome/PWA by extract_chrome_cookies.py.
+Outputs JSONL to ~/.human/feeds/ingest/twitter_YYYYMMDD.jsonl.
 
 Usage:
     python scripts/scrape_twitter_feed.py [--max-tweets 50]
@@ -11,92 +11,103 @@ Usage:
 
 import argparse
 import json
+import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
-try:
-    from playwright.sync_api import sync_playwright, TimeoutError as PwTimeout
-except ImportError:
-    print("Error: playwright not installed. Run: pip install playwright && playwright install chromium")
-    sys.exit(1)
-
-
 INGEST_DIR = Path.home() / ".human" / "feeds" / "ingest"
-STATE_FILE = Path.home() / ".human" / "browser_state" / "twitter.json"
-TWITTER_URL = "https://x.com/home"
+
+
+def run_js_in_chrome_tab(url_match: str, js: str) -> str:
+    """Execute JavaScript in the Chrome tab whose URL contains url_match."""
+    script = f'''
+    tell application "Google Chrome"
+        repeat with w in every window
+            repeat with t in every tab of w
+                if URL of t contains "{url_match}" then
+                    return execute t javascript "{js}"
+                end if
+            end repeat
+        end repeat
+        return "TAB_NOT_FOUND"
+    end tell
+    '''
+    result = subprocess.run(
+        ["osascript", "-e", script],
+        capture_output=True, text=True, timeout=30,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"AppleScript error: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
+def scroll_tab(url_match: str) -> None:
+    """Scroll down in the matching Chrome tab."""
+    run_js_in_chrome_tab(url_match, "window.scrollBy(0, window.innerHeight); 'ok'")
+    time.sleep(2)
 
 
 def scrape_twitter(max_tweets: int = 50) -> list[dict]:
-    tweets = []
+    tab_check = run_js_in_chrome_tab("x.com", "document.title")
+    if tab_check == "TAB_NOT_FOUND":
+        print("Error: No x.com tab found in Chrome. Is the Twitter PWA running?")
+        return []
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            storage_state=str(STATE_FILE) if STATE_FILE.exists() else None,
-            viewport={"width": 1280, "height": 900},
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        )
-        page = context.new_page()
+    print(f"  Found Twitter tab: {tab_check}")
 
-        try:
-            page.goto(TWITTER_URL, wait_until="domcontentloaded", timeout=30000)
-        except PwTimeout:
-            print("Warning: page load timed out, continuing anyway...")
+    js_extract = r"""
+    (function() {
+        var tweets = [];
+        document.querySelectorAll('[data-testid=\"tweetText\"]').forEach(function(el) {
+            var article = el.closest('article');
+            var link = article ? article.querySelector('a[href*=\"/status/\"]') : null;
+            tweets.push(JSON.stringify({
+                source: 'twitter',
+                content_type: 'tweet',
+                content: el.innerText.substring(0, 2000),
+                url: link ? link.href : ''
+            }));
+        });
+        return tweets.join('\\n');
+    })()
+    """.replace("\n", " ")
 
-        # Wait for tweet content to appear (up to 15s)
-        try:
-            page.wait_for_selector('[data-testid="tweetText"]', timeout=15000)
-        except PwTimeout:
-            print("Warning: no tweets found — may need to re-extract cookies")
-            browser.close()
-            return tweets
+    all_tweets = {}
+    scroll_rounds = max_tweets // 5 + 5
 
-        page.wait_for_timeout(2000)
+    for i in range(scroll_rounds):
+        if len(all_tweets) >= max_tweets:
+            break
 
-        seen_texts = set()
-        scroll_attempts = 0
-        max_scrolls = max_tweets // 5 + 10
+        raw = run_js_in_chrome_tab("x.com", js_extract)
+        if raw and raw != "TAB_NOT_FOUND":
+            for line in raw.split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    item = json.loads(line)
+                    key = item.get("content", "")[:100]
+                    if key and key not in all_tweets:
+                        all_tweets[key] = item
+                except json.JSONDecodeError:
+                    pass
 
-        while len(tweets) < max_tweets and scroll_attempts < max_scrolls:
-            tweet_elements = page.query_selector_all('[data-testid="tweetText"]')
+        if len(all_tweets) >= max_tweets:
+            break
+        scroll_tab("x.com")
 
-            for el in tweet_elements:
-                text = el.inner_text().strip()
-                if text and text not in seen_texts:
-                    seen_texts.add(text)
-                    article = el.evaluate(
-                        "el => el.closest('article')?.querySelector('a[href*=\"/status/\"]')?.href"
-                    )
-                    tweets.append({
-                        "source": "twitter",
-                        "content_type": "tweet",
-                        "content": text[:2000],
-                        "url": article or "",
-                    })
-
-                if len(tweets) >= max_tweets:
-                    break
-
-            page.evaluate("window.scrollBy(0, window.innerHeight)")
-            page.wait_for_timeout(1500)
-            scroll_attempts += 1
-
-        # Update saved state with any new cookies from this session
-        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        context.storage_state(path=str(STATE_FILE))
-        browser.close()
-
-    return tweets
+    return list(all_tweets.values())[:max_tweets]
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Scrape Twitter/X home timeline")
-    parser.add_argument("--max-tweets", type=int, default=50,
-                        help="Maximum tweets to scrape (default: 50)")
+    parser = argparse.ArgumentParser(description="Scrape Twitter/X from running PWA")
+    parser.add_argument("--max-tweets", type=int, default=50)
     args = parser.parse_args()
 
-    print(f"Scraping up to {args.max_tweets} tweets from Twitter/X...")
+    print(f"Scraping up to {args.max_tweets} tweets from running Twitter PWA...")
     tweets = scrape_twitter(args.max_tweets)
     print(f"Scraped {len(tweets)} tweets")
 
@@ -108,7 +119,7 @@ def main():
                 f.write(json.dumps(t) + "\n")
         print(f"Wrote {len(tweets)} items to {outfile}")
     else:
-        print("No tweets scraped — check cookies or login state")
+        print("No tweets scraped — is the Twitter PWA open?")
 
 
 if __name__ == "__main__":
