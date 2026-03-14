@@ -1292,6 +1292,10 @@ export class DemoGatewayClient extends EventTarget {
 
       case "update.check":
         return { available: false, current_version: "0.42.0" };
+      case "update.run":
+        return { status: "up_to_date", current_version: "0.4.0" };
+      case "exec.approval.resolve":
+        return { status: "approved" };
       case "chat.history": {
         const sk = (params?.sessionKey as string) ?? "default";
         if (sk === "default") {
@@ -1589,7 +1593,9 @@ export class DemoGatewayClient extends EventTarget {
       case "persona.set":
         return { ok: true };
 
-      // --- OAuth mocks ---
+      // --- Auth mocks ---
+      case "auth.token":
+        return { token: "demo-token-abc123", expires_in: 3600 };
       case "auth.oauth.start":
         return {
           url: "https://accounts.example.com/oauth?demo=true",
