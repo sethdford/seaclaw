@@ -58,6 +58,10 @@
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
 #endif
+#ifdef HU_ENABLE_FEEDS
+#include "human/feeds/processor.h"
+#include "human/feeds/research.h"
+#endif
 #ifdef HU_ENABLE_CURL
 #include "human/paperclip/client.h"
 #include "human/paperclip/heartbeat.h"
@@ -222,6 +226,9 @@ static const hu_command_t commands[] = {
     {"memory", "Memory operations", cmd_memory},
 #ifdef HU_HAS_PERSONA
     {"persona", "Create and manage persona profiles", cmd_persona},
+#endif
+#ifdef HU_ENABLE_FEEDS
+    {"feed", "Feed monitoring and ingestion", cmd_feed},
 #endif
     {"workspace", "Workspace management", cmd_workspace},
     {"capabilities", "Show available capabilities", cmd_capabilities},
@@ -692,6 +699,22 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
         }
     }
 #endif
+
+#ifdef HU_ENABLE_FEEDS
+    if (app_ctx.agent && app_ctx.agent->scheduler) {
+        const char *research_prompt = hu_research_agent_prompt();
+        const char *research_cron = hu_research_cron_expression();
+        uint64_t research_job_id = 0;
+        hu_error_t jerr = hu_cron_add_agent_job(
+            (hu_cron_scheduler_t *)app_ctx.agent->scheduler, alloc,
+            research_cron, research_prompt, "cli", "research-agent", &research_job_id);
+        if (jerr == HU_OK) {
+            fprintf(stderr, "[%s] research agent registered (id=%llu sched=%s)\n",
+                    HU_CODENAME, (unsigned long long)research_job_id, research_cron);
+        }
+    }
+#endif
+
 #else
     fprintf(stderr, "[%s] %zu channel(s) active\n", HU_CODENAME, app_ctx.channel_count);
 #endif

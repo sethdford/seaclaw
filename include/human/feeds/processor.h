@@ -74,6 +74,9 @@ void hu_feed_item_deinit(hu_allocator_t *alloc, hu_feed_item_t *item);
 typedef struct hu_feed_processor {
     hu_allocator_t *alloc;
     sqlite3 *db;
+    const char *interests;
+    size_t interests_len;
+    double relevance_threshold;
 } hu_feed_processor_t;
 
 typedef struct hu_feed_item_stored {
