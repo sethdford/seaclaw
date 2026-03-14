@@ -61,9 +61,9 @@ fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
 
     LaunchedEffect(events) {
         events?.let { event ->
-            if (event.type == "message" || event.type == "response") {
-                val text = event.payload?.optString("text", "")
-                    ?: event.payload?.optString("content", "")
+            if (event.type == "response") {
+                val text = event.payload?.optString("content", "")
+                    ?: event.payload?.optString("text", "")
                     ?: ""
                 if (text.isNotBlank()) {
                     messages.add(ChatMessage(nextId++, text, false))
@@ -147,7 +147,7 @@ fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
                         onSend = {
                             if (inputText.isNotBlank()) {
                                 messages.add(ChatMessage(nextId++, inputText, true))
-                                gateway.send("chat", mapOf("text" to inputText))
+                                gateway.send("chat.send", mapOf("message" to inputText))
                                 inputText = ""
                             }
                         },

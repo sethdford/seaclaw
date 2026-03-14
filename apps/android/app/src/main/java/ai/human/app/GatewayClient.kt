@@ -26,6 +26,7 @@ class GatewayClient {
         .build()
 
     private var webSocket: WebSocket? = null
+    private var requestCounter = 0
 
     private val _state = MutableStateFlow(ConnectionState.DISCONNECTED)
     val state: StateFlow<ConnectionState> = _state
@@ -50,8 +51,20 @@ class GatewayClient {
                 scope.launch {
                     try {
                         val json = JSONObject(text)
-                        val type = json.optString("type", json.optString("event", ""))
-                        _events.value = GatewayEvent(type, json.optJSONObject("payload") ?: json)
+                        val type = json.optString("type", "")
+                        if (type == "res") {
+                            val result = json.optJSONObject("result")
+                            val content = result?.optString("content", "")
+                                ?: result?.optString("text", "") ?: ""
+                            if (content.isNotBlank()) {
+                                _events.value = GatewayEvent("response", result)
+                            }
+                        } else if (type == "event") {
+                            _events.value = GatewayEvent(
+                                json.optString("event", ""),
+                                json.optJSONObject("data") ?: json
+                            )
+                        }
                     } catch (_: Exception) { }
                 }
             }
@@ -67,7 +80,10 @@ class GatewayClient {
     }
 
     fun send(method: String, params: Map<String, Any> = emptyMap()) {
+        val id = "req-${++requestCounter}"
         val json = JSONObject().apply {
+            put("type", "req")
+            put("id", id)
             put("method", method)
             put("params", JSONObject(params))
         }
