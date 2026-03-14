@@ -281,7 +281,7 @@ export class ScUsageView extends GatewayAwareLitElement {
 
     const chartData = this._tokenChartData();
     return html`
-      <div class="section" role="region" aria-label="Token usage over time">
+      <div class="section hu-scroll-reveal" role="region" aria-label="Token usage over time">
         <div class="chart-header">
           <div class="section-label">Token Usage</div>
           <hu-segmented-control
@@ -311,7 +311,7 @@ export class ScUsageView extends GatewayAwareLitElement {
 
     const chartData = this._costBreakdownData();
     return html`
-      <div class="section">
+      <div class="section hu-cv-defer hu-scroll-reveal">
         <div class="section-label">Cost Breakdown</div>
         <hu-card glass>
           <div class="chart-inner">
@@ -329,7 +329,7 @@ export class ScUsageView extends GatewayAwareLitElement {
     if (history.length < 2) return nothing;
 
     return html`
-      <div class="section" role="region" aria-label="Cost forecast">
+      <div class="section hu-cv-defer hu-scroll-reveal" role="region" aria-label="Cost forecast">
         <div class="section-label">Cost Forecast</div>
         <hu-card glass>
           <div class="chart-inner">
@@ -352,7 +352,7 @@ export class ScUsageView extends GatewayAwareLitElement {
     const maxCost = Math.max(...providers.map((p) => p.cost), 0.01);
 
     return html`
-      <div class="section">
+      <div class="section hu-cv-defer hu-scroll-reveal">
         <div class="section-label">Cost by Provider</div>
         <hu-card glass>
           <div class="provider-list">
@@ -409,7 +409,7 @@ export class ScUsageView extends GatewayAwareLitElement {
         </hu-section-header>
       </hu-page-hero>
 
-      <hu-stats-row>
+      <hu-stats-row class="hu-scroll-reveal-stagger">
         <hu-stat-card
           .value=${totalTokens}
           label="Tokens Today"

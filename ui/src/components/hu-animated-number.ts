@@ -1,5 +1,6 @@
 import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { generateSpringKeyframes, SPRING_PRESETS } from "../utils/spring.js";
 
 @customElement("hu-animated-number")
 export class ScAnimatedNumber extends LitElement {
@@ -34,10 +35,15 @@ export class ScAnimatedNumber extends LitElement {
     }
     this._from = from;
     this._start = performance.now();
+    const keyframes = generateSpringKeyframes(SPRING_PRESETS.standard);
     const tick = (now: number) => {
       const elapsed = now - this._start;
       const t = Math.min(elapsed / this.duration, 1);
-      const eased = 1 - Math.pow(1 - t, 3);
+      const idx = t * (keyframes.length - 1);
+      const i0 = Math.floor(idx);
+      const i1 = Math.min(i0 + 1, keyframes.length - 1);
+      const frac = idx - i0;
+      const eased = keyframes[i0] + frac * (keyframes[i1] - keyframes[i0]);
       this._displayed = Math.round(this._from + (to - this._from) * eased);
       if (t < 1) {
         this._raf = requestAnimationFrame(tick);

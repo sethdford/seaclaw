@@ -3,7 +3,6 @@ import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { friendlyError } from "../utils/friendly-error.js";
 import { icons } from "../icons.js";
-import { observeAllCards, unobserveAllCards } from "../utils/scroll-entrance.js";
 import type { ActivityEvent } from "../components/hu-activity-feed.js";
 import "../components/hu-card.js";
 import "../components/hu-badge.js";
@@ -302,6 +301,26 @@ export class ScOverviewView extends GatewayAwareLitElement {
       font-weight: var(--hu-weight-medium);
       color: var(--hu-text);
     }
+    .show-more-btn {
+      margin-top: var(--hu-space-sm);
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      font-size: var(--hu-text-xs);
+      font-weight: var(--hu-weight-medium);
+      color: var(--hu-accent-text, var(--hu-accent));
+      background: transparent;
+      border: none;
+      border-radius: var(--hu-radius-sm);
+      cursor: pointer;
+      font-family: var(--hu-font);
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
+    }
+    .show-more-btn:hover {
+      background: var(--hu-hover-overlay);
+    }
+    .show-more-btn:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
+    }
     @container (max-width: 768px) {
       .quick-actions {
         grid-template-columns: 1fr;
@@ -315,12 +334,6 @@ export class ScOverviewView extends GatewayAwareLitElement {
     }
   `;
 
-  override updated(): void {
-    if (!this.loading && this.shadowRoot) {
-      observeAllCards(this.shadowRoot);
-    }
-  }
-
   @state() private health: HealthRes = {};
   @state() private capabilities: CapabilitiesRes = {};
   @state() private channels: ChannelItem[] = [];
@@ -329,6 +342,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
   @state() private error = "";
   @state() private updateInfo: UpdateInfo = {};
   @state() private activityEvents: ActivityEvent[] = [];
+  @state() private channelsExpanded = false;
   @state() private connectionStatus: "connected" | "connecting" | "disconnected" = "disconnected";
   private _connectionStatusHandler = ((e: CustomEvent<string>) => {
     const s = e.detail as "connected" | "connecting" | "disconnected";
@@ -359,7 +373,6 @@ export class ScOverviewView extends GatewayAwareLitElement {
     super.disconnectedCallback();
     this.gateway?.removeEventListener("status", this._connectionStatusHandler);
     this.gateway?.removeEventListener("gateway", this._gwEventHandler);
-    if (this.shadowRoot) unobserveAllCards(this.shadowRoot);
   }
 
   protected override onGatewaySwapped(
@@ -633,7 +646,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
       { label: "Voice", icon: icons.mic, target: "voice" },
     ];
     return html`
-      <div class="quick-actions">
+      <div class="quick-actions hu-scroll-reveal-stagger">
         ${actions.map(
           (a) => html`
             <hu-card
@@ -664,9 +677,15 @@ export class ScOverviewView extends GatewayAwareLitElement {
   /* ── Detail zone ────────────────────────────────────── */
 
   private _renderDetails() {
+    const CHANNELS_VISIBLE = 5;
+    const channelsToShow = this.channelsExpanded
+      ? this.channels
+      : this.channels.slice(0, CHANNELS_VISIBLE);
+    const hasMoreChannels = this.channels.length > CHANNELS_VISIBLE;
+
     return html`
-      <div class="details">
-        <div class="bento">
+      <div class="details hu-cv-defer">
+        <div class="bento hu-scroll-reveal-stagger">
           <hu-card hoverable accent surface="high" class="activity">
             <hu-activity-timeline .events=${this.activityEvents}></hu-activity-timeline>
           </hu-card>
@@ -693,7 +712,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
                       height=${100}
                     ></hu-chart>
                     <div class="channels-inner">
-                      ${this.channels.map(
+                      ${channelsToShow.map(
                         (ch) => html`
                           <div class="channel-item">
                             <span class="channel-name">${ch.label ?? ch.key ?? "unnamed"}</span>
@@ -704,6 +723,18 @@ export class ScOverviewView extends GatewayAwareLitElement {
                         `,
                       )}
                     </div>
+                    ${hasMoreChannels
+                      ? html`
+                          <button
+                            type="button"
+                            class="show-more-btn"
+                            @click=${() => (this.channelsExpanded = !this.channelsExpanded)}
+                            aria-expanded=${this.channelsExpanded}
+                          >
+                            ${this.channelsExpanded ? "Show less" : "Show more"}
+                          </button>
+                        `
+                      : nothing}
                   </div>
                 `}
           </hu-card>

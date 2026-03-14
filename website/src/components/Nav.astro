@@ -51,10 +51,12 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       </a>
       <button
         id="mobile-menu-btn"
+        type="button"
         class="md:hidden flex items-center justify-center w-8 h-8 nav-link"
         aria-label="Open menu"
         aria-expanded="false"
         aria-controls="mobile-menu"
+        popovertarget="mobile-menu"
       >
         <svg
           class="hamburger-icon w-5 h-5"
@@ -77,7 +79,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
   </div>
   <div
     id="mobile-menu"
-    class="md:hidden hidden"
+    class="mobile-menu-popover md:hidden"
+    popover="auto"
     style="background: var(--hu-web-surface-elevated); backdrop-filter: blur(24px) saturate(1.8); -webkit-backdrop-filter: blur(24px) saturate(1.8); border-bottom: 1px solid var(--hu-web-border);"
   >
     <div class="max-w-6xl mx-auto px-6 py-4 flex flex-col gap-3">
@@ -108,6 +111,13 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
   .nav-link:focus-visible {
     color: var(--hu-web-text);
   }
+  .mobile-menu-popover {
+    position: fixed;
+    top: 4rem;
+    left: 0;
+    right: 0;
+    margin: 0;
+  }
 </style>
 
 <script>
@@ -116,19 +126,32 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
   const hamburger = btn?.querySelector(".hamburger-icon");
   const closeIcon = btn?.querySelector(".close-icon");
 
-  btn?.addEventListener("click", () => {
-    const open = menu?.classList.toggle("hidden") === false;
-    btn.setAttribute("aria-expanded", String(open));
+  const supportsPopover = "showPopover" in document.createElement("div");
+
+  function setExpanded(open) {
+    btn?.setAttribute("aria-expanded", String(open));
     hamburger?.classList.toggle("hidden", open);
     closeIcon?.classList.toggle("hidden", !open);
-  });
+  }
 
-  menu?.querySelectorAll(".mobile-menu-link").forEach((link) => {
-    link.addEventListener("click", () => {
-      menu.classList.add("hidden");
-      btn?.setAttribute("aria-expanded", "false");
-      hamburger?.classList.remove("hidden");
-      closeIcon?.classList.add("hidden");
+  if (supportsPopover && menu) {
+    menu.addEventListener("toggle", (e) => {
+      setExpanded(menu.matches(":popover-open"));
     });
-  });
+    menu.querySelectorAll(".mobile-menu-link").forEach((link) => {
+      link.addEventListener("click", () => menu.hidePopover());
+    });
+  } else {
+    if (menu) menu.classList.add("hidden");
+    btn?.addEventListener("click", () => {
+      const open = menu?.classList.toggle("hidden") === false;
+      setExpanded(open);
+    });
+    menu?.querySelectorAll(".mobile-menu-link").forEach((link) => {
+      link.addEventListener("click", () => {
+        menu.classList.add("hidden");
+        setExpanded(false);
+      });
+    });
+  }
 </script>

@@ -14,7 +14,6 @@ export class ScDialog extends LitElement {
 
   @state() private _closing = false;
   private _closedByConfirm = false;
-  private _closedByUserCancel = false;
   private _animationEndHandler = this._onAnimationEnd.bind(this);
   private _cancelHandler = this._onCancel.bind(this);
   private _closeHandler = this._onClose.bind(this);
@@ -183,7 +182,6 @@ export class ScDialog extends LitElement {
       if (this.open) {
         this._closing = false;
         this._closedByConfirm = false;
-        this._closedByUserCancel = false;
         dialog.showModal();
       } else if (changedProperties.get("open") === true) {
         this._startClosing(dialog);
@@ -220,15 +218,12 @@ export class ScDialog extends LitElement {
 
   private _onCancel(e: Event): void {
     e.preventDefault();
-    this._closedByUserCancel = true;
+    this.dispatchEvent(new CustomEvent("hu-cancel", { bubbles: true, composed: true }));
     this._startClosing(this.renderRoot.querySelector("dialog")!);
   }
 
   private _onClose(): void {
-    if (this._closedByUserCancel) {
-      this.dispatchEvent(new CustomEvent("hu-cancel", { bubbles: true, composed: true }));
-    }
-    this._closedByUserCancel = false;
+    this.open = false;
   }
 
   private _confirm(): void {
@@ -238,7 +233,7 @@ export class ScDialog extends LitElement {
   }
 
   private _cancel(): void {
-    this._closedByUserCancel = true;
+    this.dispatchEvent(new CustomEvent("hu-cancel", { bubbles: true, composed: true }));
     this._startClosing(this.renderRoot.querySelector("dialog")!);
   }
 

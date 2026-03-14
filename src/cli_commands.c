@@ -4,6 +4,9 @@
 #include "human/memory.h"
 #include "human/memory/factory.h"
 #include "human/security/sandbox.h"
+#ifdef HU_ENABLE_FEEDS
+#include "human/feeds/processor.h"
+#endif
 #ifdef HU_HAS_UPDATE
 #include "human/update.h"
 #endif
@@ -14,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #define HU_INIT_CONFIG_DIR  ".human"
@@ -566,3 +570,159 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv) {
     return HU_ERR_NOT_SUPPORTED;
 #endif
 }
+
+/* ── feed ──────────────────────────────────────────────────────────────── */
+#if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
+hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
+    if (argc < 3) {
+        printf("Usage: human feed <poll|status|list|health>\n");
+        return HU_OK;
+    }
+    hu_config_t cfg;
+    hu_error_t err = hu_config_load(alloc, &cfg);
+    if (err != HU_OK) {
+        fprintf(stderr, "Config error: %s\n", hu_error_string(err));
+        return err;
+    }
+    const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
+    hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
+    if (!mem.vtable) {
+        fprintf(stderr, "[feed] No memory backend configured\n");
+        hu_config_deinit(&cfg);
+        return HU_ERR_NOT_FOUND;
+    }
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    if (!db) {
+        fprintf(stderr, "[feed] SQLite database not available\n");
+        if (mem.vtable->deinit) mem.vtable->deinit(mem.ctx);
+        hu_config_deinit(&cfg);
+        return HU_ERR_NOT_FOUND;
+    }
+    const char *sub = argv[2];
+
+    if (strcmp(sub, "poll") == 0) {
+        hu_feed_processor_t fp = {.alloc = alloc, .db = db};
+        hu_feed_config_t fconf;
+        memset(&fconf, 0, sizeof(fconf));
+        fconf.enabled[HU_FEED_NEWS_RSS]    = true;
+        fconf.enabled[HU_FEED_FILE_INGEST] = true;
+        fconf.enabled[HU_FEED_GMAIL]       = true;
+        fconf.enabled[HU_FEED_IMESSAGE]    = true;
+        fconf.enabled[HU_FEED_TWITTER]     = true;
+        fconf.poll_interval_minutes[HU_FEED_FILE_INGEST] = 0;
+        fconf.poll_interval_minutes[HU_FEED_NEWS_RSS]    = 0;
+        fconf.poll_interval_minutes[HU_FEED_GMAIL]       = 0;
+        fconf.poll_interval_minutes[HU_FEED_IMESSAGE]    = 0;
+        fconf.poll_interval_minutes[HU_FEED_TWITTER]     = 0;
+        fconf.max_items_per_poll = 50;
+        uint64_t last_poll[HU_FEED_COUNT] = {0};
+        uint64_t now_ms = (uint64_t)time(NULL) * 1000ULL;
+        size_t ingested = 0;
+        err = hu_feed_processor_poll(&fp, &fconf, last_poll, now_ms, &ingested);
+        if (err == HU_OK)
+            printf("[feed] Poll complete: %zu items ingested\n", ingested);
+        else
+            fprintf(stderr, "[feed] Poll error: %s\n", hu_error_string(err));
+    } else if (strcmp(sub, "status") == 0) {
+        sqlite3_stmt *stmt = NULL;
+        int rc = sqlite3_prepare_v2(db,
+            "SELECT source, COUNT(*), MAX(ingested_at) FROM feed_items GROUP BY source",
+            -1, &stmt, NULL);
+        if (rc != SQLITE_OK) {
+            fprintf(stderr, "[feed] Query error: %s\n", sqlite3_errmsg(db));
+        } else {
+            printf("%-20s  %6s  %s\n", "SOURCE", "COUNT", "LAST INGESTED");
+            printf("%-20s  %6s  %s\n", "--------------------", "------", "-------------------");
+            int total = 0;
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                const char *src = (const char *)sqlite3_column_text(stmt, 0);
+                int cnt = sqlite3_column_int(stmt, 1);
+                int64_t ts = sqlite3_column_int64(stmt, 2);
+                total += cnt;
+                char timebuf[32] = "unknown";
+                if (ts > 0) {
+                    time_t tt = (time_t)ts;
+                    struct tm *lt = localtime(&tt);
+                    if (lt)
+                        strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", lt);
+                }
+                printf("%-20s  %6d  %s\n", src ? src : "(null)", cnt, timebuf);
+            }
+            printf("%-20s  %6d\n", "TOTAL", total);
+            sqlite3_finalize(stmt);
+        }
+    } else if (strcmp(sub, "list") == 0) {
+        sqlite3_stmt *stmt = NULL;
+        int rc = sqlite3_prepare_v2(db,
+            "SELECT source, content_type, substr(content, 1, 80), ingested_at "
+            "FROM feed_items ORDER BY ingested_at DESC LIMIT 10",
+            -1, &stmt, NULL);
+        if (rc != SQLITE_OK) {
+            fprintf(stderr, "[feed] Query error: %s\n", sqlite3_errmsg(db));
+        } else {
+            printf("Last 10 feed items:\n\n");
+            int idx = 0;
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                const char *src = (const char *)sqlite3_column_text(stmt, 0);
+                const char *ctype = (const char *)sqlite3_column_text(stmt, 1);
+                const char *content = (const char *)sqlite3_column_text(stmt, 2);
+                int64_t ts = sqlite3_column_int64(stmt, 3);
+                char timebuf[32] = "unknown";
+                if (ts > 0) {
+                    time_t tt = (time_t)ts;
+                    struct tm *lt = localtime(&tt);
+                    if (lt)
+                        strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M", lt);
+                }
+                printf("[%d] %s (%s) @ %s\n    %s\n\n",
+                       ++idx, src ? src : "?", ctype ? ctype : "?",
+                       timebuf, content ? content : "(empty)");
+            }
+            if (idx == 0)
+                printf("  (no feed items yet)\n");
+            sqlite3_finalize(stmt);
+        }
+    } else if (strcmp(sub, "health") == 0) {
+        printf("Feed Health Report\n");
+        printf("==================\n\n");
+        sqlite3_stmt *stmt = NULL;
+        int rc = sqlite3_prepare_v2(db,
+            "SELECT source, COUNT(*), MAX(ingested_at) FROM feed_items GROUP BY source",
+            -1, &stmt, NULL);
+        if (rc == SQLITE_OK) {
+            time_t now = time(NULL);
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                const char *src = (const char *)sqlite3_column_text(stmt, 0);
+                int cnt = sqlite3_column_int(stmt, 1);
+                int64_t last_ts = sqlite3_column_int64(stmt, 2);
+                double hours_ago = (last_ts > 0) ? difftime(now, (time_t)last_ts) / 3600.0 : -1;
+                const char *status_icon = (hours_ago >= 0 && hours_ago < 24) ? "OK" : "STALE";
+                if (hours_ago < 0) status_icon = "NEVER";
+                printf("  %-16s  %4d items  last=%.1fh ago  [%s]\n",
+                       src ? src : "?", cnt, hours_ago >= 0 ? hours_ago : 0.0, status_icon);
+            }
+            sqlite3_finalize(stmt);
+        }
+        const char *home = getenv("HOME");
+        if (home) {
+            char ingest_dir[512];
+            snprintf(ingest_dir, sizeof(ingest_dir), "%s/.human/feeds/ingest", home);
+            printf("\nIngest directory: %s\n", ingest_dir);
+            struct stat st;
+            if (stat(ingest_dir, &st) == 0)
+                printf("  Status: exists\n");
+            else
+                printf("  Status: NOT FOUND (create with: mkdir -p %s)\n", ingest_dir);
+        }
+        printf("\n");
+    } else {
+        fprintf(stderr, "Unknown feed subcommand: %s\n", sub);
+        printf("Usage: human feed <poll|status|list|health>\n");
+        err = HU_ERR_INVALID_ARGUMENT;
+    }
+
+    if (mem.vtable->deinit) mem.vtable->deinit(mem.ctx);
+    hu_config_deinit(&cfg);
+    return err;
+}
+#endif /* HU_ENABLE_FEEDS && HU_ENABLE_SQLITE */

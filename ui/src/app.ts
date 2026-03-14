@@ -150,6 +150,37 @@ export class ScApp extends LitElement {
       outline: none;
     }
 
+    .scroll-progress {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      height: 2px;
+      background: var(--hu-accent);
+      transform-origin: left;
+      flex-shrink: 0;
+    }
+    @supports (animation-timeline: scroll()) {
+      .scroll-progress {
+        animation: hu-scroll-grow linear forwards;
+        animation-timeline: scroll(nearest);
+      }
+    }
+    @keyframes hu-scroll-grow {
+      from {
+        transform: scaleX(0);
+      }
+      to {
+        transform: scaleX(1);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .scroll-progress {
+        animation: none;
+        transform: scaleX(1);
+        opacity: 0;
+      }
+    }
+
     main:focus-visible {
       outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
       outline-offset: calc(-1 * var(--hu-focus-ring-width, 2px));
@@ -730,6 +761,7 @@ export class ScApp extends LitElement {
         ></hu-sidebar>
 
         <main id="main-content" tabindex="0">
+          <div class="scroll-progress" role="presentation" aria-hidden="true"></div>
           <div class="view-enter">
             <hu-error-boundary .error=${this._viewError} @retry=${this._onViewRetry}>
               ${this._renderWrappedView()}

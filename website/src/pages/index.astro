@@ -1927,17 +1927,6 @@ const tools = [
       }
     </script>
     <script>
-      const bar = document.getElementById("scroll-progress");
-      if (bar) {
-        const update = () => {
-          const h = document.documentElement.scrollHeight - window.innerHeight;
-          bar.style.transform = `scaleX(${h > 0 ? window.scrollY / h : 0})`;
-        };
-        update();
-        window.addEventListener("scroll", update, { passive: true });
-      }
-    </script>
-    <script>
       {
         const root = document.documentElement;
         const prefersReduced = window.matchMedia(

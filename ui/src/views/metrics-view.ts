@@ -214,14 +214,14 @@ export class ScMetricsView extends GatewayAwareLitElement {
     ];
 
     return html`
-      <div class="section" role="region" aria-label="System health metrics">
+      <div class="section hu-scroll-reveal" role="region" aria-label="System health metrics">
         <hu-section-header
           heading="System Health"
           description="Gateway and request metrics"
         ></hu-section-header>
         <hu-card glass>
           <div class="card-inner">
-            <div class="metric-grid">
+            <div class="metric-grid hu-scroll-reveal-stagger">
               ${items.map(
                 (item) => html`
                   <div class="metric-item">
@@ -255,7 +255,7 @@ export class ScMetricsView extends GatewayAwareLitElement {
     ];
 
     return html`
-      <div class="section" role="region" aria-label="SOTA intelligence modules">
+      <div class="section hu-scroll-reveal" role="region" aria-label="SOTA intelligence modules">
         <hu-section-header
           heading="Intelligence Modules"
           description="State-of-the-art reasoning features"
@@ -285,7 +285,11 @@ export class ScMetricsView extends GatewayAwareLitElement {
     if (!bth) return nothing;
 
     return html`
-      <div class="section" role="region" aria-label="Intelligence pipeline metrics">
+      <div
+        class="section hu-cv-defer hu-scroll-reveal"
+        role="region"
+        aria-label="Intelligence pipeline metrics"
+      >
         <hu-section-header
           heading="Intelligence Pipeline"
           description="BTH pipeline metrics by category"
@@ -341,7 +345,7 @@ export class ScMetricsView extends GatewayAwareLitElement {
         </hu-section-header>
       </hu-page-hero>
 
-      <hu-stats-row>
+      <hu-stats-row class="hu-scroll-reveal-stagger">
         <hu-stat-card
           .valueStr=${formatUptime(uptime)}
           label="Uptime"

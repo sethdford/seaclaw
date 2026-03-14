@@ -31,6 +31,7 @@ option(HU_ENABLE_PERSONA "Enable persona system" ON)
 option(HU_ENABLE_AUTHENTIC "Build authentic existence features" OFF)
 option(HU_ENABLE_CARTESIA "Enable Cartesia TTS for voice messages" OFF)
 option(HU_ENABLE_ML "Build ML training subsystem (BPE tokenizer, dataloader, experiment loop)" OFF)
+option(HU_ENABLE_FEEDS "Build feed ingestion and research agent" OFF)
 
 # WASM build: cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..
 
@@ -143,6 +144,7 @@ if(HU_ENABLE_ALL_CHANNELS)
     set(HU_ENABLE_TIKTOK ON)
     set(HU_ENABLE_VOICE ON)
     set(HU_ENABLE_MQTT ON)
+    set(HU_ENABLE_FEEDS ON)
 endif()
 
 # --- Channel sources (conditionally added) ---
@@ -1274,6 +1276,9 @@ if(HU_ENABLE_WHATSAPP)
 endif()
 if(HU_ENABLE_GMAIL)
     target_compile_definitions(human PRIVATE HU_HAS_GMAIL=1)
+endif()
+if(HU_ENABLE_FEEDS)
+    target_compile_definitions(human PRIVATE HU_ENABLE_FEEDS=1)
 endif()
 
 if(HU_ENABLE_ASAN)

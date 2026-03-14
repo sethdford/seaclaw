@@ -114,7 +114,7 @@ export class ScSkillRegistry extends LitElement {
                   ? "Try a different tag or search query."
                   : "Try a different search query."}
               ></hu-empty-state>`
-            : html`<div class="skills-grid hu-stagger">
+            : html`<div class="skills-grid hu-scroll-reveal-stagger">
                 ${this._filteredResults.map(
                   (e) => html`
                     <hu-skill-card

@@ -453,7 +453,7 @@
     }
   }
 
-  /* ── Scroll progress indicator ── */
+  /* ── Scroll progress indicator (CSS scroll-driven animation) ── */
   .scroll-progress {
     position: fixed;
     top: 0;
@@ -467,13 +467,31 @@
     );
     z-index: 9999;
     transform-origin: left;
-    transform: scaleX(0);
     will-change: transform;
     contain: layout style;
     pointer-events: none;
   }
+  @supports (animation-timeline: scroll()) {
+    .scroll-progress {
+      animation: hu-scroll-grow linear forwards;
+      animation-timeline: scroll(root block);
+    }
+    @keyframes hu-scroll-grow {
+      from {
+        transform: scaleX(0);
+      }
+      to {
+        transform: scaleX(1);
+      }
+    }
+  }
+  @supports not (animation-timeline: scroll()) {
+    .scroll-progress {
+      transform: scaleX(0);
+    }
+  }
 
-  /* ── Card glow on hover ── */
+  /* ── Card glow on hover (uses --hu-glow-opacity @property for smooth interpolation) ── */
   .card-glow {
     position: relative;
   }
@@ -484,18 +502,22 @@
     inset: -1px;
     border-radius: inherit;
     background: linear-gradient(
-      135deg,
+      var(--hu-gradient-angle, 135deg),
       var(--hu-accent-subtle),
       transparent 50%,
       var(--hu-accent-tertiary-subtle)
     );
-    opacity: 0;
-    transition: opacity var(--hu-duration-slow) var(--hu-ease-out);
+    --hu-glow-opacity: 0;
+    opacity: var(--hu-glow-opacity);
+    transition:
+      --hu-glow-opacity var(--hu-duration-slow) var(--hu-ease-out),
+      --hu-gradient-angle var(--hu-duration-slow) var(--hu-ease-out);
     z-index: -1;
   }
 
   .card-glow:hover::before {
-    opacity: 1;
+    --hu-glow-opacity: 1;
+    --hu-gradient-angle: 165deg;
   }
 
   /* ── Spotlight card effect ── */
@@ -517,14 +539,15 @@
       transparent 70%
     );
     transform: translate(-50%, -50%);
-    opacity: 0;
-    transition: opacity var(--hu-duration-slow) var(--hu-ease-out);
+    --hu-glow-opacity: 0;
+    opacity: var(--hu-glow-opacity);
+    transition: --hu-glow-opacity var(--hu-duration-slow) var(--hu-ease-out);
     pointer-events: none;
     z-index: 0;
   }
 
   .card-spotlight:hover::after {
-    opacity: 1;
+    --hu-glow-opacity: 1;
   }
 
   .card-spotlight > * {
@@ -596,9 +619,9 @@
     transform: translateY(20px);
     transition:
       opacity var(--hu-duration-slower, 0.5s)
-        var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+        var(--hu-spring-gentle, var(--hu-ease-out)),
       transform var(--hu-duration-slower, 0.5s)
-        var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+        var(--hu-spring-gentle, var(--hu-ease-out));
   }
   [data-reveal].revealed {
     opacity: 1;
@@ -759,7 +782,7 @@
     z-index: -1;
   }
 
-  /* ── Buttons ── */
+  /* ── Buttons (uses --hu-gradient-angle @property for animated gradient on hover) ── */
   .btn-primary {
     display: inline-flex;
     align-items: center;
@@ -768,13 +791,17 @@
     border-radius: var(--hu-radius-full);
     font-size: 0.9375rem;
     font-weight: 600;
+    --hu-gradient-angle: 135deg;
     background: linear-gradient(
-      135deg,
+      var(--hu-gradient-angle),
       var(--hu-accent),
       var(--hu-accent-hover)
     );
     color: var(--hu-on-accent);
-    transition: all var(--hu-duration-normal) var(--hu-ease-out);
+    transition:
+      --hu-gradient-angle var(--hu-duration-normal) var(--hu-ease-out),
+      transform var(--hu-duration-normal) var(--hu-ease-out),
+      box-shadow var(--hu-duration-normal) var(--hu-ease-out);
     box-shadow:
       0 1px 2px color-mix(in srgb, var(--hu-web-text) 10%, transparent),
       inset 0 1px 0 color-mix(in srgb, white 15%, transparent);
@@ -785,8 +812,9 @@
   }
 
   .btn-primary:hover {
+    --hu-gradient-angle: 165deg;
     background: linear-gradient(
-      135deg,
+      var(--hu-gradient-angle),
       var(--hu-accent-hover),
       var(--hu-accent)
     );
@@ -1178,14 +1206,23 @@
   }
 }
 
-/* ── Provider pill transition (token-based) ── */
+/* ── Provider pill transition (uses --hu-accent-lightness @property for smooth glow) ── */
+.provider-pill {
+  --hu-accent-lightness: 15%;
+}
+
 .provider-pill.transition-all {
-  transition-duration: var(--hu-duration-normal);
+  transition:
+    transform var(--hu-duration-normal) var(--hu-ease-out),
+    box-shadow var(--hu-duration-normal) var(--hu-ease-out),
+    --hu-accent-lightness var(--hu-duration-normal) var(--hu-ease-out);
 }
 
 .provider-pill:hover {
+  --hu-accent-lightness: 25%;
   transform: translateY(-2px) scale(1.04);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--hu-accent) 15%, transparent);
+  box-shadow: 0 4px 16px
+    color-mix(in srgb, var(--hu-accent) var(--hu-accent-lightness), transparent);
 }
 
 /* ── GPU compositing hints — promote animated layers ── */
@@ -1300,6 +1337,10 @@
 
   .comparison-bar {
     transition: none !important;
+  }
+
+  .scroll-progress {
+    display: none !important;
   }
 }
 

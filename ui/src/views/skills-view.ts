@@ -477,7 +477,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
               heading="No skills installed"
               description="Install skills from the registry below or paste a URL above."
             ></hu-empty-state>`
-          : html`<div class="skills-grid hu-stagger">
+          : html`<div class="skills-grid hu-scroll-reveal-stagger">
               ${filtered.map(
                 (s) => html`
                   <hu-skill-card
