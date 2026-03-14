@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 import 'design_tokens.dart';
 
 void main() {
@@ -41,62 +39,72 @@ class HumanApp extends StatelessWidget {
       primary: seedColor,
     );
 
-    final textTheme = GoogleFonts.nunitoSansTextTheme(
-      brightness == Brightness.light
-          ? ThemeData.light().textTheme
-          : ThemeData.dark().textTheme,
-    ).copyWith(
-      bodyLarge: textTheme.bodyLarge?.copyWith(
+    final baseTheme = brightness == Brightness.light
+        ? ThemeData.light().textTheme
+        : ThemeData.dark().textTheme;
+    final textTheme = baseTheme.copyWith(
+      bodyLarge: baseTheme.bodyLarge?.copyWith(
+        fontFamily: 'Avenir',
         fontSize: HUTokens.type_role_body_lg_font_size.toDouble(),
         fontWeight: FontWeight.w400,
         height: HUTokens.type_role_body_lg_line_height,
       ),
-      bodyMedium: textTheme.bodyMedium?.copyWith(
+      bodyMedium: baseTheme.bodyMedium?.copyWith(
+        fontFamily: 'Avenir',
         fontSize: HUTokens.type_role_body_md_font_size.toDouble(),
         fontWeight: FontWeight.w400,
         height: HUTokens.type_role_body_md_line_height,
       ),
-      bodySmall: textTheme.bodySmall?.copyWith(
+      bodySmall: baseTheme.bodySmall?.copyWith(
+        fontFamily: 'Avenir',
         fontSize: HUTokens.type_role_body_sm_font_size.toDouble(),
         fontWeight: FontWeight.w400,
         height: HUTokens.type_role_body_sm_line_height,
       ),
-      labelLarge: textTheme.labelLarge?.copyWith(
+      labelLarge: baseTheme.labelLarge?.copyWith(
+        fontFamily: 'Avenir',
         fontSize: HUTokens.type_role_label_lg_font_size.toDouble(),
         fontWeight: FontWeight.w500,
         height: HUTokens.type_role_label_lg_line_height,
       ),
-      labelMedium: textTheme.labelMedium?.copyWith(
+      labelMedium: baseTheme.labelMedium?.copyWith(
+        fontFamily: 'Avenir',
         fontSize: HUTokens.type_role_label_md_font_size.toDouble(),
         fontWeight: FontWeight.w500,
         height: HUTokens.type_role_label_md_line_height,
       ),
-      labelSmall: textTheme.labelSmall?.copyWith(
+      labelSmall: baseTheme.labelSmall?.copyWith(
+        fontFamily: 'Avenir',
         fontSize: HUTokens.type_role_label_sm_font_size.toDouble(),
         fontWeight: FontWeight.w500,
         height: HUTokens.type_role_label_sm_line_height,
       ),
-      titleLarge: textTheme.titleLarge?.copyWith(
+      titleLarge: baseTheme.titleLarge?.copyWith(
+        fontFamily: 'Avenir',
         fontSize: HUTokens.type_role_title_lg_font_size.toDouble(),
         fontWeight: FontWeight.w500,
         height: HUTokens.type_role_title_lg_line_height,
       ),
-      titleMedium: textTheme.titleMedium?.copyWith(
+      titleMedium: baseTheme.titleMedium?.copyWith(
+        fontFamily: 'Avenir',
         fontSize: HUTokens.type_role_title_md_font_size.toDouble(),
         fontWeight: FontWeight.w500,
         height: HUTokens.type_role_title_md_line_height,
       ),
-      titleSmall: textTheme.titleSmall?.copyWith(
+      titleSmall: baseTheme.titleSmall?.copyWith(
+        fontFamily: 'Avenir',
         fontSize: HUTokens.type_role_title_sm_font_size.toDouble(),
         fontWeight: FontWeight.w500,
         height: HUTokens.type_role_title_sm_line_height,
       ),
-      headlineMedium: textTheme.headlineMedium?.copyWith(
+      headlineMedium: baseTheme.headlineMedium?.copyWith(
+        fontFamily: 'Avenir',
         fontSize: HUTokens.type_role_headline_md_font_size.toDouble(),
         fontWeight: FontWeight.w600,
         height: HUTokens.type_role_headline_md_line_height,
       ),
-      headlineSmall: textTheme.headlineSmall?.copyWith(
+      headlineSmall: baseTheme.headlineSmall?.copyWith(
+        fontFamily: 'Avenir',
         fontSize: HUTokens.type_role_headline_sm_font_size.toDouble(),
         fontWeight: FontWeight.w600,
         height: HUTokens.type_role_headline_sm_line_height,
