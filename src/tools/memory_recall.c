@@ -4,6 +4,7 @@
 #include "human/core/string.h"
 #include "human/memory.h"
 #include "human/tool.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -62,16 +63,43 @@ static hu_error_t memory_recall_execute(void *ctx, hu_allocator_t *alloc,
         *out = hu_tool_result_fail("recall failed", 13);
         return HU_OK;
     }
-    char *ok = hu_strndup(alloc, "recall complete", 15);
-    if (!ok) {
-        if (entries)
-            alloc->free(alloc->ctx, entries, count * sizeof(hu_memory_entry_t));
+    if (!entries || count == 0) {
+        char *msg = hu_strndup(alloc, "[]", 2);
+        if (!msg) {
+            *out = hu_tool_result_fail("out of memory", 12);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        *out = hu_tool_result_ok_owned(msg, 2);
+        return HU_OK;
+    }
+    size_t cap = 256 * count;
+    char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+    if (!buf) {
+        for (size_t i = 0; i < count; i++)
+            hu_memory_entry_free_fields(alloc, &entries[i]);
+        alloc->free(alloc->ctx, entries, count * sizeof(hu_memory_entry_t));
         *out = hu_tool_result_fail("out of memory", 12);
         return HU_ERR_OUT_OF_MEMORY;
     }
-    if (entries)
-        alloc->free(alloc->ctx, entries, count * sizeof(hu_memory_entry_t));
-    *out = hu_tool_result_ok_owned(ok, 15);
+    size_t pos = 0;
+    buf[pos++] = '[';
+    for (size_t i = 0; i < count; i++) {
+        if (i > 0 && pos < cap - 1)
+            buf[pos++] = ',';
+        int wrote = snprintf(buf + pos, cap - pos,
+                             "{\"key\":\"%.*s\",\"content\":\"%.*s\",\"score\":%.4f}",
+                             (int)(entries[i].key_len), entries[i].key ? entries[i].key : "",
+                             (int)(entries[i].content_len > 200 ? 200 : entries[i].content_len),
+                             entries[i].content ? entries[i].content : "", entries[i].score);
+        if (wrote > 0 && (size_t)wrote < cap - pos)
+            pos += (size_t)wrote;
+        hu_memory_entry_free_fields(alloc, &entries[i]);
+    }
+    if (pos < cap - 1)
+        buf[pos++] = ']';
+    buf[pos] = '\0';
+    alloc->free(alloc->ctx, entries, count * sizeof(hu_memory_entry_t));
+    *out = hu_tool_result_ok_owned(buf, pos);
     return HU_OK;
 #endif
 }
