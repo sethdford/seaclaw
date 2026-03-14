@@ -19,15 +19,15 @@ updated: 2026-03-09
 | 9     | Category-defining (Awwwards winner tier) |
 | 10    | Sets the standard others measure against |
 
-## Current Scores (Q1 2026 — Sprint 5 Re-Audit)
+## Current Scores (Q1 2026 — Sprint 7 Re-Audit)
 
 | Surface   | Perf | Visual | Motion | Density | A11y | Brand | Innovation | Total | Target      |
 | --------- | ---- | ------ | ------ | ------- | ---- | ----- | ---------- | ----- | ----------- |
-| Website   | 8    | 8      | 8      | 8       | 9    | 8     | 8          | 57/70 | 63+ (9 avg) |
-| Dashboard | 8    | 8      | 8      | 8       | 9    | 8     | 8          | 57/70 | 63+ (9 avg) |
-| iOS       | 5    | 7      | 7      | 7       | 7    | 8     | 7          | 48/70 | 63+ (9 avg) |
-| macOS     | 5    | 7      | 7      | 7       | 7    | 8     | 7          | 48/70 | 63+ (9 avg) |
-| Android   | 5    | 6      | 6      | 6       | 7    | 7     | 7          | 44/70 | 63+ (9 avg) |
+| Website   | 8    | 8      | 9      | 8       | 9    | 8     | 9          | 59/70 | 63+ (9 avg) |
+| Dashboard | 8    | 8      | 8      | 8       | 9    | 8     | 9          | 58/70 | 63+ (9 avg) |
+| iOS       | 5    | 7      | 8      | 7       | 8    | 8     | 8          | 51/70 | 63+ (9 avg) |
+| macOS     | 5    | 7      | 7      | 7       | 8    | 8     | 8          | 50/70 | 63+ (9 avg) |
+| Android   | 5    | 7      | 7      | 7       | 8    | 7     | 8          | 49/70 | 63+ (9 avg) |
 
 ## Benchmark Comparison
 
@@ -125,12 +125,15 @@ Detailed rubrics for each of the 7 dimensions, with concrete criteria for achiev
 | Q1 2026 (sprint 3) | 54      | 56        | 41  | 44    | 41      |
 | Q1 2026 (sprint 4) | 57      | 56        | 43  | 44    | 42      |
 | Q1 2026 (sprint 5) | 57      | 57        | 48  | 48    | 44      |
+| Q1 2026 (sprint 7) | 59      | 58        | 51  | 50    | 49      |
 
 Sprint 3 changes: macOS app fully tokenized (HUTokens, Avenir, spring animations, tonal surfaces). Android Compose UI built from scratch (Overview, Chat, Settings screens with Material 3 + HUTokens, spring animations). Website hardcoded hex replaced with tokens. Lighthouse thresholds tightened (98+ performance, 100 a11y). Bundle budget reduced to 300KB. Automated quality score reporting in CI. Award-winning quality criteria document created. Component quality check bug fixed.
 
 Sprint 4 changes: Website — Three.js WebGL hero particle field, CSS scroll-driven animations (scroll-timeline, view-timeline), @view-transition CSS for cross-document transitions, @starting-style enter animations, custom cursor with hover states, branded scrollbar, micro-gradients on interactive elements, typography-as-hero treatment, comparison section redesigned, prefers-contrast:more + forced-colors support, Three.js bundled, HTML compression, GitHub Pages deployment with custom domain. Dashboard — ambient loading indicator in sidebar header. iOS — App Intents for Siri (send message + check status), Live Activity for active conversations. Android — GatewayClient WebSocket (OkHttp), Glance home screen widget. CI — quality gate 80%, LCP 1000ms, competitive benchmark on push.
 
 Sprint 5 changes: macOS — WindowGroup with NavigationSplitView for multi-window support, sidebar navigation across 5 tabs, full keyboard shortcuts (Cmd+1-4 for tab navigation, Cmd+R for service control, Cmd+Shift+O for browser), toolbar service status indicator. iOS — Dynamic Type confirmed (relativeTo: on all custom fonts), pull-to-refresh on Overview, searchable Sessions list, additional VoiceOver accessibility labels on Settings buttons and session detail. Android — TalkBack content descriptions added to SessionsScreen (session items, delete actions), ToolsScreen (tool cards, heading), SettingsScreen (gateway URL, connection status, connect button). Dashboard — Lighthouse CI config added for localhost:3000 with accessibility and CLS thresholds. Quality — award criteria updated (keyboard/trackpad macOS, Dynamic Type iOS, Accessibility Scanner Android checked off).
+
+Sprint 7 changes: **Website** — SOTA CSS features: `:has()` selector for contextual card/nav styling, `field-sizing: content` for auto-growing inputs, Anchor Positioning API for tooltip placement with `@position-try` fallback, `text-wrap: balance` on headings. **Dashboard** — Accessibility pass on 12 components (aria-label, role attributes for sparkline, stat-card, timeline, empty-state, latex, message-stream, metric-row, overview-stats, skill-detail, status-dot, stats-row, form-group); native `<dialog>` cancel event fix (eager dispatch); dependency updates (vitest 4.1, dompurify, katex, shiki, happy-dom). **iOS** — `matchedGeometryEffect` hero transitions on Sessions (list→detail) and Tools (card→expanded overlay) with spring physics (response: 0.35, dampingFraction: 0.86). **macOS** — Full Chat view (message list, TextEditor input, Cmd+Return to send, gateway integration), Sessions view (searchable list, split detail, Cmd+Delete), Tools view (LazyVGrid, toggle cards, hover effects). **Android** — GatewayClient `request()` method for JSON-RPC; Sessions and Tools screens wired to live gateway data with refresh buttons; TalkBack accessibility maintained. **Infra** — npm audit fix (flatted vuln), Cloudflare deploy workflow fixed (design-tokens install/build step added), CMake parallel build race fixed (pre-create object dirs), version string unified to 0.4.0 across all 5 sources (main.c, version.c, mcp_server.c, status.c, cli_commands.c, main_wasi.c), `rope_theta` added to GPT config struct.
 
 ## Action Items from Last Review
 
@@ -144,12 +147,15 @@ Sprint 5 changes: macOS — WindowGroup with NavigationSplitView for multi-windo
 - [x] **Website Token Compliance**: All hardcoded hex replaced with `--hu-*` tokens. Terminal chrome tokenized.
 - [x] **CI Quality Gates**: Lighthouse 98+ perf, 100 a11y, CLS 0.005, TBT 50ms. Bundle budget 300KB. Automated quality scoring in CI.
 - [ ] **Performance (dashboard)**: Target Lighthouse 99+. Need to measure and optimize.
-- [x] **Innovation**: WebGL hero (Three.js particles), scroll-driven animations, @starting-style, custom cursor, ambient sidebar indicator. Container queries and :has() adoption in progress.
-- [x] **iOS feature parity**: App Intents for Siri, Live Activity, Dynamic Type, pull-to-refresh, searchable Sessions, full VoiceOver labels.
-- [x] **Android polish**: Glance widget, GatewayClient WebSocket, predictive back gesture, TalkBack content descriptions on all screens.
-- [x] **macOS parity**: WindowGroup multi-window, NavigationSplitView sidebar, keyboard shortcuts (Cmd+1-4), service toolbar.
-- [x] **Award submissions**: GitHub Actions deployment workflow using GitHub Pages (h-uman.ai).
-- [ ] **Production Lighthouse audit**: Verify production site meets award criteria (Lighthouse >=98, a11y 100, zero CLS, LCP <1.0s on 4G).
+- [x] **Innovation**: WebGL hero, scroll-driven animations, @starting-style, custom cursor, ambient sidebar indicator, :has(), field-sizing, Anchor Positioning API, text-wrap: balance/pretty, @property, interpolate-size, subgrid, native CSS nesting.
+- [x] **iOS feature parity**: App Intents, Live Activity, Dynamic Type, pull-to-refresh, searchable Sessions, VoiceOver labels, onboarding, deep links, matchedGeometryEffect hero transitions.
+- [x] **Android polish**: Glance widget, GatewayClient wired to all 4 screens (overview, chat, sessions, tools), predictive back, TalkBack everywhere, ProGuard, adaptive icon, onboarding, deep links.
+- [x] **macOS parity**: WindowGroup, NavigationSplitView, keyboard shortcuts, service toolbar, full Chat/Sessions/Tools views with gateway integration.
+- [x] **Dashboard accessibility**: 12 components audited and fixed (sparkline, stat-card, timeline, empty-state, latex, message-stream, etc).
+- [x] **Infra**: npm audit clean, Cloudflare deploy fixed, CMake parallel build fixed, version unified to 0.4.0.
+- [ ] **Performance (dashboard)**: Target Lighthouse 99+. Need to measure and optimize.
+- [ ] **Production Lighthouse audit**: Configure deploy secrets and verify production site meets award criteria (Lighthouse >=98, a11y 100, zero CLS, LCP <1.0s on 4G).
+- [ ] **Native performance profiling**: 60fps, <100ms tap response across iOS/macOS/Android.
 
 ## Related
 

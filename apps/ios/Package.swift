@@ -23,8 +23,9 @@ let package = Package(
                 .product(name: "HumanProtocol", package: "HumanKit"),
             ],
             path: "Sources/HumaniOS",
+            exclude: ["Resources/Info.plist"],
             resources: [
-                .process("Resources", exclude: ["Info.plist"]),
+                .process("Resources"),
             ]
         ),
     ]

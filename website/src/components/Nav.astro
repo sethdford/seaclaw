@@ -130,14 +130,14 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
 
   const supportsPopover = "showPopover" in document.createElement("div");
 
-  function setExpanded(open) {
+  function setExpanded(open: boolean) {
     btn?.setAttribute("aria-expanded", String(open));
     hamburger?.classList.toggle("hidden", open);
     closeIcon?.classList.toggle("hidden", !open);
   }
 
   if (supportsPopover && menu) {
-    menu.addEventListener("toggle", (e) => {
+    menu.addEventListener("toggle", () => {
       setExpanded(menu.matches(":popover-open"));
     });
     menu.querySelectorAll(".mobile-menu-link").forEach((link) => {
