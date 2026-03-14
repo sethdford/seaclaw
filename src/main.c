@@ -463,8 +463,32 @@ static hu_error_t cmd_cron(hu_allocator_t *alloc, int argc, char **argv) {
         return HU_OK;
     }
 
+    if (strcmp(sub, "add-learn") == 0) {
+        if (argc < 4 || !argv[3]) {
+            alloc->free(alloc->ctx, path, path_len + 1);
+            fprintf(stderr, "[%s] cron add-learn <schedule>\n", HU_CODENAME);
+            fprintf(stderr, "  Example: human cron add-learn \"*/5 * * * *\"  (every 5 min)\n");
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        const char *schedule = argv[3];
+        size_t schedule_len = strlen(schedule);
+        const char *command = "human pwa learn";
+        size_t cmd_len = strlen(command);
+        char *new_id = NULL;
+        err = hu_crontab_add(alloc, path, schedule, schedule_len, command, cmd_len, &new_id);
+        alloc->free(alloc->ctx, path, path_len + 1);
+        if (err != HU_OK) {
+            fprintf(stderr, "[%s] cron add-learn: %s\n", HU_CODENAME, hu_error_string(err));
+            return err;
+        }
+        printf("Added PWA learn cron job %s (runs: human pwa learn)\n", new_id ? new_id : "");
+        if (new_id)
+            alloc->free(alloc->ctx, new_id, strlen(new_id) + 1);
+        return HU_OK;
+    }
+
     alloc->free(alloc->ctx, path, path_len + 1);
-    fprintf(stderr, "[%s] cron: use 'list', 'add', 'add-digest', or 'remove'\n", HU_CODENAME);
+    fprintf(stderr, "[%s] cron: use 'list', 'add', 'add-digest', 'add-learn', or 'remove'\n", HU_CODENAME);
     fprintf(stderr, "  human cron list\n");
     fprintf(stderr, "  human cron add <schedule> <command>\n");
     fprintf(stderr, "  human cron add-digest <schedule>   (schedule PWA digest, e.g. \"0 9 * * *\")\n");
