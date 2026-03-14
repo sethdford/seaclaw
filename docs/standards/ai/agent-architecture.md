@@ -1,3 +1,7 @@
+---
+title: Agent Architecture
+---
+
 # Agent Architecture
 
 Standards for designing, orchestrating, and governing the agent pipeline within the human runtime.

@@ -1,3 +1,7 @@
+---
+title: Standards Index
+---
+
 # Standards Index
 
 Canonical source of truth for all project standards. AI agents and human contributors reference these docs -- they are never duplicated, only pointed to.

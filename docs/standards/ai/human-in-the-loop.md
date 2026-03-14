@@ -1,3 +1,7 @@
+---
+title: Human-in-the-Loop
+---
+
 # Human-in-the-Loop
 
 When agent actions require human approval, and how the approval workflow operates. The goal is maximum autonomy for safe operations with targeted human oversight where the stakes justify it.

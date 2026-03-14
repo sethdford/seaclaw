@@ -1,3 +1,7 @@
+---
+title: C API Design
+---
+
 # C API Design
 
 Standards for the public C API surface, stability tiers, and versioning.

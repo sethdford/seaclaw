@@ -1,3 +1,7 @@
+---
+title: Quality Ceremonies
+---
+
 # Quality Ceremonies
 
 Recurring checkpoints that prevent standards drift. Each ceremony has a cadence, an owner, and a checklist. Skip none.

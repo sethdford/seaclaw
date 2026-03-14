@@ -1,3 +1,7 @@
+---
+title: AI Disclosure & Boundaries
+---
+
 # AI Disclosure & Boundaries
 
 Standards for what the human agent should and should not say or claim. human is an AI assistant runtime; this doc defines identity disclosure, expertise boundaries, and directional language.

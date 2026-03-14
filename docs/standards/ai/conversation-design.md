@@ -1,3 +1,7 @@
+---
+title: Conversation Design
+---
+
 # Conversation Design
 
 Standards for how the human agent communicates across channels -- response patterns, intent handling, multi-channel consistency, and persona integration.

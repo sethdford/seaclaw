@@ -1,3 +1,7 @@
+---
+title: AI Safety
+---
+
 # AI Safety
 
 Security standards specific to AI agent behavior: prompt injection prevention, output validation, and safe tool execution.

@@ -1,3 +1,7 @@
+---
+title: Quality Governance
+---
+
 # Quality Governance
 
 Every artifact in this repository -- code, documentation, configuration, tests -- must meet five non-negotiable standards.

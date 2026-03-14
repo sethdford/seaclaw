@@ -1,3 +1,7 @@
+---
+title: Memory Management
+---
+
 # Memory Management
 
 Standards for allocation, ownership, and cleanup across the human runtime.

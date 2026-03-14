@@ -1,3 +1,7 @@
+---
+title: Gateway API Design
+---
+
 # Gateway API Design
 
 Standards for the HTTP/WebSocket gateway server in `src/gateway/gateway.c`.

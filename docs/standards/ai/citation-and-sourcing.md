@@ -1,3 +1,7 @@
+---
+title: Citation and Sourcing
+---
+
 # Citation and Sourcing
 
 How data sources are attributed and disclosed in agent responses. Users should always be able to assess the provenance and trustworthiness of information the agent provides.

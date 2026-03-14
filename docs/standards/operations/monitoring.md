@@ -1,3 +1,7 @@
+---
+title: Monitoring and Observability
+---
+
 # Monitoring and Observability
 
 Standards for logging, health checks, alerting, and metrics collection across all human deployment contexts.

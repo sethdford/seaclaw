@@ -1,3 +1,7 @@
+---
+title: Incident Response
+---
+
 # Incident Response
 
 Standards for detecting, triaging, and resolving incidents across all human deployment contexts (native binary, Docker, WASM, gateway server).

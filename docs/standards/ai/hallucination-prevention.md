@@ -1,3 +1,7 @@
+---
+title: Hallucination Prevention
+---
+
 # Hallucination Prevention
 
 Standards for preventing fabricated data, invented capabilities, false claims, and ungrounded assertions in agent responses, tool outputs, and memory-derived content.

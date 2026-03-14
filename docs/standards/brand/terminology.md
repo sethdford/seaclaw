@@ -1,3 +1,7 @@
+---
+title: Terminology
+---
+
 # Terminology
 
 Canonical terms used across the human project (code, docs, UI, CLI). Single source of truth for naming consistency.

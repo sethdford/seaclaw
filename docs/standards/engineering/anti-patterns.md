@@ -1,3 +1,7 @@
+---
+title: Anti-Patterns
+---
+
 # Anti-Patterns
 
 Patterns explicitly prohibited in the human runtime. Each anti-pattern has a concrete reason.

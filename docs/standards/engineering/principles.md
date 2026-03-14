@@ -1,3 +1,7 @@
+---
+title: Engineering Principles
+---
+
 # Engineering Principles
 
 Mandatory engineering principles for all code in the human runtime. These are implementation constraints, not suggestions.

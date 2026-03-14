@@ -1,3 +1,7 @@
+---
+title: Performance Budgets
+---
+
 # Performance Budgets
 
 Hard limits and measurement practices for the human runtime. These metrics define the product identity.

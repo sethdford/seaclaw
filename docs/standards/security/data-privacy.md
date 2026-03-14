@@ -1,3 +1,7 @@
+---
+title: Data Privacy & Lifecycle
+---
+
 # Data Privacy & Lifecycle
 
 Standards for how human stores, accesses, and disposes of user data. human is a C11 AI assistant runtime that stores user conversations, memories, personas, and secrets locally and optionally in SQLite.

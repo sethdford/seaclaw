@@ -1,3 +1,7 @@
+---
+title: Channel Testing Checklist
+---
+
 # Channel Testing Checklist
 
 Standards for testing the 34 channel implementations in the human runtime.

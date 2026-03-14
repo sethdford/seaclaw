@@ -1,3 +1,7 @@
+---
+title: Prompt Engineering
+---
+
 # Prompt Engineering
 
 Standards for system prompt construction, persona-driven composition, context management, and RAG patterns across all 50+ providers supported by the human runtime.

@@ -1,3 +1,7 @@
+---
+title: Naming Conventions
+---
+
 # Naming Conventions
 
 Mandatory naming rules for all identifiers in the human runtime.
