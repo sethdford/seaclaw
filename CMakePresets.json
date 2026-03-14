@@ -66,6 +66,22 @@
         "HU_ENABLE_CURL": "OFF",
         "HU_ENABLE_TLS": "OFF"
       }
+    },
+    {
+      "name": "minimal-release",
+      "displayName": "Minimal Release (smallest binary)",
+      "binaryDir": "${sourceDir}/build-minimal-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "HU_ENABLE_LTO": "ON",
+        "HU_ENABLE_CLI": "ON",
+        "HU_ENABLE_SQLITE": "OFF",
+        "HU_ENABLE_CURL": "OFF",
+        "HU_ENABLE_TLS": "OFF",
+        "HU_ENABLE_PERSONA": "OFF",
+        "HU_ENABLE_SKILLS": "OFF",
+        "HU_ENABLE_ML": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -92,6 +108,11 @@
     {
       "name": "minimal",
       "configurePreset": "minimal",
+      "jobs": 0
+    },
+    {
+      "name": "minimal-release",
+      "configurePreset": "minimal-release",
       "jobs": 0
     }
   ],

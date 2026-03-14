@@ -93,6 +93,9 @@ void run_ported_modules_tests(void);
 void run_cron_tests(void);
 void run_subagent_tests(void);
 void run_mcp_tests(void);
+void run_mcp_transport_tests(void);
+void run_otel_trace_tests(void);
+void run_mcp_audit_tests(void);
 void run_voice_tests(void);
 void run_cli_tests(void);
 void run_vector_stores_tests(void);
@@ -221,7 +224,9 @@ void run_emotion_map_tests(void);
 #endif
 #ifdef HU_ENABLE_ML
 void run_ml_tests(void);
+void run_lora_tests(void);
 #endif
+void run_multigraph_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -289,6 +294,7 @@ int main(int argc, char **argv) {
     run_rag_tests();
     run_multimodal_tests();
     run_retrieval_tests();
+    run_multigraph_tests();
     run_vector_tests();
     run_vector_full_tests();
     run_infrastructure_tests();
@@ -340,6 +346,9 @@ int main(int argc, char **argv) {
     run_cron_tests();
     run_subagent_tests();
     run_mcp_tests();
+    run_mcp_transport_tests();
+    run_otel_trace_tests();
+    run_mcp_audit_tests();
     run_voice_tests();
     run_vector_stores_tests();
     run_cli_tests();
@@ -466,6 +475,7 @@ int main(int argc, char **argv) {
 #endif
 #ifdef HU_ENABLE_ML
     run_ml_tests();
+    run_lora_tests();
 #endif
 
     HU_TEST_REPORT();

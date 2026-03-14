@@ -1,0 +1,47 @@
+name: Agent Evaluation
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      golden_set:
+        description: "Path to golden set file"
+        default: "data/eval/golden_set.jsonl"
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-build
+        with:
+          build-type: Debug
+          enable-curl: "true"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run golden-set evaluation
+        env:
+          GEMINI_EVAL_KEY: ${{ secrets.GEMINI_EVAL_KEY }}
+          GOLDEN_SET_PATH: ${{ github.event.inputs.golden_set || 'data/eval/golden_set.jsonl' }}
+        run: |
+          python3 scripts/eval_golden_set.py \
+            --binary ./build/human \
+            --golden-set "$GOLDEN_SET_PATH" \
+            --output eval_results.json
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: eval_results.json
+
+      - name: Check for regression
+        run: python3 scripts/eval_check_regression.py --results eval_results.json
