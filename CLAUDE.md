@@ -15,7 +15,7 @@ cmake --build --preset dev
 # Other presets: test (no ASan), release (MinSizeRel+LTO), fuzz (Clang), minimal
 cmake --list-presets               # show all available presets
 
-# Run tests (4,640+ tests, must be 0 failures, 0 ASan errors)
+# Run tests (4,980+ tests, must be 0 failures, 0 ASan errors)
 ./build/human_tests                          # full suite
 ./build/human_tests --suite=JSON             # run suites matching "JSON"
 ./build/human_tests --filter=config_parse    # run tests matching "config_parse"
@@ -36,7 +36,7 @@ Vtable-driven and modular. Extend by implementing vtable structs + factory regis
 - `src/tools/` — `hu_tool_t` vtable (tool execution)
 - `src/memory/` — `hu_memory_t` vtable (memory backends)
 - `src/security/` — policy, pairing, secrets, sandboxing
-- `src/runtime/` — `hu_runtime_t` vtable (native, docker, wasm)
+- `src/runtime/` — `hu_runtime_t` vtable (native, docker are real; wasm/cloudflare/gce return `HU_ERR_NOT_SUPPORTED`)
 - `src/peripherals/` — `hu_peripheral_t` vtable (Arduino, STM32, RPi)
 - `src/persona/` — persona profiles, prompt builder, example banks
 
@@ -73,14 +73,14 @@ Types: `feat fix refactor test docs chore perf ci build style`
 
 ## CI Pipeline
 
-| Workflow                    | What it checks                                                                                                                                  |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ci.yml`                    | C build + 3726 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
-| `benchmark.yml`             | Performance regression (binary size, startup time, RSS)                                                                                         |
-| `codeql.yml`                | Static analysis security scanning                                                                                                               |
-| `security.yml`              | Dependency audit, SBOM generation                                                                                                               |
-| `release.yml`               | Build release artifacts, .deb packages, cross-ARM64                                                                                             |
-| `competitive-benchmark.yml` | Weekly PageSpeed competitive analysis (15 brands, 7 scoring dimensions)                                                                         |
+| Workflow                    | What it checks                                                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ci.yml`                    | C build + ~4980 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
+| `benchmark.yml`             | Performance regression (binary size, startup time, RSS)                                                                                          |
+| `codeql.yml`                | Static analysis security scanning                                                                                                                |
+| `security.yml`              | Dependency audit, SBOM generation                                                                                                                |
+| `release.yml`               | Build release artifacts (Linux x86_64 + macOS aarch64), Docker image, Trivy scan                                                                 |
+| `competitive-benchmark.yml` | Weekly PageSpeed competitive analysis (15 brands, 7 scoring dimensions)                                                                          |
 
 Rule: if CI will catch it, run the equivalent locally first.
 
@@ -100,7 +100,7 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 | --------------------------------- | --------------------------------------------------------------------- |
 | `src/`                            | All C source (~715 files, ~139K lines)                                |
 | `include/human/`                  | Public headers                                                        |
-| `tests/`                          | 131 test files, 4,640+ tests                                          |
+| `tests/`                          | 131 test files, 4,980+ tests                                          |
 | `fuzz/`                           | libFuzzer harnesses                                                   |
 | `ui/`                             | LitElement web dashboard                                              |
 | `website/`                        | Astro marketing site                                                  |
