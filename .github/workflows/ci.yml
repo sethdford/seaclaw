@@ -152,6 +152,12 @@ jobs:
       - name: Android lint + unit tests
         run: cd apps/android && ./gradlew lint test 2>&1 || echo "Lint/test completed with warnings"
 
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: cd apps/macos && swift build
+
   ui:
     runs-on: ubuntu-latest
     defaults:
