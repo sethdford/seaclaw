@@ -39,7 +39,7 @@ abstract final class HUTokens {
   static const chart_categorical_7 = Color(0xFFFCD34D);
   static const chart_categorical_8 = Color(0xFFA3D46A);
   static const chart_diverging_negative = Color(0xFFF97066);
-  static const chart_diverging_neutral = Color(0xFF5E7A94);
+  static const chart_diverging_neutral = Color(0xFF7A96B0);
   static const chart_diverging_positive = Color(0xFF7AB648);
   static const chart_sequential_100 = Color(0xFFE2F2C8);
   static const chart_sequential_200 = Color(0xFFC5E59A);
@@ -51,7 +51,7 @@ abstract final class HUTokens {
   static const chart_sequential_800 = Color(0xFF366320);
   static const chart_status_error = Color(0xFFF97066);
   static const chart_status_info = Color(0xFF6366F1);
-  static const chart_status_muted = Color(0xFF5E7A94);
+  static const chart_status_muted = Color(0xFF7A96B0);
   static const chart_status_success = Color(0xFF7AB648);
   static const chart_status_warning = Color(0xFFF59E0B);
   static const choreography_blur_from = 0;
@@ -127,7 +127,7 @@ abstract final class HUTokens {
   static const color_neutral_300 = Color(0xFF2F4A64);
   static const color_neutral_400 = Color(0xFF3D5468);
   static const color_neutral_50 = Color(0xFF060B12);
-  static const color_neutral_500 = Color(0xFF5E7A94);
+  static const color_neutral_500 = Color(0xFF7A96B0);
   static const color_neutral_600 = Color(0xFF8AA0B8);
   static const color_neutral_700 = Color(0xFFC0D0E0);
   static const color_neutral_750 = Color(0xFFD8E4F0);
@@ -223,7 +223,7 @@ abstract final class HUTokens {
   static const dark_surface_dim = Color(0xFF030710);
   static const dark_text = Color(0xFFD8E4F0);
   static const dark_text_faint = Color(0xFF3D5468);
-  static const dark_text_muted = Color(0xFF5E7A94);
+  static const dark_text_muted = Color(0xFF7A96B0);
   static const dark_warning = Color(0xFFEAB308);
   static const dropdown_item_padding_x = 8;
   static const dropdown_item_padding_y = 4;

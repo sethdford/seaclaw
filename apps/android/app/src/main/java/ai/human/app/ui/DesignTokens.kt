@@ -57,7 +57,7 @@ object HUTokens {
         val surfaceDim = Color(0xFF030710)
         val text = Color(0xFFD8E4F0)
         val textFaint = Color(0xFF3D5468)
-        val textMuted = Color(0xFF5E7A94)
+        val textMuted = Color(0xFF7A96B0)
         val warning = Color(0xFFEAB308)
         val warningDim = Color(0x26EAB308)
     }

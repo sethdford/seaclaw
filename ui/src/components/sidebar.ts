@@ -252,7 +252,7 @@ export class ScSidebar extends LitElement {
       border-left: 3px solid transparent;
       border-radius: var(--hu-radius-sm);
       font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
+      color: var(--hu-text);
       cursor: pointer;
       transition:
         background var(--hu-duration-fast),
