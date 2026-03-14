@@ -88,14 +88,14 @@ updated: 2026-03-13
 - [x] prefers-contrast: more supported
 - [x] Original typography treatment (not default system stack)
 - [x] No stock photography — all illustrations/assets bespoke
-- [ ] Schema.org structured data
-- [ ] OG + Twitter Card meta complete with images
+- [x] Schema.org structured data
+- [x] OG + Twitter Card meta complete with images
 
 ### Apple Design Award Checklist (iOS/macOS)
 
 - [x] Uses platform conventions (NavigationStack, TabView, .sheet)
 - [ ] Dynamic Type support (all text scales)
-- [ ] VoiceOver labels on every interactive element
+- [x] VoiceOver labels on every interactive element
 - [x] Haptic feedback on meaningful interactions
 - [x] Spring animations (UISpringTimingParameters or SwiftUI .spring)
 - [x] Widget / Live Activity / App Intent integration
