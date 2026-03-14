@@ -1,7 +1,6 @@
 package ai.human.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -42,7 +41,7 @@ private data class ChatMessage(
 )
 
 private val chatSpring = spring<Float>(
-    dampingRatio = Spring.DampingRatioMediumBouncy,
+    dampingRatio = 0.7f,
     stiffness = HUTokens.springStandardStiffness,
 )
 

@@ -1,7 +1,6 @@
 package ai.human.app.ui.screens
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -121,7 +120,7 @@ private fun ConnectionStatusIndicator(isConnected: Boolean) {
     val animatedColor by animateColorAsState(
         targetValue = targetColor,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
+            dampingRatio = 0.7f,
             stiffness = HUTokens.springStandardStiffness,
         ),
         label = "connection_status_color",

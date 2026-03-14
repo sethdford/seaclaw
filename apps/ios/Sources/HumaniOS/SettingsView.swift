@@ -25,17 +25,20 @@ struct SettingsView: View {
                         .font(.custom("Avenir-Medium", size: HUTokens.textSm, relativeTo: .subheadline))
                 } footer: {
                     Text("WebSocket URL, e.g. wss://localhost:3000/ws")
+                        .font(.custom("Avenir-Book", size: HUTokens.textSm, relativeTo: .footnote))
                 }
 
                 Section {
                     HStack {
                         Text("Status")
+                            .font(.custom("Avenir-Book", size: HUTokens.textBase, relativeTo: .body))
                         Spacer()
                         HStack(spacing: HUTokens.spaceSm) {
                             Circle()
                                 .fill(connectionManager.isConnected ? tokens.success : tokens.error)
                                 .frame(width: 8, height: 8)
                             Text(connectionManager.isConnected ? "Connected" : "Disconnected")
+                                .font(.custom("Avenir-Book", size: HUTokens.textSm, relativeTo: .subheadline))
                                 .foregroundStyle(.secondary)
                         }
                         .accessibilityLabel("Connection status: \(connectionManager.isConnected ? "Connected" : "Disconnected")")

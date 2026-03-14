@@ -1,7 +1,6 @@
 package ai.human.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -34,8 +33,8 @@ import androidx.compose.ui.draw.clip
 import ai.human.app.ui.HUTokens
 
 private val overviewSpring = spring<Float>(
-    dampingRatio = Spring.DampingRatioMediumBouncy,
-    stiffness = HUTokens.springExpressiveStiffness,
+    dampingRatio = 0.7f,
+    stiffness = HUTokens.springStandardStiffness,
 )
 
 @Composable
@@ -153,8 +152,8 @@ fun OverviewScreen() {
                 visible = visible,
                 enter = fadeIn(animationSpec = tween(HUTokens.durationNormal.toInt(), delayMillis = 200)) +
                     slideInVertically(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                        animationSpec =                         spring(
+                            dampingRatio = 0.7f,
                             stiffness = HUTokens.springStandardStiffness,
                         ),
                         initialOffsetY = { it / 4 },
