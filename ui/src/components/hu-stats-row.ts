@@ -33,7 +33,7 @@ export class ScStatsRow extends LitElement {
   `;
 
   override render() {
-    return html`<div class="stats-row"><slot></slot></div>`;
+    return html`<div class="stats-row" role="group"><slot></slot></div>`;
   }
 }
 

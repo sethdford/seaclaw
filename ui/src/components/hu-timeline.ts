@@ -94,10 +94,10 @@ export class ScTimeline extends LitElement {
   override render() {
     const visible = this.items.slice(0, this.max);
     return html`
-      <div class="timeline">
+      <div class="timeline" role="list">
         ${visible.map(
           (item, i) => html`
-            <div class="entry" style="animation-delay: ${i * 50}ms">
+            <div class="entry" role="listitem" style="animation-delay: ${i * 50}ms">
               <div class="dot ${item.status}"></div>
               <div class="line"></div>
               <div class="content">

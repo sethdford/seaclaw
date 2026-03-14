@@ -65,7 +65,7 @@ export class ScMetricRow extends LitElement {
         ${this.items.map(
           (item, i) => html`
             ${i > 0 ? html`<div class="divider"></div>` : nothing}
-            <div class="item">
+            <div class="item" role="group" aria-label="${item.label}: ${item.value}">
               <span class="item-label">${item.label}</span>
               <span class="item-value ${item.accent || ""}">${item.value}</span>
             </div>

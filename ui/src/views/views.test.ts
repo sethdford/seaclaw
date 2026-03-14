@@ -19,6 +19,7 @@ import "./usage-view.js";
 import "./metrics-view.js";
 import "./security-view.js";
 import "./logs-view.js";
+import "./memory-view.js";
 
 const VIEW_TAGS = [
   "hu-overview-view",
@@ -37,6 +38,7 @@ const VIEW_TAGS = [
   "hu-metrics-view",
   "hu-security-view",
   "hu-logs-view",
+  "hu-memory-view",
 ];
 
 describe("views", () => {
@@ -359,8 +361,10 @@ describe("view accessibility", () => {
     "hu-voice-view",
     "hu-nodes-view",
     "hu-usage-view",
+    "hu-metrics-view",
     "hu-security-view",
     "hu-logs-view",
+    "hu-memory-view",
   ];
 
   for (const tag of ALL_VIEWS) {

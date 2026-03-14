@@ -130,9 +130,12 @@ export class ScStatCard extends LitElement {
           ? icons["trending-down"]
           : null;
 
+    const displayValue = this.valueStr
+      ? `${this.prefix}${this.valueStr}${this.suffix}`
+      : `${this.prefix}${this.value}${this.suffix}`;
     return html`
       <hu-card glass hoverable>
-        <div class="stat-card">
+        <div class="stat-card" role="group" aria-label="${this.label}: ${displayValue}">
           ${this.trend
             ? html`
                 <div class="trend ${this.trendDirection}">

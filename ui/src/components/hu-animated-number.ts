@@ -5,7 +5,7 @@ import { generateSpringKeyframes, SPRING_PRESETS } from "../utils/spring.js";
 @customElement("hu-animated-number")
 export class ScAnimatedNumber extends LitElement {
   @property({ type: Number }) value = 0;
-  @property({ type: Number }) duration = 600;
+  @property({ type: Number }) duration = 500;
   @property({ type: String }) suffix = "";
   @property({ type: String }) prefix = "";
   @state() private _displayed = 0;

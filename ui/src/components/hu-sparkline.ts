@@ -64,13 +64,16 @@ export class ScSparkline extends LitElement {
     const h = this.height - pad * 2;
     const lastY = pad + h - ((last - min) / range) * h;
     const lastX = this.width - pad;
+    const trend = last > pts[0] ? "upward" : last < pts[0] ? "downward" : "stable";
+    const ariaLabel = `Sparkline: ${trend} trend over ${pts.length} data points`;
 
     return html`
       <svg
         width=${this.width}
         height=${this.height}
         viewBox="0 0 ${this.width} ${this.height}"
-        aria-hidden="true"
+        role="img"
+        aria-label=${ariaLabel}
       >
         ${this.fill ? html`<path class="area" d=${area} fill=${this.color} />` : null}
         <path class="line" d=${line} stroke=${this.color} />

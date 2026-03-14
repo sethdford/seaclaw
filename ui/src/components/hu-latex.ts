@@ -79,9 +79,11 @@ export class ScLatex extends LitElement {
 
   override render() {
     if (this._rendered) {
-      return html`<span class="katex">${unsafeHTML(DOMPurify.sanitize(this._rendered))}</span>`;
+      return html`<span class="katex" role="math" aria-label=${this.latex}
+        >${unsafeHTML(DOMPurify.sanitize(this._rendered))}</span
+      >`;
     }
-    return html`<span class="latex-raw">${this.latex}</span>`;
+    return html`<span class="latex-raw" role="math" aria-label=${this.latex}>${this.latex}</span>`;
   }
 }
 

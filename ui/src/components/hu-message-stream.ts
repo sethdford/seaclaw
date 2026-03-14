@@ -220,7 +220,7 @@ export class ScMessageStream extends LitElement {
 
   override render() {
     return html`
-      <div class="bubble role-${this.role}">
+      <div class="bubble role-${this.role}" role="log" aria-live="polite">
         <div class="content">
           ${renderMarkdown(this.content, {
             onCopyCode: (code) => this._copyCode(code),

@@ -34,7 +34,7 @@ export class ScOverviewStats extends LitElement {
 
   override render() {
     return html`
-      <div class="metrics-block">
+      <div class="metrics-block" role="group" aria-label="Overview statistics">
         <hu-stats-row>
           ${this.metrics.map(
             (m, i) => html`

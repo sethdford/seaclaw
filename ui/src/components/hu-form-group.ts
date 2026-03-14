@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 const FORM_CONTROL_SELECTOR = "hu-input, hu-select, hu-combobox, hu-checkbox, hu-textarea";
@@ -9,6 +9,8 @@ export class ScFormGroup extends LitElement {
   @property({ type: String }) description = "";
 
   @state() private _dirty = false;
+  private static _idCounter = 0;
+  private _titleId = `hu-form-group-title-${ScFormGroup._idCounter++}`;
 
   static override styles = css`
     :host {
@@ -112,11 +114,17 @@ export class ScFormGroup extends LitElement {
 
   override render() {
     return html`
-      <form class="wrapper" @submit=${this._onSubmit}>
+      <form
+        class="wrapper"
+        @submit=${this._onSubmit}
+        aria-labelledby=${this.title ? this._titleId : nothing}
+      >
         ${this.title || this.description || this._dirty
           ? html`
               <div class="header">
-                ${this.title ? html`<h3 class="title">${this.title}</h3>` : null}
+                ${this.title
+                  ? html`<h3 id=${this._titleId} class="title">${this.title}</h3>`
+                  : null}
                 ${this.description ? html`<p class="description">${this.description}</p>` : null}
                 ${this._dirty ? html`<span class="dirty-indicator">Unsaved changes</span>` : null}
               </div>

@@ -88,7 +88,11 @@ export class ScStatusDot extends LitElement {
 
   override render() {
     return html`
-      <span class="dot size-${this.size} status-${this.status}" aria-hidden="true"></span>
+      <span
+        class="dot size-${this.size} status-${this.status}"
+        role="status"
+        aria-label="Status: ${this.status}"
+      ></span>
     `;
   }
 }
