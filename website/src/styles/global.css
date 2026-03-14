@@ -74,9 +74,32 @@
   }
 }
 
+/* ── Shared-element morph transitions ── */
+::view-transition-old(site-logo),
+::view-transition-new(site-logo) {
+  animation-duration: var(--hu-duration-normal, 200ms);
+}
+
+::view-transition-old(page-heading),
+::view-transition-new(page-heading) {
+  animation-duration: var(--hu-duration-slow, 300ms);
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(nav-bar),
+::view-transition-new(nav-bar) {
+  animation-duration: var(--hu-duration-fast, 100ms);
+}
+
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(root),
-  ::view-transition-new(root) {
+  ::view-transition-new(root),
+  ::view-transition-old(site-logo),
+  ::view-transition-new(site-logo),
+  ::view-transition-old(page-heading),
+  ::view-transition-new(page-heading),
+  ::view-transition-old(nav-bar),
+  ::view-transition-new(nav-bar) {
     animation: none !important;
   }
 }
@@ -1344,6 +1367,35 @@
   .hero-webgl-canvas {
     opacity: 0.3 !important;
   }
+}
+
+/* ── Container Queries ── */
+.spectrum-grid,
+.numbers-section,
+.dash-stats-grid,
+.provider-grid-wrap {
+  container-type: inline-size;
+}
+
+@container (max-width: 600px) {
+  .spectrum-card {
+    padding: var(--hu-space-lg, 1.25rem) var(--hu-space-md, 1rem);
+  }
+  .spectrum-card h3 {
+    font-size: var(--hu-text-base, 1rem);
+  }
+}
+
+@container (max-width: 480px) {
+  .number-item {
+    padding-block: var(--hu-space-md, 1rem);
+  }
+}
+
+/* ── Content Visibility (off-screen rendering optimization) ── */
+.cv-defer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
 }
 
 /* ── Print ── */
