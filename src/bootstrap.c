@@ -37,6 +37,7 @@
 #if HU_HAS_PWA
 #include "human/channels/pwa.h"
 #include "human/pwa.h"
+#include "human/pwa_learner.h"
 #endif
 #if HU_HAS_IMAP
 #include "human/channels/imap.h"
@@ -351,6 +352,8 @@ typedef struct hu_bootstrap_internal {
 #if HU_HAS_PWA
     hu_pwa_driver_registry_t pwa_driver_registry;
     bool pwa_driver_registry_ok;
+    hu_pwa_learner_t pwa_learner;
+    bool pwa_learner_ok;
 #endif
 
     bool provider_ok;
@@ -1274,6 +1277,15 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         ctx->channel_count = ch_count;
     }
 
+#if HU_HAS_PWA
+    if (ctx->agent_ok && bi->agent.memory) {
+        hu_error_t lerr = hu_pwa_learner_init(alloc, &bi->pwa_learner, bi->agent.memory);
+        bi->pwa_learner_ok = (lerr == HU_OK);
+        if (bi->pwa_learner_ok)
+            ctx->pwa_learner = &bi->pwa_learner;
+    }
+#endif
+
     return HU_OK;
 
 fail:
@@ -1328,6 +1340,8 @@ void hu_app_teardown(hu_app_ctx_t *ctx) {
     if (bi->agent_registry_ok)
         hu_agent_registry_destroy(&bi->agent_registry);
 #if HU_HAS_PWA
+    if (bi->pwa_learner_ok)
+        hu_pwa_learner_destroy(&bi->pwa_learner);
     if (bi->pwa_driver_registry_ok) {
         hu_pwa_set_global_registry(NULL);
         hu_pwa_driver_registry_destroy(alloc, &bi->pwa_driver_registry);

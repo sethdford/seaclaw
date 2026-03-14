@@ -63,6 +63,8 @@
 #include "human/paperclip/heartbeat.h"
 #endif
 #include "human/pwa.h"
+#include "human/pwa_context.h"
+#include "human/pwa_learner.h"
 #include "human/plugin_loader.h"
 #include "human/tool.h"
 #include "human/tools/factory.h"
@@ -437,10 +439,35 @@ static hu_error_t cmd_cron(hu_allocator_t *alloc, int argc, char **argv) {
         return HU_OK;
     }
 
+    if (strcmp(sub, "add-digest") == 0) {
+        if (argc < 4 || !argv[3]) {
+            alloc->free(alloc->ctx, path, path_len + 1);
+            fprintf(stderr, "[%s] cron add-digest <schedule>\n", HU_CODENAME);
+            fprintf(stderr, "  Example: human cron add-digest \"0 9 * * *\"  (daily at 9 AM)\n");
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        const char *schedule = argv[3];
+        size_t schedule_len = strlen(schedule);
+        const char *command = "human pwa digest";
+        size_t cmd_len = strlen(command);
+        char *new_id = NULL;
+        err = hu_crontab_add(alloc, path, schedule, schedule_len, command, cmd_len, &new_id);
+        alloc->free(alloc->ctx, path, path_len + 1);
+        if (err != HU_OK) {
+            fprintf(stderr, "[%s] cron add-digest: %s\n", HU_CODENAME, hu_error_string(err));
+            return err;
+        }
+        printf("Added PWA digest cron job %s (runs: human pwa digest)\n", new_id ? new_id : "");
+        if (new_id)
+            alloc->free(alloc->ctx, new_id, strlen(new_id) + 1);
+        return HU_OK;
+    }
+
     alloc->free(alloc->ctx, path, path_len + 1);
-    fprintf(stderr, "[%s] cron: use 'list', 'add', or 'remove'\n", HU_CODENAME);
+    fprintf(stderr, "[%s] cron: use 'list', 'add', 'add-digest', or 'remove'\n", HU_CODENAME);
     fprintf(stderr, "  human cron list\n");
     fprintf(stderr, "  human cron add <schedule> <command>\n");
+    fprintf(stderr, "  human cron add-digest <schedule>   (schedule PWA digest, e.g. \"0 9 * * *\")\n");
     fprintf(stderr, "  human cron remove <id>\n");
     return HU_ERR_INVALID_ARGUMENT;
 }
@@ -946,8 +973,52 @@ static const char *const PWA_APP_NAMES[] = {"slack",    "discord",  "whatsapp", 
                                             "linkedin", "facebook"};
 #define PWA_APP_COUNT (sizeof(PWA_APP_NAMES) / sizeof(PWA_APP_NAMES[0]))
 
+static const char *pwa_digest_category(const char *app_name) {
+    if (!app_name)
+        return "App";
+    if (strcmp(app_name, "calendar") == 0)
+        return "Calendar";
+    if (strcmp(app_name, "gmail") == 0)
+        return "Email";
+    if (strcmp(app_name, "slack") == 0 || strcmp(app_name, "discord") == 0 ||
+        strcmp(app_name, "whatsapp") == 0 || strcmp(app_name, "telegram") == 0)
+        return "Chat";
+    if (strcmp(app_name, "notion") == 0)
+        return "Docs";
+    if (strcmp(app_name, "twitter") == 0 || strcmp(app_name, "linkedin") == 0 ||
+        strcmp(app_name, "facebook") == 0)
+        return "Social";
+    return "App";
+}
+
 static hu_error_t cmd_pwa(hu_allocator_t *alloc, int argc, char **argv) {
     const char *sub = (argc >= 3 && argv[2]) ? argv[2] : "list";
+
+    if (strcmp(sub, "context") == 0) {
+#if HU_IS_TEST
+        (void)alloc;
+        fprintf(stderr, "PWA: browser automation unavailable in test build\n");
+        return HU_OK;
+#else
+        char *result = NULL;
+        size_t result_len = 0;
+        hu_error_t err = hu_pwa_context_build(alloc, &result, &result_len);
+        if (err != HU_OK) {
+            fprintf(stderr, "PWA context: %s\n", hu_error_string(err));
+            return err;
+        }
+        if (result && result_len > 0) {
+            printf("%.*s", (int)result_len, result);
+            if (result[result_len - 1] != '\n')
+                printf("\n");
+        } else {
+            printf("(no open PWA tabs with content)\n");
+        }
+        if (result)
+            alloc->free(alloc->ctx, result, result_len + 1);
+        return HU_OK;
+#endif
+    }
 
     if (strcmp(sub, "list") == 0) {
         size_t count = 0;
@@ -1174,6 +1245,64 @@ static hu_error_t cmd_pwa(hu_allocator_t *alloc, int argc, char **argv) {
 #endif
     }
 
+    if (strcmp(sub, "digest") == 0) {
+#if HU_IS_TEST
+        fprintf(stderr, "PWA: browser automation unavailable in test build\n");
+        return HU_OK;
+#else
+        hu_pwa_browser_t browser;
+        hu_error_t err = hu_pwa_detect_browser(&browser);
+        if (err != HU_OK) {
+            fprintf(stderr, "PWA: no supported browser found\n");
+            return err;
+        }
+        time_t now = time(NULL);
+        struct tm *tm = localtime(&now);
+        char ts[32];
+        strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M", tm);
+        printf("=== PWA Digest (%s) ===\n\n", ts);
+        fflush(stdout);
+
+        size_t scanned = 0;
+        for (size_t i = 0; i < PWA_APP_COUNT; i++) {
+            const hu_pwa_driver_t *drv = hu_pwa_driver_resolve(PWA_APP_NAMES[i]);
+            if (!drv || !drv->read_messages_js)
+                continue;
+
+            hu_pwa_tab_t tab;
+            err = hu_pwa_find_tab(alloc, browser, drv->url_pattern, &tab);
+            if (err != HU_OK)
+                continue;
+
+            fflush(stdout);
+            char *result = NULL;
+            size_t result_len = 0;
+            err = hu_pwa_exec_js(alloc, &tab, drv->read_messages_js, &result, &result_len);
+            hu_pwa_tab_free(alloc, &tab);
+
+            if (err != HU_OK) {
+                if (result)
+                    alloc->free(alloc->ctx, result, result_len + 1);
+                continue;
+            }
+            const char *label = pwa_digest_category(drv->app_name);
+            const char *name = drv->display_name ? drv->display_name : drv->app_name;
+            printf("[%s] %s:\n", label, name);
+            if (result && result_len > 0) {
+                printf("  %.*s\n\n", (int)result_len, result);
+                alloc->free(alloc->ctx, result, result_len + 1);
+            } else {
+                printf("  (no content)\n\n");
+                if (result)
+                    alloc->free(alloc->ctx, result, result_len + 1);
+            }
+            scanned++;
+        }
+        printf("=== End digest (%zu apps scanned) ===\n", scanned);
+        return HU_OK;
+#endif
+    }
+
     if (strcmp(sub, "scan") == 0) {
 #if HU_IS_TEST
         fprintf(stderr, "PWA: browser automation unavailable in test build\n");
@@ -1224,7 +1353,48 @@ static hu_error_t cmd_pwa(hu_allocator_t *alloc, int argc, char **argv) {
 #endif
     }
 
-    fprintf(stderr, "Usage: human pwa [list|tabs|scan|watch [secs]|read <app>|send <app> [target] <message>]\n");
+    if (strcmp(sub, "learn") == 0) {
+#if HU_IS_TEST
+        fprintf(stderr, "PWA: browser automation unavailable in test build\n");
+        return HU_OK;
+#else
+        const char *home = getenv("HOME");
+        if (!home) {
+            fprintf(stderr, "PWA learn: HOME not set\n");
+            return HU_ERR_IO;
+        }
+        char db_path[512];
+        int n = snprintf(db_path, sizeof(db_path), "%s/.human/memory.db", home);
+        if (n <= 0 || (size_t)n >= sizeof(db_path))
+            return HU_ERR_IO;
+        hu_memory_t mem = hu_sqlite_memory_create(alloc, db_path);
+        if (!mem.vtable) {
+            fprintf(stderr, "PWA learn: failed to open memory at %s\n", db_path);
+            return HU_ERR_IO;
+        }
+        hu_pwa_learner_t learner;
+        hu_error_t err = hu_pwa_learner_init(alloc, &learner, &mem);
+        if (err != HU_OK) {
+            fprintf(stderr, "PWA learn: init failed: %s\n", hu_error_string(err));
+            mem.vtable->deinit(mem.ctx);
+            return err;
+        }
+        printf("Scanning PWA tabs and storing content in memory...\n");
+        fflush(stdout);
+        size_t ingested = 0;
+        err = hu_pwa_learner_scan(&learner, &ingested);
+        if (err != HU_OK)
+            fprintf(stderr, "PWA learn: scan error: %s\n", hu_error_string(err));
+        else
+            printf("Ingested %zu new items into memory (total: %zu)\n",
+                   ingested, learner.ingest_count);
+        hu_pwa_learner_destroy(&learner);
+        mem.vtable->deinit(mem.ctx);
+        return err;
+#endif
+    }
+
+    fprintf(stderr, "Usage: human pwa [list|context|tabs|digest|scan|watch [secs]|learn|read <app>|send <app> [target] <message>]\n");
     return HU_ERR_INVALID_ARGUMENT;
 }
 

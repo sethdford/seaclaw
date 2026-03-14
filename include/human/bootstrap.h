@@ -42,6 +42,7 @@ typedef struct hu_app_ctx {
     void *cron;            /* hu_cron_scheduler_t * */
     void *agent_registry;  /* hu_agent_registry_t * */
     void *skillforge;      /* hu_skillforge_t * */
+    void *pwa_learner;     /* hu_pwa_learner_t * */
 
     /* When with_channels: service channels for polling */
     hu_service_channel_t *channels;

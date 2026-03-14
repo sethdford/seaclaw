@@ -554,7 +554,9 @@ set(HU_CORE_SOURCES
     src/tools/skill_write.c
     src/tools/pwa.c
     src/pwa/bridge.c
+    src/pwa/context.c
     src/pwa/drivers.c
+    src/pwa/learner.c
     src/tools/jira.c
     src/tools/social.c
     src/tools/facebook.c
