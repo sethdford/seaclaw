@@ -574,8 +574,10 @@
 
   .glass-nav {
     background: var(--hu-web-surface-elevated);
-    backdrop-filter: blur(24px) saturate(1.8);
-    -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
+      saturate(var(--hu-glass-standard-saturate, 180%));
+    -webkit-backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
+      saturate(var(--hu-glass-standard-saturate, 180%));
     border-bottom: 1px solid var(--hu-web-border);
     box-shadow: var(
       --hu-shadow-sm,
