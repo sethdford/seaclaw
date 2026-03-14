@@ -846,7 +846,7 @@ static void test_train_with_backward(void) {
     HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, tmpdir, 2, 4, "train", &train_dl), HU_OK);
     HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, tmpdir, 2, 4, "val", &val_dl), HU_OK);
 
-    hu_training_config_t train_cfg = { .total_batch_size = 2, .device_batch_size = 2,
+    hu_training_config_t train_cfg = { .device_batch_size = 2,
         .time_budget_secs = 5, .eval_tokens = 8, .grad_accum_steps = 1 };
     hu_ml_train_result_t result = {0};
     hu_error_t err = hu_ml_train(&alloc, &model, &opt, train_dl, val_dl,
@@ -1238,7 +1238,6 @@ static void test_experiment_loop_keep_discard(void) {
     loop_cfg.base_config.gpt.sequence_len = 16;
     loop_cfg.base_config.training.device_batch_size = 2;
     loop_cfg.base_config.training.time_budget_secs = 1;
-    loop_cfg.base_config.training.total_batch_size = 32;
     loop_cfg.data_dir = dir;
     loop_cfg.convergence_threshold = 0.0;
 

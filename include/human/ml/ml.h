@@ -59,7 +59,6 @@ typedef struct hu_optimizer_config {
 } hu_optimizer_config_t;
 
 typedef struct hu_training_config {
-    size_t total_batch_size;
     size_t device_batch_size;
     int time_budget_secs;
     size_t eval_tokens;

@@ -180,7 +180,6 @@ hu_experiment_config_t hu_experiment_config_default(void)
     c.optimizer.warmdown_ratio = 0.5f;
     c.optimizer.final_lr_frac = 0.0f;
 
-    c.training.total_batch_size = 524288;
     c.training.device_batch_size = 128;
     c.training.time_budget_secs = 300;
     c.training.eval_tokens = 20971520;
