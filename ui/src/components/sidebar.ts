@@ -483,7 +483,7 @@ export class ScSidebar extends LitElement {
                 ${section.items.map(
                   (item) => html`
                     <button
-                      class="nav-item ${this.activeTab === item.id ? "active" : ""}"
+                      class="nav-item"
                       ?aria-current=${this.activeTab === item.id}
                       aria-label=${item.label}
                       title=${this.collapsed ? item.label : undefined}
