@@ -55,6 +55,9 @@ struct OverviewView: View {
             }
             .background(tokens.bgSurface)
             .navigationTitle("Overview")
+            .refreshable {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
         }
         .onAppear {
             withAnimation(HUTokens.springExpressive) {

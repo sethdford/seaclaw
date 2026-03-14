@@ -27,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import ai.human.app.ui.HUTokens
@@ -47,6 +49,7 @@ fun SettingsScreen() {
             text = "Gateway",
             style = MaterialTheme.typography.titleMedium,
             color = colorScheme.onBackground,
+            modifier = Modifier.semantics { contentDescription = "Gateway settings" },
         )
 
         BasicTextField(
@@ -56,7 +59,8 @@ fun SettingsScreen() {
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(HUTokens.radiusMd))
                 .background(colorScheme.surfaceVariant)
-                .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm),
+                .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm)
+                .semantics { contentDescription = "Gateway URL: $gatewayUrl" },
             textStyle = TextStyle(
                 color = colorScheme.onSurface,
                 fontSize = HUTokens.textBase,
@@ -78,7 +82,11 @@ fun SettingsScreen() {
         )
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Connection status: ${if (isConnected) "Connected" else "Disconnected"}"
+                },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(HUTokens.spaceMd),
         ) {
@@ -101,7 +109,8 @@ fun SettingsScreen() {
                     shape = RoundedCornerShape(HUTokens.radiusMd),
                 )
                 .clickable { isConnected = !isConnected }
-                .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm),
+                .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm)
+                .semantics { contentDescription = if (isConnected) "Disconnect from gateway" else "Connect to gateway" },
             contentAlignment = Alignment.Center,
         ) {
             Text(

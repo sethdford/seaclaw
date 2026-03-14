@@ -35,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import ai.human.app.ui.HUTokens
 
@@ -90,6 +92,7 @@ fun SessionsScreen() {
                     text = "Sessions",
                     style = MaterialTheme.typography.headlineLarge,
                     color = colorScheme.onBackground,
+                    modifier = Modifier.semantics { contentDescription = "Sessions heading" },
                 )
             }
         }
@@ -148,7 +151,7 @@ private fun SessionListItem(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Delete,
-                    contentDescription = "Delete",
+                    contentDescription = "Delete session ${session.title}",
                     tint = colorScheme.onError,
                 )
             }
@@ -161,7 +164,10 @@ private fun SessionListItem(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(HUTokens.radiusLg))
                 .background(colorScheme.primaryContainer)
-                .padding(HUTokens.spaceMd),
+                .padding(HUTokens.spaceMd)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "${session.title}, ${session.timestamp}, ${session.messageCount} messages"
+                },
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

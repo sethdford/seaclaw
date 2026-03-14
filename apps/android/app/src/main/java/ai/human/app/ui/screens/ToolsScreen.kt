@@ -33,6 +33,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import ai.human.app.ui.HUTokens
 
@@ -109,6 +111,7 @@ fun ToolsScreen() {
                     text = "Tools",
                     style = MaterialTheme.typography.headlineLarge,
                     color = colorScheme.onBackground,
+                    modifier = Modifier.semantics { contentDescription = "Tools heading" },
                 )
             }
         }
@@ -183,7 +186,10 @@ private fun ToolCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(HUTokens.radiusLg))
             .background(colorScheme.primaryContainer)
-            .padding(HUTokens.spaceMd),
+            .padding(HUTokens.spaceMd)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "$name: $description"
+            },
     ) {
         Column {
             Icon(

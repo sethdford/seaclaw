@@ -26,6 +26,7 @@ struct SessionsView: View {
         ChatSession(title: "Quick Questions", lastMessage: "Sure, I can help with that.", timestamp: Date().addingTimeInterval(-172800), isArchived: true),
     ]
     @State private var selectedSession: ChatSession?
+    @State private var searchText = ""
 
     private var tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color) {
         if colorScheme == .dark {
@@ -48,7 +49,12 @@ struct SessionsView: View {
     }
 
     private var activeSessions: [ChatSession] {
-        sessions.filter { !$0.isArchived }
+        let active = sessions.filter { !$0.isArchived }
+        if searchText.isEmpty { return active }
+        return active.filter {
+            $0.title.localizedCaseInsensitiveContains(searchText) ||
+            ($0.lastMessage?.localizedCaseInsensitiveContains(searchText) ?? false)
+        }
     }
 
     private var archivedSessions: [ChatSession] {
@@ -156,6 +162,7 @@ struct SessionsView: View {
             .background(tokens.bgSurface)
             .scrollContentBackground(.hidden)
             .navigationTitle("Sessions")
+            .searchable(text: $searchText, prompt: "Search sessions")
             .navigationDestination(item: $selectedSession) { session in
                 SessionDetailView(session: session, tokens: tokens)
             }
@@ -199,6 +206,8 @@ private struct SessionRow: View {
         .listRowInsets(EdgeInsets(top: HUTokens.spaceXs, leading: HUTokens.spaceMd, bottom: HUTokens.spaceXs, trailing: HUTokens.spaceMd))
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(session.title), \(session.lastMessage ?? "no messages"), \(formatTimestamp(session.timestamp))")
     }
 }
 
@@ -232,6 +241,7 @@ private struct SessionDetailView: View {
         }
         .background(tokens.bgSurface)
         .navigationTitle(session.title)
+        .accessibilityLabel("Session: \(session.title)")
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif

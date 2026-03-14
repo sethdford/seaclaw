@@ -3,10 +3,15 @@ import Combine
 import AppKit
 import HumanChatUI
 
+enum MacTab: String, CaseIterable {
+    case overview, chat, sessions, tools, settings
+}
+
 @MainActor
 class StatusViewModel: ObservableObject {
     @Published var isServiceRunning = false
     @Published var gatewayURL: String = "ws://localhost:3000/ws"
+    @Published var selectedTab: MacTab = .overview
 
     var isGatewayConnected: Bool { gatewayClient.isConnected }
     var statusColor: Color {

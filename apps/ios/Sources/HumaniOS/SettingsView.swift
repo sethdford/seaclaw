@@ -54,6 +54,7 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    .accessibilityLabel(connectionManager.isConnected ? "Disconnect from gateway" : "Connect to gateway")
 
                     if connectionManager.isConnected {
                         Button("Reconnect") {
@@ -61,6 +62,7 @@ struct SettingsView: View {
                                 connectionManager.reconnect()
                             }
                         }
+                        .accessibilityLabel("Reconnect to gateway")
                     }
                 } header: {
                     Text("Connection Status")
