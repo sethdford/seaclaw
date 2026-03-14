@@ -14,6 +14,9 @@ hu_thread_pool_t *hu_thread_pool_create(size_t n);
 /* Submit work. Returns false if the queue is full or pool is shutting down. */
 bool hu_thread_pool_submit(hu_thread_pool_t *pool, hu_work_fn fn, void *arg);
 
+/* Return count of workers currently executing. */
+size_t hu_thread_pool_active(hu_thread_pool_t *pool);
+
 /* Drain pending work and join all threads. */
 void hu_thread_pool_destroy(hu_thread_pool_t *pool);
 

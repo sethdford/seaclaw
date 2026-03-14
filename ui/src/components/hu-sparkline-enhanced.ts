@@ -129,6 +129,10 @@ export class ScSparklineEnhanced extends LitElement {
     const h = this.height - pad * 2;
     const lastY = pad + h - ((last - min) / range) * h;
     const lastX = this.width - pad;
+    const ariaLabel =
+      this.data.length >= 2
+        ? `Sparkline showing trend from ${min} to ${max}`
+        : "Sparkline (insufficient data)";
 
     return html`
       <div style="--color: ${this.color}">
@@ -136,7 +140,8 @@ export class ScSparklineEnhanced extends LitElement {
           width=${this.width}
           height=${this.height}
           viewBox="0 0 ${this.width} ${this.height}"
-          aria-hidden="true"
+          role="img"
+          aria-label=${ariaLabel}
           @mousemove=${this._handleMouseMove}
           @mouseleave=${this._handleMouseLeave}
         >

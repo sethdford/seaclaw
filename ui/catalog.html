@@ -52,6 +52,8 @@
       <a href="#hu-tabs">hu-tabs</a>
       <a href="#hu-avatar">hu-avatar</a>
       <a href="#hu-status-dot">hu-status-dot</a>
+      <a href="#hu-connection-pulse">hu-connection-pulse</a>
+      <a href="#hu-activity-heatmap">hu-activity-heatmap</a>
       <a href="#hu-progress">hu-progress</a>
       <a href="#hu-input">hu-input</a>
       <a href="#hu-select">hu-select</a>
@@ -638,6 +640,28 @@
           </div>
         </div>
         <div class="code-snippet"><pre><code>&lt;hu-status-dot status="connected" size="sm"&gt;&lt;/hu-status-dot&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="hu-connection-pulse">
+        <h2>hu-connection-pulse</h2>
+        <div class="playground">
+          <div class="preview" style="gap: var(--hu-space-md); display: flex; align-items: center; flex-wrap: wrap;">
+            <hu-connection-pulse status="connected"></hu-connection-pulse>
+            <hu-connection-pulse status="connecting"></hu-connection-pulse>
+            <hu-connection-pulse status="disconnected"></hu-connection-pulse>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-connection-pulse status="connected"&gt;&lt;/hu-connection-pulse&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="hu-activity-heatmap">
+        <h2>hu-activity-heatmap</h2>
+        <div class="playground">
+          <div class="preview" style="width: 100%;">
+            <hu-activity-heatmap id="heatmap-preview"></hu-activity-heatmap>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-activity-heatmap .data=${[0,1,2,3,...]}&gt;&lt;/hu-activity-heatmap&gt;</code></pre></div>
       </section>
 
       <section class="component-section" id="hu-progress">
@@ -1589,6 +1613,8 @@
       import "/src/components/hu-toast.js";
       import "/src/components/hu-avatar.js";
       import "/src/components/hu-status-dot.js";
+      import "/src/components/hu-connection-pulse.js";
+      import "/src/components/hu-activity-heatmap.js";
       import "/src/components/hu-tabs.js";
       import "/src/components/hu-progress.js";
       import "/src/components/hu-input.js";
@@ -1681,6 +1707,19 @@
       setTheme(initialTheme);
       document.getElementById("theme-dark")?.addEventListener("click", () => setTheme("dark"));
       document.getElementById("theme-light")?.addEventListener("click", () => setTheme("light"));
+
+      // hu-activity-heatmap sample data (deterministic)
+      customElements.whenDefined("hu-activity-heatmap").then(() => {
+        const heatmap = document.getElementById("heatmap-preview");
+        if (heatmap) {
+          const total = 84;
+          const data = Array.from({ length: total }, (_, i) => {
+            const wave = Math.sin((i / total) * Math.PI * 3) * 0.5 + 0.5;
+            return Math.round(wave * 4 + (i % 3));
+          });
+          heatmap.data = data;
+        }
+      });
 
       // hu-combobox demo options
       customElements.whenDefined("hu-combobox").then(() => {

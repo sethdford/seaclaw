@@ -16,20 +16,20 @@
 /* ── Browser Names & Detection ─────────────────────────────────────── */
 
 static const char *const BROWSER_NAMES[] = {
-    [HU_PWA_BROWSER_SAFARI] = "Safari",
     [HU_PWA_BROWSER_CHROME] = "Google Chrome",
     [HU_PWA_BROWSER_ARC] = "Arc",
     [HU_PWA_BROWSER_BRAVE] = "Brave Browser",
     [HU_PWA_BROWSER_EDGE] = "Microsoft Edge",
+    [HU_PWA_BROWSER_SAFARI] = "Safari",
 };
 
 #if !HU_IS_TEST && defined(__APPLE__)
 static const char *const BROWSER_PATHS[] = {
-    "/Applications/Safari.app",
     "/Applications/Google Chrome.app",
     "/Applications/Arc.app",
     "/Applications/Brave Browser.app",
     "/Applications/Microsoft Edge.app",
+    "/Applications/Safari.app",
 };
 #endif
 

@@ -25,6 +25,8 @@ const VIEWS = [
   { path: "/#voice", name: "Voice" },
   { path: "/#nodes", name: "Nodes" },
   { path: "/#usage", name: "Usage" },
+  { path: "/#memory", name: "Memory" },
+  { path: "/#metrics", name: "Metrics" },
   { path: "/#security", name: "Security" },
   { path: "/#logs", name: "Logs" },
 ];

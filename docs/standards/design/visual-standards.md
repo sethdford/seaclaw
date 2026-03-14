@@ -490,3 +490,62 @@ Before shipping any visual change, verify:
 | `ux-patterns.md`     | Layout archetypes, interaction patterns          |
 | `motion-design.md`   | Animation principles, spring system, performance |
 | `AGENTS.md` §12      | Enforcement rules for agents                     |
+
+---
+
+## Category-Defining Excellence
+
+> To exceed the standards set by Edward Tufte, Apple, and Google Material Design, every Human surface must meet these criteria. These are not aspirational — they are the minimum bar for shipping.
+
+### Exceeding Tufte (Data Visualization)
+
+**Principle**: Understanding should be involuntary. The viewer should comprehend the data before they consciously decide to look at it.
+
+| Rule                                | Enforcement                                                                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Data-ink ratio > 0.9**            | Every visual element must encode data. Grid lines, decorative borders, background fills that don't convey information are forbidden.                   |
+| **Direct labels always**            | No legends. Values appear directly on or adjacent to the data they describe. Labels are part of the data, not metadata.                                |
+| **Tabular figures everywhere**      | All numeric displays use `font-variant-numeric: tabular-nums`. Numbers must align vertically in columns and not shift horizontally when values change. |
+| **Small multiples over complexity** | When comparing more than 3 series, use repeated small charts with identical scales rather than overlapping lines or stacked bars.                      |
+| **Sparklines are prose**            | Sparklines should be used inline with text, like words in a sentence. A stat card without a sparkline is an incomplete thought.                        |
+| **Progressive density**             | Overview shows the macro trend. Hover reveals the micro detail. Click opens the full dataset. Never show all data at once.                             |
+| **No chartjunk**                    | No 3D effects, no gradient fills on data areas, no ornamental axes, no drop shadows on bars. The data IS the decoration.                               |
+
+### Exceeding Apple (Design & Motion)
+
+**Principle**: Every interaction should feel like touching a physical object. The UI should have weight, momentum, and texture.
+
+| Rule                                   | Enforcement                                                                                                                                         |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Spring physics mandatory**           | Every animation uses spring physics. No linear or cubic-bezier for interactive elements. Springs have mass, stiffness, and damping.                 |
+| **Anticipation on every action**       | Before a state change, the element prepares (slight scale-down, color shift, micro-movement in the direction of the action). Disney Principle 2.    |
+| **Follow-through on every completion** | After a state change completes, child elements settle with a slight overshoot. Disney Principle 5.                                                  |
+| **Spatial continuity**                 | When navigating between views, shared elements maintain spatial identity via View Transitions API or matched-geometry. Elements don't teleport.     |
+| **Depth is earned**                    | Every elevation level serves a purpose. Higher = more interactive. Background < Surface < Card < Modal < Toast. Never use elevation for decoration. |
+| **Glass reveals depth**                | Backdrop-filter blur levels correspond to the layer's distance from the content below. Thin glass for nearby content, thick glass for distant.      |
+| **Haptic vocabulary**                  | On iOS: selection (tab switch), impact (button press), notification (status change). Each haptic type maps to exactly one interaction category.     |
+| **0ms perceived latency**              | Optimistic UI on all primary actions. The UI should respond to the user's intent before the server confirms.                                        |
+
+### Exceeding Google Material Design (Systematic Design)
+
+**Principle**: The design system should be so complete that a component built from tokens alone, without seeing any reference, looks correct.
+
+| Rule                             | Enforcement                                                                                                                                         |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Token completeness**           | Every visual property (color, spacing, radius, shadow, duration, easing, font) has a token. If you write a raw value, the system is incomplete.     |
+| **Tonal surface hierarchy**      | Every container uses a tonal surface token. The primary-tinted background hierarchy creates brand depth without explicit color application.         |
+| **State layer compositing**      | Interactive states (hover, pressed, focused, dragged) use tinted overlays composited on top of the surface, not replacement colors.                 |
+| **Dynamic color derivation**     | All palette colors are derived from the brand primary via OKLCH perceptual color space. No manually picked complementary colors.                    |
+| **Cross-platform token parity**  | CSS, Swift, Kotlin, Dart, and C all consume the same W3C token source. A design change is a token change, not a code change.                        |
+| **Accessibility as composition** | High contrast and reduced motion are achieved by token overrides, not conditional branches. The same component code renders correctly in all modes. |
+| **Responsive by architecture**   | Layouts respond to container size, not viewport size. Container queries, not media queries, drive component adaptation.                             |
+
+### The Human Standard
+
+When all three are met, the result is:
+
+- **Data that speaks** (Tufte) — users understand before they decide to look
+- **Interactions that feel** (Apple) — users feel the interface, not just see it
+- **Systems that scale** (Google) — contributors produce quality by default, not by effort
+
+This is the standard. Ship nothing less.

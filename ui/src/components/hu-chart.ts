@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 export interface ChartDataset {
@@ -30,6 +30,7 @@ export class ScChart extends LitElement {
   @property({ attribute: false }) data: ChartData = { labels: [], datasets: [] };
   @property({ type: Number }) height = 200;
   @property({ type: Boolean }) horizontal = false;
+  @property({ type: Boolean }) hideLegend = false;
 
   private _chart: { destroy: () => void; resize: () => void } | null = null;
   private _resizeObserver: ResizeObserver | null = null;
@@ -47,6 +48,22 @@ export class ScChart extends LitElement {
     }
     .wrapper canvas {
       display: block;
+    }
+    .doughnut-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      font-family: var(--hu-font);
+      font-size: var(--hu-text-lg);
+      font-weight: var(--hu-weight-semibold);
+      color: var(--hu-text);
+      font-variant-numeric: tabular-nums;
     }
     .empty {
       display: flex;
@@ -85,7 +102,8 @@ export class ScChart extends LitElement {
       changed.has("type") ||
       changed.has("data") ||
       changed.has("height") ||
-      changed.has("horizontal")
+      changed.has("horizontal") ||
+      changed.has("hideLegend")
     ) {
       this._scheduleChartUpdate();
     }
@@ -170,6 +188,7 @@ export class ScChart extends LitElement {
         indexAxis: this.horizontal ? "y" : "x",
         plugins: {
           legend: {
+            display: !this.hideLegend,
             labels: {
               font: { family: fontFamily },
               color: textMuted,
@@ -238,6 +257,12 @@ export class ScChart extends LitElement {
       `;
     }
 
+    const total =
+      this.type === "doughnut" && this.data?.datasets?.[0]?.data
+        ? this.data.datasets[0].data.reduce((a, b) => a + b, 0)
+        : 0;
+    const showCenter = this.type === "doughnut" && this.hideLegend && total > 0;
+
     return html`
       <div class="wrapper" style="--height: ${this.height}px; min-height: ${this.height}px">
         <canvas
@@ -245,6 +270,9 @@ export class ScChart extends LitElement {
           aria-label="Chart"
           style="display: block; box-sizing: border-box; height: ${this.height}px; width: 100%"
         ></canvas>
+        ${showCenter
+          ? html`<div class="doughnut-center" aria-hidden="true">${total.toLocaleString()}</div>`
+          : nothing}
       </div>
     `;
   }

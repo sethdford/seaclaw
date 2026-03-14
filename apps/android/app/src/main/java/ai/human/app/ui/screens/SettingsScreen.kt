@@ -27,18 +27,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import ai.human.app.GatewayClient
+import ai.human.app.ConnectionState
 import ai.human.app.ui.HUTokens
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    gateway: GatewayClient,
+    connectionState: ConnectionState,
+) {
     val colorScheme = MaterialTheme.colorScheme
     var gatewayUrl by remember { mutableStateOf("ws://localhost:3000") }
-    var isConnected by remember { mutableStateOf(false) }
+    val isConnected = connectionState == ConnectionState.CONNECTED
 
     Column(
         modifier = Modifier
@@ -68,6 +71,7 @@ fun SettingsScreen() {
                 fontFamily = MaterialTheme.typography.bodyMedium.fontFamily,
             ),
             singleLine = true,
+            cursorBrush = SolidColor(colorScheme.primary),
             decorationBox = { innerTextField ->
                 Box {
                     if (gatewayUrl.isEmpty()) {
@@ -93,7 +97,11 @@ fun SettingsScreen() {
         ) {
             ConnectionStatusIndicator(isConnected = isConnected)
             Text(
-                text = if (isConnected) "Connected" else "Disconnected",
+                text = when (connectionState) {
+                    ConnectionState.CONNECTED -> "Connected"
+                    ConnectionState.CONNECTING -> "Connecting..."
+                    ConnectionState.DISCONNECTED -> "Disconnected"
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = colorScheme.onSurfaceVariant,
             )
@@ -109,11 +117,16 @@ fun SettingsScreen() {
                     if (isConnected) colorScheme.error else colorScheme.primary,
                     shape = RoundedCornerShape(HUTokens.radiusMd),
                 )
-                .clickable { isConnected = !isConnected }
+                .clickable {
+                    if (isConnected) {
+                        gateway.disconnect()
+                    } else {
+                        gateway.connect(gatewayUrl)
+                    }
+                }
                 .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm)
                 .semantics {
                     contentDescription = if (isConnected) "Disconnect from gateway" else "Connect to gateway"
-                    role = Role.Button
                 },
             contentAlignment = Alignment.Center,
         ) {

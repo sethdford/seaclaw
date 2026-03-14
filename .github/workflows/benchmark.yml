@@ -9,6 +9,9 @@ on:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v6
 
@@ -59,3 +62,22 @@ jobs:
           echo "|--------|----------|----------|" >> $GITHUB_STEP_SUMMARY
           echo "| Binary | ${BINARY_SIZE_KB} KB | ~75 MB (node_modules) |" >> $GITHUB_STEP_SUMMARY
           echo "| Dependencies | 0 (libc only) | 1,200+ npm packages |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment PR with benchmark
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## Performance Benchmark
+            | Metric | Value |
+            |--------|-------|
+            | Binary Size | ${process.env.BINARY_SIZE_KB} KB |
+            | Startup | Measured in CI |
+
+            _Automated by benchmark workflow_`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });

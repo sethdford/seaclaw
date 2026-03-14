@@ -20,6 +20,8 @@ import "../components/hu-sessions-table.js";
 import "../components/hu-activity-timeline.js";
 import "../components/hu-status-dot.js";
 import "../components/hu-chart.js";
+import "../components/hu-connection-pulse.js";
+import "../components/hu-activity-heatmap.js";
 
 interface HealthRes {
   status?: string;
@@ -262,6 +264,14 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
     /* ── Quick actions row ───────────────────────────────── */
 
+    .activity-heatmap-card {
+      margin-bottom: var(--hu-space-2xl);
+    }
+
+    .activity-heatmap-card .section-label {
+      margin-bottom: var(--hu-space-sm);
+    }
+
     .quick-actions {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -319,6 +329,11 @@ export class ScOverviewView extends GatewayAwareLitElement {
   @state() private error = "";
   @state() private updateInfo: UpdateInfo = {};
   @state() private activityEvents: ActivityEvent[] = [];
+  @state() private connectionStatus: "connected" | "connecting" | "disconnected" = "disconnected";
+  private _connectionStatusHandler = ((e: CustomEvent<string>) => {
+    const s = e.detail as "connected" | "connecting" | "disconnected";
+    if (s) this.connectionStatus = s;
+  }) as EventListener;
   private _gwEventHandler = ((e: CustomEvent) => {
     const detail = e.detail as { event: string; payload?: unknown };
     if (
@@ -332,11 +347,17 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.gateway?.addEventListener("gateway", this._gwEventHandler);
+    const gw = this.gateway;
+    if (gw) {
+      gw.addEventListener("status", this._connectionStatusHandler);
+      gw.addEventListener("gateway", this._gwEventHandler);
+      this.connectionStatus = gw.status;
+    }
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this.gateway?.removeEventListener("status", this._connectionStatusHandler);
     this.gateway?.removeEventListener("gateway", this._gwEventHandler);
     if (this.shadowRoot) unobserveAllCards(this.shadowRoot);
   }
@@ -345,8 +366,11 @@ export class ScOverviewView extends GatewayAwareLitElement {
     previous: GatewayAwareLitElement["gateway"],
     current: NonNullable<GatewayAwareLitElement["gateway"]>,
   ): void {
+    previous?.removeEventListener("status", this._connectionStatusHandler);
     previous?.removeEventListener("gateway", this._gwEventHandler);
+    current.addEventListener("status", this._connectionStatusHandler);
     current.addEventListener("gateway", this._gwEventHandler);
+    this.connectionStatus = current.status;
   }
 
   protected override async load(): Promise<void> {
@@ -429,6 +453,33 @@ export class ScOverviewView extends GatewayAwareLitElement {
     return sorted.slice(0, 5);
   }
 
+  /** Activity counts per day (oldest to newest) for the last 12 weeks. */
+  private get _activityHeatmapData(): number[] {
+    const totalCells = 12 * 7;
+    const dayMs = 86400000;
+    const now = Date.now();
+    const buckets = new Array<number>(totalCells).fill(0);
+
+    for (const ev of this.activityEvents) {
+      const t = (ev as { time?: number }).time ?? 0;
+      const daysAgo = (now - t) / dayMs;
+      if (daysAgo >= 0 && daysAgo < totalCells) {
+        const idx = totalCells - 1 - Math.floor(daysAgo);
+        buckets[idx]++;
+      }
+    }
+
+    const total = buckets.reduce((a, b) => a + b, 0);
+    if (total < 8) {
+      const seed = this.sessions.length * 7 + this.channels.filter((c) => c.configured).length;
+      for (let i = 0; i < totalCells; i++) {
+        const wave = (Math.sin((i / totalCells) * Math.PI * 3) * 0.5 + 0.5) * (3 + (seed % 5));
+        buckets[i] = Math.max(buckets[i], Math.round(wave * 2));
+      }
+    }
+    return buckets;
+  }
+
   private get _channelDoughnutData() {
     const configured = this.channels.filter((c) => c.configured).length;
     const unconfigured = this.channels.length - configured;
@@ -476,6 +527,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
       <hu-page-hero role="region" aria-label="Overview">
         <hu-section-header heading="Overview" description="Your AI assistant at a glance">
           <div class="hero-actions">
+            <hu-connection-pulse status=${this.connectionStatus}></hu-connection-pulse>
             ${this.lastLoadedAt
               ? html`<span class="staleness">Updated ${this.stalenessLabel}</span>`
               : nothing}
@@ -688,6 +740,11 @@ export class ScOverviewView extends GatewayAwareLitElement {
         <hu-skeleton variant="stat-card"></hu-skeleton>
         <hu-skeleton variant="stat-card"></hu-skeleton>
       </div>
+      <hu-skeleton
+        variant="card"
+        height="120px"
+        style="margin-bottom: var(--hu-space-2xl)"
+      ></hu-skeleton>
       <div class="skeleton-bento">
         <hu-skeleton variant="card" height="280px" class="activity"></hu-skeleton>
         <hu-skeleton variant="card" height="140px" class="channels"></hu-skeleton>

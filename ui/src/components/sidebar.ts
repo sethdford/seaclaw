@@ -433,7 +433,7 @@ export class ScSidebar extends LitElement {
   override render() {
     return html`
       <aside class="sidebar">
-        <header class="header">
+        <header class="header" role="banner">
           <div class="logo" aria-hidden="true">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
               <path
@@ -475,7 +475,7 @@ export class ScSidebar extends LitElement {
           </div>
         </header>
 
-        <nav class="nav">
+        <nav class="nav" aria-label="Main navigation">
           ${SECTIONS.map(
             (section) => html`
               <div class="section">

@@ -17,6 +17,7 @@ struct hu_thread_pool {
     size_t head;
     size_t tail;
     size_t count;
+    size_t busy_count;
     pthread_mutex_t mutex;
     pthread_cond_t not_empty;
     pthread_cond_t not_full;
@@ -88,6 +89,15 @@ hu_thread_pool_t *hu_thread_pool_create(size_t n) {
         }
     }
     return pool;
+}
+
+size_t hu_thread_pool_active(hu_thread_pool_t *pool) {
+    if (!pool)
+        return 0;
+    pthread_mutex_lock(&pool->mutex);
+    size_t n = pool->busy_count;
+    pthread_mutex_unlock(&pool->mutex);
+    return n;
 }
 
 bool hu_thread_pool_submit(hu_thread_pool_t *pool, hu_work_fn fn, void *arg) {

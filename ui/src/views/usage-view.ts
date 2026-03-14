@@ -11,6 +11,7 @@ import "../components/hu-skeleton.js";
 import "../components/hu-empty-state.js";
 import "../components/hu-button.js";
 import "../components/hu-chart.js";
+import "../components/hu-forecast-chart.js";
 import type { ChartData } from "../components/hu-chart.js";
 import "../components/hu-segmented-control.js";
 import { friendlyError } from "../utils/friendly-error.js";
@@ -321,6 +322,28 @@ export class ScUsageView extends GatewayAwareLitElement {
     `;
   }
 
+  private _renderForecastChart() {
+    const history = this.summary.daily_cost_history ?? [];
+    const projectedTotal = this.summary.projected_monthly_usd ?? this.summary.monthly_cost_usd ?? 0;
+    const daysInMonth = this.summary.days_in_month ?? 31;
+    if (history.length < 2) return nothing;
+
+    return html`
+      <div class="section" role="region" aria-label="Cost forecast">
+        <div class="section-label">Cost Forecast</div>
+        <hu-card glass>
+          <div class="chart-inner">
+            <hu-forecast-chart
+              .history=${history}
+              .projectedTotal=${projectedTotal}
+              .daysInMonth=${daysInMonth}
+            ></hu-forecast-chart>
+          </div>
+        </hu-card>
+      </div>
+    `;
+  }
+
   private _renderProviders() {
     const providers = this.summary.by_provider;
     if (!providers || providers.length === 0) return nothing;
@@ -427,7 +450,7 @@ export class ScUsageView extends GatewayAwareLitElement {
             `
           : html`
               ${this._renderTokenChart()} ${this._renderCostBreakdownChart()}
-              ${this._renderProviders()}
+              ${this._renderForecastChart()} ${this._renderProviders()}
             `}
     `;
   }

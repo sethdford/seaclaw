@@ -102,6 +102,8 @@ const MORE_TABS: { id: TabId; label: string; icon: ReturnType<typeof html> }[] =
 @customElement("hu-app")
 export class ScApp extends LitElement {
   static override styles = css`
+    @layer base, tokens, components, views, utilities;
+
     :host {
       display: block;
       height: 100vh;

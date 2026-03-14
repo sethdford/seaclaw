@@ -19,6 +19,7 @@
 #include "human/agent/proactive.h"
 #include "human/agent/prompt.h"
 #include "human/agent/superhuman.h"
+#include "human/agent/tool_call_parser.h"
 #include "human/agent/tool_router.h"
 #include "human/observability/bth_metrics.h"
 #ifdef HU_HAS_PERSONA
@@ -818,6 +819,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             .intelligence_context_len = intelligence_ctx_len,
             .skills_context = skills_ctx,
             .skills_context_len = skills_ctx_len,
+            .native_tools = (agent->provider.vtable->supports_native_tools &&
+                             agent->provider.vtable->supports_native_tools(agent->provider.ctx)),
         };
         err = hu_prompt_build_system(agent->alloc, &cfg, &system_prompt, &system_prompt_len);
         if (persona_prompt)
@@ -1093,6 +1096,21 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         agent->total_tokens += resp.usage.total_tokens;
         hu_agent_internal_record_cost(agent, &resp.usage);
         turn_tokens += resp.usage.total_tokens;
+
+        /* Text-based tool call parsing for providers without native tool support */
+        if (resp.tool_calls_count == 0 && resp.content && resp.content_len > 0 &&
+            agent->provider.vtable->supports_native_tools &&
+            !agent->provider.vtable->supports_native_tools(agent->provider.ctx)) {
+            hu_tool_call_t *text_calls = NULL;
+            size_t text_calls_count = 0;
+            if (hu_text_tool_calls_parse(agent->alloc, resp.content, resp.content_len, &text_calls,
+                                         &text_calls_count) == HU_OK &&
+                text_calls_count > 0) {
+                /* Replace resp tool calls with parsed text tool calls */
+                resp.tool_calls = text_calls;
+                resp.tool_calls_count = text_calls_count;
+            }
+        }
 
         if (resp.tool_calls_count == 0) {
             uint64_t turn_duration_ms = hu_agent_internal_clock_diff_ms(turn_start, clock());

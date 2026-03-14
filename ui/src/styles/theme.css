@@ -1,5 +1,6 @@
 @import "./_tokens.css";
 @import "./_dynamic-color.css";
+@import "./high-contrast.css";
 @import "./scroll-driven.css";
 
 :root {
@@ -1239,7 +1240,25 @@ hu-card.hu-entrance.hu-visible {
   z-index: 1;
 }
 
-/* Skip link — screen reader / keyboard navigation */
+/* Skip link — screen reader / keyboard navigation (light DOM) */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  background: var(--hu-accent);
+  color: var(--hu-on-accent);
+  padding: var(--hu-space-sm) var(--hu-space-md);
+  z-index: 9999;
+  font-family: var(--hu-font);
+  font-size: var(--hu-text-sm);
+  border-radius: 0 0 var(--hu-radius-sm) 0;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
 .hu-skip-link {
   position: absolute;
   top: -100%;
@@ -1270,4 +1289,42 @@ hu-card.hu-entrance.hu-visible {
     filter: sepia(var(--hu-ambient-warmth)) saturate(calc(1 + var(--hu-ambient-warmth) * 0.2));
     transition: filter 3s ease;
   }
+}
+
+/* ── SOTA 2026 CSS Features ── */
+
+:root {
+  interpolate-size: allow-keywords;
+}
+
+@property --hu-glow-opacity {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --hu-gradient-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 135deg;
+}
+
+h1,
+h2,
+h3,
+[class*="heading"],
+[class*="title"],
+.hero-title {
+  text-wrap: balance;
+}
+
+p,
+li,
+dd {
+  text-wrap: pretty;
+}
+
+.hu-cv-defer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
 }

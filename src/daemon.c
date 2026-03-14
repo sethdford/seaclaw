@@ -2078,21 +2078,29 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 #ifdef HU_ENABLE_SQLITE
-                /* P7: Feed processor poll — every 6 hours */
+                /* P7: Feed processor poll — every 5 minutes (per-type intervals apply) */
                 {
                     static uint64_t last_feed_poll_types[HU_FEED_COUNT] = {0};
                     static uint64_t last_feed_poll_global = 0;
                     uint64_t fp_now = (uint64_t)t * 1000ULL;
                     if (agent && agent->memory &&
-                        (last_feed_poll_global == 0 || (fp_now - last_feed_poll_global) >= 21600000ULL)) {
+                        (last_feed_poll_global == 0 || (fp_now - last_feed_poll_global) >= 300000ULL)) {
                         sqlite3 *fdb = hu_sqlite_memory_get_db(agent->memory);
                         if (fdb) {
                             hu_feed_processor_t fp = {.alloc = alloc, .db = fdb};
                             hu_feed_config_t fconf;
                             memset(&fconf, 0, sizeof(fconf));
-                            fconf.enabled[HU_FEED_NEWS_RSS] = true;
-                            fconf.poll_interval_minutes[HU_FEED_NEWS_RSS] = 360;
-                            fconf.max_items_per_poll = 10;
+                            fconf.enabled[HU_FEED_NEWS_RSS]    = true;
+                            fconf.enabled[HU_FEED_FILE_INGEST] = true;
+                            fconf.enabled[HU_FEED_GMAIL]       = true;
+                            fconf.enabled[HU_FEED_IMESSAGE]    = true;
+                            fconf.enabled[HU_FEED_TWITTER]     = true;
+                            fconf.poll_interval_minutes[HU_FEED_FILE_INGEST] = 5;
+                            fconf.poll_interval_minutes[HU_FEED_NEWS_RSS]    = 360;
+                            fconf.poll_interval_minutes[HU_FEED_GMAIL]       = 60;
+                            fconf.poll_interval_minutes[HU_FEED_IMESSAGE]    = 30;
+                            fconf.poll_interval_minutes[HU_FEED_TWITTER]     = 120;
+                            fconf.max_items_per_poll = 20;
                             size_t ingested = 0;
                             (void)hu_feed_processor_poll(&fp, &fconf, last_feed_poll_types,
                                                          fp_now, &ingested);

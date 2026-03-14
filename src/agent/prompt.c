@@ -280,20 +280,74 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
     if (err != HU_OK)
         goto fail;
     if (config->tools && config->tools_count > 0) {
-        for (size_t i = 0; i < config->tools_count; i++) {
-            const hu_tool_t *t = &config->tools[i];
-            if (t->vtable && t->vtable->name) {
-                const char *name = t->vtable->name(t->ctx);
-                if (name) {
-                    char line[256];
-                    int n = snprintf(line, sizeof(line), "- %s\n", name);
-                    if (n > 0) {
-                        err = append(alloc, &buf, &len, &cap, line, (size_t)n);
-                        if (err != HU_OK)
-                            goto fail;
+        if (config->native_tools) {
+            for (size_t i = 0; i < config->tools_count; i++) {
+                const hu_tool_t *t = &config->tools[i];
+                if (t->vtable && t->vtable->name) {
+                    const char *name = t->vtable->name(t->ctx);
+                    if (name) {
+                        char line[256];
+                        int n = snprintf(line, sizeof(line), "- %s\n", name);
+                        if (n > 0) {
+                            err = append(alloc, &buf, &len, &cap, line, (size_t)n);
+                            if (err != HU_OK)
+                                goto fail;
+                        }
                     }
                 }
             }
+        } else {
+            /* Text-based tool calling: emit full descriptions and parameters */
+            for (size_t i = 0; i < config->tools_count; i++) {
+                const hu_tool_t *t = &config->tools[i];
+                if (!t->vtable || !t->vtable->name)
+                    continue;
+                const char *name = t->vtable->name(t->ctx);
+                if (!name)
+                    continue;
+                const char *desc = t->vtable->description ? t->vtable->description(t->ctx) : NULL;
+                const char *params =
+                    t->vtable->parameters_json ? t->vtable->parameters_json(t->ctx) : NULL;
+                char hdr[512];
+                int hn = snprintf(hdr, sizeof(hdr), "### %s\n", name);
+                if (hn > 0) {
+                    err = append(alloc, &buf, &len, &cap, hdr, (size_t)hn);
+                    if (err != HU_OK)
+                        goto fail;
+                }
+                if (desc) {
+                    err = append(alloc, &buf, &len, &cap, desc, strlen(desc));
+                    if (err != HU_OK)
+                        goto fail;
+                    err = append(alloc, &buf, &len, &cap, "\n", 1);
+                    if (err != HU_OK)
+                        goto fail;
+                }
+                if (params) {
+                    err = append(alloc, &buf, &len, &cap, "Parameters: ", 12);
+                    if (err != HU_OK)
+                        goto fail;
+                    err = append(alloc, &buf, &len, &cap, params, strlen(params));
+                    if (err != HU_OK)
+                        goto fail;
+                    err = append(alloc, &buf, &len, &cap, "\n", 1);
+                    if (err != HU_OK)
+                        goto fail;
+                }
+                err = append(alloc, &buf, &len, &cap, "\n", 1);
+                if (err != HU_OK)
+                    goto fail;
+            }
+            static const char tool_format[] =
+                "## Tool Call Format\n\n"
+                "To use a tool, wrap a JSON object in <tool_call> tags:\n"
+                "<tool_call>{\"name\": \"tool_name\", \"arguments\": {\"param\": \"value\"}}"
+                "</tool_call>\n\n"
+                "You may use multiple tool calls in one response. "
+                "Any text outside <tool_call> tags is shown to the user.\n\n";
+            err = append(alloc, &buf, &len, &cap, tool_format, sizeof(tool_format) - 1);
+            if (err != HU_OK)
+                goto fail;
         }
         err = append(alloc, &buf, &len, &cap, "\n", 1);
         if (err != HU_OK)

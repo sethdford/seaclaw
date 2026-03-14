@@ -37,6 +37,7 @@ export class ScMetricRow extends LitElement {
       font-size: var(--hu-text-sm);
       font-weight: var(--hu-weight-medium);
       color: var(--hu-text);
+      font-variant-numeric: tabular-nums;
     }
 
     .item-value.success {

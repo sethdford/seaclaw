@@ -113,6 +113,7 @@ export class ScMetricsView extends GatewayAwareLitElement {
       font-size: var(--hu-text-base);
       font-weight: var(--hu-weight-semibold);
       color: var(--hu-text);
+      font-variant-numeric: tabular-nums;
     }
     .bth-group {
       margin-bottom: var(--hu-space-xl);

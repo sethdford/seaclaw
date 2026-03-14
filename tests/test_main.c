@@ -168,6 +168,7 @@ void run_degradation_tests(void);
 void run_memory_degradation_tests(void);
 void run_self_awareness_tests(void);
 void run_superhuman_tests(void);
+void run_tool_call_parser_tests(void);
 void run_tool_router_tests(void);
 void run_dag_tests(void);
 void run_mood_tests(void);
@@ -416,6 +417,7 @@ int main(int argc, char **argv) {
     run_memory_degradation_tests();
     run_self_awareness_tests();
     run_superhuman_tests();
+    run_tool_call_parser_tests();
     run_tool_router_tests();
     run_dag_tests();
     run_mood_tests();

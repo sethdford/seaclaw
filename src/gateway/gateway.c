@@ -14,6 +14,7 @@
 #include "human/gateway/ws_server.h"
 #include "human/health.h"
 #include "human/security.h"
+#include "human/version.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +28,7 @@
 #include <netinet/in.h>
 #include <poll.h>
 #include <pthread.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -35,6 +37,15 @@
 
 #define HU_GATEWAY_DEFAULT_PORT    3000
 #define HU_GATEWAY_POLL_TIMEOUT_MS 100
+
+#ifdef HU_GATEWAY_POSIX
+static volatile sig_atomic_t s_gateway_stop = 0;
+
+static void gateway_signal_handler(int sig) {
+    (void)sig;
+    s_gateway_stop = 1;
+}
+#endif
 
 void hu_gateway_config_from_cfg(const hu_config_gateway_t *cfg_gw, hu_gateway_config_t *out) {
     if (!cfg_gw || !out)
@@ -703,7 +714,38 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
     }
 
     if (path_is(path, "/health") || path_is(path, "/healthz")) {
-        send_json(fd, 200, "{\"status\":\"ok\"}");
+        hu_allocator_t a = hu_system_allocator();
+        hu_health_snapshot_t snap;
+        hu_health_snapshot(&snap);
+        char *components_json = NULL;
+        size_t components_cap = 0;
+        if (snap.component_count > 0 && snap.components) {
+            components_cap = snap.component_count * 128 + 2;
+            components_json = (char *)a.alloc(a.ctx, components_cap);
+            if (components_json) {
+                size_t off = 0;
+                off += (size_t)snprintf(components_json + off, components_cap - off, "[");
+                for (size_t i = 0; i < snap.component_count; i++) {
+                    if (i > 0)
+                        off += (size_t)snprintf(components_json + off, components_cap - off, ",");
+                    off += (size_t)snprintf(components_json + off, components_cap - off,
+                        "{\"status\":\"%s\",\"updated_at\":\"%s\"}",
+                        snap.components[i].status, snap.components[i].updated_at);
+                }
+                off += (size_t)snprintf(components_json + off, components_cap - off, "]");
+            }
+        }
+        char *json = hu_sprintf(&a,
+            "{\"status\":\"ok\",\"version\":\"%s\",\"pid\":%u,\"uptime_seconds\":%llu,\"components\":%s}",
+            hu_version_string(), snap.pid, (unsigned long long)snap.uptime_seconds,
+            components_json ? components_json : "[]");
+        send_json(fd, 200, json ? json : "{\"status\":\"ok\"}");
+        if (json)
+            a.free(a.ctx, json, strlen(json) + 1);
+        if (components_json)
+            a.free(a.ctx, components_json, components_cap);
+        if (snap.components)
+            free(snap.components);
         return;
     }
 
@@ -1189,6 +1231,14 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
 
     gw->listen_fd = fd;
     gw->running = true;
+    s_gateway_stop = 0;
+    {
+        struct sigaction sa;
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = gateway_signal_handler;
+        sigaction(SIGTERM, &sa, NULL);
+        sigaction(SIGINT, &sa, NULL);
+    }
     gw->rate_limiter =
         hu_rate_limiter_create(alloc, cfg.rate_limit_requests > 0 ? cfg.rate_limit_requests : 60,
                                cfg.rate_limit_window > 0 ? cfg.rate_limit_window : 60);
@@ -1209,7 +1259,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
             (unsigned)cfg.port, cfg.control_ui_dir ? cfg.control_ui_dir : "disabled");
 
     /* Poll-based event loop: listen socket + WebSocket connections */
-    while (gw->running) {
+    while (gw->running && !s_gateway_stop) {
         struct pollfd fds[1 + HU_WS_SERVER_MAX_CONNS];
         int nfds = 0;
 
@@ -1476,6 +1526,33 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
                 }
             }
         }
+    }
+
+    /* Graceful shutdown: stop accepting, drain in-flight requests */
+    if (s_gateway_stop) {
+        hu_health_mark_error("gateway", "shutting down");
+        fprintf(stderr, "[gateway] graceful shutdown initiated, draining connections...\n");
+        if (fd >= 0) {
+            close(fd);
+            fd = -1;
+        }
+        /* Give thread pool workers time to finish (up to 5 seconds) */
+        if (gw && gw->http_pool) {
+            for (int i = 0; i < 50 && hu_thread_pool_active(gw->http_pool) > 0; i++) {
+                struct timespec ts = {0, 100000000}; /* 100ms */
+                nanosleep(&ts, NULL);
+            }
+        }
+        /* Close all active WebSocket connections */
+        if (gw) {
+            for (int i = 0; i < HU_WS_SERVER_MAX_CONNS; i++) {
+                if (gw->ws.conns[i].active) {
+                    close(gw->ws.conns[i].fd);
+                    gw->ws.conns[i].active = false;
+                }
+            }
+        }
+        fprintf(stderr, "[gateway] shutdown complete\n");
     }
 
 cleanup:

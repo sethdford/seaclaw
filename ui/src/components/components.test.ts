@@ -150,6 +150,47 @@ describe("hu-status-dot", () => {
   });
 });
 
+describe("hu-connection-pulse", () => {
+  it("should be defined as a custom element", async () => {
+    await import("./hu-connection-pulse.js");
+    expect(customElements.get("hu-connection-pulse")).toBeDefined();
+  });
+
+  it("should default to disconnected status", async () => {
+    const { HuConnectionPulse } = await import("./hu-connection-pulse.js");
+    const el = new HuConnectionPulse();
+    expect(el.status).toBe("disconnected");
+  });
+
+  it("should reflect status property", async () => {
+    const { HuConnectionPulse } = await import("./hu-connection-pulse.js");
+    const el = new HuConnectionPulse();
+    el.status = "connected";
+    expect(el.status).toBe("connected");
+  });
+});
+
+describe("hu-activity-heatmap", () => {
+  it("should be defined as a custom element", async () => {
+    await import("./hu-activity-heatmap.js");
+    expect(customElements.get("hu-activity-heatmap")).toBeDefined();
+  });
+
+  it("should default to empty data and 12 weeks", async () => {
+    const { HuActivityHeatmap } = await import("./hu-activity-heatmap.js");
+    const el = new HuActivityHeatmap();
+    expect(el.data).toEqual([]);
+    expect(el.weeks).toBe(12);
+  });
+
+  it("should accept data array", async () => {
+    const { HuActivityHeatmap } = await import("./hu-activity-heatmap.js");
+    const el = new HuActivityHeatmap();
+    el.data = [1, 2, 3, 0, 5];
+    expect(el.data).toEqual([1, 2, 3, 0, 5]);
+  });
+});
+
 describe("hu-progress", () => {
   it("should be defined as a custom element", async () => {
     await import("./hu-progress.js");

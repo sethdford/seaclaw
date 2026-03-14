@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing } from "lit";
+import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 type DialogVariant = "default" | "danger";
@@ -13,45 +13,50 @@ export class ScDialog extends LitElement {
   @property({ type: String }) variant: DialogVariant = "default";
 
   @state() private _closing = false;
-  private _closeTimeout: ReturnType<typeof setTimeout> | null = null;
-  private _focusableSelector =
-    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-  private _keyHandler = this._onKeyDown.bind(this);
+  private _closedByConfirm = false;
+  private _closedByUserCancel = false;
+  private _animationEndHandler = this._onAnimationEnd.bind(this);
+  private _cancelHandler = this._onCancel.bind(this);
+  private _closeHandler = this._onClose.bind(this);
 
   static override styles = css`
-    .backdrop {
+    dialog {
       position: fixed;
       inset: 0;
       z-index: var(--hu-z-modal-backdrop);
+      margin: auto;
+      padding: var(--hu-space-lg);
+      border: none;
+      background: transparent;
+      max-width: var(--hu-modal-max-width, 400px);
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    dialog::backdrop {
       background: var(--hu-backdrop-overlay);
       backdrop-filter: blur(var(--hu-glass-standard-blur))
         saturate(var(--hu-glass-standard-saturate));
       -webkit-backdrop-filter: blur(var(--hu-glass-standard-blur))
         saturate(var(--hu-glass-standard-saturate));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: var(--hu-space-lg);
-      box-sizing: border-box;
       animation: hu-fade-in var(--hu-duration-normal) var(--hu-ease-out);
     }
 
-    .backdrop.closing {
+    dialog.closing::backdrop {
       animation: hu-fade-out var(--hu-duration-fast) var(--hu-ease-in) forwards;
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .backdrop {
+      dialog::backdrop {
         animation: none;
       }
-      .backdrop.closing {
+      dialog.closing::backdrop {
         animation: none;
       }
     }
 
-    .panel {
+    dialog .panel {
       width: 100%;
-      max-width: var(--hu-modal-max-width, 400px);
       background: color-mix(in srgb, var(--hu-bg-overlay) 85%, transparent);
       backdrop-filter: blur(var(--hu-glass-standard-blur))
         saturate(var(--hu-glass-standard-saturate));
@@ -61,21 +66,24 @@ export class ScDialog extends LitElement {
       border-radius: var(--hu-radius-xl);
       box-shadow: var(--hu-shadow-xl);
       padding: var(--hu-space-lg);
+    }
+
+    dialog[open] .panel:not(.closing) {
       animation: hu-bounce-in var(--hu-duration-normal)
         var(--hu-spring-out, cubic-bezier(0.34, 1.56, 0.64, 1));
     }
 
-    .panel.closing {
+    dialog .panel.closing {
       animation:
         hu-fade-out var(--hu-duration-fast) var(--hu-ease-in) forwards,
         hu-scale-out var(--hu-duration-fast) var(--hu-ease-in) forwards;
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .panel {
+      dialog .panel {
         animation: none;
       }
-      .panel.closing {
+      dialog .panel.closing {
         animation: none;
       }
     }
@@ -159,97 +167,91 @@ export class ScDialog extends LitElement {
     }
   `;
 
+  override firstUpdated(): void {
+    const dialog = this.renderRoot.querySelector("dialog");
+    if (dialog) {
+      dialog.addEventListener("cancel", this._cancelHandler);
+      dialog.addEventListener("close", this._closeHandler);
+      dialog.addEventListener("animationend", this._animationEndHandler);
+    }
+  }
+
   override updated(changedProperties: Map<string, unknown>): void {
     if (changedProperties.has("open")) {
+      const dialog = this.renderRoot.querySelector("dialog");
+      if (!dialog) return;
       if (this.open) {
         this._closing = false;
-        if (this._closeTimeout) {
-          clearTimeout(this._closeTimeout);
-          this._closeTimeout = null;
-        }
-        document.addEventListener("keydown", this._keyHandler);
-        requestAnimationFrame(() => this._trapFocus());
+        this._closedByConfirm = false;
+        this._closedByUserCancel = false;
+        dialog.showModal();
       } else if (changedProperties.get("open") === true) {
-        this._closing = true;
-        this._closeTimeout = setTimeout(() => {
-          this._closing = false;
-          this._closeTimeout = null;
-          document.removeEventListener("keydown", this._keyHandler);
-        }, 200);
+        this._startClosing(dialog);
       }
     }
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    if (this._closeTimeout) clearTimeout(this._closeTimeout);
-    document.removeEventListener("keydown", this._keyHandler);
-  }
-
-  private _getFocusableElements(): HTMLElement[] {
-    const root = this.renderRoot;
-    return Array.from(root.querySelectorAll<HTMLElement>(this._focusableSelector));
-  }
-
-  private _trapFocus(): void {
-    const focusable = this._getFocusableElements();
-    if (focusable.length > 0) {
-      focusable[0].focus();
+    const dialog = this.renderRoot.querySelector("dialog");
+    if (dialog) {
+      dialog.removeEventListener("cancel", this._cancelHandler);
+      dialog.removeEventListener("close", this._closeHandler);
+      dialog.removeEventListener("animationend", this._animationEndHandler);
     }
   }
 
-  private _onKeyDown(e: KeyboardEvent): void {
-    if (!this.open) return;
-    if (e.key === "Escape") {
-      e.preventDefault();
-      this._cancel();
+  private _startClosing(dialog: HTMLDialogElement): void {
+    if (this._closing) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      dialog.close();
       return;
     }
-    if (e.key !== "Tab") return;
-    const focusable = this._getFocusableElements();
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (e.shiftKey) {
-      if (document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      }
-    } else if (document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
+    this._closing = true;
   }
 
-  private _onBackdropClick(e: MouseEvent): void {
-    if (e.target === e.currentTarget) {
-      this._cancel();
+  private _onAnimationEnd(e: AnimationEvent): void {
+    if (e.target instanceof HTMLElement && !e.target.classList.contains("panel")) return;
+    const dialog = this.renderRoot.querySelector("dialog");
+    if (!dialog || !this._closing) return;
+    this._closing = false;
+    dialog.close();
+  }
+
+  private _onCancel(e: Event): void {
+    e.preventDefault();
+    this._closedByUserCancel = true;
+    this._startClosing(this.renderRoot.querySelector("dialog")!);
+  }
+
+  private _onClose(): void {
+    if (this._closedByUserCancel) {
+      this.dispatchEvent(new CustomEvent("hu-cancel", { bubbles: true, composed: true }));
     }
+    this._closedByUserCancel = false;
   }
 
   private _confirm(): void {
+    this._closedByConfirm = true;
     this.dispatchEvent(new CustomEvent("hu-confirm", { bubbles: true, composed: true }));
+    this._startClosing(this.renderRoot.querySelector("dialog")!);
   }
 
   private _cancel(): void {
-    this.dispatchEvent(new CustomEvent("hu-cancel", { bubbles: true, composed: true }));
+    this._closedByUserCancel = true;
+    this._startClosing(this.renderRoot.querySelector("dialog")!);
   }
 
   override render() {
-    if (!this.open && !this._closing) return nothing;
-
     const titleId = "hu-dialog-title";
     const descId = "hu-dialog-desc";
     const confirmClass = this.variant === "danger" ? "btn-confirm-danger" : "btn-confirm-default";
 
     return html`
-      <div
-        class="backdrop ${this._closing ? "closing" : ""}"
-        role="alertdialog"
-        aria-modal="true"
+      <dialog
+        class=${this._closing ? "closing" : ""}
         aria-labelledby=${titleId}
         aria-describedby=${descId}
-        @click=${this._onBackdropClick}
       >
         <div
           class="panel hu-entry-scale ${this._closing ? "closing" : ""}"
@@ -266,7 +268,7 @@ export class ScDialog extends LitElement {
             </button>
           </div>
         </div>
-      </div>
+      </dialog>
     `;
   }
 }

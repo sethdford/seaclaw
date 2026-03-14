@@ -34,7 +34,6 @@ struct OverviewView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: HUTokens.spaceLg) {
-                    // Connection status banner
                     HStack(spacing: HUTokens.spaceSm) {
                         Circle()
                             .fill(connectionManager.isConnected ? tokens.success : tokens.error)
@@ -42,8 +41,26 @@ struct OverviewView: View {
                         Text(connectionManager.isConnected ? "Connected" : "Disconnected")
                             .font(.custom("Avenir-Medium", size: HUTokens.textSm, relativeTo: .subheadline))
                             .foregroundStyle(tokens.textMuted)
+                        Spacer()
+                        if !connectionManager.isConnected {
+                            Button {
+#if os(iOS)
+                                HUTokens.Haptic.medium.trigger()
+#endif
+                                withAnimation(HUTokens.springExpressive) {
+                                    connectionManager.reconnect()
+                                }
+                            } label: {
+                                Text("Retry")
+                                    .font(.custom("Avenir-Medium", size: HUTokens.textSm, relativeTo: .subheadline))
+                                    .foregroundStyle(tokens.accent)
+                            }
+                            .accessibilityLabel("Retry gateway connection")
+                        }
                     }
                     .padding(.horizontal)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Gateway \(connectionManager.isConnected ? "connected" : "disconnected")")
 
                     // Stat cards grid
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: HUTokens.spaceMd) {

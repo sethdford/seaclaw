@@ -43,6 +43,13 @@ struct ContentView: View {
                 .tag(AppTab.settings)
         }
         .tint(accentColor)
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToTab)) { notification in
+            if let tab = notification.userInfo?["tab"] as? AppTab {
+                withAnimation(HUTokens.springExpressive) {
+                    selectedTab = tab
+                }
+            }
+        }
         .onChange(of: selectedTab) { _, _ in
 #if os(iOS)
             HUTokens.Haptic.selection.trigger()

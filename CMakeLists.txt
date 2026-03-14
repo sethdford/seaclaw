@@ -443,6 +443,7 @@ set(HU_CORE_SOURCES
     src/agent/conversation_plan.c
     src/agent/info_asymmetry.c
     src/agent/theory_of_mind.c
+    src/agent/tool_call_parser.c
     src/agent/tool_router.c
     src/agent/speculative.c
     src/agent/uncertainty.c
@@ -1764,6 +1765,7 @@ set(HU_TEST_SOURCES
     tests/test_memory_degradation.c
     tests/test_self_awareness.c
     tests/test_superhuman.c
+    tests/test_tool_call_parser.c
     tests/test_tool_router.c
     tests/test_dag.c
     tests/test_mood.c
