@@ -414,6 +414,7 @@ jobs:
           uploadArtifacts: true
           temporaryPublicStorage: true
           configPath: .lighthouserc.json
+          artifactName: lighthouse-website
 
   lighthouse-dashboard:
     runs-on: ubuntu-latest
@@ -432,6 +433,7 @@ jobs:
           uploadArtifacts: true
           temporaryPublicStorage: true
           configPath: .lighthouserc-dashboard.json
+          artifactName: lighthouse-dashboard
 
   design-tokens:
     runs-on: ubuntu-latest

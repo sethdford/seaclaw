@@ -1,3 +1,7 @@
+---
+title: ML Subsystem Audit Report
+---
+
 # ML Subsystem Audit Report
 
 **Scope:** C implementation in `src/ml/`, `include/human/ml/`, `tests/test_ml.c`  
