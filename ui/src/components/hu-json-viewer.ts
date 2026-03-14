@@ -35,7 +35,7 @@ export class ScJsonViewer extends LitElement {
     this._syncExpandedFromDepth();
   }
 
-  override updated(changed: Map<string, unknown>): void {
+  protected override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("data") || changed.has("expandedDepth")) {
       this._syncExpandedFromDepth();
     }

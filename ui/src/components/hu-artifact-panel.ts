@@ -164,7 +164,7 @@ export class ScArtifactPanel extends LitElement {
     }
   `;
 
-  override updated(changed: Map<string, unknown>): void {
+  protected override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("open") || changed.has("artifact")) {
       this._updatePanelState();
     }

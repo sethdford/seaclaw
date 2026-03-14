@@ -4,57 +4,45 @@ on:
   push:
     branches: [main]
     paths:
-      - 'website/**'
+      - "website/**"
+      - "design-tokens/**"
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
+  deployments: write
 
 jobs:
-  build:
-    name: Build
+  deploy:
     runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
 
-      - name: Setup Node
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: website/package-lock.json
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Install design-tokens deps
+        run: cd design-tokens && npm ci --ignore-scripts
 
-      - name: Install dependencies
-        run: npm ci
-        working-directory: website
+      - name: Build design tokens
+        run: cd design-tokens && npm run build
 
-      - name: Build
-        run: npm run build
-        working-directory: website
+      - name: Install website deps
+        run: cd website && npm ci
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
+      - name: Build website
+        run: cd website && npm run build
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
         with:
-          path: website/dist
-
-  deploy:
-    name: Deploy
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: website
+          vercel-args: "--prod"
