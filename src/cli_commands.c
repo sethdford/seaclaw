@@ -535,7 +535,7 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv) {
             check_only = true;
     }
     const char *ver = hu_version_string();
-    printf("Human v%s\n", ver ? ver : "0.3.0");
+    printf("Human v%s\n", ver ? ver : "0.4.0");
 
     char latest[64];
     hu_error_t err = hu_update_check(latest, sizeof(latest));

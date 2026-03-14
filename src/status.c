@@ -16,7 +16,7 @@ hu_error_t hu_status_run(hu_allocator_t *alloc, char *buf, size_t buf_size) {
         const char *ver = hu_version_string();
         (void)snprintf(buf, buf_size,
                        "Human Status (no config found -- run onboard first)\n\nVersion: %s\n",
-                       ver ? ver : "0.3.0");
+                       ver ? ver : "0.4.0");
         return HU_OK;
     }
 

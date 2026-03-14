@@ -126,7 +126,7 @@ hu_error_t hu_file_ingest_fetch(hu_allocator_t *alloc,
         fclose(fp);
 
         /* Rename to .done to avoid re-processing */
-        char done_path[768];
+        char done_path[780];
         snprintf(done_path, sizeof(done_path), "%s.done", file_path);
         (void)rename(file_path, done_path);
     }

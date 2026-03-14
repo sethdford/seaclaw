@@ -10,7 +10,7 @@
 #include <string.h>
 
 #define MCP_SERVER_NAME      "human"
-#define MCP_SERVER_VERSION   "0.3.0"
+#define MCP_SERVER_VERSION   "0.4.0"
 #define MCP_PROTOCOL_VERSION "2024-11-05"
 #define MCP_LINE_BUF_INIT    4096
 
