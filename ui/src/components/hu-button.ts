@@ -195,6 +195,13 @@ export class ScButton extends LitElement {
         animation: none !important;
       }
     }
+
+    @media (prefers-contrast: more) {
+      button {
+        border: 2px solid currentColor;
+        box-shadow: none;
+      }
+    }
   `;
 
   render() {

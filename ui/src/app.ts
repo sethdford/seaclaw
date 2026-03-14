@@ -472,6 +472,13 @@ export class ScApp extends LitElement {
     dynamicLight.start();
     this._initAmbientIntelligence();
 
+    if ("requestIdleCallback" in window) {
+      requestIdleCallback(() => {
+        import("./views/chat-view.js");
+        import("./views/agents-view.js");
+      });
+    }
+
     const wsUrl =
       typeof window !== "undefined" &&
       (window as unknown as { __VITE_WS_PROXY__?: string }).__VITE_WS_PROXY__

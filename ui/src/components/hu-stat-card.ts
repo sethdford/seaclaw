@@ -47,18 +47,16 @@ export class ScStatCard extends LitElement {
       gap: var(--hu-space-2xs);
       font-size: var(--hu-text-xs);
       font-weight: var(--hu-weight-medium);
-    }
 
-    .trend.up {
-      color: var(--hu-success);
-    }
-
-    .trend.down {
-      color: var(--hu-error);
-    }
-
-    .trend.flat {
-      color: var(--hu-text-muted);
+      &.up {
+        color: var(--hu-success);
+      }
+      &.down {
+        color: var(--hu-error);
+      }
+      &.flat {
+        color: var(--hu-text-muted);
+      }
     }
 
     .trend-icon svg {

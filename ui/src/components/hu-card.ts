@@ -31,6 +31,8 @@ export class ScCard extends LitElement {
         inset 0 1px 0 color-mix(in srgb, var(--hu-color-white) 90%, transparent),
         inset 0 -1px 0 color-mix(in srgb, var(--hu-text) 4%, transparent);
       overflow: hidden;
+      container-type: inline-size;
+      contain: layout style paint;
     }
 
     /* Gradient border glow — bright top edge fading to transparent bottom (Apple Liquid Glass) */
@@ -171,6 +173,20 @@ export class ScCard extends LitElement {
       :host([clickable]) {
         transition: none !important;
         animation: none !important;
+      }
+    }
+
+    @container (max-width: 280px) {
+      .card {
+        padding: var(--hu-space-md);
+      }
+    }
+
+    @media (prefers-contrast: more) {
+      .card {
+        border-width: 2px;
+        border-color: var(--hu-border);
+        box-shadow: none;
       }
     }
   `;
