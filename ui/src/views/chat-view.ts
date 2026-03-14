@@ -447,8 +447,7 @@ export class ScChatView extends GatewayAwareLitElement {
       await gw.request("sessions.patch", { key: id, label: title });
       // Update UI on success
       this._sessions = this._sessions.map((s) => (s.id === id ? { ...s, title } : s));
-    } catch (e) {
-      // Revert the UI update on failure
+    } catch {
       this._sessions = this._sessions.map((s) =>
         s.id === id ? { ...s, title: originalLabel } : s,
       );
