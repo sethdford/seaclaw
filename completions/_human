@@ -18,6 +18,7 @@ _human() {
         cmd)
             _describe 'command' '(
                 agent:Start interactive agent session
+                agents:Manage named agent definitions
                 gateway:Start webhook gateway server
                 mcp:Run as MCP server \(stdin/stdout JSON-RPC\)
                 service:Run as background service
