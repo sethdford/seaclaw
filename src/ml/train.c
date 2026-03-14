@@ -157,18 +157,24 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
 
         /* Optimizer step after accumulation */
         if (micro_step >= accum_steps) {
-            /* Apply LR schedule based on time progress */
-            if (t_budget > 0.0 && optimizer->vtable->set_lr_multiplier) {
+            /* Compute training progress and apply LR schedule */
+            float progress = 0.0f;
+            if (t_budget > 0.0) {
                 double elapsed = wall_seconds() - t_start;
-                float progress = (float)(elapsed / t_budget);
-                if (progress > 1.0f) progress = 1.0f;
+                progress = (float)(elapsed / t_budget);
+            } else if (config->max_steps > 0) {
+                progress = (float)(num_steps + 1) / (float)config->max_steps;
+            }
+            if (progress > 1.0f) progress = 1.0f;
+
+            if (optimizer->vtable->set_lr_multiplier && progress > 0.0f) {
                 float mult = hu_ml_lr_schedule(progress,
                     config->warmup_ratio, config->warmdown_ratio,
                     config->final_lr_frac);
                 optimizer->vtable->set_lr_multiplier(optimizer->ctx, mult);
-                if (optimizer->vtable->set_training_progress)
-                    optimizer->vtable->set_training_progress(optimizer->ctx, progress);
             }
+            if (optimizer->vtable->set_training_progress)
+                optimizer->vtable->set_training_progress(optimizer->ctx, progress);
 
             err = optimizer->vtable->step(optimizer->ctx, NULL, NULL, 0);
             if (err != HU_OK) return err;
@@ -179,6 +185,7 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
 
         double elapsed = wall_seconds() - t_start;
         if (t_budget > 0.0 && elapsed >= t_budget) break;
+        if (config->max_steps > 0 && num_steps >= config->max_steps) break;
     }
 
     /* Flush remaining micro-steps */

@@ -61,6 +61,7 @@ typedef struct hu_optimizer_config {
 typedef struct hu_training_config {
     size_t device_batch_size;
     int time_budget_secs;
+    size_t max_steps;      /* Step-based training limit (0 = use time budget) */
     size_t eval_tokens;
     size_t grad_accum_steps;
     float warmup_ratio;

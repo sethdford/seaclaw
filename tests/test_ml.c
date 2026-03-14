@@ -1342,7 +1342,6 @@ static void test_experiment_loop_runs(void) {
     loop_cfg.base_config.gpt.sequence_len = 16;
     loop_cfg.base_config.training.device_batch_size = 2;
     loop_cfg.base_config.training.time_budget_secs = 1;
-    loop_cfg.base_config.training.total_batch_size = 32;
     loop_cfg.data_dir = dir;
     loop_cfg.convergence_threshold = 0.0;
 
@@ -1535,7 +1534,7 @@ static void test_grad_accumulation(void) {
     HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, tmpdir, 2, 4, "val", &val_dl), HU_OK);
 
     /* Train with grad_accum_steps = 2 */
-    hu_training_config_t train_cfg = { .total_batch_size = 4, .device_batch_size = 2,
+    hu_training_config_t train_cfg = { .device_batch_size = 2,
         .time_budget_secs = 5, .eval_tokens = 8, .grad_accum_steps = 2 };
     hu_ml_train_result_t result = {0};
     hu_error_t err = hu_ml_train(&alloc, &model, &opt, train_dl, val_dl,
@@ -1830,6 +1829,64 @@ static void test_gpt_gelu_activation(void) {
     model.vtable->deinit(model.ctx, &alloc);
 }
 
+/* ─── GPT: SwiGLU activation ──────────────────────────────────────────── */
+
+static void test_gpt_swiglu_activation(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 8; cfg.vocab_size = 16; cfg.n_layer = 1;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 16; cfg.head_dim = 8;
+    cfg.activation = HU_ML_ACT_SWIGLU;
+
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
+
+    int32_t ids[8] = {0,1,2,3,4,5,6,7};
+    hu_ml_tensor_t input = { .data = ids, .shape = {1, 8, 0, 0}, .ndim = 2,
+                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 32 };
+    hu_ml_tensor_t output = {0};
+    HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
+
+    float *logits = (float *)output.data;
+    for (size_t i = 0; i < 8 * 16; i++) HU_ASSERT(isfinite(logits[i]));
+
+    /* Backward should also work with SwiGLU */
+    float *d_logits = (float *)alloc.alloc(alloc.ctx, output.size_bytes);
+    for (size_t i = 0; i < 8 * 16; i++) d_logits[i] = 0.001f;
+    hu_ml_tensor_t grad = { .data = d_logits, .shape = {1, 8, 16, 0}, .ndim = 3,
+                            .dtype = HU_ML_DTYPE_F32, .size_bytes = output.size_bytes };
+    HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad), HU_OK);
+
+    alloc.free(alloc.ctx, d_logits, output.size_bytes);
+    alloc.free(alloc.ctx, output.data, output.size_bytes);
+    model.vtable->deinit(model.ctx, &alloc);
+}
+
+/* ─── GPT: SwiGLU param count smaller than ReLU² ─────────────────────── */
+
+static void test_gpt_swiglu_fewer_params(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg_relu = {0};
+    cfg_relu.sequence_len = 8; cfg_relu.vocab_size = 16; cfg_relu.n_layer = 1;
+    cfg_relu.n_head = 2; cfg_relu.n_kv_head = 2; cfg_relu.n_embd = 16; cfg_relu.head_dim = 8;
+    cfg_relu.activation = HU_ML_ACT_RELU_SQ;
+
+    hu_gpt_config_t cfg_swiglu = cfg_relu;
+    cfg_swiglu.activation = HU_ML_ACT_SWIGLU;
+
+    hu_model_t m1 = {0}, m2 = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg_relu, &m1), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg_swiglu, &m2), HU_OK);
+
+    size_t p1 = m1.vtable->num_params(m1.ctx);
+    size_t p2 = m2.vtable->num_params(m2.ctx);
+    /* SwiGLU down projection is E×2E vs E×4E, so fewer params */
+    HU_ASSERT(p2 < p1);
+
+    m1.vtable->deinit(m1.ctx, &alloc);
+    m2.vtable->deinit(m2.ctx, &alloc);
+}
+
 /* ─── GPT: window attention ───────────────────────────────────────────── */
 
 static void test_gpt_window_attention(void) {
@@ -2026,6 +2083,8 @@ void run_ml_tests(void) {
     HU_RUN_TEST(test_experiment_store_null_args);
     /* Architecture variants */
     HU_RUN_TEST(test_gpt_gelu_activation);
+    HU_RUN_TEST(test_gpt_swiglu_activation);
+    HU_RUN_TEST(test_gpt_swiglu_fewer_params);
     HU_RUN_TEST(test_gpt_window_attention);
     HU_RUN_TEST(test_gpt_odd_head_dim_rejected);
     /* Dataloader edge cases */
