@@ -14,5 +14,8 @@ hu_error_t cmd_auth(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_sandbox(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_init(hu_allocator_t *alloc, int argc, char **argv);
+#ifdef HU_ENABLE_FEEDS
+hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv);
+#endif
 
 #endif /* HU_CLI_COMMANDS_H */
