@@ -21,12 +21,15 @@
 /* ── Browser Detection ─────────────────────────────────────────────── */
 
 typedef enum hu_pwa_browser {
-    HU_PWA_BROWSER_CHROME = 0,
+    HU_PWA_BROWSER_SAFARI = 0,
+    HU_PWA_BROWSER_CHROME,
     HU_PWA_BROWSER_ARC,
     HU_PWA_BROWSER_BRAVE,
     HU_PWA_BROWSER_EDGE,
     HU_PWA_BROWSER_COUNT,
 } hu_pwa_browser_t;
+
+#define HU_PWA_BROWSER_IS_SAFARI(b) ((b) == HU_PWA_BROWSER_SAFARI)
 
 const char *hu_pwa_browser_name(hu_pwa_browser_t browser);
 

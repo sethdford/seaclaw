@@ -16,6 +16,7 @@
 /* ── Browser Names & Detection ─────────────────────────────────────── */
 
 static const char *const BROWSER_NAMES[] = {
+    [HU_PWA_BROWSER_SAFARI] = "Safari",
     [HU_PWA_BROWSER_CHROME] = "Google Chrome",
     [HU_PWA_BROWSER_ARC] = "Arc",
     [HU_PWA_BROWSER_BRAVE] = "Brave Browser",
@@ -24,6 +25,7 @@ static const char *const BROWSER_NAMES[] = {
 
 #if !HU_IS_TEST && defined(__APPLE__)
 static const char *const BROWSER_PATHS[] = {
+    "/Applications/Safari.app",
     "/Applications/Google Chrome.app",
     "/Applications/Arc.app",
     "/Applications/Brave Browser.app",
@@ -316,19 +318,20 @@ hu_error_t hu_pwa_find_tab(hu_allocator_t *alloc, hu_pwa_browser_t browser,
     if (esc_err != HU_OK)
         return esc_err;
 
+    const char *title_prop = HU_PWA_BROWSER_IS_SAFARI(browser) ? "name" : "title";
     char script[2048];
     int n = snprintf(script, sizeof(script),
         "tell application \"%s\"\n"
         "  repeat with w from 1 to count of windows\n"
         "    repeat with t from 1 to count of tabs of window w\n"
         "      if URL of tab t of window w contains \"%s\" then\n"
-        "        return (w as text) & \"|\" & (t as text) & \"|\" & URL of tab t of window w & \"|\" & title of tab t of window w\n"
+        "        return (w as text) & \"|\" & (t as text) & \"|\" & URL of tab t of window w & \"|\" & %s of tab t of window w\n"
         "      end if\n"
         "    end repeat\n"
         "  end repeat\n"
         "  return \"NOT_FOUND\"\n"
         "end tell",
-        app, escaped_pattern);
+        app, escaped_pattern, title_prop);
     alloc->free(alloc->ctx, escaped_pattern, escaped_len + 1);
     if (n <= 0 || (size_t)n >= sizeof(script))
         return HU_ERR_PARSE;
@@ -401,6 +404,7 @@ hu_error_t hu_pwa_list_tabs(hu_allocator_t *alloc, hu_pwa_browser_t browser,
     if (esc_err != HU_OK)
         return esc_err;
 
+    const char *title_prop = HU_PWA_BROWSER_IS_SAFARI(browser) ? "name" : "title";
     char script[2048];
     int n = snprintf(script, sizeof(script),
         "set output to \"\"\n"
@@ -409,13 +413,13 @@ hu_error_t hu_pwa_list_tabs(hu_allocator_t *alloc, hu_pwa_browser_t browser,
         "    repeat with t from 1 to count of tabs of window w\n"
         "      set u to URL of tab t of window w\n"
         "      if u contains \"%s\" or \"%s\" = \"\" then\n"
-        "        set output to output & (w as text) & \"|\" & (t as text) & \"|\" & u & \"|\" & title of tab t of window w & \"\\n\"\n"
+        "        set output to output & (w as text) & \"|\" & (t as text) & \"|\" & u & \"|\" & %s of tab t of window w & \"\\n\"\n"
         "      end if\n"
         "    end repeat\n"
         "  end repeat\n"
         "end tell\n"
         "return output",
-        app, escaped_filter, escaped_filter);
+        app, escaped_filter, escaped_filter, title_prop);
     alloc->free(alloc->ctx, escaped_filter, escaped_filter_len + 1);
     if (n <= 0 || (size_t)n >= sizeof(script))
         return HU_ERR_PARSE;
@@ -513,13 +517,22 @@ hu_error_t hu_pwa_exec_js(hu_allocator_t *alloc, const hu_pwa_tab_t *tab,
         return HU_ERR_OUT_OF_MEMORY;
     }
 
-    int n = snprintf(script, script_size,
-        "tell application \"%s\"\n"
-        "  tell tab %d of window %d\n"
-        "    execute javascript \"%s\"\n"
-        "  end tell\n"
-        "end tell",
-        app, tab->tab_idx, tab->window_idx, escaped_js);
+    int n;
+    if (HU_PWA_BROWSER_IS_SAFARI(tab->browser)) {
+        n = snprintf(script, script_size,
+            "tell application \"%s\"\n"
+            "  do JavaScript \"%s\" in tab %d of window %d\n"
+            "end tell",
+            app, escaped_js, tab->tab_idx, tab->window_idx);
+    } else {
+        n = snprintf(script, script_size,
+            "tell application \"%s\"\n"
+            "  tell tab %d of window %d\n"
+            "    execute javascript \"%s\"\n"
+            "  end tell\n"
+            "end tell",
+            app, tab->tab_idx, tab->window_idx, escaped_js);
+    }
     alloc->free(alloc->ctx, escaped_js, ejs_len + 1);
 
     if (n <= 0 || (size_t)n >= script_size) {
@@ -538,12 +551,22 @@ hu_error_t hu_pwa_activate_tab(hu_allocator_t *alloc, const hu_pwa_tab_t *tab) {
 
     const char *app = hu_pwa_browser_name(tab->browser);
     char script[512];
-    int n = snprintf(script, sizeof(script),
-        "tell application \"%s\"\n"
-        "  activate\n"
-        "  set active tab index of window %d to %d\n"
-        "end tell",
-        app, tab->window_idx, tab->tab_idx);
+    int n;
+    if (HU_PWA_BROWSER_IS_SAFARI(tab->browser)) {
+        n = snprintf(script, sizeof(script),
+            "tell application \"%s\"\n"
+            "  activate\n"
+            "  set current tab of window %d to tab %d of window %d\n"
+            "end tell",
+            app, tab->window_idx, tab->tab_idx, tab->window_idx);
+    } else {
+        n = snprintf(script, sizeof(script),
+            "tell application \"%s\"\n"
+            "  activate\n"
+            "  set active tab index of window %d to %d\n"
+            "end tell",
+            app, tab->window_idx, tab->tab_idx);
+    }
     if (n <= 0 || (size_t)n >= sizeof(script))
         return HU_ERR_PARSE;
 
