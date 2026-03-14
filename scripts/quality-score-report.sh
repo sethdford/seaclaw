@@ -170,3 +170,10 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     printf "$REPORT\n" | sed 's/^/- /'
   } >> "$GITHUB_STEP_SUMMARY"
 fi
+
+# Fail CI if quality score drops below threshold
+QUALITY_GATE=${QUALITY_GATE_PCT:-70}
+if [ "$PCT" -lt "$QUALITY_GATE" ]; then
+  echo "::error::Quality score ${PCT}% is below the ${QUALITY_GATE}% gate. Fix quality issues before merging."
+  exit 1
+fi
