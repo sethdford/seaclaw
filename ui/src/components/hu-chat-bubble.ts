@@ -71,6 +71,11 @@ export class ScChatBubble extends LitElement {
       }
     }
 
+    :host {
+      display: block;
+      contain: layout style;
+    }
+
     @keyframes hu-cursor-fade-out {
       from {
         opacity: 1;

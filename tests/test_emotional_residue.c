@@ -77,11 +77,70 @@ static void emotional_residue_build_directive_returns_non_null(void) {
     alloc.free(alloc.ctx, dir, len + 1);
 }
 
+static void emotional_residue_negative_valence_directive(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_emotional_residue_t r = {0};
+    r.id = 2;
+    r.episode_id = 2;
+    memcpy(r.contact_id, "user_b", 7);
+    r.valence = -0.8;
+    r.intensity = 0.9;
+    r.decay_rate = 0.05;
+    r.created_at = (int64_t)time(NULL);
+
+    size_t len = 0;
+    char *dir = hu_emotional_residue_build_directive(&alloc, &r, 1, &len);
+    HU_ASSERT_NOT_NULL(dir);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(dir, "negative") != NULL);
+    alloc.free(alloc.ctx, dir, len + 1);
+}
+
+static void emotional_residue_zero_count_returns_null(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    size_t len = 0;
+    char *dir = hu_emotional_residue_build_directive(&alloc, NULL, 0, &len);
+    HU_ASSERT_NULL(dir);
+    HU_ASSERT_EQ(len, 0u);
+}
+
+static void emotional_residue_multiple_contacts_independent(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+
+    int64_t id1 = 0, id2 = 0;
+    HU_ASSERT_EQ(hu_emotional_residue_add(db, 0, "alice", 5, 0.5, 0.6, 0.1, &id1), HU_OK);
+    HU_ASSERT_EQ(hu_emotional_residue_add(db, 0, "bob", 3, -0.3, 0.4, 0.1, &id2), HU_OK);
+    HU_ASSERT_TRUE(id1 != id2);
+
+    hu_emotional_residue_t *out = NULL;
+    size_t count = 0;
+    int64_t now_ts = (int64_t)time(NULL) + 60;
+    HU_ASSERT_EQ(hu_emotional_residue_get_active(&alloc, db, "alice", 5, now_ts, &out, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_STR_EQ(out[0].contact_id, "alice");
+    alloc.free(alloc.ctx, out, count * sizeof(hu_emotional_residue_t));
+
+    out = NULL;
+    count = 0;
+    HU_ASSERT_EQ(hu_emotional_residue_get_active(&alloc, db, "bob", 3, now_ts, &out, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_STR_EQ(out[0].contact_id, "bob");
+    alloc.free(alloc.ctx, out, count * sizeof(hu_emotional_residue_t));
+
+    mem.vtable->deinit(mem.ctx);
+}
+
 void run_emotional_residue_tests(void) {
     HU_TEST_SUITE("emotional_residue");
     HU_RUN_TEST(emotional_residue_add_and_get_active_finds_with_decay);
     HU_RUN_TEST(emotional_residue_after_many_days_excluded);
     HU_RUN_TEST(emotional_residue_build_directive_returns_non_null);
+    HU_RUN_TEST(emotional_residue_negative_valence_directive);
+    HU_RUN_TEST(emotional_residue_zero_count_returns_null);
+    HU_RUN_TEST(emotional_residue_multiple_contacts_independent);
 }
 
 #else

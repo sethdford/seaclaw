@@ -51,6 +51,7 @@ export class ScToolsView extends GatewayAwareLitElement {
       view-transition-name: view-tools;
       display: block;
       max-width: 75rem;
+      container-type: inline-size;
     }
     .table-section {
       margin-top: var(--hu-space-xl);
@@ -70,6 +71,16 @@ export class ScToolsView extends GatewayAwareLitElement {
       font-weight: var(--hu-weight-semibold);
       font-size: var(--hu-text-base);
       color: var(--hu-text);
+    }
+    @container (max-width: 480px) {
+      .expand-panel {
+        padding: var(--hu-space-sm);
+      }
+      .expand-panel-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--hu-space-xs);
+      }
     }
     @media (prefers-reduced-motion: reduce) {
       * {

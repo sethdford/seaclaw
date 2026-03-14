@@ -109,21 +109,25 @@ export class ScConfigView extends GatewayAwareLitElement {
       justify-content: space-between;
       user-select: none;
       transition: background var(--hu-duration-fast);
-    }
-    .section-header:hover {
-      background: var(--hu-bg-overlay);
-    }
-    .section-header .chevron {
-      transition: transform var(--hu-duration-normal) var(--hu-ease-out);
-      color: var(--hu-text-muted);
-      display: flex;
-    }
-    .section-header .chevron svg {
-      width: 0.875rem;
-      height: 0.875rem;
-    }
-    .section-header.collapsed .chevron {
-      transform: rotate(-90deg);
+
+      &:hover {
+        background: var(--hu-bg-overlay);
+      }
+
+      & .chevron {
+        transition: transform var(--hu-duration-normal) var(--hu-ease-out);
+        color: var(--hu-text-muted);
+        display: flex;
+
+        & svg {
+          width: 0.875rem;
+          height: 0.875rem;
+        }
+      }
+
+      &.collapsed .chevron {
+        transform: rotate(-90deg);
+      }
     }
     .section-content {
       padding: var(--hu-space-md) var(--hu-space-lg);
@@ -147,19 +151,22 @@ export class ScConfigView extends GatewayAwareLitElement {
       display: flex;
       flex-direction: column;
       gap: var(--hu-space-xs);
-    }
-    .field label {
-      font-size: var(--hu-text-base);
-      font-weight: var(--hu-weight-medium);
-      color: var(--hu-text);
-    }
-    .field .description {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-      margin-top: var(--hu-space-2xs);
-    }
-    .field .description-error {
-      color: var(--hu-error);
+
+      & label {
+        font-size: var(--hu-text-base);
+        font-weight: var(--hu-weight-medium);
+        color: var(--hu-text);
+      }
+
+      & .description {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+        margin-top: var(--hu-space-2xs);
+      }
+
+      & .description-error {
+        color: var(--hu-error);
+      }
     }
     .raw-area {
       --hu-font: var(--hu-font-mono);

@@ -110,10 +110,10 @@ export class ScAgentsView extends GatewayAwareLitElement {
 
     .profile-item {
       color: var(--hu-text-muted);
-    }
 
-    .profile-item strong {
-      color: var(--hu-text);
+      & strong {
+        color: var(--hu-text);
+      }
     }
 
     .skeleton-sessions {

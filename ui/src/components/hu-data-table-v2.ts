@@ -139,6 +139,7 @@ export class ScDataTableV2 extends LitElement {
       display: block;
       overflow-x: auto;
       font-family: var(--hu-font);
+      contain: layout style;
     }
 
     .search-wrap {

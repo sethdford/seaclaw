@@ -63,6 +63,7 @@ export class ScSidebar extends LitElement {
       flex-direction: column;
       width: var(--hu-sidebar-width);
       min-width: var(--hu-sidebar-width);
+      contain: layout style;
       background: color-mix(
         in srgb,
         var(--hu-bg-surface) var(--hu-glass-standard-bg-opacity, 8%),
@@ -264,25 +265,27 @@ export class ScSidebar extends LitElement {
       font-family: var(--hu-font);
     }
 
-    .nav-item:active {
-      transform: scale(0.97);
-    }
+    .nav-item {
+      &:active {
+        transform: scale(0.97);
+      }
 
-    .nav-item:focus-visible {
-      outline: var(--hu-focus-ring-width) solid var(--hu-accent);
-      outline-offset: calc(-1 * var(--hu-focus-ring-width));
-      border-radius: var(--hu-radius);
-    }
+      &:focus-visible {
+        outline: var(--hu-focus-ring-width) solid var(--hu-accent);
+        outline-offset: calc(-1 * var(--hu-focus-ring-width));
+        border-radius: var(--hu-radius);
+      }
 
-    .nav-item:hover:not([aria-current]) {
-      background: var(--hu-hover-overlay);
-      color: var(--hu-text);
-    }
+      &:hover:not([aria-current]) {
+        background: var(--hu-hover-overlay);
+        color: var(--hu-text);
+      }
 
-    .nav-item[aria-current] {
-      background: var(--hu-accent-subtle);
-      border-left: 3px solid var(--hu-accent);
-      color: var(--hu-accent-text, var(--hu-accent));
+      &[aria-current] {
+        background: var(--hu-accent-subtle);
+        border-left: 3px solid var(--hu-accent);
+        color: var(--hu-accent-text, var(--hu-accent));
+      }
     }
 
     :host([collapsed]) .nav-item {
