@@ -51,6 +51,11 @@ typedef struct hu_optimizer_config {
     float warmup_ratio;
     float warmdown_ratio;
     float final_lr_frac;
+    float muon_beta_start;    /* Momentum schedule start (default 0.85) */
+    float muon_beta_end;      /* Momentum schedule end (default 0.95) */
+    int muon_beta_ramp_steps; /* Steps to ramp from start to end (default 300) */
+    float grad_clip_norm;     /* Max gradient norm (0 = disabled) */
+    size_t n_embd;            /* For dmodel LR scaling; 0 = disabled */
 } hu_optimizer_config_t;
 
 typedef struct hu_training_config {

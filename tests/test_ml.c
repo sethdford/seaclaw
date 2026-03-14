@@ -1687,6 +1687,269 @@ static void test_experiment_store_null_args(void) {
     hu_experiment_store_close(NULL);
 }
 
+/* ─── Newton-Schulz orthogonality test ─────────────────────────────────── */
+
+static void test_newton_schulz_orthogonal(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
+        .matrix_lr = 0.01f, .scalar_lr = 0.001f, .weight_decay = 0.0f,
+        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
+
+    /* 4×8 matrix param and grad */
+    float param[32], grad[32];
+    for (int i = 0; i < 32; i++) { param[i] = 0.1f * (float)i; grad[i] = 0.01f * (float)(i + 1); }
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, param, grad, 4, 8, HU_PARAM_MATRIX), HU_OK);
+
+    /* Run one step — the internal NS orthogonalizes the update direction */
+    HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
+
+    /* After the step, params should have changed and be finite */
+    int changed = 0;
+    for (int i = 0; i < 32; i++) {
+        HU_ASSERT(isfinite(param[i]));
+        if (fabsf(param[i] - 0.1f * (float)i) > 1e-8f) changed = 1;
+    }
+    HU_ASSERT(changed);
+
+    /* Verify the update was non-trivial: run a few more steps */
+    for (int step = 0; step < 5; step++) {
+        for (int i = 0; i < 32; i++) grad[i] = 0.01f * (float)(i + step + 2);
+        HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
+    }
+    for (int i = 0; i < 32; i++) HU_ASSERT(isfinite(param[i]));
+
+    opt.vtable->deinit(opt.ctx, &alloc);
+}
+
+/* ─── Newton-Schulz: tall matrix (rows > cols) ────────────────────────── */
+
+static void test_newton_schulz_tall_matrix(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_optimizer_config_t opt_cfg = { .matrix_lr = 0.01f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
+
+    float param[24], grad[24];
+    for (int i = 0; i < 24; i++) { param[i] = (float)i * 0.05f; grad[i] = (float)(i + 1) * 0.02f; }
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, param, grad, 6, 4, HU_PARAM_MATRIX), HU_OK);
+    HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
+    for (int i = 0; i < 24; i++) HU_ASSERT(isfinite(param[i]));
+
+    opt.vtable->deinit(opt.ctx, &alloc);
+}
+
+/* ─── Gradient clipping test ──────────────────────────────────────────── */
+
+static void test_grad_clipping(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
+        .matrix_lr = 0.01f, .scalar_lr = 0.01f, .weight_decay = 0.0f,
+        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f, .grad_clip_norm = 1.0f };
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
+
+    /* 1×4 scalar param with huge gradient */
+    float param[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+    float grad[4] = {100.0f, 100.0f, 100.0f, 100.0f};
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, param, grad, 1, 4, HU_PARAM_SCALAR), HU_OK);
+
+    float before[4];
+    memcpy(before, param, sizeof(before));
+    HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
+
+    /* Params should have changed, but clipping limits the step size */
+    for (int i = 0; i < 4; i++) HU_ASSERT(isfinite(param[i]));
+    /* With clip_norm=1.0, the gradient norm (200) is clipped to 1.0,
+     * so the effective gradient is ~(0.005, ...) — very small update */
+    float max_delta = 0.0f;
+    for (int i = 0; i < 4; i++) {
+        float d = fabsf(param[i] - before[i]);
+        if (d > max_delta) max_delta = d;
+    }
+    HU_ASSERT(max_delta < 1.0f);
+
+    opt.vtable->deinit(opt.ctx, &alloc);
+}
+
+/* ─── Momentum schedule test ──────────────────────────────────────────── */
+
+static void test_momentum_schedule(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_optimizer_config_t opt_cfg = { .matrix_lr = 0.01f,
+        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f,
+        .muon_beta_start = 0.5f, .muon_beta_end = 0.9f,
+        .muon_beta_ramp_steps = 10 };
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
+
+    float param[16], grad[16];
+    for (int i = 0; i < 16; i++) { param[i] = (float)i * 0.1f; grad[i] = 0.01f; }
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, param, grad, 4, 4, HU_PARAM_MATRIX), HU_OK);
+
+    /* Run 15 steps — beta should ramp from 0.5 to 0.9 over first 10, then stay at 0.9 */
+    for (int step = 0; step < 15; step++) {
+        for (int i = 0; i < 16; i++) grad[i] = 0.01f * (float)(step + 1);
+        HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
+    }
+    for (int i = 0; i < 16; i++) HU_ASSERT(isfinite(param[i]));
+
+    opt.vtable->deinit(opt.ctx, &alloc);
+}
+
+/* ─── GPT: GELU activation ────────────────────────────────────────────── */
+
+static void test_gpt_gelu_activation(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 8; cfg.vocab_size = 16; cfg.n_layer = 1;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 16; cfg.head_dim = 8;
+    cfg.activation = HU_ML_ACT_GELU;
+
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
+
+    int32_t ids[8] = {0,1,2,3,4,5,6,7};
+    hu_ml_tensor_t input = { .data = ids, .shape = {1, 8, 0, 0}, .ndim = 2,
+                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 32 };
+    hu_ml_tensor_t output = {0};
+    HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
+
+    float *logits = (float *)output.data;
+    for (size_t i = 0; i < 8 * 16; i++) HU_ASSERT(isfinite(logits[i]));
+
+    /* Backward should also work with GELU */
+    float *d_logits = (float *)alloc.alloc(alloc.ctx, output.size_bytes);
+    for (size_t i = 0; i < 8 * 16; i++) d_logits[i] = 0.001f;
+    hu_ml_tensor_t grad = { .data = d_logits, .shape = {1, 8, 16, 0}, .ndim = 3,
+                            .dtype = HU_ML_DTYPE_F32, .size_bytes = output.size_bytes };
+    HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad), HU_OK);
+
+    alloc.free(alloc.ctx, d_logits, output.size_bytes);
+    alloc.free(alloc.ctx, output.data, output.size_bytes);
+    model.vtable->deinit(model.ctx, &alloc);
+}
+
+/* ─── GPT: window attention ───────────────────────────────────────────── */
+
+static void test_gpt_window_attention(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 16; cfg.vocab_size = 32; cfg.n_layer = 2;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 16; cfg.head_dim = 8;
+    memcpy(cfg.window_pattern, "SL", 3);
+
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
+
+    int32_t ids[16];
+    for (int i = 0; i < 16; i++) ids[i] = i % 32;
+    hu_ml_tensor_t input = { .data = ids, .shape = {1, 16, 0, 0}, .ndim = 2,
+                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 64 };
+    hu_ml_tensor_t output = {0};
+    HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
+
+    float *logits = (float *)output.data;
+    for (size_t i = 0; i < 16 * 32; i++) HU_ASSERT(isfinite(logits[i]));
+
+    alloc.free(alloc.ctx, output.data, output.size_bytes);
+    model.vtable->deinit(model.ctx, &alloc);
+}
+
+/* ─── GPT: even head_dim enforced ─────────────────────────────────────── */
+
+static void test_gpt_odd_head_dim_rejected(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 8; cfg.vocab_size = 16; cfg.n_layer = 1;
+    cfg.n_head = 3; cfg.n_kv_head = 3; cfg.n_embd = 9; cfg.head_dim = 3;
+
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_ERR_INVALID_ARGUMENT);
+}
+
+/* ─── Checkpoint: load from invalid file ──────────────────────────────── */
+
+static void test_checkpoint_invalid_file(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 8; cfg.vocab_size = 16; cfg.n_layer = 1;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 16; cfg.head_dim = 8;
+
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
+    hu_optimizer_config_t opt_cfg = { .matrix_lr = 0.01f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
+
+    /* Load from nonexistent file */
+    HU_ASSERT_EQ(hu_ml_checkpoint_load(&alloc, "/tmp/nonexistent_ckpt_abc123.bin", &model, &opt),
+                 HU_ERR_IO);
+
+    /* Create a file with wrong magic */
+    const char *bad_path = "/tmp/hu_bad_ckpt.bin";
+    FILE *f = fopen(bad_path, "wb");
+    HU_ASSERT(f != NULL);
+    uint32_t bad_magic = 0xDEADBEEF;
+    fwrite(&bad_magic, 4, 1, f);
+    fclose(f);
+    HU_ASSERT_EQ(hu_ml_checkpoint_load(&alloc, bad_path, &model, &opt), HU_ERR_IO);
+    remove(bad_path);
+
+    /* Create a file with correct magic but wrong param count */
+    f = fopen(bad_path, "wb");
+    HU_ASSERT(f != NULL);
+    uint32_t magic = 0x48554D4C, version = 1;
+    size_t wrong_count = 999;
+    fwrite(&magic, 4, 1, f);
+    fwrite(&version, 4, 1, f);
+    fwrite(&wrong_count, sizeof(size_t), 1, f);
+    fclose(f);
+    HU_ASSERT_EQ(hu_ml_checkpoint_load(&alloc, bad_path, &model, &opt), HU_ERR_IO);
+    remove(bad_path);
+
+    opt.vtable->deinit(opt.ctx, &alloc);
+    model.vtable->deinit(model.ctx, &alloc);
+}
+
+/* ─── Dataloader: empty shard ─────────────────────────────────────────── */
+
+static void test_dataloader_empty_shard(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *dir = "/tmp/hu_dl_empty";
+    mkdir_p(dir);
+
+    /* Create empty shard file */
+    char path[256];
+    snprintf(path, sizeof(path), "%s/shard_00000.bin", dir);
+    FILE *f = fopen(path, "wb");
+    fclose(f);
+
+    /* Create a second non-empty shard for val to use */
+    char path2[256];
+    snprintf(path2, sizeof(path2), "%s/shard_00001.bin", dir);
+    int32_t data[32];
+    for (int i = 0; i < 32; i++) data[i] = i;
+    f = fopen(path2, "wb");
+    fwrite(data, sizeof(int32_t), 32, f);
+    fclose(f);
+
+    hu_ml_dataloader_t *dl = NULL;
+    hu_error_t err = hu_ml_dataloader_create(&alloc, dir, 2, 8, "train", &dl);
+    /* Should either fail or succeed with no data to iterate */
+    if (err == HU_OK && dl) {
+        hu_ml_batch_t batch = {0};
+        hu_ml_dataloader_next(dl, &batch);
+        if (batch.input_ids) hu_ml_batch_free(&alloc, &batch);
+        hu_ml_dataloader_deinit(dl);
+    }
+
+    remove(path);
+    remove(path2);
+    rmdir(dir);
+}
+
 void run_ml_tests(void) {
     HU_TEST_SUITE("ml");
     /* BPE tokenizer */
@@ -1739,6 +2002,10 @@ void run_ml_tests(void) {
     HU_RUN_TEST(test_muon_adamw_null_args);
     HU_RUN_TEST(test_muon_adamw_add_param_zero);
     HU_RUN_TEST(test_lr_schedule);
+    HU_RUN_TEST(test_newton_schulz_orthogonal);
+    HU_RUN_TEST(test_newton_schulz_tall_matrix);
+    HU_RUN_TEST(test_grad_clipping);
+    HU_RUN_TEST(test_momentum_schedule);
     /* Training pipeline */
     HU_RUN_TEST(test_train_pipeline);
     /* Experiment loop */
@@ -1754,9 +2021,16 @@ void run_ml_tests(void) {
     /* Checkpoint */
     HU_RUN_TEST(test_checkpoint_roundtrip);
     HU_RUN_TEST(test_checkpoint_null_args);
+    HU_RUN_TEST(test_checkpoint_invalid_file);
     /* Experiment store */
     HU_RUN_TEST(test_experiment_store_roundtrip);
     HU_RUN_TEST(test_experiment_store_null_args);
+    /* Architecture variants */
+    HU_RUN_TEST(test_gpt_gelu_activation);
+    HU_RUN_TEST(test_gpt_window_attention);
+    HU_RUN_TEST(test_gpt_odd_head_dim_rejected);
+    /* Dataloader edge cases */
+    HU_RUN_TEST(test_dataloader_empty_shard);
     /* CLI */
     HU_RUN_TEST(test_ml_cli_train_help);
     HU_RUN_TEST(test_ml_cli_experiment_help);

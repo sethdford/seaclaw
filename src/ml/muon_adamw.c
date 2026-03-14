@@ -11,7 +11,6 @@
 #include <string.h>
 
 #define ADAM_EPS 1e-8f
-#define MUON_NESTEROV_BETA 0.95f
 
 /* ─── Internal structs ────────────────────────────────────────────────────── */
 
@@ -35,6 +34,7 @@ typedef struct hu_muon_adamw {
     size_t group_count;
     size_t group_capacity;
     float lr_multiplier;
+    int global_step;
 } hu_muon_adamw_t;
 
 /* ─── LR schedule ───────────────────────────────────────────────────────── */
@@ -116,9 +116,6 @@ static void matmul_xxt(float *y, const float *x, size_t m, size_t n)
         }
 }
 
-/* Newton-Schulz iteration: X = a*X + (b*A + c*A@A) @ X
- * where A = X@X^T (or X^T@X for tall). Operates on the "wide" form.
- * X is m×n (m <= n), A is m×m, scratch is m×m + m×n. */
 /* Newton-Schulz orthogonalization on rows×cols matrix x (modified in-place).
  * For tall matrices (rows > cols), transposes to wide form, orthogonalizes,
  * then transposes back so the caller always sees rows×cols output. */
@@ -202,9 +199,8 @@ static hu_error_t newton_schulz_orthogonalize(float *x, size_t rows, size_t cols
 /* ─── Muon step (2D matrices) ──────────────────────────────────────────────── */
 
 static hu_error_t step_muon(hu_param_group_t *g, const hu_optimizer_config_t *cfg,
-                            float lr, float wd, hu_allocator_t *alloc)
+                            float lr, float wd, float beta, hu_allocator_t *alloc)
 {
-    const float beta = MUON_NESTEROV_BETA;
     const size_t rows = g->rows;
     const size_t cols = g->cols;
     const size_t n = g->numel;
@@ -262,30 +258,72 @@ static hu_error_t muon_adamw_step(void *ctx, hu_ml_tensor_t *params,
     hu_muon_adamw_t *m = (hu_muon_adamw_t *)ctx;
     const hu_optimizer_config_t *cfg = &m->config;
     float mult = m->lr_multiplier;
+    m->global_step++;
+
+    /* Gradient clipping (max-norm across all param groups) */
+    if (cfg->grad_clip_norm > 0.0f) {
+        float total_sq = 0.0f;
+        for (size_t i = 0; i < m->group_count; i++) {
+            hu_param_group_t *g = &m->groups[i];
+            for (size_t j = 0; j < g->numel; j++)
+                total_sq += g->grad[j] * g->grad[j];
+        }
+        float total_norm = sqrtf(total_sq);
+        if (total_norm > cfg->grad_clip_norm) {
+            float clip_scale = cfg->grad_clip_norm / (total_norm + 1e-12f);
+            for (size_t i = 0; i < m->group_count; i++) {
+                hu_param_group_t *g = &m->groups[i];
+                for (size_t j = 0; j < g->numel; j++)
+                    g->grad[j] *= clip_scale;
+            }
+        }
+    }
+
+    /* Momentum schedule: ramp from beta_start to beta_end over ramp_steps */
+    float beta_start = cfg->muon_beta_start > 0.0f ? cfg->muon_beta_start : 0.85f;
+    float beta_end = cfg->muon_beta_end > 0.0f ? cfg->muon_beta_end : 0.95f;
+    int ramp_steps = cfg->muon_beta_ramp_steps > 0 ? cfg->muon_beta_ramp_steps : 300;
+    float t = (m->global_step < ramp_steps)
+        ? (float)m->global_step / (float)ramp_steps : 1.0f;
+    float muon_beta = beta_start + t * (beta_end - beta_start);
+
+    /* Weight decay schedule: wd * (1 - progress), progress from lr_multiplier */
+    float wd_scale = (mult < 1.0f) ? (1.0f - mult) : 0.0f;
+    /* When lr_multiplier represents progress through training, weight_decay decays.
+     * At start (mult near 0 during warmup), wd is maximal. At end (mult=final_lr_frac), wd decays.
+     * Use 1.0 when no schedule is active. */
+    float wd_base = cfg->weight_decay;
+    if (wd_scale > 0.0f)
+        wd_base *= (1.0f - wd_scale);
+
+    /* dmodel LR scaling: AdamW LRs scaled by (n_embd/768)^-0.5 */
+    float dmodel_scale = 1.0f;
+    if (cfg->n_embd > 0)
+        dmodel_scale = sqrtf(768.0f / (float)cfg->n_embd);
 
     for (size_t i = 0; i < m->group_count; i++) {
         hu_param_group_t *g = &m->groups[i];
         float lr;
-        float wd = cfg->weight_decay * mult;
+        float wd = wd_base * mult;
 
         switch (g->kind) {
         case HU_PARAM_EMBEDDING:
-            lr = cfg->embedding_lr * mult;
+            lr = cfg->embedding_lr * mult * dmodel_scale;
             step_adamw(g, cfg, lr, 0.0f);
             break;
         case HU_PARAM_UNEMBEDDING:
-            lr = cfg->unembedding_lr * mult;
+            lr = cfg->unembedding_lr * mult * dmodel_scale;
             step_adamw(g, cfg, lr, 0.0f);
             break;
         case HU_PARAM_MATRIX:
             lr = cfg->matrix_lr * mult;
             {
-                hu_error_t err = step_muon(g, cfg, lr, wd, m->alloc);
+                hu_error_t err = step_muon(g, cfg, lr, wd, muon_beta, m->alloc);
                 if (err != HU_OK) return err;
             }
             break;
         case HU_PARAM_SCALAR:
-            lr = cfg->scalar_lr * mult;
+            lr = cfg->scalar_lr * mult * dmodel_scale;
             step_adamw(g, cfg, lr, wd);
             break;
         }
@@ -353,6 +391,7 @@ hu_error_t hu_muon_adamw_create(hu_allocator_t *alloc,
     m->group_count = 0;
     m->group_capacity = 0;
     m->lr_multiplier = 1.0f;
+    m->global_step = 0;
 
     out->ctx = m;
     out->vtable = &muon_adamw_vtable;

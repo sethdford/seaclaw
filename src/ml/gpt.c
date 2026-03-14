@@ -12,6 +12,23 @@
 #include <stdint.h>
 #include <string.h>
 
+/* ─── Window attention helper ─────────────────────────────────────────────── */
+
+/* Returns the attention window size for a given layer.
+ * window_pattern is a string like "SSSL" where S=sliding, L=local (full).
+ * The pattern repeats across layers. Returns 0 for full attention. */
+static size_t layer_window_size(const hu_gpt_config_t *cfg, size_t layer_idx)
+{
+    if (cfg->window_pattern[0] == '\0') return 0;
+    size_t pat_len = 0;
+    while (pat_len < sizeof(cfg->window_pattern) && cfg->window_pattern[pat_len])
+        pat_len++;
+    if (pat_len == 0) return 0;
+    char c = cfg->window_pattern[layer_idx % pat_len];
+    if (c == 'S' || c == 's') return cfg->sequence_len / 4;
+    return 0;
+}
+
 /* ─── Activation cache ───────────────────────────────────────────────────── */
 
 typedef struct {
@@ -55,6 +72,63 @@ static float prng_next(uint64_t *seed)
 /* ─── Forward helpers ────────────────────────────────────────────────────── */
 
 static float relu_sq(float x) { float r = (x > 0.0f) ? x : 0.0f; return r * r; }
+static float gelu(float x) {
+    return 0.5f * x * (1.0f + tanhf(0.7978845608f * (x + 0.044715f * x * x * x)));
+}
+
+static void apply_activation(float *buf, size_t n, hu_ml_activation_t act)
+{
+    switch (act) {
+    case HU_ML_ACT_GELU:
+        for (size_t i = 0; i < n; i++) buf[i] = gelu(buf[i]);
+        break;
+    case HU_ML_ACT_SWIGLU:
+        /* SwiGLU: split buffer in half, apply silu(first_half) * second_half.
+         * For SwiGLU, MLP up projection is 2x wider and output is split. */
+        for (size_t i = 0; i < n / 2; i++) {
+            float gate = buf[i] / (1.0f + expf(-buf[i]));
+            buf[i] = gate * buf[i + n / 2];
+        }
+        break;
+    default: /* HU_ML_ACT_RELU_SQ */
+        for (size_t i = 0; i < n; i++) buf[i] = relu_sq(buf[i]);
+        break;
+    }
+}
+
+static void apply_activation_bw(float *d_out, const float *pre, size_t n, hu_ml_activation_t act)
+{
+    switch (act) {
+    case HU_ML_ACT_GELU: {
+        for (size_t i = 0; i < n; i++) {
+            float x = pre[i];
+            float t = tanhf(0.7978845608f * (x + 0.044715f * x * x * x));
+            float sech2 = 1.0f - t * t;
+            float inner_d = 0.7978845608f * (1.0f + 3.0f * 0.044715f * x * x);
+            d_out[i] *= 0.5f * (1.0f + t) + 0.5f * x * sech2 * inner_d;
+        }
+        break;
+    }
+    case HU_ML_ACT_SWIGLU: {
+        /* Backward for SwiGLU: gate = silu(x_gate), out = gate * x_val
+         * d_x_val = d_out * gate, d_x_gate = d_out * x_val * silu'(x_gate) */
+        for (size_t i = 0; i < n / 2; i++) {
+            float x_gate = pre[i], x_val = pre[i + n / 2];
+            float sig = 1.0f / (1.0f + expf(-x_gate));
+            float silu = x_gate * sig;
+            float silu_d = sig * (1.0f + x_gate * (1.0f - sig));
+            float d = d_out[i];
+            d_out[i] = d * x_val * silu_d;
+            d_out[i + n / 2] = d * silu;
+        }
+        break;
+    }
+    default: /* HU_ML_ACT_RELU_SQ */
+        for (size_t i = 0; i < n; i++)
+            d_out[i] = pre[i] > 0.0f ? d_out[i] * 2.0f * pre[i] : 0.0f;
+        break;
+    }
+}
 
 static void softmax_vec(float *x, int n)
 {
@@ -358,6 +432,7 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
 
         /* e. Causal self-attention — scores written directly to cache */
         float scale = 1.0f / sqrtf((float)hd);
+        size_t win = layer_window_size(cfg, li);
         memset(ao, 0, xsz);
         for (size_t b = 0; b < B; b++)
             for (size_t h = 0; h < nh; h++) {
@@ -365,8 +440,10 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
                 for (size_t i = 0; i < S; i++) {
                     float *w = lc->attn_w + (b * nh + h) * S * S + i * S;
                     const float *qi = q_buf + (b * S + i) * (nh * hd) + h * hd;
+                    /* Sliding window: only attend to positions within window */
+                    size_t j_start = (win > 0 && i >= win) ? (i - win + 1) : 0;
                     for (size_t j = 0; j < S; j++) {
-                        if (j <= i) {
+                        if (j <= i && j >= j_start) {
                             const float *kj = k_buf + (b * S + j) * (nkv * hd) + kvh * hd;
                             float dot = 0.0f;
                             for (size_t d = 0; d < hd; d++) dot += qi[d] * kj[d];
@@ -408,7 +485,7 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
         /* i. MLP: up, activation, down */
         matmul_atb(up_buf, xn, g->muw[li], (int)(B * S), (int)nm, (int)E);
         memcpy(lc->up_pre, up_buf, B * S * nm * sizeof(float));
-        for (size_t i = 0; i < B * S * nm; i++) up_buf[i] = relu_sq(up_buf[i]);
+        apply_activation(up_buf, B * S * nm, cfg->activation);
         matmul_atb(mo, up_buf, g->mdw[li], (int)(B * S), (int)E, (int)nm);
 
         /* j. MLP residual */
@@ -545,8 +622,8 @@ static hu_error_t gpt_backward(void *ctx, const hu_ml_tensor_t *grad_output)
 
         /* MLP down backward: mlp_out = up_post @ W_down^T */
         /* Recompute up_post from cached up_pre */
-        for (size_t i = 0; i < BS * nm; i++)
-            up_post[i] = relu_sq(lc->up_pre[i]);
+        memcpy(up_post, lc->up_pre, BS * nm * 4);
+        apply_activation(up_post, BS * nm, cfg->activation);
 
         memset(d_up, 0, BS * nm * 4);
         /* d_up += d_mlp @ W_down  (BS×E @ E×nm = BS×nm) */
@@ -554,9 +631,8 @@ static hu_error_t gpt_backward(void *ctx, const hu_ml_tensor_t *grad_output)
         /* grad_mdw += d_mlp^T @ up_post  (E×BS @ BS×nm = E×nm) */
         matmul_add_tab(g->grad_mdw[li], d_mlp, up_post, (int)BS, (int)E, (int)nm);
 
-        /* relu_sq backward: d_up_pre = d_up * (pre > 0 ? 2*pre : 0) */
-        for (size_t i = 0; i < BS * nm; i++)
-            d_up[i] = lc->up_pre[i] > 0.0f ? d_up[i] * 2.0f * lc->up_pre[i] : 0.0f;
+        /* Activation backward */
+        apply_activation_bw(d_up, lc->up_pre, BS * nm, cfg->activation);
 
         /* MLP up backward: up_pre = x_norm2 @ W_up^T */
         memset(d_xn, 0, xsz);
