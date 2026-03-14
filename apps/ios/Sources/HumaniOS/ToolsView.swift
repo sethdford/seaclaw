@@ -144,6 +144,8 @@ private struct ToolCard: View {
         .padding(HUTokens.spaceMd)
         .background(surfaceContainer)
         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(tool.name): \(tool.description)")
         .opacity(appeared ? 1 : 0)
         .scaleEffect(appeared ? 1 : 0.95)
         .animation(HUTokens.springExpressive.delay(delay), value: appeared)

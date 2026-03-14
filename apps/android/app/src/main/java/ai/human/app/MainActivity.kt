@@ -76,31 +76,31 @@ fun HumanApp() {
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Filled.Home, contentDescription = null) },
+                    icon = { Icon(Icons.Filled.Home, contentDescription = "Overview") },
                     label = { Text("Overview") },
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Filled.Chat, contentDescription = null) },
+                    icon = { Icon(Icons.Filled.Chat, contentDescription = "Chat") },
                     label = { Text("Chat") },
                 )
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    icon = { Icon(Icons.Filled.History, contentDescription = null) },
+                    icon = { Icon(Icons.Filled.History, contentDescription = "Sessions") },
                     label = { Text("Sessions") },
                 )
                 NavigationBarItem(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 },
-                    icon = { Icon(Icons.Filled.Build, contentDescription = null) },
+                    icon = { Icon(Icons.Filled.Build, contentDescription = "Tools") },
                     label = { Text("Tools") },
                 )
                 NavigationBarItem(
                     selected = selectedTab == 4,
                     onClick = { selectedTab = 4 },
-                    icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                    icon = { Icon(Icons.Filled.Settings, contentDescription = "Settings") },
                     label = { Text("Settings") },
                 )
             }
