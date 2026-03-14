@@ -145,33 +145,6 @@ static void test_agent_cli_demo_overrides_provider(void) {
     hu_config_deinit(&cfg);
 }
 
-
-static void test_agent_cli_prompt_once_parsing(void) {
-    const char *argv[] = {"agent", "--prompt", "Research AI", "--once", "--message", "Check feeds", "--channel", "cli"};
-    hu_parsed_agent_args_t args;
-    memset(&args, 0, sizeof(args));
-    hu_error_t err = hu_agent_cli_parse_args(argv, 8, &args);
-    HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_NOT_NULL(args.prompt);
-    HU_ASSERT_STR_EQ(args.prompt, "Research AI");
-    HU_ASSERT_EQ(args.once, 1);
-    HU_ASSERT_NOT_NULL(args.message);
-    HU_ASSERT_STR_EQ(args.message, "Check feeds");
-    HU_ASSERT_NOT_NULL(args.channel);
-    HU_ASSERT_STR_EQ(args.channel, "cli");
-}
-
-static void test_agent_cli_prompt_without_once(void) {
-    const char *argv[] = {"agent", "--prompt", "System prompt text"};
-    hu_parsed_agent_args_t args;
-    memset(&args, 0, sizeof(args));
-    hu_error_t err = hu_agent_cli_parse_args(argv, 3, &args);
-    HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_NOT_NULL(args.prompt);
-    HU_ASSERT_STR_EQ(args.prompt, "System prompt text");
-    HU_ASSERT_EQ(args.once, 0);
-}
-
 void run_cli_tests(void) {
     HU_TEST_SUITE("CLI Commands");
     HU_RUN_TEST(test_cmd_channel_list);
@@ -189,6 +162,4 @@ void run_cli_tests(void) {
     HU_RUN_TEST(test_agent_cli_demo_flag_parsing);
     HU_RUN_TEST(test_agent_cli_no_demo_flag);
     HU_RUN_TEST(test_agent_cli_demo_overrides_provider);
-    HU_RUN_TEST(test_agent_cli_prompt_once_parsing);
-    HU_RUN_TEST(test_agent_cli_prompt_without_once);
 }

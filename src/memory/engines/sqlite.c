@@ -265,7 +265,6 @@ static const char *const schema_parts[] = {
     "CREATE INDEX IF NOT EXISTS idx_feed_items_source ON feed_items(source)",
     "CREATE INDEX IF NOT EXISTS idx_feed_items_contact ON feed_items(contact_id)",
     "CREATE INDEX IF NOT EXISTS idx_feed_items_ingested ON feed_items(ingested_at)",
-    "CREATE UNIQUE INDEX IF NOT EXISTS idx_feed_items_dedup ON feed_items(source, substr(content, 1, 200))",
     "CREATE TABLE IF NOT EXISTS oauth_tokens("
     "provider TEXT PRIMARY KEY,"
     "access_token TEXT NOT NULL,"

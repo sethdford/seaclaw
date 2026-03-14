@@ -2088,11 +2088,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         sqlite3 *fdb = hu_sqlite_memory_get_db(agent->memory);
                         if (fdb) {
                             hu_feed_processor_t fp = {.alloc = alloc, .db = fdb};
-                            if (config && config->feeds.interests) {
-                                fp.interests = config->feeds.interests;
-                                fp.interests_len = strlen(config->feeds.interests);
-                                fp.relevance_threshold = config->feeds.relevance_threshold;
-                            }
                             hu_feed_config_t fconf;
                             memset(&fconf, 0, sizeof(fconf));
                             fconf.enabled[HU_FEED_NEWS_RSS]    = true;
@@ -2100,24 +2095,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             fconf.enabled[HU_FEED_GMAIL]       = true;
                             fconf.enabled[HU_FEED_IMESSAGE]    = true;
                             fconf.enabled[HU_FEED_TWITTER]     = true;
-                            fconf.poll_interval_minutes[HU_FEED_FILE_INGEST] =
-                                (config && config->feeds.poll_interval_file_ingest > 0)
-                                    ? config->feeds.poll_interval_file_ingest : 5;
-                            fconf.poll_interval_minutes[HU_FEED_NEWS_RSS] =
-                                (config && config->feeds.poll_interval_rss > 0)
-                                    ? config->feeds.poll_interval_rss : 360;
-                            fconf.poll_interval_minutes[HU_FEED_GMAIL] =
-                                (config && config->feeds.poll_interval_gmail > 0)
-                                    ? config->feeds.poll_interval_gmail : 60;
-                            fconf.poll_interval_minutes[HU_FEED_IMESSAGE] =
-                                (config && config->feeds.poll_interval_imessage > 0)
-                                    ? config->feeds.poll_interval_imessage : 30;
-                            fconf.poll_interval_minutes[HU_FEED_TWITTER] =
-                                (config && config->feeds.poll_interval_twitter > 0)
-                                    ? config->feeds.poll_interval_twitter : 120;
-                            fconf.max_items_per_poll =
-                                (config && config->feeds.max_items_per_poll > 0)
-                                    ? config->feeds.max_items_per_poll : 20;
+                            fconf.poll_interval_minutes[HU_FEED_FILE_INGEST] = 5;
+                            fconf.poll_interval_minutes[HU_FEED_NEWS_RSS]    = 360;
+                            fconf.poll_interval_minutes[HU_FEED_GMAIL]       = 60;
+                            fconf.poll_interval_minutes[HU_FEED_IMESSAGE]    = 30;
+                            fconf.poll_interval_minutes[HU_FEED_TWITTER]     = 120;
+                            fconf.max_items_per_poll = 20;
                             size_t ingested = 0;
                             (void)hu_feed_processor_poll(&fp, &fconf, last_feed_poll_types,
                                                          fp_now, &ingested);

@@ -423,15 +423,8 @@ hu_error_t hu_feed_processor_store_item(hu_feed_processor_t *proc,
     if (!proc || !proc->db || !item)
         return HU_ERR_INVALID_ARGUMENT;
 
-    if (proc->interests && proc->interests_len > 0 && proc->relevance_threshold > 0.0) {
-        double score = hu_feeds_score_relevance(item->content, item->content_len,
-                                                proc->interests, proc->interests_len);
-        if (score < proc->relevance_threshold)
-            return HU_OK;
-    }
-
     const char *sql =
-        "INSERT OR IGNORE INTO feed_items (source, contact_id, content_type, content, "
+        "INSERT INTO feed_items (source, contact_id, content_type, content, "
         "url, ingested_at) VALUES (?, ?, ?, ?, ?, ?)";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(proc->db, sql, -1, &stmt, NULL) != SQLITE_OK)
@@ -607,8 +600,6 @@ hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
     if (!proc || !config || !last_poll_ms || !items_ingested)
         return HU_ERR_INVALID_ARGUMENT;
     *items_ingested = 0;
-    size_t fetch_errors = 0;
-    (void)fetch_errors;
 
     for (int i = 0; i < HU_FEED_COUNT; i++) {
         hu_feed_type_t type = (hu_feed_type_t)i;
@@ -644,8 +635,8 @@ hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
                         item.content_len = strlen(item.content);
                         snprintf(item.url, sizeof(item.url), "%s", articles[a].link);
                         item.ingested_at = (int64_t)(now_ms / 1000);
-                        if (hu_feed_processor_store_item(proc, &item) == HU_OK)
-                            (*items_ingested)++;
+                        (void)hu_feed_processor_store_item(proc, &item);
+                        (*items_ingested)++;
                     }
                 }
             }
@@ -671,8 +662,8 @@ hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
                     item.content[clen] = '\0';
                     item.content_len = clen;
                     item.ingested_at = gmail_items[g].ingested_at;
-                    if (hu_feed_processor_store_item(proc, &item) == HU_OK)
-                        (*items_ingested)++;
+                    (void)hu_feed_processor_store_item(proc, &item);
+                    (*items_ingested)++;
                 }
             }
 #endif
@@ -699,8 +690,8 @@ hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
                     item.content[clen] = '\0';
                     item.content_len = clen;
                     item.ingested_at = im_items[m].ingested_at;
-                    if (hu_feed_processor_store_item(proc, &item) == HU_OK)
-                        (*items_ingested)++;
+                    (void)hu_feed_processor_store_item(proc, &item);
+                    (*items_ingested)++;
                 }
             }
 #endif
@@ -726,8 +717,8 @@ hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
                     if (tw_items[t].url[0])
                         snprintf(item.url, sizeof(item.url), "%s", tw_items[t].url);
                     item.ingested_at = tw_items[t].ingested_at;
-                    if (hu_feed_processor_store_item(proc, &item) == HU_OK)
-                        (*items_ingested)++;
+                    (void)hu_feed_processor_store_item(proc, &item);
+                    (*items_ingested)++;
                 }
             }
 #endif
@@ -753,15 +744,13 @@ hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
                     if (fi_items[f].url[0])
                         snprintf(item.url, sizeof(item.url), "%s", fi_items[f].url);
                     item.ingested_at = fi_items[f].ingested_at;
-                    if (hu_feed_processor_store_item(proc, &item) == HU_OK)
-                        (*items_ingested)++;
+                    (void)hu_feed_processor_store_item(proc, &item);
+                    (*items_ingested)++;
                 }
             }
 #endif
         }
     }
-    if (fetch_errors > 0 && *items_ingested == 0)
-        return HU_ERR_IO;
     return HU_OK;
 }
 

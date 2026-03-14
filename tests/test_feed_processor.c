@@ -105,82 +105,11 @@ static void feed_processor_empty_count_zero(void) {
     mem.vtable->deinit(mem.ctx);
 }
 
-static void feed_processor_dedup_ignores_duplicate(void) {
-    hu_allocator_t alloc = hu_system_allocator();
-    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
-    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
-    HU_ASSERT_NOT_NULL(db);
-    hu_feed_processor_t proc = {.alloc = &alloc, .db = db};
-    hu_feed_item_stored_t item = {0};
-    snprintf(item.source, sizeof(item.source), "twitter");
-    snprintf(item.content_type, sizeof(item.content_type), "tweet");
-    snprintf(item.content, sizeof(item.content), "Duplicate test content here");
-    item.content_len = strlen(item.content);
-    item.ingested_at = 1000;
-    hu_error_t err = hu_feed_processor_store_item(&proc, &item);
-    HU_ASSERT_EQ(err, HU_OK);
-    item.ingested_at = 2000;
-    err = hu_feed_processor_store_item(&proc, &item);
-    HU_ASSERT_EQ(err, HU_OK);
-    hu_feed_item_stored_t *out = NULL;
-    size_t count = 0;
-    err = hu_feed_processor_get_recent(&alloc, db, "twitter", 7, 10, &out, &count);
-    HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_EQ(count, 1u);
-    if (out) hu_feed_items_free(&alloc, out, count);
-    mem.vtable->deinit(mem.ctx);
-}
-
-static void feed_processor_relevance_filters_low_score(void) {
-    hu_allocator_t alloc = hu_system_allocator();
-    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
-    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
-    HU_ASSERT_NOT_NULL(db);
-    hu_feed_processor_t proc = {.alloc = &alloc, .db = db, .interests = "quantum blockchain", .interests_len = 18, .relevance_threshold = 0.8};
-    hu_feed_item_stored_t relevant = {0};
-    snprintf(relevant.source, sizeof(relevant.source), "rss");
-    snprintf(relevant.content_type, sizeof(relevant.content_type), "article");
-    snprintf(relevant.content, sizeof(relevant.content), "quantum blockchain revolution in computing");
-    relevant.content_len = strlen(relevant.content);
-    relevant.ingested_at = 1000;
-    hu_feed_item_stored_t irrelevant = {0};
-    snprintf(irrelevant.source, sizeof(irrelevant.source), "rss");
-    snprintf(irrelevant.content_type, sizeof(irrelevant.content_type), "article");
-    snprintf(irrelevant.content, sizeof(irrelevant.content), "best pizza recipes for friday night dinner");
-    irrelevant.content_len = strlen(irrelevant.content);
-    irrelevant.ingested_at = 2000;
-    hu_error_t err = hu_feed_processor_store_item(&proc, &relevant);
-    HU_ASSERT_EQ(err, HU_OK);
-    err = hu_feed_processor_store_item(&proc, &irrelevant);
-    HU_ASSERT_EQ(err, HU_OK);
-    hu_feed_item_stored_t *out = NULL;
-    size_t count = 0;
-    err = hu_feed_processor_get_recent(&alloc, db, "rss", 3, 10, &out, &count);
-    HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_EQ(count, 1u);
-    if (out) hu_feed_items_free(&alloc, out, count);
-    mem.vtable->deinit(mem.ctx);
-}
-
-static void feed_processor_error_propagation_on_null_db(void) {
-    hu_allocator_t alloc = hu_system_allocator();
-    hu_feed_processor_t proc = {.alloc = &alloc, .db = NULL};
-    hu_feed_item_stored_t item = {0};
-    snprintf(item.source, sizeof(item.source), "rss");
-    snprintf(item.content, sizeof(item.content), "test");
-    item.content_len = 4;
-    hu_error_t err = hu_feed_processor_store_item(&proc, &item);
-    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
-}
-
 void run_feed_processor_tests(void) {
     HU_TEST_SUITE("feed_processor");
     HU_RUN_TEST(feed_processor_store_item_get_recent_found);
     HU_RUN_TEST(feed_processor_get_for_contact_scoped);
     HU_RUN_TEST(feed_processor_empty_count_zero);
-    HU_RUN_TEST(feed_processor_dedup_ignores_duplicate);
-    HU_RUN_TEST(feed_processor_relevance_filters_low_score);
-    HU_RUN_TEST(feed_processor_error_propagation_on_null_db);
 }
 
 #else

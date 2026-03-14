@@ -123,18 +123,6 @@ hu_error_t hu_agent_cli_parse_args(const char *const *argv, size_t argc,
             out->use_tui = 1;
         } else if (strcmp(a, "--demo") == 0) {
             out->demo_mode = 1;
-        } else if (strcmp(a, "--prompt") == 0) {
-            if (i + 1 < argc) {
-                out->prompt = argv[i + 1];
-                i++;
-            }
-        } else if (strcmp(a, "--channel") == 0) {
-            if (i + 1 < argc) {
-                out->channel = argv[i + 1];
-                i++;
-            }
-        } else if (strcmp(a, "--once") == 0) {
-            out->once = 1;
         }
     }
     return HU_OK;
@@ -412,7 +400,6 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         .pressure_compact = cfg.agent.context_pressure_compact,
         .compact_target = cfg.agent.context_compact_target,
         .llm_compiler_enabled = cfg.agent.llm_compiler_enabled,
-        .crag_enabled = cfg.agent.crag_enabled,
         .tree_of_thought = cfg.agent.tree_of_thought,
         .constitutional_ai = cfg.agent.constitutional_ai,
         .speculative_cache = cfg.agent.speculative_cache,
@@ -555,62 +542,6 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         if (sb_storage)
             hu_sandbox_storage_destroy(sb_storage, &sb_alloc);
         hu_awareness_deinit(&cli_awareness);
-        hu_config_deinit(&cfg);
-        return err;
-    }
-
-    if (parsed_args.once && parsed_args.prompt && parsed_args.prompt[0]) {
-        const char *msg = parsed_args.message && parsed_args.message[0]
-                              ? parsed_args.message
-                              : "Analyze the provided context and report findings.";
-        const char *chan =
-            parsed_args.channel && parsed_args.channel[0] ? parsed_args.channel : "cli";
-        agent.active_channel = chan;
-        agent.active_channel_len = strlen(chan);
-        char *response = NULL;
-        size_t response_len = 0;
-        err = hu_agent_run_single(&agent, parsed_args.prompt, strlen(parsed_args.prompt), msg,
-                                  strlen(msg), &response, &response_len);
-        if (err == HU_OK && response && response_len > 0) {
-            fwrite(response, 1, response_len, stdout);
-            fputc('\n', stdout);
-            fflush(stdout);
-            alloc->free(alloc->ctx, response, response_len + 1);
-        } else if (err != HU_OK) {
-            fprintf(stderr, "[%s] Agent turn failed: %s\n", HU_CODENAME, hu_error_string(err));
-        }
-        hu_agent_deinit(&agent);
-        if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
-            retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);
-        if (vector_store.vtable && vector_store.vtable->deinit)
-            vector_store.vtable->deinit(vector_store.ctx, alloc);
-        if (embedder.vtable && embedder.vtable->deinit)
-            embedder.vtable->deinit(embedder.ctx, alloc);
-        if (memory.vtable && memory.vtable->deinit)
-            memory.vtable->deinit(memory.ctx);
-        if (observer.vtable && observer.vtable->deinit)
-            observer.vtable->deinit(observer.ctx);
-        if (log_fp)
-            fclose(log_fp);
-        hu_tools_destroy_default(alloc, tools, tools_count);
-#ifdef HU_HAS_OTEL
-        if (otel_observer.vtable && otel_observer.vtable->deinit)
-            otel_observer.vtable->deinit(otel_observer.ctx);
-#endif
-        if (agent.policy_engine)
-            hu_policy_engine_destroy(agent.policy_engine);
-        if (cli_mailbox)
-            hu_mailbox_destroy(cli_mailbox);
-        if (cli_agent_pool)
-            hu_agent_pool_destroy(cli_agent_pool);
-        if (cron)
-            hu_cron_destroy(cron, alloc);
-        if (policy.tracker)
-            hu_rate_tracker_destroy(policy.tracker);
-        if (sb_storage)
-            hu_sandbox_storage_destroy(sb_storage, &sb_alloc);
-        hu_awareness_deinit(&cli_awareness);
-        hu_bus_deinit(&cli_bus);
         hu_config_deinit(&cfg);
         return err;
     }

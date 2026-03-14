@@ -718,31 +718,6 @@ static void test_config_behavior_defaults(void) {
     hu_arena_destroy(arena);
 }
 
-
-static void test_config_parse_feeds_section(void) {
-    hu_allocator_t backing = hu_system_allocator();
-    hu_config_t cfg_local;
-    memset(&cfg_local, 0, sizeof(cfg_local));
-    hu_arena_t *arena = hu_arena_create(backing);
-    HU_ASSERT_NOT_NULL(arena);
-    cfg_local.arena = arena;
-    cfg_local.allocator = hu_arena_allocator(arena);
-    const char *json = "{ \"feeds\": { \"enabled\": true, \"interests\": \"AI LLM GPT\", \"relevance_threshold\": 0.3, \"poll_interval_rss\": 120, \"poll_interval_gmail\": 30, \"poll_interval_imessage\": 15, \"poll_interval_twitter\": 60, \"poll_interval_file_ingest\": 10, \"max_items_per_poll\": 50 } }";
-    hu_error_t err = hu_config_parse_json(&cfg_local, json, strlen(json));
-    HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_EQ(cfg_local.feeds.enabled, true);
-    HU_ASSERT_NOT_NULL(cfg_local.feeds.interests);
-    HU_ASSERT_STR_EQ(cfg_local.feeds.interests, "AI LLM GPT");
-    HU_ASSERT_EQ((int)(cfg_local.feeds.relevance_threshold * 10), 3);
-    HU_ASSERT_EQ(cfg_local.feeds.poll_interval_rss, 120u);
-    HU_ASSERT_EQ(cfg_local.feeds.poll_interval_gmail, 30u);
-    HU_ASSERT_EQ(cfg_local.feeds.poll_interval_imessage, 15u);
-    HU_ASSERT_EQ(cfg_local.feeds.poll_interval_twitter, 60u);
-    HU_ASSERT_EQ(cfg_local.feeds.poll_interval_file_ingest, 10u);
-    HU_ASSERT_EQ(cfg_local.feeds.max_items_per_poll, 50u);
-    hu_arena_destroy(arena);
-}
-
 void run_config_parse_tests(void) {
     HU_TEST_SUITE("Config parse");
     HU_RUN_TEST(test_config_parse_empty_json);
@@ -791,7 +766,4 @@ void run_config_parse_tests(void) {
     HU_TEST_SUITE("Behavior thresholds");
     HU_RUN_TEST(test_config_parse_behavior_thresholds);
     HU_RUN_TEST(test_config_behavior_defaults);
-
-    HU_TEST_SUITE("Feeds config");
-    HU_RUN_TEST(test_config_parse_feeds_section);
 }

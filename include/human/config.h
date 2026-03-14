@@ -77,7 +77,6 @@ typedef struct hu_persona_channel_entry {
 
 typedef struct hu_agent_config {
     bool llm_compiler_enabled;
-    bool crag_enabled;
     bool tool_routing_enabled;
     bool tree_of_thought;
     bool constitutional_ai;
@@ -116,22 +115,6 @@ typedef struct hu_plugins_config {
     char **plugin_paths;
     size_t plugin_paths_len;
 } hu_plugins_config_t;
-
-typedef struct hu_feeds_config {
-    bool enabled;
-    char *gmail_client_id;
-    char *gmail_client_secret;
-    char *gmail_refresh_token;
-    char *twitter_bearer_token;
-    char *interests;
-    double relevance_threshold;
-    uint32_t poll_interval_rss;
-    uint32_t poll_interval_gmail;
-    uint32_t poll_interval_imessage;
-    uint32_t poll_interval_twitter;
-    uint32_t poll_interval_file_ingest;
-    uint32_t max_items_per_poll;
-} hu_feeds_config_t;
 
 typedef struct hu_heartbeat_config {
     bool enabled;
@@ -519,7 +502,6 @@ typedef struct hu_config {
     size_t mcp_servers_len;
     hu_policy_config_t policy;
     hu_plugins_config_t plugins;
-    hu_feeds_config_t feeds;
     hu_arena_t *arena;
     hu_allocator_t allocator;
 } hu_config_t;
