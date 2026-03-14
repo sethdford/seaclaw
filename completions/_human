@@ -42,6 +42,7 @@ _human() {
                 init:Initialize configuration
                 paperclip:Paperclip agent integration
                 persona:Persona management
+                pwa:PWA browser automation
                 sandbox:Sandbox management
             )'
             ;;
