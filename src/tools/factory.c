@@ -83,7 +83,9 @@
 #include "human/tools/send_message.h"
 #include "human/tools/shell.h"
 #include "human/tools/pwa.h"
+#ifdef HU_HAS_SKILLS
 #include "human/tools/skill_run.h"
+#endif
 #include "human/tools/skill_write.h"
 #include "human/tools/spawn.h"
 #include "human/tools/web_fetch.h"
@@ -151,7 +153,10 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     if (!alloc || !out_tools || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
 #ifndef HU_HAS_CRON
-    (void)cron; /* accepted but ignored when cron is disabled */
+    (void)cron;
+#endif
+#ifndef HU_HAS_SKILLS
+    (void)skillforge;
 #endif
 
     size_t tools_alloc = HU_TOOLS_COUNT * sizeof(hu_tool_t);
@@ -448,10 +453,12 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
         goto fail;
     idx++;
 
+#ifdef HU_HAS_SKILLS
     err = hu_skill_run_create(alloc, &tools[idx], skillforge);
     if (err != HU_OK)
         goto fail;
     idx++;
+#endif
 
     err = hu_pwa_tool_create(alloc, &tools[idx]);
     if (err != HU_OK)

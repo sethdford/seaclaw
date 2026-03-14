@@ -1,6 +1,8 @@
 #include "test_framework.h"
 #include "human/pwa.h"
+#ifdef HU_HAS_PWA
 #include "human/channels/pwa.h"
+#endif
 #include "human/tools/pwa.h"
 #include "human/core/json.h"
 #include <string.h>
@@ -492,8 +494,9 @@ static void test_global_registry_resolve_unknown(void) {
     HU_ASSERT_NULL(d);
 }
 
-/* ── Channel ───────────────────────────────────────────────────────── */
+/* ── Channel (requires PWA channel compiled in) ───────────────────── */
 
+#ifdef HU_HAS_PWA
 static void test_pwa_channel_create_destroy(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
@@ -562,6 +565,7 @@ static void test_pwa_channel_poll_empty(void) {
     HU_ASSERT_EQ(count, 0);
     hu_pwa_channel_destroy(&ch);
 }
+#endif /* HU_HAS_PWA */
 
 /* ── Suite Runner ──────────────────────────────────────────────────── */
 
@@ -627,6 +631,7 @@ void run_pwa_tests(void) {
     HU_RUN_TEST(test_global_registry_resolve_custom_override);
     HU_RUN_TEST(test_global_registry_resolve_unknown);
 
+#ifdef HU_HAS_PWA
     HU_TEST_SUITE("pwa_channel");
     HU_RUN_TEST(test_pwa_channel_create_destroy);
     HU_RUN_TEST(test_pwa_channel_name);
@@ -634,4 +639,5 @@ void run_pwa_tests(void) {
     HU_RUN_TEST(test_pwa_channel_send_stores_message);
     HU_RUN_TEST(test_pwa_channel_poll_inject);
     HU_RUN_TEST(test_pwa_channel_poll_empty);
+#endif
 }
