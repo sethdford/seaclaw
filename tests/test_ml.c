@@ -2154,9 +2154,9 @@ static void test_gpt_residual_lambda(void) {
     float orig_rl = *rl;
 
     *rl = 1.0f;
-    hu_ml_tensor_t output1 = {0};
-    HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output1), HU_OK);
-    float logit_a = ((float *)output1.data)[0];
+    hu_ml_tensor_t output1b = {0};
+    HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output1b), HU_OK);
+    float logit_a = ((float *)output1b.data)[0];
 
     *rl = 10.0f;
     hu_ml_tensor_t output2 = {0};
@@ -2206,9 +2206,8 @@ static void test_gpt_multilayer_backward(void) {
 
     /* Finite-diff check on first-layer param */
     int32_t targets[] = {1,2,3,4};
-    float eps = 1e-3f;
-    int nonzero = 0;
     float eps = 5e-3f;
+    int nonzero = 0;
     size_t check_n = aqw0_sz < 4 ? aqw0_sz : 4;
     for (size_t j = 0; j < check_n; j++) {
         float orig = aqw0[j];
@@ -2232,14 +2231,14 @@ static void test_gpt_multilayer_backward(void) {
 static void test_gpt_swiglu_finite_diff(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 2; cfg.vocab_size = 8; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 4; cfg.head_dim = 2;
+    cfg.sequence_len = 4; cfg.vocab_size = 16; cfg.n_layer = 1;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
     cfg.activation = HU_ML_ACT_SWIGLU;
 
-    int32_t ids[] = {0, 1};
-    int32_t targets[] = {1, 2};
-    size_t V = 8, BS = 2;
-    float eps = 1e-3f;
+    int32_t ids[] = {0, 1, 2, 3};
+    int32_t targets[] = {1, 2, 3, 4};
+    size_t V = 16, BS = 4;
+    float eps = 5e-3f;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
@@ -2267,8 +2266,8 @@ static void test_gpt_swiglu_finite_diff(void) {
         if (fabsf(ng) > 1e-8f) nonzero_count++;
     }
 
-    (void)finite_count;
-    (void)nonzero_count;
+    HU_ASSERT_EQ(finite_count, (int)check_n);
+    HU_ASSERT(nonzero_count > 0);
 
     model.vtable->deinit(model.ctx, &alloc);
 }
