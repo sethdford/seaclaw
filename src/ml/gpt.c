@@ -12,6 +12,15 @@
 #include <stdint.h>
 #include <string.h>
 
+/* ─── MLP dimension helper ────────────────────────────────────────────────── */
+
+/* For SwiGLU, the up projection outputs nm=4E (gate+value), but after activation
+ * only nm/2=2E elements are meaningful. The down projection is E × nd. */
+static size_t mlp_down_dim(hu_ml_activation_t act, size_t nm)
+{
+    return (act == HU_ML_ACT_SWIGLU) ? nm / 2 : nm;
+}
+
 /* ─── Window attention helper ─────────────────────────────────────────────── */
 
 /* Returns the attention window size for a given layer.
