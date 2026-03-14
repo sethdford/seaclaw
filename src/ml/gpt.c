@@ -25,16 +25,18 @@ static size_t mlp_down_dim(hu_ml_activation_t act, size_t nm)
 
 /* Returns the attention window size for a given layer.
  * window_pattern is a string like "SSSL" where S=sliding, L=local (full).
- * The pattern repeats across layers. Returns 0 for full attention. */
+ * The pattern repeats across layers. The last layer always uses full attention
+ * to ensure the output can attend to all positions. Returns 0 for full attention. */
 static size_t layer_window_size(const hu_gpt_config_t *cfg, size_t layer_idx)
 {
     if (cfg->window_pattern[0] == '\0') return 0;
+    if (layer_idx == cfg->n_layer - 1) return 0;
     size_t pat_len = 0;
     while (pat_len < sizeof(cfg->window_pattern) && cfg->window_pattern[pat_len])
         pat_len++;
     if (pat_len == 0) return 0;
     char c = cfg->window_pattern[layer_idx % pat_len];
-    if (c == 'S' || c == 's') return cfg->sequence_len / 4;
+    if (c == 'S' || c == 's') return cfg->sequence_len / 2;
     return 0;
 }
 
@@ -708,8 +710,8 @@ static hu_error_t gpt_backward(void *ctx, const hu_ml_tensor_t *grad_output)
             }
 
         /* Q/K head norm backward (before RoPE backward — reverse of forward order) */
-        head_norm_bw(d_q, lc->q, (int)B, (int)S, (int)nh, (int)hd);
-        head_norm_bw(d_k, lc->k, (int)B, (int)S, (int)nkv, (int)hd);
+        head_norm_bw(d_q, lc->q, lc->q_norm_inv, (int)B, (int)S, (int)nh, (int)hd);
+        head_norm_bw(d_k, lc->k, lc->k_norm_inv, (int)B, (int)S, (int)nkv, (int)hd);
 
         /* RoPE backward */
         apply_rope_bw(d_q, d_k, g->rcos, g->rsin, (int)B, (int)S, (int)nh, (int)nkv, (int)hd);
