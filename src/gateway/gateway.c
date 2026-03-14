@@ -429,7 +429,7 @@ static void send_response(int fd, int status, const char *content_type, const ch
     else if (status == 304)
         status_str = "304 Not Modified";
 
-    char hdr[640];
+    char hdr[960];
     const char *cors_origin = get_cors_origin_for_response();
     char cors_line[256] = "";
     char retry_line[64] = "";
@@ -445,6 +445,9 @@ static void send_response(int fd, int status, const char *content_type, const ch
                      "Content-Length: %zu\r\n"
                      "X-Frame-Options: DENY\r\n"
                      "X-Content-Type-Options: nosniff\r\n"
+                     "Content-Security-Policy: default-src 'self'\r\n"
+                     "Strict-Transport-Security: max-age=63072000; includeSubDomains\r\n"
+                     "Referrer-Policy: strict-origin-when-cross-origin\r\n"
                      "%s"
                      "%s"
                      "\r\n",
@@ -473,7 +476,7 @@ static void send_json_with_cookie(int fd, int status, const char *body, const ch
                              : (status == 400) ? "400 Bad Request"
                              : (status == 401) ? "401 Unauthorized"
                                                : "500 Internal Server Error";
-    char hdr[768];
+    char hdr[1024];
     const char *cors_origin = get_cors_origin_for_response();
     char cors_line[256] = "";
     char cookie_line[512];
@@ -494,6 +497,9 @@ static void send_json_with_cookie(int fd, int status, const char *body, const ch
                      "Content-Length: %zu\r\n"
                      "X-Frame-Options: DENY\r\n"
                      "X-Content-Type-Options: nosniff\r\n"
+                     "Content-Security-Policy: default-src 'self'\r\n"
+                     "Strict-Transport-Security: max-age=63072000; includeSubDomains\r\n"
+                     "Referrer-Policy: strict-origin-when-cross-origin\r\n"
                      "%s"
                      "%s"
                      "\r\n",
@@ -710,6 +716,46 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             alloc.free(alloc.ctx, json, strlen(json) + 1);
         if (r.checks)
             alloc.free(alloc.ctx, (void *)r.checks, r.check_count * sizeof(hu_component_check_t));
+        return;
+    }
+
+    if (path_is(path, "/metrics")) {
+        hu_allocator_t a = hu_system_allocator();
+        hu_health_snapshot_t snap;
+        hu_health_snapshot(&snap);
+        size_t cap = 2048 + snap.component_count * 128;
+        char *buf = (char *)a.alloc(a.ctx, cap);
+        if (!buf) {
+            send_json(fd, 503, "{\"error\":\"out of memory\"}");
+            if (snap.components) free(snap.components);
+            return;
+        }
+        size_t off = 0;
+        off += (size_t)snprintf(buf + off, cap - off,
+            "# HELP human_uptime_seconds Time since process start\n"
+            "# TYPE human_uptime_seconds gauge\n"
+            "human_uptime_seconds %llu\n",
+            (unsigned long long)snap.uptime_seconds);
+        off += (size_t)snprintf(buf + off, cap - off,
+            "# HELP human_websocket_connections Active WebSocket connections\n"
+            "# TYPE human_websocket_connections gauge\n"
+            "human_websocket_connections %zu\n",
+            gw->ws.conn_count);
+        if (snap.component_count > 0 && snap.components) {
+            off += (size_t)snprintf(buf + off, cap - off,
+                "# HELP human_component_healthy Component health (1=ok, 0=error)\n"
+                "# TYPE human_component_healthy gauge\n");
+            hu_readiness_result_t r = hu_health_check_readiness(&a);
+            for (size_t i = 0; i < r.check_count; i++) {
+                off += (size_t)snprintf(buf + off, cap - off,
+                    "human_component_healthy{component=\"%s\"} %d\n",
+                    r.checks[i].name, r.checks[i].healthy ? 1 : 0);
+            }
+            if (r.checks) a.free(a.ctx, (void *)r.checks, r.check_count * sizeof(hu_component_check_t));
+        }
+        send_response(fd, 200, "text/plain; version=0.0.4; charset=utf-8", buf, off, 0);
+        a.free(a.ctx, buf, cap);
+        if (snap.components) free(snap.components);
         return;
     }
 
