@@ -6,6 +6,7 @@ import type { GatewayStatus } from "../gateway.js";
 import { GatewayClient as GatewayClientClass } from "../gateway.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
+import { log } from "../lib/log.js";
 import { ScToast } from "../components/hu-toast.js";
 import { ChatController, type ChatItem, type GatewayLike } from "../controllers/chat-controller.js";
 import "../components/hu-button.js";
@@ -254,7 +255,7 @@ export class ScChatView extends GatewayAwareLitElement {
         });
       }
     } catch (e) {
-      console.warn("Failed to load sessions:", e);
+      log.warn("Failed to load sessions:", e);
       this._sessions = [];
     } finally {
       this._sessionsLoading = false;

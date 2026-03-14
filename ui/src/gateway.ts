@@ -1,3 +1,5 @@
+import { log } from "./lib/log.js";
+
 export type GatewayStatus = "disconnected" | "connecting" | "connected";
 
 export interface GatewayRequest {
@@ -125,7 +127,7 @@ export class GatewayClient extends EventTarget {
     try {
       data = JSON.parse(ev.data as string) as Record<string, unknown>;
     } catch {
-      console.warn("[gateway] failed to parse message:", ev.data);
+      log.warn("[gateway] failed to parse message:", ev.data);
       return;
     }
     const type = data.type as string;

@@ -1,5 +1,6 @@
 import { LitElement } from "lit";
 import type { GatewayClient } from "./gateway.js";
+import { log } from "./lib/log.js";
 import { getGateway, GATEWAY_CHANGED, type GatewayChangedDetail } from "./gateway-provider.js";
 import { observeAllCards, unobserveAllCards } from "./utils/scroll-entrance.js";
 import { isAuthError } from "./utils/friendly-error.js";
@@ -95,7 +96,7 @@ export class GatewayAwareLitElement extends LitElement {
         if (this.shadowRoot) observeAllCards(this.shadowRoot);
       });
     } catch (e) {
-      console.warn(`[${this.tagName.toLowerCase()}] load failed:`, e);
+      log.warn(`[${this.tagName.toLowerCase()}] load failed:`, e);
       if (isAuthError(e)) {
         this._stopAutoRefresh();
         document.dispatchEvent(new CustomEvent(AUTH_FAILED));

@@ -1,5 +1,6 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { EVENT_NAMES } from "../utils.js";
+import { log } from "../lib/log.js";
 import { ChatCache } from "./chat-cache.js";
 import {
   exportAsJson as exportItemsAsJson,
@@ -174,7 +175,7 @@ export class ChatController implements ReactiveController {
       try {
         await gw.abort();
       } catch (e) {
-        console.warn("[chat-controller] abort failed:", e);
+        log.warn("[chat-controller] abort failed:", e);
       }
     }
     this.isWaiting = false;

@@ -2,6 +2,7 @@ import { html, css, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { friendlyError } from "../utils/friendly-error.js";
+import { log } from "../lib/log.js";
 import { ScToast } from "../components/hu-toast.js";
 import { icons } from "../icons.js";
 import "../components/hu-page-hero.js";
@@ -271,7 +272,7 @@ export class ScConfigView extends GatewayAwareLitElement {
       const s = res?.schema;
       this.schema = s ?? { type: "object", properties: {} };
     } catch (e) {
-      console.warn("[config-view] failed to load schema, using defaults:", e);
+      log.warn("[config-view] failed to load schema, using defaults:", e);
       this.schema = {
         type: "object",
         properties: {
@@ -308,7 +309,7 @@ export class ScConfigView extends GatewayAwareLitElement {
           .filter((o) => o.value);
       }
     } catch (e) {
-      console.warn("[config-view] failed to load provider options, using defaults:", e);
+      log.warn("[config-view] failed to load provider options, using defaults:", e);
     }
   }
 
@@ -319,7 +320,7 @@ export class ScConfigView extends GatewayAwareLitElement {
         const current = toRawConfig(this.config);
         return JSON.stringify(parsed) !== JSON.stringify(current);
       } catch (e) {
-        console.warn("[config-view] malformed JSON in raw mode:", e);
+        log.warn("[config-view] malformed JSON in raw mode:", e);
         return this.rawText.trim().length > 0;
       }
     }
@@ -431,7 +432,7 @@ export class ScConfigView extends GatewayAwareLitElement {
           temperature: Number(parsed.default_temperature ?? parsed.temperature ?? 0.7),
         };
       } catch (e) {
-        console.warn("[config-view] failed to parse raw JSON, keeping previous state:", e);
+        log.warn("[config-view] failed to parse raw JSON, keeping previous state:", e);
       }
     } else {
       this.rawText = JSON.stringify(toRawConfig(this.edited), null, 2);

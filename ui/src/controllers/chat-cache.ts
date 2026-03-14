@@ -1,4 +1,5 @@
 import type { ChatItem } from "./chat-controller.js";
+import { log } from "../lib/log.js";
 
 const KEY_PREFIX = "hu-chat-";
 
@@ -43,7 +44,7 @@ export class ChatCache {
       const items = parseCached(raw);
       return items.length > 0 ? items : [];
     } catch {
-      console.warn("[chat-cache] failed to restore cache:", storageKey(key));
+      log.warn("[chat-cache] failed to restore cache:", storageKey(key));
     }
     return [];
   }
