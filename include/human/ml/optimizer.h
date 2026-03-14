@@ -23,6 +23,7 @@ typedef struct hu_ml_optimizer_vtable {
                        const hu_ml_tensor_t *grads, size_t count);
     void (*zero_grad)(void *ctx);
     void (*set_lr_multiplier)(void *ctx, float multiplier);
+    void (*set_training_progress)(void *ctx, float progress);
     void (*deinit)(void *ctx, hu_allocator_t *alloc);
 } hu_ml_optimizer_vtable_t;
 

@@ -34,6 +34,7 @@ typedef struct hu_muon_adamw {
     size_t group_count;
     size_t group_capacity;
     float lr_multiplier;
+    float training_progress; /* 0..1 fraction of training completed */
     int global_step;
 } hu_muon_adamw_t;
 
@@ -287,14 +288,9 @@ static hu_error_t muon_adamw_step(void *ctx, hu_ml_tensor_t *params,
         ? (float)m->global_step / (float)ramp_steps : 1.0f;
     float muon_beta = beta_start + t * (beta_end - beta_start);
 
-    /* Weight decay schedule: wd * (1 - progress), progress from lr_multiplier */
-    float wd_scale = (mult < 1.0f) ? (1.0f - mult) : 0.0f;
-    /* When lr_multiplier represents progress through training, weight_decay decays.
-     * At start (mult near 0 during warmup), wd is maximal. At end (mult=final_lr_frac), wd decays.
-     * Use 1.0 when no schedule is active. */
-    float wd_base = cfg->weight_decay;
-    if (wd_scale > 0.0f)
-        wd_base *= (1.0f - wd_scale);
+    /* Weight decay schedule: wd * (1 - progress) — full wd at start, zero at end */
+    float progress = m->training_progress;
+    float wd_base = cfg->weight_decay * (1.0f - progress);
 
     /* dmodel LR scaling: AdamW LRs scaled by (n_embd/768)^-0.5 */
     float dmodel_scale = 1.0f;
@@ -345,6 +341,11 @@ static void muon_adamw_set_lr_multiplier(void *ctx, float multiplier)
     ((hu_muon_adamw_t *)ctx)->lr_multiplier = multiplier;
 }
 
+static void muon_adamw_set_training_progress(void *ctx, float progress)
+{
+    ((hu_muon_adamw_t *)ctx)->training_progress = progress;
+}
+
 static void muon_adamw_deinit(void *ctx, hu_allocator_t *alloc)
 {
     hu_muon_adamw_t *m = (hu_muon_adamw_t *)ctx;
@@ -369,6 +370,7 @@ static const hu_ml_optimizer_vtable_t muon_adamw_vtable = {
     .step = muon_adamw_step,
     .zero_grad = muon_adamw_zero_grad,
     .set_lr_multiplier = muon_adamw_set_lr_multiplier,
+    .set_training_progress = muon_adamw_set_training_progress,
     .deinit = muon_adamw_deinit,
 };
 
@@ -391,6 +393,7 @@ hu_error_t hu_muon_adamw_create(hu_allocator_t *alloc,
     m->group_count = 0;
     m->group_capacity = 0;
     m->lr_multiplier = 1.0f;
+    m->training_progress = 0.0f;
     m->global_step = 0;
 
     out->ctx = m;

@@ -369,6 +369,7 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
     const int32_t *ids = (const int32_t *)input->data;
     size_t E = cfg->n_embd, V = cfg->vocab_size, L = cfg->n_layer;
     size_t nh = cfg->n_head, nkv = cfg->n_kv_head, hd = cfg->head_dim, nm = 4 * E;
+    size_t nd = mlp_down_dim(cfg->activation, nm);
     hu_allocator_t *a = g->alloc;
 
     hu_error_t cerr = cache_alloc(g, B, S);
@@ -495,7 +496,7 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
         matmul_atb(up_buf, xn, g->muw[li], (int)(B * S), (int)nm, (int)E);
         memcpy(lc->up_pre, up_buf, B * S * nm * sizeof(float));
         apply_activation(up_buf, B * S * nm, cfg->activation);
-        matmul_atb(mo, up_buf, g->mdw[li], (int)(B * S), (int)E, (int)nm);
+        matmul_atb(mo, up_buf, g->mdw[li], (int)(B * S), (int)E, (int)nd);
 
         /* j. MLP residual */
         for (size_t i = 0; i < B * S * E; i++) x[i] += mo[i];
@@ -546,6 +547,7 @@ static hu_error_t gpt_backward(void *ctx, const hu_ml_tensor_t *grad_output)
     size_t B = c->B, S = c->S;
     size_t E = cfg->n_embd, V = cfg->vocab_size, L = cfg->n_layer;
     size_t nh = cfg->n_head, nkv = cfg->n_kv_head, hd = cfg->head_dim, nm = 4 * E;
+    size_t nd = mlp_down_dim(cfg->activation, nm);
 
     if (grad_output->size_bytes < B * S * V * sizeof(float))
         return HU_ERR_INVALID_ARGUMENT;
@@ -635,10 +637,10 @@ static hu_error_t gpt_backward(void *ctx, const hu_ml_tensor_t *grad_output)
         apply_activation(up_post, BS * nm, cfg->activation);
 
         memset(d_up, 0, BS * nm * 4);
-        /* d_up += d_mlp @ W_down  (BS×E @ E×nm = BS×nm) */
-        matmul_add_ab(d_up, d_mlp, g->mdw[li], (int)BS, (int)E, (int)nm);
-        /* grad_mdw += d_mlp^T @ up_post  (E×BS @ BS×nm = E×nm) */
-        matmul_add_tab(g->grad_mdw[li], d_mlp, up_post, (int)BS, (int)E, (int)nm);
+        /* d_up += d_mlp @ W_down  (BS×E @ E×nd = BS×nd) */
+        matmul_add_ab(d_up, d_mlp, g->mdw[li], (int)BS, (int)E, (int)nd);
+        /* grad_mdw += d_mlp^T @ up_post  (E×BS @ BS×nd = E×nd) */
+        matmul_add_tab(g->grad_mdw[li], d_mlp, up_post, (int)BS, (int)E, (int)nd);
 
         /* Activation backward */
         apply_activation_bw(d_up, lc->up_pre, BS * nm, cfg->activation);
@@ -809,6 +811,7 @@ static void gpt_deinit(void *ctx, hu_allocator_t *alloc)
     const hu_gpt_config_t *cfg = &g->config;
     size_t E = cfg->n_embd, V = cfg->vocab_size, L = cfg->n_layer;
     size_t nh = cfg->n_head, nkv = cfg->n_kv_head, hd = cfg->head_dim, nm = 4 * E;
+    size_t nd = mlp_down_dim(cfg->activation, nm);
 
     cache_free(g);
 
@@ -817,7 +820,7 @@ static void gpt_deinit(void *ctx, hu_allocator_t *alloc)
     FP(g->grad_wte, V*E*4); FP(g->grad_lm_head, V*E*4);
     for (size_t i = 0; i < L; i++) {
         size_t qsz = nh*hd*E*4, kvsz = nkv*hd*E*4, osz = E*nh*hd*4;
-        size_t usz = nm*E*4, dsz = E*nm*4;
+        size_t usz = nm*E*4, dsz = E*nd*4;
         if (g->aqw) FP(g->aqw[i], qsz);
         if (g->akw) FP(g->akw[i], kvsz);
         if (g->avw) FP(g->avw[i], kvsz);
@@ -892,6 +895,7 @@ hu_error_t hu_gpt_create(hu_allocator_t *alloc, const hu_gpt_config_t *config,
     size_t V = config->vocab_size, E = config->n_embd, L = config->n_layer;
     size_t nh = config->n_head, nkv = config->n_kv_head, hd = config->head_dim;
     size_t nm = 4 * E;
+    size_t nd = mlp_down_dim(config->activation, nm);
     uint64_t seed = 42;
 
     /* Autoresearch init scales: embedding ~ N(0,1), lm_head ~ N(0,0.001),
@@ -916,7 +920,7 @@ hu_error_t hu_gpt_create(hu_allocator_t *alloc, const hu_gpt_config_t *config,
     GAP(g->grad_muw, L); GAP(g->grad_mdw, L);
 
     for (size_t i = 0; i < L; i++) {
-        size_t qsz = nh*hd*E, kvsz = nkv*hd*E, osz = E*nh*hd, usz = nm*E, dsz = E*nm;
+        size_t qsz = nh*hd*E, kvsz = nkv*hd*E, osz = E*nh*hd, usz = nm*E, dsz = E*nd;
         GA(g->aqw[i], qsz); GA(g->akw[i], kvsz); GA(g->avw[i], kvsz);
         GA(g->aow[i], osz); GA(g->muw[i], usz); GA(g->mdw[i], dsz);
         GA(g->grad_aqw[i], qsz); GA(g->grad_akw[i], kvsz); GA(g->grad_avw[i], kvsz);
@@ -946,7 +950,7 @@ hu_error_t hu_gpt_create(hu_allocator_t *alloc, const hu_gpt_config_t *config,
 
     g->total_params = V * E * 2;
     g->total_params += L * (nh*hd*E + nkv*hd*E*2 + E*nh*hd);
-    g->total_params += L * (nm*E + E*nm);
+    g->total_params += L * (nm*E + E*nd);
     g->total_params += L * 2;
 
     /* Build param descriptor array for get_params / checkpoint */
@@ -972,8 +976,8 @@ hu_error_t hu_gpt_create(hu_allocator_t *alloc, const hu_gpt_config_t *config,
                 .shape = {E, nh*hd, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_F32};
             g->param_descs[pi++] = (hu_ml_tensor_t){.data = g->muw[i], .size_bytes = nm*E*4,
                 .shape = {nm, E, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_F32};
-            g->param_descs[pi++] = (hu_ml_tensor_t){.data = g->mdw[i], .size_bytes = E*nm*4,
-                .shape = {E, nm, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_F32};
+            g->param_descs[pi++] = (hu_ml_tensor_t){.data = g->mdw[i], .size_bytes = E*nd*4,
+                .shape = {E, nd, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_F32};
             g->param_descs[pi++] = (hu_ml_tensor_t){.data = &g->rl[i], .size_bytes = 4,
                 .shape = {1, 1, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_F32};
             g->param_descs[pi++] = (hu_ml_tensor_t){.data = &g->x0l[i], .size_bytes = 4,
@@ -1002,6 +1006,7 @@ hu_error_t hu_gpt_register_params(hu_model_t *model, struct hu_ml_optimizer *opt
     const hu_gpt_config_t *cfg = &g->config;
     size_t E = cfg->n_embd, V = cfg->vocab_size, L = cfg->n_layer;
     size_t nh = cfg->n_head, nkv = cfg->n_kv_head, hd = cfg->head_dim, nm = 4 * E;
+    size_t nd = mlp_down_dim(cfg->activation, nm);
     hu_error_t err;
 
     err = hu_muon_adamw_add_param(opt, g->wte, g->grad_wte, V, E, HU_PARAM_EMBEDDING);
@@ -1020,7 +1025,7 @@ hu_error_t hu_gpt_register_params(hu_model_t *model, struct hu_ml_optimizer *opt
         if (err != HU_OK) return err;
         err = hu_muon_adamw_add_param(opt, g->muw[i], g->grad_muw[i], nm, E, HU_PARAM_MATRIX);
         if (err != HU_OK) return err;
-        err = hu_muon_adamw_add_param(opt, g->mdw[i], g->grad_mdw[i], E, nm, HU_PARAM_MATRIX);
+        err = hu_muon_adamw_add_param(opt, g->mdw[i], g->grad_mdw[i], E, nd, HU_PARAM_MATRIX);
         if (err != HU_OK) return err;
         err = hu_muon_adamw_add_param(opt, &g->rl[i], &g->grad_rl[i], 1, 1, HU_PARAM_SCALAR);
         if (err != HU_OK) return err;

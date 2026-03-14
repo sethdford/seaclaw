@@ -247,6 +247,8 @@ hu_error_t hu_experiment_loop(hu_allocator_t *alloc,
     current_config.training.warmup_ratio = current_config.optimizer.warmup_ratio;
     current_config.training.warmdown_ratio = current_config.optimizer.warmdown_ratio;
     current_config.training.final_lr_frac = current_config.optimizer.final_lr_frac;
+    /* Wire n_embd for dmodel LR scaling */
+    current_config.optimizer.n_embd = current_config.gpt.n_embd;
 
     /* Open experiment store if a results path is given (non-fatal on failure) */
     hu_experiment_store_t *store = NULL;
@@ -260,8 +262,10 @@ hu_error_t hu_experiment_loop(hu_allocator_t *alloc,
         hu_experiment_result_t result = {0};
         result.iteration = i;
 
-        if (i > 0)
+        if (i > 0) {
             mutate_config(&current_config, i);
+            current_config.optimizer.n_embd = current_config.gpt.n_embd;
+        }
 
         hu_error_t err = run_single_experiment(alloc, &current_config,
                                                config->data_dir, &result);

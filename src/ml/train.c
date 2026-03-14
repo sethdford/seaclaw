@@ -166,6 +166,8 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
                     config->warmup_ratio, config->warmdown_ratio,
                     config->final_lr_frac);
                 optimizer->vtable->set_lr_multiplier(optimizer->ctx, mult);
+                if (optimizer->vtable->set_training_progress)
+                    optimizer->vtable->set_training_progress(optimizer->ctx, progress);
             }
 
             err = optimizer->vtable->step(optimizer->ctx, NULL, NULL, 0);
