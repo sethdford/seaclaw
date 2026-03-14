@@ -28,6 +28,16 @@ jobs:
           echo "## Binary Size: ${SIZE_KB} KB" >> $GITHUB_STEP_SUMMARY
           echo "BINARY_SIZE_KB=${SIZE_KB}" >> $GITHUB_ENV
 
+      - name: Check binary size regression
+        if: github.event_name == 'pull_request'
+        run: |
+          MAX_SIZE_KB=1800
+          if [ "$BINARY_SIZE_KB" -gt "$MAX_SIZE_KB" ]; then
+            echo "::error::Binary size ${BINARY_SIZE_KB}KB exceeds limit of ${MAX_SIZE_KB}KB"
+            exit 1
+          fi
+          echo "Binary size ${BINARY_SIZE_KB}KB is within limit of ${MAX_SIZE_KB}KB"
+
       - uses: ./.github/actions/setup-build
         with:
           build-dir: build-test

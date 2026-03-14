@@ -72,8 +72,6 @@ static void integration_full_agent_turn_with_memory_context(void) {
     hu_agent_deinit(&agent);
     if (mem.vtable->deinit)
         mem.vtable->deinit(mem.ctx);
-    if (prov.vtable->deinit)
-        prov.vtable->deinit(prov.ctx, &alloc);
 }
 
 /* ── 2. Proactive check-in with memory ────────────────────────────────────── */

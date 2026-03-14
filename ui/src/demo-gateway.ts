@@ -1294,6 +1294,10 @@ export class DemoGatewayClient extends EventTarget {
         return { available: false, current_version: "0.42.0" };
       case "update.run":
         return { status: "up_to_date", current_version: "0.4.0" };
+      case "push.register":
+        return { status: "registered", endpoint: "demo" };
+      case "push.unregister":
+        return { status: "unregistered" };
       case "exec.approval.resolve":
         return { status: "approved" };
       case "chat.history": {

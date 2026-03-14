@@ -32,22 +32,17 @@ test.describe("Performance Latency Budgets", () => {
     );
     await expect(chatNavBtn).toBeVisible({ timeout: 5000 });
 
-    const start = await page.evaluate(() => {
-      const app = document.querySelector("hu-app");
-      const sidebar = app?.shadowRoot?.querySelector("hu-sidebar");
-      const buttons = sidebar?.shadowRoot?.querySelectorAll("button.nav-item");
-      const chatBtn = Array.from(buttons ?? []).find((b) =>
-        b.getAttribute("aria-label")?.toLowerCase().includes("chat"),
-      ) as HTMLElement | null;
-      if (!chatBtn) return -1;
-      const s = performance.now();
-      chatBtn.click();
-      return s;
-    });
-    if (start < 0) {
+    const isVisible = await chatNavBtn.isVisible().catch(() => false);
+    if (!isVisible) {
       test.skip(true, "No chat nav button found in sidebar");
       return;
     }
+
+    const start = await chatNavBtn.evaluate((el) => {
+      const s = performance.now();
+      (el as HTMLElement).click();
+      return s;
+    });
 
     const chatView = page.locator("hu-app >> hu-chat-view");
     await expect(chatView).toBeAttached({ timeout: 5000 });

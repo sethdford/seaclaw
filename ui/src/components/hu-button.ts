@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 type ButtonVariant = "primary" | "secondary" | "destructive" | "ghost";
@@ -11,6 +11,7 @@ export class ScButton extends LitElement {
   @property({ type: Boolean }) loading = false;
   @property({ type: Boolean }) disabled = false;
   @property({ type: Boolean, attribute: "icon-only" }) iconOnly = false;
+  @property({ type: String, attribute: "aria-label" }) ariaLabelAttr = "";
 
   static override styles = css`
     @keyframes hu-spin {
@@ -211,6 +212,7 @@ export class ScButton extends LitElement {
         ?disabled=${this.disabled}
         aria-busy=${this.loading}
         aria-disabled=${this.disabled}
+        aria-label=${this.ariaLabelAttr || nothing}
       >
         ${this.loading ? html`<span class="spinner" aria-hidden="true"></span>` : null}
         <span class="slot">

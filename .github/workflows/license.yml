@@ -1,0 +1,37 @@
+name: License Compliance
+
+on:
+  pull_request:
+    paths:
+      - "ui/package.json"
+      - "ui/package-lock.json"
+      - "website/package.json"
+      - "website/package-lock.json"
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check-licenses:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install license-checker
+        run: npm install -g license-checker
+
+      - name: Check UI licenses
+        working-directory: ui
+        run: |
+          npm ci
+          license-checker --onlyAllow "MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;0BSD;CC0-1.0;CC-BY-4.0;Unlicense;BlueOak-1.0.0" --excludePrivatePackages
+
+      - name: Check website licenses
+        working-directory: website
+        run: |
+          npm ci
+          license-checker --onlyAllow "MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;0BSD;CC0-1.0;CC-BY-4.0;Unlicense;BlueOak-1.0.0" --excludePrivatePackages
