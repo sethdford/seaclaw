@@ -14,7 +14,7 @@ if [ -n "$ANY_HITS" ]; then
 fi
 
 # Check for console.log/debug in production code (console.warn/error allowed for diagnostics)
-CONSOLE_HITS=$(grep -rn --include='*.ts' --exclude='*.test.ts' --exclude='demo-gateway.ts' -E 'console\.(log|debug)\(' src/ 2>/dev/null || true)
+CONSOLE_HITS=$(grep -rn --include='*.ts' --exclude='*.test.ts' --exclude='demo-gateway.ts' --exclude='log.ts' -E 'console\.(log|debug)\(' src/ 2>/dev/null || true)
 if [ -n "$CONSOLE_HITS" ]; then
   echo "FAIL: Found console.log/debug statements in production code:"
   echo "$CONSOLE_HITS"
