@@ -1309,6 +1309,30 @@ hu-card.hu-entrance.hu-visible {
   initial-value: 135deg;
 }
 
+@property --hu-cursor-scale {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@property --hu-pulse-opacity {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0.9;
+}
+
+@property --hu-progress-value {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+@property --hu-border-glow {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
+}
+
 h1,
 h2,
 h3,

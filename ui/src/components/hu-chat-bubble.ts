@@ -124,22 +124,22 @@ export class ScChatBubble extends LitElement {
       border-radius: var(--hu-radius-xl) var(--hu-radius-xl) var(--hu-radius-sm) var(--hu-radius-xl);
       animation: hu-bubble-send var(--hu-duration-normal)
         var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
-    }
 
-    .bubble.role-user::after {
-      content: "";
-      display: var(--tail-display, none);
-      position: absolute;
-      bottom: -1px;
-      right: calc(-1 * var(--hu-space-sm));
-      width: var(--hu-space-sm);
-      height: calc(var(--hu-space-sm) + var(--hu-space-2xs));
-      background: var(--hu-accent);
-      clip-path: polygon(0 0, 100% 100%, 0 100%);
-    }
+      &::after {
+        content: "";
+        display: var(--tail-display, none);
+        position: absolute;
+        bottom: -1px;
+        right: calc(-1 * var(--hu-space-sm));
+        width: var(--hu-space-sm);
+        height: calc(var(--hu-space-sm) + var(--hu-space-2xs));
+        background: var(--hu-accent);
+        clip-path: polygon(0 0, 100% 100%, 0 100%);
+      }
 
-    .bubble.role-user.show-tail::after {
-      --tail-display: block;
+      &.show-tail::after {
+        --tail-display: block;
+      }
     }
 
     .bubble.role-assistant {
@@ -154,22 +154,22 @@ export class ScChatBubble extends LitElement {
       box-shadow: var(--hu-shadow-xs);
       animation: hu-bubble-receive var(--hu-duration-normal)
         var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
-    }
 
-    .bubble.role-assistant::after {
-      content: "";
-      display: var(--tail-display, none);
-      position: absolute;
-      bottom: -1px;
-      left: calc(-1 * var(--hu-space-sm));
-      width: var(--hu-space-sm);
-      height: calc(var(--hu-space-sm) + var(--hu-space-2xs));
-      background: color-mix(in srgb, var(--hu-surface-container) 65%, transparent);
-      clip-path: polygon(100% 0, 100% 100%, 0 100%);
-    }
+      &::after {
+        content: "";
+        display: var(--tail-display, none);
+        position: absolute;
+        bottom: -1px;
+        left: calc(-1 * var(--hu-space-sm));
+        width: var(--hu-space-sm);
+        height: calc(var(--hu-space-sm) + var(--hu-space-2xs));
+        background: color-mix(in srgb, var(--hu-surface-container) 65%, transparent);
+        clip-path: polygon(100% 0, 100% 100%, 0 100%);
+      }
 
-    .bubble.role-assistant.show-tail::after {
-      --tail-display: block;
+      &.show-tail::after {
+        --tail-display: block;
+      }
     }
 
     @media (prefers-reduced-transparency: reduce) {
@@ -197,73 +197,71 @@ export class ScChatBubble extends LitElement {
       overflow: hidden;
     }
 
-    /* Assistant markdown content */
     .bubble.role-assistant .md-content {
       color: var(--hu-text);
+
+      & a {
+        color: var(--hu-accent);
+        text-decoration: none;
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+
+      & code.inline {
+        font-family: var(--hu-font-mono);
+        font-size: 0.9em;
+        padding: 0.1em 0.35em;
+        border-radius: var(--hu-radius-sm);
+        background: var(--hu-bg-inset);
+      }
     }
 
-    .bubble.role-assistant .md-content a {
-      color: var(--hu-accent);
-      text-decoration: none;
-    }
-
-    .bubble.role-assistant .md-content a:hover {
-      text-decoration: underline;
-    }
-
-    .bubble.role-assistant .md-content code.inline {
-      font-family: var(--hu-font-mono);
-      font-size: 0.9em;
-      padding: 0.1em 0.35em;
-      border-radius: var(--hu-radius-sm);
-      background: var(--hu-bg-inset);
-    }
-
-    /* User bubble content */
     .bubble.role-user .md-content {
       color: var(--hu-on-accent);
-    }
 
-    .bubble.role-user .md-content a {
-      color: var(--hu-on-accent);
-      text-decoration: underline;
-    }
+      & a {
+        color: var(--hu-on-accent);
+        text-decoration: underline;
+        &:hover {
+          text-decoration: underline;
+        }
+      }
 
-    .bubble.role-user .md-content a:hover {
-      text-decoration: underline;
-    }
-
-    .bubble.role-user .md-content code.inline {
-      font-family: var(--hu-font-mono);
-      font-size: 0.9em;
-      padding: 0.1em 0.35em;
-      border-radius: var(--hu-radius-sm);
-      background: color-mix(in srgb, var(--hu-on-accent) 90%, transparent);
+      & code.inline {
+        font-family: var(--hu-font-mono);
+        font-size: 0.9em;
+        padding: 0.1em 0.35em;
+        border-radius: var(--hu-radius-sm);
+        background: color-mix(in srgb, var(--hu-on-accent) 90%, transparent);
+      }
     }
 
     /* Shared markdown styles */
     .md-heading {
       font-weight: var(--hu-weight-semibold);
       margin: var(--hu-space-sm) 0 var(--hu-space-xs);
+
+      &:first-child {
+        margin-top: 0;
+      }
     }
 
-    .md-heading:first-child {
-      margin-top: 0;
-    }
-
-    .md-content h1.md-heading {
-      font-size: var(--hu-text-2xl);
-    }
-    .md-content h2.md-heading {
-      font-size: var(--hu-text-xl);
-    }
-    .md-content h3.md-heading {
-      font-size: var(--hu-text-lg);
-    }
-    .md-content h4.md-heading,
-    .md-content h5.md-heading,
-    .md-content h6.md-heading {
-      font-size: var(--hu-text-base);
+    .md-content {
+      & h1.md-heading {
+        font-size: var(--hu-text-2xl);
+      }
+      & h2.md-heading {
+        font-size: var(--hu-text-xl);
+      }
+      & h3.md-heading {
+        font-size: var(--hu-text-lg);
+      }
+      & h4.md-heading,
+      & h5.md-heading,
+      & h6.md-heading {
+        font-size: var(--hu-text-base);
+      }
     }
 
     .md-paragraph {

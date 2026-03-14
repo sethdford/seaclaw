@@ -170,14 +170,13 @@ export class ScCommandPalette extends LitElement {
       color: var(--hu-text);
       cursor: pointer;
       border-radius: var(--hu-radius);
-    }
 
-    .item:hover {
-      background: var(--hu-hover-overlay);
-    }
-
-    .item.selected {
-      background: var(--hu-hover-overlay);
+      &:hover {
+        background: var(--hu-hover-overlay);
+      }
+      &.selected {
+        background: var(--hu-hover-overlay);
+      }
     }
 
     .icon {
@@ -188,21 +187,21 @@ export class ScCommandPalette extends LitElement {
       align-items: center;
       justify-content: center;
       color: var(--hu-text-muted);
-    }
 
-    .icon svg {
-      width: 100%;
-      height: 100%;
+      & svg {
+        width: 100%;
+        height: 100%;
+      }
     }
 
     .label {
       flex: 1;
       min-width: 0;
-    }
 
-    .label strong {
-      font-weight: var(--hu-weight-semibold);
-      color: var(--hu-text);
+      & strong {
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+      }
     }
 
     .meta {

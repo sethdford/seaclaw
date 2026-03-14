@@ -39,20 +39,18 @@ export class ScToolResult extends LitElement {
       border-radius: var(--hu-radius);
       box-shadow: var(--hu-shadow-xs);
       overflow: hidden;
-    }
 
-    .container.status-running {
-      animation: hu-pulse-border var(--hu-duration-slow) var(--hu-ease-in-out) infinite;
-    }
-
-    .container.status-success {
-      border-left-color: var(--hu-success);
-      animation: none;
-    }
-
-    .container.status-error {
-      border-left-color: var(--hu-error);
-      animation: none;
+      &.status-running {
+        animation: hu-pulse-border var(--hu-duration-slow) var(--hu-ease-in-out) infinite;
+      }
+      &.status-success {
+        border-left-color: var(--hu-success);
+        animation: none;
+      }
+      &.status-error {
+        border-left-color: var(--hu-error);
+        animation: none;
+      }
     }
 
     .header {
@@ -66,15 +64,14 @@ export class ScToolResult extends LitElement {
       color: var(--hu-text);
       cursor: pointer;
       user-select: none;
-    }
 
-    .header:hover {
-      background: color-mix(in srgb, var(--hu-surface, var(--hu-bg-surface)) 8%, transparent);
-    }
-
-    .header:focus-visible {
-      outline: var(--hu-focus-ring-width) solid var(--hu-focus-ring);
-      outline-offset: -2px;
+      &:hover {
+        background: color-mix(in srgb, var(--hu-surface, var(--hu-bg-surface)) 8%, transparent);
+      }
+      &:focus-visible {
+        outline: var(--hu-focus-ring-width) solid var(--hu-focus-ring);
+        outline-offset: -2px;
+      }
     }
 
     .icon {
@@ -82,18 +79,16 @@ export class ScToolResult extends LitElement {
       height: var(--hu-icon-sm);
       flex-shrink: 0;
       color: inherit;
-    }
 
-    .icon.running {
-      animation: hu-spin var(--hu-duration-slow) linear infinite;
-    }
-
-    .icon.success {
-      color: var(--hu-accent);
-    }
-
-    .icon.error {
-      color: var(--hu-error);
+      &.running {
+        animation: hu-spin var(--hu-duration-slow) linear infinite;
+      }
+      &.success {
+        color: var(--hu-accent);
+      }
+      &.error {
+        color: var(--hu-error);
+      }
     }
 
     .tool-body {

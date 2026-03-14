@@ -44,79 +44,81 @@ export class ScPopover extends LitElement {
         transform var(--hu-duration-normal) var(--hu-spring-out);
     }
 
-    .popover.open {
-      opacity: 1;
-      visibility: visible;
-      transform: scale(1);
-      animation: hu-fade-in var(--hu-duration-fast) var(--hu-ease-out);
-    }
+    .popover {
+      &.open {
+        opacity: 1;
+        visibility: visible;
+        transform: scale(1);
+        animation: hu-fade-in var(--hu-duration-fast) var(--hu-ease-out);
+      }
 
-    /* Native popover enhancement */
-    .popover[popover] {
-      margin: 0;
-      padding: var(--hu-space-md);
-      background: color-mix(in srgb, var(--hu-surface-container-high) 88%, transparent);
-      backdrop-filter: blur(var(--hu-glass-standard-blur))
-        saturate(var(--hu-glass-standard-saturate));
-      -webkit-backdrop-filter: blur(var(--hu-glass-standard-blur))
-        saturate(var(--hu-glass-standard-saturate));
-      border: 1px solid var(--hu-glass-border-color);
-      border-radius: var(--hu-radius-lg);
-      box-shadow: var(--hu-shadow-lg);
-    }
-    .popover[popover]:popover-open {
-      opacity: 1;
-      visibility: visible;
-      transform: scale(1);
+      &[popover] {
+        margin: 0;
+        padding: var(--hu-space-md);
+        background: color-mix(in srgb, var(--hu-surface-container-high) 88%, transparent);
+        backdrop-filter: blur(var(--hu-glass-standard-blur))
+          saturate(var(--hu-glass-standard-saturate));
+        -webkit-backdrop-filter: blur(var(--hu-glass-standard-blur))
+          saturate(var(--hu-glass-standard-saturate));
+        border: 1px solid var(--hu-glass-border-color);
+        border-radius: var(--hu-radius-lg);
+        box-shadow: var(--hu-shadow-lg);
+
+        &:popover-open {
+          opacity: 1;
+          visibility: visible;
+          transform: scale(1);
+        }
+      }
+
+      &.position-bottom {
+        top: 100%;
+        left: 50%;
+        margin-top: var(--hu-space-xs);
+        transform: translateX(-50%) scale(0.96);
+        &.open {
+          transform: translateX(-50%) scale(1);
+        }
+      }
+
+      &.position-top {
+        bottom: 100%;
+        left: 50%;
+        margin-bottom: var(--hu-space-xs);
+        transform: translateX(-50%) scale(0.96);
+        &.open {
+          transform: translateX(-50%) scale(1);
+        }
+      }
+
+      &.position-left {
+        right: 100%;
+        top: 50%;
+        margin-right: var(--hu-space-xs);
+        transform: translateY(-50%) scale(0.96);
+        &.open {
+          transform: translateY(-50%) scale(1);
+        }
+      }
+
+      &.position-right {
+        left: 100%;
+        top: 50%;
+        margin-left: var(--hu-space-xs);
+        transform: translateY(-50%) scale(0.96);
+        &.open {
+          transform: translateY(-50%) scale(1);
+        }
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
       .popover {
         transition: none;
+        &.open {
+          animation: none;
+        }
       }
-      .popover.open {
-        animation: none;
-      }
-    }
-
-    .popover.position-bottom {
-      top: 100%;
-      left: 50%;
-      margin-top: var(--hu-space-xs);
-      transform: translateX(-50%) scale(0.96);
-    }
-    .popover.position-bottom.open {
-      transform: translateX(-50%) scale(1);
-    }
-
-    .popover.position-top {
-      bottom: 100%;
-      left: 50%;
-      margin-bottom: var(--hu-space-xs);
-      transform: translateX(-50%) scale(0.96);
-    }
-    .popover.position-top.open {
-      transform: translateX(-50%) scale(1);
-    }
-
-    .popover.position-left {
-      right: 100%;
-      top: 50%;
-      margin-right: var(--hu-space-xs);
-      transform: translateY(-50%) scale(0.96);
-    }
-    .popover.position-left.open {
-      transform: translateY(-50%) scale(1);
-    }
-
-    .popover.position-right {
-      left: 100%;
-      top: 50%;
-      margin-left: var(--hu-space-xs);
-      transform: translateY(-50%) scale(0.96);
-    }
-    .popover.position-right.open {
-      transform: translateY(-50%) scale(1);
     }
 
     .arrow {

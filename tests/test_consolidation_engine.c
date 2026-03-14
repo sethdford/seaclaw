@@ -174,12 +174,56 @@ static void consolidation_engine_run_scheduled_respects_time_gating(void) {
     mem.vtable->deinit(mem.ctx);
 }
 
+static void consolidation_engine_nightly_empty_db_no_crash(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+
+    hu_consolidation_engine_t engine = {.alloc = &alloc, .db = db};
+    int64_t now_ts = (int64_t)time(NULL);
+    HU_ASSERT_EQ(hu_consolidation_engine_nightly(&engine, now_ts), HU_OK);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void consolidation_engine_weekly_under_threshold_no_summary(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+
+    for (int i = 0; i < 3; i++) {
+        char summary[64];
+        int n = snprintf(summary, sizeof(summary), "Chat %d", i);
+        int64_t id = 0;
+        HU_ASSERT_EQ(hu_episode_store_insert(&alloc, db, "contact_e", 9, summary, (size_t)n,
+                                             NULL, 0, "key", 3, 0.5, "conversation", 12, &id),
+                     HU_OK);
+    }
+
+    hu_consolidation_engine_t engine = {.alloc = &alloc, .db = db};
+    HU_ASSERT_EQ(hu_consolidation_engine_weekly(&engine, (int64_t)time(NULL)), HU_OK);
+
+    hu_episode_sqlite_t *out = NULL;
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_episode_get_by_contact(&alloc, db, "contact_e", 9, 20, 0, &out, &count), HU_OK);
+    bool found_summary = false;
+    for (size_t i = 0; i < count; i++) {
+        if (strstr(out[i].source, "weekly_summary") != NULL) found_summary = true;
+    }
+    HU_ASSERT_FALSE(found_summary);
+    if (out) hu_episode_free(&alloc, out, count);
+    mem.vtable->deinit(mem.ctx);
+}
+
 void run_consolidation_engine_tests(void) {
     HU_TEST_SUITE("consolidation_engine");
     HU_RUN_TEST(consolidation_engine_nightly_deduplicates_similar_episodes);
     HU_RUN_TEST(consolidation_engine_weekly_creates_summary_when_more_than_five);
     HU_RUN_TEST(consolidation_engine_monthly_deletes_old_low_salience);
     HU_RUN_TEST(consolidation_engine_run_scheduled_respects_time_gating);
+    HU_RUN_TEST(consolidation_engine_nightly_empty_db_no_crash);
+    HU_RUN_TEST(consolidation_engine_weekly_under_threshold_no_summary);
 }
 
 #else

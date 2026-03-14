@@ -60,10 +60,22 @@ static void test_memory_degradation_seed_forget_remind_me(void) {
     hu_str_free(&alloc, r);
 }
 
+static void test_memory_degradation_not_protected_normal_text(void) {
+    HU_ASSERT_FALSE(hu_memory_degradation_is_protected("Had lunch today", 15));
+    HU_ASSERT_FALSE(hu_memory_degradation_is_protected("Watched a movie", 15));
+}
+
+static void test_memory_degradation_protected_emotional_keyword(void) {
+    const char *s = "She died last Tuesday";
+    HU_ASSERT_TRUE(hu_memory_degradation_is_protected(s, strlen(s)));
+}
+
 void run_memory_degradation_tests(void) {
     HU_TEST_SUITE("memory_degradation");
     HU_RUN_TEST(test_memory_degradation_protected_promised_mindy);
     HU_RUN_TEST(test_memory_degradation_rate_zero_never_degrade);
     HU_RUN_TEST(test_memory_degradation_seed_fuzz_day_changed);
     HU_RUN_TEST(test_memory_degradation_seed_forget_remind_me);
+    HU_RUN_TEST(test_memory_degradation_not_protected_normal_text);
+    HU_RUN_TEST(test_memory_degradation_protected_emotional_keyword);
 }

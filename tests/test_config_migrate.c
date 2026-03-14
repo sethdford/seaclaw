@@ -51,9 +51,27 @@ static void test_migrate_v1_memory_backend_moved(void) {
     hu_json_free(&alloc, root);
 }
 
+static void test_migrate_null_root_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_error_t err = hu_config_migrate(&alloc, NULL);
+    HU_ASSERT_NEQ(err, HU_OK);
+}
+
+static void test_migrate_empty_object_gets_version(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_json_value_t *root = hu_json_object_new(&alloc);
+    hu_error_t err = hu_config_migrate(&alloc, root);
+    HU_ASSERT_EQ(err, HU_OK);
+    double ver = hu_json_get_number(root, "config_version", 0);
+    HU_ASSERT_TRUE(ver >= 1.0);
+    hu_json_free(&alloc, root);
+}
+
 void run_config_migrate_tests(void) {
     HU_RUN_TEST(test_migrate_missing_version_defaults_to_v1);
     HU_RUN_TEST(test_migrate_current_version_noop);
     HU_RUN_TEST(test_migrate_future_version_rejected);
     HU_RUN_TEST(test_migrate_v1_memory_backend_moved);
+    HU_RUN_TEST(test_migrate_null_root_returns_error);
+    HU_RUN_TEST(test_migrate_empty_object_gets_version);
 }

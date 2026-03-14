@@ -41,11 +41,33 @@ static void google_photos_fetch_url_field_populated(void) {
     HU_ASSERT_TRUE(strstr(items[0].url, "photos.google.com") != NULL);
 }
 
+static void google_photos_fetch_insufficient_cap_rejects(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_feed_ingest_item_t items[1];
+    size_t count = 0;
+    hu_error_t err = hu_google_photos_fetch(&alloc, NULL, "token", 5,
+        items, 1, &count);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+
+static void google_photos_fetch_content_type_set(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_feed_ingest_item_t items[4];
+    size_t count = 0;
+    hu_error_t err = hu_google_photos_fetch(&alloc, NULL, "tok", 3,
+        items, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(count >= 1u);
+    HU_ASSERT_TRUE(items[0].content_type[0] != '\0');
+}
+
 void run_google_feeds_tests(void) {
     HU_TEST_SUITE("google feeds");
     HU_RUN_TEST(google_photos_fetch_mock_returns_correct_source);
     HU_RUN_TEST(google_photos_fetch_item_count_matches_expected);
     HU_RUN_TEST(google_photos_fetch_url_field_populated);
+    HU_RUN_TEST(google_photos_fetch_insufficient_cap_rejects);
+    HU_RUN_TEST(google_photos_fetch_content_type_set);
 }
 
 #endif /* HU_ENABLE_FEEDS */

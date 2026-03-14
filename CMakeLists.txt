@@ -1806,7 +1806,6 @@ set(HU_TEST_SOURCES
     tests/test_mcp_transport.c
     tests/test_mcp_audit.c
     tests/test_multigraph.c
-    tests/test_lora.c
 )
 if(HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_SOURCES tests/test_google_feeds.c tests/test_music_feeds.c

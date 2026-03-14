@@ -37,18 +37,19 @@ export class ScTimeline extends LitElement {
       margin-top: var(--hu-space-xs);
       flex-shrink: 0;
       justify-self: center;
-    }
-    .dot.success {
-      background: var(--hu-success);
-    }
-    .dot.error {
-      background: var(--hu-error);
-    }
-    .dot.info {
-      background: var(--hu-accent);
-    }
-    .dot.pending {
-      background: var(--hu-text-muted);
+
+      &.success {
+        background: var(--hu-success);
+      }
+      &.error {
+        background: var(--hu-error);
+      }
+      &.info {
+        background: var(--hu-accent);
+      }
+      &.pending {
+        background: var(--hu-text-muted);
+      }
     }
     .line {
       position: absolute;
