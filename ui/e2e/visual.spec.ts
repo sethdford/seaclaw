@@ -39,7 +39,10 @@ test.describe("Visual Regression — Dark Theme", () => {
       await waitForViewReady(page, viewTag);
       const updating = testInfo.config.updateSnapshots !== "none";
       if (!updating && !snapshotExists(testInfo, snapName)) {
-        test.skip(true, `No baseline for ${process.platform}, run --update-snapshots locally`);
+        test.skip(
+          true,
+          `No baseline for ${process.platform}; run: npx playwright test visual.spec.ts --update-snapshots`,
+        );
       }
       await expect(page).toHaveScreenshot(`${view.name}-dark.png`, {
         maxDiffPixelRatio: CROSS_PLATFORM_THRESHOLD,
@@ -63,7 +66,10 @@ test.describe("Visual Regression — Light Theme", () => {
       await page.waitForTimeout(ANIMATION_SETTLE_MS);
       const updating = testInfo.config.updateSnapshots !== "none";
       if (!updating && !snapshotExists(testInfo, snapName)) {
-        test.skip(true, `No baseline for ${process.platform}, run --update-snapshots locally`);
+        test.skip(
+          true,
+          `No baseline for ${process.platform}; run: npx playwright test visual.spec.ts --update-snapshots`,
+        );
       }
       await expect(page).toHaveScreenshot(`${view.name}-light.png`, {
         maxDiffPixelRatio: CROSS_PLATFORM_THRESHOLD,
@@ -80,7 +86,10 @@ test.describe("Visual Regression — Catalog", () => {
     await expect(page.locator("body")).toBeVisible({ timeout: 5000 });
     const updating = testInfo.config.updateSnapshots !== "none";
     if (!updating && !snapshotExists(testInfo, snapName)) {
-      test.skip(true, `No baseline for ${process.platform}, run --update-snapshots locally`);
+      test.skip(
+        true,
+        `No baseline for ${process.platform}; run: npx playwright test visual.spec.ts --update-snapshots`,
+      );
     }
     await expect(page).toHaveScreenshot("catalog.png", {
       maxDiffPixelRatio: CROSS_PLATFORM_THRESHOLD,

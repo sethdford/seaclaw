@@ -3,21 +3,15 @@ import { waitForViewReady, WAIT } from "./helpers.js";
 
 test.describe("Performance Latency Budgets", () => {
   test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto("/?demo#overview");
     await waitForViewReady(page, "hu-overview-view");
     await page.waitForTimeout(WAIT);
   });
 
   test("button click responds within 50ms budget", async ({ page }) => {
-    const hasNav = await page.evaluate(() => {
-      const app = document.querySelector("hu-app");
-      const sidebar = app?.shadowRoot?.querySelector("hu-sidebar");
-      return (sidebar?.shadowRoot?.querySelectorAll("button.nav-item")?.length ?? 0) > 0;
-    });
-    if (!hasNav) {
-      test.skip(true, "No nav items found in sidebar shadow DOM");
-      return;
-    }
+    const navItem = page.locator("hu-app >> hu-sidebar >> button.nav-item").first();
+    await expect(navItem).toBeVisible({ timeout: 5000 });
 
     const elapsed = await page.evaluate(() => {
       const app = document.querySelector("hu-app");
@@ -33,6 +27,11 @@ test.describe("Performance Latency Budgets", () => {
   });
 
   test("view transition completes within 200ms budget", async ({ page }) => {
+    const chatNavBtn = page.locator(
+      'hu-app >> hu-sidebar >> button.nav-item[aria-label*="Chat" i]',
+    );
+    await expect(chatNavBtn).toBeVisible({ timeout: 5000 });
+
     const start = await page.evaluate(() => {
       const app = document.querySelector("hu-app");
       const sidebar = app?.shadowRoot?.querySelector("hu-sidebar");
@@ -46,7 +45,7 @@ test.describe("Performance Latency Budgets", () => {
       return s;
     });
     if (start < 0) {
-      test.skip(true, "No chat nav button found");
+      test.skip(true, "No chat nav button found in sidebar");
       return;
     }
 
