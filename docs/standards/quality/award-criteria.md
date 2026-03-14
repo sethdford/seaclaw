@@ -20,47 +20,53 @@ updated: 2026-03-13
 
 ## Current State vs Award Tier
 
-### Website (54/70 → Target: 63+)
+### Website (57/70 → Target: 63+)
 
-| Dimension     | Current | Award Tier (9)                                                                                                                                       | Gap                                                     | Priority Fix                                      |
-| ------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------- |
-| Performance   | 8       | Lighthouse 99+, LCP <0.3s, CLS 0.00, INP <50ms, TTFB <100ms                                                                                          | LCP too high (2.6s), need 99+ Lighthouse                | Critical-path CSS, image CDN, edge deployment     |
-| Visual Craft  | 8       | Zero raw hex/px, editorial typography with 5+ weights, tonal surface depth, micro-gradients on interactive elements, dark/light pixel-perfect parity | Close but needs polish                                  | Typography audit, gradient refinement             |
-| Motion        | 7       | Spring physics on every interaction, GSAP ScrollTrigger with parallax, page transition choreography, 3D transforms on hero, scroll-driven narrative  | Missing scroll narrative, limited parallax              | Add scroll-driven hero, parallax sections         |
-| Density       | 7       | Direct-label charts, animated counters, progressive disclosure, small multiples for comparisons, tabular figures                                     | Missing small multiples and direct labels               | Redesign comparison section                       |
-| Accessibility | 9       | Lighthouse 100, axe zero violations, VoiceOver tested, prefers-contrast support, skip links, ARIA landmarks                                          | Almost there                                            | prefers-contrast, ARIA landmark audit             |
-| Brand         | 8       | Avenir everywhere, Phosphor everywhere, 60-30-10 validated, glass system consistent, design token parity with dashboard                              | Close                                                   | Cross-surface visual audit                        |
-| Innovation    | 7       | View Transitions, scroll-driven animations, @starting-style, native popover, anchor positioning, WebGPU or Three.js hero                             | Missing WebGL/3D element, limited @starting-style usage | Add 3D hero element, adopt more platform features |
+| Dimension     | Current | Award Tier (9)                                                                                                                                       | Gap                                                                                                                 | Priority Fix                         |
+| ------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Performance   | 8       | Lighthouse 99+, LCP <0.3s, CLS 0.00, INP <50ms, TTFB <100ms                                                                                          | LCP optimized (bundled Three.js, font preloads trimmed, HTML compression), need production URL for real measurement | Edge deployment + CDN tuning         |
+| Visual Craft  | 8       | Zero raw hex/px, editorial typography with 5+ weights, tonal surface depth, micro-gradients on interactive elements, dark/light pixel-perfect parity | Micro-gradients on interactive elements added, typography-as-hero treatment done                                    | Glass polish on remaining cards      |
+| Motion        | 8       | Spring physics on every interaction, GSAP ScrollTrigger with parallax, page transition choreography, 3D transforms on hero, scroll-driven narrative  | WebGL hero, scroll-driven animations, @starting-style, custom cursor all implemented                                | Shared-element morph transitions     |
+| Density       | 8       | Direct-label charts, animated counters, progressive disclosure, small multiples for comparisons, tabular figures                                     | Comparison section redesigned with direct labels                                                                    | Small multiples for comparative data |
+| Accessibility | 9       | Lighthouse 100, axe zero violations, VoiceOver tested, prefers-contrast support, skip links, ARIA landmarks                                          | prefers-contrast:more and forced-colors mode both supported                                                         | VoiceOver manual testing             |
+| Brand         | 8       | Avenir everywhere, Phosphor everywhere, 60-30-10 validated, glass system consistent, design token parity with dashboard                              | Branded scrollbar, custom cursor reinforce brand identity                                                           | Cross-surface visual audit           |
+| Innovation    | 8       | View Transitions, scroll-driven animations, @starting-style, native popover, anchor positioning, WebGPU or Three.js hero                             | WebGL hero, @view-transition, scroll-timeline, @starting-style all shipped                                          | Container queries, :has() selector   |
 
 ### Dashboard (56/70 → Target: 63+)
 
-| Dimension     | Current | Award Tier (9)                                                                                                               | Gap                                 | Priority Fix                       |
-| ------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ---------------------------------- |
-| Performance   | 8       | Bundle <80KB, TTI <1s, no layout thrashing, requestIdleCallback for deferred work                                            | Need to measure and optimize        | Lighthouse audit                   |
-| Visual Craft  | 8       | Tonal surfaces on every card, micro-interactions on every input, consistent elevation hierarchy, editorial stat presentation | Need more tonal variety             | Elevation audit                    |
-| Motion        | 8       | Spring on all, view transitions between all routes, scroll-driven lists, ambient loading indicators                          | Close — needs ambient indicators    | Add subtle ambient animation       |
-| Density       | 7       | Sparklines everywhere, animated numbers, direct-label charts, progressive disclosure on all settings                         | Missing sparklines in several views | Add sparklines to overview/usage   |
-| Accessibility | 9       | 100 axe, full keyboard, focus trap, reduced-motion                                                                           | Almost there                        | Final axe audit                    |
-| Brand         | 8       | Token parity with website, identical component styling                                                                       | Close                               | Cross-surface audit                |
-| Innovation    | 8       | Command palette, glass tooltips, scroll-driven, view transitions                                                             | Close — needs spatial/ambient       | Add ambient intelligence indicator |
+| Dimension     | Current | Award Tier (9)                                                                                                               | Gap                                                                | Priority Fix                             |
+| ------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------- |
+| Performance   | 8       | Bundle <80KB, TTI <1s, no layout thrashing, requestIdleCallback for deferred work                                            | Need to measure and optimize                                       | Lighthouse audit                         |
+| Visual Craft  | 8       | Tonal surfaces on every card, micro-interactions on every input, consistent elevation hierarchy, editorial stat presentation | Need more tonal variety                                            | Elevation audit                          |
+| Motion        | 8       | Spring on all, view transitions between all routes, scroll-driven lists, ambient loading indicators                          | Ambient sidebar indicator added                                    | Shared-element morphs on route change    |
+| Density       | 7       | Sparklines everywhere, animated numbers, direct-label charts, progressive disclosure on all settings                         | Missing sparklines in several views                                | Add sparklines to overview/usage         |
+| Accessibility | 9       | 100 axe, full keyboard, focus trap, reduced-motion                                                                           | Almost there                                                       | Final axe audit                          |
+| Brand         | 8       | Token parity with website, identical component styling                                                                       | Close                                                              | Cross-surface audit                      |
+| Innovation    | 8       | Command palette, glass tooltips, scroll-driven, view transitions                                                             | Ambient sidebar indicator added; container queries and :has() next | Adopt container queries, :has() selector |
 
-### iOS App (41/70 → Target: 63+)
+### iOS App (43/70 → Target: 63+)
 
-| Dimension     | Current | Award Tier (9)                                                                        | Gap                                   | Priority Fix                      |
-| ------------- | ------- | ------------------------------------------------------------------------------------- | ------------------------------------- | --------------------------------- |
-| Performance   | 5       | 60fps scrolling, <100ms tap response, memory <50MB                                    | Untested                              | Profile and optimize              |
-| Visual Craft  | 6       | HUTokens everywhere, SF Symbols + Phosphor, tonal backgrounds, editorial typography   | Missing tonal surfaces, limited views | Add overview view, tonal surfaces |
-| Motion        | 6       | HUTokens.springExpressive on all transitions, matchedGeometryEffect, hero transitions | Missing matched geometry              | Add hero transitions              |
-| Density       | 6       | Compact chat bubbles, inline stats, progressive settings                              | Only 2 views                          | Add overview with stats           |
-| Accessibility | 6       | VoiceOver labels, Dynamic Type, high contrast                                         | Missing Dynamic Type                  | Add Dynamic Type support          |
-| Brand         | 7       | Avenir, accent colors, spring physics                                                 | Close for existing views              | Extend to new views               |
-| Innovation    | 5       | Live Activities, App Intents, StoreKit                                                | None implemented                      | Add App Intents for Siri          |
+| Dimension     | Current | Award Tier (9)                                                                        | Gap                                                       | Priority Fix                        |
+| ------------- | ------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------- |
+| Performance   | 5       | 60fps scrolling, <100ms tap response, memory <50MB                                    | Untested                                                  | Profile and optimize                |
+| Visual Craft  | 6       | HUTokens everywhere, SF Symbols + Phosphor, tonal backgrounds, editorial typography   | Missing tonal surfaces, limited views                     | Add overview view, tonal surfaces   |
+| Motion        | 6       | HUTokens.springExpressive on all transitions, matchedGeometryEffect, hero transitions | Missing matched geometry                                  | Add hero transitions                |
+| Density       | 6       | Compact chat bubbles, inline stats, progressive settings                              | Only 2 views                                              | Add overview with stats             |
+| Accessibility | 6       | VoiceOver labels, Dynamic Type, high contrast                                         | Missing Dynamic Type                                      | Add Dynamic Type support            |
+| Brand         | 7       | Avenir, accent colors, spring physics                                                 | Close for existing views                                  | Extend to new views                 |
+| Innovation    | 7       | Live Activities, App Intents, StoreKit                                                | App Intents (Send + Status) and Live Activity implemented | Dynamic Type, matchedGeometryEffect |
 
-### Android App (35/70 → Target: 63+)
+### Android App (42/70 → Target: 63+)
 
-| Dimension | Current | Award Tier (9)                                                                      | Gap          | Priority Fix              |
-| --------- | ------- | ----------------------------------------------------------------------------------- | ------------ | ------------------------- |
-| All       | 4-6     | Full Compose UI with Material3 + HUTokens overlay, spring animations, accessibility | No UI at all | Build complete Compose UI |
+| Dimension     | Current | Award Tier (9)                                            | Gap                                        | Priority Fix                        |
+| ------------- | ------- | --------------------------------------------------------- | ------------------------------------------ | ----------------------------------- |
+| Performance   | 5       | 60fps scrolling, <100ms tap response, memory <50MB        | Untested on real devices                   | Profile and optimize                |
+| Visual Craft  | 6       | Full Compose UI with Material3 + HUTokens, tonal surfaces | 3 screens built, need polish               | Elevation audit, tonal variety      |
+| Motion        | 6       | Spring animations on all transitions                      | Spring animations in place                 | matchedGeometryEffect equivalent    |
+| Density       | 6       | Compact chat bubbles, overview stats                      | Static data in screens                     | Wire GatewayClient for live data    |
+| Accessibility | 5       | TalkBack labels, Material a11y                            | Not yet audited with Accessibility Scanner | Run Scanner, fix issues             |
+| Brand         | 7       | HUTokens, Avenir, accent colors consistent                | Close                                      | Cross-surface audit                 |
+| Innovation    | 7       | Glance widget, GatewayClient WebSocket, predictive back   | Widget + WebSocket implemented             | Wire live data, add dynamic content |
 
 ## Concrete Award-Winning Checklist
 
@@ -70,43 +76,43 @@ updated: 2026-03-13
 - [ ] Lighthouse Accessibility = 100
 - [ ] Zero CLS on all pages
 - [ ] LCP < 1.0s on 4G connection
-- [ ] Spring physics on every interactive element
-- [ ] Scroll-driven narrative with parallax
-- [ ] At least one 3D/WebGL element (hero or transition)
-- [ ] @starting-style enter animations on dynamically added elements
-- [ ] View Transitions API between pages (if MPA) or routes (if SPA)
-- [ ] Custom cursor or hover interactions that delight
-- [ ] Responsive from 320px to 2560px with fluid typography
-- [ ] Dark mode with equal visual quality to light mode
-- [ ] prefers-reduced-motion fully supported
-- [ ] prefers-contrast: more supported
-- [ ] Original typography treatment (not default system stack)
-- [ ] No stock photography — all illustrations/assets bespoke
+- [x] Spring physics on every interactive element
+- [x] Scroll-driven narrative with parallax
+- [x] At least one 3D/WebGL element (hero or transition)
+- [x] @starting-style enter animations on dynamically added elements
+- [x] View Transitions API between pages (if MPA) or routes (if SPA)
+- [x] Custom cursor or hover interactions that delight
+- [x] Responsive from 320px to 2560px with fluid typography
+- [x] Dark mode with equal visual quality to light mode
+- [x] prefers-reduced-motion fully supported
+- [x] prefers-contrast: more supported
+- [x] Original typography treatment (not default system stack)
+- [x] No stock photography — all illustrations/assets bespoke
 - [ ] Schema.org structured data
 - [ ] OG + Twitter Card meta complete with images
 
 ### Apple Design Award Checklist (iOS/macOS)
 
-- [ ] Uses platform conventions (NavigationStack, TabView, .sheet)
+- [x] Uses platform conventions (NavigationStack, TabView, .sheet)
 - [ ] Dynamic Type support (all text scales)
 - [ ] VoiceOver labels on every interactive element
-- [ ] Haptic feedback on meaningful interactions
-- [ ] Spring animations (UISpringTimingParameters or SwiftUI .spring)
-- [ ] Widget / Live Activity / App Intent integration
-- [ ] Proper light/dark/tinted appearance support
+- [x] Haptic feedback on meaningful interactions
+- [x] Spring animations (UISpringTimingParameters or SwiftUI .spring)
+- [x] Widget / Live Activity / App Intent integration
+- [x] Proper light/dark/tinted appearance support
 - [ ] Keyboard/trackpad support (macOS)
-- [ ] Avenir custom font with proper weight mapping
+- [x] Avenir custom font with proper weight mapping
 
 ### Google Play Best App Checklist (Android)
 
-- [ ] Material 3 theming with dynamic color support
-- [ ] Compose-first UI
-- [ ] Edge-to-edge with proper insets
-- [ ] Predictive back gesture support
+- [x] Material 3 theming with dynamic color support
+- [x] Compose-first UI
+- [x] Edge-to-edge with proper insets
+- [x] Predictive back gesture support
 - [ ] Accessibility Scanner zero issues
-- [ ] Spring animations (Compose animation-core)
-- [ ] Widget integration
-- [ ] Proper dark theme
+- [x] Spring animations (Compose animation-core)
+- [x] Widget integration
+- [x] Proper dark theme
 
 ## Stretch Targets (Score 10)
 

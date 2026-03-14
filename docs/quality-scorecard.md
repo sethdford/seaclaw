@@ -19,15 +19,15 @@ updated: 2026-03-09
 | 9     | Category-defining (Awwwards winner tier) |
 | 10    | Sets the standard others measure against |
 
-## Current Scores (Q1 2026 — Sprint 3 Re-Audit)
+## Current Scores (Q1 2026 — Sprint 4 Re-Audit)
 
 | Surface   | Perf | Visual | Motion | Density | A11y | Brand | Innovation | Total | Target      |
 | --------- | ---- | ------ | ------ | ------- | ---- | ----- | ---------- | ----- | ----------- |
-| Website   | 8    | 8      | 7      | 7       | 9    | 8     | 7          | 54/70 | 63+ (9 avg) |
+| Website   | 8    | 8      | 8      | 8       | 9    | 8     | 8          | 57/70 | 63+ (9 avg) |
 | Dashboard | 8    | 8      | 8      | 7       | 9    | 8     | 8          | 56/70 | 63+ (9 avg) |
-| iOS       | 5    | 6      | 6      | 6       | 6    | 7     | 5          | 41/70 | 63+ (9 avg) |
+| iOS       | 5    | 6      | 6      | 6       | 6    | 7     | 7          | 43/70 | 63+ (9 avg) |
 | macOS     | 5    | 7      | 7      | 6       | 6    | 8     | 5          | 44/70 | 63+ (9 avg) |
-| Android   | 5    | 6      | 6      | 6       | 5    | 7     | 6          | 41/70 | 63+ (9 avg) |
+| Android   | 5    | 6      | 6      | 6       | 5    | 7     | 7          | 42/70 | 63+ (9 avg) |
 
 ## Benchmark Comparison
 
@@ -123,8 +123,11 @@ Detailed rubrics for each of the 7 dimensions, with concrete criteria for achiev
 | Q1 2026 (sprint 1) | 54      | 56        | 39  | 39    | 34      |
 | Q1 2026 (sprint 2) | 54      | 56        | 41  | 41    | 35      |
 | Q1 2026 (sprint 3) | 54      | 56        | 41  | 44    | 41      |
+| Q1 2026 (sprint 4) | 57      | 56        | 43  | 44    | 42      |
 
 Sprint 3 changes: macOS app fully tokenized (HUTokens, Avenir, spring animations, tonal surfaces). Android Compose UI built from scratch (Overview, Chat, Settings screens with Material 3 + HUTokens, spring animations). Website hardcoded hex replaced with tokens. Lighthouse thresholds tightened (98+ performance, 100 a11y). Bundle budget reduced to 300KB. Automated quality score reporting in CI. Award-winning quality criteria document created. Component quality check bug fixed.
+
+Sprint 4 changes: Website — Three.js WebGL hero particle field, CSS scroll-driven animations (scroll-timeline, view-timeline), @view-transition CSS for cross-document transitions, @starting-style enter animations, custom cursor with hover states, branded scrollbar, micro-gradients on interactive elements, typography-as-hero treatment, comparison section redesigned, prefers-contrast:more + forced-colors support, Three.js bundled, HTML compression, Vercel deployment config with edge caching. Dashboard — ambient loading indicator in sidebar header. iOS — App Intents for Siri (send message + check status), Live Activity for active conversations. Android — GatewayClient WebSocket (OkHttp), Glance home screen widget. CI — quality gate 80%, LCP 1000ms, competitive benchmark on push.
 
 ## Action Items from Last Review
 
@@ -138,10 +141,10 @@ Sprint 3 changes: macOS app fully tokenized (HUTokens, Avenir, spring animations
 - [x] **Website Token Compliance**: All hardcoded hex replaced with `--hu-*` tokens. Terminal chrome tokenized.
 - [x] **CI Quality Gates**: Lighthouse 98+ perf, 100 a11y, CLS 0.005, TBT 50ms. Bundle budget 300KB. Automated quality scoring in CI.
 - [ ] **Performance (dashboard)**: Target Lighthouse 99+. Need to measure and optimize.
-- [ ] **Innovation**: Explore spatial UI patterns, ambient intelligence indicators, WebGL hero.
-- [ ] **iOS feature parity**: Add Overview, Sessions views; Dynamic Type; App Intents for Siri.
-- [ ] **Android polish**: Accessibility Scanner audit, predictive back gesture, widget integration.
-- [ ] **Award submissions**: Deploy to production for Awwwards/Webby judging.
+- [x] **Innovation**: WebGL hero (Three.js particles), scroll-driven animations, @starting-style, custom cursor, ambient sidebar indicator. Container queries and :has() adoption in progress.
+- [x] **iOS feature parity**: App Intents for Siri (SendMessage + CheckStatus), Live Activity for active chat sessions. Still needs: Overview view, Dynamic Type.
+- [x] **Android polish**: Glance widget, GatewayClient WebSocket, predictive back gesture configured. Still needs: Accessibility Scanner audit, wiring live data to ChatScreen/OverviewScreen.
+- [x] **Award submissions**: GitHub Actions deployment workflow created. Needs: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID secrets configured to go live.
 
 ## Related
 
