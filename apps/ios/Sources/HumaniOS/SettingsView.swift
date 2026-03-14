@@ -5,8 +5,12 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var connectionManager: ConnectionManager
 
-    private var tokens: (success: Color, error: Color) {
-        colorScheme == .dark ? (HUTokens.Dark.success, HUTokens.Dark.error) : (HUTokens.Light.success, HUTokens.Light.error)
+    private var tokens: (success: Color, error: Color, text: Color, textMuted: Color) {
+        if colorScheme == .dark {
+            return (HUTokens.Dark.success, HUTokens.Dark.error, HUTokens.Dark.text, HUTokens.Dark.textMuted)
+        } else {
+            return (HUTokens.Light.success, HUTokens.Light.error, HUTokens.Light.text, HUTokens.Light.textMuted)
+        }
     }
 
     var body: some View {
@@ -15,6 +19,7 @@ struct SettingsView: View {
                 Section {
                     TextField("Gateway URL", text: $connectionManager.gatewayURL)
                         .autocorrectionDisabled()
+                        .font(.custom("Avenir-Book", size: HUTokens.textBase, relativeTo: .body))
                         .accessibilityLabel("Server URL")
 #if os(iOS)
                         .textInputAutocapitalization(.never)
@@ -32,14 +37,15 @@ struct SettingsView: View {
                     HStack {
                         Text("Status")
                             .font(.custom("Avenir-Book", size: HUTokens.textBase, relativeTo: .body))
+                            .foregroundStyle(tokens.text)
                         Spacer()
                         HStack(spacing: HUTokens.spaceSm) {
                             Circle()
                                 .fill(connectionManager.isConnected ? tokens.success : tokens.error)
-                                .frame(width: 8, height: 8)
+                                .frame(width: HUTokens.spaceSm, height: HUTokens.spaceSm)
                             Text(connectionManager.isConnected ? "Connected" : "Disconnected")
                                 .font(.custom("Avenir-Book", size: HUTokens.textSm, relativeTo: .subheadline))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(tokens.textMuted)
                         }
                         .accessibilityLabel("Connection status: \(connectionManager.isConnected ? "Connected" : "Disconnected")")
                         .animation(HUTokens.springExpressive, value: connectionManager.isConnected)
@@ -54,6 +60,7 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    .font(.custom("Avenir-Medium", size: HUTokens.textBase, relativeTo: .body))
                     .accessibilityLabel(connectionManager.isConnected ? "Disconnect from gateway" : "Connect to gateway")
 
                     if connectionManager.isConnected {
@@ -62,6 +69,7 @@ struct SettingsView: View {
                                 connectionManager.reconnect()
                             }
                         }
+                        .font(.custom("Avenir-Medium", size: HUTokens.textBase, relativeTo: .body))
                         .accessibilityLabel("Reconnect to gateway")
                     }
                 } header: {

@@ -22,6 +22,7 @@ struct HumanApp: App {
                 }
                 .keyboardShortcut("r", modifiers: [.command])
                 .disabled(status.isServiceRunning)
+                .accessibilityLabel("Start h-uman background service")
 
                 Button("Stop Service") {
                     withAnimation(HUTokens.springExpressive) {
@@ -30,6 +31,7 @@ struct HumanApp: App {
                 }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(!status.isServiceRunning)
+                .accessibilityLabel("Stop h-uman background service")
 
                 Divider()
 
@@ -39,18 +41,24 @@ struct HumanApp: App {
                     }
                 }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
+                .accessibilityLabel("Open h-uman dashboard in browser")
             }
             CommandMenu("Navigate") {
                 Button("Overview") { status.selectedTab = .overview }
                     .keyboardShortcut("1")
+                    .accessibilityLabel("Navigate to Overview tab")
                 Button("Chat") { status.selectedTab = .chat }
                     .keyboardShortcut("2")
+                    .accessibilityLabel("Navigate to Chat tab")
                 Button("Sessions") { status.selectedTab = .sessions }
                     .keyboardShortcut("3")
+                    .accessibilityLabel("Navigate to Sessions tab")
                 Button("Tools") { status.selectedTab = .tools }
                     .keyboardShortcut("4")
+                    .accessibilityLabel("Navigate to Tools tab")
                 Button("Settings") { status.selectedTab = .settings }
                     .keyboardShortcut(",")
+                    .accessibilityLabel("Navigate to Settings tab")
             }
         }
 
@@ -103,6 +111,7 @@ struct HumanApp: App {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(status.statusColor)
                 .animation(HUTokens.springExpressive, value: "\(status.isServiceRunning)-\(status.isGatewayConnected)")
+                .accessibilityLabel("h-uman menu: \(status.isServiceRunning ? "service running" : "service stopped")")
         }
     }
 }

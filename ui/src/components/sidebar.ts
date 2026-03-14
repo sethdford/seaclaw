@@ -225,7 +225,7 @@ export class ScSidebar extends LitElement {
       font-weight: var(--hu-weight-medium);
       letter-spacing: var(--hu-tracking-xs);
       text-transform: uppercase;
-      color: var(--hu-text-muted);
+      color: var(--hu-text);
       padding: var(--hu-space-xs) var(--hu-space-md);
       margin-bottom: var(--hu-space-xs);
       white-space: nowrap;
@@ -321,7 +321,7 @@ export class ScSidebar extends LitElement {
       align-items: center;
       gap: var(--hu-space-sm);
       font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
+      color: var(--hu-text);
     }
 
     :host([collapsed]) .status-row .status-label {
@@ -341,7 +341,7 @@ export class ScSidebar extends LitElement {
       background: transparent;
       border: none;
       border-radius: var(--hu-radius-sm);
-      color: var(--hu-text-muted);
+      color: var(--hu-text);
       cursor: pointer;
       font-size: var(--hu-text-xs);
       font-family: var(--hu-font);
@@ -379,7 +379,7 @@ export class ScSidebar extends LitElement {
       background: transparent;
       border: none;
       border-radius: var(--hu-radius-sm);
-      color: var(--hu-text-muted);
+      color: var(--hu-text);
       cursor: pointer;
       transition:
         background var(--hu-duration-fast),

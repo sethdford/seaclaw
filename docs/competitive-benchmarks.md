@@ -1,6 +1,6 @@
 ---
 title: Human Competitive Benchmarks
-updated: 2026-03-09
+updated: 2026-03-14
 ---
 
 # Human Competitive Benchmarks
@@ -87,7 +87,7 @@ _Last updated: 2026-03-10. Scores based on industry analysis and site evaluation
 
 | Brand            | Perf | Visual | Motion | Density | A11y | Brand | Innovation | Total |
 | ---------------- | ---- | ------ | ------ | ------- | ---- | ----- | ---------- | ----- |
-| Human            | 8    | 7      | 7      | 7       | 9    | 6     | 7          | 51/70 |
+| Human (web)      | 8    | 8      | 8      | 8       | 9    | 8     | 8          | 57/70 |
 | Linear           | 4    | 9      | 9      | 9       | 6    | 9     | 8          | 54/70 |
 | Vercel           | 6    | 8      | 7      | 8       | 7    | 8     | 8          | 52/70 |
 | Raycast          | 7    | 9      | 9      | 9       | 7    | 9     | 8          | 58/70 |
@@ -120,6 +120,7 @@ Human's lightweight C runtime and minimal UI stack (Lit, design tokens) position
 
 ## Update History
 
+- **2026-03-14**: Aligned quality scores with scorecard (Human web 57/70); updated award readiness (WebGL hero, scroll-driven, Dynamic Type, Live Activities, App Intents, TalkBack, Glance widget shipped)
 - **2026-03-13**: Award-winning UI sprint — spring-first motion, scroll-driven animations, glass expansion, brand consistency, LCP optimizations, quality infrastructure
 - **2026-03-10**: First automated + manual audit completed (Q1 2026)
 - **2026-03-09**: Initial benchmark registry created
@@ -180,22 +181,20 @@ Targeted improvements to close the gap with benchmark brands:
 
 ## Award Submission Readiness
 
-| Program                  | Surface   | Status          | Blockers                                                            |
-| ------------------------ | --------- | --------------- | ------------------------------------------------------------------- |
-| **Awwwards**             | Website   | Not ready       | LCP too high (2.6s), missing WebGL hero, no scroll-driven narrative |
-| **CSS Design Awards**    | Website   | Partially ready | Strong CSS innovation, needs production deployment                  |
-| **Webby Awards**         | Dashboard | Partially ready | Strong UX, needs production deployment for judging                  |
-| **Apple Design Awards**  | iOS       | Not ready       | Only 2 views, missing Dynamic Type, Live Activities, App Intents    |
-| **Google Play Best App** | Android   | Not ready       | New Compose UI, needs polish, Accessibility Scanner, Widget         |
+| Program                  | Surface   | Status          | Blockers                                                              |
+| ------------------------ | --------- | --------------- | --------------------------------------------------------------------- |
+| **Awwwards**             | Website   | Partially ready | LCP too high (2.6s); WebGL hero and scroll-driven narrative shipped   |
+| **CSS Design Awards**    | Website   | Partially ready | Strong CSS innovation, needs production deployment                    |
+| **Webby Awards**         | Dashboard | Partially ready | Strong UX, needs production deployment for judging                    |
+| **Apple Design Awards**  | iOS       | Partially ready | Dynamic Type, Live Activities, App Intents shipped; production polish |
+| **Google Play Best App** | Android   | Partially ready | Glance widget, TalkBack labels shipped; polish and live data wiring   |
 
 See `docs/standards/quality/award-criteria.md` for complete submission checklists.
 
 ## Next Steps
 
 - Deploy h-uman.ai for production PageSpeed data and award submissions
-- iOS feature parity: add Overview, Sessions views; Dynamic Type; App Intents for Siri
-- Android polish: Accessibility Scanner audit, predictive back, widget
-- Website WebGL hero element for Awwwards visual impact
+- Website LCP optimization for production (WebGL hero and scroll-driven narrative shipped)
 - Website scroll-driven narrative sections with parallax
 - Dashboard Lighthouse audit — target 99+ performance
 - Flutter app: build Compose-equivalent screens or sunset decision

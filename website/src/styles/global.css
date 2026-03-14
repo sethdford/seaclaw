@@ -1448,3 +1448,58 @@ body {
     box-shadow: none;
   }
 }
+
+/* ── SOTA 2026 CSS Features ────────────────────────── */
+
+/* 1. CSS @property — animatable custom properties for gradient/accent transitions */
+@property --hu-gradient-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 135deg;
+}
+@property --hu-accent-lightness {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 50%;
+}
+@property --hu-glow-opacity {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* 2. text-wrap: pretty — better line breaks on body/paragraph text */
+p,
+li,
+dd,
+figcaption {
+  text-wrap: pretty;
+}
+
+/* 3. interpolate-size — enables animating height:auto */
+:root {
+  interpolate-size: allow-keywords;
+}
+
+/* 4. Subgrid — aligned card layouts */
+.subgrid-rows {
+  display: grid;
+  grid-template-rows: subgrid;
+}
+
+/* 5. Native CSS nesting — interactive card utility */
+.card-interactive {
+  transition: transform var(--hu-duration-normal) var(--hu-ease-out);
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  & .card-title {
+    text-wrap: balance;
+  }
+}

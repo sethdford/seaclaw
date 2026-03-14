@@ -130,7 +130,9 @@ fun ToolsScreen() {
                         text = category.title,
                         style = MaterialTheme.typography.titleMedium,
                         color = colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = HUTokens.spaceMd),
+                        modifier = Modifier
+                            .padding(top = HUTokens.spaceMd)
+                            .semantics { contentDescription = "Category: ${category.title}" },
                     )
                 }
             }
@@ -194,7 +196,7 @@ private fun ToolCard(
         Column {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
+                contentDescription = "Icon for $name",
                 tint = colorScheme.primary,
                 modifier = Modifier.size(HUTokens.spaceLg),
             )

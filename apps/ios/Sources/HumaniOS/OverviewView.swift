@@ -2,20 +2,20 @@ import SwiftUI
 import HumanChatUI
 
 struct OverviewView: View {
-    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var connectionManager: ConnectionManager
+    @Environment(\.colorScheme) private var colorScheme
     @State private var appeared = false
 
-    private var tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, success: Color, error: Color, accent: Color) {
+    private var tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color) {
         if colorScheme == .dark {
             return (
                 HUTokens.Dark.bgSurface,
                 HUTokens.Dark.surfaceContainer,
                 HUTokens.Dark.text,
                 HUTokens.Dark.textMuted,
+                HUTokens.Dark.accent,
                 HUTokens.Dark.success,
-                HUTokens.Dark.error,
-                HUTokens.Dark.accent
+                HUTokens.Dark.error
             )
         } else {
             return (
@@ -23,151 +23,110 @@ struct OverviewView: View {
                 HUTokens.Light.surfaceContainer,
                 HUTokens.Light.text,
                 HUTokens.Light.textMuted,
+                HUTokens.Light.accent,
                 HUTokens.Light.success,
-                HUTokens.Light.error,
-                HUTokens.Light.accent
+                HUTokens.Light.error
             )
         }
     }
-
-    private let stats = [
-        ("Providers", 9, "cpu"),
-        ("Channels", 34, "bubble.left.and.bubble.right"),
-        ("Tools", 67, "wrench.and.screwdriver"),
-    ]
-
-    private let recentActivity: [(String, String, String)] = [
-        ("Chat message sent", "2 min ago", "bubble.left.fill"),
-        ("Tool: shell executed", "5 min ago", "terminal"),
-        ("Connected to gateway", "12 min ago", "antenna.radiowaves.left.and.right"),
-        ("Session started", "1 hr ago", "clock"),
-    ]
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: HUTokens.spaceLg) {
-                    connectionCard
-                    statsSection
-                    recentActivitySection
+                    // Connection status banner
+                    HStack(spacing: HUTokens.spaceSm) {
+                        Circle()
+                            .fill(connectionManager.isConnected ? tokens.success : tokens.error)
+                            .frame(width: 8, height: 8)
+                        Text(connectionManager.isConnected ? "Connected" : "Disconnected")
+                            .font(.custom("Avenir-Medium", size: HUTokens.textSm, relativeTo: .subheadline))
+                            .foregroundStyle(tokens.textMuted)
+                    }
+                    .padding(.horizontal)
+
+                    // Stat cards grid
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: HUTokens.spaceMd) {
+                        StatCard(
+                            title: "Messages",
+                            value: "1,247",
+                            trend: "+12%",
+                            trendUp: true,
+                            tokens: tokens,
+                            appeared: appeared,
+                            delay: 0
+                        )
+                        StatCard(
+                            title: "Channels",
+                            value: "8",
+                            trend: "Active",
+                            trendUp: true,
+                            tokens: tokens,
+                            appeared: appeared,
+                            delay: 0.05
+                        )
+                        StatCard(
+                            title: "Uptime",
+                            value: "99.8%",
+                            trend: "30d",
+                            trendUp: true,
+                            tokens: tokens,
+                            appeared: appeared,
+                            delay: 0.1
+                        )
+                        StatCard(
+                            title: "Latency",
+                            value: "42ms",
+                            trend: "avg",
+                            trendUp: false,
+                            tokens: tokens,
+                            appeared: appeared,
+                            delay: 0.15
+                        )
+                    }
+                    .padding(.horizontal)
+
+                    // Recent activity
+                    VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
+                        Text("Recent Activity")
+                            .font(.custom("Avenir-Heavy", size: HUTokens.textLg, relativeTo: .body))
+                            .foregroundStyle(tokens.text)
+                            .padding(.horizontal)
+
+                        VStack(spacing: 0) {
+                            ForEach(Array(ActivityRow.activities.enumerated()), id: \.offset) { index, activity in
+                                ActivityRow(
+                                    title: activity.0,
+                                    source: activity.1,
+                                    timeAgo: activity.2,
+                                    accent: tokens.accent,
+                                    text: tokens.text,
+                                    textMuted: tokens.textMuted
+                                )
+                                .opacity(appeared ? 1 : 0)
+                                .offset(y: appeared ? 0 : HUTokens.spaceSm)
+                                .animation(HUTokens.springExpressive.delay(0.15 + Double(index) * 0.03), value: appeared)
+
+                                if index < ActivityRow.activities.count - 1 {
+                                    Divider()
+                                        .background(tokens.textMuted.opacity(HUTokens.opacityOverlayMedium))
+                                        .padding(.leading, HUTokens.space2xl)
+                                }
+                            }
+                        }
+                        .background(tokens.surfaceContainer)
+                        .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
+                    }
                 }
-                .padding(HUTokens.spaceMd)
+                .padding(.vertical)
             }
             .background(tokens.bgSurface)
             .navigationTitle("Overview")
-            .refreshable {
-                try? await Task.sleep(nanoseconds: 500_000_000)
-            }
-        }
-        .onAppear {
-            withAnimation(HUTokens.springExpressive) {
-                appeared = true
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var connectionCard: some View {
-        HStack(spacing: HUTokens.spaceMd) {
-            Image(systemName: connectionManager.isConnected ? "antenna.radiowaves.left.and.right" : "wifi.slash")
-                .font(.custom("Avenir-Heavy", size: HUTokens.textXl, relativeTo: .title3))
-                .foregroundStyle(connectionManager.isConnected ? tokens.success : tokens.error)
-                .frame(width: 44, height: 44)
-                .background((connectionManager.isConnected ? tokens.success : tokens.error).opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
-
-            VStack(alignment: .leading, spacing: HUTokens.spaceXs) {
-                Text(connectionManager.isConnected ? "Connected" : "Disconnected")
-                    .font(.custom("Avenir-Heavy", size: HUTokens.textLg, relativeTo: .body))
-                    .foregroundStyle(tokens.text)
-                Text(connectionManager.gatewayURL)
-                    .font(.custom("Avenir-Book", size: HUTokens.textSm, relativeTo: .subheadline))
-                    .foregroundStyle(tokens.textMuted)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            Spacer()
-        }
-        .padding(HUTokens.spaceMd)
-        .background(tokens.surfaceContainer)
-        .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Gateway \(connectionManager.isConnected ? "connected" : "disconnected") at \(connectionManager.gatewayURL)")
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 12)
-        .animation(HUTokens.springExpressive.delay(0), value: appeared)
-        .animation(HUTokens.springExpressive, value: connectionManager.isConnected)
-    }
-
-    @ViewBuilder
-    private var statsSection: some View {
-        VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
-            Text("Stats")
-                .font(.custom("Avenir-Heavy", size: HUTokens.textLg, relativeTo: .body))
-                .foregroundStyle(tokens.text)
-
-            LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: HUTokens.spaceMd),
-                GridItem(.flexible(), spacing: HUTokens.spaceMd),
-                GridItem(.flexible(), spacing: HUTokens.spaceMd),
-            ], spacing: HUTokens.spaceMd) {
-                ForEach(Array(stats.enumerated()), id: \.offset) { index, stat in
-                    StatCard(
-                        title: stat.0,
-                        value: "\(stat.1)",
-                        icon: stat.2,
-                        surfaceContainer: tokens.surfaceContainer,
-                        text: tokens.text,
-                        textMuted: tokens.textMuted,
-                        accent: tokens.accent,
-                        appeared: appeared,
-                        delay: Double(index) * 0.05
-                    )
+            .onAppear {
+                withAnimation(HUTokens.springExpressive) {
+                    appeared = true
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private var recentActivitySection: some View {
-        VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
-            Text("Recent Activity")
-                .font(.custom("Avenir-Heavy", size: HUTokens.textLg, relativeTo: .body))
-                .foregroundStyle(tokens.text)
-
-            VStack(spacing: 0) {
-                ForEach(Array(recentActivity.enumerated()), id: \.offset) { index, item in
-                    HStack(spacing: HUTokens.spaceMd) {
-                        Image(systemName: item.2)
-                            .font(.custom("Avenir-Medium", size: HUTokens.textBase, relativeTo: .body))
-                            .foregroundStyle(tokens.accent)
-                            .frame(width: 32, alignment: .center)
-                        VStack(alignment: .leading, spacing: HUTokens.spaceXs) {
-                            Text(item.0)
-                                .font(.custom("Avenir-Book", size: HUTokens.textBase, relativeTo: .body))
-                                .foregroundStyle(tokens.text)
-                            Text(item.1)
-                                .font(.custom("Avenir-Book", size: HUTokens.textXs, relativeTo: .caption))
-                                .foregroundStyle(tokens.textMuted)
-                        }
-                        Spacer()
-                    }
-                    .padding(HUTokens.spaceMd)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(item.0), \(item.1)")
-                    .opacity(appeared ? 1 : 0)
-                    .offset(y: appeared ? 0 : 8)
-                    .animation(HUTokens.springExpressive.delay(0.15 + Double(index) * 0.03), value: appeared)
-
-                    if index < recentActivity.count - 1 {
-                        Divider()
-                            .background(tokens.textMuted.opacity(0.3))
-                            .padding(.leading, 48)
-                    }
-                }
-            }
-            .background(tokens.surfaceContainer)
-            .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
         }
     }
 }
@@ -175,34 +134,85 @@ struct OverviewView: View {
 private struct StatCard: View {
     let title: String
     let value: String
-    let icon: String
-    let surfaceContainer: Color
-    let text: Color
-    let textMuted: Color
-    let accent: Color
+    let trend: String
+    let trendUp: Bool
+    let tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
     let appeared: Bool
     let delay: Double
 
     var body: some View {
-        VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
-            Image(systemName: icon)
-                .font(.custom("Avenir-Medium", size: HUTokens.textLg, relativeTo: .body))
-                .foregroundStyle(accent)
-            Text(value)
-                .font(.custom("Avenir-Heavy", size: HUTokens.textXl, relativeTo: .title3))
-                .foregroundStyle(text)
+        VStack(alignment: .leading, spacing: HUTokens.spaceXs) {
             Text(title)
+                .font(.custom("Avenir-Medium", size: HUTokens.textXs, relativeTo: .caption))
+                .foregroundStyle(tokens.textMuted)
+            Text(value)
+                .font(.custom("Avenir-Black", size: HUTokens.textXl, relativeTo: .title3))
+                .foregroundStyle(tokens.text)
+                .monospacedDigit()
+            HStack(spacing: 4) {
+                Image(systemName: trendUp ? "arrow.up.right" : "arrow.down.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(trendUp ? tokens.accent : tokens.textMuted)
+                Text(trend)
+                    .font(.custom("Avenir-Medium", size: HUTokens.textXs, relativeTo: .caption))
+                    .foregroundStyle(trendUp ? tokens.accent : tokens.textMuted)
+            }
+        }
+        .padding(HUTokens.spaceMd)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(tokens.surfaceContainer)
+        .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusMd, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value), \(trend)")
+        .scaleEffect(appeared ? 1 : 0.95)
+        .opacity(appeared ? 1 : 0)
+        .animation(HUTokens.springExpressive.delay(delay), value: appeared)
+    }
+}
+
+private struct ActivityRow: View {
+    let title: String
+    let source: String
+    let timeAgo: String
+    let accent: Color
+    let text: Color
+    let textMuted: Color
+
+    static let activities: [(String, String, String)] = [
+        ("Chat message received", "Slack", "2m ago"),
+        ("Tool executed: web_search", "Agent", "5m ago"),
+        ("Session started", "CLI", "12m ago"),
+        ("Memory consolidated", "System", "1h ago"),
+        ("Channel connected", "Discord", "2h ago"),
+    ]
+
+    var body: some View {
+        HStack(spacing: HUTokens.spaceMd) {
+            Circle()
+                .fill(accent.opacity(HUTokens.opacityOverlayLight))
+                .frame(width: 32, height: 32)
+                .overlay(
+                    Circle()
+                        .fill(accent)
+                        .frame(width: 8, height: 8)
+                )
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.custom("Avenir-Medium", size: HUTokens.textSm, relativeTo: .subheadline))
+                    .foregroundStyle(text)
+                Text(source)
+                    .font(.custom("Avenir-Book", size: HUTokens.textXs, relativeTo: .caption))
+                    .foregroundStyle(textMuted)
+            }
+            Spacer()
+            Text(timeAgo)
                 .font(.custom("Avenir-Book", size: HUTokens.textXs, relativeTo: .caption))
                 .foregroundStyle(textMuted)
+                .monospacedDigit()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(HUTokens.spaceMd)
-        .background(surfaceContainer)
-        .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
+        .padding(.horizontal, HUTokens.spaceMd)
+        .padding(.vertical, HUTokens.spaceXs)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title): \(value)")
-        .opacity(appeared ? 1 : 0)
-        .scaleEffect(appeared ? 1 : 0.9)
-        .animation(HUTokens.springExpressive.delay(delay), value: appeared)
+        .accessibilityLabel("\(title), \(source), \(timeAgo)")
     }
 }

@@ -27,10 +27,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.dp
 import ai.human.app.ui.HUTokens
 
 @Composable
@@ -110,7 +111,10 @@ fun SettingsScreen() {
                 )
                 .clickable { isConnected = !isConnected }
                 .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm)
-                .semantics { contentDescription = if (isConnected) "Disconnect from gateway" else "Connect to gateway" },
+                .semantics {
+                    contentDescription = if (isConnected) "Disconnect from gateway" else "Connect to gateway"
+                    role = Role.Button
+                },
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -137,8 +141,9 @@ private fun ConnectionStatusIndicator(isConnected: Boolean) {
 
     Box(
         modifier = Modifier
-            .size(12.dp)
+            .size(HUTokens.spaceMd)
             .clip(CircleShape)
-            .background(animatedColor),
+            .background(animatedColor)
+            .semantics { contentDescription = "Connection status indicator" },
     )
 }

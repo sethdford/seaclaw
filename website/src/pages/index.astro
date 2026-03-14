@@ -1644,93 +1644,257 @@ const tools = [
           const camera = new THREE.PerspectiveCamera(60, w() / h(), 0.1, 100);
           camera.position.z = 30;
 
-          const count = 600;
-          const geo = new THREE.BufferGeometry();
-          const positions = new Float32Array(count * 3);
-          const velocities = new Float32Array(count * 3);
-          for (let i = 0; i < count * 3; i++) {
-            positions[i] = (Math.random() - 0.5) * 50;
-            velocities[i] = (Math.random() - 0.5) * 0.01;
-          }
-          geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-
           const accentColor =
             getComputedStyle(document.documentElement)
               .getPropertyValue("--hu-accent")
               .trim() || "#7AB648";
-          const mat = new THREE.PointsMaterial({
-            size: 0.12,
-            color: new THREE.Color(accentColor),
+          const accentSecondary =
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--hu-accent-secondary")
+              .trim() || "#f59e0b";
+
+          // Neural network topology: 5 layers, 8–15 nodes per layer
+          const layerSizes = [10, 12, 10, 12, 10];
+          const layerZ = [-14, -7, 0, 7, 14];
+          const layerWidth = 18;
+          const nodeBasePos: number[][] = [];
+          let idx = 0;
+          for (let L = 0; L < layerSizes.length; L++) {
+            const n = layerSizes[L];
+            const z = layerZ[L];
+            for (let i = 0; i < n; i++) {
+              const t = n > 1 ? i / (n - 1) : 0.5;
+              const x = (t - 0.5) * layerWidth;
+              const y = Math.sin(i * 0.7) * 1.5;
+              nodeBasePos.push([x, y, z]);
+              idx++;
+            }
+          }
+          const nodeCount = nodeBasePos.length;
+
+          // Orbital/breathing params per node
+          const orbitRadius = new Float32Array(nodeCount);
+          const orbitPhase = new Float32Array(nodeCount);
+          const breathPhase = new Float32Array(nodeCount);
+          const isAccent = new Uint8Array(nodeCount);
+          for (let i = 0; i < nodeCount; i++) {
+            orbitRadius[i] = 0.15 + Math.random() * 0.25;
+            orbitPhase[i] = Math.random() * Math.PI * 2;
+            breathPhase[i] = Math.random() * Math.PI * 2;
+            isAccent[i] = Math.random() < 0.2 ? 1 : 0;
+          }
+
+          // Connections between adjacent layers (each node → 2–4 random next-layer nodes)
+          const connections: [number, number][] = [];
+          let layerStart = 0;
+          for (let L = 0; L < layerSizes.length - 1; L++) {
+            const nCur = layerSizes[L];
+            const nNext = layerSizes[L + 1];
+            const nextStart = layerStart + nCur;
+            for (let i = 0; i < nCur; i++) {
+              const src = layerStart + i;
+              const k = 2 + Math.floor(Math.random() * 3);
+              const used = new Set<number>();
+              for (let c = 0; c < Math.min(k, nNext); c++) {
+                let t = Math.floor(Math.random() * nNext);
+                while (used.has(t)) t = (t + 1) % nNext;
+                used.add(t);
+                connections.push([src, nextStart + t]);
+              }
+            }
+            layerStart = nextStart;
+          }
+
+          const linePositions = new Float32Array(connections.length * 6);
+          const lineColors = new Float32Array(connections.length * 6);
+          const lineGeo = new THREE.BufferGeometry();
+          lineGeo.setAttribute(
+            "position",
+            new THREE.BufferAttribute(linePositions, 3),
+          );
+          lineGeo.setAttribute(
+            "color",
+            new THREE.BufferAttribute(lineColors, 3),
+          );
+          const lineMat = new THREE.LineBasicMaterial({
+            vertexColors: true,
             transparent: true,
-            opacity: 0.5,
+            opacity: 0.18,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+          });
+          const lines = new THREE.LineSegments(lineGeo, lineMat);
+          scene.add(lines);
+
+          const posArr = new Float32Array(nodeCount * 3);
+          const colorArr = new Float32Array(nodeCount * 3);
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute("position", new THREE.BufferAttribute(posArr, 3));
+          geo.setAttribute("color", new THREE.BufferAttribute(colorArr, 3));
+
+          const accentCol = new THREE.Color(accentColor);
+          const secondaryCol = new THREE.Color(accentSecondary);
+          const mat = new THREE.PointsMaterial({
+            size: 0.18,
+            vertexColors: true,
+            sizeAttenuation: true,
+            transparent: true,
+            opacity: 0.7,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
           });
           const points = new THREE.Points(geo, mat);
           scene.add(points);
 
-          const linePositions: number[] = [];
-          for (let i = 0; i < count; i++) {
-            for (let j = i + 1; j < count; j++) {
-              const dx = positions[i * 3] - positions[j * 3];
-              const dy = positions[i * 3 + 1] - positions[j * 3 + 1];
-              const dz = positions[i * 3 + 2] - positions[j * 3 + 2];
-              const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-              if (dist < 5 && linePositions.length < 3000) {
-                linePositions.push(
-                  positions[i * 3],
-                  positions[i * 3 + 1],
-                  positions[i * 3 + 2],
-                );
-                linePositions.push(
-                  positions[j * 3],
-                  positions[j * 3 + 1],
-                  positions[j * 3 + 2],
-                );
-              }
-            }
-          }
-          const lineGeo = new THREE.BufferGeometry();
-          lineGeo.setAttribute(
+          // Mouse interaction
+          const mouse = new THREE.Vector2(-10, -10);
+          const mouse3D = new THREE.Vector3(0, 0, 0);
+          const raycaster = new THREE.Raycaster();
+          const plane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+          const intersect = new THREE.Vector3();
+          document.addEventListener("mousemove", (e) => {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+          });
+          document.addEventListener("mouseleave", () => {
+            mouse.x = -10;
+            mouse.y = -10;
+          });
+
+          // Mouse glow sprite
+          const glowGeo = new THREE.BufferGeometry();
+          glowGeo.setAttribute(
             "position",
-            new THREE.Float32BufferAttribute(linePositions, 3),
+            new THREE.Float32BufferAttribute([0, 0, 0], 3),
           );
-          const lineMat = new THREE.LineBasicMaterial({
+          const glowMat = new THREE.PointsMaterial({
+            size: 4,
             color: new THREE.Color(accentColor),
             transparent: true,
-            opacity: 0.08,
+            opacity: 0.15,
             blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            sizeAttenuation: true,
           });
-          const lines = new THREE.LineSegments(lineGeo, lineMat);
-          scene.add(lines);
+          const glowPoint = new THREE.Points(glowGeo, glowMat);
+          glowPoint.visible = false;
+          scene.add(glowPoint);
 
-          let mouseX = 0,
-            mouseY = 0;
-          document.addEventListener("mousemove", (e) => {
-            mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
-            mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
-          });
-
+          const MOUSE_RADIUS = 8;
+          const MOUSE_STRENGTH = 0.015;
+          const FRAME_INTERVAL = 1000 / 60;
+          let lastFrame = 0;
           let animId: number;
-          const animate = () => {
+
+          const animate = (now: number) => {
             animId = requestAnimationFrame(animate);
-            const pos = geo.attributes.position.array as Float32Array;
-            for (let i = 0; i < count * 3; i++) {
-              pos[i] += velocities[i];
-              if (Math.abs(pos[i]) > 25) velocities[i] *= -1;
+            if (now - lastFrame < FRAME_INTERVAL) return;
+            lastFrame = now;
+            const t = now * 0.001;
+            const breath = 1 + 0.04 * Math.sin(t * 0.8);
+            const pulse = 0.08 + 0.06 * Math.sin(t * 2.5);
+
+            raycaster.setFromCamera(mouse, camera);
+            raycaster.ray.intersectPlane(plane, intersect);
+            mouse3D.copy(intersect);
+            const mouseActive =
+              mouse.x > -2 && mouse.x < 2 && mouse.y > -2 && mouse.y < 2;
+            glowPoint.visible = mouseActive;
+            if (mouseActive) {
+              glowPoint.position.copy(mouse3D);
+            }
+
+            for (let i = 0; i < nodeCount; i++) {
+              const [bx, by, bz] = nodeBasePos[i];
+              const orb = orbitRadius[i];
+              const ph = orbitPhase[i];
+              const br = breathPhase[i];
+              let x = bx + orb * Math.cos(t * 0.6 + ph) * breath;
+              let y = by + orb * Math.sin(t * 0.5 + ph * 1.1) * breath;
+              let z = bz + orb * 0.5 * Math.sin(t * 0.4 + br) * breath;
+
+              if (mouseActive) {
+                const dx = x - mouse3D.x;
+                const dy = y - mouse3D.y;
+                const dz = z - mouse3D.z;
+                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                if (dist < MOUSE_RADIUS && dist > 0.01) {
+                  const f = (1 - dist / MOUSE_RADIUS) * MOUSE_STRENGTH;
+                  x += (dx / dist) * f;
+                  y += (dy / dist) * f;
+                  z += (dz / dist) * f;
+                }
+              }
+
+              posArr[i * 3] = x;
+              posArr[i * 3 + 1] = y;
+              posArr[i * 3 + 2] = z;
+              const depth = (z + 14) / 28;
+              const col = isAccent[i] ? secondaryCol : accentCol;
+              const alphaMult = 0.4 + 0.6 * depth;
+              const pulseMult = isAccent[i]
+                ? 0.7 + 0.3 * Math.sin(t * 2.2 + breathPhase[i])
+                : 1;
+              colorArr[i * 3] = col.r * alphaMult * pulseMult;
+              colorArr[i * 3 + 1] = col.g * alphaMult * pulseMult;
+              colorArr[i * 3 + 2] = col.b * alphaMult * pulseMult;
             }
             geo.attributes.position.needsUpdate = true;
-            points.rotation.y += 0.0005;
-            lines.rotation.y += 0.0005;
-            camera.position.x += (mouseX * 3 - camera.position.x) * 0.02;
-            camera.position.y += (-mouseY * 2 - camera.position.y) * 0.02;
-            camera.lookAt(scene.position);
+            geo.attributes.color!.needsUpdate = true;
+
+            for (let c = 0; c < connections.length; c++) {
+              const [a, b] = connections[c];
+              const ax = posArr[a * 3];
+              const ay = posArr[a * 3 + 1];
+              const az = posArr[a * 3 + 2];
+              const bx = posArr[b * 3];
+              const by = posArr[b * 3 + 1];
+              const bz = posArr[b * 3 + 2];
+              linePositions[c * 6] = ax;
+              linePositions[c * 6 + 1] = ay;
+              linePositions[c * 6 + 2] = az;
+              linePositions[c * 6 + 3] = bx;
+              linePositions[c * 6 + 4] = by;
+              linePositions[c * 6 + 5] = bz;
+
+              const midX = (ax + bx) * 0.5;
+              const midY = (ay + by) * 0.5;
+              const midZ = (az + bz) * 0.5;
+              const distToMouse = mouseActive
+                ? Math.sqrt(
+                    (midX - mouse3D.x) ** 2 +
+                      (midY - mouse3D.y) ** 2 +
+                      (midZ - mouse3D.z) ** 2,
+                  )
+                : 999;
+              const brighten =
+                distToMouse < MOUSE_RADIUS * 1.5
+                  ? 1 + 0.8 * (1 - distToMouse / (MOUSE_RADIUS * 1.5))
+                  : 1;
+              const flowPhase = (t * 3 + c * 0.1) % 1;
+              const flowPulse = 0.6 + 0.4 * Math.sin(flowPhase * Math.PI * 2);
+              const base = Math.min(1, (0.2 + 0.15 * flowPulse) * brighten);
+              lineColors[c * 6] = accentCol.r * base;
+              lineColors[c * 6 + 1] = accentCol.g * base;
+              lineColors[c * 6 + 2] = accentCol.b * base;
+              lineColors[c * 6 + 3] = accentCol.r * base;
+              lineColors[c * 6 + 4] = accentCol.g * base;
+              lineColors[c * 6 + 5] = accentCol.b * base;
+            }
+            lineGeo.attributes.position.needsUpdate = true;
+            lineGeo.attributes.color!.needsUpdate = true;
+
+            camera.position.x += (mouse.x * 2 - camera.position.x * 0.3) * 0.02;
+            camera.position.y +=
+              (-mouse.y * 1.5 - camera.position.y * 0.3) * 0.02;
+            camera.lookAt(0, 0, 0);
+
             renderer.render(scene, camera);
           };
 
           canvas.style.opacity = "1";
           canvas.style.transition = "opacity 1.5s ease-out";
-          animate();
+          animate(performance.now());
 
           const onResize = () => {
             camera.aspect = w() / h();
@@ -1744,7 +1908,8 @@ const tools = [
               if (!entries[0]?.isIntersecting) {
                 cancelAnimationFrame(animId);
               } else {
-                animate();
+                lastFrame = 0;
+                animate(performance.now());
               }
             },
             { threshold: 0 },

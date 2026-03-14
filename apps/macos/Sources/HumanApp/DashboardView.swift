@@ -53,7 +53,7 @@ struct DashboardView: View {
                 HStack(spacing: HUTokens.spaceXs) {
                     Circle()
                         .fill(status.isServiceRunning ? tokens.success : tokens.error)
-                        .frame(width: 8, height: 8)
+                        .frame(width: HUTokens.spaceSm, height: HUTokens.spaceSm)
                     Text(status.isServiceRunning ? "Running" : "Stopped")
                         .font(.custom("Avenir-Book", size: HUTokens.textXs))
                         .foregroundStyle(tokens.textMuted)
@@ -97,13 +97,13 @@ struct MacOverviewPane: View {
         ScrollView {
             VStack(alignment: .leading, spacing: HUTokens.spaceLg) {
                 Text("Overview")
-                    .font(.custom("Avenir-Heavy", size: HUTokens.text2xl))
+                    .font(.custom("Avenir-Heavy", size: HUTokens.textXl))
                     .foregroundStyle(tokens.text)
 
                 HStack(spacing: HUTokens.spaceMd) {
                     Circle()
                         .fill(status.isGatewayConnected ? tokens.success : tokens.error)
-                        .frame(width: 10, height: 10)
+                        .frame(width: HUTokens.spaceMd, height: HUTokens.spaceMd)
                     Text(status.isGatewayConnected ? "Gateway Connected" : "Gateway Disconnected")
                         .font(.custom("Avenir-Medium", size: HUTokens.textBase))
                         .foregroundStyle(tokens.text)
@@ -217,7 +217,7 @@ struct MacSessionsPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: HUTokens.spaceMd) {
             Text("Sessions")
-                .font(.custom("Avenir-Heavy", size: HUTokens.text2xl))
+                .font(.custom("Avenir-Heavy", size: HUTokens.textXl))
                 .foregroundStyle(tokens.text)
                 .padding(.horizontal, HUTokens.spaceLg)
                 .padding(.top, HUTokens.spaceLg)
@@ -266,7 +266,7 @@ struct MacToolsPane: View {
         ScrollView {
             VStack(alignment: .leading, spacing: HUTokens.spaceMd) {
                 Text("Tools")
-                    .font(.custom("Avenir-Heavy", size: HUTokens.text2xl))
+                    .font(.custom("Avenir-Heavy", size: HUTokens.textXl))
                     .foregroundStyle(tokens.text)
 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: HUTokens.spaceMd), count: 3), spacing: HUTokens.spaceMd) {
