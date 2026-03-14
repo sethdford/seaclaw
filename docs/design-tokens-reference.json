@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-14T17:09:55.577Z",
+  "generated": "2026-03-14T17:59:12.382Z",
   "groups": {
     "color.neutral": [
       {
@@ -44,8 +44,8 @@
       },
       {
         "name": "500",
-        "value": "#5e7a94",
-        "hex": "#5e7a94"
+        "value": "#7a96b0",
+        "hex": "#7a96b0"
       },
       {
         "name": "600",
@@ -1689,8 +1689,8 @@
       },
       {
         "name": "text-muted",
-        "value": "#5e7a94",
-        "hex": "#5e7a94"
+        "value": "#7a96b0",
+        "hex": "#7a96b0"
       },
       {
         "name": "text-faint",
@@ -3199,8 +3199,8 @@
       },
       {
         "name": "neutral",
-        "value": "#5e7a94",
-        "hex": "#5e7a94"
+        "value": "#7a96b0",
+        "hex": "#7a96b0"
       },
       {
         "name": "negative",
@@ -3231,8 +3231,8 @@
       },
       {
         "name": "muted",
-        "value": "#5e7a94",
-        "hex": "#5e7a94"
+        "value": "#7a96b0",
+        "hex": "#7a96b0"
       }
     ],
     "chart": [

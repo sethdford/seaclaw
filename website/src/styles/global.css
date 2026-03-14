@@ -1369,6 +1369,34 @@
   }
 }
 
+/* ── Ambient Intelligence ── */
+:root {
+  --hu-ambient-warmth: 0;
+  --hu-scroll-depth: 0;
+}
+
+body {
+  filter:
+    sepia(var(--hu-ambient-warmth))
+    saturate(calc(1 + var(--hu-ambient-warmth) * 0.3));
+  transition: filter 2s ease;
+}
+
+.hero-gradient::before {
+  opacity: calc(0.8 + var(--hu-scroll-depth) * 0.2);
+}
+
+.section-divider {
+  opacity: calc(0.08 + var(--hu-scroll-depth) * 0.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    filter: none !important;
+    transition: none !important;
+  }
+}
+
 /* ── Container Queries ── */
 .spectrum-grid,
 .numbers-section,
