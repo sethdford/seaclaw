@@ -1976,9 +1976,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         last_consolidation_ms = now_ms;
                     if (now_ms - last_consolidation_ms >= interval_ms) {
                         hu_consolidation_config_t cons_cfg = {
-                            .decay_days = cfg->behavior.decay_days,
+                            .decay_days = config ? config->behavior.decay_days : 30,
                             .decay_factor = 0.5,
-                            .dedup_threshold = cfg->behavior.dedup_threshold,
+                            .dedup_threshold = config ? config->behavior.dedup_threshold : 0,
                             .max_entries = 5000,
                             .provider = &agent->provider,
                             .model = agent->model_name,
