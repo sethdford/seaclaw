@@ -1,0 +1,5 @@
+{"id": "greeting", "input": "Hello, how are you?", "expected_topics": ["hello", "help"], "min_relevance": 5}
+{"id": "weather", "input": "What's the weather like?", "expected_topics": ["weather", "temperature", "forecast"], "min_relevance": 4}
+{"id": "math", "input": "What is 2+2?", "expected_topics": ["4", "four"], "min_relevance": 7}
+{"id": "coding", "input": "Write a Python hello world", "expected_topics": ["print", "hello", "python"], "min_relevance": 6}
+{"id": "explain", "input": "Explain what an API is in one sentence", "expected_topics": ["interface", "application", "software"], "min_relevance": 5}

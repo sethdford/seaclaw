@@ -31,7 +31,7 @@ jobs:
       - name: Check binary size regression
         if: github.event_name == 'pull_request'
         run: |
-          MAX_SIZE_KB=1800
+          MAX_SIZE_KB=1750
           if [ "$BINARY_SIZE_KB" -gt "$MAX_SIZE_KB" ]; then
             echo "::error::Binary size ${BINARY_SIZE_KB}KB exceeds limit of ${MAX_SIZE_KB}KB"
             exit 1

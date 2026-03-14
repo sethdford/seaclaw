@@ -324,6 +324,9 @@ set(HU_CORE_SOURCES
     src/status.c
     src/http_util.c
     src/mcp.c
+    src/mcp_transport_stdio.c
+    src/mcp_transport_sse.c
+    src/mcp_transport_http.c
     src/multimodal.c
     src/multimodal/calendar.c
     src/multimodal/document.c
@@ -337,6 +340,7 @@ set(HU_CORE_SOURCES
     src/agent_routing.c
     src/health.c
     src/security/security.c
+    src/security/mcp_audit.c
     src/security/policy.c
     src/security/pairing.c
     src/security/secrets.c
@@ -503,6 +507,7 @@ set(HU_CORE_SOURCES
     src/memory/retrieval/llm_reranker.c
     src/memory/retrieval/strategy_learner.c
     src/memory/retrieval/engine.c
+    src/memory/retrieval/multigraph.c
     src/memory/connections.c
     src/memory/knowledge.c
     src/memory/cognitive.c
@@ -838,6 +843,7 @@ if(HU_ENABLE_ML)
         src/ml/train.c
         src/ml/checkpoint.c
         src/ml/cli.c
+        src/ml/lora.c
     )
 endif()
 
@@ -1796,6 +1802,11 @@ set(HU_TEST_SOURCES
     tests/test_privacy_audit.c
     tests/test_collab_planning.c
     tests/test_ml.c
+    tests/test_otel_traces.c
+    tests/test_mcp_transport.c
+    tests/test_mcp_audit.c
+    tests/test_multigraph.c
+    tests/test_lora.c
 )
 if(HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_SOURCES tests/test_google_feeds.c tests/test_music_feeds.c
