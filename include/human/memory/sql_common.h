@@ -3,7 +3,7 @@
 
 /*
  * Shared SQL fragments for memory engine backends.
- * Avoids duplicating DDL strings across sqlite.c, lucid.c, lancedb.c.
+ * Avoids duplicating DDL strings across sqlite.c, sqlite_lucid.c, sqlite_fts.c.
  */
 
 #define HU_SQL_PRAGMA_INIT     \

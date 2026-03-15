@@ -81,6 +81,7 @@ typedef struct hu_agent_config {
     bool tree_of_thought;
     bool constitutional_ai;
     bool speculative_cache;
+    bool multi_agent;
     bool compact_context;
     uint32_t max_tool_iterations;
     uint32_t max_history_messages;
@@ -130,6 +131,7 @@ typedef struct hu_feeds_config {
     uint32_t poll_interval_twitter;
     uint32_t poll_interval_file_ingest;
     uint32_t max_items_per_poll;
+    uint32_t retention_days;
 } hu_feeds_config_t;
 
 typedef struct hu_heartbeat_config {

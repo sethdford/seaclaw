@@ -61,6 +61,7 @@
 #ifdef HU_ENABLE_FEEDS
 #include "human/feeds/processor.h"
 #include "human/feeds/research.h"
+#include "human/feeds/trends.h"
 #endif
 #ifdef HU_ENABLE_ML
 #include "human/ml/cli.h"
@@ -746,11 +747,65 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
 
 #ifdef HU_ENABLE_FEEDS
     if (app_ctx.agent && app_ctx.agent->scheduler) {
-        const char *rp = hu_research_agent_prompt();
         const char *rc = hu_research_cron_expression();
+        const char *prompt_to_use = hu_research_agent_prompt();
+        char *digest = NULL;
+        size_t digest_len = 0;
+        char *full_prompt = NULL;
+        size_t full_len = 0;
+
+#ifdef HU_ENABLE_SQLITE
+        sqlite3 *feed_db = hu_sqlite_memory_get_db(app_ctx.memory);
+        if (feed_db) {
+            int64_t since = (int64_t)time(NULL) - 86400;
+            hu_feed_build_daily_digest(alloc, feed_db, since, 4000, &digest, &digest_len);
+
+            char *trend_section = NULL;
+            size_t trend_len = 0;
+            if (config && config->feeds.interests) {
+                hu_feed_trend_t *trends = NULL;
+                size_t trend_count = 0;
+                if (hu_feed_detect_trends(alloc, feed_db, config->feeds.interests,
+                        strlen(config->feeds.interests), &trends, &trend_count) == HU_OK) {
+                    hu_feed_trends_build_section(alloc, trends, trend_count, &trend_section, &trend_len);
+                    hu_feed_trends_free(alloc, trends, trend_count);
+                }
+            }
+
+            hu_feed_correlate_recent(alloc, feed_db, since, 0.3);
+
+            size_t combined_len = (digest ? digest_len : 0) + (trend_section ? trend_len : 0);
+            if (combined_len > 0) {
+                char *combined = (char *)alloc->alloc(alloc->ctx, combined_len + 1);
+                if (combined) {
+                    size_t p = 0;
+                    if (trend_section) { memcpy(combined + p, trend_section, trend_len); p += trend_len; }
+                    if (digest) { memcpy(combined + p, digest, digest_len); p += digest_len; }
+                    combined[p] = '\0';
+                    if (hu_research_build_prompt(alloc, combined, p, &full_prompt, &full_len) == HU_OK && full_prompt)
+                        prompt_to_use = full_prompt;
+                    alloc->free(alloc->ctx, combined, combined_len + 1);
+                }
+            }
+
+            if (trend_section) alloc->free(alloc->ctx, trend_section, trend_len + 1);
+
+            if (config->feeds.retention_days > 0) {
+                hu_feed_processor_t cleanup_proc = {.alloc = alloc, .db = feed_db};
+                hu_feed_processor_cleanup(&cleanup_proc, config->feeds.retention_days);
+            }
+        }
+#endif
+
         uint64_t rid = 0;
-        hu_error_t je = hu_cron_add_agent_job((hu_cron_scheduler_t *)app_ctx.agent->scheduler, alloc, rc, rp, "cli", "research-agent", &rid);
-        if (je == HU_OK) fprintf(stderr, "[%s] research agent registered (id=%llu sched=%s)\n", HU_CODENAME, (unsigned long long)rid, rc);
+        hu_error_t je = hu_cron_add_agent_job((hu_cron_scheduler_t *)app_ctx.agent->scheduler, alloc, rc, prompt_to_use, "cli", "research-agent", &rid);
+        if (je == HU_OK)
+            fprintf(stderr, "[%s] research agent registered with %s (id=%llu sched=%s)\n",
+                    HU_CODENAME, full_prompt ? "feed digest" : "base prompt",
+                    (unsigned long long)rid, rc);
+
+        if (digest) alloc->free(alloc->ctx, digest, digest_len + 1);
+        if (full_prompt) alloc->free(alloc->ctx, full_prompt, full_len + 1);
     }
 #endif
 

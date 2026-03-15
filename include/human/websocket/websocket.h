@@ -23,6 +23,9 @@ hu_error_t hu_ws_recv(hu_ws_client_t *ws, hu_allocator_t *alloc, char **data_out
 
 void hu_ws_close(hu_ws_client_t *ws, hu_allocator_t *alloc);
 
+/* Close and free the client; use after hu_ws_connect when done */
+void hu_ws_client_free(hu_ws_client_t *ws, hu_allocator_t *alloc);
+
 /* Frame helpers (for testing and custom use) */
 size_t hu_ws_build_frame(char *buf, size_t buf_size, unsigned opcode, const char *payload,
                          size_t payload_len, const unsigned char mask_key[4]);

@@ -16,18 +16,31 @@ jobs:
         include:
           - os: ubuntu-latest
             target: linux-x86_64
+          - os: ubuntu-latest
+            target: linux-aarch64
+            cross: true
           - os: macos-latest
             target: macos-aarch64
 
     steps:
       - uses: actions/checkout@v6
+
+      - name: Install aarch64 cross-compiler
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+            libsqlite3-dev:arm64 libcurl4-openssl-dev:arm64
+        continue-on-error: true
+
       - uses: ./.github/actions/setup-build
         with:
           build-type: MinSizeRel
           enable-lto: "true"
-          enable-curl: "true"
+          enable-curl: ${{ !matrix.cross && 'true' || 'false' }}
           enable-all-channels: "true"
           target: human
+          extra-cmake-flags: ${{ matrix.cross && '-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=aarch64' || '' }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -58,8 +71,9 @@ jobs:
         run: |
           ls -R artifacts/
           mv artifacts/human-linux-x86_64/human human-linux-x86_64.bin
+          mv artifacts/human-linux-aarch64/human human-linux-aarch64.bin
           mv artifacts/human-macos-aarch64/human human-macos-aarch64.bin
-          chmod +x human-linux-x86_64.bin human-macos-aarch64.bin
+          chmod +x human-linux-x86_64.bin human-linux-aarch64.bin human-macos-aarch64.bin
 
       - name: Package completions and man pages
         run: tar czf human-extras.tar.gz completions/ docs/man/ install.sh LICENSE
@@ -69,6 +83,7 @@ jobs:
         with:
           files: |
             human-linux-x86_64.bin
+            human-linux-aarch64.bin
             human-macos-aarch64.bin
             human-extras.tar.gz
             install.sh

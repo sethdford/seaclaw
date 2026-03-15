@@ -95,7 +95,7 @@ hu_error_t hu_cartesia_tts_synthesize(hu_allocator_t *alloc,
     if (err)
         goto fail;
     err = hu_json_buf_append_raw(&jbuf, "\"},\"output_format\":{\"container\":\"mp3\","
-        "\"encoding\":\"mp3\",\"sample_rate\":44100},\"generation_config\":{", 68);
+        "\"sample_rate\":44100,\"bit_rate\":128000},\"generation_config\":{", 98);
     if (err)
         goto fail;
 

@@ -59,4 +59,5 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.9.7")
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
     implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 }

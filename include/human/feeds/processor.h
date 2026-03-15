@@ -104,12 +104,40 @@ hu_error_t hu_feed_processor_get_for_contact(hu_allocator_t *alloc, sqlite3 *db,
 void hu_feed_items_free(hu_allocator_t *alloc, hu_feed_item_stored_t *items,
                         size_t count);
 
+hu_error_t hu_feed_build_daily_digest(hu_allocator_t *alloc, sqlite3 *db,
+                                      int64_t since_ts, size_t max_chars,
+                                      char **out, size_t *out_len);
+
 /* Poll all enabled feeds that are due. Stores new items via hu_feed_processor_store_item.
  * last_poll_ms is array of HU_FEED_COUNT timestamps; updated on successful poll. */
 hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
                                   const hu_feed_config_t *config,
                                   uint64_t *last_poll_ms, uint64_t now_ms,
                                   size_t *items_ingested);
+
+hu_error_t hu_feed_processor_get_all_recent(hu_allocator_t *alloc, sqlite3 *db,
+                                            int64_t since_ts, size_t limit,
+                                            hu_feed_item_stored_t **out,
+                                            size_t *out_count);
+hu_error_t hu_feed_search(hu_allocator_t *alloc, sqlite3 *db,
+                          const char *query, size_t query_len, size_t limit,
+                          hu_feed_item_stored_t **out, size_t *out_count);
+hu_error_t hu_feed_build_daily_digest(hu_allocator_t *alloc, sqlite3 *db,
+                                      int64_t since_ts, size_t max_chars,
+                                      char **out, size_t *out_len);
+hu_error_t hu_feed_processor_cleanup(hu_feed_processor_t *proc,
+                                     uint32_t retention_days);
+hu_error_t hu_feed_correlate_recent(hu_allocator_t *alloc, sqlite3 *db,
+                                    int64_t since_ts, double threshold);
+
+struct hu_embedder;
+struct hu_vector_store;
+hu_error_t hu_feed_semantic_search(hu_allocator_t *alloc, sqlite3 *db,
+                                   struct hu_embedder *embedder,
+                                   struct hu_vector_store *store,
+                                   const char *query, size_t query_len,
+                                   size_t limit,
+                                   hu_feed_item_stored_t **out, size_t *out_count);
 
 #endif /* HU_ENABLE_SQLITE */
 

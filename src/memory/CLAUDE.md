@@ -10,8 +10,8 @@ factory.c           Engine registry and creation (hu_memory_t vtable)
     sqlite.c         SQLite-backed persistent memory
     markdown.c       Markdown file memory
     memory_lru.c     In-memory LRU cache
-    lucid.c          Lucid memory backend
-    lancedb.c        LanceDB vector-native backend
+    sqlite_lucid.c   SQLite + optional lucid CLI backend
+    sqlite_fts.c     SQLite + FTS5 full-text search backend
     none.c           No-op backend
     registry.c       Engine registration
 

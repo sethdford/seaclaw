@@ -69,7 +69,11 @@ static const char *const SCHEMA[] = {
     "first_seen INTEGER NOT NULL,"
     "last_seen INTEGER NOT NULL,"
     "mention_count INTEGER NOT NULL DEFAULT 1,"
-    "metadata_json TEXT)",
+    "metadata_json TEXT,"
+    "community_id INTEGER DEFAULT NULL,"
+    "recall_count INTEGER NOT NULL DEFAULT 0,"
+    "last_recalled INTEGER DEFAULT NULL,"
+    "supersedes_id INTEGER DEFAULT NULL)",
     "CREATE TABLE IF NOT EXISTS relations ("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
     "source_id INTEGER NOT NULL REFERENCES entities(id),"
@@ -80,9 +84,27 @@ static const char *const SCHEMA[] = {
     "last_seen INTEGER NOT NULL,"
     "context TEXT,"
     "UNIQUE(source_id, target_id, relation_type))",
+    "CREATE TABLE IF NOT EXISTS temporal_events ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "entity_id INTEGER REFERENCES entities(id),"
+    "description TEXT NOT NULL,"
+    "occurred_at INTEGER NOT NULL,"
+    "duration_sec INTEGER DEFAULT 0)",
+    "CREATE TABLE IF NOT EXISTS causal_links ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "action_entity_id INTEGER REFERENCES entities(id),"
+    "outcome_entity_id INTEGER REFERENCES entities(id),"
+    "context TEXT,"
+    "confidence REAL NOT NULL DEFAULT 0.5,"
+    "created_at INTEGER NOT NULL,"
+    "UNIQUE(action_entity_id, outcome_entity_id))",
     "CREATE INDEX IF NOT EXISTS idx_relations_source ON relations(source_id)",
     "CREATE INDEX IF NOT EXISTS idx_relations_target ON relations(target_id)",
     "CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name)",
+    "CREATE INDEX IF NOT EXISTS idx_temporal_events_entity ON temporal_events(entity_id)",
+    "CREATE INDEX IF NOT EXISTS idx_temporal_events_occurred ON temporal_events(occurred_at)",
+    "CREATE INDEX IF NOT EXISTS idx_causal_links_action ON causal_links(action_entity_id)",
+    "CREATE INDEX IF NOT EXISTS idx_causal_links_outcome ON causal_links(outcome_entity_id)",
     NULL,
 };
 

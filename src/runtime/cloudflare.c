@@ -6,6 +6,7 @@ static char cf_ctx_dummy;
 
 static hu_error_t cf_wrap_command(void *ctx, const char **argv_in, size_t argc_in,
                                   const char **argv_out, size_t max_out, size_t *argc_out) {
+#if !defined(HU_HAS_RUNTIME_EXOTIC)
     (void)ctx;
     (void)argv_in;
     (void)argc_in;
@@ -13,6 +14,26 @@ static hu_error_t cf_wrap_command(void *ctx, const char **argv_in, size_t argc_i
     (void)max_out;
     (void)argc_out;
     return HU_ERR_NOT_SUPPORTED;
+#else
+    (void)ctx;
+    if (!argv_out || !argc_out || (argc_in > 0 && !argv_in))
+        return HU_ERR_INVALID_ARGUMENT;
+    /* npx wrangler dev <argv...>; need 4 slots (npx, wrangler, dev, NULL) + argc_in */
+    if (max_out < 4 + argc_in)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    size_t idx = 0;
+    argv_out[idx++] = "npx";
+    argv_out[idx++] = "wrangler";
+    argv_out[idx++] = "dev";
+
+    for (size_t i = 0; i < argc_in && idx < max_out - 1; i++)
+        argv_out[idx++] = argv_in[i];
+
+    argv_out[idx] = NULL;
+    *argc_out = idx;
+    return HU_OK;
+#endif
 }
 
 static const char *cf_name(void *ctx) {

@@ -1602,6 +1602,19 @@ static void group_prompt_hint_macro_is_defined(void) {
     const char *hint = HU_GROUP_CHAT_PROMPT_HINT;
     HU_ASSERT_NOT_NULL(hint);
     HU_ASSERT_TRUE(strlen(hint) > 10);
+    HU_ASSERT_TRUE(strstr(hint, "GROUP CHAT") != NULL);
+    HU_ASSERT_TRUE(strstr(hint, "group conversation") != NULL);
+}
+
+static void group_history_before_gate_classifier(void) {
+    hu_channel_history_entry_t entries[3] = {
+        make_entry(false, "hey everyone", "12:00"),
+        make_entry(false, "who wants to go?", "12:01"),
+        make_entry(true, "I'm in!", "12:02"),
+    };
+    hu_group_response_t r =
+        hu_conversation_classify_group("cool let's do it", 16, "bot", 3, entries, 3);
+    HU_ASSERT(r == HU_GROUP_SKIP || r == HU_GROUP_BRIEF || r == HU_GROUP_RESPOND);
 }
 
 /* ── Thread callback tests ──────────────────────────────────────────── */
@@ -3061,6 +3074,7 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(classify_group_consecutive_2_skips_with_history);
     HU_RUN_TEST(classify_group_medium_message_is_brief);
     HU_RUN_TEST(group_prompt_hint_macro_is_defined);
+    HU_RUN_TEST(group_history_before_gate_classifier);
 
     /* Tapback-vs-text decision */
     HU_RUN_TEST(tapback_decision_lol_tapback_or_both);

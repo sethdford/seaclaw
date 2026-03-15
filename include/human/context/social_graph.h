@@ -4,10 +4,20 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/memory.h"
+#include "human/memory/graph.h"
 #include "human/persona.h"
 #include <stddef.h>
 
 #ifdef HU_ENABLE_SQLITE
+
+/* Build social context from the knowledge graph (entities and relations).
+ * Uses hu_graph_build_contact_context when contact_id is provided, else hu_graph_build_context.
+ * Caller must free the returned string. */
+hu_error_t hu_social_graph_build_context(hu_allocator_t *alloc, hu_graph_t *graph,
+                                         const char *query, size_t query_len,
+                                         const char *contact_id, size_t contact_id_len,
+                                         size_t max_hops, size_t max_chars, char **out,
+                                         size_t *out_len);
 
 /* Store a relationship for a contact. Upserts if (contact_id, person_name) exists. */
 hu_error_t hu_social_graph_store(hu_allocator_t *alloc, hu_memory_t *memory,

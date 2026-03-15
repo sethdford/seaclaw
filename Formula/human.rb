@@ -21,18 +21,20 @@ class Human < Formula
       -DCMAKE_BUILD_TYPE=MinSizeRel
       -DHU_ENABLE_LTO=ON
       -DHU_ENABLE_SQLITE=ON
+      -DHU_ENABLE_ALL_CHANNELS=ON
     ]
     args << "-DHU_ENABLE_CURL=#{build.with?("curl") ? "ON" : "OFF"}"
 
     system "cmake", "-S", ".", "-B", "build", *args, *std_cmake_args
-    system "cmake", "--build", "build"
+    system "cmake", "--build", "build", "--target", "human", "-j", ENV.make_jobs.to_s
     bin.install "build/human"
 
-    man1.install "docs/man/human.1"
-    man1.install "docs/man/human-gateway.1"
+    man1.install "docs/man/human.1" if File.exist?("docs/man/human.1")
+    man1.install "docs/man/human-gateway.1" if File.exist?("docs/man/human-gateway.1")
 
     bash_completion.install "completions/human.bash" => "human"
     zsh_completion.install "completions/_human" => "_human"
+    fish_completion.install "completions/human.fish" if File.exist?("completions/human.fish")
   end
 
   test do

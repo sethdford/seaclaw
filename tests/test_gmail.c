@@ -83,11 +83,19 @@ static void test_gmail_create_null_out(void) {
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
 
-static void test_gmail_send_is_null(void) {
+static void test_gmail_send_test_mode_stores_message(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
     hu_gmail_create(&alloc, "client_id", 6, "client_secret", 13, "refresh_token", 13, 60, &ch);
-    HU_ASSERT_NULL(ch.vtable->send);
+    HU_ASSERT_NOT_NULL(ch.vtable->send);
+    hu_error_t err =
+        ch.vtable->send(ch.ctx, "recipient@example.com", 21, "Hello from test", 15, NULL, 0);
+    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED); /* test mode returns NOT_SUPPORTED */
+    size_t len = 0;
+    const char *last = hu_gmail_test_get_last_message(&ch, &len);
+    HU_ASSERT_NOT_NULL(last);
+    HU_ASSERT_EQ(len, 15u);
+    HU_ASSERT_STR_EQ(last, "Hello from test");
     hu_gmail_destroy(&ch);
 }
 
@@ -145,7 +153,7 @@ void run_gmail_tests(void) {
     HU_RUN_TEST(test_gmail_create_destroy);
     HU_RUN_TEST(test_gmail_create_null_alloc);
     HU_RUN_TEST(test_gmail_create_null_out);
-    HU_RUN_TEST(test_gmail_send_is_null);
+    HU_RUN_TEST(test_gmail_send_test_mode_stores_message);
     HU_RUN_TEST(test_gmail_health_check_no_token);
     HU_RUN_TEST(test_gmail_poll_test_mode);
     HU_RUN_TEST(test_gmail_start_stop);

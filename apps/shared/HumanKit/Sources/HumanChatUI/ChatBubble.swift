@@ -18,8 +18,12 @@ public struct ChatBubble: View {
         self.role = role
     }
 
-    private var tokens: (bgElevated: Color, accent: Color) {
-        colorScheme == .dark ? (HUTokens.Dark.bgElevated, HUTokens.Dark.accent) : (HUTokens.Light.bgElevated, HUTokens.Light.accent)
+    private var tokens: (bgElevated: Color, accent: Color, onAccent: Color, text: Color) {
+        if colorScheme == .dark {
+            return (HUTokens.Dark.bgElevated, HUTokens.Dark.accent, HUTokens.Dark.onAccent, HUTokens.Dark.text)
+        } else {
+            return (HUTokens.Light.bgElevated, HUTokens.Light.accent, HUTokens.Light.onAccent, HUTokens.Light.text)
+        }
     }
 
     public var body: some View {
@@ -30,7 +34,7 @@ public struct ChatBubble: View {
                 .padding(.horizontal, HUTokens.spaceMd)
                 .padding(.vertical, HUTokens.spaceSm)
                 .background(role == .user ? tokens.accent : tokens.bgElevated)
-                .foregroundColor(role == .user ? .white : .primary)
+                .foregroundStyle(role == .user ? tokens.onAccent : tokens.text)
                 .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusXl, style: .continuous))
             if role == .assistant { Spacer(minLength: HUTokens.space2xl) }
         }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # update-stats.sh — Sync all docs with actual repo metrics.
-# Patches: AGENTS.md, README.md, CONTRIBUTING.md, PROJECT_STATUS.md, human/STUBS.md, CLAUDE.md
+# Patches: AGENTS.md, README.md, CONTRIBUTING.md, PROJECT_STATUS.md, human-skills/STUBS.md, CLAUDE.md
 # Usage: ./scripts/update-stats.sh [--apply]
 #   Without --apply: prints stats only (dry run).
 #   With --apply: patches all files in place.

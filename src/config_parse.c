@@ -738,6 +738,8 @@ static hu_error_t parse_feeds(hu_allocator_t *a, hu_config_t *cfg, const hu_json
     if (v >= 1 && v <= 10080) cfg->feeds.poll_interval_file_ingest = (uint32_t)v;
     v = hu_json_get_number(obj, "max_items_per_poll", cfg->feeds.max_items_per_poll);
     if (v >= 1 && v <= 1000) cfg->feeds.max_items_per_poll = (uint32_t)v;
+    v = hu_json_get_number(obj, "retention_days", cfg->feeds.retention_days);
+    if (v >= 1 && v <= 365) cfg->feeds.retention_days = (uint32_t)v;
     return HU_OK;
 }
 

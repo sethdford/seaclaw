@@ -189,6 +189,175 @@ static void merge_distinctive_words(const char *existing, const char *new_words,
         out[cap - 1] = '\0';
 }
 
+#define MAX_PHRASE_LEN 48
+#define MAX_PHRASE_ENTRIES 32
+#define TOP_PHRASES 10
+
+typedef struct {
+    char phrase[MAX_PHRASE_LEN + 1];
+    size_t count;
+} phrase_entry_t;
+
+/* Parse JSON array ["a","b","c"] and add each phrase to entries. Returns number added. */
+static size_t parse_phrase_json(const char *json, phrase_entry_t *entries, size_t max_entries) {
+    if (!json || !entries || max_entries == 0)
+        return 0;
+    const char *p = json;
+    while (*p && *p != '[')
+        p++;
+    if (*p != '[')
+        return 0;
+    p++;
+    size_t n = 0;
+    while (n < max_entries) {
+        while (*p == ' ' || *p == '\t' || *p == ',')
+            p++;
+        if (*p == ']' || *p == '\0')
+            break;
+        if (*p != '"')
+            break;
+        p++;
+        const char *start = p;
+        while (*p && *p != '"') {
+            if (*p == '\\' && p[1])
+                p++;
+            p++;
+        }
+        if (!*p)
+            break;
+        size_t len = (size_t)(p - start);
+        if (len > MAX_PHRASE_LEN)
+            len = MAX_PHRASE_LEN;
+        p++;
+        int found = -1;
+        for (size_t k = 0; k < n; k++) {
+            if (strncmp(entries[k].phrase, start, len) == 0 && entries[k].phrase[len] == '\0') {
+                entries[k].count++;
+                found = (int)k;
+                break;
+            }
+        }
+        if (found < 0) {
+            memcpy(entries[n].phrase, start, len);
+            entries[n].phrase[len] = '\0';
+            entries[n].count = 1;
+            n++;
+        }
+    }
+    return n;
+}
+
+/* Extract bigrams from message and add to entries. Returns number added. */
+static size_t extract_bigrams(const char *msg, size_t msg_len, phrase_entry_t *entries,
+                              size_t max_entries) {
+    if (!msg || msg_len == 0 || !entries || max_entries == 0)
+        return 0;
+
+#define MAX_WORDS 64
+    char *words[MAX_WORDS];
+    size_t n_words = 0;
+    for (size_t i = 0; i < MAX_WORDS; i++)
+        words[i] = NULL;
+
+    size_t i = 0;
+    while (i < msg_len && n_words < MAX_WORDS) {
+        while (i < msg_len && !isalnum((unsigned char)msg[i]))
+            i++;
+        if (i >= msg_len)
+            break;
+        size_t start = i;
+        while (i < msg_len && isalnum((unsigned char)msg[i]))
+            i++;
+        size_t len = i - start;
+        if (len == 0 || len > 48)
+            continue;
+        char w[64];
+        size_t copy = len < sizeof(w) - 1 ? len : sizeof(w) - 1;
+        for (size_t k = 0; k < copy; k++)
+            w[k] = (char)tolower((unsigned char)msg[start + k]);
+        w[copy] = '\0';
+        if (is_stopword(w, copy))
+            continue;
+        words[n_words] = (char *)malloc(copy + 1);
+        if (words[n_words]) {
+            memcpy(words[n_words], w, copy + 1);
+            n_words++;
+        }
+    }
+
+    size_t n_entries = 0;
+    for (size_t k = 0; k + 1 < n_words && n_entries < max_entries; k++) {
+        size_t l1 = strlen(words[k]);
+        size_t l2 = strlen(words[k + 1]);
+        if (l1 + 1 + l2 > MAX_PHRASE_LEN)
+            continue;
+        char bigram[MAX_PHRASE_LEN + 1];
+        int r = snprintf(bigram, sizeof(bigram), "%s %s", words[k], words[k + 1]);
+        if (r <= 0 || (size_t)r >= sizeof(bigram))
+            continue;
+        int found = -1;
+        for (size_t j = 0; j < n_entries; j++) {
+            if (strcmp(entries[j].phrase, bigram) == 0) {
+                entries[j].count++;
+                found = (int)j;
+                break;
+            }
+        }
+        if (found < 0) {
+            strncpy(entries[n_entries].phrase, bigram, MAX_PHRASE_LEN);
+            entries[n_entries].phrase[MAX_PHRASE_LEN] = '\0';
+            entries[n_entries].count = 1;
+            n_entries++;
+        }
+    }
+
+    for (size_t k = 0; k < n_words; k++)
+        free(words[k]);
+#undef MAX_WORDS
+    return n_entries;
+}
+
+/* Sort entries by count descending. */
+static int phrase_count_cmp(const void *a, const void *b) {
+    const phrase_entry_t *pa = (const phrase_entry_t *)a;
+    const phrase_entry_t *pb = (const phrase_entry_t *)b;
+    if (pa->count > pb->count)
+        return -1;
+    if (pa->count < pb->count)
+        return 1;
+    return 0;
+}
+
+/* Build JSON array from top phrases. */
+static void build_phrase_json(const phrase_entry_t *entries, size_t n, char *out, size_t cap) {
+    out[0] = '\0';
+    if (!out || cap < 4 || n == 0)
+        return;
+    size_t pos = 0;
+    if (pos + 2 <= cap)
+        out[pos++] = '[';
+    for (size_t i = 0; i < n && i < TOP_PHRASES && pos < cap - 1; i++) {
+        if (i > 0 && pos + 1 < cap)
+            out[pos++] = ',';
+        if (pos + 2 < cap)
+            out[pos++] = '"';
+        const char *p = entries[i].phrase;
+        while (*p && pos < cap - 2) {
+            if (*p == '"' || *p == '\\') {
+                if (pos + 1 < cap)
+                    out[pos++] = '\\';
+            }
+            if (pos < cap - 1)
+                out[pos++] = *p++;
+        }
+        if (pos < cap - 1)
+            out[pos++] = '"';
+    }
+    if (pos < cap - 1)
+        out[pos++] = ']';
+    out[pos] = '\0';
+}
+
 hu_error_t hu_style_fingerprint_update(hu_memory_t *memory, hu_allocator_t *alloc,
                                        const char *contact_id, size_t contact_id_len,
                                        const char *message, size_t message_len) {
@@ -214,8 +383,8 @@ hu_error_t hu_style_fingerprint_update(hu_memory_t *memory, hu_allocator_t *allo
     sqlite3_stmt *sel = NULL;
     int rc = sqlite3_prepare_v2(db,
                                 "SELECT uses_lowercase, uses_periods, laugh_style, "
-                                "avg_message_length, distinctive_words FROM style_fingerprints "
-                                "WHERE contact_id=?",
+                                "avg_message_length, common_phrases, distinctive_words "
+                                "FROM style_fingerprints WHERE contact_id=?",
                                 -1, &sel, NULL);
     if (rc != SQLITE_OK)
         return HU_ERR_MEMORY_BACKEND;
@@ -224,6 +393,7 @@ hu_error_t hu_style_fingerprint_update(hu_memory_t *memory, hu_allocator_t *allo
 
     int old_lc = 0, old_per = 0;
     int old_avg = 0;
+    const char *old_phrases = NULL;
     const char *old_dist = NULL;
 
     rc = sqlite3_step(sel);
@@ -239,7 +409,8 @@ hu_error_t hu_style_fingerprint_update(hu_memory_t *memory, hu_allocator_t *allo
             laugh[ls_len] = '\0';
         }
         old_avg = sqlite3_column_int(sel, 3);
-        old_dist = (const char *)sqlite3_column_text(sel, 4);
+        old_phrases = (const char *)sqlite3_column_text(sel, 4);
+        old_dist = (const char *)sqlite3_column_text(sel, 5);
     }
     sqlite3_finalize(sel);
 
@@ -249,6 +420,33 @@ hu_error_t hu_style_fingerprint_update(hu_memory_t *memory, hu_allocator_t *allo
 
     char merged_dist[512];
     merge_distinctive_words(old_dist ? old_dist : "", new_dist, merged_dist, sizeof(merged_dist));
+
+    phrase_entry_t phrase_entries[MAX_PHRASE_ENTRIES];
+    phrase_entry_t new_entries[MAX_PHRASE_ENTRIES];
+    memset(phrase_entries, 0, sizeof(phrase_entries));
+    memset(new_entries, 0, sizeof(new_entries));
+    size_t n_phrases = parse_phrase_json(old_phrases, phrase_entries, MAX_PHRASE_ENTRIES);
+    size_t n_new = extract_bigrams(message, message_len, new_entries, MAX_PHRASE_ENTRIES);
+    for (size_t j = 0; j < n_new && n_phrases < MAX_PHRASE_ENTRIES; j++) {
+        int found = -1;
+        for (size_t k = 0; k < n_phrases; k++) {
+            if (strcmp(phrase_entries[k].phrase, new_entries[j].phrase) == 0) {
+                phrase_entries[k].count += new_entries[j].count;
+                found = (int)k;
+                break;
+            }
+        }
+        if (found < 0) {
+            strncpy(phrase_entries[n_phrases].phrase, new_entries[j].phrase, MAX_PHRASE_LEN);
+            phrase_entries[n_phrases].phrase[MAX_PHRASE_LEN] = '\0';
+            phrase_entries[n_phrases].count = new_entries[j].count;
+            n_phrases++;
+        }
+    }
+    qsort(phrase_entries, n_phrases, sizeof(phrase_entry_t), phrase_count_cmp);
+
+    char merged_phrases[512];
+    build_phrase_json(phrase_entries, n_phrases, merged_phrases, sizeof(merged_phrases));
 
     sqlite3_stmt *stmt = NULL;
     rc = sqlite3_prepare_v2(db,
@@ -266,7 +464,9 @@ hu_error_t hu_style_fingerprint_update(hu_memory_t *memory, hu_allocator_t *allo
     sqlite3_bind_text(stmt, 4, laugh[0] ? laugh : NULL, laugh[0] ? (int)strlen(laugh) : 0,
                       laugh[0] ? SQLITE_STATIC : (sqlite3_destructor_type)0);
     sqlite3_bind_int(stmt, 5, new_avg);
-    sqlite3_bind_null(stmt, 6);
+    sqlite3_bind_text(stmt, 6, merged_phrases[0] ? merged_phrases : NULL,
+                     merged_phrases[0] ? (int)strlen(merged_phrases) : 0,
+                     merged_phrases[0] ? SQLITE_STATIC : (sqlite3_destructor_type)0);
     sqlite3_bind_text(stmt, 7, merged_dist[0] ? merged_dist : NULL,
                       merged_dist[0] ? (int)strlen(merged_dist) : 0,
                       merged_dist[0] ? SQLITE_STATIC : (sqlite3_destructor_type)0);

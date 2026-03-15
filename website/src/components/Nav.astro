@@ -8,7 +8,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
   class="fixed top-0 left-0 right-0 z-50 transition-all"
   style="transition-duration: var(--hu-duration-moderate); view-transition-name: nav-bar"
 >
-  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+  <div class="max-w-6xl mx-auto px-6 flex items-center justify-between" style="min-height: 56px; max-height: 56px">
     <a href={`${base}`} class="flex items-center gap-3 group">
       <img
         src={`${base}human.svg`}
@@ -115,7 +115,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
   }
   .mobile-menu-popover {
     position: fixed;
-    top: 4rem;
+    top: 56px;
     left: 0;
     right: 0;
     margin: 0;

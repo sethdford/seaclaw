@@ -230,9 +230,9 @@ export class ScMessageThread extends LitElement {
       background: var(--hu-hover-overlay);
     }
     .pill-icon svg {
-      width: 0.875rem;
-      height: 0.875rem;
-      vertical-align: -0.125rem;
+      width: var(--hu-icon-xs);
+      height: var(--hu-icon-xs);
+      vertical-align: calc(-1 * var(--hu-space-2xs));
     }
     .waiting-row {
       display: flex;
@@ -287,12 +287,12 @@ export class ScMessageThread extends LitElement {
       border-color: var(--hu-accent);
     }
     .branch-btn svg {
-      width: 0.75rem;
-      height: 0.75rem;
+      width: var(--hu-icon-xs);
+      height: var(--hu-icon-xs);
     }
     .branch-label {
       font-variant-numeric: tabular-nums;
-      min-width: 2rem;
+      min-width: var(--hu-space-xl);
       text-align: center;
     }
     .reaction-pills {
@@ -465,7 +465,7 @@ export class ScMessageThread extends LitElement {
       font-family: var(--hu-font);
       font-size: var(--hu-text-base);
       color: var(--hu-text-muted);
-      max-width: 24rem;
+      max-width: var(--hu-toast-max-width, 400px);
     }
     .hero-suggestions {
       display: flex;
@@ -494,7 +494,7 @@ export class ScMessageThread extends LitElement {
       &:hover {
         border-color: var(--hu-accent);
         background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
-        transform: translateY(-1px);
+        transform: translateY(calc(-1 * var(--hu-focus-ring-width, 2px)));
       }
       &:active {
         transform: scale(0.97);

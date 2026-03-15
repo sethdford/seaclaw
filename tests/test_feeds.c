@@ -14,11 +14,12 @@ static void feeds_create_table_sql_valid(void) {
     HU_ASSERT_TRUE(len > 0);
     HU_ASSERT_NOT_NULL(strstr(buf, "CREATE TABLE"));
     HU_ASSERT_NOT_NULL(strstr(buf, "feed_items"));
-    HU_ASSERT_NOT_NULL(strstr(buf, "type"));
+    HU_ASSERT_NOT_NULL(strstr(buf, "content_type"));
     HU_ASSERT_NOT_NULL(strstr(buf, "source"));
     HU_ASSERT_NOT_NULL(strstr(buf, "content"));
-    HU_ASSERT_NOT_NULL(strstr(buf, "relevance"));
-    HU_ASSERT_NOT_NULL(strstr(buf, "processed"));
+    HU_ASSERT_NOT_NULL(strstr(buf, "ingested_at"));
+    HU_ASSERT_NOT_NULL(strstr(buf, "referenced"));
+    HU_ASSERT_NOT_NULL(strstr(buf, "cluster_id"));
 }
 
 static void feeds_insert_sql_valid(void) {
@@ -44,7 +45,6 @@ static void feeds_insert_sql_valid(void) {
     HU_ASSERT_NOT_NULL(strstr(buf, "social_instagram"));
     HU_ASSERT_NOT_NULL(strstr(buf, "instagram:@friend"));
     HU_ASSERT_NOT_NULL(strstr(buf, "posted about hiking"));
-    HU_ASSERT_NOT_NULL(strstr(buf, "outdoors"));
 }
 
 static void feeds_query_unprocessed_sql_valid(void) {
@@ -57,7 +57,7 @@ static void feeds_query_unprocessed_sql_valid(void) {
     HU_ASSERT_TRUE(len > 0);
     HU_ASSERT_NOT_NULL(strstr(buf, "SELECT"));
     HU_ASSERT_NOT_NULL(strstr(buf, "news_rss"));
-    HU_ASSERT_NOT_NULL(strstr(buf, "processed = 0"));
+    HU_ASSERT_NOT_NULL(strstr(buf, "ingested_at"));
     HU_ASSERT_NOT_NULL(strstr(buf, "LIMIT 10"));
 }
 
@@ -68,7 +68,7 @@ static void feeds_mark_processed_sql_valid(void) {
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(len > 0);
     HU_ASSERT_NOT_NULL(strstr(buf, "UPDATE"));
-    HU_ASSERT_NOT_NULL(strstr(buf, "processed = 1"));
+    HU_ASSERT_NOT_NULL(strstr(buf, "referenced = 1"));
     HU_ASSERT_NOT_NULL(strstr(buf, "id = 42"));
 }
 
@@ -81,7 +81,8 @@ static void feeds_query_by_topic_sql_valid(void) {
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(len > 0);
     HU_ASSERT_NOT_NULL(strstr(buf, "SELECT"));
-    HU_ASSERT_NOT_NULL(strstr(buf, "topic = 'hiking'"));
+    HU_ASSERT_NOT_NULL(strstr(buf, "content LIKE"));
+    HU_ASSERT_NOT_NULL(strstr(buf, "hiking"));
     HU_ASSERT_NOT_NULL(strstr(buf, "LIMIT 5"));
 }
 

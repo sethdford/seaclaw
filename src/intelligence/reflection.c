@@ -560,7 +560,7 @@ hu_error_t hu_reflection_daily(hu_reflection_engine_t *engine, int64_t now_ts) {
         hu_feed_item_stored_t *feed_items = NULL;
         size_t feed_count = 0;
         hu_error_t ferr = hu_feed_processor_get_recent(engine->alloc, engine->db,
-                                                       NULL, 0, 10, &feed_items, &feed_count);
+                                                       "rss", 3, 10, &feed_items, &feed_count);
         if (ferr == HU_OK && feed_items && feed_count > 0)
             hu_feed_items_free(engine->alloc, feed_items, feed_count);
     }

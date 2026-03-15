@@ -68,6 +68,73 @@ static void test_audio_cleanup_temp_empty_path_safe(void) {
     hu_audio_cleanup_temp("");
 }
 
+static void test_audio_pipeline_process_null_alloc_returns_error(void) {
+    static const unsigned char buf[] = {0x01, 0x02};
+    void *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_audio_pipeline_process(NULL, buf, sizeof(buf), &out, &out_len);
+    HU_ASSERT_NEQ(err, HU_OK);
+}
+
+static void test_audio_pipeline_process_null_out_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    static const unsigned char buf[] = {0x01, 0x02};
+    size_t out_len = 0;
+    hu_error_t err = hu_audio_pipeline_process(&alloc, buf, sizeof(buf), NULL, &out_len);
+    HU_ASSERT_NEQ(err, HU_OK);
+}
+
+static void test_audio_pipeline_process_null_out_len_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    static const unsigned char buf[] = {0x01, 0x02};
+    void *out = NULL;
+    hu_error_t err = hu_audio_pipeline_process(&alloc, buf, sizeof(buf), &out, NULL);
+    HU_ASSERT_NEQ(err, HU_OK);
+}
+
+static void test_audio_pipeline_process_null_input_with_len_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    void *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_audio_pipeline_process(&alloc, NULL, 5, &out, &out_len);
+    HU_ASSERT_NEQ(err, HU_OK);
+}
+
+static void test_audio_pipeline_process_empty_input_returns_ok(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    void *out = (void *)0xdeadbeef;
+    size_t out_len = 999;
+    hu_error_t err = hu_audio_pipeline_process(&alloc, "", 0, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NULL(out);
+    HU_ASSERT_EQ(out_len, 0);
+}
+
+static void test_audio_pipeline_process_pass_through_returns_copy(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    static const unsigned char buf[] = {0x52, 0x49, 0x46, 0x46}; /* RIFF - WAV header */
+    void *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_audio_pipeline_process(&alloc, buf, sizeof(buf), &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_EQ(out_len, sizeof(buf));
+    HU_ASSERT(memcmp(out, buf, sizeof(buf)) == 0);
+    alloc.free(alloc.ctx, out, out_len);
+}
+
+static void test_audio_pipeline_process_pcm_pass_through(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    static const unsigned char pcm[] = {0x00, 0x01, 0x02, 0x03};
+    void *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_audio_pipeline_process(&alloc, pcm, sizeof(pcm), &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_EQ(out_len, sizeof(pcm));
+    alloc.free(alloc.ctx, out, out_len);
+}
+
 void run_audio_pipeline_tests(void) {
     HU_TEST_SUITE("Audio pipeline");
     HU_RUN_TEST(test_audio_mp3_to_caf_mock_creates_file);
@@ -77,6 +144,13 @@ void run_audio_pipeline_tests(void) {
     HU_RUN_TEST(test_audio_mp3_to_caf_null_out_path_returns_error);
     HU_RUN_TEST(test_audio_cleanup_temp_null_safe);
     HU_RUN_TEST(test_audio_cleanup_temp_empty_path_safe);
+    HU_RUN_TEST(test_audio_pipeline_process_null_alloc_returns_error);
+    HU_RUN_TEST(test_audio_pipeline_process_null_out_returns_error);
+    HU_RUN_TEST(test_audio_pipeline_process_null_out_len_returns_error);
+    HU_RUN_TEST(test_audio_pipeline_process_null_input_with_len_returns_error);
+    HU_RUN_TEST(test_audio_pipeline_process_empty_input_returns_ok);
+    HU_RUN_TEST(test_audio_pipeline_process_pass_through_returns_copy);
+    HU_RUN_TEST(test_audio_pipeline_process_pcm_pass_through);
 }
 
 #endif /* HU_ENABLE_CARTESIA */

@@ -1,19 +1,15 @@
 #include "human/providers/codex_cli.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/process_util.h"
 #include "human/core/string.h"
 #include "human/provider.h"
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef HU_GATEWAY_POSIX
-#include <fcntl.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#endif
-
-#define HU_CODEX_CLI_NAME      "codex"
-#define HU_CODEX_DEFAULT_MODEL "codex-mini-latest"
+#define HU_CODEX_CLI_NAME       "codex"
+#define HU_CODEX_DEFAULT_MODEL  "codex-mini-latest"
+#define HU_CODEX_PROMPT_MAX     65536
 
 typedef struct hu_codex_cli_ctx {
     char *model;
@@ -37,69 +33,36 @@ static const char *extract_last_user_message(const hu_chat_message_t *msgs, size
 #if defined(HU_GATEWAY_POSIX) && !HU_IS_TEST
 static hu_error_t run_codex(hu_allocator_t *alloc, const char *prompt, size_t prompt_len,
                             char **out, size_t *out_len) {
-    char prompt_buf[65536];
-    if (prompt_len >= sizeof(prompt_buf) - 1)
+    if (!alloc || !prompt || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
+    if (prompt_len >= HU_CODEX_PROMPT_MAX - 1)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char prompt_buf[HU_CODEX_PROMPT_MAX];
     memcpy(prompt_buf, prompt, prompt_len);
     prompt_buf[prompt_len] = '\0';
 
-    char *argv[] = {(char *)HU_CODEX_CLI_NAME, "--quiet", prompt_buf, NULL};
+    const char *argv[] = {HU_CODEX_CLI_NAME, "--quiet", prompt_buf, NULL};
 
-    int fds[2];
-    if (pipe(fds) != 0)
-        return HU_ERR_IO;
-
-    pid_t pid = fork();
-    if (pid < 0) {
-        close(fds[0]);
-        close(fds[1]);
-        return HU_ERR_IO;
+    hu_run_result_t result = {0};
+    hu_error_t err = hu_process_run(alloc, argv, NULL, 4 * 1024 * 1024, &result);
+    if (err != HU_OK) {
+        hu_run_result_free(alloc, &result);
+        return err;
     }
-
-    if (pid == 0) {
-        close(fds[0]);
-        dup2(fds[1], STDOUT_FILENO);
-        dup2(fds[1], STDERR_FILENO);
-        close(fds[1]);
-        execvp(HU_CODEX_CLI_NAME, argv);
-        _exit(127);
-    }
-
-    close(fds[1]);
-    size_t cap = 4 * 1024 * 1024;
-    char *buf = (char *)alloc->alloc(alloc->ctx, cap);
-    if (!buf) {
-        close(fds[0]);
-        waitpid(pid, NULL, 0);
-        return HU_ERR_OUT_OF_MEMORY;
-    }
-    size_t len = 0;
-    for (;;) {
-        if (len >= cap - 1)
-            break;
-        ssize_t n = read(fds[0], buf + len, cap - len - 1);
-        if (n <= 0)
-            break;
-        len += (size_t)n;
-    }
-    buf[len] = '\0';
-    close(fds[0]);
-
-    int status;
-    waitpid(pid, &status, 0);
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        alloc->free(alloc->ctx, buf, cap);
+    if (!result.success || !result.stdout_buf) {
+        hu_run_result_free(alloc, &result);
         return HU_ERR_PROVIDER_RESPONSE;
     }
 
-    /* Trim trailing whitespace */
-    while (len > 0 && (buf[len - 1] == ' ' || buf[len - 1] == '\t' || buf[len - 1] == '\r' ||
-                       buf[len - 1] == '\n'))
+    size_t len = result.stdout_len;
+    while (len > 0 &&
+           (result.stdout_buf[len - 1] == ' ' || result.stdout_buf[len - 1] == '\t' ||
+            result.stdout_buf[len - 1] == '\r' || result.stdout_buf[len - 1] == '\n'))
         len--;
-    buf[len] = '\0';
 
-    *out = hu_strndup(alloc, buf, len);
-    alloc->free(alloc->ctx, buf, cap);
+    *out = hu_strndup(alloc, result.stdout_buf, len);
+    hu_run_result_free(alloc, &result);
     if (!*out)
         return HU_ERR_OUT_OF_MEMORY;
     *out_len = len;

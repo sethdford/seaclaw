@@ -73,6 +73,7 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->agent.constitutional_ai = false;
     cfg->agent.speculative_cache = false;
     cfg->agent.tool_routing_enabled = false;
+    cfg->agent.multi_agent = false;
     cfg->agent.compact_context = false;
     cfg->agent.context_pressure_warn = 0.85f;
     cfg->agent.context_pressure_compact = 0.95f;

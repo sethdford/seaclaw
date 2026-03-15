@@ -410,6 +410,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         .constitutional_ai = cfg.agent.constitutional_ai,
         .speculative_cache = cfg.agent.speculative_cache,
         .tool_routing_enabled = cfg.agent.tool_routing_enabled,
+        .multi_agent = cfg.agent.multi_agent,
     };
     hu_agent_t agent;
     err = hu_agent_from_config(

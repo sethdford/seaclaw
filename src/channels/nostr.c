@@ -1,3 +1,4 @@
+#include "human/channel.h"
 #include "human/channels/nostr.h"
 #include "human/core/json.h"
 #include "human/core/process_util.h"
@@ -5,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #define HU_NOSTR_MAX_MSG         65536
@@ -158,6 +160,154 @@ static bool nostr_health_check(void *ctx) {
 #endif
 }
 
+#if !HU_IS_TEST && defined(HU_GATEWAY_POSIX)
+static int nostr_history_compare(const void *a, const void *b) {
+    const hu_channel_history_entry_t *ea = (const hu_channel_history_entry_t *)a;
+    const hu_channel_history_entry_t *eb = (const hu_channel_history_entry_t *)b;
+    return strcmp(ea->timestamp, eb->timestamp);
+}
+
+static void nostr_parse_nak_output(hu_allocator_t *alloc,
+                                   hu_channel_history_entry_t *entries, size_t cap, size_t *cnt,
+                                   const char *buf, size_t buf_len, bool from_contact) {
+    const char *p = buf;
+    const char *end = buf + buf_len;
+    while (p < end && *cnt < cap) {
+        const char *line_start = p;
+        while (p < end && *p != '\n')
+            p++;
+        size_t line_len = (size_t)(p - line_start);
+        if (p < end)
+            p++;
+        if (line_len == 0)
+            continue;
+        hu_json_value_t *ev = NULL;
+        if (hu_json_parse(alloc, line_start, line_len, &ev) != HU_OK || !ev)
+            continue;
+        if (ev->type != HU_JSON_OBJECT) {
+            hu_json_free(alloc, ev);
+            continue;
+        }
+        int kind = (int)hu_json_get_number(ev, "kind", -1);
+        if (kind != 1 && kind != 4) {
+            hu_json_free(alloc, ev);
+            continue;
+        }
+        const char *content = hu_json_get_string(ev, "content");
+        double created_at = hu_json_get_number(ev, "created_at", 0);
+        hu_json_free(alloc, ev);
+        if (!content)
+            continue;
+        entries[*cnt].from_me = !from_contact;
+        size_t ct_len = strlen(content);
+        if (ct_len >= sizeof(entries[0].text))
+            ct_len = sizeof(entries[0].text) - 1;
+        memcpy(entries[*cnt].text, content, ct_len);
+        entries[*cnt].text[ct_len] = '\0';
+        time_t t = (time_t)created_at;
+        struct tm tm_buf;
+        struct tm *tm = localtime_r(&t, &tm_buf);
+        if (tm) {
+            strftime(entries[*cnt].timestamp, sizeof(entries[0].timestamp), "%Y-%m-%dT%H:%M:%S",
+                     tm);
+        } else {
+            snprintf(entries[*cnt].timestamp, sizeof(entries[0].timestamp), "%lld",
+                     (long long)created_at);
+        }
+        (*cnt)++;
+    }
+}
+#endif
+
+static hu_error_t nostr_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                  const char *contact_id, size_t contact_id_len,
+                                                  size_t limit, hu_channel_history_entry_t **out,
+                                                  size_t *out_count) {
+    hu_nostr_ctx_t *c = (hu_nostr_ctx_t *)ctx;
+    if (!alloc || !contact_id || contact_id_len == 0 || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+
+#if HU_IS_TEST
+    (void)c;
+    (void)contact_id_len;
+    (void)limit;
+    return HU_ERR_NOT_SUPPORTED;
+#elif defined(HU_GATEWAY_POSIX)
+    if (!c->nak_path || c->nak_path[0] == '\0' || !c->relay_url || c->relay_url[0] == '\0')
+        return HU_ERR_NOT_SUPPORTED;
+    if (!c->bot_pubkey || c->bot_pubkey[0] == '\0')
+        return HU_ERR_NOT_SUPPORTED;
+
+    size_t cap = (limit > 100 ? 100 : limit) * 2;
+    if (cap < 2)
+        cap = 2;
+    hu_channel_history_entry_t *entries =
+        (hu_channel_history_entry_t *)alloc->alloc(alloc->ctx, cap * sizeof(*entries));
+    if (!entries)
+        return HU_ERR_OUT_OF_MEMORY;
+    memset(entries, 0, cap * sizeof(*entries));
+    size_t cnt = 0;
+
+    char contact_buf[HU_NOSTR_MAX_TARGET + 1];
+    size_t clen = contact_id_len > HU_NOSTR_MAX_TARGET ? HU_NOSTR_MAX_TARGET : contact_id_len;
+    memcpy(contact_buf, contact_id, clen);
+    contact_buf[clen] = '\0';
+
+    size_t per_limit = (limit > 50 ? 50 : limit);
+
+    for (int direction = 0; direction < 2 && cnt < cap; direction++) {
+        char cmd[2048];
+        int nc;
+        if (direction == 0) {
+            nc = snprintf(cmd, sizeof(cmd),
+                          "%s req -k 4 -a %s -p %s -r %s --limit %zu 2>/dev/null", c->nak_path,
+                          contact_buf, c->bot_pubkey, c->relay_url, per_limit);
+        } else {
+            nc = snprintf(cmd, sizeof(cmd),
+                          "%s req -k 4 -a %s -p %s -r %s --limit %zu 2>/dev/null", c->nak_path,
+                          c->bot_pubkey, contact_buf, c->relay_url, per_limit);
+        }
+        if (nc < 0 || nc >= (int)sizeof(cmd))
+            continue;
+        char *sh_cmd = (char *)c->alloc->alloc(c->alloc->ctx, (size_t)nc + 1);
+        if (!sh_cmd)
+            continue;
+        memcpy(sh_cmd, cmd, (size_t)nc + 1);
+        const char *argv[] = {"sh", "-c", sh_cmd, NULL};
+        hu_run_result_t run = {0};
+        hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &run);
+        c->alloc->free(c->alloc->ctx, sh_cmd, (size_t)nc + 1);
+        if (err != HU_OK || !run.success || !run.stdout_buf || run.stdout_len == 0) {
+            hu_run_result_free(c->alloc, &run);
+            continue;
+        }
+        nostr_parse_nak_output(alloc, entries, cap, &cnt, run.stdout_buf, run.stdout_len,
+                              (direction == 0));
+        hu_run_result_free(c->alloc, &run);
+    }
+
+    if (cnt == 0) {
+        alloc->free(alloc->ctx, entries, cap * sizeof(*entries));
+        return HU_OK;
+    }
+
+    qsort(entries, cnt, sizeof(*entries), nostr_history_compare);
+    if (cnt > limit)
+        cnt = limit;
+
+    *out = entries;
+    *out_count = cnt;
+    return HU_OK;
+#else
+    (void)c;
+    (void)contact_id_len;
+    (void)limit;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
 static const hu_channel_vtable_t nostr_vtable = {
     .start = nostr_start,
     .stop = nostr_stop,
@@ -167,6 +317,7 @@ static const hu_channel_vtable_t nostr_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
+    .load_conversation_history = nostr_load_conversation_history,
 };
 
 hu_error_t hu_nostr_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_loop_msg_t *msgs,

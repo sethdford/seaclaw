@@ -10,7 +10,9 @@
   --hu-focus-glow: rgb(59 130 246 / 0.15);
   --hu-glass-text-shadow-color: rgb(0 0 0 / 0.5);
   --hu-glass-hover-border: rgb(255 255 255 / 0.08);
-  --hu-accent-glow: rgb(122 182 72 / 0.35);
+  --hu-accent-glow: color-mix(in srgb, var(--hu-accent) 35%, transparent);
+  /* Focus ring references accent (overrides generated hex in _tokens.css) */
+  --hu-focus-ring: var(--hu-accent);
   /* Spring easing — cubic-bezier approximations for physics motion */
   --hu-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --hu-ease-spring-gentle: cubic-bezier(0.22, 1.2, 0.36, 1);
@@ -79,17 +81,20 @@ body {
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     color-scheme: light;
+    --hu-focus-ring: var(--hu-accent-hover);
   }
 }
 
 [data-theme="light"] {
   color-scheme: light;
+  --hu-focus-ring: var(--hu-accent-hover);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
   /* Dark mode glass depth — slightly higher opacity for cards/panels */
   --hu-glass-card-bg-mix: 75%;
+  --hu-focus-ring: var(--hu-accent);
 }
 
 :focus-visible {

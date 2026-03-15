@@ -96,7 +96,7 @@ Last updated: 2026-03-11
 ## What's Stubbed (Interface Defined, Returns HU_ERR_NOT_SUPPORTED)
 
 - **postgres.c, redis.c**: Memory engines — stubs present, need external libs for real backend
-- **lancedb.c, lucid.c**: SQLite-backed memory engines — real when `HU_ENABLE_SQLITE=ON`, including `store_ex` with source attribution; stub path when SQLite unavailable
+- **sqlite_fts.c, sqlite_lucid.c**: SQLite-backed memory engines — real when `HU_ENABLE_SQLITE=ON`, including `store_ex` with source attribution; stub path when SQLite unavailable
 - **store_pgvector.c**: Vector store stub (needs libpq + pgvector)
 - **Self-update**: Interface defined, no download/replace mechanism
 

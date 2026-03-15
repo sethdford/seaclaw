@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-14T19:40:05.229Z",
+  "generated": "2026-03-15T12:25:32.380Z",
   "groups": {
     "color.neutral": [
       {
@@ -1343,6 +1343,20 @@
       {
         "name": "damping",
         "value": "10"
+      },
+      {
+        "name": "mass",
+        "value": "1"
+      }
+    ],
+    "spring.interactive": [
+      {
+        "name": "stiffness",
+        "value": "322"
+      },
+      {
+        "name": "damping",
+        "value": "31"
       },
       {
         "name": "mass",

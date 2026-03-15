@@ -1,4 +1,5 @@
 #include "human/feeds/processor.h"
+#include "human/memory/vector.h"
 #ifdef HU_ENABLE_FEEDS
 #include "human/feeds/news.h"
 #include "human/feeds/gmail.h"
@@ -10,6 +11,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #define HU_FEEDS_ESCAPE_BUF 2048
 
@@ -39,13 +41,14 @@ hu_error_t hu_feeds_create_table_sql(char *buf, size_t cap, size_t *out_len) {
     static const char sql[] =
         "CREATE TABLE IF NOT EXISTS feed_items (\n"
         "    id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
-        "    type TEXT NOT NULL,\n"
         "    source TEXT NOT NULL,\n"
+        "    contact_id TEXT,\n"
+        "    content_type TEXT NOT NULL,\n"
         "    content TEXT NOT NULL,\n"
-        "    topic TEXT,\n"
-        "    relevance REAL NOT NULL,\n"
-        "    fetched_at INTEGER NOT NULL,\n"
-        "    processed INTEGER NOT NULL DEFAULT 0\n"
+        "    url TEXT,\n"
+        "    ingested_at INTEGER NOT NULL,\n"
+        "    referenced INTEGER DEFAULT 0,\n"
+        "    cluster_id INTEGER DEFAULT NULL\n"
         ")";
 
     size_t len = sizeof(sql) - 1;
@@ -65,12 +68,9 @@ hu_error_t hu_feeds_insert_sql(const hu_feed_item_t *item, char *buf,
     size_t src_len = item->source_len ? item->source_len : strlen(src);
     const char *cnt = item->content ? item->content : "";
     size_t cnt_len = item->content_len ? item->content_len : strlen(cnt);
-    const char *top = item->topic ? item->topic : "";
-    size_t top_len = item->topic_len ? item->topic_len : strlen(top);
 
     char esc_src[HU_FEEDS_ESCAPE_BUF];
     char esc_cnt[HU_FEEDS_ESCAPE_BUF];
-    char esc_top[HU_FEEDS_ESCAPE_BUF];
 
     if (src_len > 0 &&
         escape_sql_string(src, src_len, esc_src, sizeof(esc_src)) == 0)
@@ -84,21 +84,13 @@ hu_error_t hu_feeds_insert_sql(const hu_feed_item_t *item, char *buf,
     if (cnt_len == 0)
         esc_cnt[0] = '\0';
 
-    if (top_len > 0 &&
-        escape_sql_string(top, top_len, esc_top, sizeof(esc_top)) == 0)
-        return HU_ERR_INVALID_ARGUMENT;
-    if (top_len == 0)
-        esc_top[0] = '\0';
-
     const char *type_str = hu_feed_type_str(item->type);
-    int proc = item->processed ? 1 : 0;
 
     int n = snprintf(
         buf, cap,
-        "INSERT INTO feed_items (type, source, content, topic, relevance, "
-        "fetched_at, processed) VALUES ('%s', '%s', '%s', '%s', %f, %llu, %d)",
-        type_str, esc_src, esc_cnt, esc_top, item->relevance,
-        (unsigned long long)item->fetched_at, proc);
+        "INSERT INTO feed_items (source, content_type, content, url, ingested_at) "
+        "VALUES ('%s', '%s', '%s', '', %llu)",
+        esc_src, type_str, esc_cnt, (unsigned long long)item->fetched_at);
 
     if (n < 0 || (size_t)n >= cap)
         return HU_ERR_INVALID_ARGUMENT;
@@ -119,9 +111,8 @@ hu_error_t hu_feeds_query_unprocessed_sql(hu_feed_type_t type, uint32_t limit,
 
     int n = snprintf(
         buf, cap,
-        "SELECT id, type, source, content, topic, relevance, fetched_at, "
-        "processed FROM feed_items WHERE type = '%s' AND processed = 0 "
-        "ORDER BY relevance DESC, fetched_at DESC LIMIT %u",
+        "SELECT id, source, content_type, content, url, ingested_at FROM "
+        "feed_items WHERE source LIKE '%s%%' ORDER BY ingested_at DESC LIMIT %u",
         esc, limit);
 
     if (n < 0 || (size_t)n >= cap)
@@ -136,7 +127,7 @@ hu_error_t hu_feeds_mark_processed_sql(int64_t id, char *buf, size_t cap,
         return HU_ERR_INVALID_ARGUMENT;
 
     int n = snprintf(buf, cap,
-                     "UPDATE feed_items SET processed = 1 WHERE id = %lld",
+                     "UPDATE feed_items SET referenced = 1 WHERE id = %lld",
                      (long long)id);
 
     if (n < 0 || (size_t)n >= cap)
@@ -157,9 +148,8 @@ hu_error_t hu_feeds_query_by_topic_sql(const char *topic, size_t topic_len,
 
     int n = snprintf(
         buf, cap,
-        "SELECT id, type, source, content, topic, relevance, fetched_at, "
-        "processed FROM feed_items WHERE topic = '%s' ORDER BY relevance DESC "
-        "LIMIT %u",
+        "SELECT id, source, content_type, content, url, ingested_at FROM "
+        "feed_items WHERE content LIKE '%%%s%%' ORDER BY ingested_at DESC LIMIT %u",
         esc, limit);
 
     if (n < 0 || (size_t)n >= cap)
@@ -754,6 +744,438 @@ hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
 #endif
         }
     }
+    return HU_OK;
+}
+
+hu_error_t hu_feed_processor_get_all_recent(hu_allocator_t *alloc, sqlite3 *db,
+                                           int64_t since_ts, size_t limit,
+                                           hu_feed_item_stored_t **out,
+                                           size_t *out_count) {
+    if (!alloc || !db || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *out = NULL;
+    *out_count = 0;
+
+    const char *sql =
+        "SELECT source, contact_id, content_type, content, url, ingested_at "
+        "FROM feed_items WHERE ingested_at >= ? ORDER BY ingested_at DESC LIMIT ?";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_IO;
+
+    sqlite3_bind_int64(stmt, 1, since_ts);
+    sqlite3_bind_int(stmt, 2, (int)limit);
+
+    hu_feed_item_stored_t *items = NULL;
+    size_t count = 0;
+    size_t cap = 0;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (count >= cap) {
+            size_t new_cap = cap == 0 ? 4 : cap * 2;
+            hu_feed_item_stored_t *tmp = (hu_feed_item_stored_t *)alloc->alloc(
+                alloc->ctx, new_cap * sizeof(hu_feed_item_stored_t));
+            if (!tmp) {
+                if (items) alloc->free(alloc->ctx, items,
+                                       cap * sizeof(hu_feed_item_stored_t));
+                sqlite3_finalize(stmt);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            if (items) {
+                memcpy(tmp, items, count * sizeof(hu_feed_item_stored_t));
+                alloc->free(alloc->ctx, items,
+                            cap * sizeof(hu_feed_item_stored_t));
+            }
+            items = tmp;
+            cap = new_cap;
+        }
+        hu_feed_item_stored_t *it = &items[count];
+        memset(it, 0, sizeof(*it));
+
+        const char *s = (const char *)sqlite3_column_text(stmt, 0);
+        if (s) snprintf(it->source, sizeof(it->source), "%s", s);
+        s = (const char *)sqlite3_column_text(stmt, 1);
+        if (s) snprintf(it->contact_id, sizeof(it->contact_id), "%s", s);
+        s = (const char *)sqlite3_column_text(stmt, 2);
+        if (s) snprintf(it->content_type, sizeof(it->content_type), "%s", s);
+        s = (const char *)sqlite3_column_text(stmt, 3);
+        if (s) {
+            snprintf(it->content, sizeof(it->content), "%s", s);
+            it->content_len = strlen(it->content);
+        }
+        s = (const char *)sqlite3_column_text(stmt, 4);
+        if (s) snprintf(it->url, sizeof(it->url), "%s", s);
+        it->ingested_at = sqlite3_column_int64(stmt, 5);
+        count++;
+    }
+    sqlite3_finalize(stmt);
+
+    *out = items;
+    *out_count = count;
+    return HU_OK;
+}
+
+hu_error_t hu_feed_search(hu_allocator_t *alloc, sqlite3 *db,
+                          const char *query, size_t query_len, size_t limit,
+                          hu_feed_item_stored_t **out, size_t *out_count) {
+    (void)query_len;
+    if (!alloc || !db || !query || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *out = NULL;
+    *out_count = 0;
+
+    const char *sql =
+        "SELECT source, contact_id, content_type, content, url, ingested_at "
+        "FROM feed_items WHERE id IN (SELECT rowid FROM feed_items_fts WHERE "
+        "feed_items_fts MATCH ?) ORDER BY ingested_at DESC LIMIT ?";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_IO;
+
+    sqlite3_bind_text(stmt, 1, query, -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 2, (int)limit);
+
+    hu_feed_item_stored_t *items = NULL;
+    size_t count = 0;
+    size_t cap = 0;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (count >= cap) {
+            size_t new_cap = cap == 0 ? 4 : cap * 2;
+            hu_feed_item_stored_t *tmp = (hu_feed_item_stored_t *)alloc->alloc(
+                alloc->ctx, new_cap * sizeof(hu_feed_item_stored_t));
+            if (!tmp) {
+                if (items) alloc->free(alloc->ctx, items,
+                                       cap * sizeof(hu_feed_item_stored_t));
+                sqlite3_finalize(stmt);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            if (items) {
+                memcpy(tmp, items, count * sizeof(hu_feed_item_stored_t));
+                alloc->free(alloc->ctx, items,
+                            cap * sizeof(hu_feed_item_stored_t));
+            }
+            items = tmp;
+            cap = new_cap;
+        }
+        hu_feed_item_stored_t *it = &items[count];
+        memset(it, 0, sizeof(*it));
+
+        const char *s = (const char *)sqlite3_column_text(stmt, 0);
+        if (s) snprintf(it->source, sizeof(it->source), "%s", s);
+        s = (const char *)sqlite3_column_text(stmt, 1);
+        if (s) snprintf(it->contact_id, sizeof(it->contact_id), "%s", s);
+        s = (const char *)sqlite3_column_text(stmt, 2);
+        if (s) snprintf(it->content_type, sizeof(it->content_type), "%s", s);
+        s = (const char *)sqlite3_column_text(stmt, 3);
+        if (s) {
+            snprintf(it->content, sizeof(it->content), "%s", s);
+            it->content_len = strlen(it->content);
+        }
+        s = (const char *)sqlite3_column_text(stmt, 4);
+        if (s) snprintf(it->url, sizeof(it->url), "%s", s);
+        it->ingested_at = sqlite3_column_int64(stmt, 5);
+        count++;
+    }
+    sqlite3_finalize(stmt);
+
+    *out = items;
+    *out_count = count;
+    return HU_OK;
+}
+
+hu_error_t hu_feed_build_daily_digest(hu_allocator_t *alloc, sqlite3 *db,
+                                     int64_t since_ts, size_t max_chars,
+                                     char **out, size_t *out_len) {
+    if (!alloc || !db || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *out = NULL;
+    *out_len = 0;
+
+    const char *count_sql =
+        "SELECT source, COUNT(*) as cnt FROM feed_items WHERE ingested_at >= ? "
+        "GROUP BY source ORDER BY cnt DESC";
+    sqlite3_stmt *count_stmt = NULL;
+    if (sqlite3_prepare_v2(db, count_sql, -1, &count_stmt, NULL) != SQLITE_OK)
+        goto no_items;
+
+    sqlite3_bind_int64(count_stmt, 1, since_ts);
+
+    size_t total_items = 0;
+    size_t source_count = 0;
+    char sources[32][32];
+    int counts[32];
+    memset(sources, 0, sizeof(sources));
+    memset(counts, 0, sizeof(counts));
+
+    while (sqlite3_step(count_stmt) == SQLITE_ROW && source_count < 32) {
+        const char *src = (const char *)sqlite3_column_text(count_stmt, 0);
+        int cnt = sqlite3_column_int(count_stmt, 1);
+        if (src) {
+            snprintf(sources[source_count], sizeof(sources[0]), "%s", src);
+            counts[source_count] = cnt;
+            total_items += (size_t)cnt;
+            source_count++;
+        }
+    }
+    sqlite3_finalize(count_stmt);
+    count_stmt = NULL;
+
+    if (source_count == 0)
+        goto no_items;
+
+    size_t need = 128;
+    need += snprintf(NULL, 0, "## Feed Digest (%zu items from %zu sources)\n\n",
+                     total_items, source_count);
+    if (need < 128)
+        need = 128;
+
+    char *buf = (char *)alloc->alloc(alloc->ctx, need);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    size_t pos = 0;
+    int n = snprintf(buf + pos, need - pos,
+                     "## Feed Digest (%zu items from %zu sources)\n\n",
+                     total_items, source_count);
+    if (n < 0 || (size_t)n >= need - pos) {
+        alloc->free(alloc->ctx, buf, need);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    pos += (size_t)n;
+
+    const char *item_sql =
+        "SELECT content_type, substr(content, 1, 200), url FROM feed_items "
+        "WHERE source = ? AND ingested_at >= ? ORDER BY ingested_at DESC LIMIT 5";
+    sqlite3_stmt *item_stmt = NULL;
+    if (sqlite3_prepare_v2(db, item_sql, -1, &item_stmt, NULL) != SQLITE_OK) {
+        alloc->free(alloc->ctx, buf, need);
+        return HU_ERR_IO;
+    }
+
+    for (size_t si = 0; si < source_count && pos < max_chars; si++) {
+        sqlite3_reset(item_stmt);
+        sqlite3_bind_text(item_stmt, 1, sources[si], -1, SQLITE_STATIC);
+        sqlite3_bind_int64(item_stmt, 2, since_ts);
+
+        int row = 0;
+        while (sqlite3_step(item_stmt) == SQLITE_ROW && pos < max_chars && row < 5) {
+            const char *preview = (const char *)sqlite3_column_text(item_stmt, 1);
+            const char *url = (const char *)sqlite3_column_text(item_stmt, 2);
+            const char *prev_str = preview ? preview : "";
+            const char *url_str = url ? url : "";
+
+            size_t line_cap = 512;
+            char line[512];
+            n = snprintf(line, line_cap, "- [%s] %s (%s)\n",
+                         sources[si], prev_str, url_str);
+            if (n > 0 && (size_t)n < line_cap) {
+                size_t grow = (size_t)n + 1;
+                char *new_buf = (char *)alloc->alloc(alloc->ctx, pos + grow);
+                if (!new_buf) {
+                    sqlite3_finalize(item_stmt);
+                    alloc->free(alloc->ctx, buf, need);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                memcpy(new_buf, buf, pos);
+                memcpy(new_buf + pos, line, (size_t)n + 1);
+                alloc->free(alloc->ctx, buf, need);
+                buf = new_buf;
+                need = pos + grow;
+                pos += (size_t)n;
+            }
+            row++;
+        }
+    }
+    sqlite3_finalize(item_stmt);
+
+    *out = buf;
+    *out_len = pos;
+    return HU_OK;
+
+no_items: {
+    static const char empty[] = "(No recent items)";
+    char *fallback = (char *)alloc->alloc(alloc->ctx, sizeof(empty));
+    if (!fallback)
+        return HU_ERR_OUT_OF_MEMORY;
+    memcpy(fallback, empty, sizeof(empty));
+    *out = fallback;
+    *out_len = sizeof(empty) - 1;
+    return HU_OK;
+}
+}
+
+hu_error_t hu_feed_processor_cleanup(hu_feed_processor_t *proc,
+                                     uint32_t retention_days) {
+    if (!proc || !proc->db)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    int64_t cutoff = (int64_t)time(NULL) - (int64_t)(retention_days * 86400u);
+    const char *sql = "DELETE FROM feed_items WHERE ingested_at < ?";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(proc->db, sql, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_IO;
+
+    sqlite3_bind_int64(stmt, 1, cutoff);
+    int rc = sqlite3_step(stmt);
+    int deleted = sqlite3_changes(proc->db);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE)
+        return HU_ERR_IO;
+    (void)fprintf(stderr, "feed_processor_cleanup: deleted %d rows\n", deleted);
+    return HU_OK;
+}
+
+hu_error_t hu_feed_correlate_recent(hu_allocator_t *alloc, sqlite3 *db,
+                                    int64_t since_ts, double threshold) {
+    if (!alloc || !db) return HU_ERR_INVALID_ARGUMENT;
+    if (threshold <= 0.0) threshold = 0.3;
+
+    const char *sql =
+        "SELECT id, source, content FROM feed_items "
+        "WHERE ingested_at >= ? AND cluster_id IS NULL "
+        "ORDER BY ingested_at DESC LIMIT 200";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_IO;
+    sqlite3_bind_int64(stmt, 1, since_ts);
+
+    typedef struct { int64_t id; char source[32]; char content[512]; } row_t;
+    row_t *rows = NULL;
+    size_t count = 0, cap = 0;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (count >= cap) {
+            size_t nc = cap == 0 ? 16 : cap * 2;
+            row_t *tmp = (row_t *)alloc->alloc(alloc->ctx, nc * sizeof(row_t));
+            if (!tmp) { if (rows) alloc->free(alloc->ctx, rows, cap * sizeof(row_t)); sqlite3_finalize(stmt); return HU_ERR_OUT_OF_MEMORY; }
+            if (rows) { memcpy(tmp, rows, count * sizeof(row_t)); alloc->free(alloc->ctx, rows, cap * sizeof(row_t)); }
+            rows = tmp; cap = nc;
+        }
+        row_t *r = &rows[count];
+        memset(r, 0, sizeof(*r));
+        r->id = sqlite3_column_int64(stmt, 0);
+        const char *s = (const char *)sqlite3_column_text(stmt, 1);
+        if (s) snprintf(r->source, sizeof(r->source), "%s", s);
+        s = (const char *)sqlite3_column_text(stmt, 2);
+        if (s) snprintf(r->content, sizeof(r->content), "%s", s);
+        count++;
+    }
+    sqlite3_finalize(stmt);
+
+    if (count < 2) { if (rows) alloc->free(alloc->ctx, rows, cap * sizeof(row_t)); return HU_OK; }
+
+    int64_t next_cluster = (int64_t)time(NULL);
+    const char *update_sql = "UPDATE feed_items SET cluster_id = ? WHERE id = ?";
+    size_t clusters_formed = 0;
+    int *assigned = (int *)alloc->alloc(alloc->ctx, count * sizeof(int));
+    if (!assigned) { alloc->free(alloc->ctx, rows, cap * sizeof(row_t)); return HU_ERR_OUT_OF_MEMORY; }
+    memset(assigned, 0, count * sizeof(int));
+
+    for (size_t i = 0; i < count; i++) {
+        if (assigned[i]) continue;
+        int has_cluster = 0;
+        for (size_t j = i + 1; j < count; j++) {
+            if (assigned[j]) continue;
+            if (strcmp(rows[i].source, rows[j].source) == 0) continue;
+            double score = hu_feeds_score_relevance(
+                rows[j].content, strlen(rows[j].content),
+                rows[i].content, strlen(rows[i].content));
+            if (score >= threshold) {
+                if (!has_cluster) {
+                    sqlite3_stmt *us = NULL;
+                    if (sqlite3_prepare_v2(db, update_sql, -1, &us, NULL) == SQLITE_OK) {
+                        sqlite3_bind_int64(us, 1, next_cluster);
+                        sqlite3_bind_int64(us, 2, rows[i].id);
+                        sqlite3_step(us); sqlite3_finalize(us);
+                    }
+                    assigned[i] = 1;
+                    has_cluster = 1;
+                }
+                sqlite3_stmt *us = NULL;
+                if (sqlite3_prepare_v2(db, update_sql, -1, &us, NULL) == SQLITE_OK) {
+                    sqlite3_bind_int64(us, 1, next_cluster);
+                    sqlite3_bind_int64(us, 2, rows[j].id);
+                    sqlite3_step(us); sqlite3_finalize(us);
+                }
+                assigned[j] = 1;
+            }
+        }
+        if (has_cluster) { clusters_formed++; next_cluster++; }
+    }
+
+    alloc->free(alloc->ctx, assigned, count * sizeof(int));
+    alloc->free(alloc->ctx, rows, cap * sizeof(row_t));
+    if (clusters_formed > 0)
+        fprintf(stderr, "[feeds] correlated %zu clusters from %zu items\n", clusters_formed, count);
+    return HU_OK;
+}
+
+hu_error_t hu_feed_semantic_search(hu_allocator_t *alloc, sqlite3 *db,
+                                   hu_embedder_t *embedder, hu_vector_store_t *store,
+                                   const char *query, size_t query_len,
+                                   size_t limit,
+                                   hu_feed_item_stored_t **out, size_t *out_count) {
+    if (!alloc || !db || !embedder || !store || !query || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+
+    hu_embedding_t qe = {0};
+    hu_error_t err = embedder->vtable->embed(embedder->ctx, alloc, query, query_len, &qe);
+    if (err != HU_OK) return err;
+
+    hu_vector_entry_t *entries = NULL;
+    size_t entry_count = 0;
+    err = store->vtable->search(store->ctx, alloc, &qe, limit, &entries, &entry_count);
+    hu_embedding_free(alloc, &qe);
+    if (err != HU_OK) return err;
+
+    if (entry_count == 0) { hu_vector_entries_free(alloc, entries, 0); return HU_OK; }
+
+    hu_feed_item_stored_t *items = (hu_feed_item_stored_t *)alloc->alloc(
+        alloc->ctx, entry_count * sizeof(hu_feed_item_stored_t));
+    if (!items) { hu_vector_entries_free(alloc, entries, entry_count); return HU_ERR_OUT_OF_MEMORY; }
+
+    size_t found = 0;
+    const char *sql = "SELECT source, contact_id, content_type, content, url, ingested_at "
+                      "FROM feed_items WHERE id = ?";
+    for (size_t i = 0; i < entry_count; i++) {
+        if (!entries[i].id) continue;
+        int64_t row_id = 0;
+        for (const char *p = entries[i].id; *p >= '0' && *p <= '9'; p++)
+            row_id = row_id * 10 + (*p - '0');
+        if (row_id == 0) continue;
+
+        sqlite3_stmt *stmt = NULL;
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) continue;
+        sqlite3_bind_int64(stmt, 1, row_id);
+
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            hu_feed_item_stored_t *it = &items[found];
+            memset(it, 0, sizeof(*it));
+            const char *s = (const char *)sqlite3_column_text(stmt, 0);
+            if (s) snprintf(it->source, sizeof(it->source), "%s", s);
+            s = (const char *)sqlite3_column_text(stmt, 1);
+            if (s) snprintf(it->contact_id, sizeof(it->contact_id), "%s", s);
+            s = (const char *)sqlite3_column_text(stmt, 2);
+            if (s) snprintf(it->content_type, sizeof(it->content_type), "%s", s);
+            s = (const char *)sqlite3_column_text(stmt, 3);
+            if (s) { snprintf(it->content, sizeof(it->content), "%s", s); it->content_len = strlen(it->content); }
+            s = (const char *)sqlite3_column_text(stmt, 4);
+            if (s) snprintf(it->url, sizeof(it->url), "%s", s);
+            it->ingested_at = sqlite3_column_int64(stmt, 5);
+            found++;
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    hu_vector_entries_free(alloc, entries, entry_count);
+    *out = items;
+    *out_count = found;
     return HU_OK;
 }
 

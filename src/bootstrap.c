@@ -653,6 +653,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             .constitutional_ai = bi->cfg.agent.constitutional_ai,
             .speculative_cache = bi->cfg.agent.speculative_cache,
             .tool_routing_enabled = bi->cfg.agent.tool_routing_enabled,
+            .multi_agent = bi->cfg.agent.multi_agent,
         };
         hu_observer_t *obs = bi->observer.vtable ? &bi->observer : NULL;
         err = hu_agent_from_config(

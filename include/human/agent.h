@@ -73,6 +73,7 @@ typedef struct hu_agent_context_config {
     bool constitutional_ai;
     bool speculative_cache;
     bool tool_routing_enabled;
+    bool multi_agent;
 } hu_agent_context_config_t;
 
 /* Called when a tool needs user approval before execution.
@@ -201,6 +202,7 @@ struct hu_agent {
     bool tree_of_thought_enabled;
 
     bool constitutional_enabled;
+    bool multi_agent_enabled;
     struct hu_speculative_cache *speculative_cache;
 
 #ifdef HU_HAS_PERSONA

@@ -260,7 +260,13 @@ const char *hu_imessage_reaction_to_tapback_name(hu_reaction_type_t reaction) {
 }
 
 #if defined(HU_IMESSAGE_TAPBACK_ENABLED)
-/* Maps reaction type to iMessage AX context menu label (Love, Like, Ha Ha, etc.). */
+/*
+ * Tapback mapping: hu_reaction_type_t -> iMessage AX context menu label.
+ * chat.db associated_message_type values (for reference when reading tapbacks):
+ *   2000=love, 2001=like, 2002=dislike, 2003=laugh, 2004=emphasis, 2005=question.
+ * Sending uses JXA + System Events AXShowMenu; AppleScript has no native tapback API.
+ * Requires accessibility permissions; UI hierarchy may vary by macOS version.
+ */
 static const char *imessage_reaction_to_ax_menu_name(hu_reaction_type_t reaction) {
     switch (reaction) {
     case HU_REACTION_HEART:
@@ -490,6 +496,8 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
                     const char *url = media[i];
                     if (!url || url[0] != '/')
                         continue; /* Skip URLs and non-file media */
+                    if (access(url, R_OK) != 0)
+                        continue; /* Skip if file does not exist or is not readable */
                     size_t path_len = strlen(url);
                     size_t path_esc_cap = path_len * 2 + 1;
                     if (path_esc_cap > 8192)
@@ -593,12 +601,24 @@ static hu_error_t imessage_load_conversation_history(void *ctx, hu_allocator_t *
         return HU_ERR_INTERNAL;
     }
 
-    const char *sql = "SELECT m.is_from_me, m.text, "
-                      "  datetime(m.date/1000000000 + 978307200, 'unixepoch', 'localtime') as ts "
-                      "FROM message m "
-                      "JOIN handle h ON m.handle_id = h.ROWID "
-                      "WHERE h.id = ?1 AND m.associated_message_type = 0 "
-                      "ORDER BY m.date DESC LIMIT ?2";
+    const char *sql =
+        "SELECT m.is_from_me, m.text, "
+        "  datetime(m.date/1000000000 + 978307200, 'unixepoch', 'localtime') as ts, "
+        "  (SELECT COUNT(*) FROM message_attachment_join maj "
+        "   JOIN attachment a ON maj.attachment_id = a.ROWID "
+        "   WHERE maj.message_id = m.ROWID AND a.filename IS NOT NULL "
+        "   AND (LOWER(a.filename) LIKE '%.mov' OR LOWER(a.filename) LIKE '%.mp4' "
+        "     OR LOWER(a.filename) LIKE '%.m4v')) > 0 AS has_video, "
+        "  (SELECT COUNT(*) FROM message_attachment_join maj2 "
+        "   JOIN attachment a2 ON maj2.attachment_id = a2.ROWID "
+        "   WHERE maj2.message_id = m.ROWID AND a2.filename IS NOT NULL "
+        "   AND (LOWER(a2.filename) LIKE '%.jpg' OR LOWER(a2.filename) LIKE '%.jpeg' "
+        "     OR LOWER(a2.filename) LIKE '%.png' OR LOWER(a2.filename) LIKE '%.heic' "
+        "     OR LOWER(a2.filename) LIKE '%.gif' OR LOWER(a2.filename) LIKE '%.webp')) > 0 AS has_image "
+        "FROM message m "
+        "JOIN handle h ON m.handle_id = h.ROWID "
+        "WHERE h.id = ?1 AND m.associated_message_type = 0 "
+        "ORDER BY m.date DESC LIMIT ?2";
 
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
@@ -630,6 +650,8 @@ static hu_error_t imessage_load_conversation_history(void *ctx, hu_allocator_t *
         entries[count].from_me = sqlite3_column_int(stmt, 0) != 0;
         const char *txt = (const char *)sqlite3_column_text(stmt, 1);
         const char *ts = (const char *)sqlite3_column_text(stmt, 2);
+        int has_video = sqlite3_column_int(stmt, 3);
+        int has_image = sqlite3_column_int(stmt, 4);
         if (txt && strlen(txt) > 0) {
             size_t tlen = strlen(txt);
             if (tlen >= sizeof(entries[0].text))
@@ -639,10 +661,15 @@ static hu_error_t imessage_load_conversation_history(void *ctx, hu_allocator_t *
         } else if (entries[count].from_me) {
             snprintf(entries[count].text, sizeof(entries[0].text), "[you replied]");
         } else {
-            /* Empty text = attachment. Use generic placeholder; prompt builder
+            /* Empty text = attachment. Use specific placeholder when known; prompt builder
              * should call hu_conversation_attachment_context() to inject guidance
              * for natural acknowledgment ("love that!", "that looks great", etc.). */
-            snprintf(entries[count].text, sizeof(entries[0].text), "[image or attachment]");
+            if (has_video)
+                snprintf(entries[count].text, sizeof(entries[0].text), "[Video]");
+            else if (has_image)
+                snprintf(entries[count].text, sizeof(entries[0].text), "[Photo]");
+            else
+                snprintf(entries[count].text, sizeof(entries[0].text), "[image or attachment]");
         }
         if (ts) {
             size_t tslen = strlen(ts);

@@ -7,6 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+#endif
+
 #define HU_PROMOTION_HIGH_EMOTION_THRESHOLD 0.7
 #define HU_PROMOTION_EMOTION_INTENSITY_THRESHOLD 0.3
 #define HU_PROMOTION_RECENCY_TURNS          3
@@ -338,4 +342,38 @@ hu_error_t hu_promotion_run_emotions(hu_allocator_t *alloc, const hu_stm_buffer_
     }
 
     return HU_OK;
+}
+
+hu_error_t hu_promotion_promote_tier(hu_memory_t *memory, const char *from_category,
+                                    size_t from_category_len, const char *to_category,
+                                    size_t to_category_len, size_t max_count) {
+    if (!memory || !from_category || !to_category)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#ifdef HU_ENABLE_SQLITE
+    sqlite3 *db = hu_sqlite_memory_get_db(memory);
+    if (!db)
+        return HU_ERR_NOT_SUPPORTED;
+
+    const char *sql = "UPDATE memories SET category = ?1, updated_at = datetime('now') "
+                     "WHERE rowid IN (SELECT rowid FROM memories WHERE category = ?2 "
+                     "ORDER BY updated_at DESC LIMIT ?3)";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
+
+    sqlite3_bind_text(stmt, 1, to_category, (int)to_category_len, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, from_category, (int)from_category_len, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 3, max_count > 0 ? (sqlite3_int64)max_count : 999999);
+
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_BACKEND;
+#else
+    (void)from_category_len;
+    (void)to_category_len;
+    (void)max_count;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
 }

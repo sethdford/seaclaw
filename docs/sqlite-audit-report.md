@@ -1,6 +1,7 @@
 ---
 title: SQLite/Database Code Audit Report
 ---
+
 # SQLite/Database Code Audit Report
 
 **Date:** 2025-03-08  
@@ -10,16 +11,16 @@ title: SQLite/Database Code Audit Report
 
 ## 1. SQLite Usage Map
 
-| File                                  | Purpose                                                                                     |
-| ------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `src/channels/imessage.c`             | Read-only access to macOS `~/Library/Messages/chat.db` for conversation history and polling |
-| `src/memory/engines/sqlite.c`         | Primary memory backend: memories, messages, kv tables, FTS5                                 |
-| `src/memory/engines/lucid.c`          | Lucid memory backend (SQLite + workspace)                                                   |
-| `src/memory/engines/lancedb.c`        | LanceDB memory backend (SQLite metadata)                                                    |
-| `src/memory/graph.c`                  | GraphRAG: entities, relations (GraphRAG knowledge graph)                                    |
-| `src/memory/lifecycle/migrate.c`      | Migration: read legacy brain.db for import                                                  |
-| `src/tools/database.c`                | Database tool: execute user-provided SQL (query/execute/tables)                             |
-| `src/persona/cli.c`                   | iMessage query for persona sampling                                                         |
+| File                                | Purpose                                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| `src/channels/imessage.c`           | Read-only access to macOS `~/Library/Messages/chat.db` for conversation history and polling |
+| `src/memory/engines/sqlite.c`       | Primary memory backend: memories, messages, kv tables, FTS5                                 |
+| `src/memory/engines/sqlite_lucid.c` | SQLite + optional lucid CLI backend                                                         |
+| `src/memory/engines/sqlite_fts.c`   | SQLite + FTS5 full-text search backend                                                      |
+| `src/memory/graph.c`                | GraphRAG: entities, relations (GraphRAG knowledge graph)                                    |
+| `src/memory/lifecycle/migrate.c`    | Migration: read legacy brain.db for import                                                  |
+| `src/tools/database.c`              | Database tool: execute user-provided SQL (query/execute/tables)                             |
+| `src/persona/cli.c`                 | iMessage query for persona sampling                                                         |
 | `include/human/memory/sql_common.h` | Shared DDL and pragma definitions                                                           |
 | `include/human/memory/retrieval.h`  | Declares `hu_graph_t` for retrieval engine                                                  |
 | `include/human/memory/graph.h`      | Graph API (entities, relations)                                                             |
@@ -30,15 +31,15 @@ title: SQLite/Database Code Audit Report
 
 ### 2.1 Tables by File
 
-| Table              | File                         | Indexes                   | Foreign Keys                           | Notes                 |
-| ------------------ | ---------------------------- | ------------------------- | -------------------------------------- | --------------------- |
-| `memories`         | sqlite.c, lucid.c, lancedb.c | category, key, session_id | None                                   | FTS5 in sqlite.c only |
-| `memories_fts`     | sqlite.c                     | (FTS5 internal)           | N/A                                    | Virtual table         |
-| `messages`         | sqlite.c                     | None                      | None                                   | Session store         |
-| `kv`               | sqlite.c                     | (PRIMARY KEY)             | None                                   | Key-value             |
-| `entities`         | graph.c                      | name                      | None                                   | GraphRAG              |
-| `relations`        | graph.c                      | source_id, target_id      | source_id→entities, target_id→entities | GraphRAG              |
-| `lancedb_memories` | lancedb.c                    | category, session_id      | None                                   | Different schema      |
+| Table              | File                                   | Indexes                   | Foreign Keys                           | Notes                 |
+| ------------------ | -------------------------------------- | ------------------------- | -------------------------------------- | --------------------- |
+| `memories`         | sqlite.c, sqlite_lucid.c, sqlite_fts.c | category, key, session_id | None                                   | FTS5 in sqlite.c only |
+| `memories_fts`     | sqlite.c                               | (FTS5 internal)           | N/A                                    | Virtual table         |
+| `messages`         | sqlite.c                               | None                      | None                                   | Session store         |
+| `kv`               | sqlite.c                               | (PRIMARY KEY)             | None                                   | Key-value             |
+| `entities`         | graph.c                                | name                      | None                                   | GraphRAG              |
+| `relations`        | graph.c                                | source_id, target_id      | source_id→entities, target_id→entities | GraphRAG              |
+| `lancedb_memories` | sqlite_fts.c                           | category, session_id      | None                                   | Different schema      |
 
 ### 2.2 Schema Issues
 
@@ -59,15 +60,15 @@ None identified. All tables are actively used.
 
 ### 3.1 Parameterization (SQL Injection)
 
-| File       | Status    | Notes                                              |
-| ---------- | --------- | -------------------------------------------------- |
-| imessage.c | Safe      | All user/contact values via `sqlite3_bind_*`       |
-| sqlite.c   | Safe      | All values parameterized                           |
-| lucid.c    | Safe      | All values parameterized                           |
-| lancedb.c  | Safe      | All values parameterized                           |
-| graph.c    | Safe      | All values parameterized                           |
-| migrate.c  | Low risk  | SQL built from schema metadata (hardcoded strings) |
-| database.c | By design | User-provided SQL; no concatenation                |
+| File           | Status    | Notes                                              |
+| -------------- | --------- | -------------------------------------------------- |
+| imessage.c     | Safe      | All user/contact values via `sqlite3_bind_*`       |
+| sqlite.c       | Safe      | All values parameterized                           |
+| sqlite_lucid.c | Safe      | All values parameterized                           |
+| sqlite_fts.c   | Safe      | All values parameterized                           |
+| graph.c        | Safe      | All values parameterized                           |
+| migrate.c      | Low risk  | SQL built from schema metadata (hardcoded strings) |
+| database.c     | By design | User-provided SQL; no concatenation                |
 
 **migrate.c (lines 131-133):** SQL built with `snprintf` using expressions from `detect_columns()` which assigns hardcoded strings. No user input. Low risk for trusted legacy brain.db.
 
@@ -118,7 +119,7 @@ Only `sqlite3_free(errmsg)` for error strings. All usages correct.
 | Aspect                            | Status                                                                       |
 | --------------------------------- | ---------------------------------------------------------------------------- |
 | Multi-threaded access             | No shared SQLite db across threads. Each channel/engine owns its connection. |
-| WAL mode                          | Set via `HU_SQL_PRAGMA_INIT` in sqlite.c, lucid.c, lancedb.c                 |
+| WAL mode                          | Set via `HU_SQL_PRAGMA_INIT` in sqlite.c, sqlite_lucid.c, sqlite_fts.c       |
 | graph.c                           | **Missing:** No `journal_mode=WAL`, `busy_timeout`, or `foreign_keys`        |
 | imessage.c, migrate.c, database.c | Read-only or short-lived; no pragmas (acceptable)                            |
 

@@ -712,6 +712,13 @@ hu_error_t hu_ws_recv(hu_ws_client_t *ws, hu_allocator_t *alloc, char **data_out
 #endif
 }
 
+void hu_ws_client_free(hu_ws_client_t *ws, hu_allocator_t *alloc) {
+    if (!ws || !alloc)
+        return;
+    hu_ws_close(ws, alloc);
+    alloc->free(alloc->ctx, ws, sizeof(struct hu_ws_client));
+}
+
 void hu_ws_close(hu_ws_client_t *ws, hu_allocator_t *alloc) {
     if (!ws)
         return;

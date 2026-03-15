@@ -121,8 +121,15 @@ hu_error_t hu_vision_describe_image(hu_allocator_t *alloc, hu_provider_t *provid
                                     size_t *description_len) {
     if (!alloc || !provider || !description_out || !description_len)
         return HU_ERR_INVALID_ARGUMENT;
+    if (!image_path || !model)
+        return HU_ERR_INVALID_ARGUMENT;
     *description_out = NULL;
     *description_len = 0;
+
+#if !defined(HU_HTTP_CURL) && !(defined(HU_IS_TEST) && HU_IS_TEST)
+    /* Provider calls require HTTP (libcurl); tests use mock provider */
+    return HU_ERR_NOT_SUPPORTED;
+#endif
 
     if (!provider->vtable || !provider->vtable->supports_vision ||
         !provider->vtable->supports_vision(provider->ctx))

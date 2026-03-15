@@ -84,10 +84,67 @@ static size_t count_distinct_words(const char *s, size_t len) {
     return distinct;
 }
 
+static const char *const TOM_POSITIVE[] = {
+    "happy", "great", "love", "good", "excellent", "wonderful", "amazing",
+    "awesome", "fantastic", "thanks", "thank", "glad", "excited", "enjoy", "nice"};
+static const size_t TOM_POSITIVE_COUNT = sizeof(TOM_POSITIVE) / sizeof(TOM_POSITIVE[0]);
+
+static const char *const TOM_NEGATIVE[] = {
+    "sad", "bad", "hate", "terrible", "awful", "angry", "upset", "worried",
+    "frustrated", "annoyed", "disappointed", "sorry", "miss", "lost", "hurt"};
+static const size_t TOM_NEGATIVE_COUNT = sizeof(TOM_NEGATIVE) / sizeof(TOM_NEGATIVE[0]);
+
+static bool word_matches(const char *word, size_t wlen, const char *dict_word) {
+    size_t dlen = strlen(dict_word);
+    if (wlen != dlen)
+        return false;
+    for (size_t i = 0; i < wlen; i++) {
+        if (tolower((unsigned char)word[i]) != tolower((unsigned char)dict_word[i]))
+            return false;
+    }
+    return true;
+}
+
 static double simple_sentiment(const char *s, size_t len) {
-    (void)s;
-    (void)len;
-    return 0.0;
+    if (!s || len == 0)
+        return 0.0;
+    char buf[512];
+    size_t copy = len < sizeof(buf) - 1 ? len : sizeof(buf) - 1;
+    memcpy(buf, s, copy);
+    buf[copy] = '\0';
+
+    size_t pos_count = 0;
+    size_t neg_count = 0;
+    const char *p = buf;
+    while (*p) {
+        while (*p && !isalnum((unsigned char)*p))
+            p++;
+        if (!*p)
+            break;
+        const char *start = p;
+        while (*p && isalnum((unsigned char)*p))
+            p++;
+        size_t wlen = (size_t)(p - start);
+        if (wlen == 0)
+            continue;
+
+        for (size_t i = 0; i < TOM_POSITIVE_COUNT; i++) {
+            if (word_matches(start, wlen, TOM_POSITIVE[i])) {
+                pos_count++;
+                break;
+            }
+        }
+        for (size_t i = 0; i < TOM_NEGATIVE_COUNT; i++) {
+            if (word_matches(start, wlen, TOM_NEGATIVE[i])) {
+                neg_count++;
+                break;
+            }
+        }
+    }
+    size_t total = pos_count + neg_count;
+    if (total == 0)
+        return 0.0;
+    return (double)((int)pos_count - (int)neg_count) / (double)(total > 0 ? total : 1);
 }
 
 static int parse_timestamp_ms(const char *ts) {
@@ -99,6 +156,38 @@ static int parse_timestamp_ms(const char *ts) {
     if (sscanf(ts, "%d:%d", &h, &m) >= 2)
         return (h * 3600 + m * 60) * 1000;
     return 0;
+}
+
+static bool response_slow(const hu_channel_history_entry_t *entries, size_t count) {
+    if (!entries || count < 2)
+        return false;
+    int their_ts[64];
+    size_t their_count = 0;
+    for (size_t i = 0; i < count && their_count < 64; i++) {
+        if (entries[i].from_me)
+            continue;
+        their_ts[their_count++] = parse_timestamp_ms(entries[i].timestamp);
+    }
+    if (their_count < 2)
+        return false;
+    double sum_gap = 0.0;
+    int gap_count = 0;
+    int last_gap = 0;
+    for (size_t i = 1; i < their_count; i++) {
+        int delta = their_ts[i] - their_ts[i - 1];
+        if (delta >= 0) {
+            sum_gap += (double)delta;
+            gap_count++;
+            if (i == their_count - 1)
+                last_gap = delta;
+        }
+    }
+    if (gap_count == 0)
+        return false;
+    double avg_gap = sum_gap / (double)gap_count;
+    if (avg_gap <= 0.0)
+        return false;
+    return (double)last_gap > 2.0 * avg_gap;
 }
 
 hu_error_t hu_theory_of_mind_update_baseline(hu_memory_t *memory, hu_allocator_t *alloc,
@@ -314,7 +403,7 @@ hu_theory_of_mind_deviation_t hu_theory_of_mind_detect_deviation(
     dev.sentiment_shift =
         (fabs(curr_sentiment - baseline->sentiment_baseline) > TOM_SENTIMENT_SHIFT_THRESH);
 
-    dev.response_slow = false;
+    dev.response_slow = response_slow(entries, count);
 
     float weight_sum = 0.0f;
     float severity_sum = 0.0f;

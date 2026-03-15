@@ -109,6 +109,26 @@ static void style_none_memory_returns_not_supported(void) {
     mem.vtable->deinit(mem.ctx);
 }
 
+static void style_update_populates_common_phrases(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    hu_error_t err = hu_style_fingerprint_update(&mem, &alloc, "contact_phrases", 15,
+                                                 "that sounds great thanks so much", 33);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_style_fingerprint_t fp;
+    memset(&fp, 0, sizeof(fp));
+    err = hu_style_fingerprint_get(&mem, &alloc, "contact_phrases", 15, &fp);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(fp.common_phrases[0] != '\0');
+    HU_ASSERT_EQ(fp.common_phrases[0], '[');
+    HU_ASSERT_TRUE(strstr(fp.common_phrases, "sounds great") != NULL);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
 void run_style_tracker_tests(void) {
     HU_TEST_SUITE("style_tracker");
     HU_RUN_TEST(style_update_haha_sets_laugh_style_and_lowercase);
@@ -117,6 +137,7 @@ void run_style_tracker_tests(void) {
     HU_RUN_TEST(style_no_fingerprint_build_directive_returns_zero);
     HU_RUN_TEST(style_get_nonexistent_returns_zeroed);
     HU_RUN_TEST(style_none_memory_returns_not_supported);
+    HU_RUN_TEST(style_update_populates_common_phrases);
 }
 
 #else

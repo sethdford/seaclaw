@@ -10,7 +10,7 @@ typedef struct hu_pgvector_config {
     size_t dimensions;
 } hu_pgvector_config_t;
 
-/* Create pgvector store. When HU_ENABLE_POSTGRES is not defined, returns store that fails all ops.
+/* Create pgvector store. When HU_ENABLE_PGVECTOR is not defined, returns store that fails all ops.
  */
 hu_vector_store_t hu_vector_store_pgvector_create(hu_allocator_t *alloc,
                                                   const hu_pgvector_config_t *config);

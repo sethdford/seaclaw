@@ -749,6 +749,20 @@ static void test_matrix_poll_null_args(void) {
     hu_error_t err = hu_matrix_poll(NULL, NULL, NULL, 0, NULL);
     HU_ASSERT(err == HU_ERR_INVALID_ARGUMENT);
 }
+
+static void test_matrix_load_history_not_supported_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_matrix_create(&alloc, "https://matrix.org", 17, "tok", 3, &ch);
+    hu_channel_history_entry_t *entries = NULL;
+    size_t count = 0;
+    hu_error_t err = ch.vtable->load_conversation_history(ch.ctx, &alloc, "!room:matrix.org", 16,
+                                                          10, &entries, &count);
+    HU_ASSERT(err == HU_ERR_NOT_SUPPORTED);
+    HU_ASSERT(entries == NULL);
+    HU_ASSERT(count == 0);
+    hu_matrix_destroy(&ch);
+}
 #endif
 
 /* ─── IRC ──────────────────────────────────────────────────────────────────── */
@@ -2514,6 +2528,7 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_matrix_send);
     HU_RUN_TEST(test_matrix_poll_test_mode);
     HU_RUN_TEST(test_matrix_poll_null_args);
+    HU_RUN_TEST(test_matrix_load_history_not_supported_in_test);
 #endif
 #if HU_HAS_IRC
     HU_RUN_TEST(test_irc_create);

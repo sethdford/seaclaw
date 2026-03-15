@@ -26,6 +26,7 @@
 #include "human/persona/circadian.h"
 #include "human/persona/relationship.h"
 #endif
+#include "human/agent/orchestrator.h"
 #include "human/agent/reflection.h"
 #include "human/skillforge.h"
 #include "human/context.h"
@@ -1526,6 +1527,43 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     }
                 }
 #endif
+                /* Multi-agent orchestrator: when enabled with 2+ independent tool calls and
+                 * registered agents, delegate subtasks via the orchestrator. Results are merged
+                 * and appended as tool results before falling through to the normal path. */
+                if (agent->multi_agent_enabled && tc_count >= 2 && agent->agent_registry) {
+                    hu_orchestrator_t orch;
+                    if (hu_orchestrator_create(agent->alloc, &orch) == HU_OK) {
+                        hu_orchestrator_load_from_registry(&orch, agent->agent_registry);
+                        if (orch.agent_count > 0) {
+                            const char *subtask_descs[HU_ORCHESTRATOR_MAX_TASKS];
+                            size_t subtask_lens[HU_ORCHESTRATOR_MAX_TASKS];
+                            size_t sub_n = tc_count < HU_ORCHESTRATOR_MAX_TASKS
+                                               ? tc_count : HU_ORCHESTRATOR_MAX_TASKS;
+                            for (size_t s = 0; s < sub_n; s++) {
+                                subtask_descs[s] = calls[s].name;
+                                subtask_lens[s] = calls[s].name_len;
+                            }
+                            hu_orchestrator_propose_split(&orch, msg, msg_len,
+                                                          subtask_descs, subtask_lens, sub_n);
+                            for (size_t s = 0; s < orch.task_count && s < sub_n; s++) {
+                                if (orch.agents[s % orch.agent_count].agent_id_len > 0) {
+                                    hu_orchestrator_assign_task(
+                                        &orch, orch.tasks[s].id,
+                                        orch.agents[s % orch.agent_count].agent_id,
+                                        orch.agents[s % orch.agent_count].agent_id_len);
+                                }
+                            }
+                            hu_observer_event_t ev = {
+                                .tag = HU_OBSERVER_EVENT_TOOL_CALL, .data = {{0}}};
+                            ev.data.tool_call.tool = "orchestrator";
+                            ev.data.tool_call.duration_ms = 0;
+                            ev.data.tool_call.success = true;
+                            HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
+                        }
+                        hu_orchestrator_deinit(&orch);
+                    }
+                }
+
                 /* Use dispatcher for parallel execution when enabled (Tier 1.3) */
                 hu_dispatcher_t dispatcher;
                 hu_dispatcher_default(&dispatcher);

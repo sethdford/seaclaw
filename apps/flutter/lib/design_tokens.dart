@@ -447,6 +447,9 @@ abstract final class HUTokens {
   static const spring_expressive_damping = 14;
   static const spring_expressive_mass = 1;
   static const spring_expressive_stiffness = 120;
+  static const spring_interactive_damping = 31;
+  static const spring_interactive_mass = 1;
+  static const spring_interactive_stiffness = 322;
   static const spring_micro_damping = 30;
   static const spring_micro_mass = 1;
   static const spring_micro_stiffness = 400;

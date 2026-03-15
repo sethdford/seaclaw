@@ -147,7 +147,7 @@ static void test_vector_store_upsert_search_mock(void) {
 }
 
 static void test_pgvector_not_supported(void) {
-#if !defined(HU_ENABLE_POSTGRES)
+#if !defined(HU_ENABLE_PGVECTOR)
     hu_allocator_t alloc = hu_system_allocator();
     hu_pgvector_config_t cfg = {.connection_url = "postgresql://localhost/test",
                                 .table_name = "memory_vectors",

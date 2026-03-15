@@ -1,6 +1,10 @@
 /*
  * F60 — Mood Persistence Across Conversations.
  * Global mood state carrying across all contacts. Decays toward neutral.
+ *
+ * SQLite is required for mood functionality. When HU_ENABLE_SQLITE is not
+ * defined, hu_mood_get_current and hu_mood_set return HU_ERR_NOT_SUPPORTED.
+ * Mood state is stored in the mood_log table of the SQLite memory backend.
  */
 #include "human/persona/mood.h"
 #include "human/core/allocator.h"

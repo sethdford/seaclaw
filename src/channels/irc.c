@@ -145,6 +145,22 @@ static bool irc_health_check(void *ctx) {
     return true;
 }
 
+/* IRC protocol does not provide server-side message history. History would require
+ * a bouncer (ZNC) or local log files. */
+static hu_error_t irc_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                const char *contact_id, size_t contact_id_len,
+                                                size_t limit, hu_channel_history_entry_t **out,
+                                                size_t *out_count) {
+    (void)ctx;
+    (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
+    (void)limit;
+    (void)out;
+    (void)out_count;
+    return HU_ERR_NOT_SUPPORTED;
+}
+
 static const hu_channel_vtable_t irc_vtable = {
     .start = irc_start,
     .stop = irc_stop,
@@ -154,6 +170,7 @@ static const hu_channel_vtable_t irc_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
+    .load_conversation_history = irc_load_conversation_history,
 };
 
 hu_error_t hu_irc_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_loop_msg_t *msgs,

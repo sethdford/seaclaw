@@ -1,7 +1,9 @@
 /* Tests for agent registry, config-driven creation, and skill unification. */
+#include "human/agent.h"
 #include "human/agent/registry.h"
 #include "human/agent/spawn.h"
 #include "human/config_types.h"
+#include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/skillforge.h"
@@ -451,6 +453,85 @@ static void test_registry_register_with_tools_and_skills(void) {
     hu_agent_registry_destroy(&reg);
 }
 
+/* ─── orchestrator integration ────────────────────────────────────────────── */
+
+#include "human/agent/orchestrator.h"
+
+static void test_orchestrator_load_from_registry(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_agent_registry_t reg;
+    hu_agent_registry_create(&alloc, &reg);
+
+    hu_named_agent_config_t cfg1 = {
+        .name = "coder",
+        .provider = "anthropic",
+        .model = "claude-sonnet",
+        .role = "builder",
+        .description = "Code generation",
+        .capabilities = "coding,review",
+    };
+    hu_named_agent_config_t cfg2 = {
+        .name = "researcher",
+        .provider = "openai",
+        .model = "gpt-4o",
+        .role = "analyst",
+        .description = "Research tasks",
+        .capabilities = "research,analysis",
+    };
+    hu_agent_registry_register(&reg, &cfg1);
+    hu_agent_registry_register(&reg, &cfg2);
+
+    hu_orchestrator_t orch;
+    hu_error_t err = hu_orchestrator_create(&alloc, &orch);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    err = hu_orchestrator_load_from_registry(&orch, &reg);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(orch.agent_count, 2u);
+    HU_ASSERT_STR_EQ(orch.agents[0].agent_id, "coder");
+    HU_ASSERT_STR_EQ(orch.agents[1].agent_id, "researcher");
+
+    const char *subtasks[] = {"implement feature", "research API"};
+    size_t subtask_lens[] = {17, 12};
+    err = hu_orchestrator_propose_split(&orch, "Build a new module", 18,
+                                         subtasks, subtask_lens, 2);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(orch.task_count, 2u);
+
+    err = hu_orchestrator_assign_task(&orch, orch.tasks[0].id, "coder", 5);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(orch.tasks[0].status, HU_TASK_ASSIGNED);
+
+    err = hu_orchestrator_assign_task(&orch, orch.tasks[1].id, "researcher", 10);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    err = hu_orchestrator_complete_task(&orch, orch.tasks[0].id, "code done", 9);
+    HU_ASSERT_EQ(err, HU_OK);
+    err = hu_orchestrator_complete_task(&orch, orch.tasks[1].id, "research done", 13);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    HU_ASSERT(hu_orchestrator_all_complete(&orch));
+
+    char *merged = NULL;
+    size_t merged_len = 0;
+    err = hu_orchestrator_merge_results(&orch, &alloc, &merged, &merged_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(merged);
+    HU_ASSERT(merged_len > 0);
+    alloc.free(alloc.ctx, merged, merged_len + 1);
+
+    hu_orchestrator_deinit(&orch);
+    hu_agent_registry_destroy(&reg);
+}
+
+static void test_orchestrator_multi_agent_flag(void) {
+    hu_agent_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    HU_ASSERT_EQ(cfg.multi_agent, false);
+    cfg.multi_agent = true;
+    HU_ASSERT_EQ(cfg.multi_agent, true);
+}
+
 /* ─── suite runner ────────────────────────────────────────────────────────── */
 
 void run_agent_registry_tests(void) {
@@ -478,4 +559,6 @@ void run_agent_registry_tests(void) {
     HU_RUN_TEST(test_skill_run_disabled_skill_fails);
     HU_RUN_TEST(test_skillforge_has_command_field);
     HU_RUN_TEST(test_registry_register_with_tools_and_skills);
+    HU_RUN_TEST(test_orchestrator_load_from_registry);
+    HU_RUN_TEST(test_orchestrator_multi_agent_flag);
 }

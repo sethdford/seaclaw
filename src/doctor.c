@@ -146,6 +146,7 @@ hu_error_t hu_doctor_check_config_semantics(hu_allocator_t *alloc, const hu_conf
         {"speculative_cache", cfg->agent.speculative_cache},
         {"llm_compiler", cfg->agent.llm_compiler_enabled},
         {"tool_routing", cfg->agent.tool_routing_enabled},
+        {"multi_agent", cfg->agent.multi_agent},
     };
     size_t active = 0;
     for (size_t i = 0; i < sizeof(modules) / sizeof(modules[0]); i++) {

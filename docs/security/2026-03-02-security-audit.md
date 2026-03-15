@@ -275,7 +275,7 @@ The audit identified **47 unique findings** across 4 security domains. After ded
 
 ### M-10: SQLite Security Settings Not Applied
 
-- **Files:** `src/memory/engines/sqlite.c`, `lucid.c`, `lancedb.c` | CWE-359 | Set `PRAGMA secure_delete=ON`, `journal_mode=WAL`, `foreign_keys=ON`.
+- **Files:** `src/memory/engines/sqlite.c`, `sqlite_lucid.c`, `sqlite_fts.c` | CWE-359 | Set `PRAGMA secure_delete=ON`, `journal_mode=WAL`, `foreign_keys=ON`.
 
 ### M-11: No Explicit TLS Verification for libcurl
 
@@ -289,7 +289,7 @@ The audit identified **47 unique findings** across 4 security domains. After ded
 
 ## LOW Findings
 
-### L-01: `SQLITE_TRANSIENT` Used Despite Project Rule (sqlite.c, lucid.c, lancedb.c)
+### L-01: `SQLITE_TRANSIENT` Used Despite Project Rule (sqlite.c, sqlite_lucid.c, sqlite_fts.c)
 
 ### L-02: Audit Log Can Include Full Command Strings with Secrets (security/audit.c)
 

@@ -261,11 +261,27 @@ static const char *const schema_parts[] = {
     "content TEXT NOT NULL,"
     "url TEXT,"
     "ingested_at INTEGER NOT NULL,"
-    "referenced INTEGER DEFAULT 0)",
+    "referenced INTEGER DEFAULT 0,"
+    "cluster_id INTEGER DEFAULT NULL)",
     "CREATE INDEX IF NOT EXISTS idx_feed_items_source ON feed_items(source)",
     "CREATE INDEX IF NOT EXISTS idx_feed_items_contact ON feed_items(contact_id)",
     "CREATE INDEX IF NOT EXISTS idx_feed_items_ingested ON feed_items(ingested_at)",
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_feed_items_dedup ON feed_items(source, substr(content, 1, 200))",
+    "CREATE VIRTUAL TABLE IF NOT EXISTS feed_items_fts USING fts5(content, source, content_type, content=feed_items, content_rowid=id)",
+    "CREATE TRIGGER IF NOT EXISTS feed_items_ai AFTER INSERT ON feed_items BEGIN INSERT INTO feed_items_fts(rowid, content, source, content_type) VALUES (new.id, new.content, new.source, new.content_type); END",
+    "CREATE TRIGGER IF NOT EXISTS feed_items_ad AFTER DELETE ON feed_items BEGIN INSERT INTO feed_items_fts(feed_items_fts, rowid, content, source, content_type) VALUES ('delete', old.id, old.content, old.source, old.content_type); END",
+    "CREATE TABLE IF NOT EXISTS research_findings("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "source TEXT,"
+    "finding TEXT NOT NULL,"
+    "relevance TEXT,"
+    "priority TEXT DEFAULT 'MEDIUM',"
+    "suggested_action TEXT,"
+    "status TEXT DEFAULT 'pending',"
+    "created_at INTEGER NOT NULL,"
+    "acted_at INTEGER)",
+    "CREATE INDEX IF NOT EXISTS idx_findings_status ON research_findings(status)",
+    "CREATE INDEX IF NOT EXISTS idx_findings_priority ON research_findings(priority)",
     "CREATE TABLE IF NOT EXISTS oauth_tokens("
     "provider TEXT PRIMARY KEY,"
     "access_token TEXT NOT NULL,"

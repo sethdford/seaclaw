@@ -450,15 +450,85 @@ static void test_runtime_gce_storage_path(void) {
     HU_ASSERT_TRUE(strstr(path, "human") != NULL);
 }
 
-static void test_wasm_runtime_wrap_not_supported(void) {
+static void test_wasm_runtime_wrap_command(void) {
     hu_runtime_t r = hu_runtime_wasm(64);
     HU_ASSERT_NOT_NULL(r.vtable->wrap_command);
 
-    const char *argv_in[] = {"echo", "x"};
+    const char *argv_in[] = {"module.wasm", "arg1", "arg2"};
+    const char *argv_out[32];
+    size_t argc_out = 0;
+    hu_error_t err = r.vtable->wrap_command(r.ctx, argv_in, 3, argv_out, 32, &argc_out);
+#if defined(HU_HAS_RUNTIME_EXOTIC)
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(argv_out[0], "wasmtime");
+    HU_ASSERT_STR_EQ(argv_out[1], "run");
+    HU_ASSERT_STR_EQ(argv_out[2], "--dir=.");
+    HU_ASSERT_STR_EQ(argv_out[3], "--max-memory-pages=1024"); /* 64 MB * 16 */
+    HU_ASSERT_STR_EQ(argv_out[4], "module.wasm");
+    HU_ASSERT_STR_EQ(argv_out[5], "arg1");
+    HU_ASSERT_STR_EQ(argv_out[6], "arg2");
+    HU_ASSERT_EQ(argv_out[7], (const char *)NULL);
+    HU_ASSERT_EQ(argc_out, 7u);
+#else
+    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+#endif
+}
+
+static void test_wasm_runtime_wrap_command_no_memory_limit(void) {
+#if defined(HU_HAS_RUNTIME_EXOTIC)
+    hu_runtime_t r = hu_runtime_wasm(0);
+    const char *argv_in[] = {"app.wasm", "x"};
     const char *argv_out[32];
     size_t argc_out = 0;
     hu_error_t err = r.vtable->wrap_command(r.ctx, argv_in, 2, argv_out, 32, &argc_out);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(argv_out[0], "wasmtime");
+    HU_ASSERT_STR_EQ(argv_out[1], "run");
+    HU_ASSERT_STR_EQ(argv_out[2], "--dir=.");
+    HU_ASSERT_STR_EQ(argv_out[3], "app.wasm");
+    HU_ASSERT_STR_EQ(argv_out[4], "x");
+    HU_ASSERT_EQ(argv_out[5], (const char *)NULL);
+    HU_ASSERT_EQ(argc_out, 5u);
+#else
+    (void)0; /* no-op when exotic runtime not built */
+#endif
+}
+
+static void test_wasm_runtime_wrap_command_null_args_returns_invalid(void) {
+#if defined(HU_HAS_RUNTIME_EXOTIC)
+    hu_runtime_t r = hu_runtime_wasm(64);
+    const char *argv_in[] = {"m.wasm"};
+    const char *argv_out[8];
+    size_t argc_out = 0;
+    hu_error_t err = r.vtable->wrap_command(r.ctx, argv_in, 1, NULL, 8, &argc_out);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    err = r.vtable->wrap_command(r.ctx, argv_in, 1, argv_out, 8, NULL);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    err = r.vtable->wrap_command(r.ctx, argv_in, 1, argv_out, 2, &argc_out);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+#endif
+}
+
+static void test_cloudflare_runtime_wrap_command(void) {
+    hu_runtime_t r = hu_runtime_cloudflare();
+    HU_ASSERT_NOT_NULL(r.vtable->wrap_command);
+
+    const char *argv_in[] = {"arg1", "arg2"};
+    const char *argv_out[32];
+    size_t argc_out = 0;
+    hu_error_t err = r.vtable->wrap_command(r.ctx, argv_in, 2, argv_out, 32, &argc_out);
+#if defined(HU_HAS_RUNTIME_EXOTIC)
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(argv_out[0], "npx");
+    HU_ASSERT_STR_EQ(argv_out[1], "wrangler");
+    HU_ASSERT_STR_EQ(argv_out[2], "dev");
+    HU_ASSERT_STR_EQ(argv_out[3], "arg1");
+    HU_ASSERT_STR_EQ(argv_out[4], "arg2");
+    HU_ASSERT_EQ(argv_out[5], (const char *)NULL);
+    HU_ASSERT_EQ(argc_out, 5u);
+#else
     HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+#endif
 }
 
 void run_runtime_tests(void) {
@@ -506,7 +576,10 @@ void run_runtime_tests(void) {
     HU_RUN_TEST(test_docker_runtime_workspace_null_with_mount);
     HU_RUN_TEST(test_docker_runtime_init_deinit_lifecycle);
     HU_RUN_TEST(test_native_runtime_no_wrap);
-    HU_RUN_TEST(test_wasm_runtime_wrap_not_supported);
+    HU_RUN_TEST(test_wasm_runtime_wrap_command);
+    HU_RUN_TEST(test_wasm_runtime_wrap_command_no_memory_limit);
+    HU_RUN_TEST(test_wasm_runtime_wrap_command_null_args_returns_invalid);
+    HU_RUN_TEST(test_cloudflare_runtime_wrap_command);
     HU_RUN_TEST(test_runtime_gce_create);
     HU_RUN_TEST(test_runtime_gce_has_shell);
     HU_RUN_TEST(test_runtime_gce_has_filesystem);

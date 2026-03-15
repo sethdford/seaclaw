@@ -136,6 +136,134 @@ static bool matrix_health_check(void *ctx) {
     return true;
 }
 
+#if defined(HU_HTTP_CURL) && !HU_IS_TEST
+static hu_error_t matrix_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                   const char *contact_id, size_t contact_id_len,
+                                                   size_t limit, hu_channel_history_entry_t **out,
+                                                   size_t *out_count) {
+    if (!ctx || !alloc || !contact_id || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+
+    hu_matrix_ctx_t *c = (hu_matrix_ctx_t *)ctx;
+    if (!c->homeserver || c->homeserver_len == 0 || !c->access_token || c->access_token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+
+    if (limit > 50)
+        limit = 50;
+
+    char url_buf[1024];
+    int nu = snprintf(url_buf, sizeof(url_buf),
+                      "%.*s/_matrix/client/v3/rooms/%.*s/messages?dir=b&limit=%zu",
+                      (int)c->homeserver_len, c->homeserver, (int)contact_id_len, contact_id,
+                      limit);
+    if (nu < 0 || (size_t)nu >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s",
+                      (int)c->access_token_len, c->access_token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+
+    hu_http_response_t resp = {0};
+    hu_error_t err = hu_http_get(alloc, url_buf, auth_buf, &resp);
+    if (err != HU_OK || !resp.body || resp.status_code != 200) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return err != HU_OK ? err : HU_ERR_INTERNAL;
+    }
+
+    hu_json_value_t *parsed = NULL;
+    err = hu_json_parse(alloc, resp.body, resp.body_len, &parsed);
+    if (resp.owned && resp.body)
+        hu_http_response_free(alloc, &resp);
+    if (err != HU_OK || !parsed)
+        return HU_OK;
+
+    hu_json_value_t *chunk = hu_json_object_get(parsed, "chunk");
+    if (!chunk || chunk->type != HU_JSON_ARRAY) {
+        hu_json_free(alloc, parsed);
+        return HU_OK;
+    }
+
+    size_t arr_len = chunk->data.array.len;
+    if (arr_len > limit)
+        arr_len = limit;
+
+    hu_channel_history_entry_t *entries =
+        (hu_channel_history_entry_t *)alloc->alloc(alloc->ctx, arr_len * sizeof(*entries));
+    if (!entries) {
+        hu_json_free(alloc, parsed);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    memset(entries, 0, arr_len * sizeof(*entries));
+    size_t count = 0;
+
+    for (size_t i = 0; i < chunk->data.array.len && count < arr_len; i++) {
+        hu_json_value_t *ev = chunk->data.array.items[i];
+        if (!ev || ev->type != HU_JSON_OBJECT)
+            continue;
+        const char *ev_type = hu_json_get_string(ev, "type");
+        if (!ev_type || strcmp(ev_type, "m.room.message") != 0)
+            continue;
+        const char *sender = hu_json_get_string(ev, "sender");
+        hu_json_value_t *content = hu_json_object_get(ev, "content");
+        if (!content)
+            continue;
+        const char *body = hu_json_get_string(content, "body");
+        if (!body || strlen(body) == 0)
+            continue;
+
+        entries[count].from_me =
+            (sender && c->user_id && strcmp(sender, c->user_id) == 0);
+
+        size_t text_len = strlen(body);
+        if (text_len > 511)
+            text_len = 511;
+        memcpy(entries[count].text, body, text_len);
+        entries[count].text[text_len] = '\0';
+
+        double ts_ms = hu_json_get_number(ev, "origin_server_ts", 0.0);
+        time_t sec = (time_t)((int64_t)ts_ms / 1000);
+        struct tm *tm = gmtime(&sec);
+        if (tm)
+            strftime(entries[count].timestamp, sizeof(entries[count].timestamp),
+                     "%Y-%m-%dT%H:%M:%SZ", tm);
+
+        count++;
+    }
+
+    hu_json_free(alloc, parsed);
+
+    /* API returns newest first (dir=b); reverse for chronological order */
+    for (size_t i = 0; i < count / 2; i++) {
+        hu_channel_history_entry_t tmp = entries[i];
+        entries[i] = entries[count - 1 - i];
+        entries[count - 1 - i] = tmp;
+    }
+
+    *out = entries;
+    *out_count = count;
+    return HU_OK;
+}
+#else
+static hu_error_t matrix_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                   const char *contact_id, size_t contact_id_len,
+                                                   size_t limit, hu_channel_history_entry_t **out,
+                                                   size_t *out_count) {
+    (void)ctx;
+    (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
+    (void)limit;
+    (void)out;
+    (void)out_count;
+    return HU_ERR_NOT_SUPPORTED;
+}
+#endif
+
 static const hu_channel_vtable_t matrix_vtable = {
     .start = matrix_start,
     .stop = matrix_stop,
@@ -145,6 +273,7 @@ static const hu_channel_vtable_t matrix_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
+    .load_conversation_history = matrix_load_conversation_history,
 };
 
 hu_error_t hu_matrix_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_loop_msg_t *msgs,

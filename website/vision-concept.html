@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>h-uman — Vision Concept: What Great Looks Like</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,700;9..40,900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green: #7AB648;
+  --green-dim: rgba(122, 182, 72, 0.12);
+  --green-glow: rgba(122, 182, 72, 0.35);
+  --bg: #060d12;
+  --surface: #0d1820;
+  --surface-high: #162430;
+  --border: rgba(255,255,255,0.06);
+  --text: #f0f2f4;
+  --text-2: #8a9baa;
+  --text-3: #4a5d6e;
+  --amber: #f5a623;
+  --coral: #e86c5d;
+  --blue: #60a5fa;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ═══ SECTION LABEL ═══ */
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--amber);
+  background: rgba(245, 166, 35, 0.08);
+  border: 1px solid rgba(245, 166, 35, 0.15);
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 40px;
+}
+
+.section-label::before {
+  content: '';
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+section {
+  position: relative;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ═══ HERO ═══ */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 100px 32px 80px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 900px;
+  height: 900px;
+  background: radial-gradient(ellipse, rgba(122, 182, 72, 0.06) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-2);
+  margin-bottom: 48px;
+  animation: fadeUp 0.6s ease-out;
+}
+
+.hero-badge .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.hero h1 {
+  font-size: clamp(3rem, 8vw, 6.5rem);
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  max-width: 800px;
+  margin-bottom: 32px;
+  animation: fadeUp 0.7s ease-out 0.1s both;
+}
+
+.hero h1 .gradient {
+  background: linear-gradient(135deg, var(--green) 0%, #a8d87e 50%, var(--amber) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-sub {
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  color: var(--text-2);
+  max-width: 540px;
+  line-height: 1.7;
+  margin-bottom: 16px;
+  animation: fadeUp 0.7s ease-out 0.2s both;
+}
+
+.hero-specs {
+  font-size: 14px;
+  color: var(--text-3);
+  margin-bottom: 44px;
+  letter-spacing: 0.01em;
+  animation: fadeUp 0.7s ease-out 0.25s both;
+}
+
+.hero-specs strong { color: var(--text-2); font-weight: 500; }
+
+.hero-ctas {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 36px;
+  animation: fadeUp 0.7s ease-out 0.3s both;
+}
+
+.btn-primary {
+  padding: 13px 30px;
+  border-radius: 10px;
+  background: var(--green);
+  color: #0a1a0a;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px var(--green-glow); }
+
+.btn-outline {
+  padding: 13px 30px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  font-weight: 500;
+  font-size: 14px;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-outline:hover { border-color: var(--text-3); color: var(--text); transform: translateY(-1px); }
+
+.install-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px 11px 20px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-2);
+  animation: fadeUp 0.7s ease-out 0.35s both;
+  max-width: 480px;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+.install-bar:hover { border-color: rgba(255,255,255,0.1); }
+.install-bar .prompt { color: var(--green); }
+.install-bar code { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.install-bar button {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+.install-bar button:hover { color: var(--green); background: var(--green-dim); }
+.install-bar button.copied { color: var(--green); }
+
+/* ═══ NUMBERS ═══ */
+.numbers {
+  padding: 0 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.numbers-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.num-cell {
+  text-align: center;
+  padding: 36px 8px;
+  border-right: 1px solid var(--border);
+}
+
+.num-cell:last-child { border-right: none; }
+
+.num-val {
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.num-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+/* ═══ PROBLEM ═══ */
+.problem {
+  padding: 100px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-height: 80vh;
+  justify-content: center;
+}
+
+.problem h2 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 48px;
+}
+
+.bloat-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 48px;
+}
+
+.bloat-card {
+  padding: 14px 32px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: clamp(0.95rem, 2vw, 1.15rem);
+  color: var(--text-2);
+  width: 100%;
+  max-width: 380px;
+  transition: all 0.3s;
+}
+
+.bloat-card:last-child { color: var(--text-3); font-style: italic; }
+
+.problem .punchline {
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+}
+
+.problem .punchline .accent { color: var(--green); font-weight: 600; }
+
+/* ═══ CONTRAST ═══ */
+.contrast {
+  padding: 80px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.contrast-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  max-width: 720px;
+  width: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.contrast-cell {
+  text-align: center;
+  padding: 44px 24px;
+}
+
+.contrast-cell:not(:last-child) { border-right: 1px solid var(--border); }
+
+.contrast-num {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: var(--green);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.contrast-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.contrast-note {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* ═══ BENTO ═══ */
+.bento {
+  padding: 120px 32px;
+}
+
+.section-header {
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto 64px;
+}
+
+.section-header h2 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  margin-bottom: 16px;
+  line-height: 1.1;
+}
+
+.section-header p {
+  font-size: 16px;
+  color: var(--text-2);
+  line-height: 1.7;
+}
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: auto;
+  gap: 12px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.bento-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.bento-card:hover {
+  border-color: rgba(122, 182, 72, 0.2);
+  transform: translateY(-3px);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(122, 182, 72, 0.1);
+}
+
+.bento-card.span-2 { grid-column: span 2; }
+
+.bento-card .card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--green-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  font-size: 18px;
+}
+
+.bento-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+.bento-card p { font-size: 14px; color: var(--text-2); line-height: 1.65; }
+
+.bento-card .card-metric {
+  position: absolute;
+  bottom: 20px;
+  right: 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-3);
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+}
+
+/* ═══ ECOSYSTEM ═══ */
+.ecosystem { padding: 120px 32px; }
+
+.eco-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.eco-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.eco-card:hover {
+  border-color: rgba(122, 182, 72, 0.15);
+  transform: translateY(-2px);
+}
+
+.eco-card .big-num {
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: var(--green);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.eco-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+
+.eco-card .desc {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.pill-grid { display: flex; flex-wrap: wrap; gap: 5px; margin-top: auto; }
+
+.pill {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid;
+}
+
+.pill.prov { color: rgba(122,182,72,0.85); background: rgba(122,182,72,0.06); border-color: rgba(122,182,72,0.12); }
+.pill.chan { color: rgba(96,165,250,0.85); background: rgba(96,165,250,0.06); border-color: rgba(96,165,250,0.12); }
+.pill.tool { color: rgba(245,166,35,0.85); background: rgba(245,166,35,0.06); border-color: rgba(245,166,35,0.12); }
+.pill.more { color: var(--text-3); background: rgba(255,255,255,0.02); border-color: var(--border); font-style: italic; }
+
+/* ═══ COMPARISON ═══ */
+.comparison { padding: 120px 32px; }
+
+.comp-grid {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.metric-label { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+.comp-bars { display: flex; flex-direction: column; gap: 6px; }
+
+.comp-bar-row { display: flex; align-items: center; gap: 12px; }
+
+.comp-bar-label {
+  width: 80px;
+  text-align: right;
+  font-size: 12px;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.comp-bar-label.accent { color: var(--green); }
+.comp-bar-label.muted { color: var(--text-3); }
+
+.bar-track {
+  flex: 1;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.025);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: fit-content;
+  padding-left: 10px;
+}
+
+.bar-fill.green { background: linear-gradient(90deg, var(--green), #8bc55a); color: #0a1a0a; }
+.bar-fill.gray { background: rgba(255,255,255,0.05); color: var(--text-3); height: 24px; margin-top: 3px; font-weight: 500; }
+
+/* ═══ CTA ═══ */
+.cta {
+  padding: 160px 32px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.cta::before {
+  content: '';
+  position: absolute;
+  bottom: -30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(ellipse, rgba(122, 182, 72, 0.06) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+.cta h2 {
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.cta > p { font-size: 16px; color: var(--text-2); margin-bottom: 44px; position: relative; }
+.cta .hero-ctas { position: relative; }
+
+/* ═══ FOOTER ═══ */
+.footer {
+  padding: 40px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 960px;
+  margin: 0 auto;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.footer a { color: var(--text-3); text-decoration: none; transition: color 0.2s; }
+.footer a:hover { color: var(--text-2); }
+
+/* ═══ DESIGN NOTES PANEL ═══ */
+.notes-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 200;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  letter-spacing: 0.05em;
+  backdrop-filter: blur(12px);
+}
+
+.notes-toggle:hover { border-color: var(--amber); color: var(--amber); transform: translateY(-1px); }
+
+.design-notes {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 300px;
+  height: 100vh;
+  background: rgba(6, 13, 18, 0.97);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  border-left: 1px solid var(--border);
+  padding: 24px;
+  overflow-y: auto;
+  z-index: 150;
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.design-notes.open { transform: translateX(0); }
+
+.design-notes h3 {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--amber);
+  margin: 24px 0 10px;
+  font-weight: 600;
+}
+
+.design-notes h3:first-child { margin-top: 0; }
+.design-notes p { color: var(--text-2); margin-bottom: 8px; }
+.design-notes strong { color: var(--text); }
+
+.principle {
+  padding: 10px 14px;
+  background: var(--surface);
+  border-radius: 8px;
+  border-left: 2px solid var(--green);
+  margin-bottom: 8px;
+  color: var(--text-2);
+}
+
+/* ═══ ANIMATIONS ═══ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.8); }
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reveal.visible .bar-fill {
+  transition: width 1s cubic-bezier(0.22, 1.2, 0.36, 1) 0.3s;
+}
+
+/* ═══ RESPONSIVE ═══ */
+@media (max-width: 768px) {
+  .numbers-inner { grid-template-columns: repeat(3, 1fr); }
+  .num-cell:nth-child(3) { border-right: none; }
+  .num-cell:nth-child(4) { border-top: 1px solid var(--border); }
+  .bento-grid, .eco-grid { grid-template-columns: 1fr; }
+  .bento-card.span-2 { grid-column: span 1; }
+  .contrast-grid { grid-template-columns: 1fr; }
+  .contrast-cell:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+
+<button class="notes-toggle" id="notesBtn">Design Notes</button>
+
+<div class="design-notes" id="notesPanel">
+  <h3>Core Philosophy</h3>
+  <div class="principle">Every section has ONE job. One insight. One emotion.</div>
+  <div class="principle">Typography IS the visual. The numbers ARE the product shot.</div>
+  <div class="principle">Progressive disclosure — start simple, reveal complexity on scroll.</div>
+
+  <h3>What Makes This "Apple-tier"</h3>
+  <p><strong>Narrative arc:</strong> Vision → Proof → Problem → Contrast → Depth → Ecosystem → Data → Action. Not a feature list — a story.</p>
+  <p><strong>Typography as hero:</strong> "118×" in massive display type IS the product screenshot. h-uman's advantage is invisible (small binary) — so we make the NUMBER the visual.</p>
+  <p><strong>Whitespace is deliberate:</strong> 120px+ section padding. Content breathes. Nothing competes for attention.</p>
+  <p><strong>Two-paragraph hero:</strong> First paragraph explains what h-uman DOES (plain English). Second gives specs. Visitors understand value before they see stats.</p>
+
+  <h3>Key Improvements Over Current</h3>
+  <p>1. <strong>Hero explains WHAT</strong> h-uman does (not just how small it is)</p>
+  <p>2. <strong>Install command</strong> with copy button right in the hero</p>
+  <p>3. <strong>Version badge</strong> signals active development</p>
+  <p>4. <strong>Comparison callout</strong> (118×/50×/Zero) appears EARLY, right after the problem</p>
+  <p>5. <strong>Bento grid</strong> replaces flat 4-column card list — visual hierarchy through asymmetry</p>
+  <p>6. <strong>Ecosystem as 3 category cards</strong> with big numbers — not a flat pill cloud</p>
+  <p>7. <strong>CTA is differentiated:</strong> "Ship your first agent" (action) vs hero's "Bring AI to every device" (vision)</p>
+  <p>8. <strong>Card metrics</strong> — subtle data points in card corners reward careful readers</p>
+
+  <h3>SOTA Patterns Used</h3>
+  <p>• <strong>Apple:</strong> Massive type, progressive disclosure, numbers as visuals, aggressive whitespace</p>
+  <p>• <strong>Linear:</strong> Bento grid, glass-less dark cards, spring hover animations</p>
+  <p>• <strong>Stripe:</strong> Calm confidence, Tufte-style data viz, clean hierarchy</p>
+  <p>• <strong>Vercel:</strong> Install bar in hero, monospace details, speed metrics</p>
+  <p>• <strong>Raycast:</strong> Badge-style metadata, hover glow borders, metric callouts</p>
+
+  <h3>What's NOT in This Concept</h3>
+  <p>• WebGL hero (already built — keep it)</p>
+  <p>• Terminal typewriter demo (keep, update numbers)</p>
+  <p>• Dashboard preview (keep, update numbers)</p>
+  <p>• Architecture diagram (keep as-is)</p>
+  <p>These existing sections are strong. This concept shows the NEW and RESTRUCTURED parts.</p>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <span class="section-label">Section 1 — Hero</span>
+
+  <div class="hero-badge">
+    <span class="dot"></span>
+    Open source · MIT Licensed · v0.4.0
+  </div>
+
+  <h1>Bring AI to <span class="gradient">every</span> device on&nbsp;Earth.</h1>
+
+  <p class="hero-sub">
+    An autonomous AI that runs shell commands, manages files, browses the web, and remembers everything — across 50+ AI models and 34 messaging channels.
+  </p>
+
+  <p class="hero-specs">
+    All in <strong>1,696 kilobytes</strong> of pure C. Zero dependencies. Under <strong>30 ms</strong> cold start.
+  </p>
+
+  <div class="hero-ctas">
+    <button class="btn-primary">Get Started</button>
+    <button class="btn-outline">View on GitHub</button>
+  </div>
+
+  <div class="install-bar">
+    <span class="prompt">$</span>
+    <code>git clone https://github.com/sethdford/h-uman.git</code>
+    <button id="copyBtn" title="Copy to clipboard">⎘</button>
+  </div>
+</section>
+
+<!-- ═══ NUMBERS ═══ -->
+<section class="numbers">
+  <div class="numbers-inner">
+    <div class="num-cell"><div class="num-val">1,696 KB</div><div class="num-label">Binary</div></div>
+    <div class="num-cell"><div class="num-val">&lt;30 ms</div><div class="num-label">Startup</div></div>
+    <div class="num-cell"><div class="num-val">4,980+</div><div class="num-label">Tests</div></div>
+    <div class="num-cell"><div class="num-val">50+</div><div class="num-label">Providers</div></div>
+    <div class="num-cell"><div class="num-val">34</div><div class="num-label">Channels</div></div>
+    <div class="num-cell"><div class="num-val">67+</div><div class="num-label">Tools</div></div>
+  </div>
+</section>
+
+<!-- ═══ PROBLEM ═══ -->
+<section class="problem">
+  <span class="section-label">Section 3 — The Problem</span>
+  <h2 class="reveal">To run an AI assistant today,<br>you need...</h2>
+  <div class="bloat-stack">
+    <div class="bloat-card reveal">A container runtime</div>
+    <div class="bloat-card reveal">A Python environment</div>
+    <div class="bloat-card reveal">2 GB of RAM</div>
+    <div class="bloat-card reveal">A cloud API key</div>
+    <div class="bloat-card reveal">A stable internet connection</div>
+    <div class="bloat-card reveal">A prayer</div>
+  </div>
+  <p class="punchline reveal">h-uman needs one thing: <span class="accent">a CPU.</span></p>
+</section>
+
+<!-- ═══ CONTRAST ═══ -->
+<section class="contrast">
+  <span class="section-label">Section 4 — The Proof (NEW)</span>
+
+  <div class="contrast-grid reveal">
+    <div class="contrast-cell">
+      <div class="contrast-num" data-target="118">0×</div>
+      <div class="contrast-label">smaller</div>
+    </div>
+    <div class="contrast-cell">
+      <div class="contrast-num" data-target="50">0×</div>
+      <div class="contrast-label">less RAM</div>
+    </div>
+    <div class="contrast-cell">
+      <div class="contrast-num">Zero</div>
+      <div class="contrast-label">dependencies</div>
+    </div>
+  </div>
+  <p class="contrast-note">vs. leading AI agent frameworks</p>
+</section>
+
+<!-- ═══ BENTO ═══ -->
+<section class="bento">
+  <span class="section-label">Section 5 — Bento Grid (replaces flat cards)</span>
+
+  <div class="section-header">
+    <h2 class="reveal">From data centers to<br>five-dollar boards.</h2>
+    <p class="reveal">The same binary. The same config. Every device.</p>
+  </div>
+
+  <div class="bento-grid">
+    <div class="bento-card span-2 reveal">
+      <div class="card-icon">☁</div>
+      <h3>Cloud & Server</h3>
+      <p>Deploy to Docker, WASM, or Cloudflare Workers. Gateway handles webhooks, tunnels, and multi-channel routing automatically. One agent, every platform.</p>
+      <span class="card-metric">34 channels</span>
+    </div>
+    <div class="bento-card reveal">
+      <div class="card-icon">⌨</div>
+      <h3>Your Laptop</h3>
+      <p>Full AI agent with local Ollama or llama.cpp. Shell, files, git, browser, memory. No cloud dependency.</p>
+      <span class="card-metric">&lt; 6 MB RAM</span>
+    </div>
+    <div class="bento-card reveal">
+      <div class="card-icon">◎</div>
+      <h3>Edge</h3>
+      <p>Raspberry Pi, ARM SBCs. Under 30 ms startup. Always-on intelligence at the edge.</p>
+      <span class="card-metric">&lt; 30 ms</span>
+    </div>
+    <div class="bento-card span-2 reveal">
+      <div class="card-icon">⬡</div>
+      <h3>Embedded Hardware</h3>
+      <p>Arduino, STM32, Nucleo. Serial JSON protocol gives your microcontroller a brain. Read sensors, make decisions, control outputs — with AI reasoning.</p>
+      <span class="card-metric">1,696 KB</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ECOSYSTEM ═══ -->
+<section class="ecosystem">
+  <span class="section-label">Section 6 — Categorized Ecosystem (replaces pill soup)</span>
+
+  <div class="section-header">
+    <h2 class="reveal">An ecosystem, not a<br>walled garden.</h2>
+    <p class="reveal">Swap any provider, channel, or tool with a single config change. No vendor lock-in.</p>
+  </div>
+
+  <div class="eco-grid">
+    <div class="eco-card reveal">
+      <div class="big-num">50+</div>
+      <h3>AI Providers</h3>
+      <p class="desc">Cloud APIs and local models. Switch with one line of config.</p>
+      <div class="pill-grid">
+        <span class="pill prov">OpenAI</span>
+        <span class="pill prov">Anthropic</span>
+        <span class="pill prov">Gemini</span>
+        <span class="pill prov">Ollama</span>
+        <span class="pill prov">llama.cpp</span>
+        <span class="pill prov">Groq</span>
+        <span class="pill prov">Mistral</span>
+        <span class="pill prov">DeepSeek</span>
+        <span class="pill more">+42 more</span>
+      </div>
+    </div>
+    <div class="eco-card reveal">
+      <div class="big-num">34</div>
+      <h3>Channels</h3>
+      <p class="desc">One agent, every platform. Users message you where they already are.</p>
+      <div class="pill-grid">
+        <span class="pill chan">Telegram</span>
+        <span class="pill chan">Discord</span>
+        <span class="pill chan">Slack</span>
+        <span class="pill chan">Signal</span>
+        <span class="pill chan">iMessage</span>
+        <span class="pill chan">Matrix</span>
+        <span class="pill chan">Email</span>
+        <span class="pill chan">IRC</span>
+        <span class="pill more">+26 more</span>
+      </div>
+    </div>
+    <div class="eco-card reveal">
+      <div class="big-num">67+</div>
+      <h3>Tools</h3>
+      <p class="desc">Not a chatbot — an agent. Real access to your system.</p>
+      <div class="pill-grid">
+        <span class="pill tool">Shell</span>
+        <span class="pill tool">File Ops</span>
+        <span class="pill tool">Git</span>
+        <span class="pill tool">Browser</span>
+        <span class="pill tool">Memory</span>
+        <span class="pill tool">Web Search</span>
+        <span class="pill tool">Cron</span>
+        <span class="pill tool">HTTP</span>
+        <span class="pill more">+59 more</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ COMPARISON ═══ -->
+<section class="comparison">
+  <span class="section-label">Section 7 — Tufte Data Viz</span>
+
+  <div class="section-header">
+    <h2 class="reveal">Less code. Less memory.<br>More integrations.</h2>
+    <p class="reveal">By orders of magnitude.</p>
+  </div>
+
+  <div class="comp-grid">
+    <div class="comp-row reveal">
+      <div class="metric-label">Binary Size</div>
+      <div class="comp-bars">
+        <div class="comp-bar-row">
+          <span class="comp-bar-label accent">h-uman</span>
+          <div class="bar-track"><div class="bar-fill green" data-w="3%">1.7 MB</div></div>
+        </div>
+        <div class="comp-bar-row">
+          <span class="comp-bar-label muted">Claude Code</span>
+          <div class="bar-track"><div class="bar-fill gray" data-w="100%">~200 MB</div></div>
+        </div>
+        <div class="comp-bar-row">
+          <span class="comp-bar-label muted">OpenAI Codex</span>
+          <div class="bar-track"><div class="bar-fill gray" data-w="25%">~50 MB</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="comp-row reveal">
+      <div class="metric-label">Peak RAM</div>
+      <div class="comp-bars">
+        <div class="comp-bar-row">
+          <span class="comp-bar-label accent">h-uman</span>
+          <div class="bar-track"><div class="bar-fill green" data-w="3%">&lt;6 MB</div></div>
+        </div>
+        <div class="comp-bar-row">
+          <span class="comp-bar-label muted">Claude Code</span>
+          <div class="bar-track"><div class="bar-fill gray" data-w="100%">~300 MB</div></div>
+        </div>
+        <div class="comp-bar-row">
+          <span class="comp-bar-label muted">OpenAI Codex</span>
+          <div class="bar-track"><div class="bar-fill gray" data-w="33%">~100 MB</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="comp-row reveal">
+      <div class="metric-label">Dependencies</div>
+      <div class="comp-bars">
+        <div class="comp-bar-row">
+          <span class="comp-bar-label accent">h-uman</span>
+          <div class="bar-track"><div class="bar-fill green" data-w="2%">0</div></div>
+        </div>
+        <div class="comp-bar-row">
+          <span class="comp-bar-label muted">Claude Code</span>
+          <div class="bar-track"><div class="bar-fill gray" data-w="100%">900+</div></div>
+        </div>
+        <div class="comp-bar-row">
+          <span class="comp-bar-label muted">OpenAI Codex</span>
+          <div class="bar-track"><div class="bar-fill gray" data-w="22%">200+</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section class="cta">
+  <span class="section-label">Section 8 — CTA (differentiated from hero)</span>
+
+  <h2 class="reveal">Ship your first agent<br>in&nbsp;minutes.</h2>
+  <p class="reveal">Open source. MIT licensed. Under 2 MB. Runs on anything with a CPU.</p>
+
+  <div class="hero-ctas reveal" style="justify-content: center">
+    <button class="btn-primary">Get Started</button>
+    <button class="btn-outline">View on GitHub</button>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<div class="footer">
+  <span>h-uman</span>
+  <div style="display:flex;gap:24px;">
+    <a href="#">Docs</a>
+    <a href="#">GitHub</a>
+    <span>MIT License</span>
+  </div>
+</div>
+
+<script>
+const notesBtn = document.getElementById('notesBtn');
+const notesPanel = document.getElementById('notesPanel');
+notesBtn.addEventListener('click', () => {
+  notesPanel.classList.toggle('open');
+  notesBtn.textContent = notesPanel.classList.contains('open') ? 'Close' : 'Design Notes';
+});
+
+document.getElementById('copyBtn').addEventListener('click', function() {
+  navigator.clipboard.writeText('git clone https://github.com/sethdford/h-uman.git');
+  this.textContent = '✓';
+  this.classList.add('copied');
+  setTimeout(() => { this.textContent = '⎘'; this.classList.remove('copied'); }, 1500);
+});
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+
+      entry.target.querySelectorAll('[data-target]').forEach(el => {
+        const target = parseInt(el.dataset.target);
+        const start = performance.now();
+        const animate = (now) => {
+          const progress = Math.min((now - start) / 1400, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          el.textContent = Math.round(target * eased) + '×';
+          if (progress < 1) requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+      });
+
+      entry.target.querySelectorAll('.bar-fill[data-w]').forEach((bar, i) => {
+        setTimeout(() => { bar.style.width = bar.dataset.w; }, 100 + i * 80);
+      });
+
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+document.querySelectorAll('.bar-fill[data-w]').forEach(bar => { bar.style.width = '0%'; });
+
+document.querySelectorAll('.bloat-card').forEach((card, i) => {
+  card.style.transitionDelay = (i * 0.08) + 's';
+});
+</script>
+
+</body>
+</html>

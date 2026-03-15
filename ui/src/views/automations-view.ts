@@ -1,5 +1,6 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { staggerMotion9Styles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import { ScToast } from "../components/hu-toast.js";
@@ -53,92 +54,95 @@ interface ChannelStatus {
 @customElement("hu-automations-view")
 export class ScAutomationsView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
-  static override styles = css`
-    :host {
-      view-transition-name: view-automations;
-      display: block;
-      max-width: 60rem;
-      margin: 0 auto;
-      font-family: var(--hu-font);
-      color: var(--hu-text);
-    }
-
-    .job-list {
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-lg);
-    }
-
-    .modal-footer {
-      display: flex;
-      justify-content: flex-end;
-      gap: var(--hu-space-sm);
-      margin-top: var(--hu-space-xl);
-      padding-top: var(--hu-space-lg);
-      border-top: 1px solid var(--hu-border);
-    }
-
-    .delete-body {
-      padding: var(--hu-space-lg) 0;
-    }
-
-    .delete-body p {
-      margin: 0;
-      font-size: var(--hu-text-base);
-      color: var(--hu-text);
-      line-height: var(--hu-leading-relaxed);
-    }
-
-    .templates-section {
-      margin-bottom: var(--hu-space-xl);
-    }
-
-    .templates-section h3 {
-      margin: 0 0 var(--hu-space-md);
-      font-size: var(--hu-text-lg);
-      font-weight: var(--hu-weight-semibold);
-      color: var(--hu-text);
-    }
-
-    .templates-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
-      gap: var(--hu-space-md);
-    }
-
-    .template-card .template-name {
-      font-size: var(--hu-text-base);
-      font-weight: var(--hu-weight-medium);
-      color: var(--hu-text);
-      margin-bottom: var(--hu-space-xs);
-    }
-
-    .template-card .template-desc {
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
-      margin-bottom: var(--hu-space-xs);
-    }
-
-    .template-card .template-schedule {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-faint);
-    }
-    .run-chart-card {
-      margin-bottom: var(--hu-space-xl);
-    }
-    .run-chart-title {
-      margin: 0 0 var(--hu-space-md);
-      font-size: var(--hu-text-base);
-      font-weight: var(--hu-weight-semibold);
-      color: var(--hu-text);
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0s !important;
-        transition-duration: 0s !important;
+  static override styles = [
+    staggerMotion9Styles,
+    css`
+      :host {
+        view-transition-name: view-automations;
+        display: block;
+        max-width: 60rem;
+        margin: 0 auto;
+        font-family: var(--hu-font);
+        color: var(--hu-text);
       }
-    }
-  `;
+
+      .job-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-lg);
+      }
+
+      .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--hu-space-sm);
+        margin-top: var(--hu-space-xl);
+        padding-top: var(--hu-space-lg);
+        border-top: 1px solid var(--hu-border);
+      }
+
+      .delete-body {
+        padding: var(--hu-space-lg) 0;
+      }
+
+      .delete-body p {
+        margin: 0;
+        font-size: var(--hu-text-base);
+        color: var(--hu-text);
+        line-height: var(--hu-leading-relaxed);
+      }
+
+      .templates-section {
+        margin-bottom: var(--hu-space-xl);
+      }
+
+      .templates-section h3 {
+        margin: 0 0 var(--hu-space-md);
+        font-size: var(--hu-text-lg);
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+      }
+
+      .templates-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+        gap: var(--hu-space-md);
+      }
+
+      .template-card .template-name {
+        font-size: var(--hu-text-base);
+        font-weight: var(--hu-weight-medium);
+        color: var(--hu-text);
+        margin-bottom: var(--hu-space-xs);
+      }
+
+      .template-card .template-desc {
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text-muted);
+        margin-bottom: var(--hu-space-xs);
+      }
+
+      .template-card .template-schedule {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-faint);
+      }
+      .run-chart-card {
+        margin-bottom: var(--hu-space-xl);
+      }
+      .run-chart-title {
+        margin: 0 0 var(--hu-space-md);
+        font-size: var(--hu-text-base);
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0s !important;
+          transition-duration: 0s !important;
+        }
+      }
+    `,
+  ];
 
   @state() private jobs: CronJob[] = [];
   @state() private runsMap = new Map<number, CronRun[]>();
@@ -406,7 +410,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
 
   private _renderStats() {
     return html`
-      <hu-stats-row>
+      <hu-stats-row class="hu-stagger-motion9">
         <hu-stat-card
           .value=${this.totalCount}
           label="Total"
@@ -474,7 +478,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
       return html`
         <div class="templates-section">
           <h3>Quick Start Templates</h3>
-          <div class="templates-grid">
+          <div class="templates-grid hu-stagger-motion9">
             ${TEMPLATES.filter((t) => t.type === this.activeTab).map(
               (t) => html`
                 <hu-card clickable @click=${() => this._useTemplate(t)}>
@@ -502,7 +506,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
       `;
     }
     return html`
-      <div class="job-list">
+      <div class="job-list hu-stagger-motion9">
         ${this.filteredJobs.map(
           (job) => html`
             <hu-automation-card

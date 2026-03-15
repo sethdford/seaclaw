@@ -125,7 +125,7 @@ static void test_pgvector_create_destroy(void) {
 }
 
 static void test_pgvector_ops_when_disabled(void) {
-#if !defined(HU_ENABLE_POSTGRES)
+#if !defined(HU_ENABLE_PGVECTOR)
     hu_allocator_t alloc = hu_system_allocator();
     hu_pgvector_config_t cfg = {
         .connection_url = "postgresql://localhost/test",

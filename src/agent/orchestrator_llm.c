@@ -123,6 +123,8 @@ hu_error_t hu_orchestrator_decompose_goal(hu_allocator_t *alloc, hu_provider_t *
 #else
     if (!provider || !provider->vtable || !provider->vtable->chat_with_system)
         return HU_ERR_NOT_SUPPORTED;
+    if (goal_len > 0 && !goal)
+        return HU_ERR_INVALID_ARGUMENT;
 
     size_t cap_buf = 256;
     for (size_t i = 0; i < capability_count && capabilities; i++) {

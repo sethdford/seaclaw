@@ -33,6 +33,7 @@ option(HU_ENABLE_AUTHENTIC "Build authentic existence features" OFF)
 option(HU_ENABLE_CARTESIA "Enable Cartesia TTS for voice messages" OFF)
 option(HU_ENABLE_ML "Build ML training subsystem (BPE tokenizer, dataloader, experiment loop)" OFF)
 option(HU_ENABLE_FEEDS "Build feed ingestion and research agent" OFF)
+option(HU_ENABLE_EMBEDDED_MODEL "Enable embedded model provider (llama.cpp/llama-cli)" OFF)
 
 # WASM build: cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..
 
@@ -811,7 +812,8 @@ endif()
 if(HU_ENABLE_FEEDS)
     list(APPEND HU_CORE_SOURCES src/feeds/apple.c src/feeds/google.c src/feeds/music.c
         src/feeds/news.c src/feeds/email.c src/feeds/gmail.c src/feeds/imessage.c
-        src/feeds/twitter.c src/feeds/file_ingest.c src/feeds/research.c)
+        src/feeds/twitter.c src/feeds/file_ingest.c src/feeds/research.c src/feeds/findings.c
+        src/feeds/trends.c)
 endif()
 
 # Skillforge + Phase 8 intelligence (skills, reflection, feedback, meta-learning)
@@ -1178,6 +1180,13 @@ if(UNIX AND NOT WIN32)
     target_compile_definitions(human_core PRIVATE HU_GATEWAY_POSIX=1)
 endif()
 
+if(HU_ENABLE_EMBEDDED_MODEL)
+    target_compile_definitions(human_core PRIVATE HU_ENABLE_EMBEDDED_MODEL=1)
+    message(STATUS "Embedded model provider: enabled (llama.cpp/llama-cli)")
+else()
+    message(STATUS "Embedded model provider: disabled")
+endif()
+
 if(HU_ENABLE_CURL)
     find_package(CURL QUIET)
     target_compile_definitions(human_core PRIVATE HU_ENABLE_CURL=1)
@@ -1458,7 +1467,8 @@ endif()
 if(NOT HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_EXTRA_MODULES src/feeds/apple.c src/feeds/google.c src/feeds/music.c
         src/feeds/news.c src/feeds/email.c src/feeds/gmail.c src/feeds/imessage.c
-        src/feeds/twitter.c src/feeds/file_ingest.c src/feeds/research.c)
+        src/feeds/twitter.c src/feeds/file_ingest.c src/feeds/research.c src/feeds/findings.c
+        src/feeds/trends.c)
 endif()
 if(NOT HU_ENABLE_PUSH)
     list(APPEND HU_TEST_EXTRA_MODULES src/gateway/push.c)
@@ -1893,7 +1903,7 @@ add_executable(human_tests ${HU_TEST_SOURCES} wasm/wasm_alloc.c)
 target_link_libraries(human_tests human_core_test)
 target_include_directories(human_tests PRIVATE ${HU_ROOT}/tests)
 # HU_HAS_PERSONA always set for tests: test lib has persona (main or extra), struct layout must match
-target_compile_definitions(human_tests PRIVATE HU_IS_TEST=1 HU_GATEWAY_TEST_MODE=1 HU_HAS_NONE_ENGINE=1 HU_HAS_CRON=1 HU_HAS_PUSH=1 HU_HAS_UPDATE=1 HU_HAS_SKILLS=1 HU_HAS_PERSONA=1)
+target_compile_definitions(human_tests PRIVATE HU_IS_TEST=1 HU_GATEWAY_TEST_MODE=1 HU_HAS_NONE_ENGINE=1 HU_HAS_CRON=1 HU_HAS_PUSH=1 HU_HAS_UPDATE=1 HU_HAS_SKILLS=1 HU_HAS_PERSONA=1 HU_HAS_RUNTIME_EXOTIC=1)
 if(HU_ENABLE_PERSONA)
     target_compile_definitions(human_tests PRIVATE HU_ENABLE_PERSONA=1)
 endif()

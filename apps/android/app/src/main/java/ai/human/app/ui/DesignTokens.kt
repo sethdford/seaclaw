@@ -202,6 +202,9 @@ object HUTokens {
     val springDramaticStiffness = 80f
     val springDramaticDamping = 10f
     val springDramaticMass = 1f
+    val springInteractiveStiffness = 322f
+    val springInteractiveDamping = 31f
+    val springInteractiveMass = 1f
 
     // Opacity
     val opacityDisabled = 0.38f

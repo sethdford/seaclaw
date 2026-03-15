@@ -5,7 +5,18 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-typedef struct hu_webrtc_config { char *stun_server; char *turn_server; char *turn_username; char *turn_password; uint16_t local_port; bool audio_enabled; bool video_enabled; } hu_webrtc_config_t;
+typedef struct hu_webrtc_config {
+    char *stun_server;
+    char *turn_server;
+    char *turn_username;
+    char *turn_password;
+    uint16_t local_port;
+    bool audio_enabled;
+    bool video_enabled;
+    char *signaling_endpoint; /* HTTP URL for SDP exchange; required for production */
+    char *api_key;           /* Bearer token for signaling/audio endpoints; optional */
+    char *audio_endpoint;    /* HTTP URL for audio fallback when WebRTC data channel unavailable */
+} hu_webrtc_config_t;
 typedef struct hu_webrtc_session { hu_allocator_t *alloc; hu_webrtc_config_t config; bool connected; char *local_sdp; char *remote_sdp; } hu_webrtc_session_t;
 hu_error_t hu_webrtc_session_create(hu_allocator_t *alloc, const hu_webrtc_config_t *config, hu_webrtc_session_t **out);
 hu_error_t hu_webrtc_connect(hu_webrtc_session_t *session, const char *remote_sdp);

@@ -700,6 +700,8 @@ hu_error_t cp_admin_metrics_snapshot(hu_allocator_t *alloc, hu_app_context_t *ap
                                hu_json_bool_new(alloc, app->agent->llm_compiler_enabled));
             hu_json_object_set(alloc, intel_obj, "speculative_cache",
                                hu_json_bool_new(alloc, app->agent->speculative_cache != NULL));
+            hu_json_object_set(alloc, intel_obj, "multi_agent",
+                               hu_json_bool_new(alloc, app->agent->multi_agent_enabled));
             hu_json_object_set(alloc, obj, "intelligence", intel_obj);
         }
     }

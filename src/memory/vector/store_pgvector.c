@@ -1,9 +1,10 @@
 #include "human/memory/vector/store_pgvector.h"
 #include "human/core/string.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(HU_ENABLE_POSTGRES)
+#if defined(HU_ENABLE_PGVECTOR)
 #include <libpq-fe.h>
 
 static bool is_safe_identifier(const char *id) {
@@ -14,6 +15,31 @@ static bool is_safe_identifier(const char *id) {
               *p == '_'))
             return false;
     }
+    return true;
+}
+
+static bool ensure_table(PGconn *conn, const char *table_name, size_t dimensions) {
+    if (!conn || !table_name || dimensions == 0)
+        return false;
+    PGresult *res = PQexec(conn, "CREATE EXTENSION IF NOT EXISTS vector");
+    if (res)
+        PQclear(res);
+
+    size_t dims = dimensions > 0 ? dimensions : 1536;
+    char sql[512];
+    int n = snprintf(sql, sizeof(sql),
+                     "CREATE TABLE IF NOT EXISTS %s (key TEXT PRIMARY KEY, embedding vector(%zu), "
+                     "metadata TEXT, updated_at TIMESTAMPTZ DEFAULT now())",
+                     table_name, dims);
+    if (n < 0 || n >= (int)sizeof(sql))
+        return false;
+    res = PQexec(conn, sql);
+    if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
+        if (res)
+            PQclear(res);
+        return false;
+    }
+    PQclear(res);
     return true;
 }
 
@@ -28,10 +54,8 @@ typedef struct pgvector_ctx {
 static hu_error_t pgvector_upsert_impl(void *ctx, hu_allocator_t *alloc, const char *id,
                                        size_t id_len, const float *embedding, size_t dims,
                                        const char *metadata, size_t metadata_len) {
-    (void)metadata;
-    (void)metadata_len;
     pgvector_ctx_t *p = (pgvector_ctx_t *)ctx;
-    if (!p || !p->conn || !embedding)
+    if (!p || !p->conn || !embedding || !id)
         return HU_ERR_INVALID_ARGUMENT;
 
     char *key_z = hu_strndup(alloc, id, id_len);
@@ -49,19 +73,33 @@ static hu_error_t pgvector_upsert_impl(void *ctx, hu_allocator_t *alloc, const c
     vec_buf[pos++] = ']';
     vec_buf[pos] = '\0';
 
+    char *meta_z = NULL;
+    if (metadata && metadata_len > 0) {
+        meta_z = hu_strndup(alloc, metadata, metadata_len);
+        if (!meta_z) {
+            alloc->free(alloc->ctx, key_z, id_len + 1);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+    }
+
     char sql[8192];
-    int slen =
-        snprintf(sql, sizeof(sql),
-                 "INSERT INTO %s (key, embedding, updated_at) VALUES ($1, $2::vector, now()) "
-                 "ON CONFLICT (key) DO UPDATE SET embedding = $2::vector, updated_at = now()",
-                 p->table_name);
+    int slen = snprintf(sql, sizeof(sql),
+                        "INSERT INTO %s (key, embedding, metadata, updated_at) "
+                        "VALUES ($1, $2::vector, $3, now()) "
+                        "ON CONFLICT (key) DO UPDATE SET embedding = $2::vector, metadata = $3, "
+                        "updated_at = now()",
+                        p->table_name);
     if (slen >= (int)sizeof(sql) || slen < 0) {
+        if (meta_z)
+            alloc->free(alloc->ctx, meta_z, metadata_len + 1);
         alloc->free(alloc->ctx, key_z, id_len + 1);
         return HU_ERR_INVALID_ARGUMENT;
     }
 
-    const char *params[2] = {key_z, vec_buf};
-    PGresult *res = PQexecParams(p->conn, sql, 2, NULL, params, NULL, NULL, 0);
+    const char *params[3] = {key_z, vec_buf, meta_z ? meta_z : NULL};
+    PGresult *res = PQexecParams(p->conn, sql, 3, NULL, params, NULL, NULL, 0);
+    if (meta_z)
+        alloc->free(alloc->ctx, meta_z, metadata_len + 1);
     alloc->free(alloc->ctx, key_z, id_len + 1);
     if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
         if (res)
@@ -91,9 +129,11 @@ static hu_error_t pgvector_search_impl(void *ctx, hu_allocator_t *alloc,
     vec_buf[pos] = '\0';
 
     size_t lim = limit > 0 ? limit : 10;
+    if (lim > 10000)
+        lim = 10000;
     char sql[8192];
     int slen = snprintf(sql, sizeof(sql),
-                        "SELECT key, 1 - (embedding <=> $1::vector) AS sim FROM %s "
+                        "SELECT key, 1 - (embedding <=> $1::vector) AS sim, metadata FROM %s "
                         "ORDER BY embedding <=> $1::vector LIMIT %zu",
                         p->table_name, lim);
     if (slen >= (int)sizeof(sql) || slen < 0)
@@ -127,9 +167,12 @@ static hu_error_t pgvector_search_impl(void *ctx, hu_allocator_t *alloc,
     for (int i = 0; i < nrows; i++) {
         const char *key = PQgetvalue(res, i, 0);
         const char *sim = PQgetvalue(res, i, 1);
+        const char *meta = PQgetvalue(res, i, 2);
         if (key)
             arr[i].id = hu_strdup(alloc, key);
         arr[i].score = (float)atof(sim ? sim : "0");
+        if (meta && meta[0])
+            arr[i].metadata = hu_strdup(alloc, meta);
     }
     PQclear(res);
     *results = arr;
@@ -140,7 +183,7 @@ static hu_error_t pgvector_search_impl(void *ctx, hu_allocator_t *alloc,
 static hu_error_t pgvector_delete_impl(void *ctx, hu_allocator_t *alloc, const char *id,
                                        size_t id_len) {
     pgvector_ctx_t *p = (pgvector_ctx_t *)ctx;
-    if (!p || !p->conn)
+    if (!p || !p->conn || !id)
         return HU_ERR_INVALID_ARGUMENT;
 
     char *key_z = hu_strndup(alloc, id, id_len);
@@ -280,7 +323,7 @@ hu_vector_store_t hu_vector_store_pgvector_create(hu_allocator_t *alloc,
 
     const char *table_val =
         (config->table_name && config->table_name[0]) ? config->table_name : "memory_vectors";
-#if defined(HU_ENABLE_POSTGRES)
+#if defined(HU_ENABLE_PGVECTOR)
     if (!is_safe_identifier(table_val))
         return s;
 #endif
@@ -294,7 +337,7 @@ hu_vector_store_t hu_vector_store_pgvector_create(hu_allocator_t *alloc,
     p->table_name = hu_strdup(alloc, table_val);
     p->dimensions = config->dimensions;
 
-#if defined(HU_ENABLE_POSTGRES)
+#if defined(HU_ENABLE_PGVECTOR)
     if (p->connection_url) {
         p->conn = PQconnectdb(p->connection_url);
         if (!p->conn || PQstatus(p->conn) != CONNECTION_OK) {
@@ -302,6 +345,8 @@ hu_vector_store_t hu_vector_store_pgvector_create(hu_allocator_t *alloc,
                 PQfinish(p->conn);
             p->conn = NULL;
         }
+        if (p->conn && p->dimensions > 0)
+            (void)ensure_table(p->conn, p->table_name, p->dimensions);
     }
 #endif
 

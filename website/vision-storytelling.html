@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>h-uman — Visual Storytelling Concept</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Overridden per design-system: Avenir in production. Space Grotesk here for concept contrast. */
+:root {
+  --g: #7AB648;
+  --g2: #a8d87e;
+  --g-dim: rgba(122,182,72,0.12);
+  --g-glow: rgba(122,182,72,0.3);
+  --amber: #f5a623;
+  --coral: #e86c5d;
+  --indigo: #818cf8;
+  --blue: #60a5fa;
+  --bg: #050a0e;
+  --s1: #0c1519;
+  --s2: #131f28;
+  --border: rgba(255,255,255,0.05);
+  --t1: #edf0f3;
+  --t2: #7d909f;
+  --t3: #3d5060;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t1);font-family:'Space Grotesk',system-ui,sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+::selection{background:var(--g);color:#050a0e}
+
+/* ═══ SCROLL-DRIVEN REVEAL SYSTEM ═══ */
+.rv{opacity:0;transform:translateY(40px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
+.rv.on{opacity:1;transform:none}
+.rv-d1{transition-delay:.1s}.rv-d2{transition-delay:.2s}.rv-d3{transition-delay:.3s}
+.rv-d4{transition-delay:.4s}.rv-d5{transition-delay:.5s}.rv-d6{transition-delay:.6s}
+.rv-scale{transform:scale(.92) translateY(20px)}.rv-scale.on{transform:none}
+
+/* ═══ GLOBAL ═══ */
+section{position:relative;overflow:hidden}
+.container{max-width:1080px;margin:0 auto;padding:0 32px}
+h2{font-size:clamp(2.2rem,5.5vw,4rem);font-weight:700;letter-spacing:-.04em;line-height:1.05}
+.mono{font-family:'JetBrains Mono',monospace}
+.accent{color:var(--g)}
+
+/* ═══ SECT 1: SCALE OPENING ═══ */
+.scale-open{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:100px 32px 60px;position:relative}
+.scale-open::before{content:'';position:absolute;top:-10%;left:50%;transform:translateX(-50%);width:1200px;height:1200px;background:radial-gradient(ellipse,rgba(122,182,72,.04) 0%,transparent 60%);pointer-events:none}
+
+.binary-viz{position:relative;width:100%;max-width:680px;margin:0 auto 56px;height:200px}
+.bin-human{position:absolute;left:50%;bottom:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:2}
+.bin-human .bar{width:6px;background:linear-gradient(to top,var(--g),var(--g2));border-radius:3px 3px 0 0;height:0;transition:height 1.4s cubic-bezier(.34,1.56,.64,1) .3s}
+.bin-human .bar.on{height:12px}
+.bin-human .label{margin-top:10px;font-size:11px;font-weight:600;color:var(--g);white-space:nowrap}
+.bin-human .size{font-size:clamp(1.6rem,4vw,2.4rem);font-weight:700;color:var(--g);margin-top:4px;opacity:0;transform:translateY(8px);transition:all .6s cubic-bezier(.16,1,.3,1) 1.2s}
+.bin-human .size.on{opacity:1;transform:none}
+
+.bin-others{position:absolute;bottom:0;display:flex;flex-direction:column;align-items:center}
+.bin-others .bar{width:48px;border-radius:6px 6px 0 0;height:0;transition:height 1s cubic-bezier(.16,1,.3,1)}
+.bin-others .label{margin-top:10px;font-size:10px;color:var(--t3);white-space:nowrap}
+.bin-others .size{font-size:12px;color:var(--t3);margin-top:2px}
+
+.bin-claude{left:10%}.bin-claude .bar{background:rgba(255,255,255,.04);transition-delay:.5s}
+.bin-claude .bar.on{height:160px}
+.bin-codex{right:25%}.bin-codex .bar{background:rgba(255,255,255,.03);transition-delay:.7s;width:36px}
+.bin-codex .bar.on{height:60px}
+.bin-langchain{right:8%}.bin-langchain .bar{background:rgba(255,255,255,.025);transition-delay:.9s;width:40px}
+.bin-langchain .bar.on{height:80px}
+
+.scale-open h1{font-size:clamp(3.2rem,8vw,7rem);font-weight:700;letter-spacing:-.05em;line-height:.95;margin-bottom:24px}
+.scale-open h1 .thin{font-weight:300;color:var(--t2)}
+
+.scale-open .sub{font-size:clamp(1rem,2vw,1.2rem);color:var(--t2);max-width:500px;line-height:1.7;margin-bottom:40px}
+
+.hero-ctas{display:flex;gap:12px;margin-bottom:32px}
+.btn-g{padding:13px 30px;border-radius:10px;background:var(--g);color:#050a0e;font-weight:600;font-size:14px;border:none;cursor:pointer;text-decoration:none;font-family:inherit;transition:all .25s cubic-bezier(.34,1.56,.64,1)}
+.btn-g:hover{transform:translateY(-2px);box-shadow:0 12px 40px var(--g-glow)}
+.btn-o{padding:13px 30px;border-radius:10px;background:transparent;color:var(--t2);font-weight:500;font-size:14px;border:1px solid var(--border);cursor:pointer;text-decoration:none;font-family:inherit;transition:all .25s cubic-bezier(.34,1.56,.64,1)}
+.btn-o:hover{border-color:var(--t3);color:var(--t1);transform:translateY(-1px)}
+
+/* ═══ SECT 2: THE BLOAT WATERFALL ═══ */
+.bloat{padding:120px 0;min-height:100vh;display:flex;align-items:center}
+.bloat-inner{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+.bloat-text h2{margin-bottom:20px}
+.bloat-text p{font-size:15px;color:var(--t2);line-height:1.7}
+
+.dep-tree{position:relative;width:100%;height:400px}
+.dep-tree svg{width:100%;height:100%}
+.dep-node{fill:none;stroke:var(--t3);stroke-width:1;opacity:0;transition:opacity .4s,stroke .3s}
+.dep-node.on{opacity:1}
+.dep-node.bad{stroke:var(--coral);stroke-width:1.5}
+.dep-circle{fill:var(--s1);stroke:var(--t3);stroke-width:1;r:0;transition:r .5s cubic-bezier(.34,1.56,.64,1),fill .3s,stroke .3s}
+.dep-circle.on{r:6}
+.dep-circle.root{fill:var(--coral);stroke:var(--coral);r:0}
+.dep-circle.root.on{r:10}
+.dep-label{fill:var(--t3);font-size:8px;font-family:'JetBrains Mono',monospace;opacity:0;transition:opacity .3s}
+.dep-label.on{opacity:1}
+
+/* ═══ SECT 3: THE CRYSTAL ═══ */
+.crystal{padding:140px 0;text-align:center}
+.crystal h2{margin-bottom:16px}
+.crystal .sub{font-size:16px;color:var(--t2);max-width:480px;margin:0 auto 64px;line-height:1.7}
+
+.crystal-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;max-width:600px;margin:0 auto 60px;border-radius:16px;overflow:hidden}
+.crystal-cell{aspect-ratio:1;background:var(--s1);border:1px solid var(--border);position:relative;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;transition:all .5s cubic-bezier(.34,1.56,.64,1);opacity:0;transform:scale(.5)}
+.crystal-cell.on{opacity:1;transform:none}
+.crystal-cell.filled{background:var(--g-dim);border-color:rgba(122,182,72,.15);color:var(--g)}
+.crystal-cell.core{background:rgba(122,182,72,.2);border-color:rgba(122,182,72,.3);color:var(--g);font-weight:600}
+
+.crystal-legend{display:flex;gap:24px;justify-content:center;font-size:12px;color:var(--t2)}
+.crystal-legend span{display:flex;align-items:center;gap:8px}
+.crystal-legend .dot{width:8px;height:8px;border-radius:2px}
+.crystal-legend .dot.green{background:var(--g-dim);border:1px solid rgba(122,182,72,.2)}
+.crystal-legend .dot.dark{background:var(--s1);border:1px solid var(--border)}
+
+/* ═══ SECT 4: DEVICE SPECTRUM (SVG ILLUSTRATION) ═══ */
+.devices{padding:140px 0;background:linear-gradient(180deg,transparent 0%,rgba(122,182,72,.02) 50%,transparent 100%)}
+.devices h2{text-align:center;margin-bottom:16px}
+.devices .sub{text-align:center;font-size:16px;color:var(--t2);max-width:480px;margin:0 auto 72px;line-height:1.7}
+
+.device-row{display:flex;justify-content:center;align-items:flex-end;gap:clamp(16px,4vw,48px);margin-bottom:64px}
+.device-item{display:flex;flex-direction:column;align-items:center;gap:16px}
+.device-svg{transition:transform .5s cubic-bezier(.34,1.56,.64,1)}
+.device-item:hover .device-svg{transform:translateY(-8px)}
+.device-name{font-size:13px;font-weight:600;color:var(--t1)}
+.device-spec{font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+
+.device-line{width:100%;max-width:800px;margin:0 auto;position:relative;height:3px}
+.device-line::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--g),var(--g2),var(--amber),transparent);border-radius:2px;opacity:0;transition:opacity 1s .3s}
+.device-line.on::before{opacity:1}
+.device-dots{position:absolute;top:50%;left:0;right:0;display:flex;justify-content:space-between;transform:translateY(-50%)}
+.device-dot{width:10px;height:10px;border-radius:50%;border:2px solid;transform:scale(0);transition:transform .5s cubic-bezier(.34,1.56,.64,1)}
+.device-dot.on{transform:scale(1)}
+.device-dot:nth-child(1){border-color:var(--g);background:var(--g);transition-delay:.5s}
+.device-dot:nth-child(2){border-color:var(--g2);background:var(--g2);transition-delay:.7s}
+.device-dot:nth-child(3){border-color:var(--amber);background:var(--amber);transition-delay:.9s}
+.device-dot:nth-child(4){border-color:var(--coral);background:var(--coral);transition-delay:1.1s}
+
+.device-labels{display:flex;justify-content:space-between;max-width:800px;margin:20px auto 0;font-size:11px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;font-weight:500}
+
+/* ═══ SECT 5: NETWORK VIZ (ECOSYSTEM) ═══ */
+.network{padding:140px 0}
+.network h2{text-align:center;margin-bottom:16px}
+.network .sub{text-align:center;font-size:16px;color:var(--t2);max-width:520px;margin:0 auto 80px;line-height:1.7}
+
+.net-viz{position:relative;width:100%;max-width:680px;margin:0 auto;aspect-ratio:16/10}
+.net-viz svg{width:100%;height:100%}
+.net-line{stroke-width:1;stroke-dasharray:200;stroke-dashoffset:200;transition:stroke-dashoffset 1.2s cubic-bezier(.16,1,.3,1)}
+.net-line.on{stroke-dashoffset:0}
+.net-node{opacity:0;transition:opacity .4s cubic-bezier(.16,1,.3,1),transform .5s cubic-bezier(.34,1.56,.64,1);transform-origin:center;transform:scale(0)}
+.net-node.on{opacity:1;transform:scale(1)}
+.net-label{font-family:'JetBrains Mono',monospace;font-size:9px;opacity:0;transition:opacity .3s}
+.net-label.on{opacity:1}
+
+.net-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:680px;margin:48px auto 0}
+.net-stat{text-align:center;padding:24px;background:var(--s1);border:1px solid var(--border);border-radius:12px;transition:all .3s cubic-bezier(.34,1.56,.64,1)}
+.net-stat:hover{border-color:rgba(122,182,72,.15);transform:translateY(-2px)}
+.net-stat .num{font-size:clamp(2rem,4vw,3rem);font-weight:700;color:var(--g);line-height:1;margin-bottom:4px}
+.net-stat .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--t3);font-weight:500}
+
+/* ═══ SECT 6: BENCHMARK BARS ═══ */
+.benchmarks{padding:140px 0}
+.benchmarks h2{text-align:center;margin-bottom:16px}
+.benchmarks .sub{text-align:center;font-size:16px;color:var(--t2);max-width:480px;margin:0 auto 72px;line-height:1.7}
+
+.bench-grid{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+.bench-row .metric{font-size:12px;font-weight:600;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.bench-row .metric .unit{font-size:10px;color:var(--t3);font-weight:400}
+.bench-bars{display:flex;flex-direction:column;gap:8px}
+.bench-bar{display:flex;align-items:center;gap:14px}
+.bench-name{width:88px;text-align:right;font-size:12px;flex-shrink:0;font-weight:500}
+.bench-name.us{color:var(--g)}
+.bench-name.them{color:var(--t3)}
+.bench-track{flex:1;height:32px;border-radius:8px;background:rgba(255,255,255,.02);overflow:hidden;position:relative}
+.bench-fill{height:100%;border-radius:8px;display:flex;align-items:center;padding:0 12px;font-size:11px;font-weight:600;width:0;transition:width 1.4s cubic-bezier(.22,1.2,.36,1)}
+.bench-fill.green{background:linear-gradient(90deg,var(--g),var(--g2));color:#050a0e;justify-content:flex-end}
+.bench-fill.gray{background:rgba(255,255,255,.04);color:var(--t3);font-weight:400;justify-content:flex-end;height:26px;margin-top:3px}
+.bench-fill .val{opacity:0;transition:opacity .3s .8s}
+.bench-fill.on .val{opacity:1}
+
+/* ═══ SECT 7: CODE QUALITY SVG ═══ */
+.quality{padding:140px 0;background:linear-gradient(180deg,transparent 0%,rgba(122,182,72,.015) 50%,transparent 100%)}
+.quality h2{text-align:center;margin-bottom:16px}
+.quality .sub{text-align:center;font-size:16px;color:var(--t2);max-width:520px;margin:0 auto 80px;line-height:1.7}
+
+.quality-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:960px;margin:0 auto}
+.q-card{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:32px;position:relative;overflow:hidden;transition:all .35s cubic-bezier(.34,1.56,.64,1)}
+.q-card:hover{border-color:rgba(122,182,72,.15);transform:translateY(-3px);box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.q-card .q-icon{width:48px;height:48px;margin-bottom:20px;position:relative}
+.q-card h3{font-size:16px;font-weight:600;margin-bottom:8px}
+.q-card p{font-size:13px;color:var(--t2);line-height:1.6}
+.q-card .q-num{position:absolute;top:24px;right:24px;font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:var(--g);opacity:.6}
+
+/* ring animation */
+.ring-svg{width:48px;height:48px}
+.ring-bg{fill:none;stroke:var(--border);stroke-width:3}
+.ring-fg{fill:none;stroke:var(--g);stroke-width:3;stroke-linecap:round;stroke-dasharray:125.6;stroke-dashoffset:125.6;transition:stroke-dashoffset 1.5s cubic-bezier(.16,1,.3,1)}
+.ring-fg.on{stroke-dashoffset:0}
+.ring-fg.p95{stroke-dashoffset:6.28}
+.ring-fg.p98{stroke-dashoffset:2.51}
+.ring-fg.p100{stroke-dashoffset:0}
+
+/* ═══ SECT 8: CTA ═══ */
+.cta-final{padding:180px 32px;text-align:center;position:relative}
+.cta-final::before{content:'';position:absolute;bottom:-20%;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(ellipse,rgba(122,182,72,.05) 0%,transparent 60%);pointer-events:none}
+.cta-final h2{position:relative;margin-bottom:20px}
+.cta-final p{font-size:16px;color:var(--t2);margin-bottom:48px;position:relative}
+
+/* ═══ ANIMATED BORDER GRADIENT ═══ */
+.glow-border{position:relative;border-radius:16px;padding:1px}
+.glow-border::before{content:'';position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:conic-gradient(from var(--angle,0deg),transparent 60%,var(--g) 80%,transparent 100%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:spin 4s linear infinite}
+@keyframes spin{to{--angle:360deg}}
+@property --angle{syntax:"<angle>";initial-value:0deg;inherits:false}
+
+/* ═══ FLOATING PARTICLES ═══ */
+.particles{position:fixed;inset:0;pointer-events:none;z-index:-1;overflow:hidden}
+.particle{position:absolute;width:2px;height:2px;background:var(--g);border-radius:50%;opacity:0;animation:float linear infinite}
+@keyframes float{
+  0%{opacity:0;transform:translateY(100vh) scale(0)}
+  10%{opacity:.3}
+  90%{opacity:.3}
+  100%{opacity:0;transform:translateY(-10vh) scale(1)}
+}
+
+/* ═══ RESPONSIVE ═══ */
+@media(max-width:768px){
+  .bloat-inner{grid-template-columns:1fr;gap:40px}
+  .quality-cards{grid-template-columns:1fr}
+  .net-stats{grid-template-columns:1fr}
+  .device-row{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+
+<!-- Floating particles background -->
+<div class="particles" id="particles"></div>
+
+<!-- ═══ SECT 1: SCALE OPENING ═══ -->
+<section class="scale-open" id="scale">
+  <div class="binary-viz rv rv-scale" id="binViz">
+    <div class="bin-others bin-claude"><div class="bar" id="barClaude"></div><div class="label">Claude Code</div><div class="size">~200 MB</div></div>
+    <div class="bin-others bin-codex"><div class="bar" id="barCodex"></div><div class="label">Codex CLI</div><div class="size">~50 MB</div></div>
+    <div class="bin-others bin-langchain"><div class="bar" id="barLang"></div><div class="label">LangChain</div><div class="size">~90 MB</div></div>
+    <div class="bin-human"><div class="bar" id="barHuman"></div><div class="label">h-uman</div><div class="size" id="humanSize">1.7 MB</div></div>
+  </div>
+
+  <h1 class="rv rv-d1"><span class="thin">What if AI didn't need</span><br>200 megabytes?</h1>
+  <p class="sub rv rv-d2">An autonomous AI runtime in 1,696 kilobytes of pure C. Shell, files, browser, memory, 50+ models, 34 channels. Zero dependencies.</p>
+
+  <div class="hero-ctas rv rv-d3">
+    <button class="btn-g">Get Started</button>
+    <button class="btn-o">View on GitHub</button>
+  </div>
+</section>
+
+<!-- ═══ SECT 2: THE BLOAT WATERFALL ═══ -->
+<section class="bloat">
+  <div class="container">
+    <div class="bloat-inner">
+      <div class="bloat-text">
+        <h2 class="rv">The dependency<br><span class="accent">problem.</span></h2>
+        <p class="rv rv-d1">Every AI framework starts simple. Then it pulls in a runtime. Then a package manager. Then 900 transitive dependencies. Then a container to hold it all together.</p>
+        <p class="rv rv-d2" style="margin-top:16px;color:var(--t3)">What if you could skip all of that?</p>
+      </div>
+      <div class="dep-tree rv rv-scale" id="depTree">
+        <svg viewBox="0 0 340 400" fill="none">
+          <!-- Root -->
+          <circle class="dep-circle root" cx="170" cy="30" data-delay="0"/>
+          <text class="dep-label" x="170" y="56" text-anchor="middle" data-delay="100">agent.py</text>
+
+          <!-- Level 1 -->
+          <line class="dep-node" x1="170" y1="40" x2="60" y2="100" data-delay="200"/>
+          <line class="dep-node" x1="170" y1="40" x2="170" y2="100" data-delay="250"/>
+          <line class="dep-node" x1="170" y1="40" x2="280" y2="100" data-delay="300"/>
+          <circle class="dep-circle" cx="60" cy="105" data-delay="350"/>
+          <text class="dep-label" x="60" y="122" text-anchor="middle" data-delay="350">langchain</text>
+          <circle class="dep-circle" cx="170" cy="105" data-delay="400"/>
+          <text class="dep-label" x="170" y="122" text-anchor="middle" data-delay="400">openai</text>
+          <circle class="dep-circle" cx="280" cy="105" data-delay="450"/>
+          <text class="dep-label" x="280" y="122" text-anchor="middle" data-delay="450">chromadb</text>
+
+          <!-- Level 2 -->
+          <line class="dep-node bad" x1="60" y1="115" x2="20" y2="175" data-delay="500"/>
+          <line class="dep-node bad" x1="60" y1="115" x2="60" y2="175" data-delay="520"/>
+          <line class="dep-node bad" x1="60" y1="115" x2="100" y2="175" data-delay="540"/>
+          <line class="dep-node bad" x1="170" y1="115" x2="140" y2="175" data-delay="560"/>
+          <line class="dep-node bad" x1="170" y1="115" x2="200" y2="175" data-delay="580"/>
+          <line class="dep-node bad" x1="280" y1="115" x2="240" y2="175" data-delay="600"/>
+          <line class="dep-node bad" x1="280" y1="115" x2="280" y2="175" data-delay="620"/>
+          <line class="dep-node bad" x1="280" y1="115" x2="320" y2="175" data-delay="640"/>
+
+          <circle class="dep-circle" cx="20" cy="180" data-delay="700"/>
+          <circle class="dep-circle" cx="60" cy="180" data-delay="720"/>
+          <circle class="dep-circle" cx="100" cy="180" data-delay="740"/>
+          <circle class="dep-circle" cx="140" cy="180" data-delay="760"/>
+          <circle class="dep-circle" cx="200" cy="180" data-delay="780"/>
+          <circle class="dep-circle" cx="240" cy="180" data-delay="800"/>
+          <circle class="dep-circle" cx="280" cy="180" data-delay="820"/>
+          <circle class="dep-circle" cx="320" cy="180" data-delay="840"/>
+
+          <!-- Level 3 — chaos -->
+          <line class="dep-node bad" x1="20" y1="190" x2="10" y2="240" data-delay="900"/>
+          <line class="dep-node bad" x1="20" y1="190" x2="35" y2="240" data-delay="910"/>
+          <line class="dep-node bad" x1="60" y1="190" x2="50" y2="240" data-delay="920"/>
+          <line class="dep-node bad" x1="60" y1="190" x2="75" y2="240" data-delay="930"/>
+          <line class="dep-node bad" x1="100" y1="190" x2="90" y2="240" data-delay="940"/>
+          <line class="dep-node bad" x1="100" y1="190" x2="115" y2="240" data-delay="950"/>
+          <line class="dep-node bad" x1="140" y1="190" x2="130" y2="240" data-delay="960"/>
+          <line class="dep-node bad" x1="200" y1="190" x2="190" y2="240" data-delay="970"/>
+          <line class="dep-node bad" x1="200" y1="190" x2="215" y2="240" data-delay="980"/>
+          <line class="dep-node bad" x1="240" y1="190" x2="230" y2="240" data-delay="990"/>
+          <line class="dep-node bad" x1="280" y1="190" x2="265" y2="240" data-delay="1000"/>
+          <line class="dep-node bad" x1="280" y1="190" x2="295" y2="240" data-delay="1010"/>
+          <line class="dep-node bad" x1="320" y1="190" x2="310" y2="240" data-delay="1020"/>
+          <line class="dep-node bad" x1="320" y1="190" x2="335" y2="240" data-delay="1030"/>
+
+          <circle class="dep-circle" cx="10" cy="245" r="4" data-delay="1100"/>
+          <circle class="dep-circle" cx="35" cy="245" r="4" data-delay="1110"/>
+          <circle class="dep-circle" cx="50" cy="245" r="4" data-delay="1120"/>
+          <circle class="dep-circle" cx="75" cy="245" r="4" data-delay="1130"/>
+          <circle class="dep-circle" cx="90" cy="245" r="4" data-delay="1140"/>
+          <circle class="dep-circle" cx="115" cy="245" r="4" data-delay="1150"/>
+          <circle class="dep-circle" cx="130" cy="245" r="4" data-delay="1160"/>
+          <circle class="dep-circle" cx="190" cy="245" r="4" data-delay="1170"/>
+          <circle class="dep-circle" cx="215" cy="245" r="4" data-delay="1180"/>
+          <circle class="dep-circle" cx="230" cy="245" r="4" data-delay="1190"/>
+          <circle class="dep-circle" cx="265" cy="245" r="4" data-delay="1200"/>
+          <circle class="dep-circle" cx="295" cy="245" r="4" data-delay="1210"/>
+          <circle class="dep-circle" cx="310" cy="245" r="4" data-delay="1220"/>
+          <circle class="dep-circle" cx="335" cy="245" r="4" data-delay="1230"/>
+
+          <!-- Counter -->
+          <text class="dep-label" x="170" y="300" text-anchor="middle" font-size="11" data-delay="1400" id="depCount" fill="var(--coral)">900+ dependencies</text>
+          <text class="dep-label" x="170" y="320" text-anchor="middle" font-size="9" data-delay="1600" fill="var(--t3)">~200 MB installed</text>
+
+          <!-- The alternative -->
+          <line x1="120" y1="350" x2="220" y2="350" stroke="var(--border)" stroke-width="1" stroke-dasharray="4"/>
+          <text class="dep-label" x="170" y="380" text-anchor="middle" font-size="11" data-delay="2000" fill="var(--g)">h-uman: 0 dependencies</text>
+          <text class="dep-label" x="170" y="396" text-anchor="middle" font-size="9" data-delay="2200" fill="var(--t3)">1,696 KB. That's it.</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECT 3: THE CRYSTAL (BINARY MAP) ═══ -->
+<section class="crystal">
+  <div class="container">
+    <h2 class="rv">What's inside<br><span class="accent">1,696 kilobytes?</span></h2>
+    <p class="sub rv rv-d1">Every byte has a purpose. No runtime. No interpreter. No garbage collector. Just compiled C.</p>
+
+    <div class="crystal-grid rv rv-scale" id="crystalGrid"></div>
+
+    <div class="crystal-legend rv rv-d3">
+      <span><span class="dot green"></span> Active module</span>
+      <span><span class="dot dark"></span> Unused space</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECT 4: DEVICE SPECTRUM ═══ -->
+<section class="devices">
+  <div class="container">
+    <h2 class="rv">From data centers to<br><span class="accent">five-dollar boards.</span></h2>
+    <p class="sub rv rv-d1">The same binary. The same config. Every device on the spectrum.</p>
+
+    <div class="device-row rv rv-d2">
+      <!-- Cloud -->
+      <div class="device-item">
+        <svg class="device-svg" width="100" height="80" viewBox="0 0 100 80">
+          <rect x="10" y="5" width="80" height="50" rx="4" fill="none" stroke="var(--g)" stroke-width="1.5"/>
+          <rect x="15" y="10" width="70" height="40" rx="2" fill="var(--g-dim)"/>
+          <line x1="35" y1="10" x2="35" y2="50" stroke="rgba(122,182,72,.2)" stroke-width=".5"/>
+          <line x1="55" y1="10" x2="55" y2="50" stroke="rgba(122,182,72,.2)" stroke-width=".5"/>
+          <line x1="75" y1="10" x2="75" y2="50" stroke="rgba(122,182,72,.2)" stroke-width=".5"/>
+          <line x1="15" y1="25" x2="85" y2="25" stroke="rgba(122,182,72,.2)" stroke-width=".5"/>
+          <line x1="15" y1="38" x2="85" y2="38" stroke="rgba(122,182,72,.2)" stroke-width=".5"/>
+          <circle cx="22" cy="16" r="2" fill="var(--g)" opacity=".6"><animate attributeName="opacity" values=".6;1;.6" dur="2s" repeatCount="indefinite"/></circle>
+          <circle cx="22" cy="30" r="2" fill="var(--g)" opacity=".4"><animate attributeName="opacity" values=".4;.8;.4" dur="2.5s" repeatCount="indefinite"/></circle>
+          <circle cx="22" cy="44" r="2" fill="var(--g)" opacity=".8"><animate attributeName="opacity" values=".8;.4;.8" dur="1.8s" repeatCount="indefinite"/></circle>
+          <rect x="40" y="60" width="20" height="4" rx="1" fill="var(--t3)" opacity=".3"/>
+          <rect x="35" y="66" width="30" height="3" rx="1" fill="var(--t3)" opacity=".2"/>
+        </svg>
+        <div class="device-name">Cloud</div>
+        <div class="device-spec">34 channels</div>
+      </div>
+
+      <!-- Laptop -->
+      <div class="device-item">
+        <svg class="device-svg" width="100" height="80" viewBox="0 0 100 80">
+          <rect x="15" y="5" width="70" height="48" rx="4" fill="none" stroke="var(--g2)" stroke-width="1.5"/>
+          <rect x="20" y="10" width="60" height="38" rx="2" fill="var(--s1)"/>
+          <text x="50" y="33" text-anchor="middle" fill="var(--g)" font-family="JetBrains Mono" font-size="7" opacity=".8">$ human</text>
+          <path d="M10 58 L15 53 L85 53 L90 58 Z" fill="none" stroke="var(--g2)" stroke-width="1.5"/>
+          <rect x="42" y="55" width="16" height="2" rx="1" fill="var(--t3)" opacity=".3"/>
+        </svg>
+        <div class="device-name">Workstation</div>
+        <div class="device-spec">&lt;6 MB RAM</div>
+      </div>
+
+      <!-- Raspberry Pi -->
+      <div class="device-item">
+        <svg class="device-svg" width="72" height="64" viewBox="0 0 72 64">
+          <rect x="6" y="8" width="56" height="44" rx="3" fill="none" stroke="var(--amber)" stroke-width="1.5"/>
+          <rect x="10" y="12" width="20" height="16" rx="2" fill="rgba(245,166,35,.1)" stroke="var(--amber)" stroke-width=".5"/>
+          <text x="20" y="23" text-anchor="middle" fill="var(--amber)" font-size="5" font-family="JetBrains Mono">CPU</text>
+          <rect x="0" y="20" width="6" height="8" rx="1" fill="var(--t3)" opacity=".3"/>
+          <rect x="0" y="32" width="6" height="8" rx="1" fill="var(--t3)" opacity=".3"/>
+          <circle cx="56" cy="16" r="2" fill="var(--amber)" opacity=".5"><animate attributeName="opacity" values=".5;1;.5" dur="1.5s" repeatCount="indefinite"/></circle>
+          <!-- GPIO pins -->
+          <line x1="12" y1="4" x2="12" y2="8" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="18" y1="4" x2="18" y2="8" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="24" y1="4" x2="24" y2="8" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="30" y1="4" x2="30" y2="8" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="36" y1="4" x2="36" y2="8" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="42" y1="4" x2="42" y2="8" stroke="var(--t3)" stroke-width="1.5"/>
+        </svg>
+        <div class="device-name">Edge</div>
+        <div class="device-spec">&lt;30 ms boot</div>
+      </div>
+
+      <!-- MCU -->
+      <div class="device-item">
+        <svg class="device-svg" width="52" height="52" viewBox="0 0 52 52">
+          <rect x="12" y="12" width="28" height="28" rx="2" fill="none" stroke="var(--coral)" stroke-width="1.5"/>
+          <rect x="16" y="16" width="20" height="20" rx="1" fill="rgba(232,108,93,.08)"/>
+          <text x="26" y="29" text-anchor="middle" fill="var(--coral)" font-size="6" font-family="JetBrains Mono">MCU</text>
+          <!-- Pins -->
+          <line x1="16" y1="8" x2="16" y2="12" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="22" y1="8" x2="22" y2="12" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="28" y1="8" x2="28" y2="12" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="34" y1="8" x2="34" y2="12" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="16" y1="40" x2="16" y2="44" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="22" y1="40" x2="22" y2="44" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="28" y1="40" x2="28" y2="44" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="34" y1="40" x2="34" y2="44" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="8" y1="18" x2="12" y2="18" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="8" y1="26" x2="12" y2="26" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="8" y1="34" x2="12" y2="34" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="40" y1="18" x2="44" y2="18" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="40" y1="26" x2="44" y2="26" stroke="var(--t3)" stroke-width="1.5"/>
+          <line x1="40" y1="34" x2="44" y2="34" stroke="var(--t3)" stroke-width="1.5"/>
+          <circle cx="26" cy="26" r="1.5" fill="var(--coral)" opacity=".5"><animate attributeName="opacity" values=".3;1;.3" dur="2s" repeatCount="indefinite"/></circle>
+        </svg>
+        <div class="device-name">Embedded</div>
+        <div class="device-spec">1,696 KB</div>
+      </div>
+    </div>
+
+    <div class="device-line rv rv-d2" id="deviceLine">
+      <div class="device-dots">
+        <div class="device-dot"></div>
+        <div class="device-dot"></div>
+        <div class="device-dot"></div>
+        <div class="device-dot"></div>
+      </div>
+    </div>
+    <div class="device-labels rv rv-d3">
+      <span>Maximum power</span>
+      <span>Minimum footprint</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECT 5: NETWORK VIZ ═══ -->
+<section class="network">
+  <div class="container">
+    <h2 class="rv">One agent.<br><span class="accent">Every platform.</span></h2>
+    <p class="sub rv rv-d1">50+ AI providers, 34 channels, 67+ tools. Swap any layer with one config change.</p>
+
+    <div class="net-viz rv rv-scale" id="netViz">
+      <svg viewBox="0 0 680 400" fill="none">
+        <!-- Center node -->
+        <circle class="net-node" cx="340" cy="200" r="24" fill="var(--g-dim)" stroke="var(--g)" stroke-width="2" data-delay="0"/>
+        <text class="net-label" x="340" y="204" text-anchor="middle" fill="var(--g)" font-size="11" font-weight="600" data-delay="100">h-uman</text>
+
+        <!-- Providers (left) -->
+        <line class="net-line" x1="316" y1="200" x2="120" y2="80" stroke="rgba(122,182,72,.3)" data-delay="300"/>
+        <line class="net-line" x1="316" y1="200" x2="80" y2="160" stroke="rgba(122,182,72,.3)" data-delay="350"/>
+        <line class="net-line" x1="316" y1="200" x2="80" y2="240" stroke="rgba(122,182,72,.3)" data-delay="400"/>
+        <line class="net-line" x1="316" y1="200" x2="120" y2="320" stroke="rgba(122,182,72,.3)" data-delay="450"/>
+
+        <circle class="net-node" cx="120" cy="80" r="14" fill="var(--s1)" stroke="var(--g)" stroke-width="1" data-delay="500"/>
+        <text class="net-label" x="120" y="84" text-anchor="middle" fill="var(--g)" font-size="8" data-delay="500">OpenAI</text>
+
+        <circle class="net-node" cx="80" cy="160" r="14" fill="var(--s1)" stroke="var(--g)" stroke-width="1" data-delay="550"/>
+        <text class="net-label" x="80" y="164" text-anchor="middle" fill="var(--g)" font-size="8" data-delay="550">Claude</text>
+
+        <circle class="net-node" cx="80" cy="240" r="14" fill="var(--s1)" stroke="var(--g)" stroke-width="1" data-delay="600"/>
+        <text class="net-label" x="80" y="244" text-anchor="middle" fill="var(--g)" font-size="8" data-delay="600">Ollama</text>
+
+        <circle class="net-node" cx="120" cy="320" r="14" fill="var(--s1)" stroke="var(--g)" stroke-width="1" data-delay="650"/>
+        <text class="net-label" x="120" y="324" text-anchor="middle" fill="var(--g)" font-size="8" data-delay="650">Gemini</text>
+
+        <text class="net-label" x="30" y="200" fill="var(--g)" font-size="10" font-weight="600" data-delay="700">50+</text>
+        <text class="net-label" x="30" y="214" fill="var(--t3)" font-size="8" data-delay="750">providers</text>
+
+        <!-- Channels (right) -->
+        <line class="net-line" x1="364" y1="200" x2="560" y2="80" stroke="rgba(96,165,250,.3)" data-delay="500"/>
+        <line class="net-line" x1="364" y1="200" x2="600" y2="160" stroke="rgba(96,165,250,.3)" data-delay="550"/>
+        <line class="net-line" x1="364" y1="200" x2="600" y2="240" stroke="rgba(96,165,250,.3)" data-delay="600"/>
+        <line class="net-line" x1="364" y1="200" x2="560" y2="320" stroke="rgba(96,165,250,.3)" data-delay="650"/>
+
+        <circle class="net-node" cx="560" cy="80" r="14" fill="var(--s1)" stroke="var(--blue)" stroke-width="1" data-delay="700"/>
+        <text class="net-label" x="560" y="84" text-anchor="middle" fill="var(--blue)" font-size="8" data-delay="700">Telegram</text>
+
+        <circle class="net-node" cx="600" cy="160" r="14" fill="var(--s1)" stroke="var(--blue)" stroke-width="1" data-delay="750"/>
+        <text class="net-label" x="600" y="164" text-anchor="middle" fill="var(--blue)" font-size="8" data-delay="750">Discord</text>
+
+        <circle class="net-node" cx="600" cy="240" r="14" fill="var(--s1)" stroke="var(--blue)" stroke-width="1" data-delay="800"/>
+        <text class="net-label" x="600" y="244" text-anchor="middle" fill="var(--blue)" font-size="8" data-delay="800">Slack</text>
+
+        <circle class="net-node" cx="560" cy="320" r="14" fill="var(--s1)" stroke="var(--blue)" stroke-width="1" data-delay="850"/>
+        <text class="net-label" x="560" y="324" text-anchor="middle" fill="var(--blue)" font-size="8" data-delay="850">Email</text>
+
+        <text class="net-label" x="640" y="200" fill="var(--blue)" font-size="10" font-weight="600" data-delay="900" text-anchor="end">34</text>
+        <text class="net-label" x="640" y="214" fill="var(--t3)" font-size="8" data-delay="950" text-anchor="end">channels</text>
+
+        <!-- Tools (bottom) -->
+        <line class="net-line" x1="340" y1="224" x2="240" y2="370" stroke="rgba(245,166,35,.3)" data-delay="700"/>
+        <line class="net-line" x1="340" y1="224" x2="340" y2="380" stroke="rgba(245,166,35,.3)" data-delay="750"/>
+        <line class="net-line" x1="340" y1="224" x2="440" y2="370" stroke="rgba(245,166,35,.3)" data-delay="800"/>
+
+        <circle class="net-node" cx="240" cy="370" r="12" fill="var(--s1)" stroke="var(--amber)" stroke-width="1" data-delay="900"/>
+        <text class="net-label" x="240" y="374" text-anchor="middle" fill="var(--amber)" font-size="7" data-delay="900">Shell</text>
+
+        <circle class="net-node" cx="340" cy="380" r="12" fill="var(--s1)" stroke="var(--amber)" stroke-width="1" data-delay="950"/>
+        <text class="net-label" x="340" y="384" text-anchor="middle" fill="var(--amber)" font-size="7" data-delay="950">Memory</text>
+
+        <circle class="net-node" cx="440" cy="370" r="12" fill="var(--s1)" stroke="var(--amber)" stroke-width="1" data-delay="1000"/>
+        <text class="net-label" x="440" y="374" text-anchor="middle" fill="var(--amber)" font-size="7" data-delay="1000">Browser</text>
+      </svg>
+    </div>
+
+    <div class="net-stats">
+      <div class="net-stat rv"><div class="num" data-count="50">0</div><div class="lbl">Providers</div></div>
+      <div class="net-stat rv rv-d1"><div class="num" data-count="34">0</div><div class="lbl">Channels</div></div>
+      <div class="net-stat rv rv-d2"><div class="num" data-count="67">0</div><div class="lbl">Tools</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECT 6: BENCHMARK BARS ═══ -->
+<section class="benchmarks">
+  <div class="container">
+    <h2 class="rv">Orders of magnitude<br><span class="accent">smaller.</span></h2>
+    <p class="sub rv rv-d1">Not marginally better. Categorically different.</p>
+
+    <div class="bench-grid" id="benchGrid">
+      <div class="bench-row rv">
+        <div class="metric">Binary Size <span class="unit">megabytes</span></div>
+        <div class="bench-bars">
+          <div class="bench-bar"><span class="bench-name us">h-uman</span><div class="bench-track"><div class="bench-fill green" data-w="2.5%"><span class="val">1.7 MB</span></div></div></div>
+          <div class="bench-bar"><span class="bench-name them">Codex CLI</span><div class="bench-track"><div class="bench-fill gray" data-w="25%"><span class="val">~50 MB</span></div></div></div>
+          <div class="bench-bar"><span class="bench-name them">LangChain</span><div class="bench-track"><div class="bench-fill gray" data-w="45%"><span class="val">~90 MB</span></div></div></div>
+          <div class="bench-bar"><span class="bench-name them">Claude Code</span><div class="bench-track"><div class="bench-fill gray" data-w="100%"><span class="val">~200 MB</span></div></div></div>
+        </div>
+      </div>
+      <div class="bench-row rv rv-d1">
+        <div class="metric">Peak RAM <span class="unit">megabytes</span></div>
+        <div class="bench-bars">
+          <div class="bench-bar"><span class="bench-name us">h-uman</span><div class="bench-track"><div class="bench-fill green" data-w="3%"><span class="val">&lt;6 MB</span></div></div></div>
+          <div class="bench-bar"><span class="bench-name them">Codex CLI</span><div class="bench-track"><div class="bench-fill gray" data-w="33%"><span class="val">~100 MB</span></div></div></div>
+          <div class="bench-bar"><span class="bench-name them">Claude Code</span><div class="bench-track"><div class="bench-fill gray" data-w="100%"><span class="val">~300 MB</span></div></div></div>
+        </div>
+      </div>
+      <div class="bench-row rv rv-d2">
+        <div class="metric">Cold Start <span class="unit">milliseconds</span></div>
+        <div class="bench-bars">
+          <div class="bench-bar"><span class="bench-name us">h-uman</span><div class="bench-track"><div class="bench-fill green" data-w="3%"><span class="val">&lt;30 ms</span></div></div></div>
+          <div class="bench-bar"><span class="bench-name them">Codex CLI</span><div class="bench-track"><div class="bench-fill gray" data-w="50%"><span class="val">~500 ms</span></div></div></div>
+          <div class="bench-bar"><span class="bench-name them">LangChain</span><div class="bench-track"><div class="bench-fill gray" data-w="100%"><span class="val">~1000 ms</span></div></div></div>
+        </div>
+      </div>
+      <div class="bench-row rv rv-d3">
+        <div class="metric">Dependencies <span class="unit">count</span></div>
+        <div class="bench-bars">
+          <div class="bench-bar"><span class="bench-name us">h-uman</span><div class="bench-track"><div class="bench-fill green" data-w="2%"><span class="val">0</span></div></div></div>
+          <div class="bench-bar"><span class="bench-name them">Codex CLI</span><div class="bench-track"><div class="bench-fill gray" data-w="22%"><span class="val">~200</span></div></div></div>
+          <div class="bench-bar"><span class="bench-name them">Claude Code</span><div class="bench-track"><div class="bench-fill gray" data-w="100%"><span class="val">900+</span></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECT 7: QUALITY ═══ -->
+<section class="quality">
+  <div class="container">
+    <h2 class="rv">Built to a standard,<br><span class="accent">not a deadline.</span></h2>
+    <p class="sub rv rv-d1">4,980+ tests. Zero ASan errors. Every allocation freed. Every path covered.</p>
+
+    <div class="quality-cards">
+      <div class="q-card rv">
+        <div class="q-icon">
+          <svg class="ring-svg" viewBox="0 0 48 48"><circle class="ring-bg" cx="24" cy="24" r="20"/><circle class="ring-fg p100" cx="24" cy="24" r="20" transform="rotate(-90 24 24)"/></svg>
+        </div>
+        <span class="q-num">4,980+</span>
+        <h3>Tests</h3>
+        <p>Unit, integration, and fuzz tests. Full suite runs in under 7 seconds. Zero flakes.</p>
+      </div>
+      <div class="q-card rv rv-d1">
+        <div class="q-icon">
+          <svg class="ring-svg" viewBox="0 0 48 48"><circle class="ring-bg" cx="24" cy="24" r="20"/><circle class="ring-fg p100" cx="24" cy="24" r="20" transform="rotate(-90 24 24)"/></svg>
+        </div>
+        <span class="q-num">0</span>
+        <h3>Memory Leaks</h3>
+        <p>AddressSanitizer on every build. Every allocation tracked. Every byte freed.</p>
+      </div>
+      <div class="q-card rv rv-d2">
+        <div class="q-icon">
+          <svg class="ring-svg" viewBox="0 0 48 48"><circle class="ring-bg" cx="24" cy="24" r="20"/><circle class="ring-fg p98" cx="24" cy="24" r="20" transform="rotate(-90 24 24)" style="stroke:var(--amber)"/></svg>
+        </div>
+        <span class="q-num" style="color:var(--amber)">98</span>
+        <h3>Accessibility Score</h3>
+        <p>WCAG 2.1 AA. Lighthouse 98+. Focus rings, keyboard nav, reduced motion — all built in.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECT 8: CTA ═══ -->
+<section class="cta-final">
+  <div class="container">
+    <h2 class="rv">Ship your first agent<br>in&nbsp;<span class="accent">minutes.</span></h2>
+    <p class="rv rv-d1">Open source. MIT licensed. 1,696 KB. Runs on anything with a CPU.</p>
+    <div class="hero-ctas rv rv-d2" style="justify-content:center">
+      <button class="btn-g">Get Started</button>
+      <button class="btn-o">View on GitHub</button>
+    </div>
+  </div>
+</section>
+
+<script>
+/* ═══ PARTICLES ═══ */
+const pc = document.getElementById('particles');
+for (let i = 0; i < 30; i++) {
+  const p = document.createElement('div');
+  p.className = 'particle';
+  p.style.left = Math.random() * 100 + '%';
+  p.style.animationDuration = (8 + Math.random() * 16) + 's';
+  p.style.animationDelay = Math.random() * 10 + 's';
+  p.style.width = p.style.height = (1 + Math.random() * 2) + 'px';
+  pc.appendChild(p);
+}
+
+/* ═══ SCROLL REVEAL ═══ */
+const ro = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('on');
+
+      // Count-up numbers
+      e.target.querySelectorAll('[data-count]').forEach(el => {
+        const t = parseInt(el.dataset.count);
+        const s = performance.now();
+        const run = (now) => {
+          const p = Math.min((now - s) / 1200, 1);
+          el.textContent = Math.round(t * (1 - Math.pow(1 - p, 3))) + '+';
+          if (p < 1) requestAnimationFrame(run);
+        };
+        requestAnimationFrame(run);
+      });
+
+      // Benchmark bars
+      e.target.querySelectorAll('.bench-fill[data-w]').forEach((bar, i) => {
+        setTimeout(() => {
+          bar.style.width = bar.dataset.w;
+          bar.classList.add('on');
+        }, 200 + i * 100);
+      });
+
+      ro.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.rv').forEach(el => ro.observe(el));
+
+/* ═══ BINARY VIZ ═══ */
+const scaleObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      document.querySelectorAll('#binViz .bar').forEach(b => b.classList.add('on'));
+      document.getElementById('humanSize').classList.add('on');
+      scaleObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.3 });
+scaleObs.observe(document.getElementById('binViz'));
+
+/* ═══ DEPENDENCY TREE ═══ */
+const depObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('[data-delay]').forEach(el => {
+        setTimeout(() => el.classList.add('on'), parseInt(el.dataset.delay));
+      });
+      depObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.2 });
+depObs.observe(document.getElementById('depTree'));
+
+/* ═══ CRYSTAL GRID ═══ */
+const modules = [
+  {name:'core',core:true},{name:'json',core:true},{name:'http',core:true},{name:'str',core:true},{name:'arena',core:true},{name:'err',core:true},
+  {name:'agent'},{name:'ctx'},{name:'plan'},{name:'disp'},{name:'comp'},{name:'turn'},
+  {name:'prov'},{name:'chan'},{name:'tool'},{name:'mem'},{name:'sec'},{name:'run'},
+  {name:'sse'},{name:'ws'},{name:'log'},{name:'cfg'},{name:'gw'},{name:'cli'},
+  {name:'pers'},{name:'emb'},{name:'sql'},{name:'lru'},{name:'vec'},{name:'obs'},
+  {},{},{},{},{},{},
+];
+const grid = document.getElementById('crystalGrid');
+modules.forEach((m, i) => {
+  const cell = document.createElement('div');
+  cell.className = 'crystal-cell' + (m.core ? ' core' : m.name ? ' filled' : '');
+  cell.textContent = m.name || '';
+  cell.style.transitionDelay = (i * 30) + 'ms';
+  grid.appendChild(cell);
+});
+
+const crystalObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('.crystal-cell').forEach(c => c.classList.add('on'));
+      crystalObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.3 });
+crystalObs.observe(grid);
+
+/* ═══ DEVICE LINE ═══ */
+const lineObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('on');
+      e.target.querySelectorAll('.device-dot').forEach(d => d.classList.add('on'));
+      lineObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.5 });
+lineObs.observe(document.getElementById('deviceLine'));
+
+/* ═══ NETWORK VIZ ═══ */
+const netObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('[data-delay]').forEach(el => {
+        setTimeout(() => el.classList.add('on'), parseInt(el.dataset.delay));
+      });
+      netObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.15 });
+netObs.observe(document.getElementById('netViz'));
+
+/* ═══ QUALITY RINGS ═══ */
+const ringObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('.ring-fg').forEach(r => r.classList.add('on'));
+      ringObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.3 });
+document.querySelectorAll('.q-card').forEach(c => ringObs.observe(c));
+</script>
+
+</body>
+</html>

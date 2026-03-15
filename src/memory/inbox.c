@@ -1,15 +1,39 @@
 #include "human/memory/inbox.h"
 #include "human/core/string.h"
 #include "human/memory/ingest.h"
+#include "human/memory.h"
 #include "human/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #if !defined(_WIN32) && !defined(__CYGWIN__)
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
+
+#if defined(HU_ENABLE_SQLITE) && !defined(HU_IS_TEST)
+#include <sqlite3.h>
+
+static void inbox_record_feed_item(sqlite3 *db, const char *path, size_t path_len,
+                                   const char *filename, size_t filename_len) {
+    if (!db || !path || path_len == 0)
+        return;
+    const char *sql = "INSERT OR IGNORE INTO feed_items (source, contact_id, content_type, "
+                     "content, url, ingested_at) VALUES (?1, '', 'text/plain', ?2, '', ?3)";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+        return;
+    sqlite3_bind_text(stmt, 1, path, (int)path_len, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, filename && filename_len > 0 ? filename : path,
+                      (int)(filename && filename_len > 0 ? filename_len : path_len),
+                      SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 3, (sqlite3_int64)time(NULL));
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+}
 #endif
 
 hu_error_t hu_inbox_init(hu_inbox_watcher_t *watcher, hu_allocator_t *alloc, hu_memory_t *memory,
@@ -123,6 +147,14 @@ hu_error_t hu_inbox_poll(hu_inbox_watcher_t *watcher, size_t *processed_count) {
             err = hu_ingest_file(watcher->alloc, watcher->memory, path, (size_t)n);
         if (err != HU_OK)
             continue;
+
+#if defined(HU_ENABLE_SQLITE) && !defined(HU_IS_TEST)
+        {
+            sqlite3 *db = hu_sqlite_memory_get_db(watcher->memory);
+            if (db)
+                inbox_record_feed_item(db, path, (size_t)n, ent->d_name, strlen(ent->d_name));
+        }
+#endif
 
         if (watcher->processed_dir) {
             char dest[1024];

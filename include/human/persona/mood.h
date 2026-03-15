@@ -1,6 +1,9 @@
 #ifndef HU_PERSONA_MOOD_H
 #define HU_PERSONA_MOOD_H
 
+/* Mood functionality requires SQLite (HU_ENABLE_SQLITE). Without it,
+ * hu_mood_get_current and hu_mood_set return HU_ERR_NOT_SUPPORTED. */
+
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/memory.h"

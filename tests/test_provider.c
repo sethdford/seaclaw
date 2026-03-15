@@ -1,10 +1,13 @@
+#include "human/config.h"
 #include "human/core/allocator.h"
+#include "human/core/arena.h"
 #include "human/core/error.h"
 #include "human/provider.h"
 #include "human/providers/anthropic.h"
 #include "human/providers/codex_cli.h"
 #include "human/providers/error_classify.h"
 #include "human/providers/factory.h"
+#include "human/providers/helpers.h"
 #include "human/providers/ollama.h"
 #include "human/providers/openai.h"
 #include "human/providers/openai_codex.h"
@@ -562,6 +565,197 @@ static void test_factory_openai_codex(void) {
     prov.vtable->deinit(prov.ctx, &alloc);
 }
 
+/* ─── hu_provider_create_from_config (from_config.c) ─────────────────────── */
+static void test_from_config_null_alloc_returns_error(void) {
+    hu_config_t cfg = {0};
+    hu_provider_t out = {0};
+    hu_error_t err =
+        hu_provider_create_from_config(NULL, &cfg, "router", 6, &out);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_from_config_null_cfg_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_provider_t out = {0};
+    hu_error_t err =
+        hu_provider_create_from_config(&alloc, NULL, "router", 6, &out);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_from_config_null_name_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_config_t cfg = {0};
+    hu_provider_t out = {0};
+    hu_error_t err =
+        hu_provider_create_from_config(&alloc, &cfg, NULL, 6, &out);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_from_config_zero_name_len_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_config_t cfg = {0};
+    hu_provider_t out = {0};
+    hu_error_t err =
+        hu_provider_create_from_config(&alloc, &cfg, "router", 0, &out);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_from_config_null_out_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_config_t cfg = {0};
+    hu_error_t err =
+        hu_provider_create_from_config(&alloc, &cfg, "router", 6, NULL);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_from_config_unknown_provider_returns_not_supported(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_config_t cfg = {0};
+    hu_provider_t out = {0};
+    hu_error_t err =
+        hu_provider_create_from_config(&alloc, &cfg, "unknown", 7, &out);
+    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+}
+
+static void test_from_config_router_creates_provider(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    hu_config_t cfg = {0};
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json =
+        "{\"providers\":[{\"name\":\"openai\",\"api_key\":\"sk-test\"}],"
+        "\"router\":{\"standard\":\"openai\"}}";
+    hu_error_t perr = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(perr, HU_OK);
+
+    hu_provider_t out = {0};
+    hu_error_t err =
+        hu_provider_create_from_config(&backing, &cfg, "router", 6, &out);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out.ctx);
+    HU_ASSERT_NOT_NULL(out.vtable);
+    HU_ASSERT_STR_EQ(out.vtable->get_name(out.ctx), "router");
+    if (out.vtable->deinit)
+        out.vtable->deinit(out.ctx, &backing);
+    hu_arena_destroy(arena);
+}
+
+static void test_from_config_reliable_creates_provider(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    hu_config_t cfg = {0};
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json =
+        "{\"providers\":[{\"name\":\"openai\",\"api_key\":\"sk-test\"}],"
+        "\"reliability\":{\"primary_provider\":\"openai\"}}";
+    hu_error_t perr = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(perr, HU_OK);
+
+    hu_provider_t out = {0};
+    hu_error_t err =
+        hu_provider_create_from_config(&backing, &cfg, "reliable", 8, &out);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out.ctx);
+    HU_ASSERT_NOT_NULL(out.vtable);
+    HU_ASSERT_STR_EQ(out.vtable->get_name(out.ctx), "openai");
+    if (out.vtable->deinit)
+        out.vtable->deinit(out.ctx, &backing);
+    hu_arena_destroy(arena);
+}
+
+/* ─── helpers.c ───────────────────────────────────────────────────────────── */
+static void test_helpers_is_reasoning_model_o1(void) {
+    HU_ASSERT_TRUE(hu_helpers_is_reasoning_model("o1", 2));
+}
+
+static void test_helpers_is_reasoning_model_o3(void) {
+    HU_ASSERT_TRUE(hu_helpers_is_reasoning_model("o3-mini", 7));
+}
+
+static void test_helpers_is_reasoning_model_o4_mini(void) {
+    HU_ASSERT_TRUE(hu_helpers_is_reasoning_model("o4-mini", 7));
+}
+
+static void test_helpers_is_reasoning_model_gpt5(void) {
+    HU_ASSERT_TRUE(hu_helpers_is_reasoning_model("gpt-5", 5));
+}
+
+static void test_helpers_is_reasoning_model_codex_mini(void) {
+    HU_ASSERT_TRUE(hu_helpers_is_reasoning_model("codex-mini", 10));
+}
+
+static void test_helpers_is_reasoning_model_gpt4_returns_false(void) {
+    HU_ASSERT_FALSE(hu_helpers_is_reasoning_model("gpt-4", 5));
+}
+
+static void test_helpers_is_reasoning_model_null_returns_false(void) {
+    HU_ASSERT_FALSE(hu_helpers_is_reasoning_model(NULL, 5));
+}
+
+static void test_helpers_is_reasoning_model_zero_len_returns_false(void) {
+    HU_ASSERT_FALSE(hu_helpers_is_reasoning_model("o1", 0));
+}
+
+static void test_helpers_extract_openai_content_succeeds(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *body =
+        "{\"choices\":[{\"message\":{\"content\":\"Hello world\"}}]}";
+    char *out = hu_helpers_extract_openai_content(&alloc, body, strlen(body));
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_STR_EQ(out, "Hello world");
+    alloc.free(alloc.ctx, out, strlen(out) + 1);
+}
+
+static void test_helpers_extract_openai_content_invalid_json_returns_null(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char *out = hu_helpers_extract_openai_content(&alloc, "{invalid", 8);
+    HU_ASSERT_NULL(out);
+}
+
+static void test_helpers_extract_openai_content_empty_choices_returns_null(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *body = "{\"choices\":[]}";
+    char *out = hu_helpers_extract_openai_content(&alloc, body, strlen(body));
+    HU_ASSERT_NULL(out);
+}
+
+static void test_helpers_extract_anthropic_content_succeeds(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *body =
+        "{\"content\":[{\"type\":\"text\",\"text\":\"Hi there\"}]}";
+    char *out =
+        hu_helpers_extract_anthropic_content(&alloc, body, strlen(body));
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_STR_EQ(out, "Hi there");
+    alloc.free(alloc.ctx, out, strlen(out) + 1);
+}
+
+static void test_helpers_extract_anthropic_content_invalid_json_returns_null(
+    void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char *out =
+        hu_helpers_extract_anthropic_content(&alloc, "{invalid", 8);
+    HU_ASSERT_NULL(out);
+}
+
+static void test_helpers_extract_anthropic_content_empty_array_returns_null(
+    void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *body = "{\"content\":[]}";
+    char *out =
+        hu_helpers_extract_anthropic_content(&alloc, body, strlen(body));
+    HU_ASSERT_NULL(out);
+}
+
+static void test_chat_response_free_null_safe(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_chat_response_free(&alloc, NULL);
+}
+
 void run_provider_tests(void) {
     HU_TEST_SUITE("Provider");
     HU_RUN_TEST(test_openai_create_succeeds);
@@ -587,4 +781,29 @@ void run_provider_tests(void) {
     HU_RUN_TEST(test_scrub_redacts_sk);
     HU_RUN_TEST(test_factory_codex_cli);
     HU_RUN_TEST(test_factory_openai_codex);
+
+    HU_RUN_TEST(test_from_config_null_alloc_returns_error);
+    HU_RUN_TEST(test_from_config_null_cfg_returns_error);
+    HU_RUN_TEST(test_from_config_null_name_returns_error);
+    HU_RUN_TEST(test_from_config_zero_name_len_returns_error);
+    HU_RUN_TEST(test_from_config_null_out_returns_error);
+    HU_RUN_TEST(test_from_config_unknown_provider_returns_not_supported);
+    HU_RUN_TEST(test_from_config_router_creates_provider);
+    HU_RUN_TEST(test_from_config_reliable_creates_provider);
+
+    HU_RUN_TEST(test_helpers_is_reasoning_model_o1);
+    HU_RUN_TEST(test_helpers_is_reasoning_model_o3);
+    HU_RUN_TEST(test_helpers_is_reasoning_model_o4_mini);
+    HU_RUN_TEST(test_helpers_is_reasoning_model_gpt5);
+    HU_RUN_TEST(test_helpers_is_reasoning_model_codex_mini);
+    HU_RUN_TEST(test_helpers_is_reasoning_model_gpt4_returns_false);
+    HU_RUN_TEST(test_helpers_is_reasoning_model_null_returns_false);
+    HU_RUN_TEST(test_helpers_is_reasoning_model_zero_len_returns_false);
+    HU_RUN_TEST(test_helpers_extract_openai_content_succeeds);
+    HU_RUN_TEST(test_helpers_extract_openai_content_invalid_json_returns_null);
+    HU_RUN_TEST(test_helpers_extract_openai_content_empty_choices_returns_null);
+    HU_RUN_TEST(test_helpers_extract_anthropic_content_succeeds);
+    HU_RUN_TEST(test_helpers_extract_anthropic_content_invalid_json_returns_null);
+    HU_RUN_TEST(test_helpers_extract_anthropic_content_empty_array_returns_null);
+    HU_RUN_TEST(test_chat_response_free_null_safe);
 }

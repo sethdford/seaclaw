@@ -17,6 +17,8 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
         hu_json_get_bool(obj, "speculative_cache", cfg->agent.speculative_cache);
     cfg->agent.tool_routing_enabled =
         hu_json_get_bool(obj, "tool_routing", cfg->agent.tool_routing_enabled);
+    cfg->agent.multi_agent =
+        hu_json_get_bool(obj, "multi_agent", cfg->agent.multi_agent);
     cfg->agent.compact_context =
         hu_json_get_bool(obj, "compact_context", cfg->agent.compact_context);
     double mti = hu_json_get_number(obj, "max_tool_iterations", cfg->agent.max_tool_iterations);

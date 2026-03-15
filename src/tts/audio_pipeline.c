@@ -6,10 +6,12 @@
 #include "human/core/error.h"
 #include "human/core/process_util.h"
 #include "human/tts/audio_pipeline.h"
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 hu_error_t hu_audio_mp3_to_caf(hu_allocator_t *alloc,
@@ -109,14 +111,159 @@ void hu_audio_cleanup_temp(const char *audio_path) {
         (void)unlink(audio_path);
 }
 
+typedef enum {
+    AUDIO_FMT_UNKNOWN,
+    AUDIO_FMT_MP3,
+    AUDIO_FMT_WAV,
+    AUDIO_FMT_OGG,
+    AUDIO_FMT_PCM,
+} audio_format_t;
+
+static audio_format_t detect_audio_format(const unsigned char *data, size_t len) {
+    if (!data || len < 4)
+        return AUDIO_FMT_PCM;
+    if (data[0] == 0xFF && (data[1] & 0xE0) == 0xE0)
+        return AUDIO_FMT_MP3;
+    if (len >= 3 && data[0] == 'I' && data[1] == 'D' && data[2] == '3')
+        return AUDIO_FMT_MP3;
+    if (len >= 4 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F')
+        return AUDIO_FMT_WAV;
+    if (len >= 4 && data[0] == 'O' && data[1] == 'g' && data[2] == 'g' && data[3] == 'S')
+        return AUDIO_FMT_OGG;
+    return AUDIO_FMT_PCM;
+}
+
+static hu_error_t pass_through(hu_allocator_t *alloc, const void *input,
+    size_t input_len, void **out, size_t *out_len) {
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (input_len == 0) {
+        *out = NULL;
+        *out_len = 0;
+        return HU_OK;
+    }
+    if (!input)
+        return HU_ERR_INVALID_ARGUMENT;
+    void *buf = alloc->alloc(alloc->ctx, input_len);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+    memcpy(buf, input, input_len);
+    *out = buf;
+    *out_len = input_len;
+    return HU_OK;
+}
+
 hu_error_t hu_audio_pipeline_process(hu_allocator_t *alloc, const void *input,
     size_t input_len, void **out, size_t *out_len) {
-    (void)alloc;
-    (void)input;
-    (void)input_len;
-    (void)out;
-    (void)out_len;
-    return HU_ERR_NOT_SUPPORTED;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!input && input_len > 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    return pass_through(alloc, input, input_len, out, out_len);
+#elif defined(__APPLE__) || defined(__linux__)
+    audio_format_t fmt = detect_audio_format((const unsigned char *)input, input_len);
+    if (fmt == AUDIO_FMT_PCM || fmt == AUDIO_FMT_UNKNOWN)
+        return pass_through(alloc, input, input_len, out, out_len);
+
+    const char *ext;
+    switch (fmt) {
+        case AUDIO_FMT_MP3: ext = ".mp3"; break;
+        case AUDIO_FMT_WAV: ext = ".wav"; break;
+        case AUDIO_FMT_OGG: ext = ".ogg"; break;
+        default: return pass_through(alloc, input, input_len, out, out_len);
+    }
+    size_t ext_len = strlen(ext);
+
+    char in_path[256];
+    int n_in = snprintf(in_path, sizeof(in_path), "/tmp/human-audio-XXXXXX%s", ext);
+    if (n_in < 0 || (size_t)n_in >= sizeof(in_path))
+        return HU_ERR_IO;
+
+    int fd = mkstemps(in_path, (int)ext_len);
+    if (fd < 0)
+        return HU_ERR_IO;
+
+    ssize_t nw = write(fd, input, input_len);
+    close(fd);
+    if (nw < 0 || (size_t)nw != input_len) {
+        unlink(in_path);
+        return HU_ERR_IO;
+    }
+
+    char out_path[256];
+    size_t in_path_len = strlen(in_path);
+    int n_out_path = snprintf(out_path, sizeof(out_path), "%.*s.wav",
+        (int)(in_path_len - ext_len), in_path);
+    if (n_out_path < 0 || (size_t)n_out_path >= sizeof(out_path)) {
+        unlink(in_path);
+        return HU_ERR_IO;
+    }
+
+    bool ok = false;
+#if defined(__APPLE__)
+    const char *argv[] = {
+        "afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1",
+        in_path, "-o", out_path, NULL
+    };
+    hu_run_result_t result = {0};
+    hu_error_t run_err = hu_process_run(alloc, argv, NULL, 4096, &result);
+    ok = (run_err == HU_OK && result.success);
+    hu_run_result_free(alloc, &result);
+#elif defined(__linux__)
+    const char *argv[] = {
+        "ffmpeg", "-i", in_path, "-f", "wav", "-acodec", "pcm_s16le",
+        "-ar", "16000", "-ac", "1", "-y", out_path, NULL
+    };
+    hu_run_result_t result = {0};
+    hu_error_t run_err = hu_process_run(alloc, argv, NULL, 4096, &result);
+    ok = (run_err == HU_OK && result.success);
+    hu_run_result_free(alloc, &result);
+#endif
+
+    unlink(in_path);
+    if (!ok) {
+        unlink(out_path);
+        return pass_through(alloc, input, input_len, out, out_len);
+    }
+
+    int out_fd = open(out_path, O_RDONLY);
+    if (out_fd < 0) {
+        unlink(out_path);
+        return pass_through(alloc, input, input_len, out, out_len);
+    }
+
+    struct stat st;
+    if (fstat(out_fd, &st) != 0 || st.st_size <= 0 || (size_t)st.st_size > 64 * 1024 * 1024) {
+        close(out_fd);
+        unlink(out_path);
+        return pass_through(alloc, input, input_len, out, out_len);
+    }
+    size_t out_size = (size_t)st.st_size;
+
+    void *buf = alloc->alloc(alloc->ctx, out_size);
+    if (!buf) {
+        close(out_fd);
+        unlink(out_path);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+
+    ssize_t nr = read(out_fd, buf, out_size);
+    close(out_fd);
+    unlink(out_path);
+    if (nr < 0 || (size_t)nr != out_size) {
+        alloc->free(alloc->ctx, buf, out_size);
+        return pass_through(alloc, input, input_len, out, out_len);
+    }
+
+    *out = buf;
+    *out_len = out_size;
+    return HU_OK;
+
+#else
+    return pass_through(alloc, input, input_len, out, out_len);
+#endif
 }
 
 #else /* !HU_ENABLE_CARTESIA */

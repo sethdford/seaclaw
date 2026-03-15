@@ -170,45 +170,34 @@ hu_error_t hu_tot_explore(hu_allocator_t *alloc, hu_provider_t *provider,
     result->branches_pruned = pruned;
     return HU_OK;
 #else
-    if (!provider || !provider->vtable || !provider->vtable->chat)
+    if (!provider || !provider->vtable || !provider->vtable->chat_with_system)
         return HU_ERR_NOT_SUPPORTED;
     if (!problem || problem_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
 
-    /* 1. Build generate-thoughts prompt */
+    /* 1. Generate thoughts via chat_with_system */
     char *gen_sys = hu_sprintf(alloc, TOT_GEN_SYS, num_branches);
     if (!gen_sys)
         return HU_ERR_OUT_OF_MEMORY;
 
-    hu_chat_message_t gen_msgs[2];
-    memset(gen_msgs, 0, sizeof(gen_msgs));
-    gen_msgs[0].role = HU_ROLE_SYSTEM;
-    gen_msgs[0].content = gen_sys;
-    gen_msgs[0].content_len = strlen(gen_sys);
-    gen_msgs[1].role = HU_ROLE_USER;
-    gen_msgs[1].content = problem;
-    gen_msgs[1].content_len = problem_len;
+    char *gen_out = NULL;
+    size_t gen_out_len = 0;
+    const char *gen_model = (model && model_len > 0) ? model : "gpt-4o-mini";
+    size_t gen_model_len = (model && model_len > 0) ? model_len : 11;
 
-    hu_chat_request_t gen_req;
-    memset(&gen_req, 0, sizeof(gen_req));
-    gen_req.messages = gen_msgs;
-    gen_req.messages_count = 2;
-    gen_req.model = model;
-    gen_req.model_len = model_len;
-    gen_req.temperature = 0.7;
-
-    hu_chat_response_t gen_resp;
-    memset(&gen_resp, 0, sizeof(gen_resp));
-    hu_error_t err =
-        provider->vtable->chat(provider->ctx, alloc, &gen_req, model, model_len, 0.7, &gen_resp);
+    hu_error_t err = provider->vtable->chat_with_system(
+        provider->ctx, alloc, gen_sys, strlen(gen_sys), problem, problem_len,
+        gen_model, gen_model_len, 0.7, &gen_out, &gen_out_len);
     hu_str_free(alloc, gen_sys);
 
     if (err != HU_OK) {
-        hu_chat_response_free(alloc, &gen_resp);
+        if (gen_out)
+            alloc->free(alloc->ctx, gen_out, gen_out_len + 1);
         return err;
     }
-    if (!gen_resp.content || gen_resp.content_len == 0) {
-        hu_chat_response_free(alloc, &gen_resp);
+    if (!gen_out || gen_out_len == 0) {
+        if (gen_out)
+            alloc->free(alloc->ctx, gen_out, gen_out_len + 1);
         return HU_ERR_PROVIDER_RESPONSE;
     }
 
@@ -216,8 +205,8 @@ hu_error_t hu_tot_explore(hu_allocator_t *alloc, hu_provider_t *provider,
     hu_tot_branch_t branches[HU_TOT_MAX_BRANCHES];
     memset(branches, 0, sizeof(branches));
     size_t branch_count =
-        parse_thoughts(alloc, gen_resp.content, gen_resp.content_len, branches, HU_TOT_MAX_BRANCHES);
-    hu_chat_response_free(alloc, &gen_resp);
+        parse_thoughts(alloc, gen_out, gen_out_len, branches, HU_TOT_MAX_BRANCHES);
+    alloc->free(alloc->ctx, gen_out, gen_out_len + 1);
 
     if (branch_count == 0) {
         result->branches_explored = 0;
@@ -225,17 +214,19 @@ hu_error_t hu_tot_explore(hu_allocator_t *alloc, hu_provider_t *provider,
         return HU_OK;
     }
 
-    /* 3. Evaluate each thought */
+    /* 3. Score each thought via chat_with_system */
     const char *eval_sys = TOT_EVAL_SYS;
     size_t eval_sys_len = sizeof(TOT_EVAL_SYS) - 1;
+    const char *eval_model = (model && model_len > 0) ? model : "gpt-4o-mini";
+    size_t eval_model_len = (model && model_len > 0) ? model_len : 11;
 
     size_t pruned = 0;
     int best_idx = -1;
     double best_score = -1.0;
 
     for (size_t i = 0; i < branch_count; i++) {
-        /* Build eval user message: problem + thought */
-        size_t user_cap = problem_len + branches[i].thought_len + 64;
+        /* Build eval message: "Rate this approach on a scale of 0.0 to 1.0: {thought}" */
+        size_t user_cap = branches[i].thought_len + 64;
         char *user_msg = (char *)alloc->alloc(alloc->ctx, user_cap);
         if (!user_msg) {
             for (size_t j = 0; j < branch_count; j++)
@@ -243,39 +234,24 @@ hu_error_t hu_tot_explore(hu_allocator_t *alloc, hu_provider_t *provider,
                     hu_str_free(alloc, branches[j].thought);
             return HU_ERR_OUT_OF_MEMORY;
         }
-        int n = snprintf(user_msg, user_cap, "Problem: %.*s\n\nThought to evaluate: %s",
-                         (int)problem_len, problem, branches[i].thought);
+        int n = snprintf(user_msg, user_cap, "Rate this approach on a scale of 0.0 to 1.0: %s",
+                         branches[i].thought);
         size_t user_len = (n > 0 && (size_t)n < user_cap) ? (size_t)n : strlen(user_msg);
 
-        hu_chat_message_t eval_msgs[2];
-        memset(eval_msgs, 0, sizeof(eval_msgs));
-        eval_msgs[0].role = HU_ROLE_SYSTEM;
-        eval_msgs[0].content = eval_sys;
-        eval_msgs[0].content_len = eval_sys_len;
-        eval_msgs[1].role = HU_ROLE_USER;
-        eval_msgs[1].content = user_msg;
-        eval_msgs[1].content_len = user_len;
-
-        hu_chat_request_t eval_req;
-        memset(&eval_req, 0, sizeof(eval_req));
-        eval_req.messages = eval_msgs;
-        eval_req.messages_count = 2;
-        eval_req.model = model;
-        eval_req.model_len = model_len;
-        eval_req.temperature = 0.0;
-
-        hu_chat_response_t eval_resp;
-        memset(&eval_resp, 0, sizeof(eval_resp));
-        err = provider->vtable->chat(provider->ctx, alloc, &eval_req, model, model_len, 0.0,
-                                     &eval_resp);
+        char *eval_out = NULL;
+        size_t eval_out_len = 0;
+        err = provider->vtable->chat_with_system(
+            provider->ctx, alloc, eval_sys, eval_sys_len, user_msg, user_len,
+            eval_model, eval_model_len, 0.0, &eval_out, &eval_out_len);
         alloc->free(alloc->ctx, user_msg, user_cap);
 
-        if (err == HU_OK && eval_resp.content && eval_resp.content_len > 0) {
-            double score = parse_score(eval_resp.content, eval_resp.content_len);
+        if (err == HU_OK && eval_out && eval_out_len > 0) {
+            double score = parse_score(eval_out, eval_out_len);
             if (score >= 0.0)
                 branches[i].score = score;
         }
-        hu_chat_response_free(alloc, &eval_resp);
+        if (eval_out)
+            alloc->free(alloc->ctx, eval_out, eval_out_len + 1);
 
         if (branches[i].score < prune_threshold)
             pruned++;

@@ -29,6 +29,7 @@ typedef struct hu_gmail_ctx {
     char *access_token;
     size_t access_token_len;
     int64_t token_expires_at;
+    char *user_email; /* cached from profile, for From header */
     int poll_interval_sec;
     bool running;
 #if HU_IS_TEST
@@ -44,9 +45,10 @@ typedef struct hu_gmail_ctx {
 
 /* ─── Helpers ───────────────────────────────────────────────────────────── */
 
-/* base64url_decode lives in gmail_base64.c for testability */
+/* base64url_decode/encode live in gmail_base64.c for testability */
 extern hu_error_t base64url_decode(const char *in, size_t in_len, char *out, size_t out_cap,
                                    size_t *out_len);
+extern size_t base64url_encode(const unsigned char *in, size_t in_len, char *out, size_t out_cap);
 
 #if defined(HU_HTTP_CURL) && !HU_IS_TEST
 static int form_encode_char(char *out, size_t cap, size_t *j, unsigned char c) {
@@ -150,6 +152,48 @@ static hu_error_t ensure_access_token(hu_gmail_ctx_t *c) {
         return refresh_access_token(c);
     return HU_OK;
 }
+
+#if defined(HU_HTTP_CURL) && !HU_IS_TEST
+static hu_error_t fetch_user_email(hu_gmail_ctx_t *c) {
+    if (c->user_email)
+        return HU_OK;
+    hu_error_t err = ensure_access_token(c);
+    if (err != HU_OK)
+        return err;
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Bearer %s", c->access_token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+    char profile_url[128];
+    int nu = snprintf(profile_url, sizeof(profile_url), "%s/profile", GMAIL_API_BASE);
+    if (nu <= 0 || (size_t)nu >= sizeof(profile_url))
+        return HU_ERR_INTERNAL;
+    hu_http_response_t resp = {0};
+    err = hu_http_get(c->alloc, profile_url, auth_buf, &resp);
+    if (err != HU_OK || !resp.body || resp.status_code != 200) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(c->alloc, &resp);
+        return err != HU_OK ? err : HU_ERR_INTERNAL;
+    }
+    hu_json_value_t *root = NULL;
+    err = hu_json_parse(c->alloc, resp.body, resp.body_len, &root);
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    if (err != HU_OK || !root)
+        return HU_ERR_PARSE;
+    const char *email = hu_json_get_string(root, "emailAddress");
+    if (!email || !email[0]) {
+        hu_json_free(c->alloc, root);
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    }
+    size_t elen = strlen(email);
+    c->user_email = hu_strndup(c->alloc, email, elen);
+    hu_json_free(c->alloc, root);
+    if (!c->user_email)
+        return HU_ERR_OUT_OF_MEMORY;
+    return HU_OK;
+}
+#endif
 
 const char *get_header_value(hu_json_value_t *headers, const char *name) {
     if (!headers || headers->type != HU_JSON_ARRAY)
@@ -267,22 +311,109 @@ static void gmail_stop(void *ctx) {
         c->running = false;
 }
 
-#if HU_IS_TEST
-static __attribute__((unused)) hu_error_t gmail_send(void *ctx, const char *target, size_t target_len, const char *message,
+static hu_error_t gmail_send(void *ctx, const char *target, size_t target_len, const char *message,
                              size_t message_len, const char *const *media, size_t media_count) {
-    (void)target;
-    (void)target_len;
     (void)media;
     (void)media_count;
     hu_gmail_ctx_t *c = (hu_gmail_ctx_t *)ctx;
+    if (!c)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!target || !message)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if HU_IS_TEST
+    /* Test mode: store to mock buffer, return NOT_SUPPORTED (unchanged) */
     size_t len = message_len > 4095 ? 4095 : message_len;
-    if (message && len > 0)
+    if (len > 0)
         memcpy(c->last_message, message, len);
     c->last_message[len] = '\0';
     c->last_message_len = len;
     return HU_ERR_NOT_SUPPORTED;
-}
+#elif defined(HU_HTTP_CURL)
+    hu_error_t err = ensure_access_token(c);
+    if (err != HU_OK)
+        return err;
+    err = fetch_user_email(c);
+    if (err != HU_OK)
+        return err;
+
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Bearer %s", c->access_token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+
+    /* Build RFC 2822 message: From, To, Subject, Content-Type, blank line, body */
+    size_t to_len = target_len > 254 ? 254 : target_len;
+    size_t subj_len = 0; /* no subject from send API */
+    size_t body_len = message_len > 32768 ? 32768 : message_len;
+
+    size_t raw_cap = 256 + to_len + subj_len + body_len + 64;
+    char *raw = (char *)c->alloc->alloc(c->alloc->ctx, raw_cap);
+    if (!raw)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    int nr = snprintf(raw, raw_cap,
+                      "From: %s\r\nTo: %.*s\r\nSubject: Re: \r\n"
+                      "Content-Type: text/plain; charset=utf-8\r\n\r\n",
+                      c->user_email, (int)to_len, target);
+    if (nr <= 0 || (size_t)nr >= raw_cap) {
+        c->alloc->free(c->alloc->ctx, raw, raw_cap);
+        return HU_ERR_INTERNAL;
+    }
+    size_t raw_len = (size_t)nr;
+    size_t copy = body_len < raw_cap - raw_len ? body_len : raw_cap - raw_len - 1;
+    memcpy(raw + raw_len, message, copy);
+    raw_len += copy;
+    raw[raw_len] = '\0';
+
+    /* Base64url-encode the raw message */
+    size_t b64_cap = (raw_len * 4 / 3) + 4;
+    char *b64 = (char *)c->alloc->alloc(c->alloc->ctx, b64_cap);
+    if (!b64) {
+        c->alloc->free(c->alloc->ctx, raw, raw_cap);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    size_t b64_len =
+        base64url_encode((const unsigned char *)raw, raw_len, b64, b64_cap);
+    c->alloc->free(c->alloc->ctx, raw, raw_cap);
+
+    /* JSON body: {"raw": "<base64url>"} — escape quotes in b64? No, base64url has no quotes */
+    size_t json_cap = 32 + b64_len * 2;
+    char *json_body = (char *)c->alloc->alloc(c->alloc->ctx, json_cap);
+    if (!json_body) {
+        c->alloc->free(c->alloc->ctx, b64, b64_cap);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    int nj = snprintf(json_body, json_cap, "{\"raw\":\"%.*s\"}", (int)b64_len, b64);
+    c->alloc->free(c->alloc->ctx, b64, b64_cap);
+    if (nj <= 0 || (size_t)nj >= json_cap) {
+        c->alloc->free(c->alloc->ctx, json_body, json_cap);
+        return HU_ERR_INTERNAL;
+    }
+
+    const char *send_url = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
+    hu_http_response_t resp = {0};
+    err = hu_http_post_json(c->alloc, send_url, auth_buf, json_body, (size_t)nj, &resp);
+    c->alloc->free(c->alloc->ctx, json_body, json_cap);
+    if (err != HU_OK) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(c->alloc, &resp);
+        return err;
+    }
+    if (resp.status_code < 200 || resp.status_code >= 300) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(c->alloc, &resp);
+        return HU_ERR_PROVIDER_AUTH;
+    }
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    return HU_OK;
+#else
+    (void)target_len;
+    (void)message_len;
+    return HU_ERR_NOT_SUPPORTED;
 #endif
+}
 
 static const char *gmail_name(void *ctx) {
     (void)ctx;
@@ -467,7 +598,7 @@ static hu_error_t gmail_load_conversation_history(void *ctx, hu_allocator_t *all
 static const hu_channel_vtable_t gmail_vtable = {
     .start = gmail_start,
     .stop = gmail_stop,
-    .send = NULL, /* read-only: daemon skips agent turn when send is NULL */
+    .send = gmail_send,
     .name = gmail_name,
     .health_check = gmail_health_check,
     .send_event = NULL,
@@ -537,6 +668,8 @@ void hu_gmail_destroy(hu_channel_t *ch) {
                 a->free(a->ctx, c->refresh_token, strlen(c->refresh_token) + 1);
             if (c->access_token)
                 a->free(a->ctx, c->access_token, c->access_token_len + 1);
+            if (c->user_email)
+                a->free(a->ctx, c->user_email, strlen(c->user_email) + 1);
             a->free(a->ctx, c, sizeof(*c));
         }
         ch->ctx = NULL;
