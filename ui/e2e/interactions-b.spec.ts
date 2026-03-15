@@ -104,3 +104,61 @@ test.describe("Skills (Interactions)", () => {
     }).toPass({ timeout: POLL });
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Memory (Interactions)
+// ─────────────────────────────────────────────────────────────
+test.describe("Memory (Interactions)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#memory");
+    await page.waitForTimeout(WAIT);
+  });
+
+  test("shows memory entries with keys", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-memory-view"));
+      expect(text).toContain("user-prefers-dark-mode");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows category badges", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-memory-view"));
+      expect(text).toMatch(/core/i);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("search input accepts text", async ({ page }) => {
+    await page.evaluate(() => {
+      const app = document.querySelector("hu-app");
+      const view = app?.shadowRoot?.querySelector("hu-memory-view");
+      const input = view?.shadowRoot?.querySelector("hu-input");
+      const nativeInput = input?.shadowRoot?.querySelector("input");
+      if (nativeInput) {
+        (nativeInput as HTMLInputElement).value = "dark mode";
+        nativeInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    await page.waitForTimeout(600);
+
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-memory-view"));
+      expect(text).toContain("user-prefers-dark-mode");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("segmented control filter exists", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("hu-memory-view", "hu-segmented-control"))).toBe(
+        true,
+      );
+    }).toPass({ timeout: POLL });
+  });
+
+  test("graph section available", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-memory-view"));
+      expect(text).toMatch(/graph|knowledge|connection/i);
+    }).toPass({ timeout: POLL });
+  });
+});

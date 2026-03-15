@@ -51,6 +51,7 @@ export class ScLogsView extends GatewayAwareLitElement {
       view-transition-name: view-logs;
       display: flex;
       flex-direction: column;
+      contain: layout style;
       flex: 1;
       min-height: 0;
       color: var(--hu-text);

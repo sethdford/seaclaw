@@ -26,6 +26,7 @@ export class ScChatView extends GatewayAwareLitElement {
       view-transition-name: view-chat;
       display: flex;
       flex-direction: column;
+      contain: layout style;
       height: 100%;
       max-height: calc(100vh - var(--hu-space-5xl));
     }

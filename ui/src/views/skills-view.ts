@@ -37,6 +37,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
       view-transition-name: view-skills;
       display: block;
       color: var(--hu-text);
+      contain: layout style;
     }
     .toolbar {
       display: flex;

@@ -79,6 +79,7 @@ export class ScConfigView extends GatewayAwareLitElement {
       view-transition-name: view-config;
       display: block;
       max-width: 40rem;
+      contain: layout style;
       margin: 0 auto;
     }
     .header-actions {

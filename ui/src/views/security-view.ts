@@ -68,6 +68,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
       view-transition-name: view-security;
       display: block;
       color: var(--hu-text);
+      contain: layout style;
     }
     .grid {
       display: grid;

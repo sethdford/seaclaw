@@ -27,6 +27,7 @@ export class ScMessageStream extends LitElement {
 
     :host {
       display: block;
+      contain: layout style;
     }
 
     .bubble {

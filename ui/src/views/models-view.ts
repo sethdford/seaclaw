@@ -55,6 +55,7 @@ export class ScModelsView extends GatewayAwareLitElement {
       view-transition-name: view-models;
       display: block;
       max-width: 75rem;
+      contain: layout style;
     }
     .info-section {
       display: grid;

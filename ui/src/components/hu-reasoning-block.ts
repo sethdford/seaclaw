@@ -26,6 +26,7 @@ export class ScReasoningBlock extends LitElement {
 
     :host {
       display: block;
+      contain: layout style;
     }
 
     .reasoning-block {

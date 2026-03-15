@@ -67,6 +67,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
       view-transition-name: view-overview;
       display: block;
       max-width: 75rem;
+      contain: layout style;
       padding: var(--hu-space-lg) var(--hu-space-xl);
     }
 

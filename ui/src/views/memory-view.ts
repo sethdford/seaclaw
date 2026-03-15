@@ -104,6 +104,7 @@ export class ScMemoryView extends GatewayAwareLitElement {
       view-transition-name: view-memory;
       display: flex;
       flex-direction: column;
+      contain: layout style;
       flex: 1;
       min-height: 0;
       color: var(--hu-text);

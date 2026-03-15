@@ -58,6 +58,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
       view-transition-name: view-agents;
       display: block;
       color: var(--hu-text);
+      contain: layout style;
       max-width: 75rem;
       padding: var(--hu-space-lg) var(--hu-space-xl);
     }

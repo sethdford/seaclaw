@@ -51,6 +51,7 @@ export class ScToolsView extends GatewayAwareLitElement {
       view-transition-name: view-tools;
       display: block;
       max-width: 75rem;
+      contain: layout style;
       container-type: inline-size;
     }
     .table-section {
