@@ -12,6 +12,7 @@
 #include "human/core/string.h"
 #include <sqlite3.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 #define PATCH_TEXT_MAX 2048
@@ -279,6 +280,63 @@ hu_error_t hu_self_improve_get_prompt_patches(hu_self_improve_t *engine,
         return HU_ERR_OUT_OF_MEMORY;
     *out = joined;
     *out_len = strlen(joined);
+    return HU_OK;
+}
+
+hu_error_t hu_self_improve_get_tool_prefs_prompt(hu_self_improve_t *engine,
+                                                  char **out, size_t *out_len) {
+    if (!engine || !engine->db || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
+
+    const char *sql =
+        "SELECT tool_name, weight, successes, failures FROM tool_prefs "
+        "WHERE successes + failures >= 3 ORDER BY weight DESC LIMIT 10";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(engine->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+
+    char buf[2048];
+    size_t pos = 0;
+    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Tool reliability:");
+    bool first = true;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW && pos < sizeof(buf) - 64) {
+        const char *tn = (const char *)sqlite3_column_text(stmt, 0);
+        int32_t successes = (int32_t)sqlite3_column_int(stmt, 2);
+        int32_t failures = (int32_t)sqlite3_column_int(stmt, 3);
+        if (!tn)
+            continue;
+        int total = successes + failures;
+        int pct = (total > 0) ? (int)((successes * 100.0) / (double)total + 0.5) : 0;
+        int n = snprintf(buf + pos, sizeof(buf) - pos, "%s %s (%d%%)",
+                         first ? " " : ", ", tn, pct);
+        if (n > 0 && pos + (size_t)n < sizeof(buf)) {
+            pos += (size_t)n;
+            first = false;
+        }
+    }
+    sqlite3_finalize(stmt);
+
+    if (first) {
+        char *empty = (char *)engine->alloc->alloc(engine->alloc->ctx, 1);
+        if (!empty)
+            return HU_ERR_OUT_OF_MEMORY;
+        empty[0] = '\0';
+        *out = empty;
+        *out_len = 0;
+        return HU_OK;
+    }
+
+    char *result = (char *)engine->alloc->alloc(engine->alloc->ctx, pos + 1);
+    if (!result)
+        return HU_ERR_OUT_OF_MEMORY;
+    memcpy(result, buf, pos);
+    result[pos] = '\0';
+    *out = result;
+    *out_len = pos;
     return HU_OK;
 }
 

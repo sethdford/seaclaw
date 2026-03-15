@@ -24,6 +24,21 @@ MONITORED_SERVERS = [
     {"id": "1151597006481850499", "name": "Anthropic", "focus": "claude-api"},
     {"id": "1067681017716330498", "name": "r/LocalLLaMA", "focus": "local-inference"},
     {"id": "946399602226503691", "name": "Stable Diffusion", "focus": "image-generation"},
+    {"id": "1136218227832381523", "name": "Cursor", "focus": "ai-coding"},
+    {"id": "1110598183144399038", "name": "Weights & Biases", "focus": "ml-ops"},
+    {"id": "823813159592001537", "name": "EleutherAI", "focus": "open-source-llm"},
+    {"id": "1055206227587465306", "name": "Together AI", "focus": "inference-infra"},
+]
+
+REDDIT_AI_FEEDS = [
+    "https://www.reddit.com/r/MachineLearning/top/.json?t=day&limit=5",
+    "https://www.reddit.com/r/LocalLLaMA/top/.json?t=day&limit=5",
+    "https://www.reddit.com/r/artificial/top/.json?t=day&limit=5",
+    "https://www.reddit.com/r/ClaudeAI/top/.json?t=day&limit=5",
+    "https://www.reddit.com/r/singularity/top/.json?t=day&limit=5",
+    "https://www.reddit.com/r/ChatGPT/top/.json?t=day&limit=5",
+    "https://www.reddit.com/r/StableDiffusion/top/.json?t=day&limit=5",
+    "https://www.reddit.com/r/Oobabooga/top/.json?t=day&limit=5",
 ]
 
 DISCORD_WIDGET_API = "https://discord.com/api/guilds/{}/widget.json"
@@ -82,6 +97,33 @@ def main():
                 "focus": server["focus"],
                 "scraped_at": scrape_ts,
             })
+
+    for reddit_url in REDDIT_AI_FEEDS:
+        try:
+            req = urllib.request.Request(reddit_url, headers={
+                "User-Agent": "h-uman-feed/1.0 (research bot)",
+            })
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = json.loads(r.read())
+            for post in data.get("data", {}).get("children", []):
+                pd = post.get("data", {})
+                title = pd.get("title", "")
+                selftext = pd.get("selftext", "")[:500]
+                subreddit = pd.get("subreddit", "")
+                score = pd.get("score", 0)
+                url = pd.get("url", "")
+                items.append({
+                    "source": "reddit",
+                    "content_type": "reddit_post",
+                    "content": f"[r/{subreddit}] {title} (score: {score}){(' - ' + selftext) if selftext else ''}",
+                    "url": url,
+                    "author": pd.get("author", ""),
+                    "subreddit": subreddit,
+                    "score": score,
+                    "scraped_at": scrape_ts,
+                })
+        except Exception:
+            pass
 
     if bot_token:
         with open(CONFIG_PATH) as f:

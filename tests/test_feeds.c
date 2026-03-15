@@ -970,9 +970,9 @@ static void cycle_actions_high_findings(void) {
     HU_ASSERT_TRUE(result.causal_recorded >= 1);
 
     sqlite3_stmt *chk = NULL;
-    sqlite3_prepare_v2(db, "SELECT status FROM research_findings WHERE priority = 'HIGH'", -1, &chk, NULL);
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM research_findings WHERE status = 'actioned'", -1, &chk, NULL);
     HU_ASSERT_EQ(sqlite3_step(chk), SQLITE_ROW);
-    HU_ASSERT_STR_EQ((const char *)sqlite3_column_text(chk, 0), "actioned");
+    HU_ASSERT_EQ(sqlite3_column_int(chk, 0), 1);
     sqlite3_finalize(chk);
 
     sqlite3_close(db);
@@ -1069,6 +1069,114 @@ static void cycle_null_args_returns_error(void) {
     HU_ASSERT_EQ(hu_intelligence_run_cycle(&alloc, (sqlite3 *)1, NULL), HU_ERR_INVALID_ARGUMENT);
 }
 
+static void e2e_ingest_findings_cycle_learns(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = setup_cycle_db();
+    HU_ASSERT_NOT_NULL(db);
+    int64_t now = (int64_t)time(NULL);
+
+    sqlite3_stmt *ins = NULL;
+    sqlite3_prepare_v2(db,
+        "INSERT INTO feed_items(source, content_type, content, ingested_at) VALUES (?,?,?,?)",
+        -1, &ins, NULL);
+    const char *articles[] = {
+        "New transformer architecture achieves SOTA on reasoning benchmarks",
+        "Anthropic releases Claude 4 with improved autonomous coding",
+        "OpenAI introduces GPT-5 with native tool use",
+        "Google DeepMind publishes Gemini 3 technical report",
+        "Meta open-sources Llama 4 with 405B parameters",
+    };
+    for (int i = 0; i < 5; i++) {
+        sqlite3_bind_text(ins, 1, "rss", -1, SQLITE_STATIC);
+        sqlite3_bind_text(ins, 2, "article", -1, SQLITE_STATIC);
+        sqlite3_bind_text(ins, 3, articles[i], -1, SQLITE_STATIC);
+        sqlite3_bind_int64(ins, 4, now - (i * 60));
+        sqlite3_step(ins);
+        sqlite3_reset(ins);
+    }
+    sqlite3_finalize(ins);
+
+    const char *agent_output =
+        "- **Source**: rss\n"
+        "- **Finding**: New transformer beats SOTA on reasoning\n"
+        "- **Relevance**: Could improve h-uman's provider layer\n"
+        "- **Priority**: HIGH\n"
+        "- **Suggested Action**: Investigate new architecture for integration\n\n"
+        "- **Source**: rss\n"
+        "- **Finding**: Claude 4 improves autonomous coding\n"
+        "- **Relevance**: Direct competitor analysis needed\n"
+        "- **Priority**: MEDIUM\n"
+        "- **Suggested Action**: Investigate competitive features and benchmark\n\n"
+        "- **Source**: rss\n"
+        "- **Finding**: Llama 4 open-sourced with 405B params\n"
+        "- **Relevance**: Could serve as local provider option\n"
+        "- **Priority**: HIGH\n"
+        "- **Suggested Action**: Investigate adding Llama 4 as provider\n";
+
+    hu_error_t err = hu_findings_parse_and_store(&alloc, db, agent_output, strlen(agent_output));
+    HU_ASSERT_EQ(err, HU_OK);
+
+    sqlite3_stmt *fc = NULL;
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM research_findings", -1, &fc, NULL);
+    sqlite3_step(fc);
+    int findings_count = sqlite3_column_int(fc, 0);
+    sqlite3_finalize(fc);
+    HU_ASSERT_TRUE(findings_count >= 3);
+
+    hu_intelligence_cycle_result_t result;
+    err = hu_intelligence_run_cycle(&alloc, db, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    HU_ASSERT_TRUE(result.findings_actioned >= 3);
+    HU_ASSERT_TRUE(result.events_recorded >= 1);
+    HU_ASSERT_TRUE(result.causal_recorded >= 1);
+
+    sqlite3_stmt *chk = NULL;
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM general_lessons", -1, &chk, NULL);
+    sqlite3_step(chk);
+    int lessons = sqlite3_column_int(chk, 0);
+    sqlite3_finalize(chk);
+    HU_ASSERT_TRUE(lessons >= 1);
+
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM current_events", -1, &chk, NULL);
+    sqlite3_step(chk);
+    int events = sqlite3_column_int(chk, 0);
+    sqlite3_finalize(chk);
+    HU_ASSERT_TRUE(events >= 1);
+
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM inferred_values", -1, &chk, NULL);
+    sqlite3_step(chk);
+    int values = sqlite3_column_int(chk, 0);
+    sqlite3_finalize(chk);
+    HU_ASSERT_TRUE(values >= 1);
+
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM opinions", -1, &chk, NULL);
+    sqlite3_step(chk);
+    int opinions = sqlite3_column_int(chk, 0);
+    sqlite3_finalize(chk);
+    HU_ASSERT_TRUE(opinions >= 1);
+
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM behavioral_feedback", -1, &chk, NULL);
+    sqlite3_step(chk);
+    int feedback = sqlite3_column_int(chk, 0);
+    sqlite3_finalize(chk);
+    HU_ASSERT_TRUE(feedback >= 1);
+
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM cognitive_load_log", -1, &chk, NULL);
+    sqlite3_step(chk);
+    int cog = sqlite3_column_int(chk, 0);
+    sqlite3_finalize(chk);
+    HU_ASSERT_TRUE(cog >= 1);
+
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM growth_milestones", -1, &chk, NULL);
+    sqlite3_step(chk);
+    int milestones = sqlite3_column_int(chk, 0);
+    sqlite3_finalize(chk);
+    HU_ASSERT_TRUE(milestones >= 1);
+
+    sqlite3_close(db);
+}
+
 #endif /* HU_ENABLE_SQLITE */
 
 void run_feeds_tests(void) {
@@ -1112,5 +1220,6 @@ void run_feeds_tests(void) {
     HU_RUN_TEST(cycle_populates_opinions);
     HU_RUN_TEST(cycle_records_cognitive_load);
     HU_RUN_TEST(cycle_null_args_returns_error);
+    HU_RUN_TEST(e2e_ingest_findings_cycle_learns);
 #endif
 }

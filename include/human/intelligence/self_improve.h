@@ -61,6 +61,10 @@ double hu_self_improve_get_tool_weight(hu_self_improve_t *engine,
 hu_error_t hu_self_improve_get_prompt_patches(hu_self_improve_t *engine,
                                               char **out, size_t *out_len);
 
+/* Build tool reliability prompt from tool_prefs. Caller must free *out. */
+hu_error_t hu_self_improve_get_tool_prefs_prompt(hu_self_improve_t *engine,
+                                                 char **out, size_t *out_len);
+
 /* Get count of active patches. */
 hu_error_t hu_self_improve_active_patch_count(hu_self_improve_t *engine, size_t *out);
 

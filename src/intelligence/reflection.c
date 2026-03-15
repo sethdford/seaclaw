@@ -33,20 +33,37 @@ static void escape_sql_string(const char *s, size_t len, char *buf, size_t cap, 
 }
 
 hu_error_t hu_reflection_create_tables_sql(char *buf, size_t cap, size_t *out_len) {
-    if (!buf || !out_len || cap < 1024)
+    if (!buf || !out_len || cap < 2048)
         return HU_ERR_INVALID_ARGUMENT;
 
     static const char sql[] =
-        "CREATE TABLE IF NOT EXISTS feedback_signals (\n"
+        "CREATE TABLE IF NOT EXISTS behavioral_feedback(\n"
         "    id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+        "    behavior_type TEXT NOT NULL,\n"
         "    contact_id TEXT NOT NULL,\n"
-        "    type INTEGER NOT NULL,\n"
+        "    signal TEXT NOT NULL,\n"
         "    context TEXT,\n"
-        "    our_action TEXT,\n"
         "    timestamp INTEGER NOT NULL\n"
         ");\n"
-        "CREATE INDEX IF NOT EXISTS idx_feedback_contact ON feedback_signals(contact_id);\n"
-        "CREATE INDEX IF NOT EXISTS idx_feedback_timestamp ON feedback_signals(timestamp);\n"
+        "CREATE INDEX IF NOT EXISTS idx_behavioral_feedback_contact ON behavioral_feedback(contact_id);\n"
+        "CREATE INDEX IF NOT EXISTS idx_behavioral_feedback_timestamp ON behavioral_feedback(timestamp);\n"
+        "CREATE TABLE IF NOT EXISTS general_lessons(\n"
+        "    id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+        "    lesson TEXT NOT NULL,\n"
+        "    confidence REAL DEFAULT 0.5,\n"
+        "    source_count INTEGER DEFAULT 1,\n"
+        "    first_learned INTEGER NOT NULL,\n"
+        "    last_confirmed INTEGER\n"
+        ");\n"
+        "CREATE TABLE IF NOT EXISTS self_evaluations(\n"
+        "    id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+        "    contact_id TEXT NOT NULL,\n"
+        "    week INTEGER NOT NULL,\n"
+        "    metrics TEXT NOT NULL,\n"
+        "    recommendations TEXT,\n"
+        "    created_at INTEGER NOT NULL\n"
+        ");\n"
+        "CREATE INDEX IF NOT EXISTS idx_self_evaluations_contact ON self_evaluations(contact_id);\n"
         "CREATE TABLE IF NOT EXISTS reflections (\n"
         "    id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
         "    period TEXT NOT NULL,\n"
@@ -75,19 +92,24 @@ hu_error_t hu_feedback_insert_sql(const hu_feedback_signal_t *fb, char *buf, siz
     char contact_esc[HU_REFLECTION_ESCAPE_BUF];
     char context_esc[HU_REFLECTION_ESCAPE_BUF];
     char action_esc[HU_REFLECTION_ESCAPE_BUF];
+    char signal_esc[HU_REFLECTION_ESCAPE_BUF];
 
-    size_t ce_len, cxe_len, ae_len;
+    size_t ce_len, cxe_len, ae_len, se_len;
     escape_sql_string(fb->contact_id, fb->contact_id_len, contact_esc, sizeof(contact_esc),
                       &ce_len);
     escape_sql_string(fb->context ? fb->context : "", fb->context_len, context_esc,
                       sizeof(context_esc), &cxe_len);
     escape_sql_string(fb->our_action ? fb->our_action : "", fb->our_action_len, action_esc,
                       sizeof(action_esc), &ae_len);
+    {
+        const char *sig = hu_feedback_type_str(fb->type);
+        escape_sql_string(sig, strlen(sig), signal_esc, sizeof(signal_esc), &se_len);
+    }
 
     int n = snprintf(buf, cap,
-                    "INSERT INTO feedback_signals (contact_id, type, context, our_action, timestamp) "
-                    "VALUES ('%s', %d, '%s', '%s', %llu)",
-                    contact_esc, (int)fb->type, context_esc, action_esc,
+                    "INSERT INTO behavioral_feedback (behavior_type, contact_id, signal, context, timestamp) "
+                    "VALUES ('%s', '%s', '%s', '%s', %llu)",
+                    action_esc, contact_esc, signal_esc, context_esc,
                     (unsigned long long)fb->timestamp);
     if (n < 0 || (size_t)n >= cap)
         return HU_ERR_INVALID_ARGUMENT;
@@ -105,8 +127,8 @@ hu_error_t hu_feedback_query_recent_sql(const char *contact_id, size_t len, uint
     escape_sql_string(contact_id, len, contact_esc, sizeof(contact_esc), &ce_len);
 
     int n = snprintf(buf, cap,
-                    "SELECT id, contact_id, type, context, our_action, timestamp FROM "
-                    "feedback_signals WHERE contact_id = '%s' ORDER BY timestamp DESC LIMIT %u",
+                    "SELECT id, behavior_type, contact_id, signal, context, timestamp FROM "
+                    "behavioral_feedback WHERE contact_id = '%s' ORDER BY timestamp DESC LIMIT %u",
                     contact_esc, limit);
     if (n < 0 || (size_t)n >= cap)
         return HU_ERR_INVALID_ARGUMENT;

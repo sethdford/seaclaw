@@ -589,6 +589,16 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             pos += (size_t)n;
                         agent->alloc->free(agent->alloc->ctx, patches, patches_len + 1);
                     }
+                    char *tool_prefs = NULL;
+                    size_t tool_prefs_len = 0;
+                    if (hu_self_improve_get_tool_prefs_prompt(&si, &tool_prefs, &tool_prefs_len) == HU_OK &&
+                        tool_prefs && tool_prefs_len > 0) {
+                        int n = snprintf(parts + pos, sizeof(parts) - pos,
+                                         "\n%s\n", tool_prefs);
+                        if (n > 0 && pos + (size_t)n < sizeof(parts))
+                            pos += (size_t)n;
+                        agent->alloc->free(agent->alloc->ctx, tool_prefs, tool_prefs_len + 1);
+                    }
                     hu_self_improve_deinit(&si);
                 }
             }

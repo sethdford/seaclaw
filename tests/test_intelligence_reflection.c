@@ -15,7 +15,9 @@ static void test_reflection_create_tables_sql_valid(void) {
     hu_error_t err = hu_reflection_create_tables_sql(buf, sizeof(buf), &len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(len > 0);
-    HU_ASSERT_TRUE(strstr(buf, "feedback_signals") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "behavioral_feedback") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "general_lessons") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "self_evaluations") != NULL);
     HU_ASSERT_TRUE(strstr(buf, "reflections") != NULL);
     HU_ASSERT_TRUE(strstr(buf, "CREATE TABLE") != NULL);
 }
@@ -37,7 +39,7 @@ static void test_feedback_insert_sql_valid(void) {
     hu_error_t err = hu_feedback_insert_sql(&fb, buf, sizeof(buf), &len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(strstr(buf, "user_a") != NULL);
-    HU_ASSERT_TRUE(strstr(buf, "INSERT INTO feedback_signals") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "INSERT INTO behavioral_feedback") != NULL);
     hu_feedback_signal_deinit(&alloc, &fb);
 }
 
@@ -67,6 +69,7 @@ static void test_feedback_query_recent_sql_valid(void) {
     hu_error_t err = hu_feedback_query_recent_sql("contact_1", 9, 10, buf, sizeof(buf), &len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(strstr(buf, "contact_1") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "behavioral_feedback") != NULL);
     HU_ASSERT_TRUE(strstr(buf, "ORDER BY timestamp DESC") != NULL);
     HU_ASSERT_TRUE(strstr(buf, "LIMIT 10") != NULL);
 }
@@ -233,7 +236,14 @@ static void test_skill_observation_deinit_frees_all(void) {
 
 static void test_reflection_create_tables_sql_null_buf_returns_error(void) {
     size_t len = 0;
-    hu_error_t err = hu_reflection_create_tables_sql(NULL, 1024, &len);
+    hu_error_t err = hu_reflection_create_tables_sql(NULL, 2048, &len);
+    HU_ASSERT_NEQ(err, HU_OK);
+}
+
+static void test_reflection_create_tables_sql_small_cap_returns_error(void) {
+    char buf[2048];
+    size_t len = 0;
+    hu_error_t err = hu_reflection_create_tables_sql(buf, 512, &len);
     HU_ASSERT_NEQ(err, HU_OK);
 }
 
@@ -375,6 +385,7 @@ void run_intelligence_reflection_tests(void) {
     HU_RUN_TEST(test_reflection_entry_deinit_frees_all);
     HU_RUN_TEST(test_skill_observation_deinit_frees_all);
     HU_RUN_TEST(test_reflection_create_tables_sql_null_buf_returns_error);
+    HU_RUN_TEST(test_reflection_create_tables_sql_small_cap_returns_error);
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(test_daily_reflection_three_positive_creates_skill);
     HU_RUN_TEST(test_daily_reflection_no_feedback_no_skills);

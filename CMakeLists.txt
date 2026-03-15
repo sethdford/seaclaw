@@ -1851,6 +1851,7 @@ set(HU_TEST_SOURCES
     tests/test_intelligence_reflection.c
     tests/test_feedback.c
     tests/test_intelligence_skills.c
+    tests/test_intelligence_cycle.c
     tests/test_reflection_advanced.c
     tests/test_privacy_audit.c
     tests/test_collab_planning.c

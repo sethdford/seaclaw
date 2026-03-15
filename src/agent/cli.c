@@ -21,6 +21,7 @@
 #include "human/feeds/research.h"
 #include "human/feeds/trends.h"
 #include "human/intelligence/cycle.h"
+#include "human/intelligence/self_improve.h"
 #endif
 #include "human/memory/factory.h"
 #include "human/memory/retrieval.h"
@@ -592,10 +593,25 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                             hu_feed_trends_free(alloc, trends, trend_count);
                         }
                     }
-                    size_t ctx_len = digest_len + (trend_section ? trend_len : 0);
+
+                    char *patches = NULL;
+                    size_t patches_len = 0;
+                    hu_self_improve_t si = {0};
+                    if (hu_self_improve_create(alloc, feed_db, &si) == HU_OK) {
+                        (void)hu_self_improve_init_tables(&si);
+                        (void)hu_self_improve_get_prompt_patches(&si, &patches, &patches_len);
+                        hu_self_improve_deinit(&si);
+                    }
+
+                    size_t ctx_len = digest_len + (trend_section ? trend_len : 0) +
+                                     (patches ? patches_len : 0);
                     char *ctx_buf = (char *)alloc->alloc(alloc->ctx, ctx_len + 1);
                     if (ctx_buf) {
                         size_t p = 0;
+                        if (patches && patches_len > 0) {
+                            memcpy(ctx_buf + p, patches, patches_len);
+                            p += patches_len;
+                        }
                         if (trend_section) { memcpy(ctx_buf + p, trend_section, trend_len); p += trend_len; }
                         memcpy(ctx_buf + p, digest, digest_len); p += digest_len;
                         ctx_buf[p] = '\0';
@@ -603,6 +619,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                             effective_prompt = enriched_prompt;
                         alloc->free(alloc->ctx, ctx_buf, ctx_len + 1);
                     }
+                    if (patches) alloc->free(alloc->ctx, patches, patches_len + 1);
                     if (trend_section) alloc->free(alloc->ctx, trend_section, trend_len + 1);
                     alloc->free(alloc->ctx, digest, digest_len + 1);
                 }

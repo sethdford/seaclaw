@@ -6,24 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define HU_SKILL_ESCAPE_BUF 1024
-
 static const uint64_t MS_PER_DAY = 86400000ULL;
-
-/* Escape single quotes for SQL string literals */
-static void escape_sql_string(const char *s, size_t len, char *buf, size_t cap, size_t *out_len) {
-    size_t pos = 0;
-    for (size_t i = 0; i < len && pos + 2 < cap; i++) {
-        if (s[i] == '\'') {
-            buf[pos++] = '\'';
-            buf[pos++] = '\'';
-        } else {
-            buf[pos++] = s[i];
-        }
-    }
-    buf[pos] = '\0';
-    *out_len = pos;
-}
 
 /* Count words in a string; words[] points into s (no copy) */
 static size_t count_words(const char *s, size_t len, const char *words[64], size_t max_words) {
@@ -126,46 +109,33 @@ hu_error_t hu_skills_insert_sql(const hu_learned_skill_t *skill, char *buf, size
     if (!skill->name || !skill->trigger || !skill->strategy)
         return HU_ERR_INVALID_ARGUMENT;
 
-    char name_esc[HU_SKILL_ESCAPE_BUF];
-    char desc_esc[HU_SKILL_ESCAPE_BUF];
-    char trigger_esc[HU_SKILL_ESCAPE_BUF];
-    char strategy_esc[HU_SKILL_ESCAPE_BUF];
-
-    size_t ne_len, de_len, te_len, se_len;
-    escape_sql_string(skill->name, skill->name_len, name_esc, sizeof(name_esc), &ne_len);
-    escape_sql_string(skill->description ? skill->description : "", skill->description_len,
-                      desc_esc, sizeof(desc_esc), &de_len);
-    escape_sql_string(skill->trigger, skill->trigger_len, trigger_esc, sizeof(trigger_esc),
-                      &te_len);
-    escape_sql_string(skill->strategy, skill->strategy_len, strategy_esc, sizeof(strategy_esc),
-                      &se_len);
-
-    int n = snprintf(buf, cap,
-                    "INSERT INTO learned_skills (name, description, trigger, strategy, status, "
-                    "success_rate, usage_count, learned_at, last_used, parent_skill_id) "
-                    "VALUES ('%s', '%s', '%s', '%s', %d, %f, %u, %llu, %llu, %lld)",
-                    name_esc, desc_esc, trigger_esc, strategy_esc, (int)skill->status,
-                    skill->success_rate, skill->usage_count,
-                    (unsigned long long)skill->learned_at, (unsigned long long)skill->last_used,
-                    (long long)skill->parent_skill_id);
-    if (n < 0 || (size_t)n >= cap)
+    static const char sql[] =
+        "INSERT INTO learned_skills (name, description, trigger, strategy, status, "
+        "success_rate, usage_count, learned_at, last_used, parent_skill_id) "
+        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
+    size_t len = sizeof(sql) - 1;
+    if (len >= cap)
         return HU_ERR_INVALID_ARGUMENT;
-    *out_len = (size_t)n;
+    memcpy(buf, sql, len + 1);
+    *out_len = len;
     return HU_OK;
 }
 
 hu_error_t hu_skills_update_usage_sql(int64_t id, double new_success_rate, char *buf, size_t cap,
                                       size_t *out_len) {
+    (void)id;
+    (void)new_success_rate;
     if (!buf || !out_len || cap < 256)
         return HU_ERR_INVALID_ARGUMENT;
 
-    int n = snprintf(buf, cap,
-                    "UPDATE learned_skills SET success_rate = %f, usage_count = usage_count + 1, "
-                    "last_used = (strftime('%%s','now')*1000) WHERE id = %lld",
-                    new_success_rate, (long long)id);
-    if (n < 0 || (size_t)n >= cap)
+    static const char sql[] =
+        "UPDATE learned_skills SET success_rate = ?1, usage_count = usage_count + 1, "
+        "last_used = (strftime('%s','now')*1000) WHERE id = ?2";
+    size_t len = sizeof(sql) - 1;
+    if (len >= cap)
         return HU_ERR_INVALID_ARGUMENT;
-    *out_len = (size_t)n;
+    memcpy(buf, sql, len + 1);
+    *out_len = len;
     return HU_OK;
 }
 
@@ -185,35 +155,37 @@ hu_error_t hu_skills_query_active_sql(char *buf, size_t cap, size_t *out_len) {
     return HU_OK;
 }
 
+/* Outputs parameterized SQL with ?1 for the trigger. Caller must bind parameter 1. */
 hu_error_t hu_skills_query_by_trigger_sql(const char *trigger, size_t trigger_len, char *buf,
                                           size_t cap, size_t *out_len) {
+    (void)trigger_len;
     if (!trigger || !buf || !out_len || cap < 512)
         return HU_ERR_INVALID_ARGUMENT;
 
-    char trigger_esc[HU_SKILL_ESCAPE_BUF];
-    size_t te_len;
-    escape_sql_string(trigger, trigger_len, trigger_esc, sizeof(trigger_esc), &te_len);
-
-    int n = snprintf(buf, cap,
-                    "SELECT id, name, description, trigger, strategy, status, success_rate, "
-                    "usage_count, learned_at, last_used, parent_skill_id FROM learned_skills "
-                    "WHERE INSTR(trigger, '%s') > 0 AND status != 4",
-                    trigger_esc);
-    if (n < 0 || (size_t)n >= cap)
+    static const char sql[] =
+        "SELECT id, name, description, trigger, strategy, status, success_rate, "
+        "usage_count, learned_at, last_used, parent_skill_id FROM learned_skills "
+        "WHERE INSTR(trigger, ?1) > 0 AND status != 4";
+    size_t len = sizeof(sql) - 1;
+    if (len >= cap)
         return HU_ERR_INVALID_ARGUMENT;
-    *out_len = (size_t)n;
+    memcpy(buf, sql, len + 1);
+    *out_len = len;
     return HU_OK;
 }
 
 hu_error_t hu_skills_retire_sql(int64_t id, char *buf, size_t cap, size_t *out_len) {
+    (void)id;
     if (!buf || !out_len || cap < 256)
         return HU_ERR_INVALID_ARGUMENT;
 
-    int n = snprintf(buf, cap, "UPDATE learned_skills SET status = 4 WHERE id = %lld",
-                     (long long)id);
-    if (n < 0 || (size_t)n >= cap)
+    static const char sql[] =
+        "UPDATE learned_skills SET status = 4 WHERE id = ?1";
+    size_t len = sizeof(sql) - 1;
+    if (len >= cap)
         return HU_ERR_INVALID_ARGUMENT;
-    *out_len = (size_t)n;
+    memcpy(buf, sql, len + 1);
+    *out_len = len;
     return HU_OK;
 }
 
@@ -252,17 +224,19 @@ bool hu_skill_should_retire(double success_rate, uint32_t usage_count, uint64_t 
 }
 
 hu_error_t hu_skill_chain_query_sql(int64_t parent_id, char *buf, size_t cap, size_t *out_len) {
+    (void)parent_id;
     if (!buf || !out_len || cap < 256)
         return HU_ERR_INVALID_ARGUMENT;
 
-    int n = snprintf(buf, cap,
-                    "SELECT id, name, description, trigger, strategy, status, success_rate, "
-                    "usage_count, learned_at, last_used, parent_skill_id FROM learned_skills "
-                    "WHERE parent_skill_id = %lld AND status != 4 ORDER BY success_rate DESC",
-                    (long long)parent_id);
-    if (n < 0 || (size_t)n >= cap)
+    static const char sql[] =
+        "SELECT id, name, description, trigger, strategy, status, success_rate, "
+        "usage_count, learned_at, last_used, parent_skill_id FROM learned_skills "
+        "WHERE parent_skill_id = ?1 AND status != 4 ORDER BY success_rate DESC";
+    size_t len = sizeof(sql) - 1;
+    if (len >= cap)
         return HU_ERR_INVALID_ARGUMENT;
-    *out_len = (size_t)n;
+    memcpy(buf, sql, len + 1);
+    *out_len = len;
     return HU_OK;
 }
 

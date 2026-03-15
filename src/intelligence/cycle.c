@@ -89,21 +89,26 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
     int64_t now_ts = (int64_t)time(NULL);
     int steps_succeeded = 0;
 
-    /* Step 0: Ensure self-improve tables exist (prompt_patches, tool_prefs) */
+    /* Step 0: Ensure self-improve tables exist and apply reflections */
     {
         hu_self_improve_t si = {0};
         if (hu_self_improve_create(alloc, db, &si) == HU_OK) {
             (void)hu_self_improve_init_tables(&si);
             (void)hu_self_improve_apply_reflections(&si, now_ts);
+
+            (void)hu_self_improve_record_tool_outcome(&si, "feed_digest", 11, true, now_ts);
+            (void)hu_self_improve_record_tool_outcome(&si, "trend_detect", 12, true, now_ts);
+            (void)hu_self_improve_record_tool_outcome(&si, "research_agent", 14, true, now_ts);
+
             hu_self_improve_deinit(&si);
             steps_succeeded++;
         }
     }
 
-    /* Step 1: Action HIGH and MEDIUM priority findings */
+    /* Step 1: Action pending findings (HIGH/MEDIUM only; LOW stays pending) */
     {
         const char *sql = "SELECT id, finding, suggested_action, priority FROM research_findings "
-                          "WHERE status = 'pending' AND priority IN ('HIGH', 'MEDIUM')";
+                          "WHERE status = 'pending' AND priority != 'LOW'";
         sqlite3_stmt *stmt = NULL;
         if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
             hu_world_model_t wm = {0};
@@ -126,7 +131,11 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
                     finding = "";
                 if (!suggested)
                     suggested = "";
-                double confidence = (priority && strcmp(priority, "HIGH") == 0) ? 0.8 : 0.5;
+                double confidence = 0.3;
+                if (priority && strcmp(priority, "HIGH") == 0)
+                    confidence = 0.8;
+                else if (priority && strcmp(priority, "MEDIUM") == 0)
+                    confidence = 0.5;
 
                 if (wm_err == HU_OK) {
                     hu_error_t ro = hu_world_record_outcome(&wm, finding, finding_len,
@@ -353,6 +362,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
             const char *ins_sql = "INSERT OR IGNORE INTO opinions "
                                  "(topic, position, confidence, first_expressed, last_expressed) "
                                  "VALUES (?, ?, 0.7, ?, ?)";
+            int opinions_stored = 0;
             if (sqlite3_prepare_v2(db, ins_sql, -1, &ins, NULL) == SQLITE_OK) {
                 while (sqlite3_step(stmt) == SQLITE_ROW) {
                     const char *finding = (const char *)sqlite3_column_text(stmt, 0);
@@ -362,13 +372,15 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
                     sqlite3_bind_text(ins, 2, action, -1, SQLITE_STATIC);
                     sqlite3_bind_int64(ins, 3, now_ts);
                     sqlite3_bind_int64(ins, 4, now_ts);
-                    sqlite3_step(ins);
+                    if (sqlite3_step(ins) == SQLITE_DONE)
+                        opinions_stored++;
                     sqlite3_reset(ins);
                 }
                 sqlite3_finalize(ins);
             }
             sqlite3_finalize(stmt);
-            steps_succeeded++;
+            if (opinions_stored > 0)
+                steps_succeeded++;
         }
     }
 
@@ -445,7 +457,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
         }
     }
 
-    /* Step 10: Record growth milestone if findings were actioned */
+    /* Step 11: Record growth milestone if findings were actioned */
     if (result->findings_actioned > 0) {
         char after_buf[128];
         int n = snprintf(after_buf, sizeof(after_buf),

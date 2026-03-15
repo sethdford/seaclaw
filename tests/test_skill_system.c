@@ -39,7 +39,8 @@ static void test_skills_insert_sql_produces_valid_insert(void) {
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(len > 0);
     HU_ASSERT_TRUE(strstr(buf, "INSERT INTO learned_skills") != NULL);
-    HU_ASSERT_TRUE(strstr(buf, "parse_json") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "?1") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "?10") != NULL);
 }
 
 static void test_skills_update_usage_sql_produces_valid_update(void) {
@@ -48,8 +49,8 @@ static void test_skills_update_usage_sql_produces_valid_update(void) {
     hu_error_t err = hu_skills_update_usage_sql(42, 0.85, buf, sizeof(buf), &len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(strstr(buf, "UPDATE learned_skills") != NULL);
-    HU_ASSERT_TRUE(strstr(buf, "0.85") != NULL);
-    HU_ASSERT_TRUE(strstr(buf, "42") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "?1") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "?2") != NULL);
 }
 
 static void test_skills_query_active_sql_excludes_retired(void) {
@@ -68,6 +69,7 @@ static void test_skills_query_by_trigger_sql_uses_trigger(void) {
         hu_skills_query_by_trigger_sql(trigger, strlen(trigger), buf, sizeof(buf), &len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(strstr(buf, "INSTR") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "?1") != NULL);
 }
 
 static void test_skills_retire_sql_sets_status_four(void) {
@@ -76,6 +78,7 @@ static void test_skills_retire_sql_sets_status_four(void) {
     hu_error_t err = hu_skills_retire_sql(7, buf, sizeof(buf), &len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(strstr(buf, "status = 4") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "?1") != NULL);
 }
 
 static void test_skill_trigger_match_full_overlap_returns_one(void) {
@@ -147,7 +150,7 @@ static void test_skill_chain_query_sql_filters_by_parent(void) {
     size_t len = 0;
     hu_error_t err = hu_skill_chain_query_sql(10, buf, sizeof(buf), &len);
     HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_TRUE(strstr(buf, "parent_skill_id = 10") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "parent_skill_id = ?1") != NULL);
 }
 
 static void test_meta_learning_compute_learning_rate(void) {

@@ -2007,7 +2007,7 @@ h3 {
   background: linear-gradient(
     90deg,
     var(--hu-accent),
-    color-mix(in srgb, var(--hu-accent) 80%, #a8d87e)
+    color-mix(in srgb, var(--hu-accent) 80%, var(--hu-accent-subtle))
   );
   color: var(--hu-on-accent, #0a1a0a);
   justify-content: flex-end;

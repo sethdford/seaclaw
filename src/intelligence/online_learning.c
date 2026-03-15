@@ -85,7 +85,72 @@ hu_error_t hu_online_learning_record(hu_online_learning_t *engine,
     sqlite3_bind_int64(stmt, 5, signal->timestamp);
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_STORE;
+    if (rc != SQLITE_DONE)
+        return HU_ERR_MEMORY_STORE;
+
+    /* Auto-update strategy weight from signal (closes loop: signals -> weights) */
+    char strategy_buf[STRATEGY_MAX];
+    const char *strategy = NULL;
+    size_t strategy_len = 0;
+    double evidence = signal->magnitude;
+
+    switch (signal->type) {
+    case HU_SIGNAL_TOOL_SUCCESS:
+        if (signal->tool_name_len > 0) {
+            size_t tn = signal->tool_name_len < (STRATEGY_MAX - 6u)
+                            ? signal->tool_name_len
+                            : (size_t)(STRATEGY_MAX - 6);
+            memcpy(strategy_buf, "tool:", 5);
+            memcpy(strategy_buf + 5, signal->tool_name, tn);
+            strategy_buf[5 + tn] = '\0';
+            strategy = strategy_buf;
+            strategy_len = 5 + tn;
+            evidence = signal->magnitude;
+        }
+        break;
+    case HU_SIGNAL_TOOL_FAILURE:
+        if (signal->tool_name_len > 0) {
+            size_t tn = signal->tool_name_len < (STRATEGY_MAX - 6u)
+                            ? signal->tool_name_len
+                            : (size_t)(STRATEGY_MAX - 6);
+            memcpy(strategy_buf, "tool:", 5);
+            memcpy(strategy_buf + 5, signal->tool_name, tn);
+            strategy_buf[5 + tn] = '\0';
+            strategy = strategy_buf;
+            strategy_len = 5 + tn;
+            evidence = 1.0 - signal->magnitude;
+        }
+        break;
+    case HU_SIGNAL_USER_APPROVAL:
+        strategy = "user_interaction";
+        strategy_len = 16;
+        evidence = signal->magnitude;
+        break;
+    case HU_SIGNAL_USER_CORRECTION:
+        strategy = "user_interaction";
+        strategy_len = 16;
+        evidence = 1.0 - signal->magnitude;
+        break;
+    case HU_SIGNAL_LONG_RESPONSE:
+        strategy = "response_length";
+        strategy_len = 15;
+        evidence = signal->magnitude;
+        break;
+    case HU_SIGNAL_SHORT_RESPONSE:
+        strategy = "response_length";
+        strategy_len = 15;
+        evidence = 1.0 - signal->magnitude;
+        break;
+    default:
+        break;
+    }
+
+    if (strategy && strategy_len > 0) {
+        (void)hu_online_learning_update_weight(engine, strategy, strategy_len,
+                                               evidence, signal->timestamp);
+    }
+
+    return HU_OK;
 }
 
 hu_error_t hu_online_learning_update_weight(hu_online_learning_t *engine,

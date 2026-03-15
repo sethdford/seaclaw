@@ -371,12 +371,12 @@ static void test_tot_explore_in_test_mode_returns_mock(void) {
     hu_tot_result_t result;
     memset(&result, 0, sizeof(result));
 
-    /* HU_IS_TEST: no provider needed, returns mock branches */
+    /* HU_IS_TEST: no provider needed, returns mock branches with 2-level expansion */
     hu_error_t err = hu_tot_explore(&alloc, NULL, "gpt-4", 4, "Solve X", 7, &cfg, &result);
     HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_EQ(result.branches_explored, 3u);
+    HU_ASSERT_TRUE(result.branches_explored >= 3u);
     HU_ASSERT_TRUE(result.branches_pruned >= 0u);
-    /* Best thought should be "Break into subproblems" (score 0.9) */
+    /* Best thought should contain "subproblems" (highest scoring branch) */
     if (result.best_thought) {
         HU_ASSERT_TRUE(strstr(result.best_thought, "subproblems") != NULL);
         HU_ASSERT_TRUE(result.best_score > 0.5);

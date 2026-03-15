@@ -56,7 +56,8 @@ hu_error_t hu_skills_update_usage_sql(int64_t id, double new_success_rate, char 
 /* F94: Query active (non-retired) skills */
 hu_error_t hu_skills_query_active_sql(char *buf, size_t cap, size_t *out_len);
 
-/* F95: Query skills by trigger */
+/* F95: Query skills by trigger. Outputs parameterized SQL with ?1 for the trigger.
+ * Caller must bind parameter 1 (trigger string) when executing. */
 hu_error_t hu_skills_query_by_trigger_sql(const char *trigger, size_t trigger_len, char *buf,
                                           size_t cap, size_t *out_len);
 
