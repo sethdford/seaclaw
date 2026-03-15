@@ -3738,6 +3738,131 @@ static void test_checkpoint_optimizer_mismatch(void) {
     remove(ckpt);
 }
 
+/* ─── Evaluator: remaining null args ─────────────────────────────────── */
+
+static void test_evaluator_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_model_t model = {0};
+    hu_ml_dataloader_t *dl = (hu_ml_dataloader_t *)0x1; /* non-null sentinel */
+    int32_t token_bytes[4] = {1,1,1,1};
+    hu_ml_eval_result_t result = {0};
+
+    HU_ASSERT_EQ(hu_ml_evaluate_bpb(NULL, &model, dl, token_bytes, 4, 4, &result),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_evaluate_bpb(&alloc, NULL, dl, token_bytes, 4, 4, &result),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_evaluate_bpb(&alloc, &model, NULL, token_bytes, 4, 4, &result),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_evaluate_bpb(&alloc, &model, dl, NULL, 4, 4, &result),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_evaluate_bpb(&alloc, &model, dl, token_bytes, 4, 4, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+
+/* ─── Prepare: missing input file and directory ──────────────────────── */
+
+static void test_prepare_missing_input(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_bpe_tokenizer_t *tok = NULL;
+    HU_ASSERT_EQ(hu_bpe_tokenizer_create(&alloc, &tok), HU_OK);
+
+    /* Missing input file */
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(&alloc, tok,
+        "/tmp/hu_nonexistent_input_xyz.txt", "/tmp/hu_out.bin"), HU_ERR_IO);
+
+    /* Missing input directory */
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(&alloc, tok,
+        "/tmp/hu_nonexistent_dir_xyz", "/tmp"), HU_ERR_IO);
+
+    /* Null args */
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(NULL, tok, "/tmp/a", "/tmp/b"),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(&alloc, NULL, "/tmp/a", "/tmp/b"),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(&alloc, tok, NULL, "/tmp/b"),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(&alloc, tok, "/tmp/a", NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(NULL, tok, "/tmp", "/tmp"),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(&alloc, NULL, "/tmp", "/tmp"),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(&alloc, tok, NULL, "/tmp"),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(&alloc, tok, "/tmp", NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+
+    hu_bpe_tokenizer_deinit(tok);
+}
+
+/* ─── Newton-Schulz: verify Q^T Q ≈ I (actual orthogonality) ────────── */
+
+static void test_newton_schulz_orthogonality_check(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_optimizer_config_t opt_cfg = {
+        .matrix_lr = 1.0f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f,
+        .weight_decay = 0.0f
+    };
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
+
+    /* 4×8 matrix — after Muon step, the update direction should be
+     * (near-)orthogonal. We verify by running a step with lr=1 and
+     * checking that the applied direction has orthonormal rows.
+     *
+     * Strategy: capture param before and after step, compute
+     * direction D = (before - after) / lr, then check D @ D^T ≈ I. */
+    const size_t rows = 4, cols = 8;
+    float param[32], grad[32], before[32];
+    for (size_t i = 0; i < 32; i++) {
+        param[i] = 0.1f * (float)(i + 1);
+        grad[i] = 0.05f * (float)((i * 7 + 3) % 13) - 0.3f;
+    }
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, param, grad, rows, cols, HU_PARAM_MATRIX), HU_OK);
+
+    memcpy(before, param, sizeof(before));
+    HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
+
+    /* D = before - after (= lr * orthogonal_direction, lr=1) */
+    float D[32];
+    for (size_t i = 0; i < 32; i++)
+        D[i] = before[i] - param[i];
+
+    /* Compute Gram matrix G = D @ D^T. For an orthogonal update direction,
+     * G should be approximately proportional to the identity matrix:
+     * diagonal entries ≈ same value, off-diagonals ≈ 0. */
+    float gram[16] = {0}; /* 4×4 */
+    for (size_t i = 0; i < rows; i++)
+        for (size_t j = 0; j < rows; j++) {
+            float dot = 0.0f;
+            for (size_t k = 0; k < cols; k++)
+                dot += D[i * cols + k] * D[j * cols + k];
+            gram[i * rows + j] = dot;
+        }
+
+    /* All diagonal entries should be positive and finite */
+    for (size_t i = 0; i < rows; i++) {
+        HU_ASSERT(gram[i * rows + i] > 1e-8f);
+        HU_ASSERT(isfinite(gram[i * rows + i]));
+    }
+
+    /* Off-diagonals should be small relative to the diagonal mean */
+    float diag_mean = 0.0f;
+    for (size_t i = 0; i < rows; i++)
+        diag_mean += gram[i * rows + i];
+    diag_mean /= (float)rows;
+
+    for (size_t i = 0; i < rows; i++)
+        for (size_t j = 0; j < rows; j++) {
+            if (i == j) continue;
+            float ratio = fabsf(gram[i * rows + j]) / diag_mean;
+            HU_ASSERT(ratio < 0.3f);
+        }
+
+    opt.vtable->deinit(opt.ctx, &alloc);
+}
+
 void run_ml_tests(void) {
     HU_TEST_SUITE("ml");
     /* BPE tokenizer */
@@ -3875,4 +4000,8 @@ void run_ml_tests(void) {
     HU_RUN_TEST(test_agent_apply_kv_nembd);
     HU_RUN_TEST(test_evaluator_zero_bytes);
     HU_RUN_TEST(test_checkpoint_optimizer_mismatch);
+    /* Evaluator, prepare, Newton-Schulz coverage */
+    HU_RUN_TEST(test_evaluator_null_args);
+    HU_RUN_TEST(test_prepare_missing_input);
+    HU_RUN_TEST(test_newton_schulz_orthogonality_check);
 }

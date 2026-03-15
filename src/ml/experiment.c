@@ -308,6 +308,7 @@ hu_error_t hu_experiment_loop(hu_allocator_t *alloc,
     int best_iter = -1;
 
     hu_experiment_config_t current_config = config->base_config;
+    hu_experiment_result_t prev_result = {0};
 
     /* Copy LR schedule from optimizer config to training config */
     current_config.training.warmup_ratio = current_config.optimizer.warmup_ratio;
@@ -332,7 +333,7 @@ hu_error_t hu_experiment_loop(hu_allocator_t *alloc,
             int used_agent = 0;
             if (config->provider)
                 used_agent = agent_suggest_mutation(alloc, &current_config,
-                    config->provider, config->persona, (i > 0) ? &result : NULL);
+                    config->provider, config->persona, &prev_result);
             if (!used_agent)
                 mutate_config(&current_config, i);
             current_config.optimizer.n_embd = current_config.gpt.n_embd;
@@ -370,6 +371,8 @@ hu_error_t hu_experiment_loop(hu_allocator_t *alloc,
 
         if (callback)
             callback(&result, user_data);
+
+        prev_result = result;
 
         if (config->convergence_threshold > 0.0 && best_bpb <= config->convergence_threshold)
             break;

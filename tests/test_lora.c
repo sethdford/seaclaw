@@ -270,6 +270,29 @@ static void lora_load_bad_file(void) {
     remove(path);
 }
 
+static void lora_invalid_layer_idx(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_lora_config_t cfg = {.rank = 2, .alpha = 2.0f, .dropout = 0.0f, .targets = HU_LORA_TARGET_ALL};
+    hu_lora_adapter_t *adapter = NULL;
+    HU_ASSERT_EQ(hu_lora_create(&alloc, &cfg, 4, 4, 2, &adapter), HU_OK);
+
+    float input[4] = {1,2,3,4};
+    float output[4] = {0};
+    float grad_out[4] = {1,1,1,1};
+
+    /* Valid indices: 0 and 1 */
+    HU_ASSERT_EQ(hu_lora_apply(adapter, 0, input, 1, output), HU_OK);
+    HU_ASSERT_EQ(hu_lora_apply(adapter, 1, input, 1, output), HU_OK);
+
+    /* Out of bounds */
+    HU_ASSERT_EQ(hu_lora_apply(adapter, 2, input, 1, output), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_lora_apply(adapter, 999, input, 1, output), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_lora_backward(adapter, 2, input, grad_out, 1, NULL), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_lora_set_layer_weights(adapter, 2, NULL, NULL), HU_ERR_INVALID_ARGUMENT);
+
+    hu_lora_destroy(&alloc, adapter);
+}
+
 /* Failing allocator for OOM testing */
 static int oom_alloc_count;
 static int oom_fail_at;
@@ -320,6 +343,7 @@ void run_lora_tests(void) {
     HU_RUN_TEST(lora_backward_grad_input_finite_diff);
     HU_RUN_TEST(lora_partial_set_weights);
     HU_RUN_TEST(lora_target_flags);
+    HU_RUN_TEST(lora_invalid_layer_idx);
     HU_RUN_TEST(lora_save_load_roundtrip);
     HU_RUN_TEST(lora_load_bad_file);
     HU_RUN_TEST(lora_oom_create);
