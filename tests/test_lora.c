@@ -100,6 +100,105 @@ static void lora_target_flags(void) {
     HU_ASSERT_EQ((int)HU_LORA_TARGET_ALL, 0x3F);
 }
 
+static void lora_backward_grad_input(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_lora_config_t cfg = {.rank = 2, .alpha = 2.0f, .dropout = 0.0f, .targets = HU_LORA_TARGET_ALL};
+    hu_lora_adapter_t *adapter = NULL;
+    HU_ASSERT_EQ(hu_lora_create(&alloc, &cfg, 4, 4, 1, &adapter), HU_OK);
+
+    /* A = [[1,0,0,0],[0,1,0,0]], B = [[1,0],[0,1],[0,0],[0,0]], scale = 2/2 = 1.0
+     * LoRA forward: output += (input @ A^T @ B^T) * scale
+     * d_input = scale * grad_output @ B @ A */
+    float A[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+    float B[8] = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    HU_ASSERT_EQ(hu_lora_set_layer_weights(adapter, 0, A, B), HU_OK);
+
+    float input[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+    float grad_output[4] = {1.0f, 0.5f, 0.0f, 0.0f};
+    float grad_input[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+    HU_ASSERT_EQ(hu_lora_backward(adapter, 0, input, grad_output, 1, grad_input), HU_OK);
+
+    /* grad_output @ B = [1,0.5,0,0] @ [[1,0],[0,1],[0,0],[0,0]] = [1, 0.5]
+     * gob @ A = [1, 0.5] @ [[1,0,0,0],[0,1,0,0]] = [1, 0.5, 0, 0] * scale=1 */
+    HU_ASSERT_FLOAT_EQ(grad_input[0], 1.0f, 1e-5f);
+    HU_ASSERT_FLOAT_EQ(grad_input[1], 0.5f, 1e-5f);
+    HU_ASSERT_FLOAT_EQ(grad_input[2], 0.0f, 1e-5f);
+    HU_ASSERT_FLOAT_EQ(grad_input[3], 0.0f, 1e-5f);
+
+    hu_lora_destroy(&alloc, adapter);
+}
+
+static void lora_backward_grad_input_finite_diff(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_lora_config_t cfg = {.rank = 2, .alpha = 4.0f, .dropout = 0.0f, .targets = HU_LORA_TARGET_ALL};
+    hu_lora_adapter_t *adapter = NULL;
+    HU_ASSERT_EQ(hu_lora_create(&alloc, &cfg, 4, 3, 1, &adapter), HU_OK);
+
+    float A[8] = {0.5f, -0.3f, 0.1f, 0.4f, -0.2f, 0.6f, -0.1f, 0.3f};
+    float B[6] = {0.3f, -0.5f, 0.2f, 0.4f, -0.1f, 0.7f};
+    HU_ASSERT_EQ(hu_lora_set_layer_weights(adapter, 0, A, B), HU_OK);
+
+    float input[4] = {1.0f, -0.5f, 0.3f, 0.8f};
+    const size_t in_dim = 4, out_dim = 3;
+
+    /* Forward to get base output */
+    float output_base[3] = {0.0f, 0.0f, 0.0f};
+    HU_ASSERT_EQ(hu_lora_apply(adapter, 0, input, 1, output_base), HU_OK);
+
+    /* Use unit grad_output for each output dimension to build full Jacobian,
+     * then compute grad_input = sum_j grad_output[j] * d(output[j])/d(input[k]) */
+    float grad_input_analytical[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float grad_output_full[3] = {1.0f, 1.0f, 1.0f};
+    HU_ASSERT_EQ(hu_lora_backward(adapter, 0, input, grad_output_full, 1,
+                                   grad_input_analytical), HU_OK);
+
+    /* Numerical gradient via finite differences */
+    const float eps = 1e-3f;
+    for (size_t k = 0; k < in_dim; k++) {
+        float saved = input[k];
+
+        input[k] = saved + eps;
+        float out_plus[3] = {0.0f, 0.0f, 0.0f};
+        HU_ASSERT_EQ(hu_lora_apply(adapter, 0, input, 1, out_plus), HU_OK);
+
+        input[k] = saved - eps;
+        float out_minus[3] = {0.0f, 0.0f, 0.0f};
+        HU_ASSERT_EQ(hu_lora_apply(adapter, 0, input, 1, out_minus), HU_OK);
+
+        input[k] = saved;
+
+        float numerical = 0.0f;
+        for (size_t j = 0; j < out_dim; j++)
+            numerical += (out_plus[j] - out_minus[j]) / (2.0f * eps);
+
+        HU_ASSERT_FLOAT_EQ(grad_input_analytical[k], numerical, 1e-2f);
+    }
+
+    hu_lora_destroy(&alloc, adapter);
+}
+
+static void lora_partial_set_weights(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_lora_config_t cfg = {.rank = 2, .alpha = 2.0f, .dropout = 0.0f, .targets = HU_LORA_TARGET_ALL};
+    hu_lora_adapter_t *adapter = NULL;
+    HU_ASSERT_EQ(hu_lora_create(&alloc, &cfg, 4, 4, 1, &adapter), HU_OK);
+
+    float A[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+    HU_ASSERT_EQ(hu_lora_set_layer_weights(adapter, 0, A, NULL), HU_OK);
+
+    float B[8] = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    HU_ASSERT_EQ(hu_lora_set_layer_weights(adapter, 0, NULL, B), HU_OK);
+
+    float input[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+    float output[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    HU_ASSERT_EQ(hu_lora_apply(adapter, 0, input, 1, output), HU_OK);
+    HU_ASSERT_FLOAT_EQ(output[0], 1.0f, 0.001f);
+    HU_ASSERT_FLOAT_EQ(output[1], 2.0f, 0.001f);
+
+    hu_lora_destroy(&alloc, adapter);
+}
+
 static void lora_save_load_test_mode(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_lora_config_t cfg = {.rank = 4, .alpha = 8.0f, .dropout = 0.0f, .targets = HU_LORA_TARGET_ALL};
@@ -128,6 +227,9 @@ void run_lora_tests(void) {
     HU_RUN_TEST(lora_destroy_null);
     HU_RUN_TEST(lora_apply_adds_delta);
     HU_RUN_TEST(lora_backward_accumulates);
+    HU_RUN_TEST(lora_backward_grad_input);
+    HU_RUN_TEST(lora_backward_grad_input_finite_diff);
+    HU_RUN_TEST(lora_partial_set_weights);
     HU_RUN_TEST(lora_target_flags);
     HU_RUN_TEST(lora_save_load_test_mode);
 }

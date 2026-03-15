@@ -8,6 +8,8 @@
 #include "human/ml/optimizer.h"
 #include <math.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #define ADAM_EPS 1e-8f
@@ -462,5 +464,89 @@ hu_error_t hu_muon_adamw_add_param(hu_ml_optimizer_t *opt, float *param,
     }
 
     m->group_count++;
+    return HU_OK;
+}
+
+/* ─── Checkpoint helpers ─────────────────────────────────────────────────── */
+
+hu_error_t hu_muon_adamw_save_state(hu_ml_optimizer_t *opt, void *file) {
+    if (!opt || !opt->ctx || !file)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (opt->vtable != &muon_adamw_vtable)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    hu_muon_adamw_t *m = (hu_muon_adamw_t *)opt->ctx;
+    FILE *f = (FILE *)file;
+
+    uint32_t gc = (uint32_t)m->group_count;
+    int32_t gs = m->global_step;
+    if (fwrite(&gc, sizeof(gc), 1, f) != 1)
+        return HU_ERR_IO;
+    if (fwrite(&gs, sizeof(gs), 1, f) != 1)
+        return HU_ERR_IO;
+
+    for (size_t i = 0; i < m->group_count; i++) {
+        hu_param_group_t *g = &m->groups[i];
+        uint32_t kind = (uint32_t)g->kind;
+        uint32_t numel = (uint32_t)g->numel;
+        int32_t sc = g->step_count;
+        uint32_t has_mom = g->momentum_buf ? 1 : 0;
+        if (fwrite(&kind, 4, 1, f) != 1 ||
+            fwrite(&numel, 4, 1, f) != 1 ||
+            fwrite(&sc, 4, 1, f) != 1 ||
+            fwrite(&has_mom, 4, 1, f) != 1)
+            return HU_ERR_IO;
+        size_t sz = g->numel * sizeof(float);
+        if (fwrite(g->exp_avg, 1, sz, f) != sz)
+            return HU_ERR_IO;
+        if (fwrite(g->exp_avg_sq, 1, sz, f) != sz)
+            return HU_ERR_IO;
+        if (has_mom && fwrite(g->momentum_buf, 1, sz, f) != sz)
+            return HU_ERR_IO;
+    }
+    return HU_OK;
+}
+
+hu_error_t hu_muon_adamw_load_state(hu_ml_optimizer_t *opt, void *file) {
+    if (!opt || !opt->ctx || !file)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (opt->vtable != &muon_adamw_vtable)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    hu_muon_adamw_t *m = (hu_muon_adamw_t *)opt->ctx;
+    FILE *f = (FILE *)file;
+
+    uint32_t gc = 0;
+    int32_t gs = 0;
+    if (fread(&gc, sizeof(gc), 1, f) != 1 || fread(&gs, sizeof(gs), 1, f) != 1)
+        return HU_ERR_IO;
+    if ((size_t)gc != m->group_count)
+        return HU_ERR_IO;
+    m->global_step = gs;
+
+    for (size_t i = 0; i < m->group_count; i++) {
+        hu_param_group_t *g = &m->groups[i];
+        uint32_t kind, numel, has_mom;
+        int32_t sc;
+        if (fread(&kind, 4, 1, f) != 1 ||
+            fread(&numel, 4, 1, f) != 1 ||
+            fread(&sc, 4, 1, f) != 1 ||
+            fread(&has_mom, 4, 1, f) != 1)
+            return HU_ERR_IO;
+        if ((size_t)numel != g->numel || (uint32_t)g->kind != kind)
+            return HU_ERR_IO;
+        g->step_count = sc;
+        size_t sz = g->numel * sizeof(float);
+        if (fread(g->exp_avg, 1, sz, f) != sz)
+            return HU_ERR_IO;
+        if (fread(g->exp_avg_sq, 1, sz, f) != sz)
+            return HU_ERR_IO;
+        if (has_mom) {
+            if (!g->momentum_buf)
+                return HU_ERR_IO;
+            if (fread(g->momentum_buf, 1, sz, f) != sz)
+                return HU_ERR_IO;
+        }
+    }
     return HU_OK;
 }

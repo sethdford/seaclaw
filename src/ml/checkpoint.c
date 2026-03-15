@@ -1,4 +1,5 @@
-/* Checkpoint save/load for ML models — binary format (HUML magic, version 1). */
+/* Checkpoint save/load for ML models — binary format (HUML magic, version 2).
+ * Version 2 adds optimizer state after model parameters. */
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
@@ -10,13 +11,12 @@
 #include <stdio.h>
 
 #define HUML_MAGIC 0x48554D4C
-#define HUML_VERSION 1
+#define HUML_VERSION 2
 
 hu_error_t hu_ml_checkpoint_save(hu_allocator_t *alloc, const char *path,
                                  hu_model_t *model, hu_ml_optimizer_t *opt)
 {
     (void)alloc;
-    (void)opt;
     if (!alloc || !path || !model || !opt)
         return HU_ERR_INVALID_ARGUMENT;
     if (!model->vtable || !model->vtable->get_params)
@@ -46,6 +46,12 @@ hu_error_t hu_ml_checkpoint_save(hu_allocator_t *alloc, const char *path,
         if (sz > 0 && (!params[i].data || fwrite(params[i].data, 1, sz, f) != sz))
             goto fail;
     }
+
+    /* Optimizer state (version 2+) */
+    err = hu_muon_adamw_save_state(opt, f);
+    if (err != HU_OK)
+        goto fail;
+
     fclose(f);
     return HU_OK;
 fail:
@@ -57,7 +63,6 @@ hu_error_t hu_ml_checkpoint_load(hu_allocator_t *alloc, const char *path,
                                  hu_model_t *model, hu_ml_optimizer_t *opt)
 {
     (void)alloc;
-    (void)opt;
     if (!alloc || !path || !model || !opt)
         return HU_ERR_INVALID_ARGUMENT;
     if (!model->vtable || !model->vtable->get_params)
@@ -77,7 +82,7 @@ hu_error_t hu_ml_checkpoint_load(hu_allocator_t *alloc, const char *path,
     if (fread(&magic, sizeof(magic), 1, f) != 1 ||
         fread(&version, sizeof(version), 1, f) != 1 ||
         fread(&file_count, sizeof(file_count), 1, f) != 1 ||
-        magic != (uint32_t)HUML_MAGIC || version != (uint32_t)HUML_VERSION ||
+        magic != (uint32_t)HUML_MAGIC || (version != 1 && version != 2) ||
         file_count != count) {
         fclose(f);
         return HU_ERR_IO;
@@ -89,6 +94,14 @@ hu_error_t hu_ml_checkpoint_load(hu_allocator_t *alloc, const char *path,
         if (sz > 0 && (!params[i].data || fread(params[i].data, 1, sz, f) != sz))
             goto fail_load;
     }
+
+    /* Optimizer state (version 2+) */
+    if (version >= 2) {
+        err = hu_muon_adamw_load_state(opt, f);
+        if (err != HU_OK)
+            goto fail_load;
+    }
+
     fclose(f);
     return HU_OK;
 fail_load:

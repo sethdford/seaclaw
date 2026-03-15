@@ -3132,6 +3132,171 @@ static void test_experiment_loop_agent_fallback(void) {
     remove(p1); remove(p2); rmdir(td);
 }
 
+/* ─── Dataloader: invalid split name ──────────────────────────────────── */
+
+static void test_dataloader_invalid_split(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ml_dataloader_t *dl = NULL;
+    HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, "/tmp", 1, 1, "invalid", &dl),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_NULL(dl);
+    HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, "/tmp", 1, 1, "test", &dl),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+
+/* ─── Evaluator: zero vocab / zero tokens ────────────────────────────── */
+
+static void test_evaluator_edge_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
+
+    const char *dir = "/tmp/test_eval_edge";
+    mkdir_p(dir);
+    int32_t tokens[32];
+    for (int i = 0; i < 32; i++) tokens[i] = i % 8;
+    char p[256]; snprintf(p, sizeof(p), "%s/val_00000.bin", dir);
+    FILE *f = fopen(p, "wb");
+    fwrite(tokens, sizeof(int32_t), 32, f); fclose(f);
+    hu_ml_dataloader_t *dl = NULL;
+    HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, dir, 1, 4, "val", &dl), HU_OK);
+
+    int32_t tb[8] = {1,1,1,1,1,1,1,1};
+    hu_ml_eval_result_t res = {0};
+
+    HU_ASSERT_EQ(hu_ml_evaluate_bpb(&alloc, &model, dl, tb, 0, 8, &res),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_evaluate_bpb(&alloc, &model, dl, tb, 8, 0, &res),
+                 HU_ERR_INVALID_ARGUMENT);
+
+    hu_ml_dataloader_deinit(dl);
+    model.vtable->deinit(model.ctx, &alloc);
+    remove(p); rmdir(dir);
+}
+
+/* ─── Prepare: tokenize directory ────────────────────────────────────── */
+
+static void test_prepare_tokenize_dir(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_bpe_tokenizer_t *tok = NULL;
+    hu_bpe_tokenizer_create(&alloc, &tok);
+
+    const char *in_dir = "/tmp/test_ml_tokdir_in";
+    const char *out_dir = "/tmp/test_ml_tokdir_out";
+    mkdir_p(in_dir);
+    mkdir_p(out_dir);
+
+    char p1[256], p2[256];
+    snprintf(p1, sizeof(p1), "%s/a.txt", in_dir);
+    snprintf(p2, sizeof(p2), "%s/b.txt", in_dir);
+    write_text_file(p1, "hello world test data");
+    write_text_file(p2, "second file for tokenization");
+
+    hu_error_t err = hu_ml_prepare_tokenize_dir(&alloc, tok, in_dir, out_dir);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    char o1[256], o2[256];
+    snprintf(o1, sizeof(o1), "%s/a.bin", out_dir);
+    snprintf(o2, sizeof(o2), "%s/b.bin", out_dir);
+
+    FILE *f1 = fopen(o1, "rb");
+    FILE *f2 = fopen(o2, "rb");
+    HU_ASSERT_NOT_NULL(f1);
+    HU_ASSERT_NOT_NULL(f2);
+    if (f1) fclose(f1);
+    if (f2) fclose(f2);
+
+    remove(o1); remove(o2); rmdir(out_dir);
+    remove(p1); remove(p2); rmdir(in_dir);
+    hu_bpe_tokenizer_deinit(tok);
+}
+
+/* ─── Checkpoint: optimizer state roundtrip ──────────────────────────── */
+
+static void test_checkpoint_optimizer_state(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
+
+    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
+        .matrix_lr = 0.01f, .scalar_lr = 0.001f, .weight_decay = 0.01f,
+        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt), HU_OK);
+
+    /* Run a few optimizer steps to populate exp_avg / exp_avg_sq / momentum */
+    hu_ml_tensor_t *params = NULL;
+    size_t pcount = 0;
+    HU_ASSERT_EQ(model.vtable->get_params(model.ctx, &params, &pcount), HU_OK);
+
+    float *fake_grad = (float *)alloc.alloc(alloc.ctx, params[0].size_bytes);
+    size_t nf = params[0].size_bytes / sizeof(float);
+    for (size_t i = 0; i < nf; i++) fake_grad[i] = 0.1f * (float)(i % 7 - 3);
+
+    hu_ml_tensor_t gt = { .data = fake_grad, .size_bytes = params[0].size_bytes, .ndim = 1 };
+    gt.shape[0] = nf;
+    opt.vtable->step(opt.ctx, params, &gt, 1);
+    opt.vtable->step(opt.ctx, params, &gt, 1);
+
+    /* Save model + optimizer */
+    const char *ckpt = "/tmp/test_opt_state.bin";
+    HU_ASSERT_EQ(hu_ml_checkpoint_save(&alloc, ckpt, &model, &opt), HU_OK);
+
+    /* Corrupt model params */
+    memset(params[0].data, 0, params[0].size_bytes);
+
+    /* Create a fresh optimizer with same structure */
+    hu_ml_optimizer_t opt2 = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt2), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt2), HU_OK);
+
+    /* Load — should restore both model and optimizer state */
+    HU_ASSERT_EQ(hu_ml_checkpoint_load(&alloc, ckpt, &model, &opt2), HU_OK);
+
+    /* Verify model params restored */
+    HU_ASSERT_EQ(model.vtable->get_params(model.ctx, &params, &pcount), HU_OK);
+    int nonzero = 0;
+    float *pd = (float *)params[0].data;
+    for (size_t i = 0; i < nf; i++)
+        if (fabsf(pd[i]) > 1e-10f) nonzero++;
+    HU_ASSERT(nonzero > 0);
+
+    /* Step both optimizers with same gradient — should produce same result */
+    float *p1_copy = (float *)alloc.alloc(alloc.ctx, params[0].size_bytes);
+    memcpy(p1_copy, params[0].data, params[0].size_bytes);
+
+    opt.vtable->step(opt.ctx, params, &gt, 1);
+    float *after_orig = (float *)alloc.alloc(alloc.ctx, params[0].size_bytes);
+    memcpy(after_orig, params[0].data, params[0].size_bytes);
+
+    memcpy(params[0].data, p1_copy, params[0].size_bytes);
+    opt2.vtable->step(opt2.ctx, params, &gt, 1);
+
+    int match = 1;
+    for (size_t i = 0; i < nf; i++) {
+        if (fabsf(((float*)params[0].data)[i] - after_orig[i]) > 1e-6f) {
+            match = 0; break;
+        }
+    }
+    HU_ASSERT_EQ(match, 1);
+
+    alloc.free(alloc.ctx, after_orig, params[0].size_bytes);
+    alloc.free(alloc.ctx, p1_copy, params[0].size_bytes);
+    alloc.free(alloc.ctx, fake_grad, params[0].size_bytes);
+    opt2.vtable->deinit(opt2.ctx, &alloc);
+    opt.vtable->deinit(opt.ctx, &alloc);
+    model.vtable->deinit(model.ctx, &alloc);
+    remove(ckpt);
+}
+
 void run_ml_tests(void) {
     HU_TEST_SUITE("ml");
     /* BPE tokenizer */
@@ -3253,4 +3418,10 @@ void run_ml_tests(void) {
     /* LoRA-GPT integration */
     HU_RUN_TEST(test_gpt_lora_forward);
     HU_RUN_TEST(test_gpt_lora_training);
+    /* Edge-case tests */
+    HU_RUN_TEST(test_dataloader_invalid_split);
+    HU_RUN_TEST(test_evaluator_edge_args);
+    HU_RUN_TEST(test_prepare_tokenize_dir);
+    /* Checkpoint optimizer state */
+    HU_RUN_TEST(test_checkpoint_optimizer_state);
 }

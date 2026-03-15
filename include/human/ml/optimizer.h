@@ -50,4 +50,10 @@ hu_error_t hu_muon_adamw_add_param(hu_ml_optimizer_t *opt, float *param,
                                    float *grad, size_t rows, size_t cols,
                                    hu_param_kind_t kind);
 
+/* Checkpoint helpers — serialize/deserialize optimizer state to/from file.
+ * The file handle is passed as void* to avoid stdio.h in this header;
+ * callers must pass a valid FILE*. */
+hu_error_t hu_muon_adamw_save_state(hu_ml_optimizer_t *opt, void *file);
+hu_error_t hu_muon_adamw_load_state(hu_ml_optimizer_t *opt, void *file);
+
 #endif
