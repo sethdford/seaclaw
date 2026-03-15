@@ -175,6 +175,41 @@ static void test_weakness_description_populated(void) {
     hu_weakness_report_free(&alloc, &report);
 }
 
+static void test_weakness_analyze_summary_empty_run(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_eval_run_t run = {.results = NULL, .results_count = 0, .passed = 0, .failed = 0};
+    hu_weakness_summary_t summaries[8] = {{0}};
+    size_t out_count = 99;
+    HU_ASSERT_EQ(hu_weakness_analyze_summary(&alloc, &run, NULL, summaries, 8, &out_count),
+                 HU_OK);
+    HU_ASSERT_EQ(out_count, 0u);
+}
+
+static void test_weakness_analyze_summary_groups_failures(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_eval_task_t tasks[3] = {
+        {.id = "t1", .prompt = "2+2", .prompt_len = 3, .expected = "4", .expected_len = 1,
+         .category = "math"},
+        {.id = "t2", .prompt = "cap", .prompt_len = 3, .expected = "Paris", .expected_len = 5,
+         .category = "geography"},
+        {.id = "t3", .prompt = "fmt", .prompt_len = 3, .expected = "json", .expected_len = 4,
+         .category = "output_format"},
+    };
+    hu_eval_suite_t suite = {.name = "test", .tasks = tasks, .tasks_count = 3};
+    hu_eval_result_t results[3] = {
+        {.task_id = "t1", .passed = false, .actual_output = "5", .actual_output_len = 1},
+        {.task_id = "t2", .passed = false, .actual_output = "London", .actual_output_len = 6},
+        {.task_id = "t3", .passed = false, .actual_output = "text", .actual_output_len = 4},
+    };
+    hu_eval_run_t run = {.results = results, .results_count = 3, .failed = 3};
+    hu_weakness_summary_t summaries[8] = {{0}};
+    size_t out_count = 0;
+    HU_ASSERT_EQ(hu_weakness_analyze_summary(&alloc, &run, &suite, summaries, 8, &out_count),
+                 HU_OK);
+    HU_ASSERT_TRUE(out_count >= 2u);
+    HU_ASSERT_TRUE(out_count <= 3u);
+}
+
 static void test_weakness_free_null(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_weakness_report_free(NULL, NULL);
@@ -197,5 +232,7 @@ void run_weakness_tests(void) {
     HU_RUN_TEST(test_weakness_mixed_pass_fail);
     HU_RUN_TEST(test_weakness_type_str);
     HU_RUN_TEST(test_weakness_description_populated);
+    HU_RUN_TEST(test_weakness_analyze_summary_empty_run);
+    HU_RUN_TEST(test_weakness_analyze_summary_groups_failures);
     HU_RUN_TEST(test_weakness_free_null);
 }

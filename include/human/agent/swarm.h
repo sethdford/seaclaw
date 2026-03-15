@@ -9,8 +9,9 @@
 
 /*
  * Swarm — parallel agent execution for decomposed tasks.
- * Under HU_IS_TEST: executes sequentially with mock results.
- * Production: sequential for now (threading requires careful design).
+ * Under HU_IS_TEST: executes sequentially with mock results (no real threads).
+ * Production (POSIX): pthread-based parallel execution up to max_parallel workers.
+ * Production (non-POSIX): sequential fallback.
  */
 
 typedef struct hu_swarm_config {

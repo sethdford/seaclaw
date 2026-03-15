@@ -243,6 +243,16 @@ static const char *const schema_parts[] = {
     "created_at INTEGER NOT NULL)",
     "CREATE INDEX IF NOT EXISTS idx_prospective_trigger ON prospective_memories(trigger_type, trigger_value)",
     "CREATE INDEX IF NOT EXISTS idx_prospective_expires ON prospective_memories(expires_at)",
+    "CREATE TABLE IF NOT EXISTS prospective_tasks("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "description TEXT NOT NULL,"
+    "trigger_type TEXT NOT NULL,"
+    "trigger_value TEXT NOT NULL,"
+    "priority REAL DEFAULT 0.5,"
+    "fired INTEGER DEFAULT 0,"
+    "created_at INTEGER NOT NULL,"
+    "fired_at INTEGER)",
+    "CREATE INDEX IF NOT EXISTS idx_prospective_tasks_trigger ON prospective_tasks(trigger_type, trigger_value) WHERE fired=0",
     "CREATE TABLE IF NOT EXISTS emotional_residue("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
     "episode_id INTEGER,"

@@ -81,6 +81,13 @@ static void imessage_feed_insufficient_cap_returns_error(void) {
     HU_ASSERT_NEQ(err, HU_OK);
 }
 
+static void imessage_feed_null_out_count_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_feed_ingest_item_t items[4];
+    hu_error_t err = hu_imessage_feed_fetch(&alloc, 0, items, 4, NULL);
+    HU_ASSERT_NEQ(err, HU_OK);
+}
+
 /* ── Twitter feed (F96) ──────────────────────────────────────────────── */
 
 static void twitter_feed_mock_returns_two_items(void) {
@@ -291,6 +298,7 @@ void run_research_feeds_tests(void) {
     HU_RUN_TEST(imessage_feed_mock_returns_two_items);
     HU_RUN_TEST(imessage_feed_null_items_returns_error);
     HU_RUN_TEST(imessage_feed_insufficient_cap_returns_error);
+    HU_RUN_TEST(imessage_feed_null_out_count_returns_error);
 
     /* Twitter feed */
     HU_RUN_TEST(twitter_feed_mock_returns_two_items);

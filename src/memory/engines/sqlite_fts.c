@@ -123,6 +123,8 @@ static void fill_entry_from_mock(hu_allocator_t *alloc, const mock_entry_t *m,
     out->session_id =
         m->session_id ? hu_strndup(alloc, m->session_id, strlen(m->session_id)) : NULL;
     out->session_id_len = m->session_id ? strlen(m->session_id) : 0;
+    out->source = NULL;
+    out->source_len = 0;
     out->score = NAN;
 }
 

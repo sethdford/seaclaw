@@ -70,7 +70,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         <div
           class="absolute inset-0 opacity-30"
           style="background: radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in srgb, var(--hu-accent) 25%, transparent), transparent 70%);"
-        />
+        >
+        </div>
         <div class="relative z-10 max-w-5xl mx-auto text-center">
           <h1
             class="text-[clamp(3.5rem,10vw,7rem)] font-black leading-[0.95] tracking-tighter mb-4"
@@ -88,16 +89,15 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
             class="text-[clamp(1rem,1.8vw,1.2rem)] max-w-2xl mx-auto leading-relaxed"
             style="color: var(--hu-web-text-tertiary);"
           >
-            We built an AI runtime that's honest about what it is. Not trying to be human. Not pretending to be anything it's not. Just a fast, small, capable runtime that fits anywhere a CPU exists.
+            We built an AI runtime that's honest about what it is. Not trying to
+            be human. Not pretending to be anything it's not. Just a fast,
+            small, capable runtime that fits anywhere a CPU exists.
           </p>
         </div>
       </section>
 
       {/* ═══ 2. Name & Tagline ═══ */}
-      <section
-        class="py-24 md:py-32 px-6 cv-defer"
-        data-reveal
-      >
+      <section class="py-24 md:py-32 px-6 cv-defer" data-reveal>
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
@@ -106,28 +106,47 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
             Name & Tagline
           </h2>
           <div class="grid md:grid-cols-2 gap-12 md:gap-16 items-start">
-            <div class="glass rounded-2xl p-8 md:p-10" style="border: 1px solid var(--color-border);">
+            <div
+              class="glass rounded-2xl p-8 md:p-10"
+              style="border: 1px solid var(--color-border);"
+            >
               <div
                 class="text-[clamp(2.5rem,5vw,4rem)] font-black mb-6"
                 style="font-family: var(--hu-font); color: var(--color-accent); letter-spacing: -0.02em;"
               >
                 h-uman
               </div>
-              <p class="text-base leading-relaxed" style="color: var(--color-text-secondary);">
-                The hyphen splits the word, reminding you this is almost—but not quite—human. It's a deliberate pause. A breath. A moment of honesty before the rest of the word completes.
+              <p
+                class="text-base leading-relaxed"
+                style="color: var(--color-text-secondary);"
+              >
+                The hyphen splits the word, reminding you this is almost—but not
+                quite—human. It's a deliberate pause. A breath. A moment of
+                honesty before the rest of the word completes.
               </p>
             </div>
-            <div class="glass rounded-2xl p-8 md:p-10" style="border: 1px solid var(--color-border);">
+            <div
+              class="glass rounded-2xl p-8 md:p-10"
+              style="border: 1px solid var(--color-border);"
+            >
               <div
                 class="text-[clamp(1.5rem,3vw,2rem)] font-normal mb-6"
                 style="font-family: var(--hu-font); color: var(--color-text);"
               >
                 not quite human.
               </div>
-              <ul class="space-y-3 text-sm" style="color: var(--color-text-secondary);">
+              <ul
+                class="space-y-3 text-sm"
+                style="color: var(--color-text-secondary);"
+              >
                 <li>Always lowercase.</li>
                 <li>Always ends with a period.</li>
-                <li>Use em dash when pairing with brand name: <span style="color: var(--color-text);">h-uman — not quite human.</span></li>
+                <li>
+                  Use em dash when pairing with brand name: <span
+                    style="color: var(--color-text);"
+                    >h-uman — not quite human.</span
+                  >
+                </li>
               </ul>
             </div>
           </div>
@@ -135,10 +154,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       </section>
 
       {/* ═══ 3. Logo ═══ */}
-      <section
-        class="py-24 md:py-32 px-6 cv-defer"
-        data-reveal
-      >
+      <section class="py-24 md:py-32 px-6 cv-defer" data-reveal>
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
@@ -158,8 +174,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 <span
                   class="absolute top-4 left-4 right-4 bottom-4 border border-dashed rounded-lg opacity-40"
                   style="border-color: var(--hu-accent);"
-                  aria-hidden="true"
-                />
+                  aria-hidden="true"></span>
                 <img
                   src={`${base}human.svg`}
                   alt="h-uman logo"
@@ -186,7 +201,10 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                   class="w-16 h-16"
                   loading="lazy"
                 />
-                <span class="text-xs mt-3" style="color: var(--hu-web-text-tertiary);">64px</span>
+                <span
+                  class="text-xs mt-3"
+                  style="color: var(--hu-web-text-tertiary);">64px</span
+                >
               </div>
               <div
                 class="rounded-xl p-8 flex flex-col items-center justify-center"
@@ -200,7 +218,10 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                   class="w-12 h-12"
                   loading="lazy"
                 />
-                <span class="text-xs mt-3" style="color: var(--color-text-tertiary);">48px on light</span>
+                <span
+                  class="text-xs mt-3"
+                  style="color: var(--color-text-tertiary);">48px on light</span
+                >
               </div>
               <div
                 class="rounded-xl p-8 flex flex-col items-center justify-center"
@@ -214,7 +235,10 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                   class="w-8 h-8"
                   loading="lazy"
                 />
-                <span class="text-xs mt-3" style="color: var(--hu-web-text-tertiary);">32px on dark</span>
+                <span
+                  class="text-xs mt-3"
+                  style="color: var(--hu-web-text-tertiary);">32px on dark</span
+                >
               </div>
             </div>
           </div>
@@ -222,10 +246,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       </section>
 
       {/* ═══ 4. Color ═══ */}
-      <section
-        class="py-24 md:py-32 px-6 cv-defer"
-        data-reveal
-      >
+      <section class="py-24 md:py-32 px-6 cv-defer" data-reveal>
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
@@ -235,20 +256,35 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
           </h2>
           <div class="space-y-12">
             <div>
-              <h3 class="text-lg font-semibold mb-4" style="color: var(--color-text);">
+              <h3
+                class="text-lg font-semibold mb-4"
+                style="color: var(--color-text);"
+              >
                 Fidelity Green (Primary)
               </h3>
               <div
                 class="h-32 md:h-40 rounded-2xl mb-4"
                 style="background: var(--hu-accent);"
-              />
+              >
+              </div>
               <p class="text-sm" style="color: var(--color-text-secondary);">
-                <code class="px-2 py-0.5 rounded" style="background: var(--hu-web-code-bg); color: var(--color-accent);">#7AB648</code>
-                — <code class="px-2 py-0.5 rounded" style="background: var(--hu-web-code-bg);">var(--hu-accent)</code>
+                <code
+                  class="px-2 py-0.5 rounded"
+                  style="background: var(--hu-web-code-bg); color: var(--color-accent);"
+                  >#7AB648</code
+                >
+                — <code
+                  class="px-2 py-0.5 rounded"
+                  style="background: var(--hu-web-code-bg);"
+                  >var(--hu-accent)</code
+                >
               </p>
             </div>
             <div>
-              <h3 class="text-lg font-semibold mb-4" style="color: var(--color-text);">
+              <h3
+                class="text-lg font-semibold mb-4"
+                style="color: var(--color-text);"
+              >
                 Accent Hierarchy
               </h3>
               <div class="brand-color-grid">
@@ -271,7 +307,10 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               </div>
             </div>
             <div>
-              <h3 class="text-lg font-semibold mb-4" style="color: var(--color-text);">
+              <h3
+                class="text-lg font-semibold mb-4"
+                style="color: var(--color-text);"
+              >
                 Light & Dark
               </h3>
               <div class="grid sm:grid-cols-2 gap-6">
@@ -279,22 +318,56 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                   class="rounded-2xl p-6 border"
                   style="background: var(--hu-web-bg); border-color: var(--color-border);"
                 >
-                  <p class="text-xs uppercase tracking-wider mb-4" style="color: var(--color-text-tertiary);">Light mode</p>
+                  <p
+                    class="text-xs uppercase tracking-wider mb-4"
+                    style="color: var(--color-text-tertiary);"
+                  >
+                    Light mode
+                  </p>
                   <div class="flex gap-3">
-                    <div class="w-12 h-12 rounded-lg" style="background: var(--hu-accent);" />
-                    <div class="w-12 h-12 rounded-lg" style="background: var(--hu-accent-secondary);" />
-                    <div class="w-12 h-12 rounded-lg" style="background: var(--hu-accent-tertiary);" />
+                    <div
+                      class="w-12 h-12 rounded-lg"
+                      style="background: var(--hu-accent);"
+                    >
+                    </div>
+                    <div
+                      class="w-12 h-12 rounded-lg"
+                      style="background: var(--hu-accent-secondary);"
+                    >
+                    </div>
+                    <div
+                      class="w-12 h-12 rounded-lg"
+                      style="background: var(--hu-accent-tertiary);"
+                    >
+                    </div>
                   </div>
                 </div>
                 <div
                   class="rounded-2xl p-6"
                   style="background: var(--hu-bg-surface, #152333); border: 1px solid color-mix(in srgb, white 0.1, transparent);"
                 >
-                  <p class="text-xs uppercase tracking-wider mb-4" style="color: var(--hu-web-text-tertiary);">Dark mode</p>
+                  <p
+                    class="text-xs uppercase tracking-wider mb-4"
+                    style="color: var(--hu-web-text-tertiary);"
+                  >
+                    Dark mode
+                  </p>
                   <div class="flex gap-3">
-                    <div class="w-12 h-12 rounded-lg" style="background: var(--hu-accent);" />
-                    <div class="w-12 h-12 rounded-lg" style="background: var(--hu-accent-secondary);" />
-                    <div class="w-12 h-12 rounded-lg" style="background: var(--hu-accent-tertiary);" />
+                    <div
+                      class="w-12 h-12 rounded-lg"
+                      style="background: var(--hu-accent);"
+                    >
+                    </div>
+                    <div
+                      class="w-12 h-12 rounded-lg"
+                      style="background: var(--hu-accent-secondary);"
+                    >
+                    </div>
+                    <div
+                      class="w-12 h-12 rounded-lg"
+                      style="background: var(--hu-accent-tertiary);"
+                    >
+                    </div>
                   </div>
                 </div>
               </div>
@@ -304,10 +377,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       </section>
 
       {/* ═══ 5. Typography ═══ */}
-      <section
-        class="py-24 md:py-32 px-6 cv-defer"
-        data-reveal
-      >
+      <section class="py-24 md:py-32 px-6 cv-defer" data-reveal>
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
@@ -316,64 +386,124 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
             Typography
           </h2>
           <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
-            Avenir at all weights. Use <code class="px-2 py-0.5 rounded" style="background: var(--hu-web-code-bg);">var(--hu-font)</code>.
+            Avenir at all weights. Use <code
+              class="px-2 py-0.5 rounded"
+              style="background: var(--hu-web-code-bg);">var(--hu-font)</code
+            >.
           </p>
           <div class="space-y-10">
             <div class="brand-type-spec" style="font-weight: 300;">
-              <span class="text-xs uppercase tracking-wider" style="color: var(--color-text-tertiary);">Light 300</span>
-              <p class="text-xl mt-2" style="font-family: var(--hu-font); color: var(--color-text);">
+              <span
+                class="text-xs uppercase tracking-wider"
+                style="color: var(--color-text-tertiary);">Light 300</span
+              >
+              <p
+                class="text-xl mt-2"
+                style="font-family: var(--hu-font); color: var(--color-text);"
+              >
                 The quick brown fox jumps over the lazy dog. 0123456789
               </p>
             </div>
             <div class="brand-type-spec" style="font-weight: 400;">
-              <span class="text-xs uppercase tracking-wider" style="color: var(--color-text-tertiary);">Book 400</span>
-              <p class="text-xl mt-2" style="font-family: var(--hu-font); color: var(--color-text);">
+              <span
+                class="text-xs uppercase tracking-wider"
+                style="color: var(--color-text-tertiary);">Book 400</span
+              >
+              <p
+                class="text-xl mt-2"
+                style="font-family: var(--hu-font); color: var(--color-text);"
+              >
                 The quick brown fox jumps over the lazy dog. 0123456789
               </p>
             </div>
             <div class="brand-type-spec" style="font-weight: 500;">
-              <span class="text-xs uppercase tracking-wider" style="color: var(--color-text-tertiary);">Medium 500</span>
-              <p class="text-xl mt-2" style="font-family: var(--hu-font); color: var(--color-text);">
+              <span
+                class="text-xs uppercase tracking-wider"
+                style="color: var(--color-text-tertiary);">Medium 500</span
+              >
+              <p
+                class="text-xl mt-2"
+                style="font-family: var(--hu-font); color: var(--color-text);"
+              >
                 The quick brown fox jumps over the lazy dog. 0123456789
               </p>
             </div>
             <div class="brand-type-spec" style="font-weight: 700;">
-              <span class="text-xs uppercase tracking-wider" style="color: var(--color-text-tertiary);">Heavy 700</span>
-              <p class="text-xl mt-2" style="font-family: var(--hu-font); color: var(--color-text);">
+              <span
+                class="text-xs uppercase tracking-wider"
+                style="color: var(--color-text-tertiary);">Heavy 700</span
+              >
+              <p
+                class="text-xl mt-2"
+                style="font-family: var(--hu-font); color: var(--color-text);"
+              >
                 The quick brown fox jumps over the lazy dog. 0123456789
               </p>
             </div>
             <div class="brand-type-spec" style="font-weight: 900;">
-              <span class="text-xs uppercase tracking-wider" style="color: var(--color-text-tertiary);">Black 900</span>
-              <p class="text-xl mt-2" style="font-family: var(--hu-font); color: var(--color-text);">
+              <span
+                class="text-xs uppercase tracking-wider"
+                style="color: var(--color-text-tertiary);">Black 900</span
+              >
+              <p
+                class="text-xl mt-2"
+                style="font-family: var(--hu-font); color: var(--color-text);"
+              >
                 The quick brown fox jumps over the lazy dog. 0123456789
               </p>
             </div>
           </div>
           <div class="mt-16">
-            <h3 class="text-lg font-semibold mb-4" style="color: var(--color-text);">
+            <h3
+              class="text-lg font-semibold mb-4"
+              style="color: var(--color-text);"
+            >
               Type Scale
             </h3>
             <div class="flex flex-wrap gap-4 items-baseline">
-              <span style="font-family: var(--hu-font); font-size: var(--hu-text-2xs); color: var(--color-text);">2xs</span>
-              <span style="font-family: var(--hu-font); font-size: var(--hu-text-xs); color: var(--color-text);">xs</span>
-              <span style="font-family: var(--hu-font); font-size: var(--hu-text-sm); color: var(--color-text);">sm</span>
-              <span style="font-family: var(--hu-font); font-size: var(--hu-text-base); color: var(--color-text);">base</span>
-              <span style="font-family: var(--hu-font); font-size: var(--hu-text-lg); color: var(--color-text);">lg</span>
-              <span style="font-family: var(--hu-font); font-size: var(--hu-text-xl); color: var(--color-text);">xl</span>
-              <span style="font-family: var(--hu-font); font-size: var(--hu-text-2xl); color: var(--color-text);">2xl</span>
-              <span style="font-family: var(--hu-font); font-size: var(--hu-text-3xl); color: var(--color-text);">3xl</span>
-              <span style="font-family: var(--hu-font); font-size: var(--hu-text-hero); color: var(--color-text);">hero</span>
+              <span
+                style="font-family: var(--hu-font); font-size: var(--hu-text-2xs); color: var(--color-text);"
+                >2xs</span
+              >
+              <span
+                style="font-family: var(--hu-font); font-size: var(--hu-text-xs); color: var(--color-text);"
+                >xs</span
+              >
+              <span
+                style="font-family: var(--hu-font); font-size: var(--hu-text-sm); color: var(--color-text);"
+                >sm</span
+              >
+              <span
+                style="font-family: var(--hu-font); font-size: var(--hu-text-base); color: var(--color-text);"
+                >base</span
+              >
+              <span
+                style="font-family: var(--hu-font); font-size: var(--hu-text-lg); color: var(--color-text);"
+                >lg</span
+              >
+              <span
+                style="font-family: var(--hu-font); font-size: var(--hu-text-xl); color: var(--color-text);"
+                >xl</span
+              >
+              <span
+                style="font-family: var(--hu-font); font-size: var(--hu-text-2xl); color: var(--color-text);"
+                >2xl</span
+              >
+              <span
+                style="font-family: var(--hu-font); font-size: var(--hu-text-3xl); color: var(--color-text);"
+                >3xl</span
+              >
+              <span
+                style="font-family: var(--hu-font); font-size: var(--hu-text-hero); color: var(--color-text);"
+                >hero</span
+              >
             </div>
           </div>
         </div>
       </section>
 
       {/* ═══ 6. Voice & Tone ═══ */}
-      <section
-        class="py-24 md:py-32 px-6 cv-defer"
-        data-reveal
-      >
+      <section class="py-24 md:py-32 px-6 cv-defer" data-reveal>
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
@@ -382,66 +512,146 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
             Voice & Tone
           </h2>
           <div class="grid md:grid-cols-3 gap-6">
-            <div class="glass rounded-2xl p-8" style="border: 1px solid var(--color-border);">
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
               <div class="flex items-center gap-3 mb-4">
-                <svg class="w-8 h-8 flex-shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--hu-accent);" aria-hidden="true">
-                  <path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,96a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,96Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,128Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,160Z"/>
+                <svg
+                  class="w-8 h-8 flex-shrink-0"
+                  viewBox="0 0 256 256"
+                  fill="currentColor"
+                  style="color: var(--hu-accent);"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,96a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,96Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,128Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,160Z"
+                  ></path>
                 </svg>
-                <h3 class="text-lg font-bold" style="color: var(--color-text);">Honest</h3>
+                <h3 class="text-lg font-bold" style="color: var(--color-text);">
+                  Honest
+                </h3>
               </div>
-              <p class="text-sm mb-4" style="color: var(--color-text-secondary);">
+              <p
+                class="text-sm mb-4"
+                style="color: var(--color-text-secondary);"
+              >
                 We say what we are and aren't.
               </p>
               <div class="space-y-3 text-sm">
                 <div>
-                  <span class="text-xs uppercase" style="color: var(--hu-accent);">Good</span>
-                  <p style="color: var(--color-text);">"h-uman is a C runtime. It doesn't run in the cloud by default."</p>
+                  <span
+                    class="text-xs uppercase"
+                    style="color: var(--hu-accent);">Good</span
+                  >
+                  <p style="color: var(--color-text);">
+                    "h-uman is a C runtime. It doesn't run in the cloud by
+                    default."
+                  </p>
                 </div>
                 <div>
-                  <span class="text-xs uppercase" style="color: var(--hu-error);">Bad</span>
-                  <p style="color: var(--color-text-tertiary);">"h-uman is the most powerful AI platform ever built."</p>
+                  <span
+                    class="text-xs uppercase"
+                    style="color: var(--hu-error);">Bad</span
+                  >
+                  <p style="color: var(--color-text-tertiary);">
+                    "h-uman is the most powerful AI platform ever built."
+                  </p>
                 </div>
               </div>
             </div>
-            <div class="glass rounded-2xl p-8" style="border: 1px solid var(--color-border);">
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
               <div class="flex items-center gap-3 mb-4">
-                <svg class="w-8 h-8 flex-shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--hu-accent-tertiary);" aria-hidden="true">
-                  <path d="M224,128a96,96,0,0,0-96-96H64A64,64,0,0,0,0,96v64a64,64,0,0,0,64,64h64a96,96,0,0,0,96-96Zm-16,0a80,80,0,0,1-80,80H64A48,48,0,0,1,16,160V96A48,48,0,0,1,64,48h64A80,80,0,0,1,208,128Z"/>
+                <svg
+                  class="w-8 h-8 flex-shrink-0"
+                  viewBox="0 0 256 256"
+                  fill="currentColor"
+                  style="color: var(--hu-accent-tertiary);"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M224,128a96,96,0,0,0-96-96H64A64,64,0,0,0,0,96v64a64,64,0,0,0,64,64h64a96,96,0,0,0,96-96Zm-16,0a80,80,0,0,1-80,80H64A48,48,0,0,1,16,160V96A48,48,0,0,1,64,48h64A80,80,0,0,1,208,128Z"
+                  ></path>
                 </svg>
-                <h3 class="text-lg font-bold" style="color: var(--color-text);">Technical</h3>
+                <h3 class="text-lg font-bold" style="color: var(--color-text);">
+                  Technical
+                </h3>
               </div>
-              <p class="text-sm mb-4" style="color: var(--color-text-secondary);">
+              <p
+                class="text-sm mb-4"
+                style="color: var(--color-text-secondary);"
+              >
                 We respect the intelligence of our users.
               </p>
               <div class="space-y-3 text-sm">
                 <div>
-                  <span class="text-xs uppercase" style="color: var(--hu-accent);">Good</span>
-                  <p style="color: var(--color-text);">"~1.7 MB binary. Zero deps. &lt;6 MB RSS."</p>
+                  <span
+                    class="text-xs uppercase"
+                    style="color: var(--hu-accent);">Good</span
+                  >
+                  <p style="color: var(--color-text);">
+                    "~1.7 MB binary. Zero deps. &lt;6 MB RSS."
+                  </p>
                 </div>
                 <div>
-                  <span class="text-xs uppercase" style="color: var(--hu-error);">Bad</span>
-                  <p style="color: var(--color-text-tertiary);">"Super fast and lightweight!"</p>
+                  <span
+                    class="text-xs uppercase"
+                    style="color: var(--hu-error);">Bad</span
+                  >
+                  <p style="color: var(--color-text-tertiary);">
+                    "Super fast and lightweight!"
+                  </p>
                 </div>
               </div>
             </div>
-            <div class="glass rounded-2xl p-8" style="border: 1px solid var(--color-border);">
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
               <div class="flex items-center gap-3 mb-4">
-                <svg class="w-8 h-8 flex-shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--hu-accent-secondary);" aria-hidden="true">
-                  <path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32Zm0,176H48V48H208V208ZM184,96a8,8,0,0,1-8,8H80a8,8,0,0,1,0-16h96A8,8,0,0,1,184,96Zm0,32a8,8,0,0,1-8,8H80a8,8,0,0,1,0-16h96A8,8,0,0,1,184,128Z"/>
+                <svg
+                  class="w-8 h-8 flex-shrink-0"
+                  viewBox="0 0 256 256"
+                  fill="currentColor"
+                  style="color: var(--hu-accent-secondary);"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32Zm0,176H48V48H208V208ZM184,96a8,8,0,0,1-8,8H80a8,8,0,0,1,0-16h96A8,8,0,0,1,184,96Zm0,32a8,8,0,0,1-8,8H80a8,8,0,0,1,0-16h96A8,8,0,0,1,184,128Z"
+                  ></path>
                 </svg>
-                <h3 class="text-lg font-bold" style="color: var(--color-text);">Concise</h3>
+                <h3 class="text-lg font-bold" style="color: var(--color-text);">
+                  Concise
+                </h3>
               </div>
-              <p class="text-sm mb-4" style="color: var(--color-text-secondary);">
+              <p
+                class="text-sm mb-4"
+                style="color: var(--color-text-secondary);"
+              >
                 Every word earns its place.
               </p>
               <div class="space-y-3 text-sm">
                 <div>
-                  <span class="text-xs uppercase" style="color: var(--hu-accent);">Good</span>
-                  <p style="color: var(--color-text);">"One binary. Zero deps."</p>
+                  <span
+                    class="text-xs uppercase"
+                    style="color: var(--hu-accent);">Good</span
+                  >
+                  <p style="color: var(--color-text);">
+                    "One binary. Zero deps."
+                  </p>
                 </div>
                 <div>
-                  <span class="text-xs uppercase" style="color: var(--hu-error);">Bad</span>
-                  <p style="color: var(--color-text-tertiary);">"You get a single executable file with no external dependencies whatsoever."</p>
+                  <span
+                    class="text-xs uppercase"
+                    style="color: var(--hu-error);">Bad</span
+                  >
+                  <p style="color: var(--color-text-tertiary);">
+                    "You get a single executable file with no external
+                    dependencies whatsoever."
+                  </p>
                 </div>
               </div>
             </div>
@@ -547,7 +757,9 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     </style>
 
     <script>
-      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
 
       if (prefersReducedMotion) {
         document.querySelectorAll("[data-reveal]").forEach((el) => {
@@ -565,7 +777,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               }
             });
           },
-          { threshold: 0.15, rootMargin: "0px 0px -50px 0px" }
+          { threshold: 0.15, rootMargin: "0px 0px -50px 0px" },
         );
         document.querySelectorAll("[data-reveal]").forEach((el) => {
           revealObserver.observe(el);

@@ -39,6 +39,35 @@ hu_error_t hu_prospective_check_triggers(hu_allocator_t *alloc, sqlite3 *db,
 
 hu_error_t hu_prospective_mark_fired(sqlite3 *db, int64_t id);
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Prospective tasks — time/event-triggered scheduled actions
+ * Table: prospective_tasks (created by sqlite engine)
+ * ────────────────────────────────────────────────────────────────────────── */
+
+typedef struct hu_prospective_task {
+    int64_t id;
+    char description[512];
+    char trigger_type[32];
+    char trigger_value[256];
+    double priority;
+    int fired;
+    int64_t created_at;
+    int64_t fired_at;
+} hu_prospective_task_t;
+
+hu_error_t hu_prospective_schedule(sqlite3 *db, const char *description, size_t desc_len,
+                                   const char *trigger_type, size_t tt_len,
+                                   const char *trigger_value, size_t tv_len,
+                                   double priority, int64_t *out_id);
+
+hu_error_t hu_prospective_task_check_triggers(hu_allocator_t *alloc, sqlite3 *db,
+                                              const char *trigger_type,
+                                              const char *trigger_value, size_t tv_len,
+                                              int64_t now_ts, hu_prospective_task_t **out,
+                                              size_t *out_count);
+
+hu_error_t hu_prospective_task_mark_fired(sqlite3 *db, int64_t id);
+
 #endif /* HU_ENABLE_SQLITE */
 
 #endif /* HU_MEMORY_PROSPECTIVE_H */

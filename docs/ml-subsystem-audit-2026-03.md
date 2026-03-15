@@ -1,3 +1,7 @@
+---
+title: ML Subsystem Audit — March 2026
+---
+
 # ML Subsystem Audit — March 2026
 
 Audit of the ML subsystem for remaining gaps, bugs, and non-SOTA patterns. Excludes items already fixed (soft-cap, LoRA integration, weight decay, etc.).

@@ -1857,6 +1857,7 @@ set(HU_TEST_SOURCES
     tests/test_planning.c
     tests/test_rel_dynamics.c
     tests/test_prospective.c
+    tests/test_prospective_memory.c
     tests/test_emotional_residue.c
     tests/test_consolidation_engine.c
     tests/test_conv_goals.c
@@ -1902,6 +1903,7 @@ set(HU_TEST_SOURCES
     tests/test_agent_trainer.c
     tests/test_otel_traces.c
     tests/test_mcp_transport.c
+    tests/test_mcp_transport_sse.c
     tests/test_mcp_audit.c
     tests/test_multigraph.c
     tests/test_memory_graph.c

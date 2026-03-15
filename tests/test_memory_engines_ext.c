@@ -37,6 +37,91 @@ static void test_lucid_lifecycle(void) {
     hu_memory_entry_free_fields(&alloc, &entry);
     mem.vtable->deinit(mem.ctx);
 }
+
+static void test_lucid_init_creates_table(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_lucid_memory_create(&alloc, ":memory:", "/tmp/ws");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+    HU_ASSERT_NOT_NULL(mem.ctx);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_lucid_store_and_get(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_lucid_memory_create(&alloc, ":memory:", "/tmp/ws");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CORE};
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "sg1", 3, "stored content", 14, &cat, NULL, 0),
+                 HU_OK);
+
+    hu_memory_entry_t entry = {0};
+    bool found = false;
+    HU_ASSERT_EQ(mem.vtable->get(mem.ctx, &alloc, "sg1", 3, &entry, &found), HU_OK);
+    HU_ASSERT(found);
+    HU_ASSERT_EQ(entry.content_len, 14u);
+    hu_memory_entry_free_fields(&alloc, &entry);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_lucid_list_entries(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_lucid_memory_create(&alloc, ":memory:", "/tmp/ws");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CORE};
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "la", 2, "a", 1, &cat, NULL, 0), HU_OK);
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "lb", 2, "b", 1, &cat, NULL, 0), HU_OK);
+
+    hu_memory_entry_t *out = NULL;
+    size_t count = 0;
+    HU_ASSERT_EQ(mem.vtable->list(mem.ctx, &alloc, NULL, NULL, 0, &out, &count), HU_OK);
+    HU_ASSERT_EQ(count, 2u);
+    if (out) {
+        for (size_t i = 0; i < count; i++)
+            hu_memory_entry_free_fields(&alloc, &out[i]);
+        alloc.free(alloc.ctx, out, count * sizeof(hu_memory_entry_t));
+    }
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_lucid_delete_removes(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_lucid_memory_create(&alloc, ":memory:", "/tmp/ws");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CORE};
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "del", 3, "remove me", 9, &cat, NULL, 0), HU_OK);
+
+    bool deleted = false;
+    HU_ASSERT_EQ(mem.vtable->forget(mem.ctx, "del", 3, &deleted), HU_OK);
+    HU_ASSERT(deleted);
+
+    hu_memory_entry_t entry = {0};
+    bool found = false;
+    HU_ASSERT_EQ(mem.vtable->get(mem.ctx, &alloc, "del", 3, &entry, &found), HU_OK);
+    HU_ASSERT_FALSE(found);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_lucid_update_existing(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_lucid_memory_create(&alloc, ":memory:", "/tmp/ws");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CORE};
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "up", 2, "original", 8, &cat, NULL, 0), HU_OK);
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "up", 2, "updated content", 15, &cat, NULL, 0),
+                 HU_OK);
+
+    hu_memory_entry_t entry = {0};
+    bool found = false;
+    HU_ASSERT_EQ(mem.vtable->get(mem.ctx, &alloc, "up", 2, &entry, &found), HU_OK);
+    HU_ASSERT(found);
+    HU_ASSERT_EQ(entry.content_len, 15u);
+    hu_memory_entry_free_fields(&alloc, &entry);
+    mem.vtable->deinit(mem.ctx);
+}
 #endif
 
 #if defined(HU_HAS_LANCEDB_ENGINE) && defined(HU_IS_TEST) && HU_IS_TEST
@@ -60,6 +145,100 @@ static void test_lancedb_lifecycle(void) {
     mem.vtable->count(mem.ctx, &count);
     HU_ASSERT_EQ(count, 0u);
 
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_fts_init_creates_table(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_lancedb_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+    HU_ASSERT_NOT_NULL(mem.ctx);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_fts_store_and_recall(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_lancedb_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CORE};
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "k1", 2, "apple banana cherry", 19, &cat, NULL, 0),
+                 HU_OK);
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "k2", 2, "dog elephant fox", 16, &cat, NULL, 0),
+                 HU_OK);
+
+    hu_memory_entry_t *out = NULL;
+    size_t count = 0;
+    HU_ASSERT_EQ(mem.vtable->recall(mem.ctx, &alloc, "banana", 6, 10, NULL, 0, &out, &count),
+                 HU_OK);
+    HU_ASSERT_TRUE(count >= 1u);
+    if (out) {
+        for (size_t i = 0; i < count; i++)
+            hu_memory_entry_free_fields(&alloc, &out[i]);
+        alloc.free(alloc.ctx, out, count * sizeof(hu_memory_entry_t));
+    }
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_fts_get_by_key(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_lancedb_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CORE};
+    const char *content = "exact content";
+    size_t content_len = 13u;
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "exact_key", 9, content, content_len, &cat, NULL, 0),
+                 HU_OK);
+
+    hu_memory_entry_t entry = {0};
+    bool found = false;
+    HU_ASSERT_EQ(mem.vtable->get(mem.ctx, &alloc, "exact_key", 9, &entry, &found), HU_OK);
+    HU_ASSERT(found);
+    HU_ASSERT_EQ(entry.key_len, 9u);
+    HU_ASSERT_EQ(entry.content_len, content_len);
+    hu_memory_entry_free_fields(&alloc, &entry);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_fts_list_entries(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_lancedb_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CORE};
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "list_a", 6, "content a", 9, &cat, NULL, 0), HU_OK);
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "list_b", 6, "content b", 9, &cat, NULL, 0), HU_OK);
+
+    hu_memory_entry_t *out = NULL;
+    size_t count = 0;
+    HU_ASSERT_EQ(mem.vtable->list(mem.ctx, &alloc, NULL, NULL, 0, &out, &count), HU_OK);
+    HU_ASSERT_EQ(count, 2u);
+    if (out) {
+        for (size_t i = 0; i < count; i++)
+            hu_memory_entry_free_fields(&alloc, &out[i]);
+        alloc.free(alloc.ctx, out, count * sizeof(hu_memory_entry_t));
+    }
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_fts_delete_removes(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_lancedb_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CORE};
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "del_me", 6, "to be deleted", 14, &cat, NULL, 0),
+                 HU_OK);
+
+    bool deleted = false;
+    HU_ASSERT_EQ(mem.vtable->forget(mem.ctx, "del_me", 6, &deleted), HU_OK);
+    HU_ASSERT(deleted);
+
+    hu_memory_entry_t entry = {0};
+    bool found = false;
+    HU_ASSERT_EQ(mem.vtable->get(mem.ctx, &alloc, "del_me", 6, &entry, &found), HU_OK);
+    HU_ASSERT_FALSE(found);
     mem.vtable->deinit(mem.ctx);
 }
 #endif
@@ -354,9 +533,19 @@ void run_memory_engines_ext_tests(void) {
 
 #if defined(HU_HAS_LUCID_ENGINE) && defined(HU_IS_TEST) && HU_IS_TEST
     HU_RUN_TEST(test_lucid_lifecycle);
+    HU_RUN_TEST(test_lucid_init_creates_table);
+    HU_RUN_TEST(test_lucid_store_and_get);
+    HU_RUN_TEST(test_lucid_list_entries);
+    HU_RUN_TEST(test_lucid_delete_removes);
+    HU_RUN_TEST(test_lucid_update_existing);
 #endif
 #if defined(HU_HAS_LANCEDB_ENGINE) && defined(HU_IS_TEST) && HU_IS_TEST
     HU_RUN_TEST(test_lancedb_lifecycle);
+    HU_RUN_TEST(test_fts_init_creates_table);
+    HU_RUN_TEST(test_fts_store_and_recall);
+    HU_RUN_TEST(test_fts_get_by_key);
+    HU_RUN_TEST(test_fts_list_entries);
+    HU_RUN_TEST(test_fts_delete_removes);
 #endif
 #if defined(HU_IS_TEST) && HU_IS_TEST
     HU_RUN_TEST(test_postgres_lifecycle);

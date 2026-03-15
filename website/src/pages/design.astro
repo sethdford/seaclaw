@@ -93,7 +93,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 >
                   <path
                     d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,96a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,96Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,128Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,160Z"
-                  />
+                  ></path>
                 </svg>
               </div>
               <h3
@@ -127,7 +127,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 >
                   <path
                     d="M240,128v8a8,8,0,0,1-8,8H24a8,8,0,0,1-8-8v-8a8,8,0,0,1,8-8H232A8,8,0,0,1,240,128ZM24,184H232a8,8,0,0,0,0-16H24a8,8,0,0,0,0,16Zm0-64H232a8,8,0,0,0,0-16H24a8,8,0,0,0,0,16Z"
-                  />
+                  ></path>
                 </svg>
               </div>
               <h3
@@ -141,7 +141,11 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 style="color: var(--color-text-secondary); font-family: var(--hu-font);"
               >
                 If it's slow, it's ugly. Every animation runs on the compositor.
-                Every transition respects <code class="text-[var(--hu-text-sm)] px-1.5 py-0.5 rounded" style="background: var(--hu-web-code-bg); font-family: var(--hu-font-mono);">prefers-reduced-motion</code>.
+                Every transition respects <code
+                  class="text-[var(--hu-text-sm)] px-1.5 py-0.5 rounded"
+                  style="background: var(--hu-web-code-bg); font-family: var(--hu-font-mono);"
+                  >prefers-reduced-motion</code
+                >.
               </p>
             </article>
             <article
@@ -161,7 +165,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 >
                   <path
                     d="M224,128a96,96,0,1,0-96,96A96.11,96.11,0,0,0,224,128Zm-176,0a80,80,0,1,1,80,80A80.09,80.09,0,0,1,48,128Zm96-48a8,8,0,0,1,8-8h8V64a8,8,0,0,1,16,0v16h8a8,8,0,0,1,0,16H168v16a8,8,0,0,1-16,0V96H152A8,8,0,0,1,144,80Zm-8,96a8,8,0,0,1-8,8H112a8,8,0,0,1,0-16h16A8,8,0,0,1,136,176Zm32-32a8,8,0,0,1-8,8H104a8,8,0,0,1,0-16h56A8,8,0,0,1,168,144Z"
-                  />
+                  ></path>
                 </svg>
               </div>
               <h3
@@ -307,47 +311,58 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               <div
                 class="flex-1"
                 style="background: var(--hu-dynamic-primary-50);"
-              />
+              >
+              </div>
               <div
                 class="flex-1"
                 style="background: var(--hu-dynamic-primary-100);"
-              />
+              >
+              </div>
               <div
                 class="flex-1"
                 style="background: var(--hu-dynamic-primary-200);"
-              />
+              >
+              </div>
               <div
                 class="flex-1"
                 style="background: var(--hu-dynamic-primary-300);"
-              />
+              >
+              </div>
               <div
                 class="flex-1"
                 style="background: var(--hu-dynamic-primary-400);"
-              />
+              >
+              </div>
               <div
                 class="flex-1"
                 style="background: var(--hu-dynamic-primary-500);"
-              />
+              >
+              </div>
               <div
                 class="flex-1"
                 style="background: var(--hu-dynamic-primary-600);"
-              />
+              >
+              </div>
               <div
                 class="flex-1"
                 style="background: var(--hu-dynamic-primary-700);"
-              />
+              >
+              </div>
               <div
                 class="flex-1"
                 style="background: var(--hu-dynamic-primary-800);"
-              />
+              >
+              </div>
               <div
                 class="flex-1"
                 style="background: var(--hu-dynamic-primary-900);"
-              />
+              >
+              </div>
               <div
                 class="flex-1"
                 style="background: var(--hu-dynamic-primary-950);"
-              />
+              >
+              </div>
             </div>
           </div>
         </div>
@@ -485,13 +500,10 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
             </p>
             <pre
               class="p-6 rounded-xl overflow-x-auto"
-              style="background: var(--hu-web-code-bg); font-family: var(--hu-font-mono); font-size: var(--hu-text-sm); border: 1px solid var(--color-border);"
-            >
-              <code style="color: var(--color-text);"
-                ><span style="color: var(--color-accent);">$</span> cmake --preset dev
+              style="background: var(--hu-web-code-bg); font-family: var(--hu-font-mono); font-size: var(--hu-text-sm); border: 1px solid var(--color-border);">
+              <code style="color: var(--color-text);"><span style="color: var(--color-accent);">$</span> cmake --preset dev
 <span style="color: var(--color-accent);">$</span> cmake --build --preset dev
-<span style="color: var(--color-text-tertiary);">[100%] Built target human</span></code
-              >
+<span style="color: var(--color-text-tertiary);">[100%] Built target human</span></code>
             </pre>
           </div>
 
@@ -549,7 +561,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
             <div
               class="absolute inset-0"
               style="background: linear-gradient(135deg, color-mix(in srgb, var(--hu-accent) 25%, transparent) 0%, color-mix(in srgb, var(--hu-accent-tertiary) 20%, transparent) 50%, color-mix(in srgb, var(--hu-accent-secondary) 18%, transparent) 100%);"
-            />
+            >
+            </div>
             <div class="relative grid md:grid-cols-3 gap-6">
               <div
                 class="hu-glass-subtle p-8 rounded-2xl transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:scale-[1.02] glass-demo-card"
@@ -673,7 +686,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                   <div
                     class="h-full w-0 rounded-lg transition-all"
                     style="background: var(--color-accent); transition-duration: var(--hu-duration-fast); transition-timing-function: var(--hu-ease-out);"
-                  />
+                  >
+                  </div>
                 </div>
               </div>
               <div class="flex items-center gap-4">
@@ -691,7 +705,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                   <div
                     class="h-full w-0 rounded-lg transition-all"
                     style="background: var(--color-accent); transition-duration: var(--hu-duration-normal); transition-timing-function: var(--hu-ease-out);"
-                  />
+                  >
+                  </div>
                 </div>
               </div>
               <div class="flex items-center gap-4">
@@ -709,7 +724,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                   <div
                     class="h-full w-0 rounded-lg transition-all"
                     style="background: var(--color-accent); transition-duration: var(--hu-duration-slow); transition-timing-function: var(--hu-ease-out);"
-                  />
+                  >
+                  </div>
                 </div>
               </div>
             </div>
@@ -725,11 +741,15 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               class="text-[var(--hu-text-base)]"
               style="color: var(--color-text-secondary); font-family: var(--hu-font);"
             >
-              <strong style="color: var(--color-text);">prefers-reduced-motion</strong> — All
-              animations respect the user's motion preference. When
-              <code class="px-1.5 py-0.5 rounded text-[var(--hu-text-sm)]" style="background: var(--hu-web-code-bg); font-family: var(--hu-font-mono);">prefers-reduced-motion: reduce</code>
-              is set, durations collapse to near-instant and spring effects are
-              disabled.
+              <strong style="color: var(--color-text);"
+                >prefers-reduced-motion</strong
+              > — All animations respect the user's motion preference. When
+              <code
+                class="px-1.5 py-0.5 rounded text-[var(--hu-text-sm)]"
+                style="background: var(--hu-web-code-bg); font-family: var(--hu-font-mono);"
+                >prefers-reduced-motion: reduce</code
+              >
+              is set, durations collapse to near-instant and spring effects are disabled.
             </p>
           </div>
         </div>
@@ -761,7 +781,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 256 256">
                 <path
                   d="M224.49,136.49l-72,72a12,12,0,0,1-17-17L187,140H40a12,12,0,0,1,0-24H187L135.51,64.48a12,12,0,0,1,17-17l72,72A12,12,0,0,1,224.49,136.49Z"
-                />
+                ></path>
               </svg>
             </a>
             <a
@@ -773,7 +793,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 256 256">
                 <path
                   d="M224.49,136.49l-72,72a12,12,0,0,1-17-17L187,140H40a12,12,0,0,1,0-24H187L135.51,64.48a12,12,0,0,1,17-17l72,72A12,12,0,0,1,224.49,136.49Z"
-                />
+                ></path>
               </svg>
             </a>
             <a
@@ -787,7 +807,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 256 256">
                 <path
                   d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.42-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68Z"
-                />
+                ></path>
               </svg>
             </a>
           </div>
@@ -878,7 +898,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         const spring = box.dataset.spring;
         box.addEventListener("mouseenter", () => {
           if (!prefersReducedMotion && spring) {
-            box.style.transform = springMap[spring as keyof typeof springMap] || "scale(1.05)";
+            box.style.transform =
+              springMap[spring as keyof typeof springMap] || "scale(1.05)";
           }
         });
         box.addEventListener("mouseleave", () => {

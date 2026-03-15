@@ -105,6 +105,7 @@ void run_cron_tests(void);
 void run_subagent_tests(void);
 void run_mcp_tests(void);
 void run_mcp_transport_tests(void);
+void run_mcp_transport_sse_tests(void);
 void run_otel_trace_tests(void);
 void run_mcp_audit_tests(void);
 void run_voice_tests(void);
@@ -167,6 +168,7 @@ void run_arbitrator_tests(void);
 void run_planning_tests(void);
 void run_rel_dynamics_tests(void);
 void run_prospective_tests(void);
+void run_prospective_memory_tests(void);
 void run_emotional_residue_tests(void);
 void run_consolidation_engine_tests(void);
 void run_conv_goals_tests(void);
@@ -406,6 +408,7 @@ int main(int argc, char **argv) {
     run_subagent_tests();
     run_mcp_tests();
     run_mcp_transport_tests();
+    run_mcp_transport_sse_tests();
     run_otel_trace_tests();
     run_mcp_audit_tests();
     run_voice_tests();
@@ -469,6 +472,7 @@ int main(int argc, char **argv) {
     run_rel_dynamics_tests();
 #ifdef HU_ENABLE_SQLITE
     run_prospective_tests();
+    run_prospective_memory_tests();
     run_emotional_residue_tests();
     run_consolidation_engine_tests();
 #endif
