@@ -9,7 +9,7 @@ graph TB
     subgraph external [External Interfaces]
         CLI[CLI Terminal]
         Gateway[HTTP/WS Gateway]
-        Channels[34 Messaging Channels]
+        Channels[38 Messaging Channels]
     end
 
     subgraph core [Agent Core]
@@ -125,8 +125,8 @@ graph TD
 
     subgraph implementations [Implementations - src/]
         ProvImpl["providers/ - 50+"]
-        ChanImpl["channels/ - 34"]
-        ToolImpl["tools/ - 67+"]
+        ChanImpl["channels/ - 38"]
+        ToolImpl["tools/ - 83"]
         MemImpl["memory/ - 6 engines"]
         RTImpl["runtime/ - 5 adapters"]
         SecImpl["security/ - 11 sandboxes"]

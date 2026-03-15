@@ -66,6 +66,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Web / network tools** | `src/tools/http_request.c`, `web_fetch.c`                            | `test_tools_all.c` (Web/Network suite)    |
 | **Memory tools**        | `src/tools/memory_recall.c`, `memory_store.c`                        | `test_tools_all.c` (Memory/Message suite) |
 | **Cron tools**          | `src/tools/cron_add.c`, `cron_remove.c`, `cron_list.c`, `cron_run.c` | `test_cron.c`                             |
+| **Computer use / LSP**  | `src/tools/computer_use.c`, `lsp.c`                                  | `test_computer_use.c`, `test_lsp.c`       |
 
 ## Memory
 
@@ -136,38 +137,40 @@ Use this to find the right files for a given task without searching the full cod
 
 ## Other Subsystems
 
-| Concept                          | Primary Source Files                                                      | Test Files                                                    |
-| -------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| **Runtime (native/docker/wasm)** | `src/runtime/native.c`, `docker.c`, `wasm_rt.c`, `factory.c`              | `test_runtime.c`, `test_runtime_bundle.c`                     |
-| **Feeds (social/google/apple)**  | `src/feeds/processor.c`, `social.c`, `google.c`, `apple.c`                | `test_feeds.c`, `test_feed_processor.c`                       |
-| **Intelligence / skills**        | `src/intelligence/skills.c`, `skill_system.c`, `reflection.c`             | `test_skills.c`, `test_skill_system.c`, `test_intelligence.c` |
-| **Peripherals**                  | `src/peripherals/factory.c`, `arduino.c`, `stm32.c`, `rpi.c`              | `test_peripheral.c`                                           |
-| **Observability**                | `src/observability/log_observer.c`, `metrics_observer.c`, `bth_metrics.c` | `test_observer.c`, `test_bth_metrics.c`                       |
-| **Subagent / MCP**               | `src/subagent.c`, `src/mcp.c`, `src/mcp_server.c`                         | `test_subagent.c`, `test_mcp.c`                               |
-| **Session**                      | `src/session.c`                                                           | `test_session.c`                                              |
-| **WebSocket client**             | `src/websocket/websocket.c`                                               | `test_websocket.c`                                            |
-| **Tunnel**                       | `src/tunnel/ngrok.c`, `cloudflare.c`, `tailscale.c`                       | `test_tunnel.c`                                               |
-| **Voice / TTS**                  | `src/voice.c`, `src/tts/audio_pipeline.c`, `emotion_map.c`                | `test_voice.c`, `test_audio_pipeline.c`, `test_emotion_map.c` |
-| **Paperclip**                    | `src/paperclip/client.c`, `heartbeat.c`                                   | `test_paperclip.c`                                            |
+| Concept                                                | Primary Source Files                                                                                                            | Test Files                                                                         |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **Runtime (native/docker/wasm)**                       | `src/runtime/native.c`, `docker.c`, `wasm_rt.c`, `factory.c`                                                                    | `test_runtime.c`, `test_runtime_bundle.c`                                          |
+| **Feeds (social/google/apple/gmail/imessage/twitter)** | `src/feeds/processor.c`, `social.c`, `google.c`, `apple.c`, `gmail.c`, `imessage.c`, `twitter.c`, `research.c`, `file_ingest.c` | `test_feeds.c`, `test_feed_processor.c`, `test_research_feeds.c`                   |
+| **Intelligence / skills**                              | `src/intelligence/skills.c`, `skill_system.c`, `reflection.c`, `experience.c`                                                   | `test_skills.c`, `test_skill_system.c`, `test_intelligence.c`, `test_experience.c` |
+| **Peripherals**                                        | `src/peripherals/factory.c`, `arduino.c`, `stm32.c`, `rpi.c`                                                                    | `test_peripheral.c`                                                                |
+| **Observability**                                      | `src/observability/log_observer.c`, `metrics_observer.c`, `bth_metrics.c`                                                       | `test_observer.c`, `test_bth_metrics.c`                                            |
+| **Subagent / MCP**                                     | `src/subagent.c`, `src/mcp.c`, `src/mcp_server.c`                                                                               | `test_subagent.c`, `test_mcp.c`                                                    |
+| **Session**                                            | `src/session.c`                                                                                                                 | `test_session.c`                                                                   |
+| **WebSocket client**                                   | `src/websocket/websocket.c`                                                                                                     | `test_websocket.c`                                                                 |
+| **Tunnel**                                             | `src/tunnel/ngrok.c`, `cloudflare.c`, `tailscale.c`                                                                             | `test_tunnel.c`                                                                    |
+| **Voice / TTS / WebRTC**                               | `src/voice.c`, `src/voice/realtime.c`, `src/voice/webrtc.c`, `src/tts/audio_pipeline.c`, `emotion_map.c`                        | `test_voice.c`, `test_webrtc.c`, `test_audio_pipeline.c`, `test_emotion_map.c`     |
+| **Paperclip**                                          | `src/paperclip/client.c`, `heartbeat.c`                                                                                         | `test_paperclip.c`                                                                 |
+| **Eval**                                               | `src/eval.c`                                                                                                                    | `test_eval.c`                                                                      |
+| **A2A**                                                | `src/a2a.c`                                                                                                                     | `test_a2a.c`                                                                       |
 
 ## AGI Frontiers / Intelligence
 
-| Concept                     | Primary Source Files                             | Test Files               |
-| --------------------------- | ------------------------------------------------ | ------------------------ |
-| **Constitutional AI**       | `src/agent/constitutional.c`                     | `test_agent_modules.c`   |
-| **Goal autonomy**           | `src/agent/goals.c`                              | `test_goal_engine.c`     |
-| **Agent orchestrator**      | `src/agent/orchestrator.c`, `orchestrator_llm.c` | `test_agi_frontiers.c`   |
-| **Agent registry**          | `src/agent/registry.c`                           | `test_agent_registry.c`  |
-| **Speculative execution**   | `src/agent/speculative.c`                        | `test_agi_frontiers.c`   |
-| **Tree-of-thought**         | `src/agent/tree_of_thought.c`                    | `test_agent_modules.c`   |
-| **Uncertainty estimation**  | `src/agent/uncertainty.c`                        | `test_agi_frontiers.c`   |
-| **Online learning**         | `src/intelligence/online_learning.c`             | `test_agi_frontiers.c`   |
-| **Self-improvement**        | `src/intelligence/self_improve.c`                | `test_agi_frontiers.c`   |
-| **Value learning**          | `src/intelligence/value_learning.c`              | `test_value_learning.c`  |
-| **World model**             | `src/intelligence/world_model.c`                 | `test_agi_frontiers.c`   |
-| **Strategy learner**        | `src/memory/retrieval/strategy_learner.c`        | `test_agi_frontiers.c`   |
-| **Peripheral control tool** | `src/tools/peripheral_ctrl.c`                    | `test_peripheral_ctrl.c` |
-| **Skill runner tool**       | `src/tools/skill_run.c`                          | `test_agent_registry.c`  |
-| **PWA bridge**              | `src/pwa/bridge.c`, `drivers.c`                  | `test_pwa.c`             |
-| **ML subsystem**            | `src/ml/gpt.c`, `train.c`, `prepare.c`           | `test_ml.c`              |
-| **Research feeds**          | `src/feeds/research.c`, `file_ingest.c`          | `test_research_feeds.c`  |
+| Concept                     | Primary Source Files                                                                                     | Test Files               |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------ |
+| **Constitutional AI**       | `src/agent/constitutional.c`                                                                             | `test_agent_modules.c`   |
+| **Goal autonomy**           | `src/agent/goals.c`                                                                                      | `test_goal_engine.c`     |
+| **Agent orchestrator**      | `src/agent/orchestrator.c`, `orchestrator_llm.c`                                                         | `test_agi_frontiers.c`   |
+| **Agent registry**          | `src/agent/registry.c`                                                                                   | `test_agent_registry.c`  |
+| **Speculative execution**   | `src/agent/speculative.c`                                                                                | `test_agi_frontiers.c`   |
+| **Tree-of-thought**         | `src/agent/tree_of_thought.c`                                                                            | `test_agent_modules.c`   |
+| **Uncertainty estimation**  | `src/agent/uncertainty.c`                                                                                | `test_agi_frontiers.c`   |
+| **Online learning**         | `src/intelligence/online_learning.c`                                                                     | `test_agi_frontiers.c`   |
+| **Self-improvement**        | `src/intelligence/self_improve.c`                                                                        | `test_agi_frontiers.c`   |
+| **Value learning**          | `src/intelligence/value_learning.c`                                                                      | `test_value_learning.c`  |
+| **World model**             | `src/intelligence/world_model.c`                                                                         | `test_agi_frontiers.c`   |
+| **Strategy learner**        | `src/memory/retrieval/strategy_learner.c`                                                                | `test_agi_frontiers.c`   |
+| **Peripheral control tool** | `src/tools/peripheral_ctrl.c`                                                                            | `test_peripheral_ctrl.c` |
+| **Skill runner tool**       | `src/tools/skill_run.c`                                                                                  | `test_agent_registry.c`  |
+| **PWA bridge**              | `src/pwa/bridge.c`, `context.c`, `drivers.c`, `learner.c`                                                | `test_pwa.c`             |
+| **ML subsystem**            | `src/ml/gpt.c`, `train.c`, `prepare.c`, `tokenizer_bpe.c`, `dataloader.c`, `evaluator.c`, `experiment.c` | `test_ml.c`              |
+| **Research feeds**          | `src/feeds/research.c`, `file_ingest.c`, `gmail.c`, `imessage.c`, `twitter.c`                            | `test_research_feeds.c`  |

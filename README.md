@@ -18,7 +18,7 @@
 The smallest fully autonomous AI assistant infrastructure — a static C binary that fits on any $5 board, boots in milliseconds, and requires nothing but libc.
 
 ```
-~1696 KB binary · <30 ms startup · 3,849+ tests · 50+ providers · 34 channels · 67+ tools · Pluggable everything
+~1696 KB binary · <30 ms startup · 5,087+ tests · 50+ providers · 38 channels · 83+ tools · Pluggable everything
 ```
 
 ### Features
@@ -27,7 +27,7 @@ The smallest fully autonomous AI assistant infrastructure — a static C binary 
 - **Near-Zero Memory:** < 6 MB peak RSS. Runs comfortably on the cheapest ARM SBCs and microcontrollers.
 - **Instant Startup:** 6–27 ms on Apple Silicon, sub-50 ms on edge cores.
 - **True Portability:** Single self-contained binary across ARM, x86, and RISC-V. Drop it anywhere, it just runs.
-- **Feature-Complete:** 50+ providers, 34 channels, 67+ tools, hybrid vector+FTS5 memory, multi-layer sandbox, tunnels, hardware peripherals, MCP, subagents, streaming, voice — the full stack.
+- **Feature-Complete:** 50+ providers, 38 channels, 83+ tools, hybrid vector+FTS5 memory, multi-layer sandbox, tunnels, hardware peripherals, MCP, subagents, streaming, voice — the full stack.
 - **Interactive TUI:** Full-screen terminal UI with split panes, markdown rendering, multi-session tabs (Ctrl+T), tool approval prompts, streaming output, and input history. Build with `-DHU_ENABLE_TUI=ON` and run with `--tui`.
 - **Performance-Optimized:** Per-turn arena allocator, HTTP connection pooling, HTTP/2, system prompt caching — all benefiting from C-level control.
 
@@ -57,7 +57,7 @@ Human's verified numbers (measured on macOS arm64, March 2026):
 Binary size:   ~1696 KB (MinSizeRel + LTO, all channels)
 Peak RSS:      ~5.7 MB (--version), ~5.9 MB (test suite)
 Startup:       6–27 ms avg (Apple Silicon M4 Max)
-Tests:         3,849 passing, 0 ASan errors
+Tests:         5,087 passing, 0 ASan errors
 ```
 
 ### Why Switch from OpenClaw?
@@ -196,21 +196,21 @@ This pattern keeps networking/secrets in the edge host and lets you swap/update 
 
 Every subsystem is a **vtable interface** — swap implementations with a config change, zero code changes.
 
-| Subsystem         | Interface        | Ships with                                                                                                                                                     | Extend                                                    |
-| ----------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| **AI Models**     | `Provider`       | 50+ providers (OpenRouter, Anthropic, OpenAI, Gemini, Ollama, llama.cpp, Groq, Mistral, xAI, DeepSeek, Together, Fireworks, Perplexity, Cohere, Bedrock, etc.) | `custom:https://your-api.com` — any OpenAI-compatible API |
-| **Channels**      | `Channel`        | CLI, Telegram, Signal, Discord, Slack, iMessage, Matrix, WhatsApp, Webhook, IRC, Lark/Feishu, OneBot, Line, DingTalk, Email, Nostr, QQ, MaixCam, Mattermost    | Any messaging API                                         |
-| **Memory**        | `Memory`         | SQLite with hybrid search (FTS5 + vector cosine similarity), Markdown                                                                                          | Any persistence backend                                   |
-| **Tools**         | `Tool`           | 67+ built-in: shell, file ops, git, memory, browser, screenshot, composio, http, cron, hardware, web search, delegate, and more                                | Any capability                                            |
-| **Observability** | `Observer`       | Noop, Log, File, Multi                                                                                                                                         | Prometheus, OTel                                          |
-| **Runtime**       | `RuntimeAdapter` | Native, Docker (sandboxed), WASM (wasmtime)                                                                                                                    | Any runtime                                               |
-| **Security**      | `Sandbox`        | Landlock, Firejail, Bubblewrap, Docker, auto-detect                                                                                                            | Any sandbox backend                                       |
-| **Identity**      | `IdentityConfig` | OpenClaw (markdown), AIEOS v1.1 (JSON)                                                                                                                         | Any identity format                                       |
-| **Tunnel**        | `Tunnel`         | None, Cloudflare, Tailscale, ngrok, Custom                                                                                                                     | Any tunnel binary                                         |
-| **Heartbeat**     | Engine           | [`src/heartbeat.c`](src/heartbeat.c) periodic tasks                                                                                                            | —                                                         |
-| **Skills**        | Loader           | TOML manifests + SKILL.md instructions                                                                                                                         | Community skill packs                                     |
-| **Peripherals**   | `Peripheral`     | Serial, Arduino, Raspberry Pi GPIO, STM32/Nucleo                                                                                                               | Any hardware interface                                    |
-| **Cron**          | Scheduler        | Cron expressions + one-shot timers with JSON persistence                                                                                                       | —                                                         |
+| Subsystem         | Interface        | Ships with                                                                                                                                                            | Extend                                                    |
+| ----------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **AI Models**     | `Provider`       | 50+ providers (OpenRouter, Anthropic, OpenAI, Gemini, Ollama, llama.cpp, Groq, Mistral, xAI, DeepSeek, Together, Fireworks, Perplexity, Cohere, Bedrock, etc.)        | `custom:https://your-api.com` — any OpenAI-compatible API |
+| **Channels**      | `Channel`        | CLI, Telegram, Signal, Discord, Slack, iMessage, Matrix, WhatsApp, Webhook, IRC, Lark/Feishu, OneBot, Line, DingTalk, Email, Nostr, QQ, MaixCam, Mattermost, and more | Any messaging API                                         |
+| **Memory**        | `Memory`         | SQLite with hybrid search (FTS5 + vector cosine similarity), Markdown                                                                                                 | Any persistence backend                                   |
+| **Tools**         | `Tool`           | 83+ built-in: shell, file ops, git, memory, browser, screenshot, composio, http, cron, hardware, web search, delegate, computer use, LSP, and more                    | Any capability                                            |
+| **Observability** | `Observer`       | Noop, Log, File, Multi                                                                                                                                                | Prometheus, OTel                                          |
+| **Runtime**       | `RuntimeAdapter` | Native, Docker (sandboxed), WASM (wasmtime)                                                                                                                           | Any runtime                                               |
+| **Security**      | `Sandbox`        | Landlock, Firejail, Bubblewrap, Docker, auto-detect                                                                                                                   | Any sandbox backend                                       |
+| **Identity**      | `IdentityConfig` | OpenClaw (markdown), AIEOS v1.1 (JSON)                                                                                                                                | Any identity format                                       |
+| **Tunnel**        | `Tunnel`         | None, Cloudflare, Tailscale, ngrok, Custom                                                                                                                            | Any tunnel binary                                         |
+| **Heartbeat**     | Engine           | [`src/heartbeat.c`](src/heartbeat.c) periodic tasks                                                                                                                   | —                                                         |
+| **Skills**        | Loader           | TOML manifests + SKILL.md instructions                                                                                                                                | Community skill packs                                     |
+| **Peripherals**   | `Peripheral`     | Serial, Arduino, Raspberry Pi GPIO, STM32/Nucleo                                                                                                                      | Any hardware interface                                    |
+| **Cron**          | Scheduler        | Cron expressions + one-shot timers with JSON persistence                                                                                                              | —                                                         |
 
 ### Memory System
 
@@ -611,7 +611,7 @@ Build and tests require a C11 compiler and CMake 3.16+. One-time setup:
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Debug -DHU_ENABLE_ALL_CHANNELS=ON
 cmake --build .                            # Dev build
-./human_tests                             # 3,849+ tests
+./human_tests                             # 5,087+ tests
 cd ..
 ```
 
@@ -646,10 +646,10 @@ Channel CJM coverage (ingress parsing/filtering, session key routing, account pr
 ```
 
 Language: C11 + ASM (aarch64, x86_64)
-Source files: 715
-Lines of code: ~139K
-Test files: 128
-Tests: 3,849
+Source files: 993
+Lines of code: ~192K
+Test files: 236
+Tests: 5,087
 Binary: ~1696 KB (MinSizeRel + LTO, all channels)
 Peak RSS: ~5.7 MB
 Startup: 6–27 ms avg (Apple Silicon)
@@ -664,27 +664,34 @@ Dependencies: libc + optional SQLite, libcurl
 src/
 main.c CLI entry point + command routing
 agent/ Agent loop, context, planner, compaction, dispatcher
-channels/ 35 channel implementations (cli, telegram, discord, ...)
+channels/ 38 channel implementations (cli, telegram, discord, ...)
 providers/ 50+ AI provider implementations
 memory/ SQLite + markdown + LRU backends, embeddings, vector search
-tools/ 68+ tool implementations
+tools/ 83+ tool implementations
 security/ Policy, pairing, secrets, sandbox backends
 runtime/ Runtime adapters (native, docker, wasm, cloudflare)
 core/ Allocator, arena, error, json, http, string, slice
 observability/ Log + metrics observers
 gateway/ HTTP gateway server
 persona/ Persona profiles, prompt builder, example banks
+ml/          ML training subsystem (BPE, GPT, optimizer) — HU_ENABLE_ML
+feeds/       Feed processor, research agent, social feeds
+intelligence/ Skills, self-improvement, value learning, world model
+pwa/         Progressive web app bridge, context, entities
+voice/       Voice pipeline, WebRTC, realtime
 config.c Config loading/merging (~/.human/config.json)
 ...
 
 include/human/ Public C headers
-tests/ 128 test files, 3,849 tests
+tests/ 236 test files, 5,087+ tests
 asm/ Platform-specific assembly (aarch64, x86_64, generic C)
 
 ui/ Web UI (LitElement + Vite)
 apps/ios/ Native iOS app (SwiftUI)
 apps/android/ Native Android app (Kotlin + Jetpack Compose)
 apps/shared/ Shared packages (HumanKit for iOS)
+apps/macos/   Native macOS app (SwiftUI)
+apps/flutter/ Flutter cross-platform app
 
 ```
 

@@ -3,6 +3,10 @@
 External data ingestion from social, messaging, news, and file sources.
 Feed sources gated behind `HU_ENABLE_FEEDS`, storage behind `HU_ENABLE_SQLITE`.
 
+## Testing
+
+- `test_feeds.c`, `test_feed_processor.c`, `test_research_feeds.c`
+
 ## Architecture
 
 ```
@@ -10,6 +14,10 @@ processor.c       SQL generation, relevance scoring, prompt building, poll loop
 gmail.c           Gmail feed source (OAuth, IMAP)
 imessage.c        iMessage feed source (macOS ChatDB)
 twitter.c         Twitter/X feed source (Bearer token API)
+social.c          Social feed source (Facebook, Instagram, TikTok)
+google.c          Google feed source (photos, contacts)
+apple.c           Apple feed source (photos, reminders, health)
+research.c        Research feed source
 file_ingest.c     Local file ingestion from ~/.human/ingest/
 ```
 

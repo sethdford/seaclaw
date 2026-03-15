@@ -2,6 +2,10 @@
 
 On-device ML training for autonomous experimentation. Gated behind `HU_ENABLE_ML`.
 
+## Testing
+
+- `test_ml.c`
+
 ## Architecture
 
 ```

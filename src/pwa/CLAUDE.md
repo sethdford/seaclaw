@@ -1,6 +1,6 @@
 # src/pwa/ — Progressive Web App Browser Automation
 
-AppleScript-based browser automation for macOS. Drives Chrome, Arc, Brave, Edge, or Safari tabs via `osascript` and `execute javascript`. Used for PWA context injection and tab control.
+AppleScript-based browser automation for macOS. Drives Chrome, Arc, Brave, Edge, or Safari tabs via `osascript` and `execute javascript`. Used for PWA context injection and tab control. Gated behind `HU_ENABLE_PWA`.
 
 ## Key Files
 
@@ -8,6 +8,10 @@ AppleScript-based browser automation for macOS. Drives Chrome, Arc, Brave, Edge,
 - `context.c` — PWA context management
 - `drivers.c` — browser-specific drivers
 - `learner.c` — learning/adaptation logic
+
+## Testing
+
+- `test_pwa.c`
 
 ## Rules
 
