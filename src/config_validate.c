@@ -27,6 +27,7 @@ static const char *const hu_config_top_keys[] = {
     "policy",        "plugins",
     "security",      "secrets",
     "identity",      "feeds",
+    "provider",      "model",
 };
 static const size_t hu_config_top_keys_len =
     sizeof(hu_config_top_keys) / sizeof(hu_config_top_keys[0]);

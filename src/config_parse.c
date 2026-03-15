@@ -779,12 +779,14 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
     }
 
     const char *prov = hu_json_get_string(root, "default_provider");
+    if (!prov) prov = hu_json_get_string(root, "provider");
     if (prov) {
         if (cfg->default_provider)
             a->free(a->ctx, cfg->default_provider, strlen(cfg->default_provider) + 1);
         cfg->default_provider = hu_strdup(a, prov);
     }
     const char *model = hu_json_get_string(root, "default_model");
+    if (!model) model = hu_json_get_string(root, "model");
     if (model && model[0]) {
         if (cfg->default_model)
             a->free(a->ctx, cfg->default_model, strlen(cfg->default_model) + 1);
