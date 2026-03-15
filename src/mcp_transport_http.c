@@ -26,6 +26,11 @@ static hu_error_t http_send(void *ctx, const char *data, size_t len) {
     hu_error_t err = hu_http_post_json(alloc, c->url, NULL, data, len, &resp);
     if (err != HU_OK)
         return err;
+    if (resp.status_code < 200 || resp.status_code >= 300) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return HU_ERR_IO;
+    }
     if (resp.body && resp.body_len > 0) {
         c->last_response = hu_strndup(alloc, resp.body, resp.body_len);
         c->last_response_len = resp.body_len;

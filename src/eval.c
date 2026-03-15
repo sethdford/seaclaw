@@ -1,11 +1,62 @@
 #include "human/eval.h"
-#include <string.h>
+#include "human/core/string.h"
+#include <ctype.h>
+#include <inttypes.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#include <inttypes.h>
+#include <string.h>
 
 #define EVAL_MAX_TASKS 256
+
+static int tolower_c(int c) {
+    return (c >= 'A' && c <= 'Z') ? (c + 32) : c;
+}
+
+static bool str_case_contains(const char *haystack, size_t hlen, const char *needle, size_t nlen) {
+    if (nlen == 0 || nlen > hlen) return false;
+    for (size_t i = 0; i <= hlen - nlen; i++) {
+        size_t j = 0;
+        while (j < nlen && tolower_c((unsigned char)haystack[i + j]) == tolower_c((unsigned char)needle[j]))
+            j++;
+        if (j == nlen) return true;
+    }
+    return false;
+}
+
+static size_t count_expected_words_in_actual(const char *actual, size_t actual_len, const char *expected, size_t expected_len) {
+    size_t count = 0;
+    size_t total_expected = 0;
+    const char *p = expected;
+    const char *end = expected + expected_len;
+    while (p < end) {
+        while (p < end && (isspace((unsigned char)*p) || *p == '\0')) p++;
+        if (p >= end) break;
+        const char *word_start = p;
+        while (p < end && !isspace((unsigned char)*p) && *p != '\0') p++;
+        size_t word_len = (size_t)(p - word_start);
+        if (word_len > 0) {
+            total_expected++;
+            if (str_case_contains(actual, actual_len, word_start, word_len))
+                count++;
+        }
+    }
+    (void)total_expected;
+    return count;
+}
+
+static size_t count_words(const char *s, size_t len) {
+    size_t n = 0;
+    const char *p = s;
+    const char *end = s + len;
+    while (p < end) {
+        while (p < end && (isspace((unsigned char)*p) || *p == '\0')) p++;
+        if (p >= end) break;
+        n++;
+        while (p < end && !isspace((unsigned char)*p) && *p != '\0') p++;
+    }
+    return n;
+}
 
 static char *extract_str(hu_allocator_t *alloc, const char *obj_start, const char *obj_end, const char *key) {
     const char *k = strstr(obj_start, key);
@@ -128,6 +179,175 @@ hu_error_t hu_eval_suite_load_json(hu_allocator_t *alloc, const char *json, size
     return HU_OK;
 }
 
+hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, const char *model, size_t model_len, hu_eval_suite_t *suite, hu_eval_match_mode_t mode, hu_eval_run_t *out) {
+    if (!alloc || !suite || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)provider;
+#else
+    if (!provider || !provider->vtable || !provider->vtable->chat_with_system || !provider->vtable->get_name)
+        return HU_ERR_INVALID_ARGUMENT;
+#endif
+    memset(out, 0, sizeof(*out));
+    if (suite->tasks_count == 0) {
+        out->suite_name = suite->name ? hu_strdup(alloc, suite->name) : hu_strndup(alloc, "eval", 4);
+        out->provider = hu_strndup(alloc, "test", 4);
+        out->model = model && model_len > 0 ? hu_strndup(alloc, model, model_len) : NULL;
+        out->results = NULL;
+        out->results_count = 0;
+        out->passed = 0;
+        out->failed = 0;
+        out->pass_rate = 1.0;
+        return HU_OK;
+    }
+    out->results = alloc->alloc(alloc->ctx, suite->tasks_count * sizeof(hu_eval_result_t));
+    if (!out->results)
+        return HU_ERR_OUT_OF_MEMORY;
+    memset(out->results, 0, suite->tasks_count * sizeof(hu_eval_result_t));
+    out->results_count = suite->tasks_count;
+
+    for (size_t i = 0; i < suite->tasks_count; i++) {
+        hu_eval_task_t *task = &suite->tasks[i];
+        hu_eval_result_t *res = &out->results[i];
+        char *response = NULL;
+        size_t response_len = 0;
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+        {
+            const char *prefix = "Mock response for: ";
+            size_t plen = strlen(prefix);
+            size_t prompt_len = task->prompt ? strlen(task->prompt) : 0;
+            size_t total = plen + prompt_len + 1;
+            response = alloc->alloc(alloc->ctx, total);
+            if (response) {
+                memcpy(response, prefix, plen);
+                if (task->prompt)
+                    memcpy(response + plen, task->prompt, prompt_len + 1);
+                else
+                    response[plen] = '\0';
+                response_len = plen + prompt_len;
+            }
+        }
+#else
+        {
+            hu_error_t err = provider->vtable->chat_with_system(provider->ctx, alloc, NULL, 0,
+                task->prompt ? task->prompt : "", task->prompt ? task->prompt_len : 0,
+                model ? model : "", model_len, 0.0, &response, &response_len);
+            if (err != HU_OK) {
+                res->task_id = task->id ? hu_strdup(alloc, task->id) : NULL;
+                res->passed = false;
+                res->actual_output = NULL;
+                res->actual_output_len = 0;
+                res->elapsed_ms = 0;
+                res->tool_calls_made = 0;
+                res->tokens_used = 0;
+                res->error_msg = hu_sprintf(alloc, "provider error: %d", (int)err);
+                if (response)
+                    alloc->free(alloc->ctx, response, response_len + 1);
+                out->failed++;
+                continue;
+            }
+        }
+#endif
+
+        bool passed = false;
+        hu_eval_check(alloc, response ? response : "", response_len, task->expected ? task->expected : "", task->expected ? task->expected_len : 0, mode, &passed);
+
+        res->task_id = task->id ? hu_strdup(alloc, task->id) : NULL;
+        res->passed = passed;
+        res->actual_output = response;
+        res->actual_output_len = response_len;
+        res->elapsed_ms = 0;
+        res->tool_calls_made = 0;
+        res->tokens_used = 0;
+        res->error_msg = NULL;
+
+        if (passed)
+            out->passed++;
+        else
+            out->failed++;
+    }
+
+    out->pass_rate = (out->results_count > 0) ? (double)out->passed / (double)out->results_count : 1.0;
+
+    out->suite_name = suite->name ? hu_strdup(alloc, suite->name) : hu_strndup(alloc, "eval", 4);
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    out->provider = hu_strndup(alloc, "test", 4);
+#else
+    {
+        const char *pname = provider->vtable->get_name(provider->ctx);
+        out->provider = pname ? hu_strdup(alloc, pname) : hu_strndup(alloc, "unknown", 7);
+    }
+#endif
+    out->model = (model && model_len > 0) ? hu_strndup(alloc, model, model_len) : NULL;
+
+    return HU_OK;
+}
+
+hu_error_t hu_eval_run_load_json(hu_allocator_t *alloc, const char *json, size_t json_len,
+                                 hu_eval_run_t *out) {
+    if (!alloc || !json || !json_len || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+
+    /* Parse report format: {"suite":"...","passed":N,"failed":N,"pass_rate":X.XX,"elapsed_ms":N} */
+    const char *p = json;
+    const char *end = json + json_len;
+    while (p < end) {
+        if (strncmp(p, "\"suite\"", 7) == 0) {
+            p = strchr(p + 7, '"');
+            if (p) {
+                p++;
+                const char *ve = strchr(p, '"');
+                if (ve && ve - p > 0) {
+                    size_t n = (size_t)(ve - p);
+                    out->suite_name = alloc->alloc(alloc->ctx, n + 1);
+                    if (out->suite_name) {
+                        memcpy(out->suite_name, p, n);
+                        out->suite_name[n] = '\0';
+                    }
+                }
+            }
+            break;
+        }
+        p++;
+    }
+    p = json;
+    if (strstr(json, "\"passed\"")) {
+        const char *k = strstr(json, "\"passed\"");
+        if (k) {
+            const char *v = strchr(k + 8, ':');
+            if (v)
+                (void)sscanf(v + 1, "%zu", &out->passed);
+        }
+    }
+    if (strstr(json, "\"failed\"")) {
+        const char *k = strstr(json, "\"failed\"");
+        if (k) {
+            const char *v = strchr(k + 8, ':');
+            if (v)
+                (void)sscanf(v + 1, "%zu", &out->failed);
+        }
+    }
+    if (strstr(json, "\"pass_rate\"")) {
+        const char *k = strstr(json, "\"pass_rate\"");
+        if (k) {
+            const char *v = strchr(k + 11, ':');
+            if (v)
+                (void)sscanf(v + 1, "%lf", &out->pass_rate);
+        }
+    }
+    if (strstr(json, "\"elapsed_ms\"")) {
+        const char *k = strstr(json, "\"elapsed_ms\"");
+        if (k) {
+            const char *v = strchr(k + 12, ':');
+            if (v)
+                (void)sscanf(v + 1, "%" SCNd64, &out->total_elapsed_ms);
+        }
+    }
+    return HU_OK;
+}
+
 hu_error_t hu_eval_check(hu_allocator_t *alloc, const char *actual, size_t actual_len, const char *expected, size_t expected_len, hu_eval_match_mode_t mode, bool *passed) {
     if (!alloc || !actual || !expected || !passed) return HU_ERR_INVALID_ARGUMENT;
     *passed = false;
@@ -136,17 +356,19 @@ hu_error_t hu_eval_check(hu_allocator_t *alloc, const char *actual, size_t actua
         case HU_EVAL_CONTAINS:
             if (expected_len <= actual_len) { for (size_t i = 0; i <= actual_len - expected_len; i++) { if (memcmp(actual+i, expected, expected_len) == 0) { *passed = true; break; } } } break;
         case HU_EVAL_NUMERIC_CLOSE: { double a = atof(actual); double e = atof(expected); *passed = fabs(a - e) < 0.01; break; }
-        case HU_EVAL_LLM_JUDGE:
-            /* Placeholder: no LLM available. Use contains heuristic until real judge exists. */
-            if (expected_len <= actual_len) {
-                for (size_t i = 0; i <= actual_len - expected_len; i++) {
-                    if (memcmp(actual + i, expected, expected_len) == 0) {
-                        *passed = true;
-                        break;
-                    }
-                }
+        case HU_EVAL_LLM_JUDGE: {
+            /* Heuristic: case-insensitive contains OR word overlap >= 50% of expected words. */
+            if (str_case_contains(actual, actual_len, expected, expected_len)) {
+                *passed = true;
+                break;
+            }
+            size_t exp_words = count_words(expected, expected_len);
+            if (exp_words > 0) {
+                size_t matched = count_expected_words_in_actual(actual, actual_len, expected, expected_len);
+                *passed = (matched >= (exp_words + 1) / 2);
             }
             break;
+        }
     }
     return HU_OK;
 }

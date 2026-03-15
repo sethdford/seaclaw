@@ -54,6 +54,50 @@ static void test_eval_llm_judge_placeholder(void) {
     HU_ASSERT(!passed);
 }
 
+static void test_eval_llm_judge_case_insensitive(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    bool passed = false;
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "the CAPITAL is paris", 20, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT(passed);
+    passed = false;
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "HELLO WORLD", 11, "hello", 5, HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT(passed);
+}
+
+static void test_eval_llm_judge_word_overlap(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    bool passed = false;
+    HU_ASSERT_EQ(hu_eval_check(&alloc,
+        "The transformer architecture uses attention mechanisms for sequence modeling", 75,
+        "transformer attention sequence", 30,
+        HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT(passed);
+
+    passed = true;
+    HU_ASSERT_EQ(hu_eval_check(&alloc,
+        "The weather is sunny today", 26,
+        "transformer attention sequence modeling", 39,
+        HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT(!passed);
+}
+
+static void test_eval_llm_judge_word_overlap_threshold(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    bool passed = false;
+    HU_ASSERT_EQ(hu_eval_check(&alloc,
+        "machine learning optimization gradient", 38,
+        "machine learning optimization gradient descent backprop", 55,
+        HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT(passed);
+
+    passed = true;
+    HU_ASSERT_EQ(hu_eval_check(&alloc,
+        "machine zzzzz yyyyy xxxxx", 25,
+        "machine learning optimization gradient descent backprop", 55,
+        HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT(!passed);
+}
+
 static void test_eval_exact(void) {
     hu_allocator_t alloc = hu_system_allocator();
     bool passed = false;
@@ -96,6 +140,134 @@ static void test_eval_compare(void) {
     alloc.free(alloc.ctx, report, rlen + 1);
 }
 
+static void test_eval_run_suite_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_eval_suite_t suite = {0};
+    hu_eval_run_t run = {0};
+    HU_ASSERT_EQ(hu_eval_run_suite(NULL, NULL, NULL, 0, &suite, HU_EVAL_EXACT, &run),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_run_suite(&alloc, NULL, NULL, 0, NULL, HU_EVAL_EXACT, &run),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_run_suite(&alloc, NULL, NULL, 0, &suite, HU_EVAL_EXACT, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_eval_run_suite_empty(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_eval_suite_t suite = {0};
+    suite.name = "empty-suite";
+    suite.tasks = NULL;
+    suite.tasks_count = 0;
+    hu_eval_run_t run = {0};
+    HU_ASSERT_EQ(hu_eval_run_suite(&alloc, NULL, "model", 5, &suite, HU_EVAL_EXACT, &run), HU_OK);
+    HU_ASSERT_NOT_NULL(run.suite_name);
+    HU_ASSERT_STR_EQ(run.suite_name, "empty-suite");
+    HU_ASSERT_EQ(run.results_count, 0u);
+    HU_ASSERT_EQ(run.passed, 0u);
+    HU_ASSERT_EQ(run.failed, 0u);
+    HU_ASSERT_FLOAT_EQ(run.pass_rate, 1.0, 0.001);
+    hu_eval_run_free(&alloc, &run);
+}
+
+static void test_eval_run_suite_with_tasks(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"name\":\"math\",\"tasks\":["
+        "{\"id\":\"t1\",\"prompt\":\"What is 2+2?\",\"expected\":\"4\",\"category\":\"math\",\"difficulty\":1},"
+        "{\"id\":\"t2\",\"prompt\":\"Capital of France?\",\"expected\":\"Paris\",\"category\":\"geo\",\"difficulty\":1}"
+        "]}";
+    hu_eval_suite_t suite = {0};
+    HU_ASSERT_EQ(hu_eval_suite_load_json(&alloc, json, strlen(json), &suite), HU_OK);
+
+    hu_eval_run_t run = {0};
+    HU_ASSERT_EQ(hu_eval_run_suite(&alloc, NULL, "test-model", 10, &suite, HU_EVAL_CONTAINS, &run), HU_OK);
+    HU_ASSERT_NOT_NULL(run.suite_name);
+    HU_ASSERT_STR_EQ(run.suite_name, "math");
+    HU_ASSERT_EQ(run.results_count, 2u);
+    HU_ASSERT_NOT_NULL(run.results);
+    HU_ASSERT_EQ(run.passed + run.failed, run.results_count);
+    HU_ASSERT_TRUE(run.pass_rate >= 0.0 && run.pass_rate <= 1.0);
+    HU_ASSERT_NOT_NULL(run.provider);
+    HU_ASSERT_STR_EQ(run.provider, "test");
+
+    for (size_t i = 0; i < run.results_count; i++) {
+        HU_ASSERT_NOT_NULL(run.results[i].task_id);
+        HU_ASSERT_NOT_NULL(run.results[i].actual_output);
+        HU_ASSERT_TRUE(run.results[i].actual_output_len > 0);
+    }
+
+    hu_eval_run_free(&alloc, &run);
+    hu_eval_suite_free(&alloc, &suite);
+}
+
+static void test_eval_run_suite_report_roundtrip(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"name\":\"rt\",\"tasks\":["
+        "{\"id\":\"t1\",\"prompt\":\"hello\",\"expected\":\"hello\",\"category\":\"test\",\"difficulty\":1}"
+        "]}";
+    hu_eval_suite_t suite = {0};
+    HU_ASSERT_EQ(hu_eval_suite_load_json(&alloc, json, strlen(json), &suite), HU_OK);
+
+    hu_eval_run_t run = {0};
+    HU_ASSERT_EQ(hu_eval_run_suite(&alloc, NULL, NULL, 0, &suite, HU_EVAL_CONTAINS, &run), HU_OK);
+
+    char *report = NULL;
+    size_t rlen = 0;
+    HU_ASSERT_EQ(hu_eval_report_json(&alloc, &run, &report, &rlen), HU_OK);
+    HU_ASSERT_NOT_NULL(report);
+    HU_ASSERT_TRUE(rlen > 0);
+    HU_ASSERT_TRUE(strstr(report, "\"suite\"") != NULL);
+    HU_ASSERT_TRUE(strstr(report, "\"passed\"") != NULL);
+
+    alloc.free(alloc.ctx, report, rlen + 1);
+    hu_eval_run_free(&alloc, &run);
+    hu_eval_suite_free(&alloc, &suite);
+}
+
+static void test_eval_run_load_json_valid(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"suite\":\"my-suite\",\"passed\":8,\"failed\":2,\"pass_rate\":0.80,\"elapsed_ms\":1500}";
+    hu_eval_run_t run = {0};
+    HU_ASSERT_EQ(hu_eval_run_load_json(&alloc, json, strlen(json), &run), HU_OK);
+    HU_ASSERT_NOT_NULL(run.suite_name);
+    HU_ASSERT_STR_EQ(run.suite_name, "my-suite");
+    HU_ASSERT_EQ(run.passed, 8u);
+    HU_ASSERT_EQ(run.failed, 2u);
+    HU_ASSERT_FLOAT_EQ(run.pass_rate, 0.80, 0.01);
+    HU_ASSERT_EQ(run.total_elapsed_ms, 1500);
+    hu_eval_run_free(&alloc, &run);
+}
+
+static void test_eval_run_load_json_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_eval_run_t run = {0};
+    HU_ASSERT_EQ(hu_eval_run_load_json(NULL, "{}", 2, &run), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_run_load_json(&alloc, NULL, 2, &run), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_run_load_json(&alloc, "{}", 0, &run), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_run_load_json(&alloc, "{}", 2, NULL), HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_eval_run_load_json_partial(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"suite\":\"partial\",\"passed\":3}";
+    hu_eval_run_t run = {0};
+    HU_ASSERT_EQ(hu_eval_run_load_json(&alloc, json, strlen(json), &run), HU_OK);
+    HU_ASSERT_NOT_NULL(run.suite_name);
+    HU_ASSERT_STR_EQ(run.suite_name, "partial");
+    HU_ASSERT_EQ(run.passed, 3u);
+    HU_ASSERT_EQ(run.failed, 0u);
+    HU_ASSERT_FLOAT_EQ(run.pass_rate, 0.0, 0.001);
+    hu_eval_run_free(&alloc, &run);
+}
+
+static void test_eval_check_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    bool passed = false;
+    HU_ASSERT_EQ(hu_eval_check(NULL, "a", 1, "a", 1, HU_EVAL_EXACT, &passed), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, NULL, 1, "a", 1, HU_EVAL_EXACT, &passed), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "a", 1, NULL, 1, HU_EVAL_EXACT, &passed), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "a", 1, "a", 1, HU_EVAL_EXACT, NULL), HU_ERR_INVALID_ARGUMENT);
+}
+
 static void test_eval_run_free(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_eval_run_t run = {0};
@@ -127,6 +299,17 @@ void run_eval_tests(void) {
     HU_RUN_TEST(test_eval_contains);
     HU_RUN_TEST(test_eval_numeric);
     HU_RUN_TEST(test_eval_llm_judge_placeholder);
+    HU_RUN_TEST(test_eval_llm_judge_case_insensitive);
+    HU_RUN_TEST(test_eval_llm_judge_word_overlap);
+    HU_RUN_TEST(test_eval_llm_judge_word_overlap_threshold);
+    HU_RUN_TEST(test_eval_check_null_args);
+    HU_RUN_TEST(test_eval_run_suite_null_args);
+    HU_RUN_TEST(test_eval_run_suite_empty);
+    HU_RUN_TEST(test_eval_run_suite_with_tasks);
+    HU_RUN_TEST(test_eval_run_suite_report_roundtrip);
+    HU_RUN_TEST(test_eval_run_load_json_valid);
+    HU_RUN_TEST(test_eval_run_load_json_null_args);
+    HU_RUN_TEST(test_eval_run_load_json_partial);
     HU_RUN_TEST(test_eval_report);
     HU_RUN_TEST(test_eval_compare);
     HU_RUN_TEST(test_eval_run_free);

@@ -2,6 +2,7 @@
 #define HU_EVAL_H
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/provider.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -13,9 +14,11 @@ typedef struct hu_eval_run { char *suite_name; char *provider; char *model; hu_e
 typedef enum { HU_EVAL_EXACT=0, HU_EVAL_CONTAINS, HU_EVAL_NUMERIC_CLOSE, HU_EVAL_LLM_JUDGE } hu_eval_match_mode_t;
 
 hu_error_t hu_eval_suite_load_json(hu_allocator_t *alloc, const char *json, size_t json_len, hu_eval_suite_t *out);
+hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, const char *model, size_t model_len, hu_eval_suite_t *suite, hu_eval_match_mode_t mode, hu_eval_run_t *out);
 hu_error_t hu_eval_check(hu_allocator_t *alloc, const char *actual, size_t actual_len, const char *expected, size_t expected_len, hu_eval_match_mode_t mode, bool *passed);
 hu_error_t hu_eval_report_json(hu_allocator_t *alloc, const hu_eval_run_t *run, char **out, size_t *out_len);
 hu_error_t hu_eval_compare(hu_allocator_t *alloc, const hu_eval_run_t *baseline, const hu_eval_run_t *current, char **report, size_t *report_len);
+hu_error_t hu_eval_run_load_json(hu_allocator_t *alloc, const char *json, size_t json_len, hu_eval_run_t *out);
 void hu_eval_suite_free(hu_allocator_t *alloc, hu_eval_suite_t *suite);
 void hu_eval_run_free(hu_allocator_t *alloc, hu_eval_run_t *run);
 void hu_eval_result_free(hu_allocator_t *alloc, hu_eval_result_t *result);

@@ -124,9 +124,6 @@ hu_error_t hu_feed_processor_get_all_recent(hu_allocator_t *alloc, sqlite3 *db,
 hu_error_t hu_feed_search(hu_allocator_t *alloc, sqlite3 *db,
                           const char *query, size_t query_len, size_t limit,
                           hu_feed_item_stored_t **out, size_t *out_count);
-hu_error_t hu_feed_build_daily_digest(hu_allocator_t *alloc, sqlite3 *db,
-                                      int64_t since_ts, size_t max_chars,
-                                      char **out, size_t *out_len);
 hu_error_t hu_feed_processor_cleanup(hu_feed_processor_t *proc,
                                      uint32_t retention_days);
 hu_error_t hu_feed_correlate_recent(hu_allocator_t *alloc, sqlite3 *db,
