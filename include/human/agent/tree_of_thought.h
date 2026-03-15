@@ -30,13 +30,22 @@ typedef struct hu_tot_result {
     double best_score;
     size_t branches_explored;
     size_t branches_pruned;
+    int max_depth_reached;
+    int llm_calls_made;
 } hu_tot_result_t;
+
+#define HU_TOT_STRATEGY_BEAM_SEARCH 0
+#define HU_TOT_STRATEGY_BEST_FIRST  1
+#define HU_TOT_STRATEGY_DFS         2
 
 typedef struct hu_tot_config {
     int num_branches;       /* candidates per level (default 3) */
     int max_depth;          /* reasoning depth (default 2) */
     double prune_threshold; /* discard branches below this score (default 0.3) */
     bool enabled;
+    int beam_width;         /* top-K to keep at each level (default 3) */
+    int max_total_nodes;    /* absolute node budget (default 50) */
+    int strategy;           /* 0=beam_search, 1=best_first, 2=dfs */
 } hu_tot_config_t;
 
 /* Generate and evaluate multiple reasoning branches for a problem.

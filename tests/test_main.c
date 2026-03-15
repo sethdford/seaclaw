@@ -12,6 +12,7 @@ jmp_buf hu__jmp;
 void run_allocator_tests(void);
 void run_data_loader_tests(void);
 void run_agent_modules_tests(void);
+void run_tot_recursive_tests(void);
 void run_agent_subsystems_tests(void);
 void run_crypto_tests(void);
 void run_json_tests(void);
@@ -215,6 +216,10 @@ void run_bth_e2e_tests(void);
 void run_bth_metrics_tests(void);
 void run_memory_features_tests(void);
 void run_agi_frontiers_tests(void);
+void run_mcts_planner_tests(void);
+void run_world_model_graph_tests(void);
+void run_world_simulation_tests(void);
+void run_world_context_tests(void);
 void run_peripheral_ctrl_tests(void);
 void run_value_learning_tests(void);
 void run_goal_engine_tests(void);
@@ -285,6 +290,7 @@ int main(int argc, char **argv) {
     run_allocator_tests();
     run_data_loader_tests();
     run_agent_modules_tests();
+    run_tot_recursive_tests();
     run_agent_subsystems_tests();
     run_crypto_tests();
     run_wasm_tests();
@@ -491,6 +497,10 @@ int main(int argc, char **argv) {
     run_bth_metrics_tests();
     run_memory_features_tests();
     run_agi_frontiers_tests();
+    run_mcts_planner_tests();
+    run_world_model_graph_tests();
+    run_world_simulation_tests();
+    run_world_context_tests();
     run_agent_registry_tests();
     run_pwa_tests();
 #ifdef HU_ENABLE_CURL

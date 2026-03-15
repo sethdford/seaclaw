@@ -6,28 +6,30 @@ struct OverviewView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var appeared = false
 
-    private var tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color) {
-        if colorScheme == .dark {
-            return (
-                HUTokens.Dark.bgSurface,
-                HUTokens.Dark.surfaceContainer,
-                HUTokens.Dark.text,
-                HUTokens.Dark.textMuted,
-                HUTokens.Dark.accent,
-                HUTokens.Dark.success,
-                HUTokens.Dark.error
-            )
-        } else {
-            return (
-                HUTokens.Light.bgSurface,
-                HUTokens.Light.surfaceContainer,
-                HUTokens.Light.text,
-                HUTokens.Light.textMuted,
-                HUTokens.Light.accent,
-                HUTokens.Light.success,
-                HUTokens.Light.error
-            )
-        }
+    private typealias TokenSet = (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
+
+    private var tokens: TokenSet {
+        let dark: TokenSet = (
+            HUTokens.Dark.bgSurface,
+            HUTokens.Dark.surfaceContainer,
+            HUTokens.Dark.surfaceContainerHigh,
+            HUTokens.Dark.text,
+            HUTokens.Dark.textMuted,
+            HUTokens.Dark.accent,
+            HUTokens.Dark.success,
+            HUTokens.Dark.error
+        )
+        let light: TokenSet = (
+            HUTokens.Light.bgSurface,
+            HUTokens.Light.surfaceContainer,
+            HUTokens.Light.surfaceContainerHigh,
+            HUTokens.Light.text,
+            HUTokens.Light.textMuted,
+            HUTokens.Light.accent,
+            HUTokens.Light.success,
+            HUTokens.Light.error
+        )
+        return colorScheme == .dark ? dark : light
     }
 
     var body: some View {
@@ -160,7 +162,7 @@ private struct StatCard: View {
     let value: String
     let trend: String
     let trendUp: Bool
-    let tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
+    let tokens: OverviewView.TokenSet
     let appeared: Bool
     let delay: Double
 

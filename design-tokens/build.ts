@@ -84,8 +84,21 @@ function remToPx(val: string): number | null {
   return Math.round(parseFloat(m[1]) * REM_PX);
 }
 
-/** Parse dimension (rem, px) to numeric px */
+/** Parse clamp(min, ..., max) with rem values — use midpoint for native (no fluid support) */
+function parseClampRem(val: string): number | null {
+  const remMatches = val.match(/[\d.]+rem/g);
+  if (remMatches && remMatches.length >= 2) {
+    const minPx = parseFloat(remMatches[0]) * REM_PX;
+    const maxPx = parseFloat(remMatches[remMatches.length - 1]) * REM_PX;
+    return Math.round((minPx + maxPx) / 2);
+  }
+  return null;
+}
+
+/** Parse dimension (rem, px, clamp) to numeric px */
 function dimToPx(val: string): number | null {
+  const clampPx = parseClampRem(val);
+  if (clampPx != null) return clampPx;
   if (val.endsWith("rem")) return remToPx(val);
   const m = val.match(/^(\d+)px$/);
   return m ? parseInt(m[1], 10) : null;
@@ -1381,6 +1394,9 @@ function generateKotlin(tokens: TokenMap): string {
     "fontSize.base": "textBase",
     "fontSize.lg": "textLg",
     "fontSize.xl": "textXl",
+    "fontSize.2xl": "text2xl",
+    "fontSize.3xl": "text3xl",
+    "fontSize.hero": "textHero",
   };
   for (const [path, name] of Object.entries(sizeMap)) {
     const v = tokens[path] as string | undefined;

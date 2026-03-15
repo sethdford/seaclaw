@@ -50,6 +50,7 @@ reference/
 
 # Worktrees
 .worktrees
+.claude/worktrees/
 
 # iOS / macOS / Swift build caches
 apps/ios/.build/

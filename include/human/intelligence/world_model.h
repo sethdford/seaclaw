@@ -69,10 +69,86 @@ hu_error_t hu_world_record_outcome(hu_world_model_t *model,
                                    const char *outcome, size_t outcome_len,
                                    double confidence, int64_t now_ts);
 
+/* --- Context-Aware Simulation (AGI-W2, AGI-W5) --- */
+
+typedef struct hu_world_context {
+    char entities[8][128];  /* up to 8 relevant entities */
+    size_t entity_count;
+    int64_t time_window_start;
+    int64_t time_window_end;
+    char user_state[256];
+    size_t user_state_len;
+} hu_world_context_t;
+
+hu_error_t hu_world_context_from_text(const char *text, size_t text_len,
+                                       hu_world_context_t *out);
+
+hu_error_t hu_world_simulate_with_context(hu_world_model_t *model,
+                                           const char *action, size_t action_len,
+                                           const hu_world_context_t *ctx,
+                                           hu_wm_prediction_t *out);
+
+hu_error_t hu_world_compare_actions(hu_world_model_t *model,
+                                     const char **actions, const size_t *lens,
+                                     size_t count, const hu_world_context_t *ctx,
+                                     hu_action_option_t *ranked_out);
+
+hu_error_t hu_world_what_if(hu_world_model_t *model,
+                             const char *action, size_t action_len,
+                             const hu_world_context_t *ctx,
+                             hu_wm_prediction_t *scenarios, size_t max_scenarios,
+                             size_t *out_count);
+
 /* Get causal chain depth from an action (how many hops of consequences). */
 hu_error_t hu_world_causal_depth(hu_world_model_t *model,
                                  const char *action, size_t action_len,
                                  size_t *out_depth);
+
+/* --- Causal Graph Engine (AGI-W1) --- */
+
+typedef enum {
+    HU_EDGE_CAUSES = 0,
+    HU_EDGE_PREVENTS,
+    HU_EDGE_ENABLES,
+    HU_EDGE_CORRELATES,
+    HU_EDGE_TEMPORAL_FOLLOWS
+} hu_causal_edge_type_t;
+
+typedef struct hu_causal_node {
+    int64_t id;
+    char label[256];
+    size_t label_len;
+    char type[64];       /* "entity", "action", "outcome", "event" */
+    size_t type_len;
+    int64_t created_at;
+} hu_causal_node_t;
+
+typedef struct hu_causal_edge {
+    int64_t id;
+    int64_t source_id;
+    int64_t target_id;
+    hu_causal_edge_type_t type;
+    double confidence;
+    int evidence_count;
+    int64_t last_observed;
+} hu_causal_edge_t;
+
+hu_error_t hu_world_add_node(hu_world_model_t *model, const char *label, size_t label_len,
+                             const char *type, size_t type_len, int64_t *out_id);
+
+hu_error_t hu_world_add_edge(hu_world_model_t *model, int64_t source, int64_t target,
+                             hu_causal_edge_type_t type, double confidence, int64_t timestamp);
+
+hu_error_t hu_world_get_neighbors(hu_world_model_t *model, int64_t node_id,
+                                  hu_causal_edge_t *edges, size_t max_edges, size_t *out_count);
+
+hu_error_t hu_world_trace_causal_chain(hu_world_model_t *model, int64_t start_node,
+                                       int max_depth, hu_causal_node_t *path, size_t max_path,
+                                       size_t *out_len);
+
+hu_error_t hu_world_find_paths(hu_world_model_t *model, int64_t from, int64_t to,
+                               int max_depth, hu_causal_node_t *path, size_t max_path,
+                               size_t *out_len);
 
 #endif /* HU_ENABLE_SQLITE */
 #endif /* HU_INTELLIGENCE_WORLD_MODEL_H */

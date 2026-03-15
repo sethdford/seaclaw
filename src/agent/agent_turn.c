@@ -109,11 +109,19 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             hu_agent_clear_current_for_tools();
             return guard_err;
         }
-        if (risk == HU_INJECTION_HIGH_RISK && agent->observer) {
-            hu_observer_event_t ev = {.tag = HU_OBSERVER_EVENT_ERR};
-            ev.data.err.component = "input_guard";
-            ev.data.err.message = "high-risk injection pattern detected";
-            hu_observer_record_event(*agent->observer, &ev);
+        if (risk == HU_INJECTION_HIGH_RISK) {
+            if (agent->observer) {
+                hu_observer_event_t ev = {.tag = HU_OBSERVER_EVENT_ERR};
+                ev.data.err.component = "input_guard";
+                ev.data.err.message = "high-risk injection pattern detected";
+                hu_observer_record_event(*agent->observer, &ev);
+            }
+            *response_out = hu_strndup(agent->alloc,
+                "I can't process that request due to safety concerns.", 52);
+            if (response_len_out)
+                *response_len_out = 52;
+            hu_agent_clear_current_for_tools();
+            return HU_OK;
         }
     }
 
@@ -1578,14 +1586,77 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                            compiler_resp.content_len,
                                                            &dag) == HU_OK &&
                                 dag.node_count > 0) {
-                                hu_observer_event_t ev = {
-                                    .tag = HU_OBSERVER_EVENT_TOOL_CALL,
-                                    .data = {{0}},
-                                };
-                                ev.data.tool_call.tool = "llm_compiler";
-                                ev.data.tool_call.duration_ms = 0;
-                                ev.data.tool_call.success = true;
-                                HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
+                                /* Execute DAG: process nodes in dependency order */
+                                bool dag_executed = false;
+                                size_t max_dag_iters = dag.node_count * 2;
+                                for (size_t di = 0; di < max_dag_iters && !hu_dag_is_complete(&dag); di++) {
+                                    for (size_t ni = 0; ni < dag.node_count; ni++) {
+                                        hu_dag_node_t *node = &dag.nodes[ni];
+                                        if (node->status != HU_DAG_PENDING)
+                                            continue;
+                                        /* Check all deps are done */
+                                        bool deps_met = true;
+                                        for (size_t d = 0; d < node->dep_count; d++) {
+                                            hu_dag_node_t *dep = hu_dag_find_node(&dag, node->deps[d],
+                                                                                   node->deps[d] ? strlen(node->deps[d]) : 0);
+                                            if (!dep || dep->status != HU_DAG_DONE) {
+                                                deps_met = false;
+                                                break;
+                                            }
+                                        }
+                                        if (!deps_met)
+                                            continue;
+                                        node->status = HU_DAG_RUNNING;
+                                        hu_tool_t *dag_tool = hu_agent_internal_find_tool(
+                                            agent, node->tool_name, node->tool_name ? strlen(node->tool_name) : 0);
+                                        if (!dag_tool) {
+                                            node->status = HU_DAG_FAILED;
+                                            continue;
+                                        }
+                                        hu_tool_result_t dag_result = hu_tool_result_fail("invalid", 7);
+                                        hu_json_value_t *dag_args = NULL;
+                                        if (node->args_json) {
+                                            (void)hu_json_parse(agent->alloc, node->args_json,
+                                                              strlen(node->args_json), &dag_args);
+                                        }
+                                        if (dag_args && dag_tool->vtable->execute) {
+                                            dag_tool->vtable->execute(dag_tool->ctx, agent->alloc,
+                                                                      dag_args, &dag_result);
+                                        }
+                                        if (dag_args)
+                                            hu_json_free(agent->alloc, dag_args);
+                                        if (dag_result.success) {
+                                            node->status = HU_DAG_DONE;
+                                            if (dag_result.output && dag_result.output_len > 0) {
+                                                node->result = hu_strndup(agent->alloc, dag_result.output,
+                                                                          dag_result.output_len);
+                                                node->result_len = dag_result.output_len;
+                                            }
+                                        } else {
+                                            node->status = HU_DAG_FAILED;
+                                        }
+                                        hu_tool_result_free(agent->alloc, &dag_result);
+                                        dag_executed = true;
+                                    }
+                                }
+                                if (dag_executed) {
+                                    hu_observer_event_t ev = {
+                                        .tag = HU_OBSERVER_EVENT_TOOL_CALL, .data = {{0}}};
+                                    ev.data.tool_call.tool = "llm_compiler";
+                                    ev.data.tool_call.duration_ms = 0;
+                                    ev.data.tool_call.success = hu_dag_is_complete(&dag);
+                                    HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
+                                    /* Append DAG results to history so the LLM sees them */
+                                    for (size_t ni = 0; ni < dag.node_count; ni++) {
+                                        hu_dag_node_t *node = &dag.nodes[ni];
+                                        const char *r = node->result ? node->result : (node->status == HU_DAG_DONE ? "ok" : "failed");
+                                        size_t rlen = node->result ? node->result_len : strlen(r);
+                                        (void)hu_agent_internal_append_history(
+                                            agent, HU_ROLE_TOOL, r, rlen,
+                                            node->tool_name, node->tool_name ? strlen(node->tool_name) : 0,
+                                            node->id, node->id ? strlen(node->id) : 0);
+                                    }
+                                }
                             }
                             hu_dag_deinit(&dag);
                         }

@@ -140,6 +140,9 @@ object HUTokens {
     val textBase = 14.sp
     val textLg = 16.sp
     val textXl = 20.sp
+    val text2xl = 24.sp
+    val text3xl = 30.sp
+    val textHero = 44.sp
 
     // Font weights
     val weightBlack = 900

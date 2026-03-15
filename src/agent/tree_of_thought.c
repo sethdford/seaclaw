@@ -13,7 +13,6 @@
 
 #define TOT_GEN_PREFIX "THOUGHT "
 #define TOT_GEN_PREFIX_LEN 7
-#define HU_TOT_MAX_TOTAL_NODES 50
 
 #if defined(__GNUC__) || defined(__clang__)
 #define TOT_UNUSED __attribute__((unused))
@@ -40,6 +39,9 @@ hu_tot_config_t hu_tot_config_default(void) {
         .max_depth = 2,
         .prune_threshold = 0.3,
         .enabled = true,
+        .beam_width = 3,
+        .max_total_nodes = 50,
+        .strategy = HU_TOT_STRATEGY_BEAM_SEARCH,
     };
 }
 
@@ -54,6 +56,8 @@ void hu_tot_result_free(hu_allocator_t *alloc, hu_tot_result_t *result) {
     result->best_score = 0.0;
     result->branches_explored = 0;
     result->branches_pruned = 0;
+    result->max_depth_reached = 0;
+    result->llm_calls_made = 0;
 }
 
 /* Parse "THOUGHT N: content" lines from response. Returns count of branches parsed.
@@ -145,32 +149,127 @@ hu_error_t hu_tot_explore(hu_allocator_t *alloc, hu_provider_t *provider,
     (void)problem;
     (void)problem_len;
 
-    static const char *mock_thoughts[] = {"Break into subproblems", "Use analogy", "Work backwards"};
-    static const double mock_scores[] = {0.9, 0.6, 0.25};
+    /* Recursive mock: 3 root branches, 2 children per surviving, 1 grandchild per surviving. */
+    static const char *mock_root[] = {"Break into subproblems", "Use analogy", "Work backwards"};
+    static const double mock_root_scores[] = {0.9, 0.6, 0.25};
 
     int max_depth = config ? config->max_depth : 2;
-    size_t n = (size_t)num_branches;
-    if (n > 3)
-        n = 3;
+    int beam_width = config && config->beam_width > 0 ? config->beam_width : 3;
+    int max_total_nodes = config && config->max_total_nodes > 0 ? config->max_total_nodes : 50;
 
     size_t pruned = 0;
-    size_t total_explored = n;
+    size_t total_explored = 0;
+    int max_depth_reached = 0;
     const char *best_thought_str = NULL;
     double best_score = -1.0;
 
-    for (size_t i = 0; i < n; i++) {
-        if (mock_scores[i] < prune_threshold)
+    /* Level 0: 3 root branches */
+    for (int i = 0; i < 3 && total_explored < (size_t)max_total_nodes; i++) {
+        total_explored++;
+        if (mock_root_scores[i] < prune_threshold)
             pruned++;
-        else if (mock_scores[i] > best_score) {
-            best_score = mock_scores[i];
-            best_thought_str = mock_thoughts[i];
+        else if (mock_root_scores[i] > best_score) {
+            best_score = mock_root_scores[i];
+            best_thought_str = mock_root[i];
         }
     }
+    /* Surviving roots (score > prune): 0.9, 0.6. Keep top beam_width. */
+    double level0_scores[3] = {0.9, 0.6, 0.25};
+    /* Sort by score desc, take top beam_width */
+    int survivors0[3];
+    int n0 = 0;
+    for (int i = 0; i < 3 && n0 < beam_width; i++) {
+        int best_idx = -1;
+        double best_s = -1.0;
+        for (int j = 0; j < 3; j++) {
+            int used = 0;
+            for (int k = 0; k < n0; k++)
+                if (survivors0[k] == j)
+                    used = 1;
+            if (!used && level0_scores[j] >= prune_threshold && level0_scores[j] > best_s) {
+                best_s = level0_scores[j];
+                best_idx = j;
+            }
+        }
+        if (best_idx < 0)
+            break;
+        survivors0[n0++] = best_idx;
+    }
 
-    if (max_depth > 1) {
-        best_score = 0.95;
-        best_thought_str = "Break into subproblems (refined)";
-        total_explored += (size_t)(max_depth - 1) * 2;
+    /* Level 1: 2 children per surviving root, scores = parent ± 0.05 */
+    if (max_depth > 1 && total_explored < (size_t)max_total_nodes) {
+        max_depth_reached = 1;
+        for (int s = 0; s < n0 && total_explored < (size_t)max_total_nodes; s++) {
+            int p = survivors0[s];
+            double ps = level0_scores[p];
+            int is_sub = (p == 0);
+            for (int c = 0; c < 2 && total_explored < (size_t)max_total_nodes; c++) {
+                double cs = ps + (c == 0 ? 0.05 : -0.05);
+                total_explored++;
+                if (cs < prune_threshold)
+                    pruned++;
+                else if (cs > best_score) {
+                    best_score = cs;
+                    best_thought_str = is_sub ? "Break into subproblems (refined)" : "Use analogy (refined)";
+                }
+            }
+        }
+
+        /* Level 2: 1 grandchild per surviving at level 1, keep top beam_width at level 1 first */
+        double l1_scores[6];
+        const char *l1_thoughts[6];
+        int l1_count = 0;
+        for (int s = 0; s < n0; s++) {
+            int p = survivors0[s];
+            double ps = level0_scores[p];
+            int is_sub = (p == 0);
+            for (int c = 0; c < 2; c++) {
+                double cs = ps + (c == 0 ? 0.05 : -0.05);
+                if (cs >= prune_threshold) {
+                    l1_scores[l1_count] = cs;
+                    l1_thoughts[l1_count] = is_sub ? "Break into subproblems (refined)" : "Use analogy (refined)";
+                    l1_count++;
+                }
+            }
+        }
+        /* Sort l1 by score, take top beam_width */
+        int surv1[6];
+        int n1 = 0;
+        for (int i = 0; i < l1_count && n1 < beam_width; i++) {
+            int best_idx = -1;
+            double best_s = -1.0;
+            for (int j = 0; j < l1_count; j++) {
+                int used = 0;
+                for (int k = 0; k < n1; k++)
+                    if (surv1[k] == j)
+                        used = 1;
+                if (!used && l1_scores[j] > best_s) {
+                    best_s = l1_scores[j];
+                    best_idx = j;
+                }
+            }
+            if (best_idx < 0)
+                break;
+            surv1[n1++] = best_idx;
+        }
+
+        if (max_depth > 2 && total_explored < (size_t)max_total_nodes) {
+            max_depth_reached = 2;
+            for (int s = 0; s < n1 && total_explored < (size_t)max_total_nodes; s++) {
+                double ps = l1_scores[surv1[s]];
+                int is_sub = (l1_thoughts[surv1[s]] != NULL && strstr(l1_thoughts[surv1[s]], "subproblems") != NULL);
+                double gs = ps + 0.05;
+                if (gs > 1.0)
+                    gs = 1.0;
+                total_explored++;
+                if (gs < prune_threshold)
+                    pruned++;
+                else if (gs > best_score) {
+                    best_score = gs;
+                    best_thought_str = is_sub ? "Break into subproblems (refined further)" : "Use analogy (refined further)";
+                }
+            }
+        }
     }
 
     if (best_thought_str) {
@@ -182,6 +281,8 @@ hu_error_t hu_tot_explore(hu_allocator_t *alloc, hu_provider_t *provider,
     }
     result->branches_explored = total_explored;
     result->branches_pruned = pruned;
+    result->max_depth_reached = max_depth_reached;
+    result->llm_calls_made = 0;
     return HU_OK;
 #else
     if (!provider || !provider->vtable || !provider->vtable->chat_with_system)
@@ -279,7 +380,11 @@ hu_error_t hu_tot_explore(hu_allocator_t *alloc, hu_provider_t *provider,
         current_best = hu_strdup(alloc, branches[best_idx].thought);
 
     int max_depth = config ? config->max_depth : 2;
-    if (max_depth > 1 && current_best && total_explored < HU_TOT_MAX_TOTAL_NODES) {
+    int node_limit = config && config->max_total_nodes > 0 ? config->max_total_nodes : 50;
+    int llm_calls = 1 + (int)branch_count;
+    int max_depth_reached = 0;
+
+    if (max_depth > 1 && current_best && total_explored < (size_t)node_limit) {
         for (int depth = 1; depth < max_depth; depth++) {
             char *expand_sys = hu_sprintf(alloc, TOT_EXPAND_SYS, current_best, num_branches);
             if (!expand_sys)
@@ -291,6 +396,7 @@ hu_error_t hu_tot_explore(hu_allocator_t *alloc, hu_provider_t *provider,
                 provider->ctx, alloc, expand_sys, strlen(expand_sys), problem, problem_len,
                 gen_model, gen_model_len, 0.7, &expand_out, &expand_out_len);
             hu_str_free(alloc, expand_sys);
+            llm_calls++;
 
             if (err != HU_OK || !expand_out || expand_out_len == 0) {
                 if (expand_out)
@@ -331,6 +437,7 @@ hu_error_t hu_tot_explore(hu_allocator_t *alloc, hu_provider_t *provider,
                     provider->ctx, alloc, eval_sys, eval_sys_len, user_msg, user_len,
                     eval_model, eval_model_len, 0.0, &eval_out, &eval_out_len);
                 alloc->free(alloc->ctx, user_msg, user_cap);
+                llm_calls++;
 
                 if (err == HU_OK && eval_out && eval_out_len > 0) {
                     double score = parse_score(eval_out, eval_out_len);
@@ -357,13 +464,16 @@ hu_error_t hu_tot_explore(hu_allocator_t *alloc, hu_provider_t *provider,
                 if (sub_branches[j].thought)
                     hu_str_free(alloc, sub_branches[j].thought);
 
-            if (total_explored >= HU_TOT_MAX_TOTAL_NODES)
+            max_depth_reached = depth;
+            if (total_explored >= (size_t)node_limit)
                 break;
         }
     }
 
     result->branches_explored = total_explored;
     result->branches_pruned = pruned;
+    result->max_depth_reached = max_depth_reached;
+    result->llm_calls_made = llm_calls;
 
     if (current_best) {
         result->best_thought = current_best;

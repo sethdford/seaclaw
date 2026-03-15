@@ -32,7 +32,7 @@ struct OnboardingView: View {
                             .foregroundStyle(tokens.accent)
                             .frame(height: 100)
                         Text(page.1)
-                            .font(.custom("Avenir-Heavy", size: HUTokens.text2xl, relativeTo: .title))
+                            .font(.custom("Avenir-Heavy", size: HUTokens.text2Xl, relativeTo: .title))
                             .foregroundStyle(tokens.text)
                             .multilineTextAlignment(.center)
                         Text(page.2)

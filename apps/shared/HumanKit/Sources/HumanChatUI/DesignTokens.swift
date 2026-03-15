@@ -135,8 +135,11 @@ public enum HUTokens {
     public static let fontMono = "Geist Mono"
 
     // MARK: - Font sizes
+    public static let text2Xl: CGFloat = 24
     public static let text2Xs: CGFloat = 10
+    public static let text3Xl: CGFloat = 30
     public static let textBase: CGFloat = 14
+    public static let textHero: CGFloat = 44
     public static let textLg: CGFloat = 16
     public static let textSm: CGFloat = 13
     public static let textXl: CGFloat = 20

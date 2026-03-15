@@ -395,6 +395,7 @@ set(HU_CORE_SOURCES
     src/agent/task_list.c
     src/agent/profile.c
     src/agent/planner.c
+    src/agent/mcts_planner.c
     src/agent/dag.c
     src/agent/dag_executor.c
     src/agent/llm_compiler.c
@@ -1511,6 +1512,13 @@ if(NOT HU_ENABLE_ML)
         src/ml/muon_adamw.c src/ml/train.c src/ml/checkpoint.c src/ml/cli.c
         src/ml/lora.c)
 endif()
+# Phase 7 modules (experience, forgetting) — tests need them when SQLite is OFF (minimal build)
+if(NOT HU_ENABLE_SQLITE)
+    list(APPEND HU_TEST_EXTRA_MODULES
+        src/intelligence/experience.c
+        src/memory/forgetting.c
+    )
+endif()
 add_library(human_core_test STATIC ${HU_CORE_SOURCES} ${HU_TEST_EXTRA_CHANNELS} ${HU_TEST_EXTRA_MODULES} ${HU_CRYPTO_SOURCES} ${HU_ASM_SOURCES})
 target_include_directories(human_core_test PUBLIC ${HU_ROOT}/include)
 target_include_directories(human_core_test PRIVATE ${HU_ROOT}/asm/generic)
@@ -1678,6 +1686,7 @@ enable_testing()
 set(HU_TEST_SOURCES
     tests/test_main.c
     tests/test_agent_modules.c
+    tests/test_tot_recursive.c
     tests/test_agent_subsystems.c
     tests/test_crypto.c
     tests/test_wasm.c
@@ -1885,7 +1894,8 @@ if(HU_ENABLE_CURL)
 endif()
 
 list(APPEND HU_TEST_SOURCES tests/test_memory_features.c)
-list(APPEND HU_TEST_SOURCES tests/test_agi_frontiers.c)
+list(APPEND HU_TEST_SOURCES tests/test_agi_frontiers.c tests/test_world_model_graph.c tests/test_mcts_planner.c)
+list(APPEND HU_TEST_SOURCES tests/test_world_simulation.c tests/test_world_context.c)
 list(APPEND HU_TEST_SOURCES tests/test_agent_registry.c)
 list(APPEND HU_TEST_SOURCES tests/test_pwa.c)
 
