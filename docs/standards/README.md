@@ -39,6 +39,7 @@ AGENTS.md                <- Full engineering protocol
 | [citation-and-sourcing.md](ai/citation-and-sourcing.md)       | Source tiers, attribution patterns, freshness rules, confidence mapping                    | Agent responses that reference data        |
 | [human-in-the-loop.md](ai/human-in-the-loop.md)               | Approval tiers, confirmation flow, security policy integration, escalation triggers        | Tool execution, security-sensitive actions |
 | [disclosure.md](ai/disclosure.md)                             | AI identity disclosure, expertise boundaries, directional language, claims to avoid        | Agent responses, persona design            |
+| [responsible-ai.md](ai/responsible-ai.md)                     | Model governance, selection criteria, bias detection, output monitoring, incident response | Model selection, provider evaluation       |
 
 ## Brand
 
@@ -48,28 +49,32 @@ AGENTS.md                <- Full engineering protocol
 
 ## Design
 
-| Doc                                               | Covers                                                           | Used When                         |
-| ------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------- |
-| [visual-standards.md](design/visual-standards.md) | Visual hierarchy, composition, depth, spacing, quality checklist | Any visual change                 |
-| [motion-design.md](design/motion-design.md)       | Animation principles, spring physics, timing, choreography       | Adding or modifying animation     |
-| [ux-patterns.md](design/ux-patterns.md)           | Layout archetypes, responsive behavior, interaction patterns     | Creating or restructuring views   |
-| [design-strategy.md](design/design-strategy.md)   | Token philosophy, color hierarchy, theme support                 | Token values and design decisions |
-| [design-system.md](design/design-system.md)       | Design system overview, component rules                          | Building UI components            |
+| Doc                                                         | Covers                                                                 | Used When                         |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------- |
+| [visual-standards.md](design/visual-standards.md)           | Visual hierarchy, composition, depth, spacing, quality checklist       | Any visual change                 |
+| [motion-design.md](design/motion-design.md)                 | Animation principles, spring physics, timing, choreography             | Adding or modifying animation     |
+| [ux-patterns.md](design/ux-patterns.md)                     | Layout archetypes, responsive behavior, interaction patterns           | Creating or restructuring views   |
+| [design-strategy.md](design/design-strategy.md)             | Token philosophy, color hierarchy, theme support                       | Token values and design decisions |
+| [design-system.md](design/design-system.md)                 | Design system overview, component rules                                | Building UI components            |
+| [accessibility-testing.md](design/accessibility-testing.md) | WCAG compliance, Lighthouse, axe-core, screen reader, keyboard testing | Accessibility work, UI changes    |
 
 ## Engineering
 
-| Doc                                                      | Covers                                                      | Used When                     |
-| -------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------- |
-| [principles.md](engineering/principles.md)               | KISS, YAGNI, DRY, fail-fast, secure-by-default, determinism | All code changes              |
-| [naming.md](engineering/naming.md)                       | Identifier conventions, type naming, constant naming        | All code changes              |
-| [anti-patterns.md](engineering/anti-patterns.md)         | Prohibited patterns with reasons and alternatives           | Code review, design decisions |
-| [testing.md](engineering/testing.md)                     | Test structure, naming, mocking, coverage, quality rules    | Writing or modifying tests    |
-| [workflow.md](engineering/workflow.md)                   | Branching, commits, versioning, releases, hotfixes          | All development work          |
-| [memory-management.md](engineering/memory-management.md) | Allocator types, ownership rules, cleanup patterns, ASan    | Allocation and cleanup code   |
-| [performance.md](engineering/performance.md)             | Binary size, RSS, startup time, per-operation budgets       | Performance-sensitive changes |
-| [api-design.md](engineering/api-design.md)               | API surface, stability tiers, versioning, deprecation       | Public API changes            |
-| [gateway-api.md](engineering/gateway-api.md)             | HTTP/WebSocket gateway, REST conventions, security, RPC     | Gateway endpoints, webhooks   |
-| [cross-platform.md](engineering/cross-platform.md)       | Platform detection, abstractions, guards, hardcoded paths   | Platform-specific code        |
+| Doc                                                          | Covers                                                          | Used When                         |
+| ------------------------------------------------------------ | --------------------------------------------------------------- | --------------------------------- |
+| [principles.md](engineering/principles.md)                   | KISS, YAGNI, DRY, fail-fast, secure-by-default, determinism     | All code changes                  |
+| [naming.md](engineering/naming.md)                           | Identifier conventions, type naming, constant naming            | All code changes                  |
+| [anti-patterns.md](engineering/anti-patterns.md)             | Prohibited patterns with reasons and alternatives               | Code review, design decisions     |
+| [testing.md](engineering/testing.md)                         | Test structure, naming, mocking, coverage, quality rules        | Writing or modifying tests        |
+| [workflow.md](engineering/workflow.md)                       | Branching, commits, versioning, releases, hotfixes              | All development work              |
+| [memory-management.md](engineering/memory-management.md)     | Allocator types, ownership rules, cleanup patterns, ASan        | Allocation and cleanup code       |
+| [performance.md](engineering/performance.md)                 | Binary size, RSS, startup time, per-operation budgets           | Performance-sensitive changes     |
+| [performance-testing.md](engineering/performance-testing.md) | Performance measurement, regression detection, profiling        | Performance testing, CI gates     |
+| [api-design.md](engineering/api-design.md)                   | API surface, stability tiers, versioning, deprecation           | Public API changes                |
+| [gateway-api.md](engineering/gateway-api.md)                 | HTTP/WebSocket gateway, REST conventions, security, RPC         | Gateway endpoints, webhooks       |
+| [cross-platform.md](engineering/cross-platform.md)           | Platform detection, abstractions, guards, hardcoded paths       | Platform-specific code            |
+| [dependencies.md](engineering/dependencies.md)               | Dependency tiers, version pinning, vulnerability scanning, SBOM | Adding dependencies, supply chain |
+| [error-handling.md](engineering/error-handling.md)           | Error propagation, reporting, recovery patterns, anti-patterns  | Error handling, debugging         |
 
 ## Quality
 
@@ -83,16 +88,18 @@ AGENTS.md                <- Full engineering protocol
 
 ## Operations
 
-| Doc                                                     | Covers                                                           | Used When             |
-| ------------------------------------------------------- | ---------------------------------------------------------------- | --------------------- |
-| [incident-response.md](operations/incident-response.md) | Severity levels, triage workflow, postmortem template, runbooks  | When things break     |
-| [monitoring.md](operations/monitoring.md)               | Structured logging, health checks, alerting, AI-specific metrics | All deployed services |
+| Doc                                                     | Covers                                                              | Used When                    |
+| ------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------- |
+| [incident-response.md](operations/incident-response.md) | Severity levels, triage workflow, postmortem template, runbooks     | When things break            |
+| [monitoring.md](operations/monitoring.md)               | Structured logging, health checks, alerting, AI-specific metrics    | All deployed services        |
+| [observability.md](operations/observability.md)         | SLI/SLO definitions, structured logging, metrics, trace propagation | Observability, SLOs, metrics |
 
 ## Security
 
-| Doc                                         | Covers                                                            | Used When                          |
-| ------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------- |
-| [threat-model.md](security/threat-model.md) | STRIDE threat model, attack surface analysis                      | Security-sensitive changes         |
-| [sandbox.md](security/sandbox.md)           | Sandbox isolation system, backend comparison                      | Runtime and tool execution changes |
-| [ai-safety.md](security/ai-safety.md)       | Prompt injection, output validation, safe tool execution          | AI agent behavior, tool security   |
-| [data-privacy.md](security/data-privacy.md) | Data classification, lifecycle, retention, user rights, isolation | Data handling, memory, logging     |
+| Doc                                         | Covers                                                            | Used When                            |
+| ------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------ |
+| [threat-model.md](security/threat-model.md) | STRIDE threat model, attack surface analysis                      | Security-sensitive changes           |
+| [sandbox.md](security/sandbox.md)           | Sandbox isolation system, backend comparison                      | Runtime and tool execution changes   |
+| [ai-safety.md](security/ai-safety.md)       | Prompt injection, output validation, safe tool execution          | AI agent behavior, tool security     |
+| [data-privacy.md](security/data-privacy.md) | Data classification, lifecycle, retention, user rights, isolation | Data handling, memory, logging       |
+| [compliance.md](security/compliance.md)     | GDPR, CCPA/CPRA compliance mapping, DPA requirements, audit trail | Data privacy compliance, deployments |

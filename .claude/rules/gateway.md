@@ -38,3 +38,9 @@ The gateway handles external HTTP/WebSocket traffic. Read AGENTS.md sections 3.5
 - Test malformed requests (bad JSON, missing fields, wrong types)
 - Test authentication and authorization boundaries
 - Test with oversized and edge-case inputs
+
+## Standards
+
+- Read `docs/standards/engineering/gateway-api.md` for API design rules.
+- Read `docs/standards/security/threat-model.md` for gateway threat model.
+- Read `docs/standards/operations/observability.md` for logging and metrics.

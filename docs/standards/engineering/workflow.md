@@ -156,3 +156,11 @@ RIGHT -- Every release goes through the checklist; small changes can have big im
 WRONG -- Direct push to main to "save time"
 RIGHT -- PR workflow catches issues that self-review misses
 ```
+
+## Normative References
+
+| ID            | Source                             | Version                          | Relevance                            |
+| ------------- | ---------------------------------- | -------------------------------- | ------------------------------------ |
+| [Accelerate]  | Forsgren, Humble, Kim — Accelerate | 1st ed. (2018)                   | DORA metrics for deployment velocity |
+| [TBD]         | Trunk Based Development            | trunkbaseddevelopment.com (2023) | Short-lived branch methodology       |
+| [ConvCommits] | Conventional Commits               | 1.0.0                            | Commit message format standard       |

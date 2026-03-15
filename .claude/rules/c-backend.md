@@ -37,3 +37,11 @@ All extension points use `void *ctx` + function pointer vtables. Callers OWN the
 ```bash
 cd build && cmake --build . -j$(nproc) && ./human_tests
 ```
+
+## Standards
+
+- Read `docs/standards/engineering/principles.md` for KISS/YAGNI/DRY rules.
+- Read `docs/standards/engineering/naming.md` for identifier conventions.
+- Read `docs/standards/engineering/anti-patterns.md` for prohibited patterns.
+- Read `docs/standards/engineering/error-handling.md` for error propagation.
+- Read `docs/standards/engineering/memory-management.md` for allocator rules.

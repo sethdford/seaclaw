@@ -1,0 +1,29 @@
+---
+description: Flutter app development rules
+globs:
+  - apps/flutter/**
+---
+
+# Flutter App Rules
+
+- Read `docs/standards/design/accessibility-testing.md` §4.3 for Flutter accessibility.
+- Read `docs/standards/design/visual-standards.md` for visual hierarchy.
+- Read `docs/standards/design/motion-design.md` for animation patterns.
+
+## Design Tokens
+- Use `HUTokens` constants from `lib/tokens.dart` (or equivalent).
+- Typography: Nunito Sans as Avenir fallback. Use Material 3 type scale.
+- Colors: `Theme.of(context).colorScheme.*` — never hardcoded hex.
+- Spacing: token-based, never raw pixel values.
+
+## Architecture
+- Gateway connection via `GatewayClient` (JSON-RPC over WebSocket).
+- Lazy screen loading (switch, not IndexedStack) for performance.
+- `const` constructors wherever possible.
+- `RepaintBoundary` on expensive list widgets.
+
+## Accessibility
+- `Semantics(header: true)` on screen titles.
+- `Semantics(label:, button: true)` on icon-only buttons.
+- `ExcludeSemantics` on decorative elements.
+- Test with platform screen readers.

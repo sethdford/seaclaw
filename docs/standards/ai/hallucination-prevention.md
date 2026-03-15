@@ -170,3 +170,12 @@ RIGHT -- Appropriate hedging builds trust; false confidence destroys it
 WRONG -- Pad a thin response with general knowledge to seem thorough
 RIGHT -- A shorter, grounded response is better than a longer, fabricated one
 ```
+
+## Normative References
+
+| ID           | Source                         | Version                 | Relevance                                  |
+| ------------ | ------------------------------ | ----------------------- | ------------------------------------------ |
+| [CAI]        | Bai et al. — Constitutional AI | arXiv:2212.08073 (2022) | Self-critique and revision methodology     |
+| [TruthfulQA] | Lin et al. — TruthfulQA        | arXiv:2109.07958 (2021) | Truthfulness measurement benchmark         |
+| [HELM]       | Stanford CRFM — HELM           | v1.0 (2023)             | Holistic evaluation including truthfulness |
+| [FactScore]  | Min et al. — FActScore         | arXiv:2305.14251 (2023) | Fine-grained factuality evaluation         |

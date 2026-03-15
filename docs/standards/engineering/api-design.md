@@ -119,3 +119,12 @@ RIGHT -- remove only in the version specified in the DEPRECATED comment (minor o
 WRONG -- change Stable tier struct layout without major bump
 RIGHT -- add new fields at end; never remove or reorder; major bump for breaking changes
 ```
+
+## Normative References
+
+| ID           | Source                    | Version            | Relevance                            |
+| ------------ | ------------------------- | ------------------ | ------------------------------------ |
+| [JSON-RPC]   | JSON-RPC Specification    | 2.0 (2013-01-04)   | Gateway control protocol wire format |
+| [OpenAPI]    | OpenAPI Specification     | 3.1.0 (2021-02-15) | REST API documentation standard      |
+| [Richardson] | Richardson Maturity Model | 2010               | REST API maturity levels             |
+| [Semver]     | Semantic Versioning       | 2.0.0              | API versioning scheme                |

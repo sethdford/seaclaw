@@ -6,6 +6,8 @@ globs:
   - "website/scripts/**"
 ---
 
+- Read `docs/standards/engineering/workflow.md` for commit and branch naming.
+
 # Scripts
 
 - Use `#!/usr/bin/env bash` and `set -euo pipefail`

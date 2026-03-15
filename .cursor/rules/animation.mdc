@@ -6,6 +6,7 @@ globs:
   - "website/src/**"
 ---
 
+- Read `docs/standards/design/motion-design.md` for animation principles and token usage.
 - Use `var(--hu-duration-fast)`, `var(--hu-duration-normal)`, `var(--hu-duration-slow)` — never hardcode `100ms`, `200ms`, `0.2s`, etc.
 - Use `var(--hu-ease-out)`, `var(--hu-ease-in-out)` — never hardcode `cubic-bezier(...)` or `ease`
 - Use spring tokens: `--hu-spring-micro` for button/toggle, `--hu-spring-standard` for panels, `--hu-spring-expressive` for page transitions, `--hu-spring-dramatic` for hero reveals

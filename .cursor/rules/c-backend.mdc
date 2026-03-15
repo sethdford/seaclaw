@@ -7,7 +7,7 @@ globs:
 
 # C Backend Standards
 
-Read `AGENTS.md` sections 2-6 before modifying any C source.
+Read `AGENTS.md` sections 2-6 before modifying any C source. Read `docs/standards/engineering/principles.md`, `docs/standards/engineering/naming.md`, `docs/standards/engineering/anti-patterns.md`, `docs/standards/engineering/error-handling.md` before modifying C source.
 
 ## Vtable Pattern
 

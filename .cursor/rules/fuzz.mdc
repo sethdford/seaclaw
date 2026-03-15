@@ -5,6 +5,8 @@ globs:
   - "tests/fuzz/**"
 ---
 
+- Read `docs/standards/engineering/testing.md` for test structure rules.
+
 # Fuzz Harness Standards
 
 Fuzz harnesses use libFuzzer to find crashes, memory errors, and edge cases in parsers and input handlers.

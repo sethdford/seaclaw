@@ -1,0 +1,17 @@
+---
+description: ML subsystem rules — model training, tokenization, optimization
+globs:
+  - src/ml/**
+  - include/human/ml/**
+  - tests/test_ml.c
+---
+
+# ML Subsystem
+
+- Gated behind `HU_ENABLE_ML`. Use `#ifdef HU_ENABLE_ML` guards.
+- Read `src/ml/CLAUDE.md` before modifying.
+- Read `docs/standards/engineering/memory-management.md` — all tensors freed via allocator.
+- Read `docs/standards/engineering/performance.md` — measure binary size impact.
+- Vtable interfaces: `hu_model_t`, `hu_ml_optimizer_t`.
+- Test gradient checks structurally (parameter existence, forward/backward success), not numerically.
+- No bare `malloc` — use `hu_allocator_t`.

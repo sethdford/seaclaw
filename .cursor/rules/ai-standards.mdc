@@ -24,6 +24,8 @@ Read the applicable standard from `docs/standards/ai/` before modifying agent, p
 - **Human-in-the-loop** (`docs/standards/ai/human-in-the-loop.md`): approval tiers, security policy integration, confirmation flow
 - **Citation and sourcing** (`docs/standards/ai/citation-and-sourcing.md`): source tiers, freshness rules, confidence mapping
 - **Evaluation** (`docs/standards/ai/evaluation.md`): quality dimensions, golden-set testing, per-provider metrics
+- **Disclosure** (`docs/standards/ai/disclosure.md`): AI identity disclosure rules
+- **Responsible AI** (`docs/standards/ai/responsible-ai.md`): model governance
 
 ## Critical Rules
 

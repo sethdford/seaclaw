@@ -55,3 +55,12 @@ Mandatory engineering principles for all code in the human runtime. These are im
 - Keep dependency direction inward to contracts: concrete implementations depend on vtable/config/util, not on each other.
 - Avoid cross-subsystem coupling (provider code importing channel internals, tool code mutating gateway policy).
 - Keep module responsibilities single-purpose: orchestration in `agent/`, transport in `channels/`, model I/O in `providers/`, policy in `security/`, execution in `tools/`.
+
+## Normative References
+
+| ID           | Source                                   | Version        | Relevance                                                                |
+| ------------ | ---------------------------------------- | -------------- | ------------------------------------------------------------------------ |
+| [Accelerate] | Forsgren, Humble, Kim — Accelerate       | 1st ed. (2018) | DORA metrics: deployment frequency, lead time, MTTR, change failure rate |
+| [CleanCode]  | Robert C. Martin — Clean Code            | 1st ed. (2008) | KISS, DRY, SRP principles grounding                                      |
+| [Unix-Phil]  | McIlroy, Pinson, Tague — Unix Philosophy | 1978           | "Do one thing well" — basis for KISS                                     |
+| [C11]        | ISO/IEC 9899:2011                        | C11            | Language standard compliance                                             |

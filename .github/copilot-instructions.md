@@ -55,3 +55,18 @@ cmake --preset dev && cmake --build build -j$(nproc)
 - `docs/CONCEPT_INDEX.md` — concept-to-file mapping
 - `docs/error-codes.md` — error code reference
 - Per-module `CLAUDE.md` files in each `src/` subdirectory
+
+## Standards
+
+All project standards live in `docs/standards/`. Read the applicable standard before writing code.
+
+| Area        | Path                          | Key Standards                                                                        |
+| ----------- | ----------------------------- | ------------------------------------------------------------------------------------ |
+| AI          | `docs/standards/ai/`          | Agent architecture, hallucination prevention, evaluation, responsible AI, disclosure |
+| Design      | `docs/standards/design/`      | Visual standards, motion design, UX patterns, accessibility testing                  |
+| Engineering | `docs/standards/engineering/` | Principles, naming, testing, error handling, performance, dependencies               |
+| Operations  | `docs/standards/operations/`  | Incident response, monitoring, observability and SLOs                                |
+| Quality     | `docs/standards/quality/`     | Governance, ceremonies, code review                                                  |
+| Security    | `docs/standards/security/`    | Threat model, sandbox, AI safety, data privacy, compliance                           |
+
+Full index: `docs/standards/README.md`

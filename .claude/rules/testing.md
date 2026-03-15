@@ -33,3 +33,8 @@ Use `scripts/what-to-test.sh` to map changed files to relevant suites.
 - Include axe-core accessibility checks for every page/view
 - LitElement Shadow DOM: scope selectors to host component first, then inner class
 - Prefer `data-testid` attributes for E2E anchors
+
+## Standards
+
+- Read `docs/standards/engineering/testing.md` for test naming, structure, and coverage rules.
+- Read `docs/standards/engineering/performance-testing.md` for performance test methodology.

@@ -34,3 +34,9 @@ Implement `hu_runtime_t` vtable. Register in `src/runtime/factory.c`.
 - Test vtable wiring (create, configure, run, cleanup)
 - Test failure modes (unsupported platform, invalid config, resource exhaustion)
 - Test cleanup on error paths — no resource leaks
+
+## Standards
+
+- Read `docs/standards/security/sandbox.md` for sandbox backend rules.
+- Read `docs/standards/security/threat-model.md` for runtime security boundaries.
+- Read `docs/standards/engineering/error-handling.md` for error propagation.

@@ -1,0 +1,20 @@
+---
+description: Performance rules for hot paths and binary size management
+globs:
+  - src/**/*.c
+  - include/human/**/*.h
+alwaysApply: false
+---
+
+# Performance Rules
+
+Apply these rules when modifying hot paths (agent loop, provider calls, memory queries, gateway request handling).
+
+- Read `docs/standards/engineering/performance.md` for hard limits.
+- Read `docs/standards/engineering/performance-testing.md` for measurement methodology.
+- Binary size budget: ~1696 KB release. Measure impact of changes with `size build-release/human`.
+- Startup time budget: <30 ms. No lazy initialization that blocks startup.
+- Peak RSS budget: ~5.7 MB. No unnecessary heap allocations in the hot path.
+- Animate only compositor properties in UI (transform, opacity, filter).
+- Use `arena` allocator for per-turn allocations that can be bulk-freed.
+- Profile before optimizing — measure, don't guess.

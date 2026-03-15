@@ -154,3 +154,12 @@ RIGHT -- Security policy is the authority; AI intent does not override policy
 WRONG -- Expose raw provider errors to users
 RIGHT -- Transform to friendly messages; log full details for debugging
 ```
+
+## Normative References
+
+| ID              | Source                               | Version          | Relevance                                                         |
+| --------------- | ------------------------------------ | ---------------- | ----------------------------------------------------------------- |
+| [OWASP-LLM]     | OWASP Top 10 for LLM Applications    | 1.1 (2023-10)    | LLM vulnerability taxonomy (prompt injection, data leakage, etc.) |
+| [Anthropic-RSP] | Anthropic Responsible Scaling Policy | v1.0 (2023-09)   | AI capability evaluation and safety thresholds                    |
+| [NIST-AI-RMF]   | NIST AI Risk Management Framework    | 1.0 (2023-01-26) | AI risk identification and mitigation                             |
+| [Google-SAIF]   | Google Secure AI Framework           | 1.0 (2023-06)    | AI system security principles                                     |

@@ -36,3 +36,9 @@ Every tool implements `hu_tool_t`: `execute`, `name`, `description`, `parameters
 - At least one boundary/failure test (invalid input, missing params)
 - At least one security test (path traversal, injection, unauthorized access)
 - Use `HU_IS_TEST` mock paths — no real network, no real filesystem writes
+
+## Standards
+
+- Read `docs/standards/security/ai-safety.md` for safe tool execution.
+- Read `docs/standards/engineering/error-handling.md` for error propagation.
+- Read `docs/standards/security/threat-model.md` for tool security boundaries.

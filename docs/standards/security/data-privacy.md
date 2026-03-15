@@ -108,3 +108,12 @@ RIGHT -- Export in user-friendly JSON; no raw database dumps
 WRONG -- Disable memory storage without informing the user
 RIGHT -- Opt-out is explicit; user understands what is not being stored
 ```
+
+## Normative References
+
+| ID          | Source                                       | Version                        | Relevance                           |
+| ----------- | -------------------------------------------- | ------------------------------ | ----------------------------------- |
+| [GDPR]      | EU General Data Protection Regulation        | 2016/679                       | EU data protection requirements     |
+| [CCPA]      | California Consumer Privacy Act              | 2018 (as amended by CPRA 2020) | California privacy rights           |
+| [ISO-27701] | ISO/IEC 27701 Privacy Information Management | 2019                           | Privacy management system standard  |
+| [NIST-PF]   | NIST Privacy Framework                       | 1.0 (2020-01-16)               | Privacy risk management methodology |

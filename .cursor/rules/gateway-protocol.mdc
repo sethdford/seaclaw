@@ -7,6 +7,8 @@ globs:
   - "ui/src/controllers/**"
 ---
 
+- Read `docs/standards/engineering/gateway-api.md` for the gateway API standard.
+
 # Gateway Wire Protocol
 
 The UI communicates with the C gateway over WebSocket using a JSON-RPC style protocol.

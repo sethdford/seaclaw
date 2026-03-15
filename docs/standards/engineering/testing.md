@@ -142,3 +142,12 @@ RIGHT -- Free every allocation in every test; ASan is a safety net, not a substi
 WRONG -- Depend on test execution order
 RIGHT -- Each test is independent; setup and teardown in every test function
 ```
+
+## Normative References
+
+| ID            | Source                       | Version | Relevance                                  |
+| ------------- | ---------------------------- | ------- | ------------------------------------------ |
+| [TestPyramid] | Martin Fowler — Test Pyramid | 2012    | Unit > integration > E2E ratio guidance    |
+| [GoogleTest]  | Google Testing Blog          | Ongoing | Testing best practices for large codebases |
+| [CERT-C]      | SEI CERT C Coding Standard   | 2016    | Security-relevant test requirements        |
+| [ASan]        | Google AddressSanitizer      | LLVM 18 | Memory error detection methodology         |

@@ -191,3 +191,13 @@ RIGHT -- Every output includes provider, model, prompt version, latency, and err
 WRONG -- Evaluate only on one channel and assume other channels are fine
 RIGHT -- Per-channel evaluation catches channel-specific degradation
 ```
+
+## Normative References
+
+| ID           | Source                  | Version                 | Relevance                                          |
+| ------------ | ----------------------- | ----------------------- | -------------------------------------------------- |
+| [MMLU]       | Hendrycks et al. — MMLU | arXiv:2009.03300 (2020) | Massive multitask language understanding benchmark |
+| [HumanEval]  | Chen et al. — HumanEval | arXiv:2107.03374 (2021) | Code generation evaluation benchmark               |
+| [LMSYS]      | LMSYS Chatbot Arena     | Ongoing (2024)          | Crowdsourced model comparison via Elo ratings      |
+| [HELM]       | Stanford CRFM — HELM    | v1.0 (2023)             | Holistic multi-dimension evaluation                |
+| [AlpacaEval] | Li et al. — AlpacaEval  | v2.0 (2024)             | Instruction-following evaluation                   |

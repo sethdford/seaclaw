@@ -25,3 +25,10 @@ This is a high-blast-radius area. Read AGENTS.md sections 3.5 and 7.5 before any
 - At least one boundary/failure-mode test per change
 - Test lockout, invalid input, privilege escalation paths
 - Use `HU_IS_TEST` for crypto or network operations
+
+## Standards
+
+- Read `docs/standards/security/threat-model.md` for STRIDE methodology.
+- Read `docs/standards/security/ai-safety.md` for prompt injection prevention.
+- Read `docs/standards/security/data-privacy.md` for PII handling.
+- Read `docs/standards/security/compliance.md` for GDPR/CCPA mapping.

@@ -4,6 +4,7 @@ globs:
   - "ui/src/components/**"
 ---
 
+- Read `docs/standards/design/design-system.md` and `docs/standards/design/ux-patterns.md` for component architecture.
 - Component tag: `hu-<name>` prefix, registered with `@customElement("hu-<name>")`
 - Base class: LitElement with `static styles = css\`...\``
 - All styles must use `--hu-*` tokens — no raw hex, px spacing, or font-family
