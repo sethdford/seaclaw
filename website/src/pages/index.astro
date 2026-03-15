@@ -143,20 +143,35 @@ const tools = [
       type="application/ld+json"
       set:html={JSON.stringify({
         "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        name: "h-uman",
-        description:
-          "not quite human. Autonomous AI agent runtime in 1,696 kilobytes of pure C.",
-        applicationCategory: "DeveloperApplication",
-        operatingSystem: "Cross-platform",
-        url: "https://h-uman.ai/",
-        license: "https://opensource.org/licenses/MIT",
-        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-        author: {
-          "@type": "Organization",
-          name: "h-uman",
-          url: "https://github.com/sethdford/h-uman",
-        },
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://h-uman.ai/#website",
+            name: "h-uman",
+            url: "https://h-uman.ai/",
+            description: "Autonomous AI agent runtime in 1,696 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers.",
+            publisher: { "@id": "https://h-uman.ai/#organization" },
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://h-uman.ai/#organization",
+            name: "h-uman",
+            url: "https://github.com/sethdford/h-uman",
+            sameAs: ["https://github.com/sethdford/h-uman"],
+          },
+          {
+            "@type": "SoftwareApplication",
+            name: "h-uman",
+            description:
+              "not quite human. Autonomous AI agent runtime in 1,696 kilobytes of pure C.",
+            applicationCategory: "DeveloperApplication",
+            operatingSystem: "Cross-platform",
+            url: "https://h-uman.ai/",
+            license: "https://opensource.org/licenses/MIT",
+            offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+            author: { "@id": "https://h-uman.ai/#organization" },
+          },
+        ],
       })}
     />
     <style is:global>

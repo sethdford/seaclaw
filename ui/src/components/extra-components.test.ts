@@ -1473,7 +1473,7 @@ describe("hu-welcome-card", () => {
     const heading = el.shadowRoot?.querySelector(".hero h2");
     expect(heading?.textContent).toContain("Welcome to h-uman");
     const desc = el.shadowRoot?.querySelector(".hero p");
-    expect(desc?.textContent).toContain("autonomous AI assistant runtime");
+    expect(desc?.textContent).toContain("not quite human.");
     const features = el.shadowRoot?.querySelectorAll(".feature");
     expect(features?.length).toBe(3);
     const cta = el.shadowRoot?.querySelector(".cta hu-button");
