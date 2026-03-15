@@ -25,7 +25,7 @@ hu_error_t hu_skill_insert(hu_allocator_t *alloc, sqlite3 *db, const char *name,
                           int64_t parent_skill_id, int64_t now_ts,
                           int64_t *out_id) {
     (void)alloc;
-    if (!db || !out_id)
+    if (!db)
         return HU_ERR_INVALID_ARGUMENT;
     if (!name || name_len == 0 || !type || type_len == 0 || !strategy || strat_len == 0 ||
         !origin || origin_len == 0)
@@ -62,7 +62,8 @@ hu_error_t hu_skill_insert(hu_allocator_t *alloc, sqlite3 *db, const char *name,
     if (rc != SQLITE_DONE)
         return HU_ERR_MEMORY_BACKEND;
 
-    *out_id = sqlite3_last_insert_rowid(db);
+    if (out_id)
+        *out_id = sqlite3_last_insert_rowid(db);
     return HU_OK;
 }
 
@@ -478,7 +479,7 @@ hu_error_t hu_skill_record_attempt(sqlite3 *db,
     const char *outcome_evidence, size_t ev_len,
     const char *context, size_t ctx_len,
     int64_t *out_id) {
-    if (!db || !out_id)
+    if (!db)
         return HU_ERR_INVALID_ARGUMENT;
     if (!contact_id || cid_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
@@ -512,7 +513,8 @@ hu_error_t hu_skill_record_attempt(sqlite3 *db,
     if (rc != SQLITE_DONE)
         return HU_ERR_MEMORY_BACKEND;
 
-    *out_id = sqlite3_last_insert_rowid(db);
+    if (out_id)
+        *out_id = sqlite3_last_insert_rowid(db);
     return HU_OK;
 }
 

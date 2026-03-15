@@ -10,9 +10,13 @@
 
 #ifdef HU_GATEWAY_POSIX
 #include <fcntl.h>
+#include <signal.h>
+#include <sys/select.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
+
+#define HU_CLAUDE_CLI_TIMEOUT_SECS 120
 
 #define HU_CLAUDE_CLI_NAME      "claude"
 #define HU_CLAUDE_DEFAULT_MODEL "claude-sonnet-4"
@@ -91,13 +95,24 @@ static hu_error_t run_claude_cli(hu_allocator_t *alloc, const char *prompt, size
     char *buf = (char *)alloc->alloc(alloc->ctx, cap);
     if (!buf) {
         close(stdout_fds[0]);
+        kill(pid, SIGTERM);
         waitpid(pid, NULL, 0);
         return HU_ERR_OUT_OF_MEMORY;
     }
     size_t len = 0;
+    bool timed_out = false;
     for (;;) {
         if (len >= cap - 1)
             break;
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(stdout_fds[0], &rfds);
+        struct timeval tv = {.tv_sec = HU_CLAUDE_CLI_TIMEOUT_SECS, .tv_usec = 0};
+        int sel = select(stdout_fds[0] + 1, &rfds, NULL, NULL, &tv);
+        if (sel <= 0) {
+            timed_out = true;
+            break;
+        }
         ssize_t n = read(stdout_fds[0], buf + len, cap - len - 1);
         if (n <= 0)
             break;
@@ -105,6 +120,13 @@ static hu_error_t run_claude_cli(hu_allocator_t *alloc, const char *prompt, size
     }
     buf[len] = '\0';
     close(stdout_fds[0]);
+
+    if (timed_out) {
+        alloc->free(alloc->ctx, buf, cap);
+        kill(pid, SIGTERM);
+        waitpid(pid, NULL, 0);
+        return HU_ERR_TIMEOUT;
+    }
 
     int status;
     waitpid(pid, &status, 0);
@@ -193,6 +215,7 @@ static hu_error_t claude_cli_chat_with_system(void *ctx, hu_allocator_t *alloc,
 }
 
 #if !HU_IS_TEST
+__attribute__((unused))
 static const char *extract_last_user_message(const hu_chat_message_t *msgs, size_t count,
                                              size_t *out_len) {
     for (size_t i = count; i > 0; i--) {
@@ -225,16 +248,43 @@ static hu_error_t claude_cli_chat(void *ctx, hu_allocator_t *alloc,
 #else
 #ifdef HU_GATEWAY_POSIX
     {
-        size_t prompt_len = 0;
-        const char *prompt =
-            extract_last_user_message(request->messages, request->messages_count, &prompt_len);
-        if (!prompt)
+        /* Combine system prompt + user message so the CLI gets full context */
+        const char *sys = NULL;
+        size_t sys_len = 0;
+        const char *user = NULL;
+        size_t user_len = 0;
+        for (size_t i = 0; i < request->messages_count; i++) {
+            if (request->messages[i].role == HU_ROLE_SYSTEM && request->messages[i].content_len > 0) {
+                sys = request->messages[i].content;
+                sys_len = request->messages[i].content_len;
+            }
+            if (request->messages[i].role == HU_ROLE_USER && request->messages[i].content_len > 0) {
+                user = request->messages[i].content;
+                user_len = request->messages[i].content_len;
+            }
+        }
+        if (!user)
             return HU_ERR_INVALID_ARGUMENT;
+
+        char combined[65536];
+        size_t combined_len = 0;
+        if (sys && sys_len > 0 && sys_len + user_len + 4 < sizeof(combined)) {
+            memcpy(combined, sys, sys_len);
+            combined[sys_len] = '\n';
+            combined[sys_len + 1] = '\n';
+            memcpy(combined + sys_len + 2, user, user_len);
+            combined_len = sys_len + 2 + user_len;
+        } else if (user_len < sizeof(combined)) {
+            memcpy(combined, user, user_len);
+            combined_len = user_len;
+        } else {
+            return HU_ERR_INVALID_ARGUMENT;
+        }
 
         char *text = NULL;
         size_t text_len = 0;
         hu_error_t err =
-            run_claude_cli(alloc, prompt, prompt_len, model, model_len, &text, &text_len);
+            run_claude_cli(alloc, combined, combined_len, model, model_len, &text, &text_len);
         if (err != HU_OK)
             return err;
 

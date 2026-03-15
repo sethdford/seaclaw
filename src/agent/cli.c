@@ -21,6 +21,7 @@
 #include "human/feeds/research.h"
 #include "human/feeds/trends.h"
 #include "human/intelligence/cycle.h"
+#include "human/intelligence/online_learning.h"
 #include "human/intelligence/self_improve.h"
 #endif
 #include "human/memory/factory.h"
@@ -47,6 +48,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #if defined(HU_GATEWAY_POSIX) && !defined(HU_IS_TEST)
@@ -653,6 +655,35 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             alloc->free(alloc->ctx, response, response_len + 1);
         } else if (err != HU_OK) {
             fprintf(stderr, "[%s] Agent turn failed: %s\n", HU_CODENAME, hu_error_string(err));
+#if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
+            {
+                sqlite3 *fail_db = hu_sqlite_memory_get_db(&memory);
+                if (fail_db) {
+                    sqlite3_stmt *fb = NULL;
+                    if (sqlite3_prepare_v2(fail_db,
+                            "INSERT INTO behavioral_feedback "
+                            "(behavior_type, contact_id, signal, context, timestamp) "
+                            "VALUES ('research_cycle', 'system', 'negative', ?, ?)",
+                            -1, &fb, NULL) == SQLITE_OK) {
+                        char ctx_buf[128];
+                        int cl = snprintf(ctx_buf, sizeof(ctx_buf), "Agent failed: %s",
+                                          hu_error_string(err));
+                        sqlite3_bind_text(fb, 1, ctx_buf, cl, SQLITE_STATIC);
+                        sqlite3_bind_int64(fb, 2, (int64_t)time(NULL));
+                        sqlite3_step(fb);
+                        sqlite3_finalize(fb);
+                    }
+                    hu_online_learning_t ol = {0};
+                    if (hu_online_learning_create(alloc, fail_db, 0.1, &ol) == HU_OK) {
+                        (void)hu_online_learning_init_tables(&ol);
+                        int64_t now = (int64_t)time(NULL);
+                        (void)hu_online_learning_update_weight(&ol, "research_findings", 18,
+                                                               -0.5, now);
+                        hu_online_learning_deinit(&ol);
+                    }
+                }
+            }
+#endif
         }
         if (enriched_prompt) alloc->free(alloc->ctx, enriched_prompt, enriched_len + 1);
         hu_agent_deinit(&agent);

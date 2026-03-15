@@ -53,7 +53,7 @@ def main():
 
     for i, query in enumerate(QUERIES):
         if i > 0:
-            time.sleep(3)
+            time.sleep(8)
 
         data = fetch_s2(query, limit=5)
         if not data or "data" not in data:
