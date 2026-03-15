@@ -8,6 +8,7 @@
 #ifdef HU_ENABLE_SQLITE
 #include "human/feeds/findings.h"
 #include "human/feeds/trends.h"
+#include "human/intelligence/cycle.h"
 #include <sqlite3.h>
 #include <time.h>
 #endif
@@ -859,6 +860,215 @@ static void feed_trends_build_section_empty(void) {
     hu_str_free(&alloc, out);
 }
 
+static sqlite3 *setup_cycle_db(void) {
+    sqlite3 *db = NULL;
+    sqlite3_open(":memory:", &db);
+    sqlite3_exec(db,
+        "CREATE TABLE IF NOT EXISTS feed_items("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT NOT NULL, contact_id TEXT,"
+        "content_type TEXT NOT NULL, content TEXT NOT NULL,"
+        "url TEXT, ingested_at INTEGER NOT NULL,"
+        "referenced INTEGER DEFAULT 0, cluster_id INTEGER DEFAULT NULL);"
+        "CREATE TABLE IF NOT EXISTS research_findings("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT, finding TEXT NOT NULL, relevance TEXT,"
+        "priority TEXT DEFAULT 'MEDIUM', suggested_action TEXT,"
+        "status TEXT DEFAULT 'pending', created_at INTEGER NOT NULL,"
+        "acted_at INTEGER);"
+        "CREATE TABLE IF NOT EXISTS current_events("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "topic TEXT, summary TEXT, source TEXT,"
+        "published_at INTEGER, relevance REAL);"
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_ce_dedup ON current_events(summary);"
+        "CREATE TABLE IF NOT EXISTS general_lessons("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "lesson TEXT UNIQUE, confidence REAL,"
+        "source_count INTEGER, first_learned INTEGER, last_confirmed INTEGER);"
+        "CREATE TABLE IF NOT EXISTS inferred_values("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "name TEXT UNIQUE, description TEXT,"
+        "importance REAL, evidence_count INTEGER,"
+        "created_at INTEGER, updated_at INTEGER);"
+        "CREATE TABLE IF NOT EXISTS behavioral_feedback("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "behavior_type TEXT, contact_id TEXT, signal TEXT,"
+        "context TEXT, timestamp INTEGER);"
+        "CREATE TABLE IF NOT EXISTS self_evaluations("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "contact_id TEXT, week TEXT, metrics TEXT,"
+        "recommendations TEXT, created_at INTEGER);"
+        "CREATE TABLE IF NOT EXISTS growth_milestones("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "contact_id TEXT, topic TEXT, before_state TEXT,"
+        "after_state TEXT, created_at INTEGER);"
+        "CREATE TABLE IF NOT EXISTS opinions("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "topic TEXT, position TEXT, confidence REAL,"
+        "first_expressed INTEGER, last_expressed INTEGER,"
+        "superseded_by TEXT);"
+        "CREATE TABLE IF NOT EXISTS cognitive_load_log("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "capacity REAL, conversation_depth REAL,"
+        "hour_of_day INTEGER, day_of_week INTEGER,"
+        "physical_state TEXT, recorded_at INTEGER);"
+        "CREATE TABLE IF NOT EXISTS causal_observations("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "action TEXT, outcome TEXT, context TEXT,"
+        "confidence REAL, observed_at INTEGER);"
+        "CREATE TABLE IF NOT EXISTS learning_signals("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "type INTEGER, context TEXT, tool_name TEXT,"
+        "magnitude REAL, timestamp INTEGER);"
+        "CREATE TABLE IF NOT EXISTS strategy_weights("
+        "strategy TEXT PRIMARY KEY, weight REAL, updated_at INTEGER);"
+        "CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, value TEXT);"
+        "CREATE TABLE IF NOT EXISTS skills("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "name TEXT, type TEXT, contact_id TEXT,"
+        "trigger_conditions TEXT, strategy TEXT,"
+        "success_rate REAL DEFAULT 0, attempts INTEGER DEFAULT 0,"
+        "successes INTEGER DEFAULT 0, version INTEGER DEFAULT 1,"
+        "origin TEXT, parent_skill_id INTEGER DEFAULT 0,"
+        "created_at INTEGER, updated_at INTEGER, retired INTEGER DEFAULT 0);"
+        "CREATE TABLE IF NOT EXISTS skill_attempts("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "skill_id INTEGER, contact_id TEXT, applied_at INTEGER,"
+        "outcome_signal TEXT, outcome_evidence TEXT, context TEXT);",
+        NULL, NULL, NULL);
+    return db;
+}
+
+static void cycle_actions_high_findings(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = setup_cycle_db();
+    HU_ASSERT_NOT_NULL(db);
+    int64_t now = (int64_t)time(NULL);
+
+    sqlite3_exec(db,
+        "INSERT INTO research_findings(source, finding, relevance, priority, "
+        "suggested_action, status, created_at) VALUES "
+        "('test', 'Important finding', 'high', 'HIGH', 'Investigate this', 'pending', 1000),"
+        "('test', 'Low finding', 'low', 'LOW', 'Monitor later', 'pending', 1000);",
+        NULL, NULL, NULL);
+
+    sqlite3_exec(db,
+        "INSERT INTO feed_items(source, content_type, content, ingested_at) "
+        "VALUES ('rss', 'article', 'Test article about AI', ?);",
+        NULL, NULL, NULL);
+    sqlite3_stmt *fi = NULL;
+    sqlite3_prepare_v2(db,
+        "INSERT INTO feed_items(source, content_type, content, ingested_at) VALUES ('rss', 'article', 'Test article about AI', ?)", -1, &fi, NULL);
+    sqlite3_bind_int64(fi, 1, now);
+    sqlite3_step(fi);
+    sqlite3_finalize(fi);
+
+    hu_intelligence_cycle_result_t result;
+    hu_error_t err = hu_intelligence_run_cycle(&alloc, db, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(result.findings_actioned, 1u);
+    HU_ASSERT_TRUE(result.causal_recorded >= 1);
+
+    sqlite3_stmt *chk = NULL;
+    sqlite3_prepare_v2(db, "SELECT status FROM research_findings WHERE priority = 'HIGH'", -1, &chk, NULL);
+    HU_ASSERT_EQ(sqlite3_step(chk), SQLITE_ROW);
+    HU_ASSERT_STR_EQ((const char *)sqlite3_column_text(chk, 0), "actioned");
+    sqlite3_finalize(chk);
+
+    sqlite3_close(db);
+}
+
+static void cycle_populates_current_events(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = setup_cycle_db();
+    int64_t now = (int64_t)time(NULL);
+
+    sqlite3_stmt *ins = NULL;
+    sqlite3_prepare_v2(db,
+        "INSERT INTO feed_items(source, content_type, content, ingested_at) VALUES (?,?,?,?)",
+        -1, &ins, NULL);
+    for (int i = 0; i < 5; i++) {
+        char content[64];
+        snprintf(content, sizeof(content), "Feed item %d about AI", i);
+        sqlite3_bind_text(ins, 1, "rss", -1, SQLITE_STATIC);
+        sqlite3_bind_text(ins, 2, "article", -1, SQLITE_STATIC);
+        sqlite3_bind_text(ins, 3, content, -1, SQLITE_STATIC);
+        sqlite3_bind_int64(ins, 4, now);
+        sqlite3_step(ins);
+        sqlite3_reset(ins);
+    }
+    sqlite3_finalize(ins);
+
+    hu_intelligence_cycle_result_t result;
+    hu_error_t err = hu_intelligence_run_cycle(&alloc, db, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(result.events_recorded, 5u);
+
+    sqlite3_stmt *chk = NULL;
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM current_events", -1, &chk, NULL);
+    sqlite3_step(chk);
+    HU_ASSERT_EQ(sqlite3_column_int(chk, 0), 5);
+    sqlite3_finalize(chk);
+
+    sqlite3_close(db);
+}
+
+static void cycle_populates_opinions(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = setup_cycle_db();
+
+    sqlite3_exec(db,
+        "INSERT INTO research_findings(source, finding, relevance, priority, "
+        "suggested_action, status, created_at) VALUES "
+        "('test', 'AI safety critical', 'high', 'HIGH', 'Review safety protocols', 'actioned', 1000);",
+        NULL, NULL, NULL);
+
+    hu_intelligence_cycle_result_t result;
+    hu_error_t err = hu_intelligence_run_cycle(&alloc, db, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    sqlite3_stmt *chk = NULL;
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM opinions", -1, &chk, NULL);
+    sqlite3_step(chk);
+    HU_ASSERT_TRUE(sqlite3_column_int(chk, 0) >= 1);
+    sqlite3_finalize(chk);
+
+    sqlite3_close(db);
+}
+
+static void cycle_records_cognitive_load(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = setup_cycle_db();
+    int64_t now = (int64_t)time(NULL);
+
+    sqlite3_stmt *ins = NULL;
+    sqlite3_prepare_v2(db,
+        "INSERT INTO feed_items(source, content_type, content, ingested_at) VALUES ('rss', 'article', 'AI news', ?)",
+        -1, &ins, NULL);
+    sqlite3_bind_int64(ins, 1, now);
+    sqlite3_step(ins);
+    sqlite3_finalize(ins);
+
+    hu_intelligence_cycle_result_t result;
+    hu_intelligence_run_cycle(&alloc, db, &result);
+
+    sqlite3_stmt *chk = NULL;
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM cognitive_load_log", -1, &chk, NULL);
+    sqlite3_step(chk);
+    HU_ASSERT_TRUE(sqlite3_column_int(chk, 0) >= 1);
+    sqlite3_finalize(chk);
+
+    sqlite3_close(db);
+}
+
+static void cycle_null_args_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_intelligence_cycle_result_t result;
+    HU_ASSERT_EQ(hu_intelligence_run_cycle(NULL, NULL, &result), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_intelligence_run_cycle(&alloc, NULL, &result), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_intelligence_run_cycle(&alloc, (sqlite3 *)1, NULL), HU_ERR_INVALID_ARGUMENT);
+}
+
 #endif /* HU_ENABLE_SQLITE */
 
 void run_feeds_tests(void) {
@@ -897,5 +1107,10 @@ void run_feeds_tests(void) {
     HU_RUN_TEST(findings_get_pending_null_args);
     HU_RUN_TEST(feed_detect_trends_no_spikes);
     HU_RUN_TEST(feed_trends_build_section_empty);
+    HU_RUN_TEST(cycle_actions_high_findings);
+    HU_RUN_TEST(cycle_populates_current_events);
+    HU_RUN_TEST(cycle_populates_opinions);
+    HU_RUN_TEST(cycle_records_cognitive_load);
+    HU_RUN_TEST(cycle_null_args_returns_error);
 #endif
 }

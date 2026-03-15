@@ -826,6 +826,7 @@ if(HU_ENABLE_SKILLS)
         src/intelligence/reflection.c
         src/intelligence/feedback.c
         src/intelligence/meta_learning.c
+        src/intelligence/cycle.c
     )
 endif()
 
@@ -1459,6 +1460,7 @@ if(NOT HU_ENABLE_SKILLS)
         src/intelligence/reflection.c
         src/intelligence/feedback.c
         src/intelligence/meta_learning.c
+        src/intelligence/cycle.c
     )
 endif()
 if(NOT HU_ENABLE_SOCIAL)

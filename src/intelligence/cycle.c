@@ -1,0 +1,538 @@
+#ifdef HU_ENABLE_SQLITE
+
+#include "human/intelligence/cycle.h"
+#include "human/intelligence/online_learning.h"
+#include "human/intelligence/self_improve.h"
+#include "human/intelligence/value_learning.h"
+#include "human/intelligence/world_model.h"
+#include "human/intelligence/reflection.h"
+#include "human/intelligence/meta_learning.h"
+#include "human/intelligence/skills.h"
+#include <sqlite3.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+
+#define WORD_BUF_SIZE 64
+#define MAX_WORDS 128
+
+typedef struct word_count {
+    char word[WORD_BUF_SIZE];
+    int count;
+} word_count_t;
+
+static void extract_first_significant_word(const char *text, size_t text_len,
+                                           char *out, size_t out_cap, size_t *out_len) {
+    *out_len = 0;
+    if (!text || out_cap == 0)
+        return;
+    size_t i = 0;
+    while (i < text_len && (text[i] == ' ' || text[i] == '\t' || text[i] == ',' || text[i] == '.'))
+        i++;
+    size_t start = i;
+    while (i < text_len && text[i] != ' ' && text[i] != '\t' && text[i] != ',' && text[i] != '.' && text[i] != '\0')
+        i++;
+    size_t word_len = i - start;
+    if (word_len < 5)
+        return;
+    if (word_len >= out_cap)
+        word_len = out_cap - 1;
+    memcpy(out, text + start, word_len);
+    out[word_len] = '\0';
+    *out_len = word_len;
+}
+
+static void add_word_to_counts(word_count_t *counts, int *n, const char *word, size_t word_len) {
+    if (word_len < 5 || *n >= MAX_WORDS)
+        return;
+    if (word_len >= WORD_BUF_SIZE)
+        word_len = WORD_BUF_SIZE - 1;
+    char w[WORD_BUF_SIZE];
+    memcpy(w, word, word_len);
+    w[word_len] = '\0';
+    for (int i = 0; i < *n; i++) {
+        if (strncmp(counts[i].word, w, word_len) == 0 && counts[i].word[word_len] == '\0') {
+            counts[i].count++;
+            return;
+        }
+    }
+    memcpy(counts[*n].word, w, word_len + 1);
+    counts[*n].count = 1;
+    (*n)++;
+}
+
+static void extract_words_from_text(const char *text, size_t text_len,
+                                    word_count_t *counts, int *n) {
+    size_t i = 0;
+    while (i < text_len && *n < MAX_WORDS) {
+        while (i < text_len && (text[i] == ' ' || text[i] == '\t' || text[i] == ',' ||
+                                text[i] == '.' || text[i] == ';' || text[i] == ':'))
+            i++;
+        if (i >= text_len)
+            break;
+        size_t start = i;
+        while (i < text_len && text[i] != ' ' && text[i] != '\t' && text[i] != ',' &&
+               text[i] != '.' && text[i] != ';' && text[i] != ':' && text[i] != '\0')
+            i++;
+        size_t word_len = i - start;
+        if (word_len >= 5)
+            add_word_to_counts(counts, n, text + start, word_len);
+    }
+}
+
+hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
+                                     hu_intelligence_cycle_result_t *result) {
+    if (!alloc || !db || !result)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    memset(result, 0, sizeof(*result));
+    int64_t now_ts = (int64_t)time(NULL);
+    int steps_succeeded = 0;
+
+    /* Step 0: Ensure self-improve tables exist (prompt_patches, tool_prefs) */
+    {
+        hu_self_improve_t si = {0};
+        if (hu_self_improve_create(alloc, db, &si) == HU_OK) {
+            (void)hu_self_improve_init_tables(&si);
+            (void)hu_self_improve_apply_reflections(&si, now_ts);
+            hu_self_improve_deinit(&si);
+            steps_succeeded++;
+        }
+    }
+
+    /* Step 1: Action HIGH and MEDIUM priority findings */
+    {
+        const char *sql = "SELECT id, finding, suggested_action, priority FROM research_findings "
+                          "WHERE status = 'pending' AND priority IN ('HIGH', 'MEDIUM')";
+        sqlite3_stmt *stmt = NULL;
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+            hu_world_model_t wm = {0};
+            hu_online_learning_t ol = {0};
+            hu_error_t wm_err = hu_world_model_create(alloc, db, &wm);
+            hu_error_t ol_err = hu_online_learning_create(alloc, db, 0.1, &ol);
+            if (wm_err == HU_OK)
+                (void)hu_world_model_init_tables(&wm);
+            if (ol_err == HU_OK)
+                (void)hu_online_learning_init_tables(&ol);
+
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                int64_t id = sqlite3_column_int64(stmt, 0);
+                const char *finding = (const char *)sqlite3_column_text(stmt, 1);
+                const char *suggested = (const char *)sqlite3_column_text(stmt, 2);
+                const char *priority = (const char *)sqlite3_column_text(stmt, 3);
+                size_t finding_len = finding ? strlen(finding) : 0;
+                size_t suggested_len = suggested ? strlen(suggested) : 0;
+                if (!finding)
+                    finding = "";
+                if (!suggested)
+                    suggested = "";
+                double confidence = (priority && strcmp(priority, "HIGH") == 0) ? 0.8 : 0.5;
+
+                if (wm_err == HU_OK) {
+                    hu_error_t ro = hu_world_record_outcome(&wm, finding, finding_len,
+                                                           suggested, suggested_len, confidence, now_ts);
+                    if (ro == HU_OK)
+                        result->causal_recorded++;
+                }
+
+                if (ol_err == HU_OK) {
+                    hu_learning_signal_t sig = {0};
+                    sig.type = HU_SIGNAL_TOOL_SUCCESS;
+                    sig.magnitude = confidence;
+                    sig.timestamp = now_ts;
+                    size_t ctx_len = finding_len < 511 ? finding_len : 511;
+                    if (ctx_len > 0) {
+                        memcpy(sig.context, finding, ctx_len);
+                        sig.context[ctx_len] = '\0';
+                        sig.context_len = ctx_len;
+                    }
+                    (void)hu_online_learning_record(&ol, &sig);
+                }
+
+                sqlite3_stmt *upd = NULL;
+                if (sqlite3_prepare_v2(db, "UPDATE research_findings SET status = ?, acted_at = ? WHERE id = ?",
+                                       -1, &upd, NULL) == SQLITE_OK) {
+                    sqlite3_bind_text(upd, 1, "actioned", 8, SQLITE_STATIC);
+                    sqlite3_bind_int64(upd, 2, now_ts);
+                    sqlite3_bind_int64(upd, 3, id);
+                    if (sqlite3_step(upd) == SQLITE_DONE)
+                        result->findings_actioned++;
+                    sqlite3_finalize(upd);
+                }
+            }
+            sqlite3_finalize(stmt);
+            if (wm_err == HU_OK)
+                hu_world_model_deinit(&wm);
+            if (ol_err == HU_OK)
+                hu_online_learning_deinit(&ol);
+            if (result->findings_actioned > 0)
+                steps_succeeded++;
+        } else {
+            fprintf(stderr, "intelligence/cycle: step 1 prepare failed\n");
+        }
+    }
+
+    /* Step 2: Populate current_events from recent feed items */
+    {
+        int64_t cutoff = now_ts - (24 * 3600);
+        const char *sql = "SELECT DISTINCT source, content_type, substr(content, 1, 200), "
+                         "url, ingested_at FROM feed_items WHERE ingested_at >= ? "
+                         "ORDER BY ingested_at DESC LIMIT 20";
+        sqlite3_stmt *stmt = NULL;
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(stmt, 1, cutoff);
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                const char *source = (const char *)sqlite3_column_text(stmt, 0);
+                const char *content_type = (const char *)sqlite3_column_text(stmt, 1);
+                const char *content = (const char *)sqlite3_column_text(stmt, 2);
+                int64_t ingested_at = sqlite3_column_int64(stmt, 4);
+                if (!source)
+                    source = "";
+                if (!content_type)
+                    content_type = "feed";
+                if (!content)
+                    content = "";
+
+                sqlite3_stmt *ins = NULL;
+                const char *ins_sql = "INSERT OR IGNORE INTO current_events "
+                                     "(topic, summary, source, published_at, relevance) "
+                                     "VALUES (?, ?, ?, ?, 0.5)";
+                if (sqlite3_prepare_v2(db, ins_sql, -1, &ins, NULL) == SQLITE_OK) {
+                    sqlite3_bind_text(ins, 1, content_type, -1, SQLITE_STATIC);
+                    sqlite3_bind_text(ins, 2, content, -1, SQLITE_STATIC);
+                    sqlite3_bind_text(ins, 3, source, -1, SQLITE_STATIC);
+                    sqlite3_bind_int64(ins, 4, ingested_at);
+                    if (sqlite3_step(ins) == SQLITE_DONE)
+                        result->events_recorded++;
+                    sqlite3_finalize(ins);
+                }
+            }
+            sqlite3_finalize(stmt);
+            if (result->events_recorded > 0)
+                steps_succeeded++;
+        } else {
+            fprintf(stderr, "intelligence/cycle: step 2 prepare failed (feed_items may not exist)\n");
+        }
+    }
+
+    /* Step 3: Extract general lessons from actioned findings */
+    {
+        const char *sql = "SELECT suggested_action FROM research_findings WHERE status = 'actioned'";
+        sqlite3_stmt *stmt = NULL;
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+            word_count_t counts[MAX_WORDS];
+            int n = 0;
+            memset(counts, 0, sizeof(counts));
+            while (sqlite3_step(stmt) == SQLITE_ROW && n < MAX_WORDS) {
+                const char *action = (const char *)sqlite3_column_text(stmt, 0);
+                if (action)
+                    extract_words_from_text(action, strlen(action), counts, &n);
+            }
+            sqlite3_finalize(stmt);
+
+            sqlite3_stmt *ins = NULL;
+            const char *ins_sql = "INSERT OR IGNORE INTO general_lessons "
+                                 "(lesson, confidence, source_count, first_learned, last_confirmed) "
+                                 "VALUES (?, 0.5, ?, ?, ?)";
+            if (sqlite3_prepare_v2(db, ins_sql, -1, &ins, NULL) == SQLITE_OK) {
+                for (int i = 0; i < n; i++) {
+                    if (counts[i].count >= 2) {
+                        char lesson[256];
+                        int ln = snprintf(lesson, sizeof(lesson),
+                                         "Research suggests: %s is a recurring theme across %d findings",
+                                         counts[i].word, counts[i].count);
+                        if (ln > 0 && (size_t)ln < sizeof(lesson)) {
+                            sqlite3_bind_text(ins, 1, lesson, ln, SQLITE_STATIC);
+                            sqlite3_bind_int(ins, 2, counts[i].count);
+                            sqlite3_bind_int64(ins, 3, now_ts);
+                            sqlite3_bind_int64(ins, 4, now_ts);
+                            if (sqlite3_step(ins) == SQLITE_DONE)
+                                result->lessons_extracted++;
+                            sqlite3_reset(ins);
+                        }
+                    }
+                }
+                sqlite3_finalize(ins);
+            }
+            if (result->lessons_extracted > 0)
+                steps_succeeded++;
+        } else {
+            fprintf(stderr, "intelligence/cycle: step 3 prepare failed\n");
+        }
+    }
+
+    /* Step 4: Learn values from HIGH findings */
+    {
+        hu_value_engine_t ve = {0};
+        if (hu_value_engine_create(alloc, db, &ve) == HU_OK) {
+            (void)hu_value_init_tables(&ve);
+            const char *sql = "SELECT finding, suggested_action FROM research_findings "
+                              "WHERE priority = 'HIGH' AND status = 'actioned'";
+            sqlite3_stmt *stmt = NULL;
+            if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+                while (sqlite3_step(stmt) == SQLITE_ROW) {
+                    const char *finding = (const char *)sqlite3_column_text(stmt, 0);
+                    const char *action = (const char *)sqlite3_column_text(stmt, 1);
+                    if (!action)
+                        continue;
+                    size_t action_len = strlen(action);
+                    char word[WORD_BUF_SIZE];
+                    size_t word_len = 0;
+                    extract_first_significant_word(action, action_len, word, sizeof(word), &word_len);
+                    if (word_len == 0)
+                        continue;
+                    size_t finding_len = finding ? strlen(finding) : 0;
+                    if (!finding)
+                        finding = "";
+                    hu_error_t err = hu_value_learn_from_correction(&ve, word, word_len,
+                                                                    finding, finding_len, 1.0, now_ts);
+                    if (err == HU_OK)
+                        result->values_learned++;
+                }
+                sqlite3_finalize(stmt);
+            }
+            hu_value_engine_deinit(&ve);
+            if (result->values_learned > 0)
+                steps_succeeded++;
+        } else {
+            fprintf(stderr, "intelligence/cycle: step 4 value engine create failed\n");
+        }
+    }
+
+    /* Step 5: Run reflection (weekly, extract lessons, daily) */
+    {
+        hu_reflection_engine_t re = {0};
+        if (hu_reflection_engine_create(alloc, db, &re) == HU_OK) {
+            hu_error_t rw = hu_reflection_weekly(&re, now_ts);
+            hu_error_t rel = hu_reflection_extract_general_lessons(&re, now_ts);
+            hu_error_t rd = hu_reflection_daily(&re, now_ts);
+            if (rw == HU_OK || rel == HU_OK || rd == HU_OK) {
+                result->skills_updated = 1;
+                steps_succeeded++;
+            }
+            hu_reflection_engine_deinit(&re);
+        } else {
+            fprintf(stderr, "intelligence/cycle: step 5 reflection engine create failed\n");
+        }
+    }
+
+    /* Step 6: Run meta-learning optimization */
+    {
+        hu_meta_params_t params = {0};
+        if (hu_meta_learning_optimize(db, &params) == HU_OK)
+            steps_succeeded++;
+    }
+
+    /* Step 7: Seed behavioral feedback from successful cycle run */
+    if (result->findings_actioned > 0 || result->events_recorded > 0) {
+        sqlite3_stmt *fb = NULL;
+        const char *fb_sql = "INSERT INTO behavioral_feedback "
+                            "(behavior_type, contact_id, signal, context, timestamp) "
+                            "VALUES (?, 'system', ?, ?, ?)";
+        if (sqlite3_prepare_v2(db, fb_sql, -1, &fb, NULL) == SQLITE_OK) {
+            sqlite3_bind_text(fb, 1, "research_cycle", -1, SQLITE_STATIC);
+            sqlite3_bind_text(fb, 2, "positive", -1, SQLITE_STATIC);
+            char ctx[128];
+            int cl = snprintf(ctx, sizeof(ctx), "Cycle processed %zu findings, %zu events",
+                              result->findings_actioned, result->events_recorded);
+            sqlite3_bind_text(fb, 3, ctx, cl, SQLITE_STATIC);
+            sqlite3_bind_int64(fb, 4, now_ts);
+            if (sqlite3_step(fb) == SQLITE_DONE)
+                steps_succeeded++;
+            sqlite3_finalize(fb);
+        }
+    }
+
+    /* Step 8: Populate opinions from HIGH-priority findings */
+    {
+        const char *sql = "SELECT finding, suggested_action FROM research_findings "
+                          "WHERE priority = 'HIGH' AND status = 'actioned'";
+        sqlite3_stmt *stmt = NULL;
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+            sqlite3_stmt *ins = NULL;
+            const char *ins_sql = "INSERT OR IGNORE INTO opinions "
+                                 "(topic, position, confidence, first_expressed, last_expressed) "
+                                 "VALUES (?, ?, 0.7, ?, ?)";
+            if (sqlite3_prepare_v2(db, ins_sql, -1, &ins, NULL) == SQLITE_OK) {
+                while (sqlite3_step(stmt) == SQLITE_ROW) {
+                    const char *finding = (const char *)sqlite3_column_text(stmt, 0);
+                    const char *action = (const char *)sqlite3_column_text(stmt, 1);
+                    if (!finding || !action) continue;
+                    sqlite3_bind_text(ins, 1, finding, -1, SQLITE_STATIC);
+                    sqlite3_bind_text(ins, 2, action, -1, SQLITE_STATIC);
+                    sqlite3_bind_int64(ins, 3, now_ts);
+                    sqlite3_bind_int64(ins, 4, now_ts);
+                    sqlite3_step(ins);
+                    sqlite3_reset(ins);
+                }
+                sqlite3_finalize(ins);
+            }
+            sqlite3_finalize(stmt);
+            steps_succeeded++;
+        }
+    }
+
+    /* Step 9: Create skills from recurring findings topics */
+    {
+        const char *sql = "SELECT source, suggested_action FROM research_findings "
+                          "WHERE status = 'actioned' GROUP BY source";
+        sqlite3_stmt *stmt = NULL;
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                const char *source = (const char *)sqlite3_column_text(stmt, 0);
+                const char *action = (const char *)sqlite3_column_text(stmt, 1);
+                if (!source || !action) continue;
+                size_t act_len = strlen(action);
+
+                char skill_name[128];
+                int sn = snprintf(skill_name, sizeof(skill_name), "monitor_%s", source);
+                if (sn < 0 || (size_t)sn >= sizeof(skill_name)) continue;
+
+                hu_skill_t existing = {0};
+                if (hu_skill_get_by_name(alloc, db, skill_name, (size_t)sn, &existing) == HU_OK
+                    && existing.id != 0) {
+                    hu_skill_record_attempt(db, existing.id, "system", 6, now_ts,
+                                            "positive", 8, "cycle run", 9, action,
+                                            act_len < 256 ? act_len : 256, NULL);
+                    hu_skill_update_success_rate(db, existing.id,
+                                                 existing.attempts + 1, existing.successes + 1);
+                    result->skills_updated++;
+                    continue;
+                }
+
+                char strategy[512];
+                int stl = snprintf(strategy, sizeof(strategy),
+                                   "Monitor %s for AI developments: %.*s",
+                                   source, (int)(act_len < 300 ? act_len : 300), action);
+                if (stl < 0 || (size_t)stl >= sizeof(strategy)) continue;
+
+                int64_t skill_id = 0;
+                hu_error_t err = hu_skill_insert(alloc, db,
+                    skill_name, (size_t)sn,
+                    "research", 8,
+                    "system", 6,
+                    NULL, 0,
+                    strategy, (size_t)stl,
+                    "intelligence_cycle", 18,
+                    0, now_ts, &skill_id);
+                if (err == HU_OK)
+                    result->skills_updated++;
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    /* Step 10: Log cognitive load (how much was processed) */
+    {
+        size_t total_processed = result->findings_actioned + result->events_recorded +
+                                 result->lessons_extracted + result->values_learned;
+        sqlite3_stmt *cl = NULL;
+        const char *cl_sql = "INSERT INTO cognitive_load_log "
+                            "(capacity, conversation_depth, hour_of_day, day_of_week, "
+                            "physical_state, recorded_at) "
+                            "VALUES (?, ?, ?, ?, ?, ?)";
+        if (sqlite3_prepare_v2(db, cl_sql, -1, &cl, NULL) == SQLITE_OK) {
+            sqlite3_bind_int(cl, 1, (int)total_processed);
+            sqlite3_bind_int(cl, 2, (int)result->findings_actioned);
+            struct tm *t = localtime(&(time_t){now_ts});
+            sqlite3_bind_int(cl, 3, t ? t->tm_hour : 0);
+            sqlite3_bind_int(cl, 4, t ? t->tm_wday : 0);
+            sqlite3_bind_text(cl, 5, "research_cycle", -1, SQLITE_STATIC);
+            sqlite3_bind_int64(cl, 6, now_ts);
+            if (sqlite3_step(cl) == SQLITE_DONE)
+                steps_succeeded++;
+            sqlite3_finalize(cl);
+        }
+    }
+
+    /* Step 10: Record growth milestone if findings were actioned */
+    if (result->findings_actioned > 0) {
+        char after_buf[128];
+        int n = snprintf(after_buf, sizeof(after_buf),
+                         "actioned %zu findings, extracted %zu lessons",
+                         result->findings_actioned, result->lessons_extracted);
+        if (n > 0 && (size_t)n < sizeof(after_buf)) {
+            sqlite3_stmt *stmt = NULL;
+            const char *sql = "INSERT INTO growth_milestones "
+                             "(contact_id, topic, before_state, after_state, created_at) "
+                             "VALUES ('system', 'research_cycle', 'pending findings', ?, ?)";
+            if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+                sqlite3_bind_text(stmt, 1, after_buf, n, SQLITE_STATIC);
+                sqlite3_bind_int64(stmt, 2, now_ts);
+                if (sqlite3_step(stmt) == SQLITE_DONE)
+                    steps_succeeded++;
+                sqlite3_finalize(stmt);
+            }
+        }
+    }
+
+    /* Step 12: Update strategy weights from cycle outcomes */
+    {
+        hu_online_learning_t ol = {0};
+        if (hu_online_learning_create(alloc, db, 0.1, &ol) == HU_OK) {
+            (void)hu_online_learning_init_tables(&ol);
+            if (result->findings_actioned > 0)
+                (void)hu_online_learning_update_weight(&ol, "research_findings", 18,
+                                                       1.0, now_ts);
+            if (result->events_recorded > 0)
+                (void)hu_online_learning_update_weight(&ol, "feed_monitoring", 15,
+                                                       0.8, now_ts);
+            if (result->lessons_extracted > 0)
+                (void)hu_online_learning_update_weight(&ol, "lesson_extraction", 17,
+                                                       0.7, now_ts);
+            if (result->skills_updated > 0)
+                (void)hu_online_learning_update_weight(&ol, "skill_creation", 14,
+                                                       0.6, now_ts);
+            hu_online_learning_deinit(&ol);
+            steps_succeeded++;
+        }
+    }
+
+    /* Step 13: Apply matching skills to findings and record attempts */
+    {
+        hu_skill_t *active = NULL;
+        size_t active_count = 0;
+        if (hu_skill_load_active(alloc, db, "system", 6, &active, &active_count) == HU_OK
+            && active && active_count > 0) {
+            const char *sql = "SELECT id, finding FROM research_findings WHERE status = 'actioned' "
+                              "ORDER BY created_at DESC LIMIT 10";
+            sqlite3_stmt *stmt = NULL;
+            if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+                while (sqlite3_step(stmt) == SQLITE_ROW) {
+                    const char *finding = (const char *)sqlite3_column_text(stmt, 1);
+                    if (!finding) continue;
+                    size_t flen = strlen(finding);
+                    for (size_t s = 0; s < active_count; s++) {
+                        if (active[s].strategy_len == 0) continue;
+                        char *match = strstr(active[s].strategy, "Monitor ");
+                        if (!match) continue;
+                        char source_prefix[64] = {0};
+                        size_t si = 8;
+                        size_t sp = 0;
+                        while (si < active[s].strategy_len && active[s].strategy[si] != ' '
+                               && sp < sizeof(source_prefix) - 1) {
+                            source_prefix[sp++] = active[s].strategy[si++];
+                        }
+                        if (sp > 0 && strstr(finding, source_prefix)) {
+                            int64_t attempt_id = 0;
+                            hu_skill_record_attempt(db, active[s].id, "system", 6, now_ts,
+                                                    "positive", 8, "finding matched", 15,
+                                                    finding, flen < 256 ? flen : 256,
+                                                    &attempt_id);
+                            hu_skill_update_success_rate(db, active[s].id,
+                                                         active[s].attempts + 1,
+                                                         active[s].successes + 1);
+                        }
+                    }
+                }
+                sqlite3_finalize(stmt);
+            }
+            hu_skill_free(alloc, active, active_count);
+            steps_succeeded++;
+        }
+    }
+
+    return steps_succeeded > 0 ? HU_OK : HU_ERR_IO;
+}
+
+#endif /* HU_ENABLE_SQLITE */

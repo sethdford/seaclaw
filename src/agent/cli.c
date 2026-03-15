@@ -20,6 +20,7 @@
 #include "human/feeds/processor.h"
 #include "human/feeds/research.h"
 #include "human/feeds/trends.h"
+#include "human/intelligence/cycle.h"
 #endif
 #include "human/memory/factory.h"
 #include "human/memory/retrieval.h"
@@ -620,8 +621,16 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
 #if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
             {
                 sqlite3 *findings_db = hu_sqlite_memory_get_db(&memory);
-                if (findings_db)
+                if (findings_db) {
                     hu_findings_parse_and_store(alloc, findings_db, response, response_len);
+                    hu_intelligence_cycle_result_t cycle_result;
+                    memset(&cycle_result, 0, sizeof(cycle_result));
+                    if (hu_intelligence_run_cycle(alloc, findings_db, &cycle_result) == HU_OK) {
+                        fprintf(stderr, "[intelligence] cycle: %zu actioned, %zu lessons, %zu events, %zu values\n",
+                                cycle_result.findings_actioned, cycle_result.lessons_extracted,
+                                cycle_result.events_recorded, cycle_result.values_learned);
+                    }
+                }
             }
 #endif
             alloc->free(alloc->ctx, response, response_len + 1);

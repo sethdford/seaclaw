@@ -8,6 +8,7 @@
 #include "human/feeds/processor.h"
 #include "human/feeds/findings.h"
 #include "human/feeds/trends.h"
+#include "human/intelligence/cycle.h"
 #endif
 #ifdef HU_HAS_UPDATE
 #include "human/update.h"
@@ -577,7 +578,7 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv) {
 #if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
 hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
-        printf("Usage: human feed <poll|status|list|health|findings|search|digest|correlate|cleanup>\n");
+        printf("Usage: human feed <poll|status|list|health|findings|search|digest|correlate|cleanup|learn>\n");
         return HU_OK;
     }
     hu_config_t cfg;
@@ -653,6 +654,33 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
             printf("%-20s  %6d\n", "TOTAL", total);
             sqlite3_finalize(stmt);
         }
+        /* Intelligence stats */
+        printf("\nIntelligence:\n");
+        sqlite3_stmt *istmt = NULL;
+        int irc = sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM research_findings WHERE status = 'actioned'", -1, &istmt, NULL);
+        if (irc == SQLITE_OK && sqlite3_step(istmt) == SQLITE_ROW)
+            printf("  Findings actioned: %d\n", sqlite3_column_int(istmt, 0));
+        if (istmt) sqlite3_finalize(istmt);
+
+        irc = sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM general_lessons", -1, &istmt, NULL);
+        if (irc == SQLITE_OK && sqlite3_step(istmt) == SQLITE_ROW)
+            printf("  General lessons:   %d\n", sqlite3_column_int(istmt, 0));
+        if (istmt) sqlite3_finalize(istmt);
+
+        irc = sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM current_events", -1, &istmt, NULL);
+        if (irc == SQLITE_OK && sqlite3_step(istmt) == SQLITE_ROW)
+            printf("  Current events:    %d\n", sqlite3_column_int(istmt, 0));
+        if (istmt) sqlite3_finalize(istmt);
+
+        irc = sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM inferred_values", -1, &istmt, NULL);
+        if (irc == SQLITE_OK && sqlite3_step(istmt) == SQLITE_ROW)
+            printf("  Inferred values:   %d\n", sqlite3_column_int(istmt, 0));
+        if (istmt) sqlite3_finalize(istmt);
+
+        irc = sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM growth_milestones", -1, &istmt, NULL);
+        if (irc == SQLITE_OK && sqlite3_step(istmt) == SQLITE_ROW)
+            printf("  Growth milestones: %d\n", sqlite3_column_int(istmt, 0));
+        if (istmt) sqlite3_finalize(istmt);
     } else if (strcmp(sub, "list") == 0) {
         sqlite3_stmt *stmt = NULL;
         int rc = sqlite3_prepare_v2(db,
@@ -811,9 +839,24 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         hu_error_t cerr = hu_feed_processor_cleanup(&fp, days);
         if (cerr == HU_OK) printf("[feed] Cleanup complete (removed items older than %u days)\n", days);
         else fprintf(stderr, "[feed] Cleanup error: %s\n", hu_error_string(cerr));
+    } else if (strcmp(sub, "learn") == 0) {
+        hu_intelligence_cycle_result_t learn_result;
+        memset(&learn_result, 0, sizeof(learn_result));
+        hu_error_t lerr = hu_intelligence_run_cycle(alloc, db, &learn_result);
+        if (lerr == HU_OK) {
+            printf("[feed] Intelligence cycle complete:\n");
+            printf("  Findings actioned: %zu\n", learn_result.findings_actioned);
+            printf("  Lessons extracted: %zu\n", learn_result.lessons_extracted);
+            printf("  Events recorded:   %zu\n", learn_result.events_recorded);
+            printf("  Values learned:    %zu\n", learn_result.values_learned);
+            printf("  Causal recorded:   %zu\n", learn_result.causal_recorded);
+            printf("  Skills updated:    %zu\n", learn_result.skills_updated);
+        } else {
+            fprintf(stderr, "[feed] Intelligence cycle error: %s\n", hu_error_string(lerr));
+        }
     } else {
         fprintf(stderr, "Unknown feed subcommand: %s\n", sub);
-        printf("Usage: human feed <poll|status|list|health|findings|search|digest|correlate|cleanup>\n");
+        printf("Usage: human feed <poll|status|list|health|findings|search|digest|correlate|cleanup|learn>\n");
         err = HU_ERR_INVALID_ARGUMENT;
     }
 

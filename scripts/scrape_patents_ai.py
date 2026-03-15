@@ -3,6 +3,9 @@
 
 Uses Google Patents public RSS and USPTO PAIR API to find recent AI/ML patent
 applications that could signal upcoming technology trends.
+
+Note: Google Patents RSS (patents.google.com/rss/search) returns 404 as of 2026.
+The script will produce 0 items until an alternative source is integrated.
 """
 import json, os, sys, datetime, urllib.request, urllib.parse, xml.etree.ElementTree as ET
 
