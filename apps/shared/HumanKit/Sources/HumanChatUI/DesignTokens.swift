@@ -136,13 +136,11 @@ public enum HUTokens {
 
     // MARK: - Font sizes
     public static let text2Xs: CGFloat = 10
-    public static let textXs: CGFloat = 11
-    public static let textSm: CGFloat = 13
     public static let textBase: CGFloat = 14
     public static let textLg: CGFloat = 16
+    public static let textSm: CGFloat = 13
     public static let textXl: CGFloat = 20
-    public static let text2xl: CGFloat = 24
-    public static let text3xl: CGFloat = 30
+    public static let textXs: CGFloat = 11
 
     // MARK: - Font weights
     public static let weightBlack: CGFloat = 900

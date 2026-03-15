@@ -548,8 +548,12 @@ export class ScMessageThread extends LitElement {
         outline: 2px solid var(--hu-accent);
         outline-offset: 2px;
       }
-      &[data-stagger="1"] { animation-delay: var(--hu-stagger-delay, 50ms); }
-      &[data-stagger="2"] { animation-delay: calc(2 * var(--hu-stagger-delay, 50ms)); }
+      &[data-stagger="1"] {
+        animation-delay: var(--hu-stagger-delay, 50ms);
+      }
+      &[data-stagger="2"] {
+        animation-delay: calc(2 * var(--hu-stagger-delay, 50ms));
+      }
     }
     @keyframes hu-suggestion-enter {
       from {

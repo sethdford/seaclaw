@@ -23,12 +23,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -61,6 +57,7 @@ import ai.human.app.ui.screens.SettingsScreen
 import ai.human.app.ui.screens.ToolsScreen
 import ai.human.app.ui.theme.HumanTheme
 import ai.human.app.ui.HUTokens
+import ai.human.app.R
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -118,36 +115,71 @@ fun HumanApp(intent: Intent?) {
     Scaffold(
         bottomBar = {
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Filled.Home, contentDescription = "Overview") },
+                    icon = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_phosphor_house),
+                            contentDescription = "Overview",
+                            tint = if (selectedTab == 0) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
                     label = { Text("Overview") },
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Filled.Chat, contentDescription = "Chat") },
+                    icon = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_phosphor_chat_circle),
+                            contentDescription = "Chat",
+                            tint = if (selectedTab == 1) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
                     label = { Text("Chat") },
                 )
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    icon = { Icon(Icons.Filled.History, contentDescription = "Sessions") },
+                    icon = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_phosphor_clock),
+                            contentDescription = "Sessions",
+                            tint = if (selectedTab == 2) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
                     label = { Text("Sessions") },
                 )
                 NavigationBarItem(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 },
-                    icon = { Icon(Icons.Filled.Build, contentDescription = "Tools") },
+                    icon = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_phosphor_wrench),
+                            contentDescription = "Tools",
+                            tint = if (selectedTab == 3) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
                     label = { Text("Tools") },
                 )
                 NavigationBarItem(
                     selected = selectedTab == 4,
                     onClick = { selectedTab = 4 },
-                    icon = { Icon(Icons.Filled.Settings, contentDescription = "Settings") },
+                    icon = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_phosphor_gear),
+                            contentDescription = "Settings",
+                            tint = if (selectedTab == 4) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
                     label = { Text("Settings") },
                 )
             }

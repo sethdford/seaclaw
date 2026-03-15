@@ -52,7 +52,7 @@ public struct ChatInputBar: View {
     }
 }
 
-#Preview {
+#Preview("Light") {
     struct PreviewWrapper: View {
         @State private var text = ""
         var body: some View {
@@ -61,4 +61,17 @@ public struct ChatInputBar: View {
     }
     return PreviewWrapper()
         .padding()
+        .preferredColorScheme(.light)
+}
+
+#Preview("Dark") {
+    struct PreviewWrapper: View {
+        @State private var text = ""
+        var body: some View {
+            ChatInputBar(text: $text) {}
+        }
+    }
+    return PreviewWrapper()
+        .padding()
+        .preferredColorScheme(.dark)
 }

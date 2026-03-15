@@ -4,6 +4,7 @@
  */
 #include "human/pwa_context.h"
 #include "human/pwa.h"
+#include "human/pwa_entities.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -19,7 +20,11 @@ static const char *const PWA_CONTEXT_APPS[] = {
 #if HU_IS_TEST
 static const char PWA_CONTEXT_TEST_STRING[] =
     "[Calendar] Test event today\n"
-    "[Slack] Test: hello from alice\n";
+    "[Slack] Test: hello from alice\n"
+    "\n--- Entities ---\n"
+    "Emails: alice@example.com\n"
+    "\n--- Alerts ---\n"
+    "[NORMAL] slack: New messages\n";
 #endif
 
 hu_error_t hu_pwa_context_build(hu_allocator_t *alloc, char **out, size_t *out_len) {

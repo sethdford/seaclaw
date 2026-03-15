@@ -37,7 +37,7 @@ struct SettingsView: View {
         .frame(minWidth: 400, minHeight: 200)
         .background(bgSurface)
         .tint(accent)
-        .animation(HUTokens.springExpressive, value: binaryPath)
+        .animation(HUTokens.springInteractive, value: binaryPath)
         .onAppear {
             let pm = ProcessManager()
             binaryPath = pm.humanPath() ?? ""

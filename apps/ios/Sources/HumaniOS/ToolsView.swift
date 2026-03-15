@@ -21,11 +21,12 @@ struct ToolsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var appeared = false
 
-    private var tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color) {
+    private var tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color) {
         if colorScheme == .dark {
             return (
                 HUTokens.Dark.bgSurface,
                 HUTokens.Dark.surfaceContainer,
+                HUTokens.Dark.surfaceContainerHigh,
                 HUTokens.Dark.text,
                 HUTokens.Dark.textMuted,
                 HUTokens.Dark.accent
@@ -34,6 +35,7 @@ struct ToolsView: View {
             return (
                 HUTokens.Light.bgSurface,
                 HUTokens.Light.surfaceContainer,
+                HUTokens.Light.surfaceContainerHigh,
                 HUTokens.Light.text,
                 HUTokens.Light.textMuted,
                 HUTokens.Light.accent
@@ -82,7 +84,7 @@ struct ToolsView: View {
             .navigationTitle("Tools")
         }
         .onAppear {
-            withAnimation(HUTokens.springExpressive) {
+            withAnimation(HUTokens.springInteractive) {
                 appeared = true
             }
         }
@@ -92,7 +94,7 @@ struct ToolsView: View {
     private func categorySection(category: ToolCategory, tools: [ToolItem]) -> some View {
         VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
             Text(category.rawValue)
-                .font(.custom("Avenir-Heavy", size: HUTokens.textLg, relativeTo: .body))
+                .font(.custom("Avenir-Heavy", size: HUTokens.textXl, relativeTo: .body))
                 .foregroundStyle(tokens.text)
 
             LazyVGrid(columns: [
@@ -100,9 +102,9 @@ struct ToolsView: View {
                 GridItem(.flexible(), spacing: HUTokens.spaceMd),
             ], spacing: HUTokens.spaceMd) {
                 ForEach(Array(tools.enumerated()), id: \.element.id) { index, tool in
-                    ToolCard(
+                        ToolCard(
                         tool: tool,
-                        surfaceContainer: tokens.surfaceContainer,
+                        surfaceContainer: tokens.surfaceContainerHigh,
                         text: tokens.text,
                         textMuted: tokens.textMuted,
                         accent: tokens.accent,
@@ -129,7 +131,7 @@ private struct ToolCard: View {
             HStack {
                 Image(systemName: tool.icon)
                     .font(.custom("Avenir-Medium", size: HUTokens.textLg, relativeTo: .body))
-                    .foregroundStyle(accent)
+                    .foregroundStyle(textMuted)
                 Spacer()
             }
             Text(tool.name)
@@ -148,6 +150,6 @@ private struct ToolCard: View {
         .accessibilityLabel("\(tool.name): \(tool.description)")
         .opacity(appeared ? 1 : 0)
         .scaleEffect(appeared ? 1 : 0.95)
-        .animation(HUTokens.springExpressive.delay(delay), value: appeared)
+        .animation(HUTokens.springInteractive.delay(delay), value: appeared)
     }
 }

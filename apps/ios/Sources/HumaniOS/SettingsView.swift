@@ -48,11 +48,11 @@ struct SettingsView: View {
                                 .foregroundStyle(tokens.textMuted)
                         }
                         .accessibilityLabel("Connection status: \(connectionManager.isConnected ? "Connected" : "Disconnected")")
-                        .animation(HUTokens.springExpressive, value: connectionManager.isConnected)
+                        .animation(HUTokens.springInteractive, value: connectionManager.isConnected)
                     }
 
                     Button(connectionManager.isConnected ? "Disconnect" : "Connect") {
-                        withAnimation(HUTokens.springExpressive) {
+                        withAnimation(HUTokens.springInteractive) {
                             if connectionManager.isConnected {
                                 connectionManager.disconnect()
                             } else {
@@ -65,7 +65,7 @@ struct SettingsView: View {
 
                     if connectionManager.isConnected {
                         Button("Reconnect") {
-                            withAnimation(HUTokens.springExpressive) {
+                            withAnimation(HUTokens.springInteractive) {
                                 connectionManager.reconnect()
                             }
                         }

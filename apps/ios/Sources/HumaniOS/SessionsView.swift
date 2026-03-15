@@ -28,11 +28,12 @@ struct SessionsView: View {
     @State private var selectedSession: ChatSession?
     @State private var searchText = ""
 
-    private var tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color) {
+    private var tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color) {
         if colorScheme == .dark {
             return (
                 HUTokens.Dark.bgSurface,
                 HUTokens.Dark.surfaceContainer,
+                HUTokens.Dark.surfaceContainerHigh,
                 HUTokens.Dark.text,
                 HUTokens.Dark.textMuted,
                 HUTokens.Dark.accent
@@ -41,6 +42,7 @@ struct SessionsView: View {
             return (
                 HUTokens.Light.bgSurface,
                 HUTokens.Light.surfaceContainer,
+                HUTokens.Light.surfaceContainerHigh,
                 HUTokens.Light.text,
                 HUTokens.Light.textMuted,
                 HUTokens.Light.accent
@@ -172,14 +174,14 @@ struct SessionsView: View {
 
 private struct SessionRow: View {
     let session: ChatSession
-    let tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color)
+    let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color)
     let formatTimestamp: (Date) -> String
 
     var body: some View {
         HStack(spacing: HUTokens.spaceMd) {
             Image(systemName: "bubble.left.and.bubble.right")
                 .font(.custom("Avenir-Medium", size: HUTokens.textLg, relativeTo: .body))
-                .foregroundStyle(tokens.accent)
+                .foregroundStyle(tokens.textMuted)
                 .frame(width: 36, alignment: .center)
 
             VStack(alignment: .leading, spacing: HUTokens.spaceXs) {
@@ -201,7 +203,7 @@ private struct SessionRow: View {
                 .foregroundStyle(tokens.textMuted)
         }
         .padding(HUTokens.spaceMd)
-        .background(tokens.surfaceContainer)
+        .background(tokens.surfaceContainerHigh)
         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusMd, style: .continuous))
         .listRowInsets(EdgeInsets(top: HUTokens.spaceXs, leading: HUTokens.spaceMd, bottom: HUTokens.spaceXs, trailing: HUTokens.spaceMd))
         .listRowSeparator(.hidden)
@@ -213,7 +215,7 @@ private struct SessionRow: View {
 
 private struct SessionDetailView: View {
     let session: ChatSession
-    let tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color)
+    let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color)
 
     var body: some View {
         ScrollView {
@@ -228,7 +230,7 @@ private struct SessionDetailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(HUTokens.spaceMd)
-                .background(tokens.surfaceContainer)
+                .background(tokens.surfaceContainerHigh)
                 .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
 
                 if let msg = session.lastMessage {

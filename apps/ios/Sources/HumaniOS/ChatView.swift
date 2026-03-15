@@ -65,12 +65,12 @@ struct ChatView: View {
                             .transition(messageTransition)
                     }
                 }
-                .animation(HUTokens.springExpressive, value: messages.count + toolCalls.count)
+                .animation(HUTokens.springInteractive, value: messages.count + toolCalls.count)
                 .padding()
             }
             .onChange(of: messages.count) { _, _ in
                 if let last = messages.last {
-                    withAnimation(HUTokens.springExpressive) { proxy.scrollTo(last.id, anchor: .bottom) }
+                    withAnimation(HUTokens.springInteractive) { proxy.scrollTo(last.id, anchor: .bottom) }
                 }
             }
         }
@@ -131,7 +131,7 @@ struct ChatView: View {
         inputText = ""
         sendTrigger += 1
 
-        withAnimation(HUTokens.springExpressive) {
+        withAnimation(HUTokens.springInteractive) {
             messages.append(ChatMessage(id: UUID(), text: trimmed, role: .user))
         }
 
@@ -143,7 +143,7 @@ struct ChatView: View {
                 )
             } catch {
                 await MainActor.run {
-                    withAnimation(HUTokens.springExpressive) {
+                    withAnimation(HUTokens.springInteractive) {
                         messages.append(ChatMessage(
                             id: UUID(),
                             text: "Failed to send: \(error.localizedDescription)",
@@ -167,7 +167,7 @@ struct ChatView: View {
                 let state = payload?["state"]?.value as? String
                 let content = payload?["message"]?.value as? String
                 if let content = content, !content.isEmpty {
-                    withAnimation(HUTokens.springExpressive) {
+                    withAnimation(HUTokens.springExpressive) { // Page-level transition
                         switch state {
                         case "received":
                             messages.append(ChatMessage(id: UUID(), text: content, role: .user))
@@ -191,7 +191,7 @@ struct ChatView: View {
                 let args = (payload?["arguments"]?.value as? [String: Any])
                     .flatMap { try? JSONSerialization.data(withJSONObject: $0) }
                     .flatMap { String(data: $0, encoding: .utf8) }
-                withAnimation(HUTokens.springExpressive) {
+                withAnimation(HUTokens.springInteractive) {
                     if let ok = payload?["success"]?.value as? Bool, !toolCalls.isEmpty {
                         let idx = toolCalls.count - 1
                         let result = (payload?["detail"]?.value ?? payload?["message"]?.value).map { "\($0)" }

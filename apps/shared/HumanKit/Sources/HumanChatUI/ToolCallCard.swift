@@ -80,10 +80,20 @@ public struct ToolCallCard: View {
     }
 }
 
-#Preview {
+#Preview("Light") {
     VStack(spacing: HUTokens.spaceMd) {
         ToolCallCard(name: "shell", arguments: "{\"cmd\":\"ls\"}", status: .running)
         ToolCallCard(name: "browser", status: .completed, result: "Opened page")
     }
     .padding()
+    .preferredColorScheme(.light)
+}
+
+#Preview("Dark") {
+    VStack(spacing: HUTokens.spaceMd) {
+        ToolCallCard(name: "shell", arguments: "{\"cmd\":\"ls\"}", status: .running)
+        ToolCallCard(name: "browser", status: .completed, result: "Opened page")
+    }
+    .padding()
+    .preferredColorScheme(.dark)
 }

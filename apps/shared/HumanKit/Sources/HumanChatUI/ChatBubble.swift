@@ -38,10 +38,20 @@ public struct ChatBubble: View {
     }
 }
 
-#Preview {
+#Preview("Light") {
     VStack(spacing: HUTokens.spaceMd) {
         ChatBubble(text: "Hello, how can I help?", role: .assistant)
         ChatBubble(text: "What's the weather today?", role: .user)
     }
     .padding()
+    .preferredColorScheme(.light)
+}
+
+#Preview("Dark") {
+    VStack(spacing: HUTokens.spaceMd) {
+        ChatBubble(text: "Hello, how can I help?", role: .assistant)
+        ChatBubble(text: "What's the weather today?", role: .user)
+    }
+    .padding()
+    .preferredColorScheme(.dark)
 }

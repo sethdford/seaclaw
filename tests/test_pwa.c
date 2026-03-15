@@ -1,5 +1,7 @@
 #include "test_framework.h"
 #include "human/pwa.h"
+#include "human/pwa_cdp.h"
+#include "human/experience.h"
 #include "human/pwa_context.h"
 #include "human/pwa_learner.h"
 #ifdef HU_HAS_PWA
