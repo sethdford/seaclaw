@@ -104,6 +104,7 @@ export class ScMessageThread extends LitElement {
       display: flex;
       flex-direction: column;
       flex: 1;
+      contain: layout style;
       position: relative;
       min-height: 0;
     }
@@ -310,13 +311,13 @@ export class ScMessageThread extends LitElement {
       font-size: var(--hu-text-xs);
       font-family: var(--hu-font);
       cursor: pointer;
-    }
-    .reaction-pill:hover {
-      border-color: var(--hu-accent);
-    }
-    .reaction-pill.mine {
-      border-color: var(--hu-accent);
-      background: var(--hu-accent-subtle);
+      &:hover {
+        border-color: var(--hu-accent);
+      }
+      &.mine {
+        border-color: var(--hu-accent);
+        background: var(--hu-accent-subtle);
+      }
     }
     .reaction-icon {
       width: var(--hu-icon-sm);
@@ -404,29 +405,29 @@ export class ScMessageThread extends LitElement {
       transition:
         border-color var(--hu-duration-fast) var(--hu-ease-out),
         background var(--hu-duration-fast) var(--hu-ease-out);
-    }
-    .artifact-card:hover {
-      border-color: var(--hu-accent);
-      background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
-    }
-    .artifact-card:focus-visible {
-      outline: 2px solid var(--hu-accent);
-      outline-offset: 2px;
-    }
-    .artifact-card .artifact-icon {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: var(--hu-icon-sm);
-      height: var(--hu-icon-sm);
-      color: var(--hu-text-muted);
-    }
-    .artifact-card .artifact-icon svg {
-      width: 100%;
-      height: 100%;
-    }
-    .artifact-card:hover .artifact-icon {
-      color: var(--hu-accent);
+      &:hover {
+        border-color: var(--hu-accent);
+        background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
+        & .artifact-icon {
+          color: var(--hu-accent);
+        }
+      }
+      &:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
+      }
+      & .artifact-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--hu-icon-sm);
+        height: var(--hu-icon-sm);
+        color: var(--hu-text-muted);
+        & svg {
+          width: 100%;
+          height: 100%;
+        }
+      }
     }
 
     /* Empty state hero */
@@ -489,23 +490,23 @@ export class ScMessageThread extends LitElement {
         border-color var(--hu-duration-fast),
         background var(--hu-duration-fast),
         transform var(--hu-duration-fast);
-    }
-    .hero-chip:hover {
-      border-color: var(--hu-accent);
-      background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
-      transform: translateY(-1px);
-    }
-    .hero-chip:active {
-      transform: scale(0.97);
-    }
-    .hero-chip:focus-visible {
-      outline: 2px solid var(--hu-accent);
-      outline-offset: 2px;
-    }
-    .hero-chip svg {
-      width: var(--hu-icon-sm);
-      height: var(--hu-icon-sm);
-      color: var(--hu-accent);
+      &:hover {
+        border-color: var(--hu-accent);
+        background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
+        transform: translateY(-1px);
+      }
+      &:active {
+        transform: scale(0.97);
+      }
+      &:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
+      }
+      & svg {
+        width: var(--hu-icon-sm);
+        height: var(--hu-icon-sm);
+        color: var(--hu-accent);
+      }
     }
     @media (prefers-reduced-transparency: reduce) {
       .hero-chip {
@@ -539,20 +540,16 @@ export class ScMessageThread extends LitElement {
         color var(--hu-duration-fast);
       animation: hu-suggestion-enter var(--hu-duration-normal)
         var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
-    }
-    .suggestion-chip:hover {
-      border-color: var(--hu-accent);
-      color: var(--hu-accent);
-    }
-    .suggestion-chip:focus-visible {
-      outline: 2px solid var(--hu-accent);
-      outline-offset: 2px;
-    }
-    .suggestion-chip[data-stagger="1"] {
-      animation-delay: var(--hu-stagger-delay, 50ms);
-    }
-    .suggestion-chip[data-stagger="2"] {
-      animation-delay: calc(2 * var(--hu-stagger-delay, 50ms));
+      &:hover {
+        border-color: var(--hu-accent);
+        color: var(--hu-accent);
+      }
+      &:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
+      }
+      &[data-stagger="1"] { animation-delay: var(--hu-stagger-delay, 50ms); }
+      &[data-stagger="2"] { animation-delay: calc(2 * var(--hu-stagger-delay, 50ms)); }
     }
     @keyframes hu-suggestion-enter {
       from {

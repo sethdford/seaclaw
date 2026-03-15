@@ -140,6 +140,7 @@ export class ScDataTableV2 extends LitElement {
       overflow-x: auto;
       font-family: var(--hu-font);
       contain: layout style;
+      container-type: inline-size;
     }
 
     .search-wrap {
@@ -297,7 +298,7 @@ export class ScDataTableV2 extends LitElement {
       margin-top: var(--hu-space-md);
     }
 
-    @media (max-width: 640px) /* --hu-breakpoint-md */ {
+    @container (max-width: 640px) /* --hu-breakpoint-md */ {
       .table-wrap table {
         display: none;
       }
@@ -337,7 +338,7 @@ export class ScDataTableV2 extends LitElement {
       }
     }
 
-    @media (min-width: 641px) /* --hu-breakpoint-md */ {
+    @container (min-width: 641px) /* --hu-breakpoint-md */ {
       .cards {
         display: none;
       }

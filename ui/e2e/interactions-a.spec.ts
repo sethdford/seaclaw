@@ -159,3 +159,92 @@ test.describe("Security (Interactions)", () => {
     }).toPass({ timeout: POLL });
   });
 });
+
+test.describe("Tools (Interactions)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#tools");
+    await page.waitForTimeout(WAIT);
+  });
+
+  test("shows tool list with items", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-tools-view"));
+      expect(text).toContain("shell");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows tool descriptions", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-tools-view"));
+      expect(text).toContain("Execute shell commands");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("page hero renders", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("hu-tools-view", "hu-page-hero"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+});
+
+test.describe("Models (Interactions)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#models");
+    await page.waitForTimeout(WAIT);
+  });
+
+  test("shows provider list", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-models-view"));
+      expect(text).toContain("openrouter");
+      expect(text).toContain("anthropic");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows API key status", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-models-view"));
+      expect(text).toMatch(/key|configured|API/i);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("page hero renders", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("hu-models-view", "hu-page-hero"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+});
+
+test.describe("Sessions (Interactions)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#sessions");
+    await page.waitForTimeout(WAIT);
+  });
+
+  test("shows session list", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-sessions-view"));
+      expect(text).toContain("Project Planning");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows session message counts", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-sessions-view"));
+      expect(text).toMatch(/24|12|8/);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows last message preview", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-sessions-view"));
+      expect(text).toContain("sprint goals");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("page hero renders", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("hu-sessions-view", "hu-page-hero"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+});
