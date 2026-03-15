@@ -432,8 +432,28 @@ hu_error_t hu_feed_processor_store_item(hu_feed_processor_t *proc,
     sqlite3_bind_int64(stmt, 6, item->ingested_at);
 
     int rc = sqlite3_step(stmt);
+    if (rc != SQLITE_DONE) {
+        sqlite3_finalize(stmt);
+        return HU_ERR_IO;
+    }
+    int inserted = sqlite3_changes(proc->db);
     sqlite3_finalize(stmt);
-    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_IO;
+
+    /* Generate and store embedding if configured and row was inserted */
+    if (inserted > 0 && proc->embedder && proc->vec_store &&
+        proc->embedder->vtable && proc->vec_store->vtable) {
+        char id_str[32];
+        int64_t row_id = sqlite3_last_insert_rowid(proc->db);
+        snprintf(id_str, sizeof(id_str), "%lld", (long long)row_id);
+        hu_embedding_t emb = {0};
+        if (proc->embedder->vtable->embed(proc->embedder->ctx, proc->alloc,
+                item->content, item->content_len, &emb) == HU_OK) {
+            proc->vec_store->vtable->insert(proc->vec_store->ctx, proc->alloc,
+                id_str, strlen(id_str), &emb, item->content, item->content_len);
+            hu_embedding_free(proc->alloc, &emb);
+        }
+    }
+    return HU_OK;
 }
 
 hu_error_t hu_feed_processor_get_recent(hu_allocator_t *alloc, sqlite3 *db,

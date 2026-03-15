@@ -77,6 +77,8 @@ typedef struct hu_feed_processor {
     const char *interests;
     size_t interests_len;
     double relevance_threshold;
+    struct hu_embedder *embedder;      /* optional: generates embeddings on ingest */
+    struct hu_vector_store *vec_store; /* optional: stores embeddings for semantic search */
 } hu_feed_processor_t;
 
 typedef struct hu_feed_item_stored {

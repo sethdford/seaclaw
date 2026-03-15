@@ -15,6 +15,12 @@
 #include "human/design_tokens.h"
 #include "human/memory.h"
 #include "human/memory/engines.h"
+#if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
+#include "human/feeds/findings.h"
+#include "human/feeds/processor.h"
+#include "human/feeds/research.h"
+#include "human/feeds/trends.h"
+#endif
 #include "human/memory/factory.h"
 #include "human/memory/retrieval.h"
 #include "human/memory/vector.h"
@@ -562,18 +568,67 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             parsed_args.channel && parsed_args.channel[0] ? parsed_args.channel : "cli";
         agent.active_channel = chan;
         agent.active_channel_len = strlen(chan);
+
+        const char *effective_prompt = parsed_args.prompt;
+        char *enriched_prompt = NULL;
+        size_t enriched_len = 0;
+#if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
+        {
+            sqlite3 *feed_db = hu_sqlite_memory_get_db(&memory);
+            if (feed_db) {
+                char *digest = NULL;
+                size_t digest_len = 0;
+                int64_t since = (int64_t)time(NULL) - 86400;
+                if (hu_feed_build_daily_digest(alloc, feed_db, since, 2000, &digest, &digest_len) == HU_OK && digest) {
+                    char *trend_section = NULL;
+                    size_t trend_len = 0;
+                    if (cfg.feeds.interests) {
+                        hu_feed_trend_t *trends = NULL;
+                        size_t trend_count = 0;
+                        if (hu_feed_detect_trends(alloc, feed_db, cfg.feeds.interests,
+                                strlen(cfg.feeds.interests), &trends, &trend_count) == HU_OK) {
+                            hu_feed_trends_build_section(alloc, trends, trend_count, &trend_section, &trend_len);
+                            hu_feed_trends_free(alloc, trends, trend_count);
+                        }
+                    }
+                    size_t ctx_len = digest_len + (trend_section ? trend_len : 0);
+                    char *ctx_buf = (char *)alloc->alloc(alloc->ctx, ctx_len + 1);
+                    if (ctx_buf) {
+                        size_t p = 0;
+                        if (trend_section) { memcpy(ctx_buf + p, trend_section, trend_len); p += trend_len; }
+                        memcpy(ctx_buf + p, digest, digest_len); p += digest_len;
+                        ctx_buf[p] = '\0';
+                        if (hu_research_build_prompt(alloc, ctx_buf, p, &enriched_prompt, &enriched_len) == HU_OK && enriched_prompt)
+                            effective_prompt = enriched_prompt;
+                        alloc->free(alloc->ctx, ctx_buf, ctx_len + 1);
+                    }
+                    if (trend_section) alloc->free(alloc->ctx, trend_section, trend_len + 1);
+                    alloc->free(alloc->ctx, digest, digest_len + 1);
+                }
+            }
+        }
+#endif
+
         char *response = NULL;
         size_t response_len = 0;
-        err = hu_agent_run_single(&agent, parsed_args.prompt, strlen(parsed_args.prompt), msg,
+        err = hu_agent_run_single(&agent, effective_prompt, strlen(effective_prompt), msg,
                                   strlen(msg), &response, &response_len);
         if (err == HU_OK && response && response_len > 0) {
             fwrite(response, 1, response_len, stdout);
             fputc('\n', stdout);
             fflush(stdout);
+#if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
+            {
+                sqlite3 *findings_db = hu_sqlite_memory_get_db(&memory);
+                if (findings_db)
+                    hu_findings_parse_and_store(alloc, findings_db, response, response_len);
+            }
+#endif
             alloc->free(alloc->ctx, response, response_len + 1);
         } else if (err != HU_OK) {
             fprintf(stderr, "[%s] Agent turn failed: %s\n", HU_CODENAME, hu_error_string(err));
         }
+        if (enriched_prompt) alloc->free(alloc->ctx, enriched_prompt, enriched_len + 1);
         hu_agent_deinit(&agent);
         if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
             retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);

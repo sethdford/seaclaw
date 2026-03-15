@@ -6,6 +6,8 @@
 #include "human/security/sandbox.h"
 #ifdef HU_ENABLE_FEEDS
 #include "human/feeds/processor.h"
+#include "human/feeds/findings.h"
+#include "human/feeds/trends.h"
 #endif
 #ifdef HU_HAS_UPDATE
 #include "human/update.h"
@@ -575,7 +577,7 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv) {
 #if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
 hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
-        printf("Usage: human feed <poll|status|list|health>\n");
+        printf("Usage: human feed <poll|status|list|health|findings|search|digest|correlate|cleanup>\n");
         return HU_OK;
     }
     hu_config_t cfg;
@@ -715,9 +717,103 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
                 printf("  Status: NOT FOUND (create with: mkdir -p %s)\n", ingest_dir);
         }
         printf("\n");
+    } else if (strcmp(sub, "findings") == 0) {
+        hu_research_finding_t *findings = NULL;
+        size_t fcount = 0;
+        const char *filter = (argc >= 4) ? argv[3] : "all";
+        hu_error_t ferr;
+        if (strcmp(filter, "pending") == 0)
+            ferr = hu_findings_get_pending(alloc, db, 50, &findings, &fcount);
+        else
+            ferr = hu_findings_get_all(alloc, db, 50, &findings, &fcount);
+        if (ferr != HU_OK) {
+            fprintf(stderr, "[feed] Findings query error: %s\n", hu_error_string(ferr));
+        } else if (fcount == 0) {
+            printf("No research findings yet. Run the research agent first.\n");
+        } else {
+            printf("Research Findings (%zu %s):\n\n", fcount,
+                   strcmp(filter, "pending") == 0 ? "pending" : "total");
+            for (size_t i = 0; i < fcount; i++) {
+                hu_research_finding_t *f = &findings[i];
+                char timebuf[32] = "unknown";
+                if (f->created_at > 0) {
+                    time_t tt = (time_t)f->created_at;
+                    struct tm *lt = localtime(&tt);
+                    if (lt) strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M", lt);
+                }
+                printf("[%lld] [%s] %s @ %s\n", (long long)f->id,
+                       f->priority[0] ? f->priority : "?",
+                       f->status[0] ? f->status : "?", timebuf);
+                printf("  Finding: %.120s%s\n",
+                       f->finding, strlen(f->finding) > 120 ? "..." : "");
+                if (f->source[0])
+                    printf("  Source: %s\n", f->source);
+                if (f->suggested_action[0])
+                    printf("  Action: %.100s%s\n",
+                           f->suggested_action, strlen(f->suggested_action) > 100 ? "..." : "");
+                printf("\n");
+            }
+            hu_findings_free(alloc, findings, fcount);
+        }
+    } else if (strcmp(sub, "search") == 0) {
+        if (argc < 4) {
+            printf("Usage: human feed search <query>\n");
+        } else {
+            const char *query = argv[3];
+            hu_feed_item_stored_t *results = NULL;
+            size_t rcount = 0;
+            hu_error_t serr = hu_feed_search(alloc, db, query, strlen(query), 20,
+                                             &results, &rcount);
+            if (serr != HU_OK) {
+                fprintf(stderr, "[feed] Search error: %s\n", hu_error_string(serr));
+            } else if (rcount == 0) {
+                printf("No results for '%s'\n", query);
+            } else {
+                printf("Feed search results for '%s' (%zu matches):\n\n", query, rcount);
+                for (size_t i = 0; i < rcount; i++) {
+                    hu_feed_item_stored_t *r = &results[i];
+                    char timebuf[32] = "unknown";
+                    if (r->ingested_at > 0) {
+                        time_t tt = (time_t)r->ingested_at;
+                        struct tm *lt = localtime(&tt);
+                        if (lt) strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M", lt);
+                    }
+                    printf("[%zu] %s (%s) @ %s\n    %.100s%s\n",
+                           i + 1, r->source, r->content_type, timebuf,
+                           r->content, r->content_len > 100 ? "..." : "");
+                    if (r->url[0]) printf("    %s\n", r->url);
+                    printf("\n");
+                }
+                hu_feed_items_free(alloc, results, rcount);
+            }
+        }
+    } else if (strcmp(sub, "digest") == 0) {
+        char *digest_text = NULL;
+        size_t digest_text_len = 0;
+        int64_t since = (int64_t)time(NULL) - 86400;
+        hu_error_t derr = hu_feed_build_daily_digest(alloc, db, since, 8000,
+                                                     &digest_text, &digest_text_len);
+        if (derr != HU_OK) {
+            fprintf(stderr, "[feed] Digest error: %s\n", hu_error_string(derr));
+        } else {
+            printf("%.*s", (int)digest_text_len, digest_text);
+            alloc->free(alloc->ctx, digest_text, digest_text_len + 1);
+        }
+    } else if (strcmp(sub, "correlate") == 0) {
+        int64_t since = (int64_t)time(NULL) - 86400;
+        hu_error_t cerr = hu_feed_correlate_recent(alloc, db, since, 0.3);
+        if (cerr == HU_OK) printf("[feed] Correlation complete\n");
+        else fprintf(stderr, "[feed] Correlation error: %s\n", hu_error_string(cerr));
+    } else if (strcmp(sub, "cleanup") == 0) {
+        uint32_t days = 30;
+        if (argc >= 4) { int d = atoi(argv[3]); if (d > 0 && d <= 365) days = (uint32_t)d; }
+        hu_feed_processor_t fp = {.alloc = alloc, .db = db};
+        hu_error_t cerr = hu_feed_processor_cleanup(&fp, days);
+        if (cerr == HU_OK) printf("[feed] Cleanup complete (removed items older than %u days)\n", days);
+        else fprintf(stderr, "[feed] Cleanup error: %s\n", hu_error_string(cerr));
     } else {
         fprintf(stderr, "Unknown feed subcommand: %s\n", sub);
-        printf("Usage: human feed <poll|status|list|health>\n");
+        printf("Usage: human feed <poll|status|list|health|findings|search|digest|correlate|cleanup>\n");
         err = HU_ERR_INVALID_ARGUMENT;
     }
 

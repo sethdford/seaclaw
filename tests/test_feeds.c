@@ -656,6 +656,198 @@ static void feed_detect_trends_no_spikes(void) {
     sqlite3_close(db);
 }
 
+static void findings_parse_and_store_valid(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    const char *schema =
+        "CREATE TABLE IF NOT EXISTS research_findings("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT,"
+        "finding TEXT NOT NULL,"
+        "relevance TEXT,"
+        "priority TEXT DEFAULT 'MEDIUM',"
+        "suggested_action TEXT,"
+        "status TEXT DEFAULT 'pending',"
+        "created_at INTEGER NOT NULL,"
+        "acted_at INTEGER)";
+    HU_ASSERT_EQ(sqlite3_exec(db, schema, NULL, NULL, NULL), SQLITE_OK);
+
+    const char *agent_output =
+        "Here are research findings:\n"
+        "- **Source**: arxiv.org\n"
+        "- **Finding**: New transformer architecture reduces compute by 40%\n"
+        "- **Relevance**: Directly applicable to our training pipeline\n"
+        "- **Priority**: HIGH\n"
+        "- **Action**: Implement scaled dot-product variant\n"
+        "\n"
+        "- **Source**: github.com/openai\n"
+        "- **Finding**: Tiktoken v2 released with faster BPE\n"
+        "- **Relevance**: Could improve our tokenizer performance\n"
+        "- **Priority**: MEDIUM\n"
+        "- **Action**: Benchmark against our BPE implementation\n";
+
+    hu_error_t err = hu_findings_parse_and_store(&alloc, db, agent_output, strlen(agent_output));
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_research_finding_t *items = NULL;
+    size_t count = 0;
+    err = hu_findings_get_pending(&alloc, db, 10, &items, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 2u);
+
+    /* Results are DESC by created_at, so order may vary — check both exist */
+    int found_arxiv = 0, found_github = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (strstr(items[i].source, "arxiv")) found_arxiv = 1;
+        if (strstr(items[i].source, "github")) found_github = 1;
+    }
+    HU_ASSERT_TRUE(found_arxiv);
+    HU_ASSERT_TRUE(found_github);
+
+    hu_findings_free(&alloc, items, count);
+    sqlite3_close(db);
+}
+
+static void findings_parse_and_store_malformed(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    const char *schema =
+        "CREATE TABLE IF NOT EXISTS research_findings("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT,"
+        "finding TEXT NOT NULL,"
+        "relevance TEXT,"
+        "priority TEXT DEFAULT 'MEDIUM',"
+        "suggested_action TEXT,"
+        "status TEXT DEFAULT 'pending',"
+        "created_at INTEGER NOT NULL,"
+        "acted_at INTEGER)";
+    HU_ASSERT_EQ(sqlite3_exec(db, schema, NULL, NULL, NULL), SQLITE_OK);
+
+    /* No markers at all — should store nothing */
+    const char *garbage = "This is just random text with no structure";
+    hu_error_t err = hu_findings_parse_and_store(&alloc, db, garbage, strlen(garbage));
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_research_finding_t *items = NULL;
+    size_t count = 0;
+    err = hu_findings_get_pending(&alloc, db, 10, &items, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+
+    /* Marker present but finding line is empty — should skip */
+    const char *partial = "- **Source**: test\n- **Finding**:\n";
+    err = hu_findings_parse_and_store(&alloc, db, partial, strlen(partial));
+    HU_ASSERT_EQ(err, HU_OK);
+    err = hu_findings_get_pending(&alloc, db, 10, &items, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+
+    sqlite3_close(db);
+}
+
+static void findings_parse_and_store_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    HU_ASSERT_EQ(hu_findings_parse_and_store(NULL, db, "x", 1), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_findings_parse_and_store(&alloc, NULL, "x", 1), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_findings_parse_and_store(&alloc, db, NULL, 1), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_findings_parse_and_store(&alloc, db, "x", 0), HU_ERR_INVALID_ARGUMENT);
+
+    sqlite3_close(db);
+}
+
+static void findings_get_all_with_limit(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    const char *schema =
+        "CREATE TABLE IF NOT EXISTS research_findings("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT,"
+        "finding TEXT NOT NULL,"
+        "relevance TEXT,"
+        "priority TEXT DEFAULT 'MEDIUM',"
+        "suggested_action TEXT,"
+        "status TEXT DEFAULT 'pending',"
+        "created_at INTEGER NOT NULL,"
+        "acted_at INTEGER)";
+    HU_ASSERT_EQ(sqlite3_exec(db, schema, NULL, NULL, NULL), SQLITE_OK);
+
+    /* Store 5 findings */
+    for (int i = 0; i < 5; i++) {
+        char finding[64];
+        snprintf(finding, sizeof(finding), "Finding number %d", i);
+        hu_error_t err = hu_findings_store(&alloc, db, "test", finding, "MED", "MEDIUM", "none");
+        HU_ASSERT_EQ(err, HU_OK);
+    }
+
+    /* Mark one as completed so it's not "pending" */
+    HU_ASSERT_EQ(hu_findings_mark_status(db, 3, "completed"), HU_OK);
+
+    /* get_all should return all 5 regardless of status */
+    hu_research_finding_t *items = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_findings_get_all(&alloc, db, 100, &items, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 5u);
+    hu_findings_free(&alloc, items, count);
+
+    /* get_pending should return only 4 (one was completed) */
+    err = hu_findings_get_pending(&alloc, db, 100, &items, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 4u);
+    hu_findings_free(&alloc, items, count);
+
+    /* Limit should be respected */
+    err = hu_findings_get_all(&alloc, db, 2, &items, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 2u);
+    hu_findings_free(&alloc, items, count);
+
+    /* get_all null args */
+    HU_ASSERT_EQ(hu_findings_get_all(NULL, db, 10, &items, &count), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_findings_get_all(&alloc, NULL, 10, &items, &count), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_findings_get_all(&alloc, db, 10, NULL, &count), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_findings_get_all(&alloc, db, 10, &items, NULL), HU_ERR_INVALID_ARGUMENT);
+
+    sqlite3_close(db);
+}
+
+static void findings_store_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    HU_ASSERT_EQ(hu_findings_store(&alloc, NULL, "s", "f", "r", "p", "a"), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_findings_store(&alloc, db, "s", NULL, "r", "p", "a"), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_findings_mark_status(NULL, 1, "done"), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_findings_mark_status(db, 1, NULL), HU_ERR_INVALID_ARGUMENT);
+
+    sqlite3_close(db);
+}
+
+static void findings_get_pending_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    hu_research_finding_t *items = NULL;
+    size_t count = 0;
+
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    HU_ASSERT_EQ(hu_findings_get_pending(NULL, db, 10, &items, &count), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_findings_get_pending(&alloc, NULL, 10, &items, &count), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_findings_get_pending(&alloc, db, 10, NULL, &count), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_findings_get_pending(&alloc, db, 10, &items, NULL), HU_ERR_INVALID_ARGUMENT);
+    sqlite3_close(db);
+}
+
 static void feed_trends_build_section_empty(void) {
     hu_allocator_t alloc = hu_system_allocator();
     char *out = NULL;
@@ -697,6 +889,12 @@ void run_feeds_tests(void) {
     HU_RUN_TEST(feed_correlate_groups_similar);
     HU_RUN_TEST(findings_store_and_retrieve);
     HU_RUN_TEST(findings_mark_status);
+    HU_RUN_TEST(findings_parse_and_store_valid);
+    HU_RUN_TEST(findings_parse_and_store_malformed);
+    HU_RUN_TEST(findings_parse_and_store_null_args);
+    HU_RUN_TEST(findings_get_all_with_limit);
+    HU_RUN_TEST(findings_store_null_args);
+    HU_RUN_TEST(findings_get_pending_null_args);
     HU_RUN_TEST(feed_detect_trends_no_spikes);
     HU_RUN_TEST(feed_trends_build_section_empty);
 #endif
