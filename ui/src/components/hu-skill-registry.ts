@@ -142,6 +142,8 @@ export class ScSkillRegistry extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      contain: layout style;
+      container-type: inline-size;
     }
 
     .section {
@@ -192,22 +194,19 @@ export class ScSkillRegistry extends LitElement {
       color: var(--hu-text-muted);
       font-family: var(--hu-font);
       transition: all var(--hu-duration-fast) var(--hu-ease-out);
-    }
-
-    .tag-chip:hover {
-      color: var(--hu-text);
-      border-color: var(--hu-text-muted);
-    }
-
-    .tag-chip:focus-visible {
-      outline: 2px solid var(--hu-accent);
-      outline-offset: 2px;
-    }
-
-    .tag-chip[aria-checked="true"] {
-      background: var(--hu-accent);
-      color: var(--hu-bg);
-      border-color: var(--hu-accent);
+      &:hover {
+        color: var(--hu-text);
+        border-color: var(--hu-text-muted);
+      }
+      &:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
+      }
+      &[aria-checked="true"] {
+        background: var(--hu-accent);
+        color: var(--hu-bg);
+        border-color: var(--hu-accent);
+      }
     }
 
     .skills-grid {
@@ -216,13 +215,13 @@ export class ScSkillRegistry extends LitElement {
       gap: var(--hu-space-lg);
     }
 
-    @media (max-width: 30rem) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
       .skills-grid {
         grid-template-columns: 1fr;
       }
     }
 
-    @media (max-width: 48rem) /* --hu-breakpoint-lg */ {
+    @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
       .skills-grid {
         grid-template-columns: 1fr 1fr;
       }

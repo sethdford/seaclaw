@@ -11,6 +11,8 @@ export class ScWelcomeCard extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      contain: layout style;
+      container-type: inline-size;
     }
 
     .card {
@@ -107,7 +109,7 @@ export class ScWelcomeCard extends LitElement {
       justify-content: center;
     }
 
-    @media (max-width: 480px) /* --hu-breakpoint-sm */ {
+    @container (max-width: 480px) /* --hu-breakpoint-sm */ {
       .features {
         grid-template-columns: 1fr;
       }

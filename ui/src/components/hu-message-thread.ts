@@ -105,6 +105,7 @@ export class ScMessageThread extends LitElement {
       flex-direction: column;
       flex: 1;
       contain: layout style;
+      container-type: inline-size;
       position: relative;
       min-height: 0;
     }
@@ -337,7 +338,7 @@ export class ScMessageThread extends LitElement {
     .reaction-count {
       color: var(--hu-text-muted);
     }
-    @media (max-width: 640px) /* --hu-breakpoint-md */ {
+    @container (max-width: 640px) /* --hu-breakpoint-md */ {
       .messages {
         padding: var(--hu-space-sm);
       }

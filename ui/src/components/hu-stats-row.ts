@@ -10,6 +10,8 @@ export class ScStatsRow extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      contain: layout style;
+      container-type: inline-size;
     }
 
     .stats-row {
@@ -19,13 +21,13 @@ export class ScStatsRow extends LitElement {
       margin-bottom: var(--hu-space-2xl);
     }
 
-    @media (max-width: 40rem) /* --hu-breakpoint-md */ {
+    @container (max-width: 40rem) /* --hu-breakpoint-md */ {
       .stats-row {
         grid-template-columns: 1fr 1fr;
       }
     }
 
-    @media (max-width: 30rem) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
       .stats-row {
         grid-template-columns: 1fr;
       }

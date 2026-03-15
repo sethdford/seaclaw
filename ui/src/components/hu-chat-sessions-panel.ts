@@ -32,6 +32,8 @@ export class ScChatSessionsPanel extends LitElement {
       --_panel-width-expanded: 17.5rem;
       display: block;
       width: 0;
+      contain: layout style;
+      container-type: inline-size;
       overflow: hidden;
       flex-shrink: 0;
       transition: width var(--hu-duration-normal) var(--hu-ease-spring);
@@ -50,7 +52,7 @@ export class ScChatSessionsPanel extends LitElement {
       border-right: 1px solid var(--hu-border-subtle);
     }
 
-    @media (max-width: 768px) /* --hu-breakpoint-lg */ {
+    @container (max-width: 768px) /* --hu-breakpoint-lg */ {
       :host([open]) {
         position: fixed;
         left: 0;
@@ -79,23 +81,20 @@ export class ScChatSessionsPanel extends LitElement {
         background var(--hu-duration-fast) var(--hu-ease-out),
         border-color var(--hu-duration-fast) var(--hu-ease-out),
         color var(--hu-duration-fast) var(--hu-ease-out);
-    }
-
-    .new-chat-btn:hover {
-      background: var(--hu-hover-overlay);
-      border-color: var(--hu-accent);
-      color: var(--hu-accent-text, var(--hu-accent));
-    }
-
-    .new-chat-btn:focus-visible {
-      outline: 2px solid var(--hu-accent);
-      outline-offset: 2px;
-    }
-
-    .new-chat-btn svg {
-      width: var(--hu-icon-md);
-      height: var(--hu-icon-md);
-      flex-shrink: 0;
+      &:hover {
+        background: var(--hu-hover-overlay);
+        border-color: var(--hu-accent);
+        color: var(--hu-accent-text, var(--hu-accent));
+      }
+      &:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
+      }
+      & svg {
+        width: var(--hu-icon-md);
+        height: var(--hu-icon-md);
+        flex-shrink: 0;
+      }
     }
 
     .search-wrap {
@@ -115,19 +114,16 @@ export class ScChatSessionsPanel extends LitElement {
       font-size: var(--hu-text-sm);
       outline: none;
       transition: border-color var(--hu-duration-fast);
-    }
-
-    .search-input:focus {
-      border-color: var(--hu-accent);
-    }
-
-    .search-input:focus-visible {
-      outline: 2px solid var(--hu-accent);
-      outline-offset: 2px;
-    }
-
-    .search-input::placeholder {
-      color: var(--hu-text-faint);
+      &:focus {
+        border-color: var(--hu-accent);
+      }
+      &:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
+      }
+      &::placeholder {
+        color: var(--hu-text-faint);
+      }
     }
 
     .session-list {
@@ -178,24 +174,20 @@ export class ScChatSessionsPanel extends LitElement {
       font-family: var(--hu-font);
       font-size: var(--hu-text-sm);
       color: var(--hu-text);
-    }
-
-    .session-item:hover {
-      background: var(--hu-hover-overlay);
-    }
-
-    .session-item.active {
-      border-left-color: var(--hu-accent-subtle);
-      background: var(--hu-surface-container-high);
-    }
-
-    .session-item.focused {
-      background: var(--hu-surface-container-high);
-    }
-
-    .session-item:focus-visible {
-      outline: 2px solid var(--hu-accent);
-      outline-offset: 2px;
+      &:hover {
+        background: var(--hu-hover-overlay);
+      }
+      &.active {
+        border-left-color: var(--hu-accent-subtle);
+        background: var(--hu-surface-container-high);
+      }
+      &.focused {
+        background: var(--hu-surface-container-high);
+      }
+      &:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
+      }
     }
 
     .session-content {

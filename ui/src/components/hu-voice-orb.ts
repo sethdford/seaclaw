@@ -16,6 +16,7 @@ export class ScVoiceOrb extends LitElement {
       flex-direction: column;
       align-items: center;
       contain: layout style;
+      container-type: inline-size;
       padding: var(--hu-space-lg) 0 var(--hu-space-md);
       position: relative;
       flex-shrink: 0;
@@ -33,11 +34,10 @@ export class ScVoiceOrb extends LitElement {
       opacity: 0.4;
       pointer-events: none;
       transition: opacity var(--hu-duration-normal) var(--hu-ease-out);
-    }
-
-    .mic-orb-glow.active {
-      opacity: 0.8;
-      animation: hu-glow-breathe 3s ease-in-out infinite; /* hu-lint-ok: ambient */
+      &.active {
+        opacity: 0.8;
+        animation: hu-glow-breathe 3s ease-in-out infinite; /* hu-lint-ok: ambient */
+      }
     }
 
     @keyframes hu-glow-breathe {
@@ -76,43 +76,37 @@ export class ScVoiceOrb extends LitElement {
         border-color var(--hu-duration-fast) var(--hu-ease-out),
         box-shadow var(--hu-duration-normal) var(--hu-ease-out),
         transform var(--hu-duration-fast) var(--hu-ease-out);
-    }
-
-    .mic-btn svg {
-      width: 2.5rem;
-      height: 2.5rem;
-      filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--hu-text) 10%, transparent));
-    }
-
-    .mic-btn:hover:not(:disabled) {
-      background: var(--hu-hover-overlay);
-      border-color: var(--hu-accent);
-      color: var(--hu-accent-text, var(--hu-accent));
-      box-shadow: var(--hu-shadow-md);
-      transform: translateY(-2px);
-    }
-
-    .mic-btn:active:not(:disabled) {
-      transform: translateY(1px) scaleY(0.97) scaleX(1.01);
-    }
-
-    .mic-btn:focus-visible {
-      outline: 2px solid var(--hu-accent);
-      outline-offset: var(--hu-space-xs);
-    }
-
-    .mic-btn:disabled {
-      opacity: var(--hu-opacity-disabled, 0.5);
-      cursor: not-allowed;
-    }
-
-    .mic-btn.active {
-      background: var(--hu-accent);
-      background-image: var(--hu-button-gradient-primary);
-      border-color: var(--hu-accent);
-      color: var(--hu-on-accent);
-      box-shadow: var(--hu-shadow-glow-accent);
-      transform: translateY(-1px);
+      & svg {
+        width: 2.5rem;
+        height: 2.5rem;
+        filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--hu-text) 10%, transparent));
+      }
+      &:hover:not(:disabled) {
+        background: var(--hu-hover-overlay);
+        border-color: var(--hu-accent);
+        color: var(--hu-accent-text, var(--hu-accent));
+        box-shadow: var(--hu-shadow-md);
+        transform: translateY(-2px);
+      }
+      &:active:not(:disabled) {
+        transform: translateY(1px) scaleY(0.97) scaleX(1.01);
+      }
+      &:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: var(--hu-space-xs);
+      }
+      &:disabled {
+        opacity: var(--hu-opacity-disabled, 0.5);
+        cursor: not-allowed;
+      }
+      &.active {
+        background: var(--hu-accent);
+        background-image: var(--hu-button-gradient-primary);
+        border-color: var(--hu-accent);
+        color: var(--hu-on-accent);
+        box-shadow: var(--hu-shadow-glow-accent);
+        transform: translateY(-1px);
+      }
     }
 
     .mic-ring {
@@ -165,7 +159,7 @@ export class ScVoiceOrb extends LitElement {
       font-weight: var(--hu-weight-medium);
     }
 
-    @media (max-width: 30rem) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
       .mic-btn {
         width: 4.5rem;
         height: 4.5rem;

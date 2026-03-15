@@ -81,6 +81,7 @@ export class ScChatComposer extends LitElement {
     :host {
       display: block;
       contain: layout style;
+      container-type: inline-size;
     }
     .composer {
       display: flex;
@@ -523,7 +524,7 @@ export class ScChatComposer extends LitElement {
         background: var(--hu-bg-surface);
       }
     }
-    @media (max-width: 640px) /* --hu-breakpoint-md */ {
+    @container (max-width: 640px) /* --hu-breakpoint-md */ {
       .input-row {
         flex-wrap: wrap;
       }

@@ -16,6 +16,8 @@ export class ScFilePreview extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      contain: layout style;
+      container-type: inline-size;
     }
 
     .grid {
@@ -25,7 +27,7 @@ export class ScFilePreview extends LitElement {
       padding: var(--hu-space-sm) 0;
     }
 
-    @media (max-width: 480px) /* --hu-breakpoint-sm */ {
+    @container (max-width: 480px) /* --hu-breakpoint-sm */ {
       .grid {
         grid-template-columns: repeat(2, 1fr);
       }
@@ -47,11 +49,10 @@ export class ScFilePreview extends LitElement {
       transition:
         box-shadow var(--hu-duration-fast) var(--hu-ease-out),
         transform var(--hu-duration-fast) var(--hu-ease-out);
-    }
-
-    .card:hover {
-      box-shadow: var(--hu-shadow-sm);
-      transform: translateY(-2px);
+      &:hover {
+        box-shadow: var(--hu-shadow-sm);
+        transform: translateY(-2px);
+      }
     }
 
     .card-image {
@@ -69,11 +70,10 @@ export class ScFilePreview extends LitElement {
       width: 2.5rem;
       height: 2.5rem;
       color: var(--hu-text-muted);
-    }
-
-    .card-icon svg {
-      width: var(--hu-icon-lg);
-      height: var(--hu-icon-lg);
+      & svg {
+        width: var(--hu-icon-lg);
+        height: var(--hu-icon-lg);
+      }
     }
 
     .card-name {

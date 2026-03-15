@@ -34,6 +34,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
       flex-direction: column;
       height: 100%;
       max-height: calc(100vh - var(--hu-space-5xl));
+      contain: layout style;
+      container-type: inline-size;
     }
 
     .container {
@@ -150,7 +152,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     /* ── Responsive ──────────────────────────────────── */
 
-    @media (max-width: 480px) /* --hu-breakpoint-sm */ {
+    @container (max-width: 480px) /* --hu-breakpoint-sm */ {
       .input-row {
         flex-direction: column;
         align-items: stretch;

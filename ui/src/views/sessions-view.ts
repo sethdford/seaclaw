@@ -39,6 +39,8 @@ export class ScSessionsView extends GatewayAwareLitElement {
       display: block;
       color: var(--hu-text);
       max-width: 75rem;
+      contain: layout style;
+      container-type: inline-size;
       padding: var(--hu-space-lg) var(--hu-space-xl);
     }
 
@@ -110,7 +112,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
       color: var(--hu-text-muted);
     }
 
-    @media (max-width: 48rem) /* --hu-breakpoint-lg */ {
+    @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
       .sessions-grid {
         grid-template-columns: 1fr;
       }

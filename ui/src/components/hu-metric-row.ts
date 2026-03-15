@@ -7,6 +7,11 @@ export class ScMetricRow extends LitElement {
   items: Array<{ label: string; value: string; accent?: string }> = [];
 
   static override styles = css`
+    :host {
+      display: block;
+      contain: layout style;
+      container-type: inline-size;
+    }
     .row {
       display: flex;
       align-items: center;
@@ -38,17 +43,15 @@ export class ScMetricRow extends LitElement {
       font-weight: var(--hu-weight-medium);
       color: var(--hu-text);
       font-variant-numeric: tabular-nums;
+      &.success {
+        color: var(--hu-success);
+      }
+      &.error {
+        color: var(--hu-error);
+      }
     }
 
-    .item-value.success {
-      color: var(--hu-success);
-    }
-
-    .item-value.error {
-      color: var(--hu-error);
-    }
-
-    @media (max-width: 480px) /* --hu-breakpoint-sm */ {
+    @container (max-width: 480px) /* --hu-breakpoint-sm */ {
       .divider {
         display: none;
       }

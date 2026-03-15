@@ -68,6 +68,8 @@ export class ScUsageView extends GatewayAwareLitElement {
       display: block;
       color: var(--hu-text);
       max-width: 60rem;
+      contain: layout style;
+      container-type: inline-size;
     }
     .section {
       margin-bottom: var(--hu-space-2xl);
@@ -139,7 +141,7 @@ export class ScUsageView extends GatewayAwareLitElement {
       min-width: 2.5rem;
       text-align: right;
     }
-    @media (max-width: 30rem) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
       .provider-name {
         width: 5rem;
       }

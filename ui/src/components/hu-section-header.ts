@@ -7,6 +7,11 @@ export class ScSectionHeader extends LitElement {
   @property({ type: String }) description = "";
 
   static override styles = css`
+    :host {
+      display: block;
+      contain: layout style;
+      container-type: inline-size;
+    }
     .header {
       display: flex;
       align-items: center;
@@ -35,7 +40,7 @@ export class ScSectionHeader extends LitElement {
       flex-shrink: 0;
     }
 
-    @media (max-width: var(--hu-breakpoint-md)) /* --hu-breakpoint-md */ {
+    @container (max-width: 40rem) /* --hu-breakpoint-md */ {
       .header {
         flex-wrap: wrap;
       }

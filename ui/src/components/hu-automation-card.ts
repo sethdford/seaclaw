@@ -88,6 +88,8 @@ export class ScAutomationCard extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      contain: layout style;
+      container-type: inline-size;
     }
 
     .card-wrapper {
@@ -375,7 +377,7 @@ export class ScAutomationCard extends LitElement {
       font-variant-numeric: tabular-nums;
     }
 
-    @media (max-width: 480px) /* --hu-breakpoint-sm */ {
+    @container (max-width: 480px) /* --hu-breakpoint-sm */ {
       .footer-row {
         flex-direction: column;
         align-items: flex-start;
