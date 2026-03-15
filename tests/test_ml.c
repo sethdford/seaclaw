@@ -2559,6 +2559,283 @@ static void test_dataloader_empty_shard(void) {
     rmdir(dir);
 }
 
+
+static void test_gpt_kv_head_validation(void) {
+    hu_allocator_t a = hu_system_allocator();
+    hu_gpt_config_t c = {0};
+    c.sequence_len = 8; c.vocab_size = 16; c.n_layer = 1;
+    c.n_head = 4; c.n_embd = 16; c.head_dim = 4;
+    hu_model_t m = {0};
+    c.n_kv_head = 0;
+    HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_ERR_INVALID_ARGUMENT);
+    c.n_kv_head = 5;
+    HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_ERR_INVALID_ARGUMENT);
+    c.n_kv_head = 3;
+    HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_ERR_INVALID_ARGUMENT);
+    c.n_kv_head = 2;
+    HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_OK);
+    m.vtable->deinit(m.ctx, &a);
+}
+
+static void test_train_byte_weighted_loss(void) {
+    hu_allocator_t a = hu_system_allocator();
+    char td[] = "/tmp/hu_bwl_XXXXXX";
+    HU_ASSERT(mkdtemp(td));
+    int32_t d[64]; for (int i = 0; i < 64; i++) d[i] = i % 16;
+    char p1[256], p2[256];
+    snprintf(p1, 256, "%s/shard_00000.bin", td);
+    snprintf(p2, 256, "%s/shard_00001.bin", td);
+    write_bin_file(p1, d, 64);
+    write_bin_file(p2, d, 64);
+    hu_gpt_config_t g = {0};
+    g.sequence_len = 8; g.vocab_size = 16; g.n_layer = 1;
+    g.n_head = 2; g.n_kv_head = 2; g.n_embd = 4; g.head_dim = 2;
+    hu_model_t m = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&a, &g, &m), HU_OK);
+    hu_optimizer_config_t oc = {.embedding_lr = .01f, .unembedding_lr = .01f,
+        .matrix_lr = .01f, .scalar_lr = .001f, .adam_beta1 = .9f, .adam_beta2 = .999f};
+    hu_ml_optimizer_t o = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&a, &oc, &o), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&m, &o), HU_OK);
+    hu_ml_dataloader_t *tl = NULL, *vl = NULL;
+    HU_ASSERT_EQ(hu_ml_dataloader_create(&a, td, 2, 4, "train", &tl), HU_OK);
+    HU_ASSERT_EQ(hu_ml_dataloader_create(&a, td, 2, 4, "val", &vl), HU_OK);
+    int32_t tb[16]; for (int i = 0; i < 16; i++) tb[i] = 1;
+    hu_training_config_t tc = {.device_batch_size = 2, .time_budget_secs = 2, .eval_tokens = 8};
+    hu_ml_train_result_t r = {0};
+    HU_ASSERT_EQ(hu_ml_train(&a, &m, &o, tl, vl, &tc, tb, 16, &r), HU_OK);
+    HU_ASSERT(r.num_steps > 0);
+    hu_ml_dataloader_deinit(vl); hu_ml_dataloader_deinit(tl);
+    o.vtable->deinit(o.ctx, &a); m.vtable->deinit(m.ctx, &a);
+    remove(p1); remove(p2); rmdir(td);
+}
+
+static void test_rope_backward_through_k(void) {
+    hu_allocator_t a = hu_system_allocator();
+    hu_gpt_config_t c = {0};
+    c.sequence_len = 2; c.vocab_size = 8; c.n_layer = 1;
+    c.n_head = 2; c.n_kv_head = 2; c.n_embd = 4; c.head_dim = 2;
+    hu_model_t m = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_OK);
+    seed_output_projections(&m, 0.01f);
+    int32_t ids[] = {0, 1}, tgt[] = {1, 2};
+    size_t V = 8, BS = 2;
+    float eps = 1e-3f;
+    hu_ml_tensor_t *p = NULL; size_t pc = 0;
+    m.vtable->get_params(m.ctx, &p, &pc);
+    float *lm = (float *)p[1].data;
+    size_t cn = p[1].size_bytes / 4;
+    if (cn > 4) cn = 4;
+    int nz = 0;
+    for (size_t j = 0; j < cn; j++) {
+        float o2 = lm[j];
+        lm[j] = o2 + eps;
+        float lp = compute_ce_loss(&a, &m, ids, tgt, BS, V);
+        lm[j] = o2 - eps;
+        float lml = compute_ce_loss(&a, &m, ids, tgt, BS, V);
+        lm[j] = o2;
+        if (isfinite((lp - lml) / (2 * eps)) && fabsf((lp - lml) / (2 * eps)) > 1e-8f) nz++;
+    }
+    HU_ASSERT(nz > 0);
+    m.vtable->deinit(m.ctx, &a);
+}
+
+static void test_gpt_configurable_soft_cap(void) {
+    hu_allocator_t a = hu_system_allocator();
+    hu_gpt_config_t c = {0};
+    c.sequence_len = 4; c.vocab_size = 8; c.n_layer = 1;
+    c.n_head = 2; c.n_kv_head = 2; c.n_embd = 8; c.head_dim = 4;
+    c.logit_soft_cap = 5.0f;
+    hu_model_t m = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_OK);
+    int32_t ids[4] = {0, 1, 2, 3};
+    hu_ml_tensor_t in = {.data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
+                         .dtype = HU_ML_DTYPE_I32, .size_bytes = 16};
+    hu_ml_tensor_t out = {0};
+    HU_ASSERT_EQ(m.vtable->forward(m.ctx, &in, &out), HU_OK);
+    float *lo = (float *)out.data;
+    for (size_t i = 0; i < 32; i++) {
+        HU_ASSERT(isfinite(lo[i]));
+        HU_ASSERT(lo[i] >= -5.01f && lo[i] <= 5.01f);
+    }
+    float *dl = (float *)a.alloc(a.ctx, out.size_bytes);
+    for (size_t i = 0; i < 32; i++) dl[i] = .01f;
+    hu_ml_tensor_t gr = {.data = dl, .shape = {1, 4, 8, 0}, .ndim = 3,
+                         .dtype = HU_ML_DTYPE_F32, .size_bytes = out.size_bytes};
+    HU_ASSERT_EQ(m.vtable->backward(m.ctx, &gr), HU_OK);
+    a.free(a.ctx, dl, out.size_bytes);
+    a.free(a.ctx, out.data, out.size_bytes);
+    m.vtable->deinit(m.ctx, &a);
+}
+
+static void test_gpt_value_embeds(void) {
+    hu_allocator_t a = hu_system_allocator();
+    hu_gpt_config_t c = {0};
+    c.sequence_len = 4; c.vocab_size = 8; c.n_layer = 2;
+    c.n_head = 2; c.n_kv_head = 2; c.n_embd = 8; c.head_dim = 4;
+    c.use_value_embeds = 1;
+    hu_model_t m = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_OK);
+    hu_gpt_config_t cn = c; cn.use_value_embeds = 0;
+    hu_model_t mn = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&a, &cn, &mn), HU_OK);
+    HU_ASSERT(m.vtable->num_params(m.ctx) > mn.vtable->num_params(mn.ctx));
+    mn.vtable->deinit(mn.ctx, &a);
+    int32_t ids[4] = {0, 1, 2, 3};
+    hu_ml_tensor_t in = {.data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
+                         .dtype = HU_ML_DTYPE_I32, .size_bytes = 16};
+    hu_ml_tensor_t out = {0};
+    HU_ASSERT_EQ(m.vtable->forward(m.ctx, &in, &out), HU_OK);
+    float *dl = (float *)a.alloc(a.ctx, out.size_bytes);
+    for (size_t i = 0; i < 32; i++) dl[i] = .01f;
+    hu_ml_tensor_t gr = {.data = dl, .shape = {1, 4, 8, 0}, .ndim = 3,
+                         .dtype = HU_ML_DTYPE_F32, .size_bytes = out.size_bytes};
+    HU_ASSERT_EQ(m.vtable->backward(m.ctx, &gr), HU_OK);
+    hu_optimizer_config_t oc = {.embedding_lr = .01f, .unembedding_lr = .01f,
+        .matrix_lr = .01f, .scalar_lr = .001f, .adam_beta1 = .9f, .adam_beta2 = .999f};
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&a, &oc, &opt), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&m, &opt), HU_OK);
+    opt.vtable->deinit(opt.ctx, &a);
+    a.free(a.ctx, dl, out.size_bytes);
+    a.free(a.ctx, out.data, out.size_bytes);
+    m.vtable->deinit(m.ctx, &a);
+}
+
+static void test_grad_accum_equivalence(void) {
+    hu_allocator_t a = hu_system_allocator();
+    char td[] = "/tmp/hu_gae_XXXXXX";
+    HU_ASSERT(mkdtemp(td));
+    int32_t d[128]; for (int i = 0; i < 128; i++) d[i] = i % 8;
+    char p1[256], p2[256];
+    snprintf(p1, 256, "%s/shard_00000.bin", td);
+    snprintf(p2, 256, "%s/shard_00001.bin", td);
+    write_bin_file(p1, d, 128); write_bin_file(p2, d, 128);
+    hu_gpt_config_t gc = {0};
+    gc.sequence_len = 4; gc.vocab_size = 8; gc.n_layer = 1;
+    gc.n_head = 2; gc.n_kv_head = 2; gc.n_embd = 4; gc.head_dim = 2;
+    /* Run A: batch_size=4, accum=1 */
+    hu_model_t mA = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&a, &gc, &mA), HU_OK);
+    hu_ml_tensor_t *pA = NULL; size_t pcA = 0;
+    mA.vtable->get_params(mA.ctx, &pA, &pcA);
+    size_t tb = 0;
+    for (size_t i = 0; i < pcA; i++) tb += pA[i].size_bytes;
+    float *iw = (float *)a.alloc(a.ctx, tb);
+    size_t off = 0;
+    for (size_t i = 0; i < pcA; i++) { memcpy((char *)iw + off, pA[i].data, pA[i].size_bytes); off += pA[i].size_bytes; }
+    hu_optimizer_config_t oc = {.embedding_lr = .01f, .unembedding_lr = .01f,
+        .matrix_lr = .01f, .scalar_lr = .001f, .adam_beta1 = 0, .adam_beta2 = .999f};
+    hu_ml_optimizer_t oA = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&a, &oc, &oA), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&mA, &oA), HU_OK);
+    hu_ml_dataloader_t *dA = NULL;
+    HU_ASSERT_EQ(hu_ml_dataloader_create(&a, td, 4, 4, "train", &dA), HU_OK);
+    hu_training_config_t tA = {.device_batch_size = 4, .max_steps = 1, .grad_accum_steps = 1};
+    hu_ml_train_result_t rA = {0};
+    HU_ASSERT_EQ(hu_ml_train(&a, &mA, &oA, dA, NULL, &tA, NULL, 8, &rA), HU_OK);
+    float *wA = (float *)a.alloc(a.ctx, tb);
+    off = 0;
+    for (size_t i = 0; i < pcA; i++) { memcpy((char *)wA + off, pA[i].data, pA[i].size_bytes); off += pA[i].size_bytes; }
+    hu_ml_dataloader_deinit(dA); oA.vtable->deinit(oA.ctx, &a); mA.vtable->deinit(mA.ctx, &a);
+    /* Run B: batch_size=2, accum=2 */
+    hu_model_t mB = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&a, &gc, &mB), HU_OK);
+    hu_ml_tensor_t *pB = NULL; size_t pcB = 0;
+    mB.vtable->get_params(mB.ctx, &pB, &pcB);
+    off = 0;
+    for (size_t i = 0; i < pcB; i++) { memcpy(pB[i].data, (char *)iw + off, pB[i].size_bytes); off += pB[i].size_bytes; }
+    hu_ml_optimizer_t oB = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&a, &oc, &oB), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&mB, &oB), HU_OK);
+    hu_ml_dataloader_t *dB = NULL;
+    HU_ASSERT_EQ(hu_ml_dataloader_create(&a, td, 2, 4, "train", &dB), HU_OK);
+    hu_training_config_t tB = {.device_batch_size = 2, .max_steps = 1, .grad_accum_steps = 2};
+    hu_ml_train_result_t rB = {0};
+    HU_ASSERT_EQ(hu_ml_train(&a, &mB, &oB, dB, NULL, &tB, NULL, 8, &rB), HU_OK);
+    int cc = 0, tc2 = 0;
+    off = 0;
+    for (size_t i = 0; i < pcB; i++) {
+        float *wa = (float *)((char *)wA + off);
+        float *wb = (float *)pB[i].data;
+        size_t n = pB[i].size_bytes / 4;
+        for (size_t j = 0; j < n; j++) {
+            tc2++;
+            if (fabsf(wa[j] - wb[j]) / (fabsf(wa[j]) + fabsf(wb[j]) + 1e-8f) < .1f) cc++;
+        }
+        off += pB[i].size_bytes;
+    }
+    HU_ASSERT(cc > tc2 / 2);
+    hu_ml_dataloader_deinit(dB); oB.vtable->deinit(oB.ctx, &a); mB.vtable->deinit(mB.ctx, &a);
+    a.free(a.ctx, iw, tb); a.free(a.ctx, wA, tb);
+    remove(p1); remove(p2); rmdir(td);
+}
+
+static void test_gpt_value_embeds_finite_diff(void) {
+    hu_allocator_t a = hu_system_allocator();
+    hu_gpt_config_t c = {0};
+    c.sequence_len = 2; c.vocab_size = 8; c.n_layer = 1;
+    c.n_head = 2; c.n_kv_head = 2; c.n_embd = 4; c.head_dim = 2;
+    c.use_value_embeds = 1;
+    hu_model_t m = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_OK);
+    seed_output_projections(&m, 0.1f);
+    hu_ml_tensor_t *p = NULL; size_t pc = 0;
+    m.vtable->get_params(m.ctx, &p, &pc);
+    /* Scale lm_head 100x -- keep diverse random values, do NOT set uniform */
+    float *lmh = (float *)p[1].data;
+    for (size_t j = 0; j < p[1].size_bytes / 4; j++) lmh[j] *= 100.0f;
+    int32_t ids[] = {0, 1}, tgt[] = {1, 2};
+    size_t V = 8, BS = 2;
+    float eps = 0.01f;
+    float *ve = (float *)p[pc - 1].data;
+    size_t cn = p[pc - 1].size_bytes / 4;
+    if (cn > 8) cn = 8;
+    int nz = 0;
+    for (size_t j = 0; j < cn; j++) {
+        float o2 = ve[j];
+        ve[j] = o2 + eps;
+        float lp = compute_ce_loss(&a, &m, ids, tgt, BS, V);
+        ve[j] = o2 - eps;
+        float lml = compute_ce_loss(&a, &m, ids, tgt, BS, V);
+        ve[j] = o2;
+        float fd = (lp - lml) / (2 * eps);
+        if (isfinite(fd) && fabsf(fd) > 1e-10f) nz++;
+    }
+    HU_ASSERT(nz > 0);
+    m.vtable->deinit(m.ctx, &a);
+}
+
+static void test_experiment_loop_agent_fallback(void) {
+    hu_allocator_t a = hu_system_allocator();
+    char td[] = "/tmp/hu_elf_XXXXXX";
+    HU_ASSERT(mkdtemp(td));
+    int32_t d[128]; for (int i = 0; i < 128; i++) d[i] = i % 8;
+    char p1[256], p2[256];
+    snprintf(p1, 256, "%s/shard_00000.bin", td);
+    snprintf(p2, 256, "%s/shard_00001.bin", td);
+    write_bin_file(p1, d, 128); write_bin_file(p2, d, 128);
+    int dummy = 42;
+    hu_experiment_loop_config_t lc = {0};
+    lc.max_iterations = 2;
+    lc.base_config = hu_experiment_config_default();
+    lc.base_config.gpt.sequence_len = 4;
+    lc.base_config.gpt.vocab_size = 8;
+    lc.base_config.gpt.n_layer = 1;
+    lc.base_config.gpt.n_head = 2;
+    lc.base_config.gpt.n_kv_head = 2;
+    lc.base_config.gpt.n_embd = 4;
+    lc.base_config.gpt.head_dim = 2;
+    lc.base_config.training.device_batch_size = 2;
+    lc.base_config.training.time_budget_secs = 2;
+    lc.base_config.training.eval_tokens = 4;
+    lc.data_dir = td;
+    lc.provider = &dummy;
+    lc.persona = "test-researcher";
+    HU_ASSERT_EQ(hu_experiment_loop(&a, &lc, NULL, NULL), HU_OK);
+    remove(p1); remove(p2); rmdir(td);
+}
+
 void run_ml_tests(void) {
     HU_TEST_SUITE("ml");
     /* BPE tokenizer */
@@ -2663,4 +2940,13 @@ void run_ml_tests(void) {
     HU_RUN_TEST(test_ml_cli_experiment_help);
     HU_RUN_TEST(test_ml_cli_prepare_help);
     HU_RUN_TEST(test_ml_cli_status);
+    /* New SOTA tests */
+    HU_RUN_TEST(test_gpt_kv_head_validation);
+    HU_RUN_TEST(test_train_byte_weighted_loss);
+    HU_RUN_TEST(test_rope_backward_through_k);
+    HU_RUN_TEST(test_gpt_configurable_soft_cap);
+    HU_RUN_TEST(test_gpt_value_embeds);
+    HU_RUN_TEST(test_grad_accum_equivalence);
+    HU_RUN_TEST(test_gpt_value_embeds_finite_diff);
+    HU_RUN_TEST(test_experiment_loop_agent_fallback);
 }

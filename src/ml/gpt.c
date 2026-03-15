@@ -67,6 +67,7 @@ typedef struct hu_gpt {
     float *grad_wte, *grad_lm_head;
     float **grad_aqw, **grad_akw, **grad_avw, **grad_aow, **grad_muw, **grad_mdw;
     float *grad_rl, *grad_x0l;
+    float **val_embed, **grad_val_embed;
     gpt_cache_t cache;
     size_t total_params;
     hu_ml_tensor_t *param_descs;
@@ -425,20 +426,26 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
         gpt_lcache_t *lc = &c->layers[li];
         memcpy(lc->x_pre, x, xsz);
 
-        /* a. Residual mixing */
+        /* a. Per-layer value embedding */
+        if (cfg->use_value_embeds && g->val_embed) {
+            matmul_atb(x0, c->x_embed, g->val_embed[li], (int)(B * S), (int)E, (int)E);
+            for (size_t i = 0; i < B * S; i++) rms_norm(x0 + i * E, x0 + i * E, E);
+        }
+
+        /* b. Residual mixing */
         float rlv = g->rl[li], x0v = g->x0l[li];
         for (size_t i = 0; i < B * S * E; i++) x[i] = rlv * x[i] + x0v * x0[i];
 
-        /* b. First RMS norm */
+        /* c. First RMS norm */
         for (size_t i = 0; i < B * S; i++) rms_norm(xn + i * E, x + i * E, E);
         memcpy(lc->x_norm1, xn, xsz);
 
-        /* c. Q, K, V projections (output in [B*S × n_head*hd]) */
+        /* d. Q, K, V projections (output in [B*S × n_head*hd]) */
         matmul_atb(q_buf, xn, g->aqw[li], (int)(B * S), (int)(nh * hd), (int)E);
         matmul_atb(k_buf, xn, g->akw[li], (int)(B * S), (int)(nkv * hd), (int)E);
         matmul_atb(v_buf, xn, g->avw[li], (int)(B * S), (int)(nkv * hd), (int)E);
 
-        /* d. RoPE + Q/K head normalization (cache 1/||x|| for backward) */
+        /* e. RoPE + Q/K head normalization (cache 1/||x|| for backward) */
         apply_rope(q_buf, k_buf, g->rcos, g->rsin, (int)B, (int)S, (int)nh, (int)nkv, (int)hd);
         head_norm(q_buf, lc->q_norm_inv, (int)B, (int)S, (int)nh, (int)hd);
         head_norm(k_buf, lc->k_norm_inv, (int)B, (int)S, (int)nkv, (int)hd);
@@ -446,7 +453,7 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
         memcpy(lc->k, k_buf, B * nkv * S * hd * sizeof(float));
         memcpy(lc->v, v_buf, B * nkv * S * hd * sizeof(float));
 
-        /* e. Causal self-attention — scores written directly to cache */
+        /* f. Causal self-attention — scores written directly to cache */
         float scale = 1.0f / sqrtf((float)hd);
         size_t win = layer_window_size(cfg, li);
         memset(ao, 0, xsz);
@@ -478,7 +485,7 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
             }
         memcpy(lc->attn_out, ao, xsz);
 
-        /* f. Output projection: proj = ao @ W_o^T */
+        /* g. Output projection: proj = ao @ W_o^T */
         float *proj = (float *)a->alloc(a->ctx, xsz);
         if (!proj) {
             a->free(a->ctx, x, xsz); a->free(a->ctx, x0, xsz); a->free(a->ctx, xn, xsz);
@@ -489,22 +496,22 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
         }
         matmul_atb(proj, ao, g->aow[li], (int)(B * S), (int)E, (int)(nh * hd));
 
-        /* g. Attention residual */
+        /* h. Attention residual */
         for (size_t i = 0; i < B * S * E; i++) x[i] += proj[i];
         a->free(a->ctx, proj, xsz);
         memcpy(lc->x_post_attn, x, xsz);
 
-        /* h. Second RMS norm */
+        /* i. Second RMS norm */
         for (size_t i = 0; i < B * S; i++) rms_norm(xn + i * E, x + i * E, E);
         memcpy(lc->x_norm2, xn, xsz);
 
-        /* i. MLP: up, activation, down */
+        /* j. MLP: up, activation, down */
         matmul_atb(up_buf, xn, g->muw[li], (int)(B * S), (int)nm, (int)E);
         memcpy(lc->up_pre, up_buf, B * S * nm * sizeof(float));
         apply_activation(up_buf, B * S * nm, cfg->activation);
         matmul_atb(mo, up_buf, g->mdw[li], (int)(B * S), (int)E, (int)nd);
 
-        /* j. MLP residual */
+        /* k. MLP residual */
         for (size_t i = 0; i < B * S * E; i++) x[i] += mo[i];
     }
 
@@ -526,7 +533,10 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
     matmul_atb(logits, x, g->lm_head, (int)(B * S), (int)V, (int)E);
 
     /* 6. Soft-cap */
-    for (size_t i = 0; i < B * S * V; i++) logits[i] = 15.0f * tanhf(logits[i] / 15.0f);
+    {
+        float sc = cfg->logit_soft_cap > 0.0f ? cfg->logit_soft_cap : 30.0f;
+        for (size_t i = 0; i < B * S * V; i++) logits[i] = sc * tanhf(logits[i] / sc);
+    }
     memcpy(c->logits, logits, lsz);
 
     output->data = logits;
@@ -736,12 +746,32 @@ static hu_error_t gpt_backward(void *ctx, const hu_ml_tensor_t *grad_output)
             rms_norm_bw(dx + i * E, d_xn + i * E,
                         x_mixed + i * E, lc->x_norm1 + i * E, E);
 
+        /* Recompute x0 for this layer (value embed or cached) */
+        if (cfg->use_value_embeds && g->val_embed) {
+            matmul_atb(x_mixed, c->x_embed, g->val_embed[li], (int)BS, (int)E, (int)E);
+            for (size_t i = 0; i < BS; i++) rms_norm(x_mixed + i * E, x_mixed + i * E, E);
+        }
+
         /* Resid lambda backward: x_mixed = rl*x_pre + x0l*x0 */
         for (size_t i = 0; i < BS * E; i++) {
+            float x0i = (cfg->use_value_embeds && g->val_embed) ? x_mixed[i] : c->x0[i];
             g->grad_rl[li] += dx[i] * lc->x_pre[i];
-            g->grad_x0l[li] += dx[i] * c->x0[i];
+            g->grad_x0l[li] += dx[i] * x0i;
             d_x0[i] += x0v * dx[i];
             dx[i] *= rlv;
+        }
+
+        /* Value embedding gradient */
+        if (cfg->use_value_embeds && g->grad_val_embed) {
+            float *d_x0_layer = (float *)a->alloc(a->ctx, xsz);
+            if (d_x0_layer) {
+                memset(d_x0_layer, 0, xsz);
+                for (size_t i = 0; i < BS; i++)
+                    rms_norm_bw(d_x0_layer + i * E, d_x0 + i * E,
+                                x_mixed + i * E, x_mixed + i * E, E);
+                matmul_add_tab(g->grad_val_embed[li], c->x_embed, d_x0_layer, (int)BS, (int)E, (int)E);
+                a->free(a->ctx, d_x0_layer, xsz);
+            }
         }
     }
 
@@ -846,6 +876,14 @@ static void gpt_deinit(void *ctx, hu_allocator_t *alloc)
     FP(g->grad_aqw, L*sizeof(float*)); FP(g->grad_akw, L*sizeof(float*));
     FP(g->grad_avw, L*sizeof(float*)); FP(g->grad_aow, L*sizeof(float*));
     FP(g->grad_muw, L*sizeof(float*)); FP(g->grad_mdw, L*sizeof(float*));
+    if (g->val_embed) {
+        for (size_t i = 0; i < L; i++) FP(g->val_embed[i], E*E*4);
+        FP(g->val_embed, L*sizeof(float*));
+    }
+    if (g->grad_val_embed) {
+        for (size_t i = 0; i < L; i++) FP(g->grad_val_embed[i], E*E*4);
+        FP(g->grad_val_embed, L*sizeof(float*));
+    }
     FP(g->rl, L*4); FP(g->x0l, L*4);
     FP(g->grad_rl, L*4); FP(g->grad_x0l, L*4);
     size_t rope_len = cfg->sequence_len * (hd / 2);
@@ -892,6 +930,9 @@ hu_error_t hu_gpt_create(hu_allocator_t *alloc, const hu_gpt_config_t *config,
     if (config->n_embd != config->n_head * config->head_dim)
         return HU_ERR_INVALID_ARGUMENT;
     if (config->head_dim % 2 != 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (config->n_kv_head == 0 || config->n_kv_head > config->n_head ||
+        config->n_head % config->n_kv_head != 0)
         return HU_ERR_INVALID_ARGUMENT;
 
     hu_gpt_t *g = (hu_gpt_t *)alloc->alloc(alloc->ctx, sizeof(hu_gpt_t));
@@ -952,6 +993,19 @@ hu_error_t hu_gpt_create(hu_allocator_t *alloc, const hu_gpt_config_t *config,
         g->x0l[i] = 0.1f;    /* autoresearch: fill_(0.1) */
     }
 
+    /* Per-layer value embeddings (optional) */
+    if (config->use_value_embeds) {
+        GAP(g->val_embed, L);
+        GAP(g->grad_val_embed, L);
+        for (size_t i = 0; i < L; i++) {
+            GA(g->val_embed[i], E*E);
+            GA(g->grad_val_embed[i], E*E);
+            memset(g->grad_val_embed[i], 0, E*E*4);
+            for (size_t j = 0; j < E*E; j++)
+                g->val_embed[i][j] = (j / E == j % E) ? 1.0f : prng_next(&seed) * tf_sc * 0.01f;
+        }
+    }
+
     size_t rope_len = config->sequence_len * (hd / 2);
     GA(g->rcos, rope_len); GA(g->rsin, rope_len);
     precompute_rope(g->rcos, g->rsin, config->sequence_len, hd, config->rope_theta);
@@ -960,9 +1014,10 @@ hu_error_t hu_gpt_create(hu_allocator_t *alloc, const hu_gpt_config_t *config,
     g->total_params += L * (nh*hd*E + nkv*hd*E*2 + E*nh*hd);
     g->total_params += L * (nm*E + E*nd);
     g->total_params += L * 2;
+    if (config->use_value_embeds) g->total_params += L * E * E;
 
     /* Build param descriptor array for get_params / checkpoint */
-    g->param_desc_count = 2 + L * 8;
+    g->param_desc_count = 2 + L * (8 + (config->use_value_embeds ? 1 : 0));
     g->param_descs = (hu_ml_tensor_t *)alloc->alloc(alloc->ctx,
         g->param_desc_count * sizeof(hu_ml_tensor_t));
     if (!g->param_descs) goto fail;
@@ -990,6 +1045,9 @@ hu_error_t hu_gpt_create(hu_allocator_t *alloc, const hu_gpt_config_t *config,
                 .shape = {1, 1, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_F32};
             g->param_descs[pi++] = (hu_ml_tensor_t){.data = &g->x0l[i], .size_bytes = 4,
                 .shape = {1, 1, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_F32};
+            if (config->use_value_embeds && g->val_embed)
+                g->param_descs[pi++] = (hu_ml_tensor_t){.data = g->val_embed[i],
+                    .size_bytes = E*E*4, .shape = {E, E, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_F32};
         }
     }
 
@@ -1039,6 +1097,10 @@ hu_error_t hu_gpt_register_params(hu_model_t *model, struct hu_ml_optimizer *opt
         if (err != HU_OK) return err;
         err = hu_muon_adamw_add_param(opt, &g->x0l[i], &g->grad_x0l[i], 1, 1, HU_PARAM_SCALAR);
         if (err != HU_OK) return err;
+        if (cfg->use_value_embeds && g->val_embed) {
+            err = hu_muon_adamw_add_param(opt, g->val_embed[i], g->grad_val_embed[i], E, E, HU_PARAM_MATRIX);
+            if (err != HU_OK) return err;
+        }
     }
     return HU_OK;
 }

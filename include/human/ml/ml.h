@@ -39,6 +39,8 @@ typedef struct hu_gpt_config {
     char window_pattern[8];
     hu_ml_activation_t activation;
     float rope_theta;
+    float logit_soft_cap;       /* Soft-cap for logits (0 = default 30.0) */
+    int use_value_embeds;       /* Per-layer value embeddings for x0 (0 = shared) */
 } hu_gpt_config_t;
 
 typedef struct hu_optimizer_config {

@@ -168,6 +168,7 @@ hu_experiment_config_t hu_experiment_config_default(void)
     c.gpt.head_dim = 128;
     memcpy(c.gpt.window_pattern, "SSSL", 5);
     c.gpt.activation = HU_ML_ACT_RELU_SQ;
+    c.gpt.logit_soft_cap = 30.0f;
 
     c.optimizer.embedding_lr = 0.6f;
     c.optimizer.unembedding_lr = 0.004f;

@@ -16,7 +16,9 @@
 #include "human/ml/tokenizer_ml.h"
 #include "human/ml/train.h"
 #include "human/ml/experiment_store.h"
+#include "human/provider.h"
 #include <math.h>
+#include <stdlib.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -68,6 +70,72 @@ static uint32_t xorshift32(uint32_t *state)
     x ^= x << 5;
     *state = x;
     return x;
+}
+
+
+#ifndef HU_IS_TEST
+/* Parse key=value from agent response and apply to config */
+static void apply_agent_kv(hu_experiment_config_t *cfg, const char *key, const char *val)
+{
+    if (!cfg || !key || !val) return;
+    if (strcmp(key, "n_layer") == 0) { int v = atoi(val); if (v > 0 && v <= 64) cfg->gpt.n_layer = (size_t)v; }
+    else if (strcmp(key, "n_embd") == 0) { int v = atoi(val); if (v > 0 && v <= 4096 && (size_t)v % cfg->gpt.head_dim == 0) { cfg->gpt.n_embd = (size_t)v; cfg->gpt.n_head = (size_t)v / cfg->gpt.head_dim; cfg->gpt.n_kv_head = cfg->gpt.n_head; } }
+    else if (strcmp(key, "matrix_lr") == 0) { float v = (float)atof(val); if (v > 0 && v < 1.0f) cfg->optimizer.matrix_lr = v; }
+    else if (strcmp(key, "embedding_lr") == 0) { float v = (float)atof(val); if (v > 0 && v < 10.0f) cfg->optimizer.embedding_lr = v; }
+    else if (strcmp(key, "weight_decay") == 0) { float v = (float)atof(val); if (v >= 0 && v < 1.0f) cfg->optimizer.weight_decay = v; }
+    else if (strcmp(key, "activation") == 0) {
+        if (strcmp(val, "relu_sq") == 0) cfg->gpt.activation = HU_ML_ACT_RELU_SQ;
+        else if (strcmp(val, "gelu") == 0) cfg->gpt.activation = HU_ML_ACT_GELU;
+        else if (strcmp(val, "swiglu") == 0) cfg->gpt.activation = HU_ML_ACT_SWIGLU;
+    }
+}
+#endif /* !HU_IS_TEST */
+
+/* Ask the provider for a config mutation suggestion */
+static int agent_suggest_mutation(hu_allocator_t *alloc, hu_experiment_config_t *cfg,
+                                  void *provider_ptr, const char *persona,
+                                  const hu_experiment_result_t *last_result)
+{
+#ifdef HU_IS_TEST
+    (void)alloc; (void)cfg; (void)provider_ptr; (void)persona; (void)last_result;
+    return 0;
+#else
+    if (!provider_ptr || !alloc) return 0;
+    hu_provider_t *prov = (hu_provider_t *)provider_ptr;
+    if (!prov->vtable || !prov->vtable->chat_with_system) return 0;
+
+    char sys_prompt[1024];
+    snprintf(sys_prompt, sizeof(sys_prompt),
+             "You are %s, an AI research assistant. Suggest ONE config mutation as key=value. "
+             "Keys: n_layer, n_embd, matrix_lr, embedding_lr, weight_decay, activation. "
+             "Current: n_layer=%zu n_embd=%zu lr=%.4f bpb=%.4f",
+             persona ? persona : "researcher",
+             cfg->gpt.n_layer, cfg->gpt.n_embd,
+             cfg->optimizer.matrix_lr,
+             last_result ? last_result->val_bpb : 0.0);
+
+    char *response = NULL;
+    size_t resp_len = 0;
+    hu_error_t err = prov->vtable->chat_with_system(
+        prov->ctx, alloc, sys_prompt, strlen(sys_prompt),
+        "Suggest a mutation.", 19, NULL, 0, 0.7, &response, &resp_len);
+    if (err != HU_OK || !response) return 0;
+
+    /* Parse key=value from response */
+    char *eq = strchr(response, '=');
+    if (eq && eq > response) {
+        *eq = '\0';
+        char *key = response;
+        while (*key == ' ') key++;
+        char *val = eq + 1;
+        while (*val == ' ') val++;
+        char *end = val + strlen(val) - 1;
+        while (end > val && (*end == '\n' || *end == ' ')) *end-- = '\0';
+        apply_agent_kv(cfg, key, val);
+    }
+    alloc->free(alloc->ctx, response, resp_len);
+    return 1;
+#endif
 }
 
 /* Apply a mutation to the config for the next experiment.
@@ -263,7 +331,12 @@ hu_error_t hu_experiment_loop(hu_allocator_t *alloc,
         result.iteration = i;
 
         if (i > 0) {
-            mutate_config(&current_config, i);
+            int used_agent = 0;
+            if (config->provider)
+                used_agent = agent_suggest_mutation(alloc, &current_config,
+                    config->provider, config->persona, (i > 0) ? &result : NULL);
+            if (!used_agent)
+                mutate_config(&current_config, i);
             current_config.optimizer.n_embd = current_config.gpt.n_embd;
         }
 
