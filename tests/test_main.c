@@ -248,7 +248,9 @@ void run_emotion_map_tests(void);
 #ifdef HU_ENABLE_ML
 void run_ml_tests(void);
 void run_lora_tests(void);
+void run_agent_trainer_tests(void);
 #endif
+void run_training_data_tests(void);
 void run_multigraph_tests(void);
 void run_memory_graph_tests(void);
 void run_experience_tests(void);
@@ -262,7 +264,9 @@ void run_corrective_rag_tests(void);
 void run_otel_tests(void);
 void run_cot_audit_tests(void);
 void run_moderation_tests(void);
+void run_code_sandbox_tests(void);
 void run_computer_use_tests(void);
+void run_gui_agent_tests(void);
 void run_lsp_tests(void);
 void run_webrtc_tests(void);
 void run_embedded_provider_tests(void);
@@ -543,7 +547,9 @@ int main(int argc, char **argv) {
 #ifdef HU_ENABLE_ML
     run_ml_tests();
     run_lora_tests();
+    run_agent_trainer_tests();
 #endif
+    run_training_data_tests();
 
     run_experience_tests();
     run_experience_engine_tests();
@@ -556,7 +562,9 @@ int main(int argc, char **argv) {
     run_otel_tests();
     run_cot_audit_tests();
     run_moderation_tests();
+    run_code_sandbox_tests();
     run_computer_use_tests();
+    run_gui_agent_tests();
     run_lsp_tests();
     run_webrtc_tests();
     run_embedded_provider_tests();

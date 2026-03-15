@@ -32,10 +32,12 @@
 #endif
 #include "human/tools/delegate.h"
 #include "human/tools/diff.h"
+#include "human/tools/code_sandbox.h"
 #include "human/tools/file_append.h"
 #include "human/tools/file_edit.h"
 #include "human/tools/file_read.h"
 #include "human/tools/file_write.h"
+#include "human/tools/gui_agent.h"
 #include "human/tools/git.h"
 #ifdef HU_HAS_PERIPHERALS
 #include "human/tools/hardware_info.h"
@@ -106,8 +108,8 @@
 #define HU_TOOLS_PERSONA_COUNT 0
 #endif
 #define HU_TOOLS_COUNT_BASE         \
-    (46 + HU_TOOLS_CRON_COUNT - 1 + \
-     HU_TOOLS_PERSONA_COUNT) /* 44 base + skill_run + pwa + save_for_later + homeassistant + persona(0|1) + cron */
+    (48 + HU_TOOLS_CRON_COUNT - 1 + \
+     HU_TOOLS_PERSONA_COUNT) /* 46 base + gui_agent + code_sandbox + skill_run + pwa + ... */
 #ifdef HU_HAS_TOOLS_BROWSER
 #define HU_TOOLS_BROWSER_COUNT 3
 #else
@@ -333,6 +335,16 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
 #endif
 
     err = hu_schema_create(alloc, &tools[idx]);
+    if (err != HU_OK)
+        goto fail;
+    idx++;
+
+    err = hu_gui_agent_create(alloc, &tools[idx]);
+    if (err != HU_OK)
+        goto fail;
+    idx++;
+
+    err = hu_code_sandbox_create(alloc, &tools[idx]);
     if (err != HU_OK)
         goto fail;
     idx++;

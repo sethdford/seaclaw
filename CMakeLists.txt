@@ -689,7 +689,9 @@ list(APPEND HU_CORE_SOURCES
     src/memory/corrective_rag.c
     src/security/cot_audit.c
     src/security/moderation.c
+    src/tools/code_sandbox.c
     src/tools/computer_use.c
+    src/tools/gui_agent.c
     src/tools/lsp.c
     src/voice/webrtc.c
     src/voice/realtime.c
@@ -877,7 +879,11 @@ if(HU_ENABLE_ML)
         src/ml/checkpoint.c
         src/ml/cli.c
         src/ml/lora.c
+        src/ml/agent_trainer.c
     )
+    if(HU_ENABLE_SQLITE)
+        list(APPEND HU_CORE_SOURCES src/ml/training_data.c)
+    endif()
 endif()
 
 # Data loader (always compiled)
@@ -1892,6 +1898,8 @@ set(HU_TEST_SOURCES
     tests/test_collab_planning.c
     tests/test_ml.c
     tests/test_lora.c
+    tests/test_training_data.c
+    tests/test_agent_trainer.c
     tests/test_otel_traces.c
     tests/test_mcp_transport.c
     tests/test_mcp_audit.c
@@ -1940,7 +1948,9 @@ list(APPEND HU_TEST_SOURCES
     tests/test_otel.c
     tests/test_cot_audit.c
     tests/test_moderation.c
+    tests/test_code_sandbox.c
     tests/test_computer_use.c
+    tests/test_gui_agent.c
     tests/test_lsp.c
     tests/test_webrtc.c
     tests/test_embedded_provider.c
