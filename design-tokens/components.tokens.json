@@ -2,19 +2,40 @@
   "$schema": "https://design-tokens.github.io/community-group/format/",
   "$extensions": {
     "com.human.platform": "all",
-    "com.human.version": "0.3.0"
+    "com.human.version": "0.5.0"
   },
   "$description": "Component-level token overrides — radius, padding, typography, min sizes",
   "sidebar": {
-    "width": { "$value": "240px", "$type": "dimension" },
-    "collapsed": { "$value": "52px", "$type": "dimension" }
+    "width": {
+      "$value": "240px",
+      "$type": "dimension"
+    },
+    "collapsed": {
+      "$value": "52px",
+      "$type": "dimension"
+    }
   },
   "button": {
-    "radius": { "$value": "{radius.md}", "$type": "dimension" },
-    "padding-x": { "$value": "{spacing.md}", "$type": "dimension" },
-    "padding-y": { "$value": "{spacing.sm}", "$type": "dimension" },
-    "font-size": { "$value": "{fontSize.sm}", "$type": "dimension" },
-    "font-weight": { "$value": "{fontWeight.medium}", "$type": "number" },
+    "radius": {
+      "$value": "{radius.md}",
+      "$type": "dimension"
+    },
+    "padding-x": {
+      "$value": "{spacing.md}",
+      "$type": "dimension"
+    },
+    "padding-y": {
+      "$value": "{spacing.sm}",
+      "$type": "dimension"
+    },
+    "font-size": {
+      "$value": "{fontSize.sm}",
+      "$type": "dimension"
+    },
+    "font-weight": {
+      "$value": "{fontWeight.medium}",
+      "$type": "number"
+    },
     "min-height": {
       "$value": "36px",
       "$type": "dimension",
@@ -22,84 +43,246 @@
     }
   },
   "card": {
-    "radius": { "$value": "{radius.lg}", "$type": "dimension" },
-    "padding": { "$value": "{spacing.lg}", "$type": "dimension" }
+    "radius": {
+      "$value": "{radius.lg}",
+      "$type": "dimension"
+    },
+    "padding": {
+      "$value": "{spacing.lg}",
+      "$type": "dimension"
+    }
   },
   "modal": {
-    "radius": { "$value": "{radius.xl}", "$type": "dimension" },
-    "padding": { "$value": "{spacing.xl}", "$type": "dimension" },
-    "max-width": { "$value": "480px", "$type": "dimension" }
+    "radius": {
+      "$value": "{radius.xl}",
+      "$type": "dimension"
+    },
+    "padding": {
+      "$value": "{spacing.xl}",
+      "$type": "dimension"
+    },
+    "max-width": {
+      "$value": "480px",
+      "$type": "dimension"
+    }
   },
   "badge": {
-    "radius": { "$value": "{radius.full}", "$type": "dimension" },
-    "padding-x": { "$value": "{spacing.sm}", "$type": "dimension" },
-    "padding-y": { "$value": "{spacing.xs}", "$type": "dimension" },
-    "font-size": { "$value": "{fontSize.xs}", "$type": "dimension" },
-    "font-weight": { "$value": "{fontWeight.medium}", "$type": "number" }
+    "radius": {
+      "$value": "{radius.full}",
+      "$type": "dimension"
+    },
+    "padding-x": {
+      "$value": "{spacing.sm}",
+      "$type": "dimension"
+    },
+    "padding-y": {
+      "$value": "{spacing.xs}",
+      "$type": "dimension"
+    },
+    "font-size": {
+      "$value": "{fontSize.xs}",
+      "$type": "dimension"
+    },
+    "font-weight": {
+      "$value": "{fontWeight.medium}",
+      "$type": "number"
+    }
   },
   "toast": {
-    "radius": { "$value": "{radius.lg}", "$type": "dimension" },
-    "padding": { "$value": "{spacing.md}", "$type": "dimension" },
-    "max-width": { "$value": "400px", "$type": "dimension" }
+    "radius": {
+      "$value": "{radius.lg}",
+      "$type": "dimension"
+    },
+    "padding": {
+      "$value": "{spacing.md}",
+      "$type": "dimension"
+    },
+    "max-width": {
+      "$value": "400px",
+      "$type": "dimension"
+    }
   },
   "input": {
-    "radius": { "$value": "{radius.md}", "$type": "dimension" },
-    "padding-x": { "$value": "{spacing.sm}", "$type": "dimension" },
-    "padding-y": { "$value": "{spacing.sm}", "$type": "dimension" },
-    "font-size": { "$value": "{fontSize.base}", "$type": "dimension" },
-    "min-height": { "$value": "40px", "$type": "dimension" }
+    "radius": {
+      "$value": "{radius.md}",
+      "$type": "dimension"
+    },
+    "padding-x": {
+      "$value": "{spacing.sm}",
+      "$type": "dimension"
+    },
+    "padding-y": {
+      "$value": "{spacing.sm}",
+      "$type": "dimension"
+    },
+    "font-size": {
+      "$value": "{fontSize.base}",
+      "$type": "dimension"
+    },
+    "min-height": {
+      "$value": "40px",
+      "$type": "dimension"
+    }
   },
   "tooltip": {
-    "radius": { "$value": "{radius.sm}", "$type": "dimension" },
-    "padding-x": { "$value": "{spacing.sm}", "$type": "dimension" },
-    "padding-y": { "$value": "{spacing.xs}", "$type": "dimension" },
-    "font-size": { "$value": "{fontSize.xs}", "$type": "dimension" },
-    "max-width": { "$value": "280px", "$type": "dimension" }
+    "radius": {
+      "$value": "{radius.sm}",
+      "$type": "dimension"
+    },
+    "padding-x": {
+      "$value": "{spacing.sm}",
+      "$type": "dimension"
+    },
+    "padding-y": {
+      "$value": "{spacing.xs}",
+      "$type": "dimension"
+    },
+    "font-size": {
+      "$value": "{fontSize.xs}",
+      "$type": "dimension"
+    },
+    "max-width": {
+      "$value": "280px",
+      "$type": "dimension"
+    }
   },
   "dropdown": {
-    "radius": { "$value": "{radius.lg}", "$type": "dimension" },
-    "padding": { "$value": "{spacing.xs}", "$type": "dimension" },
-    "item-padding-x": { "$value": "{spacing.sm}", "$type": "dimension" },
-    "item-padding-y": { "$value": "{spacing.xs}", "$type": "dimension" },
-    "item-radius": { "$value": "{radius.sm}", "$type": "dimension" },
-    "min-width": { "$value": "180px", "$type": "dimension" }
+    "radius": {
+      "$value": "{radius.lg}",
+      "$type": "dimension"
+    },
+    "padding": {
+      "$value": "{spacing.xs}",
+      "$type": "dimension"
+    },
+    "item-padding-x": {
+      "$value": "{spacing.sm}",
+      "$type": "dimension"
+    },
+    "item-padding-y": {
+      "$value": "{spacing.xs}",
+      "$type": "dimension"
+    },
+    "item-radius": {
+      "$value": "{radius.sm}",
+      "$type": "dimension"
+    },
+    "min-width": {
+      "$value": "180px",
+      "$type": "dimension"
+    }
   },
   "tabs": {
-    "padding-x": { "$value": "{spacing.md}", "$type": "dimension" },
-    "padding-y": { "$value": "{spacing.sm}", "$type": "dimension" },
-    "font-size": { "$value": "{fontSize.sm}", "$type": "dimension" },
-    "font-weight": { "$value": "{fontWeight.medium}", "$type": "number" },
-    "indicator-height": { "$value": "2px", "$type": "dimension" }
+    "padding-x": {
+      "$value": "{spacing.md}",
+      "$type": "dimension"
+    },
+    "padding-y": {
+      "$value": "{spacing.sm}",
+      "$type": "dimension"
+    },
+    "font-size": {
+      "$value": "{fontSize.sm}",
+      "$type": "dimension"
+    },
+    "font-weight": {
+      "$value": "{fontWeight.medium}",
+      "$type": "number"
+    },
+    "indicator-height": {
+      "$value": "2px",
+      "$type": "dimension"
+    }
   },
   "avatar": {
-    "size-sm": { "$value": "28px", "$type": "dimension" },
-    "size-md": { "$value": "36px", "$type": "dimension" },
-    "size-lg": { "$value": "48px", "$type": "dimension" },
-    "font-size": { "$value": "{fontSize.xs}", "$type": "dimension" },
-    "font-weight": { "$value": "{fontWeight.medium}", "$type": "number" }
+    "size-sm": {
+      "$value": "28px",
+      "$type": "dimension"
+    },
+    "size-md": {
+      "$value": "36px",
+      "$type": "dimension"
+    },
+    "size-lg": {
+      "$value": "48px",
+      "$type": "dimension"
+    },
+    "font-size": {
+      "$value": "{fontSize.xs}",
+      "$type": "dimension"
+    },
+    "font-weight": {
+      "$value": "{fontWeight.medium}",
+      "$type": "number"
+    }
   },
   "progress": {
-    "height": { "$value": "4px", "$type": "dimension" },
-    "radius": { "$value": "{radius.full}", "$type": "dimension" }
+    "height": {
+      "$value": "4px",
+      "$type": "dimension"
+    },
+    "radius": {
+      "$value": "{radius.full}",
+      "$type": "dimension"
+    }
   },
   "sheet": {
-    "radius": { "$value": "{radius.xl}", "$type": "dimension" },
-    "padding": { "$value": "{spacing.lg}", "$type": "dimension" },
-    "handle-width": { "$value": "36px", "$type": "dimension" },
-    "handle-height": { "$value": "4px", "$type": "dimension" }
+    "radius": {
+      "$value": "{radius.xl}",
+      "$type": "dimension"
+    },
+    "padding": {
+      "$value": "{spacing.lg}",
+      "$type": "dimension"
+    },
+    "handle-width": {
+      "$value": "36px",
+      "$type": "dimension"
+    },
+    "handle-height": {
+      "$value": "4px",
+      "$type": "dimension"
+    }
   },
   "command-palette": {
-    "radius": { "$value": "{radius.xl}", "$type": "dimension" },
-    "padding": { "$value": "{spacing.sm}", "$type": "dimension" },
-    "max-width": { "$value": "560px", "$type": "dimension" },
-    "item-padding-x": { "$value": "{spacing.md}", "$type": "dimension" },
-    "item-padding-y": { "$value": "{spacing.sm}", "$type": "dimension" },
-    "item-radius": { "$value": "{radius.md}", "$type": "dimension" }
+    "radius": {
+      "$value": "{radius.xl}",
+      "$type": "dimension"
+    },
+    "padding": {
+      "$value": "{spacing.sm}",
+      "$type": "dimension"
+    },
+    "max-width": {
+      "$value": "560px",
+      "$type": "dimension"
+    },
+    "item-padding-x": {
+      "$value": "{spacing.md}",
+      "$type": "dimension"
+    },
+    "item-padding-y": {
+      "$value": "{spacing.sm}",
+      "$type": "dimension"
+    },
+    "item-radius": {
+      "$value": "{radius.md}",
+      "$type": "dimension"
+    }
   },
   "floating-action-button": {
-    "size": { "$value": "56px", "$type": "dimension" },
-    "radius": { "$value": "{radius.xl}", "$type": "dimension" },
-    "icon-size": { "$value": "24px", "$type": "dimension" }
+    "size": {
+      "$value": "56px",
+      "$type": "dimension"
+    },
+    "radius": {
+      "$value": "{radius.xl}",
+      "$type": "dimension"
+    },
+    "icon-size": {
+      "$value": "24px",
+      "$type": "dimension"
+    }
   },
   "icon": {
     "xs": {

@@ -2,7 +2,7 @@
   "$schema": "https://design-tokens.github.io/community-group/format/",
   "$extensions": {
     "com.human.platform": "all",
-    "com.human.version": "0.3.0"
+    "com.human.version": "0.5.0"
   },
   "$description": "Motion tokens — duration, easing, spring, choreography, and purpose-based transitions",
   "duration": {
@@ -53,7 +53,10 @@
     }
   },
   "easing": {
-    "linear": { "$value": "linear", "$type": "cubicBezier" },
+    "linear": {
+      "$value": "linear",
+      "$type": "cubicBezier"
+    },
     "ease-out": {
       "$value": "cubic-bezier(0.16, 1, 0.3, 1)",
       "$type": "cubicBezier"
@@ -100,84 +103,186 @@
   "spring": {
     "$description": "Physics-based spring parameters for native platforms and JS animation libs",
     "micro": {
-      "stiffness": { "$value": 400, "$type": "number" },
-      "damping": { "$value": 30, "$type": "number" },
-      "mass": { "$value": 1, "$type": "number" },
+      "stiffness": {
+        "$value": 400,
+        "$type": "number"
+      },
+      "damping": {
+        "$value": 30,
+        "$type": "number"
+      },
+      "mass": {
+        "$value": 1,
+        "$type": "number"
+      },
       "$description": "Button press, toggle (~100ms settle)"
     },
     "standard": {
-      "stiffness": { "$value": 200, "$type": "number" },
-      "damping": { "$value": 20, "$type": "number" },
-      "mass": { "$value": 1, "$type": "number" },
+      "stiffness": {
+        "$value": 200,
+        "$type": "number"
+      },
+      "damping": {
+        "$value": 20,
+        "$type": "number"
+      },
+      "mass": {
+        "$value": 1,
+        "$type": "number"
+      },
       "$description": "Panel slide, dropdown open (~250ms settle)"
     },
     "expressive": {
-      "stiffness": { "$value": 120, "$type": "number" },
-      "damping": { "$value": 14, "$type": "number" },
-      "mass": { "$value": 1, "$type": "number" },
+      "stiffness": {
+        "$value": 120,
+        "$type": "number"
+      },
+      "damping": {
+        "$value": 14,
+        "$type": "number"
+      },
+      "mass": {
+        "$value": 1,
+        "$type": "number"
+      },
       "$description": "Page transition, modal enter (~400ms settle)"
     },
     "dramatic": {
-      "stiffness": { "$value": 80, "$type": "number" },
-      "damping": { "$value": 10, "$type": "number" },
-      "mass": { "$value": 1, "$type": "number" },
+      "stiffness": {
+        "$value": 80,
+        "$type": "number"
+      },
+      "damping": {
+        "$value": 10,
+        "$type": "number"
+      },
+      "mass": {
+        "$value": 1,
+        "$type": "number"
+      },
       "$description": "Hero reveal, onboarding (~600ms settle)"
     },
     "interactive": {
-      "stiffness": { "$value": 322, "$type": "number" },
-      "damping": { "$value": 31, "$type": "number" },
-      "mass": { "$value": 1, "$type": "number" },
+      "stiffness": {
+        "$value": 322,
+        "$type": "number"
+      },
+      "damping": {
+        "$value": 31,
+        "$type": "number"
+      },
+      "mass": {
+        "$value": 1,
+        "$type": "number"
+      },
       "$description": "Interactive elements — buttons, toggles, list items (response 0.35, dampingFraction 0.86)"
     }
   },
   "purpose": {
     "$description": "Purpose-based motion presets for specific interaction types",
     "enter": {
-      "duration": { "$value": "{duration.normal}", "$type": "duration" },
-      "easing": { "$value": "{easing.ease-out}", "$type": "cubicBezier" },
+      "duration": {
+        "$value": "{duration.normal}",
+        "$type": "duration"
+      },
+      "easing": {
+        "$value": "{easing.ease-out}",
+        "$type": "cubicBezier"
+      },
       "$description": "Element enters viewport or DOM"
     },
     "exit": {
-      "duration": { "$value": "{duration.fast}", "$type": "duration" },
-      "easing": { "$value": "{easing.ease-in}", "$type": "cubicBezier" },
+      "duration": {
+        "$value": "{duration.fast}",
+        "$type": "duration"
+      },
+      "easing": {
+        "$value": "{easing.ease-in}",
+        "$type": "cubicBezier"
+      },
       "$description": "Element leaves viewport or DOM"
     },
     "emphasize": {
-      "duration": { "$value": "{duration.slow}", "$type": "duration" },
-      "easing": { "$value": "{easing.emphasize}", "$type": "cubicBezier" },
+      "duration": {
+        "$value": "{duration.slow}",
+        "$type": "duration"
+      },
+      "easing": {
+        "$value": "{easing.emphasize}",
+        "$type": "cubicBezier"
+      },
       "$description": "Attention-drawing animation"
     },
     "move": {
-      "duration": { "$value": "{duration.normal}", "$type": "duration" },
-      "easing": { "$value": "{easing.ease-in-out}", "$type": "cubicBezier" },
+      "duration": {
+        "$value": "{duration.normal}",
+        "$type": "duration"
+      },
+      "easing": {
+        "$value": "{easing.ease-in-out}",
+        "$type": "cubicBezier"
+      },
       "$description": "Element repositioning (layout shift, reorder)"
     },
     "page-enter": {
-      "duration": { "$value": "{duration.slow}", "$type": "duration" },
-      "easing": { "$value": "{easing.ease-out}", "$type": "cubicBezier" },
+      "duration": {
+        "$value": "{duration.slow}",
+        "$type": "duration"
+      },
+      "easing": {
+        "$value": "{easing.ease-out}",
+        "$type": "cubicBezier"
+      },
       "$description": "Page/view entering"
     },
     "page-exit": {
-      "duration": { "$value": "{duration.fast}", "$type": "duration" },
-      "easing": { "$value": "{easing.ease-in}", "$type": "cubicBezier" },
+      "duration": {
+        "$value": "{duration.fast}",
+        "$type": "duration"
+      },
+      "easing": {
+        "$value": "{easing.ease-in}",
+        "$type": "cubicBezier"
+      },
       "$description": "Page/view exiting"
     },
     "shared-element": {
-      "duration": { "$value": "{duration.slow}", "$type": "duration" },
-      "easing": { "$value": "{easing.spring-out}", "$type": "cubicBezier" },
+      "duration": {
+        "$value": "{duration.slow}",
+        "$type": "duration"
+      },
+      "easing": {
+        "$value": "{easing.spring-out}",
+        "$type": "cubicBezier"
+      },
       "$description": "Shared element transition between views"
     }
   },
   "choreography": {
     "$description": "Stagger and cascade timing",
-    "stagger-delay": { "$value": "50ms", "$type": "duration" },
-    "stagger-max": { "$value": "300ms", "$type": "duration" },
-    "cascade-delay": { "$value": "30ms", "$type": "duration" },
-    "cascade-max": { "$value": "200ms", "$type": "duration" }
+    "stagger-delay": {
+      "$value": "50ms",
+      "$type": "duration"
+    },
+    "stagger-max": {
+      "$value": "300ms",
+      "$type": "duration"
+    },
+    "cascade-delay": {
+      "$value": "30ms",
+      "$type": "duration"
+    },
+    "cascade-max": {
+      "$value": "200ms",
+      "$type": "duration"
+    }
   },
   "reduced-motion": {
     "$description": "Alternative values when prefers-reduced-motion: reduce is active",
-    "duration-override": { "$value": "0ms", "$type": "duration" },
+    "duration-override": {
+      "$value": "0ms",
+      "$type": "duration"
+    },
     "spring-override-damping": {
       "$value": 100,
       "$type": "number",
@@ -194,31 +299,61 @@
   "micro-physics": {
     "$description": "Pixar-inspired micro-physics presets — anticipation, follow-through, squash/stretch for UI elements",
     "button-press": {
-      "scaleX": { "$value": 1.01, "$type": "number" },
-      "scaleY": { "$value": 0.97, "$type": "number" },
+      "scaleX": {
+        "$value": 1.01,
+        "$type": "number"
+      },
+      "scaleY": {
+        "$value": 0.97,
+        "$type": "number"
+      },
       "$description": "Squash on press — slight horizontal expand, vertical compress"
     },
     "button-release": {
-      "scaleX": { "$value": 0.99, "$type": "number" },
-      "scaleY": { "$value": 1.02, "$type": "number" },
+      "scaleX": {
+        "$value": 0.99,
+        "$type": "number"
+      },
+      "scaleY": {
+        "$value": 1.02,
+        "$type": "number"
+      },
       "$description": "Stretch on release — vertical overshoot before settling"
     },
     "modal-anticipate": {
-      "scale": { "$value": 0.97, "$type": "number" },
-      "pause": { "$value": "50ms", "$type": "duration" },
+      "scale": {
+        "$value": 0.97,
+        "$type": "number"
+      },
+      "pause": {
+        "$value": "50ms",
+        "$type": "duration"
+      },
       "$description": "Modal shrinks slightly before expanding (anticipation)"
     },
     "card-hover": {
-      "translateY": { "$value": "-2px", "$type": "string" },
+      "translateY": {
+        "$value": "-2px",
+        "$type": "string"
+      },
       "$description": "Subtle lift on hover — perceived lightness"
     },
     "dropdown-anticipate": {
-      "scaleY": { "$value": 0.98, "$type": "number" },
+      "scaleY": {
+        "$value": 0.98,
+        "$type": "number"
+      },
       "$description": "Dropdown compresses from origin before expanding"
     },
     "toggle-squash": {
-      "scaleX": { "$value": 1.15, "$type": "number" },
-      "scaleY": { "$value": 0.85, "$type": "number" },
+      "scaleX": {
+        "$value": 1.15,
+        "$type": "number"
+      },
+      "scaleY": {
+        "$value": 0.85,
+        "$type": "number"
+      },
       "$description": "Toggle thumb squashes during slide"
     },
     "secondary-delay": {
@@ -255,7 +390,7 @@
       "$description": "Origin container starts at this scale during morph"
     },
     "scale-end": {
-      "$value": 1.0,
+      "$value": 1,
       "$type": "number",
       "$description": "Destination container reaches full scale"
     }

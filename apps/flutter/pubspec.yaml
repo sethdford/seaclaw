@@ -1,6 +1,6 @@
 name: human_flutter
 description: Human Flutter design tokens and shared UI.
-version: 0.3.0
+version: 0.5.0
 publish_to: none
 
 environment:

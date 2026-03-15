@@ -2,7 +2,7 @@
   "$schema": "https://design-tokens.github.io/community-group/format/",
   "$extensions": {
     "com.human.platform": "all",
-    "com.human.version": "0.3.0"
+    "com.human.version": "0.5.0"
   },
   "$description": "Elevation tokens — shadow definitions mapped to semantic levels",
   "elevation": {
@@ -39,11 +39,29 @@
   },
   "elevation-role": {
     "$description": "Semantic elevation assignments",
-    "surface": { "$value": 0, "$type": "number" },
-    "card": { "$value": 1, "$type": "number" },
-    "dropdown": { "$value": 2, "$type": "number" },
-    "modal": { "$value": 3, "$type": "number" },
-    "toast": { "$value": 4, "$type": "number" },
-    "tooltip": { "$value": 5, "$type": "number" }
+    "surface": {
+      "$value": 0,
+      "$type": "number"
+    },
+    "card": {
+      "$value": 1,
+      "$type": "number"
+    },
+    "dropdown": {
+      "$value": 2,
+      "$type": "number"
+    },
+    "modal": {
+      "$value": 3,
+      "$type": "number"
+    },
+    "toast": {
+      "$value": 4,
+      "$type": "number"
+    },
+    "tooltip": {
+      "$value": 5,
+      "$type": "number"
+    }
   }
 }

@@ -3,6 +3,35 @@
 All notable changes to human are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0] - 2026-03-15
+
+### Added
+
+- **Intelligence Phase 3**: weakness analyzer (categorize eval failures), experience
+  distiller (deduplicate learned patterns), entropy gate (retrieval quality scoring),
+  memory graph (entity-relationship storage), research executor (feed processing pipeline)
+- **Brand refresh**: "h-uman — not quite human." tagline across all surfaces — website hero,
+  CLI banners, native app onboarding, meta tags, OG images, PWA manifests
+- **Website — brand & design pages**: `/brand/` (identity, logo, color, typography, voice)
+  and `/design/` (principles, color system, glass tiers, motion) showcase pages
+- **Hero transformation**: massive wordmark + tagline-first hierarchy with proof points
+- **Token pipeline improvements**: `clamp()` support for Swift/Kotlin generation, new
+  `text2Xl`, `text3Xl`, `textHero` size tokens
+- **CMake fixes**: resolve Linux minimal-build linker errors for Phase 7 modules
+
+### Changed
+
+- Unified all version strings to 0.5.0 across C runtime, npm, design tokens, native apps
+- iOS app version → 1.1.0 (build 2), Android → 1.1 (versionCode 2)
+- Lighthouse scores: homepage 94/96/100/100, brand 100/96/100/100, design 99/96/100/100
+
+### Fixed
+
+- Linux linker errors: missing `experience.c`, `forgetting.c`, `weakness.c` in minimal build
+- iOS `HUTokens.text2xl` and `surfaceContainerHigh` missing from generated tokens
+- iOS `OverviewView.swift` type-check timeout from complex inline ternary
+- Orphaned `.claude/worktrees/` submodule references causing git errors
+
 ## [0.4.0] - 2026-03-08
 
 ### Added

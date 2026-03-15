@@ -2421,7 +2421,7 @@ add_custom_target(benchmark
 )
 
 # Print build info
-message(STATUS "Human v0.4.0")
+message(STATUS "Human v0.5.0")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Channels: ${CHANNEL_SOURCES}")
 message(STATUS "Engines: none=${HU_ENABLE_NONE_ENGINE} markdown=${HU_ENABLE_MARKDOWN_ENGINE} sqlite=${HU_ENABLE_SQLITE} postgres=${HU_ENABLE_POSTGRES}")

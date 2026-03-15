@@ -2,12 +2,11 @@
   "$schema": "https://design-tokens.github.io/community-group/format/",
   "$extensions": {
     "com.human.platform": "all",
-    "com.human.version": "0.3.0"
+    "com.human.version": "0.5.0"
   },
   "$description": "Data visualization tokens — chart colors, series palettes, and visualization spacing",
   "chart": {
     "categorical": {
-      "$description": "Ordered categorical series — 8 colors optimized for visual distinction across color vision deficiencies",
       "1": {
         "$value": "{color.fidelity.500}",
         "$type": "color",
@@ -47,32 +46,81 @@
         "$value": "{color.fidelity.300}",
         "$type": "color",
         "$description": "Light green"
-      }
+      },
+      "$description": "Ordered categorical series — 8 colors optimized for visual distinction across color vision deficiencies"
     },
     "sequential": {
-      "$description": "Sequential ramp — single hue from light to dark for ordered data",
-      "100": { "$value": "{color.fidelity.100}", "$type": "color" },
-      "200": { "$value": "{color.fidelity.200}", "$type": "color" },
-      "300": { "$value": "{color.fidelity.300}", "$type": "color" },
-      "400": { "$value": "{color.fidelity.400}", "$type": "color" },
-      "500": { "$value": "{color.fidelity.500}", "$type": "color" },
-      "600": { "$value": "{color.fidelity.600}", "$type": "color" },
-      "700": { "$value": "{color.fidelity.700}", "$type": "color" },
-      "800": { "$value": "{color.fidelity.800}", "$type": "color" }
+      "100": {
+        "$value": "{color.fidelity.100}",
+        "$type": "color"
+      },
+      "200": {
+        "$value": "{color.fidelity.200}",
+        "$type": "color"
+      },
+      "300": {
+        "$value": "{color.fidelity.300}",
+        "$type": "color"
+      },
+      "400": {
+        "$value": "{color.fidelity.400}",
+        "$type": "color"
+      },
+      "500": {
+        "$value": "{color.fidelity.500}",
+        "$type": "color"
+      },
+      "600": {
+        "$value": "{color.fidelity.600}",
+        "$type": "color"
+      },
+      "700": {
+        "$value": "{color.fidelity.700}",
+        "$type": "color"
+      },
+      "800": {
+        "$value": "{color.fidelity.800}",
+        "$type": "color"
+      },
+      "$description": "Sequential ramp — single hue from light to dark for ordered data"
     },
     "diverging": {
       "$description": "Diverging palette — positive to negative via neutral midpoint",
-      "positive": { "$value": "{color.fidelity.500}", "$type": "color" },
-      "neutral": { "$value": "{color.neutral.500}", "$type": "color" },
-      "negative": { "$value": "{color.coral.500}", "$type": "color" }
+      "positive": {
+        "$value": "{color.fidelity.500}",
+        "$type": "color"
+      },
+      "neutral": {
+        "$value": "{color.neutral.500}",
+        "$type": "color"
+      },
+      "negative": {
+        "$value": "{color.coral.500}",
+        "$type": "color"
+      }
     },
     "status": {
       "$description": "Semantic status colors for chart elements",
-      "success": { "$value": "{color.fidelity.500}", "$type": "color" },
-      "warning": { "$value": "{color.amber.500}", "$type": "color" },
-      "error": { "$value": "{color.coral.500}", "$type": "color" },
-      "info": { "$value": "{color.indigo.500}", "$type": "color" },
-      "muted": { "$value": "{color.neutral.500}", "$type": "color" }
+      "success": {
+        "$value": "{color.fidelity.500}",
+        "$type": "color"
+      },
+      "warning": {
+        "$value": "{color.amber.500}",
+        "$type": "color"
+      },
+      "error": {
+        "$value": "{color.coral.500}",
+        "$type": "color"
+      },
+      "info": {
+        "$value": "{color.indigo.500}",
+        "$type": "color"
+      },
+      "muted": {
+        "$value": "{color.neutral.500}",
+        "$type": "color"
+      }
     },
     "brand": {
       "$value": "{color.fidelity.500}",
@@ -82,10 +130,25 @@
   },
   "spacing": {
     "$description": "Chart-specific spacing tokens",
-    "bar-gap": { "$value": "4px", "$type": "dimension" },
-    "bar-radius": { "$value": "3px", "$type": "dimension" },
-    "axis-padding": { "$value": "8px", "$type": "dimension" },
-    "legend-gap": { "$value": "12px", "$type": "dimension" },
-    "tooltip-padding": { "$value": "8px 12px", "$type": "dimension" }
+    "bar-gap": {
+      "$value": "4px",
+      "$type": "dimension"
+    },
+    "bar-radius": {
+      "$value": "3px",
+      "$type": "dimension"
+    },
+    "axis-padding": {
+      "$value": "8px",
+      "$type": "dimension"
+    },
+    "legend-gap": {
+      "$value": "12px",
+      "$type": "dimension"
+    },
+    "tooltip-padding": {
+      "$value": "8px 12px",
+      "$type": "dimension"
+    }
   }
 }

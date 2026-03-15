@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define HU_VERSION           "0.4.0"
+#define HU_VERSION           "0.5.0"
 #define HU_CODENAME          "Human"
 #define HU_WASI_PREOPEN_ROOT 3
 

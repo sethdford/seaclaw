@@ -2,30 +2,84 @@
   "$schema": "https://design-tokens.github.io/community-group/format/",
   "$extensions": {
     "com.human.platform": "all",
-    "com.human.version": "0.3.0"
+    "com.human.version": "0.5.0"
   },
   "color": {
     "$description": "Ocean-inspired primitive color palette",
     "neutral": {
-      "$description": "Tonal ocean scale — deep midnight blues to coastal whites. Dark surface steps widened for M3-level contrast between elevation levels.",
-      "0": { "$value": "#000000", "$type": "color" },
-      "50": { "$value": "#060b12", "$type": "color" },
-      "100": { "$value": "#0d1520", "$type": "color" },
-      "150": { "$value": "#152333", "$type": "color" },
-      "200": { "$value": "#1e3044", "$type": "color" },
-      "250": { "$value": "#273d55", "$type": "color" },
-      "300": { "$value": "#2f4a64", "$type": "color" },
-      "400": { "$value": "#3d5468", "$type": "color" },
-      "500": { "$value": "#7a96b0", "$type": "color" },
-      "600": { "$value": "#8aa0b8", "$type": "color" },
-      "700": { "$value": "#c0d0e0", "$type": "color" },
-      "750": { "$value": "#d8e4f0", "$type": "color" },
-      "800": { "$value": "#e6edf4", "$type": "color" },
-      "825": { "$value": "#ecf2f8", "$type": "color" },
-      "850": { "$value": "#f0f5fa", "$type": "color" },
-      "900": { "$value": "#f7f9fc", "$type": "color" },
-      "925": { "$value": "#fafcfe", "$type": "color" },
-      "1000": { "$value": "#ffffff", "$type": "color" }
+      "0": {
+        "$value": "#000000",
+        "$type": "color"
+      },
+      "50": {
+        "$value": "#060b12",
+        "$type": "color"
+      },
+      "100": {
+        "$value": "#0d1520",
+        "$type": "color"
+      },
+      "150": {
+        "$value": "#152333",
+        "$type": "color"
+      },
+      "200": {
+        "$value": "#1e3044",
+        "$type": "color"
+      },
+      "250": {
+        "$value": "#273d55",
+        "$type": "color"
+      },
+      "300": {
+        "$value": "#2f4a64",
+        "$type": "color"
+      },
+      "400": {
+        "$value": "#3d5468",
+        "$type": "color"
+      },
+      "500": {
+        "$value": "#7a96b0",
+        "$type": "color"
+      },
+      "600": {
+        "$value": "#8aa0b8",
+        "$type": "color"
+      },
+      "700": {
+        "$value": "#c0d0e0",
+        "$type": "color"
+      },
+      "750": {
+        "$value": "#d8e4f0",
+        "$type": "color"
+      },
+      "800": {
+        "$value": "#e6edf4",
+        "$type": "color"
+      },
+      "825": {
+        "$value": "#ecf2f8",
+        "$type": "color"
+      },
+      "850": {
+        "$value": "#f0f5fa",
+        "$type": "color"
+      },
+      "900": {
+        "$value": "#f7f9fc",
+        "$type": "color"
+      },
+      "925": {
+        "$value": "#fafcfe",
+        "$type": "color"
+      },
+      "1000": {
+        "$value": "#ffffff",
+        "$type": "color"
+      },
+      "$description": "Tonal ocean scale — deep midnight blues to coastal whites. Dark surface steps widened for M3-level contrast between elevation levels."
     },
     "tonal": {
       "$description": "M3-style tonal surface primitives — neutrals tinted with fidelity green for surface-container hierarchy",
@@ -81,179 +135,578 @@
       }
     },
     "teal": {
+      "50": {
+        "$value": "#f0fdfa",
+        "$type": "color"
+      },
+      "100": {
+        "$value": "#ccfbf1",
+        "$type": "color"
+      },
+      "200": {
+        "$value": "#99f6e4",
+        "$type": "color"
+      },
+      "300": {
+        "$value": "#5eead4",
+        "$type": "color"
+      },
+      "400": {
+        "$value": "#2dd4bf",
+        "$type": "color"
+      },
+      "500": {
+        "$value": "#14b8a6",
+        "$type": "color"
+      },
+      "600": {
+        "$value": "#0d9488",
+        "$type": "color"
+      },
+      "700": {
+        "$value": "#0f766e",
+        "$type": "color"
+      },
+      "800": {
+        "$value": "#115e59",
+        "$type": "color"
+      },
+      "900": {
+        "$value": "#134e4a",
+        "$type": "color"
+      },
       "$description": "Legacy ocean teal/aqua — retained for reference",
-      "50": { "$value": "#f0fdfa", "$type": "color" },
-      "100": { "$value": "#ccfbf1", "$type": "color" },
-      "200": { "$value": "#99f6e4", "$type": "color" },
-      "300": { "$value": "#5eead4", "$type": "color" },
-      "400": { "$value": "#2dd4bf", "$type": "color" },
-      "500": { "$value": "#14b8a6", "$type": "color" },
-      "600": { "$value": "#0d9488", "$type": "color" },
-      "700": { "$value": "#0f766e", "$type": "color" },
-      "800": { "$value": "#115e59", "$type": "color" },
-      "900": { "$value": "#134e4a", "$type": "color" },
-      "dark-subtle": { "$value": "rgba(20, 184, 166, 0.14)", "$type": "color" },
-      "light-500": { "$value": "#0d9488", "$type": "color" },
-      "light-600": { "$value": "#0f766e", "$type": "color" },
-      "light-400": { "$value": "#14b8a6", "$type": "color" },
-      "light-subtle": { "$value": "rgba(13, 148, 136, 0.10)", "$type": "color" }
+      "dark-subtle": {
+        "$value": "rgba(20, 184, 166, 0.14)",
+        "$type": "color"
+      },
+      "light-500": {
+        "$value": "#0d9488",
+        "$type": "color"
+      },
+      "light-600": {
+        "$value": "#0f766e",
+        "$type": "color"
+      },
+      "light-400": {
+        "$value": "#14b8a6",
+        "$type": "color"
+      },
+      "light-subtle": {
+        "$value": "rgba(13, 148, 136, 0.10)",
+        "$type": "color"
+      }
     },
     "fidelity": {
+      "50": {
+        "$value": "#f3fae8",
+        "$type": "color"
+      },
+      "100": {
+        "$value": "#e2f2c8",
+        "$type": "color"
+      },
+      "200": {
+        "$value": "#c5e59a",
+        "$type": "color"
+      },
+      "300": {
+        "$value": "#a3d46a",
+        "$type": "color"
+      },
+      "400": {
+        "$value": "#8DC63F",
+        "$type": "color"
+      },
+      "500": {
+        "$value": "#7AB648",
+        "$type": "color"
+      },
+      "600": {
+        "$value": "#5A9A30",
+        "$type": "color"
+      },
+      "700": {
+        "$value": "#3a6a24",
+        "$type": "color"
+      },
+      "800": {
+        "$value": "#366320",
+        "$type": "color"
+      },
+      "900": {
+        "$value": "#264A17",
+        "$type": "color"
+      },
       "$description": "Primary accent — Fidelity-inspired green",
-      "50": { "$value": "#f3fae8", "$type": "color" },
-      "100": { "$value": "#e2f2c8", "$type": "color" },
-      "200": { "$value": "#c5e59a", "$type": "color" },
-      "300": { "$value": "#a3d46a", "$type": "color" },
-      "400": { "$value": "#8DC63F", "$type": "color" },
-      "500": { "$value": "#7AB648", "$type": "color" },
-      "600": { "$value": "#5A9A30", "$type": "color" },
-      "700": { "$value": "#3a6a24", "$type": "color" },
-      "800": { "$value": "#366320", "$type": "color" },
-      "900": { "$value": "#264A17", "$type": "color" },
-      "dark-subtle": { "$value": "rgba(122, 182, 72, 0.14)", "$type": "color" },
-      "light-500": { "$value": "#5A9A30", "$type": "color" },
-      "light-600": { "$value": "#3a6a24", "$type": "color" },
-      "light-400": { "$value": "#7AB648", "$type": "color" },
-      "light-subtle": { "$value": "rgba(90, 154, 48, 0.10)", "$type": "color" }
+      "dark-subtle": {
+        "$value": "rgba(122, 182, 72, 0.14)",
+        "$type": "color"
+      },
+      "light-500": {
+        "$value": "#5A9A30",
+        "$type": "color"
+      },
+      "light-600": {
+        "$value": "#3a6a24",
+        "$type": "color"
+      },
+      "light-400": {
+        "$value": "#7AB648",
+        "$type": "color"
+      },
+      "light-subtle": {
+        "$value": "rgba(90, 154, 48, 0.10)",
+        "$type": "color"
+      }
     },
     "seafoam": {
+      "50": {
+        "$value": "#ecfdf5",
+        "$type": "color"
+      },
+      "100": {
+        "$value": "#d1fae5",
+        "$type": "color"
+      },
+      "200": {
+        "$value": "#a7f3d0",
+        "$type": "color"
+      },
+      "300": {
+        "$value": "#6ee7b7",
+        "$type": "color"
+      },
+      "400": {
+        "$value": "#34d399",
+        "$type": "color"
+      },
+      "500": {
+        "$value": "#10b981",
+        "$type": "color"
+      },
+      "600": {
+        "$value": "#059669",
+        "$type": "color"
+      },
+      "700": {
+        "$value": "#047857",
+        "$type": "color"
+      },
+      "800": {
+        "$value": "#065f46",
+        "$type": "color"
+      },
+      "900": {
+        "$value": "#064e3b",
+        "$type": "color"
+      },
       "$description": "Secondary — sea foam green for success states",
-      "50": { "$value": "#ecfdf5", "$type": "color" },
-      "100": { "$value": "#d1fae5", "$type": "color" },
-      "200": { "$value": "#a7f3d0", "$type": "color" },
-      "300": { "$value": "#6ee7b7", "$type": "color" },
-      "400": { "$value": "#34d399", "$type": "color" },
-      "500": { "$value": "#10b981", "$type": "color" },
-      "600": { "$value": "#059669", "$type": "color" },
-      "700": { "$value": "#047857", "$type": "color" },
-      "800": { "$value": "#065f46", "$type": "color" },
-      "900": { "$value": "#064e3b", "$type": "color" },
-      "dim": { "$value": "rgba(16, 185, 129, 0.15)", "$type": "color" },
-      "light-500": { "$value": "#059669", "$type": "color" },
-      "light-dim": { "$value": "rgba(5, 150, 105, 0.10)", "$type": "color" }
+      "dim": {
+        "$value": "rgba(16, 185, 129, 0.15)",
+        "$type": "color"
+      },
+      "light-500": {
+        "$value": "#059669",
+        "$type": "color"
+      },
+      "light-dim": {
+        "$value": "rgba(5, 150, 105, 0.10)",
+        "$type": "color"
+      }
     },
     "coral": {
+      "50": {
+        "$value": "#fff5f4",
+        "$type": "color"
+      },
+      "100": {
+        "$value": "#ffe0dd",
+        "$type": "color"
+      },
+      "200": {
+        "$value": "#ffc5c0",
+        "$type": "color"
+      },
+      "300": {
+        "$value": "#ffa099",
+        "$type": "color"
+      },
+      "400": {
+        "$value": "#ff5c50",
+        "$type": "color"
+      },
+      "500": {
+        "$value": "#f97066",
+        "$type": "color"
+      },
+      "600": {
+        "$value": "#fb8a82",
+        "$type": "color"
+      },
+      "700": {
+        "$value": "#e11d48",
+        "$type": "color"
+      },
+      "800": {
+        "$value": "#be123c",
+        "$type": "color"
+      },
+      "900": {
+        "$value": "#881337",
+        "$type": "color"
+      },
       "$description": "Warm accent — coral for errors and warnings",
-      "50": { "$value": "#fff5f4", "$type": "color" },
-      "100": { "$value": "#ffe0dd", "$type": "color" },
-      "200": { "$value": "#ffc5c0", "$type": "color" },
-      "300": { "$value": "#ffa099", "$type": "color" },
-      "400": { "$value": "#ff5c50", "$type": "color" },
-      "500": { "$value": "#f97066", "$type": "color" },
-      "600": { "$value": "#fb8a82", "$type": "color" },
-      "700": { "$value": "#e11d48", "$type": "color" },
-      "800": { "$value": "#be123c", "$type": "color" },
-      "900": { "$value": "#881337", "$type": "color" },
       "dark-subtle": {
         "$value": "rgba(249, 112, 102, 0.12)",
         "$type": "color"
       },
-      "light-500": { "$value": "#e11d48", "$type": "color" },
-      "light-600": { "$value": "#be123c", "$type": "color" },
-      "light-400": { "$value": "#f43f5e", "$type": "color" },
-      "light-subtle": { "$value": "rgba(225, 29, 72, 0.08)", "$type": "color" }
+      "light-500": {
+        "$value": "#e11d48",
+        "$type": "color"
+      },
+      "light-600": {
+        "$value": "#be123c",
+        "$type": "color"
+      },
+      "light-400": {
+        "$value": "#f43f5e",
+        "$type": "color"
+      },
+      "light-subtle": {
+        "$value": "rgba(225, 29, 72, 0.08)",
+        "$type": "color"
+      }
     },
     "green": {
-      "500": { "$value": "#22c55e", "$type": "color" },
-      "dim": { "$value": "rgba(34, 197, 94, 0.15)", "$type": "color" },
-      "light-500": { "$value": "#16a34a", "$type": "color" },
-      "light-dim": { "$value": "rgba(22, 163, 74, 0.1)", "$type": "color" }
+      "500": {
+        "$value": "#22c55e",
+        "$type": "color"
+      },
+      "dim": {
+        "$value": "rgba(34, 197, 94, 0.15)",
+        "$type": "color"
+      },
+      "light-500": {
+        "$value": "#16a34a",
+        "$type": "color"
+      },
+      "light-dim": {
+        "$value": "rgba(22, 163, 74, 0.1)",
+        "$type": "color"
+      }
     },
     "yellow": {
-      "500": { "$value": "#eab308", "$type": "color" },
-      "dim": { "$value": "rgba(234, 179, 8, 0.15)", "$type": "color" },
-      "light-500": { "$value": "#ca8a04", "$type": "color" },
-      "light-dim": { "$value": "rgba(202, 138, 4, 0.1)", "$type": "color" }
+      "500": {
+        "$value": "#eab308",
+        "$type": "color"
+      },
+      "dim": {
+        "$value": "rgba(234, 179, 8, 0.15)",
+        "$type": "color"
+      },
+      "light-500": {
+        "$value": "#ca8a04",
+        "$type": "color"
+      },
+      "light-dim": {
+        "$value": "rgba(202, 138, 4, 0.1)",
+        "$type": "color"
+      }
     },
     "red": {
-      "500": { "$value": "#ef4444", "$type": "color" },
-      "dim": { "$value": "rgba(239, 68, 68, 0.15)", "$type": "color" },
-      "light-500": { "$value": "#dc2626", "$type": "color" },
-      "light-dim": { "$value": "rgba(220, 38, 38, 0.1)", "$type": "color" }
+      "500": {
+        "$value": "#ef4444",
+        "$type": "color"
+      },
+      "dim": {
+        "$value": "rgba(239, 68, 68, 0.15)",
+        "$type": "color"
+      },
+      "light-500": {
+        "$value": "#dc2626",
+        "$type": "color"
+      },
+      "light-dim": {
+        "$value": "rgba(220, 38, 38, 0.1)",
+        "$type": "color"
+      }
     },
     "blue": {
-      "500": { "$value": "#3b82f6", "$type": "color" },
-      "dim": { "$value": "rgba(59, 130, 246, 0.15)", "$type": "color" },
-      "light-500": { "$value": "#2563eb", "$type": "color" },
-      "light-dim": { "$value": "rgba(37, 99, 235, 0.1)", "$type": "color" }
+      "500": {
+        "$value": "#3b82f6",
+        "$type": "color"
+      },
+      "dim": {
+        "$value": "rgba(59, 130, 246, 0.15)",
+        "$type": "color"
+      },
+      "light-500": {
+        "$value": "#2563eb",
+        "$type": "color"
+      },
+      "light-dim": {
+        "$value": "rgba(37, 99, 235, 0.1)",
+        "$type": "color"
+      }
     },
     "amber": {
+      "50": {
+        "$value": "#fffbeb",
+        "$type": "color"
+      },
+      "100": {
+        "$value": "#fef3c7",
+        "$type": "color"
+      },
+      "200": {
+        "$value": "#fde68a",
+        "$type": "color"
+      },
+      "300": {
+        "$value": "#fcd34d",
+        "$type": "color"
+      },
+      "400": {
+        "$value": "#fbbf24",
+        "$type": "color"
+      },
+      "500": {
+        "$value": "#f59e0b",
+        "$type": "color"
+      },
+      "600": {
+        "$value": "#d97706",
+        "$type": "color"
+      },
+      "700": {
+        "$value": "#b45309",
+        "$type": "color"
+      },
+      "800": {
+        "$value": "#92400e",
+        "$type": "color"
+      },
+      "900": {
+        "$value": "#78350f",
+        "$type": "color"
+      },
       "$description": "Warm secondary accent — amber/gold for highlights and featured content",
-      "50": { "$value": "#fffbeb", "$type": "color" },
-      "100": { "$value": "#fef3c7", "$type": "color" },
-      "200": { "$value": "#fde68a", "$type": "color" },
-      "300": { "$value": "#fcd34d", "$type": "color" },
-      "400": { "$value": "#fbbf24", "$type": "color" },
-      "500": { "$value": "#f59e0b", "$type": "color" },
-      "600": { "$value": "#d97706", "$type": "color" },
-      "700": { "$value": "#b45309", "$type": "color" },
-      "800": { "$value": "#92400e", "$type": "color" },
-      "900": { "$value": "#78350f", "$type": "color" },
-      "dark-subtle": { "$value": "rgba(245, 158, 11, 0.14)", "$type": "color" },
-      "light-500": { "$value": "#d97706", "$type": "color" },
-      "light-600": { "$value": "#b45309", "$type": "color" },
-      "light-400": { "$value": "#f59e0b", "$type": "color" },
-      "light-subtle": { "$value": "rgba(217, 119, 6, 0.10)", "$type": "color" }
+      "dark-subtle": {
+        "$value": "rgba(245, 158, 11, 0.14)",
+        "$type": "color"
+      },
+      "light-500": {
+        "$value": "#d97706",
+        "$type": "color"
+      },
+      "light-600": {
+        "$value": "#b45309",
+        "$type": "color"
+      },
+      "light-400": {
+        "$value": "#f59e0b",
+        "$type": "color"
+      },
+      "light-subtle": {
+        "$value": "rgba(217, 119, 6, 0.10)",
+        "$type": "color"
+      }
     },
     "indigo": {
+      "50": {
+        "$value": "#eef2ff",
+        "$type": "color"
+      },
+      "100": {
+        "$value": "#e0e7ff",
+        "$type": "color"
+      },
+      "200": {
+        "$value": "#c7d2fe",
+        "$type": "color"
+      },
+      "300": {
+        "$value": "#a5b4fc",
+        "$type": "color"
+      },
+      "400": {
+        "$value": "#818cf8",
+        "$type": "color"
+      },
+      "500": {
+        "$value": "#6366f1",
+        "$type": "color"
+      },
+      "600": {
+        "$value": "#4f46e5",
+        "$type": "color"
+      },
+      "700": {
+        "$value": "#4338ca",
+        "$type": "color"
+      },
+      "800": {
+        "$value": "#3730a3",
+        "$type": "color"
+      },
+      "900": {
+        "$value": "#312e81",
+        "$type": "color"
+      },
       "$description": "Depth accent — indigo for info states, data viz, and richness",
-      "50": { "$value": "#eef2ff", "$type": "color" },
-      "100": { "$value": "#e0e7ff", "$type": "color" },
-      "200": { "$value": "#c7d2fe", "$type": "color" },
-      "300": { "$value": "#a5b4fc", "$type": "color" },
-      "400": { "$value": "#818cf8", "$type": "color" },
-      "500": { "$value": "#6366f1", "$type": "color" },
-      "600": { "$value": "#4f46e5", "$type": "color" },
-      "700": { "$value": "#4338ca", "$type": "color" },
-      "800": { "$value": "#3730a3", "$type": "color" },
-      "900": { "$value": "#312e81", "$type": "color" },
-      "dark-subtle": { "$value": "rgba(99, 102, 241, 0.14)", "$type": "color" },
-      "light-500": { "$value": "#4f46e5", "$type": "color" },
-      "light-600": { "$value": "#4338ca", "$type": "color" },
-      "light-400": { "$value": "#6366f1", "$type": "color" },
-      "light-subtle": { "$value": "rgba(79, 70, 229, 0.10)", "$type": "color" }
+      "dark-subtle": {
+        "$value": "rgba(99, 102, 241, 0.14)",
+        "$type": "color"
+      },
+      "light-500": {
+        "$value": "#4f46e5",
+        "$type": "color"
+      },
+      "light-600": {
+        "$value": "#4338ca",
+        "$type": "color"
+      },
+      "light-400": {
+        "$value": "#6366f1",
+        "$type": "color"
+      },
+      "light-subtle": {
+        "$value": "rgba(79, 70, 229, 0.10)",
+        "$type": "color"
+      }
     }
   },
   "spacing": {
     "$description": "Spacing scale (rem-based)",
-    "2xs": { "$value": "0.125rem", "$type": "dimension" },
-    "xs": { "$value": "0.25rem", "$type": "dimension" },
-    "sm": { "$value": "0.5rem", "$type": "dimension" },
-    "md": { "$value": "1rem", "$type": "dimension" },
-    "lg": { "$value": "1.5rem", "$type": "dimension" },
-    "xl": { "$value": "2rem", "$type": "dimension" },
-    "2xl": { "$value": "3rem", "$type": "dimension" },
-    "3xl": { "$value": "4rem", "$type": "dimension" },
-    "4xl": { "$value": "5rem", "$type": "dimension" },
-    "5xl": { "$value": "6rem", "$type": "dimension" },
-    "6xl": { "$value": "8rem", "$type": "dimension" }
+    "2xs": {
+      "$value": "0.125rem",
+      "$type": "dimension"
+    },
+    "xs": {
+      "$value": "0.25rem",
+      "$type": "dimension"
+    },
+    "sm": {
+      "$value": "0.5rem",
+      "$type": "dimension"
+    },
+    "md": {
+      "$value": "1rem",
+      "$type": "dimension"
+    },
+    "lg": {
+      "$value": "1.5rem",
+      "$type": "dimension"
+    },
+    "xl": {
+      "$value": "2rem",
+      "$type": "dimension"
+    },
+    "2xl": {
+      "$value": "3rem",
+      "$type": "dimension"
+    },
+    "3xl": {
+      "$value": "4rem",
+      "$type": "dimension"
+    },
+    "4xl": {
+      "$value": "5rem",
+      "$type": "dimension"
+    },
+    "5xl": {
+      "$value": "6rem",
+      "$type": "dimension"
+    },
+    "6xl": {
+      "$value": "8rem",
+      "$type": "dimension"
+    }
   },
   "radius": {
     "$description": "Border radius scale",
-    "none": { "$value": "0", "$type": "dimension" },
-    "sm": { "$value": "4px", "$type": "dimension" },
-    "md": { "$value": "8px", "$type": "dimension" },
-    "lg": { "$value": "12px", "$type": "dimension" },
-    "xl": { "$value": "16px", "$type": "dimension" },
-    "2xl": { "$value": "24px", "$type": "dimension" },
-    "full": { "$value": "9999px", "$type": "dimension" }
+    "none": {
+      "$value": "0",
+      "$type": "dimension"
+    },
+    "sm": {
+      "$value": "4px",
+      "$type": "dimension"
+    },
+    "md": {
+      "$value": "8px",
+      "$type": "dimension"
+    },
+    "lg": {
+      "$value": "12px",
+      "$type": "dimension"
+    },
+    "xl": {
+      "$value": "16px",
+      "$type": "dimension"
+    },
+    "2xl": {
+      "$value": "24px",
+      "$type": "dimension"
+    },
+    "full": {
+      "$value": "9999px",
+      "$type": "dimension"
+    }
   },
   "blur": {
     "$description": "Blur radius for backdrop-filter glass effects",
-    "sm": { "$value": "4px", "$type": "dimension" },
-    "md": { "$value": "12px", "$type": "dimension" },
-    "lg": { "$value": "24px", "$type": "dimension" },
-    "xl": { "$value": "40px", "$type": "dimension" }
+    "sm": {
+      "$value": "4px",
+      "$type": "dimension"
+    },
+    "md": {
+      "$value": "12px",
+      "$type": "dimension"
+    },
+    "lg": {
+      "$value": "24px",
+      "$type": "dimension"
+    },
+    "xl": {
+      "$value": "40px",
+      "$type": "dimension"
+    }
   },
   "z-index": {
     "$description": "Z-index stacking scale",
-    "base": { "$value": 0, "$type": "number" },
-    "dropdown": { "$value": 1000, "$type": "number" },
-    "sticky": { "$value": 1100, "$type": "number" },
-    "modal-backdrop": { "$value": 1200, "$type": "number" },
-    "modal": { "$value": 1300, "$type": "number" },
-    "popover": { "$value": 1400, "$type": "number" },
-    "tooltip": { "$value": 1500, "$type": "number" },
-    "toast": { "$value": 1600, "$type": "number" }
+    "base": {
+      "$value": 0,
+      "$type": "number"
+    },
+    "dropdown": {
+      "$value": 1000,
+      "$type": "number"
+    },
+    "sticky": {
+      "$value": 1100,
+      "$type": "number"
+    },
+    "modal-backdrop": {
+      "$value": 1200,
+      "$type": "number"
+    },
+    "modal": {
+      "$value": 1300,
+      "$type": "number"
+    },
+    "popover": {
+      "$value": 1400,
+      "$type": "number"
+    },
+    "tooltip": {
+      "$value": 1500,
+      "$type": "number"
+    },
+    "toast": {
+      "$value": 1600,
+      "$type": "number"
+    }
   }
 }

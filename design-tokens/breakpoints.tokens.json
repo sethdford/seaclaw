@@ -2,34 +2,34 @@
   "$schema": "https://design-tokens.github.io/community-group/format/",
   "$extensions": {
     "com.human.platform": "all",
-    "com.human.version": "0.3.0"
+    "com.human.version": "0.5.0"
   },
   "$description": "Responsive breakpoint tokens",
   "breakpoint": {
     "sm": {
       "$value": "480px",
       "$type": "dimension",
-      "$description": "Small \u2014 compact mobile"
+      "$description": "Small — compact mobile"
     },
     "md": {
       "$value": "640px",
       "$type": "dimension",
-      "$description": "Medium \u2014 mobile landscape"
+      "$description": "Medium — mobile landscape"
     },
     "lg": {
       "$value": "768px",
       "$type": "dimension",
-      "$description": "Large \u2014 tablets"
+      "$description": "Large — tablets"
     },
     "xl": {
       "$value": "1024px",
       "$type": "dimension",
-      "$description": "Extra-large \u2014 desktop"
+      "$description": "Extra-large — desktop"
     },
     "2xl": {
       "$value": "1536px",
       "$type": "dimension",
-      "$description": "2x extra-large \u2014 ultrawide"
+      "$description": "2x extra-large — ultrawide"
     }
   }
 }

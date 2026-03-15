@@ -14,7 +14,7 @@
       {
         packages.default = pkgs.stdenv.mkDerivation {
           pname = "human";
-          version = "0.3.0";
+          version = "0.5.0";
           src = ./.;
 
           nativeBuildInputs = [ pkgs.cmake ];

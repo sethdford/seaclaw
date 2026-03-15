@@ -149,7 +149,7 @@
 #include "human/channels/nostr.h"
 #endif
 
-#define HU_VERSION  "0.4.0"
+#define HU_VERSION  "0.5.0"
 #define HU_CODENAME "human"
 
 typedef struct hu_command {
