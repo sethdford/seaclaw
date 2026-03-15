@@ -27,7 +27,7 @@ static void print_usage(void) {
 
 static void print_version(void) {
     char buf[64];
-    int len = snprintf(buf, sizeof(buf), "%s v%s (WASI)\n", HU_CODENAME, HU_VERSION);
+    int len = snprintf(buf, sizeof(buf), "%s v%s (WASI) — not quite human.\n", HU_CODENAME, HU_VERSION);
     if (len > 0) {
         size_t n = 0;
         hu_wasi_fd_write(1, buf, (size_t)len, &n);
