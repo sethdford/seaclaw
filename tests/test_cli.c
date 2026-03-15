@@ -178,4 +178,6 @@ void run_cli_tests(void) {
     HU_RUN_TEST(test_agent_cli_demo_overrides_provider);
     HU_RUN_TEST(test_agent_cli_prompt_once_parsing);
     HU_RUN_TEST(test_agent_cli_prompt_without_once);
+    HU_RUN_TEST(test_agent_cli_prompt_once_parsing);
+    HU_RUN_TEST(test_agent_cli_prompt_without_once);
 }

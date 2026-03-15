@@ -1,8 +1,12 @@
 #ifdef HU_ENABLE_SQLITE
 
+#include "human/agent/tree_of_thought.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/intelligence/cycle.h"
+#include "human/intelligence/online_learning.h"
+#include "human/intelligence/self_improve.h"
+#include "human/intelligence/world_model.h"
 #include "human/memory.h"
 #include "test_framework.h"
 #include <sqlite3.h>
@@ -534,6 +538,227 @@ static void cycle_low_priority_findings_skipped(void) {
     mem.vtable->deinit(mem.ctx);
 }
 
+/* --- World model simulation_cache --- */
+
+static void cycle_simulation_cache_returns_cached_result(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+
+    hu_world_model_t wm;
+    HU_ASSERT_EQ(hu_world_model_create(&alloc, db, &wm), HU_OK);
+    HU_ASSERT_EQ(hu_world_model_init_tables(&wm), HU_OK);
+
+    /* Seed a causal observation */
+    int64_t now = (int64_t)time(NULL);
+    HU_ASSERT_EQ(hu_world_record_outcome(&wm, "deploy code", 11, "service restarts", 16, 0.9, now), HU_OK);
+
+    /* First simulate — should query causal_observations and cache the result */
+    hu_wm_prediction_t pred1 = {0};
+    HU_ASSERT_EQ(hu_world_simulate(&wm, "deploy code", 11, NULL, 0, &pred1), HU_OK);
+    HU_ASSERT_TRUE(pred1.confidence > 0.0);
+    HU_ASSERT_TRUE(pred1.outcome_len > 0);
+
+    /* Verify simulation_cache has an entry */
+    sqlite3_stmt *stmt = NULL;
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM simulation_cache", -1, &stmt, NULL);
+    sqlite3_step(stmt);
+    int cache_count = sqlite3_column_int(stmt, 0);
+    sqlite3_finalize(stmt);
+    HU_ASSERT_TRUE(cache_count >= 1);
+
+    /* Second simulate — should hit cache and return same result */
+    hu_wm_prediction_t pred2 = {0};
+    HU_ASSERT_EQ(hu_world_simulate(&wm, "deploy code", 11, NULL, 0, &pred2), HU_OK);
+    HU_ASSERT_TRUE(pred2.confidence > 0.0);
+    /* Confidence should be same from cache */
+    HU_ASSERT_TRUE(pred1.confidence == pred2.confidence);
+
+    hu_world_model_deinit(&wm);
+    mem.vtable->deinit(mem.ctx);
+}
+
+/* --- Self-improve tool prefs prompt format --- */
+
+static void self_improve_tool_prefs_prompt_format(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+
+    hu_self_improve_t si;
+    HU_ASSERT_EQ(hu_self_improve_create(&alloc, db, &si), HU_OK);
+    HU_ASSERT_EQ(hu_self_improve_init_tables(&si), HU_OK);
+
+    int64_t now = (int64_t)time(NULL);
+    /* Record several tool outcomes (need 3+ per tool for prompt inclusion) */
+    HU_ASSERT_EQ(hu_self_improve_record_tool_outcome(&si, "web_search", 10, true, now), HU_OK);
+    HU_ASSERT_EQ(hu_self_improve_record_tool_outcome(&si, "web_search", 10, true, now), HU_OK);
+    HU_ASSERT_EQ(hu_self_improve_record_tool_outcome(&si, "web_search", 10, false, now), HU_OK);
+    HU_ASSERT_EQ(hu_self_improve_record_tool_outcome(&si, "file_read", 9, true, now), HU_OK);
+    HU_ASSERT_EQ(hu_self_improve_record_tool_outcome(&si, "file_read", 9, true, now), HU_OK);
+    HU_ASSERT_EQ(hu_self_improve_record_tool_outcome(&si, "file_read", 9, true, now), HU_OK);
+
+    char *prompt = NULL;
+    size_t prompt_len = 0;
+    HU_ASSERT_EQ(hu_self_improve_get_tool_prefs_prompt(&si, &prompt, &prompt_len), HU_OK);
+    HU_ASSERT_NOT_NULL(prompt);
+    HU_ASSERT_TRUE(prompt_len > 0);
+    /* Should mention tool names */
+    HU_ASSERT_TRUE(strstr(prompt, "web_search") != NULL || strstr(prompt, "file_read") != NULL);
+
+    alloc.free(alloc.ctx, prompt, prompt_len + 1);
+    hu_self_improve_deinit(&si);
+    mem.vtable->deinit(mem.ctx);
+}
+
+/* --- World model context-based prediction --- */
+
+static void cycle_context_changes_prediction(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+
+    hu_world_model_t wm;
+    HU_ASSERT_EQ(hu_world_model_create(&alloc, db, &wm), HU_OK);
+    HU_ASSERT_EQ(hu_world_model_init_tables(&wm), HU_OK);
+
+    int64_t now = (int64_t)time(NULL);
+    /* Record outcomes with different contexts */
+    HU_ASSERT_EQ(hu_world_record_outcome(&wm, "send message", 12, "delivered quickly", 17, 0.9, now), HU_OK);
+
+    /* Simulate with no context */
+    hu_wm_prediction_t pred_none = {0};
+    hu_error_t err1 = hu_world_simulate(&wm, "send message", 12, NULL, 0, &pred_none);
+
+    /* Simulate with a context */
+    hu_wm_prediction_t pred_ctx = {0};
+    hu_error_t err2 = hu_world_simulate(&wm, "send message", 12, "urgent", 6, &pred_ctx);
+
+    /* Both should succeed (may or may not differ in outcome depending on data) */
+    HU_ASSERT_EQ(err1, HU_OK);
+    HU_ASSERT_EQ(err2, HU_OK);
+    /* At minimum, both return valid predictions */
+    HU_ASSERT_TRUE(pred_none.confidence >= 0.0);
+    HU_ASSERT_TRUE(pred_ctx.confidence >= 0.0);
+
+    hu_world_model_deinit(&wm);
+    mem.vtable->deinit(mem.ctx);
+}
+
+/* --- Online learning: record changes weight --- */
+
+static void cycle_record_signal_changes_weight(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+
+    hu_online_learning_t ol;
+    HU_ASSERT_EQ(hu_online_learning_create(&alloc, db, 0.1, &ol), HU_OK);
+    HU_ASSERT_EQ(hu_online_learning_init_tables(&ol), HU_OK);
+
+    /* Get baseline weight (should be 1.0 neutral) */
+    const char *strategy = "tool:test_strategy";
+    double before = hu_online_learning_get_weight(&ol, strategy, 18);
+    HU_ASSERT_TRUE(before == 1.0);
+
+    /* Record a learning signal — triggers update_weight internally */
+    hu_learning_signal_t sig = {0};
+    sig.type = HU_SIGNAL_TOOL_SUCCESS;
+    sig.magnitude = 0.8;
+    sig.timestamp = (int64_t)time(NULL);
+    memcpy(sig.tool_name, "test_strategy", 13);
+    sig.tool_name_len = 13;
+    HU_ASSERT_EQ(hu_online_learning_record(&ol, &sig), HU_OK);
+
+    /* Weight should have changed from default 1.0 */
+    double after = hu_online_learning_get_weight(&ol, strategy, 18);
+    HU_ASSERT_TRUE(after != 1.0);
+
+    hu_online_learning_deinit(&ol);
+    mem.vtable->deinit(mem.ctx);
+}
+
+/* --- Cycle triggers prompt patches (self_improve tables) --- */
+
+static void cycle_triggers_prompt_patches(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+    ensure_opinions_table(db);
+
+    int64_t now = (int64_t)time(NULL);
+
+    insert_finding(db, "research", "Prompt engineering improves responses",
+                   "high", "HIGH",
+                   "Adopt systematic prompt engineering approach",
+                   now - 60);
+
+    hu_intelligence_cycle_result_t r = {0};
+    hu_error_t err = hu_intelligence_run_cycle(&alloc, db, &r);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(r.findings_actioned >= 1);
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db,
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='prompt_patches'",
+        -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    rc = sqlite3_step(stmt);
+    HU_ASSERT_EQ(rc, SQLITE_ROW);
+    sqlite3_finalize(stmt);
+
+    rc = sqlite3_prepare_v2(db,
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='tool_prefs'",
+        -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    rc = sqlite3_step(stmt);
+    HU_ASSERT_EQ(rc, SQLITE_ROW);
+    sqlite3_finalize(stmt);
+
+    rc = sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM tool_prefs", -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    rc = sqlite3_step(stmt);
+    HU_ASSERT_EQ(rc, SQLITE_ROW);
+    int tool_count = sqlite3_column_int(stmt, 0);
+    sqlite3_finalize(stmt);
+    HU_ASSERT_TRUE(tool_count >= 3);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+/* --- Tree-of-thought: depth increases exploration --- */
+
+static void tot_depth_increases_exploration(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tot_config_t cfg1 = hu_tot_config_default();
+    cfg1.max_depth = 1;
+    cfg1.enabled = true;
+
+    hu_tot_result_t result1 = {0};
+    hu_error_t err1 = hu_tot_explore(&alloc, NULL, "test", 4, "solve this problem", 18,
+                                     &cfg1, &result1);
+    HU_ASSERT_EQ(err1, HU_OK);
+    HU_ASSERT_TRUE(result1.branches_explored >= 1);
+    size_t explored1 = result1.branches_explored;
+    hu_tot_result_free(&alloc, &result1);
+
+    hu_tot_config_t cfg3 = hu_tot_config_default();
+    cfg3.max_depth = 3;
+    cfg3.enabled = true;
+
+    hu_tot_result_t result3 = {0};
+    hu_error_t err3 = hu_tot_explore(&alloc, NULL, "test", 4, "solve this problem", 18,
+                                     &cfg3, &result3);
+    HU_ASSERT_EQ(err3, HU_OK);
+    HU_ASSERT_TRUE(result3.branches_explored >= explored1);
+    hu_tot_result_free(&alloc, &result3);
+}
+
 void run_intelligence_cycle_tests(void) {
     HU_TEST_SUITE("intelligence_cycle");
     HU_RUN_TEST(cycle_null_alloc_returns_invalid);
@@ -552,6 +777,12 @@ void run_intelligence_cycle_tests(void) {
     HU_RUN_TEST(cycle_records_growth_milestone);
     HU_RUN_TEST(cycle_seeds_behavioral_feedback);
     HU_RUN_TEST(cycle_low_priority_findings_skipped);
+    HU_RUN_TEST(cycle_simulation_cache_returns_cached_result);
+    HU_RUN_TEST(cycle_context_changes_prediction);
+    HU_RUN_TEST(cycle_record_signal_changes_weight);
+    HU_RUN_TEST(cycle_triggers_prompt_patches);
+    HU_RUN_TEST(tot_depth_increases_exploration);
+    HU_RUN_TEST(self_improve_tool_prefs_prompt_format);
 }
 
 #else

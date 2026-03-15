@@ -276,6 +276,7 @@ static const hu_command_t commands[] = {
     {"capabilities", "Show available capabilities", cmd_capabilities},
     {"models", "List available models", cmd_models},
     {"auth", "Authentication management", cmd_auth},
+    {"eval", "Run eval suites and compare runs", cmd_eval},
     {"update", "Check for updates", cmd_update},
 #ifdef HU_ENABLE_CURL
     {"paperclip", "Paperclip agent integration", cmd_paperclip},

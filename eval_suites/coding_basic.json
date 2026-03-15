@@ -1,0 +1,45 @@
+{
+  "name": "coding-basic",
+  "tasks": [
+    {
+      "id": "c1",
+      "prompt": "Write a Python function that returns the factorial of n",
+      "expected": "def factorial",
+      "category": "coding",
+      "difficulty": 1,
+      "timeout_ms": 15000
+    },
+    {
+      "id": "c2",
+      "prompt": "Write a function to check if a string is a palindrome",
+      "expected": "palindrome",
+      "category": "coding",
+      "difficulty": 1,
+      "timeout_ms": 15000
+    },
+    {
+      "id": "c3",
+      "prompt": "Write a function to find the maximum element in a list",
+      "expected": "max",
+      "category": "coding",
+      "difficulty": 1,
+      "timeout_ms": 15000
+    },
+    {
+      "id": "c4",
+      "prompt": "Write a binary search function",
+      "expected": "binary_search",
+      "category": "coding",
+      "difficulty": 2,
+      "timeout_ms": 15000
+    },
+    {
+      "id": "c5",
+      "prompt": "Write a function to reverse a linked list",
+      "expected": "reverse",
+      "category": "coding",
+      "difficulty": 3,
+      "timeout_ms": 15000
+    }
+  ]
+}

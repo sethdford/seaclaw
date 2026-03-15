@@ -1,0 +1,45 @@
+{
+  "name": "tool-use-basic",
+  "tasks": [
+    {
+      "id": "t1",
+      "prompt": "Use the shell tool to list files in the current directory",
+      "expected": "shell",
+      "category": "tool-selection",
+      "difficulty": 1,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "t2",
+      "prompt": "Read the contents of README.md",
+      "expected": "read_file",
+      "category": "tool-selection",
+      "difficulty": 1,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "t3",
+      "prompt": "Search for all Python files in the project",
+      "expected": "shell",
+      "category": "tool-selection",
+      "difficulty": 2,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "t4",
+      "prompt": "Save a note about the meeting tomorrow",
+      "expected": "memory_store",
+      "category": "tool-selection",
+      "difficulty": 2,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "t5",
+      "prompt": "Send a message to Alice on Telegram saying hello",
+      "expected": "send_message",
+      "category": "tool-selection",
+      "difficulty": 2,
+      "timeout_ms": 10000
+    }
+  ]
+}

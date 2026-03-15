@@ -3,6 +3,7 @@
 #ifdef HU_ENABLE_SQLITE
 #include "human/memory.h"
 #endif
+#include <string.h>
 
 static void test_experience_init_deinit(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -86,6 +87,39 @@ static void test_experience_memory_store_recall(void) {
 }
 #endif
 
+static void test_experience_record_recall_verifies_content(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_experience_store_t store;
+    hu_experience_store_init(&alloc, NULL, &store);
+
+    hu_experience_record(&store, "debug segfault", 14,
+                         "used gdb backtrace", 18,
+                         "found null pointer", 18, 0.95);
+    hu_experience_record(&store, "optimize query", 14,
+                         "added index", 11,
+                         "50x speedup", 11, 0.99);
+
+    char *ctx = NULL;
+    size_t ctx_len = 0;
+    HU_ASSERT_EQ(hu_experience_recall_similar(&store, "debug crash", 11, &ctx, &ctx_len), HU_OK);
+    HU_ASSERT_NOT_NULL(ctx);
+    HU_ASSERT_TRUE(ctx_len > 0);
+    HU_ASSERT_TRUE(strstr(ctx, "debug") != NULL || strstr(ctx, "segfault") != NULL ||
+                   strstr(ctx, "gdb") != NULL || strstr(ctx, "null pointer") != NULL);
+    alloc.free(alloc.ctx, ctx, ctx_len + 1);
+
+    ctx = NULL;
+    ctx_len = 0;
+    HU_ASSERT_EQ(hu_experience_recall_similar(&store, "optimize database", 17, &ctx, &ctx_len), HU_OK);
+    HU_ASSERT_NOT_NULL(ctx);
+    HU_ASSERT_TRUE(ctx_len > 0);
+    HU_ASSERT_TRUE(strstr(ctx, "optimize") != NULL || strstr(ctx, "index") != NULL ||
+                   strstr(ctx, "speedup") != NULL);
+    alloc.free(alloc.ctx, ctx, ctx_len + 1);
+
+    hu_experience_store_deinit(&store);
+}
+
 void run_experience_tests(void) {
     HU_TEST_SUITE("Experience Store");
     HU_RUN_TEST(test_experience_init_deinit);
@@ -93,6 +127,7 @@ void run_experience_tests(void) {
     HU_RUN_TEST(test_experience_recall);
     HU_RUN_TEST(test_experience_build_prompt);
     HU_RUN_TEST(test_experience_null_args);
+    HU_RUN_TEST(test_experience_record_recall_verifies_content);
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(test_experience_memory_store_recall);
 #endif

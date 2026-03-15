@@ -1,0 +1,85 @@
+{
+  "name": "reasoning-basic",
+  "tasks": [
+    {
+      "id": "r1",
+      "prompt": "What is 15 + 27?",
+      "expected": "42",
+      "category": "arithmetic",
+      "difficulty": 1,
+      "timeout_ms": 5000
+    },
+    {
+      "id": "r2",
+      "prompt": "If all cats are animals and Whiskers is a cat, is Whiskers an animal?",
+      "expected": "yes",
+      "category": "logic",
+      "difficulty": 1,
+      "timeout_ms": 5000
+    },
+    {
+      "id": "r3",
+      "prompt": "What comes next in the sequence: 2, 4, 8, 16, ?",
+      "expected": "32",
+      "category": "pattern",
+      "difficulty": 2,
+      "timeout_ms": 5000
+    },
+    {
+      "id": "r4",
+      "prompt": "A bat and a ball cost $1.10. The bat costs $1 more than the ball. How much does the ball cost?",
+      "expected": "$0.05",
+      "category": "reasoning",
+      "difficulty": 3,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "r5",
+      "prompt": "If it takes 5 machines 5 minutes to make 5 widgets, how long would it take 100 machines to make 100 widgets?",
+      "expected": "5 minutes",
+      "category": "reasoning",
+      "difficulty": 3,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "r6",
+      "prompt": "What is the capital of France?",
+      "expected": "Paris",
+      "category": "knowledge",
+      "difficulty": 1,
+      "timeout_ms": 5000
+    },
+    {
+      "id": "r7",
+      "prompt": "Translate 'hello world' to Spanish.",
+      "expected": "hola mundo",
+      "category": "translation",
+      "difficulty": 2,
+      "timeout_ms": 5000
+    },
+    {
+      "id": "r8",
+      "prompt": "What is the square root of 144?",
+      "expected": "12",
+      "category": "arithmetic",
+      "difficulty": 1,
+      "timeout_ms": 5000
+    },
+    {
+      "id": "r9",
+      "prompt": "In a race, you overtake the person in 2nd place. What position are you now in?",
+      "expected": "2nd",
+      "category": "reasoning",
+      "difficulty": 2,
+      "timeout_ms": 5000
+    },
+    {
+      "id": "r10",
+      "prompt": "How many months have 28 days?",
+      "expected": "12",
+      "category": "reasoning",
+      "difficulty": 2,
+      "timeout_ms": 5000
+    }
+  ]
+}

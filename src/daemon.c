@@ -52,6 +52,7 @@
 #include "human/memory/compression.h"
 #include "human/visual/content.h"
 #include "human/feeds/processor.h"
+#include "human/feeds/findings.h"
 #include "human/agent/arbitrator.h"
 #define HU_COGNITIVE_SKIP_LIFE_CHAPTER 1
 #include "human/memory/cognitive.h"
@@ -71,6 +72,7 @@
 #include "human/intelligence/online_learning.h"
 #include "human/intelligence/value_learning.h"
 #include "human/intelligence/world_model.h"
+#include "human/intelligence/cycle.h"
 #include "human/agent/goals.h"
 #endif
 #include "human/platform.h"
@@ -739,6 +741,14 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
                     }
                 }
             }
+#ifdef HU_ENABLE_SQLITE
+            /* Parse research agent output for findings */
+            if (strstr(prompt, "research") && agent->memory) {
+                sqlite3 *fdb = hu_sqlite_memory_get_db(agent->memory);
+                if (fdb)
+                    (void)hu_findings_parse_and_store(alloc, fdb, response, response_len);
+            }
+#endif
         }
 
         (void)hu_cron_add_run(agent->scheduler, alloc, jobs[i].id, (int64_t)now,
@@ -2110,6 +2120,27 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             (void)hu_feed_processor_poll(&fp, &fconf, last_feed_poll_types,
                                                          fp_now, &ingested);
                             last_feed_poll_global = fp_now;
+                        }
+                    }
+                }
+#endif
+#ifdef HU_ENABLE_SQLITE
+                /* Intelligence cycle — run every 6 hours to process findings, extract lessons, reflect */
+                {
+                    static int64_t last_intelligence_cycle = 0;
+                    int64_t cycle_interval = 6 * 3600;
+                    if (agent && agent->memory &&
+                        (last_intelligence_cycle == 0 || ((int64_t)t - last_intelligence_cycle) >= cycle_interval)) {
+                        sqlite3 *cycle_db = hu_sqlite_memory_get_db(agent->memory);
+                        if (cycle_db) {
+                            hu_intelligence_cycle_result_t cycle_result = {0};
+                            hu_error_t cycle_err = hu_intelligence_run_cycle(alloc, cycle_db, &cycle_result);
+                            if (cycle_err == HU_OK) {
+                                fprintf(stderr, "[human] intelligence cycle: %zu findings, %zu lessons, %zu events\n",
+                                        cycle_result.findings_actioned, cycle_result.lessons_extracted,
+                                        cycle_result.events_recorded);
+                            }
+                            last_intelligence_cycle = (int64_t)t;
                         }
                     }
                 }

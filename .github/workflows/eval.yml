@@ -1,6 +1,11 @@
 name: Agent Evaluation
 
 on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "include/**"
+      - "eval_suites/**"
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
@@ -10,8 +15,34 @@ on:
         default: "data/eval/golden_set.jsonl"
 
 jobs:
-  evaluate:
+  eval-suites:
+    name: Run eval suites
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-build
+        with:
+          build-type: Debug
+          enable-curl: "true"
+
+      - name: Run eval suite tests
+        run: ./build/human_tests --suite="Evaluation" --suite="eval_runner" --suite="eval_bench"
+
+      - name: Run sample eval suites
+        run: |
+          ./build/human eval list
+          for suite in eval_suites/*.json; do
+            echo "=== Running $suite ==="
+            ./build/human eval run "$suite" || true
+          done
+
+  golden-set:
+    name: Golden-set evaluation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
     steps:

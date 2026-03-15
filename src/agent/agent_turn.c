@@ -48,6 +48,7 @@
 #include "human/intelligence/online_learning.h"
 #include "human/intelligence/value_learning.h"
 #include "human/intelligence/world_model.h"
+#include "human/experience.h"
 #include "human/agent/goals.h"
 #endif
 #include "human/agent/constitutional.h"
@@ -654,6 +655,47 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         agent->alloc->free(agent->alloc->ctx, vctx, vctx_len + 1);
                     }
                     hu_value_engine_deinit(&ve);
+                }
+            }
+
+            /* World model: predict likely outcome of this request */
+            {
+                hu_world_model_t wm;
+                if (hu_world_model_create(agent->alloc, intel_db, &wm) == HU_OK) {
+                    hu_wm_prediction_t pred = {0};
+                    if (hu_world_simulate(&wm, msg, msg_len, NULL, 0, &pred) == HU_OK &&
+                        pred.confidence > 0.3) {
+                        int n = snprintf(parts + pos, sizeof(parts) - pos,
+                                         "### Predicted Outcome\n"
+                                         "Based on past patterns, this request likely leads to: %.*s "
+                                         "(confidence: %.0f%%)\n",
+                                         (int)(pred.outcome_len < 200 ? pred.outcome_len : 200),
+                                         pred.outcome,
+                                         pred.confidence * 100.0);
+                        if (n > 0 && pos + (size_t)n < sizeof(parts))
+                            pos += (size_t)n;
+                    }
+                    hu_world_model_deinit(&wm);
+                }
+            }
+
+            /* Experience: recall similar past experiences */
+            {
+                hu_experience_store_t exp_store;
+                if (hu_experience_store_init(agent->alloc, agent->memory, &exp_store) == HU_OK) {
+                    char *exp_prompt = NULL;
+                    size_t exp_prompt_len = 0;
+                    if (hu_experience_build_prompt(&exp_store, msg, msg_len, &exp_prompt, &exp_prompt_len) == HU_OK &&
+                        exp_prompt && exp_prompt_len > 0) {
+                        int n = snprintf(parts + pos, sizeof(parts) - pos,
+                                         "### %.*s\n", (int)exp_prompt_len, exp_prompt);
+                        if (n > 0 && pos + (size_t)n < sizeof(parts))
+                            pos += (size_t)n;
+                        agent->alloc->free(agent->alloc->ctx, exp_prompt, exp_prompt_len + 1);
+                    } else if (exp_prompt) {
+                        agent->alloc->free(agent->alloc->ctx, exp_prompt, 1);
+                    }
+                    hu_experience_store_deinit(&exp_store);
                 }
             }
 
@@ -1428,6 +1470,20 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
                 hu_commitment_detect_result_deinit(&cr, agent->alloc);
             }
+#ifdef HU_ENABLE_SQLITE
+            /* Record this turn as experience for future recall */
+            if (agent->memory) {
+                hu_experience_store_t exp_store;
+                if (hu_experience_store_init(agent->alloc, agent->memory, &exp_store) == HU_OK) {
+                    const char *resp_text = *response_out ? *response_out : "";
+                    size_t resp_len = response_len_out ? *response_len_out : 0;
+                    (void)hu_experience_record(&exp_store, msg, msg_len,
+                                               "agent_turn", 10,
+                                               resp_text, resp_len, 1.0);
+                    hu_experience_store_deinit(&exp_store);
+                }
+            }
+#endif
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
             if (agent->turn_arena)
