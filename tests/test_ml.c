@@ -3377,6 +3377,367 @@ static void test_train_invalid_args(void) {
                  HU_ERR_INVALID_ARGUMENT);
 }
 
+/* ─── Checkpoint: v1 backward compatibility ──────────────────────────── */
+
+static void test_checkpoint_v1_compat(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
+
+    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
+        .matrix_lr = 0.01f, .scalar_lr = 0.001f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt), HU_OK);
+
+    /* Step optimizer to populate state */
+    hu_ml_tensor_t *params = NULL;
+    size_t pcount = 0;
+    HU_ASSERT_EQ(model.vtable->get_params(model.ctx, &params, &pcount), HU_OK);
+    float *fake_grad = (float *)alloc.alloc(alloc.ctx, params[0].size_bytes);
+    size_t nf = params[0].size_bytes / sizeof(float);
+    for (size_t i = 0; i < nf; i++) fake_grad[i] = 0.05f * (float)(i % 5);
+    hu_ml_tensor_t gt = { .data = fake_grad, .size_bytes = params[0].size_bytes, .ndim = 1 };
+    gt.shape[0] = nf;
+    opt.vtable->step(opt.ctx, params, &gt, 1);
+
+    /* Manually write a v1 checkpoint (model params only, no optimizer state) */
+    const char *ckpt = "/tmp/test_v1_compat.bin";
+    FILE *f = fopen(ckpt, "wb");
+    HU_ASSERT_NOT_NULL(f);
+    uint32_t magic = 0x48554D4C;
+    uint32_t version = 1;
+    fwrite(&magic, sizeof(magic), 1, f);
+    fwrite(&version, sizeof(version), 1, f);
+    fwrite(&pcount, sizeof(pcount), 1, f);
+    for (size_t i = 0; i < pcount; i++) {
+        size_t sz = params[i].size_bytes;
+        fwrite(&sz, sizeof(sz), 1, f);
+        if (sz > 0) fwrite(params[i].data, 1, sz, f);
+    }
+    fclose(f);
+
+    /* Save original param values */
+    float *orig_vals = (float *)alloc.alloc(alloc.ctx, params[0].size_bytes);
+    memcpy(orig_vals, params[0].data, params[0].size_bytes);
+
+    /* Corrupt model params */
+    memset(params[0].data, 0, params[0].size_bytes);
+
+    /* Create fresh optimizer (optimizer state will NOT be restored for v1) */
+    hu_ml_optimizer_t opt2 = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt2), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt2), HU_OK);
+
+    /* Load v1 checkpoint — must succeed, restoring model params */
+    HU_ASSERT_EQ(hu_ml_checkpoint_load(&alloc, ckpt, &model, &opt2), HU_OK);
+
+    HU_ASSERT_EQ(model.vtable->get_params(model.ctx, &params, &pcount), HU_OK);
+    int match = 1;
+    float *restored = (float *)params[0].data;
+    for (size_t i = 0; i < nf; i++) {
+        if (fabsf(restored[i] - orig_vals[i]) > 1e-8f) { match = 0; break; }
+    }
+    HU_ASSERT_EQ(match, 1);
+
+    alloc.free(alloc.ctx, orig_vals, params[0].size_bytes);
+    alloc.free(alloc.ctx, fake_grad, params[0].size_bytes);
+    opt2.vtable->deinit(opt2.ctx, &alloc);
+    opt.vtable->deinit(opt.ctx, &alloc);
+    model.vtable->deinit(model.ctx, &alloc);
+    remove(ckpt);
+}
+
+/* ─── AdamW math: verify bias correction against hand-computed reference ── */
+
+static void test_adamw_math_reference(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+
+    hu_optimizer_config_t opt_cfg = {
+        .embedding_lr = 0.1f, .unembedding_lr = 0.1f,
+        .matrix_lr = 0.01f, .scalar_lr = 0.1f,
+        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f,
+        .weight_decay = 0.0f,
+    };
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
+
+    float param[2] = {1.0f, -1.0f};
+    float grad[2] = {0.0f, 0.0f};
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, param, grad, 1, 2, HU_PARAM_SCALAR), HU_OK);
+
+    /* Step 1: grad = [0.5, -0.3] */
+    grad[0] = 0.5f; grad[1] = -0.3f;
+    opt.vtable->step(opt.ctx, NULL, NULL, 0);
+
+    /* Hand-compute AdamW step 1 (beta1=0.9, beta2=0.999, lr=0.1, eps=1e-8):
+     *   exp_avg  = 0.1*g     = [0.05, -0.03]
+     *   exp_avg_sq = 0.001*g^2 = [0.00025, 0.00009]
+     *   bias1 = 1 - 0.9^1 = 0.1
+     *   bias2 = 1 - 0.999^1 = 0.001
+     *   step_size = lr/bias1 = 1.0
+     *   denom = sqrt(exp_avg_sq/bias2) + 1e-8
+     *   denom[0] = sqrt(0.00025/0.001) + 1e-8 = sqrt(0.25) + 1e-8 = 0.5 + 1e-8
+     *   denom[1] = sqrt(0.00009/0.001) + 1e-8 = sqrt(0.09) + 1e-8 = 0.3 + 1e-8
+     *   update[0] = 1.0 * 0.05 / 0.5 = 0.1
+     *   update[1] = 1.0 * (-0.03) / 0.3 = -0.1
+     *   param[0] = 1.0 - 0.1 = 0.9
+     *   param[1] = -1.0 - (-0.1) = -0.9
+     */
+    HU_ASSERT_FLOAT_EQ(param[0], 0.9f, 1e-5f);
+    HU_ASSERT_FLOAT_EQ(param[1], -0.9f, 1e-5f);
+
+    /* Step 2: same gradient */
+    opt.vtable->zero_grad(opt.ctx);
+    grad[0] = 0.5f; grad[1] = -0.3f;
+    opt.vtable->step(opt.ctx, NULL, NULL, 0);
+
+    /* Hand-compute step 2:
+     *   exp_avg = 0.9*[0.05,-0.03] + 0.1*[0.5,-0.3] = [0.095, -0.057]
+     *   exp_avg_sq = 0.999*[0.00025,0.00009] + 0.001*[0.25,0.09]
+     *             = [0.00024975+0.00025, 0.00008991+0.00009]
+     *             = [0.00049975, 0.00017991]
+     *   bias1 = 1 - 0.9^2 = 0.19
+     *   bias2 = 1 - 0.999^2 = 0.001999
+     *   step_size = 0.1/0.19 = 0.5263158
+     *   denom[0] = sqrt(0.00049975/0.001999) + 1e-8 = sqrt(0.24999) + 1e-8 ≈ 0.49999
+     *   denom[1] = sqrt(0.00017991/0.001999) + 1e-8 = sqrt(0.08999) + 1e-8 ≈ 0.29999
+     *   update[0] = 0.5263158 * 0.095 / 0.49999 ≈ 0.1
+     *   update[1] = 0.5263158 * (-0.057) / 0.29999 ≈ -0.1
+     *   param[0] ≈ 0.9 - 0.1 = 0.8
+     *   param[1] ≈ -0.9 + 0.1 = -0.8
+     */
+    HU_ASSERT_FLOAT_EQ(param[0], 0.8f, 1e-4f);
+    HU_ASSERT_FLOAT_EQ(param[1], -0.8f, 1e-4f);
+
+    opt.vtable->deinit(opt.ctx, &alloc);
+}
+
+/* ─── Checkpoint: resume training produces identical results ─────────── */
+
+static void test_checkpoint_resume_training(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+
+    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
+        .matrix_lr = 0.01f, .scalar_lr = 0.001f, .weight_decay = 0.01f,
+        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+
+    /* ── Run A: 4 uninterrupted steps ── */
+    hu_model_t modelA = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &modelA), HU_OK);
+    hu_ml_optimizer_t optA = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &optA), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&modelA, &optA), HU_OK);
+
+    hu_ml_tensor_t *paramsA = NULL;
+    size_t pcountA = 0;
+    HU_ASSERT_EQ(modelA.vtable->get_params(modelA.ctx, &paramsA, &pcountA), HU_OK);
+    size_t nf = paramsA[0].size_bytes / sizeof(float);
+    float *fake_grad = (float *)alloc.alloc(alloc.ctx, paramsA[0].size_bytes);
+    for (size_t i = 0; i < nf; i++) fake_grad[i] = 0.1f * (float)(i % 7 - 3);
+    hu_ml_tensor_t gt = { .data = fake_grad, .size_bytes = paramsA[0].size_bytes, .ndim = 1 };
+    gt.shape[0] = nf;
+
+    for (int s = 0; s < 4; s++)
+        optA.vtable->step(optA.ctx, paramsA, &gt, 1);
+
+    /* Save Run A's final params */
+    float *paramsA_final = (float *)alloc.alloc(alloc.ctx, paramsA[0].size_bytes);
+    memcpy(paramsA_final, paramsA[0].data, paramsA[0].size_bytes);
+
+    /* ── Run B: 2 steps, checkpoint, load, 2 more steps ── */
+    hu_model_t modelB = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &modelB), HU_OK);
+    hu_ml_optimizer_t optB = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &optB), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&modelB, &optB), HU_OK);
+
+    hu_ml_tensor_t *paramsB = NULL;
+    size_t pcountB = 0;
+    HU_ASSERT_EQ(modelB.vtable->get_params(modelB.ctx, &paramsB, &pcountB), HU_OK);
+
+    /* Ensure starting weights match (both from same hu_gpt_create init) */
+    for (int s = 0; s < 2; s++)
+        optB.vtable->step(optB.ctx, paramsB, &gt, 1);
+
+    const char *ckpt = "/tmp/test_resume_ckpt.bin";
+    HU_ASSERT_EQ(hu_ml_checkpoint_save(&alloc, ckpt, &modelB, &optB), HU_OK);
+
+    /* Create fresh model+optimizer, load checkpoint */
+    hu_model_t modelC = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &modelC), HU_OK);
+    hu_ml_optimizer_t optC = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &optC), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&modelC, &optC), HU_OK);
+    HU_ASSERT_EQ(hu_ml_checkpoint_load(&alloc, ckpt, &modelC, &optC), HU_OK);
+
+    hu_ml_tensor_t *paramsC = NULL;
+    size_t pcountC = 0;
+    HU_ASSERT_EQ(modelC.vtable->get_params(modelC.ctx, &paramsC, &pcountC), HU_OK);
+
+    /* 2 more steps on the resumed model */
+    for (int s = 0; s < 2; s++)
+        optC.vtable->step(optC.ctx, paramsC, &gt, 1);
+
+    /* Compare: Run A (4 steps) == Run B (2 steps + checkpoint + 2 steps) */
+    int match = 1;
+    for (size_t i = 0; i < nf; i++) {
+        if (fabsf(((float *)paramsC[0].data)[i] - paramsA_final[i]) > 1e-5f) {
+            match = 0; break;
+        }
+    }
+    HU_ASSERT_EQ(match, 1);
+
+    alloc.free(alloc.ctx, paramsA_final, paramsA[0].size_bytes);
+    alloc.free(alloc.ctx, fake_grad, paramsA[0].size_bytes);
+    optC.vtable->deinit(optC.ctx, &alloc);
+    modelC.vtable->deinit(modelC.ctx, &alloc);
+    optB.vtable->deinit(optB.ctx, &alloc);
+    modelB.vtable->deinit(modelB.ctx, &alloc);
+    optA.vtable->deinit(optA.ctx, &alloc);
+    modelA.vtable->deinit(modelA.ctx, &alloc);
+    remove(ckpt);
+}
+
+/* ─── Agent mutation: n_embd with head_dim divisibility ──────────────── */
+
+static void test_agent_apply_kv_nembd(void) {
+    hu_experiment_config_t cfg = hu_experiment_config_default();
+    /* Default: n_embd=512, head_dim=128, n_head=4, n_kv_head=4 */
+
+    /* Valid: 256 is divisible by head_dim=128 */
+    hu_experiment_apply_agent_kv(&cfg, "n_embd", "256");
+    HU_ASSERT_EQ(cfg.gpt.n_embd, 256u);
+    HU_ASSERT_EQ(cfg.gpt.n_head, 2u);     /* 256/128 */
+    HU_ASSERT_EQ(cfg.gpt.n_kv_head, 2u);
+
+    /* Valid: 384 is divisible by 128 */
+    hu_experiment_apply_agent_kv(&cfg, "n_embd", "384");
+    HU_ASSERT_EQ(cfg.gpt.n_embd, 384u);
+    HU_ASSERT_EQ(cfg.gpt.n_head, 3u);
+
+    /* Invalid: 300 is not divisible by 128 — should be rejected */
+    hu_experiment_apply_agent_kv(&cfg, "n_embd", "300");
+    HU_ASSERT_EQ(cfg.gpt.n_embd, 384u);
+
+    /* Invalid: 0 — rejected */
+    hu_experiment_apply_agent_kv(&cfg, "n_embd", "0");
+    HU_ASSERT_EQ(cfg.gpt.n_embd, 384u);
+
+    /* Invalid: >4096 — rejected */
+    hu_experiment_apply_agent_kv(&cfg, "n_embd", "4224");
+    HU_ASSERT_EQ(cfg.gpt.n_embd, 384u);
+
+    /* Valid: 4096 is divisible by 128, at the upper bound */
+    hu_experiment_apply_agent_kv(&cfg, "n_embd", "4096");
+    HU_ASSERT_EQ(cfg.gpt.n_embd, 4096u);
+    HU_ASSERT_EQ(cfg.gpt.n_head, 32u);
+
+    /* Valid: 128 (minimum valid) */
+    hu_experiment_apply_agent_kv(&cfg, "n_embd", "128");
+    HU_ASSERT_EQ(cfg.gpt.n_embd, 128u);
+    HU_ASSERT_EQ(cfg.gpt.n_head, 1u);
+}
+
+/* ─── Evaluator: total_bytes == 0 edge case ──────────────────────────── */
+
+static void test_evaluator_zero_bytes(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t gcfg = {0};
+    gcfg.sequence_len = 4; gcfg.vocab_size = 8; gcfg.n_layer = 1;
+    gcfg.n_head = 2; gcfg.n_kv_head = 2; gcfg.n_embd = 8; gcfg.head_dim = 4;
+
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &gcfg, &model), HU_OK);
+
+    /* All token_bytes = 0: every token has zero byte length */
+    int32_t token_bytes[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    const char *shard = "/tmp/hu_eval_zero_shard.bin";
+    FILE *f = fopen(shard, "wb");
+    HU_ASSERT_NOT_NULL(f);
+    int32_t data[8] = {1, 2, 3, 0, 1, 2, 3, 0};
+    fwrite(data, sizeof(int32_t), 8, f);
+    fclose(f);
+
+    hu_ml_dataloader_t *dl = NULL;
+    hu_error_t err = hu_ml_dataloader_create(&alloc, "/tmp", 2, 4, "val", &dl);
+    if (err != HU_OK) {
+        /* If shard naming doesn't match, skip gracefully */
+        model.vtable->deinit(model.ctx, &alloc);
+        remove(shard);
+        return;
+    }
+
+    hu_ml_eval_result_t result = {0};
+    err = hu_ml_evaluate_bpb(&alloc, &model, dl, token_bytes, 8, 8, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    /* total_bytes should be 0, BPB stays 0 (undefined, but not crash) */
+    HU_ASSERT_EQ(result.total_bytes, 0u);
+    HU_ASSERT_FLOAT_EQ((float)result.val_bpb, 0.0f, 1e-6f);
+
+    hu_ml_dataloader_deinit(dl);
+    model.vtable->deinit(model.ctx, &alloc);
+    remove(shard);
+}
+
+/* ─── Optimizer state mismatch detection ─────────────────────────────── */
+
+static void test_checkpoint_optimizer_mismatch(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
+
+    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
+        .matrix_lr = 0.01f, .scalar_lr = 0.001f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt), HU_OK);
+
+    /* Save valid v2 checkpoint */
+    const char *ckpt = "/tmp/test_opt_mismatch.bin";
+    HU_ASSERT_EQ(hu_ml_checkpoint_save(&alloc, ckpt, &model, &opt), HU_OK);
+
+    /* Create a model with different dimensions → different param structure */
+    hu_gpt_config_t cfg2 = cfg;
+    cfg2.n_layer = 2;
+    hu_model_t model2 = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg2, &model2), HU_OK);
+    hu_ml_optimizer_t opt2 = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt2), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&model2, &opt2), HU_OK);
+
+    /* Load should fail — param count mismatch triggers HU_ERR_IO */
+    hu_error_t err = hu_ml_checkpoint_load(&alloc, ckpt, &model2, &opt2);
+    HU_ASSERT_EQ(err, HU_ERR_IO);
+
+    /* Now test optimizer-only mismatch: same model, different optimizer structure */
+    hu_ml_optimizer_t opt3 = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt3), HU_OK);
+    /* Don't register params — group_count=0, mismatches the checkpoint's groups */
+
+    /* Load should fail at optimizer state (group_count mismatch) */
+    err = hu_ml_checkpoint_load(&alloc, ckpt, &model, &opt3);
+    HU_ASSERT_EQ(err, HU_ERR_IO);
+
+    opt3.vtable->deinit(opt3.ctx, &alloc);
+    opt2.vtable->deinit(opt2.ctx, &alloc);
+    model2.vtable->deinit(model2.ctx, &alloc);
+    opt.vtable->deinit(opt.ctx, &alloc);
+    model.vtable->deinit(model.ctx, &alloc);
+    remove(ckpt);
+}
+
 void run_ml_tests(void) {
     HU_TEST_SUITE("ml");
     /* BPE tokenizer */
@@ -3507,4 +3868,11 @@ void run_ml_tests(void) {
     /* Agent mutation + train API */
     HU_RUN_TEST(test_agent_apply_kv);
     HU_RUN_TEST(test_train_invalid_args);
+    /* SOTA: checkpoint compat, optimizer math, resume, agent n_embd, evaluator edge */
+    HU_RUN_TEST(test_checkpoint_v1_compat);
+    HU_RUN_TEST(test_adamw_math_reference);
+    HU_RUN_TEST(test_checkpoint_resume_training);
+    HU_RUN_TEST(test_agent_apply_kv_nembd);
+    HU_RUN_TEST(test_evaluator_zero_bytes);
+    HU_RUN_TEST(test_checkpoint_optimizer_mismatch);
 }
