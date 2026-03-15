@@ -25,6 +25,8 @@ targets:
         product: HumanChatUI
       - package: HumanKit
         product: HumanProtocol
+      - target: HumanWidgetExtension
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.human.ios
@@ -36,3 +38,17 @@ targets:
         GENERATE_INFOPLIST_FILE: false
     info:
       path: Sources/HumaniOS/Resources/Info.plist
+
+  HumanWidgetExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Sources/HumanWidgetExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.human.ios.widget
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        INFOPLIST_FILE: Sources/HumanWidgetExtension/Info.plist
+        GENERATE_INFOPLIST_FILE: false

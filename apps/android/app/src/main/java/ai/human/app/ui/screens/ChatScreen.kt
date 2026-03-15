@@ -1,6 +1,7 @@
 package ai.human.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -15,7 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -41,6 +42,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import ai.human.app.GatewayClient
 import ai.human.app.ui.HUTokens
+import ai.human.app.ui.StaggeredItem
+import ai.human.app.util.isReducedMotionEnabled
 
 private data class ChatMessage(
     val id: Int,
@@ -48,14 +51,15 @@ private data class ChatMessage(
     val isUser: Boolean,
 )
 
-private val chatSpring = spring<IntOffset>(
-    dampingRatio = 0.7f,
-    stiffness = HUTokens.springStandardStiffness,
+private val listItemSpring = spring<IntOffset>(
+    dampingRatio = 0.86f,
+    stiffness = Spring.StiffnessMediumLow,
 )
 
 @Composable
 fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
     val colorScheme = MaterialTheme.colorScheme
+    val reducedMotion = isReducedMotionEnabled()
     var nextId = remember { 1 }
     val messages = remember { mutableStateListOf<ChatMessage>() }
     var inputText by remember { mutableStateOf("") }
@@ -94,13 +98,15 @@ fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
                 verticalArrangement = Arrangement.spacedBy(HUTokens.spaceMd),
                 contentPadding = PaddingValues(bottom = HUTokens.spaceMd),
             ) {
-                items(messages) { message ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() + slideInVertically(
-                            animationSpec = chatSpring,
-                            initialOffsetY = { it / 4 },
-                        ),
+                itemsIndexed(messages, key = { _, it -> it.id }) { index, message ->
+                    StaggeredItem(
+                        index = index,
+                        reducedMotion = reducedMotion,
+                        enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
+                            slideInVertically(
+                                animationSpec = listItemSpring,
+                                initialOffsetY = { it / 4 },
+                            ),
                     ) {
                         ChatBubble(
                             text = message.text,
@@ -115,7 +121,8 @@ fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
                     .fillMaxWidth()
                     .padding(HUTokens.spaceMd)
                     .clip(RoundedCornerShape(HUTokens.radiusLg))
-                    .background(colorScheme.surfaceVariant)
+                    .background(colorScheme.surfaceContainerHigh)
+                    .border(1.dp, colorScheme.outlineVariant, RoundedCornerShape(HUTokens.radiusLg))
                     .padding(HUTokens.spaceSm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(HUTokens.spaceSm),

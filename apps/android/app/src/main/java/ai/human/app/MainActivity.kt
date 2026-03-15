@@ -3,13 +3,18 @@ package ai.human.app
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +55,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
 import ai.human.app.ui.screens.ChatScreen
 import ai.human.app.ui.screens.OverviewScreen
@@ -117,6 +123,10 @@ fun HumanApp(intent: Intent?) {
                 "settings" -> selectedTab = 4
             }
         }
+    }
+
+    BackHandler(enabled = selectedTab != 0) {
+        selectedTab = 0
     }
 
     Scaffold(
@@ -196,9 +206,11 @@ fun HumanApp(intent: Intent?) {
             AnimatedContent(
                 targetState = selectedTab,
                 transitionSpec = {
-                    fadeIn() togetherWith fadeOut()
+                    (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) +
+                        slideInVertically { it / 20 }) togetherWith
+                        fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
                 },
-                modifier = Modifier.graphicsLayer { },
+                modifier = Modifier.fillMaxSize(),
                 label = "screen_transition",
             ) { tab ->
                 when (tab) {
@@ -273,7 +285,8 @@ private fun OnboardingScreen(onComplete: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(HUTokens.radiusMd))
-                    .background(colorScheme.surfaceVariant)
+                    .background(colorScheme.surfaceContainerHigh)
+                    .border(1.dp, colorScheme.outlineVariant, RoundedCornerShape(HUTokens.radiusMd))
                     .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm)
                     .semantics { contentDescription = "Gateway URL" },
                 textStyle = TextStyle(

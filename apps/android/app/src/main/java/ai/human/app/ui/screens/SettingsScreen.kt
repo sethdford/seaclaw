@@ -2,10 +2,15 @@ package ai.human.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+// Material Icons (ExpandLess/ExpandMore) are acceptable on Android — native platform uses Material Icons; Phosphor is canonical for web only.
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -39,9 +45,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import ai.human.app.GatewayClient
 import ai.human.app.ConnectionState
 import ai.human.app.ui.HUTokens
+import ai.human.app.ui.StaggeredItem
+import ai.human.app.util.isReducedMotionEnabled
 
 @Composable
 fun SettingsScreen(
@@ -49,9 +59,14 @@ fun SettingsScreen(
     connectionState: ConnectionState,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val reducedMotion = isReducedMotionEnabled()
     var gatewayUrl by remember { mutableStateOf("ws://localhost:3000") }
     var advancedExpanded by remember { mutableStateOf(false) }
     val isConnected = connectionState == ConnectionState.CONNECTED
+
+    val listItemSpring = spring<IntOffset>(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)
+    val enterTransition = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
+        slideInVertically(animationSpec = listItemSpring, initialOffsetY = { it / 4 })
 
     Column(
         modifier = Modifier
@@ -59,16 +74,19 @@ fun SettingsScreen(
             .padding(HUTokens.spaceMd),
         verticalArrangement = Arrangement.spacedBy(HUTokens.spaceLg),
     ) {
-        Text(
-            text = "Gateway",
-            style = MaterialTheme.typography.titleMedium,
-            color = colorScheme.onBackground,
-            modifier = Modifier.semantics {
-                contentDescription = "Gateway settings"
-                heading()
-            },
-        )
+        StaggeredItem(index = 0, reducedMotion = reducedMotion, enter = enterTransition) {
+            Text(
+                text = "Gateway",
+                style = MaterialTheme.typography.titleMedium,
+                color = colorScheme.onBackground,
+                modifier = Modifier.semantics {
+                    contentDescription = "Gateway settings"
+                    heading()
+                },
+            )
+        }
 
+        StaggeredItem(index = 1, reducedMotion = reducedMotion, enter = enterTransition) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -100,9 +118,11 @@ fun SettingsScreen(
                 )
             }
         }
+        }
 
         Spacer(modifier = Modifier.height(HUTokens.spaceSm))
 
+        StaggeredItem(index = 2, reducedMotion = reducedMotion, enter = enterTransition) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -130,7 +150,9 @@ fun SettingsScreen(
                 color = colorScheme.onPrimary,
             )
         }
+        }
 
+        StaggeredItem(index = 3, reducedMotion = reducedMotion, enter = enterTransition) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -160,11 +182,17 @@ fun SettingsScreen(
                 )
             }
         }
+        }
 
+        StaggeredItem(index = 4, reducedMotion = reducedMotion, enter = enterTransition) {
         AnimatedVisibility(
             visible = advancedExpanded,
-            enter = expandVertically(),
-            exit = shrinkVertically(),
+            enter = expandVertically(
+                animationSpec = if (reducedMotion) snap() else spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
+            ),
+            exit = shrinkVertically(
+                animationSpec = if (reducedMotion) snap() else spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
+            ),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(HUTokens.spaceMd)) {
                 BasicTextField(
@@ -173,7 +201,8 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(HUTokens.radiusMd))
-                        .background(colorScheme.surfaceVariant)
+                        .background(colorScheme.surfaceContainerHigh)
+                        .border(1.dp, colorScheme.outlineVariant, RoundedCornerShape(HUTokens.radiusMd))
                         .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm)
                         .semantics { contentDescription = "Gateway URL: $gatewayUrl" },
                     textStyle = TextStyle(
@@ -198,18 +227,20 @@ fun SettingsScreen(
                 )
             }
         }
+        }
     }
 }
 
 @Composable
 private fun ConnectionStatusIndicator(isConnected: Boolean) {
     val colorScheme = MaterialTheme.colorScheme
+    val reducedMotion = isReducedMotionEnabled()
     val targetColor = if (isConnected) colorScheme.primary else colorScheme.error
     val animatedColor by animateColorAsState(
         targetValue = targetColor,
-        animationSpec = spring(
-            dampingRatio = 0.7f,
-            stiffness = HUTokens.springStandardStiffness,
+        animationSpec = if (reducedMotion) snap() else spring(
+            dampingRatio = 0.86f,
+            stiffness = Spring.StiffnessMediumLow,
         ),
         label = "connection_status_color",
     )

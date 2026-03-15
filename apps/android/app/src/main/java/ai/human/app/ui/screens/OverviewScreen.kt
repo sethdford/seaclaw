@@ -2,8 +2,8 @@ package ai.human.app.ui.screens
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -47,10 +47,12 @@ import androidx.compose.ui.unit.sp
 import ai.human.app.ConnectionState
 import ai.human.app.GatewayClient
 import ai.human.app.ui.HUTokens
+import ai.human.app.ui.StaggeredItem
+import ai.human.app.util.isReducedMotionEnabled
 
-private val overviewSpring = spring<IntOffset>(
+private val listItemSpring = spring<IntOffset>(
     dampingRatio = 0.86f,
-    stiffness = HUTokens.springInteractiveStiffness,
+    stiffness = Spring.StiffnessMediumLow,
 )
 
 @Composable
@@ -59,13 +61,9 @@ fun OverviewScreen(
     connectionState: ConnectionState = ConnectionState.DISCONNECTED,
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    var visible by remember { mutableStateOf(false) }
+    val reducedMotion = isReducedMotionEnabled()
     val events by gateway.events.collectAsState()
     val recentActivity = remember { mutableStateListOf<String>() }
-
-    LaunchedEffect(Unit) {
-        visible = true
-    }
 
     LaunchedEffect(events) {
         events?.let { event ->
@@ -103,11 +101,12 @@ fun OverviewScreen(
         contentPadding = PaddingValues(bottom = HUTokens.space2xl),
     ) {
         item {
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(animationSpec = tween(HUTokens.durationNormal.toInt())) +
+            StaggeredItem(
+                index = 0,
+                reducedMotion = reducedMotion,
+                enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
                     slideInVertically(
-                        animationSpec = overviewSpring,
+                        animationSpec = listItemSpring,
                         initialOffsetY = { it / 4 },
                     ),
             ) {
@@ -156,11 +155,12 @@ fun OverviewScreen(
         }
 
         item {
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(animationSpec = tween(HUTokens.durationNormal.toInt(), delayMillis = 50)) +
+            StaggeredItem(
+                index = 1,
+                reducedMotion = reducedMotion,
+                enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
                     slideInVertically(
-                        animationSpec = overviewSpring,
+                        animationSpec = listItemSpring,
                         initialOffsetY = { it / 4 },
                     ),
             ) {
@@ -183,11 +183,12 @@ fun OverviewScreen(
         }
 
         item {
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(animationSpec = tween(HUTokens.durationNormal.toInt(), delayMillis = 100)) +
+            StaggeredItem(
+                index = 2,
+                reducedMotion = reducedMotion,
+                enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
                     slideInVertically(
-                        animationSpec = overviewSpring,
+                        animationSpec = listItemSpring,
                         initialOffsetY = { it / 4 },
                     ),
             ) {
@@ -214,11 +215,12 @@ fun OverviewScreen(
         }
 
         item {
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(animationSpec = tween(HUTokens.durationNormal.toInt(), delayMillis = 150)) +
+            StaggeredItem(
+                index = 3,
+                reducedMotion = reducedMotion,
+                enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
                     slideInVertically(
-                        animationSpec = overviewSpring,
+                        animationSpec = listItemSpring,
                         initialOffsetY = { it / 4 },
                     ),
             ) {
@@ -230,15 +232,14 @@ fun OverviewScreen(
             }
         }
 
-        items(recentActivity) { activity ->
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(animationSpec = tween(HUTokens.durationNormal.toInt(), delayMillis = 200)) +
+        items(recentActivity.size) { index ->
+            val activity = recentActivity[index]
+            StaggeredItem(
+                index = 4 + index,
+                reducedMotion = reducedMotion,
+                enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
                     slideInVertically(
-                        animationSpec = spring<IntOffset>(
-                            dampingRatio = 0.86f,
-                            stiffness = HUTokens.springInteractiveStiffness,
-                        ),
+                        animationSpec = listItemSpring,
                         initialOffsetY = { it / 4 },
                     ),
             ) {
@@ -304,10 +305,11 @@ private fun StatCard(
             AnimatedContent(
                 targetState = value,
                 transitionSpec = {
+                    val spec = spring<IntOffset>(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)
                     if (targetState > initialState) {
-                        slideInVertically { -it } togetherWith slideOutVertically { it }
+                        slideInVertically(animationSpec = spec) { -it } togetherWith slideOutVertically(animationSpec = spec) { it }
                     } else {
-                        slideInVertically { it } togetherWith slideOutVertically { -it }
+                        slideInVertically(animationSpec = spec) { it } togetherWith slideOutVertically(animationSpec = spec) { -it }
                     }
                 },
                 label = "stat_counter",

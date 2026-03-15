@@ -1,6 +1,7 @@
 package ai.human.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -26,11 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
@@ -38,6 +35,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import ai.human.app.ui.HUTokens
+import ai.human.app.ui.StaggeredItem
+import ai.human.app.util.isReducedMotionEnabled
 
 private data class ToolItem(
     val id: String,
@@ -51,9 +50,9 @@ private data class ToolCategory(
     val tools: List<ToolItem>,
 )
 
-private val sessionSpring = spring<IntOffset>(
-    dampingRatio = 0.7f,
-    stiffness = HUTokens.springStandardStiffness,
+private val listItemSpring = spring<IntOffset>(
+    dampingRatio = 0.86f,
+    stiffness = Spring.StiffnessMediumLow,
 )
 
 @Composable
@@ -85,11 +84,7 @@ fun ToolsScreen() {
             ),
         )
     }
-    var visible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        visible = true
-    }
+    val reducedMotion = isReducedMotionEnabled()
 
     LazyColumn(
         modifier = Modifier
@@ -100,11 +95,12 @@ fun ToolsScreen() {
         contentPadding = PaddingValues(bottom = HUTokens.space2xl),
     ) {
         item {
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(animationSpec = spring(dampingRatio = 0.7f)) +
+            StaggeredItem(
+                index = 0,
+                reducedMotion = reducedMotion,
+                enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
                     slideInVertically(
-                        animationSpec = sessionSpring,
+                        animationSpec = listItemSpring,
                         initialOffsetY = { it / 4 },
                     ),
             ) {
@@ -122,11 +118,12 @@ fun ToolsScreen() {
 
         categories.forEachIndexed { index, category ->
             item(key = "header_${category.title}") {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(animationSpec = spring(dampingRatio = 0.7f)) +
+                StaggeredItem(
+                    index = 1 + index * 2,
+                    reducedMotion = reducedMotion,
+                    enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
                         slideInVertically(
-                            animationSpec = sessionSpring,
+                            animationSpec = listItemSpring,
                             initialOffsetY = { it / 4 },
                         ),
                 ) {
@@ -142,11 +139,12 @@ fun ToolsScreen() {
             }
 
             item(key = "grid_${category.title}") {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(animationSpec = spring(dampingRatio = 0.7f)) +
+                StaggeredItem(
+                    index = 2 + index * 2,
+                    reducedMotion = reducedMotion,
+                    enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
                         slideInVertically(
-                            animationSpec = sessionSpring,
+                            animationSpec = listItemSpring,
                             initialOffsetY = { it / 4 },
                         ),
                 ) {

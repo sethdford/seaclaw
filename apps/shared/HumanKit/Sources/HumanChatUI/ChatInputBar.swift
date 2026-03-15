@@ -7,21 +7,39 @@ public struct ChatInputBar: View {
     public let onSend: () -> Void
     public var placeholder: String = "Message"
     public var sendTrigger: Int = 0
+    public var focusBinding: FocusState<Bool>.Binding?
 
-    public init(text: Binding<String>, onSend: @escaping () -> Void, placeholder: String = "Message", sendTrigger: Int = 0) {
+    public init(
+        text: Binding<String>,
+        onSend: @escaping () -> Void,
+        placeholder: String = "Message",
+        sendTrigger: Int = 0,
+        focus: FocusState<Bool>.Binding? = nil
+    ) {
         self._text = text
         self.onSend = onSend
         self.placeholder = placeholder
         self.sendTrigger = sendTrigger
+        self.focusBinding = focus
     }
 
     private var tokens: (bgSurface: Color, accent: Color, textMuted: Color) {
         colorScheme == .dark ? (HUTokens.Dark.bgSurface, HUTokens.Dark.accent, HUTokens.Dark.textMuted) : (HUTokens.Light.bgSurface, HUTokens.Light.accent, HUTokens.Light.textMuted)
     }
 
+    @ViewBuilder
+    private var inputField: some View {
+        if let focus = focusBinding {
+            TextField(placeholder, text: $text, axis: .vertical)
+                .focused(focus)
+        } else {
+            TextField(placeholder, text: $text, axis: .vertical)
+        }
+    }
+
     public var body: some View {
         HStack(spacing: HUTokens.spaceMd) {
-            TextField(placeholder, text: $text, axis: .vertical)
+            inputField
                 .textFieldStyle(.plain)
                 .lineLimit(1...6)
                 .font(.custom("Avenir-Book", size: HUTokens.textBase, relativeTo: .body))
@@ -30,6 +48,7 @@ public struct ChatInputBar: View {
                 .background(tokens.bgSurface)
                 .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusXl, style: .continuous))
                 .accessibilityLabel("Message input")
+                .onSubmit { onSend() }
 
             Button(action: onSend) {
                 if #available(iOS 17, *) {

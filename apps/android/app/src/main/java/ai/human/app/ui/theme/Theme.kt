@@ -1,10 +1,14 @@
 package ai.human.app.ui.theme
 
+import android.os.Build
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -45,9 +49,9 @@ private val AvenirTypography = Typography(
     headlineLarge = TextStyle(
         fontFamily = AvenirFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 30.sp,
-        lineHeight = (30 * HUTokens.leadingSnug).sp,
-        letterSpacing = (HUTokens.trackingXl * 30).sp,
+        fontSize = HUTokens.textXl,
+        lineHeight = (HUTokens.textXl.value * HUTokens.leadingSnug).sp,
+        letterSpacing = (HUTokens.trackingXl * HUTokens.textXl.value).sp,
     ),
     headlineMedium = TextStyle(
         fontFamily = AvenirFontFamily,
@@ -66,9 +70,9 @@ private val AvenirTypography = Typography(
     titleLarge = TextStyle(
         fontFamily = AvenirFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 22.sp,
-        lineHeight = (22 * HUTokens.leadingNormal).sp,
-        letterSpacing = (HUTokens.trackingSm * 22).sp,
+        fontSize = HUTokens.textLg,
+        lineHeight = (HUTokens.textLg.value * HUTokens.leadingNormal).sp,
+        letterSpacing = (HUTokens.trackingSm * HUTokens.textLg.value).sp,
     ),
     titleMedium = TextStyle(
         fontFamily = AvenirFontFamily,
@@ -131,9 +135,16 @@ private val AvenirTypography = Typography(
 @Composable
 fun HumanTheme(
     darkTheme: Boolean = androidx.compose.foundation.isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = if (darkTheme) {
+    val context = LocalContext.current
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (darkTheme) dynamicDarkColorScheme(context)
+            else dynamicLightColorScheme(context)
+        }
+        darkTheme -> {
         val t = HUTokens.Dark
         darkColorScheme(
             primary = t.accent,
@@ -148,12 +159,16 @@ fun HumanTheme(
             surface = t.bgSurface,
             onSurface = t.text,
             surfaceVariant = t.surfaceContainer,
+            surfaceContainerLow = t.surfaceDim,
+            surfaceContainerHigh = t.surfaceContainerHigh,
+            surfaceContainerHighest = t.surfaceContainerHighest,
             error = t.error,
             onError = t.onAccent,
             outline = t.border,
             outlineVariant = t.borderSubtle,
         )
-    } else {
+        }
+        else -> {
         val t = HUTokens.Light
         lightColorScheme(
             primary = t.accent,
@@ -168,11 +183,15 @@ fun HumanTheme(
             surface = t.bgSurface,
             onSurface = t.text,
             surfaceVariant = t.surfaceContainer,
+            surfaceContainerLow = t.surfaceDim,
+            surfaceContainerHigh = t.surfaceContainerHigh,
+            surfaceContainerHighest = t.surfaceContainerHighest,
             error = t.error,
             onError = t.onAccent,
             outline = t.border,
             outlineVariant = t.borderSubtle,
         )
+        }
     }
 
     MaterialTheme(

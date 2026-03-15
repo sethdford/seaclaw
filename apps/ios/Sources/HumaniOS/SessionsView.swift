@@ -85,6 +85,23 @@ struct SessionsView: View {
 #endif
                         selectedSession = session
                     }
+#if os(iOS)
+                    .contextMenu {
+                        Button {
+                            UIPasteboard.general.string = [session.title, session.lastMessage].compactMap { $0 }.joined(separator: "\n")
+                        } label: { Label("Copy", systemImage: "doc.on.doc") }
+                        if let msg = session.lastMessage {
+                            ShareLink(item: "\(session.title)\n\n\(msg)") {
+                                Label("Share", systemImage: "square.and.arrow.up")
+                            }
+                        }
+                        Button(role: .destructive) {
+                            withAnimation(HUTokens.springExpressive) {
+                                sessions.removeAll { $0.id == session.id }
+                            }
+                        } label: { Label("Delete", systemImage: "trash") }
+                    }
+#endif
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
 #if os(iOS)
@@ -127,6 +144,23 @@ struct SessionsView: View {
 #endif
                                 selectedSession = session
                             }
+#if os(iOS)
+                            .contextMenu {
+                                Button {
+                                    UIPasteboard.general.string = [session.title, session.lastMessage].compactMap { $0 }.joined(separator: "\n")
+                                } label: { Label("Copy", systemImage: "doc.on.doc") }
+                                if let msg = session.lastMessage {
+                                    ShareLink(item: "\(session.title)\n\n\(msg)") {
+                                        Label("Share", systemImage: "square.and.arrow.up")
+                                    }
+                                }
+                                Button(role: .destructive) {
+                                    withAnimation(HUTokens.springExpressive) {
+                                        sessions.removeAll { $0.id == session.id }
+                                    }
+                                } label: { Label("Delete", systemImage: "trash") }
+                            }
+#endif
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
 #if os(iOS)

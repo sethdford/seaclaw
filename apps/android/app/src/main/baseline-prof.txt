@@ -1,0 +1,5 @@
+# Baseline profile for critical app startup and navigation paths
+# Covers main activity and critical paths. Generate full profile via:
+# ./gradlew :app:generateBaselineProfile
+HSPLai/human/app/MainActivity;->onCreate(Landroid/os/Bundle;)V
+HSPLai/human/app/MainActivity;->onNewIntent(Landroid/content/Intent;)V

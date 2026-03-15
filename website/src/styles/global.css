@@ -1041,10 +1041,33 @@
     max-width: 50%;
   }
 
-  /* ── Footer polish ── */
+  /* ── Footer polish (density 9) ── */
   .site-footer {
     border-top: 1px solid var(--hu-web-border);
     background: color-mix(in srgb, var(--hu-accent) 2%, var(--hu-web-bg));
+  }
+
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 2fr repeat(3, 1fr);
+    gap: var(--hu-space-xl);
+    align-items: start;
+  }
+
+  @media (max-width: 768px) {
+    .footer-grid {
+      grid-template-columns: 1fr;
+      gap: var(--hu-space-lg);
+    }
+  }
+
+  /* ── Section spacing (density 9) ── */
+  .section-spacing {
+    padding-block: var(--hu-space-4xl);
+  }
+
+  .section-spacing-sm {
+    padding-block: var(--hu-space-xl);
   }
 
   /* ── WebGL hero canvas ── */
@@ -1141,13 +1164,39 @@
     );
   }
 
-  .numbers-grid {
-    background-image: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--hu-accent) 2%, transparent),
-      transparent
-    );
-  }
+.numbers-grid {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--hu-accent) 2%, transparent),
+    transparent
+  );
+}
+
+/* ── Stats strip (density 9) ── */
+.numbers-grid.stats-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--hu-space-xl);
+  padding: var(--hu-space-lg) 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.numbers-grid.stats-strip .number-item {
+  padding: 0;
+  border: none;
+}
+
+.numbers-grid.stats-strip .stat-value {
+  font-size: var(--hu-text-2xl, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.numbers-grid.stats-strip .stat-label {
+  font-size: var(--hu-text-sm);
+  color: var(--hu-web-text-tertiary, var(--color-text-tertiary));
+}
 
   /* ── Comparison bars ── */
   .comparison-bar {
@@ -1800,10 +1849,10 @@ h3 {
   transform: scale(1);
 }
 
-/* ── Ecosystem Categorized Cards ── */
+/* ── Ecosystem Categorized Cards (density 9) ── */
 .eco-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--hu-space-lg);
   max-width: 960px;
   margin: 0 auto;
@@ -1815,7 +1864,7 @@ h3 {
   backdrop-filter: blur(16px);
   border: 1px solid color-mix(in srgb, var(--hu-border, var(--hu-web-border)) 50%, transparent);
   border-radius: var(--hu-radius-xl);
-  padding: var(--hu-space-2xl);
+  padding: var(--hu-space-lg);
   display: flex;
   flex-direction: column;
   transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -1828,12 +1877,20 @@ h3 {
 }
 
 .eco-card .eco-num {
-  font-size: clamp(2.5rem, 5vw, 3.5rem);
-  font-weight: 900;
-  letter-spacing: -0.03em;
+  font-size: var(--hu-text-2xl, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--hu-accent);
   line-height: 1;
-  margin-bottom: var(--hu-space-xs);
+  margin-bottom: 0;
+}
+
+.eco-card h3 {
+  font-size: var(--hu-text-base);
+}
+
+.eco-card p {
+  font-size: var(--hu-text-sm);
 }
 
 .eco-card .eco-pills {
@@ -1849,10 +1906,10 @@ h3 {
   }
 }
 
-/* ── Quality Ring Gauges ── */
+/* ── Quality Ring Gauges (density 9) ── */
 .quality-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--hu-space-lg);
   max-width: 960px;
   margin: 0 auto;
@@ -1863,7 +1920,7 @@ h3 {
   backdrop-filter: blur(16px);
   border: 1px solid color-mix(in srgb, var(--hu-border, var(--hu-web-border)) 50%, transparent);
   border-radius: var(--hu-radius-xl);
-  padding: var(--hu-space-2xl);
+  padding: var(--hu-space-lg);
   position: relative;
   overflow: hidden;
   transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -1877,13 +1934,21 @@ h3 {
 
 .q-card .q-num {
   position: absolute;
-  top: var(--hu-space-xl);
-  right: var(--hu-space-xl);
+  top: var(--hu-space-lg);
+  right: var(--hu-space-lg);
   font-family: var(--font-mono);
-  font-size: 24px;
+  font-size: var(--hu-text-xl);
   font-weight: 700;
   color: var(--hu-accent);
   opacity: 0.6;
+}
+
+.q-card h3 {
+  font-size: var(--hu-text-base);
+}
+
+.q-card p {
+  font-size: var(--hu-text-sm);
 }
 
 .ring-svg {

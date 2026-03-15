@@ -1,6 +1,9 @@
 import SwiftUI
 import HumanChatUI
 
+/// Motion 9 spring for all interactive animations.
+private let springMotion9 = Animation.spring(response: 0.35, dampingFraction: 0.86)
+
 @main
 struct HumanApp: App {
     @StateObject private var status = StatusViewModel()
@@ -13,10 +16,53 @@ struct HumanApp: App {
         }
         .defaultSize(width: 900, height: 600)
         .commands {
-            CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .newItem) {
+                Button("New Chat") {
+                    status.selectedTab = .chat
+                    status.connectIfNeeded()
+                }
+                .keyboardShortcut("n", modifiers: .command)
+                .accessibilityLabel("New chat")
+            }
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates...") {
+                    // Placeholder: app update check
+                }
+                .accessibilityLabel("Check for updates")
+            }
+            CommandMenu("Chat") {
+                Button("New Chat") {
+                    status.selectedTab = .chat
+                    status.connectIfNeeded()
+                }
+                .keyboardShortcut("n", modifiers: .command)
+                .accessibilityLabel("New chat")
+                Button("Clear History") {
+                    // Placeholder: clear chat history
+                }
+                .keyboardShortcut("k", modifiers: [.command, .shift])
+                .accessibilityLabel("Clear chat history")
+            }
+            CommandMenu("View") {
+                Button("Overview") { status.selectedTab = .overview }
+                    .keyboardShortcut("1", modifiers: .command)
+                    .accessibilityLabel("Navigate to Overview tab")
+                Button("Chat") { status.selectedTab = .chat }
+                    .keyboardShortcut("2", modifiers: .command)
+                    .accessibilityLabel("Navigate to Chat tab")
+                Button("Sessions") { status.selectedTab = .sessions }
+                    .keyboardShortcut("3", modifiers: .command)
+                    .accessibilityLabel("Navigate to Sessions tab")
+                Button("Tools") { status.selectedTab = .tools }
+                    .keyboardShortcut("4", modifiers: .command)
+                    .accessibilityLabel("Navigate to Tools tab")
+                Button("Settings") { status.selectedTab = .settings }
+                    .keyboardShortcut("5", modifiers: .command)
+                    .accessibilityLabel("Navigate to Settings tab")
+            }
             CommandMenu("Service") {
                 Button("Start Service") {
-                    withAnimation(HUTokens.springExpressive) {
+                    withAnimation(springMotion9) {
                         status.startService()
                     }
                 }
@@ -25,7 +71,7 @@ struct HumanApp: App {
                 .accessibilityLabel("Start h-uman background service")
 
                 Button("Stop Service") {
-                    withAnimation(HUTokens.springExpressive) {
+                    withAnimation(springMotion9) {
                         status.stopService()
                     }
                 }
@@ -42,23 +88,6 @@ struct HumanApp: App {
                 }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
                 .accessibilityLabel("Open h-uman dashboard in browser")
-            }
-            CommandMenu("Navigate") {
-                Button("Overview") { status.selectedTab = .overview }
-                    .keyboardShortcut("1")
-                    .accessibilityLabel("Navigate to Overview tab")
-                Button("Chat") { status.selectedTab = .chat }
-                    .keyboardShortcut("2")
-                    .accessibilityLabel("Navigate to Chat tab")
-                Button("Sessions") { status.selectedTab = .sessions }
-                    .keyboardShortcut("3")
-                    .accessibilityLabel("Navigate to Sessions tab")
-                Button("Tools") { status.selectedTab = .tools }
-                    .keyboardShortcut("4")
-                    .accessibilityLabel("Navigate to Tools tab")
-                Button("Settings") { status.selectedTab = .settings }
-                    .keyboardShortcut(",")
-                    .accessibilityLabel("Navigate to Settings tab")
             }
         }
 
@@ -77,7 +106,7 @@ struct HumanApp: App {
                 .keyboardShortcut("d")
                 .accessibilityLabel("Open h-uman dashboard in browser")
                 Button("Start Service") {
-                    withAnimation(HUTokens.springExpressive) {
+                    withAnimation(springMotion9) {
                         status.startService()
                     }
                 }
@@ -85,7 +114,7 @@ struct HumanApp: App {
                 .disabled(status.isServiceRunning)
                 .accessibilityLabel("Start h-uman background service")
                 Button("Stop Service") {
-                    withAnimation(HUTokens.springExpressive) {
+                    withAnimation(springMotion9) {
                         status.stopService()
                     }
                 }
@@ -111,7 +140,7 @@ struct HumanApp: App {
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(status.statusColor)
-                .animation(HUTokens.springExpressive, value: "\(status.isServiceRunning)-\(status.isGatewayConnected)")
+                .animation(springMotion9, value: "\(status.isServiceRunning)-\(status.isGatewayConnected)")
                 .accessibilityLabel("h-uman menu: \(status.isServiceRunning ? "service running" : "service stopped")")
         }
     }

@@ -5,6 +5,7 @@ import HumanProtocol
 struct ChatView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var connectionManager: ConnectionManager
+    @FocusState private var isInputFocused: Bool
     @State private var messages: [ChatMessage] = []
     @State private var inputText = ""
     @State private var toolCalls: [ToolCallInfo] = []
@@ -43,7 +44,7 @@ struct ChatView: View {
         VStack(spacing: 0) {
             messageList
             if let err = errorBanner { errorBannerView(err) }
-            ChatInputBar(text: $inputText, onSend: { sendMessage() }, sendTrigger: sendTrigger)
+            ChatInputBar(text: $inputText, onSend: { sendMessage() }, sendTrigger: sendTrigger, focus: $isInputFocused)
                 .background(tokens.bgSurface)
         }
     }
@@ -58,6 +59,21 @@ struct ChatView: View {
                             .id(msg.id)
                             .transition(messageTransition)
                             .accessibilityLabel(msg.text)
+#if os(iOS)
+                            .contextMenu {
+                                Button {
+                                    UIPasteboard.general.string = msg.text
+                                } label: { Label("Copy", systemImage: "doc.on.doc") }
+                                ShareLink(item: msg.text) {
+                                    Label("Share", systemImage: "square.and.arrow.up")
+                                }
+                                Button(role: .destructive) {
+                                    withAnimation(HUTokens.springInteractive) {
+                                        messages.removeAll { $0.id == msg.id }
+                                    }
+                                } label: { Label("Delete", systemImage: "trash") }
+                            }
+#endif
                     }
                     ForEach(toolCalls) { tc in
                         ToolCallCard(name: tc.name, arguments: tc.arguments, status: tc.status, result: tc.result)
@@ -113,9 +129,10 @@ struct ChatView: View {
                 .foregroundStyle(connectionManager.isConnected ? tokens.success : tokens.error)
                 .contentTransition(.symbolEffect(.replace))
         } else {
+            // Intentional small indicator size; HUTokens.spaceSm (8pt) is the closest token
             Circle()
                 .fill(connectionManager.isConnected ? tokens.success : tokens.error)
-                .frame(width: 8, height: 8)
+                .frame(width: HUTokens.spaceSm, height: HUTokens.spaceSm)
         }
     }
 

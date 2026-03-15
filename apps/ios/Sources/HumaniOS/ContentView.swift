@@ -43,6 +43,28 @@ struct ContentView: View {
                 .tag(AppTab.settings)
         }
         .tint(accentColor)
+#if os(iOS)
+        .overlay(alignment: .topLeading) {
+            // iPad keyboard shortcuts: Cmd+1..5 for tabs, Cmd+N for new chat
+            Group {
+                Button { selectedTab = .overview } label: { EmptyView() }
+                    .keyboardShortcut("1", modifiers: .command)
+                Button { selectedTab = .chat } label: { EmptyView() }
+                    .keyboardShortcut("2", modifiers: .command)
+                Button { selectedTab = .sessions } label: { EmptyView() }
+                    .keyboardShortcut("3", modifiers: .command)
+                Button { selectedTab = .tools } label: { EmptyView() }
+                    .keyboardShortcut("4", modifiers: .command)
+                Button { selectedTab = .settings } label: { EmptyView() }
+                    .keyboardShortcut("5", modifiers: .command)
+                Button { selectedTab = .chat } label: { EmptyView() }
+                    .keyboardShortcut("n", modifiers: .command)
+            }
+            .frame(width: 0, height: 0)
+            .opacity(0)
+            .allowsHitTesting(false)
+        }
+#endif
         .onReceive(NotificationCenter.default.publisher(for: .navigateToTab)) { notification in
             if let tab = notification.userInfo?["tab"] as? AppTab {
                 withAnimation(HUTokens.springExpressive) {

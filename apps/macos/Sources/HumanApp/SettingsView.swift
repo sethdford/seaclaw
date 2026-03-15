@@ -3,17 +3,20 @@ import HumanChatUI
 
 struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject var status: StatusViewModel
     @State private var gatewayURL: String = "ws://localhost:3000"
     @State private var autoStartOnLogin: Bool = false
     @State private var binaryPath: String = ""
+    @State private var appeared = false
+    @State private var advancedExpanded = false
 
-    private var accent: Color {
-        colorScheme == .dark ? HUTokens.Dark.accent : HUTokens.Light.accent
-    }
-
-    private var bgSurface: Color {
-        colorScheme == .dark ? HUTokens.Dark.bgSurface : HUTokens.Light.bgSurface
+    private var tokens: (text: Color, textMuted: Color, accent: Color, bgSurface: Color, border: Color, surfaceContainer: Color, success: Color, error: Color) {
+        if colorScheme == .dark {
+            return (HUTokens.Dark.text, HUTokens.Dark.textMuted, HUTokens.Dark.accent, HUTokens.Dark.bgSurface, HUTokens.Dark.border, HUTokens.Dark.surfaceContainer, HUTokens.Dark.success, HUTokens.Dark.error)
+        } else {
+            return (HUTokens.Light.text, HUTokens.Light.textMuted, HUTokens.Light.accent, HUTokens.Light.bgSurface, HUTokens.Light.border, HUTokens.Light.surfaceContainer, HUTokens.Light.success, HUTokens.Light.error)
+        }
     }
 
     var body: some View {
@@ -21,16 +24,16 @@ struct SettingsView: View {
             Section {
                 HStack {
                     Circle()
-                        .fill(status.isGatewayConnected ? (colorScheme == .dark ? HUTokens.Dark.success : HUTokens.Light.success) : (colorScheme == .dark ? HUTokens.Dark.error : HUTokens.Light.error))
+                        .fill(status.isGatewayConnected ? tokens.success : tokens.error)
                         .frame(width: HUTokens.spaceSm, height: HUTokens.spaceSm)
                     Text(status.isGatewayConnected ? "Connected" : "Disconnected")
                         .font(.custom("Avenir-Book", size: HUTokens.textSm))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(tokens.textMuted)
                     if status.isGatewayConnected {
                         Spacer()
                         Text("42 ms")
                             .font(.custom("Avenir-Book", size: HUTokens.textXs))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(tokens.textMuted)
                             .monospacedDigit()
                             .accessibilityLabel("Connection latency: 42 milliseconds")
                     }
@@ -39,38 +42,58 @@ struct SettingsView: View {
                 .accessibilityLabel("Gateway \(status.isGatewayConnected ? "connected" : "disconnected")")
             } header: {
                 Text("Connection")
+                    .font(.custom("Avenir-Medium", size: HUTokens.textSm))
+                    .foregroundStyle(tokens.textMuted)
             }
 
-            DisclosureGroup("Advanced") {
+            DisclosureGroup(isExpanded: $advancedExpanded) {
                 TextField("Gateway URL", text: $gatewayURL)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
+                    .font(.custom("Avenir-Book", size: HUTokens.textBase))
+                    .foregroundStyle(tokens.text)
+                    .padding(HUTokens.spaceSm)
+                    .background(
+                        RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                            .fill(tokens.surfaceContainer)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                                    .stroke(tokens.border, lineWidth: 1)
+                            )
+                    )
                     .accessibilityLabel("Gateway URL")
                 Toggle("Auto-start on login", isOn: $autoStartOnLogin)
                     .accessibilityLabel("Auto-start on login")
                     .accessibilityValue(autoStartOnLogin ? "On" : "Off")
             } label: {
                 Text("Advanced")
+                    .font(.custom("Avenir-Medium", size: HUTokens.textSm))
+                    .foregroundStyle(tokens.text)
             }
 
             Section {
                 Text(binaryPath.isEmpty ? "Not found" : binaryPath)
                     .font(.custom("Avenir-Book", size: HUTokens.textSm))
-                    .foregroundColor(binaryPath.isEmpty ? .secondary : .primary)
+                    .foregroundStyle(binaryPath.isEmpty ? tokens.textMuted : tokens.text)
             } header: {
                 Text("Binary")
+                    .font(.custom("Avenir-Medium", size: HUTokens.textSm))
+                    .foregroundStyle(tokens.textMuted)
             }
             .listRowBackground(
                 RoundedRectangle(cornerRadius: HUTokens.radiusSm)
-                    .fill(bgSurface)
+                    .fill(tokens.bgSurface)
                     .padding(.vertical, HUTokens.spaceXs)
             )
         }
         .padding(HUTokens.spaceSm)
         .frame(minWidth: 400, minHeight: 200)
-        .background(bgSurface)
-        .tint(accent)
-        .animation(HUTokens.springInteractive, value: binaryPath)
+        .background(tokens.bgSurface)
+        .tint(tokens.accent)
+        .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.86), value: binaryPath)
+        .opacity(appeared ? 1 : 0)
+        .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.86), value: appeared)
         .onAppear {
+            appeared = true
             let pm = ProcessManager()
             binaryPath = pm.humanPath() ?? ""
         }

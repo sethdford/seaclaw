@@ -218,15 +218,15 @@ class _MainScaffoldState extends State<MainScaffold> {
   Widget _buildTabContent(int index) {
     switch (index) {
       case 0:
-        return RepaintBoundary(child: _PlaceholderTab(name: _tabs[0].$1));
+        return RepaintBoundary(child: const _PlaceholderTab(name: 'Overview'));
       case 1:
-        return RepaintBoundary(child: _PlaceholderTab(name: _tabs[1].$1));
+        return RepaintBoundary(child: const _PlaceholderTab(name: 'Chat'));
       case 2:
-        return RepaintBoundary(child: _PlaceholderTab(name: _tabs[2].$1));
+        return RepaintBoundary(child: const _PlaceholderTab(name: 'Sessions'));
       case 3:
-        return RepaintBoundary(child: _PlaceholderTab(name: _tabs[3].$1));
+        return RepaintBoundary(child: const _PlaceholderTab(name: 'Settings'));
       default:
-        return RepaintBoundary(child: _PlaceholderTab(name: _tabs[0].$1));
+        return RepaintBoundary(child: const _PlaceholderTab(name: 'Overview'));
     }
   }
 }

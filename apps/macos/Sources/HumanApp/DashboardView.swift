@@ -1,6 +1,9 @@
 import SwiftUI
 import HumanChatUI
 
+/// Motion 9 spring: response 0.35, damping 0.86 for all interactive elements.
+private let springMotion9 = Animation.spring(response: 0.35, dampingFraction: 0.86)
+
 /// Wraps content in a lazy container so it is built only when first displayed.
 private struct LazyDetailView<Content: View>: View {
     let build: () -> Content
@@ -11,6 +14,7 @@ private struct LazyDetailView<Content: View>: View {
 struct DashboardView: View {
     @EnvironmentObject var status: StatusViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color) {
         if colorScheme == .dark {
@@ -23,12 +27,14 @@ struct DashboardView: View {
     var body: some View {
         NavigationSplitView {
             sidebar
-        } detail: {
+        }         detail: {
             detailContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(tokens.bgSurface)
+                .drawingGroup()
         }
         .navigationSplitViewStyle(.balanced)
+        .animation(reduceMotion ? nil : springMotion9, value: status.selectedTab)
         .onChange(of: status.selectedTab) { _, tab in
             if tab == .chat { status.connectIfNeeded() }
         }
@@ -60,6 +66,28 @@ struct DashboardView: View {
         .frame(minWidth: 180)
         .focusSection()
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: {
+                    status.selectedTab = .chat
+                    status.connectIfNeeded()
+                }) {
+                    Label("New Chat", systemImage: "plus")
+                }
+                .keyboardShortcut("n", modifiers: .command)
+                .accessibilityLabel("New chat")
+            }
+            ToolbarItem(placement: .status) {
+                HStack(spacing: HUTokens.spaceXs) {
+                    Circle()
+                        .fill(status.isGatewayConnected ? tokens.success : tokens.error)
+                        .frame(width: HUTokens.spaceSm, height: HUTokens.spaceSm)
+                    Text(status.isGatewayConnected ? "Connected" : "Disconnected")
+                        .font(.custom("Avenir-Book", size: HUTokens.textXs))
+                        .foregroundStyle(tokens.textMuted)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Gateway \(status.isGatewayConnected ? "connected" : "disconnected")")
+            }
             ToolbarItem(placement: .automatic) {
                 HStack(spacing: HUTokens.spaceXs) {
                     Circle()
@@ -97,10 +125,84 @@ struct DashboardView: View {
     }
 }
 
+private struct MacGatewayCard: View {
+    @ObservedObject var status: StatusViewModel
+    let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
+    let reduceMotion: Bool
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: HUTokens.spaceMd) {
+            Circle()
+                .fill(status.isGatewayConnected ? tokens.success : tokens.error)
+                .frame(width: HUTokens.spaceMd, height: HUTokens.spaceMd)
+            Text(status.isGatewayConnected ? "Gateway Connected" : "Gateway Disconnected")
+                .font(.custom("Avenir-Medium", size: HUTokens.textBase))
+                .foregroundStyle(tokens.text)
+            Spacer()
+            Text(status.gatewayURL)
+                .font(.custom("Avenir-Book", size: HUTokens.textSm))
+                .foregroundStyle(tokens.textMuted)
+        }
+        .padding(HUTokens.spaceMd)
+        .background(tokens.surfaceContainerHigh)
+        .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
+        .scaleEffect(isHovered ? 1.02 : 1.0)
+        .animation(reduceMotion ? nil : springMotion9, value: isHovered)
+        .onHover { isHovered = $0 }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Gateway \(status.isGatewayConnected ? "connected" : "disconnected") at \(status.gatewayURL)")
+    }
+}
+
+private struct MacStatCard: View {
+    let stat: (String, String, String)
+    let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
+    let index: Int
+    let appeared: Bool
+    let reduceMotion: Bool
+    @State private var isHovered = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
+            Image(systemName: stat.2)
+                .font(.custom("Avenir-Medium", size: HUTokens.textLg))
+                .foregroundStyle(tokens.accent)
+            Text(stat.1)
+                .font(.custom("Avenir-Heavy", size: 28))
+                .kerning(-0.5)
+                .foregroundStyle(tokens.text)
+            Text(stat.0)
+                .font(.custom("Avenir-Book", size: HUTokens.textXs))
+                .foregroundStyle(tokens.textMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(HUTokens.spaceMd)
+        .background(tokens.surfaceContainerHigh)
+        .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
+        .scaleEffect(isHovered ? 1.02 : 1.0)
+        .animation(reduceMotion ? nil : springMotion9, value: isHovered)
+        .onHover { isHovered = $0 }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(stat.0): \(stat.1)")
+        .transition(.asymmetric(
+            insertion: .move(edge: .bottom).combined(with: .opacity),
+            removal: .opacity
+        ))
+        .opacity(appeared ? 1 : 0)
+        .scaleEffect(appeared ? 1 : 0.9)
+        .animation(
+            reduceMotion ? nil : springMotion9.delay(Double(Swift.min(index, 6)) * 0.05),
+            value: appeared
+        )
+    }
+}
+
 struct MacOverviewPane: View {
     let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
     @ObservedObject var status: StatusViewModel
     @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let stats: [(String, String, String)] = [
         ("Providers", "9", "cpu"),
@@ -117,47 +219,11 @@ struct MacOverviewPane: View {
                     .kerning(-0.5)
                     .foregroundStyle(tokens.text)
 
-                HStack(spacing: HUTokens.spaceMd) {
-                    Circle()
-                        .fill(status.isGatewayConnected ? tokens.success : tokens.error)
-                        .frame(width: HUTokens.spaceMd, height: HUTokens.spaceMd)
-                    Text(status.isGatewayConnected ? "Gateway Connected" : "Gateway Disconnected")
-                        .font(.custom("Avenir-Medium", size: HUTokens.textBase))
-                        .foregroundStyle(tokens.text)
-                    Spacer()
-                    Text(status.gatewayURL)
-                        .font(.custom("Avenir-Book", size: HUTokens.textSm))
-                        .foregroundStyle(tokens.textMuted)
-                }
-                .padding(HUTokens.spaceMd)
-                .background(tokens.surfaceContainerHigh)
-                .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Gateway \(status.isGatewayConnected ? "connected" : "disconnected") at \(status.gatewayURL)")
+                MacGatewayCard(status: status, tokens: tokens, reduceMotion: reduceMotion)
 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: HUTokens.spaceMd), count: 4), spacing: HUTokens.spaceMd) {
                     ForEach(Array(stats.enumerated()), id: \.offset) { index, stat in
-                        VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
-                            Image(systemName: stat.2)
-                                .font(.custom("Avenir-Medium", size: HUTokens.textLg))
-                                .foregroundStyle(tokens.accent)
-                            Text(stat.1)
-                                .font(.custom("Avenir-Heavy", size: 28))
-                                .kerning(-0.5)
-                                .foregroundStyle(tokens.text)
-                            Text(stat.0)
-                                .font(.custom("Avenir-Book", size: HUTokens.textXs))
-                                .foregroundStyle(tokens.textMuted)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(HUTokens.spaceMd)
-                        .background(tokens.surfaceContainerHigh)
-                        .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
-                        .accessibilityElement(children: .contain)
-                        .accessibilityLabel("\(stat.0): \(stat.1)")
-                        .opacity(appeared ? 1 : 0)
-                        .scaleEffect(appeared ? 1 : 0.9)
-                        .animation(HUTokens.springExpressive.delay(Double(index) * 0.05), value: appeared)
+                        MacStatCard(stat: stat, tokens: tokens, index: index, appeared: appeared, reduceMotion: reduceMotion)
                     }
                 }
 
@@ -223,7 +289,11 @@ struct MacOverviewPane: View {
             .padding(HUTokens.spaceLg)
         }
         .onAppear {
-            withAnimation(HUTokens.springExpressive) { appeared = true }
+            if reduceMotion {
+                appeared = true
+            } else {
+                withAnimation(springMotion9) { appeared = true }
+            }
         }
     }
 }
@@ -249,6 +319,8 @@ struct MacChatPane: View {
 
 struct MacSessionsPane: View {
     let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
 
     private let sessions: [(String, String, Int, String)] = [
         ("CLI conversation", "2 min ago", 12, "I'll check the forecast for you."),
@@ -265,7 +337,7 @@ struct MacSessionsPane: View {
                 .padding(.top, HUTokens.spaceLg)
 
             List {
-                ForEach(Array(sessions.enumerated()), id: \.offset) { _, session in
+                ForEach(Array(sessions.enumerated()), id: \.element.0) { index, session in
                     HStack {
                         Image(systemName: "bubble.left.and.bubble.right")
                             .foregroundStyle(tokens.accent)
@@ -298,7 +370,23 @@ struct MacSessionsPane: View {
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("\(session.0), \(session.2) messages, \(session.1), preview: \(session.3)")
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .opacity
+                    ))
+                    .opacity(appeared ? 1 : 0)
+                    .animation(
+                        reduceMotion ? nil : springMotion9.delay(Double(Swift.min(index, 6)) * 0.05),
+                        value: appeared
+                    )
                 }
+            }
+        }
+        .onAppear {
+            if reduceMotion {
+                appeared = true
+            } else {
+                withAnimation(springMotion9) { appeared = true }
             }
         }
     }
@@ -306,6 +394,8 @@ struct MacSessionsPane: View {
 
 struct MacToolsPane: View {
     let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
 
     private let tools: [(String, String, String, String)] = [
         ("Shell", "Execute commands", "terminal", "2m ago"),
@@ -326,33 +416,65 @@ struct MacToolsPane: View {
                     .foregroundStyle(tokens.text)
 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: HUTokens.spaceMd), count: 3), spacing: HUTokens.spaceMd) {
-                    ForEach(Array(tools.enumerated()), id: \.offset) { _, tool in
-                        VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
-                            Image(systemName: tool.2)
-                                .font(.custom("Avenir-Medium", size: HUTokens.textLg))
-                                .foregroundStyle(tokens.accent)
-                                .accessibilityHidden(true)
-                            Text(tool.0)
-                                .font(.custom("Avenir-Heavy", size: HUTokens.textBase))
-                                .foregroundStyle(tokens.text)
-                            Text(tool.1)
-                                .font(.custom("Avenir-Book", size: HUTokens.textXs))
-                                .foregroundStyle(tokens.textMuted)
-                            Text(tool.3)
-                                .font(.custom("Avenir-Book", size: HUTokens.textXs))
-                                .foregroundStyle(tokens.textMuted)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(HUTokens.spaceMd)
-                        .background(tokens.surfaceContainerHigh)
-                        .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
-                        .accessibilityElement(children: .contain)
-                        .accessibilityLabel("\(tool.0): \(tool.1), last used \(tool.3)")
+                    ForEach(Array(tools.enumerated()), id: \.element.0) { index, tool in
+                        MacToolCard(tool: tool, tokens: tokens, index: index, appeared: appeared, reduceMotion: reduceMotion)
                     }
                 }
             }
             .padding(HUTokens.spaceLg)
         }
+        .onAppear {
+            if reduceMotion {
+                appeared = true
+            } else {
+                withAnimation(springMotion9) { appeared = true }
+            }
+        }
+    }
+}
+
+private struct MacToolCard: View {
+    let tool: (String, String, String, String)
+    let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
+    let index: Int
+    let appeared: Bool
+    let reduceMotion: Bool
+    @State private var isHovered = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
+            Image(systemName: tool.2)
+                .font(.custom("Avenir-Medium", size: HUTokens.textLg))
+                .foregroundStyle(tokens.accent)
+                .accessibilityHidden(true)
+            Text(tool.0)
+                .font(.custom("Avenir-Heavy", size: HUTokens.textBase))
+                .foregroundStyle(tokens.text)
+            Text(tool.1)
+                .font(.custom("Avenir-Book", size: HUTokens.textXs))
+                .foregroundStyle(tokens.textMuted)
+            Text(tool.3)
+                .font(.custom("Avenir-Book", size: HUTokens.textXs))
+                .foregroundStyle(tokens.textMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(HUTokens.spaceMd)
+        .background(tokens.surfaceContainerHigh)
+        .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
+        .scaleEffect(isHovered ? 1.02 : 1.0)
+        .animation(reduceMotion ? nil : springMotion9, value: isHovered)
+        .onHover { isHovered = $0 }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(tool.0): \(tool.1), last used \(tool.3)")
+        .transition(.asymmetric(
+            insertion: .move(edge: .bottom).combined(with: .opacity),
+            removal: .opacity
+        ))
+        .opacity(appeared ? 1 : 0)
+        .animation(
+            reduceMotion ? nil : springMotion9.delay(Double(Swift.min(index, 6)) * 0.05),
+            value: appeared
+        )
     }
 }
 

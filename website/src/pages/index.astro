@@ -355,7 +355,7 @@ const tools = [
           <div class="grid md:grid-cols-2 gap-16 items-center">
             <div>
               <h2
-                class="bloat-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-12"
+                class="bloat-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-6"
                 data-reveal
                 style="color: var(--color-text); letter-spacing: -0.03em;"
               >
@@ -489,7 +489,7 @@ const tools = [
             What's inside <span style="color: var(--color-accent)">1,696&nbsp;kilobytes?</span>
           </h2>
           <p
-            class="text-lg mb-12"
+            class="text-lg mb-6"
             data-reveal
             style="color: var(--color-text-secondary)"
           >
@@ -523,14 +523,14 @@ const tools = [
             From data centers to five-dollar boards.
           </h2>
           <p
-            class="spectrum-sub text-lg mb-16 text-center"
+            class="spectrum-sub text-lg mb-6 text-center"
             data-reveal
             style="color: var(--color-text-secondary)"
           >
             The same binary. The same config. Every device on the spectrum.
           </p>
 
-          <div class="flex flex-wrap justify-center items-end gap-8 md:gap-12 mb-12" data-reveal>
+          <div class="flex flex-wrap justify-center items-end gap-8 md:gap-12 mb-6" data-reveal>
             <div class="device-item">
               <svg class="device-svg" width="100" height="80" viewBox="0 0 100 80" aria-label="Server rack illustration">
                 <rect x="10" y="5" width="80" height="50" rx="4" fill="none" stroke="var(--color-accent)" stroke-width="1.5"/>
@@ -815,7 +815,7 @@ const tools = [
             An ecosystem, not a walled garden.
           </h2>
           <p
-            class="providers-sub text-lg mb-16"
+            class="providers-sub text-lg mb-6"
             data-reveal
             style="color: var(--color-text-secondary)"
           >
@@ -824,8 +824,10 @@ const tools = [
 
           <div class="eco-grid" id="provider-grid">
             <div class="eco-card text-left" data-reveal="scale" style="--ri: 0">
-              <div class="eco-num">50+</div>
-              <h3 class="text-base font-semibold mb-2" style="color: var(--color-text)">AI Providers</h3>
+              <div class="eco-card-header flex items-baseline gap-2 flex-wrap">
+                <span class="eco-num">50+</span>
+                <h3 class="text-base font-semibold mb-0" style="color: var(--color-text)">AI Providers</h3>
+              </div>
               <p class="text-[13px] leading-relaxed mb-5" style="color: var(--color-text-secondary)">Cloud APIs and local models. Switch with one line of config.</p>
               <div class="eco-pills">
                 {providers.slice(0, 8).map((name) => (
@@ -836,9 +838,11 @@ const tools = [
             </div>
 
             <div class="eco-card text-left" data-reveal="scale" style="--ri: 1">
-              <div class="eco-num">34</div>
-              <h3 class="text-base font-semibold mb-2" style="color: var(--color-text)">Channels</h3>
-              <p class="text-[13px] leading-relaxed mb-5" style="color: var(--color-text-secondary)">One agent, every platform. Users message you where they already are.</p>
+              <div class="eco-card-header flex items-baseline gap-2 flex-wrap">
+                <span class="eco-num">34</span>
+                <h3 class="text-base font-semibold mb-0" style="color: var(--color-text)">Channels</h3>
+              </div>
+              <p class="text-[13px] leading-relaxed mb-3" style="color: var(--color-text-secondary)">One agent, every platform. Users message you where they already are.</p>
               <div class="eco-pills">
                 {channels.slice(0, 8).map((name) => (
                   <span class="provider-pill px-3 py-1 rounded-md text-[11px] font-medium" style="color: var(--color-pill-channel); background: var(--color-pill-channel-bg); border: 1px solid var(--color-pill-channel-border)">{name}</span>
@@ -848,9 +852,11 @@ const tools = [
             </div>
 
             <div class="eco-card text-left" data-reveal="scale" style="--ri: 2">
-              <div class="eco-num">67+</div>
-              <h3 class="text-base font-semibold mb-2" style="color: var(--color-text)">Tools</h3>
-              <p class="text-[13px] leading-relaxed mb-5" style="color: var(--color-text-secondary)">Not a chatbot — an agent. Real access to your system.</p>
+              <div class="eco-card-header flex items-baseline gap-2 flex-wrap">
+                <span class="eco-num">67+</span>
+                <h3 class="text-base font-semibold mb-0" style="color: var(--color-text)">Tools</h3>
+              </div>
+              <p class="text-[13px] leading-relaxed mb-3" style="color: var(--color-text-secondary)">Not a chatbot — an agent. Real access to your system.</p>
               <div class="eco-pills">
                 {tools.map((name) => (
                   <span class="provider-pill px-3 py-1 rounded-md text-[11px] font-medium" style="color: var(--color-pill-tool); background: var(--color-pill-tool-bg); border: 1px solid var(--color-pill-tool-border)">{name}</span>
@@ -866,17 +872,17 @@ const tools = [
 
       {/* ═══ TERMINAL ═══ */}
 
-      <section class="py-16 md:py-32 px-6 cv-defer">
+      <section class="section-spacing px-6 cv-defer">
         <div class="max-w-3xl mx-auto">
           <h2
-            class="terminal-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4 text-center"
+            class="terminal-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-6 text-center"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
             Three commands. Zero dependencies.
           </h2>
           <p
-            class="terminal-sub text-lg mb-12 text-center"
+            class="terminal-sub text-lg mb-6 text-center"
             data-reveal
             style="color: var(--color-text-secondary)"
           >
@@ -930,7 +936,7 @@ const tools = [
             A command center, not a status page.
           </h2>
           <p
-            class="dash-sub text-lg mb-12"
+            class="dash-sub text-lg mb-6"
             data-reveal
             style="color: var(--color-text-secondary)"
           >
@@ -1136,7 +1142,7 @@ const tools = [
             Built to a standard, not a deadline.
           </h2>
           <p
-            class="text-lg mb-16"
+            class="text-lg mb-6"
             data-reveal
             style="color: var(--color-text-secondary)"
           >

@@ -1,6 +1,7 @@
 package ai.human.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -14,7 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -26,7 +27,6 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +40,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import ai.human.app.ui.HUTokens
+import ai.human.app.ui.StaggeredItem
+import ai.human.app.util.isReducedMotionEnabled
 
 private data class SessionItem(
     val id: String,
@@ -49,9 +51,9 @@ private data class SessionItem(
     val preview: String,
 )
 
-private val sessionSpring = spring<IntOffset>(
-    dampingRatio = 0.7f,
-    stiffness = HUTokens.springStandardStiffness,
+private val listItemSpring = spring<IntOffset>(
+    dampingRatio = 0.86f,
+    stiffness = Spring.StiffnessMediumLow,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,11 +69,7 @@ fun SessionsScreen() {
             SessionItem("5", "Email thread", "2 days ago", 6, "Let me look into this."),
         )
     }
-    var visible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        visible = true
-    }
+    val reducedMotion = isReducedMotionEnabled()
 
     LazyColumn(
         modifier = Modifier
@@ -82,11 +80,12 @@ fun SessionsScreen() {
         contentPadding = PaddingValues(bottom = HUTokens.space2xl),
     ) {
         item {
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(animationSpec = spring(dampingRatio = 0.7f)) +
+            StaggeredItem(
+                index = 0,
+                reducedMotion = reducedMotion,
+                enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
                     slideInVertically(
-                        animationSpec = sessionSpring,
+                        animationSpec = listItemSpring,
                         initialOffsetY = { it / 4 },
                     ),
             ) {
@@ -102,24 +101,23 @@ fun SessionsScreen() {
             }
         }
 
-        items(
+        itemsIndexed(
             items = sessions,
-            key = { it.id },
-        ) { session ->
-            Box(modifier = Modifier.animateItem()) {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(animationSpec = spring(dampingRatio = 0.7f)) +
-                        slideInVertically(
-                            animationSpec = sessionSpring,
-                            initialOffsetY = { it / 4 },
-                        ),
-                ) {
-                    SessionListItem(
-                        session = session,
-                        onDismiss = { sessions.remove(session) },
-                    )
-                }
+            key = { _, it -> it.id },
+        ) { index, session ->
+            StaggeredItem(
+                index = 1 + index,
+                reducedMotion = reducedMotion,
+                enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
+                    slideInVertically(
+                        animationSpec = listItemSpring,
+                        initialOffsetY = { it / 4 },
+                    ),
+            ) {
+                SessionListItem(
+                    session = session,
+                    onDismiss = { sessions.remove(session) },
+                )
             }
         }
     }

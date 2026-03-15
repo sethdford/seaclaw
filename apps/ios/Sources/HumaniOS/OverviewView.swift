@@ -137,6 +137,13 @@ struct OverviewView: View {
                 }
                 .padding(.vertical)
             }
+            .refreshable {
+                connectionManager.reconnect()
+#if os(iOS)
+                let impact = UIImpactFeedbackGenerator(style: .light)
+                impact.impactOccurred()
+#endif
+            }
             .background(tokens.bgSurface)
             .navigationTitle("Overview")
             .onAppear {

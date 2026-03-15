@@ -19,15 +19,15 @@ updated: 2026-03-09
 | 9     | Category-defining (Awwwards winner tier) |
 | 10    | Sets the standard others measure against |
 
-## Current Scores (Q1 2026 — Sprint 10)
+## Current Scores (Q1 2026 — Sprint 11)
 
 | Surface   | Perf | Visual | Motion | Density | A11y | Brand | Innovation | Total | Target      |
 | --------- | ---- | ------ | ------ | ------- | ---- | ----- | ---------- | ----- | ----------- |
-| Website   | 10   | 9      | 9      | 8       | 10   | 9     | 9          | 64/70 | 63+ (9 avg) |
+| Website   | 10   | 9      | 9      | 9       | 10   | 9     | 9          | 65/70 | 63+ (9 avg) |
 | Dashboard | 9    | 9      | 9      | 9       | 9    | 9     | 9          | 63/70 | 63+ (9 avg) |
-| iOS       | 8    | 9      | 9      | 9       | 9    | 9     | 8          | 61/70 | 63+ (9 avg) |
-| macOS     | 8    | 9      | 8      | 9       | 9    | 9     | 8          | 60/70 | 63+ (9 avg) |
-| Android   | 8    | 9      | 8      | 9       | 9    | 9     | 8          | 60/70 | 63+ (9 avg) |
+| iOS       | 9    | 9      | 9      | 9       | 9    | 9     | 9          | 63/70 | 63+ (9 avg) |
+| macOS     | 9    | 9      | 9      | 9       | 9    | 9     | 9          | 63/70 | 63+ (9 avg) |
+| Android   | 9    | 9      | 9      | 9       | 9    | 9     | 9          | 63/70 | 63+ (9 avg) |
 
 ## Benchmark Comparison
 
