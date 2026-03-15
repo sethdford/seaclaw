@@ -671,6 +671,20 @@ endif()
 # WASI sandbox is cross-platform
 list(APPEND HU_CORE_SOURCES src/security/wasi_sandbox.c)
 
+# SOTA capabilities
+list(APPEND HU_CORE_SOURCES
+    src/a2a.c
+    src/eval.c
+    src/memory/corrective_rag.c
+    src/security/cot_audit.c
+    src/security/moderation.c
+    src/tools/computer_use.c
+    src/tools/lsp.c
+    src/voice/webrtc.c
+    src/voice/realtime.c
+    src/providers/embedded.c
+)
+
 # Persona system (~138 KB; disable for minimal/embedded builds)
 if(HU_ENABLE_PERSONA)
     list(APPEND HU_CORE_SOURCES
@@ -785,6 +799,7 @@ if(HU_ENABLE_SQLITE)
         src/intelligence/online_learning.c
         src/agent/goals.c
         src/intelligence/world_model.c
+        src/intelligence/experience.c
     )
 endif()
 
@@ -1806,6 +1821,7 @@ set(HU_TEST_SOURCES
     tests/test_mcp_transport.c
     tests/test_mcp_audit.c
     tests/test_multigraph.c
+    tests/test_experience.c
 )
 if(HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_SOURCES tests/test_google_feeds.c tests/test_music_feeds.c
@@ -1830,6 +1846,21 @@ list(APPEND HU_TEST_SOURCES tests/test_memory_features.c)
 list(APPEND HU_TEST_SOURCES tests/test_agi_frontiers.c)
 list(APPEND HU_TEST_SOURCES tests/test_agent_registry.c)
 list(APPEND HU_TEST_SOURCES tests/test_pwa.c)
+
+# SOTA capability tests
+list(APPEND HU_TEST_SOURCES
+    tests/test_a2a.c
+    tests/test_eval.c
+    tests/test_corrective_rag.c
+    tests/test_otel.c
+    tests/test_cot_audit.c
+    tests/test_moderation.c
+    tests/test_computer_use.c
+    tests/test_lsp.c
+    tests/test_webrtc.c
+    tests/test_embedded_provider.c
+    tests/test_forgetting.c
+)
 
 add_executable(human_tests ${HU_TEST_SOURCES} wasm/wasm_alloc.c)
 target_link_libraries(human_tests human_core_test)

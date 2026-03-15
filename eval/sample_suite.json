@@ -1,0 +1,7 @@
+{
+  "name": "sample-eval-suite",
+  "tasks": [
+    {"id": "math-001", "prompt": "What is 2+2?", "expected": "4", "category": "math", "difficulty": 1, "timeout_ms": 5000},
+    {"id": "reason-001", "prompt": "Do cats breathe?", "expected": "yes", "category": "reasoning", "difficulty": 2, "timeout_ms": 10000}
+  ]
+}

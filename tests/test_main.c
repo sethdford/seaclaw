@@ -226,6 +226,17 @@ void run_emotion_map_tests(void);
 void run_ml_tests(void);
 #endif
 void run_multigraph_tests(void);
+void run_a2a_tests(void);
+void run_eval_tests(void);
+void run_corrective_rag_tests(void);
+void run_otel_tests(void);
+void run_cot_audit_tests(void);
+void run_moderation_tests(void);
+void run_computer_use_tests(void);
+void run_lsp_tests(void);
+void run_webrtc_tests(void);
+void run_embedded_provider_tests(void);
+void run_forgetting_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -475,6 +486,18 @@ int main(int argc, char **argv) {
 #ifdef HU_ENABLE_ML
     run_ml_tests();
 #endif
+
+    run_a2a_tests();
+    run_eval_tests();
+    run_corrective_rag_tests();
+    run_otel_tests();
+    run_cot_audit_tests();
+    run_moderation_tests();
+    run_computer_use_tests();
+    run_lsp_tests();
+    run_webrtc_tests();
+    run_embedded_provider_tests();
+    run_forgetting_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();
