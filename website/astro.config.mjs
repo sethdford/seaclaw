@@ -113,8 +113,18 @@ export default defineConfig({
           ],
         },
         {
-          label: "Design System",
+          label: "Brand & Design",
           items: [
+            {
+              label: "Brand Identity",
+              link: "/brand/",
+              attrs: { target: "_self" },
+            },
+            {
+              label: "Design System Overview",
+              link: "/design/",
+              attrs: { target: "_self" },
+            },
             { label: "Design Tokens", slug: "design-system/tokens" },
             { label: "Color System", slug: "design-system/colors" },
             { label: "Typography", slug: "design-system/typography" },

@@ -186,7 +186,7 @@ const tools = [
         position: relative;
         z-index: 10;
         text-align: center;
-        max-width: 36rem;
+        max-width: 56rem;
         margin-left: auto;
         margin-right: auto;
       }
@@ -247,43 +247,46 @@ const tools = [
         >
         </div>
         <div class="ambient-blue" style="top: 30%; right: 10%;"></div>
-        <div class="hero-content text-center max-w-3xl mx-auto relative z-10">
-          <img
-            src={`${base}human.svg`}
-            alt="h-uman logo"
-            width="512"
-            height="512"
-            loading="eager"
-            decoding="async"
-            fetchpriority="high"
-            class="hero-logo w-20 h-20 md:w-24 md:h-24 mx-auto mb-10"
-            style={`filter: drop-shadow(0 0 40px var(--color-accent-glow)); animation: float 6s ease-in-out infinite;`}
-          />
-          <h1
-            class="hero-title hero-headline font-sans mb-6"
-            style="color: var(--color-text); view-transition-name: page-heading;"
-          >
-            Bring AI to <span class="text-gradient">every</span> device on&nbsp;Earth.
-          </h1>
+        <div class="hero-content text-center max-w-4xl mx-auto relative z-10">
+          <div class="hero-wordmark-row hero-logo flex items-center justify-center gap-5 md:gap-7 mb-8">
+            <img
+              src={`${base}human.svg`}
+              alt=""
+              width="512"
+              height="512"
+              loading="eager"
+              decoding="async"
+              fetchpriority="high"
+              class="hero-mark w-14 h-14 md:w-20 md:h-20"
+              style={`filter: drop-shadow(0 0 40px var(--color-accent-glow));`}
+            />
+            <span
+              class="hero-wordmark font-sans"
+              style="color: var(--color-text); view-transition-name: page-heading;"
+              aria-hidden="true"
+            >h-uman</span>
+          </div>
+          <h1 class="sr-only">h-uman — not quite human.</h1>
           <p
-            class="hero-tagline text-[clamp(1.1rem,2.2vw,1.35rem)] font-medium mb-6 hero-fade-in"
-            style="color: var(--color-text-secondary); letter-spacing: 0.04em;"
+            class="hero-tagline hero-headline font-sans"
+            style="color: var(--color-text-secondary); letter-spacing: 0.06em;"
           >
             not quite human.
           </p>
           <p
-            class="hero-subtitle hero-desc mb-5 hero-fade-in mx-auto"
+            class="hero-mission hero-desc hero-fade-in mx-auto"
           >
-            An autonomous AI that runs shell commands, manages files, browses the web, and remembers everything — across 50+ AI models and 34 messaging channels. All in <strong
-              style="color: var(--color-text)">1,696&nbsp;kilobytes</strong
-            > of pure&nbsp;C.
+            Bring AI to <span class="text-gradient">every</span> device on Earth.
           </p>
-          <p
-            class="hero-subtitle text-[clamp(0.9rem,1.8vw,1.05rem)] leading-relaxed mb-10 hero-fade-in mx-auto"
-            style="color: var(--color-text-tertiary)"
-          >
-            One static binary. Zero dependencies. Under 30&nbsp;ms cold start. Under 6&nbsp;MB&nbsp;RAM.
-          </p>
+          <div class="hero-proof hero-fade-in flex flex-wrap justify-center gap-x-6 gap-y-2 mb-10">
+            <span style="color: var(--color-text-tertiary)"><strong style="color: var(--color-text)">1,696&nbsp;KB</strong> binary</span>
+            <span style="color: var(--color-text-tertiary)" aria-hidden="true">&middot;</span>
+            <span style="color: var(--color-text-tertiary)"><strong style="color: var(--color-text)">&lt;&nbsp;6&nbsp;MB</strong> RAM</span>
+            <span style="color: var(--color-text-tertiary)" aria-hidden="true">&middot;</span>
+            <span style="color: var(--color-text-tertiary)"><strong style="color: var(--color-text)">&lt;&nbsp;30&nbsp;ms</strong> startup</span>
+            <span style="color: var(--color-text-tertiary)" aria-hidden="true">&middot;</span>
+            <span style="color: var(--color-text-tertiary)"><strong style="color: var(--color-text)">0</strong> dependencies</span>
+          </div>
           <div
             class="hero-buttons flex flex-col sm:flex-row gap-4 justify-center hero-fade-in"
           >

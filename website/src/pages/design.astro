@@ -1,0 +1,919 @@
+---
+import "../styles/global.css";
+import Nav from "../components/Nav.astro";
+
+const rawBase = import.meta.env.BASE_URL;
+const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="canonical" href="https://h-uman.ai/design" />
+    <title>Design System — h-uman</title>
+    <meta
+      name="description"
+      content="The visual language of h-uman. Every color, every motion, every surface — designed to be not quite human."
+    />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <meta name="theme-color" content="#7AB648" />
+    <meta property="og:title" content="Design System — h-uman" />
+    <meta
+      property="og:description"
+      content="The visual language of h-uman. Every color, every motion, every surface — designed to be not quite human."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://h-uman.ai/design" />
+    <style is:global>
+      :root {
+        --color-bg: var(--hu-web-bg);
+        --color-text: var(--hu-web-text);
+        --color-text-secondary: var(--hu-web-text-secondary);
+        --color-text-tertiary: var(--hu-web-text-tertiary);
+        --color-accent: var(--hu-accent);
+        --color-accent-light: var(--hu-accent-light, var(--hu-accent-subtle));
+        --color-accent-glow: var(--hu-accent-subtle);
+        --color-border: var(--hu-web-border);
+      }
+    </style>
+  </head>
+  <body
+    style="background: var(--color-bg); color: var(--color-text);"
+    class="antialiased overflow-x-hidden"
+  >
+    <a href="#main-content" class="skip-link">Skip to content</a>
+    <Nav />
+    <main id="main-content" tabindex="-1">
+      {/* ═══ 1. HERO ═══ */}
+      <section
+        class="relative min-h-[70vh] flex flex-col items-center justify-center py-24 md:py-32 px-6 cv-defer"
+      >
+        <div class="max-w-5xl mx-auto text-center">
+          <h1
+            class="text-[clamp(2rem,4vw,3rem)] font-black tracking-tight mb-6"
+            style="font-family: var(--hu-font); letter-spacing: -0.04em; line-height: 1.1;"
+          >
+            Design System
+          </h1>
+          <p
+            class="text-[clamp(1rem,2vw,1.25rem)] max-w-2xl mx-auto"
+            style="color: var(--color-text-secondary); font-family: var(--hu-font); line-height: 1.6;"
+          >
+            The visual language of h-uman. Every color, every motion, every
+            surface — designed to be not quite human.
+          </p>
+        </div>
+      </section>
+
+      {/* ═══ 2. PRINCIPLES ═══ */}
+      <section class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16 text-center"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Principles
+          </h2>
+          <div class="grid md:grid-cols-3 gap-8">
+            <article
+              class="p-8 rounded-2xl border transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:translate-y-[-2px]"
+              style="background: var(--hu-surface-container); border-color: var(--color-border);"
+              data-reveal
+            >
+              <div
+                class="w-12 h-12 rounded-xl flex items-center justify-center mb-6"
+                style="background: var(--color-accent-glow);"
+              >
+                <svg
+                  class="w-6 h-6"
+                  fill="currentColor"
+                  viewBox="0 0 256 256"
+                  style="color: var(--color-accent);"
+                >
+                  <path
+                    d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,96a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,96Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,128Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,160Z"
+                  />
+                </svg>
+              </div>
+              <h3
+                class="text-xl font-bold mb-3"
+                style="font-family: var(--hu-font);"
+              >
+                Honest by Design
+              </h3>
+              <p
+                class="text-[var(--hu-text-base)] leading-relaxed"
+                style="color: var(--color-text-secondary); font-family: var(--hu-font);"
+              >
+                We don't pretend. UI states are clear, not clever. Errors look
+                like errors.
+              </p>
+            </article>
+            <article
+              class="p-8 rounded-2xl border transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:translate-y-[-2px]"
+              style="background: var(--hu-surface-container); border-color: var(--color-border);"
+              data-reveal
+            >
+              <div
+                class="w-12 h-12 rounded-xl flex items-center justify-center mb-6"
+                style="background: var(--color-accent-glow);"
+              >
+                <svg
+                  class="w-6 h-6"
+                  fill="currentColor"
+                  viewBox="0 0 256 256"
+                  style="color: var(--color-accent);"
+                >
+                  <path
+                    d="M240,128v8a8,8,0,0,1-8,8H24a8,8,0,0,1-8-8v-8a8,8,0,0,1,8-8H232A8,8,0,0,1,240,128ZM24,184H232a8,8,0,0,0,0-16H24a8,8,0,0,0,0,16Zm0-64H232a8,8,0,0,0,0-16H24a8,8,0,0,0,0,16Z"
+                  />
+                </svg>
+              </div>
+              <h3
+                class="text-xl font-bold mb-3"
+                style="font-family: var(--hu-font);"
+              >
+                Performance is Aesthetic
+              </h3>
+              <p
+                class="text-[var(--hu-text-base)] leading-relaxed"
+                style="color: var(--color-text-secondary); font-family: var(--hu-font);"
+              >
+                If it's slow, it's ugly. Every animation runs on the compositor.
+                Every transition respects <code class="text-[var(--hu-text-sm)] px-1.5 py-0.5 rounded" style="background: var(--hu-web-code-bg); font-family: var(--hu-font-mono);">prefers-reduced-motion</code>.
+              </p>
+            </article>
+            <article
+              class="p-8 rounded-2xl border transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:translate-y-[-2px]"
+              style="background: var(--hu-surface-container); border-color: var(--color-border);"
+              data-reveal
+            >
+              <div
+                class="w-12 h-12 rounded-xl flex items-center justify-center mb-6"
+                style="background: var(--color-accent-glow);"
+              >
+                <svg
+                  class="w-6 h-6"
+                  fill="currentColor"
+                  viewBox="0 0 256 256"
+                  style="color: var(--color-accent);"
+                >
+                  <path
+                    d="M224,128a96,96,0,1,0-96,96A96.11,96.11,0,0,0,224,128Zm-176,0a80,80,0,1,1,80,80A80.09,80.09,0,0,1,48,128Zm96-48a8,8,0,0,1,8-8h8V64a8,8,0,0,1,16,0v16h8a8,8,0,0,1,0,16H168v16a8,8,0,0,1-16,0V96H152A8,8,0,0,1,144,80Zm-8,96a8,8,0,0,1-8,8H112a8,8,0,0,1,0-16h16A8,8,0,0,1,136,176Zm32-32a8,8,0,0,1-8,8H104a8,8,0,0,1,0-16h56A8,8,0,0,1,168,144Z"
+                  />
+                </svg>
+              </div>
+              <h3
+                class="text-xl font-bold mb-3"
+                style="font-family: var(--hu-font);"
+              >
+                Token-Driven
+              </h3>
+              <p
+                class="text-[var(--hu-text-base)] leading-relaxed"
+                style="color: var(--color-text-secondary); font-family: var(--hu-font);"
+              >
+                No magic numbers. Every value comes from a token. Change once,
+                update everywhere.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 3. COLOR SYSTEM ═══ */}
+      <section class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16 text-center"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Color System
+          </h2>
+
+          {/* Primary accent swatch */}
+          <div class="mb-16" data-reveal>
+            <p
+              class="text-[var(--hu-text-sm)] font-medium mb-4"
+              style="color: var(--color-text-secondary); font-family: var(--hu-font-mono);"
+            >
+              --hu-accent (Fidelity green)
+            </p>
+            <div
+              class="w-full h-32 md:h-40 rounded-2xl flex items-center justify-center transition-transform duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:scale-[1.02]"
+              style="background: var(--hu-accent); color: var(--hu-on-accent);"
+              data-swatch
+              title="var(--hu-accent)"
+            >
+              <span
+                class="text-[var(--hu-text-sm)] font-mono opacity-80"
+                style="font-family: var(--hu-font-mono);"
+              >
+                var(--hu-accent)
+              </span>
+            </div>
+          </div>
+
+          {/* M3 Tonal surfaces */}
+          <div class="mb-16" data-reveal>
+            <p
+              class="text-[var(--hu-text-sm)] font-medium mb-4"
+              style="color: var(--color-text-secondary); font-family: var(--hu-font-mono);"
+            >
+              M3 Tonal surfaces
+            </p>
+            <div class="flex flex-col gap-4">
+              <div
+                class="h-16 rounded-xl px-6 flex items-center justify-between border transition-all duration-[var(--hu-duration-normal)] hover:translate-x-2"
+                style="background: var(--hu-surface-dim); border-color: var(--color-border);"
+                data-swatch
+                title="--hu-surface-dim"
+              >
+                <span
+                  class="text-[var(--hu-text-sm)] font-mono"
+                  style="font-family: var(--hu-font-mono); color: var(--color-text);"
+                >
+                  --hu-surface-dim
+                </span>
+              </div>
+              <div
+                class="h-16 rounded-xl px-6 flex items-center justify-between border transition-all duration-[var(--hu-duration-normal)] hover:translate-x-2"
+                style="background: var(--hu-surface-container); border-color: var(--color-border);"
+                data-swatch
+                title="--hu-surface-container"
+              >
+                <span
+                  class="text-[var(--hu-text-sm)] font-mono"
+                  style="font-family: var(--hu-font-mono); color: var(--color-text);"
+                >
+                  --hu-surface-container
+                </span>
+              </div>
+              <div
+                class="h-16 rounded-xl px-6 flex items-center justify-between border transition-all duration-[var(--hu-duration-normal)] hover:translate-x-2"
+                style="background: var(--hu-surface-container-high); border-color: var(--color-border);"
+                data-swatch
+                title="--hu-surface-container-high"
+              >
+                <span
+                  class="text-[var(--hu-text-sm)] font-mono"
+                  style="font-family: var(--hu-font-mono); color: var(--color-text);"
+                >
+                  --hu-surface-container-high
+                </span>
+              </div>
+              <div
+                class="h-16 rounded-xl px-6 flex items-center justify-between border transition-all duration-[var(--hu-duration-normal)] hover:translate-x-2"
+                style="background: var(--hu-surface-container-highest); border-color: var(--color-border);"
+                data-swatch
+                title="--hu-surface-container-highest"
+              >
+                <span
+                  class="text-[var(--hu-text-sm)] font-mono"
+                  style="font-family: var(--hu-font-mono); color: var(--color-text);"
+                >
+                  --hu-surface-container-highest
+                </span>
+              </div>
+              <div
+                class="h-16 rounded-xl px-6 flex items-center justify-between border transition-all duration-[var(--hu-duration-normal)] hover:translate-x-2"
+                style="background: var(--hu-surface-bright); border-color: var(--color-border);"
+                data-swatch
+                title="--hu-surface-bright"
+              >
+                <span
+                  class="text-[var(--hu-text-sm)] font-mono"
+                  style="font-family: var(--hu-font-mono); color: var(--color-text);"
+                >
+                  --hu-surface-bright
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Dynamic color ramp */}
+          <div data-reveal>
+            <p
+              class="text-[var(--hu-text-sm)] font-medium mb-4"
+              style="color: var(--color-text-secondary); font-family: var(--hu-font-mono);"
+            >
+              Dynamic primary ramp (50–950)
+            </p>
+            <div
+              class="h-12 rounded-xl overflow-hidden flex"
+              style="border: 1px solid var(--color-border);"
+            >
+              <div
+                class="flex-1"
+                style="background: var(--hu-dynamic-primary-50);"
+              />
+              <div
+                class="flex-1"
+                style="background: var(--hu-dynamic-primary-100);"
+              />
+              <div
+                class="flex-1"
+                style="background: var(--hu-dynamic-primary-200);"
+              />
+              <div
+                class="flex-1"
+                style="background: var(--hu-dynamic-primary-300);"
+              />
+              <div
+                class="flex-1"
+                style="background: var(--hu-dynamic-primary-400);"
+              />
+              <div
+                class="flex-1"
+                style="background: var(--hu-dynamic-primary-500);"
+              />
+              <div
+                class="flex-1"
+                style="background: var(--hu-dynamic-primary-600);"
+              />
+              <div
+                class="flex-1"
+                style="background: var(--hu-dynamic-primary-700);"
+              />
+              <div
+                class="flex-1"
+                style="background: var(--hu-dynamic-primary-800);"
+              />
+              <div
+                class="flex-1"
+                style="background: var(--hu-dynamic-primary-900);"
+              />
+              <div
+                class="flex-1"
+                style="background: var(--hu-dynamic-primary-950);"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 4. TYPOGRAPHY ═══ */}
+      <section class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16 text-center"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Typography
+          </h2>
+
+          {/* Avenir display */}
+          <div class="mb-16" data-reveal>
+            <p
+              class="text-[var(--hu-text-sm)] font-medium mb-4"
+              style="color: var(--color-text-secondary); font-family: var(--hu-font-mono);"
+            >
+              Avenir (Black)
+            </p>
+            <p
+              class="text-[clamp(3rem,8vw,6rem)] font-black tracking-tight"
+              style="font-family: var(--hu-font); letter-spacing: -0.04em; line-height: 0.95;"
+            >
+              Avenir
+            </p>
+          </div>
+
+          {/* Type scale */}
+          <div class="space-y-6 mb-16" data-reveal>
+            <p
+              class="text-[var(--hu-text-sm)] font-medium mb-4"
+              style="color: var(--color-text-secondary); font-family: var(--hu-font-mono);"
+            >
+              Type scale
+            </p>
+            <div class="space-y-4">
+              <div
+                class="py-3 border-b"
+                style="border-color: var(--color-border); font-size: var(--hu-text-2xs); font-family: var(--hu-font);"
+              >
+                <span
+                  class="text-[var(--hu-text-xs)] font-mono mr-4"
+                  style="color: var(--color-text-tertiary); font-family: var(--hu-font-mono);"
+                >
+                  --hu-text-2xs
+                </span>
+                The quick brown fox
+              </div>
+              <div
+                class="py-3 border-b"
+                style="border-color: var(--color-border); font-size: var(--hu-text-xs); font-family: var(--hu-font);"
+              >
+                <span
+                  class="text-[var(--hu-text-xs)] font-mono mr-4"
+                  style="color: var(--color-text-tertiary); font-family: var(--hu-font-mono);"
+                >
+                  --hu-text-xs
+                </span>
+                The quick brown fox
+              </div>
+              <div
+                class="py-3 border-b"
+                style="border-color: var(--color-border); font-size: var(--hu-text-sm); font-family: var(--hu-font);"
+              >
+                <span
+                  class="text-[var(--hu-text-xs)] font-mono mr-4"
+                  style="color: var(--color-text-tertiary); font-family: var(--hu-font-mono);"
+                >
+                  --hu-text-sm
+                </span>
+                The quick brown fox
+              </div>
+              <div
+                class="py-3 border-b"
+                style="border-color: var(--color-border); font-size: var(--hu-text-base); font-family: var(--hu-font);"
+              >
+                <span
+                  class="text-[var(--hu-text-xs)] font-mono mr-4"
+                  style="color: var(--color-text-tertiary); font-family: var(--hu-font-mono);"
+                >
+                  --hu-text-base
+                </span>
+                The quick brown fox
+              </div>
+              <div
+                class="py-3 border-b"
+                style="border-color: var(--color-border); font-size: var(--hu-text-lg); font-family: var(--hu-font);"
+              >
+                <span
+                  class="text-[var(--hu-text-xs)] font-mono mr-4"
+                  style="color: var(--color-text-tertiary); font-family: var(--hu-font-mono);"
+                >
+                  --hu-text-lg
+                </span>
+                The quick brown fox
+              </div>
+              <div
+                class="py-3 border-b"
+                style="border-color: var(--color-border); font-size: var(--hu-text-xl); font-family: var(--hu-font);"
+              >
+                <span
+                  class="text-[var(--hu-text-xs)] font-mono mr-4"
+                  style="color: var(--color-text-tertiary); font-family: var(--hu-font-mono);"
+                >
+                  --hu-text-xl
+                </span>
+                The quick brown fox
+              </div>
+              <div
+                class="py-3 border-b"
+                style="border-color: var(--color-border); font-size: var(--hu-text-2xl); font-family: var(--hu-font);"
+              >
+                <span
+                  class="text-[var(--hu-text-xs)] font-mono mr-4"
+                  style="color: var(--color-text-tertiary); font-family: var(--hu-font-mono);"
+                >
+                  --hu-text-2xl
+                </span>
+                The quick brown fox
+              </div>
+            </div>
+          </div>
+
+          {/* Monospace */}
+          <div class="mb-16" data-reveal>
+            <p
+              class="text-[var(--hu-text-sm)] font-medium mb-4"
+              style="color: var(--color-text-secondary); font-family: var(--hu-font-mono);"
+            >
+              Geist Mono (code)
+            </p>
+            <pre
+              class="p-6 rounded-xl overflow-x-auto"
+              style="background: var(--hu-web-code-bg); font-family: var(--hu-font-mono); font-size: var(--hu-text-sm); border: 1px solid var(--color-border);"
+            >
+              <code style="color: var(--color-text);"
+                ><span style="color: var(--color-accent);">$</span> cmake --preset dev
+<span style="color: var(--color-accent);">$</span> cmake --build --preset dev
+<span style="color: var(--color-text-tertiary);">[100%] Built target human</span></code
+              >
+            </pre>
+          </div>
+
+          {/* 3-size rule demo */}
+          <div data-reveal>
+            <p
+              class="text-[var(--hu-text-sm)] font-medium mb-4"
+              style="color: var(--color-text-secondary); font-family: var(--hu-font-mono);"
+            >
+              Three-size maximum rule
+            </p>
+            <div
+              class="p-8 rounded-2xl border"
+              style="background: var(--hu-surface-container); border-color: var(--color-border);"
+            >
+              <h3
+                class="text-[var(--hu-text-2xl)] font-bold mb-2"
+                style="font-family: var(--hu-font);"
+              >
+                Section heading (2xl)
+              </h3>
+              <p
+                class="text-[var(--hu-text-base)] mb-4"
+                style="color: var(--color-text-secondary); font-family: var(--hu-font);"
+              >
+                Body text at base size. Only three type sizes visible in any
+                single view section.
+              </p>
+              <span
+                class="text-[var(--hu-text-sm)]"
+                style="color: var(--color-text-tertiary); font-family: var(--hu-font);"
+              >
+                Caption (sm)
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 5. GLASS & SURFACES ═══ */}
+      <section class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16 text-center"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Glass & Surfaces
+          </h2>
+
+          {/* Gradient background for glass demo */}
+          <div
+            class="relative rounded-3xl overflow-hidden p-12 md:p-16 mb-8"
+            style="min-height: 320px;"
+          >
+            <div
+              class="absolute inset-0"
+              style="background: linear-gradient(135deg, color-mix(in srgb, var(--hu-accent) 25%, transparent) 0%, color-mix(in srgb, var(--hu-accent-tertiary) 20%, transparent) 50%, color-mix(in srgb, var(--hu-accent-secondary) 18%, transparent) 100%);"
+            />
+            <div class="relative grid md:grid-cols-3 gap-6">
+              <div
+                class="hu-glass-subtle p-8 rounded-2xl transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:scale-[1.02] glass-demo-card"
+                data-reveal
+              >
+                <p
+                  class="text-[var(--hu-text-sm)] font-medium mb-2"
+                  style="color: var(--color-text-secondary); font-family: var(--hu-font-mono);"
+                >
+                  .hu-glass-subtle
+                </p>
+                <p
+                  class="text-[var(--hu-text-base)]"
+                  style="font-family: var(--hu-font);"
+                >
+                  Navigation, headers, subtle overlays
+                </p>
+              </div>
+              <div
+                class="hu-glass-standard p-8 rounded-2xl transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:scale-[1.02] glass-demo-card"
+                data-reveal
+              >
+                <p
+                  class="text-[var(--hu-text-sm)] font-medium mb-2"
+                  style="color: var(--color-text-secondary); font-family: var(--hu-font-mono);"
+                >
+                  .hu-glass-standard
+                </p>
+                <p
+                  class="text-[var(--hu-text-base)]"
+                  style="font-family: var(--hu-font);"
+                >
+                  Panels, cards, elevated content
+                </p>
+              </div>
+              <div
+                class="hu-glass-prominent p-8 rounded-2xl transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:scale-[1.02] glass-demo-card"
+                data-reveal
+              >
+                <p
+                  class="text-[var(--hu-text-sm)] font-medium mb-2"
+                  style="color: var(--color-text-secondary); font-family: var(--hu-font-mono);"
+                >
+                  .hu-glass-prominent
+                </p>
+                <p
+                  class="text-[var(--hu-text-base)]"
+                  style="font-family: var(--hu-font);"
+                >
+                  Modals, dialogs, focus surfaces
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 6. MOTION ═══ */}
+      <section class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16 text-center"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Motion
+          </h2>
+
+          {/* Spring physics boxes */}
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-16" data-reveal>
+            <div
+              class="motion-box h-24 rounded-xl flex items-center justify-center font-medium cursor-pointer"
+              style="background: var(--hu-surface-container); border: 1px solid var(--color-border); font-family: var(--hu-font); transition: transform var(--hu-duration-slow) var(--hu-spring-gentle);"
+              data-spring="micro"
+            >
+              Micro
+            </div>
+            <div
+              class="motion-box h-24 rounded-xl flex items-center justify-center font-medium cursor-pointer"
+              style="background: var(--hu-surface-container); border: 1px solid var(--color-border); font-family: var(--hu-font); transition: transform var(--hu-duration-slow) var(--hu-spring-gentle);"
+              data-spring="standard"
+            >
+              Standard
+            </div>
+            <div
+              class="motion-box h-24 rounded-xl flex items-center justify-center font-medium cursor-pointer"
+              style="background: var(--hu-surface-container); border: 1px solid var(--color-border); font-family: var(--hu-font); transition: transform var(--hu-duration-slow) var(--hu-spring-gentle);"
+              data-spring="expressive"
+            >
+              Expressive
+            </div>
+            <div
+              class="motion-box h-24 rounded-xl flex items-center justify-center font-medium cursor-pointer"
+              style="background: var(--hu-surface-container); border: 1px solid var(--color-border); font-family: var(--hu-font); transition: transform var(--hu-duration-slow) var(--hu-spring-gentle);"
+              data-spring="dramatic"
+            >
+              Dramatic
+            </div>
+          </div>
+
+          {/* Duration scale */}
+          <div class="mb-16" data-reveal>
+            <p
+              class="text-[var(--hu-text-sm)] font-medium mb-4"
+              style="color: var(--color-text-secondary); font-family: var(--hu-font-mono);"
+            >
+              Duration scale (hover to animate)
+            </p>
+            <div class="space-y-4">
+              <div class="flex items-center gap-4">
+                <span
+                  class="text-[var(--hu-text-sm)] w-32 font-mono"
+                  style="color: var(--color-text-tertiary); font-family: var(--hu-font-mono);"
+                >
+                  --hu-duration-fast
+                </span>
+                <div
+                  class="duration-bar flex-1 h-8 rounded-lg overflow-hidden"
+                  style="background: var(--hu-surface-container); border: 1px solid var(--color-border);"
+                  data-duration="fast"
+                >
+                  <div
+                    class="h-full w-0 rounded-lg transition-all"
+                    style="background: var(--color-accent); transition-duration: var(--hu-duration-fast); transition-timing-function: var(--hu-ease-out);"
+                  />
+                </div>
+              </div>
+              <div class="flex items-center gap-4">
+                <span
+                  class="text-[var(--hu-text-sm)] w-32 font-mono"
+                  style="color: var(--color-text-tertiary); font-family: var(--hu-font-mono);"
+                >
+                  --hu-duration-normal
+                </span>
+                <div
+                  class="duration-bar flex-1 h-8 rounded-lg overflow-hidden"
+                  style="background: var(--hu-surface-container); border: 1px solid var(--color-border);"
+                  data-duration="normal"
+                >
+                  <div
+                    class="h-full w-0 rounded-lg transition-all"
+                    style="background: var(--color-accent); transition-duration: var(--hu-duration-normal); transition-timing-function: var(--hu-ease-out);"
+                  />
+                </div>
+              </div>
+              <div class="flex items-center gap-4">
+                <span
+                  class="text-[var(--hu-text-sm)] w-32 font-mono"
+                  style="color: var(--color-text-tertiary); font-family: var(--hu-font-mono);"
+                >
+                  --hu-duration-slow
+                </span>
+                <div
+                  class="duration-bar flex-1 h-8 rounded-lg overflow-hidden"
+                  style="background: var(--hu-surface-container); border: 1px solid var(--color-border);"
+                  data-duration="slow"
+                >
+                  <div
+                    class="h-full w-0 rounded-lg transition-all"
+                    style="background: var(--color-accent); transition-duration: var(--hu-duration-slow); transition-timing-function: var(--hu-ease-out);"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Reduced motion note */}
+          <div
+            class="p-6 rounded-xl border"
+            style="background: var(--hu-surface-container); border-color: var(--color-border);"
+            data-reveal
+          >
+            <p
+              class="text-[var(--hu-text-base)]"
+              style="color: var(--color-text-secondary); font-family: var(--hu-font);"
+            >
+              <strong style="color: var(--color-text);">prefers-reduced-motion</strong> — All
+              animations respect the user's motion preference. When
+              <code class="px-1.5 py-0.5 rounded text-[var(--hu-text-sm)]" style="background: var(--hu-web-code-bg); font-family: var(--hu-font-mono);">prefers-reduced-motion: reduce</code>
+              is set, durations collapse to near-instant and spring effects are
+              disabled.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 7. EXPLORE FURTHER ═══ */}
+      <section class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto text-center">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-8"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Explore Further
+          </h2>
+          <p
+            class="text-[var(--hu-text-lg)] mb-12 max-w-2xl mx-auto"
+            style="color: var(--color-text-secondary); font-family: var(--hu-font);"
+          >
+            Dive deeper into the design system documentation and brand
+            guidelines.
+          </p>
+          <div class="flex flex-wrap justify-center gap-4">
+            <a
+              href={`${base}design-system/tokens/`}
+              class="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-[15px] transition-all duration-[var(--hu-duration-normal)] hover:translate-y-[-2px]"
+              style="background: var(--color-accent); color: var(--hu-on-accent); font-family: var(--hu-font);"
+            >
+              Design Tokens
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 256 256">
+                <path
+                  d="M224.49,136.49l-72,72a12,12,0,0,1-17-17L187,140H40a12,12,0,0,1,0-24H187L135.51,64.48a12,12,0,0,1,17-17l72,72A12,12,0,0,1,224.49,136.49Z"
+                />
+              </svg>
+            </a>
+            <a
+              href={`${base}brand`}
+              class="inline-flex items-center gap-2 px-6 py-3 rounded-full font-medium text-[15px] transition-all duration-[var(--hu-duration-normal)] hover:translate-y-[-2px]"
+              style="color: var(--color-text); border: 1px solid var(--color-border); font-family: var(--hu-font);"
+            >
+              Brand
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 256 256">
+                <path
+                  d="M224.49,136.49l-72,72a12,12,0,0,1-17-17L187,140H40a12,12,0,0,1,0-24H187L135.51,64.48a12,12,0,0,1,17-17l72,72A12,12,0,0,1,224.49,136.49Z"
+                />
+              </svg>
+            </a>
+            <a
+              href="https://github.com/sethdford/h-uman"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-2 px-6 py-3 rounded-full font-medium text-[15px] transition-all duration-[var(--hu-duration-normal)] hover:translate-y-[-2px]"
+              style="color: var(--color-text); border: 1px solid var(--color-border); font-family: var(--hu-font);"
+            >
+              GitHub
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 256 256">
+                <path
+                  d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.42-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68Z"
+                />
+              </svg>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    {/* Footer */}
+    <footer class="site-footer py-12 px-6" role="contentinfo">
+      <div
+        class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4"
+      >
+        <div class="flex items-center gap-3">
+          <img
+            src={`${base}human.svg`}
+            alt="h-uman logo"
+            width="512"
+            height="512"
+            class="w-5 h-5"
+            loading="lazy"
+            decoding="async"
+          />
+          <span
+            class="text-[13px]"
+            style="color: var(--color-text-tertiary); font-family: var(--hu-font);"
+          >
+            h-uman
+          </span>
+        </div>
+        <p
+          class="text-[13px] hidden md:block"
+          style="color: var(--color-text-tertiary); font-family: var(--hu-font);"
+        >
+          not quite human.
+        </p>
+        <div
+          class="flex items-center gap-6 text-[13px]"
+          style="color: var(--color-text-tertiary); font-family: var(--hu-font);"
+        >
+          <span>MIT License</span>
+          <span>Made with C11</span>
+          <a
+            href="https://github.com/sethdford/h-uman"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:opacity-80 transition-opacity"
+          >
+            GitHub
+          </a>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+      // Scroll reveal
+      const revealObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("revealed");
+            }
+          });
+        },
+        { rootMargin: "0px 0px -80px 0px", threshold: 0 },
+      );
+      document.querySelectorAll("[data-reveal]").forEach((el) => {
+        revealObserver.observe(el);
+      });
+
+      if (prefersReducedMotion) {
+        document.querySelectorAll("[data-reveal]").forEach((el) => {
+          el.classList.add("revealed");
+        });
+      }
+
+      // Motion boxes — spring on hover
+      const springMap = {
+        micro: "scale(1.02)",
+        standard: "scale(1.05) translateY(-4px)",
+        expressive: "scale(1.08) translateY(-8px)",
+        dramatic: "scale(1.12) translateY(-12px)",
+      };
+      document.querySelectorAll<HTMLElement>(".motion-box").forEach((box) => {
+        const spring = box.dataset.spring;
+        box.addEventListener("mouseenter", () => {
+          if (!prefersReducedMotion && spring) {
+            box.style.transform = springMap[spring as keyof typeof springMap] || "scale(1.05)";
+          }
+        });
+        box.addEventListener("mouseleave", () => {
+          box.style.transform = "";
+        });
+      });
+
+      // Duration bars — fill on hover
+      document.querySelectorAll<HTMLElement>(".duration-bar").forEach((bar) => {
+        const fill = bar.querySelector<HTMLElement>("div");
+        if (!fill) return;
+        bar.addEventListener("mouseenter", () => {
+          fill.style.width = "100%";
+        });
+        bar.addEventListener("mouseleave", () => {
+          fill.style.width = "0";
+        });
+      });
+
+      // Swatch tooltip (optional — show token on hover)
+      document.querySelectorAll("[data-swatch]").forEach((el) => {
+        el.setAttribute("title", el.getAttribute("title") || "");
+      });
+
+      // Nav glass on scroll
+      const nav = document.getElementById("site-nav");
+      const onScroll = () => {
+        if (window.scrollY > 24 && nav) {
+          nav.classList.add("glass-nav");
+        } else if (nav) {
+          nav.classList.remove("glass-nav");
+        }
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+    </script>
+  </body>
+</html>

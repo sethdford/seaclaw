@@ -1,0 +1,589 @@
+---
+import "../styles/global.css";
+import Nav from "../components/Nav.astro";
+
+const rawBase = import.meta.env.BASE_URL;
+const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="canonical" href="https://h-uman.ai/brand/" />
+    <link
+      rel="preload"
+      href="/fonts/avenir/Avenir-Black.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      fetchpriority="high"
+    />
+    <link
+      rel="preload"
+      href="/fonts/avenir/Avenir-Book.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <title>Brand — h-uman</title>
+    <meta
+      name="description"
+      content="h-uman brand identity: logo, colors, typography, voice. Fidelity green. Avenir. not quite human."
+    />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <meta name="theme-color" content="#7AB648" />
+    <meta property="og:title" content="Brand — h-uman" />
+    <meta
+      property="og:description"
+      content="h-uman brand identity: logo, colors, typography, voice."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://h-uman.ai/brand/" />
+
+    <style is:global>
+      /* --color-* aliases for brand.astro (maps to --hu-web-* / --hu-* tokens) */
+      :root {
+        --color-bg: var(--hu-web-bg);
+        --color-text: var(--hu-web-text);
+        --color-text-secondary: var(--hu-web-text-secondary);
+        --color-text-tertiary: var(--hu-web-text-tertiary);
+        --color-accent: var(--hu-accent);
+        --color-accent-light: var(--hu-accent-light, var(--hu-accent-subtle));
+        --color-border: var(--hu-web-border);
+      }
+    </style>
+  </head>
+  <body
+    style="background: var(--color-bg); color: var(--color-text);"
+    class="antialiased overflow-x-hidden"
+  >
+    <a href="#main-content" class="skip-link">Skip to content</a>
+    <Nav />
+
+    <main id="main-content" tabindex="-1">
+      {/* ═══ 1. Hero ═══ */}
+      <section
+        class="relative min-h-[70vh] flex flex-col items-center justify-center px-6 pt-24 overflow-hidden"
+        style="background: var(--hu-bg-surface, #152333);"
+      >
+        <div
+          class="absolute inset-0 opacity-30"
+          style="background: radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in srgb, var(--hu-accent) 25%, transparent), transparent 70%);"
+        />
+        <div class="relative z-10 max-w-5xl mx-auto text-center">
+          <h1
+            class="text-[clamp(3.5rem,10vw,7rem)] font-black leading-[0.95] tracking-tighter mb-4"
+            style="font-family: var(--hu-font); color: var(--hu-web-text);"
+          >
+            h-uman
+          </h1>
+          <p
+            class="text-[clamp(1.25rem,2.5vw,1.75rem)] font-normal mb-8"
+            style="color: var(--hu-web-text-secondary); letter-spacing: 0.06em;"
+          >
+            not quite human.
+          </p>
+          <p
+            class="text-[clamp(1rem,1.8vw,1.2rem)] max-w-2xl mx-auto leading-relaxed"
+            style="color: var(--hu-web-text-tertiary);"
+          >
+            We built an AI runtime that's honest about what it is. Not trying to be human. Not pretending to be anything it's not. Just a fast, small, capable runtime that fits anywhere a CPU exists.
+          </p>
+        </div>
+      </section>
+
+      {/* ═══ 2. Name & Tagline ═══ */}
+      <section
+        class="py-24 md:py-32 px-6 cv-defer"
+        data-reveal
+      >
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="color: var(--color-text); letter-spacing: -0.03em;"
+          >
+            Name & Tagline
+          </h2>
+          <div class="grid md:grid-cols-2 gap-12 md:gap-16 items-start">
+            <div class="glass rounded-2xl p-8 md:p-10" style="border: 1px solid var(--color-border);">
+              <div
+                class="text-[clamp(2.5rem,5vw,4rem)] font-black mb-6"
+                style="font-family: var(--hu-font); color: var(--color-accent); letter-spacing: -0.02em;"
+              >
+                h-uman
+              </div>
+              <p class="text-base leading-relaxed" style="color: var(--color-text-secondary);">
+                The hyphen splits the word, reminding you this is almost—but not quite—human. It's a deliberate pause. A breath. A moment of honesty before the rest of the word completes.
+              </p>
+            </div>
+            <div class="glass rounded-2xl p-8 md:p-10" style="border: 1px solid var(--color-border);">
+              <div
+                class="text-[clamp(1.5rem,3vw,2rem)] font-normal mb-6"
+                style="font-family: var(--hu-font); color: var(--color-text);"
+              >
+                not quite human.
+              </div>
+              <ul class="space-y-3 text-sm" style="color: var(--color-text-secondary);">
+                <li>Always lowercase.</li>
+                <li>Always ends with a period.</li>
+                <li>Use em dash when pairing with brand name: <span style="color: var(--color-text);">h-uman — not quite human.</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 3. Logo ═══ */}
+      <section
+        class="py-24 md:py-32 px-6 cv-defer"
+        data-reveal
+      >
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="color: var(--color-text); letter-spacing: -0.03em;"
+          >
+            Logo
+          </h2>
+          <div class="grid gap-12">
+            <div
+              class="rounded-2xl p-12 md:p-16 flex flex-col items-center justify-center min-h-[320px]"
+              style="background: var(--hu-bg-surface, #152333);"
+            >
+              <div
+                class="relative flex items-center justify-center p-16 rounded-xl mb-8"
+                style="background: color-mix(in srgb, var(--hu-accent) 8%, transparent); border: 1px dashed color-mix(in srgb, var(--hu-accent) 30%, transparent);"
+              >
+                <span
+                  class="absolute top-4 left-4 right-4 bottom-4 border border-dashed rounded-lg opacity-40"
+                  style="border-color: var(--hu-accent);"
+                  aria-hidden="true"
+                />
+                <img
+                  src={`${base}human.svg`}
+                  alt="h-uman logo"
+                  width="160"
+                  height="160"
+                  class="w-32 h-32 md:w-40 md:h-40 relative z-10"
+                  loading="lazy"
+                />
+              </div>
+              <p class="text-sm" style="color: var(--hu-web-text-secondary);">
+                Clear space: minimum 1× logo height on all sides
+              </p>
+            </div>
+            <div class="grid sm:grid-cols-3 gap-6">
+              <div
+                class="rounded-xl p-8 flex flex-col items-center justify-center"
+                style="background: var(--hu-bg-surface, #152333);"
+              >
+                <img
+                  src={`${base}human.svg`}
+                  alt="h-uman logo 64px"
+                  width="64"
+                  height="64"
+                  class="w-16 h-16"
+                  loading="lazy"
+                />
+                <span class="text-xs mt-3" style="color: var(--hu-web-text-tertiary);">64px</span>
+              </div>
+              <div
+                class="rounded-xl p-8 flex flex-col items-center justify-center"
+                style="background: var(--hu-web-surface); border: 1px solid var(--color-border);"
+              >
+                <img
+                  src={`${base}human.svg`}
+                  alt="h-uman logo 48px light"
+                  width="48"
+                  height="48"
+                  class="w-12 h-12"
+                  loading="lazy"
+                />
+                <span class="text-xs mt-3" style="color: var(--color-text-tertiary);">48px on light</span>
+              </div>
+              <div
+                class="rounded-xl p-8 flex flex-col items-center justify-center"
+                style="background: var(--hu-bg-surface, #152333);"
+              >
+                <img
+                  src={`${base}human.svg`}
+                  alt="h-uman logo 32px dark"
+                  width="32"
+                  height="32"
+                  class="w-8 h-8"
+                  loading="lazy"
+                />
+                <span class="text-xs mt-3" style="color: var(--hu-web-text-tertiary);">32px on dark</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 4. Color ═══ */}
+      <section
+        class="py-24 md:py-32 px-6 cv-defer"
+        data-reveal
+      >
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="color: var(--color-text); letter-spacing: -0.03em;"
+          >
+            Color
+          </h2>
+          <div class="space-y-12">
+            <div>
+              <h3 class="text-lg font-semibold mb-4" style="color: var(--color-text);">
+                Fidelity Green (Primary)
+              </h3>
+              <div
+                class="h-32 md:h-40 rounded-2xl mb-4"
+                style="background: var(--hu-accent);"
+              />
+              <p class="text-sm" style="color: var(--color-text-secondary);">
+                <code class="px-2 py-0.5 rounded" style="background: var(--hu-web-code-bg); color: var(--color-accent);">#7AB648</code>
+                — <code class="px-2 py-0.5 rounded" style="background: var(--hu-web-code-bg);">var(--hu-accent)</code>
+              </p>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold mb-4" style="color: var(--color-text);">
+                Accent Hierarchy
+              </h3>
+              <div class="brand-color-grid">
+                <div class="brand-swatch brand-swatch-primary">
+                  <span>Primary</span>
+                  <code>--hu-accent</code>
+                </div>
+                <div class="brand-swatch brand-swatch-secondary">
+                  <span>Secondary</span>
+                  <code>--hu-accent-secondary</code>
+                </div>
+                <div class="brand-swatch brand-swatch-tertiary">
+                  <span>Tertiary</span>
+                  <code>--hu-accent-tertiary</code>
+                </div>
+                <div class="brand-swatch brand-swatch-error">
+                  <span>Error</span>
+                  <code>--hu-error</code>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold mb-4" style="color: var(--color-text);">
+                Light & Dark
+              </h3>
+              <div class="grid sm:grid-cols-2 gap-6">
+                <div
+                  class="rounded-2xl p-6 border"
+                  style="background: var(--hu-web-bg); border-color: var(--color-border);"
+                >
+                  <p class="text-xs uppercase tracking-wider mb-4" style="color: var(--color-text-tertiary);">Light mode</p>
+                  <div class="flex gap-3">
+                    <div class="w-12 h-12 rounded-lg" style="background: var(--hu-accent);" />
+                    <div class="w-12 h-12 rounded-lg" style="background: var(--hu-accent-secondary);" />
+                    <div class="w-12 h-12 rounded-lg" style="background: var(--hu-accent-tertiary);" />
+                  </div>
+                </div>
+                <div
+                  class="rounded-2xl p-6"
+                  style="background: var(--hu-bg-surface, #152333); border: 1px solid color-mix(in srgb, white 0.1, transparent);"
+                >
+                  <p class="text-xs uppercase tracking-wider mb-4" style="color: var(--hu-web-text-tertiary);">Dark mode</p>
+                  <div class="flex gap-3">
+                    <div class="w-12 h-12 rounded-lg" style="background: var(--hu-accent);" />
+                    <div class="w-12 h-12 rounded-lg" style="background: var(--hu-accent-secondary);" />
+                    <div class="w-12 h-12 rounded-lg" style="background: var(--hu-accent-tertiary);" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 5. Typography ═══ */}
+      <section
+        class="py-24 md:py-32 px-6 cv-defer"
+        data-reveal
+      >
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="color: var(--color-text); letter-spacing: -0.03em;"
+          >
+            Typography
+          </h2>
+          <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
+            Avenir at all weights. Use <code class="px-2 py-0.5 rounded" style="background: var(--hu-web-code-bg);">var(--hu-font)</code>.
+          </p>
+          <div class="space-y-10">
+            <div class="brand-type-spec" style="font-weight: 300;">
+              <span class="text-xs uppercase tracking-wider" style="color: var(--color-text-tertiary);">Light 300</span>
+              <p class="text-xl mt-2" style="font-family: var(--hu-font); color: var(--color-text);">
+                The quick brown fox jumps over the lazy dog. 0123456789
+              </p>
+            </div>
+            <div class="brand-type-spec" style="font-weight: 400;">
+              <span class="text-xs uppercase tracking-wider" style="color: var(--color-text-tertiary);">Book 400</span>
+              <p class="text-xl mt-2" style="font-family: var(--hu-font); color: var(--color-text);">
+                The quick brown fox jumps over the lazy dog. 0123456789
+              </p>
+            </div>
+            <div class="brand-type-spec" style="font-weight: 500;">
+              <span class="text-xs uppercase tracking-wider" style="color: var(--color-text-tertiary);">Medium 500</span>
+              <p class="text-xl mt-2" style="font-family: var(--hu-font); color: var(--color-text);">
+                The quick brown fox jumps over the lazy dog. 0123456789
+              </p>
+            </div>
+            <div class="brand-type-spec" style="font-weight: 700;">
+              <span class="text-xs uppercase tracking-wider" style="color: var(--color-text-tertiary);">Heavy 700</span>
+              <p class="text-xl mt-2" style="font-family: var(--hu-font); color: var(--color-text);">
+                The quick brown fox jumps over the lazy dog. 0123456789
+              </p>
+            </div>
+            <div class="brand-type-spec" style="font-weight: 900;">
+              <span class="text-xs uppercase tracking-wider" style="color: var(--color-text-tertiary);">Black 900</span>
+              <p class="text-xl mt-2" style="font-family: var(--hu-font); color: var(--color-text);">
+                The quick brown fox jumps over the lazy dog. 0123456789
+              </p>
+            </div>
+          </div>
+          <div class="mt-16">
+            <h3 class="text-lg font-semibold mb-4" style="color: var(--color-text);">
+              Type Scale
+            </h3>
+            <div class="flex flex-wrap gap-4 items-baseline">
+              <span style="font-family: var(--hu-font); font-size: var(--hu-text-2xs); color: var(--color-text);">2xs</span>
+              <span style="font-family: var(--hu-font); font-size: var(--hu-text-xs); color: var(--color-text);">xs</span>
+              <span style="font-family: var(--hu-font); font-size: var(--hu-text-sm); color: var(--color-text);">sm</span>
+              <span style="font-family: var(--hu-font); font-size: var(--hu-text-base); color: var(--color-text);">base</span>
+              <span style="font-family: var(--hu-font); font-size: var(--hu-text-lg); color: var(--color-text);">lg</span>
+              <span style="font-family: var(--hu-font); font-size: var(--hu-text-xl); color: var(--color-text);">xl</span>
+              <span style="font-family: var(--hu-font); font-size: var(--hu-text-2xl); color: var(--color-text);">2xl</span>
+              <span style="font-family: var(--hu-font); font-size: var(--hu-text-3xl); color: var(--color-text);">3xl</span>
+              <span style="font-family: var(--hu-font); font-size: var(--hu-text-hero); color: var(--color-text);">hero</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 6. Voice & Tone ═══ */}
+      <section
+        class="py-24 md:py-32 px-6 cv-defer"
+        data-reveal
+      >
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="color: var(--color-text); letter-spacing: -0.03em;"
+          >
+            Voice & Tone
+          </h2>
+          <div class="grid md:grid-cols-3 gap-6">
+            <div class="glass rounded-2xl p-8" style="border: 1px solid var(--color-border);">
+              <div class="flex items-center gap-3 mb-4">
+                <svg class="w-8 h-8 flex-shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--hu-accent);" aria-hidden="true">
+                  <path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,96a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,96Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,128Zm0,32a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,160Z"/>
+                </svg>
+                <h3 class="text-lg font-bold" style="color: var(--color-text);">Honest</h3>
+              </div>
+              <p class="text-sm mb-4" style="color: var(--color-text-secondary);">
+                We say what we are and aren't.
+              </p>
+              <div class="space-y-3 text-sm">
+                <div>
+                  <span class="text-xs uppercase" style="color: var(--hu-accent);">Good</span>
+                  <p style="color: var(--color-text);">"h-uman is a C runtime. It doesn't run in the cloud by default."</p>
+                </div>
+                <div>
+                  <span class="text-xs uppercase" style="color: var(--hu-error);">Bad</span>
+                  <p style="color: var(--color-text-tertiary);">"h-uman is the most powerful AI platform ever built."</p>
+                </div>
+              </div>
+            </div>
+            <div class="glass rounded-2xl p-8" style="border: 1px solid var(--color-border);">
+              <div class="flex items-center gap-3 mb-4">
+                <svg class="w-8 h-8 flex-shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--hu-accent-tertiary);" aria-hidden="true">
+                  <path d="M224,128a96,96,0,0,0-96-96H64A64,64,0,0,0,0,96v64a64,64,0,0,0,64,64h64a96,96,0,0,0,96-96Zm-16,0a80,80,0,0,1-80,80H64A48,48,0,0,1,16,160V96A48,48,0,0,1,64,48h64A80,80,0,0,1,208,128Z"/>
+                </svg>
+                <h3 class="text-lg font-bold" style="color: var(--color-text);">Technical</h3>
+              </div>
+              <p class="text-sm mb-4" style="color: var(--color-text-secondary);">
+                We respect the intelligence of our users.
+              </p>
+              <div class="space-y-3 text-sm">
+                <div>
+                  <span class="text-xs uppercase" style="color: var(--hu-accent);">Good</span>
+                  <p style="color: var(--color-text);">"~1.7 MB binary. Zero deps. &lt;6 MB RSS."</p>
+                </div>
+                <div>
+                  <span class="text-xs uppercase" style="color: var(--hu-error);">Bad</span>
+                  <p style="color: var(--color-text-tertiary);">"Super fast and lightweight!"</p>
+                </div>
+              </div>
+            </div>
+            <div class="glass rounded-2xl p-8" style="border: 1px solid var(--color-border);">
+              <div class="flex items-center gap-3 mb-4">
+                <svg class="w-8 h-8 flex-shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--hu-accent-secondary);" aria-hidden="true">
+                  <path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32Zm0,176H48V48H208V208ZM184,96a8,8,0,0,1-8,8H80a8,8,0,0,1,0-16h96A8,8,0,0,1,184,96Zm0,32a8,8,0,0,1-8,8H80a8,8,0,0,1,0-16h96A8,8,0,0,1,184,128Z"/>
+                </svg>
+                <h3 class="text-lg font-bold" style="color: var(--color-text);">Concise</h3>
+              </div>
+              <p class="text-sm mb-4" style="color: var(--color-text-secondary);">
+                Every word earns its place.
+              </p>
+              <div class="space-y-3 text-sm">
+                <div>
+                  <span class="text-xs uppercase" style="color: var(--hu-accent);">Good</span>
+                  <p style="color: var(--color-text);">"One binary. Zero deps."</p>
+                </div>
+                <div>
+                  <span class="text-xs uppercase" style="color: var(--hu-error);">Bad</span>
+                  <p style="color: var(--color-text-tertiary);">"You get a single executable file with no external dependencies whatsoever."</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 7. Footer ═══ */}
+    </main>
+
+    <footer class="site-footer py-12 px-6" role="contentinfo">
+      <div
+        class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4"
+      >
+        <div class="flex items-center gap-3">
+          <img
+            src={`${base}human.svg`}
+            alt="h-uman logo"
+            width="512"
+            height="512"
+            class="w-5 h-5"
+            loading="lazy"
+            decoding="async"
+          />
+          <span class="text-[13px]" style="color: var(--color-text-tertiary)">
+            h-uman
+          </span>
+        </div>
+        <p
+          class="text-[13px] hidden md:block"
+          style="color: var(--color-text-tertiary)"
+        >
+          not quite human.
+        </p>
+        <div
+          class="flex items-center gap-6 text-[13px]"
+          style="color: var(--color-text-tertiary)"
+        >
+          <span>MIT License</span>
+          <span>Made with C11</span>
+          <a
+            href="https://github.com/sethdford/h-uman"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:opacity-80 transition-opacity"
+            style="transition-duration: var(--hu-duration-normal);"
+          >
+            GitHub
+          </a>
+        </div>
+      </div>
+    </footer>
+
+    <style>
+      .brand-color-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: var(--hu-space-md);
+      }
+      .brand-swatch {
+        aspect-ratio: 1;
+        border-radius: var(--hu-radius-lg);
+        padding: var(--hu-space-md);
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        font-size: var(--hu-text-xs);
+      }
+      .brand-swatch-primary {
+        background: var(--hu-accent);
+        color: var(--hu-on-accent);
+      }
+      .brand-swatch-secondary {
+        background: var(--hu-accent-secondary);
+        color: var(--hu-on-accent-secondary);
+      }
+      .brand-swatch-tertiary {
+        background: var(--hu-accent-tertiary);
+        color: var(--hu-on-accent-tertiary);
+      }
+      .brand-swatch-error {
+        background: var(--hu-error);
+        color: var(--hu-on-accent-secondary, #060b12);
+      }
+      .brand-swatch code {
+        font-size: 0.65rem;
+        opacity: 0.9;
+        margin-top: var(--hu-space-xs);
+      }
+      .brand-type-spec {
+        padding-bottom: var(--hu-space-lg);
+        border-bottom: 1px solid var(--color-border);
+      }
+      .brand-type-spec:last-of-type {
+        border-bottom: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        [data-reveal] {
+          opacity: 1 !important;
+          transform: none !important;
+        }
+      }
+    </style>
+
+    <script>
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      if (prefersReducedMotion) {
+        document.querySelectorAll("[data-reveal]").forEach((el) => {
+          (el as HTMLElement).style.opacity = "1";
+          (el as HTMLElement).style.transform = "none";
+          (el as HTMLElement).style.transitionDuration = "0s";
+        });
+      } else {
+        const revealObserver = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("revealed");
+                revealObserver.unobserve(entry.target);
+              }
+            });
+          },
+          { threshold: 0.15, rootMargin: "0px 0px -50px 0px" }
+        );
+        document.querySelectorAll("[data-reveal]").forEach((el) => {
+          revealObserver.observe(el);
+        });
+
+        const nav = document.getElementById("site-nav");
+        if (nav) {
+          const onScroll = () => {
+            if (window.scrollY > 80) {
+              nav.classList.add("glass-nav");
+            } else {
+              nav.classList.remove("glass-nav");
+            }
+          };
+          window.addEventListener("scroll", onScroll, { passive: true });
+          onScroll();
+        }
+      }
+    </script>
+  </body>
+</html>
