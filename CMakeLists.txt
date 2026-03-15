@@ -832,7 +832,7 @@ if(HU_ENABLE_FEEDS)
         src/feeds/research_executor.c src/feeds/trends.c)
 endif()
 
-# Skillforge + Phase 8 intelligence (skills, reflection, feedback, meta-learning)
+# Skillforge + Phase 8 intelligence (skills, reflection, feedback, meta-learning, cycle)
 if(HU_ENABLE_SKILLS)
     list(APPEND HU_CORE_SOURCES
         src/skillforge.c

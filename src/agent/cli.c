@@ -642,6 +642,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                 sqlite3 *findings_db = hu_sqlite_memory_get_db(&memory);
                 if (findings_db) {
                     hu_findings_parse_and_store(alloc, findings_db, response, response_len);
+#if defined(HU_ENABLE_SKILLS)
                     hu_intelligence_cycle_result_t cycle_result;
                     memset(&cycle_result, 0, sizeof(cycle_result));
                     if (hu_intelligence_run_cycle(alloc, findings_db, &cycle_result) == HU_OK) {
@@ -649,6 +650,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                                 cycle_result.findings_actioned, cycle_result.lessons_extracted,
                                 cycle_result.events_recorded, cycle_result.values_learned);
                     }
+#endif
                 }
             }
 #endif

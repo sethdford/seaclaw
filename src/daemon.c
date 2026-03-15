@@ -2132,7 +2132,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 #endif
-#ifdef HU_ENABLE_SQLITE
+#if defined(HU_ENABLE_SQLITE) && defined(HU_ENABLE_SKILLS)
                 /* Intelligence cycle — run every 6 hours to process findings, extract lessons, reflect */
                 {
                     static int64_t last_intelligence_cycle = 0;
