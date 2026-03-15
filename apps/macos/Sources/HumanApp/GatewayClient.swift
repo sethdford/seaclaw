@@ -13,6 +13,12 @@ class GatewayClient: ObservableObject {
         self.url = URL(string: url) ?? URL(string: "ws://localhost:3000/ws")!
     }
 
+    /// Connect only when needed (e.g. when Chat tab is selected). Idempotent.
+    func connectIfNeeded() {
+        guard !isConnected, task == nil else { return }
+        connect()
+    }
+
     func connect() {
         queue.async { [weak self] in
             guard let self = self else { return }

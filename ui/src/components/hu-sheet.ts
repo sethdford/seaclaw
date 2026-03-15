@@ -35,7 +35,7 @@ export class ScSheet extends LitElement {
     .backdrop.open {
       opacity: 1;
       visibility: visible;
-      animation: hu-fade-in var(--hu-duration-normal) var(--hu-ease-out);
+      animation: hu-backdrop-dim var(--hu-duration-normal) var(--hu-ease-out) both;
     }
 
     .panel {
@@ -59,7 +59,7 @@ export class ScSheet extends LitElement {
     }
 
     .panel.open {
-      animation: hu-sheet-enter var(--hu-duration-slow)
+      animation: hu-dialog-enter var(--hu-duration-normal)
         var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
       transform: translateY(0);
     }
@@ -103,6 +103,25 @@ export class ScSheet extends LitElement {
       flex: 1;
       overflow: auto;
       padding: 0 var(--hu-space-lg) var(--hu-space-lg);
+    }
+
+    @keyframes hu-backdrop-dim {
+      from {
+        background-color: transparent;
+      }
+      to {
+        background-color: color-mix(in srgb, var(--hu-bg) 60%, transparent);
+      }
+    }
+    @keyframes hu-dialog-enter {
+      from {
+        opacity: 0;
+        transform: scale(0.95) translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
     }
   `;
 

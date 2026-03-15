@@ -1,5 +1,6 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { staggerMotion9Styles } from "../styles/scroll-entrance.js";
 import { formatDate, formatRelative } from "../utils.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
@@ -53,101 +54,104 @@ function formatChartLabel(dateKey: string): string {
 export class ScAgentsView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
 
-  static override styles = css`
-    :host {
-      view-transition-name: view-agents;
-      display: block;
-      color: var(--hu-text);
-      contain: layout style;
-      container-type: inline-size;
-      max-width: 75rem;
-      padding: var(--hu-space-lg) var(--hu-space-xl);
-    }
+  static override styles = [
+    staggerMotion9Styles,
+    css`
+      :host {
+        view-transition-name: view-agents;
+        display: block;
+        color: var(--hu-text);
+        contain: layout style;
+        container-type: inline-size;
+        max-width: 75rem;
+        padding: var(--hu-space-lg) var(--hu-space-xl);
+      }
 
-    .staleness {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-    }
+      .staleness {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+      }
 
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: var(--hu-space-sm);
-    }
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--hu-space-sm);
+      }
 
-    .section-title {
-      font-size: var(--hu-text-lg);
-      font-weight: var(--hu-weight-semibold);
-      color: var(--hu-text);
-    }
-
-    .card-spacer {
-      margin-bottom: var(--hu-space-2xl);
-    }
-
-    .chart-section {
-      margin-bottom: var(--hu-space-2xl);
-    }
-
-    .profile-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: var(--hu-space-sm);
-    }
-
-    .profile-title {
-      font-size: var(--hu-text-lg);
-      font-weight: var(--hu-weight-semibold);
-      color: var(--hu-text);
-    }
-
-    .profile-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(8.75rem, 1fr));
-      gap: var(--hu-space-sm);
-      font-size: var(--hu-text-sm);
-    }
-
-    .profile-item {
-      color: var(--hu-text-muted);
-
-      & strong {
+      .section-title {
+        font-size: var(--hu-text-lg);
+        font-weight: var(--hu-weight-semibold);
         color: var(--hu-text);
       }
-    }
 
-    .skeleton-sessions {
-      margin-bottom: var(--hu-space-2xl);
-    }
-
-    @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
-      .metrics,
-      .skeleton-metrics {
-        grid-template-columns: repeat(2, 1fr);
+      .card-spacer {
+        margin-bottom: var(--hu-space-2xl);
       }
+
+      .chart-section {
+        margin-bottom: var(--hu-space-2xl);
+      }
+
+      .profile-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--hu-space-sm);
+      }
+
+      .profile-title {
+        font-size: var(--hu-text-lg);
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+      }
+
       .profile-grid {
-        grid-template-columns: 1fr 1fr;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(8.75rem, 1fr));
+        gap: var(--hu-space-sm);
+        font-size: var(--hu-text-sm);
       }
-    }
 
-    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
-      .metrics,
-      .skeleton-metrics {
-        grid-template-columns: 1fr;
+      .profile-item {
+        color: var(--hu-text-muted);
+
+        & strong {
+          color: var(--hu-text);
+        }
       }
-      .profile-grid {
-        grid-template-columns: 1fr;
+
+      .skeleton-sessions {
+        margin-bottom: var(--hu-space-2xl);
       }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0s !important;
-        transition-duration: 0s !important;
+
+      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+        .metrics,
+        .skeleton-metrics {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .profile-grid {
+          grid-template-columns: 1fr 1fr;
+        }
       }
-    }
-  `;
+
+      @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+        .metrics,
+        .skeleton-metrics {
+          grid-template-columns: 1fr;
+        }
+        .profile-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0s !important;
+          transition-duration: 0s !important;
+        }
+      }
+    `,
+  ];
 
   @state() private config: ConfigData = {};
   @state() private sessions: Session[] = [];
@@ -306,7 +310,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
     ];
 
     return html`
-      <hu-stats-row>
+      <hu-stats-row class="hu-stagger-motion9">
         ${metrics.map(
           (m, i) => html`
             <hu-stat-card
@@ -335,7 +339,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
 
   private _renderSessions() {
     return html`
-      <hu-card class="card-spacer">
+      <hu-card class="card-spacer hu-stagger-motion9">
         <div class="section-header">
           <span class="section-title">Active Sessions</span>
           <hu-button
@@ -368,7 +372,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
 
   private _renderConfig() {
     return html`
-      <hu-card>
+      <hu-card class="hu-stagger-motion9">
         <div class="profile-header">
           <span class="profile-title">Configuration</span>
           <hu-button

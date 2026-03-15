@@ -43,13 +43,14 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import ai.human.app.ConnectionState
 import ai.human.app.GatewayClient
 import ai.human.app.ui.HUTokens
 
 private val overviewSpring = spring<IntOffset>(
-    dampingRatio = 0.7f,
-    stiffness = HUTokens.springStandardStiffness,
+    dampingRatio = 0.86f,
+    stiffness = HUTokens.springInteractiveStiffness,
 )
 
 @Composable
@@ -117,7 +118,9 @@ fun OverviewScreen(
                 ) {
                     Text(
                         text = "Welcome back",
-                        style = MaterialTheme.typography.headlineLarge,
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            letterSpacing = (-0.5).sp,
+                        ),
                         color = colorScheme.onBackground,
                         modifier = Modifier.semantics {
                             contentDescription = "Welcome back"
@@ -233,8 +236,8 @@ fun OverviewScreen(
                 enter = fadeIn(animationSpec = tween(HUTokens.durationNormal.toInt(), delayMillis = 200)) +
                     slideInVertically(
                         animationSpec = spring<IntOffset>(
-                            dampingRatio = 0.7f,
-                            stiffness = HUTokens.springStandardStiffness,
+                            dampingRatio = 0.86f,
+                            stiffness = HUTokens.springInteractiveStiffness,
                         ),
                         initialOffsetY = { it / 4 },
                     ),
@@ -255,7 +258,7 @@ private fun StatCard(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(HUTokens.radiusLg))
-            .background(colorScheme.primaryContainer)
+            .background(colorScheme.surfaceContainerHigh)
             .padding(HUTokens.spaceMd)
             .semantics { contentDescription = "$title: $value" },
     ) {
@@ -268,7 +271,9 @@ private fun StatCard(
             Spacer(modifier = Modifier.height(HUTokens.spaceXs))
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.displaySmall.copy(
+                    letterSpacing = (-0.5).sp,
+                ),
                 color = colorScheme.onBackground,
             )
         }
@@ -285,7 +290,7 @@ private fun StatCard(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(HUTokens.radiusLg))
-            .background(colorScheme.primaryContainer)
+            .background(colorScheme.surfaceContainerHigh)
             .padding(HUTokens.spaceMd)
             .semantics { contentDescription = "$title: $value" },
     ) {
@@ -309,7 +314,9 @@ private fun StatCard(
             ) { count ->
                 Text(
                     text = "$count",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.displaySmall.copy(
+                        letterSpacing = (-0.5).sp,
+                    ),
                     color = colorScheme.onBackground,
                 )
             }
@@ -324,7 +331,7 @@ private fun ActivityItem(text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(HUTokens.radiusMd))
-            .background(colorScheme.primaryContainer)
+            .background(colorScheme.surfaceContainerHigh)
             .padding(HUTokens.spaceMd),
     ) {
         Text(

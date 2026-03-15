@@ -1,5 +1,6 @@
 import { html, css } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { staggerMotion9Styles } from "../styles/scroll-entrance.js";
 import { GatewayClient } from "../gateway.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { EVENT_NAMES } from "../utils.js";
@@ -46,167 +47,170 @@ function formatRelativeTime(ts: string): string {
 
 @customElement("hu-logs-view")
 export class ScLogsView extends GatewayAwareLitElement {
-  static override styles = css`
-    :host {
-      view-transition-name: view-logs;
-      display: flex;
-      flex-direction: column;
-      contain: layout style;
-      container-type: inline-size;
-      flex: 1;
-      min-height: 0;
-      color: var(--hu-text);
-      max-width: 60rem;
-    }
-    .layout {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      min-height: 0;
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: var(--hu-space-md);
-      flex-wrap: wrap;
-      gap: var(--hu-space-sm);
-    }
-    .controls-sticky {
-      position: sticky;
-      top: 0;
-      z-index: 1;
-      background: var(--hu-bg);
-      padding: var(--hu-space-md) 0;
-      margin-bottom: var(--hu-space-sm);
-      border-bottom: 1px solid var(--hu-border-subtle);
-    }
-    .controls {
-      display: flex;
-      gap: var(--hu-space-sm);
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .filter-input {
-      padding: var(--hu-space-sm) var(--hu-space-md);
-      background: var(--hu-bg-surface);
-      border: 1px solid var(--hu-border);
-      border-radius: var(--hu-radius);
-      color: var(--hu-text);
-      font-size: var(--hu-text-sm);
-      font-family: var(--hu-font-mono);
-      width: 13.75rem;
-      transition:
-        border-color var(--hu-duration-fast) var(--hu-ease-out),
-        box-shadow var(--hu-duration-fast) var(--hu-ease-out);
-    }
-    .filter-input:focus {
-      outline: none;
-      border-color: var(--hu-accent);
-      box-shadow: 0 0 0 var(--hu-space-xs) var(--hu-accent-subtle);
-    }
-    .filter-input::placeholder {
-      color: var(--hu-text-muted);
-    }
-    .event.chat {
-      color: var(--hu-success);
-    }
-    .event.tool-call {
-      color: var(--hu-info);
-    }
-    .event.error {
-      color: var(--hu-error);
-    }
-    .event.health {
-      color: var(--hu-warning);
-    }
-    .log-card {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-    .log-area-wrapper {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-    .log-area {
-      flex: 1;
-      min-height: 0;
-      padding: var(--hu-space-md);
-      overflow-y: auto;
-      font-family: var(--hu-font-mono);
-      font-size: var(--hu-text-sm);
-      line-height: 1.6;
-      color: var(--hu-text);
-    }
-    .log-area::-webkit-scrollbar {
-      width: var(--hu-space-sm);
-    }
-    .log-area::-webkit-scrollbar-track {
-      background: var(--hu-bg-elevated);
-      border-radius: var(--hu-radius-sm);
-    }
-    .log-area::-webkit-scrollbar-thumb {
-      background: var(--hu-border);
-      border-radius: var(--hu-radius-sm);
-    }
-    .log-area::-webkit-scrollbar-thumb:hover {
-      background: var(--hu-text-muted);
-    }
-    .skeleton-control {
-      width: 12rem;
-    }
-    .skeleton-filter {
-      width: 13.75rem;
-    }
-    .skeleton-action {
-      width: 4rem;
-    }
-    .log-area-min {
-      min-height: 12rem;
-    }
-    .skeleton-line {
-      width: 100%;
-      margin-bottom: var(--hu-space-sm);
-    }
-    .skeleton-line-90 {
-      width: 90%;
-      margin-bottom: var(--hu-space-sm);
-    }
-    .skeleton-line-95 {
-      width: 95%;
-      margin-bottom: var(--hu-space-sm);
-    }
-    .skeleton-line-85 {
-      width: 85%;
-      margin-bottom: var(--hu-space-sm);
-    }
-    .skeleton-line-70 {
-      width: 70%;
-    }
-    @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+  static override styles = [
+    staggerMotion9Styles,
+    css`
+      :host {
+        view-transition-name: view-logs;
+        display: flex;
+        flex-direction: column;
+        contain: layout style;
+        container-type: inline-size;
+        flex: 1;
+        min-height: 0;
+        color: var(--hu-text);
+        max-width: 60rem;
+      }
+      .layout {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+      }
       .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--hu-space-md);
         flex-wrap: wrap;
+        gap: var(--hu-space-sm);
+      }
+      .controls-sticky {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--hu-bg);
+        padding: var(--hu-space-md) 0;
+        margin-bottom: var(--hu-space-sm);
+        border-bottom: 1px solid var(--hu-border-subtle);
       }
       .controls {
+        display: flex;
+        gap: var(--hu-space-sm);
+        align-items: center;
         flex-wrap: wrap;
       }
-    }
-    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
       .filter-input {
-        width: 100%;
+        padding: var(--hu-space-sm) var(--hu-space-md);
+        background: var(--hu-bg-surface);
+        border: 1px solid var(--hu-border);
+        border-radius: var(--hu-radius);
+        color: var(--hu-text);
+        font-size: var(--hu-text-sm);
+        font-family: var(--hu-font-mono);
+        width: 13.75rem;
+        transition:
+          border-color var(--hu-duration-fast) var(--hu-ease-out),
+          box-shadow var(--hu-duration-fast) var(--hu-ease-out);
       }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .filter-input,
+      .filter-input:focus {
+        outline: none;
+        border-color: var(--hu-accent);
+        box-shadow: 0 0 0 var(--hu-space-xs) var(--hu-accent-subtle);
+      }
+      .filter-input::placeholder {
+        color: var(--hu-text-muted);
+      }
+      .event.chat {
+        color: var(--hu-success);
+      }
+      .event.tool-call {
+        color: var(--hu-info);
+      }
+      .event.error {
+        color: var(--hu-error);
+      }
+      .event.health {
+        color: var(--hu-warning);
+      }
+      .log-card {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .log-area-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
       .log-area {
-        transition: none !important;
+        flex: 1;
+        min-height: 0;
+        padding: var(--hu-space-md);
+        overflow-y: auto;
+        font-family: var(--hu-font-mono);
+        font-size: var(--hu-text-sm);
+        line-height: 1.6;
+        color: var(--hu-text);
       }
-    }
-  `;
+      .log-area::-webkit-scrollbar {
+        width: var(--hu-space-sm);
+      }
+      .log-area::-webkit-scrollbar-track {
+        background: var(--hu-bg-elevated);
+        border-radius: var(--hu-radius-sm);
+      }
+      .log-area::-webkit-scrollbar-thumb {
+        background: var(--hu-border);
+        border-radius: var(--hu-radius-sm);
+      }
+      .log-area::-webkit-scrollbar-thumb:hover {
+        background: var(--hu-text-muted);
+      }
+      .skeleton-control {
+        width: 12rem;
+      }
+      .skeleton-filter {
+        width: 13.75rem;
+      }
+      .skeleton-action {
+        width: 4rem;
+      }
+      .log-area-min {
+        min-height: 12rem;
+      }
+      .skeleton-line {
+        width: 100%;
+        margin-bottom: var(--hu-space-sm);
+      }
+      .skeleton-line-90 {
+        width: 90%;
+        margin-bottom: var(--hu-space-sm);
+      }
+      .skeleton-line-95 {
+        width: 95%;
+        margin-bottom: var(--hu-space-sm);
+      }
+      .skeleton-line-85 {
+        width: 85%;
+        margin-bottom: var(--hu-space-sm);
+      }
+      .skeleton-line-70 {
+        width: 70%;
+      }
+      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+        .header {
+          flex-wrap: wrap;
+        }
+        .controls {
+          flex-wrap: wrap;
+        }
+      }
+      @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+        .filter-input {
+          width: 100%;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .filter-input,
+        .log-area {
+          transition: none !important;
+        }
+      }
+    `,
+  ];
 
   @state() private logs: LogEntry[] = [];
   @state() private _buffer: LogEntry[] = [];
@@ -470,7 +474,7 @@ export class ScLogsView extends GatewayAwareLitElement {
     void this._relativeTimeKey;
     const timelineItems = this.toTimelineItems(entries);
     return html`
-      <div class="hu-stagger">
+      <div class="hu-stagger-motion9">
         <hu-card class="log-card" glass>
           <div class="log-area-wrapper">
             <div class="log-area" role="log" aria-live="polite">

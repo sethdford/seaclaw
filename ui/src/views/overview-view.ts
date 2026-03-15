@@ -1,5 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import type { PropertyValues } from "lit";
+import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { friendlyError } from "../utils/friendly-error.js";
 import { icons } from "../icons.js";
@@ -62,281 +64,284 @@ interface SessionItem {
 export class ScOverviewView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
 
-  static override styles = css`
-    :host {
-      view-transition-name: view-overview;
-      display: block;
-      max-width: 75rem;
-      contain: layout style;
-      padding: var(--hu-space-lg) var(--hu-space-xl);
-    }
-
-    /* ── Hero zone ────────────────────────────────────── */
-
-    .hero-left {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-lg);
-      min-width: 0;
-    }
-
-    .hero-status {
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-2xs);
-    }
-
-    .hero-title {
-      margin: 0;
-      font-size: var(--hu-text-3xl);
-      font-weight: var(--hu-weight-bold);
-      letter-spacing: var(--hu-tracking-hero);
-      color: var(--hu-text);
-      line-height: var(--hu-leading-tight);
-    }
-
-    .hero-meta {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-sm);
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-
-      & .update-link {
-        color: var(--hu-accent-text, var(--hu-accent));
-        text-decoration: none;
-        font-weight: var(--hu-weight-medium);
-
-        &:hover {
-          text-decoration: underline;
-        }
-      }
-    }
-
-    .hero-actions {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-sm);
-    }
-
-    .staleness {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-    }
-
-    /* ── Detail zone (asymmetric bento) ────────────────── */
-
-    .details {
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-xl);
-      container-type: inline-size;
-    }
-
-    .bento {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      grid-template-areas:
-        "activity activity channels channels"
-        "activity activity sessions sessions";
-      gap: var(--hu-space-xl);
-    }
-
-    .bento .activity {
-      grid-area: activity;
-    }
-
-    .bento .channels {
-      grid-area: channels;
-    }
-
-    .bento .sessions {
-      grid-area: sessions;
-    }
-
-    .section-label {
-      font-size: var(--hu-text-xs);
-      font-weight: var(--hu-weight-semibold);
-      letter-spacing: var(--hu-tracking-xs);
-      text-transform: uppercase;
-      color: var(--hu-accent-text, var(--hu-accent));
-      margin-bottom: var(--hu-space-sm);
-    }
-
-    .channels-with-chart {
-      display: flex;
-      gap: var(--hu-space-lg);
-      align-items: flex-start;
-    }
-
-    .channels-with-chart hu-chart {
-      flex-shrink: 0;
-    }
-
-    .channels-inner {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(var(--hu-sidebar-width), 1fr));
-      gap: var(--hu-space-sm);
-      flex: 1;
-      min-width: 0;
-    }
-
-    .channel-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--hu-space-sm);
-    }
-
-    .channel-name {
-      font-size: var(--hu-text-sm);
-      font-weight: var(--hu-weight-medium);
-      color: var(--hu-text);
-    }
-
-    /* ── Skeleton ─────────────────────────────────────── */
-
-    .skeleton-hero {
-      margin-bottom: var(--hu-space-2xl);
-    }
-
-    .skeleton-metrics {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: var(--hu-space-lg);
-      margin-bottom: var(--hu-space-2xl);
-    }
-
-    .skeleton-bento {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      grid-template-areas:
-        "activity activity channels channels"
-        "activity activity sessions sessions";
-      gap: var(--hu-space-xl);
-    }
-
-    .skeleton-bento .activity {
-      grid-area: activity;
-    }
-
-    .skeleton-bento .channels {
-      grid-area: channels;
-    }
-
-    .skeleton-bento .sessions {
-      grid-area: sessions;
-    }
-
-    /* ── Responsive (container queries) ─────────────────── */
-
-    @container (max-width: 768px) {
-      .bento {
-        grid-template-columns: 1fr;
-        grid-template-areas:
-          "activity"
-          "channels"
-          "sessions";
-      }
-      .skeleton-bento {
-        grid-template-columns: 1fr;
-        grid-template-areas:
-          "activity"
-          "channels"
-          "sessions";
-      }
-      .skeleton-metrics {
-        grid-template-columns: 1fr 1fr;
-      }
-      .channels-with-chart {
-        flex-direction: column;
-      }
-    }
-
-    @container (max-width: 480px) {
+  static override styles = [
+    scrollEntranceStyles,
+    css`
       :host {
-        padding: var(--hu-space-md) var(--hu-space-lg);
+        view-transition-name: view-overview;
+        display: block;
+        max-width: 75rem;
+        contain: layout style;
+        padding: var(--hu-space-lg) var(--hu-space-xl);
       }
-      .skeleton-metrics {
-        grid-template-columns: 1fr;
-      }
-    }
 
-    /* ── Quick actions row ───────────────────────────────── */
+      /* ── Hero zone ────────────────────────────────────── */
 
-    .activity-heatmap-card {
-      margin-bottom: var(--hu-space-2xl);
-    }
-
-    .activity-heatmap-card .section-label {
-      margin-bottom: var(--hu-space-sm);
-    }
-
-    .quick-actions {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--hu-space-lg);
-      margin-bottom: var(--hu-space-2xl);
-    }
-    .quick-action-card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--hu-space-sm);
-      padding: var(--hu-space-lg);
-
-      & .icon-wrap {
+      .hero-left {
         display: flex;
         align-items: center;
-        justify-content: center;
-        width: var(--hu-icon-2xl);
-        height: var(--hu-icon-2xl);
-        color: var(--hu-accent);
+        gap: var(--hu-space-lg);
+        min-width: 0;
+      }
 
-        & svg {
-          width: var(--hu-icon-lg);
-          height: var(--hu-icon-lg);
+      .hero-status {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-2xs);
+      }
+
+      .hero-title {
+        margin: 0;
+        font-size: var(--hu-text-3xl);
+        font-weight: var(--hu-weight-bold);
+        letter-spacing: var(--hu-tracking-hero);
+        color: var(--hu-text);
+        line-height: var(--hu-leading-tight);
+      }
+
+      .hero-meta {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-sm);
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+
+        & .update-link {
+          color: var(--hu-accent-text, var(--hu-accent));
+          text-decoration: none;
+          font-weight: var(--hu-weight-medium);
+
+          &:hover {
+            text-decoration: underline;
+          }
         }
       }
 
-      & .label {
+      .hero-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-sm);
+      }
+
+      .staleness {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+      }
+
+      /* ── Detail zone (asymmetric bento) ────────────────── */
+
+      .details {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-xl);
+        container-type: inline-size;
+      }
+
+      .bento {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-areas:
+          "activity activity channels channels"
+          "activity activity sessions sessions";
+        gap: var(--hu-space-xl);
+      }
+
+      .bento .activity {
+        grid-area: activity;
+      }
+
+      .bento .channels {
+        grid-area: channels;
+      }
+
+      .bento .sessions {
+        grid-area: sessions;
+      }
+
+      .section-label {
+        font-size: var(--hu-text-xs);
+        font-weight: var(--hu-weight-semibold);
+        letter-spacing: var(--hu-tracking-xs);
+        text-transform: uppercase;
+        color: var(--hu-accent-text, var(--hu-accent));
+        margin-bottom: var(--hu-space-sm);
+      }
+
+      .channels-with-chart {
+        display: flex;
+        gap: var(--hu-space-lg);
+        align-items: flex-start;
+      }
+
+      .channels-with-chart hu-chart {
+        flex-shrink: 0;
+      }
+
+      .channels-inner {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(var(--hu-sidebar-width), 1fr));
+        gap: var(--hu-space-sm);
+        flex: 1;
+        min-width: 0;
+      }
+
+      .channel-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--hu-space-sm);
+      }
+
+      .channel-name {
         font-size: var(--hu-text-sm);
         font-weight: var(--hu-weight-medium);
         color: var(--hu-text);
       }
-    }
-    .show-more-btn {
-      margin-top: var(--hu-space-sm);
-      padding: var(--hu-space-2xs) var(--hu-space-sm);
-      font-size: var(--hu-text-xs);
-      font-weight: var(--hu-weight-medium);
-      color: var(--hu-accent-text, var(--hu-accent));
-      background: transparent;
-      border: none;
-      border-radius: var(--hu-radius-sm);
-      cursor: pointer;
-      font-family: var(--hu-font);
-      transition: background var(--hu-duration-fast) var(--hu-ease-out);
-    }
-    .show-more-btn:hover {
-      background: var(--hu-hover-overlay);
-    }
-    .show-more-btn:focus-visible {
-      outline: 2px solid var(--hu-accent);
-      outline-offset: 2px;
-    }
-    @container (max-width: 768px) {
+
+      /* ── Skeleton ─────────────────────────────────────── */
+
+      .skeleton-hero {
+        margin-bottom: var(--hu-space-2xl);
+      }
+
+      .skeleton-metrics {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--hu-space-lg);
+        margin-bottom: var(--hu-space-2xl);
+      }
+
+      .skeleton-bento {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-areas:
+          "activity activity channels channels"
+          "activity activity sessions sessions";
+        gap: var(--hu-space-xl);
+      }
+
+      .skeleton-bento .activity {
+        grid-area: activity;
+      }
+
+      .skeleton-bento .channels {
+        grid-area: channels;
+      }
+
+      .skeleton-bento .sessions {
+        grid-area: sessions;
+      }
+
+      /* ── Responsive (container queries) ─────────────────── */
+
+      @container (max-width: 768px) {
+        .bento {
+          grid-template-columns: 1fr;
+          grid-template-areas:
+            "activity"
+            "channels"
+            "sessions";
+        }
+        .skeleton-bento {
+          grid-template-columns: 1fr;
+          grid-template-areas:
+            "activity"
+            "channels"
+            "sessions";
+        }
+        .skeleton-metrics {
+          grid-template-columns: 1fr 1fr;
+        }
+        .channels-with-chart {
+          flex-direction: column;
+        }
+      }
+
+      @container (max-width: 480px) {
+        :host {
+          padding: var(--hu-space-md) var(--hu-space-lg);
+        }
+        .skeleton-metrics {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ── Quick actions row ───────────────────────────────── */
+
+      .activity-heatmap-card {
+        margin-bottom: var(--hu-space-2xl);
+      }
+
+      .activity-heatmap-card .section-label {
+        margin-bottom: var(--hu-space-sm);
+      }
+
       .quick-actions {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--hu-space-lg);
+        margin-bottom: var(--hu-space-2xl);
       }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0s !important;
-        transition-duration: 0s !important;
+      .quick-action-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--hu-space-sm);
+        padding: var(--hu-space-lg);
+
+        & .icon-wrap {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: var(--hu-icon-2xl);
+          height: var(--hu-icon-2xl);
+          color: var(--hu-accent);
+
+          & svg {
+            width: var(--hu-icon-lg);
+            height: var(--hu-icon-lg);
+          }
+        }
+
+        & .label {
+          font-size: var(--hu-text-sm);
+          font-weight: var(--hu-weight-medium);
+          color: var(--hu-text);
+        }
       }
-    }
-  `;
+      .show-more-btn {
+        margin-top: var(--hu-space-sm);
+        padding: var(--hu-space-2xs) var(--hu-space-sm);
+        font-size: var(--hu-text-xs);
+        font-weight: var(--hu-weight-medium);
+        color: var(--hu-accent-text, var(--hu-accent));
+        background: transparent;
+        border: none;
+        border-radius: var(--hu-radius-sm);
+        cursor: pointer;
+        font-family: var(--hu-font);
+        transition: background var(--hu-duration-fast) var(--hu-ease-out);
+      }
+      .show-more-btn:hover {
+        background: var(--hu-hover-overlay);
+      }
+      .show-more-btn:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
+      }
+      @container (max-width: 768px) {
+        .quick-actions {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0s !important;
+          transition-duration: 0s !important;
+        }
+      }
+    `,
+  ];
 
   @state() private health: HealthRes = {};
   @state() private capabilities: CapabilitiesRes = {};
@@ -348,6 +353,8 @@ export class ScOverviewView extends GatewayAwareLitElement {
   @state() private activityEvents: ActivityEvent[] = [];
   @state() private channelsExpanded = false;
   @state() private connectionStatus: "connected" | "connecting" | "disconnected" = "disconnected";
+  private _scrollEntranceObserver: IntersectionObserver | null = null;
+
   private _connectionStatusHandler = ((e: CustomEvent<string>) => {
     const s = e.detail as "connected" | "connecting" | "disconnected";
     if (s) this.connectionStatus = s;
@@ -373,10 +380,39 @@ export class ScOverviewView extends GatewayAwareLitElement {
     }
   }
 
+  override updated(changedProperties: PropertyValues): void {
+    super.updated(changedProperties);
+    this.updateComplete.then(() => this._setupScrollEntrance());
+  }
+
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._scrollEntranceObserver?.disconnect();
+    this._scrollEntranceObserver = null;
     this.gateway?.removeEventListener("status", this._connectionStatusHandler);
     this.gateway?.removeEventListener("gateway", this._gwEventHandler);
+  }
+
+  private _setupScrollEntrance(): void {
+    if (typeof CSS !== "undefined" && CSS.supports?.("animation-timeline", "view()")) return;
+    const root = this.renderRoot;
+    if (!root) return;
+    const elements = root.querySelectorAll(".quick-actions > *, .bento > *");
+    if (elements.length === 0) return;
+    if (!this._scrollEntranceObserver) {
+      this._scrollEntranceObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              (e.target as HTMLElement).classList.add("entered");
+              this._scrollEntranceObserver?.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
+    }
+    elements.forEach((el) => this._scrollEntranceObserver!.observe(el));
   }
 
   protected override onGatewaySwapped(

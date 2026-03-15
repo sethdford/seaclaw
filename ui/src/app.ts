@@ -363,6 +363,7 @@ export class ScApp extends LitElement {
       background: color-mix(in srgb, var(--hu-bg) 40%, transparent);
       backdrop-filter: blur(var(--hu-blur-sm, 4px));
       -webkit-backdrop-filter: blur(var(--hu-blur-sm, 4px));
+      animation: hu-backdrop-dim var(--hu-duration-normal) var(--hu-ease-out) both;
     }
     .more-sheet {
       position: fixed;
@@ -375,7 +376,7 @@ export class ScApp extends LitElement {
       box-shadow: var(--hu-shadow-lg);
       padding: var(--hu-space-md) var(--hu-space-md)
         calc(var(--hu-space-lg) + env(safe-area-inset-bottom, 0));
-      animation: hu-sheet-up var(--hu-duration-normal) var(--hu-ease-out);
+      animation: hu-sheet-up var(--hu-duration-normal) var(--hu-ease-spring) both;
       max-height: 70vh;
       overflow-y: auto;
     }

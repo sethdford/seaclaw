@@ -1,5 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import type { PropertyValues } from "lit";
+import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import "../components/hu-page-hero.js";
@@ -99,126 +101,129 @@ function sourceLabel(source?: string): string {
 
 @customElement("hu-memory-view")
 export class ScMemoryView extends GatewayAwareLitElement {
-  static override styles = css`
-    :host {
-      view-transition-name: view-memory;
-      display: flex;
-      flex-direction: column;
-      contain: layout style;
-      container-type: inline-size;
-      flex: 1;
-      min-height: 0;
-      color: var(--hu-text);
-      max-width: 72rem;
-    }
-    .layout {
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-lg);
-    }
-    .controls {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-sm);
-      flex-wrap: wrap;
-    }
-    .controls hu-input {
-      flex: 1;
-      min-width: 12rem;
-    }
-    .memory-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
-      gap: var(--hu-space-md);
-    }
-    .memory-card {
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-xs);
-    }
-    .memory-card .entry-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--hu-space-xs);
-    }
-    .memory-card .entry-header hu-button {
-      flex-shrink: 0;
-      opacity: 0;
-      transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
-    }
-    .memory-card:hover .entry-header hu-button {
-      opacity: 1;
-    }
-    .memory-card .key {
-      font-family: var(--hu-font-mono);
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .memory-card .content {
-      font-size: var(--hu-text-sm);
-      line-height: var(--hu-leading-relaxed);
-      color: var(--hu-text);
-    }
-    .memory-card .meta {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-xs);
-      flex-wrap: wrap;
-      margin-top: var(--hu-space-xs);
-    }
-    .memory-card .source {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-faint);
-    }
-    .memory-card .timestamp {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-faint);
-      margin-left: auto;
-    }
-    .insight-card {
-      border-left: 3px solid var(--hu-accent-tertiary);
-    }
-    .consolidate-row {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-sm);
-    }
-    .consolidate-row .last-run {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-    }
-    .error-banner {
-      padding: var(--hu-space-md);
-      background: color-mix(in srgb, var(--hu-error) 10%, transparent);
-      border-radius: var(--hu-radius);
-      color: var(--hu-error);
-      font-size: var(--hu-text-sm);
-    }
-    .skeleton-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
-      gap: var(--hu-space-md);
-    }
-
-    @container (max-width: 48rem) /* --hu-breakpoint-md */ {
+  static override styles = [
+    scrollEntranceStyles,
+    css`
+      :host {
+        view-transition-name: view-memory;
+        display: flex;
+        flex-direction: column;
+        contain: layout style;
+        container-type: inline-size;
+        flex: 1;
+        min-height: 0;
+        color: var(--hu-text);
+        max-width: 72rem;
+      }
+      .layout {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-lg);
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-sm);
+        flex-wrap: wrap;
+      }
+      .controls hu-input {
+        flex: 1;
+        min-width: 12rem;
+      }
       .memory-grid {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+        gap: var(--hu-space-md);
+      }
+      .memory-card {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-xs);
+      }
+      .memory-card .entry-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--hu-space-xs);
+      }
+      .memory-card .entry-header hu-button {
+        flex-shrink: 0;
+        opacity: 0;
+        transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
+      }
+      .memory-card:hover .entry-header hu-button {
+        opacity: 1;
+      }
+      .memory-card .key {
+        font-family: var(--hu-font-mono);
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .memory-card .content {
+        font-size: var(--hu-text-sm);
+        line-height: var(--hu-leading-relaxed);
+        color: var(--hu-text);
+      }
+      .memory-card .meta {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-xs);
+        flex-wrap: wrap;
+        margin-top: var(--hu-space-xs);
+      }
+      .memory-card .source {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-faint);
+      }
+      .memory-card .timestamp {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-faint);
+        margin-left: auto;
+      }
+      .insight-card {
+        border-left: 3px solid var(--hu-accent-tertiary);
+      }
+      .consolidate-row {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-sm);
+      }
+      .consolidate-row .last-run {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+      }
+      .error-banner {
+        padding: var(--hu-space-md);
+        background: color-mix(in srgb, var(--hu-error) 10%, transparent);
+        border-radius: var(--hu-radius);
+        color: var(--hu-error);
+        font-size: var(--hu-text-sm);
       }
       .skeleton-grid {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+        gap: var(--hu-space-md);
       }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0s !important;
-        transition-duration: 0s !important;
+
+      @container (max-width: 48rem) /* --hu-breakpoint-md */ {
+        .memory-grid {
+          grid-template-columns: 1fr;
+        }
+        .skeleton-grid {
+          grid-template-columns: 1fr;
+        }
       }
-    }
-  `;
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0s !important;
+          transition-duration: 0s !important;
+        }
+      }
+    `,
+  ];
 
   @state() private status: MemoryStatus | null = null;
   @state() private entries: MemoryEntry[] = [];
@@ -229,8 +234,42 @@ export class ScMemoryView extends GatewayAwareLitElement {
   @state() private consolidating = false;
   @state() private graphEntities: GraphEntity[] = [];
   @state() private graphRelations: GraphRelation[] = [];
+  private _scrollEntranceObserver: IntersectionObserver | null = null;
 
   protected override autoRefreshInterval = 30_000;
+
+  override updated(changedProperties: PropertyValues): void {
+    super.updated(changedProperties);
+    this.updateComplete.then(() => this._setupScrollEntrance());
+  }
+
+  override disconnectedCallback(): void {
+    this._scrollEntranceObserver?.disconnect();
+    this._scrollEntranceObserver = null;
+    super.disconnectedCallback();
+  }
+
+  private _setupScrollEntrance(): void {
+    if (typeof CSS !== "undefined" && CSS.supports?.("animation-timeline", "view()")) return;
+    const root = this.renderRoot;
+    if (!root) return;
+    const elements = root.querySelectorAll(".hu-scroll-reveal-stagger > *");
+    if (elements.length === 0) return;
+    if (!this._scrollEntranceObserver) {
+      this._scrollEntranceObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              (e.target as HTMLElement).classList.add("entered");
+              this._scrollEntranceObserver?.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
+    }
+    elements.forEach((el) => this._scrollEntranceObserver!.observe(el));
+  }
 
   protected override async load(): Promise<void> {
     const gw = this.gateway;
@@ -528,7 +567,11 @@ export class ScMemoryView extends GatewayAwareLitElement {
             .icon=${icons.brain}
           ></hu-empty-state>`
         : html`
-            <div class="memory-grid" role="list" aria-label="Memory entries">
+            <div
+              class="memory-grid hu-scroll-reveal-stagger"
+              role="list"
+              aria-label="Memory entries"
+            >
               ${filtered.map((entry) => this._renderEntry(entry))}
             </div>
           `}

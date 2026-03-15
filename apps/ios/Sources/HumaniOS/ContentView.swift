@@ -16,27 +16,27 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            OverviewView()
+            LazyView(OverviewView())
                 .tabItem {
                     Label("Overview", systemImage: "square.grid.2x2")
                 }
                 .tag(AppTab.overview)
-            ChatView()
+            LazyView(ChatView())
                 .tabItem {
                     Label("Chat", systemImage: "bubble.left.and.bubble.right")
                 }
                 .tag(AppTab.chat)
-            SessionsView()
+            LazyView(SessionsView())
                 .tabItem {
                     Label("Sessions", systemImage: "clock.arrow.circlepath")
                 }
                 .tag(AppTab.sessions)
-            ToolsView()
+            LazyView(ToolsView())
                 .tabItem {
                     Label("Tools", systemImage: "wrench.and.screwdriver")
                 }
                 .tag(AppTab.tools)
-            SettingsView()
+            LazyView(SettingsView())
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }

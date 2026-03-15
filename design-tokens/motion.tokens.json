@@ -122,6 +122,12 @@
       "damping": { "$value": 10, "$type": "number" },
       "mass": { "$value": 1, "$type": "number" },
       "$description": "Hero reveal, onboarding (~600ms settle)"
+    },
+    "interactive": {
+      "stiffness": { "$value": 322, "$type": "number" },
+      "damping": { "$value": 31, "$type": "number" },
+      "mass": { "$value": 1, "$type": "number" },
+      "$description": "Interactive elements — buttons, toggles, list items (response 0.35, dampingFraction 0.86)"
     }
   },
   "purpose": {

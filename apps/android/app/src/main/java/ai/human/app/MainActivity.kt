@@ -43,6 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
@@ -95,8 +96,14 @@ fun HumanApp(intent: Intent?) {
     val gateway = remember { GatewayClient() }
     val connectionState by gateway.state.collectAsState()
 
+    DisposableEffect(selectedTab) {
+        if (selectedTab == 1) {
+            gateway.connectIfNeeded("http://localhost:3000")
+        }
+        onDispose { }
+    }
+
     DisposableEffect(Unit) {
-        gateway.connect("http://localhost:3000")
         onDispose { gateway.disconnect() }
     }
 
@@ -191,6 +198,7 @@ fun HumanApp(intent: Intent?) {
                 transitionSpec = {
                     fadeIn() togetherWith fadeOut()
                 },
+                modifier = Modifier.graphicsLayer { },
                 label = "screen_transition",
             ) { tab ->
                 when (tab) {

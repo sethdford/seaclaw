@@ -56,7 +56,12 @@ class StatusViewModel: ObservableObject {
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
         startPolling()
-        gatewayClient.connect()
+        // Defer connection until Chat tab is selected (see connectIfNeeded)
+    }
+
+    /// Connect to gateway only when Chat tab is visible (deferred startup optimization).
+    func connectIfNeeded() {
+        gatewayClient.connectIfNeeded()
     }
 
     deinit {

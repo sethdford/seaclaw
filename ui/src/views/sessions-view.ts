@@ -1,5 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import type { PropertyValues } from "lit";
+import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
 import { formatRelative } from "../utils.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
@@ -33,103 +35,140 @@ interface Session {
 export class ScSessionsView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
 
-  static override styles = css`
-    :host {
-      view-transition-name: view-sessions;
-      display: block;
-      color: var(--hu-text);
-      max-width: 75rem;
-      contain: layout style;
-      container-type: inline-size;
-      padding: var(--hu-space-lg) var(--hu-space-xl);
-    }
+  static override styles = [
+    scrollEntranceStyles,
+    css`
+      :host {
+        view-transition-name: view-sessions;
+        display: block;
+        color: var(--hu-text);
+        max-width: 75rem;
+        contain: layout style;
+        container-type: inline-size;
+        padding: var(--hu-space-lg) var(--hu-space-xl);
+      }
 
-    .staleness {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-    }
+      .staleness {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+      }
 
-    .search-row {
-      margin-bottom: var(--hu-space-lg);
-      max-width: 20rem;
-    }
+      .search-row {
+        margin-bottom: var(--hu-space-lg);
+        max-width: 20rem;
+      }
 
-    .sessions-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-      gap: var(--hu-space-lg);
-    }
-
-    .session-card {
-      position: relative;
-    }
-
-    .session-card-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: var(--hu-space-sm);
-      margin-bottom: var(--hu-space-sm);
-    }
-
-    .session-card-title {
-      font-size: var(--hu-text-base);
-      font-weight: var(--hu-weight-semibold);
-      color: var(--hu-text);
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .session-card-actions {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-2xs);
-    }
-
-    .session-card-preview {
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
-      line-height: var(--hu-leading-relaxed);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      margin-bottom: var(--hu-space-sm);
-    }
-
-    .session-card-meta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: var(--hu-space-xs);
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-    }
-
-    @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
       .sessions-grid {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+        gap: var(--hu-space-lg);
       }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0s !important;
-        transition-duration: 0s !important;
+
+      .session-card {
+        position: relative;
       }
-    }
-  `;
+
+      .session-card-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--hu-space-sm);
+        margin-bottom: var(--hu-space-sm);
+      }
+
+      .session-card-title {
+        font-size: var(--hu-text-base);
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .session-card-actions {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-2xs);
+      }
+
+      .session-card-preview {
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text-muted);
+        line-height: var(--hu-leading-relaxed);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        margin-bottom: var(--hu-space-sm);
+      }
+
+      .session-card-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: var(--hu-space-xs);
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+      }
+
+      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+        .sessions-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0s !important;
+          transition-duration: 0s !important;
+        }
+      }
+    `,
+  ];
 
   @state() private sessions: Session[] = [];
   @state() private loading = false;
   @state() private error = "";
   @state() private searchQuery = "";
   @state() private _deleteTarget: Session | null = null;
+  private _scrollEntranceObserver: IntersectionObserver | null = null;
+
+  override updated(changedProperties: PropertyValues): void {
+    super.updated(changedProperties);
+    this.updateComplete.then(() => this._setupScrollEntrance());
+  }
+
+  override disconnectedCallback(): void {
+    this._scrollEntranceObserver?.disconnect();
+    this._scrollEntranceObserver = null;
+    super.disconnectedCallback();
+  }
+
+  private _setupScrollEntrance(): void {
+    if (typeof CSS !== "undefined" && CSS.supports?.("animation-timeline", "view()")) return;
+    const root = this.renderRoot;
+    if (!root) return;
+    const elements = root.querySelectorAll(".sessions-grid > *");
+    if (elements.length === 0) return;
+    if (!this._scrollEntranceObserver) {
+      this._scrollEntranceObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              (e.target as HTMLElement).classList.add("entered");
+              this._scrollEntranceObserver?.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
+    }
+    elements.forEach((el) => this._scrollEntranceObserver!.observe(el));
+  }
 
   protected override async load(): Promise<void> {
     const gw = this.gateway;
@@ -319,7 +358,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
       `;
     }
     return html`
-      <div class="sessions-grid" role="list">
+      <div class="sessions-grid hu-scroll-reveal-stagger" role="list">
         ${filtered.map(
           (s) => html`
             <hu-card

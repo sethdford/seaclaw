@@ -5,6 +5,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,12 +31,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import ai.human.app.GatewayClient
 import ai.human.app.ui.HUTokens
 
@@ -85,7 +88,8 @@ fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = HUTokens.spaceMd)
-                    .padding(top = HUTokens.spaceMd),
+                    .padding(top = HUTokens.spaceMd)
+                    .graphicsLayer { },
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(HUTokens.spaceMd),
                 contentPadding = PaddingValues(bottom = HUTokens.spaceMd),

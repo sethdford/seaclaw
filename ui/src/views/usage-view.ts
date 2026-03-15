@@ -1,5 +1,6 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { staggerMotion9Styles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import "../components/hu-page-hero.js";
@@ -62,101 +63,104 @@ const TIME_RANGE_OPTIONS = [
 @customElement("hu-usage-view")
 export class ScUsageView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
-  static override styles = css`
-    :host {
-      view-transition-name: view-usage;
-      display: block;
-      color: var(--hu-text);
-      max-width: 60rem;
-      contain: layout style;
-      container-type: inline-size;
-    }
-    .section {
-      margin-bottom: var(--hu-space-2xl);
-    }
-    .section-label {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: var(--hu-space-sm);
-    }
-    .chart-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--hu-space-md);
-      margin-bottom: var(--hu-space-md);
-      flex-wrap: wrap;
-    }
-    .chart-inner {
-      padding: var(--hu-space-sm) var(--hu-space-md) var(--hu-space-md);
-    }
-    .provider-list {
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-md);
-    }
-    .provider-row {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-sm);
-    }
-    .provider-dot {
-      width: 0.625rem;
-      height: 0.625rem;
-      border-radius: var(--hu-radius-full);
-      flex-shrink: 0;
-    }
-    .provider-name {
-      width: 6.5rem;
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text);
-      flex-shrink: 0;
-      font-weight: var(--hu-weight-medium);
-    }
-    .provider-bar-track {
-      flex: 1;
-      height: var(--hu-space-md);
-      background: var(--hu-bg-inset);
-      border-radius: var(--hu-radius-sm);
-      overflow: hidden;
-    }
-    .provider-bar-fill {
-      height: 100%;
-      border-radius: var(--hu-radius-sm);
-      transition: width var(--hu-duration-normal) var(--hu-ease-out);
-    }
-    .provider-cost {
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text);
-      font-variant-numeric: tabular-nums;
-      font-weight: var(--hu-weight-medium);
-      min-width: 4rem;
-      text-align: right;
-    }
-    .provider-pct {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-      min-width: 2.5rem;
-      text-align: right;
-    }
-    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+  static override styles = [
+    staggerMotion9Styles,
+    css`
+      :host {
+        view-transition-name: view-usage;
+        display: block;
+        color: var(--hu-text);
+        max-width: 60rem;
+        contain: layout style;
+        container-type: inline-size;
+      }
+      .section {
+        margin-bottom: var(--hu-space-2xl);
+      }
+      .section-label {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: var(--hu-space-sm);
+      }
+      .chart-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--hu-space-md);
+        margin-bottom: var(--hu-space-md);
+        flex-wrap: wrap;
+      }
+      .chart-inner {
+        padding: var(--hu-space-sm) var(--hu-space-md) var(--hu-space-md);
+      }
+      .provider-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-md);
+      }
+      .provider-row {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-sm);
+      }
+      .provider-dot {
+        width: 0.625rem;
+        height: 0.625rem;
+        border-radius: var(--hu-radius-full);
+        flex-shrink: 0;
+      }
       .provider-name {
-        width: 5rem;
+        width: 6.5rem;
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text);
+        flex-shrink: 0;
+        font-weight: var(--hu-weight-medium);
       }
-    }
-    .icon-inline {
-      display: inline-flex;
-      width: 1em;
-      height: 1em;
-    }
-    @media (prefers-reduced-motion: reduce) {
+      .provider-bar-track {
+        flex: 1;
+        height: var(--hu-space-md);
+        background: var(--hu-bg-inset);
+        border-radius: var(--hu-radius-sm);
+        overflow: hidden;
+      }
       .provider-bar-fill {
-        transition: none;
+        height: 100%;
+        border-radius: var(--hu-radius-sm);
+        transition: width var(--hu-duration-normal) var(--hu-ease-out);
       }
-    }
-  `;
+      .provider-cost {
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text);
+        font-variant-numeric: tabular-nums;
+        font-weight: var(--hu-weight-medium);
+        min-width: 4rem;
+        text-align: right;
+      }
+      .provider-pct {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+        min-width: 2.5rem;
+        text-align: right;
+      }
+      @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+        .provider-name {
+          width: 5rem;
+        }
+      }
+      .icon-inline {
+        display: inline-flex;
+        width: 1em;
+        height: 1em;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .provider-bar-fill {
+          transition: none;
+        }
+      }
+    `,
+  ];
 
   @state() private summary: UsageSummary = {};
   @state() private loading = false;
@@ -411,7 +415,7 @@ export class ScUsageView extends GatewayAwareLitElement {
         </hu-section-header>
       </hu-page-hero>
 
-      <hu-stats-row class="hu-scroll-reveal-stagger">
+      <hu-stats-row class="hu-scroll-reveal-stagger hu-stagger-motion9">
         <hu-stat-card
           .value=${totalTokens}
           label="Tokens Today"

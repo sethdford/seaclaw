@@ -163,6 +163,23 @@ struct SessionsView: View {
             .listStyle(.plain)
             .background(tokens.bgSurface)
             .scrollContentBackground(.hidden)
+            .overlay {
+                if activeSessions.isEmpty && archivedSessions.isEmpty {
+                    VStack(spacing: HUTokens.spaceMd) {
+                        Image(systemName: "bubble.left.and.bubble.right")
+                            .font(.custom("Avenir-Book", size: HUTokens.textXl))
+                            .foregroundStyle(tokens.textMuted)
+                        Text("No sessions yet")
+                            .font(.custom("Avenir-Medium", size: HUTokens.textLg))
+                            .foregroundStyle(tokens.textMuted)
+                        Text("Start a conversation to see it here.")
+                            .font(.custom("Avenir-Book", size: HUTokens.textSm))
+                            .foregroundStyle(tokens.textMuted)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(HUTokens.spaceLg)
+                }
+            }
             .navigationTitle("Sessions")
             .searchable(text: $searchText, prompt: "Search sessions")
             .navigationDestination(item: $selectedSession) { session in

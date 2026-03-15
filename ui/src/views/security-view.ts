@@ -1,5 +1,6 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { staggerMotion9Styles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import { ScToast } from "../components/hu-toast.js";
@@ -63,174 +64,177 @@ const AUTONOMY_LABELS: Record<number, { label: string; color: string; descriptio
 @customElement("hu-security-view")
 export class ScSecurityView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
-  static override styles = css`
-    :host {
-      view-transition-name: view-security;
-      display: block;
-      color: var(--hu-text);
-      contain: layout style;
-      container-type: inline-size;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
-      gap: var(--hu-space-xl);
-      margin-bottom: var(--hu-space-2xl);
-    }
-    .card-inner {
-      padding: var(--hu-space-md);
-    }
-    .card-title {
-      font-size: var(--hu-text-base);
-      font-weight: var(--hu-weight-semibold);
-      color: var(--hu-text);
-      margin-bottom: var(--hu-space-sm);
-    }
-    .domains-label {
-      margin-top: var(--hu-space-xs);
-    }
-    .autonomy-badge-wrap {
-      margin-bottom: var(--hu-space-sm);
-    }
-    .risk-indicator {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--hu-space-xs);
-      padding: var(--hu-space-xs) var(--hu-space-sm);
-      border-radius: var(--hu-radius);
-      font-size: var(--hu-text-sm);
-      font-weight: var(--hu-weight-medium);
-      margin-bottom: var(--hu-space-sm);
-    }
-    .risk-indicator.success {
-      background: color-mix(in srgb, var(--hu-success) 20%, transparent);
-      color: var(--hu-success);
-    }
-    .risk-indicator.warning {
-      background: color-mix(in srgb, var(--hu-warning) 20%, transparent);
-      color: var(--hu-warning);
-    }
-    .risk-indicator.error {
-      background: color-mix(in srgb, var(--hu-error) 20%, transparent);
-      color: var(--hu-error);
-    }
-    .description {
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
-      line-height: 1.5;
-    }
-    .policy-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: var(--hu-space-xs) 0;
-      border-bottom: 1px solid var(--hu-border-subtle);
-      font-size: var(--hu-text-sm);
-    }
-    .policy-row:last-child {
-      border-bottom: none;
-    }
-    .policy-label {
-      color: var(--hu-text-muted);
-    }
-    .policy-value {
-      font-weight: var(--hu-weight-medium);
-      font-family: var(--hu-font-mono);
-      font-size: var(--hu-text-xs);
-    }
-    .policy-value.enabled {
-      color: var(--hu-success);
-    }
-    .policy-value.disabled {
-      color: var(--hu-text-muted);
-    }
-    .policy-value.warning {
-      color: var(--hu-warning);
-    }
-    .control-row {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-sm);
-      margin-top: var(--hu-space-md);
-    }
-    .switch-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: var(--hu-space-sm) 0;
-    }
-    .domain-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--hu-space-xs);
-      margin-top: var(--hu-space-xs);
-    }
-    .domain-tag {
-      font-family: var(--hu-font-mono);
-      font-size: var(--hu-text-xs);
-      padding: var(--hu-space-2xs) var(--hu-space-xs);
-      background: var(--hu-bg-elevated);
-      border-radius: var(--hu-radius-sm);
-      color: var(--hu-text-muted);
-    }
-    .section-title {
-      font-size: var(--hu-text-base);
-      font-weight: var(--hu-weight-semibold);
-      color: var(--hu-text);
-      margin: var(--hu-space-2xl) 0 var(--hu-space-sm);
-    }
-    .checklist {
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-xs);
-    }
-    .check-item {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-sm);
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
-    }
-    .check-icon {
-      flex-shrink: 0;
-      width: 1rem;
-      height: 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .check-icon svg {
-      width: 100%;
-      height: 100%;
-    }
-    .check-icon.pass {
-      color: var(--hu-success);
-    }
-    .check-icon.warn {
-      color: var(--hu-warning);
-    }
-    .pairing-info {
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
-      margin-top: var(--hu-space-xs);
-    }
-    @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+  static override styles = [
+    staggerMotion9Styles,
+    css`
+      :host {
+        view-transition-name: view-security;
+        display: block;
+        color: var(--hu-text);
+        contain: layout style;
+        container-type: inline-size;
+      }
       .grid {
-        grid-template-columns: 1fr 1fr;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
+        gap: var(--hu-space-xl);
+        margin-bottom: var(--hu-space-2xl);
       }
-    }
-    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
-      .grid {
-        grid-template-columns: 1fr;
+      .card-inner {
+        padding: var(--hu-space-md);
       }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      :host * {
-        animation: none !important;
-        transition: none !important;
+      .card-title {
+        font-size: var(--hu-text-base);
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+        margin-bottom: var(--hu-space-sm);
       }
-    }
-  `;
+      .domains-label {
+        margin-top: var(--hu-space-xs);
+      }
+      .autonomy-badge-wrap {
+        margin-bottom: var(--hu-space-sm);
+      }
+      .risk-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--hu-space-xs);
+        padding: var(--hu-space-xs) var(--hu-space-sm);
+        border-radius: var(--hu-radius);
+        font-size: var(--hu-text-sm);
+        font-weight: var(--hu-weight-medium);
+        margin-bottom: var(--hu-space-sm);
+      }
+      .risk-indicator.success {
+        background: color-mix(in srgb, var(--hu-success) 20%, transparent);
+        color: var(--hu-success);
+      }
+      .risk-indicator.warning {
+        background: color-mix(in srgb, var(--hu-warning) 20%, transparent);
+        color: var(--hu-warning);
+      }
+      .risk-indicator.error {
+        background: color-mix(in srgb, var(--hu-error) 20%, transparent);
+        color: var(--hu-error);
+      }
+      .description {
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text-muted);
+        line-height: 1.5;
+      }
+      .policy-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--hu-space-xs) 0;
+        border-bottom: 1px solid var(--hu-border-subtle);
+        font-size: var(--hu-text-sm);
+      }
+      .policy-row:last-child {
+        border-bottom: none;
+      }
+      .policy-label {
+        color: var(--hu-text-muted);
+      }
+      .policy-value {
+        font-weight: var(--hu-weight-medium);
+        font-family: var(--hu-font-mono);
+        font-size: var(--hu-text-xs);
+      }
+      .policy-value.enabled {
+        color: var(--hu-success);
+      }
+      .policy-value.disabled {
+        color: var(--hu-text-muted);
+      }
+      .policy-value.warning {
+        color: var(--hu-warning);
+      }
+      .control-row {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-sm);
+        margin-top: var(--hu-space-md);
+      }
+      .switch-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--hu-space-sm) 0;
+      }
+      .domain-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--hu-space-xs);
+        margin-top: var(--hu-space-xs);
+      }
+      .domain-tag {
+        font-family: var(--hu-font-mono);
+        font-size: var(--hu-text-xs);
+        padding: var(--hu-space-2xs) var(--hu-space-xs);
+        background: var(--hu-bg-elevated);
+        border-radius: var(--hu-radius-sm);
+        color: var(--hu-text-muted);
+      }
+      .section-title {
+        font-size: var(--hu-text-base);
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+        margin: var(--hu-space-2xl) 0 var(--hu-space-sm);
+      }
+      .checklist {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-xs);
+      }
+      .check-item {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-sm);
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text-muted);
+      }
+      .check-icon {
+        flex-shrink: 0;
+        width: 1rem;
+        height: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .check-icon svg {
+        width: 100%;
+        height: 100%;
+      }
+      .check-icon.pass {
+        color: var(--hu-success);
+      }
+      .check-icon.warn {
+        color: var(--hu-warning);
+      }
+      .pairing-info {
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text-muted);
+        margin-top: var(--hu-space-xs);
+      }
+      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+        .grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        :host * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    `,
+  ];
 
   @state() private config: SecurityConfig | null = null;
   @state() private rawConfig: Record<string, unknown> | null = null;
@@ -635,7 +639,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
 
     return html`
       ${hero}
-      <hu-stats-row>
+      <hu-stats-row class="hu-stagger-motion9">
         <hu-stat-card
           .value=${this.securityScore}
           label="Security Score"
@@ -665,7 +669,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
           style="--hu-stagger-delay: 150ms"
         ></hu-stat-card>
       </hu-stats-row>
-      <div class="grid">
+      <div class="grid hu-stagger-motion9">
         ${this._renderAutonomy()} ${this._renderSandbox()} ${this._renderNetwork()}
         ${this._renderPairing()}
       </div>

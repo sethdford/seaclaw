@@ -68,6 +68,10 @@ struct ToolsView: View {
         ],
     ]
 
+    private var hasAnyTools: Bool {
+        toolsByCategory.values.contains { !$0.isEmpty }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -81,6 +85,23 @@ struct ToolsView: View {
                 .padding(HUTokens.spaceMd)
             }
             .background(tokens.bgSurface)
+            .overlay {
+                if !hasAnyTools {
+                    VStack(spacing: HUTokens.spaceMd) {
+                        Image(systemName: "wrench.and.screwdriver")
+                            .font(.custom("Avenir-Book", size: HUTokens.textXl))
+                            .foregroundStyle(tokens.textMuted)
+                        Text("No tools available")
+                            .font(.custom("Avenir-Medium", size: HUTokens.textLg))
+                            .foregroundStyle(tokens.textMuted)
+                        Text("Tools will appear here when configured.")
+                            .font(.custom("Avenir-Book", size: HUTokens.textSm))
+                            .foregroundStyle(tokens.textMuted)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(HUTokens.spaceLg)
+                }
+            }
             .navigationTitle("Tools")
         }
         .onAppear {

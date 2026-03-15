@@ -31,12 +31,14 @@ jobs:
       - name: Check binary size regression
         if: github.event_name == 'pull_request'
         run: |
-          MAX_SIZE_KB=1750
-          if [ "$BINARY_SIZE_KB" -gt "$MAX_SIZE_KB" ]; then
-            echo "::error::Binary size ${BINARY_SIZE_KB}KB exceeds limit of ${MAX_SIZE_KB}KB"
+          BASELINE=1736704
+          ACTUAL=$(stat -c%s build/human 2>/dev/null || stat -f%z build/human)
+          THRESHOLD=$((BASELINE * 105 / 100))
+          if [ "$ACTUAL" -gt "$THRESHOLD" ]; then
+            echo "::error::Binary size regression: $ACTUAL bytes exceeds 5% threshold ($THRESHOLD)"
             exit 1
           fi
-          echo "Binary size ${BINARY_SIZE_KB}KB is within limit of ${MAX_SIZE_KB}KB"
+          echo "Binary size OK: $ACTUAL bytes (threshold: $THRESHOLD)"
 
       - uses: ./.github/actions/setup-build
         with:

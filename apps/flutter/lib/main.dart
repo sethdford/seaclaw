@@ -182,12 +182,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _tabs
-            .map((t) => _PlaceholderTab(name: t.$1))
-            .toList(),
-      ),
+      body: _buildTabContent(_currentIndex),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
@@ -217,6 +212,22 @@ class _MainScaffoldState extends State<MainScaffold> {
         ),
       ),
     );
+  }
+
+  /// Lazy screen loading: only build the selected tab (switch, not IndexedStack).
+  Widget _buildTabContent(int index) {
+    switch (index) {
+      case 0:
+        return RepaintBoundary(child: _PlaceholderTab(name: _tabs[0].$1));
+      case 1:
+        return RepaintBoundary(child: _PlaceholderTab(name: _tabs[1].$1));
+      case 2:
+        return RepaintBoundary(child: _PlaceholderTab(name: _tabs[2].$1));
+      case 3:
+        return RepaintBoundary(child: _PlaceholderTab(name: _tabs[3].$1));
+      default:
+        return RepaintBoundary(child: _PlaceholderTab(name: _tabs[0].$1));
+    }
   }
 }
 

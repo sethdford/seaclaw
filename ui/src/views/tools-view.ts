@@ -1,5 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import type { PropertyValues } from "lit";
+import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import type { DataTableColumnV2 } from "../components/hu-data-table-v2.js";
@@ -46,54 +48,91 @@ function countParams(raw: unknown): number {
 
 @customElement("hu-tools-view")
 export class ScToolsView extends GatewayAwareLitElement {
-  static override styles = css`
-    :host {
-      view-transition-name: view-tools;
-      display: block;
-      max-width: 75rem;
-      contain: layout style;
-      container-type: inline-size;
-    }
-    .table-section {
-      margin-top: var(--hu-space-xl);
-    }
-    .expand-panel {
-      margin-top: var(--hu-space-md);
-      padding: var(--hu-space-md);
-      background: var(--hu-bg-elevated);
-      border: 1px solid var(--hu-border-subtle);
-      border-radius: var(--hu-radius);
-    }
-    .expand-panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: var(--hu-space-md);
-      font-weight: var(--hu-weight-semibold);
-      font-size: var(--hu-text-base);
-      color: var(--hu-text);
-    }
-    @container (max-width: 480px) {
+  static override styles = [
+    scrollEntranceStyles,
+    css`
+      :host {
+        view-transition-name: view-tools;
+        display: block;
+        max-width: 75rem;
+        contain: layout style;
+        container-type: inline-size;
+      }
+      .table-section {
+        margin-top: var(--hu-space-xl);
+      }
       .expand-panel {
-        padding: var(--hu-space-sm);
+        margin-top: var(--hu-space-md);
+        padding: var(--hu-space-md);
+        background: var(--hu-bg-elevated);
+        border: 1px solid var(--hu-border-subtle);
+        border-radius: var(--hu-radius);
       }
       .expand-panel-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: var(--hu-space-xs);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--hu-space-md);
+        font-weight: var(--hu-weight-semibold);
+        font-size: var(--hu-text-base);
+        color: var(--hu-text);
       }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0s !important;
+      @container (max-width: 480px) {
+        .expand-panel {
+          padding: var(--hu-space-sm);
+        }
+        .expand-panel-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: var(--hu-space-xs);
+        }
       }
-    }
-  `;
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0s !important;
+        }
+      }
+    `,
+  ];
 
   @state() private tools: ToolDef[] = [];
   @state() private loading = true;
   @state() private error = "";
   @state() private _expandedTool: string | null = null;
+  private _scrollEntranceObserver: IntersectionObserver | null = null;
+
+  override updated(changedProperties: PropertyValues): void {
+    super.updated(changedProperties);
+    this.updateComplete.then(() => this._setupScrollEntrance());
+  }
+
+  override disconnectedCallback(): void {
+    this._scrollEntranceObserver?.disconnect();
+    this._scrollEntranceObserver = null;
+    super.disconnectedCallback();
+  }
+
+  private _setupScrollEntrance(): void {
+    if (typeof CSS !== "undefined" && CSS.supports?.("animation-timeline", "view()")) return;
+    const root = this.renderRoot;
+    if (!root) return;
+    const elements = root.querySelectorAll(".hu-scroll-reveal-stagger > *");
+    if (elements.length === 0) return;
+    if (!this._scrollEntranceObserver) {
+      this._scrollEntranceObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              (e.target as HTMLElement).classList.add("entered");
+              this._scrollEntranceObserver?.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
+    }
+    elements.forEach((el) => this._scrollEntranceObserver!.observe(el));
+  }
 
   protected override async load(): Promise<void> {
     await this.loadTools();
@@ -142,10 +181,6 @@ export class ScToolsView extends GatewayAwareLitElement {
     this._expandedTool = this._expandedTool === name ? null : name;
   }
 
-  override disconnectedCallback(): void {
-    super.disconnectedCallback();
-  }
-
   private get _expandedToolData(): unknown {
     if (!this._expandedTool) return undefined;
     const t = this.tools.find((x) => (x.name ?? "unnamed") === this._expandedTool);
@@ -160,7 +195,7 @@ export class ScToolsView extends GatewayAwareLitElement {
           description="Available tool integrations and their configurations"
         ></hu-section-header>
       </hu-page-hero>
-      <hu-stats-row>
+      <hu-stats-row class="hu-scroll-reveal-stagger">
         <hu-skeleton variant="card" height="90px"></hu-skeleton>
         <hu-skeleton variant="card" height="90px"></hu-skeleton>
         <hu-skeleton variant="card" height="90px"></hu-skeleton>
@@ -183,7 +218,7 @@ export class ScToolsView extends GatewayAwareLitElement {
           description="Available tool integrations and their configurations"
         ></hu-section-header>
       </hu-page-hero>
-      <hu-stats-row>
+      <hu-stats-row class="hu-scroll-reveal-stagger">
         <hu-stat-card
           .value=${count}
           label="Total Tools"
@@ -207,7 +242,7 @@ export class ScToolsView extends GatewayAwareLitElement {
             description=${this.error}
           ></hu-empty-state>`
         : nothing}
-      <div class="table-section" role="region" aria-label="Tools table">
+      <div class="table-section hu-scroll-reveal-stagger" role="region" aria-label="Tools table">
         ${rows.length === 0
           ? html`
               <hu-empty-state

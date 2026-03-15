@@ -1,5 +1,7 @@
 package ai.human.app
 
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.Immutable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -14,8 +16,10 @@ import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
+@Stable
 enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED }
 
+@Immutable
 data class GatewayEvent(val type: String, val payload: JSONObject?)
 
 class GatewayClient {
@@ -33,6 +37,12 @@ class GatewayClient {
 
     private val _events = MutableStateFlow<GatewayEvent?>(null)
     val events: StateFlow<GatewayEvent?> = _events
+
+    /** Connect only when needed (e.g. when Chat tab is selected). Idempotent. */
+    fun connectIfNeeded(url: String) {
+        if (_state.value == ConnectionState.CONNECTING || _state.value == ConnectionState.CONNECTED) return
+        connect(url)
+    }
 
     fun connect(url: String) {
         if (_state.value == ConnectionState.CONNECTING || _state.value == ConnectionState.CONNECTED) return

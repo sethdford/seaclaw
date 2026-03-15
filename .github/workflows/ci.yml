@@ -585,3 +585,4 @@ jobs:
           ./build-fuzz/fuzz_fast_capture -max_total_time=30 -print_final_stats=1 || true
           ./build-fuzz/fuzz_sse -max_total_time=30 -print_final_stats=1 || true
           ./build-fuzz/fuzz_http_parse -max_total_time=30 -print_final_stats=1 || true
+          ./build-fuzz/fuzz_prompt_injection -max_total_time=30 -print_final_stats=1 || true

@@ -1,15 +1,22 @@
 import SwiftUI
 import HumanChatUI
 
+/// Wraps content in a lazy container so it is built only when first displayed.
+private struct LazyDetailView<Content: View>: View {
+    let build: () -> Content
+    init(_ build: @autoclosure @escaping () -> Content) { self.build = build }
+    var body: some View { build() }
+}
+
 struct DashboardView: View {
     @EnvironmentObject var status: StatusViewModel
     @Environment(\.colorScheme) private var colorScheme
 
-    private var tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color) {
+    private var tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color) {
         if colorScheme == .dark {
-            return (HUTokens.Dark.bgSurface, HUTokens.Dark.surfaceContainer, HUTokens.Dark.text, HUTokens.Dark.textMuted, HUTokens.Dark.accent, HUTokens.Dark.success, HUTokens.Dark.error)
+            return (HUTokens.Dark.bgSurface, HUTokens.Dark.surfaceContainer, HUTokens.Dark.surfaceContainerHigh, HUTokens.Dark.text, HUTokens.Dark.textMuted, HUTokens.Dark.accent, HUTokens.Dark.success, HUTokens.Dark.error)
         } else {
-            return (HUTokens.Light.bgSurface, HUTokens.Light.surfaceContainer, HUTokens.Light.text, HUTokens.Light.textMuted, HUTokens.Light.accent, HUTokens.Light.success, HUTokens.Light.error)
+            return (HUTokens.Light.bgSurface, HUTokens.Light.surfaceContainer, HUTokens.Light.surfaceContainerHigh, HUTokens.Light.text, HUTokens.Light.textMuted, HUTokens.Light.accent, HUTokens.Light.success, HUTokens.Light.error)
         }
     }
 
@@ -22,6 +29,9 @@ struct DashboardView: View {
                 .background(tokens.bgSurface)
         }
         .navigationSplitViewStyle(.balanced)
+        .onChange(of: status.selectedTab) { _, tab in
+            if tab == .chat { status.connectIfNeeded() }
+        }
     }
 
     @ViewBuilder
@@ -69,26 +79,26 @@ struct DashboardView: View {
     private var detailContent: some View {
         switch status.selectedTab {
         case .overview:
-            MacOverviewPane(tokens: tokens, status: status)
+            LazyDetailView(MacOverviewPane(tokens: tokens, status: status))
                 .focusSection()
         case .chat:
-            MacChatPane(tokens: tokens)
+            LazyDetailView(MacChatPane(tokens: tokens))
                 .focusSection()
         case .sessions:
-            MacSessionsPane(tokens: tokens)
+            LazyDetailView(MacSessionsPane(tokens: tokens))
                 .focusSection()
         case .tools:
-            MacToolsPane(tokens: tokens)
+            LazyDetailView(MacToolsPane(tokens: tokens))
                 .focusSection()
         case .settings:
-            SettingsView()
+            LazyDetailView(SettingsView())
                 .focusSection()
         }
     }
 }
 
 struct MacOverviewPane: View {
-    let tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
+    let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
     @ObservedObject var status: StatusViewModel
     @State private var appeared = false
 
@@ -103,7 +113,8 @@ struct MacOverviewPane: View {
         ScrollView {
             VStack(alignment: .leading, spacing: HUTokens.spaceLg) {
                 Text("Overview")
-                    .font(.custom("Avenir-Heavy", size: HUTokens.textXl))
+                    .font(.custom("Avenir-Heavy", size: 24))
+                    .kerning(-0.5)
                     .foregroundStyle(tokens.text)
 
                 HStack(spacing: HUTokens.spaceMd) {
@@ -119,7 +130,7 @@ struct MacOverviewPane: View {
                         .foregroundStyle(tokens.textMuted)
                 }
                 .padding(HUTokens.spaceMd)
-                .background(tokens.surfaceContainer)
+                .background(tokens.surfaceContainerHigh)
                 .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Gateway \(status.isGatewayConnected ? "connected" : "disconnected") at \(status.gatewayURL)")
@@ -131,7 +142,8 @@ struct MacOverviewPane: View {
                                 .font(.custom("Avenir-Medium", size: HUTokens.textLg))
                                 .foregroundStyle(tokens.accent)
                             Text(stat.1)
-                                .font(.custom("Avenir-Heavy", size: HUTokens.textXl))
+                                .font(.custom("Avenir-Heavy", size: 28))
+                                .kerning(-0.5)
                                 .foregroundStyle(tokens.text)
                             Text(stat.0)
                                 .font(.custom("Avenir-Book", size: HUTokens.textXs))
@@ -139,7 +151,7 @@ struct MacOverviewPane: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(HUTokens.spaceMd)
-                        .background(tokens.surfaceContainer)
+                        .background(tokens.surfaceContainerHigh)
                         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
                         .accessibilityElement(children: .contain)
                         .accessibilityLabel("\(stat.0): \(stat.1)")
@@ -205,7 +217,7 @@ struct MacOverviewPane: View {
                     Spacer()
                 }
                 .padding(HUTokens.spaceMd)
-                .background(tokens.surfaceContainer)
+                .background(tokens.surfaceContainerHigh)
                 .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
             }
             .padding(HUTokens.spaceLg)
@@ -217,7 +229,7 @@ struct MacOverviewPane: View {
 }
 
 struct MacChatPane: View {
-    let tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
+    let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
 
     var body: some View {
         VStack {
@@ -236,7 +248,7 @@ struct MacChatPane: View {
 }
 
 struct MacSessionsPane: View {
-    let tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
+    let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
 
     private let sessions: [(String, String, Int, String)] = [
         ("CLI conversation", "2 min ago", 12, "I'll check the forecast for you."),
@@ -293,7 +305,7 @@ struct MacSessionsPane: View {
 }
 
 struct MacToolsPane: View {
-    let tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
+    let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
 
     private let tools: [(String, String, String, String)] = [
         ("Shell", "Execute commands", "terminal", "2m ago"),
@@ -332,7 +344,7 @@ struct MacToolsPane: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(HUTokens.spaceMd)
-                        .background(tokens.surfaceContainer)
+                        .background(tokens.surfaceContainerHigh)
                         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
                         .accessibilityElement(children: .contain)
                         .accessibilityLabel("\(tool.0): \(tool.1), last used \(tool.3)")

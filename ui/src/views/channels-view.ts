@@ -1,5 +1,7 @@
 import { html, css, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import type { PropertyValues } from "lit";
+import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import type { DataTableColumnV2 } from "../components/hu-data-table-v2.js";
@@ -34,47 +36,50 @@ type FilterValue = "all" | "configured" | "unconfigured";
 @customElement("hu-channels-view")
 export class ScChannelsView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
-  static override styles = css`
-    :host {
-      view-transition-name: view-channels;
-      display: block;
-      max-width: 75rem;
-    }
-    .filters {
-      margin-bottom: var(--hu-space-lg);
-    }
-    .table-section {
-      margin-top: var(--hu-space-xl);
-    }
-    .sheet-detail-row {
-      display: flex;
-      justify-content: space-between;
-      padding: var(--hu-space-sm) 0;
-      border-bottom: 1px solid var(--hu-border-subtle);
-    }
-    .sheet-detail-row:last-child {
-      border-bottom: none;
-    }
-    .sheet-detail-label {
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
-    }
-    .sheet-detail-value {
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text);
-    }
-    .sheet-title {
-      font-weight: var(--hu-weight-semibold);
-      font-size: var(--hu-text-lg);
-      color: var(--hu-text);
-      margin-bottom: var(--hu-space-lg);
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0s !important;
+  static override styles = [
+    scrollEntranceStyles,
+    css`
+      :host {
+        view-transition-name: view-channels;
+        display: block;
+        max-width: 75rem;
       }
-    }
-  `;
+      .filters {
+        margin-bottom: var(--hu-space-lg);
+      }
+      .table-section {
+        margin-top: var(--hu-space-xl);
+      }
+      .sheet-detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: var(--hu-space-sm) 0;
+        border-bottom: 1px solid var(--hu-border-subtle);
+      }
+      .sheet-detail-row:last-child {
+        border-bottom: none;
+      }
+      .sheet-detail-label {
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text-muted);
+      }
+      .sheet-detail-value {
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text);
+      }
+      .sheet-title {
+        font-weight: var(--hu-weight-semibold);
+        font-size: var(--hu-text-lg);
+        color: var(--hu-text);
+        margin-bottom: var(--hu-space-lg);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0s !important;
+        }
+      }
+    `,
+  ];
 
   @state() private channels: ChannelStatus[] = [];
   @state() private loading = true;
@@ -82,6 +87,40 @@ export class ScChannelsView extends GatewayAwareLitElement {
   @state() private filter: FilterValue = "all";
   @state() private _sheetChannel: ChannelStatus | null = null;
   @state() private _refreshing = false;
+  private _scrollEntranceObserver: IntersectionObserver | null = null;
+
+  override updated(changedProperties: PropertyValues): void {
+    super.updated(changedProperties);
+    this.updateComplete.then(() => this._setupScrollEntrance());
+  }
+
+  override disconnectedCallback(): void {
+    this._scrollEntranceObserver?.disconnect();
+    this._scrollEntranceObserver = null;
+    super.disconnectedCallback();
+  }
+
+  private _setupScrollEntrance(): void {
+    if (typeof CSS !== "undefined" && CSS.supports?.("animation-timeline", "view()")) return;
+    const root = this.renderRoot;
+    if (!root) return;
+    const elements = root.querySelectorAll(".hu-scroll-reveal-stagger > *");
+    if (elements.length === 0) return;
+    if (!this._scrollEntranceObserver) {
+      this._scrollEntranceObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              (e.target as HTMLElement).classList.add("entered");
+              this._scrollEntranceObserver?.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
+    }
+    elements.forEach((el) => this._scrollEntranceObserver!.observe(el));
+  }
 
   private readonly filterOptions: SegmentOption[] = [
     { value: "all", label: "All" },
@@ -172,10 +211,6 @@ export class ScChannelsView extends GatewayAwareLitElement {
     this._sheetChannel = null;
   }
 
-  override disconnectedCallback(): void {
-    super.disconnectedCallback();
-  }
-
   private _renderSkeleton(): TemplateResult {
     return html`
       <hu-page-hero role="region" aria-label="Channels overview">
@@ -214,7 +249,7 @@ export class ScChannelsView extends GatewayAwareLitElement {
           </hu-button>
         </hu-section-header>
       </hu-page-hero>
-      <hu-stats-row>
+      <hu-stats-row class="hu-scroll-reveal-stagger">
         <hu-stat-card
           .value=${this.channels.length}
           label="Total Channels"
@@ -252,7 +287,7 @@ export class ScChannelsView extends GatewayAwareLitElement {
           }}
         ></hu-segmented-control>
       </div>
-      <div class="table-section" role="region" aria-label="Channels table">
+      <div class="table-section hu-scroll-reveal-stagger" role="region" aria-label="Channels table">
         ${this.filteredChannels.length === 0
           ? html`
               <hu-empty-state

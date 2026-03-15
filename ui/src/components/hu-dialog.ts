@@ -38,7 +38,7 @@ export class ScDialog extends LitElement {
         saturate(var(--hu-glass-standard-saturate));
       -webkit-backdrop-filter: blur(var(--hu-glass-standard-blur))
         saturate(var(--hu-glass-standard-saturate));
-      animation: hu-fade-in var(--hu-duration-normal) var(--hu-ease-out);
+      animation: hu-backdrop-dim var(--hu-duration-normal) var(--hu-ease-out) both;
     }
 
     dialog.closing::backdrop {
@@ -68,8 +68,8 @@ export class ScDialog extends LitElement {
     }
 
     dialog[open] .panel:not(.closing) {
-      animation: hu-bounce-in var(--hu-duration-normal)
-        var(--hu-spring-out, cubic-bezier(0.34, 1.56, 0.64, 1));
+      animation: hu-dialog-enter var(--hu-duration-normal)
+        var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
     }
 
     dialog .panel.closing {
@@ -163,6 +163,25 @@ export class ScDialog extends LitElement {
     .btn-confirm-danger:hover {
       background: var(--hu-error);
       filter: brightness(1.15);
+    }
+
+    @keyframes hu-backdrop-dim {
+      from {
+        background-color: transparent;
+      }
+      to {
+        background-color: color-mix(in srgb, var(--hu-bg) 60%, transparent);
+      }
+    }
+    @keyframes hu-dialog-enter {
+      from {
+        opacity: 0;
+        transform: scale(0.95) translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
     }
   `;
 

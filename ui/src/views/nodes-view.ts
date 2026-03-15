@@ -1,5 +1,6 @@
 import { html, css, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { staggerMotion9Styles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import type { DataTableColumnV2 } from "../components/hu-data-table-v2.js";
@@ -41,56 +42,59 @@ function formatUptime(secs: number | undefined): string {
 export class ScNodesView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
 
-  static override styles = css`
-    :host {
-      view-transition-name: view-nodes;
-      display: block;
-      max-width: 75rem;
-    }
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-md);
-      margin-bottom: var(--hu-space-lg);
-    }
-    .staleness {
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
-    }
-    .table-section {
-      margin-top: var(--hu-space-md);
-    }
-    .sheet-detail-row {
-      display: flex;
-      justify-content: space-between;
-      padding: var(--hu-space-sm) 0;
-      border-bottom: 1px solid var(--hu-border-subtle);
-    }
-    .sheet-detail-row:last-child {
-      border-bottom: none;
-    }
-    .sheet-detail-label {
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
-    }
-    .sheet-detail-value {
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text);
-      font-family: var(--hu-font-mono);
-    }
-    .sheet-title {
-      font-weight: var(--hu-weight-semibold);
-      font-size: var(--hu-text-lg);
-      color: var(--hu-text);
-      margin-bottom: var(--hu-space-lg);
-      font-family: var(--hu-font-mono);
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0s !important;
+  static override styles = [
+    staggerMotion9Styles,
+    css`
+      :host {
+        view-transition-name: view-nodes;
+        display: block;
+        max-width: 75rem;
       }
-    }
-  `;
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-md);
+        margin-bottom: var(--hu-space-lg);
+      }
+      .staleness {
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text-muted);
+      }
+      .table-section {
+        margin-top: var(--hu-space-md);
+      }
+      .sheet-detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: var(--hu-space-sm) 0;
+        border-bottom: 1px solid var(--hu-border-subtle);
+      }
+      .sheet-detail-row:last-child {
+        border-bottom: none;
+      }
+      .sheet-detail-label {
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text-muted);
+      }
+      .sheet-detail-value {
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text);
+        font-family: var(--hu-font-mono);
+      }
+      .sheet-title {
+        font-weight: var(--hu-weight-semibold);
+        font-size: var(--hu-text-lg);
+        color: var(--hu-text);
+        margin-bottom: var(--hu-space-lg);
+        font-family: var(--hu-font-mono);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0s !important;
+        }
+      }
+    `,
+  ];
 
   @state() private nodes: NodeItem[] = [];
   @state() private loading = false;
@@ -194,7 +198,7 @@ export class ScNodesView extends GatewayAwareLitElement {
           description="Connected node instances and their status"
         ></hu-section-header>
       </hu-page-hero>
-      <hu-stats-row>
+      <hu-stats-row class="hu-stagger-motion9">
         <hu-stat-card
           .value=${this.nodes.length}
           label="Total Nodes"
@@ -228,7 +232,7 @@ export class ScNodesView extends GatewayAwareLitElement {
             .description=${this.error}
           ></hu-empty-state>`
         : nothing}
-      <div class="table-section" role="region" aria-label="Nodes table">
+      <div class="table-section hu-stagger-motion9" role="region" aria-label="Nodes table">
         ${this.nodes.length === 0 && !this.loading
           ? html`
               <hu-empty-state

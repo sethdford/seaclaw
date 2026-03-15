@@ -122,7 +122,7 @@ struct OverviewView: View {
                                 )
                                 .opacity(appeared ? 1 : 0)
                                 .offset(y: appeared ? 0 : HUTokens.spaceSm)
-                                .animation(HUTokens.springExpressive.delay(0.15 + Double(index) * 0.03), value: appeared)
+                                .animation(HUTokens.springExpressive.delay(min(Double(index) * 0.05, 0.3)), value: appeared)
 
                                 if index < ActivityRow.activities.count - 1 {
                                     Divider()
@@ -131,7 +131,7 @@ struct OverviewView: View {
                                 }
                             }
                         }
-                        .background(tokens.surfaceContainer)
+                        .background(tokens.surfaceContainerHigh)
                         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
                     }
                 }
@@ -177,7 +177,7 @@ private struct StatCard: View {
         }
         .padding(HUTokens.spaceMd)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(tokens.surfaceContainer)
+        .background(tokens.surfaceContainerHigh)
         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusMd, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value), \(trend)")

@@ -347,6 +347,26 @@ hu-card.hu-entrance.hu-visible {
   }
 }
 
+@keyframes hu-backdrop-dim {
+  from {
+    background-color: transparent;
+  }
+  to {
+    background-color: color-mix(in srgb, var(--hu-bg) 60%, transparent);
+  }
+}
+
+@keyframes hu-dialog-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 @keyframes hu-fade-out {
   from {
     opacity: 1;
@@ -1011,16 +1031,14 @@ hu-card.hu-entrance.hu-visible {
     var(--hu-spring-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
 
-/* ── View Transitions API (container transforms) ── */
+/* ── View Transitions API (Motion 9 route changes) ── */
 @supports (view-transition-name: none) {
   ::view-transition-old(root) {
-    animation-duration: var(--hu-duration-fast, 100ms);
-    animation-timing-function: var(--hu-ease-in, ease-in);
+    animation: hu-fade-out var(--hu-duration-fast) var(--hu-ease-out) both;
   }
 
   ::view-transition-new(root) {
-    animation-duration: var(--hu-duration-moderate, 300ms);
-    animation-timing-function: var(--hu-ease-out, ease-out);
+    animation: hu-fade-in var(--hu-duration-fast) var(--hu-ease-out) both;
   }
 
   ::view-transition-old(main-content) {
