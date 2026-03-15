@@ -1946,6 +1946,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_eval.c
     tests/test_eval_benchmarks.c
     tests/test_eval_runner.c
+    tests/test_eval_history.c
     tests/test_corrective_rag.c
     tests/test_otel.c
     tests/test_cot_audit.c

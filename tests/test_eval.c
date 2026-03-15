@@ -260,6 +260,26 @@ static void test_eval_check_null_args(void) {
     HU_ASSERT_EQ(hu_eval_check(&alloc, "a", 1, "a", 1, HU_EVAL_EXACT, NULL), HU_ERR_INVALID_ARGUMENT);
 }
 
+static void test_eval_judge_with_provider_null_falls_back(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    bool passed = false;
+    double score = -1.0;
+    HU_ASSERT_EQ(hu_eval_check_with_provider(&alloc, "The answer is 4", 15, "4", 1, HU_EVAL_LLM_JUDGE,
+                                             NULL, NULL, 0, &passed, &score), HU_OK);
+    HU_ASSERT(passed);
+    HU_ASSERT_TRUE(score >= 0.0 && score <= 1.0);
+}
+
+static void test_eval_judge_heuristic_still_works(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    bool passed = false;
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "Paris is the capital", 19, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT(passed);
+    passed = true;
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "wrong answer", 12, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT(!passed);
+}
+
 static void test_eval_run_free(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_eval_run_t run = {0};
@@ -294,6 +314,8 @@ void run_eval_tests(void) {
     HU_RUN_TEST(test_eval_llm_judge_case_insensitive);
     HU_RUN_TEST(test_eval_llm_judge_word_overlap);
     HU_RUN_TEST(test_eval_llm_judge_word_overlap_threshold);
+    HU_RUN_TEST(test_eval_judge_with_provider_null_falls_back);
+    HU_RUN_TEST(test_eval_judge_heuristic_still_works);
     HU_RUN_TEST(test_eval_check_null_args);
     HU_RUN_TEST(test_eval_run_suite_null_args);
     HU_RUN_TEST(test_eval_run_suite_empty);

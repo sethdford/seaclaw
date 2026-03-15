@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+#include <time.h>
+#endif
 
 #define EVAL_MAX_TASKS 256
 
@@ -103,6 +107,51 @@ static int64_t extract_int64(const char *obj_start, const char *obj_end, const c
     int64_t v = 0;
     (void)sscanf(vs, "%" SCNd64, &v);
     return v;
+}
+
+static bool extract_bool(const char *obj_start, const char *obj_end, const char *key)
+    __attribute__((unused));
+static bool extract_bool(const char *obj_start, const char *obj_end, const char *key) {
+    const char *k = strstr(obj_start, key);
+    if (!k || k >= obj_end) return false;
+    const char *colon = strchr(k + strlen(key), ':');
+    if (!colon || colon >= obj_end) return false;
+    const char *vs = colon + 1;
+    while (vs < obj_end && (*vs == ' ' || *vs == '\t')) vs++;
+    if (vs + 4 <= obj_end && strncmp(vs, "true", 4) == 0) return true;
+    return false;
+}
+
+static double extract_double(const char *obj_start, const char *obj_end, const char *key)
+    __attribute__((unused));
+static double extract_double(const char *obj_start, const char *obj_end, const char *key) {
+    const char *k = strstr(obj_start, key);
+    if (!k || k >= obj_end) return 0.0;
+    const char *colon = strchr(k + strlen(key), ':');
+    if (!colon || colon >= obj_end) return 0.0;
+    const char *vs = colon + 1;
+    while (vs < obj_end && (*vs == ' ' || *vs == '\t')) vs++;
+    double v = 0.0;
+    (void)sscanf(vs, "%lf", &v);
+    return v;
+}
+
+static void hu_eval_heuristic_judge(const char *actual, size_t actual_len, const char *expected,
+                                   size_t expected_len, bool *passed_out, double *score_out) {
+    if (str_case_contains(actual, actual_len, expected, expected_len)) {
+        *passed_out = true;
+        if (score_out) *score_out = 1.0;
+        return;
+    }
+    size_t exp_words = count_words(expected, expected_len);
+    if (exp_words > 0) {
+        size_t matched = count_expected_words_in_actual(actual, actual_len, expected, expected_len);
+        *passed_out = (matched >= (exp_words + 1) / 2);
+        if (score_out) *score_out = *passed_out ? (double)matched / (double)exp_words : 0.0;
+    } else {
+        *passed_out = false;
+        if (score_out) *score_out = 0.0;
+    }
 }
 
 hu_error_t hu_eval_suite_load_json(hu_allocator_t *alloc, const char *json, size_t json_len, hu_eval_suite_t *out) {
@@ -236,6 +285,7 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
             if (err != HU_OK) {
                 res->task_id = task->id ? hu_strdup(alloc, task->id) : NULL;
                 res->passed = false;
+                res->score = 0.0;
                 res->actual_output = NULL;
                 res->actual_output_len = 0;
                 res->elapsed_ms = 0;
@@ -251,10 +301,23 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
 #endif
 
         bool passed = false;
-        hu_eval_check(alloc, response ? response : "", response_len, task->expected ? task->expected : "", task->expected ? task->expected_len : 0, mode, &passed);
+        double score_val = 0.0;
+        const char *actual_str = response ? response : "";
+        size_t actual_str_len = response ? response_len : 0;
+        const char *expected_str = task->expected ? task->expected : "";
+        size_t expected_str_len = task->expected ? task->expected_len : 0;
+        if (mode == HU_EVAL_LLM_JUDGE) {
+            hu_eval_check_with_provider(alloc, actual_str, actual_str_len, expected_str,
+                                        expected_str_len, mode, provider, model, model_len,
+                                        &passed, &score_val);
+        } else {
+            hu_eval_check_with_provider(alloc, actual_str, actual_str_len, expected_str,
+                                        expected_str_len, mode, NULL, NULL, 0, &passed, NULL);
+        }
 
         res->task_id = task->id ? hu_strdup(alloc, task->id) : NULL;
         res->passed = passed;
+        res->score = score_val;
         res->actual_output = response;
         res->actual_output_len = response_len;
         res->elapsed_ms = 0;
@@ -348,29 +411,95 @@ hu_error_t hu_eval_run_load_json(hu_allocator_t *alloc, const char *json, size_t
     return HU_OK;
 }
 
-hu_error_t hu_eval_check(hu_allocator_t *alloc, const char *actual, size_t actual_len, const char *expected, size_t expected_len, hu_eval_match_mode_t mode, bool *passed) {
+hu_error_t hu_eval_check_with_provider(hu_allocator_t *alloc, const char *actual, size_t actual_len,
+                                       const char *expected, size_t expected_len,
+                                       hu_eval_match_mode_t mode, hu_provider_t *provider,
+                                       const char *model, size_t model_len, bool *passed,
+                                       double *score_out) {
     if (!alloc || !actual || !expected || !passed) return HU_ERR_INVALID_ARGUMENT;
     *passed = false;
+    if (score_out) *score_out = 0.0;
+
     switch (mode) {
-        case HU_EVAL_EXACT: *passed = (actual_len == expected_len && memcmp(actual, expected, actual_len) == 0); break;
-        case HU_EVAL_CONTAINS:
-            if (expected_len <= actual_len) { for (size_t i = 0; i <= actual_len - expected_len; i++) { if (memcmp(actual+i, expected, expected_len) == 0) { *passed = true; break; } } } break;
-        case HU_EVAL_NUMERIC_CLOSE: { double a = atof(actual); double e = atof(expected); *passed = fabs(a - e) < 0.01; break; }
+        case HU_EVAL_EXACT:
+            *passed = (actual_len == expected_len && memcmp(actual, expected, actual_len) == 0);
+            if (score_out) *score_out = *passed ? 1.0 : 0.0;
+            return HU_OK;
+        case HU_EVAL_CONTAINS: {
+            bool found = false;
+            if (expected_len <= actual_len) {
+                for (size_t i = 0; i <= actual_len - expected_len; i++) {
+                    if (memcmp(actual + i, expected, expected_len) == 0) {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            *passed = found;
+            if (score_out) *score_out = found ? 1.0 : 0.0;
+            return HU_OK;
+        }
+        case HU_EVAL_NUMERIC_CLOSE: {
+            double a = atof(actual);
+            double e = atof(expected);
+            *passed = fabs(a - e) < 0.01;
+            if (score_out) *score_out = *passed ? 1.0 : 0.0;
+            return HU_OK;
+        }
         case HU_EVAL_LLM_JUDGE: {
-            /* Heuristic: case-insensitive contains OR word overlap >= 50% of expected words. */
-            if (str_case_contains(actual, actual_len, expected, expected_len)) {
-                *passed = true;
-                break;
+#if defined(HU_IS_TEST) && HU_IS_TEST
+            (void)provider;
+            (void)model;
+            (void)model_len;
+            hu_eval_heuristic_judge(actual, actual_len, expected, expected_len, passed, score_out);
+            return HU_OK;
+#else
+            if (!provider || !provider->vtable || !provider->vtable->chat_with_system) {
+                hu_eval_heuristic_judge(actual, actual_len, expected, expected_len, passed, score_out);
+                return HU_OK;
             }
-            size_t exp_words = count_words(expected, expected_len);
-            if (exp_words > 0) {
-                size_t matched = count_expected_words_in_actual(actual, actual_len, expected, expected_len);
-                *passed = (matched >= (exp_words + 1) / 2);
+            {
+                char *user_msg = hu_sprintf(alloc,
+                    "You are an evaluation judge. Compare the expected answer with the actual answer.\n"
+                    "Expected: %.*s\nActual: %.*s\n\n"
+                    "Respond with ONLY a JSON object: {\"pass\": true/false, \"score\": 0.0-1.0, \"reason\": \"brief explanation\"}",
+                    (int)expected_len, expected, (int)actual_len, actual);
+                if (!user_msg) {
+                    hu_eval_heuristic_judge(actual, actual_len, expected, expected_len, passed, score_out);
+                    return HU_OK;
+                }
+                const char *sys = "You are a strict evaluation judge. Output only valid JSON.";
+                char *response = NULL;
+                size_t response_len = 0;
+                hu_error_t err = provider->vtable->chat_with_system(provider->ctx, alloc, sys,
+                    strlen(sys), user_msg, strlen(user_msg), model ? model : "", model_len, 0.0,
+                    &response, &response_len);
+                alloc->free(alloc->ctx, user_msg, strlen(user_msg) + 1);
+                if (err != HU_OK || !response) {
+                    hu_eval_heuristic_judge(actual, actual_len, expected, expected_len, passed, score_out);
+                    if (response) alloc->free(alloc->ctx, response, response_len + 1);
+                    return HU_OK;
+                }
+                const char *obj_start = response;
+                const char *obj_end = response + response_len;
+                bool parsed_pass = extract_bool(obj_start, obj_end, "\"pass\"");
+                double parsed_score = extract_double(obj_start, obj_end, "\"score\"");
+                if (parsed_score < 0.0) parsed_score = 0.0;
+                if (parsed_score > 1.0) parsed_score = 1.0;
+                *passed = parsed_pass;
+                if (score_out) *score_out = parsed_score;
+                alloc->free(alloc->ctx, response, response_len + 1);
+                return HU_OK;
             }
-            break;
+#endif
         }
     }
     return HU_OK;
+}
+
+hu_error_t hu_eval_check(hu_allocator_t *alloc, const char *actual, size_t actual_len, const char *expected, size_t expected_len, hu_eval_match_mode_t mode, bool *passed) {
+    return hu_eval_check_with_provider(alloc, actual, actual_len, expected, expected_len, mode,
+                                       NULL, NULL, 0, passed, NULL);
 }
 
 hu_error_t hu_eval_report_json(hu_allocator_t *alloc, const hu_eval_run_t *run, char **out, size_t *out_len) {
@@ -398,6 +527,117 @@ hu_error_t hu_eval_compare(hu_allocator_t *alloc, const hu_eval_run_t *baseline,
     *report_len = (size_t)n;
     return HU_OK;
 }
+
+#ifdef HU_ENABLE_SQLITE
+hu_error_t hu_eval_init_tables(sqlite3 *db) {
+    if (!db) return HU_ERR_INVALID_ARGUMENT;
+    const char *runs_sql =
+        "CREATE TABLE IF NOT EXISTS eval_runs ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "suite_name TEXT NOT NULL,"
+        "passed INTEGER NOT NULL,"
+        "failed INTEGER NOT NULL,"
+        "pass_rate REAL NOT NULL,"
+        "elapsed_ms INTEGER,"
+        "created_at INTEGER NOT NULL)";
+    if (sqlite3_exec(db, runs_sql, NULL, NULL, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
+    const char *results_sql =
+        "CREATE TABLE IF NOT EXISTS eval_results ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "run_id INTEGER NOT NULL REFERENCES eval_runs(id),"
+        "task_id TEXT,"
+        "passed INTEGER NOT NULL,"
+        "actual_output TEXT,"
+        "score REAL,"
+        "elapsed_ms INTEGER)";
+    if (sqlite3_exec(db, results_sql, NULL, NULL, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
+    return HU_OK;
+}
+
+hu_error_t hu_eval_store_run(hu_allocator_t *alloc, sqlite3 *db, const hu_eval_run_t *run) {
+    if (!alloc || !db || !run) return HU_ERR_INVALID_ARGUMENT;
+    sqlite3_stmt *ins_run = NULL;
+    const char *run_sql = "INSERT INTO eval_runs(suite_name,passed,failed,pass_rate,elapsed_ms,created_at) VALUES(?,?,?,?,?,?)";
+    if (sqlite3_prepare_v2(db, run_sql, -1, &ins_run, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
+    const char *suite = run->suite_name ? run->suite_name : "";
+    sqlite3_bind_text(ins_run, 1, suite, (int)strlen(suite), SQLITE_STATIC);
+    sqlite3_bind_int(ins_run, 2, (int)run->passed);
+    sqlite3_bind_int(ins_run, 3, (int)run->failed);
+    sqlite3_bind_double(ins_run, 4, run->pass_rate);
+    sqlite3_bind_int64(ins_run, 5, run->total_elapsed_ms);
+    sqlite3_bind_int64(ins_run, 6, (int64_t)time(NULL));
+    if (sqlite3_step(ins_run) != SQLITE_DONE) {
+        sqlite3_finalize(ins_run);
+        return HU_ERR_MEMORY_BACKEND;
+    }
+    int64_t run_id = sqlite3_last_insert_rowid(db);
+    sqlite3_finalize(ins_run);
+
+    if (run->results_count > 0 && run->results) {
+        sqlite3_stmt *ins_res = NULL;
+        const char *res_sql = "INSERT INTO eval_results(run_id,task_id,passed,actual_output,score,elapsed_ms) VALUES(?,?,?,?,?,?)";
+        if (sqlite3_prepare_v2(db, res_sql, -1, &ins_res, NULL) != SQLITE_OK)
+            return HU_ERR_MEMORY_BACKEND;
+        for (size_t i = 0; i < run->results_count; i++) {
+            const hu_eval_result_t *r = &run->results[i];
+            sqlite3_bind_int64(ins_res, 1, run_id);
+            sqlite3_bind_text(ins_res, 2, r->task_id ? r->task_id : "", r->task_id ? (int)strlen(r->task_id) : 0, SQLITE_STATIC);
+            sqlite3_bind_int(ins_res, 3, r->passed ? 1 : 0);
+            if (r->actual_output) {
+                sqlite3_bind_text(ins_res, 4, r->actual_output, -1, SQLITE_STATIC);
+            } else {
+                sqlite3_bind_null(ins_res, 4);
+            }
+            sqlite3_bind_double(ins_res, 5, r->score);
+            sqlite3_bind_int64(ins_res, 6, r->elapsed_ms);
+            if (sqlite3_step(ins_res) != SQLITE_DONE) {
+                sqlite3_finalize(ins_res);
+                return HU_ERR_MEMORY_BACKEND;
+            }
+            sqlite3_reset(ins_res);
+        }
+        sqlite3_finalize(ins_res);
+    }
+    return HU_OK;
+}
+
+hu_error_t hu_eval_load_history(hu_allocator_t *alloc, sqlite3 *db, hu_eval_run_t *runs,
+                                size_t max_runs, size_t *out_count) {
+    if (!alloc || !db || !runs || !out_count) return HU_ERR_INVALID_ARGUMENT;
+    *out_count = 0;
+    sqlite3_stmt *stmt = NULL;
+    const char *sql = "SELECT id,suite_name,passed,failed,pass_rate,elapsed_ms FROM eval_runs ORDER BY created_at DESC LIMIT ?";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
+    sqlite3_bind_int64(stmt, 1, (int64_t)max_runs);
+    size_t count = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW && count < max_runs) {
+        hu_eval_run_t *r = &runs[count];
+        memset(r, 0, sizeof(*r));
+        const char *name = (const char *)sqlite3_column_text(stmt, 1);
+        if (name) {
+            size_t nlen = (size_t)sqlite3_column_bytes(stmt, 1);
+            r->suite_name = alloc->alloc(alloc->ctx, nlen + 1);
+            if (r->suite_name) {
+                memcpy(r->suite_name, name, nlen + 1);
+            }
+        }
+        r->passed = (size_t)sqlite3_column_int(stmt, 2);
+        r->failed = (size_t)sqlite3_column_int(stmt, 3);
+        r->pass_rate = sqlite3_column_double(stmt, 4);
+        r->total_elapsed_ms = sqlite3_column_int64(stmt, 5);
+        r->results = NULL;
+        r->results_count = 0;
+        count++;
+    }
+    sqlite3_finalize(stmt);
+    *out_count = count;
+    return HU_OK;
+}
+#endif
 
 void hu_eval_suite_free(hu_allocator_t *alloc, hu_eval_suite_t *suite) {
     if (!alloc || !suite) return;
