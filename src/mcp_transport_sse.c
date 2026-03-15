@@ -7,8 +7,8 @@ typedef struct sse_ctx {
     char *url;
 } sse_ctx_t;
 
-static hu_error_t sse_send(void *ctx, const char *data, size_t len) {
 #ifdef HU_HTTP_CURL
+static hu_error_t sse_send(void *ctx, const char *data, size_t len) {
     sse_ctx_t *c = (sse_ctx_t *)ctx;
     if (!c || !c->url || !data)
         return HU_ERR_INVALID_ARGUMENT;
@@ -18,12 +18,6 @@ static hu_error_t sse_send(void *ctx, const char *data, size_t len) {
     if (resp.owned && resp.body)
         hu_http_response_free(&alloc, &resp);
     return err;
-#else
-    (void)ctx;
-    (void)data;
-    (void)len;
-    return HU_ERR_NOT_SUPPORTED;
-#endif
 }
 
 static hu_error_t sse_recv(void *ctx, hu_allocator_t *alloc, char **out, size_t *out_len) {
@@ -44,6 +38,7 @@ static void sse_close(void *ctx, hu_allocator_t *alloc) {
     }
     alloc->free(alloc->ctx, c, sizeof(*c));
 }
+#endif
 
 hu_error_t hu_mcp_transport_sse_create(hu_allocator_t *alloc, const char *url, size_t url_len,
                                        hu_mcp_transport_t *out) {

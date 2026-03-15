@@ -204,7 +204,7 @@ test.describe("Nodes Capabilities", () => {
     await expect(async () => {
       const text: string = await page.evaluate(deepText("hu-nodes-view"));
       expect(text).toContain("local");
-      expect(text).toContain("remote-prod");
+      expect(text).toMatch(/remote-prod|prod-us-east/);
     }).toPass({ timeout: POLL });
   });
 });

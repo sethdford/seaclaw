@@ -446,6 +446,7 @@ export class ScLogsView extends GatewayAwareLitElement {
             @hu-change=${(e: CustomEvent<{ value: string }>) => (this._level = e.detail.value)}
           ></hu-segmented-control>
           <hu-input
+            class="filter-input"
             type="text"
             placeholder="Filter..."
             aria-label="Filter log events"

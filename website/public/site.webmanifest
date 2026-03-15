@@ -1,7 +1,7 @@
 {
   "name": "Human",
   "short_name": "Human",
-  "description": "Autonomous AI agent runtime in ~1.7 MB of pure C",
+  "description": "not quite human. Autonomous AI agent runtime in ~1.7 MB of pure C.",
   "start_url": "/",
   "display": "standalone",
   "theme_color": "#7AB648",

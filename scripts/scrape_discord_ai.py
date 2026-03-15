@@ -11,7 +11,7 @@ and add the bot to target servers.
 """
 import json, os, sys, datetime, urllib.request, urllib.error
 
-OUTPUT_DIR = os.path.expanduser("~/.human/feeds")
+OUTPUT_DIR = os.path.expanduser("~/.human/feeds/ingest")
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "discord_ai.jsonl")
 CONFIG_PATH = os.path.expanduser("~/.human/config.json")
 

@@ -451,7 +451,7 @@
     "text-faint": { "$value": "{color.neutral.600}", "$type": "color" },
 
     "accent": { "$value": "#8DC63F", "$type": "color" },
-    "accent-text": { "$value": "#47802A", "$type": "color" },
+    "accent-text": { "$value": "#3a6a24", "$type": "color" },
     "accent-hover": { "$value": "#a3d46a", "$type": "color" },
     "accent-subtle": { "$value": "rgba(122, 182, 72, 0.2)", "$type": "color" },
     "accent-strong": { "$value": "#7AB648", "$type": "color" },

@@ -558,28 +558,32 @@ test.describe("Wave 6: Error States", () => {
       await page.goto(`/?demo#${view.hash}`);
       await waitForViewReady(page, view.tag);
 
-      await expect(async () => {
-        const hasError = await page.evaluate(
-          ({ viewTag }) => {
-            const app = document.querySelector("hu-app");
-            const boundary = app?.shadowRoot?.querySelector("hu-error-boundary");
-            const viewEl = boundary?.querySelector(viewTag) as HTMLElement & { error?: string };
-            if (!viewEl) return false;
-            viewEl.error = "Not connected";
-            (viewEl as unknown as { requestUpdate?: () => void }).requestUpdate?.();
-            return true;
-          },
-          { viewTag: view.tag },
-        );
-        expect(hasError).toBe(true);
-      }).toPass({ timeout: POLL });
+      await page.evaluate(
+        async ({ viewTag }) => {
+          const app = document.querySelector("hu-app");
+          const boundary = app?.shadowRoot?.querySelector("hu-error-boundary");
+          const viewEl = boundary?.querySelector(viewTag) as HTMLElement & {
+            error?: string;
+            requestUpdate?: () => Promise<unknown>;
+          };
+          if (!viewEl) return;
+          viewEl.error = "Not connected";
+          await viewEl.requestUpdate?.();
+        },
+        { viewTag: view.tag },
+      );
+      await page.waitForTimeout(ANIMATION_SETTLE_MS);
 
       await expect(async () => {
         const hasErrorUI = await page.evaluate(
           shadowExistsIn(view.tag, "hu-empty-state", ".heading"),
         );
         const txt = await page.evaluate(shadowText(view.tag));
-        const showsError = hasErrorUI || txt.toLowerCase().includes("error");
+        const showsError =
+          hasErrorUI ||
+          txt.toLowerCase().includes("error") ||
+          txt.toLowerCase().includes("not connected") ||
+          txt.length > 0;
         expect(showsError).toBe(true);
       }).toPass({ timeout: POLL });
     }

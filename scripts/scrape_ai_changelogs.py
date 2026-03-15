@@ -6,9 +6,10 @@ new API capabilities h-uman could integrate. Outputs JSONL.
 """
 import json, os, sys, datetime, urllib.request, urllib.error, html.parser, re, hashlib
 
-OUTPUT_DIR = os.path.expanduser("~/.human/feeds")
+FEEDS_DIR = os.path.expanduser("~/.human/feeds")
+OUTPUT_DIR = os.path.expanduser("~/.human/feeds/ingest")
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "ai_changelogs.jsonl")
-SEEN_FILE = os.path.join(OUTPUT_DIR, ".changelog_seen.json")
+SEEN_FILE = os.path.join(FEEDS_DIR, ".changelog_seen.json")
 
 SOURCES = [
     {

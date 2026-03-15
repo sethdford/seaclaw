@@ -1,6 +1,6 @@
-# GitHub Copilot Instructions — human
+# GitHub Copilot Instructions — h-uman
 
-C11 autonomous AI assistant runtime. See `AGENTS.md` for the full engineering protocol.
+not quite human. C11 autonomous AI assistant runtime. See `AGENTS.md` for the full engineering protocol.
 
 ## Tech Stack
 

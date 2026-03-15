@@ -100,6 +100,9 @@ static hu_error_t embedded_chat_with_system(void *ctx, hu_allocator_t *alloc,
         return HU_ERR_INVALID_ARGUMENT;
 
 #ifdef HU_IS_TEST
+    (void)ctx;
+    (void)system_prompt;
+    (void)system_prompt_len;
     const char *resp = "Mock embedded response";
     size_t rlen = strlen(resp);
     *out = alloc->alloc(alloc->ctx, rlen + 1);

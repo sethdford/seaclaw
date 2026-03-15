@@ -12,7 +12,7 @@ export default defineConfig({
     inlineStylesheets: "always",
   },
   prefetch: {
-    prefetchAll: true,
+    prefetchAll: false,
     defaultStrategy: "hover",
   },
   integrations: [

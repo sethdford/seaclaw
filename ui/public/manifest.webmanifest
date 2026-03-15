@@ -1,7 +1,7 @@
 {
   "name": "Human Control",
   "short_name": "Human",
-  "description": "AI assistant dashboard — real-time monitoring, configuration, and control.",
+  "description": "not quite human. AI assistant dashboard — real-time monitoring, configuration, and control.",
   "start_url": "/",
   "display": "standalone",
   "theme_color": "#7AB648",

@@ -47,7 +47,7 @@ abstract final class HUTokens {
   static const chart_sequential_400 = Color(0xFF8DC63F);
   static const chart_sequential_500 = Color(0xFF7AB648);
   static const chart_sequential_600 = Color(0xFF5A9A30);
-  static const chart_sequential_700 = Color(0xFF47802A);
+  static const chart_sequential_700 = Color(0xFF3A6A24);
   static const chart_sequential_800 = Color(0xFF366320);
   static const chart_status_error = Color(0xFFF97066);
   static const chart_status_info = Color(0xFF6366F1);
@@ -97,12 +97,12 @@ abstract final class HUTokens {
   static const color_fidelity_50 = Color(0xFFF3FAE8);
   static const color_fidelity_500 = Color(0xFF7AB648);
   static const color_fidelity_600 = Color(0xFF5A9A30);
-  static const color_fidelity_700 = Color(0xFF47802A);
+  static const color_fidelity_700 = Color(0xFF3A6A24);
   static const color_fidelity_800 = Color(0xFF366320);
   static const color_fidelity_900 = Color(0xFF264A17);
   static const color_fidelity_light_400 = Color(0xFF7AB648);
   static const color_fidelity_light_500 = Color(0xFF5A9A30);
-  static const color_fidelity_light_600 = Color(0xFF47802A);
+  static const color_fidelity_light_600 = Color(0xFF3A6A24);
   static const color_green_500 = Color(0xFF22C55E);
   static const color_green_light_500 = Color(0xFF16A34A);
   static const color_indigo_100 = Color(0xFFE0E7FF);
@@ -287,7 +287,7 @@ abstract final class HUTokens {
   static const high_contrast_accent = Color(0xFF8DC63F);
   static const high_contrast_accent_hover = Color(0xFFA3D46A);
   static const high_contrast_accent_strong = Color(0xFF7AB648);
-  static const high_contrast_accent_text = Color(0xFF47802A);
+  static const high_contrast_accent_text = Color(0xFF3A6A24);
   static const high_contrast_bg = Color(0xFF000000);
   static const high_contrast_bg_elevated = Color(0xFF152333);
   static const high_contrast_bg_inset = Color(0xFF000000);
@@ -334,7 +334,7 @@ abstract final class HUTokens {
   static const light_accent_tertiary_hover = Color(0xFF4338CA);
   static const light_accent_tertiary_strong = Color(0xFF6366F1);
   static const light_accent_tertiary_text = Color(0xFF4338CA);
-  static const light_accent_text = Color(0xFF47802A);
+  static const light_accent_text = Color(0xFF3A6A24);
   static const light_bg = Color(0xFFF5F5F5);
   static const light_bg_elevated = Color(0xFFF8F8F8);
   static const light_bg_inset = Color(0xFFEFEFEF);
@@ -350,8 +350,8 @@ abstract final class HUTokens {
   static const light_info = Color(0xFF2563EB);
   static const light_link = Color(0xFF5A9A30);
   static const light_link_active = Color(0xFF7AB648);
-  static const light_link_hover = Color(0xFF47802A);
-  static const light_link_visited = Color(0xFF47802A);
+  static const light_link_hover = Color(0xFF3A6A24);
+  static const light_link_visited = Color(0xFF3A6A24);
   static const light_on_accent = Color(0xFFFFFFFF);
   static const light_on_accent_secondary = Color(0xFFFFFFFF);
   static const light_on_accent_tertiary = Color(0xFFFFFFFF);

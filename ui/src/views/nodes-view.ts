@@ -130,6 +130,7 @@ export class ScNodesView extends GatewayAwareLitElement {
   private get tableRows(): Record<string, unknown>[] {
     return this.nodes.map((n) => ({
       id: n.id ?? "—",
+      hostname: n.hostname ?? n.id ?? "—",
       status: n.status ?? "unknown",
       statusVariant: this.statusVariant(n.status),
       wsCount: n.ws_connections ?? 0,
@@ -139,7 +140,7 @@ export class ScNodesView extends GatewayAwareLitElement {
   }
 
   private readonly columns: DataTableColumnV2[] = [
-    { key: "id", label: "Node ID", sortable: true },
+    { key: "hostname", label: "Hostname", sortable: true },
     {
       key: "status",
       label: "Status",
@@ -254,7 +255,9 @@ export class ScNodesView extends GatewayAwareLitElement {
       <hu-sheet ?open=${this._sheetNode != null} @close=${this._onSheetClose}>
         ${this._sheetNode
           ? html`
-              <div class="sheet-title">${this._sheetNode.id ?? "Node"}</div>
+              <div class="sheet-title">
+                ${this._sheetNode.hostname ?? this._sheetNode.id ?? "Node"}
+              </div>
               <div class="sheet-detail-row">
                 <span class="sheet-detail-label">Status</span>
                 <span class="sheet-detail-value">${this._sheetNode.status ?? "-"}</span>

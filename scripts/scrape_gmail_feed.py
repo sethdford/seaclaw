@@ -10,7 +10,7 @@ Requires Gmail API credentials. First-time setup:
 """
 import json, os, sys, datetime, urllib.request, urllib.parse
 
-OUTPUT_DIR = os.path.expanduser("~/.human/feeds")
+OUTPUT_DIR = os.path.expanduser("~/.human/feeds/ingest")
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "gmail.jsonl")
 CONFIG_PATH = os.path.expanduser("~/.human/config.json")
 

@@ -6,7 +6,7 @@ applications that could signal upcoming technology trends.
 """
 import json, os, sys, datetime, urllib.request, urllib.parse, xml.etree.ElementTree as ET
 
-OUTPUT_DIR = os.path.expanduser("~/.human/feeds")
+OUTPUT_DIR = os.path.expanduser("~/.human/feeds/ingest")
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "patents_ai.jsonl")
 
 PATENT_QUERIES = [

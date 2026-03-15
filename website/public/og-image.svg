@@ -3,8 +3,9 @@
   <circle cx="600" cy="180" r="12" fill="#7AB648" opacity="0.25"/>
   <circle cx="600" cy="180" r="4" fill="#7AB648" opacity="0.6"/>
   <line x1="400" y1="275" x2="800" y2="275" stroke="#7AB648" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
-  <text x="600" y="230" text-anchor="middle" fill="#1D1D1F" font-family="Georgia, 'Times New Roman', serif" font-size="72" font-weight="600">Human</text>
-  <text x="600" y="310" text-anchor="middle" fill="#6E6E73" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="400">Bring AI to every device on Earth.</text>
+  <text x="600" y="220" text-anchor="middle" fill="#1D1D1F" font-family="Georgia, 'Times New Roman', serif" font-size="72" font-weight="600">h-uman</text>
+  <text x="600" y="280" text-anchor="middle" fill="#6E6E73" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="400" letter-spacing="2">not quite human.</text>
+  <text x="600" y="330" text-anchor="middle" fill="#a1a1a6" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="400">Bring AI to every device on Earth.</text>
   <text x="300" y="520" text-anchor="middle" fill="#1D1D1F" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="500">~1.7 MB</text>
   <text x="600" y="520" text-anchor="middle" fill="#1D1D1F" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="500">&lt;2 ms startup</text>
   <text x="900" y="520" text-anchor="middle" fill="#1D1D1F" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="500">50+ providers</text>

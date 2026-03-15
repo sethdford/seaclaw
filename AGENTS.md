@@ -1,4 +1,6 @@
-# AGENTS.md — human Agent Engineering Protocol
+# AGENTS.md — h-uman Agent Engineering Protocol
+
+_not quite human._
 
 This file defines the default working protocol for coding agents in this repository.
 Scope: entire repository.

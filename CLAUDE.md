@@ -1,4 +1,4 @@
-# human
+# h-uman — not quite human.
 
 C11 autonomous AI assistant runtime. ~1696 KB binary, <6 MB RAM, <30 ms startup.
 Zero dependencies beyond libc (optional SQLite and libcurl).

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-15T12:25:32.380Z",
+  "generated": "2026-03-15T13:23:37.875Z",
   "groups": {
     "color.neutral": [
       {
@@ -258,8 +258,8 @@
       },
       {
         "name": "700",
-        "value": "#47802A",
-        "hex": "#47802A"
+        "value": "#3a6a24",
+        "hex": "#3a6a24"
       },
       {
         "name": "800",
@@ -282,8 +282,8 @@
       },
       {
         "name": "light-600",
-        "value": "#47802A",
-        "hex": "#47802A"
+        "value": "#3a6a24",
+        "hex": "#3a6a24"
       },
       {
         "name": "light-400",
@@ -2036,8 +2036,8 @@
       },
       {
         "name": "accent-text",
-        "value": "#47802A",
-        "hex": "#47802A"
+        "value": "#3a6a24",
+        "hex": "#3a6a24"
       },
       {
         "name": "accent-hover",
@@ -2187,8 +2187,8 @@
       },
       {
         "name": "link-hover",
-        "value": "#47802A",
-        "hex": "#47802A"
+        "value": "#3a6a24",
+        "hex": "#3a6a24"
       },
       {
         "name": "link-active",
@@ -2197,8 +2197,8 @@
       },
       {
         "name": "link-visited",
-        "value": "#47802A",
-        "hex": "#47802A"
+        "value": "#3a6a24",
+        "hex": "#3a6a24"
       },
       {
         "name": "hover-overlay",
@@ -2329,8 +2329,8 @@
       },
       {
         "name": "accent-text",
-        "value": "#47802A",
-        "hex": "#47802A"
+        "value": "#3a6a24",
+        "hex": "#3a6a24"
       },
       {
         "name": "accent-hover",
@@ -3196,8 +3196,8 @@
       },
       {
         "name": "700",
-        "value": "#47802A",
-        "hex": "#47802A"
+        "value": "#3a6a24",
+        "hex": "#3a6a24"
       },
       {
         "name": "800",

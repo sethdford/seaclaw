@@ -232,7 +232,7 @@ private fun OnboardingScreen(onComplete: () -> Unit) {
     var gatewayUrl by remember { mutableStateOf("ws://localhost:3000") }
 
     val pages = listOf(
-        Triple("Welcome to h-uman", "Your autonomous AI assistant runtime.", "Minimal footprint, maximum capability."),
+        Triple("Welcome to h-uman", "not quite human.", "Minimal footprint, maximum capability."),
         Triple("Lightning Fast", "~1696 KB binary, <6 MB RAM.", "<30 ms startup. Zero dependencies."),
         Triple("34 Channels", "Telegram, Discord, Slack, and more.", "Connect your preferred messaging platform."),
     )

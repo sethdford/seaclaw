@@ -217,8 +217,9 @@ static void run_spinner_loop(agent_turn_ctx_t *tctx, int use_ansi) {
 
 /* ── Print welcome banner ────────────────────────────────────────────── */
 static void print_banner(const char *prov_name, const char *model, size_t tools_count) {
-    printf(HU_COLOR_BOLD HU_COLOR_ACCENT "%s" HU_COLOR_RESET " v%s\n", HU_CODENAME,
-           hu_version_string());
+    printf(HU_COLOR_BOLD HU_COLOR_ACCENT "%s" HU_COLOR_RESET " v%s" HU_COLOR_DIM
+           " — not quite human." HU_COLOR_RESET "\n",
+           HU_CODENAME, hu_version_string());
     printf(HU_COLOR_DIM "Provider: %s | Model: %s | Tools: %zu" HU_COLOR_RESET "\n", prov_name,
            (model[0] ? model : "(default)"), tools_count);
     printf("Type your message, or " HU_COLOR_DIM "'exit'" HU_COLOR_RESET " to leave. " HU_COLOR_DIM

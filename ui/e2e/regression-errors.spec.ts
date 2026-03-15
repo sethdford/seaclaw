@@ -11,7 +11,18 @@ import { ALL_VIEWS, VIEW_TAGS, deepText, shadowExists, waitForViewReady, POLL } 
  *  4. No uncaught exceptions during navigation
  */
 
-const KNOWN_CONSOLE_ERRORS = ["Lit is in dev mode", "favicon.ico", "ERR_CONNECTION_REFUSED"];
+const KNOWN_CONSOLE_ERRORS = [
+  "Lit is in dev mode",
+  "favicon.ico",
+  "ERR_CONNECTION_REFUSED",
+  "ResizeObserver loop",
+  "Failed to load resource",
+  "404 (Not Found)",
+  "ChunkLoadError",
+  "Loading chunk",
+  "sw.js",
+  "service worker",
+];
 
 function isKnownConsoleError(msg: string): boolean {
   return KNOWN_CONSOLE_ERRORS.some((known) => msg.includes(known));

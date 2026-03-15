@@ -5,6 +5,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#ifdef HU_ENABLE_SQLITE
+#include "human/feeds/findings.h"
+#include "human/feeds/trends.h"
+#include <sqlite3.h>
+#include <time.h>
+#endif
 
 static void feeds_create_table_sql_valid(void) {
     char buf[1024];
@@ -254,6 +260,415 @@ static void feeds_feed_item_deinit_frees_memory(void) {
     HU_ASSERT_EQ(item.topic_len, 0);
 }
 
+#ifdef HU_ENABLE_SQLITE
+
+static void feed_search_fts_match(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    const char *schema =
+        "CREATE TABLE IF NOT EXISTS feed_items("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT NOT NULL,"
+        "contact_id TEXT,"
+        "content_type TEXT NOT NULL,"
+        "content TEXT NOT NULL,"
+        "url TEXT,"
+        "ingested_at INTEGER NOT NULL,"
+        "referenced INTEGER DEFAULT 0,"
+        "cluster_id INTEGER DEFAULT NULL)";
+    HU_ASSERT_EQ(sqlite3_exec(db, schema, NULL, NULL, NULL), SQLITE_OK);
+
+    const char *fts =
+        "CREATE VIRTUAL TABLE IF NOT EXISTS feed_items_fts USING fts5("
+        "content, source, content_type, content=feed_items, content_rowid=id)";
+    HU_ASSERT_EQ(sqlite3_exec(db, fts, NULL, NULL, NULL), SQLITE_OK);
+
+    const char *trig_ai =
+        "CREATE TRIGGER IF NOT EXISTS feed_items_ai AFTER INSERT ON feed_items "
+        "BEGIN INSERT INTO feed_items_fts(rowid, content, source, content_type) "
+        "VALUES (new.id, new.content, new.source, new.content_type); END";
+    HU_ASSERT_EQ(sqlite3_exec(db, trig_ai, NULL, NULL, NULL), SQLITE_OK);
+
+    const char *trig_ad =
+        "CREATE TRIGGER IF NOT EXISTS feed_items_ad AFTER DELETE ON feed_items "
+        "BEGIN INSERT INTO feed_items_fts(feed_items_fts, rowid, content, source, content_type) "
+        "VALUES ('delete', old.id, old.content, old.source, old.content_type); END";
+    HU_ASSERT_EQ(sqlite3_exec(db, trig_ad, NULL, NULL, NULL), SQLITE_OK);
+
+    int64_t now = (int64_t)time(NULL);
+    sqlite3_stmt *ins = NULL;
+    const char *ins_sql =
+        "INSERT INTO feed_items(source, content_type, content, ingested_at) VALUES (?,?,?,?)";
+    HU_ASSERT_EQ(sqlite3_prepare_v2(db, ins_sql, -1, &ins, NULL), SQLITE_OK);
+
+    const char *src = "rss";
+    const char *ct = "article";
+    sqlite3_bind_text(ins, 1, src, -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, ct, -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 3, "Advances in machine learning", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(ins, 4, now);
+    HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+    sqlite3_reset(ins);
+
+    sqlite3_bind_text(ins, 1, src, -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, ct, -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 3, "Deep learning and machine learning", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(ins, 4, now);
+    HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+    sqlite3_reset(ins);
+
+    sqlite3_bind_text(ins, 1, "twitter", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, "tweet", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 3, "Cooking pasta recipes", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(ins, 4, now);
+    HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+    sqlite3_finalize(ins);
+
+    hu_feed_item_stored_t *out = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_feed_search(&alloc, db, "machine learning", 16, 10, &out, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 2u);
+    hu_feed_items_free(&alloc, out, count);
+    sqlite3_close(db);
+}
+
+static void feed_build_daily_digest_groups_by_source(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    const char *schema =
+        "CREATE TABLE IF NOT EXISTS feed_items("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT NOT NULL,"
+        "contact_id TEXT,"
+        "content_type TEXT NOT NULL,"
+        "content TEXT NOT NULL,"
+        "url TEXT,"
+        "ingested_at INTEGER NOT NULL,"
+        "referenced INTEGER DEFAULT 0,"
+        "cluster_id INTEGER DEFAULT NULL)";
+    HU_ASSERT_EQ(sqlite3_exec(db, schema, NULL, NULL, NULL), SQLITE_OK);
+
+    int64_t now = (int64_t)time(NULL);
+    sqlite3_stmt *ins = NULL;
+    const char *ins_sql =
+        "INSERT INTO feed_items(source, content_type, content, ingested_at) VALUES (?,?,?,?)";
+    HU_ASSERT_EQ(sqlite3_prepare_v2(db, ins_sql, -1, &ins, NULL), SQLITE_OK);
+
+    const char *sources[2] = {"rss", "twitter"};
+    for (int i = 0; i < 5; i++) {
+        sqlite3_bind_text(ins, 1, sources[i % 2], -1, SQLITE_STATIC);
+        sqlite3_bind_text(ins, 2, "post", -1, SQLITE_STATIC);
+        sqlite3_bind_text(ins, 3, "Item content", -1, SQLITE_STATIC);
+        sqlite3_bind_int64(ins, 4, now);
+        HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+        sqlite3_reset(ins);
+    }
+    sqlite3_finalize(ins);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    int64_t since_ts = now - 86400;
+    hu_error_t err = hu_feed_build_daily_digest(&alloc, db, since_ts, 4000, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_NOT_NULL(strstr(out, "rss"));
+    HU_ASSERT_NOT_NULL(strstr(out, "twitter"));
+    hu_str_free(&alloc, out);
+    sqlite3_close(db);
+}
+
+static void feed_processor_cleanup_removes_old(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    const char *schema =
+        "CREATE TABLE IF NOT EXISTS feed_items("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT NOT NULL,"
+        "contact_id TEXT,"
+        "content_type TEXT NOT NULL,"
+        "content TEXT NOT NULL,"
+        "url TEXT,"
+        "ingested_at INTEGER NOT NULL,"
+        "referenced INTEGER DEFAULT 0,"
+        "cluster_id INTEGER DEFAULT NULL)";
+    HU_ASSERT_EQ(sqlite3_exec(db, schema, NULL, NULL, NULL), SQLITE_OK);
+
+    int64_t now = (int64_t)time(NULL);
+    int64_t old_ts = now - (60 * 86400);
+
+    sqlite3_stmt *ins = NULL;
+    const char *ins_sql =
+        "INSERT INTO feed_items(source, content_type, content, ingested_at) VALUES (?,?,?,?)";
+    HU_ASSERT_EQ(sqlite3_prepare_v2(db, ins_sql, -1, &ins, NULL), SQLITE_OK);
+
+    sqlite3_bind_text(ins, 1, "rss", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, "article", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 3, "Recent item", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(ins, 4, now);
+    HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+    sqlite3_reset(ins);
+
+    sqlite3_bind_text(ins, 1, "twitter", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, "tweet", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 3, "Old item", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(ins, 4, old_ts);
+    HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+    sqlite3_finalize(ins);
+
+    hu_feed_processor_t proc = {.alloc = &alloc, .db = db};
+    hu_error_t err = hu_feed_processor_cleanup(&proc, 30);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    sqlite3_stmt *sel = NULL;
+    HU_ASSERT_EQ(sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM feed_items", -1, &sel, NULL), SQLITE_OK);
+    HU_ASSERT_EQ(sqlite3_step(sel), SQLITE_ROW);
+    HU_ASSERT_EQ(sqlite3_column_int(sel, 0), 1);
+    sqlite3_finalize(sel);
+    sqlite3_close(db);
+}
+
+static void feed_get_all_recent_returns_items(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    const char *schema =
+        "CREATE TABLE IF NOT EXISTS feed_items("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT NOT NULL,"
+        "contact_id TEXT,"
+        "content_type TEXT NOT NULL,"
+        "content TEXT NOT NULL,"
+        "url TEXT,"
+        "ingested_at INTEGER NOT NULL,"
+        "referenced INTEGER DEFAULT 0,"
+        "cluster_id INTEGER DEFAULT NULL)";
+    HU_ASSERT_EQ(sqlite3_exec(db, schema, NULL, NULL, NULL), SQLITE_OK);
+
+    int64_t now = (int64_t)time(NULL);
+    int64_t since = now - 86400;
+    int64_t old_ts = now - (2 * 86400);
+
+    sqlite3_stmt *ins = NULL;
+    const char *ins_sql =
+        "INSERT INTO feed_items(source, content_type, content, ingested_at) VALUES (?,?,?,?)";
+    HU_ASSERT_EQ(sqlite3_prepare_v2(db, ins_sql, -1, &ins, NULL), SQLITE_OK);
+
+    sqlite3_bind_text(ins, 1, "rss", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, "article", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 3, "Recent 1", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(ins, 4, now);
+    HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+    sqlite3_reset(ins);
+
+    sqlite3_bind_text(ins, 1, "twitter", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, "tweet", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 3, "Recent 2", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(ins, 4, now - 3600);
+    HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+    sqlite3_reset(ins);
+
+    sqlite3_bind_text(ins, 1, "rss", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, "article", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 3, "Old item", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(ins, 4, old_ts);
+    HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+    sqlite3_finalize(ins);
+
+    hu_feed_item_stored_t *out = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_feed_processor_get_all_recent(&alloc, db, since, 10, &out, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 2u);
+    hu_feed_items_free(&alloc, out, count);
+    sqlite3_close(db);
+}
+
+static void feed_correlate_groups_similar(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    const char *schema =
+        "CREATE TABLE IF NOT EXISTS feed_items("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT NOT NULL,"
+        "contact_id TEXT,"
+        "content_type TEXT NOT NULL,"
+        "content TEXT NOT NULL,"
+        "url TEXT,"
+        "ingested_at INTEGER NOT NULL,"
+        "referenced INTEGER DEFAULT 0,"
+        "cluster_id INTEGER DEFAULT NULL)";
+    HU_ASSERT_EQ(sqlite3_exec(db, schema, NULL, NULL, NULL), SQLITE_OK);
+
+    int64_t now = (int64_t)time(NULL);
+    int64_t since = now - 86400;
+
+    sqlite3_stmt *ins = NULL;
+    const char *ins_sql =
+        "INSERT INTO feed_items(source, content_type, content, ingested_at) VALUES (?,?,?,?)";
+    HU_ASSERT_EQ(sqlite3_prepare_v2(db, ins_sql, -1, &ins, NULL), SQLITE_OK);
+
+    sqlite3_bind_text(ins, 1, "rss", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, "article", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 3, "AI agent developments in tech", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(ins, 4, now);
+    HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+    sqlite3_reset(ins);
+
+    sqlite3_bind_text(ins, 1, "twitter", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, "tweet", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 3, "AI agent news and updates", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(ins, 4, now);
+    HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+    sqlite3_reset(ins);
+
+    sqlite3_bind_text(ins, 1, "instagram", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, "post", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 3, "Cooking recipes for dinner", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(ins, 4, now);
+    HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+    sqlite3_finalize(ins);
+
+    hu_error_t err = hu_feed_correlate_recent(&alloc, db, since, 0.3);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    sqlite3_stmt *sel = NULL;
+    HU_ASSERT_EQ(sqlite3_prepare_v2(db, "SELECT cluster_id FROM feed_items WHERE cluster_id IS NOT NULL", -1, &sel, NULL), SQLITE_OK);
+    int has_cluster = 0;
+    while (sqlite3_step(sel) == SQLITE_ROW) {
+        has_cluster = 1;
+        break;
+    }
+    sqlite3_finalize(sel);
+    HU_ASSERT_TRUE(has_cluster);
+    sqlite3_close(db);
+}
+
+static void findings_store_and_retrieve(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    const char *schema =
+        "CREATE TABLE IF NOT EXISTS research_findings("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT,"
+        "finding TEXT NOT NULL,"
+        "relevance TEXT,"
+        "priority TEXT DEFAULT 'MEDIUM',"
+        "suggested_action TEXT,"
+        "status TEXT DEFAULT 'pending',"
+        "created_at INTEGER NOT NULL,"
+        "acted_at INTEGER)";
+    HU_ASSERT_EQ(sqlite3_exec(db, schema, NULL, NULL, NULL), SQLITE_OK);
+
+    hu_error_t err = hu_findings_store(&alloc, db, "test", "A finding", "HIGH", "HIGH", "Do something");
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_research_finding_t *items = NULL;
+    size_t count = 0;
+    err = hu_findings_get_pending(&alloc, db, 10, &items, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_NOT_NULL(strstr(items[0].finding, "A finding"));
+    hu_findings_free(&alloc, items, count);
+    sqlite3_close(db);
+}
+
+static void findings_mark_status(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    const char *schema =
+        "CREATE TABLE IF NOT EXISTS research_findings("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT,"
+        "finding TEXT NOT NULL,"
+        "relevance TEXT,"
+        "priority TEXT DEFAULT 'MEDIUM',"
+        "suggested_action TEXT,"
+        "status TEXT DEFAULT 'pending',"
+        "created_at INTEGER NOT NULL,"
+        "acted_at INTEGER)";
+    HU_ASSERT_EQ(sqlite3_exec(db, schema, NULL, NULL, NULL), SQLITE_OK);
+
+    hu_error_t err = hu_findings_store(&alloc, db, "test", "A finding", "HIGH", "HIGH", "Do something");
+    HU_ASSERT_EQ(err, HU_OK);
+
+    err = hu_findings_mark_status(db, 1, "completed");
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_research_finding_t *items = NULL;
+    size_t count = 0;
+    err = hu_findings_get_pending(&alloc, db, 10, &items, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+    sqlite3_close(db);
+}
+
+static void feed_detect_trends_no_spikes(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    const char *schema =
+        "CREATE TABLE IF NOT EXISTS feed_items("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "source TEXT NOT NULL,"
+        "contact_id TEXT,"
+        "content_type TEXT NOT NULL,"
+        "content TEXT NOT NULL,"
+        "url TEXT,"
+        "ingested_at INTEGER NOT NULL,"
+        "referenced INTEGER DEFAULT 0,"
+        "cluster_id INTEGER DEFAULT NULL)";
+    HU_ASSERT_EQ(sqlite3_exec(db, schema, NULL, NULL, NULL), SQLITE_OK);
+
+    int64_t now = (int64_t)time(NULL);
+    sqlite3_stmt *ins = NULL;
+    const char *ins_sql =
+        "INSERT INTO feed_items(source, content_type, content, ingested_at) VALUES (?,?,?,?)";
+    HU_ASSERT_EQ(sqlite3_prepare_v2(db, ins_sql, -1, &ins, NULL), SQLITE_OK);
+    sqlite3_bind_text(ins, 1, "rss", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, "article", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 3, "Single item", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(ins, 4, now);
+    HU_ASSERT_EQ(sqlite3_step(ins), SQLITE_DONE);
+    sqlite3_finalize(ins);
+
+    hu_feed_trend_t *trends = NULL;
+    size_t count = 0;
+    const char *keywords = "AI blockchain";
+    hu_error_t err = hu_feed_detect_trends(&alloc, db, keywords, strlen(keywords), &trends, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+    hu_feed_trends_free(&alloc, trends, count);
+    sqlite3_close(db);
+}
+
+static void feed_trends_build_section_empty(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char *out = NULL;
+    size_t len = 0;
+    hu_error_t err = hu_feed_trends_build_section(&alloc, NULL, 0, &out, &len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_NOT_NULL(strstr(out, "No significant trends"));
+    hu_str_free(&alloc, out);
+}
+
+#endif /* HU_ENABLE_SQLITE */
+
 void run_feeds_tests(void) {
     HU_TEST_SUITE("feeds");
     HU_RUN_TEST(feeds_create_table_sql_valid);
@@ -274,4 +689,15 @@ void run_feeds_tests(void) {
     HU_RUN_TEST(feeds_build_prompt_single_item);
     HU_RUN_TEST(feeds_build_prompt_multiple_items);
     HU_RUN_TEST(feeds_feed_item_deinit_frees_memory);
+#ifdef HU_ENABLE_SQLITE
+    HU_RUN_TEST(feed_search_fts_match);
+    HU_RUN_TEST(feed_build_daily_digest_groups_by_source);
+    HU_RUN_TEST(feed_processor_cleanup_removes_old);
+    HU_RUN_TEST(feed_get_all_recent_returns_items);
+    HU_RUN_TEST(feed_correlate_groups_similar);
+    HU_RUN_TEST(findings_store_and_retrieve);
+    HU_RUN_TEST(findings_mark_status);
+    HU_RUN_TEST(feed_detect_trends_no_spikes);
+    HU_RUN_TEST(feed_trends_build_section_empty);
+#endif
 }

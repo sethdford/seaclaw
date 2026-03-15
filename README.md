@@ -2,7 +2,11 @@
   <img src="human.svg" alt="human" width="200" />
 </p>
 
-<h1 align="center">Human</h1>
+<h1 align="center">h-uman</h1>
+
+<p align="center">
+  <em>not quite human.</em>
+</p>
 
 <p align="center">
   <strong>Bring AI to every device on Earth.</strong><br>
@@ -786,7 +790,7 @@ MIT — see [LICENSE](LICENSE)
 
 ---
 
-**human** — Bring AI to every device on Earth.
+**h-uman** — not quite human.
 
 ## Star History
 

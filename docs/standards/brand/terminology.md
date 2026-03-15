@@ -10,6 +10,24 @@ Canonical terms used across the human project (code, docs, UI, CLI). Single sour
 
 ---
 
+## Brand Identity
+
+| Element       | Canonical Form                     | Usage                                                                                       |
+| ------------- | ---------------------------------- | ------------------------------------------------------------------------------------------- |
+| Product name  | human                              | Lowercase in running text. Title case ("Human") only at sentence start or in `<title>` tags |
+| Stylized name | h-uman                             | Domain, logos, hero branding, social cards, footer lockups                                  |
+| Tagline       | not quite human.                   | Always lowercase, always ends with a period. Used in subtitles, meta descriptions, footers  |
+| Mission       | Bring AI to every device on Earth. | Hero headlines, OG titles, README header                                                    |
+
+### Tagline Usage Rules
+
+- **Standalone**: "not quite human." — lowercase, period, no dash prefix
+- **With brand**: "h-uman — not quite human." — em dash separator
+- **Never**: "Not Quite Human", "NOT QUITE HUMAN", "not quite human" (without period)
+- **Context**: the tagline conveys self-aware AI identity — honest about what the runtime is and isn't
+
+---
+
 ## Canonical Product Terms
 
 | Term       | Definition                                           | Never Use                                                 |

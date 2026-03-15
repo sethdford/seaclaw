@@ -2,7 +2,7 @@
 """Scrape GitHub trending repos (especially AI/ML) into JSONL for h-uman feed ingestion."""
 import json, os, sys, time, datetime, urllib.request, urllib.error, html.parser
 
-OUTPUT_DIR = os.path.expanduser("~/.human/feeds")
+OUTPUT_DIR = os.path.expanduser("~/.human/feeds/ingest")
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "github_trending.jsonl")
 GITHUB_TRENDING_URL = "https://github.com/trending?since=daily&spoken_language_code=en"
 

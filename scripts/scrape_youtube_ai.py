@@ -6,9 +6,10 @@ transcripts, and outputs JSONL for h-uman feed ingestion.
 """
 import json, os, sys, subprocess, datetime, urllib.request, xml.etree.ElementTree as ET
 
-OUTPUT_DIR = os.path.expanduser("~/.human/feeds")
+FEEDS_DIR = os.path.expanduser("~/.human/feeds")
+OUTPUT_DIR = os.path.expanduser("~/.human/feeds/ingest")
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "youtube_ai.jsonl")
-TRANSCRIPT_CACHE = os.path.join(OUTPUT_DIR, ".yt_transcript_cache")
+TRANSCRIPT_CACHE = os.path.join(FEEDS_DIR, ".yt_transcript_cache")
 
 CHANNELS = {
     "UCWN3xxRkmTPmbKwht9FuE5A": "Siraj Raval",

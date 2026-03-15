@@ -52,13 +52,15 @@ async function generateOgImage() {
       ${whiteClaw.replace('viewBox="0 0 128 128"', 'viewBox="0 0 128 128" width="72" height="72"')}
     </g>
 
-    <text x="200" y="230" fill="#f5f5f7" font-family="system-ui,-apple-system,sans-serif" font-size="56" font-weight="700" letter-spacing="-2">Bring AI to every</text>
-    <text x="200" y="295" fill="#f5f5f7" font-family="system-ui,-apple-system,sans-serif" font-size="56" font-weight="700" letter-spacing="-2">device on Earth.</text>
+    <text x="200" y="220" fill="#f5f5f7" font-family="system-ui,-apple-system,sans-serif" font-size="56" font-weight="700" letter-spacing="-2">Bring AI to every</text>
+    <text x="200" y="285" fill="#f5f5f7" font-family="system-ui,-apple-system,sans-serif" font-size="56" font-weight="700" letter-spacing="-2">device on Earth.</text>
 
-    <text x="200" y="360" fill="#a1a1a6" font-family="system-ui,-apple-system,sans-serif" font-size="22">~1.7 MB binary · 50+ providers · 34 channels · 67+ tools</text>
+    <text x="200" y="345" fill="#a1a1a6" font-family="system-ui,-apple-system,sans-serif" font-size="24" letter-spacing="1.5">not quite human.</text>
 
-    <text x="200" y="420" fill="#7AB648" font-family="system-ui,-apple-system,sans-serif" font-size="20" font-weight="600">Human</text>
-    <text x="310" y="420" fill="#6e6e73" font-family="system-ui,-apple-system,sans-serif" font-size="18">Pure C11 · Zero dependencies · MIT licensed</text>
+    <text x="200" y="400" fill="#86868b" font-family="system-ui,-apple-system,sans-serif" font-size="20">~1.7 MB binary · 50+ providers · 34 channels · 67+ tools</text>
+
+    <text x="200" y="450" fill="#7AB648" font-family="system-ui,-apple-system,sans-serif" font-size="20" font-weight="600">h-uman</text>
+    <text x="330" y="450" fill="#6e6e73" font-family="system-ui,-apple-system,sans-serif" font-size="18">Pure C11 · Zero dependencies · MIT licensed</text>
 
     <line x1="200" y1="490" x2="1000" y2="490" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
     <text x="200" y="530" fill="#86868b" font-family="ui-monospace,monospace" font-size="14">h-uman.ai</text>

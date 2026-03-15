@@ -141,7 +141,7 @@ export class ScWelcomeCard extends LitElement {
         <div class="hero">
           <div class="hero-icon" aria-hidden="true">${icons.zap}</div>
           <h2>${greeting}</h2>
-          <p>Your autonomous AI assistant runtime</p>
+          <p>not quite human.</p>
         </div>
         <div class="features">
           <div class="feature">

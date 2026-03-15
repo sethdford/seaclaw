@@ -768,7 +768,7 @@ export class ScApp extends LitElement {
           @toggle-collapse=${() => this._toggleSidebar()}
         ></hu-sidebar>
 
-        <main id="main-content" tabindex="0">
+        <main id="main-content" tabindex="-1" role="main">
           <div class="scroll-progress" role="presentation" aria-hidden="true"></div>
           <div class="view-enter">
             <hu-error-boundary .error=${this._viewError} @retry=${this._onViewRetry}>

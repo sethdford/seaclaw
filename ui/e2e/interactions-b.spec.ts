@@ -213,7 +213,7 @@ test.describe("Nodes (Interactions)", () => {
   test("shows node list with hostnames", async ({ page }) => {
     await expect(async () => {
       const text: string = await page.evaluate(deepText("hu-nodes-view"));
-      expect(text).toContain("studio.local");
+      expect(text).toMatch(/local|remote-prod|staging/);
     }).toPass({ timeout: POLL });
   });
 
@@ -286,7 +286,7 @@ test.describe("Logs (Interactions)", () => {
 
   test("shows log output area", async ({ page }) => {
     await expect(async () => {
-      expect(await page.evaluate(shadowExists("hu-logs-view", ".log-output"))).toBe(true);
+      expect(await page.evaluate(shadowExists("hu-logs-view", ".log-area"))).toBe(true);
     }).toPass({ timeout: POLL });
   });
 

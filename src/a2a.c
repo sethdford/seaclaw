@@ -18,6 +18,7 @@ static char *a2a_dup(hu_allocator_t *alloc, const char *s) {
     return d;
 }
 
+#ifdef HU_HTTP_CURL
 static hu_a2a_task_state_t a2a_parse_state(const char *s) {
     if (!s) return HU_A2A_TASK_SUBMITTED;
     if (strcmp(s, "submitted") == 0) return HU_A2A_TASK_SUBMITTED;
@@ -28,6 +29,7 @@ static hu_a2a_task_state_t a2a_parse_state(const char *s) {
     if (strcmp(s, "canceled") == 0) return HU_A2A_TASK_CANCELED;
     return HU_A2A_TASK_SUBMITTED;
 }
+#endif /* HU_HTTP_CURL */
 
 hu_error_t hu_a2a_discover(hu_allocator_t *alloc, const char *agent_url, hu_a2a_agent_card_t *out) {
     if (!alloc || !agent_url || !out) return HU_ERR_INVALID_ARGUMENT;

@@ -11,8 +11,8 @@ typedef struct http_ctx {
     size_t last_response_len;
 } http_ctx_t;
 
-static hu_error_t http_send(void *ctx, const char *data, size_t len) {
 #ifdef HU_HTTP_CURL
+static hu_error_t http_send(void *ctx, const char *data, size_t len) {
     http_ctx_t *c = (http_ctx_t *)ctx;
     if (!c || !c->url || !data)
         return HU_ERR_INVALID_ARGUMENT;
@@ -33,16 +33,9 @@ static hu_error_t http_send(void *ctx, const char *data, size_t len) {
     if (resp.owned && resp.body)
         hu_http_response_free(alloc, &resp);
     return HU_OK;
-#else
-    (void)ctx;
-    (void)data;
-    (void)len;
-    return HU_ERR_NOT_SUPPORTED;
-#endif
 }
 
 static hu_error_t http_recv(void *ctx, hu_allocator_t *alloc, char **out, size_t *out_len) {
-#ifdef HU_HTTP_CURL
     http_ctx_t *c = (http_ctx_t *)ctx;
     if (!c || !alloc || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
@@ -56,13 +49,6 @@ static hu_error_t http_recv(void *ctx, hu_allocator_t *alloc, char **out, size_t
         return HU_ERR_OUT_OF_MEMORY;
     *out_len = c->last_response_len;
     return HU_OK;
-#else
-    (void)ctx;
-    (void)alloc;
-    (void)out;
-    (void)out_len;
-    return HU_ERR_NOT_SUPPORTED;
-#endif
 }
 
 static void http_close(void *ctx, hu_allocator_t *alloc) {
@@ -80,6 +66,7 @@ static void http_close(void *ctx, hu_allocator_t *alloc) {
     }
     alloc->free(alloc->ctx, c, sizeof(*c));
 }
+#endif
 
 hu_error_t hu_mcp_transport_http_create(hu_allocator_t *alloc, const char *url, size_t url_len,
                                         hu_mcp_transport_t *out) {

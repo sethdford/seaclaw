@@ -298,8 +298,7 @@ static hu_command_t const *find_command(const char *name) {
 }
 
 static void print_usage(FILE *out) {
-    fprintf(out, "%s v%s — Autonomous AI Assistant Runtime (C/ASM/WASM)\n\n", HU_CODENAME,
-            HU_VERSION);
+    fprintf(out, "%s v%s — not quite human.\n\n", HU_CODENAME, HU_VERSION);
     fprintf(out, "Usage: human [command] [options]\n\n");
     fprintf(out, "Commands:\n");
     for (size_t i = 0; i < COMMANDS_COUNT; i++) {

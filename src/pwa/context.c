@@ -9,12 +9,14 @@
 
 #define PWA_CONTEXT_SUMMARY_MAX 200
 
+#if !HU_IS_TEST
 /* Built-in app names (same order as learner/main). */
 static const char *const PWA_CONTEXT_APPS[] = {
     "slack", "discord", "whatsapp", "gmail", "calendar",
     "notion", "twitter", "telegram", "linkedin", "facebook",
 };
 #define PWA_CONTEXT_APP_COUNT (sizeof(PWA_CONTEXT_APPS) / sizeof(PWA_CONTEXT_APPS[0]))
+#endif
 
 #if HU_IS_TEST
 static const char PWA_CONTEXT_TEST_STRING[] =

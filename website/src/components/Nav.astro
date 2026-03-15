@@ -7,6 +7,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
   id="site-nav"
   class="fixed top-0 left-0 right-0 z-50 transition-all"
   style="transition-duration: var(--hu-duration-moderate); view-transition-name: nav-bar"
+  aria-label="Main navigation"
 >
   <div class="max-w-6xl mx-auto px-6 flex items-center justify-between" style="min-height: 56px; max-height: 56px">
     <a href={`${base}`} class="flex items-center gap-3 group">
@@ -132,6 +133,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
 
   function setExpanded(open: boolean) {
     btn?.setAttribute("aria-expanded", String(open));
+    btn?.setAttribute("aria-label", open ? "Close menu" : "Open menu");
     hamburger?.classList.toggle("hidden", open);
     closeIcon?.classList.toggle("hidden", !open);
   }

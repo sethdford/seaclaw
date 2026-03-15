@@ -87,10 +87,10 @@ const tools = [
       crossorigin
     />
     <link rel="preconnect" href="https://github.com" />
-    <title>h-uman — Bring AI to every device on Earth</title>
+    <title>h-uman — not quite human.</title>
     <meta
       name="description"
-      content="A complete autonomous AI agent runtime in 1,696 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers. Runs on anything with a CPU."
+      content="not quite human. A complete autonomous AI agent runtime in 1,696 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers. Runs on anything with a CPU."
     />
     <link
       rel="preload"
@@ -110,11 +110,11 @@ const tools = [
     <meta name="theme-color" content="#7AB648" />
     <meta
       property="og:title"
-      content="h-uman — Bring AI to every device on Earth"
+      content="h-uman — not quite human."
     />
     <meta
       property="og:description"
-      content="~1.7 MB binary. 50+ AI providers. 34 channels. 67+ tools. Zero dependencies. Pure C."
+      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 34 channels. 67+ tools. Zero dependencies. Pure C."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://h-uman.ai/" />
@@ -123,18 +123,18 @@ const tools = [
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="h-uman - Autonomous AI agent runtime"
+      content="h-uman — not quite human."
     />
     <meta property="og:locale" content="en_US" />
     <meta property="og:site_name" content="h-uman" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="h-uman — Bring AI to every device on Earth"
+      content="h-uman — not quite human."
     />
     <meta
       name="twitter:description"
-      content="~1.7 MB binary. 50+ AI providers. 34 channels. 67+ tools. Zero dependencies. Pure C."
+      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 34 channels. 67+ tools. Zero dependencies. Pure C."
     />
     <meta name="twitter:image" content="https://h-uman.ai/og-image.png" />
 
@@ -146,7 +146,7 @@ const tools = [
         "@type": "SoftwareApplication",
         name: "h-uman",
         description:
-          "A complete autonomous AI agent runtime in 1,696 kilobytes of pure C.",
+          "not quite human. Autonomous AI agent runtime in 1,696 kilobytes of pure C.",
         applicationCategory: "DeveloperApplication",
         operatingSystem: "Cross-platform",
         url: "https://h-uman.ai/",
@@ -217,7 +217,7 @@ const tools = [
     <a href="#main-content" class="skip-link">Skip to content</a>
     <Nav />
 
-    <main id="main-content">
+    <main id="main-content" tabindex="-1">
       {/* ═══ HERO ═══ */}
 
       <section
@@ -250,6 +250,12 @@ const tools = [
           >
             Bring AI to <span class="text-gradient">every</span> device on&nbsp;Earth.
           </h1>
+          <p
+            class="hero-tagline text-[clamp(1.1rem,2.2vw,1.35rem)] font-medium mb-6 hero-fade-in"
+            style="color: var(--color-text-secondary); letter-spacing: 0.04em;"
+          >
+            not quite human.
+          </p>
           <p
             class="hero-subtitle hero-desc mb-5 hero-fade-in mx-auto"
           >
@@ -1373,7 +1379,7 @@ const tools = [
     </main>
 
     {/* ── Footer ── */}
-    <footer class="site-footer py-12 px-6">
+    <footer class="site-footer py-12 px-6" role="contentinfo">
       <div
         class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4"
       >
@@ -1395,7 +1401,7 @@ const tools = [
           class="text-[13px] hidden md:block"
           style="color: var(--color-text-tertiary)"
         >
-          Bring AI to every device on Earth.
+          not quite human.
         </p>
         <div
           class="flex items-center gap-6 text-[13px]"
@@ -2034,16 +2040,19 @@ const tools = [
           qCards.forEach((c) => ringObs.observe(c));
         }
 
-        // ═══ WebGL Hero — lightweight particle field (lazy) ═══
+        // ═══ WebGL Hero — lazy-load Three.js only when hero visible, defer until idle ═══
         const heroCanvas = document.getElementById(
           "hero-webgl",
         ) as HTMLCanvasElement;
         if (heroCanvas) {
           const heroObs = new IntersectionObserver(
-            async (entries) => {
+            (entries) => {
               if (!entries[0]?.isIntersecting) return;
               heroObs.disconnect();
-              initHeroWebGL(heroCanvas);
+              // Defer 725KB Three.js load until main thread idle — avoids blocking LCP/FCP/TTI
+              const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+              if (ric) ric(() => initHeroWebGL(heroCanvas), { timeout: 4000 });
+              else setTimeout(() => initHeroWebGL(heroCanvas), 2000);
             },
             { threshold: 0.01 },
           );

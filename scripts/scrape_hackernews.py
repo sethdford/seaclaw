@@ -2,7 +2,7 @@
 """Scrape Hacker News front page and top AI/LLM stories into JSONL for h-uman feed ingestion."""
 import json, os, sys, time, datetime, urllib.request, urllib.error
 
-OUTPUT_DIR = os.path.expanduser("~/.human/feeds")
+OUTPUT_DIR = os.path.expanduser("~/.human/feeds/ingest")
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "hackernews.jsonl")
 HN_TOP = "https://hacker-news.firebaseio.com/v0/topstories.json"
 HN_ITEM = "https://hacker-news.firebaseio.com/v0/item/{}.json"
