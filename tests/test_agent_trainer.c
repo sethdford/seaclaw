@@ -1,5 +1,7 @@
 /* Agent trainer offline training loop tests (AGI-V4). */
 
+#ifdef HU_ENABLE_ML
+
 #include "human/core/allocator.h"
 #include "human/ml/agent_trainer.h"
 #include "test_framework.h"
@@ -100,3 +102,9 @@ void run_agent_trainer_tests(void)
     HU_RUN_TEST(trainer_metrics_report);
     HU_RUN_TEST(trainer_null_args_returns_error);
 }
+
+#else
+
+void run_agent_trainer_tests(void) { (void)0; }
+
+#endif /* HU_ENABLE_ML */

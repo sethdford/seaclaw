@@ -2,7 +2,7 @@
 
 typedef int hu_test_training_data_unused_;
 
-#ifdef HU_ENABLE_SQLITE
+#if defined(HU_ENABLE_SQLITE) && defined(HU_ENABLE_ML)
 
 #include "human/core/allocator.h"
 #include <sqlite3.h>
@@ -241,4 +241,4 @@ void run_training_data_tests(void)
     (void)0;
 }
 
-#endif /* HU_ENABLE_SQLITE */
+#endif /* HU_ENABLE_SQLITE && HU_ENABLE_ML */

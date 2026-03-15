@@ -249,8 +249,8 @@ void run_emotion_map_tests(void);
 void run_ml_tests(void);
 void run_lora_tests(void);
 void run_agent_trainer_tests(void);
-#endif
 void run_training_data_tests(void);
+#endif
 void run_multigraph_tests(void);
 void run_memory_graph_tests(void);
 void run_experience_tests(void);
@@ -548,8 +548,8 @@ int main(int argc, char **argv) {
     run_ml_tests();
     run_lora_tests();
     run_agent_trainer_tests();
-#endif
     run_training_data_tests();
+#endif
 
     run_experience_tests();
     run_experience_engine_tests();
