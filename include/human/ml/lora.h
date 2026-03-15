@@ -50,7 +50,7 @@ hu_error_t hu_lora_apply(const hu_lora_adapter_t *adapter, size_t layer_idx,
 
 hu_error_t hu_lora_backward(hu_lora_adapter_t *adapter, size_t layer_idx,
                              const float *input, const float *grad_output,
-                             size_t batch_tokens);
+                             size_t batch_tokens, float *grad_input);
 
 hu_error_t hu_lora_register_params(hu_lora_adapter_t *adapter, hu_ml_optimizer_t *opt);
 size_t hu_lora_num_params(const hu_lora_adapter_t *adapter);

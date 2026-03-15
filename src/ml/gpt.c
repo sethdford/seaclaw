@@ -446,9 +446,11 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
         matmul_atb(q_buf, xn, g->aqw[li], (int)(B * S), (int)(nh * hd), (int)E);
         matmul_atb(k_buf, xn, g->akw[li], (int)(B * S), (int)(nkv * hd), (int)E);
         matmul_atb(v_buf, xn, g->avw[li], (int)(B * S), (int)(nkv * hd), (int)E);
-        if (g->lora_q) hu_lora_apply(g->lora_q, li, xn, B * S, q_buf);
-        if (g->lora_k) hu_lora_apply(g->lora_k, li, xn, B * S, k_buf);
-        if (g->lora_v) hu_lora_apply(g->lora_v, li, xn, B * S, v_buf);
+        { hu_error_t le;
+        if (g->lora_q) { le = hu_lora_apply(g->lora_q, li, xn, B * S, q_buf); if (le != HU_OK) goto fwd_cleanup; }
+        if (g->lora_k) { le = hu_lora_apply(g->lora_k, li, xn, B * S, k_buf); if (le != HU_OK) goto fwd_cleanup; }
+        if (g->lora_v) { le = hu_lora_apply(g->lora_v, li, xn, B * S, v_buf); if (le != HU_OK) goto fwd_cleanup; }
+        }
 
         /* e. RoPE + Q/K head normalization (cache 1/||x|| for backward) */
         apply_rope(q_buf, k_buf, g->rcos, g->rsin, (int)B, (int)S, (int)nh, (int)nkv, (int)hd);
@@ -500,7 +502,8 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
             cache_free(g); return HU_ERR_OUT_OF_MEMORY;
         }
         matmul_atb(proj, ao, g->aow[li], (int)(B * S), (int)E, (int)(nh * hd));
-        if (g->lora_o) hu_lora_apply(g->lora_o, li, ao, B * S, proj);
+        if (g->lora_o) { hu_error_t le = hu_lora_apply(g->lora_o, li, ao, B * S, proj);
+            if (le != HU_OK) { a->free(a->ctx, proj, xsz); goto fwd_cleanup; } }
 
         /* h. Attention residual */
         for (size_t i = 0; i < B * S * E; i++) x[i] += proj[i];
@@ -513,11 +516,11 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
 
         /* j. MLP: up, activation, down */
         matmul_atb(up_buf, xn, g->muw[li], (int)(B * S), (int)nm, (int)E);
-        if (g->lora_up) hu_lora_apply(g->lora_up, li, xn, B * S, up_buf);
+        if (g->lora_up) { hu_error_t le = hu_lora_apply(g->lora_up, li, xn, B * S, up_buf); if (le != HU_OK) goto fwd_cleanup; }
         memcpy(lc->up_pre, up_buf, B * S * nm * sizeof(float));
         apply_activation(up_buf, B * S * nm, cfg->activation);
         matmul_atb(mo, up_buf, g->mdw[li], (int)(B * S), (int)E, (int)nd);
-        if (g->lora_down) hu_lora_apply(g->lora_down, li, up_buf, B * S, mo);
+        if (g->lora_down) { hu_error_t le = hu_lora_apply(g->lora_down, li, up_buf, B * S, mo); if (le != HU_OK) goto fwd_cleanup; }
 
         /* k. MLP residual */
         for (size_t i = 0; i < B * S * E; i++) x[i] += mo[i];
@@ -556,6 +559,14 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
     a->free(a->ctx, v_buf, B*nkv*S*hd*4); a->free(a->ctx, ao, xsz);
     a->free(a->ctx, up_buf, B*S*nm*4); a->free(a->ctx, mo, xsz);
     return HU_OK;
+
+fwd_cleanup:
+    a->free(a->ctx, x, xsz); a->free(a->ctx, x0, xsz); a->free(a->ctx, xn, xsz);
+    a->free(a->ctx, q_buf, B*nh*S*hd*4); a->free(a->ctx, k_buf, B*nkv*S*hd*4);
+    a->free(a->ctx, v_buf, B*nkv*S*hd*4); a->free(a->ctx, ao, xsz);
+    a->free(a->ctx, up_buf, B*S*nm*4); a->free(a->ctx, mo, xsz);
+    cache_free(g);
+    return HU_ERR_OUT_OF_MEMORY;
 }
 
 /* ─── Backward pass ──────────────────────────────────────────────────────── */
@@ -665,7 +676,7 @@ static hu_error_t gpt_backward(void *ctx, const hu_ml_tensor_t *grad_output)
         memset(d_up, 0, BS * nm * 4);
         matmul_add_ab(d_up, d_mlp, g->mdw[li], (int)BS, (int)E, (int)nd);
         matmul_add_tab(g->grad_mdw[li], d_mlp, up_post, (int)BS, (int)E, (int)nd);
-        if (g->lora_down) hu_lora_backward(g->lora_down, li, up_post, d_mlp, BS);
+        if (g->lora_down) { hu_error_t le = hu_lora_backward(g->lora_down, li, up_post, d_mlp, BS, NULL); if (le != HU_OK) goto cleanup; }
 
         /* Activation backward */
         apply_activation_bw(d_up, lc->up_pre, BS * nm, cfg->activation);
@@ -674,7 +685,7 @@ static hu_error_t gpt_backward(void *ctx, const hu_ml_tensor_t *grad_output)
         memset(d_xn, 0, xsz);
         matmul_add_ab(d_xn, d_up, g->muw[li], (int)BS, (int)nm, (int)E);
         matmul_add_tab(g->grad_muw[li], d_up, lc->x_norm2, (int)BS, (int)nm, (int)E);
-        if (g->lora_up) hu_lora_backward(g->lora_up, li, lc->x_norm2, d_up, BS);
+        if (g->lora_up) { hu_error_t le = hu_lora_backward(g->lora_up, li, lc->x_norm2, d_up, BS, d_xn); if (le != HU_OK) goto cleanup; }
 
         /* Second RMS norm backward: accumulate into dx */
         for (size_t i = 0; i < BS; i++)
@@ -687,7 +698,7 @@ static hu_error_t gpt_backward(void *ctx, const hu_ml_tensor_t *grad_output)
         memset(d_ao, 0, xsz);
         matmul_add_ab(d_ao, dx, g->aow[li], (int)BS, (int)E, (int)(nh * hd));
         matmul_add_tab(g->grad_aow[li], dx, lc->attn_out, (int)BS, (int)E, (int)(nh * hd));
-        if (g->lora_o) hu_lora_backward(g->lora_o, li, lc->attn_out, dx, BS);
+        if (g->lora_o) { hu_error_t le = hu_lora_backward(g->lora_o, li, lc->attn_out, dx, BS, d_ao); if (le != HU_OK) goto cleanup; }
 
         /* Attention backward */
         memset(d_q, 0, B * nh * S * hd * 4);
@@ -737,15 +748,15 @@ static hu_error_t gpt_backward(void *ctx, const hu_ml_tensor_t *grad_output)
         memset(d_xn, 0, xsz);
         matmul_add_ab(d_xn, d_q, g->aqw[li], (int)BS, (int)(nh * hd), (int)E);
         matmul_add_tab(g->grad_aqw[li], d_q, lc->x_norm1, (int)BS, (int)(nh * hd), (int)E);
-        if (g->lora_q) hu_lora_backward(g->lora_q, li, lc->x_norm1, d_q, BS);
+        if (g->lora_q) { hu_error_t le = hu_lora_backward(g->lora_q, li, lc->x_norm1, d_q, BS, d_xn); if (le != HU_OK) goto cleanup; }
 
         matmul_add_ab(d_xn, d_k, g->akw[li], (int)BS, (int)(nkv * hd), (int)E);
         matmul_add_tab(g->grad_akw[li], d_k, lc->x_norm1, (int)BS, (int)(nkv * hd), (int)E);
-        if (g->lora_k) hu_lora_backward(g->lora_k, li, lc->x_norm1, d_k, BS);
+        if (g->lora_k) { hu_error_t le = hu_lora_backward(g->lora_k, li, lc->x_norm1, d_k, BS, d_xn); if (le != HU_OK) goto cleanup; }
 
         matmul_add_ab(d_xn, d_v, g->avw[li], (int)BS, (int)(nkv * hd), (int)E);
         matmul_add_tab(g->grad_avw[li], d_v, lc->x_norm1, (int)BS, (int)(nkv * hd), (int)E);
-        if (g->lora_v) hu_lora_backward(g->lora_v, li, lc->x_norm1, d_v, BS);
+        if (g->lora_v) { hu_error_t le = hu_lora_backward(g->lora_v, li, lc->x_norm1, d_v, BS, d_xn); if (le != HU_OK) goto cleanup; }
 
         /* First RMS norm backward: recompute x_mixed = rl*x_pre + x0l*x0 */
         float rlv = g->rl[li], x0v = g->x0l[li];

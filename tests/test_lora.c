@@ -89,7 +89,7 @@ static void lora_backward_accumulates(void) {
     float input[4] = {1.0f, 1.0f, 1.0f, 1.0f};
     float grad_output[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-    HU_ASSERT_EQ(hu_lora_backward(adapter, 0, input, grad_output, 1), HU_OK);
+    HU_ASSERT_EQ(hu_lora_backward(adapter, 0, input, grad_output, 1, NULL), HU_OK);
 
     /* Gradients should be non-zero (we can't inspect them directly, but backward succeeded) */
     hu_lora_destroy(&alloc, adapter);

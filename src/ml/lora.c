@@ -135,46 +135,29 @@ hu_error_t hu_lora_apply(const hu_lora_adapter_t *adapter, size_t layer_idx,
     size_t rank = layer->rank;
     float scale = layer->scale;
 
-    /* temp[batch_tokens x rank] = input * A^T */
-    /* A is [rank x in_dim], A^T is [in_dim x rank] */
-    for (size_t i = 0; i < batch_tokens; i++) {
-        for (size_t j = 0; j < rank; j++) {
-            float sum = 0.0f;
-            for (size_t k = 0; k < in_dim; k++)
-                sum += input[i * in_dim + k] * layer->A[j * in_dim + k];
-            /* Store temp in a stack buffer - we need batch_tokens*rank floats */
-            /* Use output as scratch? No - output is [batch_tokens x out_dim]. */
-            /* Allocate temp on stack if small, else heap. For simplicity use heap. */
-            (void)sum; /* will use below */
-        }
-    }
-
-    /* Allocate temp buffer for [batch_tokens x rank] */
     float *temp =
         (float *)adapter->alloc->alloc(adapter->alloc->ctx,
                                        batch_tokens * rank * sizeof(float));
     if (!temp)
         return HU_ERR_OUT_OF_MEMORY;
 
-    for (size_t i = 0; i < batch_tokens; i++) {
+    /* temp = input @ A^T  [batch_tokens × rank] */
+    for (size_t i = 0; i < batch_tokens; i++)
         for (size_t j = 0; j < rank; j++) {
             float sum = 0.0f;
             for (size_t k = 0; k < in_dim; k++)
                 sum += input[i * in_dim + k] * layer->A[j * in_dim + k];
             temp[i * rank + j] = sum;
         }
-    }
 
-    /* delta = temp * B^T, then output += delta * scale */
-    /* B is [out_dim x rank], B^T is [rank x out_dim] */
-    for (size_t i = 0; i < batch_tokens; i++) {
+    /* output += temp @ B^T * scale  [batch_tokens × out_dim] */
+    for (size_t i = 0; i < batch_tokens; i++)
         for (size_t j = 0; j < out_dim; j++) {
             float sum = 0.0f;
             for (size_t k = 0; k < rank; k++)
                 sum += temp[i * rank + k] * layer->B[j * rank + k];
             output[i * out_dim + j] += sum * scale;
         }
-    }
 
     adapter->alloc->free(adapter->alloc->ctx, temp,
                          batch_tokens * rank * sizeof(float));
@@ -183,7 +166,7 @@ hu_error_t hu_lora_apply(const hu_lora_adapter_t *adapter, size_t layer_idx,
 
 hu_error_t hu_lora_backward(hu_lora_adapter_t *adapter, size_t layer_idx,
                              const float *input, const float *grad_output,
-                             size_t batch_tokens) {
+                             size_t batch_tokens, float *grad_input) {
     if (!adapter || !input || !grad_output)
         return HU_ERR_INVALID_ARGUMENT;
     if (layer_idx >= adapter->n_layers)
@@ -194,62 +177,68 @@ hu_error_t hu_lora_backward(hu_lora_adapter_t *adapter, size_t layer_idx,
     size_t out_dim = layer->out_dim;
     size_t rank = layer->rank;
     float scale = layer->scale;
+    size_t bt_rank = batch_tokens * rank;
 
-    /* temp = input * A^T [batch_tokens x rank] */
+    /* temp = input @ A^T  [BT × rank] */
     float *temp =
-        (float *)adapter->alloc->alloc(adapter->alloc->ctx,
-                                       batch_tokens * rank * sizeof(float));
+        (float *)adapter->alloc->alloc(adapter->alloc->ctx, bt_rank * sizeof(float));
     if (!temp)
         return HU_ERR_OUT_OF_MEMORY;
 
-    for (size_t i = 0; i < batch_tokens; i++) {
+    for (size_t i = 0; i < batch_tokens; i++)
         for (size_t j = 0; j < rank; j++) {
             float sum = 0.0f;
             for (size_t k = 0; k < in_dim; k++)
                 sum += input[i * in_dim + k] * layer->A[j * in_dim + k];
             temp[i * rank + j] = sum;
         }
-    }
 
-    /* grad_B += grad_output^T * temp * scale
-     * grad_output is [batch_tokens x out_dim], temp is [batch_tokens x rank]
-     * grad_output^T * temp = [out_dim x batch_tokens] * [batch_tokens x rank]
-     * = [out_dim x rank]
-     * grad_B[j][k] += sum_i grad_output[i][j] * temp[i][k] * scale
-     */
-    for (size_t j = 0; j < out_dim; j++) {
+    /* grad_B += grad_output^T @ temp * scale  [out_dim × rank] */
+    for (size_t j = 0; j < out_dim; j++)
         for (size_t k = 0; k < rank; k++) {
             float sum = 0.0f;
             for (size_t i = 0; i < batch_tokens; i++)
                 sum += grad_output[i * out_dim + j] * temp[i * rank + k];
             layer->grad_B[j * rank + k] += sum * scale;
         }
-    }
 
-    /* grad_A += (grad_output * B)^T * input * scale
-     * grad_output * B: [batch_tokens x out_dim] * [out_dim x rank]
-     * = [batch_tokens x rank]
-     * (grad_output * B)^T * input: [rank x batch_tokens] * [batch_tokens x in_dim]
-     * = [rank x in_dim]
-     * grad_A[j][k] += sum_i (grad_output[i] * B)[j] * input[i][k] * scale
-     * (grad_output * B)[i][j] = sum_m grad_output[i][m] * B[m][j]
-     * So grad_A[j][k] += sum_i (sum_m grad_output[i][m]*B[m][j]) * input[i][k] * scale
-     */
-    for (size_t j = 0; j < rank; j++) {
+    /* gob = grad_output @ B  [BT × rank] — reuse temp buffer */
+    float *gob =
+        (float *)adapter->alloc->alloc(adapter->alloc->ctx, bt_rank * sizeof(float));
+    if (!gob) {
+        adapter->alloc->free(adapter->alloc->ctx, temp, bt_rank * sizeof(float));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    for (size_t i = 0; i < batch_tokens; i++)
+        for (size_t j = 0; j < rank; j++) {
+            float sum = 0.0f;
+            for (size_t m = 0; m < out_dim; m++)
+                sum += grad_output[i * out_dim + m] * layer->B[m * rank + j];
+            gob[i * rank + j] = sum;
+        }
+
+    /* grad_A += gob^T @ input * scale  [rank × in_dim] */
+    for (size_t j = 0; j < rank; j++)
         for (size_t k = 0; k < in_dim; k++) {
             float sum = 0.0f;
-            for (size_t i = 0; i < batch_tokens; i++) {
-                float gob = 0.0f;
-                for (size_t m = 0; m < out_dim; m++)
-                    gob += grad_output[i * out_dim + m] * layer->B[m * rank + j];
-                sum += gob * input[i * in_dim + k];
-            }
+            for (size_t i = 0; i < batch_tokens; i++)
+                sum += gob[i * rank + j] * input[i * in_dim + k];
             layer->grad_A[j * in_dim + k] += sum * scale;
         }
+
+    /* grad_input += gob @ A * scale  [BT × in_dim] */
+    if (grad_input) {
+        for (size_t i = 0; i < batch_tokens; i++)
+            for (size_t k = 0; k < in_dim; k++) {
+                float sum = 0.0f;
+                for (size_t j = 0; j < rank; j++)
+                    sum += gob[i * rank + j] * layer->A[j * in_dim + k];
+                grad_input[i * in_dim + k] += sum * scale;
+            }
     }
 
-    adapter->alloc->free(adapter->alloc->ctx, temp,
-                         batch_tokens * rank * sizeof(float));
+    adapter->alloc->free(adapter->alloc->ctx, gob, bt_rank * sizeof(float));
+    adapter->alloc->free(adapter->alloc->ctx, temp, bt_rank * sizeof(float));
     return HU_OK;
 }
 
