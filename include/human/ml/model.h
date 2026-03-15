@@ -43,4 +43,12 @@ hu_error_t hu_gpt_create(hu_allocator_t *alloc, const hu_gpt_config_t *config,
 struct hu_ml_optimizer;
 hu_error_t hu_gpt_register_params(hu_model_t *model, struct hu_ml_optimizer *opt);
 
+/* Attach LoRA adapters to a GPT model. Pass NULL for projections without LoRA.
+ * Adapters are NOT owned by the model — caller manages their lifetime. */
+struct hu_lora_adapter;
+hu_error_t hu_gpt_attach_lora(hu_model_t *model,
+                               struct hu_lora_adapter *q, struct hu_lora_adapter *k,
+                               struct hu_lora_adapter *v, struct hu_lora_adapter *o,
+                               struct hu_lora_adapter *up, struct hu_lora_adapter *down);
+
 #endif

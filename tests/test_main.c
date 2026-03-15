@@ -19,12 +19,15 @@ void run_wasm_tests(void); /* from test_wasm.c when built */
 void run_string_tests(void);
 void run_slice_tests(void);
 void run_memory_tests(void);
+void run_memory_util_tests(void);
 void run_tunnel_tests(void);
 void run_gateway_tests(void);
 void run_auth_tests(void);
 void run_security_tests(void);
 void run_vault_tests(void);
 void run_provider_tests(void);
+void run_provider_http_tests(void);
+void run_api_key_tests(void);
 void run_channel_tests(void);
 void run_tool_tests(void);
 void test_vtables_run(void);
@@ -62,6 +65,9 @@ void run_replay_tests(void);
 void run_style_clone_tests(void);
 void run_life_sim_tests(void);
 void run_persona_mood_tests(void);
+void run_persona_feedback_tests(void);
+void run_persona_cli_tests(void);
+void run_voice_maturity_tests(void);
 #endif
 void run_lifecycle_tests(void);
 void run_observer_tests(void);
@@ -224,6 +230,7 @@ void run_emotion_map_tests(void);
 #endif
 #ifdef HU_ENABLE_ML
 void run_ml_tests(void);
+void run_lora_tests(void);
 #endif
 void run_multigraph_tests(void);
 void run_experience_tests(void);
@@ -280,12 +287,14 @@ int main(int argc, char **argv) {
     run_string_tests();
     run_slice_tests();
     run_memory_tests();
+    run_memory_util_tests();
     run_tunnel_tests();
     run_gateway_tests();
     run_auth_tests();
     run_security_tests();
     run_vault_tests();
     run_provider_tests();
+    run_api_key_tests();
     run_channel_tests();
     run_tool_tests();
     test_vtables_run();
@@ -326,6 +335,9 @@ int main(int argc, char **argv) {
     run_style_clone_tests();
     run_life_sim_tests();
     run_persona_mood_tests();
+    run_persona_feedback_tests();
+    run_persona_cli_tests();
+    run_voice_maturity_tests();
 #endif
     run_lifecycle_tests();
     run_observer_tests();
@@ -486,6 +498,7 @@ int main(int argc, char **argv) {
 #endif
 #ifdef HU_ENABLE_ML
     run_ml_tests();
+    run_lora_tests();
 #endif
 
     run_experience_tests();
