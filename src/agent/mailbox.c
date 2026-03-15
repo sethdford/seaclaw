@@ -123,6 +123,14 @@ hu_error_t hu_mailbox_unregister(hu_mailbox_t *mbox, uint64_t agent_id) {
 hu_error_t hu_mailbox_send(hu_mailbox_t *mbox, uint64_t from_agent, uint64_t to_agent,
                            hu_msg_type_t type, const char *payload, size_t payload_len,
                            uint64_t correlation_id) {
+    return hu_mailbox_send_ex(mbox, from_agent, to_agent, type, payload, payload_len,
+                              correlation_id, HU_MSG_PRIO_NORMAL, 0);
+}
+
+hu_error_t hu_mailbox_send_ex(hu_mailbox_t *mbox, uint64_t from_agent, uint64_t to_agent,
+                              hu_msg_type_t type, const char *payload, size_t payload_len,
+                              uint64_t correlation_id, hu_msg_priority_t priority,
+                              uint32_t ttl_sec) {
     if (!mbox)
         return HU_ERR_INVALID_ARGUMENT;
     (void)from_agent;
@@ -140,8 +148,41 @@ hu_error_t hu_mailbox_send(hu_mailbox_t *mbox, uint64_t from_agent, uint64_t to_
     msg->payload_len = payload_len;
     msg->timestamp = (uint64_t)time(NULL);
     msg->correlation_id = correlation_id;
+    msg->priority = priority;
+    msg->ttl_sec = ttl_sec;
     ib->tail = (ib->tail + 1) % HU_INBOX_CAP;
     return HU_OK;
+}
+
+static void drop_expired_at_head(hu_mailbox_t *mbox, hu_inbox_t *ib) {
+    uint64_t now = (uint64_t)time(NULL);
+    while (ib->head != ib->tail) {
+        hu_message_t *m = &ib->msgs[ib->head];
+        if (m->ttl_sec == 0 || now <= m->timestamp + m->ttl_sec)
+            break;
+        if (m->payload)
+            mbox->alloc->free(mbox->alloc->ctx, m->payload, m->payload_len + 1);
+        ib->head = (ib->head + 1) % HU_INBOX_CAP;
+    }
+}
+
+static uint32_t find_highest_priority_index(hu_inbox_t *ib, uint64_t now) {
+    uint32_t best = ib->head;
+    int best_prio = -1;
+    uint32_t i = ib->head;
+    while (i != ib->tail) {
+        hu_message_t *m = &ib->msgs[i];
+        if (m->ttl_sec > 0 && now > m->timestamp + m->ttl_sec) {
+            i = (i + 1) % HU_INBOX_CAP;
+            continue;
+        }
+        if ((int)m->priority > best_prio) {
+            best_prio = (int)m->priority;
+            best = i;
+        }
+        i = (i + 1) % HU_INBOX_CAP;
+    }
+    return best;
 }
 
 hu_error_t hu_mailbox_recv(hu_mailbox_t *mbox, uint64_t agent_id, hu_message_t *out) {
@@ -150,8 +191,23 @@ hu_error_t hu_mailbox_recv(hu_mailbox_t *mbox, uint64_t agent_id, hu_message_t *
     hu_inbox_t *ib = find_inbox(mbox, agent_id);
     if (!ib)
         return HU_ERR_NOT_FOUND;
+
+    drop_expired_at_head(mbox, ib);
     if (ib->head == ib->tail)
         return HU_ERR_NOT_FOUND;
+
+    uint64_t now = (uint64_t)time(NULL);
+    uint32_t best = find_highest_priority_index(ib, now);
+    if (best == ib->head) {
+        *out = ib->msgs[ib->head];
+        ib->head = (ib->head + 1) % HU_INBOX_CAP;
+        return HU_OK;
+    }
+
+    /* Swap best with head so we can dequeue from head */
+    hu_message_t tmp = ib->msgs[ib->head];
+    ib->msgs[ib->head] = ib->msgs[best];
+    ib->msgs[best] = tmp;
     *out = ib->msgs[ib->head];
     ib->head = (ib->head + 1) % HU_INBOX_CAP;
     return HU_OK;

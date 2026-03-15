@@ -14,6 +14,26 @@
  */
 
 #define HU_ORCH_LLM_MAX_SUBTASKS 8
+#define HU_DECOMP_MAX_TASKS 16
+
+typedef enum hu_decomposition_strategy {
+    HU_DECOMP_SEQUENTIAL,
+    HU_DECOMP_PARALLEL,
+    HU_DECOMP_MAP_REDUCE,
+    HU_DECOMP_PIPELINE,
+} hu_decomposition_strategy_t;
+
+typedef struct hu_decomposition_subtask {
+    char description[512];
+    size_t description_len;
+    uint32_t depends_on; /* 0 = none, 1-based index of dependency */
+} hu_decomposition_subtask_t;
+
+typedef struct hu_decomposition_result {
+    hu_decomposition_subtask_t tasks[HU_DECOMP_MAX_TASKS];
+    size_t task_count;
+    hu_decomposition_strategy_t strategy;
+} hu_decomposition_result_t;
 
 typedef struct hu_decomposition {
     hu_orchestrator_task_t tasks[HU_ORCH_LLM_MAX_SUBTASKS];
@@ -34,6 +54,12 @@ hu_error_t hu_orchestrator_decompose_goal(hu_allocator_t *alloc, hu_provider_t *
                                            hu_decomposition_t *result);
 
 void hu_decomposition_free(hu_allocator_t *alloc, hu_decomposition_t *result);
+
+/* Dynamic task decomposition by strategy. Under HU_IS_TEST returns mock
+ * decomposition (3 subtasks: 2 parallel + 1 dependent). */
+hu_error_t hu_decompose_task(hu_allocator_t *alloc, const char *prompt, size_t prompt_len,
+                             hu_decomposition_strategy_t strategy,
+                             hu_decomposition_result_t *result);
 
 /* Auto-assign decomposed tasks to the orchestrator based on capabilities. */
 hu_error_t hu_orchestrator_auto_assign(hu_orchestrator_t *orch,

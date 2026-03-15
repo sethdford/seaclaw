@@ -14,7 +14,27 @@ typedef enum hu_msg_type {
     HU_MSG_CANCEL,
     HU_MSG_PING,
     HU_MSG_PONG,
+    HU_MSG_QUERY,
+    HU_MSG_RESPONSE,
+    HU_MSG_BROADCAST,
+    HU_MSG_PROGRESS,
 } hu_msg_type_t;
+
+typedef enum hu_mailbox_msg_type {
+    HU_MAILBOX_MSG_QUERY = 0,
+    HU_MAILBOX_MSG_RESPONSE,
+    HU_MAILBOX_MSG_BROADCAST,
+    HU_MAILBOX_MSG_PROGRESS,
+    HU_MAILBOX_MSG_RESULT,
+    HU_MAILBOX_MSG_ERROR,
+    HU_MAILBOX_MSG_CANCEL,
+} hu_mailbox_msg_type_t;
+
+typedef enum hu_msg_priority {
+    HU_MSG_PRIO_LOW = 0,
+    HU_MSG_PRIO_NORMAL = 1,
+    HU_MSG_PRIO_HIGH = 2,
+} hu_msg_priority_t;
 
 typedef struct hu_message {
     hu_msg_type_t type;
@@ -24,6 +44,8 @@ typedef struct hu_message {
     size_t payload_len;
     uint64_t timestamp;
     uint64_t correlation_id;
+    hu_msg_priority_t priority;
+    uint32_t ttl_sec; /* 0 = no expiry */
 } hu_message_t;
 
 typedef struct hu_mailbox hu_mailbox_t;
@@ -37,6 +59,11 @@ hu_error_t hu_mailbox_unregister(hu_mailbox_t *mbox, uint64_t agent_id);
 hu_error_t hu_mailbox_send(hu_mailbox_t *mbox, uint64_t from_agent, uint64_t to_agent,
                            hu_msg_type_t type, const char *payload, size_t payload_len,
                            uint64_t correlation_id);
+
+hu_error_t hu_mailbox_send_ex(hu_mailbox_t *mbox, uint64_t from_agent, uint64_t to_agent,
+                              hu_msg_type_t type, const char *payload, size_t payload_len,
+                              uint64_t correlation_id, hu_msg_priority_t priority,
+                              uint32_t ttl_sec);
 
 hu_error_t hu_mailbox_recv(hu_mailbox_t *mbox, uint64_t agent_id, hu_message_t *out);
 

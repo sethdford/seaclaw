@@ -333,6 +333,7 @@ set(HU_CORE_SOURCES
     src/multimodal/calendar.c
     src/multimodal/document.c
     src/multimodal/image.c
+    src/multimodal/multimodal.c
     src/rag.c
     src/service.c
     src/skill_registry.c
@@ -401,6 +402,8 @@ set(HU_CORE_SOURCES
     src/agent/llm_compiler.c
     src/agent/orchestrator.c
     src/agent/orchestrator_llm.c
+    src/agent/swarm.c
+    src/agent/agent_profile.c
     src/agent/registry.c
     src/agent/undo.c
     src/agent/cli.c
@@ -456,6 +459,7 @@ set(HU_CORE_SOURCES
     src/agent/tool_router.c
     src/agent/speculative.c
     src/agent/uncertainty.c
+    src/agent/autonomy.c
     src/providers/error_classify.c
     src/providers/api_key.c
     src/providers/helpers.c
@@ -491,6 +495,7 @@ set(HU_CORE_SOURCES
     src/memory/consolidation.c
     src/memory/deep_extract.c
     src/memory/graph.c
+    src/memory/multimodal_index.c
     src/memory/lifecycle/cache.c
     src/memory/lifecycle/hygiene.c
     src/memory/lifecycle/snapshot.c
@@ -688,6 +693,7 @@ list(APPEND HU_CORE_SOURCES
     src/tools/lsp.c
     src/voice/webrtc.c
     src/voice/realtime.c
+    src/voice/duplex.c
     src/providers/embedded.c
 )
 
@@ -1748,6 +1754,10 @@ set(HU_TEST_SOURCES
     tests/test_channel_loop.c
     tests/test_rag.c
     tests/test_multimodal.c
+    tests/test_multimodal_pipeline.c
+    tests/test_multimodal_memory.c
+    tests/test_voice_duplex.c
+    tests/test_autonomy.c
     tests/test_retrieval.c
     tests/test_prompt.c
     tests/test_vector.c
@@ -1914,6 +1924,8 @@ endif()
 
 list(APPEND HU_TEST_SOURCES tests/test_memory_features.c)
 list(APPEND HU_TEST_SOURCES tests/test_agi_frontiers.c tests/test_world_model_graph.c tests/test_mcts_planner.c)
+list(APPEND HU_TEST_SOURCES tests/test_swarm_execution.c tests/test_dynamic_decomposition.c)
+list(APPEND HU_TEST_SOURCES tests/test_agent_matching.c tests/test_agent_communication.c)
 list(APPEND HU_TEST_SOURCES tests/test_world_simulation.c tests/test_world_context.c)
 list(APPEND HU_TEST_SOURCES tests/test_agent_registry.c)
 list(APPEND HU_TEST_SOURCES tests/test_pwa.c)

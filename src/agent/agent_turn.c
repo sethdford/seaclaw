@@ -716,10 +716,15 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
             }
 
-            /* Experience: recall similar past experiences */
+            /* Experience: recall similar past experiences (semantic when available) */
             {
                 hu_experience_store_t exp_store;
                 if (hu_experience_store_init(agent->alloc, agent->memory, &exp_store) == HU_OK) {
+#ifdef HU_ENABLE_SQLITE
+                    sqlite3 *exp_db = hu_sqlite_memory_get_db(agent->memory);
+                    if (exp_db)
+                        exp_store.db = exp_db;
+#endif
                     char *exp_prompt = NULL;
                     size_t exp_prompt_len = 0;
                     if (hu_experience_build_prompt(&exp_store, msg, msg_len, &exp_prompt, &exp_prompt_len) == HU_OK &&
@@ -1529,10 +1534,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 hu_commitment_detect_result_deinit(&cr, agent->alloc);
             }
 #ifdef HU_ENABLE_SQLITE
-            /* Record this turn as experience for future recall */
+            /* Record this turn as experience for future recall (with SQLite persistence) */
             if (agent->memory) {
                 hu_experience_store_t exp_store;
                 if (hu_experience_store_init(agent->alloc, agent->memory, &exp_store) == HU_OK) {
+                    sqlite3 *rec_db = hu_sqlite_memory_get_db(agent->memory);
+                    if (rec_db)
+                        exp_store.db = rec_db;
                     const char *resp_text = *response_out ? *response_out : "";
                     size_t resp_len = response_len_out ? *response_len_out : 0;
                     (void)hu_experience_record(&exp_store, msg, msg_len,

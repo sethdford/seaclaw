@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #ifdef HU_ENABLE_SQLITE
 #include <sqlite3.h>
 #include <time.h>
@@ -74,6 +75,9 @@ hu_error_t hu_experience_store_init(hu_allocator_t *alloc, hu_memory_t *memory,
     out->memory = memory;
     out->embedder = NULL;
     out->vec_store = NULL;
+#ifdef HU_ENABLE_SQLITE
+    out->db = NULL;
+#endif
     out->stored_count = 0;
     if (memory == NULL && s_entries == NULL) {
         s_entries = (exp_entry_t *)alloc->alloc(alloc->ctx, HU_EXP_MAX * sizeof(exp_entry_t));
@@ -108,6 +112,11 @@ void hu_experience_store_deinit(hu_experience_store_t *store) {
     }
     store->alloc = NULL;
     store->memory = NULL;
+    store->embedder = NULL;
+    store->vec_store = NULL;
+#ifdef HU_ENABLE_SQLITE
+    store->db = NULL;
+#endif
     store->stored_count = 0;
 }
 
@@ -164,6 +173,25 @@ hu_error_t hu_experience_record(hu_experience_store_t *store,
     e->score = score;
     s_write_idx++;
     store->stored_count++;
+
+#ifdef HU_ENABLE_SQLITE
+    /* Persist to experience_log for distillation */
+    if (store->db) {
+        const char *log_sql =
+            "INSERT INTO experience_log (task, actions, outcome, score, recorded_at) "
+            "VALUES (?1, ?2, ?3, ?4, ?5)";
+        sqlite3_stmt *log_stmt = NULL;
+        if (sqlite3_prepare_v2(store->db, log_sql, -1, &log_stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_text(log_stmt, 1, task, (int)task_len, SQLITE_STATIC);
+            sqlite3_bind_text(log_stmt, 2, actions, (int)actions_len, SQLITE_STATIC);
+            sqlite3_bind_text(log_stmt, 3, outcome, (int)outcome_len, SQLITE_STATIC);
+            sqlite3_bind_double(log_stmt, 4, score);
+            sqlite3_bind_int64(log_stmt, 5, (int64_t)time(NULL));
+            sqlite3_step(log_stmt);
+            sqlite3_finalize(log_stmt);
+        }
+    }
+#endif
 
     /* Semantic embedding: insert into vector store if available */
     if (store->embedder && store->embedder->vtable && store->embedder->vtable->embed &&

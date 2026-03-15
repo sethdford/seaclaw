@@ -9,6 +9,34 @@
 
 #define HU_MULTIMODAL_MAX_IMAGE_SIZE (5 * 1024 * 1024)
 
+typedef enum {
+    HU_MODALITY_TEXT = 0,
+    HU_MODALITY_IMAGE,
+    HU_MODALITY_AUDIO,
+    HU_MODALITY_VIDEO
+} hu_modality_t;
+
+typedef struct hu_multimodal_content {
+    hu_modality_t type;
+    const char *data;
+    size_t data_len;
+    char mime_type[64];
+    char description[512];
+    size_t description_len;
+} hu_multimodal_content_t;
+
+typedef struct hu_provider_capabilities {
+    bool supports_image;
+    bool supports_audio;
+    bool supports_video;
+    bool supports_streaming;
+} hu_provider_capabilities_t;
+
+hu_error_t hu_multimodal_detect_type(const char *mime, size_t mime_len, hu_modality_t *out);
+hu_error_t hu_multimodal_needs_fallback(const hu_provider_capabilities_t *caps,
+                                         hu_modality_t type, bool *needs_fallback);
+const char *hu_modality_name(hu_modality_t type);
+
 typedef struct hu_multimodal_config {
     uint32_t max_images;
     size_t max_image_size_bytes;

@@ -39,6 +39,9 @@ typedef struct hu_experience_store {
     hu_memory_t *memory;
     hu_embedder_t *embedder;
     hu_vector_store_t *vec_store;
+#ifdef HU_ENABLE_SQLITE
+    sqlite3 *db;
+#endif
     size_t stored_count;
 } hu_experience_store_t;
 

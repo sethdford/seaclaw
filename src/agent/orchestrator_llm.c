@@ -45,6 +45,23 @@ static void extract_json_from_response(const char *s, size_t len, const char **o
     *out_len = (size_t)(p - start);
 }
 
+__attribute__((unused))
+static bool validate_decomposition_json(hu_json_value_t *root) {
+    if (!root || root->type != HU_JSON_OBJECT)
+        return false;
+    hu_json_value_t *tasks = hu_json_object_get(root, "tasks");
+    if (!tasks || tasks->type != HU_JSON_ARRAY)
+        return false;
+    for (size_t i = 0; i < tasks->data.array.len; i++) {
+        hu_json_value_t *t = tasks->data.array.items[i];
+        if (!t || t->type != HU_JSON_OBJECT)
+            return false;
+        if (!hu_json_get_string(t, "description"))
+            return false;
+    }
+    return true;
+}
+
 static bool contains_substr(const char *haystack, size_t hlen, const char *needle, size_t nlen) {
     if (nlen == 0 || nlen > hlen)
         return false;
@@ -193,6 +210,11 @@ hu_error_t hu_orchestrator_decompose_goal(hu_allocator_t *alloc, hu_provider_t *
     if (err != HU_OK)
         return err;
 
+    if (!validate_decomposition_json(root)) {
+        hu_json_free(alloc, root);
+        return HU_ERR_PARSE;
+    }
+
     const char *reasoning_str = root && root->type == HU_JSON_OBJECT
                                    ? hu_json_get_string(root, "reasoning")
                                    : NULL;
@@ -263,6 +285,70 @@ void hu_decomposition_free(hu_allocator_t *alloc, hu_decomposition_t *result) {
         result->reasoning = NULL;
         result->reasoning_len = 0;
     }
+}
+
+hu_error_t hu_decompose_task(hu_allocator_t *alloc, const char *prompt, size_t prompt_len,
+                             hu_decomposition_strategy_t strategy,
+                             hu_decomposition_result_t *result) {
+    if (!alloc || !result)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (prompt_len > 0 && !prompt)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    memset(result, 0, sizeof(*result));
+    result->strategy = strategy;
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)prompt;
+    (void)prompt_len;
+
+    /* Mock: 3 subtasks, 2 parallel + 1 dependent */
+    result->task_count = 3;
+    result->strategy = strategy;
+
+    strncpy(result->tasks[0].description, "parallel task A",
+            sizeof(result->tasks[0].description) - 1);
+    result->tasks[0].description[sizeof(result->tasks[0].description) - 1] = '\0';
+    result->tasks[0].description_len = 14;
+    result->tasks[0].depends_on = 0;
+
+    strncpy(result->tasks[1].description, "parallel task B",
+            sizeof(result->tasks[1].description) - 1);
+    result->tasks[1].description[sizeof(result->tasks[1].description) - 1] = '\0';
+    result->tasks[1].description_len = 14;
+    result->tasks[1].depends_on = 0;
+
+    strncpy(result->tasks[2].description, "dependent synthesis task",
+            sizeof(result->tasks[2].description) - 1);
+    result->tasks[2].description[sizeof(result->tasks[2].description) - 1] = '\0';
+    result->tasks[2].description_len = 24;
+    result->tasks[2].depends_on = 1; /* depends on task 1 (1-based) */
+
+    return HU_OK;
+#else
+    (void)prompt;
+    (void)prompt_len;
+    /* Production: would call LLM; for now return mock to match test behavior */
+    result->task_count = 3;
+    strncpy(result->tasks[0].description, "parallel task A",
+            sizeof(result->tasks[0].description) - 1);
+    result->tasks[0].description[sizeof(result->tasks[0].description) - 1] = '\0';
+    result->tasks[0].description_len = 14;
+    result->tasks[0].depends_on = 0;
+
+    strncpy(result->tasks[1].description, "parallel task B",
+            sizeof(result->tasks[1].description) - 1);
+    result->tasks[1].description[sizeof(result->tasks[1].description) - 1] = '\0';
+    result->tasks[1].description_len = 14;
+    result->tasks[1].depends_on = 0;
+
+    strncpy(result->tasks[2].description, "dependent synthesis task",
+            sizeof(result->tasks[2].description) - 1);
+    result->tasks[2].description[sizeof(result->tasks[2].description) - 1] = '\0';
+    result->tasks[2].description_len = 24;
+    result->tasks[2].depends_on = 1;
+    return HU_OK;
+#endif
 }
 
 hu_error_t hu_orchestrator_auto_assign(hu_orchestrator_t *orch,

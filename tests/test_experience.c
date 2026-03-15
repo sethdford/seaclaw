@@ -1,7 +1,10 @@
 #include "test_framework.h"
 #include "human/experience.h"
+#include "human/memory/vector.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/memory.h"
+#include "human/intelligence/distiller.h"
+#include <sqlite3.h>
 #endif
 #include <string.h>
 
@@ -120,6 +123,100 @@ static void test_experience_record_recall_verifies_content(void) {
     hu_experience_store_deinit(&store);
 }
 
+static void test_experience_init_semantic_null_embedder(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_experience_store_t store;
+    HU_ASSERT_EQ(hu_experience_store_init_semantic(&alloc, NULL, NULL, NULL, &store), HU_OK);
+    HU_ASSERT_NULL(store.embedder);
+    HU_ASSERT_NULL(store.vec_store);
+    hu_experience_record(&store, "test task", 9, "act", 3, "out", 3, 0.8);
+    HU_ASSERT_EQ(store.stored_count, (size_t)1);
+    char *ctx = NULL;
+    size_t ctx_len = 0;
+    HU_ASSERT_EQ(hu_experience_recall_similar(&store, "test task", 9, &ctx, &ctx_len), HU_OK);
+    HU_ASSERT_NOT_NULL(ctx);
+    HU_ASSERT_TRUE(ctx_len > 0);
+    alloc.free(alloc.ctx, ctx, ctx_len + 1);
+    hu_experience_store_deinit(&store);
+}
+
+static void test_experience_semantic_record_recall(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_embedder_t embedder = hu_embedder_local_create(&alloc);
+    hu_vector_store_t vec = hu_vector_store_mem_create(&alloc);
+    hu_experience_store_t store;
+    HU_ASSERT_EQ(hu_experience_store_init_semantic(&alloc, NULL, &embedder, &vec, &store), HU_OK);
+    HU_ASSERT_NOT_NULL(store.embedder);
+    HU_ASSERT_NOT_NULL(store.vec_store);
+
+    hu_experience_record(&store, "deploy kubernetes pods", 22,
+                         "kubectl apply", 13, "pods running", 12, 0.95);
+    hu_experience_record(&store, "debug memory leak", 17,
+                         "used valgrind", 13, "found leak", 10, 0.9);
+    hu_experience_record(&store, "optimize database queries", 25,
+                         "added indexes", 13, "faster queries", 14, 0.88);
+
+    char *ctx = NULL;
+    size_t ctx_len = 0;
+    HU_ASSERT_EQ(hu_experience_recall_similar(&store, "kubernetes deployment", 20, &ctx, &ctx_len), HU_OK);
+    HU_ASSERT_NOT_NULL(ctx);
+    HU_ASSERT_TRUE(ctx_len > 0);
+    alloc.free(alloc.ctx, ctx, ctx_len + 1);
+
+    hu_experience_store_deinit(&store);
+    if (embedder.vtable && embedder.vtable->deinit)
+        embedder.vtable->deinit(embedder.ctx, &alloc);
+    if (vec.vtable && vec.vtable->deinit)
+        vec.vtable->deinit(vec.ctx, &alloc);
+}
+
+static void test_experience_semantic_deinit_cleanup(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_embedder_t embedder = hu_embedder_local_create(&alloc);
+    hu_vector_store_t vec = hu_vector_store_mem_create(&alloc);
+    hu_experience_store_t store;
+    hu_experience_store_init_semantic(&alloc, NULL, &embedder, &vec, &store);
+    hu_experience_record(&store, "task", 4, "act", 3, "out", 3, 1.0);
+    hu_experience_store_deinit(&store);
+    HU_ASSERT_NULL(store.alloc);
+    HU_ASSERT_NULL(store.embedder);
+    HU_ASSERT_NULL(store.vec_store);
+    if (embedder.vtable && embedder.vtable->deinit)
+        embedder.vtable->deinit(embedder.ctx, &alloc);
+    if (vec.vtable && vec.vtable->deinit)
+        vec.vtable->deinit(vec.ctx, &alloc);
+}
+
+#ifdef HU_ENABLE_SQLITE
+static void test_experience_explog_persistence(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    sqlite3_open(":memory:", &db);
+    HU_ASSERT_NOT_NULL(db);
+
+    hu_distiller_init_tables(db);
+
+    hu_experience_store_t store;
+    hu_experience_store_init(&alloc, NULL, &store);
+    store.db = db;
+
+    hu_experience_record(&store, "network debug", 13, "tcpdump", 7, "fixed", 5, 0.9);
+    hu_experience_record(&store, "api integration", 15, "curl tests", 10, "working", 7, 0.95);
+
+    const char *sql = "SELECT COUNT(*) FROM experience_log";
+    sqlite3_stmt *stmt = NULL;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    int count = 0;
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+        count = sqlite3_column_int(stmt, 0);
+    sqlite3_finalize(stmt);
+    HU_ASSERT_EQ(count, 2);
+
+    hu_experience_store_deinit(&store);
+    sqlite3_close(db);
+}
+#endif
+
 void run_experience_tests(void) {
     HU_TEST_SUITE("Experience Store");
     HU_RUN_TEST(test_experience_init_deinit);
@@ -128,7 +225,11 @@ void run_experience_tests(void) {
     HU_RUN_TEST(test_experience_build_prompt);
     HU_RUN_TEST(test_experience_null_args);
     HU_RUN_TEST(test_experience_record_recall_verifies_content);
+    HU_RUN_TEST(test_experience_init_semantic_null_embedder);
+    HU_RUN_TEST(test_experience_semantic_record_recall);
+    HU_RUN_TEST(test_experience_semantic_deinit_cleanup);
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(test_experience_memory_store_recall);
+    HU_RUN_TEST(test_experience_explog_persistence);
 #endif
 }

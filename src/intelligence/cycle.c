@@ -1,6 +1,7 @@
 #ifdef HU_ENABLE_SQLITE
 
 #include "human/intelligence/cycle.h"
+#include "human/intelligence/distiller.h"
 #include "human/intelligence/online_learning.h"
 #include "human/intelligence/self_improve.h"
 #include "human/intelligence/value_learning.h"
@@ -268,6 +269,14 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
         } else {
             fprintf(stderr, "intelligence/cycle: step 3 prepare failed\n");
         }
+    }
+
+    /* Step 3b: Distill recurring experience patterns into lessons */
+    {
+        (void)hu_distiller_init_tables(db);
+        size_t distilled = 0;
+        if (hu_experience_distill(alloc, db, 2, now_ts, &distilled) == HU_OK)
+            result->lessons_extracted += distilled;
     }
 
     /* Step 4: Learn values from HIGH findings */
