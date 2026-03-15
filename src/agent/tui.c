@@ -13,8 +13,15 @@
 
 #if defined(HU_ENABLE_TUI) && defined(HU_GATEWAY_POSIX) && !defined(HU_IS_TEST)
 
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
 #define TB_IMPL
 #include "termbox2.h"
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 #include <pthread.h>
 #include <time.h>
 
