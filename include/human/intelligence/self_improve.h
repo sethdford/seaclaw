@@ -68,5 +68,26 @@ hu_error_t hu_self_improve_get_tool_prefs_prompt(hu_self_improve_t *engine,
 /* Get count of active patches. */
 hu_error_t hu_self_improve_active_patch_count(hu_self_improve_t *engine, size_t *out);
 
+/* --- Assessment-driven closed-loop self-improvement --- */
+
+struct hu_eval_run;
+struct hu_eval_suite;
+
+/* Analyze assessment run weaknesses, generate patches, store in eval_patches. */
+hu_error_t hu_self_improve_from_assessment(hu_self_improve_t *engine,
+                                           const struct hu_eval_run *run,
+                                           const struct hu_eval_suite *suite,
+                                           int64_t now_ts);
+
+/* Compare before/after pass rate; mark kept=1 if improved, else deactivate. */
+hu_error_t hu_self_improve_verify_patch(hu_self_improve_t *engine,
+                                        int64_t patch_id, double new_pass_rate);
+
+/* Deactivate an assessment-derived patch in prompt_patches. */
+hu_error_t hu_self_improve_rollback_patch(hu_self_improve_t *engine, int64_t patch_id);
+
+/* Get count of assessment-derived patches (kept=1). */
+hu_error_t hu_self_improve_kept_patch_count(hu_self_improve_t *engine, size_t *out);
+
 #endif /* HU_ENABLE_SQLITE */
 #endif /* HU_INTELLIGENCE_SELF_IMPROVE_H */

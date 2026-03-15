@@ -719,6 +719,45 @@ static void graph_build_communities_null_params_returns_error(void) {
     hu_graph_close(g, &alloc);
 }
 
+static void graph_leiden_communities_returns_output(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_graph_t *g = NULL;
+    hu_graph_open(&alloc, "x", 1, &g);
+
+    int64_t e1 = 0, e2 = 0, e3 = 0;
+    hu_graph_upsert_entity(g, "Alice", 5, HU_ENTITY_PERSON, NULL, &e1);
+    hu_graph_upsert_entity(g, "Bob", 3, HU_ENTITY_PERSON, NULL, &e2);
+    hu_graph_upsert_entity(g, "Charlie", 7, HU_ENTITY_PERSON, NULL, &e3);
+    hu_graph_upsert_relation(g, e1, e2, HU_REL_KNOWS, 0.9f, NULL, 0);
+    hu_graph_upsert_relation(g, e2, e3, HU_REL_KNOWS, 0.8f, NULL, 0);
+    hu_graph_upsert_relation(g, e1, e3, HU_REL_KNOWS, 0.7f, NULL, 0);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_graph_leiden_communities(g, &alloc, 10, 100, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    if (out) {
+        alloc.free(alloc.ctx, out, out_len + 1);
+    }
+
+    hu_graph_close(g, &alloc);
+}
+
+static void graph_reconsolidate_no_crash(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_graph_t *g = NULL;
+    hu_graph_open(&alloc, "x", 1, &g);
+
+    int64_t e1 = 0;
+    hu_graph_upsert_entity(g, "TestEntity", 10, HU_ENTITY_TOPIC, NULL, &e1);
+
+    hu_error_t err = hu_graph_reconsolidate(g, &alloc, "TestEntity", 10,
+                                            "new context info", 16);
+    HU_ASSERT_TRUE(err == HU_OK || err == HU_ERR_NOT_FOUND);
+
+    hu_graph_close(g, &alloc);
+}
+
 void run_graph_tests(void) {
     HU_TEST_SUITE("graph");
     HU_RUN_TEST(graph_open_valid_path_succeeds);
@@ -758,6 +797,8 @@ void run_graph_tests(void) {
     HU_RUN_TEST(graph_build_communities_with_data_returns_clusters);
     HU_RUN_TEST(graph_build_communities_empty_graph_returns_header_only);
     HU_RUN_TEST(graph_build_communities_null_params_returns_error);
+    HU_RUN_TEST(graph_leiden_communities_returns_output);
+    HU_RUN_TEST(graph_reconsolidate_no_crash);
     HU_RUN_TEST(graph_entities_free_null_alloc_no_op);
     HU_RUN_TEST(graph_entities_free_null_entities_no_op);
     HU_RUN_TEST(graph_relations_free_null_alloc_no_op);

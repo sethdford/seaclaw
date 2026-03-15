@@ -1,3 +1,9 @@
+/*
+ * DEPRECATED: This file implements an alternate skill system using 'learned_skills'
+ * table and hu_learned_skill_t. The canonical skill system is in src/intelligence/skills.c
+ * which uses 'skills' table and hu_skill_t. This file is retained for backward
+ * compatibility with tests but should not be used in new code.
+ */
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/string.h"

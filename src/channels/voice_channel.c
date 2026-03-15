@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* NOTE: For OpenAI Realtime API (full-duplex voice), see src/voice/realtime.c
+ * and include/human/voice/realtime.h. This channel uses Sonata TTS/STT instead. */
+
 #ifdef HU_HAS_SONATA
 /* FFI declarations for Sonata Rust pipeline.
  * Rust FFI uses *const u8 / *mut u8 for byte buffers, which maps to uint8_t

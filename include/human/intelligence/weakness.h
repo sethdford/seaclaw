@@ -30,6 +30,15 @@ typedef struct hu_weakness_report {
     size_t by_type[5];
 } hu_weakness_report_t;
 
+typedef struct hu_weakness_summary {
+    hu_weakness_type_t type;
+    int failed_count;
+    int total_count;
+    double severity;
+    char description[512];
+    size_t description_len;
+} hu_weakness_summary_t;
+
 hu_error_t hu_weakness_analyze(hu_allocator_t *alloc, const hu_eval_run_t *run,
                                const hu_eval_suite_t *suite,
                                hu_weakness_report_t *out);
@@ -37,5 +46,12 @@ hu_error_t hu_weakness_analyze(hu_allocator_t *alloc, const hu_eval_run_t *run,
 void hu_weakness_report_free(hu_allocator_t *alloc, hu_weakness_report_t *report);
 
 const char *hu_weakness_type_str(hu_weakness_type_t type);
+
+hu_error_t hu_weakness_analyze_summary(hu_allocator_t *alloc,
+                                       const hu_eval_run_t *run,
+                                       const hu_eval_suite_t *suite,
+                                       hu_weakness_summary_t *summaries,
+                                       size_t max_summaries,
+                                       size_t *out_count);
 
 #endif

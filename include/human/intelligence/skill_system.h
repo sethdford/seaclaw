@@ -1,6 +1,8 @@
 #ifndef HU_INTELLIGENCE_SKILL_SYSTEM_H
 #define HU_INTELLIGENCE_SKILL_SYSTEM_H
 
+/* DEPRECATED — use skills.h instead. See src/intelligence/skill_system.c. */
+
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include <stdbool.h>

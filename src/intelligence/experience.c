@@ -1,8 +1,13 @@
 #include "human/experience.h"
 #include "human/memory.h"
+#include "human/memory/vector.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+#include <time.h>
+#endif
 
 #define HU_EXP_MAX 64
 #define HU_EXP_TEXT_MAX 512
@@ -67,6 +72,8 @@ hu_error_t hu_experience_store_init(hu_allocator_t *alloc, hu_memory_t *memory,
     if (!alloc || !out) return HU_ERR_INVALID_ARGUMENT;
     out->alloc = alloc;
     out->memory = memory;
+    out->embedder = NULL;
+    out->vec_store = NULL;
     out->stored_count = 0;
     if (memory == NULL && s_entries == NULL) {
         s_entries = (exp_entry_t *)alloc->alloc(alloc->ctx, HU_EXP_MAX * sizeof(exp_entry_t));
@@ -76,6 +83,17 @@ hu_error_t hu_experience_store_init(hu_allocator_t *alloc, hu_memory_t *memory,
     } else if (memory == NULL) {
         s_write_idx = 0;
     }
+    return HU_OK;
+}
+
+hu_error_t hu_experience_store_init_semantic(hu_allocator_t *alloc, hu_memory_t *memory,
+                                             hu_embedder_t *embedder,
+                                             hu_vector_store_t *vec_store,
+                                             hu_experience_store_t *out) {
+    hu_error_t err = hu_experience_store_init(alloc, memory, out);
+    if (err != HU_OK) return err;
+    out->embedder = embedder;
+    out->vec_store = vec_store;
     return HU_OK;
 }
 
@@ -146,6 +164,29 @@ hu_error_t hu_experience_record(hu_experience_store_t *store,
     e->score = score;
     s_write_idx++;
     store->stored_count++;
+
+    /* Semantic embedding: insert into vector store if available */
+    if (store->embedder && store->embedder->vtable && store->embedder->vtable->embed &&
+        store->vec_store && store->vec_store->vtable && store->vec_store->vtable->insert) {
+        hu_embedding_t emb = {0};
+        if (store->embedder->vtable->embed(store->embedder->ctx, store->alloc,
+                                           task, task_len, &emb) == HU_OK) {
+            char id_buf[32];
+            int id_len = snprintf(id_buf, sizeof(id_buf), "exp_%zu", store->stored_count);
+            char content_buf[HU_EXP_TEXT_MAX * 3 + 64];
+            int clen = snprintf(content_buf, sizeof(content_buf),
+                               "Task: %.*s\nActions: %.*s\nOutcome: %.*s\nScore: %.2f",
+                               (int)e->task_len, e->task,
+                               (int)e->actions_len, e->actions,
+                               (int)e->outcome_len, e->outcome, score);
+            (void)store->vec_store->vtable->insert(
+                store->vec_store->ctx, store->alloc,
+                id_buf, (size_t)id_len, &emb,
+                content_buf, clen > 0 ? (size_t)clen : 0);
+            hu_embedding_free(store->alloc, &emb);
+        }
+    }
+
     return HU_OK;
 }
 
@@ -209,6 +250,50 @@ hu_error_t hu_experience_recall_similar(hu_experience_store_t *store,
         *out_context = buf;
         *out_len = pos;
         return HU_OK;
+    }
+
+    /* Semantic recall path: embed query and search vector store */
+    if (store->embedder && store->embedder->vtable && store->embedder->vtable->embed &&
+        store->vec_store && store->vec_store->vtable && store->vec_store->vtable->search) {
+        hu_embedding_t q_emb = {0};
+        if (store->embedder->vtable->embed(store->embedder->ctx, store->alloc,
+                                           task, task_len, &q_emb) == HU_OK) {
+            hu_vector_entry_t *entries = NULL;
+            size_t vcount = 0;
+            hu_error_t serr = store->vec_store->vtable->search(
+                store->vec_store->ctx, store->alloc, &q_emb, 3, &entries, &vcount);
+            hu_embedding_free(store->alloc, &q_emb);
+            if (serr == HU_OK && entries && vcount > 0) {
+                size_t total = 0;
+                for (size_t i = 0; i < vcount; i++) {
+                    if (entries[i].content && entries[i].content_len > 0)
+                        total += entries[i].content_len;
+                }
+                if (vcount > 1) total += (vcount - 1) * 5;
+                if (total > 0) {
+                    char *buf = (char *)store->alloc->alloc(store->alloc->ctx, total + 1);
+                    if (buf) {
+                        size_t pos = 0;
+                        for (size_t i = 0; i < vcount; i++) {
+                            if (entries[i].content && entries[i].content_len > 0) {
+                                if (pos > 0) {
+                                    memcpy(buf + pos, "\n---\n", 5);
+                                    pos += 5;
+                                }
+                                memcpy(buf + pos, entries[i].content, entries[i].content_len);
+                                pos += entries[i].content_len;
+                            }
+                        }
+                        buf[pos] = '\0';
+                        *out_context = buf;
+                        *out_len = pos;
+                        hu_vector_entries_free(store->alloc, entries, vcount);
+                        return HU_OK;
+                    }
+                }
+                hu_vector_entries_free(store->alloc, entries, vcount);
+            }
+        }
     }
 
     if (!s_entries || store->stored_count == 0) return HU_OK;
@@ -279,3 +364,147 @@ hu_error_t hu_experience_build_prompt(hu_experience_store_t *store,
     *out_len = prefix_len + ctx_len;
     return HU_OK;
 }
+
+#ifdef HU_ENABLE_SQLITE
+hu_error_t hu_experience_init_tables(hu_allocator_t *alloc, sqlite3 *db) {
+    if (!alloc || !db)
+        return HU_ERR_INVALID_ARGUMENT;
+    const char *sql =
+        "CREATE TABLE IF NOT EXISTS experiences ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "task TEXT, outcome TEXT, score REAL, lessons TEXT, created_at INTEGER)";
+    int rc = sqlite3_exec(db, sql, NULL, NULL, NULL);
+    return (rc == SQLITE_OK) ? HU_OK : HU_ERR_MEMORY_STORE;
+}
+
+hu_error_t hu_experience_record_db(hu_allocator_t *alloc, sqlite3 *db,
+                                   const char *task, size_t task_len,
+                                   const char *outcome, size_t outcome_len,
+                                   double score, const char *lessons, size_t lessons_len) {
+    (void)alloc;
+    if (!db || !task || !outcome)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const char *ins =
+        "INSERT INTO experiences (task, outcome, score, lessons, created_at) "
+        "VALUES (?1, ?2, ?3, ?4, ?5)";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, ins, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+
+    size_t tlen = task_len > 511 ? 511 : task_len;
+    size_t olen = outcome_len > 511 ? 511 : outcome_len;
+    size_t llen = lessons_len > 1023 ? 1023 : lessons_len;
+
+    char task_buf[512];
+    char outcome_buf[512];
+    char lessons_buf[1024];
+    memcpy(task_buf, task, tlen);
+    task_buf[tlen] = '\0';
+    memcpy(outcome_buf, outcome, olen);
+    outcome_buf[olen] = '\0';
+    if (lessons && lessons_len > 0) {
+        memcpy(lessons_buf, lessons, llen);
+        lessons_buf[llen] = '\0';
+    } else {
+        lessons_buf[0] = '\0';
+    }
+
+    int64_t now = (int64_t)time(NULL);
+    sqlite3_bind_text(stmt, 1, task_buf, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, outcome_buf, -1, SQLITE_STATIC);
+    sqlite3_bind_double(stmt, 3, score);
+    sqlite3_bind_text(stmt, 4, lessons_buf, -1, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 5, now);
+
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_STORE;
+}
+
+hu_error_t hu_experience_recall_db(hu_allocator_t *alloc, sqlite3 *db,
+                                   const char *query, size_t query_len,
+                                   hu_experience_entry_t *results, size_t max_results,
+                                   size_t *out_count) {
+    (void)alloc;
+    if (!results || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_count = 0;
+#if HU_IS_TEST
+    if (!db)
+        return HU_OK;
+#endif
+    if (!db)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char pattern[1024];
+    size_t qlen = query_len > 500 ? 500 : query_len;
+    if (qlen == 0 || !query) {
+        pattern[0] = '%';
+        pattern[1] = '\0';
+    } else {
+        pattern[0] = '%';
+        memcpy(pattern + 1, query, qlen);
+        pattern[1 + qlen] = '%';
+        pattern[2 + qlen] = '\0';
+    }
+
+    const char *sel =
+        "SELECT id, task, outcome, score, lessons, created_at FROM experiences "
+        "WHERE task LIKE ?1 ORDER BY score DESC LIMIT ?2";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sel, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+
+    sqlite3_bind_text(stmt, 1, pattern, -1, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 2, (sqlite3_int64)max_results);
+
+    size_t count = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW && count < max_results) {
+        hu_experience_entry_t *e = &results[count];
+        e->id = sqlite3_column_int64(stmt, 0);
+        const char *t = (const char *)sqlite3_column_text(stmt, 1);
+        const char *o = (const char *)sqlite3_column_text(stmt, 2);
+        const char *l = (const char *)sqlite3_column_text(stmt, 4);
+        e->score = sqlite3_column_double(stmt, 3);
+        e->timestamp = sqlite3_column_int64(stmt, 5);
+
+        if (t) {
+            size_t tl = (size_t)sqlite3_column_bytes(stmt, 1);
+            if (tl > 511) tl = 511;
+            memcpy(e->task, t, tl);
+            e->task[tl] = '\0';
+            e->task_len = tl;
+        } else {
+            e->task[0] = '\0';
+            e->task_len = 0;
+        }
+        if (o) {
+            size_t ol = (size_t)sqlite3_column_bytes(stmt, 2);
+            if (ol > 511) ol = 511;
+            memcpy(e->outcome, o, ol);
+            e->outcome[ol] = '\0';
+            e->outcome_len = ol;
+        } else {
+            e->outcome[0] = '\0';
+            e->outcome_len = 0;
+        }
+        if (l) {
+            size_t ll = (size_t)sqlite3_column_bytes(stmt, 4);
+            if (ll > 1023) ll = 1023;
+            memcpy(e->lessons, l, ll);
+            e->lessons[ll] = '\0';
+            e->lessons_len = ll;
+        } else {
+            e->lessons[0] = '\0';
+            e->lessons_len = 0;
+        }
+        count++;
+    }
+    sqlite3_finalize(stmt);
+    *out_count = count;
+    return HU_OK;
+}
+#endif /* HU_ENABLE_SQLITE */

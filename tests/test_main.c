@@ -136,6 +136,7 @@ void run_qmd_tests(void);
 void run_terminal_tests(void);
 void run_tavily_tests(void);
 void run_awareness_tests(void);
+void run_entropy_gate_tests(void);
 void run_episodic_tests(void);
 void run_reflection_tests(void);
 void run_input_guard_tests(void);
@@ -198,6 +199,7 @@ void run_news_health_email_tests(void);
 void run_google_feeds_tests(void);
 void run_music_feeds_tests(void);
 void run_research_feeds_tests(void);
+void run_research_executor_tests(void);
 #endif
 void run_feed_processor_tests(void);
 void run_forgetting_curve_tests(void);
@@ -205,6 +207,7 @@ int run_weather_fetch_tests(void);
 int run_save_for_later_tests(void);
 void run_intelligence_reflection_tests(void);
 void run_intelligence_skills_tests(void);
+void run_skill_unified_tests(void);
 void run_intelligence_cycle_tests(void);
 void run_reflection_advanced_tests(void);
 #ifdef HU_ENABLE_SQLITE
@@ -239,7 +242,10 @@ void run_ml_tests(void);
 void run_lora_tests(void);
 #endif
 void run_multigraph_tests(void);
+void run_memory_graph_tests(void);
 void run_experience_tests(void);
+void run_experience_engine_tests(void);
+void run_self_improve_loop_tests(void);
 void run_a2a_tests(void);
 void run_eval_tests(void);
 void run_eval_benchmarks_tests(void);
@@ -255,6 +261,8 @@ void run_embedded_provider_tests(void);
 void run_forgetting_tests(void);
 void run_bootstrap_tests(void);
 void run_thread_pool_tests(void);
+void run_weakness_tests(void);
+void run_distiller_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -326,6 +334,7 @@ int main(int argc, char **argv) {
     run_multimodal_tests();
     run_retrieval_tests();
     run_multigraph_tests();
+    run_memory_graph_tests();
     run_vector_tests();
     run_vector_full_tests();
     run_infrastructure_tests();
@@ -416,6 +425,7 @@ int main(int argc, char **argv) {
     run_terminal_tests();
     run_tavily_tests();
     run_awareness_tests();
+    run_entropy_gate_tests();
     run_episodic_tests();
     run_reflection_tests();
     run_input_guard_tests();
@@ -478,6 +488,7 @@ int main(int argc, char **argv) {
     run_google_feeds_tests();
     run_music_feeds_tests();
     run_research_feeds_tests();
+    run_research_executor_tests();
 #endif
     run_feed_processor_tests();
     run_forgetting_curve_tests();
@@ -485,6 +496,7 @@ int main(int argc, char **argv) {
     run_save_for_later_tests();
     run_intelligence_reflection_tests();
     run_intelligence_skills_tests();
+    run_skill_unified_tests();
     run_intelligence_cycle_tests();
     run_reflection_advanced_tests();
 #ifdef HU_ENABLE_SQLITE
@@ -518,6 +530,8 @@ int main(int argc, char **argv) {
 #endif
 
     run_experience_tests();
+    run_experience_engine_tests();
+    run_self_improve_loop_tests();
     run_a2a_tests();
     run_eval_tests();
     run_eval_benchmarks_tests();
@@ -533,6 +547,8 @@ int main(int argc, char **argv) {
     run_forgetting_tests();
     run_bootstrap_tests();
     run_thread_pool_tests();
+    run_weakness_tests();
+    run_distiller_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

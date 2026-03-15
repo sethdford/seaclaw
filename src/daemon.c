@@ -2079,6 +2079,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 hu_reflection_extract_general_lessons(&refl_engine, (int64_t)t);
                                 hu_meta_params_t meta_params = {0};
                                 hu_meta_learning_optimize(refl_db, &meta_params);
+                                fprintf(stderr, "[human] meta-learning: confidence=%.2f, refinement=%dw, discovery_min=%d\n",
+                                        meta_params.default_confidence_threshold,
+                                        meta_params.refinement_frequency_weeks,
+                                        meta_params.discovery_min_feedback_count);
                                 reflection_done_month = true;
                             }
                         }
@@ -2110,11 +2114,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             fconf.enabled[HU_FEED_GMAIL]       = true;
                             fconf.enabled[HU_FEED_IMESSAGE]    = true;
                             fconf.enabled[HU_FEED_TWITTER]     = true;
+                            fconf.enabled[HU_FEED_SOCIAL_FACEBOOK] = true;
+                            fconf.enabled[HU_FEED_SOCIAL_INSTAGRAM] = true;
                             fconf.poll_interval_minutes[HU_FEED_FILE_INGEST] = (config && config->feeds.poll_interval_file_ingest > 0) ? config->feeds.poll_interval_file_ingest : 5;
                             fconf.poll_interval_minutes[HU_FEED_NEWS_RSS] = (config && config->feeds.poll_interval_rss > 0) ? config->feeds.poll_interval_rss : 360;
                             fconf.poll_interval_minutes[HU_FEED_GMAIL] = (config && config->feeds.poll_interval_gmail > 0) ? config->feeds.poll_interval_gmail : 60;
                             fconf.poll_interval_minutes[HU_FEED_IMESSAGE] = (config && config->feeds.poll_interval_imessage > 0) ? config->feeds.poll_interval_imessage : 30;
                             fconf.poll_interval_minutes[HU_FEED_TWITTER] = (config && config->feeds.poll_interval_twitter > 0) ? config->feeds.poll_interval_twitter : 120;
+                            fconf.poll_interval_minutes[HU_FEED_SOCIAL_FACEBOOK] = 120;
+                            fconf.poll_interval_minutes[HU_FEED_SOCIAL_INSTAGRAM] = 120;
                             fconf.max_items_per_poll = (config && config->feeds.max_items_per_poll > 0) ? config->feeds.max_items_per_poll : 20;
                             size_t ingested = 0;
                             (void)hu_feed_processor_poll(&fp, &fconf, last_feed_poll_types,

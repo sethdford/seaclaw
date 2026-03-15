@@ -101,6 +101,12 @@ hu_error_t hu_skill_resolve_chain(hu_allocator_t *alloc, sqlite3 *db,
     const char *strategy, size_t strategy_len,
     char *out, size_t out_cap, size_t *out_len);
 
+/* AGI-S3: Insert a new skill when a pattern is repeatedly successful. Uses parameterized queries. */
+hu_error_t hu_skill_discover_from_pattern(hu_allocator_t *alloc, sqlite3 *db,
+                                           const char *pattern, size_t pattern_len,
+                                           double success_rate, const char *name, size_t name_len,
+                                           int64_t *out_id);
+
 #endif /* HU_ENABLE_SQLITE */
 
 #endif /* HU_INTELLIGENCE_SKILLS_H */

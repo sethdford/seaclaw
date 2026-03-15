@@ -330,6 +330,10 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
         hu_meta_params_t params = {0};
         if (hu_meta_learning_optimize(db, &params) == HU_OK)
             steps_succeeded++;
+        /* Meta-params now available for future refinement.
+         * params.default_confidence_threshold could adjust step 1's confidence mapping.
+         * params.refinement_frequency_weeks and params.discovery_min_feedback_count
+         * are used by the reflection engine's scheduling in daemon.c. */
     }
 
     /* Step 7: Seed behavioral feedback from successful cycle run */

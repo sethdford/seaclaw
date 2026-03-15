@@ -73,7 +73,6 @@ static void extract_patch_text(const char *rec, size_t rec_len, char *out, size_
 }
 
 hu_error_t hu_self_improve_apply_reflections(hu_self_improve_t *engine, int64_t now_ts) {
-    (void)now_ts;
     if (!engine || !engine->db)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -88,53 +87,160 @@ hu_error_t hu_self_improve_apply_reflections(hu_self_improve_t *engine, int64_t 
         since = sqlite3_column_int64(max_stmt, 0);
     sqlite3_finalize(max_stmt);
 
-    /* Query self_evaluations since last patch; use recommendations as patch source */
-    const char *sel =
-        "SELECT id, recommendations, created_at FROM self_evaluations "
-        "WHERE created_at > ?1 AND recommendations IS NOT NULL AND recommendations != '' "
-        "ORDER BY created_at ASC";
-    sqlite3_stmt *stmt = NULL;
-    rc = sqlite3_prepare_v2(engine->db, sel, -1, &stmt, NULL);
-    if (rc != SQLITE_OK)
-        return HU_ERR_MEMORY_STORE;
-    sqlite3_bind_int64(stmt, 1, since);
-
-    const char *ins =
-        "INSERT INTO prompt_patches (source, patch_text, active, applied_at) "
-        "VALUES (?1, ?2, 1, ?3)";
-    sqlite3_stmt *ins_stmt = NULL;
-    rc = sqlite3_prepare_v2(engine->db, ins, -1, &ins_stmt, NULL);
-    if (rc != SQLITE_OK) {
-        sqlite3_finalize(stmt);
-        return HU_ERR_MEMORY_STORE;
-    }
-
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        const char *rec = (const char *)sqlite3_column_text(stmt, 1);
-        int64_t created_at = sqlite3_column_int64(stmt, 2);
-        if (!rec)
-            continue;
-        size_t rec_len = (size_t)sqlite3_column_bytes(stmt, 1);
-        char patch_buf[PATCH_TEXT_MAX];
-        extract_patch_text(rec, rec_len, patch_buf, sizeof(patch_buf));
-        if (patch_buf[0] == '\0')
-            continue;
-
-        sqlite3_bind_text(ins_stmt, 1, "reflection", -1, SQLITE_STATIC);
-        sqlite3_bind_text(ins_stmt, 2, patch_buf, -1, SQLITE_STATIC);
-        sqlite3_bind_int64(ins_stmt, 3, created_at);
-        rc = sqlite3_step(ins_stmt);
-        sqlite3_reset(ins_stmt);
-        sqlite3_clear_bindings(ins_stmt);
-        if (rc != SQLITE_DONE) {
-            sqlite3_finalize(ins_stmt);
-            sqlite3_finalize(stmt);
-            return HU_ERR_MEMORY_STORE;
+    /* Gather signals: negative feedback count, failing strategy weights, top lessons */
+    int neg_count = 0, pos_count = 0;
+    {
+        sqlite3_stmt *fb = NULL;
+        if (sqlite3_prepare_v2(engine->db,
+                "SELECT signal, COUNT(*) FROM behavioral_feedback "
+                "WHERE timestamp > ?1 GROUP BY signal", -1, &fb, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(fb, 1, since);
+            while (sqlite3_step(fb) == SQLITE_ROW) {
+                const char *sig = (const char *)sqlite3_column_text(fb, 0);
+                int cnt = sqlite3_column_int(fb, 1);
+                if (sig && strcmp(sig, "negative") == 0) neg_count = cnt;
+                else if (sig && strcmp(sig, "positive") == 0) pos_count = cnt;
+            }
+            sqlite3_finalize(fb);
         }
     }
 
-    sqlite3_finalize(ins_stmt);
-    sqlite3_finalize(stmt);
+    char lowest_strategy[64] = {0};
+    double lowest_weight = 2.0;
+    {
+        sqlite3_stmt *sw = NULL;
+        if (sqlite3_prepare_v2(engine->db,
+                "SELECT strategy, weight FROM strategy_weights ORDER BY weight ASC LIMIT 1",
+                -1, &sw, NULL) == SQLITE_OK) {
+            if (sqlite3_step(sw) == SQLITE_ROW) {
+                const char *s = (const char *)sqlite3_column_text(sw, 0);
+                if (s) snprintf(lowest_strategy, sizeof(lowest_strategy), "%s", s);
+                lowest_weight = sqlite3_column_double(sw, 1);
+            }
+            sqlite3_finalize(sw);
+        }
+    }
+
+    char top_lesson[256] = {0};
+    {
+        sqlite3_stmt *ls = NULL;
+        if (sqlite3_prepare_v2(engine->db,
+                "SELECT lesson FROM general_lessons ORDER BY source_count DESC, "
+                "last_confirmed DESC LIMIT 1", -1, &ls, NULL) == SQLITE_OK) {
+            if (sqlite3_step(ls) == SQLITE_ROW) {
+                const char *l = (const char *)sqlite3_column_text(ls, 0);
+                if (l) snprintf(top_lesson, sizeof(top_lesson), "%.*s", 200, l);
+            }
+            sqlite3_finalize(ls);
+        }
+    }
+
+    /* Generate actionable patch based on actual signals */
+    char patch_buf[PATCH_TEXT_MAX];
+    int patch_len = 0;
+
+    if (neg_count > 0 && neg_count * 3 > pos_count) {
+        patch_len = snprintf(patch_buf, sizeof(patch_buf),
+            "RELIABILITY ISSUE: %d failures vs %d successes recently. "
+            "Prefer shorter, more focused prompts. "
+            "If a tool or provider fails, retry with simpler input before escalating.",
+            neg_count, pos_count);
+    } else if (lowest_strategy[0] && lowest_weight < 0.8) {
+        patch_len = snprintf(patch_buf, sizeof(patch_buf),
+            "STRATEGY ADJUSTMENT: '%s' has low effectiveness (%.0f%%). "
+            "Reduce reliance on this approach. Focus on higher-performing strategies.",
+            lowest_strategy, lowest_weight * 100);
+    } else if (top_lesson[0]) {
+        patch_len = snprintf(patch_buf, sizeof(patch_buf),
+            "LEARNED PATTERN: %s. Apply this insight when analyzing new information.",
+            top_lesson);
+    } else if (pos_count > 5) {
+        patch_len = snprintf(patch_buf, sizeof(patch_buf),
+            "PERFORMING WELL: %d successful cycles. "
+            "Expand scope: look for cross-domain connections between findings. "
+            "Prioritize security and architecture implications.",
+            pos_count);
+    } else {
+        /* Only fall through to "maintain" if there are truly no signals */
+        patch_len = snprintf(patch_buf, sizeof(patch_buf), "maintain");
+    }
+
+    if (patch_len <= 0 || (size_t)patch_len >= sizeof(patch_buf))
+        return HU_OK;
+
+    /* Skip if the same patch text was already the most recent one */
+    {
+        sqlite3_stmt *dup = NULL;
+        if (sqlite3_prepare_v2(engine->db,
+                "SELECT patch_text FROM prompt_patches WHERE active = 1 "
+                "ORDER BY applied_at DESC LIMIT 1", -1, &dup, NULL) == SQLITE_OK) {
+            if (sqlite3_step(dup) == SQLITE_ROW) {
+                const char *last = (const char *)sqlite3_column_text(dup, 0);
+                if (last && strcmp(last, patch_buf) == 0) {
+                    sqlite3_finalize(dup);
+                    return HU_OK;
+                }
+            }
+            sqlite3_finalize(dup);
+        }
+    }
+
+    /* Also process any self_evaluation recommendations that aren't "maintain" */
+    {
+        const char *sel =
+            "SELECT recommendations, created_at FROM self_evaluations "
+            "WHERE created_at > ?1 AND recommendations IS NOT NULL "
+            "AND recommendations != '' AND recommendations != 'maintain' "
+            "ORDER BY created_at ASC LIMIT 5";
+        sqlite3_stmt *stmt = NULL;
+        if (sqlite3_prepare_v2(engine->db, sel, -1, &stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(stmt, 1, since);
+            const char *ins =
+                "INSERT INTO prompt_patches (source, patch_text, active, applied_at) "
+                "VALUES ('reflection', ?, 1, ?)";
+            sqlite3_stmt *ins_stmt = NULL;
+            if (sqlite3_prepare_v2(engine->db, ins, -1, &ins_stmt, NULL) == SQLITE_OK) {
+                while (sqlite3_step(stmt) == SQLITE_ROW) {
+                    const char *rec = (const char *)sqlite3_column_text(stmt, 0);
+                    int64_t created_at = sqlite3_column_int64(stmt, 1);
+                    if (!rec) continue;
+                    char rec_buf[PATCH_TEXT_MAX];
+                    extract_patch_text(rec, strlen(rec), rec_buf, sizeof(rec_buf));
+                    if (rec_buf[0] && strcmp(rec_buf, "maintain") != 0) {
+                        sqlite3_bind_text(ins_stmt, 1, rec_buf, -1, SQLITE_STATIC);
+                        sqlite3_bind_int64(ins_stmt, 2, created_at);
+                        sqlite3_step(ins_stmt);
+                        sqlite3_reset(ins_stmt);
+                        sqlite3_clear_bindings(ins_stmt);
+                    }
+                }
+                sqlite3_finalize(ins_stmt);
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    /* Insert the signal-based patch */
+    if (strcmp(patch_buf, "maintain") != 0) {
+        sqlite3_stmt *ins = NULL;
+        if (sqlite3_prepare_v2(engine->db,
+                "INSERT INTO prompt_patches (source, patch_text, active, applied_at) "
+                "VALUES ('intelligence_cycle', ?, 1, ?)", -1, &ins, NULL) == SQLITE_OK) {
+            sqlite3_bind_text(ins, 1, patch_buf, patch_len, SQLITE_STATIC);
+            sqlite3_bind_int64(ins, 2, now_ts);
+            sqlite3_step(ins);
+            sqlite3_finalize(ins);
+        }
+    }
+
+    /* Deactivate stale patches (keep only the 10 most recent active) */
+    {
+        sqlite3_exec(engine->db,
+            "UPDATE prompt_patches SET active = 0 WHERE id NOT IN "
+            "(SELECT id FROM prompt_patches WHERE active = 1 ORDER BY applied_at DESC LIMIT 10)",
+            NULL, NULL, NULL);
+    }
+
     return HU_OK;
 }
 
@@ -346,6 +452,178 @@ hu_error_t hu_self_improve_active_patch_count(hu_self_improve_t *engine, size_t 
     *out = 0;
 
     const char *sql = "SELECT COUNT(*) FROM prompt_patches WHERE active = 1";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(engine->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+        *out = (size_t)sqlite3_column_int64(stmt, 0);
+    sqlite3_finalize(stmt);
+    return HU_OK;
+}
+
+/* --- Assessment-driven closed-loop self-improvement --- */
+
+#include "human/intelligence/weakness.h"
+
+hu_error_t hu_self_improve_from_assessment(hu_self_improve_t *engine,
+                                           const hu_eval_run_t *run,
+                                           const hu_eval_suite_t *suite,
+                                           int64_t now_ts) {
+    if (!engine || !engine->db || !run)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    /* Create eval_patches table if needed */
+    const char *ddl =
+        "CREATE TABLE IF NOT EXISTS eval_patches("
+        "id INTEGER PRIMARY KEY, weakness_type TEXT, task_id TEXT, "
+        "patch_text TEXT, applied INTEGER DEFAULT 0, "
+        "pass_rate_before REAL, pass_rate_after REAL, "
+        "kept INTEGER DEFAULT 0, created_at INTEGER)";
+    if (sqlite3_exec(engine->db, ddl, NULL, NULL, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+
+    hu_weakness_report_t report = {0};
+    hu_error_t err = hu_weakness_analyze(engine->alloc, run, suite, &report);
+    if (err != HU_OK)
+        return err;
+    if (report.count == 0)
+        return HU_OK;
+
+    const char *ins_eval =
+        "INSERT INTO eval_patches (weakness_type, task_id, patch_text, "
+        "applied, pass_rate_before, kept, created_at) "
+        "VALUES (?1, ?2, ?3, 0, ?4, 0, ?5)";
+    const char *ins_prompt =
+        "INSERT INTO prompt_patches (source, patch_text, active, applied_at) "
+        "VALUES (?1, ?2, 1, ?3)";
+    sqlite3_stmt *s_eval = NULL, *s_prompt = NULL;
+    int rc = sqlite3_prepare_v2(engine->db, ins_eval, -1, &s_eval, NULL);
+    if (rc != SQLITE_OK) {
+        hu_weakness_report_free(engine->alloc, &report);
+        return HU_ERR_MEMORY_STORE;
+    }
+    rc = sqlite3_prepare_v2(engine->db, ins_prompt, -1, &s_prompt, NULL);
+    if (rc != SQLITE_OK) {
+        sqlite3_finalize(s_eval);
+        hu_weakness_report_free(engine->alloc, &report);
+        return HU_ERR_MEMORY_STORE;
+    }
+
+    for (size_t i = 0; i < report.count; i++) {
+        hu_weakness_t *w = &report.items[i];
+
+        /* Insert into eval_patches */
+        sqlite3_bind_text(s_eval, 1, hu_weakness_type_str(w->type), -1, SQLITE_STATIC);
+        sqlite3_bind_text(s_eval, 2, w->task_id, -1, SQLITE_STATIC);
+        sqlite3_bind_text(s_eval, 3, w->suggested_fix, (int)w->suggested_fix_len, SQLITE_STATIC);
+        sqlite3_bind_double(s_eval, 4, run->pass_rate);
+        sqlite3_bind_int64(s_eval, 5, now_ts);
+        sqlite3_step(s_eval);
+        sqlite3_reset(s_eval);
+        sqlite3_clear_bindings(s_eval);
+
+        /* Also insert into prompt_patches so it takes effect */
+        char source[256];
+        snprintf(source, sizeof(source), "assessment:%s", w->task_id);
+        sqlite3_bind_text(s_prompt, 1, source, -1, SQLITE_STATIC);
+        sqlite3_bind_text(s_prompt, 2, w->suggested_fix, (int)w->suggested_fix_len, SQLITE_STATIC);
+        sqlite3_bind_int64(s_prompt, 3, now_ts);
+        sqlite3_step(s_prompt);
+        sqlite3_reset(s_prompt);
+        sqlite3_clear_bindings(s_prompt);
+    }
+
+    sqlite3_finalize(s_eval);
+    sqlite3_finalize(s_prompt);
+    hu_weakness_report_free(engine->alloc, &report);
+    return HU_OK;
+}
+
+hu_error_t hu_self_improve_verify_patch(hu_self_improve_t *engine,
+                                        int64_t patch_id, double new_pass_rate) {
+    if (!engine || !engine->db)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    /* Get the before rate */
+    const char *sel = "SELECT pass_rate_before FROM eval_patches WHERE id = ?1";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(engine->db, sel, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) return HU_ERR_MEMORY_STORE;
+    sqlite3_bind_int64(stmt, 1, patch_id);
+    double before = 0.0;
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+        before = sqlite3_column_double(stmt, 0);
+    else {
+        sqlite3_finalize(stmt);
+        return HU_ERR_NOT_FOUND;
+    }
+    sqlite3_finalize(stmt);
+
+    int kept = (new_pass_rate >= before) ? 1 : 0;
+
+    const char *upd = "UPDATE eval_patches SET pass_rate_after = ?1, kept = ?2 WHERE id = ?3";
+    rc = sqlite3_prepare_v2(engine->db, upd, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) return HU_ERR_MEMORY_STORE;
+    sqlite3_bind_double(stmt, 1, new_pass_rate);
+    sqlite3_bind_int(stmt, 2, kept);
+    sqlite3_bind_int64(stmt, 3, patch_id);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) return HU_ERR_MEMORY_STORE;
+
+    /* If not kept, deactivate the prompt patch too */
+    if (!kept) {
+        const char *deactivate =
+            "UPDATE prompt_patches SET active = 0 "
+            "WHERE source LIKE 'assessment:%' AND applied_at = "
+            "(SELECT created_at FROM eval_patches WHERE id = ?1)";
+        rc = sqlite3_prepare_v2(engine->db, deactivate, -1, &stmt, NULL);
+        if (rc == SQLITE_OK) {
+            sqlite3_bind_int64(stmt, 1, patch_id);
+            sqlite3_step(stmt);
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    return HU_OK;
+}
+
+hu_error_t hu_self_improve_rollback_patch(hu_self_improve_t *engine, int64_t patch_id) {
+    if (!engine || !engine->db)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    /* Mark eval_patches entry as not kept */
+    const char *upd = "UPDATE eval_patches SET kept = 0 WHERE id = ?1";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(engine->db, upd, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) return HU_ERR_MEMORY_STORE;
+    sqlite3_bind_int64(stmt, 1, patch_id);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) return HU_ERR_MEMORY_STORE;
+
+    /* Deactivate corresponding prompt patch */
+    const char *deact =
+        "UPDATE prompt_patches SET active = 0 "
+        "WHERE source LIKE 'assessment:%' AND applied_at = "
+        "(SELECT created_at FROM eval_patches WHERE id = ?1)";
+    rc = sqlite3_prepare_v2(engine->db, deact, -1, &stmt, NULL);
+    if (rc == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, patch_id);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    return HU_OK;
+}
+
+hu_error_t hu_self_improve_kept_patch_count(hu_self_improve_t *engine, size_t *out) {
+    if (!engine || !engine->db || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = 0;
+
+    const char *sql = "SELECT COUNT(*) FROM eval_patches WHERE kept = 1";
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(engine->db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)

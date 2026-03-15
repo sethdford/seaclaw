@@ -635,6 +635,46 @@ bool hu_skill_db_should_retire(int version, double success_rate) {
     return version >= 3 && success_rate < 0.35;
 }
 
+hu_error_t hu_skill_discover_from_pattern(hu_allocator_t *alloc, sqlite3 *db,
+                                           const char *pattern, size_t pattern_len,
+                                           double success_rate, const char *name, size_t name_len,
+                                           int64_t *out_id) {
+    if (!alloc || !db)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!pattern || pattern_len == 0 || !name || name_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (success_rate < 0.0 || success_rate > 1.0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    int64_t now_ts = (int64_t)time(NULL);
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db,
+                                "INSERT INTO skills (name, type, contact_id, trigger_conditions, "
+                                "strategy, success_rate, attempts, successes, version, origin, "
+                                "parent_skill_id, created_at, updated_at, retired) "
+                                "VALUES (?, ?, NULL, ?, ?, ?, 0, 0, 1, 'discovery', 0, ?, ?, 0)",
+                                -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
+
+    sqlite3_bind_text(stmt, 1, name, (int)name_len, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, "discovered", 10, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, pattern, (int)pattern_len, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 4, pattern, (int)pattern_len, SQLITE_STATIC);
+    sqlite3_bind_double(stmt, 5, success_rate);
+    sqlite3_bind_int64(stmt, 6, now_ts);
+    sqlite3_bind_int64(stmt, 7, now_ts);
+
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE)
+        return HU_ERR_MEMORY_BACKEND;
+
+    if (out_id)
+        *out_id = sqlite3_last_insert_rowid(db);
+    return HU_OK;
+}
+
 hu_error_t hu_skill_transfer(hu_allocator_t *alloc, sqlite3 *db,
     int64_t skill_id,
     const char *new_trigger, size_t trigger_len,

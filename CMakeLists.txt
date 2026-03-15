@@ -504,6 +504,7 @@ set(HU_CORE_SOURCES
     src/memory/retrieval/hybrid.c
     src/memory/retrieval/adaptive.c
     src/memory/retrieval/rrf.c
+    src/memory/retrieval/entropy_gate.c
     src/memory/rerank.c
     src/memory/retrieval/qmd.c
     src/memory/retrieval/query_expansion.c
@@ -797,6 +798,7 @@ if(HU_ENABLE_SQLITE)
         src/memory/forgetting_curve.c
         src/memory/prospective.c
         src/memory/emotional_residue.c
+        src/memory/graph/memory_graph.c
         src/feeds/oauth.c
         src/intelligence/skills.c
         src/intelligence/self_improve.c
@@ -805,6 +807,9 @@ if(HU_ENABLE_SQLITE)
         src/agent/goals.c
         src/intelligence/world_model.c
         src/intelligence/experience.c
+        src/intelligence/weakness.c
+        src/intelligence/weakness_analyzer.c
+        src/intelligence/distiller.c
     )
 endif()
 
@@ -816,7 +821,7 @@ if(HU_ENABLE_FEEDS)
     list(APPEND HU_CORE_SOURCES src/feeds/apple.c src/feeds/google.c src/feeds/music.c
         src/feeds/news.c src/feeds/email.c src/feeds/gmail.c src/feeds/imessage.c
         src/feeds/twitter.c src/feeds/file_ingest.c src/feeds/research.c src/feeds/findings.c
-        src/feeds/trends.c)
+        src/feeds/research_executor.c src/feeds/trends.c)
 endif()
 
 # Skillforge + Phase 8 intelligence (skills, reflection, feedback, meta-learning)
@@ -1336,6 +1341,12 @@ endif()
 if(HU_ENABLE_FEEDS)
     target_compile_definitions(human PRIVATE HU_ENABLE_FEEDS=1)
 endif()
+if(HU_ENABLE_SQLITE)
+    target_compile_definitions(human PRIVATE HU_ENABLE_SQLITE=1)
+    if(SQLITE3_FOUND)
+        target_include_directories(human PRIVATE ${SQLITE3_INCLUDE_DIRS})
+    endif()
+endif()
 
 if(HU_ENABLE_ASAN)
     target_compile_options(human PRIVATE -fsanitize=address -fno-omit-frame-pointer)
@@ -1473,7 +1484,7 @@ if(NOT HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_EXTRA_MODULES src/feeds/apple.c src/feeds/google.c src/feeds/music.c
         src/feeds/news.c src/feeds/email.c src/feeds/gmail.c src/feeds/imessage.c
         src/feeds/twitter.c src/feeds/file_ingest.c src/feeds/research.c src/feeds/findings.c
-        src/feeds/trends.c)
+        src/feeds/research_executor.c src/feeds/trends.c)
 endif()
 if(NOT HU_ENABLE_PUSH)
     list(APPEND HU_TEST_EXTRA_MODULES src/gateway/push.c)
@@ -1512,10 +1523,11 @@ if(NOT HU_ENABLE_ML)
         src/ml/muon_adamw.c src/ml/train.c src/ml/checkpoint.c src/ml/cli.c
         src/ml/lora.c)
 endif()
-# Phase 7 modules (experience, forgetting) — tests need them when SQLite is OFF (minimal build)
+# Phase 7 modules (experience, forgetting, weakness) — tests need them when SQLite is OFF (minimal build)
 if(NOT HU_ENABLE_SQLITE)
     list(APPEND HU_TEST_EXTRA_MODULES
         src/intelligence/experience.c
+        src/intelligence/weakness.c
         src/memory/forgetting.c
     )
 endif()
@@ -1802,6 +1814,7 @@ set(HU_TEST_SOURCES
     tests/test_voice_integration.c
     tests/test_behavioral.c
     tests/test_context_ext.c
+    tests/test_entropy_gate.c
     tests/test_episodic.c
     tests/test_reflection.c
     tests/test_input_guard.c
@@ -1862,6 +1875,7 @@ set(HU_TEST_SOURCES
     tests/test_intelligence_reflection.c
     tests/test_feedback.c
     tests/test_intelligence_skills.c
+    tests/test_skill_unified.c
     tests/test_intelligence_cycle.c
     tests/test_reflection_advanced.c
     tests/test_privacy_audit.c
@@ -1872,11 +1886,16 @@ set(HU_TEST_SOURCES
     tests/test_mcp_transport.c
     tests/test_mcp_audit.c
     tests/test_multigraph.c
+    tests/test_memory_graph.c
     tests/test_experience.c
+    tests/test_experience_engine.c
+    tests/test_self_improve_loop.c
+    tests/test_weakness.c
+    tests/test_distiller.c
 )
 if(HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_SOURCES tests/test_google_feeds.c tests/test_music_feeds.c
-        tests/test_research_feeds.c)
+        tests/test_research_feeds.c tests/test_research_executor.c)
 endif()
 if(HU_ENABLE_PERSONA)
     list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c tests/test_persona_feedback.c tests/test_persona_cli.c tests/test_voice_maturity.c)

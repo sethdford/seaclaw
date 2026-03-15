@@ -125,9 +125,38 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
+    /* Automatic planning for complex tasks */
+    char *plan_ctx = NULL;
+    size_t plan_ctx_len = 0;
+#ifndef HU_IS_TEST
+    if (msg_len > 200 && agent->tools_count >= 5 && agent->provider.vtable &&
+        agent->provider.vtable->chat) {
+        const char *tool_names[32];
+        size_t tn_count = 0;
+        for (size_t ti = 0; ti < agent->tools_count && tn_count < 32; ti++) {
+            if (agent->tools[ti].vtable && agent->tools[ti].vtable->name)
+                tool_names[tn_count++] = agent->tools[ti].vtable->name(agent->tools[ti].ctx);
+        }
+        hu_plan_t *plan = NULL;
+        if (hu_planner_generate(agent->alloc, &agent->provider, agent->model_name,
+                                 agent->model_name_len, msg, msg_len,
+                                 tool_names, tn_count, &plan) == HU_OK && plan) {
+            char plan_buf[1024];
+            int pn = snprintf(plan_buf, sizeof(plan_buf), "[PLAN]: %zu steps planned", plan->steps_count);
+            if (pn > 0 && (size_t)pn < sizeof(plan_buf)) {
+                plan_ctx = hu_strndup(agent->alloc, plan_buf, (size_t)pn);
+                plan_ctx_len = (size_t)pn;
+            }
+            hu_plan_free(agent->alloc, plan);
+        }
+    }
+#endif
+
     hu_error_t err =
         hu_agent_internal_append_history(agent, HU_ROLE_USER, msg, msg_len, NULL, 0, NULL, 0);
     if (err != HU_OK) {
+        if (plan_ctx)
+            agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
         hu_agent_clear_current_for_tools();
         return err;
     }
@@ -707,6 +736,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
             }
 
+            if (plan_ctx && plan_ctx_len > 0) {
+                int n = snprintf(parts + pos, sizeof(parts) - pos, "### %.*s\n",
+                                 (int)plan_ctx_len, plan_ctx);
+                if (n > 0 && pos + (size_t)n < sizeof(parts))
+                    pos += (size_t)n;
+            }
+
             if (pos > 0) {
                 intelligence_ctx = hu_strndup(agent->alloc, parts, pos);
                 intelligence_ctx_len = pos;
@@ -747,6 +783,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
             if (intelligence_ctx)
                 agent->alloc->free(agent->alloc->ctx, intelligence_ctx, intelligence_ctx_len + 1);
+            if (plan_ctx)
+                agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
             hu_agent_clear_current_for_tools();
             return perr;
         }
@@ -822,6 +860,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
             if (intelligence_ctx)
                 agent->alloc->free(agent->alloc->ctx, intelligence_ctx, intelligence_ctx_len + 1);
+            if (plan_ctx)
+                agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
             hu_agent_clear_current_for_tools();
             return err;
         }
@@ -915,6 +955,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
             if (superhuman_ctx)
                 agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+            if (plan_ctx)
+                agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
             hu_agent_clear_current_for_tools();
             return err;
         }
@@ -993,6 +1035,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         if (agent->cancel_requested) {
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+            if (plan_ctx)
+                agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
             if (agent->turn_arena)
                 hu_arena_reset(agent->turn_arena);
             return HU_ERR_CANCELLED;
@@ -1044,6 +1088,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 hu_agent_clear_current_for_tools();
                 if (system_prompt)
                     agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+                if (plan_ctx)
+                    agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
                 return err;
             }
             size_t total = (hist_msgs ? hist_count : 0) + 1;
@@ -1053,6 +1099,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 hu_agent_clear_current_for_tools();
                 if (system_prompt)
                     agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+                if (plan_ctx)
+                    agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
                 return HU_ERR_OUT_OF_MEMORY;
             }
             all[0].role = HU_ROLE_SYSTEM;
@@ -1149,6 +1197,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             hu_agent_clear_current_for_tools();
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+            if (plan_ctx)
+                agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
             if (agent->turn_arena)
                 hu_arena_reset(agent->turn_arena);
             return err;
@@ -1491,9 +1541,33 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     hu_experience_store_deinit(&exp_store);
                 }
             }
+            /* Value learning from user feedback signals */
+            if (agent->memory) {
+                sqlite3 *vl_db = hu_sqlite_memory_get_db(agent->memory);
+                if (vl_db) {
+                    hu_value_engine_t ve;
+                    if (hu_value_engine_create(agent->alloc, vl_db, &ve) == HU_OK) {
+                        int64_t now_vl = (int64_t)time(NULL);
+                        bool is_positive = (msg_len >= 4 && (
+                            strstr(msg, "good") || strstr(msg, "great") ||
+                            strstr(msg, "thanks") || strstr(msg, "perfect") ||
+                            strstr(msg, "exactly")));
+                        bool is_negative = (msg_len >= 2 && (
+                            strstr(msg, "wrong") || strstr(msg, "bad") ||
+                            strstr(msg, "incorrect") || strstr(msg, "no")));
+                        if (is_positive)
+                            (void)hu_value_learn_from_approval(&ve, "helpfulness", 11, 0.1, now_vl);
+                        if (is_negative)
+                            (void)hu_value_weaken(&ve, "helpfulness", 11, 0.1, now_vl);
+                        hu_value_engine_deinit(&ve);
+                    }
+                }
+            }
 #endif
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+            if (plan_ctx)
+                agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
             if (agent->turn_arena)
                 hu_arena_reset(agent->turn_arena);
             return HU_OK;
@@ -1507,6 +1581,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             hu_chat_response_free(agent->alloc, &resp);
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+            if (plan_ctx)
+                agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
             if (agent->turn_arena)
                 hu_arena_reset(agent->turn_arena);
             return err;
@@ -1690,11 +1766,56 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         orch.agents[s % orch.agent_count].agent_id_len);
                                 }
                             }
+                            /* Execute orchestrated tasks using agent's tools */
+                            for (size_t s = 0; s < orch.task_count; s++) {
+                                hu_orchestrator_task_t *task = &orch.tasks[s];
+                                if (task->status != HU_TASK_ASSIGNED)
+                                    continue;
+                                task->status = HU_TASK_IN_PROGRESS;
+                                hu_tool_t *orch_tool = hu_agent_internal_find_tool(
+                                    agent, task->description, task->description_len);
+                                if (!orch_tool) {
+                                    hu_orchestrator_fail_task(&orch, task->id, "tool not found", 14);
+                                    continue;
+                                }
+                                hu_tool_result_t orch_result = hu_tool_result_fail("no args", 7);
+                                if (s < tc_count && calls[s].arguments_len > 0) {
+                                    hu_json_value_t *orch_args = NULL;
+                                    (void)hu_json_parse(agent->alloc, calls[s].arguments,
+                                                        calls[s].arguments_len, &orch_args);
+                                    if (orch_args && orch_tool->vtable->execute) {
+                                        orch_tool->vtable->execute(orch_tool->ctx, agent->alloc,
+                                                                   orch_args, &orch_result);
+                                    }
+                                    if (orch_args)
+                                        hu_json_free(agent->alloc, orch_args);
+                                }
+                                if (orch_result.success) {
+                                    hu_orchestrator_complete_task(&orch, task->id,
+                                        orch_result.output ? orch_result.output : "ok",
+                                        orch_result.output ? orch_result.output_len : 2);
+                                } else {
+                                    hu_orchestrator_fail_task(&orch, task->id,
+                                        orch_result.error_msg ? orch_result.error_msg : "failed",
+                                        orch_result.error_msg ? orch_result.error_msg_len : 6);
+                                }
+                                hu_tool_result_free(agent->alloc, &orch_result);
+                            }
+                            /* Merge and append orchestrated results */
+                            char *merged = NULL;
+                            size_t merged_len = 0;
+                            if (hu_orchestrator_merge_results(&orch, agent->alloc, &merged, &merged_len) == HU_OK &&
+                                merged && merged_len > 0) {
+                                (void)hu_agent_internal_append_history(
+                                    agent, HU_ROLE_TOOL, merged, merged_len,
+                                    "orchestrator", 12, "orch_merge", 10);
+                                agent->alloc->free(agent->alloc->ctx, merged, merged_len + 1);
+                            }
                             hu_observer_event_t ev = {
                                 .tag = HU_OBSERVER_EVENT_TOOL_CALL, .data = {{0}}};
                             ev.data.tool_call.tool = "orchestrator";
                             ev.data.tool_call.duration_ms = 0;
-                            ev.data.tool_call.success = true;
+                            ev.data.tool_call.success = hu_orchestrator_all_complete(&orch);
                             HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
                         }
                         hu_orchestrator_deinit(&orch);
@@ -1708,6 +1829,30 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     dispatcher.max_parallel = 4;
                 dispatcher.timeout_secs = 30;
 
+#ifdef HU_ENABLE_SQLITE
+                /* World model: rank tool calls by predicted outcome */
+                if (tc_count >= 2 && agent->memory) {
+                    sqlite3 *wm_db = hu_sqlite_memory_get_db(agent->memory);
+                    if (wm_db) {
+                        hu_world_model_t wm;
+                        if (hu_world_model_create(agent->alloc, wm_db, &wm) == HU_OK) {
+                            for (size_t tc = 0; tc < tc_count; tc++) {
+                                hu_wm_prediction_t pred = {0};
+                                if (hu_world_simulate(&wm, calls[tc].name, calls[tc].name_len,
+                                                      msg, msg_len, &pred) == HU_OK &&
+                                    pred.confidence > 0.5) {
+                                    hu_observer_event_t ev = {
+                                        .tag = HU_OBSERVER_EVENT_TOOL_CALL, .data = {{0}}};
+                                    ev.data.tool_call.tool = "world_model_predict";
+                                    ev.data.tool_call.success = true;
+                                    HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
+                                }
+                            }
+                            hu_world_model_deinit(&wm);
+                        }
+                    }
+                }
+#endif
                 hu_dispatch_result_t dispatch_result;
                 memset(&dispatch_result, 0, sizeof(dispatch_result));
                 err = hu_dispatcher_dispatch(&dispatcher, agent->alloc, agent->tools,
