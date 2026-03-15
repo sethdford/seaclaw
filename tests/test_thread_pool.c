@@ -50,13 +50,13 @@ static void thread_pool_active_null_returns_zero(void) {
 }
 
 void run_thread_pool_tests(void) {
-    HU_TEST_SUITE("ThreadPool") {
-        HU_RUN_TEST(thread_pool_create_null_returns_null);
-        HU_RUN_TEST(thread_pool_create_and_destroy);
-        HU_RUN_TEST(thread_pool_destroy_null_is_safe);
-        HU_RUN_TEST(thread_pool_submit_null_pool_returns_false);
-        HU_RUN_TEST(thread_pool_submit_null_fn_returns_false);
-        HU_RUN_TEST(thread_pool_submit_and_execute);
-        HU_RUN_TEST(thread_pool_active_null_returns_zero);
-    }
+    HU_TEST_SUITE("ThreadPool");
+
+    HU_RUN_TEST(thread_pool_create_null_returns_null);
+    HU_RUN_TEST(thread_pool_create_and_destroy);
+    HU_RUN_TEST(thread_pool_destroy_null_is_safe);
+    HU_RUN_TEST(thread_pool_submit_null_pool_returns_false);
+    HU_RUN_TEST(thread_pool_submit_null_fn_returns_false);
+    HU_RUN_TEST(thread_pool_submit_and_execute);
+    HU_RUN_TEST(thread_pool_active_null_returns_zero);
 }

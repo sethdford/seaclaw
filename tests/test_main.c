@@ -245,6 +245,8 @@ void run_lsp_tests(void);
 void run_webrtc_tests(void);
 void run_embedded_provider_tests(void);
 void run_forgetting_tests(void);
+void run_bootstrap_tests(void);
+void run_thread_pool_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -513,6 +515,8 @@ int main(int argc, char **argv) {
     run_webrtc_tests();
     run_embedded_provider_tests();
     run_forgetting_tests();
+    run_bootstrap_tests();
+    run_thread_pool_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

@@ -54,12 +54,12 @@ static void bootstrap_with_agent(void) {
 }
 
 void run_bootstrap_tests(void) {
-    HU_TEST_SUITE("Bootstrap") {
-        HU_RUN_TEST(bootstrap_null_ctx_returns_error);
-        HU_RUN_TEST(bootstrap_null_alloc_returns_error);
-        HU_RUN_TEST(teardown_null_is_safe);
-        HU_RUN_TEST(teardown_zero_ctx_is_safe);
-        HU_RUN_TEST(bootstrap_minimal_no_agent_no_channels);
-        HU_RUN_TEST(bootstrap_with_agent);
-    }
+    HU_TEST_SUITE("Bootstrap");
+
+    HU_RUN_TEST(bootstrap_null_ctx_returns_error);
+    HU_RUN_TEST(bootstrap_null_alloc_returns_error);
+    HU_RUN_TEST(teardown_null_is_safe);
+    HU_RUN_TEST(teardown_zero_ctx_is_safe);
+    HU_RUN_TEST(bootstrap_minimal_no_agent_no_channels);
+    HU_RUN_TEST(bootstrap_with_agent);
 }

@@ -295,4 +295,7 @@ void run_paperclip_tests(void) {
     HU_RUN_TEST(paperclip_tool_creates_ok);
     HU_RUN_TEST(paperclip_tool_requires_action);
     HU_RUN_TEST(paperclip_tool_unknown_action);
+
+    HU_RUN_TEST(heartbeat_null_alloc_returns_error);
+    HU_RUN_TEST(heartbeat_no_env_fails_gracefully);
 }

@@ -1897,9 +1897,11 @@ list(APPEND HU_TEST_SOURCES
     tests/test_webrtc.c
     tests/test_embedded_provider.c
     tests/test_forgetting.c
+    tests/test_bootstrap.c
+    tests/test_thread_pool.c
 )
 
-add_executable(human_tests ${HU_TEST_SOURCES} wasm/wasm_alloc.c)
+add_executable(human_tests ${HU_TEST_SOURCES} wasm/wasm_alloc.c src/bootstrap.c)
 target_link_libraries(human_tests human_core_test)
 target_include_directories(human_tests PRIVATE ${HU_ROOT}/tests)
 # HU_HAS_PERSONA always set for tests: test lib has persona (main or extra), struct layout must match
