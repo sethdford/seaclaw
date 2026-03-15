@@ -115,3 +115,4 @@ data/imessage/
 data/facebook/
 data/merged/
 *.safetensors
+.lighthouseci/
