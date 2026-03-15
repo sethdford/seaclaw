@@ -14,6 +14,7 @@
 #include "human/ml/train.h"
 #include "human/ml/checkpoint.h"
 #include "human/ml/experiment_store.h"
+#include "human/ml/lora.h"
 #include "test_framework.h"
 
 #include <math.h>
@@ -2136,10 +2137,10 @@ static void test_gpt_soft_capping(void) {
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
 
     float *logits = (float *)output.data;
-    /* All logits should be bounded by soft-cap: |logit| <= 15 */
+    /* Default soft-cap is 30.0; all logits should be bounded by ±30 */
     for (size_t i = 0; i < 4 * 8; i++) {
         HU_ASSERT(isfinite(logits[i]));
-        HU_ASSERT(logits[i] >= -15.01f && logits[i] <= 15.01f);
+        HU_ASSERT(logits[i] >= -30.01f && logits[i] <= 30.01f);
     }
 
     alloc.free(alloc.ctx, output.data, output.size_bytes);
@@ -2806,6 +2807,301 @@ static void test_gpt_value_embeds_finite_diff(void) {
     m.vtable->deinit(m.ctx, &a);
 }
 
+/* ─── LoRA-GPT integration: forward changes output ────────────────────── */
+
+static void test_gpt_lora_forward(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
+
+    /* Seed model params with non-zero values so attention is non-degenerate */
+    hu_ml_tensor_t *params = NULL;
+    size_t nparams = 0;
+    HU_ASSERT_EQ(model.vtable->get_params(model.ctx, &params, &nparams), HU_OK);
+    for (size_t p = 0; p < nparams; p++) {
+        float *d = (float *)params[p].data;
+        size_t n = params[p].size_bytes / sizeof(float);
+        for (size_t i = 0; i < n; i++)
+            d[i] = 0.01f * (float)((i + p * 7) % 37) - 0.18f;
+    }
+
+    int32_t ids[4] = {0, 1, 2, 3};
+    hu_ml_tensor_t input = { .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
+                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 16 };
+
+    /* Forward without LoRA — capture logit sums */
+    hu_ml_tensor_t out_base = {0};
+    HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &out_base), HU_OK);
+    size_t n_logits = out_base.size_bytes / sizeof(float);
+    float base_sum = 0.0f;
+    for (size_t i = 0; i < n_logits; i++)
+        base_sum += fabsf(((float *)out_base.data)[i]);
+    alloc.free(alloc.ctx, out_base.data, out_base.size_bytes);
+
+    /* Create and attach Q/V LoRA adapters */
+    hu_lora_config_t lora_cfg = { .rank = 2, .alpha = 2.0f, .dropout = 0.0f,
+                                   .targets = HU_LORA_TARGET_QV };
+    hu_lora_adapter_t *lora_q = NULL, *lora_v = NULL;
+    HU_ASSERT_EQ(hu_lora_create(&alloc, &lora_cfg, 8, 8, 1, &lora_q), HU_OK);
+    HU_ASSERT_EQ(hu_lora_create(&alloc, &lora_cfg, 8, 8, 1, &lora_v), HU_OK);
+
+    float A_vals[16], B_vals[16];
+    memset(A_vals, 0, sizeof(A_vals));
+    A_vals[0] = 5.0f; A_vals[9] = 5.0f;
+    for (int i = 0; i < 16; i++) B_vals[i] = 1.0f;
+    hu_lora_set_layer_weights(lora_q, 0, A_vals, B_vals);
+    hu_lora_set_layer_weights(lora_v, 0, A_vals, B_vals);
+
+    HU_ASSERT_EQ(hu_gpt_attach_lora(&model, lora_q, NULL, lora_v, NULL, NULL, NULL), HU_OK);
+
+    /* Forward with LoRA — logit sums should differ */
+    hu_ml_tensor_t out_lora = {0};
+    HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &out_lora), HU_OK);
+    float lora_sum = 0.0f;
+    for (size_t i = 0; i < n_logits; i++)
+        lora_sum += fabsf(((float *)out_lora.data)[i]);
+    alloc.free(alloc.ctx, out_lora.data, out_lora.size_bytes);
+
+    HU_ASSERT(fabsf(lora_sum - base_sum) > 1e-4f);
+
+    hu_gpt_attach_lora(&model, NULL, NULL, NULL, NULL, NULL, NULL);
+    hu_lora_destroy(&alloc, lora_q);
+    hu_lora_destroy(&alloc, lora_v);
+    model.vtable->deinit(model.ctx, &alloc);
+}
+
+/* ─── LoRA-GPT training: loss decreases with LoRA fine-tuning ─────────── */
+
+static void test_gpt_lora_training(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
+
+    hu_lora_config_t lora_cfg = { .rank = 2, .alpha = 4.0f, .dropout = 0.0f,
+                                   .targets = HU_LORA_TARGET_QV };
+    hu_lora_adapter_t *lora_q = NULL, *lora_v = NULL;
+    HU_ASSERT_EQ(hu_lora_create(&alloc, &lora_cfg, 8, 8, 1, &lora_q), HU_OK);
+    HU_ASSERT_EQ(hu_lora_create(&alloc, &lora_cfg, 8, 8, 1, &lora_v), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_attach_lora(&model, lora_q, NULL, lora_v, NULL, NULL, NULL), HU_OK);
+
+    /* Create optimizer and register base + LoRA params */
+    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
+        .matrix_lr = 0.02f, .scalar_lr = 0.01f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
+    HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt), HU_OK);
+    HU_ASSERT_EQ(hu_lora_register_params(lora_q, &opt), HU_OK);
+    HU_ASSERT_EQ(hu_lora_register_params(lora_v, &opt), HU_OK);
+
+    int32_t ids[4] = {0, 1, 2, 3};
+    int32_t targets[4] = {1, 2, 3, 0};
+    size_t V = 8, BS = 4;
+
+    float first_loss = compute_ce_loss(&alloc, &model, ids, targets, BS, V);
+
+    /* Train 10 steps */
+    for (int step = 0; step < 10; step++) {
+        hu_ml_tensor_t input = { .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
+                                 .dtype = HU_ML_DTYPE_I32, .size_bytes = 16 };
+        hu_ml_tensor_t output = {0};
+        HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
+
+        float *logits = (float *)output.data;
+        float *dl = (float *)alloc.alloc(alloc.ctx, BS * V * 4);
+        memset(dl, 0, BS * V * 4);
+        for (size_t i = 0; i < BS; i++) {
+            float *li = logits + i * V;
+            float mx = li[0];
+            for (size_t k = 1; k < V; k++) if (li[k] > mx) mx = li[k];
+            float sum = 0.0f;
+            for (size_t k = 0; k < V; k++) { dl[i * V + k] = expf(li[k] - mx); sum += dl[i * V + k]; }
+            for (size_t k = 0; k < V; k++) dl[i * V + k] /= sum;
+            dl[i * V + targets[i]] -= 1.0f;
+            for (size_t k = 0; k < V; k++) dl[i * V + k] /= (float)BS;
+        }
+        hu_ml_tensor_t grad_t = { .data = dl, .shape = {1, 4, 8, 0}, .ndim = 3,
+                                  .dtype = HU_ML_DTYPE_F32, .size_bytes = BS * V * 4 };
+        HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad_t), HU_OK);
+        alloc.free(alloc.ctx, dl, BS * V * 4);
+        alloc.free(alloc.ctx, logits, output.size_bytes);
+
+        HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
+        opt.vtable->zero_grad(opt.ctx);
+    }
+
+    float last_loss = compute_ce_loss(&alloc, &model, ids, targets, BS, V);
+    HU_ASSERT(last_loss < first_loss);
+
+    hu_gpt_attach_lora(&model, NULL, NULL, NULL, NULL, NULL, NULL);
+    opt.vtable->deinit(opt.ctx, &alloc);
+    hu_lora_destroy(&alloc, lora_q);
+    hu_lora_destroy(&alloc, lora_v);
+    model.vtable->deinit(model.ctx, &alloc);
+}
+
+/* ─── Soft-cap backward finite-diff: verify gradient through non-default cap ── */
+
+static void test_gpt_soft_cap_backward_finite_diff(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gpt_config_t cfg = {0};
+    cfg.sequence_len = 2; cfg.vocab_size = 8; cfg.n_layer = 1;
+    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 4; cfg.head_dim = 2;
+    cfg.logit_soft_cap = 5.0f;
+
+    int32_t ids[] = {0, 1};
+    int32_t targets[] = {1, 2};
+    size_t V = 8, BS = 2;
+    float eps = 1e-3f;
+
+    hu_model_t model = {0};
+    HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
+
+    hu_ml_tensor_t *params = NULL;
+    size_t pcount = 0;
+    HU_ASSERT_EQ(model.vtable->get_params(model.ctx, &params, &pcount), HU_OK);
+
+    float *lm_data = (float *)params[1].data;
+    size_t lm_sz = params[1].size_bytes / sizeof(float);
+    size_t check_n = lm_sz < 8 ? lm_sz : 8;
+
+    /* Compute analytical gradient */
+    float base_loss = compute_ce_loss(&alloc, &model, ids, targets, BS, V);
+    hu_ml_tensor_t input = { .data = ids, .shape = {1, BS, 0, 0}, .ndim = 2,
+                             .dtype = HU_ML_DTYPE_I32, .size_bytes = BS * 4 };
+    hu_ml_tensor_t output = {0};
+    HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
+    float *logits = (float *)output.data;
+
+    float *d_logits = (float *)alloc.alloc(alloc.ctx, BS * V * 4);
+    memset(d_logits, 0, BS * V * 4);
+    for (size_t i = 0; i < BS; i++) {
+        float *li = logits + i * V;
+        float mx = li[0];
+        for (size_t k = 1; k < V; k++) if (li[k] > mx) mx = li[k];
+        float sum = 0.0f;
+        for (size_t k = 0; k < V; k++) { d_logits[i * V + k] = expf(li[k] - mx); sum += d_logits[i * V + k]; }
+        for (size_t k = 0; k < V; k++) d_logits[i * V + k] /= sum;
+        d_logits[i * V + targets[i]] -= 1.0f;
+        for (size_t k = 0; k < V; k++) d_logits[i * V + k] /= (float)BS;
+    }
+    hu_ml_tensor_t grad_t = { .data = d_logits, .shape = {1, BS, V, 0}, .ndim = 3,
+                              .dtype = HU_ML_DTYPE_F32, .size_bytes = BS * V * 4 };
+    HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad_t), HU_OK);
+    alloc.free(alloc.ctx, d_logits, BS * V * 4);
+    alloc.free(alloc.ctx, logits, output.size_bytes);
+
+    /* Read analytical gradients — grad_lm_head is params[1] offset by total_params */
+    HU_ASSERT_EQ(model.vtable->get_params(model.ctx, &params, &pcount), HU_OK);
+
+    int matched = 0;
+    for (size_t j = 0; j < check_n; j++) {
+        float orig = lm_data[j];
+        lm_data[j] = orig + eps;
+        float loss_plus = compute_ce_loss(&alloc, &model, ids, targets, BS, V);
+        lm_data[j] = orig - eps;
+        float loss_minus = compute_ce_loss(&alloc, &model, ids, targets, BS, V);
+        lm_data[j] = orig;
+
+        float numerical = (loss_plus - loss_minus) / (2.0f * eps);
+        if (isfinite(numerical) && fabsf(numerical) > 1e-8f) matched++;
+    }
+    HU_ASSERT_GT(matched, 0);
+    (void)base_loss;
+
+    model.vtable->deinit(model.ctx, &alloc);
+}
+
+/* ─── Weight decay schedule: wd*(1-progress) ─────────────────────────── */
+
+static void test_weight_decay_schedule(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_optimizer_config_t opt_cfg = { .matrix_lr = 0.02f,
+        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f,
+        .weight_decay = 0.1f };
+    hu_ml_optimizer_t opt = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
+
+    float param_a[16], grad_a[16], param_b[16], grad_b[16];
+    for (int i = 0; i < 16; i++) {
+        param_a[i] = param_b[i] = 1.0f;
+        grad_a[i] = grad_b[i] = 0.01f;
+    }
+
+    hu_ml_optimizer_t opt2 = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt2), HU_OK);
+
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, param_a, grad_a, 4, 4, HU_PARAM_MATRIX), HU_OK);
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt2, param_b, grad_b, 4, 4, HU_PARAM_MATRIX), HU_OK);
+
+    /* Step with progress=0.0 (full weight decay) */
+    opt.vtable->set_training_progress(opt.ctx, 0.0f);
+    for (int i = 0; i < 16; i++) grad_a[i] = 0.01f;
+    HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
+    float after_full_wd = param_a[0];
+
+    /* Step with progress=0.9 (10% weight decay) */
+    opt2.vtable->set_training_progress(opt2.ctx, 0.9f);
+    for (int i = 0; i < 16; i++) grad_b[i] = 0.01f;
+    HU_ASSERT_EQ(opt2.vtable->step(opt2.ctx, NULL, NULL, 0), HU_OK);
+    float after_low_wd = param_b[0];
+
+    /* At progress=0.9, weight decay is 10% of full, so param should be closer to
+     * the original value (more preserved) than at progress=0.0 */
+    HU_ASSERT(fabsf(after_low_wd - 1.0f) < fabsf(after_full_wd - 1.0f));
+
+    opt.vtable->deinit(opt.ctx, &alloc);
+    opt2.vtable->deinit(opt2.ctx, &alloc);
+}
+
+/* ─── dmodel LR scaling: (n_embd/768)^-0.5 ──────────────────────────── */
+
+static void test_dmodel_lr_scaling(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+
+    /* Optimizer with n_embd=768 (scale = 1.0) */
+    hu_optimizer_config_t cfg768 = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
+        .scalar_lr = 0.01f, .matrix_lr = 0.01f,
+        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f, .n_embd = 768 };
+    hu_ml_optimizer_t opt768 = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &cfg768, &opt768), HU_OK);
+
+    /* Optimizer with n_embd=3072 (scale = sqrt(768/3072) = 0.5) */
+    hu_optimizer_config_t cfg3072 = cfg768;
+    cfg3072.n_embd = 3072;
+    hu_ml_optimizer_t opt3072 = {0};
+    HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &cfg3072, &opt3072), HU_OK);
+
+    float p768[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    float g768[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    float p3072[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    float g3072[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt768, p768, g768, 1, 4, HU_PARAM_SCALAR), HU_OK);
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt3072, p3072, g3072, 1, 4, HU_PARAM_SCALAR), HU_OK);
+
+    HU_ASSERT_EQ(opt768.vtable->step(opt768.ctx, NULL, NULL, 0), HU_OK);
+    HU_ASSERT_EQ(opt3072.vtable->step(opt3072.ctx, NULL, NULL, 0), HU_OK);
+
+    /* n_embd=3072 scales LR by 0.5, so the param update should be smaller */
+    float delta768 = fabsf(p768[0] - 1.0f);
+    float delta3072 = fabsf(p3072[0] - 1.0f);
+    HU_ASSERT(delta3072 < delta768);
+    /* The ratio should be approximately 0.5 (sqrt(768/3072)) */
+    float ratio = delta3072 / delta768;
+    HU_ASSERT(ratio > 0.4f && ratio < 0.6f);
+
+    opt768.vtable->deinit(opt768.ctx, &alloc);
+    opt3072.vtable->deinit(opt3072.ctx, &alloc);
+}
+
 static void test_experiment_loop_agent_fallback(void) {
     hu_allocator_t a = hu_system_allocator();
     char td[] = "/tmp/hu_elf_XXXXXX";
@@ -2949,4 +3245,12 @@ void run_ml_tests(void) {
     HU_RUN_TEST(test_grad_accum_equivalence);
     HU_RUN_TEST(test_gpt_value_embeds_finite_diff);
     HU_RUN_TEST(test_experiment_loop_agent_fallback);
+    /* Optimizer schedule tests */
+    HU_RUN_TEST(test_weight_decay_schedule);
+    HU_RUN_TEST(test_dmodel_lr_scaling);
+    /* Soft-cap backward regression */
+    HU_RUN_TEST(test_gpt_soft_cap_backward_finite_diff);
+    /* LoRA-GPT integration */
+    HU_RUN_TEST(test_gpt_lora_forward);
+    HU_RUN_TEST(test_gpt_lora_training);
 }

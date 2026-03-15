@@ -62,6 +62,9 @@
 #include "human/feeds/processor.h"
 #include "human/feeds/research.h"
 #endif
+#ifdef HU_ENABLE_ML
+#include "human/ml/cli.h"
+#endif
 #ifdef HU_ENABLE_CURL
 #include "human/paperclip/client.h"
 #include "human/paperclip/heartbeat.h"
@@ -174,6 +177,9 @@ static hu_error_t cmd_migrate(hu_allocator_t *alloc, int argc, char **argv);
 #ifdef HU_HAS_PERSONA
 static hu_error_t cmd_persona(hu_allocator_t *alloc, int argc, char **argv);
 #endif
+#ifdef HU_ENABLE_ML
+static hu_error_t cmd_ml(hu_allocator_t *alloc, int argc, char **argv);
+#endif
 
 /* Forward declarations for gateway→agent bridge (used by both service-loop and gateway) */
 typedef struct gw_agent_bridge {
@@ -193,6 +199,41 @@ static bool svc_agent_on_message_locked(hu_bus_event_type_t type, const hu_bus_e
     pthread_mutex_unlock(&svc_agent_mutex);
     return result;
 }
+
+#ifdef HU_ENABLE_ML
+static hu_error_t cmd_ml(hu_allocator_t *alloc, int argc, char **argv) {
+    if (argc < 2) {
+        fprintf(stderr,
+                "Usage: human ml <subcommand>\n\n"
+                "Subcommands:\n"
+                "  train       Train a model from config\n"
+                "  experiment  Run experiment loop\n"
+                "  prepare     Tokenize data for training\n"
+                "  status      Show experiment results\n");
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    const char *sub = argv[1];
+    if (strcmp(sub, "train") == 0)
+        return hu_ml_cli_train(alloc, argc - 1, (const char **)(argv + 1));
+    if (strcmp(sub, "experiment") == 0)
+        return hu_ml_cli_experiment(alloc, argc - 1, (const char **)(argv + 1));
+    if (strcmp(sub, "prepare") == 0)
+        return hu_ml_cli_prepare(alloc, argc - 1, (const char **)(argv + 1));
+    if (strcmp(sub, "status") == 0)
+        return hu_ml_cli_status(alloc, argc - 1, (const char **)(argv + 1));
+    if (strcmp(sub, "--help") == 0 || strcmp(sub, "help") == 0) {
+        printf("Usage: human ml <subcommand>\n\n"
+               "Subcommands:\n"
+               "  train       Train a model from config\n"
+               "  experiment  Run experiment loop\n"
+               "  prepare     Tokenize data for training\n"
+               "  status      Show experiment results\n");
+        return HU_OK;
+    }
+    fprintf(stderr, "Unknown ml subcommand: %s\n", sub);
+    return HU_ERR_INVALID_ARGUMENT;
+}
+#endif
 
 #ifdef HU_ENABLE_CURL
 static hu_error_t cmd_paperclip(hu_allocator_t *alloc, int argc, char **argv) {
@@ -237,6 +278,9 @@ static const hu_command_t commands[] = {
     {"update", "Check for updates", cmd_update},
 #ifdef HU_ENABLE_CURL
     {"paperclip", "Paperclip agent integration", cmd_paperclip},
+#endif
+#ifdef HU_ENABLE_ML
+    {"ml", "Machine learning training and experiments", cmd_ml},
 #endif
     {"version", "Show version information", cmd_version},
     {"help", "Show help information", cmd_help},

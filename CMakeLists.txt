@@ -7,6 +7,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 option(HU_ENABLE_ASAN "Enable AddressSanitizer" OFF)
 option(HU_ENABLE_SQLITE "Enable SQLite memory backend" ON)
 option(HU_ENABLE_POSTGRES "Enable PostgreSQL memory backend" OFF)
+option(HU_ENABLE_PGVECTOR "Enable pgvector vector store (requires libpq)" OFF)
 option(HU_ENABLE_CURL "Enable libcurl for HTTP client" ON)
 option(HU_ENABLE_TLS "Enable TLS via OpenSSL for WSS and HTTPS" ON)
 option(HU_ENABLE_FIPS_CRYPTO "Use AES-256-GCM via OpenSSL for FIPS 140-2 compliance" OFF)
@@ -268,10 +269,10 @@ list(APPEND MEMORY_ENGINE_SOURCES
     src/memory/engines/api.c
 )
 if(HU_ENABLE_LUCID_ENGINE)
-    list(APPEND MEMORY_ENGINE_SOURCES src/memory/engines/lucid.c)
+    list(APPEND MEMORY_ENGINE_SOURCES src/memory/engines/sqlite_lucid.c)
 endif()
 if(HU_ENABLE_LANCEDB_ENGINE)
-    list(APPEND MEMORY_ENGINE_SOURCES src/memory/engines/lancedb.c)
+    list(APPEND MEMORY_ENGINE_SOURCES src/memory/engines/sqlite_fts.c)
 endif()
 
 # Threads for pthread (dispatcher parallel execution)
@@ -1136,7 +1137,7 @@ if(HU_ENABLE_POSTGRES)
     if(PostgreSQL_FOUND)
         target_include_directories(human_core PRIVATE ${PostgreSQL_INCLUDE_DIRS})
         target_link_libraries(human_core PUBLIC PostgreSQL::libpq)
-        target_compile_definitions(human_core PRIVATE HU_ENABLE_POSTGRES=1)
+        target_compile_definitions(human_core PRIVATE HU_ENABLE_POSTGRES=1 HU_ENABLE_PGVECTOR=1)
         message(STATUS "PostgreSQL memory backend: enabled")
     else()
         find_library(PQ_LIBRARY NAMES pq libpq)
@@ -1144,10 +1145,31 @@ if(HU_ENABLE_POSTGRES)
         if(PQ_LIBRARY AND PQ_INCLUDE_DIR)
             target_include_directories(human_core PRIVATE ${PQ_INCLUDE_DIR})
             target_link_libraries(human_core PUBLIC ${PQ_LIBRARY})
-            target_compile_definitions(human_core PRIVATE HU_ENABLE_POSTGRES=1)
+            target_compile_definitions(human_core PRIVATE HU_ENABLE_POSTGRES=1 HU_ENABLE_PGVECTOR=1)
             message(STATUS "PostgreSQL memory backend: enabled")
         else()
             message(STATUS "PostgreSQL memory backend: disabled (libpq not found)")
+        endif()
+    endif()
+endif()
+
+if(HU_ENABLE_PGVECTOR AND NOT HU_ENABLE_POSTGRES)
+    find_package(PostgreSQL QUIET)
+    if(PostgreSQL_FOUND)
+        target_include_directories(human_core PRIVATE ${PostgreSQL_INCLUDE_DIRS})
+        target_link_libraries(human_core PUBLIC PostgreSQL::libpq)
+        target_compile_definitions(human_core PRIVATE HU_ENABLE_PGVECTOR=1)
+        message(STATUS "pgvector vector store: enabled")
+    else()
+        find_library(PQ_LIBRARY NAMES pq libpq)
+        find_path(PQ_INCLUDE_DIR NAMES libpq-fe.h)
+        if(PQ_LIBRARY AND PQ_INCLUDE_DIR)
+            target_include_directories(human_core PRIVATE ${PQ_INCLUDE_DIR})
+            target_link_libraries(human_core PUBLIC ${PQ_LIBRARY})
+            target_compile_definitions(human_core PRIVATE HU_ENABLE_PGVECTOR=1)
+            message(STATUS "pgvector vector store: enabled")
+        else()
+            message(STATUS "pgvector vector store: disabled (libpq not found)")
         endif()
     endif()
 endif()
@@ -1472,7 +1494,8 @@ if(NOT HU_ENABLE_ML)
     list(APPEND HU_TEST_EXTRA_MODULES
         src/ml/tokenizer_bpe.c src/ml/dataloader.c src/ml/prepare.c
         src/ml/evaluator.c src/ml/experiment.c src/ml/experiment_store.c src/ml/gpt.c
-        src/ml/muon_adamw.c src/ml/train.c src/ml/checkpoint.c src/ml/cli.c)
+        src/ml/muon_adamw.c src/ml/train.c src/ml/checkpoint.c src/ml/cli.c
+        src/ml/lora.c)
 endif()
 add_library(human_core_test STATIC ${HU_CORE_SOURCES} ${HU_TEST_EXTRA_CHANNELS} ${HU_TEST_EXTRA_MODULES} ${HU_CRYPTO_SOURCES} ${HU_ASM_SOURCES})
 target_include_directories(human_core_test PUBLIC ${HU_ROOT}/include)
@@ -1650,12 +1673,15 @@ set(HU_TEST_SOURCES
     tests/test_string.c
     tests/test_slice.c
     tests/test_memory.c
+    tests/test_memory_util.c
     tests/test_tunnel.c
     tests/test_gateway.c
     tests/test_auth.c
     tests/test_security.c
     tests/test_vault.c
     tests/test_provider.c
+    tests/test_provider_http.c
+    tests/test_api_key.c
     tests/test_channel.c
     tests/test_tool.c
     tests/test_peripheral.c
@@ -1817,6 +1843,7 @@ set(HU_TEST_SOURCES
     tests/test_privacy_audit.c
     tests/test_collab_planning.c
     tests/test_ml.c
+    tests/test_lora.c
     tests/test_otel_traces.c
     tests/test_mcp_transport.c
     tests/test_mcp_audit.c
@@ -1828,7 +1855,7 @@ if(HU_ENABLE_FEEDS)
         tests/test_research_feeds.c)
 endif()
 if(HU_ENABLE_PERSONA)
-    list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c)
+    list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c tests/test_persona_feedback.c tests/test_persona_cli.c tests/test_voice_maturity.c)
 endif()
 if(HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_SOURCES tests/test_cartesia.c tests/test_audio_pipeline.c tests/test_voice_decision.c tests/test_emotion_map.c)
@@ -1989,6 +2016,9 @@ if(HU_ENABLE_LANCEDB_ENGINE)
 endif()
 if(HU_ENABLE_POSTGRES)
     target_compile_definitions(human_tests PRIVATE HU_ENABLE_POSTGRES=1)
+endif()
+if(HU_ENABLE_PGVECTOR)
+    target_compile_definitions(human_tests PRIVATE HU_ENABLE_PGVECTOR=1)
 endif()
 if(HU_ENABLE_REDIS_ENGINE)
     target_compile_definitions(human_tests PRIVATE HU_HAS_REDIS_ENGINE=1 HU_ENABLE_REDIS_ENGINE=1)
@@ -2263,6 +2293,13 @@ if(HU_ENABLE_FUZZ)
     target_link_libraries(fuzz_openai_compat PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
     target_compile_options(fuzz_openai_compat PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
     target_link_options(fuzz_openai_compat PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
+
+    add_executable(fuzz_prompt_injection fuzz/fuzz_prompt_injection.c)
+    set_target_properties(fuzz_prompt_injection PROPERTIES LINKER_LANGUAGE CXX)
+    target_compile_options(fuzz_prompt_injection PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(fuzz_prompt_injection PRIVATE ${FUZZ_EXTRA_LIBS})
+    target_compile_options(fuzz_prompt_injection PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
+    target_link_options(fuzz_prompt_injection PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
 
     add_executable(fuzz_query_param fuzz/fuzz_query_param.c)
     set_target_properties(fuzz_query_param PROPERTIES LINKER_LANGUAGE CXX)
