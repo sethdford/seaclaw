@@ -276,10 +276,6 @@ hu_error_t hu_lora_save(const hu_lora_adapter_t *adapter, const char *path) {
     if (!adapter || !path)
         return HU_ERR_INVALID_ARGUMENT;
 
-#if HU_IS_TEST
-    (void)path;
-    return HU_OK;
-#else
     FILE *f = fopen(path, "wb");
     if (!f)
         return HU_ERR_IO;
@@ -317,7 +313,6 @@ hu_error_t hu_lora_save(const hu_lora_adapter_t *adapter, const char *path) {
 fail:
     fclose(f);
     return HU_ERR_IO;
-#endif
 }
 
 hu_error_t hu_lora_set_layer_weights(hu_lora_adapter_t *adapter, size_t layer_idx,
@@ -337,11 +332,6 @@ hu_error_t hu_lora_load(hu_allocator_t *alloc, const char *path,
     if (!alloc || !path || !out)
         return HU_ERR_INVALID_ARGUMENT;
 
-#if HU_IS_TEST
-    (void)path;
-    *out = NULL;
-    return HU_OK;
-#else
     FILE *f = fopen(path, "rb");
     if (!f)
         return HU_ERR_IO;
@@ -386,5 +376,4 @@ fail_load:
 fail:
     fclose(f);
     return HU_ERR_IO;
-#endif
 }

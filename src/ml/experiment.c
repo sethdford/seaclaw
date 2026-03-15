@@ -73,9 +73,8 @@ static uint32_t xorshift32(uint32_t *state)
 }
 
 
-#ifndef HU_IS_TEST
 /* Parse key=value from agent response and apply to config */
-static void apply_agent_kv(hu_experiment_config_t *cfg, const char *key, const char *val)
+void hu_experiment_apply_agent_kv(hu_experiment_config_t *cfg, const char *key, const char *val)
 {
     if (!cfg || !key || !val) return;
     if (strcmp(key, "n_layer") == 0) { int v = atoi(val); if (v > 0 && v <= 64) cfg->gpt.n_layer = (size_t)v; }
@@ -89,7 +88,6 @@ static void apply_agent_kv(hu_experiment_config_t *cfg, const char *key, const c
         else if (strcmp(val, "swiglu") == 0) cfg->gpt.activation = HU_ML_ACT_SWIGLU;
     }
 }
-#endif /* !HU_IS_TEST */
 
 /* Ask the provider for a config mutation suggestion */
 static int agent_suggest_mutation(hu_allocator_t *alloc, hu_experiment_config_t *cfg,
@@ -131,7 +129,7 @@ static int agent_suggest_mutation(hu_allocator_t *alloc, hu_experiment_config_t 
         while (*val == ' ') val++;
         char *end = val + strlen(val) - 1;
         while (end > val && (*end == '\n' || *end == ' ')) *end-- = '\0';
-        apply_agent_kv(cfg, key, val);
+        hu_experiment_apply_agent_kv(cfg, key, val);
     }
     alloc->free(alloc->ctx, response, resp_len);
     return 1;

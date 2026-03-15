@@ -5,6 +5,8 @@
 #include "human/ml/lora.h"
 #include "test_framework.h"
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #ifdef HU_ENABLE_ML
@@ -199,24 +201,111 @@ static void lora_partial_set_weights(void) {
     hu_lora_destroy(&alloc, adapter);
 }
 
-static void lora_save_load_test_mode(void) {
+static void lora_save_load_roundtrip(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_lora_config_t cfg = {.rank = 4, .alpha = 8.0f, .dropout = 0.0f, .targets = HU_LORA_TARGET_ALL};
+    hu_lora_config_t cfg = {.rank = 2, .alpha = 4.0f, .dropout = 0.0f, .targets = HU_LORA_TARGET_QV};
     hu_lora_adapter_t *adapter = NULL;
+    HU_ASSERT_EQ(hu_lora_create(&alloc, &cfg, 4, 4, 2, &adapter), HU_OK);
 
-    HU_ASSERT_EQ(hu_lora_create(&alloc, &cfg, 8, 8, 2, &adapter), HU_OK);
+    float A0[8] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    float B0[8] = {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f};
+    float A1[8] = {-1.0f, -2.0f, -3.0f, -4.0f, -5.0f, -6.0f, -7.0f, -8.0f};
+    float B1[8] = {-0.1f, -0.2f, -0.3f, -0.4f, -0.5f, -0.6f, -0.7f, -0.8f};
+    HU_ASSERT_EQ(hu_lora_set_layer_weights(adapter, 0, A0, B0), HU_OK);
+    HU_ASSERT_EQ(hu_lora_set_layer_weights(adapter, 1, A1, B1), HU_OK);
 
-    hu_error_t err = hu_lora_save(adapter, "/tmp/lora_test.bin");
-    HU_ASSERT_EQ(err, HU_OK);
+    const char *path = "/tmp/hu_lora_roundtrip.bin";
+    HU_ASSERT_EQ(hu_lora_save(adapter, path), HU_OK);
+
+    /* Verify file was actually written */
+    FILE *f = fopen(path, "rb");
+    HU_ASSERT_NOT_NULL(f);
+    char magic[4];
+    HU_ASSERT_EQ(fread(magic, 1, 4, f), 4u);
+    HU_ASSERT_EQ(memcmp(magic, "LORA", 4), 0);
+    fclose(f);
+
+    /* Load and verify weights match */
+    hu_lora_adapter_t *loaded = NULL;
+    HU_ASSERT_EQ(hu_lora_load(&alloc, path, &loaded), HU_OK);
+    HU_ASSERT_NOT_NULL(loaded);
+
+    /* Apply both adapters to same input — outputs must match */
+    float input[4] = {1.0f, -0.5f, 0.3f, 0.8f};
+    float out_orig[4] = {0}, out_loaded[4] = {0};
+    HU_ASSERT_EQ(hu_lora_apply(adapter, 0, input, 1, out_orig), HU_OK);
+    HU_ASSERT_EQ(hu_lora_apply(loaded, 0, input, 1, out_loaded), HU_OK);
+    for (int i = 0; i < 4; i++)
+        HU_ASSERT_FLOAT_EQ(out_orig[i], out_loaded[i], 1e-6f);
+
+    memset(out_orig, 0, sizeof(out_orig));
+    memset(out_loaded, 0, sizeof(out_loaded));
+    HU_ASSERT_EQ(hu_lora_apply(adapter, 1, input, 1, out_orig), HU_OK);
+    HU_ASSERT_EQ(hu_lora_apply(loaded, 1, input, 1, out_loaded), HU_OK);
+    for (int i = 0; i < 4; i++)
+        HU_ASSERT_FLOAT_EQ(out_orig[i], out_loaded[i], 1e-6f);
+
+    hu_lora_destroy(&alloc, loaded);
+    hu_lora_destroy(&alloc, adapter);
+    remove(path);
+}
+
+static void lora_load_bad_file(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *path = "/tmp/hu_lora_bad.bin";
+
+    /* Write garbage */
+    FILE *f = fopen(path, "wb");
+    const char bad[] = "NOT_LORA_FILE";
+    fwrite(bad, 1, sizeof(bad), f);
+    fclose(f);
 
     hu_lora_adapter_t *loaded = NULL;
-    err = hu_lora_load(&alloc, "/tmp/lora_test.bin", &loaded);
-    HU_ASSERT_EQ(err, HU_OK);
-    /* In test mode load returns OK but may not allocate (skips file I/O) */
-    if (loaded)
-        hu_lora_destroy(&alloc, loaded);
+    HU_ASSERT_EQ(hu_lora_load(&alloc, path, &loaded), HU_ERR_IO);
+    HU_ASSERT_NULL(loaded);
 
-    hu_lora_destroy(&alloc, adapter);
+    /* Non-existent file */
+    HU_ASSERT_EQ(hu_lora_load(&alloc, "/tmp/nonexistent_lora_xyz.bin", &loaded), HU_ERR_IO);
+
+    remove(path);
+}
+
+/* Failing allocator for OOM testing */
+static int oom_alloc_count;
+static int oom_fail_at;
+
+static void *oom_alloc(void *ctx, size_t size) {
+    (void)ctx;
+    if (oom_fail_at >= 0 && oom_alloc_count >= oom_fail_at)
+        return NULL;
+    oom_alloc_count++;
+    return malloc(size);
+}
+
+static void oom_free(void *ctx, void *ptr, size_t size) {
+    (void)ctx; (void)size;
+    free(ptr);
+}
+
+static void lora_oom_create(void) {
+    hu_lora_config_t cfg = {.rank = 2, .alpha = 2.0f, .dropout = 0.0f, .targets = HU_LORA_TARGET_ALL};
+    hu_lora_adapter_t *adapter = NULL;
+
+    /* Fail on first alloc (adapter struct) */
+    hu_allocator_t bad = { .alloc = oom_alloc, .free = oom_free, .ctx = NULL };
+    oom_alloc_count = 0; oom_fail_at = 0;
+    HU_ASSERT_EQ(hu_lora_create(&bad, &cfg, 4, 4, 1, &adapter), HU_ERR_OUT_OF_MEMORY);
+    HU_ASSERT_NULL(adapter);
+
+    /* Fail on second alloc (layers array) */
+    oom_alloc_count = 0; oom_fail_at = 1;
+    HU_ASSERT_EQ(hu_lora_create(&bad, &cfg, 4, 4, 1, &adapter), HU_ERR_OUT_OF_MEMORY);
+    HU_ASSERT_NULL(adapter);
+
+    /* Fail partway through layer allocation */
+    oom_alloc_count = 0; oom_fail_at = 4;
+    HU_ASSERT_EQ(hu_lora_create(&bad, &cfg, 4, 4, 1, &adapter), HU_ERR_OUT_OF_MEMORY);
+    HU_ASSERT_NULL(adapter);
 }
 
 void run_lora_tests(void) {
@@ -231,7 +320,9 @@ void run_lora_tests(void) {
     HU_RUN_TEST(lora_backward_grad_input_finite_diff);
     HU_RUN_TEST(lora_partial_set_weights);
     HU_RUN_TEST(lora_target_flags);
-    HU_RUN_TEST(lora_save_load_test_mode);
+    HU_RUN_TEST(lora_save_load_roundtrip);
+    HU_RUN_TEST(lora_load_bad_file);
+    HU_RUN_TEST(lora_oom_create);
 }
 
 #else

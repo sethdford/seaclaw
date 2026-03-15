@@ -48,4 +48,8 @@ hu_error_t hu_experiment_loop(hu_allocator_t *alloc,
 hu_error_t hu_experiment_result_to_tsv(const hu_experiment_result_t *result,
                                        char *buf, size_t buf_size);
 
+/* Apply a single key=value config mutation (used by agent-driven experiment loop) */
+void hu_experiment_apply_agent_kv(hu_experiment_config_t *cfg,
+                                  const char *key, const char *val);
+
 #endif

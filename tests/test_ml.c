@@ -3297,6 +3297,86 @@ static void test_checkpoint_optimizer_state(void) {
     remove(ckpt);
 }
 
+/* ─── Agent mutation: apply_agent_kv ──────────────────────────────────── */
+
+static void test_agent_apply_kv(void) {
+    hu_experiment_config_t cfg = hu_experiment_config_default();
+    size_t orig_layer = cfg.gpt.n_layer;
+
+    hu_experiment_apply_agent_kv(&cfg, "n_layer", "4");
+    HU_ASSERT_EQ(cfg.gpt.n_layer, 4u);
+
+    hu_experiment_apply_agent_kv(&cfg, "n_layer", "0");
+    HU_ASSERT_EQ(cfg.gpt.n_layer, 4u);
+
+    hu_experiment_apply_agent_kv(&cfg, "n_layer", "65");
+    HU_ASSERT_EQ(cfg.gpt.n_layer, 4u);
+
+    hu_experiment_apply_agent_kv(&cfg, "matrix_lr", "0.005");
+    HU_ASSERT(fabsf(cfg.optimizer.matrix_lr - 0.005f) < 1e-6f);
+
+    hu_experiment_apply_agent_kv(&cfg, "matrix_lr", "-1.0");
+    HU_ASSERT(fabsf(cfg.optimizer.matrix_lr - 0.005f) < 1e-6f);
+
+    hu_experiment_apply_agent_kv(&cfg, "weight_decay", "0.1");
+    HU_ASSERT(fabsf(cfg.optimizer.weight_decay - 0.1f) < 1e-6f);
+
+    hu_experiment_apply_agent_kv(&cfg, "weight_decay", "1.0");
+    HU_ASSERT(fabsf(cfg.optimizer.weight_decay - 0.1f) < 1e-6f);
+
+    hu_experiment_apply_agent_kv(&cfg, "activation", "gelu");
+    HU_ASSERT_EQ((int)cfg.gpt.activation, (int)HU_ML_ACT_GELU);
+
+    hu_experiment_apply_agent_kv(&cfg, "activation", "swiglu");
+    HU_ASSERT_EQ((int)cfg.gpt.activation, (int)HU_ML_ACT_SWIGLU);
+
+    hu_experiment_apply_agent_kv(&cfg, "activation", "relu_sq");
+    HU_ASSERT_EQ((int)cfg.gpt.activation, (int)HU_ML_ACT_RELU_SQ);
+
+    hu_experiment_apply_agent_kv(&cfg, "activation", "bogus");
+    HU_ASSERT_EQ((int)cfg.gpt.activation, (int)HU_ML_ACT_RELU_SQ);
+
+    hu_experiment_apply_agent_kv(NULL, "n_layer", "4");
+    hu_experiment_apply_agent_kv(&cfg, NULL, "4");
+    hu_experiment_apply_agent_kv(&cfg, "n_layer", NULL);
+    (void)orig_layer;
+}
+
+/* ─── Train: invalid argument paths ──────────────────────────────────── */
+
+static void test_train_invalid_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_training_config_t tc = { .device_batch_size = 2, .time_budget_secs = 1 };
+    hu_ml_train_result_t result = {0};
+    hu_model_t model = {0};
+    hu_ml_optimizer_t opt = {0};
+
+    HU_ASSERT_EQ(hu_ml_train(NULL, &model, &opt, NULL, NULL, &tc, NULL, 0, &result),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_train(&alloc, NULL, &opt, NULL, NULL, &tc, NULL, 0, &result),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_train(&alloc, &model, NULL, NULL, NULL, &tc, NULL, 0, &result),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_train(&alloc, &model, &opt, NULL, NULL, NULL, NULL, 0, &result),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_train(&alloc, &model, &opt, NULL, NULL, &tc, NULL, 0, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+
+    hu_training_config_t tc_bad = tc;
+    tc_bad.device_batch_size = 0;
+    HU_ASSERT_EQ(hu_ml_train(&alloc, &model, &opt, NULL, NULL, &tc_bad, NULL, 0, &result),
+                 HU_ERR_INVALID_ARGUMENT);
+
+    tc_bad = tc;
+    tc_bad.time_budget_secs = -1;
+    HU_ASSERT_EQ(hu_ml_train(&alloc, &model, &opt, NULL, NULL, &tc_bad, NULL, 0, &result),
+                 HU_ERR_INVALID_ARGUMENT);
+
+    int32_t tb[4] = {1,1,1,1};
+    HU_ASSERT_EQ(hu_ml_train(&alloc, &model, &opt, NULL, NULL, &tc, tb, 0, &result),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+
 void run_ml_tests(void) {
     HU_TEST_SUITE("ml");
     /* BPE tokenizer */
@@ -3424,4 +3504,7 @@ void run_ml_tests(void) {
     HU_RUN_TEST(test_prepare_tokenize_dir);
     /* Checkpoint optimizer state */
     HU_RUN_TEST(test_checkpoint_optimizer_state);
+    /* Agent mutation + train API */
+    HU_RUN_TEST(test_agent_apply_kv);
+    HU_RUN_TEST(test_train_invalid_args);
 }
