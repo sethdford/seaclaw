@@ -3,6 +3,7 @@
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/paperclip/client.h"
+#include "human/paperclip/heartbeat.h"
 #include "human/tools/paperclip.h"
 #include "test_framework.h"
 #include <stdlib.h>
@@ -249,6 +250,22 @@ static void paperclip_tool_unknown_action(void) {
 }
 
 /* ── Test registration ───────────────────────────────────────────────── */
+
+/* ── Heartbeat ───────────────────────────────────────────────────────── */
+
+static void heartbeat_null_alloc_returns_error(void) {
+    HU_ASSERT_EQ(hu_paperclip_heartbeat(NULL, 0, NULL), HU_ERR_INVALID_ARGUMENT);
+}
+
+static void heartbeat_no_env_fails_gracefully(void) {
+#if defined(__unix__) || defined(__APPLE__)
+    unsetenv("PAPERCLIP_API_URL");
+    unsetenv("PAPERCLIP_AGENT_ID");
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_error_t err = hu_paperclip_heartbeat(&alloc, 0, NULL);
+    HU_ASSERT_TRUE(err != HU_OK);
+#endif
+}
 
 void run_paperclip_tests(void) {
     HU_TEST_SUITE("paperclip");

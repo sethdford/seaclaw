@@ -1,6 +1,6 @@
 # Architecture
 
-human is a C11 autonomous AI assistant runtime. This document provides the structural overview — see `AGENTS.md` for the full engineering protocol.
+*not quite human.* human is a C11 autonomous AI assistant runtime. This document provides the structural overview — see `AGENTS.md` for the full engineering protocol.
 
 ## System Topology
 
