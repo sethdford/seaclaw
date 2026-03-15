@@ -710,6 +710,37 @@ static hu_error_t parse_diagnostics(hu_allocator_t *a, hu_config_t *cfg,
     return HU_OK;
 }
 
+static hu_error_t parse_feeds(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
+    if (!obj || obj->type != HU_JSON_OBJECT) return HU_OK;
+    cfg->feeds.enabled = hu_json_get_bool(obj, "enabled", cfg->feeds.enabled);
+    const char *s;
+    s = hu_json_get_string(obj, "gmail_client_id");
+    if (s) { if (cfg->feeds.gmail_client_id) a->free(a->ctx, cfg->feeds.gmail_client_id, strlen(cfg->feeds.gmail_client_id)+1); cfg->feeds.gmail_client_id = hu_strdup(a, s); }
+    s = hu_json_get_string(obj, "gmail_client_secret");
+    if (s) { if (cfg->feeds.gmail_client_secret) a->free(a->ctx, cfg->feeds.gmail_client_secret, strlen(cfg->feeds.gmail_client_secret)+1); cfg->feeds.gmail_client_secret = hu_strdup(a, s); }
+    s = hu_json_get_string(obj, "gmail_refresh_token");
+    if (s) { if (cfg->feeds.gmail_refresh_token) a->free(a->ctx, cfg->feeds.gmail_refresh_token, strlen(cfg->feeds.gmail_refresh_token)+1); cfg->feeds.gmail_refresh_token = hu_strdup(a, s); }
+    s = hu_json_get_string(obj, "twitter_bearer_token");
+    if (s) { if (cfg->feeds.twitter_bearer_token) a->free(a->ctx, cfg->feeds.twitter_bearer_token, strlen(cfg->feeds.twitter_bearer_token)+1); cfg->feeds.twitter_bearer_token = hu_strdup(a, s); }
+    s = hu_json_get_string(obj, "interests");
+    if (s) { if (cfg->feeds.interests) a->free(a->ctx, cfg->feeds.interests, strlen(cfg->feeds.interests)+1); cfg->feeds.interests = hu_strdup(a, s); }
+    double v = hu_json_get_number(obj, "relevance_threshold", cfg->feeds.relevance_threshold);
+    if (v >= 0.0 && v <= 1.0) cfg->feeds.relevance_threshold = v;
+    v = hu_json_get_number(obj, "poll_interval_rss", cfg->feeds.poll_interval_rss);
+    if (v >= 1 && v <= 10080) cfg->feeds.poll_interval_rss = (uint32_t)v;
+    v = hu_json_get_number(obj, "poll_interval_gmail", cfg->feeds.poll_interval_gmail);
+    if (v >= 1 && v <= 10080) cfg->feeds.poll_interval_gmail = (uint32_t)v;
+    v = hu_json_get_number(obj, "poll_interval_imessage", cfg->feeds.poll_interval_imessage);
+    if (v >= 1 && v <= 10080) cfg->feeds.poll_interval_imessage = (uint32_t)v;
+    v = hu_json_get_number(obj, "poll_interval_twitter", cfg->feeds.poll_interval_twitter);
+    if (v >= 1 && v <= 10080) cfg->feeds.poll_interval_twitter = (uint32_t)v;
+    v = hu_json_get_number(obj, "poll_interval_file_ingest", cfg->feeds.poll_interval_file_ingest);
+    if (v >= 1 && v <= 10080) cfg->feeds.poll_interval_file_ingest = (uint32_t)v;
+    v = hu_json_get_number(obj, "max_items_per_poll", cfg->feeds.max_items_per_poll);
+    if (v >= 1 && v <= 1000) cfg->feeds.max_items_per_poll = (uint32_t)v;
+    return HU_OK;
+}
+
 hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t len) {
     if (!cfg || !content)
         return HU_ERR_INVALID_ARGUMENT;
@@ -872,6 +903,8 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
     hu_json_value_t *plugins_obj = hu_json_object_get(root, "plugins");
     if (plugins_obj)
         parse_plugins_cfg(a, cfg, plugins_obj);
+    hu_json_value_t *feeds_obj = hu_json_object_get(root, "feeds");
+    if (feeds_obj) parse_feeds(a, cfg, feeds_obj);
     hu_json_value_t *sec = hu_json_object_get(root, "security");
     if (sec && sec->type == HU_JSON_OBJECT) {
         double al = hu_json_get_number(sec, "autonomy_level", cfg->security.autonomy_level);

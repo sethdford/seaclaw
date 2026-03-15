@@ -26,7 +26,7 @@ static const char *const hu_config_top_keys[] = {
     "mcp_servers",   "nodes",
     "policy",        "plugins",
     "security",      "secrets",
-    "identity",
+    "identity",      "feeds",
 };
 static const size_t hu_config_top_keys_len =
     sizeof(hu_config_top_keys) / sizeof(hu_config_top_keys[0]);

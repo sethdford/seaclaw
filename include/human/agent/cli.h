@@ -15,6 +15,9 @@ typedef struct hu_parsed_agent_args {
     int has_temperature;
     int use_tui;
     int demo_mode;
+    const char *prompt;
+    const char *channel;
+    int once;
 } hu_parsed_agent_args_t;
 
 hu_error_t hu_agent_cli_parse_args(const char *const *argv, size_t argc,
