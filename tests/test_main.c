@@ -226,6 +226,7 @@ void run_emotion_map_tests(void);
 void run_ml_tests(void);
 #endif
 void run_multigraph_tests(void);
+void run_experience_tests(void);
 void run_a2a_tests(void);
 void run_eval_tests(void);
 void run_corrective_rag_tests(void);
@@ -487,6 +488,7 @@ int main(int argc, char **argv) {
     run_ml_tests();
 #endif
 
+    run_experience_tests();
     run_a2a_tests();
     run_eval_tests();
     run_corrective_rag_tests();
