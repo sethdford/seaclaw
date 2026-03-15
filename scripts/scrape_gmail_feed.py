@@ -34,9 +34,21 @@ def get_access_token(cid, csec, rtok):
     with urllib.request.urlopen(req, timeout=10) as r:
         return json.loads(r.read())["access_token"]
 
+def get_quota_project():
+    try:
+        with open(CONFIG_PATH) as f:
+            cfg = json.load(f)
+        return cfg.get("feeds", {}).get("gmail", {}).get("quota_project", "")
+    except Exception:
+        return ""
+
 def gmail_get(token, path):
     url = f"https://gmail.googleapis.com/gmail/v1/users/me/{path}"
-    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    headers = {"Authorization": f"Bearer {token}"}
+    qp = get_quota_project()
+    if qp:
+        headers["x-goog-user-project"] = qp
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())
 
