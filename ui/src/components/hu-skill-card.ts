@@ -44,6 +44,7 @@ export class ScSkillCard extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      contain: layout style;
     }
 
     .skill-card {

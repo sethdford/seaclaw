@@ -105,6 +105,7 @@ export class ScMemoryView extends GatewayAwareLitElement {
       display: flex;
       flex-direction: column;
       contain: layout style;
+      container-type: inline-size;
       flex: 1;
       min-height: 0;
       color: var(--hu-text);
@@ -203,7 +204,7 @@ export class ScMemoryView extends GatewayAwareLitElement {
       gap: var(--hu-space-md);
     }
 
-    @media (max-width: 48rem) /* --hu-breakpoint-md */ {
+    @container (max-width: 48rem) /* --hu-breakpoint-md */ {
       .memory-grid {
         grid-template-columns: 1fr;
       }

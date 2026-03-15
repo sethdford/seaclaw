@@ -97,15 +97,13 @@ export class ScAutomationCard extends LitElement {
       transition:
         opacity var(--hu-duration-fast) var(--hu-ease-out),
         border-color var(--hu-duration-fast) var(--hu-ease-out);
-    }
-
-    .card-wrapper.paused {
-      opacity: 0.7;
-      border-left-color: var(--hu-accent-secondary);
-    }
-
-    .card-wrapper.last-failed {
-      border-left-color: var(--hu-error);
+      &.paused {
+        opacity: 0.7;
+        border-left-color: var(--hu-accent-secondary);
+      }
+      &.last-failed {
+        border-left-color: var(--hu-error);
+      }
     }
 
     hu-card {
@@ -135,12 +133,25 @@ export class ScAutomationCard extends LitElement {
       width: 2.25rem;
       height: 1.25rem;
       cursor: pointer;
-    }
-
-    .toggle input {
-      opacity: 0;
-      width: 0;
-      height: 0;
+      & input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        &:checked + .toggle-slider {
+          background: var(--hu-accent);
+          &::before {
+            transform: translateX(1rem);
+          }
+        }
+        &:focus-visible + .toggle-slider {
+          outline: var(--hu-focus-ring-width) solid var(--hu-focus-ring);
+          outline-offset: var(--hu-focus-ring-offset);
+        }
+      }
+      &:has(input:disabled) {
+        cursor: not-allowed;
+        opacity: var(--hu-opacity-disabled);
+      }
     }
 
     .toggle-slider {
@@ -149,39 +160,20 @@ export class ScAutomationCard extends LitElement {
       background: var(--hu-border);
       border-radius: var(--hu-radius-full);
       transition: background var(--hu-duration-fast) var(--hu-ease-out);
-    }
-
-    .toggle-slider::before {
-      content: "";
-      position: absolute;
-      height: 1rem;
-      width: 1rem;
-      left: 2px; /* hu-lint-ok: sub-token toggle position */
-      bottom: 2px; /* hu-lint-ok: sub-token toggle position */
-      background: var(--hu-bg);
-      border-radius: var(--hu-radius-full);
-      box-shadow: var(--hu-shadow-sm);
-      transition:
-        transform var(--hu-duration-fast) var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
-        background var(--hu-duration-fast) var(--hu-ease-out);
-    }
-
-    .toggle input:checked + .toggle-slider {
-      background: var(--hu-accent);
-    }
-
-    .toggle input:checked + .toggle-slider::before {
-      transform: translateX(1rem);
-    }
-
-    .toggle input:focus-visible + .toggle-slider {
-      outline: var(--hu-focus-ring-width) solid var(--hu-focus-ring);
-      outline-offset: var(--hu-focus-ring-offset);
-    }
-
-    .toggle:has(input:disabled) {
-      cursor: not-allowed;
-      opacity: var(--hu-opacity-disabled);
+      &::before {
+        content: "";
+        position: absolute;
+        height: 1rem;
+        width: 1rem;
+        left: 2px; /* hu-lint-ok: sub-token toggle position */
+        bottom: 2px; /* hu-lint-ok: sub-token toggle position */
+        background: var(--hu-bg);
+        border-radius: var(--hu-radius-full);
+        box-shadow: var(--hu-shadow-sm);
+        transition:
+          transform var(--hu-duration-fast) var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
+          background var(--hu-duration-fast) var(--hu-ease-out);
+      }
     }
 
     .btn-icon {

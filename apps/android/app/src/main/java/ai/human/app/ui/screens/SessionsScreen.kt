@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import ai.human.app.ui.HUTokens
@@ -45,6 +46,7 @@ private data class SessionItem(
     val title: String,
     val timestamp: String,
     val messageCount: Int,
+    val preview: String,
 )
 
 private val sessionSpring = spring<IntOffset>(
@@ -58,11 +60,11 @@ fun SessionsScreen() {
     val colorScheme = MaterialTheme.colorScheme
     val sessions = remember {
         mutableStateListOf(
-            SessionItem("1", "CLI conversation", "2 min ago", 12),
-            SessionItem("2", "Telegram support", "1 hour ago", 8),
-            SessionItem("3", "Discord channel sync", "3 hours ago", 24),
-            SessionItem("4", "Slack workspace", "Yesterday", 15),
-            SessionItem("5", "Email thread", "2 days ago", 6),
+            SessionItem("1", "CLI conversation", "2 min ago", 12, "I'll check the forecast for you."),
+            SessionItem("2", "Telegram support", "1 hour ago", 8, "Here's my suggested refactor..."),
+            SessionItem("3", "Discord channel sync", "3 hours ago", 24, "Based on your preferences..."),
+            SessionItem("4", "Slack workspace", "Yesterday", 15, "Sure, I can help with that."),
+            SessionItem("5", "Email thread", "2 days ago", 6, "Let me look into this."),
         )
     }
     var visible by remember { mutableStateOf(false) }
@@ -92,7 +94,10 @@ fun SessionsScreen() {
                     text = "Sessions",
                     style = MaterialTheme.typography.headlineLarge,
                     color = colorScheme.onBackground,
-                    modifier = Modifier.semantics { contentDescription = "Sessions heading" },
+                    modifier = Modifier.semantics {
+                        contentDescription = "Sessions"
+                        heading()
+                    },
                 )
             }
         }
@@ -166,7 +171,7 @@ private fun SessionListItem(
                 .background(colorScheme.primaryContainer)
                 .padding(HUTokens.spaceMd)
                 .semantics(mergeDescendants = true) {
-                    contentDescription = "${session.title}, ${session.timestamp}, ${session.messageCount} messages"
+                    contentDescription = "${session.title}, ${session.messageCount} messages, ${session.timestamp}, preview: ${session.preview}"
                 },
         ) {
             Row(
@@ -175,19 +180,40 @@ private fun SessionListItem(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(HUTokens.spaceXs),
+                    ) {
+                        Text(
+                            text = session.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colorScheme.onSurface,
+                        )
+                        Text(
+                            text = "${session.messageCount}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colorScheme.primary,
+                            modifier = Modifier
+                                .background(
+                                    colorScheme.primary.copy(alpha = 0.2f),
+                                    RoundedCornerShape(HUTokens.radiusSm),
+                                )
+                                .padding(horizontal = HUTokens.spaceXs, vertical = 2),
+                        )
+                    }
                     Text(
-                        text = session.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = colorScheme.onSurface,
+                        text = (session.preview.take(40) + if (session.preview.length > 40) "…" else ""),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = session.timestamp,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = colorScheme.onSurfaceVariant,
                     )
                 }
                 Text(
-                    text = "${session.messageCount} messages",
+                    text = "${session.messageCount} msgs",
                     style = MaterialTheme.typography.labelMedium,
                     color = colorScheme.onSurfaceVariant,
                 )

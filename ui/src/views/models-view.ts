@@ -56,6 +56,7 @@ export class ScModelsView extends GatewayAwareLitElement {
       display: block;
       max-width: 75rem;
       contain: layout style;
+      container-type: inline-size;
     }
     .info-section {
       display: grid;
@@ -136,7 +137,7 @@ export class ScModelsView extends GatewayAwareLitElement {
       display: flex;
       justify-content: flex-end;
     }
-    @media (max-width: 48rem) /* --hu-breakpoint-lg */ {
+    @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
       .info-section {
         grid-template-columns: 1fr;
       }
@@ -144,7 +145,7 @@ export class ScModelsView extends GatewayAwareLitElement {
         grid-template-columns: 1fr 1fr;
       }
     }
-    @media (max-width: 40rem) /* --hu-breakpoint-md */ {
+    @container (max-width: 40rem) /* --hu-breakpoint-md */ {
       .grid {
         grid-template-columns: 1fr;
       }
@@ -152,7 +153,7 @@ export class ScModelsView extends GatewayAwareLitElement {
     .search-wrap {
       margin-bottom: var(--hu-space-xl);
     }
-    @media (max-width: 30rem) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
       .grid {
         grid-template-columns: 1fr;
       }

@@ -162,3 +162,150 @@ test.describe("Memory (Interactions)", () => {
     }).toPass({ timeout: POLL });
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Channels (Interactions)
+// ─────────────────────────────────────────────────────────────
+test.describe("Channels (Interactions)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#channels");
+    await page.waitForTimeout(WAIT);
+  });
+
+  test("shows channel list with configured channels", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-channels-view"));
+      expect(text).toContain("Telegram");
+      expect(text).toContain("Discord");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows channel status", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-channels-view"));
+      expect(text).toMatch(/Connected|Not configured|Error/);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows unconfigured channels", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-channels-view"));
+      expect(text).toContain("Signal");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("page hero renders", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("hu-channels-view", "hu-page-hero"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Nodes (Interactions)
+// ─────────────────────────────────────────────────────────────
+test.describe("Nodes (Interactions)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#nodes");
+    await page.waitForTimeout(WAIT);
+  });
+
+  test("shows node list with hostnames", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-nodes-view"));
+      expect(text).toContain("studio.local");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows node status indicators", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-nodes-view"));
+      expect(text).toMatch(/online|offline|degraded/i);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows refresh button", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-nodes-view"));
+      expect(text).toContain("Refresh");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("data table renders", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("hu-nodes-view", "hu-data-table-v2"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Usage (Interactions)
+// ─────────────────────────────────────────────────────────────
+test.describe("Usage (Interactions)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#usage");
+    await page.waitForTimeout(WAIT);
+  });
+
+  test("shows cost summary", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-usage-view"));
+      expect(text).toMatch(/\$|cost|token/i);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows provider breakdown", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-usage-view"));
+      expect(text).toContain("openrouter");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("page hero renders", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("hu-usage-view", "hu-page-hero"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("stat cards present", async ({ page }) => {
+    await expect(async () => {
+      const count = await page.evaluate(shadowCount("hu-usage-view", "hu-stat-card"));
+      expect(count).toBeGreaterThanOrEqual(2);
+    }).toPass({ timeout: POLL });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Logs (Interactions)
+// ─────────────────────────────────────────────────────────────
+test.describe("Logs (Interactions)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#logs");
+    await page.waitForTimeout(WAIT);
+  });
+
+  test("shows log output area", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("hu-logs-view", ".log-output"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("has filter input", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("hu-logs-view", ".filter-input"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("shows level filter controls", async ({ page }) => {
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText("hu-logs-view"));
+      expect(text).toMatch(/debug|info|warn|error/i);
+    }).toPass({ timeout: POLL });
+  });
+
+  test("page hero renders", async ({ page }) => {
+    await expect(async () => {
+      expect(await page.evaluate(shadowExists("hu-logs-view", "hu-page-hero"))).toBe(true);
+    }).toPass({ timeout: POLL });
+  });
+});

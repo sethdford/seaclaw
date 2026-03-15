@@ -80,6 +80,7 @@ export class ScConfigView extends GatewayAwareLitElement {
       display: block;
       max-width: 40rem;
       contain: layout style;
+      container-type: inline-size;
       margin: 0 auto;
     }
     .header-actions {
@@ -193,7 +194,7 @@ export class ScConfigView extends GatewayAwareLitElement {
       display: flex;
       gap: var(--hu-space-sm);
     }
-    @media (max-width: 30rem) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
       :host {
         max-width: 100%;
       }

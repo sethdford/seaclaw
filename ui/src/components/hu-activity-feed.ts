@@ -21,6 +21,7 @@ export class ScActivityFeed extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      contain: layout style;
     }
     .feed {
       display: flex;

@@ -121,7 +121,7 @@ export class ScCard extends LitElement {
     .card.glass {
       background: color-mix(
         in srgb,
-        var(--hu-card-surface, var(--hu-surface-container)) 65%,
+        var(--hu-card-surface, var(--hu-surface-container)) var(--hu-glass-card-bg-mix, 65%),
         transparent
       );
       backdrop-filter: blur(var(--hu-blur-lg)) saturate(var(--hu-glass-standard-saturate));

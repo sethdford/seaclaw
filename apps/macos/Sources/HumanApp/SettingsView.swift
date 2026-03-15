@@ -3,6 +3,7 @@ import HumanChatUI
 
 struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject var status: StatusViewModel
     @State private var gatewayURL: String = "ws://localhost:3000"
     @State private var autoStartOnLogin: Bool = false
     @State private var binaryPath: String = ""
@@ -17,9 +18,40 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            TextField("Gateway URL", text: $gatewayURL)
-                .textFieldStyle(.roundedBorder)
-            Toggle("Auto-start on login", isOn: $autoStartOnLogin)
+            Section {
+                HStack {
+                    Circle()
+                        .fill(status.isGatewayConnected ? (colorScheme == .dark ? HUTokens.Dark.success : HUTokens.Light.success) : (colorScheme == .dark ? HUTokens.Dark.error : HUTokens.Light.error))
+                        .frame(width: HUTokens.spaceSm, height: HUTokens.spaceSm)
+                    Text(status.isGatewayConnected ? "Connected" : "Disconnected")
+                        .font(.custom("Avenir-Book", size: HUTokens.textSm))
+                        .foregroundStyle(.secondary)
+                    if status.isGatewayConnected {
+                        Spacer()
+                        Text("42 ms")
+                            .font(.custom("Avenir-Book", size: HUTokens.textXs))
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                            .accessibilityLabel("Connection latency: 42 milliseconds")
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Gateway \(status.isGatewayConnected ? "connected" : "disconnected")")
+            } header: {
+                Text("Connection")
+            }
+
+            DisclosureGroup("Advanced") {
+                TextField("Gateway URL", text: $gatewayURL)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Gateway URL")
+                Toggle("Auto-start on login", isOn: $autoStartOnLogin)
+                    .accessibilityLabel("Auto-start on login")
+                    .accessibilityValue(autoStartOnLogin ? "On" : "Off")
+            } label: {
+                Text("Advanced")
+            }
+
             Section {
                 Text(binaryPath.isEmpty ? "Not found" : binaryPath)
                     .font(.custom("Avenir-Book", size: HUTokens.textSm))

@@ -59,6 +59,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
       display: block;
       color: var(--hu-text);
       contain: layout style;
+      container-type: inline-size;
       max-width: 75rem;
       padding: var(--hu-space-lg) var(--hu-space-xl);
     }
@@ -121,7 +122,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
       margin-bottom: var(--hu-space-2xl);
     }
 
-    @media (max-width: 48rem) /* --hu-breakpoint-lg */ {
+    @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
       .metrics,
       .skeleton-metrics {
         grid-template-columns: repeat(2, 1fr);
@@ -131,7 +132,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
       }
     }
 
-    @media (max-width: 30rem) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
       .metrics,
       .skeleton-metrics {
         grid-template-columns: 1fr;

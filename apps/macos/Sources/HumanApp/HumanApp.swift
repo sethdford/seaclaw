@@ -64,6 +64,7 @@ struct HumanApp: App {
 
         Settings {
             SettingsView()
+                .environmentObject(status)
         }
 
         MenuBarExtra {

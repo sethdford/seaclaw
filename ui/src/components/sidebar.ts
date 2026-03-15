@@ -256,10 +256,10 @@ export class ScSidebar extends LitElement {
       color: var(--hu-text);
       cursor: pointer;
       transition:
-        background var(--hu-duration-fast),
-        color var(--hu-duration-fast),
-        border-color var(--hu-duration-fast),
-        transform var(--hu-duration-normal) var(--hu-spring-out);
+        background var(--hu-duration-fast) var(--hu-ease-spring),
+        color var(--hu-duration-fast) var(--hu-ease-spring),
+        border-color var(--hu-duration-fast) var(--hu-ease-spring),
+        transform var(--hu-duration-fast) var(--hu-ease-spring);
       margin-bottom: var(--hu-space-xs);
       text-align: left;
       font-family: var(--hu-font);
@@ -282,8 +282,9 @@ export class ScSidebar extends LitElement {
       }
 
       &[aria-current] {
-        background: var(--hu-accent-subtle);
+        background: var(--hu-surface-container-high);
         border-left: 3px solid var(--hu-accent);
+        border-radius: var(--hu-radius-sm) 0 0 var(--hu-radius-sm);
         color: var(--hu-accent-text, var(--hu-accent));
       }
     }

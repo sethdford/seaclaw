@@ -4,6 +4,7 @@
 @import "./scroll-driven.css";
 
 :root {
+  --hu-glass-card-bg-mix: 65%;
   --hu-surface: var(--hu-bg-surface);
   --hu-overlay: var(--hu-color-overlay, rgb(0 0 0 / 0.6));
   --hu-focus-glow: rgb(59 130 246 / 0.15);
@@ -87,6 +88,8 @@ body {
 
 [data-theme="dark"] {
   color-scheme: dark;
+  /* Dark mode glass depth — slightly higher opacity for cards/panels */
+  --hu-glass-card-bg-mix: 75%;
 }
 
 :focus-visible {

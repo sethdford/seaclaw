@@ -15,6 +15,7 @@ export class ScVoiceOrb extends LitElement {
       display: flex;
       flex-direction: column;
       align-items: center;
+      contain: layout style;
       padding: var(--hu-space-lg) 0 var(--hu-space-md);
       position: relative;
       flex-shrink: 0;

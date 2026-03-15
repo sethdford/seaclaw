@@ -69,6 +69,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
       display: block;
       color: var(--hu-text);
       contain: layout style;
+      container-type: inline-size;
     }
     .grid {
       display: grid;
@@ -213,12 +214,12 @@ export class ScSecurityView extends GatewayAwareLitElement {
       color: var(--hu-text-muted);
       margin-top: var(--hu-space-xs);
     }
-    @media (max-width: 48rem) /* --hu-breakpoint-lg */ {
+    @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
       .grid {
         grid-template-columns: 1fr 1fr;
       }
     }
-    @media (max-width: 30rem) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
       .grid {
         grid-template-columns: 1fr;
       }

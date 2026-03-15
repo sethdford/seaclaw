@@ -52,6 +52,7 @@ export class ScLogsView extends GatewayAwareLitElement {
       display: flex;
       flex-direction: column;
       contain: layout style;
+      container-type: inline-size;
       flex: 1;
       min-height: 0;
       color: var(--hu-text);
@@ -186,7 +187,7 @@ export class ScLogsView extends GatewayAwareLitElement {
     .skeleton-line-70 {
       width: 70%;
     }
-    @media (max-width: 48rem) /* --hu-breakpoint-lg */ {
+    @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
       .header {
         flex-wrap: wrap;
       }
@@ -194,7 +195,7 @@ export class ScLogsView extends GatewayAwareLitElement {
         flex-wrap: wrap;
       }
     }
-    @media (max-width: 30rem) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
       .filter-input {
         width: 100%;
       }

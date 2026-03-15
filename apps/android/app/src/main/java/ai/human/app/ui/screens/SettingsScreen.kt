@@ -1,7 +1,10 @@
 package ai.human.app.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +19,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.TextStyle
 import ai.human.app.GatewayClient
 import ai.human.app.ConnectionState
@@ -41,6 +50,7 @@ fun SettingsScreen(
 ) {
     val colorScheme = MaterialTheme.colorScheme
     var gatewayUrl by remember { mutableStateOf("ws://localhost:3000") }
+    var advancedExpanded by remember { mutableStateOf(false) }
     val isConnected = connectionState == ConnectionState.CONNECTED
 
     Column(
@@ -53,36 +63,9 @@ fun SettingsScreen(
             text = "Gateway",
             style = MaterialTheme.typography.titleMedium,
             color = colorScheme.onBackground,
-            modifier = Modifier.semantics { contentDescription = "Gateway settings" },
-        )
-
-        BasicTextField(
-            value = gatewayUrl,
-            onValueChange = { gatewayUrl = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(HUTokens.radiusMd))
-                .background(colorScheme.surfaceVariant)
-                .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm)
-                .semantics { contentDescription = "Gateway URL: $gatewayUrl" },
-            textStyle = TextStyle(
-                color = colorScheme.onSurface,
-                fontSize = HUTokens.textBase,
-                fontFamily = MaterialTheme.typography.bodyMedium.fontFamily,
-            ),
-            singleLine = true,
-            cursorBrush = SolidColor(colorScheme.primary),
-            decorationBox = { innerTextField ->
-                Box {
-                    if (gatewayUrl.isEmpty()) {
-                        Text(
-                            text = "Gateway URL",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    innerTextField()
-                }
+            modifier = Modifier.semantics {
+                contentDescription = "Gateway settings"
+                heading()
             },
         )
 
@@ -105,6 +88,17 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = colorScheme.onSurfaceVariant,
             )
+            if (isConnected) {
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "42 ms",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics {
+                        contentDescription = "Connection latency: 42 milliseconds"
+                    },
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(HUTokens.spaceSm))
@@ -136,6 +130,74 @@ fun SettingsScreen(
                 color = colorScheme.onPrimary,
             )
         }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { advancedExpanded = !advancedExpanded }
+                .padding(vertical = HUTokens.spaceSm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = "Advanced",
+                style = MaterialTheme.typography.titleMedium,
+                color = colorScheme.onBackground,
+                modifier = Modifier.semantics {
+                    contentDescription = "Advanced settings"
+                    heading()
+                },
+            )
+            IconButton(
+                onClick = { advancedExpanded = !advancedExpanded },
+                modifier = Modifier.semantics {
+                    contentDescription = if (advancedExpanded) "Collapse advanced settings" else "Expand advanced settings"
+                },
+            ) {
+                Icon(
+                    imageVector = if (advancedExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = advancedExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(HUTokens.spaceMd)) {
+                BasicTextField(
+                    value = gatewayUrl,
+                    onValueChange = { gatewayUrl = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(HUTokens.radiusMd))
+                        .background(colorScheme.surfaceVariant)
+                        .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm)
+                        .semantics { contentDescription = "Gateway URL: $gatewayUrl" },
+                    textStyle = TextStyle(
+                        color = colorScheme.onSurface,
+                        fontSize = HUTokens.textBase,
+                        fontFamily = MaterialTheme.typography.bodyMedium.fontFamily,
+                    ),
+                    singleLine = true,
+                    cursorBrush = SolidColor(colorScheme.primary),
+                    decorationBox = { innerTextField ->
+                        Box {
+                            if (gatewayUrl.isEmpty()) {
+                                Text(
+                                    text = "Gateway URL",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            innerTextField()
+                        }
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -157,6 +219,9 @@ private fun ConnectionStatusIndicator(isConnected: Boolean) {
             .size(HUTokens.spaceMd)
             .clip(CircleShape)
             .background(animatedColor)
-            .semantics { contentDescription = "Connection status indicator" },
+            .semantics {
+                contentDescription = "Connection status indicator"
+                stateDescription = if (isConnected) "Connected" else "Disconnected"
+            },
     )
 }

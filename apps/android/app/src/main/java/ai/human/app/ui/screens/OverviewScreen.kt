@@ -1,10 +1,13 @@
 package ai.human.app.ui.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,7 +37,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -114,6 +119,10 @@ fun OverviewScreen(
                         text = "Welcome back",
                         style = MaterialTheme.typography.headlineLarge,
                         color = colorScheme.onBackground,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Welcome back"
+                            heading()
+                        },
                     )
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(HUTokens.spaceXs),
@@ -126,7 +135,8 @@ fun OverviewScreen(
                             modifier = Modifier
                                 .size(8.dp)
                                 .clip(CircleShape)
-                                .background(statusColor),
+                                .background(statusColor)
+                                .clearAndSetSemantics { },
                         )
                         Text(
                             text = statusLabel,
@@ -162,7 +172,7 @@ fun OverviewScreen(
                     )
                     StatCard(
                         title = "Events",
-                        value = "${recentActivity.size}",
+                        value = recentActivity.size,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -178,11 +188,21 @@ fun OverviewScreen(
                         initialOffsetY = { it / 4 },
                     ),
             ) {
-                StatCard(
-                    title = "Connection",
-                    value = if (connectionState == ConnectionState.CONNECTED) "Active" else "Offline",
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(HUTokens.spaceMd),
+                ) {
+                    StatCard(
+                        title = "Connection",
+                        value = if (connectionState == ConnectionState.CONNECTED) "Active" else "Offline",
+                        modifier = Modifier.weight(1f),
+                    )
+                    StatCard(
+                        title = "Messages",
+                        value = recentActivity.size * 12,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
 
@@ -251,6 +271,48 @@ private fun StatCard(
                 style = MaterialTheme.typography.titleLarge,
                 color = colorScheme.onBackground,
             )
+        }
+    }
+}
+
+@Composable
+private fun StatCard(
+    title: String,
+    value: Int,
+    modifier: Modifier = Modifier,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(HUTokens.radiusLg))
+            .background(colorScheme.primaryContainer)
+            .padding(HUTokens.spaceMd)
+            .semantics { contentDescription = "$title: $value" },
+    ) {
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                color = colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(HUTokens.spaceXs))
+            AnimatedContent(
+                targetState = value,
+                transitionSpec = {
+                    if (targetState > initialState) {
+                        slideInVertically { -it } togetherWith slideOutVertically { it }
+                    } else {
+                        slideInVertically { it } togetherWith slideOutVertically { -it }
+                    }
+                },
+                label = "stat_counter",
+            ) { count ->
+                Text(
+                    text = "$count",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = colorScheme.onBackground,
+                )
+            }
         }
     }
 }

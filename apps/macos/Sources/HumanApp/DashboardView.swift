@@ -48,6 +48,7 @@ struct DashboardView: View {
         }
         .listStyle(.sidebar)
         .frame(minWidth: 180)
+        .focusSection()
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 HStack(spacing: HUTokens.spaceXs) {
@@ -69,14 +70,19 @@ struct DashboardView: View {
         switch status.selectedTab {
         case .overview:
             MacOverviewPane(tokens: tokens, status: status)
+                .focusSection()
         case .chat:
             MacChatPane(tokens: tokens)
+                .focusSection()
         case .sessions:
             MacSessionsPane(tokens: tokens)
+                .focusSection()
         case .tools:
             MacToolsPane(tokens: tokens)
+                .focusSection()
         case .settings:
             SettingsView()
+                .focusSection()
         }
     }
 }
@@ -115,7 +121,7 @@ struct MacOverviewPane: View {
                 .padding(HUTokens.spaceMd)
                 .background(tokens.surfaceContainer)
                 .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .contain)
                 .accessibilityLabel("Gateway \(status.isGatewayConnected ? "connected" : "disconnected") at \(status.gatewayURL)")
 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: HUTokens.spaceMd), count: 4), spacing: HUTokens.spaceMd) {
@@ -135,7 +141,7 @@ struct MacOverviewPane: View {
                         .padding(HUTokens.spaceMd)
                         .background(tokens.surfaceContainer)
                         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
-                        .accessibilityElement(children: .combine)
+                        .accessibilityElement(children: .contain)
                         .accessibilityLabel("\(stat.0): \(stat.1)")
                         .opacity(appeared ? 1 : 0)
                         .scaleEffect(appeared ? 1 : 0.9)
@@ -153,6 +159,30 @@ struct MacOverviewPane: View {
                             .font(.custom("Avenir-Book", size: HUTokens.textSm))
                             .foregroundStyle(tokens.textMuted)
                         Text("~1696 KB")
+                            .font(.custom("Avenir-Heavy", size: HUTokens.textBase))
+                            .foregroundStyle(tokens.text)
+                    }
+                    VStack(alignment: .leading, spacing: HUTokens.spaceXs) {
+                        Text("Uptime")
+                            .font(.custom("Avenir-Book", size: HUTokens.textSm))
+                            .foregroundStyle(tokens.textMuted)
+                        Text("99.8%")
+                            .font(.custom("Avenir-Heavy", size: HUTokens.textBase))
+                            .foregroundStyle(tokens.text)
+                    }
+                    VStack(alignment: .leading, spacing: HUTokens.spaceXs) {
+                        Text("Model")
+                            .font(.custom("Avenir-Book", size: HUTokens.textSm))
+                            .foregroundStyle(tokens.textMuted)
+                        Text(status.isGatewayConnected ? "claude-sonnet" : "—")
+                            .font(.custom("Avenir-Heavy", size: HUTokens.textBase))
+                            .foregroundStyle(tokens.text)
+                    }
+                    VStack(alignment: .leading, spacing: HUTokens.spaceXs) {
+                        Text("Memory entries")
+                            .font(.custom("Avenir-Book", size: HUTokens.textSm))
+                            .foregroundStyle(tokens.textMuted)
+                        Text("1,247")
                             .font(.custom("Avenir-Heavy", size: HUTokens.textBase))
                             .foregroundStyle(tokens.text)
                     }
@@ -208,10 +238,10 @@ struct MacChatPane: View {
 struct MacSessionsPane: View {
     let tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
 
-    private let sessions: [(String, String, String)] = [
-        ("CLI conversation", "2 min ago", "12 messages"),
-        ("Telegram support", "1 hour ago", "8 messages"),
-        ("Discord sync", "3 hours ago", "24 messages"),
+    private let sessions: [(String, String, Int, String)] = [
+        ("CLI conversation", "2 min ago", 12, "I'll check the forecast for you."),
+        ("Telegram support", "1 hour ago", 8, "Here's my suggested refactor..."),
+        ("Discord sync", "3 hours ago", 24, "Based on your preferences..."),
     ]
 
     var body: some View {
@@ -227,21 +257,35 @@ struct MacSessionsPane: View {
                     HStack {
                         Image(systemName: "bubble.left.and.bubble.right")
                             .foregroundStyle(tokens.accent)
+                            .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: HUTokens.spaceXs) {
-                            Text(session.0)
-                                .font(.custom("Avenir-Heavy", size: HUTokens.textBase))
-                                .foregroundStyle(tokens.text)
+                            HStack(spacing: HUTokens.spaceXs) {
+                                Text(session.0)
+                                    .font(.custom("Avenir-Heavy", size: HUTokens.textBase))
+                                    .foregroundStyle(tokens.text)
+                                Text("\(session.2)")
+                                    .font(.custom("Avenir-Medium", size: HUTokens.textXs, relativeTo: .caption))
+                                    .foregroundStyle(tokens.accent)
+                                    .padding(.horizontal, HUTokens.spaceXs)
+                                    .padding(.vertical, 2)
+                                    .background(tokens.accent.opacity(HUTokens.opacityOverlayLight))
+                                    .clipShape(Capsule())
+                            }
+                            Text(String(session.3.prefix(40)) + (session.3.count > 40 ? "…" : ""))
+                                .font(.custom("Avenir-Book", size: HUTokens.textXs))
+                                .foregroundStyle(tokens.textMuted)
+                                .lineLimit(1)
                             Text(session.1)
                                 .font(.custom("Avenir-Book", size: HUTokens.textXs))
                                 .foregroundStyle(tokens.textMuted)
                         }
                         Spacer()
-                        Text(session.2)
+                        Text("\(session.2) msgs")
                             .font(.custom("Avenir-Book", size: HUTokens.textXs))
                             .foregroundStyle(tokens.textMuted)
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(session.0), \(session.1), \(session.2)")
+                    .accessibilityLabel("\(session.0), \(session.2) messages, \(session.1), preview: \(session.3)")
                 }
             }
         }
@@ -251,15 +295,15 @@ struct MacSessionsPane: View {
 struct MacToolsPane: View {
     let tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
 
-    private let tools: [(String, String, String)] = [
-        ("Shell", "Execute commands", "terminal"),
-        ("Read File", "Read file contents", "doc.text"),
-        ("Write File", "Write to a file", "doc.badge.plus"),
-        ("Fetch", "HTTP request", "network"),
-        ("Grep", "Search patterns", "magnifyingglass"),
-        ("Browser", "Web navigation", "globe"),
-        ("Memory", "Store and recall", "brain"),
-        ("Eval", "Evaluate expressions", "function"),
+    private let tools: [(String, String, String, String)] = [
+        ("Shell", "Execute commands", "terminal", "2m ago"),
+        ("Read File", "Read file contents", "doc.text", "124 uses"),
+        ("Write File", "Write to a file", "doc.badge.plus", "5m ago"),
+        ("Fetch", "HTTP request", "network", "89 uses"),
+        ("Grep", "Search patterns", "magnifyingglass", "1h ago"),
+        ("Browser", "Web navigation", "globe", "—"),
+        ("Memory", "Store and recall", "brain", "32 uses"),
+        ("Eval", "Evaluate expressions", "function", "—"),
     ]
 
     var body: some View {
@@ -275,10 +319,14 @@ struct MacToolsPane: View {
                             Image(systemName: tool.2)
                                 .font(.custom("Avenir-Medium", size: HUTokens.textLg))
                                 .foregroundStyle(tokens.accent)
+                                .accessibilityHidden(true)
                             Text(tool.0)
                                 .font(.custom("Avenir-Heavy", size: HUTokens.textBase))
                                 .foregroundStyle(tokens.text)
                             Text(tool.1)
+                                .font(.custom("Avenir-Book", size: HUTokens.textXs))
+                                .foregroundStyle(tokens.textMuted)
+                            Text(tool.3)
                                 .font(.custom("Avenir-Book", size: HUTokens.textXs))
                                 .foregroundStyle(tokens.textMuted)
                         }
@@ -286,12 +334,38 @@ struct MacToolsPane: View {
                         .padding(HUTokens.spaceMd)
                         .background(tokens.surfaceContainer)
                         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(tool.0): \(tool.1)")
+                        .accessibilityElement(children: .contain)
+                        .accessibilityLabel("\(tool.0): \(tool.1), last used \(tool.3)")
                     }
                 }
             }
             .padding(HUTokens.spaceLg)
+        }
+    }
+}
+
+private struct SparklineView: View {
+    let data: [CGFloat]
+    let color: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width / CGFloat(max(1, data.count - 1))
+            let maxVal = data.max() ?? 1
+            let minVal = data.min() ?? 0
+            let range = max(maxVal - minVal, 0.001)
+            Path { path in
+                for (i, v) in data.enumerated() {
+                    let x = CGFloat(i) * w
+                    let y = geo.size.height * (1 - (v - minVal) / range)
+                    if i == 0 {
+                        path.move(to: CGPoint(x: x, y: y))
+                    } else {
+                        path.addLine(to: CGPoint(x: x, y: y))
+                    }
+                }
+            }
+            .stroke(color, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
         }
     }
 }

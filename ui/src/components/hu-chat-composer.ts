@@ -95,14 +95,14 @@ export class ScChatComposer extends LitElement {
       transition:
         border-color var(--hu-duration-fast),
         box-shadow var(--hu-duration-fast);
-    }
-    .composer:focus-within {
-      border-color: var(--hu-accent);
-      box-shadow: 0 0 0 2px var(--hu-accent-subtle);
-    }
-    .composer.drag-over {
-      outline: 2px dashed var(--hu-accent);
-      outline-offset: calc(-1 * var(--hu-space-xs));
+      &:focus-within {
+        border-color: var(--hu-accent);
+        box-shadow: 0 0 0 2px var(--hu-accent-subtle);
+      }
+      &.drag-over {
+        outline: 2px dashed var(--hu-accent);
+        outline-offset: calc(-1 * var(--hu-space-xs));
+      }
     }
     .suggestions {
       display: flex;
@@ -110,9 +110,9 @@ export class ScChatComposer extends LitElement {
       overflow-x: auto;
       scrollbar-width: none;
       padding: var(--hu-space-xs) 0;
-    }
-    .suggestions::-webkit-scrollbar {
-      display: none;
+      &::-webkit-scrollbar {
+        display: none;
+      }
     }
     .pill {
       flex-shrink: 0;
@@ -128,14 +128,14 @@ export class ScChatComposer extends LitElement {
       transition:
         border-color var(--hu-duration-fast),
         background var(--hu-duration-fast);
-    }
-    .pill:hover {
-      border-color: var(--hu-accent);
-      background: var(--hu-accent-subtle);
-    }
-    .pill:focus-visible {
-      outline: 2px solid var(--hu-accent);
-      outline-offset: 2px;
+      &:hover {
+        border-color: var(--hu-accent);
+        background: var(--hu-accent-subtle);
+      }
+      &:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
+      }
     }
     .input-row {
       display: flex;
@@ -373,14 +373,14 @@ export class ScChatComposer extends LitElement {
       border: none;
       cursor: pointer;
       transition: background var(--hu-duration-fast);
-    }
-    .mention-item:hover,
-    .mention-item.active {
-      background: var(--hu-hover-overlay);
-    }
-    .mention-item .match {
-      color: var(--hu-accent);
-      font-weight: var(--hu-weight-medium);
+      &:hover,
+      &.active {
+        background: var(--hu-hover-overlay);
+      }
+      & .match {
+        color: var(--hu-accent);
+        font-weight: var(--hu-weight-medium);
+      }
     }
     /* 3b: Command palette */
     .command-palette {
