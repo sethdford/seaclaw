@@ -2,7 +2,9 @@
 
 #include "human/intelligence/cycle.h"
 #include "human/intelligence/distiller.h"
+#ifdef HU_ENABLE_FEEDS
 #include "human/feeds/research_executor.h"
+#endif
 #include "human/intelligence/online_learning.h"
 #include "human/intelligence/self_improve.h"
 #include "human/intelligence/value_learning.h"
@@ -219,6 +221,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
                 }
 
                 /* Classify and execute safe research actions */
+#ifdef HU_ENABLE_FEEDS
                 if (suggested_len > 0) {
                     hu_research_action_t research_action = {0};
                     if (hu_research_classify_action(suggested, suggested_len,
@@ -227,6 +230,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
                         (void)hu_research_execute_safe(alloc, db, &research_action);
                     }
                 }
+#endif
             }
             sqlite3_finalize(stmt);
             if (wm_err == HU_OK)

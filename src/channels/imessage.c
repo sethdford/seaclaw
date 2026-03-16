@@ -23,7 +23,7 @@
 #define HU_IMESSAGE_SENT_PREFIX_LEN 256
 #define HU_IMESSAGE_ROWID_FILE      ".human/imessage.rowid"
 
-#if !HU_IS_TEST
+#if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__) && defined(HU_ENABLE_SQLITE)
 static void imessage_rowid_path(char *buf, size_t cap) {
     const char *home = getenv("HOME");
     if (home)
@@ -106,6 +106,7 @@ static void imessage_record_sent(hu_imessage_ctx_t *c, const char *msg, size_t m
     c->sent_ring_idx++;
 }
 
+#ifdef HU_ENABLE_SQLITE
 static bool imessage_was_sent_by_us(hu_imessage_ctx_t *c, const char *text, size_t text_len) {
     uint32_t h = imessage_hash(text, text_len);
     for (size_t i = 0; i < HU_IMESSAGE_SENT_RING_SIZE; i++) {
@@ -120,6 +121,7 @@ static bool imessage_was_sent_by_us(hu_imessage_ctx_t *c, const char *text, size
     }
     return false;
 }
+#endif
 
 #ifdef HU_ENABLE_SQLITE
 bool hu_imessage_user_responded_recently(void *channel_ctx, const char *handle, size_t handle_len,
