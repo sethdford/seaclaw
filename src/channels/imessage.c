@@ -21,6 +21,44 @@
 
 #define HU_IMESSAGE_SENT_RING_SIZE  32
 #define HU_IMESSAGE_SENT_PREFIX_LEN 256
+#define HU_IMESSAGE_ROWID_FILE      ".human/imessage.rowid"
+
+#if !HU_IS_TEST
+static void imessage_rowid_path(char *buf, size_t cap) {
+    const char *home = getenv("HOME");
+    if (home)
+        snprintf(buf, cap, "%s/" HU_IMESSAGE_ROWID_FILE, home);
+    else
+        buf[0] = '\0';
+}
+
+static int64_t imessage_load_rowid(void) {
+    char path[512];
+    imessage_rowid_path(path, sizeof(path));
+    if (!path[0])
+        return 0;
+    FILE *f = fopen(path, "r");
+    if (!f)
+        return 0;
+    int64_t rowid = 0;
+    if (fscanf(f, "%lld", (long long *)&rowid) != 1)
+        rowid = 0;
+    fclose(f);
+    return rowid;
+}
+
+static void imessage_save_rowid(int64_t rowid) {
+    char path[512];
+    imessage_rowid_path(path, sizeof(path));
+    if (!path[0])
+        return;
+    FILE *f = fopen(path, "w");
+    if (!f)
+        return;
+    fprintf(f, "%lld\n", (long long)rowid);
+    fclose(f);
+}
+#endif
 
 typedef struct hu_imessage_ctx {
     hu_allocator_t *alloc;
@@ -996,11 +1034,11 @@ hu_error_t hu_imessage_create(hu_allocator_t *alloc, const char *default_target,
         c->default_target[default_target_len] = '\0';
         c->default_target_len = default_target_len;
     }
-    /* Seed last_rowid to current max so we only pick up NEW messages.
-     * HU_IMESSAGE_LOOKBACK env var: if set, look back N messages from max
-     * to pick up recently missed messages on restart. */
+    /* Seed last_rowid: prefer persisted value from previous run (self-heal
+     * after crash), fall back to current MAX(ROWID) minus optional lookback. */
 #if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__) && defined(HU_ENABLE_SQLITE)
     {
+        int64_t persisted = imessage_load_rowid();
         const char *home_env = getenv("HOME");
         if (home_env) {
             char db_path[512];
@@ -1008,18 +1046,29 @@ hu_error_t hu_imessage_create(hu_allocator_t *alloc, const char *default_target,
             if (dn > 0 && (size_t)dn < sizeof(db_path)) {
                 sqlite3 *db = NULL;
                 if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK) {
+                    int64_t db_max = 0;
                     sqlite3_stmt *stmt = NULL;
                     if (sqlite3_prepare_v2(db, "SELECT MAX(ROWID) FROM message", -1, &stmt, NULL) ==
                         SQLITE_OK) {
                         if (sqlite3_step(stmt) == SQLITE_ROW)
-                            c->last_rowid = sqlite3_column_int64(stmt, 0);
+                            db_max = sqlite3_column_int64(stmt, 0);
                         sqlite3_finalize(stmt);
                     }
-                    const char *lookback_env = getenv("HU_IMESSAGE_LOOKBACK");
-                    if (lookback_env) {
-                        long lb = strtol(lookback_env, NULL, 10);
-                        if (lb > 0 && lb < 100 && c->last_rowid > lb)
-                            c->last_rowid -= lb;
+                    if (persisted > 0 && persisted <= db_max) {
+                        c->last_rowid = persisted;
+                        fprintf(stderr,
+                                "[imessage] resuming from persisted rowid=%lld (db max=%lld, "
+                                "recovering %lld messages)\n",
+                                (long long)persisted, (long long)db_max,
+                                (long long)(db_max - persisted));
+                    } else {
+                        c->last_rowid = db_max;
+                        const char *lookback_env = getenv("HU_IMESSAGE_LOOKBACK");
+                        if (lookback_env) {
+                            long lb = strtol(lookback_env, NULL, 10);
+                            if (lb > 0 && lb < 100 && c->last_rowid > lb)
+                                c->last_rowid -= lb;
+                        }
                     }
                     sqlite3_close(db);
                 }
@@ -1422,6 +1471,9 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
 
     sqlite3_finalize(stmt);
     sqlite3_close(db);
+
+    if (count > 0)
+        imessage_save_rowid(c->last_rowid);
 
     if (count == 0 && getenv("HU_DEBUG"))
         fprintf(stderr, "[imessage] poll: 0 messages (last_rowid=%lld)\n",
