@@ -4,6 +4,7 @@
 #include "human/core/error.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -248,7 +249,7 @@ static void sync_autonomy_string_from_level(hu_config_t *cfg, hu_allocator_t *a)
 static hu_error_t load_json_file(hu_config_t *cfg, const char *path) {
     FILE *f = fopen(path, "rb");
     if (!f)
-        return HU_OK;
+        return (errno == ENOENT) ? HU_ERR_CONFIG_NOT_FOUND : HU_ERR_IO;
     hu_allocator_t *a = &cfg->allocator;
     hu_error_t err = HU_OK;
     fseek(f, 0, SEEK_END);
@@ -281,7 +282,8 @@ static void sync_flat_fields(hu_config_t *cfg) {
     cfg->max_actions_per_hour = cfg->autonomy.max_actions_per_hour;
 }
 
-hu_error_t hu_config_load(hu_allocator_t *backing, hu_config_t *out) {
+static hu_error_t config_load_impl(hu_allocator_t *backing, hu_config_t *out,
+                                   const char *path_override) {
     if (!backing || !out)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -298,38 +300,57 @@ hu_error_t hu_config_load(hu_allocator_t *backing, hu_config_t *out) {
     if (!home)
         home = ".";
 
-    char path_buf[HU_MAX_PATH];
-    int n = snprintf(path_buf, sizeof(path_buf), "%s/%s/%s", home, HU_CONFIG_DIR, HU_CONFIG_FILE);
-    if (n <= 0 || (size_t)n >= sizeof(path_buf)) {
-        out->config_path = hu_strdup(&a, "");
-        out->workspace_dir = hu_strdup(&a, ".");
-        sync_flat_fields(out);
-        return hu_config_validate(out);
-    }
-
     char global_path[HU_MAX_PATH];
-    strncpy(global_path, path_buf, sizeof(global_path) - 1);
-    global_path[sizeof(global_path) - 1] = '\0';
-
-    n = snprintf(path_buf, sizeof(path_buf), "%s/%s/%s", home, HU_CONFIG_DIR, HU_DEFAULT_WORKSPACE);
     char workspace_dir[HU_MAX_PATH];
-    if (n > 0 && (size_t)n < sizeof(path_buf))
-        strncpy(workspace_dir, path_buf, sizeof(workspace_dir) - 1);
-    else
+
+    if (path_override && path_override[0]) {
+        size_t plen = strlen(path_override);
+        if (plen >= sizeof(global_path))
+            plen = sizeof(global_path) - 1;
+        memcpy(global_path, path_override, plen);
+        global_path[plen] = '\0';
         strncpy(workspace_dir, ".", sizeof(workspace_dir) - 1);
-    workspace_dir[sizeof(workspace_dir) - 1] = '\0';
+        workspace_dir[sizeof(workspace_dir) - 1] = '\0';
+    } else {
+        char path_buf[HU_MAX_PATH];
+        int n = snprintf(path_buf, sizeof(path_buf), "%s/%s/%s", home, HU_CONFIG_DIR,
+                         HU_CONFIG_FILE);
+        if (n <= 0 || (size_t)n >= sizeof(path_buf)) {
+            out->config_path = hu_strdup(&a, "");
+            out->workspace_dir = hu_strdup(&a, ".");
+            sync_flat_fields(out);
+            return hu_config_validate(out);
+        }
+        strncpy(global_path, path_buf, sizeof(global_path) - 1);
+        global_path[sizeof(global_path) - 1] = '\0';
+
+        n = snprintf(path_buf, sizeof(path_buf), "%s/%s/%s", home, HU_CONFIG_DIR,
+                     HU_DEFAULT_WORKSPACE);
+        if (n > 0 && (size_t)n < sizeof(path_buf))
+            strncpy(workspace_dir, path_buf, sizeof(workspace_dir) - 1);
+        else
+            strncpy(workspace_dir, ".", sizeof(workspace_dir) - 1);
+        workspace_dir[sizeof(workspace_dir) - 1] = '\0';
+    }
 
     out->config_path = hu_strdup(&a, global_path);
     out->workspace_dir = hu_strdup(&a, workspace_dir);
 
     hu_error_t err = load_json_file(out, global_path);
+    if (err == HU_ERR_CONFIG_NOT_FOUND) {
+        fprintf(stderr, "[config] No config found at %s, using defaults\n", global_path);
+        hu_config_apply_env_overrides(out);
+        sync_autonomy_level_from_string(out);
+        sync_flat_fields(out);
+        return hu_config_validate(out);
+    }
     if (err != HU_OK) {
         hu_config_deinit(out);
         return err;
     }
 
-    /* Tighten config directory permissions if too permissive */
-    {
+    /* Tighten config directory permissions if too permissive (default path only) */
+    if (!path_override || !path_override[0]) {
         char dir_buf[HU_MAX_PATH];
         int dn = snprintf(dir_buf, sizeof(dir_buf), "%s/%s", home, HU_CONFIG_DIR);
         if (dn > 0 && (size_t)dn < sizeof(dir_buf)) {
@@ -380,6 +401,16 @@ hu_error_t hu_config_load(hu_allocator_t *backing, hu_config_t *out) {
             return verr;
     }
     return hu_config_validate(out);
+}
+
+hu_error_t hu_config_load(hu_allocator_t *backing, hu_config_t *out) {
+    return config_load_impl(backing, out, NULL);
+}
+
+hu_error_t hu_config_load_from(hu_allocator_t *backing, const char *path, hu_config_t *out) {
+    if (!path || !path[0])
+        return hu_config_load(backing, out);
+    return config_load_impl(backing, out, path);
 }
 
 const char *hu_config_env_get(const char *name) {

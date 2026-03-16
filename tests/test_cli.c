@@ -145,6 +145,16 @@ static void test_agent_cli_demo_overrides_provider(void) {
     hu_config_deinit(&cfg);
 }
 
+/* --config flag sets config_path in parsed args */
+static void test_agent_cli_config_flag_parsing(void) {
+    const char *argv[] = {"human", "agent", "--config", "/custom/path/config.json"};
+    hu_parsed_agent_args_t out;
+    hu_error_t err = hu_agent_cli_parse_args(argv, 4, &out);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out.config_path);
+    HU_ASSERT_STR_EQ(out.config_path, "/custom/path/config.json");
+}
+
 static void test_agent_cli_prompt_once_parsing(void) {
     const char *argv[] = {"agent", "--prompt", "Research AI", "--once", "--message", "Check feeds", "--channel", "cli"};
     hu_parsed_agent_args_t args; memset(&args, 0, sizeof(args));
@@ -175,6 +185,7 @@ void run_cli_tests(void) {
     HU_RUN_TEST(test_cmd_init_sc_is_test_returns_ok);
     HU_RUN_TEST(test_agent_cli_demo_flag_parsing);
     HU_RUN_TEST(test_agent_cli_no_demo_flag);
+    HU_RUN_TEST(test_agent_cli_config_flag_parsing);
     HU_RUN_TEST(test_agent_cli_demo_overrides_provider);
     HU_RUN_TEST(test_agent_cli_prompt_once_parsing);
     HU_RUN_TEST(test_agent_cli_prompt_without_once);

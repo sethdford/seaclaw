@@ -386,7 +386,6 @@ static hu_error_t plugin_register_channel_stub_fn(void *ctx, const hu_channel_t 
 
 hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char *config_path,
                             bool with_agent, bool with_channels) {
-    (void)config_path;
     if (!ctx || !alloc) {
         return HU_ERR_INVALID_ARGUMENT;
     }
@@ -400,7 +399,11 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
     memset(bi, 0, sizeof(*bi));
     ctx->channel_instances = bi;
 
-    hu_error_t err = hu_config_load(alloc, &bi->cfg);
+    hu_error_t err;
+    if (config_path && config_path[0])
+        err = hu_config_load_from(alloc, config_path, &bi->cfg);
+    else
+        err = hu_config_load(alloc, &bi->cfg);
     if (err != HU_OK)
         goto fail;
     ctx->cfg = &bi->cfg;

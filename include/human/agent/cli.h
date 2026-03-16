@@ -7,6 +7,7 @@
 
 /* Agent CLI: parse args, run loop. */
 typedef struct hu_parsed_agent_args {
+    const char *config_path;
     const char *message;
     const char *session_id;
     const char *provider_override;

@@ -526,6 +526,7 @@ typedef struct hu_config {
 } hu_config_t;
 
 hu_error_t hu_config_load(hu_allocator_t *backing, hu_config_t *out);
+hu_error_t hu_config_load_from(hu_allocator_t *backing, const char *path, hu_config_t *out);
 hu_error_t hu_config_migrate(hu_allocator_t *alloc, hu_json_value_t *root);
 void hu_config_deinit(hu_config_t *cfg);
 hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t len);

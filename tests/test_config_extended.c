@@ -30,6 +30,34 @@ static void free_config(hu_config_t *cfg) {
     backing.free(backing.ctx, cfg, sizeof(*cfg));
 }
 
+static void test_config_load_from_null_uses_default_path(void) {
+    const char *h = getenv("HOME");
+    char *old_home = h ? strdup(h) : NULL;
+    setenv("HOME", "/nonexistent_human_load_from_test", 1);
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg = {0};
+    hu_error_t err = hu_config_load_from(&backing, NULL, &cfg);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(cfg.default_provider);
+    hu_config_deinit(&cfg);
+    if (old_home) {
+        setenv("HOME", old_home, 1);
+        free(old_home);
+    } else
+        unsetenv("HOME");
+}
+
+static void test_config_load_from_custom_nonexistent_uses_defaults(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg = {0};
+    hu_error_t err = hu_config_load_from(&backing, "/nonexistent/custom/config.json", &cfg);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(cfg.default_provider);
+    HU_ASSERT_NOT_NULL(cfg.config_path);
+    HU_ASSERT_STR_EQ(cfg.config_path, "/nonexistent/custom/config.json");
+    hu_config_deinit(&cfg);
+}
+
 static void test_config_load_nonexistent_uses_defaults(void) {
     const char *h = getenv("HOME");
     char *old_home = h ? strdup(h) : NULL;
@@ -1190,6 +1218,8 @@ static void test_config_parse_very_long_key_value(void) {
 
 void run_config_extended_tests(void) {
     HU_TEST_SUITE("Config Extended");
+    HU_RUN_TEST(test_config_load_from_null_uses_default_path);
+    HU_RUN_TEST(test_config_load_from_custom_nonexistent_uses_defaults);
     HU_RUN_TEST(test_config_load_nonexistent_uses_defaults);
     HU_RUN_TEST(test_config_empty_json_uses_defaults);
     HU_RUN_TEST(test_config_partial_json_merges);

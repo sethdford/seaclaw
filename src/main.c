@@ -661,9 +661,12 @@ static bool webhook_dispatcher(const char *channel, const char *body, size_t bod
 
 static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv) {
     bool with_gateway = false;
+    const char *config_path = getenv("HUMAN_CONFIG_PATH");
     for (int i = 2; i < argc && argv[i]; i++) {
         if (strcmp(argv[i], "--with-gateway") == 0)
             with_gateway = true;
+        else if (strcmp(argv[i], "--config") == 0 && i + 1 < argc)
+            config_path = argv[++i];
     }
 
     if (hu_daemon_status()) {
@@ -680,7 +683,7 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
             with_gateway ? " (with gateway)" : "");
 
     hu_app_ctx_t app_ctx;
-    hu_error_t err = hu_app_bootstrap(&app_ctx, alloc, NULL, true, true);
+    hu_error_t err = hu_app_bootstrap(&app_ctx, alloc, config_path, true, true);
     if (err != HU_OK) {
         fprintf(stderr, "[%s] Bootstrap failed: %s\n", HU_CODENAME, hu_error_string(err));
         return err;
@@ -1738,13 +1741,16 @@ static bool gw_agent_on_message(hu_bus_event_type_t type, const hu_bus_event_t *
 
 static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
     bool with_agent = false;
+    const char *config_path = getenv("HUMAN_CONFIG_PATH");
     for (int i = 2; i < argc && argv[i]; i++) {
         if (strcmp(argv[i], "--with-agent") == 0)
             with_agent = true;
+        else if (strcmp(argv[i], "--config") == 0 && i + 1 < argc)
+            config_path = argv[++i];
     }
 
     hu_app_ctx_t app;
-    hu_error_t err = hu_app_bootstrap(&app, alloc, NULL, with_agent, false);
+    hu_error_t err = hu_app_bootstrap(&app, alloc, config_path, with_agent, false);
     if (err != HU_OK) {
         fprintf(stderr, "[%s] Bootstrap failed: %s\n", HU_CODENAME, hu_error_string(err));
         return err;

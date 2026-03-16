@@ -100,7 +100,12 @@ hu_error_t hu_agent_cli_parse_args(const char *const *argv, size_t argc,
         const char *a = argv[i];
         if (!a)
             continue;
-        if (strcmp(a, "-m") == 0 || strcmp(a, "--message") == 0) {
+        if (strcmp(a, "--config") == 0) {
+            if (i + 1 < argc) {
+                out->config_path = argv[i + 1];
+                i++;
+            }
+        } else if (strcmp(a, "-m") == 0 || strcmp(a, "--message") == 0) {
             if (i + 1 < argc) {
                 out->message = argv[i + 1];
                 i++;
@@ -244,8 +249,12 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     hu_parsed_agent_args_t parsed_args;
     hu_agent_cli_parse_args(argv, argc, &parsed_args);
 
+    const char *config_path = parsed_args.config_path ? parsed_args.config_path
+                                                      : getenv("HUMAN_CONFIG_PATH");
     hu_config_t cfg;
-    hu_error_t err = hu_config_load(alloc, &cfg);
+    hu_error_t err =
+        (config_path && config_path[0]) ? hu_config_load_from(alloc, config_path, &cfg)
+                                         : hu_config_load(alloc, &cfg);
     if (err != HU_OK) {
         fprintf(stderr, "[%s] Config error: %s\n", HU_CODENAME, hu_error_string(err));
         return err;

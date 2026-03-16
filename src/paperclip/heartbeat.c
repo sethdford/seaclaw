@@ -4,6 +4,7 @@
 #include "human/core/json.h"
 #include "human/paperclip/client.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static size_t build_task_context(char *buf, size_t cap, const hu_paperclip_task_t *task,
@@ -127,7 +128,8 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
     fprintf(stderr, "[paperclip] Context built (%zu chars). Bootstrapping agent...\n", ctx_len);
 
     hu_app_ctx_t app = {0};
-    err = hu_app_bootstrap(&app, alloc, NULL, true, false);
+    const char *config_path = getenv("HUMAN_CONFIG_PATH");
+    err = hu_app_bootstrap(&app, alloc, config_path, true, false);
     if (err != HU_OK || !app.agent_ok) {
         fprintf(stderr, "[paperclip] Agent bootstrap failed: %d (agent_ok=%d)\n", (int)err,
                 app.agent_ok);
