@@ -17,13 +17,7 @@ QUERIES = [
     "autonomous AI agent tool use",
     "large language model inference optimization",
     "retrieval augmented generation",
-    "multi-agent LLM system",
     "AI code generation assistant",
-    "model context protocol",
-    "LLM safety alignment RLHF",
-    "vector embedding semantic search",
-    "AI agent memory architecture",
-    "edge inference optimization quantization",
 ]
 
 

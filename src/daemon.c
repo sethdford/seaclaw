@@ -61,7 +61,7 @@
 #ifdef HU_HAS_PERSONA
 #include "human/persona/voice_maturity.h"
 #endif
-#ifdef HU_ENABLE_SKILLS
+#ifdef HU_HAS_SKILLS
 #include "human/intelligence/reflection.h"
 #include "human/intelligence/skills.h"
 #include "human/intelligence/feedback.h"
@@ -1926,7 +1926,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 #endif
 
-#ifdef HU_ENABLE_SKILLS
+#ifdef HU_HAS_SKILLS
     /* P8: Pre-load skill cache at startup */
     if (agent && agent->memory) {
         sqlite3 *skill_init_db = hu_sqlite_memory_get_db(agent->memory);
@@ -2000,7 +2000,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
-#ifdef HU_ENABLE_SKILLS
+#ifdef HU_HAS_SKILLS
                 /* Phase 8 (F77-F82): Scheduled reflection engine */
                 {
                     static bool reflection_done_today = false;
@@ -2132,7 +2132,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 #endif
-#if defined(HU_ENABLE_SQLITE) && defined(HU_ENABLE_SKILLS)
+#if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_SKILLS)
                 /* Intelligence cycle — run every 6 hours to process findings, extract lessons, reflect */
                 {
                     static int64_t last_intelligence_cycle = 0;
@@ -3825,7 +3825,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                     /* Phase 8 (F96): Skill trigger matching */
-#ifdef HU_ENABLE_SKILLS
+#ifdef HU_HAS_SKILLS
                     if (agent->memory && batch_key && key_len > 0) {
                         sqlite3 *skill_db = hu_sqlite_memory_get_db(agent->memory);
                         if (skill_db) {
@@ -6430,13 +6430,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* F160-F161 (Pillar 32): Behavioral feedback from response outcomes */
-#ifdef HU_ENABLE_SKILLS
+#ifdef HU_HAS_SKILLS
                 if (err == HU_OK && response && response_len > 0 && agent->memory &&
                     batch_key && key_len > 0) {
                     sqlite3 *fb_db = hu_sqlite_memory_get_db(agent->memory);
                     if (fb_db) {
                         bool fb_emoji = false, fb_laugh = false;
-                        if (combined && combined_len > 0) {
+                        if (combined_len > 0) {
                             for (size_t fi = 0; fi < combined_len; fi++) {
                                 unsigned char fc = (unsigned char)combined[fi];
                                 if (fc >= 0xF0) { fb_emoji = true; break; }

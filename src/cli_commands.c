@@ -1185,7 +1185,7 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         if (cerr == HU_OK) printf("[feed] Cleanup complete (removed items older than %u days)\n", days);
         else fprintf(stderr, "[feed] Cleanup error: %s\n", hu_error_string(cerr));
     } else if (strcmp(sub, "learn") == 0) {
-#if defined(HU_ENABLE_SKILLS)
+#if defined(HU_HAS_SKILLS)
         hu_intelligence_cycle_result_t learn_result;
         memset(&learn_result, 0, sizeof(learn_result));
         hu_error_t lerr = hu_intelligence_run_cycle(alloc, db, &learn_result);
@@ -1201,7 +1201,7 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
             fprintf(stderr, "[feed] Intelligence cycle error: %s\n", hu_error_string(lerr));
         }
 #else
-        fprintf(stderr, "[feed] Intelligence cycle requires HU_ENABLE_SKILLS\n");
+        fprintf(stderr, "[feed] Intelligence cycle requires HU_HAS_SKILLS\n");
 #endif
     } else {
         fprintf(stderr, "Unknown feed subcommand: %s\n", sub);

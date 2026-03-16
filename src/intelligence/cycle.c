@@ -513,12 +513,16 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
         }
     }
 
-    /* Step 13: Apply matching skills to findings and record attempts */
+    /* Step 13: Apply matching skills to findings; record negative for unmatched */
     {
         hu_skill_t *active = NULL;
         size_t active_count = 0;
         if (hu_skill_load_active(alloc, db, "system", 6, &active, &active_count) == HU_OK
             && active && active_count > 0) {
+            bool *matched = (bool *)alloc->alloc(alloc->ctx, active_count * sizeof(bool));
+            if (matched)
+                memset(matched, 0, active_count * sizeof(bool));
+
             const char *sql = "SELECT id, finding FROM research_findings WHERE status = 'actioned' "
                               "ORDER BY created_at DESC LIMIT 10";
             sqlite3_stmt *stmt = NULL;
@@ -529,8 +533,8 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
                     size_t flen = strlen(finding);
                     for (size_t s = 0; s < active_count; s++) {
                         if (active[s].strategy_len == 0) continue;
-                        char *match = strstr(active[s].strategy, "Monitor ");
-                        if (!match) continue;
+                        char *mon = strstr(active[s].strategy, "Monitor ");
+                        if (!mon) continue;
                         char source_prefix[64] = {0};
                         size_t si = 8;
                         size_t sp = 0;
@@ -547,11 +551,28 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
                             hu_skill_update_success_rate(db, active[s].id,
                                                          active[s].attempts + 1,
                                                          active[s].successes + 1);
+                            if (matched) matched[s] = true;
                         }
                     }
                 }
                 sqlite3_finalize(stmt);
             }
+
+            /* Record negative signals for skills that had no matching findings */
+            if (matched) {
+                for (size_t s = 0; s < active_count; s++) {
+                    if (!matched[s] && active[s].strategy_len > 0) {
+                        hu_skill_record_attempt(db, active[s].id, "system", 6, now_ts,
+                                                "negative", 8, "no matching findings", 20,
+                                                "", 0, NULL);
+                        int64_t new_attempts = active[s].attempts + 1;
+                        hu_skill_update_success_rate(db, active[s].id,
+                                                     new_attempts, active[s].successes);
+                    }
+                }
+                alloc->free(alloc->ctx, matched, active_count * sizeof(bool));
+            }
+
             hu_skill_free(alloc, active, active_count);
             steps_succeeded++;
         }

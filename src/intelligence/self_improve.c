@@ -121,12 +121,26 @@ hu_error_t hu_self_improve_apply_reflections(hu_self_improve_t *engine, int64_t 
         }
     }
 
+    /* Pick one lesson we haven't recently patched about, rotating through them.
+       Use the cycle timestamp modulo the lesson count to rotate. */
     char top_lesson[256] = {0};
     {
+        int64_t lesson_count = 0;
+        sqlite3_stmt *cnt = NULL;
+        if (sqlite3_prepare_v2(engine->db,
+                "SELECT COUNT(*) FROM general_lessons WHERE source_count >= 2",
+                -1, &cnt, NULL) == SQLITE_OK) {
+            if (sqlite3_step(cnt) == SQLITE_ROW)
+                lesson_count = sqlite3_column_int64(cnt, 0);
+            sqlite3_finalize(cnt);
+        }
+        int64_t offset = (lesson_count > 0) ? (now_ts % lesson_count) : 0;
         sqlite3_stmt *ls = NULL;
         if (sqlite3_prepare_v2(engine->db,
-                "SELECT lesson FROM general_lessons ORDER BY source_count DESC, "
-                "last_confirmed DESC LIMIT 1", -1, &ls, NULL) == SQLITE_OK) {
+                "SELECT lesson FROM general_lessons WHERE source_count >= 2 "
+                "ORDER BY source_count DESC, last_confirmed DESC "
+                "LIMIT 1 OFFSET ?1", -1, &ls, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(ls, 1, offset);
             if (sqlite3_step(ls) == SQLITE_ROW) {
                 const char *l = (const char *)sqlite3_column_text(ls, 0);
                 if (l) snprintf(top_lesson, sizeof(top_lesson), "%.*s", 200, l);
@@ -135,57 +149,96 @@ hu_error_t hu_self_improve_apply_reflections(hu_self_improve_t *engine, int64_t 
         }
     }
 
-    /* Generate actionable patch based on actual signals */
-    char patch_buf[PATCH_TEXT_MAX];
-    int patch_len = 0;
+    /* Generate ALL applicable patches (not just one) for diverse coverage.
+       Dedup by type prefix — only insert if no active patch with same prefix exists. */
+    struct { const char *prefix; char text[PATCH_TEXT_MAX]; int len; } candidates[4];
+    size_t n_cand = 0;
 
     if (neg_count > 0 && neg_count * 3 > pos_count) {
-        patch_len = snprintf(patch_buf, sizeof(patch_buf),
+        candidates[n_cand].prefix = "RELIABILITY ISSUE";
+        candidates[n_cand].len = snprintf(candidates[n_cand].text, PATCH_TEXT_MAX,
             "RELIABILITY ISSUE: %d failures vs %d successes recently. "
             "Prefer shorter, more focused prompts. "
             "If a tool or provider fails, retry with simpler input before escalating.",
             neg_count, pos_count);
-    } else if (lowest_strategy[0] && lowest_weight < 0.8) {
-        patch_len = snprintf(patch_buf, sizeof(patch_buf),
+        n_cand++;
+    }
+    if (lowest_strategy[0] && lowest_weight < 0.8) {
+        candidates[n_cand].prefix = "STRATEGY ADJUSTMENT";
+        candidates[n_cand].len = snprintf(candidates[n_cand].text, PATCH_TEXT_MAX,
             "STRATEGY ADJUSTMENT: '%s' has low effectiveness (%.0f%%). "
             "Reduce reliance on this approach. Focus on higher-performing strategies.",
             lowest_strategy, lowest_weight * 100);
-    } else if (top_lesson[0]) {
-        patch_len = snprintf(patch_buf, sizeof(patch_buf),
+        n_cand++;
+    }
+    if (top_lesson[0]) {
+        candidates[n_cand].prefix = "LEARNED PATTERN";
+        candidates[n_cand].len = snprintf(candidates[n_cand].text, PATCH_TEXT_MAX,
             "LEARNED PATTERN: %s. Apply this insight when analyzing new information.",
             top_lesson);
-    } else if (pos_count > 5) {
-        patch_len = snprintf(patch_buf, sizeof(patch_buf),
+        n_cand++;
+    }
+    if (pos_count > 5) {
+        candidates[n_cand].prefix = "PERFORMING WELL";
+        candidates[n_cand].len = snprintf(candidates[n_cand].text, PATCH_TEXT_MAX,
             "PERFORMING WELL: %d successful cycles. "
             "Expand scope: look for cross-domain connections between findings. "
             "Prioritize security and architecture implications.",
             pos_count);
-    } else {
-        /* Only fall through to "maintain" if there are truly no signals */
-        patch_len = snprintf(patch_buf, sizeof(patch_buf), "maintain");
+        n_cand++;
     }
 
-    if (patch_len <= 0 || (size_t)patch_len >= sizeof(patch_buf))
-        return HU_OK;
+    /* For each candidate, check if an active patch with the same prefix already exists.
+       If it does, UPDATE it (keeps the slot fresh). If not, INSERT a new one. */
+    for (size_t ci = 0; ci < n_cand; ci++) {
+        if (candidates[ci].len <= 0 || (size_t)candidates[ci].len >= PATCH_TEXT_MAX)
+            continue;
 
-    /* Skip if the same patch text was already the most recent one */
-    {
+        size_t prefix_len = strlen(candidates[ci].prefix);
         sqlite3_stmt *dup = NULL;
+        bool exists = false;
         if (sqlite3_prepare_v2(engine->db,
-                "SELECT patch_text FROM prompt_patches WHERE active = 1 "
-                "ORDER BY applied_at DESC LIMIT 1", -1, &dup, NULL) == SQLITE_OK) {
+                "SELECT id, patch_text FROM prompt_patches WHERE active = 1 "
+                "AND patch_text LIKE ?1 ORDER BY applied_at DESC LIMIT 1",
+                -1, &dup, NULL) == SQLITE_OK) {
+            char like_pat[64];
+            snprintf(like_pat, sizeof(like_pat), "%s%%", candidates[ci].prefix);
+            sqlite3_bind_text(dup, 1, like_pat, -1, SQLITE_STATIC);
             if (sqlite3_step(dup) == SQLITE_ROW) {
-                const char *last = (const char *)sqlite3_column_text(dup, 0);
-                if (last && strcmp(last, patch_buf) == 0) {
-                    sqlite3_finalize(dup);
-                    return HU_OK;
+                int64_t eid = sqlite3_column_int64(dup, 0);
+                const char *old_text = (const char *)sqlite3_column_text(dup, 1);
+                exists = true;
+                if (!old_text || strncmp(old_text, candidates[ci].text, (size_t)candidates[ci].len) != 0) {
+                    sqlite3_stmt *upd = NULL;
+                    if (sqlite3_prepare_v2(engine->db,
+                            "UPDATE prompt_patches SET patch_text = ?, applied_at = ? WHERE id = ?",
+                            -1, &upd, NULL) == SQLITE_OK) {
+                        sqlite3_bind_text(upd, 1, candidates[ci].text, candidates[ci].len, SQLITE_STATIC);
+                        sqlite3_bind_int64(upd, 2, now_ts);
+                        sqlite3_bind_int64(upd, 3, eid);
+                        sqlite3_step(upd);
+                        sqlite3_finalize(upd);
+                    }
                 }
             }
             sqlite3_finalize(dup);
         }
+
+        if (!exists) {
+            sqlite3_stmt *ins = NULL;
+            if (sqlite3_prepare_v2(engine->db,
+                    "INSERT INTO prompt_patches (source, patch_text, active, applied_at) "
+                    "VALUES ('intelligence_cycle', ?, 1, ?)", -1, &ins, NULL) == SQLITE_OK) {
+                sqlite3_bind_text(ins, 1, candidates[ci].text, candidates[ci].len, SQLITE_STATIC);
+                sqlite3_bind_int64(ins, 2, now_ts);
+                sqlite3_step(ins);
+                sqlite3_finalize(ins);
+            }
+        }
+        (void)prefix_len;
     }
 
-    /* Also process any self_evaluation recommendations that aren't "maintain" */
+    /* Also process self_evaluation recommendations that aren't "maintain" */
     {
         const char *sel =
             "SELECT recommendations, created_at FROM self_evaluations "
@@ -217,19 +270,6 @@ hu_error_t hu_self_improve_apply_reflections(hu_self_improve_t *engine, int64_t 
                 sqlite3_finalize(ins_stmt);
             }
             sqlite3_finalize(stmt);
-        }
-    }
-
-    /* Insert the signal-based patch */
-    if (strcmp(patch_buf, "maintain") != 0) {
-        sqlite3_stmt *ins = NULL;
-        if (sqlite3_prepare_v2(engine->db,
-                "INSERT INTO prompt_patches (source, patch_text, active, applied_at) "
-                "VALUES ('intelligence_cycle', ?, 1, ?)", -1, &ins, NULL) == SQLITE_OK) {
-            sqlite3_bind_text(ins, 1, patch_buf, patch_len, SQLITE_STATIC);
-            sqlite3_bind_int64(ins, 2, now_ts);
-            sqlite3_step(ins);
-            sqlite3_finalize(ins);
         }
     }
 
