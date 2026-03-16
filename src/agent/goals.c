@@ -22,7 +22,10 @@ hu_error_t hu_goal_engine_create(hu_allocator_t *alloc, sqlite3 *db,
 }
 
 void hu_goal_engine_deinit(hu_goal_engine_t *engine) {
-    (void)engine;
+    if (!engine)
+        return;
+    engine->alloc = NULL;
+    engine->db = NULL;
 }
 
 hu_error_t hu_goal_init_tables(hu_goal_engine_t *engine) {

@@ -150,7 +150,9 @@ static hu_error_t load_skill_file(hu_skillforge_t *sf, const char *path) {
         return err;
     }
 
-    (void)skill_add(sf, name, desc, command, params, enabled);
+    hu_error_t add_err = skill_add(sf, name, desc, command, params, enabled);
+    if (add_err != HU_OK)
+        fprintf(stderr, "[skillforge] failed to add skill from disk: %d\n", add_err);
     sf->alloc->free(sf->alloc->ctx, name, strlen(name) + 1);
     sf->alloc->free(sf->alloc->ctx, desc, strlen(desc) + 1);
     if (command)
