@@ -32,4 +32,11 @@ hu_error_t hu_ab_evaluate(hu_allocator_t *alloc, hu_ab_result_t *result,
 
 void hu_ab_result_deinit(hu_ab_result_t *result, hu_allocator_t *alloc);
 
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+
+hu_error_t hu_ab_record_selection(sqlite3 *db, size_t best_idx, int quality_score,
+                                   size_t candidate_count, int64_t timestamp);
+#endif
+
 #endif

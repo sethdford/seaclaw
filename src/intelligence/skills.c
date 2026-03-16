@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -366,6 +367,49 @@ void hu_skill_free(hu_allocator_t *alloc, hu_skill_t *skills, size_t count) {
     if (!alloc || !skills || count == 0)
         return;
     alloc->free(alloc->ctx, skills, count * sizeof(hu_skill_t));
+}
+
+hu_error_t hu_skill_build_contact_context(hu_allocator_t *alloc, sqlite3 *db,
+                                          const char *contact_id, size_t cid_len, char **out,
+                                          size_t *out_len) {
+    if (!alloc || !db || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
+
+    hu_skill_t *skills = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_skill_load_active(alloc, db, contact_id, cid_len, &skills, &count);
+    if (err != HU_OK || !skills || count == 0)
+        return err;
+
+    size_t cap = 64;
+    for (size_t i = 0; i < count; i++)
+        cap += 4 + strlen(skills[i].name) + 2 + skills[i].strategy_len + 1;
+
+    char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+    if (!buf) {
+        hu_skill_free(alloc, skills, count);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+
+    size_t pos = 0;
+    int n = snprintf(buf + pos, cap - pos, "### Learned skills (contact-specific)\n");
+    if (n > 0)
+        pos += (size_t)n;
+
+    for (size_t i = 0; i < count && pos < cap - 1; i++) {
+        n = snprintf(buf + pos, cap - pos, "- %s: %.*s\n", skills[i].name,
+                     (int)skills[i].strategy_len, skills[i].strategy);
+        if (n > 0)
+            pos += (size_t)n;
+    }
+    buf[pos] = '\0';
+
+    hu_skill_free(alloc, skills, count);
+    *out = buf;
+    *out_len = pos;
+    return HU_OK;
 }
 
 /* Parse trigger_conditions "emotion==X,topic==Y,confidence>=Z,contact==W" and check match. */

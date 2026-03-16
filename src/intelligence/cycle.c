@@ -34,7 +34,6 @@ static void extract_first_significant_word(const char *text, size_t text_len,
         return;
     size_t i = 0;
     while (i < text_len) {
-        /* Skip whitespace, punctuation, and markdown artifacts */
         while (i < text_len && (text[i] == ' ' || text[i] == '\t' || text[i] == ',' ||
                                 text[i] == '.' || text[i] == '*' || text[i] == '#' ||
                                 text[i] == '-' || text[i] == '[' || text[i] == ']' ||
@@ -76,7 +75,6 @@ static int is_cycle_stop_word(const char *w, size_t len) {
         if (strlen(stops[i]) == len && strncasecmp(w, stops[i], len) == 0)
             return 1;
     }
-    /* Also catch project name variants with any suffix (h-uman's, h-uman...) */
     if (len >= 6 && strncasecmp(w, "h-uman", 6) == 0)
         return 1;
     if (len >= 5 && strncasecmp(w, "human", 5) == 0)

@@ -9,6 +9,9 @@
 #include "human/agent/superhuman_silence.h"
 #include "human/memory/consolidation.h"
 #include "human/memory/promotion.h"
+#ifdef HU_ENABLE_SQLITE
+#include "human/intelligence/meta_learning.h"
+#endif
 #ifdef HU_HAS_PERSONA
 #include "human/persona/circadian.h"
 #include "human/persona/relationship.h"
@@ -121,6 +124,17 @@ hu_error_t hu_agent_from_config(
     out->reflection.use_llm = true;
     out->reflection.max_retries = 2;
     out->reflection.min_response_tokens = 0;
+#ifdef HU_ENABLE_SQLITE
+    out->meta_params.default_confidence_threshold = 0.5;
+    out->meta_params.refinement_frequency_weeks = 4;
+    out->meta_params.discovery_min_feedback_count = 3;
+    if (memory) {
+        sqlite3 *db = hu_sqlite_memory_get_db(memory);
+        if (db && hu_meta_learning_load(db, &out->meta_params) == HU_OK) {
+            /* loaded from DB; defaults above were overwritten */
+        }
+    }
+#endif
     out->custom_instructions = NULL;
     out->custom_instructions_len = 0;
     if (custom_instructions && custom_instructions_len > 0) {

@@ -85,12 +85,20 @@ hu_error_t hu_feeds_insert_sql(const hu_feed_item_t *item, char *buf,
         esc_cnt[0] = '\0';
 
     const char *type_str = hu_feed_type_str(item->type);
+    const char *cid = item->contact_id ? item->contact_id : "";
+    size_t cid_len = item->contact_id_len ? item->contact_id_len : strlen(cid);
+    char esc_cid[HU_FEEDS_ESCAPE_BUF];
+    if (cid_len > 0 &&
+        escape_sql_string(cid, cid_len, esc_cid, sizeof(esc_cid)) == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (cid_len == 0)
+        esc_cid[0] = '\0';
 
     int n = snprintf(
         buf, cap,
-        "INSERT INTO feed_items (source, content_type, content, url, ingested_at) "
-        "VALUES ('%s', '%s', '%s', '', %llu)",
-        esc_src, type_str, esc_cnt, (unsigned long long)item->fetched_at);
+        "INSERT INTO feed_items (source, contact_id, content_type, content, url, ingested_at) "
+        "VALUES ('%s', '%s', '%s', '%s', '', %llu)",
+        esc_src, esc_cid, type_str, esc_cnt, (unsigned long long)item->fetched_at);
 
     if (n < 0 || (size_t)n >= cap)
         return HU_ERR_INVALID_ARGUMENT;

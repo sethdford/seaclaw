@@ -1,6 +1,7 @@
 #include "human/agent/mcts_planner.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define HU_MCTS_MAX_NODES 256
@@ -65,9 +66,87 @@ static double ucb1_score(double total_value, int visit_count, int parent_visits,
 }
 
 #ifndef HU_IS_TEST
-/* Production expansion: goal-aware heuristic actions (no LLM). */
+/* Production expansion: use LLM when provider available and budget allows;
+ * otherwise heuristic templates. */
 static int prod_expand(hu_mcts_node_t *nodes, int *node_count, int parent_idx,
-                       int depth, int child_offset, const char *goal, size_t goal_len) {
+                       int depth, int child_offset, const char *goal, size_t goal_len,
+                       hu_allocator_t *alloc, hu_provider_t *provider,
+                       const char *model, size_t model_len,
+                       int *llm_calls, int max_llm_calls) {
+    if (provider && provider->vtable && provider->vtable->chat_with_system &&
+        llm_calls && *llm_calls < max_llm_calls) {
+        char system[256];
+        int sys_len = snprintf(system, sizeof(system),
+                               "You are a planning agent. Given a goal, propose 2-3 concrete next "
+                               "actions. Output one action per line, nothing else.");
+        if (sys_len < 0 || sys_len >= (int)sizeof(system))
+            sys_len = (int)sizeof(system) - 1;
+
+        size_t goal_trunc = goal_len > 200 ? 200 : goal_len;
+        char prompt[512];
+        int pn = snprintf(prompt, sizeof(prompt),
+                          "Goal: %.*s\nCurrent depth: %d\nPropose actions:",
+                          (int)goal_trunc, goal && goal_len > 0 ? goal : "", depth);
+        if (pn < 0 || pn >= (int)sizeof(prompt))
+            pn = (int)sizeof(prompt) - 1;
+
+        char *response = NULL;
+        size_t resp_len = 0;
+        hu_error_t err = provider->vtable->chat_with_system(
+            provider->ctx, alloc, system, (size_t)sys_len,
+            prompt, (size_t)pn,
+            model && model_len > 0 ? model : "gpt-4o-mini",
+            model && model_len > 0 ? model_len : 11,
+            0.2, &response, &resp_len);
+
+        if (err == HU_OK && response && resp_len > 0) {
+            (*llm_calls)++;
+            int num_actions = 0;
+            const char *p = response;
+            const char *end = response + resp_len;
+            while (p < end && num_actions < 3 && *node_count < HU_MCTS_MAX_NODES) {
+                const char *line_start = p;
+                while (p < end && *p != '\n' && *p != '\r')
+                    p++;
+                size_t line_len = (size_t)(p - line_start);
+                while (p < end && (*p == '\n' || *p == '\r'))
+                    p++;
+                if (line_len > 0) {
+                    while (line_len > 0 && (line_start[line_len - 1] == ' ' ||
+                                            line_start[line_len - 1] == '\t'))
+                        line_len--;
+                    if (line_len > 0) {
+                        int idx = (*node_count)++;
+                        hu_mcts_node_t *node = &nodes[idx];
+                        memset(node, 0, sizeof(*node));
+                        size_t copy_len = line_len < sizeof(node->action) - 1
+                                              ? line_len
+                                              : sizeof(node->action) - 1;
+                        memcpy(node->action, line_start, copy_len);
+                        node->action[copy_len] = '\0';
+                        node->action_len = copy_len;
+                        node->parent_idx = parent_idx;
+                        node->depth = depth;
+                        node->children_start = -1;
+                        node->children_count = 0;
+                        num_actions++;
+                    }
+                }
+            }
+            alloc->free(alloc->ctx, response, resp_len + 1);
+            if (num_actions > 0) {
+                if (parent_idx >= 0) {
+                    nodes[parent_idx].children_start = child_offset;
+                    nodes[parent_idx].children_count = num_actions;
+                }
+                return num_actions;
+            }
+        }
+        if (response)
+            alloc->free(alloc->ctx, response, resp_len + 1);
+    }
+
+    /* Fallback: heuristic templates */
     char buf[512];
     size_t goal_copy_len = goal_len;
     if (goal_copy_len >= 64)
@@ -112,9 +191,53 @@ static int prod_expand(hu_mcts_node_t *nodes, int *node_count, int parent_idx,
     return n;
 }
 
-/* Production simulation: shorter sequences score higher; goal-word match bonus. */
+/* Production simulation: use LLM for evaluation when provider available and
+ * budget allows; otherwise heuristic (depth penalty + goal-word match). */
 static double prod_simulate(int depth, const char *action, size_t action_len,
-                            const char *goal, size_t goal_len) {
+                            const char *goal, size_t goal_len,
+                            hu_allocator_t *alloc, hu_provider_t *provider,
+                            const char *model, size_t model_len,
+                            int *llm_calls, int max_llm_calls) {
+    if (provider && provider->vtable && provider->vtable->chat_with_system &&
+        llm_calls && *llm_calls < max_llm_calls) {
+        char system[256];
+        int sys_len = snprintf(system, sizeof(system),
+                               "You are a planning evaluator. Rate how good an action is for "
+                               "achieving a goal. Reply with a single number 0.0 to 1.0 only.");
+        if (sys_len < 0 || sys_len >= (int)sizeof(system))
+            sys_len = (int)sizeof(system) - 1;
+
+        size_t goal_trunc = goal_len > 100 ? 100 : goal_len;
+        size_t action_trunc = action_len > 200 ? 200 : action_len;
+        char prompt[512];
+        int pn = snprintf(prompt, sizeof(prompt),
+                          "Goal: %.*s\nAction (depth %d): %.*s\nScore (0.0-1.0):",
+                          (int)goal_trunc, goal && goal_len > 0 ? goal : "", depth,
+                          (int)action_trunc, action && action_len > 0 ? action : "");
+        if (pn < 0 || pn >= (int)sizeof(prompt))
+            pn = (int)sizeof(prompt) - 1;
+
+        char *response = NULL;
+        size_t resp_len = 0;
+        hu_error_t err = provider->vtable->chat_with_system(
+            provider->ctx, alloc, system, (size_t)sys_len,
+            prompt, (size_t)pn,
+            model && model_len > 0 ? model : "gpt-4o-mini",
+            model && model_len > 0 ? model_len : 11,
+            0.0, &response, &resp_len);
+
+        if (err == HU_OK && response && resp_len > 0) {
+            (*llm_calls)++;
+            double v = strtod(response, NULL);
+            alloc->free(alloc->ctx, response, resp_len + 1);
+            if (v >= 0.0 && v <= 1.0)
+                return v;
+        }
+        if (response)
+            alloc->free(alloc->ctx, response, resp_len + 1);
+    }
+
+    /* Fallback: heuristic */
     double v = 0.8 - 0.05 * (double)depth;
     if (v < 0.0)
         v = 0.0;
@@ -149,6 +272,10 @@ hu_error_t hu_mcts_plan(hu_allocator_t *alloc, const char *goal, size_t goal_len
     int max_iter = cfg->max_iterations > 0 ? cfg->max_iterations : def.max_iterations;
     int max_depth = cfg->max_depth > 0 ? cfg->max_depth : def.max_depth;
     double exploration_c = cfg->exploration_c > 0.0 ? cfg->exploration_c : def.exploration_c;
+    int max_llm_calls = cfg->max_llm_calls > 0 ? cfg->max_llm_calls : def.max_llm_calls;
+    hu_provider_t *provider = cfg->provider;
+    const char *model = cfg->model;
+    size_t model_len = cfg->model_len;
 
     memset(result, 0, sizeof(*result));
 
@@ -303,8 +430,8 @@ hu_error_t hu_mcts_plan(hu_allocator_t *alloc, const char *goal, size_t goal_len
             if (n->children_count == 0) {
                 int child_start = node_count;
                 prod_expand(nodes, &node_count, node_idx, n->depth + 1, child_start,
-                           goal, goal_len);
-                llm_calls++;
+                           goal, goal_len, alloc, provider, model, model_len,
+                           &llm_calls, max_llm_calls);
                 if (node_count >= HU_MCTS_MAX_NODES)
                     break;
                 int best_child = -1;
@@ -352,7 +479,8 @@ hu_error_t hu_mcts_plan(hu_allocator_t *alloc, const char *goal, size_t goal_len
         if (sim_depth > max_depth_reached)
             max_depth_reached = sim_depth;
         double value = prod_simulate(sim_depth, nodes[node_idx].action, nodes[node_idx].action_len,
-                                     goal, goal_len);
+                                     goal, goal_len, alloc, provider, model, model_len,
+                                     &llm_calls, max_llm_calls);
 
         int idx = node_idx;
         while (idx >= 0) {

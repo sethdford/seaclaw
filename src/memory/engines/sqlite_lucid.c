@@ -1,13 +1,9 @@
-/* Lucid memory backend — SQLite + lucid CLI for cross-project sync.
+/* Lucid memory engine — SQLite-backed with optional lucid CLI sync.
+ * Despite the name, this does not use a native Lucid library.
+ * It provides SQLite storage with optional lucid CLI for external sync.
  * HU_IS_TEST: in-memory mock.
  * When HU_ENABLE_SQLITE is not set (production build), all operations return
  * HU_ERR_NOT_SUPPORTED. This is intentional, documented stub behavior. */
-
-/*
- * Name suggests: native Lucid database backend.
- * Actually: SQLite-based storage with optional lucid CLI for sync. No Lucid library.
- * A native implementation would require the actual Lucid libraries.
- */
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"

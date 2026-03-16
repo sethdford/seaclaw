@@ -27,7 +27,7 @@ fi
 
 FILTER="${1:-all}"
 
-log "=== Daily Feed Scrape started (headless, no visible windows) ==="
+log "=== Daily Feed Scrape started (browser scrapers + API scrapers) ==="
 
 # Refresh cookies from Chrome/PWA before scraping
 log "Extracting fresh cookies from Chrome..."
@@ -51,6 +51,11 @@ run_scraper() {
 run_scraper twitter  scrape_twitter_feed.py  --max-tweets 50
 run_scraper facebook scrape_facebook_feed.py --max-posts 30
 run_scraper tiktok   scrape_tiktok_feed.py   --max-videos 30
+
+# Research scrapers (API-based, no browser automation)
+run_scraper arxiv            scrape_arxiv.py
+run_scraper openalex         scrape_openalex.py
+run_scraper semantic_scholar scrape_semantic_scholar.py
 
 log "=== Done. Files in $INGEST_DIR ==="
 ls -la "$INGEST_DIR"/*.jsonl 2>/dev/null | tee -a "$LOG_FILE" || log "(no JSONL files)"

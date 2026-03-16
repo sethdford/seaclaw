@@ -6,7 +6,8 @@
 static void decomposition_parallel_strategy(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_decomposition_result_t result = {0};
-    hu_error_t err = hu_decompose_task(&alloc, "do research", 10, HU_DECOMP_PARALLEL, &result);
+    hu_error_t err = hu_decompose_task(&alloc, NULL, NULL, 0, "do research", 10,
+                                       HU_DECOMP_PARALLEL, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(result.task_count, 3u);
     HU_ASSERT_EQ(result.strategy, HU_DECOMP_PARALLEL);
@@ -19,7 +20,8 @@ static void decomposition_parallel_strategy(void) {
 static void decomposition_sequential_strategy(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_decomposition_result_t result = {0};
-    hu_error_t err = hu_decompose_task(&alloc, "build pipeline", 14, HU_DECOMP_SEQUENTIAL, &result);
+    hu_error_t err = hu_decompose_task(&alloc, NULL, NULL, 0, "build pipeline", 14,
+                                       HU_DECOMP_SEQUENTIAL, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(result.task_count, 3u);
     HU_ASSERT_EQ(result.strategy, HU_DECOMP_SEQUENTIAL);
@@ -31,9 +33,9 @@ static void decomposition_null_args_returns_error(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_decomposition_result_t result = {0};
 
-    HU_ASSERT_EQ(hu_decompose_task(NULL, "x", 1, HU_DECOMP_PARALLEL, &result),
+    HU_ASSERT_EQ(hu_decompose_task(NULL, NULL, NULL, 0, "x", 1, HU_DECOMP_PARALLEL, &result),
                  HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_decompose_task(&alloc, "x", 1, HU_DECOMP_PARALLEL, NULL),
+    HU_ASSERT_EQ(hu_decompose_task(&alloc, NULL, NULL, 0, "x", 1, HU_DECOMP_PARALLEL, NULL),
                  HU_ERR_INVALID_ARGUMENT);
 }
 

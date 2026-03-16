@@ -3,6 +3,7 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/provider.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -12,6 +13,9 @@ typedef struct hu_mcts_config {
     double exploration_c;     /* UCB1 constant, default 1.41 */
     int64_t max_time_ms;      /* time budget, default 5000 */
     int max_llm_calls;        /* LLM call budget, default 20 */
+    hu_provider_t *provider;  /* optional: NULL = use heuristics */
+    const char *model;
+    size_t model_len;
 } hu_mcts_config_t;
 
 typedef struct hu_mcts_node {

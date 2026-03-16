@@ -98,6 +98,73 @@ static void test_source_in_recall_results(void) {
 }
 #endif
 
+#ifdef HU_ENABLE_SQLITE
+static void contact_memory_store_and_recall(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+
+    const char *contact_a = "user_a";
+    size_t contact_a_len = 6;
+    hu_error_t err = hu_memory_store_for_contact(&mem, contact_a, contact_a_len,
+                                                  "pref", 4, "likes dark mode", 15,
+                                                  NULL, "", 0);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_memory_entry_t *entries = NULL;
+    size_t count = 0;
+    err = hu_memory_recall_for_contact(&mem, &alloc, contact_a, contact_a_len,
+                                       "dark", 4, 5, "", 0, &entries, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(count >= 1);
+    HU_ASSERT_TRUE(entries[0].content && memcmp(entries[0].content, "likes dark mode", 15) == 0);
+
+    for (size_t i = 0; i < count; i++)
+        hu_memory_entry_free_fields(&alloc, &entries[i]);
+    alloc.free(alloc.ctx, entries, count * sizeof(hu_memory_entry_t));
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void contact_memory_cross_contact_isolation(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+
+    const char *contact_a = "user_a";
+    const char *contact_b = "user_b";
+    size_t len_a = 6, len_b = 6;
+
+    HU_ASSERT_EQ(hu_memory_store_for_contact(&mem, contact_a, len_a, "key_a", 5,
+                                             "alpha likes coffee", 18, NULL, "", 0), HU_OK);
+    HU_ASSERT_EQ(hu_memory_store_for_contact(&mem, contact_b, len_b, "key_b", 5,
+                                             "bravo prefers tea", 17, NULL, "", 0), HU_OK);
+
+    hu_memory_entry_t *entries = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_memory_recall_for_contact(&mem, &alloc, contact_a, len_a,
+                                                   "coffee", 6, 5, "", 0, &entries, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(count >= 1);
+    HU_ASSERT_TRUE(memcmp(entries[0].content, "alpha likes coffee", 18) == 0);
+    for (size_t i = 0; i < count; i++)
+        hu_memory_entry_free_fields(&alloc, &entries[i]);
+    alloc.free(alloc.ctx, entries, count * sizeof(hu_memory_entry_t));
+
+    entries = NULL;
+    count = 0;
+    err = hu_memory_recall_for_contact(&mem, &alloc, contact_a, len_a, "tea", 3,
+                                       5, "", 0, &entries, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+    if (entries) {
+        for (size_t i = 0; i < count; i++)
+            hu_memory_entry_free_fields(&alloc, &entries[i]);
+        alloc.free(alloc.ctx, entries, count * sizeof(hu_memory_entry_t));
+    }
+    mem.vtable->deinit(mem.ctx);
+}
+#endif
+
 static void test_store_with_source_fallback(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_memory_t mem = hu_none_memory_create(&alloc);
@@ -553,6 +620,12 @@ static void test_similarity_score_basics(void) {
 /* ── Test runner ─────────────────────────────────────────────────────── */
 
 void run_memory_features_tests(void) {
+    HU_TEST_SUITE("memory_features — contact-scoped memory");
+#ifdef HU_ENABLE_SQLITE
+    HU_RUN_TEST(contact_memory_store_and_recall);
+    HU_RUN_TEST(contact_memory_cross_contact_isolation);
+#endif
+
     HU_TEST_SUITE("memory_features — source citations");
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(test_store_ex_with_source);

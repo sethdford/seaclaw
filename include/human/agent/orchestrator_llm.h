@@ -55,9 +55,12 @@ hu_error_t hu_orchestrator_decompose_goal(hu_allocator_t *alloc, hu_provider_t *
 
 void hu_decomposition_free(hu_allocator_t *alloc, hu_decomposition_t *result);
 
-/* Dynamic task decomposition by strategy. Under HU_IS_TEST returns mock
+/* Dynamic task decomposition by strategy. When provider is non-NULL, uses LLM;
+ * otherwise returns heuristic fallback. Under HU_IS_TEST returns mock
  * decomposition (3 subtasks: 2 parallel + 1 dependent). */
-hu_error_t hu_decompose_task(hu_allocator_t *alloc, const char *prompt, size_t prompt_len,
+hu_error_t hu_decompose_task(hu_allocator_t *alloc, hu_provider_t *provider,
+                             const char *model, size_t model_len,
+                             const char *prompt, size_t prompt_len,
                              hu_decomposition_strategy_t strategy,
                              hu_decomposition_result_t *result);
 

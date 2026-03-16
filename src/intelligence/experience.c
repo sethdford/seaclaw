@@ -17,6 +17,9 @@
 #define HU_EXP_KEY_TASK_CHARS 16
 #define HU_EXP_RECALL_LIMIT 5
 
+#define HU_EXP_CONTACT_PREFIX "[contact:"
+#define HU_EXP_CONTACT_PREFIX_LEN 8
+
 typedef struct {
     char task[HU_EXP_TEXT_MAX];
     size_t task_len;
@@ -25,6 +28,8 @@ typedef struct {
     char outcome[HU_EXP_TEXT_MAX];
     size_t outcome_len;
     double score;
+    char contact_id[128];
+    size_t contact_id_len;
 } exp_entry_t;
 
 static exp_entry_t *s_entries = NULL;
@@ -171,6 +176,7 @@ hu_error_t hu_experience_record(hu_experience_store_t *store,
     e->actions_len = copy_truncated(e->actions, sizeof(e->actions), actions, actions_len);
     e->outcome_len = copy_truncated(e->outcome, sizeof(e->outcome), outcome, outcome_len);
     e->score = score;
+    e->contact_id_len = 0;
     s_write_idx++;
     store->stored_count++;
 

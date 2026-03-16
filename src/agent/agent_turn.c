@@ -35,6 +35,7 @@
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/memory/deep_extract.h"
+#include "human/memory/emotional_moments.h"
 #include "human/memory/fast_capture.h"
 #include "human/memory/stm.h"
 #include "human/memory/superhuman.h"
@@ -46,6 +47,7 @@
 #ifdef HU_ENABLE_SQLITE
 #include "human/intelligence/self_improve.h"
 #include "human/intelligence/online_learning.h"
+#include "human/intelligence/skills_context.h"
 #include "human/intelligence/value_learning.h"
 #include "human/intelligence/world_model.h"
 #include "human/experience.h"
@@ -231,8 +233,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             const char *sess = agent->memory_session_id;
             size_t sess_len = agent->memory_session_id ? agent->memory_session_id_len : 0;
             for (size_t i = 0; i < commit_result.count; i++) {
-                (void)hu_commitment_store_save(agent->commitment_store,
-                                               &commit_result.commitments[i], sess, sess_len);
+                hu_error_t cs_err = hu_commitment_store_save(agent->commitment_store,
+                                                              &commit_result.commitments[i],
+                                                              sess, sess_len);
+                if (cs_err != HU_OK)
+                    fprintf(stderr, "[agent] commitment save failed: %d\n", (int)cs_err);
             }
         }
         hu_commitment_detect_result_deinit(&commit_result, agent->alloc);
@@ -330,6 +335,56 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     agent->memory_session_id ? agent->memory_session_id_len : 0,
                                     &memory_ctx, &memory_ctx_len);
     }
+
+#ifdef HU_ENABLE_SQLITE
+    /* Load contact-scoped memories */
+    if (agent->memory && agent->memory_session_id && agent->memory_session_id_len > 0) {
+        hu_memory_entry_t *contact_entries = NULL;
+        size_t contact_count = 0;
+        if (hu_memory_recall_for_contact(agent->memory, agent->alloc,
+                agent->memory_session_id, agent->memory_session_id_len,
+                msg, msg_len, 5, "", 0, &contact_entries, &contact_count) == HU_OK &&
+            contact_entries && contact_count > 0) {
+            size_t extra_len = 0;
+            for (size_t i = 0; i < contact_count; i++)
+                extra_len += contact_entries[i].content_len + 1;
+            if (extra_len > 0) {
+                size_t old_len = memory_ctx ? memory_ctx_len : 0;
+                size_t new_total = old_len + (old_len > 0 ? 2 : 0) + extra_len + 32;
+                char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, new_total);
+                if (merged) {
+                    size_t pos = 0;
+                    if (memory_ctx && memory_ctx_len > 0) {
+                        memcpy(merged, memory_ctx, memory_ctx_len);
+                        pos = memory_ctx_len;
+                        merged[pos++] = '\n';
+                        merged[pos++] = '\n';
+                    }
+                    int n = snprintf(merged + pos, new_total - pos, "[About this contact]\n");
+                    if (n > 0)
+                        pos += (size_t)n;
+                    for (size_t i = 0; i < contact_count && pos < new_total - 1; i++) {
+                        size_t to_copy = contact_entries[i].content_len;
+                        if (pos + to_copy + 1 > new_total)
+                            to_copy = new_total - pos - 1;
+                        memcpy(merged + pos, contact_entries[i].content, to_copy);
+                        pos += to_copy;
+                        merged[pos++] = '\n';
+                    }
+                    merged[pos] = '\0';
+                    if (memory_ctx)
+                        agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
+                    memory_ctx = merged;
+                    memory_ctx_len = pos;
+                }
+            }
+            for (size_t i = 0; i < contact_count; i++)
+                hu_memory_entry_free_fields(agent->alloc, &contact_entries[i]);
+            agent->alloc->free(agent->alloc->ctx, contact_entries,
+                               contact_count * sizeof(hu_memory_entry_t));
+        }
+    }
+#endif
 
     /* Build STM context for this turn */
     char *stm_ctx = NULL;
@@ -480,6 +535,81 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
             } else if (memory_sh_ctx) {
                 agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len);
+            }
+        }
+        /* Emotional moments due for check-in (contact-scoped) */
+        if (agent->memory && agent->memory_session_id && agent->memory_session_id_len > 0) {
+            hu_emotional_moment_t *due = NULL;
+            size_t due_count = 0;
+            int64_t now_ts = (int64_t)time(NULL);
+            if (hu_emotional_moment_get_due(agent->alloc, agent->memory, now_ts, &due,
+                                            &due_count) == HU_OK &&
+                due && due_count > 0) {
+                size_t contact_due = 0;
+                for (size_t d = 0; d < due_count; d++) {
+                    bool match = (strcmp(due[d].contact_id, agent->memory_session_id) == 0);
+                    if (!match) {
+                        const char *colon = strchr(agent->memory_session_id, ':');
+                        if (colon && strcmp(due[d].contact_id, colon + 1) == 0)
+                            match = true;
+                    }
+                    if (match)
+                        contact_due++;
+                }
+                if (contact_due > 0) {
+                    size_t em_len = 64 + contact_due * 128;
+                    char *em_ctx = (char *)agent->alloc->alloc(agent->alloc->ctx, em_len);
+                    if (em_ctx) {
+                        size_t pos = 0;
+                        int n = snprintf(em_ctx + pos, em_len - pos,
+                                        "[Emotional check-in due] They shared something difficult "
+                                        "1–3 days ago. Consider a natural check-in:\n");
+                        if (n > 0)
+                            pos += (size_t)n;
+                        for (size_t d = 0; d < due_count && pos < em_len - 1; d++) {
+                            bool match =
+                                (strcmp(due[d].contact_id, agent->memory_session_id) == 0);
+                            if (!match) {
+                                const char *colon = strchr(agent->memory_session_id, ':');
+                                if (colon && strcmp(due[d].contact_id, colon + 1) == 0)
+                                    match = true;
+                            }
+                            if (match) {
+                                n = snprintf(em_ctx + pos, em_len - pos,
+                                             "- Topic: %s, emotion: %s\n", due[d].topic,
+                                             due[d].emotion);
+                                if (n > 0)
+                                    pos += (size_t)n;
+                            }
+                        }
+                        em_ctx[pos] = '\0';
+                        if (pos > 0 && superhuman_ctx) {
+                            size_t merged_len = superhuman_ctx_len + 2 + pos + 1;
+                            char *merged =
+                                (char *)agent->alloc->alloc(agent->alloc->ctx, merged_len);
+                            if (merged) {
+                                memcpy(merged, superhuman_ctx, superhuman_ctx_len);
+                                merged[superhuman_ctx_len] = '\n';
+                                merged[superhuman_ctx_len + 1] = '\n';
+                                memcpy(merged + superhuman_ctx_len + 2, em_ctx, pos + 1);
+                                agent->alloc->free(agent->alloc->ctx, superhuman_ctx,
+                                                   superhuman_ctx_len);
+                                agent->alloc->free(agent->alloc->ctx, em_ctx, em_len);
+                                superhuman_ctx = merged;
+                                superhuman_ctx_len = merged_len;
+                            } else {
+                                agent->alloc->free(agent->alloc->ctx, em_ctx, em_len);
+                            }
+                        } else if (pos > 0) {
+                            superhuman_ctx = em_ctx;
+                            superhuman_ctx_len = pos;
+                        } else {
+                            agent->alloc->free(agent->alloc->ctx, em_ctx, em_len);
+                        }
+                    }
+                }
+                agent->alloc->free(agent->alloc->ctx, due,
+                                   due_count * sizeof(hu_emotional_moment_t));
             }
         }
         /* F26: If they're quiet and it's during their usual quiet hours, inject hint */
@@ -700,8 +830,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 hu_world_model_t wm;
                 if (hu_world_model_create(agent->alloc, intel_db, &wm) == HU_OK) {
                     hu_wm_prediction_t pred = {0};
+                    double ctx_threshold = 0.3;
+#ifdef HU_ENABLE_SQLITE
+                    ctx_threshold = agent->meta_params.default_confidence_threshold * 0.6;
+                    if (ctx_threshold < 0.1) ctx_threshold = 0.1;
+#endif
                     if (hu_world_simulate(&wm, msg, msg_len, NULL, 0, &pred) == HU_OK &&
-                        pred.confidence > 0.3) {
+                        pred.confidence > ctx_threshold) {
                         int n = snprintf(parts + pos, sizeof(parts) - pos,
                                          "### Predicted Outcome\n"
                                          "Based on past patterns, this request likely leads to: %.*s "
@@ -831,6 +966,46 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
         }
     }
+#if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_SKILLS)
+    /* Per-contact learned skills (DB-backed) */
+    if (agent->memory && agent->memory_session_id && agent->memory_session_id_len > 0) {
+        sqlite3 *skill_db = hu_sqlite_memory_get_db(agent->memory);
+        if (skill_db) {
+            char *contact_skills = NULL;
+            size_t contact_skills_len = 0;
+            if (hu_skill_build_contact_context(agent->alloc, skill_db,
+                    agent->memory_session_id, agent->memory_session_id_len,
+                    &contact_skills, &contact_skills_len) == HU_OK &&
+                contact_skills && contact_skills_len > 0) {
+                if (skills_ctx && skills_ctx_len > 0) {
+                    size_t merged_len = skills_ctx_len + 2 + contact_skills_len + 1;
+                    char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, merged_len);
+                    if (merged) {
+                        memcpy(merged, skills_ctx, skills_ctx_len);
+                        merged[skills_ctx_len] = '\n';
+                        merged[skills_ctx_len + 1] = '\n';
+                        memcpy(merged + skills_ctx_len + 2, contact_skills,
+                               contact_skills_len + 1);
+                        agent->alloc->free(agent->alloc->ctx, skills_ctx, skills_ctx_len + 1);
+                        agent->alloc->free(agent->alloc->ctx, contact_skills,
+                                           contact_skills_len + 1);
+                        skills_ctx = merged;
+                        skills_ctx_len = merged_len;
+                    } else {
+                        agent->alloc->free(agent->alloc->ctx, contact_skills,
+                                           contact_skills_len + 1);
+                    }
+                } else {
+                    skills_ctx = contact_skills;
+                    skills_ctx_len = contact_skills_len;
+                }
+            } else if (contact_skills) {
+                agent->alloc->free(agent->alloc->ctx, contact_skills,
+                                   contact_skills_len + 1);
+            }
+        }
+    }
+#endif
 #endif /* HU_HAS_SKILLS */
 
     /* Build system prompt using cached static portion when available */
@@ -1006,6 +1181,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     req.tools_count = agent->tool_specs_count;
 
     uint32_t iter = 0;
+    size_t turn_tool_results_count = 0;
     int reflection_retries_left = agent->reflection.max_retries;
     uint64_t max_tokens =
         agent->token_limit ? agent->token_limit
@@ -1380,6 +1556,15 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 ab_result.candidates[bi].response) {
                                 if (bi != 0 && agent->bth_metrics)
                                     agent->bth_metrics->ab_alternates_chosen++;
+#ifdef HU_ENABLE_SQLITE
+                                if (agent->memory) {
+                                    sqlite3 *ab_db = hu_sqlite_memory_get_db(agent->memory);
+                                    if (ab_db)
+                                        (void)hu_ab_record_selection(ab_db, bi,
+                                            ab_result.candidates[bi].quality_score,
+                                            ab_result.candidate_count, (int64_t)time(NULL));
+                                }
+#endif
                                 final_content = ab_result.candidates[bi].response;
                                 final_len = ab_result.candidates[bi].response_len;
                                 ab_result.candidates[bi].response = NULL;
@@ -1509,9 +1694,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             int n = snprintf(key_buf, sizeof(key_buf), "%s:%s:%s", f->subject,
                                              f->predicate, f->object);
                             if (n > 0 && (size_t)n < sizeof(key_buf)) {
-                                (void)agent->memory->vtable->store(
+                                hu_error_t store_err = agent->memory->vtable->store(
                                     agent->memory->ctx, key_buf, (size_t)n, f->object,
                                     strlen(f->object), &cat, sid ? sid : "", sid_len);
+                                if (store_err != HU_OK && store_err != HU_ERR_NOT_SUPPORTED)
+                                    fprintf(stderr, "[agent] memory store failed: %d\n",
+                                            (int)store_err);
                             }
                         }
                     }
@@ -1527,9 +1715,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 if (cerr == HU_OK && cr.count > 0) {
                     const char *sess = agent->memory_session_id;
                     size_t sess_len = sess ? agent->memory_session_id_len : 0;
-                    for (size_t ci = 0; ci < cr.count; ci++)
-                        (void)hu_commitment_store_save(agent->commitment_store, &cr.commitments[ci],
-                                                       sess, sess_len);
+                    for (size_t ci = 0; ci < cr.count; ci++) {
+                        hu_error_t cs_err = hu_commitment_store_save(agent->commitment_store,
+                                                                      &cr.commitments[ci],
+                                                                      sess, sess_len);
+                        if (cs_err != HU_OK)
+                            fprintf(stderr, "[agent] commitment save failed: %d\n",
+                                    (int)cs_err);
+                    }
                 }
                 hu_commitment_detect_result_deinit(&cr, agent->alloc);
             }
@@ -1543,9 +1736,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         exp_store.db = rec_db;
                     const char *resp_text = *response_out ? *response_out : "";
                     size_t resp_len = response_len_out ? *response_len_out : 0;
-                    (void)hu_experience_record(&exp_store, msg, msg_len,
-                                               "agent_turn", 10,
-                                               resp_text, resp_len, 1.0);
+                    {
+                        hu_error_t exp_err = hu_experience_record(&exp_store, msg, msg_len,
+                                                                   "agent_turn", 10,
+                                                                   resp_text, resp_len, 1.0);
+                        if (exp_err != HU_OK)
+                            fprintf(stderr, "[agent] experience record failed: %d\n",
+                                    (int)exp_err);
+                    }
                     hu_experience_store_deinit(&exp_store);
                 }
             }
@@ -1570,6 +1768,21 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         hu_value_engine_deinit(&ve);
                     }
                 }
+            }
+#endif
+#ifdef HU_HAS_PERSONA
+            /* Style learning: periodically re-analyze conversations to update persona */
+            if (agent->history_count >= 50 && agent->history_count % 50 == 0 &&
+                agent->persona_name && agent->persona_name_len > 0 && agent->memory) {
+                const char *ch = agent->active_channel ? agent->active_channel : "cli";
+                size_t ch_len = agent->active_channel_len ? agent->active_channel_len : 3;
+                const char *cid = agent->memory_session_id ? agent->memory_session_id : "";
+                size_t cid_len = agent->memory_session_id_len ? agent->memory_session_id_len : 0;
+                (void)hu_persona_style_reanalyze(agent->alloc, &agent->provider,
+                                                 agent->model_name, agent->model_name_len,
+                                                 agent->memory,
+                                                 agent->persona_name, agent->persona_name_len,
+                                                 ch, ch_len, cid, cid_len);
             }
 #endif
             if (system_prompt)
@@ -1837,6 +2050,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     dispatcher.max_parallel = 4;
                 dispatcher.timeout_secs = 30;
 
+                const hu_tool_call_t *calls_to_dispatch = calls;
 #ifdef HU_ENABLE_SQLITE
                 /* World model: rank tool calls by predicted outcome */
                 if (tc_count >= 2 && agent->memory) {
@@ -1844,17 +2058,38 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     if (wm_db) {
                         hu_world_model_t wm;
                         if (hu_world_model_create(agent->alloc, wm_db, &wm) == HU_OK) {
-                            for (size_t tc = 0; tc < tc_count; tc++) {
-                                hu_wm_prediction_t pred = {0};
-                                if (hu_world_simulate(&wm, calls[tc].name, calls[tc].name_len,
-                                                      msg, msg_len, &pred) == HU_OK &&
-                                    pred.confidence > 0.5) {
-                                    hu_observer_event_t ev = {
-                                        .tag = HU_OBSERVER_EVENT_TOOL_CALL, .data = {{0}}};
-                                    ev.data.tool_call.tool = "world_model_predict";
-                                    ev.data.tool_call.success = true;
-                                    HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
+                            size_t opt_count = tc_count < 32 ? tc_count : 32;
+                            hu_tool_call_t calls_buf[32];
+                            for (size_t tc = 0; tc < opt_count; tc++)
+                                calls_buf[tc] = calls[tc];
+                            const char *action_names[32];
+                            size_t action_lens[32];
+                            for (size_t tc = 0; tc < opt_count; tc++) {
+                                action_names[tc] = calls_buf[tc].name;
+                                action_lens[tc] = calls_buf[tc].name_len;
+                            }
+                            hu_action_option_t options[32];
+                            memset(options, 0, sizeof(options));
+                            if (hu_world_evaluate_options(&wm, action_names, action_lens,
+                                                          opt_count, msg, msg_len,
+                                                          options) == HU_OK) {
+                                /* options are sorted by score descending; reorder calls to match */
+                                for (size_t i = 0; i < opt_count; i++) {
+                                    for (size_t j = 0; j < opt_count; j++) {
+                                        if (options[i].action_len == calls[j].name_len &&
+                                            memcmp(options[i].action, calls[j].name,
+                                                   options[i].action_len) == 0) {
+                                            calls_buf[i] = calls[j];
+                                            break;
+                                        }
+                                    }
                                 }
+                                calls_to_dispatch = calls_buf;
+                                hu_observer_event_t ev = {
+                                    .tag = HU_OBSERVER_EVENT_TOOL_CALL, .data = {{0}}};
+                                ev.data.tool_call.tool = "world_model_reorder";
+                                ev.data.tool_call.success = true;
+                                HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
                             }
                             hu_world_model_deinit(&wm);
                         }
@@ -1864,7 +2099,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 hu_dispatch_result_t dispatch_result;
                 memset(&dispatch_result, 0, sizeof(dispatch_result));
                 err = hu_dispatcher_dispatch(&dispatcher, agent->alloc, agent->tools,
-                                             agent->tools_count, calls, tc_count, &dispatch_result);
+                                             agent->tools_count, calls_to_dispatch, tc_count,
+                                             &dispatch_result);
+                if (err == HU_OK)
+                    turn_tool_results_count += tc_count;
+                (void)(turn_tool_results_count | 0); /* read to satisfy -Wunused-but-set-variable */
 
                 if (err == HU_OK && dispatch_result.results) {
                     for (size_t tc = 0; tc < tc_count; tc++) {

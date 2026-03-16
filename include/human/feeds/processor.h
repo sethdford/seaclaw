@@ -31,6 +31,8 @@ typedef struct hu_feed_item {
     hu_feed_type_t type;
     char *source;
     size_t source_len; /* "instagram:@friend", "rss:techcrunch" */
+    char *contact_id;
+    size_t contact_id_len;
     char *content;
     size_t content_len;
     char *topic;

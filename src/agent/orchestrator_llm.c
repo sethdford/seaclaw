@@ -287,7 +287,28 @@ void hu_decomposition_free(hu_allocator_t *alloc, hu_decomposition_t *result) {
     }
 }
 
-hu_error_t hu_decompose_task(hu_allocator_t *alloc, const char *prompt, size_t prompt_len,
+static void decomposition_result_from_orchestrator(const hu_decomposition_t *decomp,
+                                                   hu_decomposition_strategy_t strategy,
+                                                   hu_decomposition_result_t *result) {
+    memset(result, 0, sizeof(*result));
+    result->strategy = strategy;
+    result->task_count = decomp->task_count < HU_DECOMP_MAX_TASKS
+                             ? decomp->task_count
+                             : HU_DECOMP_MAX_TASKS;
+    for (size_t i = 0; i < result->task_count; i++) {
+        size_t copy = decomp->tasks[i].description_len < sizeof(result->tasks[i].description) - 1
+                          ? decomp->tasks[i].description_len
+                          : sizeof(result->tasks[i].description) - 1;
+        memcpy(result->tasks[i].description, decomp->tasks[i].description, copy);
+        result->tasks[i].description[copy] = '\0';
+        result->tasks[i].description_len = copy;
+        result->tasks[i].depends_on = decomp->tasks[i].depends_on;
+    }
+}
+
+hu_error_t hu_decompose_task(hu_allocator_t *alloc, hu_provider_t *provider,
+                             const char *model, size_t model_len,
+                             const char *prompt, size_t prompt_len,
                              hu_decomposition_strategy_t strategy,
                              hu_decomposition_result_t *result) {
     if (!alloc || !result)
@@ -299,6 +320,9 @@ hu_error_t hu_decompose_task(hu_allocator_t *alloc, const char *prompt, size_t p
     result->strategy = strategy;
 
 #if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)provider;
+    (void)model;
+    (void)model_len;
     (void)prompt;
     (void)prompt_len;
 
@@ -326,10 +350,21 @@ hu_error_t hu_decompose_task(hu_allocator_t *alloc, const char *prompt, size_t p
 
     return HU_OK;
 #else
-    (void)prompt;
-    (void)prompt_len;
-    /* Production: would call LLM; for now return mock to match test behavior */
+    if (provider && provider->vtable && provider->vtable->chat_with_system) {
+        hu_decomposition_t decomp = {0};
+        hu_error_t err = hu_orchestrator_decompose_goal(alloc, provider, model, model_len,
+                                                        prompt, prompt_len, NULL, 0, &decomp);
+        if (err == HU_OK && decomp.task_count > 0) {
+            decomposition_result_from_orchestrator(&decomp, strategy, result);
+            hu_decomposition_free(alloc, &decomp);
+            return HU_OK;
+        }
+        hu_decomposition_free(alloc, &decomp);
+    }
+
+    /* Fallback: heuristic (same structure as mock) */
     result->task_count = 3;
+    result->strategy = strategy;
     strncpy(result->tasks[0].description, "parallel task A",
             sizeof(result->tasks[0].description) - 1);
     result->tasks[0].description[sizeof(result->tasks[0].description) - 1] = '\0';

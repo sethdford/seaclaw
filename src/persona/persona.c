@@ -3510,10 +3510,356 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                         goto fail;
                 }
                 err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                    if (err != HU_OK)
+                        goto fail;
+            }
+        }
+    }
+
+    /* Time-of-day overlay */
+    {
+        uint8_t hour = 12;
+#ifndef HU_IS_TEST
+        time_t now = time(NULL);
+        struct tm lt_buf;
+        struct tm *lt = localtime_r(&now, &lt_buf);
+        if (lt)
+            hour = (uint8_t)(lt->tm_hour & 0xFF);
+#endif
+        const char *overlay = NULL;
+        if (hour >= 22 || hour < 5)
+            overlay = persona->time_overlay_late_night;
+        else if (hour >= 5 && hour < 9)
+            overlay = persona->time_overlay_early_morning;
+        else if (hour >= 12 && hour < 17)
+            overlay = persona->time_overlay_afternoon;
+        else if (hour >= 17 && hour < 22)
+            overlay = persona->time_overlay_evening;
+        if (overlay && overlay[0]) {
+            err = append_prompt(alloc, &buf, &len, &cap,
+                               "\n--- Current Time Context ---\n", 31);
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap, overlay, strlen(overlay));
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+            if (err != HU_OK)
+                goto fail;
+        }
+    }
+
+    /* Daily routine — current block from weekday/weekend */
+    {
+        const hu_routine_block_t *blocks = NULL;
+        size_t block_count = 0;
+        int minutes_since_midnight = 12 * 60;
+#ifndef HU_IS_TEST
+        time_t now = time(NULL);
+        struct tm lt_buf;
+        struct tm *lt = localtime_r(&now, &lt_buf);
+        if (lt) {
+            minutes_since_midnight = lt->tm_hour * 60 + lt->tm_min;
+            int dow = lt->tm_wday;
+            if (dow >= 1 && dow <= 5) {
+                blocks = persona->daily_routine.weekday;
+                block_count = persona->daily_routine.weekday_count;
+            } else {
+                blocks = persona->daily_routine.weekend;
+                block_count = persona->daily_routine.weekend_count;
+            }
+        }
+#else
+        blocks = persona->daily_routine.weekday;
+        block_count = persona->daily_routine.weekday_count;
+#endif
+        if (blocks && block_count > 0) {
+            size_t idx = 0;
+            for (; idx < block_count; idx++) {
+                int h = 0, m = 0;
+                if (sscanf(blocks[idx].time, "%d:%d", &h, &m) != 2)
+                    continue;
+                int start = h * 60 + m;
+                int end = 24 * 60;
+                if (idx + 1 < block_count) {
+                    int h2 = 0, m2 = 0;
+                    if (sscanf(blocks[idx + 1].time, "%d:%d", &h2, &m2) == 2)
+                        end = h2 * 60 + m2;
+                }
+                if (minutes_since_midnight >= start && minutes_since_midnight < end)
+                    break;
+            }
+            if (idx < block_count) {
+                const hu_routine_block_t *b = &blocks[idx];
+                if (b->activity[0] || b->availability[0] || b->mood_modifier[0]) {
+                    err = append_prompt(alloc, &buf, &len, &cap,
+                                       "\n--- Current Routine Block ---\n", 29);
+                    if (err != HU_OK)
+                        goto fail;
+                    char block_buf[256];
+                    int bn = snprintf(block_buf, sizeof(block_buf),
+                                     "Time: %s. Activity: %s. Availability: %s. Mood: %s.\n",
+                                     b->time, b->activity, b->availability, b->mood_modifier);
+                    if (bn > 0 && (size_t)bn < sizeof(block_buf)) {
+                        err = append_prompt(alloc, &buf, &len, &cap, block_buf, (size_t)bn);
+                        if (err != HU_OK)
+                            goto fail;
+                    }
+                }
+            }
+        }
+    }
+
+    /* Current life chapter */
+    if (persona->current_chapter.theme[0] || persona->current_chapter.mood[0]) {
+        err = append_prompt(alloc, &buf, &len, &cap, "\n--- Current Life Chapter ---\n", 30);
+        if (err != HU_OK)
+            goto fail;
+        if (persona->current_chapter.theme[0]) {
+            err = append_prompt(alloc, &buf, &len, &cap, "Theme: ", 7);
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap,
+                               persona->current_chapter.theme,
+                               strlen(persona->current_chapter.theme));
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+            if (err != HU_OK)
+                goto fail;
+        }
+        if (persona->current_chapter.mood[0]) {
+            err = append_prompt(alloc, &buf, &len, &cap, "Mood: ", 6);
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap,
+                               persona->current_chapter.mood,
+                               strlen(persona->current_chapter.mood));
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+            if (err != HU_OK)
+                goto fail;
+        }
+        if (persona->current_chapter.key_threads_count > 0) {
+            err = append_prompt(alloc, &buf, &len, &cap, "Key threads: ", 13);
+            if (err != HU_OK)
+                goto fail;
+            for (size_t i = 0; i < persona->current_chapter.key_threads_count; i++) {
+                if (i > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, "; ", 2);
+                    if (err != HU_OK)
+                        goto fail;
+                }
+                if (persona->current_chapter.key_threads[i][0]) {
+                    err = append_prompt(alloc, &buf, &len, &cap,
+                                       persona->current_chapter.key_threads[i],
+                                       strlen(persona->current_chapter.key_threads[i]));
+                    if (err != HU_OK)
+                        goto fail;
+                }
+            }
+            err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+            if (err != HU_OK)
+                goto fail;
+        }
+    }
+
+    /* Important dates — today's MM-DD */
+    if (persona->important_dates && persona->important_dates_count > 0) {
+        char today_md[8] = {0};
+#ifndef HU_IS_TEST
+        {
+            time_t now = time(NULL);
+            struct tm lt_buf;
+            struct tm *lt = localtime_r(&now, &lt_buf);
+            if (lt)
+                strftime(today_md, sizeof(today_md), "%m-%d", lt);
+        }
+#else
+        snprintf(today_md, sizeof(today_md), "01-01");
+#endif
+        for (size_t i = 0; i < persona->important_dates_count; i++) {
+            const hu_important_date_t *d = &persona->important_dates[i];
+            if (!d->date[0])
+                continue;
+            if (strcmp(d->date, today_md) != 0)
+                continue;
+            err = append_prompt(alloc, &buf, &len, &cap,
+                               "\n--- Important Date Today ---\n", 29);
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap, d->type, strlen(d->type));
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap, ": ", 2);
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap, d->message, strlen(d->message));
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+            if (err != HU_OK)
+                goto fail;
+            break;
+        }
+    }
+
+    /* Core values */
+    if (persona->core_values_count > 0) {
+        err = append_prompt(alloc, &buf, &len, &cap, "\n--- Core Values ---\n", 21);
+        if (err != HU_OK)
+            goto fail;
+        for (size_t i = 0; i < persona->core_values_count; i++) {
+            if (persona->core_values[i][0]) {
+                err = append_prompt(alloc, &buf, &len, &cap, "- ", 2);
+                if (err != HU_OK)
+                    goto fail;
+                err = append_prompt(alloc, &buf, &len, &cap,
+                                   persona->core_values[i],
+                                   strlen(persona->core_values[i]));
+                if (err != HU_OK)
+                    goto fail;
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
                 if (err != HU_OK)
                     goto fail;
             }
         }
+    }
+
+    /* Key relationships */
+    if (persona->relationships_count > 0) {
+        err = append_prompt(alloc, &buf, &len, &cap, "\n--- Key Relationships ---\n", 27);
+        if (err != HU_OK)
+            goto fail;
+        for (size_t i = 0; i < persona->relationships_count; i++) {
+            const hu_relationship_t *r = &persona->relationships[i];
+            if (!r->name[0])
+                continue;
+            err = append_prompt(alloc, &buf, &len, &cap, "- ", 2);
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap, r->name, strlen(r->name));
+            if (err != HU_OK)
+                goto fail;
+            if (r->role[0]) {
+                err = append_prompt(alloc, &buf, &len, &cap, " (", 2);
+                if (err != HU_OK)
+                    goto fail;
+                err = append_prompt(alloc, &buf, &len, &cap, r->role, strlen(r->role));
+                if (err != HU_OK)
+                    goto fail;
+                err = append_prompt(alloc, &buf, &len, &cap, ")", 1);
+                if (err != HU_OK)
+                    goto fail;
+            }
+            if (r->notes[0]) {
+                err = append_prompt(alloc, &buf, &len, &cap, ": ", 2);
+                if (err != HU_OK)
+                    goto fail;
+                err = append_prompt(alloc, &buf, &len, &cap, r->notes, strlen(r->notes));
+                if (err != HU_OK)
+                    goto fail;
+            }
+            err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+            if (err != HU_OK)
+                goto fail;
+        }
+    }
+
+    /* Immersive reinforcement */
+    if (persona->immersive_reinforcement && persona->immersive_reinforcement_count > 0) {
+        err = append_prompt(alloc, &buf, &len, &cap,
+                           "\n--- Immersive Reinforcement ---\n", 32);
+        if (err != HU_OK)
+            goto fail;
+        for (size_t i = 0; i < persona->immersive_reinforcement_count; i++) {
+            const char *s = persona->immersive_reinforcement[i];
+            if (s && s[0]) {
+                err = append_prompt(alloc, &buf, &len, &cap, "- ", 2);
+                if (err != HU_OK)
+                    goto fail;
+                err = append_prompt(alloc, &buf, &len, &cap, s, strlen(s));
+                if (err != HU_OK)
+                    goto fail;
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                if (err != HU_OK)
+                    goto fail;
+            }
+        }
+    }
+
+    /* Identity reinforcement */
+    if (persona->identity_reinforcement && persona->identity_reinforcement[0]) {
+        err = append_prompt(alloc, &buf, &len, &cap,
+                           "\n--- Identity Reinforcement ---\n", 31);
+        if (err != HU_OK)
+            goto fail;
+        err = append_prompt(alloc, &buf, &len, &cap,
+                           persona->identity_reinforcement,
+                           strlen(persona->identity_reinforcement));
+        if (err != HU_OK)
+            goto fail;
+        err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    /* Anti-patterns (persona-level) */
+    if (persona->anti_patterns && persona->anti_patterns_count > 0) {
+        err = append_prompt(alloc, &buf, &len, &cap, "\n--- Anti-Patterns ---\n", 22);
+        if (err != HU_OK)
+            goto fail;
+        for (size_t i = 0; i < persona->anti_patterns_count; i++) {
+            const char *s = persona->anti_patterns[i];
+            if (s && s[0]) {
+                err = append_prompt(alloc, &buf, &len, &cap, "- ", 2);
+                if (err != HU_OK)
+                    goto fail;
+                err = append_prompt(alloc, &buf, &len, &cap, s, strlen(s));
+                if (err != HU_OK)
+                    goto fail;
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                if (err != HU_OK)
+                    goto fail;
+            }
+        }
+    }
+
+    /* Style rules */
+    if (persona->style_rules && persona->style_rules_count > 0) {
+        err = append_prompt(alloc, &buf, &len, &cap, "\n--- Style Rules ---\n", 19);
+        if (err != HU_OK)
+            goto fail;
+        for (size_t i = 0; i < persona->style_rules_count; i++) {
+            const char *s = persona->style_rules[i];
+            if (s && s[0]) {
+                err = append_prompt(alloc, &buf, &len, &cap, "- ", 2);
+                if (err != HU_OK)
+                    goto fail;
+                err = append_prompt(alloc, &buf, &len, &cap, s, strlen(s));
+                if (err != HU_OK)
+                    goto fail;
+                err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                if (err != HU_OK)
+                    goto fail;
+            }
+        }
+    }
+
+    /* Proactive rules */
+    if (persona->proactive_rules && persona->proactive_rules[0]) {
+        err = append_prompt(alloc, &buf, &len, &cap, "\n--- Proactive Rules ---\n", 24);
+        if (err != HU_OK)
+            goto fail;
+        err = append_prompt(alloc, &buf, &len, &cap,
+                           persona->proactive_rules,
+                           strlen(persona->proactive_rules));
+        if (err != HU_OK)
+            goto fail;
+        err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
     }
 
     if (len > HU_PERSONA_PROMPT_MAX_BYTES) {

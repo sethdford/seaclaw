@@ -136,6 +136,20 @@ hu_error_t hu_memory_store_with_source(hu_memory_t *mem, const char *key, size_t
                                        size_t session_id_len, const char *source,
                                        size_t source_len);
 
+/* Contact-scoped recall: wraps memory store/recall with contact filtering.
+ * Stores with key prefix contact:<contact_id>:<key>; recalls by contact scope. */
+hu_error_t hu_memory_store_for_contact(hu_memory_t *mem, const char *contact_id,
+                                       size_t contact_id_len, const char *key, size_t key_len,
+                                       const char *content, size_t content_len,
+                                       const hu_memory_category_t *category,
+                                       const char *session_id, size_t session_id_len);
+
+hu_error_t hu_memory_recall_for_contact(hu_memory_t *mem, hu_allocator_t *alloc,
+                                        const char *contact_id, size_t contact_id_len,
+                                        const char *query, size_t query_len, size_t limit,
+                                        const char *session_id, size_t session_id_len,
+                                        hu_memory_entry_t **out, size_t *out_count);
+
 hu_memory_t hu_none_memory_create(hu_allocator_t *alloc);
 hu_memory_t hu_sqlite_memory_create(hu_allocator_t *alloc, const char *db_path);
 hu_session_store_t hu_sqlite_memory_get_session_store(hu_memory_t *mem);

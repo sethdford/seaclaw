@@ -485,6 +485,7 @@ set(HU_CORE_SOURCES
     src/memory/engines/registry.c
     src/memory/factory.c
     src/memory/util.c
+    src/memory/contact_memory.c
     src/memory/stm.c
     src/memory/emotional_graph.c
     src/memory/comfort_patterns.c
@@ -719,6 +720,7 @@ if(HU_ENABLE_PERSONA)
         src/persona/training.c
         src/persona/life_sim.c
         src/persona/mood.c
+        src/persona/style_learner.c
         src/tools/persona.c
         src/context/theory_of_mind.c
         src/context/self_awareness.c
@@ -958,6 +960,9 @@ if(Threads_FOUND)
 endif()
 if(UNIX AND NOT APPLE)
     target_link_libraries(human_core PUBLIC m dl)
+endif()
+if(APPLE)
+    target_link_libraries(human_core PRIVATE "-framework ApplicationServices")
 endif()
 target_include_directories(human_core PRIVATE ${HU_ROOT}/asm/generic ${HU_ROOT}/src/agent ${HU_ROOT}/src/gateway)
 ## HU_IS_TEST is intentionally NOT set here — human_core is the production library.
@@ -1516,7 +1521,8 @@ if(NOT HU_ENABLE_PERSONA)
         src/persona/analyzer.c src/persona/creator.c src/persona/cli.c src/persona/feedback.c
         src/persona/replay.c src/persona/circadian.c src/persona/relationship.c
         src/persona/auto_profile.c src/persona/auto_tune.c src/persona/voice_maturity.c
-        src/persona/style_clone.c src/persona/life_sim.c src/persona/mood.c src/tools/persona.c
+        src/persona/style_clone.c src/persona/life_sim.c src/persona/mood.c
+        src/persona/style_learner.c src/tools/persona.c
         src/context/theory_of_mind.c src/context/self_awareness.c src/context/anticipatory.c
         src/context/protective.c src/context/humor.c src/context/social_graph.c
         src/context/authentic.c
@@ -1738,6 +1744,7 @@ set(HU_TEST_SOURCES
     tests/test_vtables.c
     tests/test_e2e.c
     tests/test_e2e_conversation.c
+    tests/test_e2e_agent_loop.c
     tests/test_subsystems.c
     tests/test_config_parse.c
     tests/test_config_migrate.c

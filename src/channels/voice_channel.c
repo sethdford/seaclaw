@@ -3,8 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* NOTE: For OpenAI Realtime API (full-duplex voice), see src/voice/realtime.c
- * and include/human/voice/realtime.h. This channel uses Sonata TTS/STT instead. */
+/* Voice channel uses Sonata TTS/STT for text-to-speech and speech-to-text.
+ * For OpenAI Realtime API (full-duplex voice), see src/voice/realtime.c.
+ * For WebRTC-based voice, see src/voice/webrtc.c.
+ * Integration of realtime/WebRTC into this channel is a future enhancement
+ * requiring a config flag to switch between Sonata and realtime modes. */
 
 #ifdef HU_HAS_SONATA
 /* FFI declarations for Sonata Rust pipeline.

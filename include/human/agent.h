@@ -21,6 +21,9 @@
 #include "human/cost.h"
 #include "human/memory.h"
 #include "human/memory/retrieval.h"
+#ifdef HU_ENABLE_SQLITE
+#include "human/intelligence/meta_learning.h"
+#endif
 #include "human/memory/stm.h"
 #include "human/observability/bth_metrics.h"
 #include "human/observer.h"
@@ -204,6 +207,10 @@ struct hu_agent {
     bool constitutional_enabled;
     bool multi_agent_enabled;
     struct hu_speculative_cache *speculative_cache;
+
+#ifdef HU_ENABLE_SQLITE
+    hu_meta_params_t meta_params;
+#endif
 
 #ifdef HU_HAS_PERSONA
     hu_relationship_state_t relationship; /* session-based warmth adaptation */

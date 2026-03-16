@@ -1,13 +1,10 @@
-/* LanceDB memory backend — SQLite + optional vector. Text-based search without embeddings.
+/* LanceDB memory engine — SQLite-backed with FTS5 text search.
+ * Despite the name, this does not use the LanceDB library.
+ * It provides a LanceDB-inspired interface over SQLite for vector-like
+ * similarity search using full-text search indexing.
  * HU_IS_TEST: in-memory mock.
  * When HU_ENABLE_SQLITE is not set (production build), all operations return
  * HU_ERR_NOT_SUPPORTED. This is intentional, documented stub behavior. */
-
-/*
- * Name suggests: native LanceDB vector DB backend.
- * Actually: SQLite-based storage with text search (LIKE). No LanceDB library.
- * A native implementation would require the actual LanceDB libraries.
- */
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"

@@ -34,6 +34,7 @@
 #include "human/memory/deep_extract.h"
 #include "human/memory/episodic.h"
 #include "human/memory/emotional_residue.h"
+#include "human/memory/forgetting.h"
 #include "human/memory/forgetting_curve.h"
 #include "human/memory/prospective.h"
 #include "human/memory/emotional_graph.h"
@@ -53,6 +54,7 @@
 #include "human/visual/content.h"
 #include "human/feeds/processor.h"
 #include "human/feeds/findings.h"
+#include "human/feeds/research.h"
 #include "human/agent/arbitrator.h"
 #define HU_COGNITIVE_SKIP_LIFE_CHAPTER 1
 #include "human/memory/cognitive.h"
@@ -684,6 +686,31 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
             continue;
 
         const char *prompt = jobs[i].command;
+        char *fresh_prompt = NULL;
+        size_t fresh_prompt_len = 0;
+
+        /* Rebuild research agent prompt with fresh digest */
+#ifdef HU_ENABLE_SQLITE
+        if (jobs[i].name && strcmp(jobs[i].name, "research-agent") == 0 &&
+            agent->memory) {
+            sqlite3 *fresh_db = hu_sqlite_memory_get_db(agent->memory);
+            if (fresh_db) {
+                int64_t since = (int64_t)now - 86400;
+                char *digest = NULL;
+                size_t digest_len = 0;
+                hu_feed_build_daily_digest(alloc, fresh_db, since, 4000,
+                                           &digest, &digest_len);
+                if (digest && digest_len > 0) {
+                    if (hu_research_build_prompt(alloc, digest, digest_len,
+                                                 &fresh_prompt, &fresh_prompt_len) == HU_OK &&
+                        fresh_prompt) {
+                        prompt = fresh_prompt;
+                    }
+                    alloc->free(alloc->ctx, digest, digest_len + 1);
+                }
+            }
+        }
+#endif
         size_t prompt_len = strlen(prompt);
         const char *target_channel = jobs[i].channel;
 
@@ -757,6 +784,8 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
         if (response)
             agent->alloc->free(agent->alloc->ctx, response, response_len + 1);
         hu_agent_clear_history(agent);
+        if (fresh_prompt)
+            alloc->free(alloc->ctx, fresh_prompt, fresh_prompt_len + 1);
     }
     return HU_OK;
 }
@@ -2037,6 +2066,20 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 /* P7: Forgetting curve batch decay */
                                 (void)hu_forgetting_apply_batch_decay(refl_db, (int64_t)t, 0.1);
 
+                                /* Vtable-based memory decay + prune */
+                                if (agent && agent->memory) {
+                                    hu_forgetting_stats_t decay_stats = {0};
+                                    if (hu_memory_decay(alloc, agent->memory, 0.05, &decay_stats) == HU_OK &&
+                                        decay_stats.decayed > 0)
+                                        fprintf(stderr, "[human] memory decay: %zu decayed\n",
+                                                decay_stats.decayed);
+                                    hu_forgetting_stats_t prune_stats = {0};
+                                    if (hu_memory_prune(alloc, agent->memory, 0.01, &prune_stats) == HU_OK &&
+                                        prune_stats.pruned > 0)
+                                        fprintf(stderr, "[human] memory prune: %zu pruned\n",
+                                                prune_stats.pruned);
+                                }
+
                                 /* P7: Emotional residue decay (reduce intensity of old entries) */
                                 /* Decay is applied on read via exponential formula; no separate
                                  * batch call needed — hu_emotional_residue_get_active already
@@ -2147,6 +2190,28 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 fprintf(stderr, "[human] intelligence cycle: %zu findings, %zu lessons, %zu events\n",
                                         cycle_result.findings_actioned, cycle_result.lessons_extracted,
                                         cycle_result.events_recorded);
+                            }
+                            if (cycle_err == HU_OK && (cycle_result.findings_actioned > 0 ||
+                                cycle_result.lessons_extracted > 0)) {
+                                char cycle_lesson[256];
+                                int cl_len = snprintf(cycle_lesson, sizeof(cycle_lesson),
+                                    "Intelligence cycle completed: %zu findings actioned, "
+                                    "%zu lessons extracted, %zu values learned, %zu skills updated",
+                                    cycle_result.findings_actioned, cycle_result.lessons_extracted,
+                                    cycle_result.values_learned, cycle_result.skills_updated);
+                                if (cl_len > 0 && (size_t)cl_len < sizeof(cycle_lesson)) {
+                                    sqlite3_stmt *cl_stmt = NULL;
+                                    const char *cl_sql = "INSERT OR IGNORE INTO general_lessons "
+                                        "(lesson, confidence, source_count, first_learned, last_confirmed) "
+                                        "VALUES (?, 0.6, 1, ?, ?)";
+                                    if (sqlite3_prepare_v2(cycle_db, cl_sql, -1, &cl_stmt, NULL) == SQLITE_OK) {
+                                        sqlite3_bind_text(cl_stmt, 1, cycle_lesson, cl_len, SQLITE_STATIC);
+                                        sqlite3_bind_int64(cl_stmt, 2, (int64_t)t);
+                                        sqlite3_bind_int64(cl_stmt, 3, (int64_t)t);
+                                        (void)sqlite3_step(cl_stmt);
+                                        sqlite3_finalize(cl_stmt);
+                                    }
+                                }
                             }
                             last_intelligence_cycle = (int64_t)t;
                         }

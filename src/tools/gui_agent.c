@@ -6,6 +6,10 @@
 #include "human/tool.h"
 #include <string.h>
 
+#if defined(__APPLE__) && !defined(HU_IS_TEST)
+#include <ApplicationServices/ApplicationServices.h>
+#endif
+
 #define GUI_AGENT_PARAMS                                                                           \
     "{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"enum\":[\"capture\"," \
     "\"execute\",\"verify\",\"app_allowed\"]},\"type\":{\"type\":\"string\"},\"x\":{\"type\":"     \
@@ -49,6 +53,76 @@ static void mock_state_init(hu_gui_state_t *state) {
 }
 #endif
 
+#if defined(__APPLE__) && !defined(HU_IS_TEST)
+#define HU_GUI_MAX_ELEMENTS 32
+
+static void ax_collect_elements(AXUIElementRef elem, hu_gui_state_t *state) {
+    if (state->element_count >= HU_GUI_MAX_ELEMENTS)
+        return;
+    CFArrayRef children = NULL;
+    if (AXUIElementCopyAttributeValue(elem, kAXChildrenAttribute, (CFTypeRef *)&children) !=
+        kAXErrorSuccess ||
+        !children) {
+        return;
+    }
+    CFIndex count = CFArrayGetCount(children);
+    for (CFIndex i = 0; i < count && state->element_count < HU_GUI_MAX_ELEMENTS; i++) {
+        AXUIElementRef child = (AXUIElementRef)CFArrayGetValueAtIndex(children, i);
+        hu_gui_element_t *ge = &state->elements[state->element_count];
+
+        CFStringRef role = NULL;
+        if (AXUIElementCopyAttributeValue(child, kAXRoleAttribute, (CFTypeRef *)&role) ==
+                kAXErrorSuccess &&
+            role) {
+            if (!CFStringGetCString(role, ge->type, (CFIndex)sizeof(ge->type), kCFStringEncodingUTF8))
+                ge->type[0] = '\0';
+            ge->type[sizeof(ge->type) - 1] = '\0';
+            CFRelease(role);
+        } else {
+            ge->type[0] = '\0';
+        }
+
+        CFStringRef label = NULL;
+        if (AXUIElementCopyAttributeValue(child, kAXTitleAttribute, (CFTypeRef *)&label) ==
+                kAXErrorSuccess &&
+            label) {
+            if (!CFStringGetCString(label, ge->label, (CFIndex)sizeof(ge->label),
+                                   kCFStringEncodingUTF8))
+                ge->label[0] = '\0';
+            ge->label_len = strlen(ge->label);
+            ge->label[sizeof(ge->label) - 1] = '\0';
+            CFRelease(label);
+        } else {
+            ge->label[0] = '\0';
+            ge->label_len = 0;
+        }
+
+        AXValueRef pos_val = NULL;
+        AXValueRef size_val = NULL;
+        CGPoint pos = {0};
+        CGSize size = {0};
+        if (AXUIElementCopyAttributeValue(child, kAXPositionAttribute, (CFTypeRef *)&pos_val) ==
+            kAXErrorSuccess) {
+            if (pos_val && AXValueGetValue(pos_val, kAXValueTypeCGPoint, &pos))
+                ge->x = (int)pos.x, ge->y = (int)pos.y;
+            if (pos_val)
+                CFRelease(pos_val);
+        }
+        if (AXUIElementCopyAttributeValue(child, kAXSizeAttribute, (CFTypeRef *)&size_val) ==
+            kAXErrorSuccess) {
+            if (size_val && AXValueGetValue(size_val, kAXValueTypeCGSize, &size))
+                ge->width = (int)size.width, ge->height = (int)size.height;
+            if (size_val)
+                CFRelease(size_val);
+        }
+
+        state->element_count++;
+        ax_collect_elements(child, state);
+    }
+    CFRelease(children);
+}
+#endif
+
 hu_error_t hu_gui_capture_state(hu_allocator_t *alloc, hu_gui_state_t *state) {
     if (!alloc || !state)
         return HU_ERR_INVALID_ARGUMENT;
@@ -57,17 +131,58 @@ hu_error_t hu_gui_capture_state(hu_allocator_t *alloc, hu_gui_state_t *state) {
     memcpy(state->app_name, "Calculator", 10);
     return HU_OK;
 #else
+#if defined(__APPLE__)
+    memset(state, 0, sizeof(*state));
+
+    AXUIElementRef sys_wide = AXUIElementCreateSystemWide();
+    AXUIElementRef focused_app = NULL;
+    AXError ax_err =
+        AXUIElementCopyAttributeValue(sys_wide, kAXFocusedApplicationAttribute,
+                                      (CFTypeRef *)&focused_app);
+    CFRelease(sys_wide);
+    if (ax_err != kAXErrorSuccess || !focused_app)
+        return HU_ERR_IO;
+
+    CFStringRef title = NULL;
+    if (AXUIElementCopyAttributeValue(focused_app, kAXTitleAttribute, (CFTypeRef *)&title) ==
+            kAXErrorSuccess &&
+        title) {
+        if (!CFStringGetCString(title, state->app_name, (CFIndex)sizeof(state->app_name),
+                               kCFStringEncodingUTF8))
+            state->app_name[0] = '\0';
+        state->app_name[sizeof(state->app_name) - 1] = '\0';
+        CFRelease(title);
+    }
+
+    AXUIElementRef focused_window = NULL;
+    if (AXUIElementCopyAttributeValue(focused_app, kAXFocusedWindowAttribute,
+                                      (CFTypeRef *)&focused_window) == kAXErrorSuccess &&
+        focused_window) {
+        ax_collect_elements(focused_window, state);
+        CFRelease(focused_window);
+    }
+
+    CGDirectDisplayID display = CGMainDisplayID();
+    state->screen_width = (int)CGDisplayPixelsWide(display);
+    state->screen_height = (int)CGDisplayPixelsHigh(display);
+    state->verified = true;
+
+    CFRelease(focused_app);
+    return HU_OK;
+#else
+    (void)alloc;
     (void)state;
     return HU_ERR_NOT_SUPPORTED;
+#endif
 #endif
 }
 
 hu_error_t hu_gui_execute_action(hu_allocator_t *alloc, const hu_gui_action_t *action,
                                  hu_gui_state_t *new_state) {
-    (void)alloc;
     if (!action || !new_state)
         return HU_ERR_INVALID_ARGUMENT;
 #ifdef HU_IS_TEST
+    (void)alloc;
     mock_state_init(new_state);
     switch (action->type) {
     case HU_GUI_ACTION_CLICK:
@@ -88,9 +203,96 @@ hu_error_t hu_gui_execute_action(hu_allocator_t *alloc, const hu_gui_action_t *a
     }
     return HU_OK;
 #else
+#if defined(__APPLE__)
+    hu_error_t err;
+    switch (action->type) {
+    case HU_GUI_ACTION_CLICK: {
+        CGPoint point = CGPointMake((CGFloat)action->x, (CGFloat)action->y);
+        CGEventRef down =
+            CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, point, kCGMouseButtonLeft);
+        CGEventRef up =
+            CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, point, kCGMouseButtonLeft);
+        if (down && up) {
+            CGEventPost(kCGHIDEventTap, down);
+            CGEventPost(kCGHIDEventTap, up);
+        }
+        if (down)
+            CFRelease(down);
+        if (up)
+            CFRelease(up);
+        break;
+    }
+    case HU_GUI_ACTION_TYPE: {
+        if (action->text_len > 0 && action->text_len <= sizeof(action->text)) {
+            CFStringRef str =
+                CFStringCreateWithBytes(kCFAllocatorDefault, (const UInt8 *)action->text,
+                                       (CFIndex)action->text_len, kCFStringEncodingUTF8, false);
+            if (str) {
+                CFIndex len = CFStringGetLength(str);
+                for (CFIndex i = 0; i < len; i++) {
+                    UniChar ch = CFStringGetCharacterAtIndex(str, i);
+                    CGEventRef ev_down = CGEventCreateKeyboardEvent(NULL, 0, true);
+                    CGEventRef ev_up = CGEventCreateKeyboardEvent(NULL, 0, false);
+                    if (ev_down) {
+                        CGEventKeyboardSetUnicodeString(ev_down, 1, &ch);
+                        CGEventPost(kCGHIDEventTap, ev_down);
+                        CFRelease(ev_down);
+                    }
+                    if (ev_up) {
+                        CGEventKeyboardSetUnicodeString(ev_up, 1, &ch);
+                        CGEventPost(kCGHIDEventTap, ev_up);
+                        CFRelease(ev_up);
+                    }
+                }
+                CFRelease(str);
+            }
+        }
+        break;
+    }
+    case HU_GUI_ACTION_SCROLL: {
+        int32_t scroll_delta = (action->y != 0) ? (action->y > 0 ? 1 : -1) : 0;
+        CGEventRef scroll =
+            CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitLine, 1, scroll_delta);
+        if (scroll) {
+            CGPoint point = CGPointMake((CGFloat)action->x, (CGFloat)action->y);
+            CGEventSetLocation(scroll, point);
+            CGEventPost(kCGHIDEventTap, scroll);
+            CFRelease(scroll);
+        }
+        break;
+    }
+    case HU_GUI_ACTION_KEY: {
+        if (action->key_combo_len > 0 && action->key_combo_len < sizeof(action->key_combo)) {
+            for (size_t i = 0; i < action->key_combo_len; i++) {
+                UniChar ch = (UniChar)(unsigned char)action->key_combo[i];
+                CGEventRef key_down = CGEventCreateKeyboardEvent(NULL, 0, true);
+                CGEventRef key_up = CGEventCreateKeyboardEvent(NULL, 0, false);
+                if (key_down) {
+                    CGEventKeyboardSetUnicodeString(key_down, 1, &ch);
+                    CGEventPost(kCGHIDEventTap, key_down);
+                    CFRelease(key_down);
+                }
+                if (key_up) {
+                    CGEventKeyboardSetUnicodeString(key_up, 1, &ch);
+                    CGEventPost(kCGHIDEventTap, key_up);
+                    CFRelease(key_up);
+                }
+            }
+        }
+        break;
+    }
+    case HU_GUI_ACTION_SCREENSHOT: {
+        break;
+    }
+    }
+    err = hu_gui_capture_state(alloc, new_state);
+    return err;
+#else
+    (void)alloc;
     (void)action;
     (void)new_state;
     return HU_ERR_NOT_SUPPORTED;
+#endif
 #endif
 }
 
