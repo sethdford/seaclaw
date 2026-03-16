@@ -269,12 +269,17 @@ hu_observer_t hu_observer_composite_create(hu_composite_observer_ctx_t *ctx,
 }
 
 hu_observer_t hu_observer_registry_create(const char *backend, void *user_ctx) {
-    (void)user_ctx;
     if (!backend)
         return hu_observer_noop();
     if (strcmp(backend, "log") == 0 || strcmp(backend, "verbose") == 0)
         return hu_observer_log_stderr();
     if (strcmp(backend, "noop") == 0 || strcmp(backend, "none") == 0)
         return hu_observer_noop();
+    if (strcmp(backend, "metrics") == 0) {
+        hu_metrics_observer_ctx_t *ctx = (hu_metrics_observer_ctx_t *)user_ctx;
+        return hu_observer_metrics_create(ctx);
+    }
+    /* "otel" requires hu_otel_observer_create() with allocator + config;
+     * use that function directly instead of the registry. */
     return hu_observer_noop();
 }
