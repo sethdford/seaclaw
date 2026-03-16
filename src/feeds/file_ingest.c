@@ -10,6 +10,7 @@
 #include "human/core/json.h"
 #include "human/feeds/ingest.h"
 #include <dirent.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -110,8 +111,13 @@ hu_error_t hu_file_ingest_fetch(hu_allocator_t *alloc,
         if (!fp)
             continue;
 
+        bool fully_read = true;
         char line[MAX_LINE_LEN];
-        while (fgets(line, sizeof(line), fp) && cnt < items_cap) {
+        while (fgets(line, sizeof(line), fp)) {
+            if (cnt >= items_cap) {
+                fully_read = false;
+                break;
+            }
             size_t line_len = strlen(line);
             while (line_len > 0 && (line[line_len - 1] == '\n' || line[line_len - 1] == '\r'))
                 line[--line_len] = '\0';
@@ -125,10 +131,12 @@ hu_error_t hu_file_ingest_fetch(hu_allocator_t *alloc,
         }
         fclose(fp);
 
-        /* Rename to .done to avoid re-processing */
-        char done_path[780];
-        snprintf(done_path, sizeof(done_path), "%s.done", file_path);
-        (void)rename(file_path, done_path);
+        /* Only rename to .done if we read every line — avoids data loss */
+        if (fully_read) {
+            char done_path[780];
+            snprintf(done_path, sizeof(done_path), "%s.done", file_path);
+            (void)rename(file_path, done_path);
+        }
     }
 
     closedir(dir);

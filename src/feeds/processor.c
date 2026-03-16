@@ -739,10 +739,10 @@ hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
 
         if (type == HU_FEED_FILE_INGEST) {
 #ifdef HU_ENABLE_FEEDS
-            hu_feed_ingest_item_t fi_items[20];
+            hu_feed_ingest_item_t fi_items[100];
             size_t fi_count = 0;
             if (hu_file_ingest_fetch(proc->alloc,
-                    fi_items, 20, &fi_count) == HU_OK) {
+                    fi_items, 100, &fi_count) == HU_OK) {
                 for (size_t f = 0; f < fi_count; f++) {
                     hu_feed_item_stored_t item = {0};
                     snprintf(item.source, sizeof(item.source), "%s", fi_items[f].source);
