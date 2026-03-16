@@ -237,6 +237,8 @@ void run_world_context_tests(void);
 void run_peripheral_ctrl_tests(void);
 void run_value_learning_tests(void);
 void run_goal_engine_tests(void);
+void run_dispatch_tests(void);
+void run_policy_engine_tests(void);
 void run_agent_registry_tests(void);
 void run_pwa_tests(void);
 #ifdef HU_ENABLE_CURL
@@ -337,6 +339,8 @@ int main(int argc, char **argv) {
     run_peripheral_ctrl_tests();
     run_value_learning_tests();
     run_goal_engine_tests();
+    run_dispatch_tests();
+    run_policy_engine_tests();
     run_e2e_tests();
     run_e2e_conversation_tests();
     run_e2e_agent_loop_tests();

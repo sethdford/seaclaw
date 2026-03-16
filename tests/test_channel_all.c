@@ -1656,6 +1656,8 @@ static void test_dispatch_health_check(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
     hu_dispatch_create(&alloc, &ch);
+    HU_ASSERT_FALSE(ch.vtable->health_check(ch.ctx));
+    ch.vtable->start(ch.ctx);
     HU_ASSERT_TRUE(ch.vtable->health_check(ch.ctx));
     hu_dispatch_destroy(&ch);
 }

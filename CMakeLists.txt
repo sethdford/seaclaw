@@ -1546,6 +1546,7 @@ if(NOT HU_ENABLE_SQLITE)
     list(APPEND HU_TEST_EXTRA_MODULES
         src/intelligence/experience.c
         src/intelligence/weakness.c
+        src/intelligence/weakness_analyzer.c
         src/memory/forgetting.c
     )
 endif()
@@ -1741,6 +1742,8 @@ set(HU_TEST_SOURCES
     tests/test_peripheral_ctrl.c
     tests/test_value_learning.c
     tests/test_goal_engine.c
+    tests/test_dispatch.c
+    tests/test_policy_engine.c
     tests/test_vtables.c
     tests/test_e2e.c
     tests/test_e2e_conversation.c
@@ -2084,6 +2087,9 @@ if(HU_ENABLE_TIKTOK)
 endif()
 if(HU_ENABLE_GMAIL)
     target_compile_definitions(human_tests PRIVATE HU_HAS_GMAIL=1)
+endif()
+if(HU_ENABLE_DISPATCH)
+    target_compile_definitions(human_tests PRIVATE HU_HAS_DISPATCH=1)
 endif()
 if(HU_ENABLE_VOICE)
     target_compile_definitions(human_tests PRIVATE HU_HAS_SONATA=1)

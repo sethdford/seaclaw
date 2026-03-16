@@ -278,6 +278,42 @@ static void test_goal_free_handles_null(void) {
     hu_goal_free(NULL, NULL, 0);
 }
 
+static void test_goal_engine_deinit_null_handles_gracefully(void) {
+    hu_goal_engine_deinit(NULL);
+}
+
+static void test_goal_select_next_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = open_test_db();
+    hu_goal_engine_t engine = {0};
+    hu_goal_engine_create(&alloc, db, &engine);
+    hu_goal_init_tables(&engine);
+
+    hu_goal_t out = {0};
+    bool found = false;
+    HU_ASSERT_EQ(hu_goal_select_next(NULL, &out, &found), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_goal_select_next(&engine, NULL, &found), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_goal_select_next(&engine, &out, NULL), HU_ERR_INVALID_ARGUMENT);
+
+    hu_goal_engine_deinit(&engine);
+    close_test_db(db);
+}
+
+static void test_goal_count_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = open_test_db();
+    hu_goal_engine_t engine = {0};
+    hu_goal_engine_create(&alloc, db, &engine);
+    hu_goal_init_tables(&engine);
+
+    size_t n = 0;
+    HU_ASSERT_EQ(hu_goal_count(NULL, &n), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_goal_count(&engine, NULL), HU_ERR_INVALID_ARGUMENT);
+
+    hu_goal_engine_deinit(&engine);
+    close_test_db(db);
+}
+
 static void test_auto_goal_status_str(void) {
     HU_ASSERT_NOT_NULL(hu_auto_goal_status_str(HU_AUTO_GOAL_PENDING));
     HU_ASSERT_NOT_NULL(hu_auto_goal_status_str(HU_AUTO_GOAL_ACTIVE));
@@ -305,6 +341,9 @@ void run_goal_engine_tests(void) {
     HU_RUN_TEST(test_goal_count);
     HU_RUN_TEST(test_goal_build_context);
     HU_RUN_TEST(test_goal_free_handles_null);
+    HU_RUN_TEST(test_goal_engine_deinit_null_handles_gracefully);
+    HU_RUN_TEST(test_goal_select_next_null_args);
+    HU_RUN_TEST(test_goal_count_null_args);
     HU_RUN_TEST(test_auto_goal_status_str);
 #endif
 }
