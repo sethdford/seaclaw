@@ -28,8 +28,8 @@ jobs:
           build-type: Debug
           enable-curl: "true"
 
-      - name: Run eval suite tests
-        run: ./build/human_tests --suite="Evaluation" --suite="eval_runner" --suite="eval_bench"
+      - name: Run eval suite tests (includes regression detection)
+        run: ./build/human_tests --suite="Evaluation" --suite="eval_runner" --suite="eval_bench" --suite="Eval History"
 
       - name: Run sample eval suites
         run: |

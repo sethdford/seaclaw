@@ -24,11 +24,22 @@ void hu_eval_suite_free(hu_allocator_t *alloc, hu_eval_suite_t *suite);
 void hu_eval_run_free(hu_allocator_t *alloc, hu_eval_run_t *run);
 void hu_eval_result_free(hu_allocator_t *alloc, hu_eval_result_t *result);
 
+typedef struct hu_eval_regression {
+    double baseline_pass_rate;
+    double current_pass_rate;
+    double delta;
+    bool regressed;
+    size_t baseline_runs;
+} hu_eval_regression_t;
+
 #ifdef HU_ENABLE_SQLITE
 #include <sqlite3.h>
 hu_error_t hu_eval_init_tables(sqlite3 *db);
 hu_error_t hu_eval_store_run(hu_allocator_t *alloc, sqlite3 *db, const hu_eval_run_t *run);
 hu_error_t hu_eval_load_history(hu_allocator_t *alloc, sqlite3 *db, hu_eval_run_t *runs,
                                 size_t max_runs, size_t *out_count);
+hu_error_t hu_eval_detect_regression(sqlite3 *db, const char *suite_name,
+                                     double current_pass_rate, double threshold,
+                                     hu_eval_regression_t *out);
 #endif
 #endif

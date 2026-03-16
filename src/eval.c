@@ -535,6 +535,8 @@ hu_error_t hu_eval_init_tables(sqlite3 *db) {
         "CREATE TABLE IF NOT EXISTS eval_runs ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT,"
         "suite_name TEXT NOT NULL,"
+        "provider TEXT,"
+        "model TEXT,"
         "passed INTEGER NOT NULL,"
         "failed INTEGER NOT NULL,"
         "pass_rate REAL NOT NULL,"
@@ -542,6 +544,9 @@ hu_error_t hu_eval_init_tables(sqlite3 *db) {
         "created_at INTEGER NOT NULL)";
     if (sqlite3_exec(db, runs_sql, NULL, NULL, NULL) != SQLITE_OK)
         return HU_ERR_MEMORY_BACKEND;
+    /* Migration: add provider/model columns to existing tables */
+    sqlite3_exec(db, "ALTER TABLE eval_runs ADD COLUMN provider TEXT", NULL, NULL, NULL);
+    sqlite3_exec(db, "ALTER TABLE eval_runs ADD COLUMN model TEXT", NULL, NULL, NULL);
     const char *results_sql =
         "CREATE TABLE IF NOT EXISTS eval_results ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -559,16 +564,24 @@ hu_error_t hu_eval_init_tables(sqlite3 *db) {
 hu_error_t hu_eval_store_run(hu_allocator_t *alloc, sqlite3 *db, const hu_eval_run_t *run) {
     if (!alloc || !db || !run) return HU_ERR_INVALID_ARGUMENT;
     sqlite3_stmt *ins_run = NULL;
-    const char *run_sql = "INSERT INTO eval_runs(suite_name,passed,failed,pass_rate,elapsed_ms,created_at) VALUES(?,?,?,?,?,?)";
+    const char *run_sql = "INSERT INTO eval_runs(suite_name,provider,model,passed,failed,pass_rate,elapsed_ms,created_at) VALUES(?,?,?,?,?,?,?,?)";
     if (sqlite3_prepare_v2(db, run_sql, -1, &ins_run, NULL) != SQLITE_OK)
         return HU_ERR_MEMORY_BACKEND;
     const char *suite = run->suite_name ? run->suite_name : "";
     sqlite3_bind_text(ins_run, 1, suite, (int)strlen(suite), SQLITE_STATIC);
-    sqlite3_bind_int(ins_run, 2, (int)run->passed);
-    sqlite3_bind_int(ins_run, 3, (int)run->failed);
-    sqlite3_bind_double(ins_run, 4, run->pass_rate);
-    sqlite3_bind_int64(ins_run, 5, run->total_elapsed_ms);
-    sqlite3_bind_int64(ins_run, 6, (int64_t)time(NULL));
+    if (run->provider)
+        sqlite3_bind_text(ins_run, 2, run->provider, (int)strlen(run->provider), SQLITE_STATIC);
+    else
+        sqlite3_bind_null(ins_run, 2);
+    if (run->model)
+        sqlite3_bind_text(ins_run, 3, run->model, (int)strlen(run->model), SQLITE_STATIC);
+    else
+        sqlite3_bind_null(ins_run, 3);
+    sqlite3_bind_int(ins_run, 4, (int)run->passed);
+    sqlite3_bind_int(ins_run, 5, (int)run->failed);
+    sqlite3_bind_double(ins_run, 6, run->pass_rate);
+    sqlite3_bind_int64(ins_run, 7, run->total_elapsed_ms);
+    sqlite3_bind_int64(ins_run, 8, (int64_t)time(NULL));
     if (sqlite3_step(ins_run) != SQLITE_DONE) {
         sqlite3_finalize(ins_run);
         return HU_ERR_MEMORY_BACKEND;
@@ -609,7 +622,7 @@ hu_error_t hu_eval_load_history(hu_allocator_t *alloc, sqlite3 *db, hu_eval_run_
     if (!alloc || !db || !runs || !out_count) return HU_ERR_INVALID_ARGUMENT;
     *out_count = 0;
     sqlite3_stmt *stmt = NULL;
-    const char *sql = "SELECT id,suite_name,passed,failed,pass_rate,elapsed_ms FROM eval_runs ORDER BY created_at DESC LIMIT ?";
+    const char *sql = "SELECT id,suite_name,provider,model,passed,failed,pass_rate,elapsed_ms FROM eval_runs ORDER BY created_at DESC LIMIT ?";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
         return HU_ERR_MEMORY_BACKEND;
     sqlite3_bind_int64(stmt, 1, (int64_t)max_runs);
@@ -621,20 +634,68 @@ hu_error_t hu_eval_load_history(hu_allocator_t *alloc, sqlite3 *db, hu_eval_run_
         if (name) {
             size_t nlen = (size_t)sqlite3_column_bytes(stmt, 1);
             r->suite_name = alloc->alloc(alloc->ctx, nlen + 1);
-            if (r->suite_name) {
+            if (r->suite_name)
                 memcpy(r->suite_name, name, nlen + 1);
-            }
         }
-        r->passed = (size_t)sqlite3_column_int(stmt, 2);
-        r->failed = (size_t)sqlite3_column_int(stmt, 3);
-        r->pass_rate = sqlite3_column_double(stmt, 4);
-        r->total_elapsed_ms = sqlite3_column_int64(stmt, 5);
+        const char *prov = (const char *)sqlite3_column_text(stmt, 2);
+        if (prov) {
+            size_t plen = (size_t)sqlite3_column_bytes(stmt, 2);
+            r->provider = alloc->alloc(alloc->ctx, plen + 1);
+            if (r->provider)
+                memcpy(r->provider, prov, plen + 1);
+        }
+        const char *mdl = (const char *)sqlite3_column_text(stmt, 3);
+        if (mdl) {
+            size_t mlen = (size_t)sqlite3_column_bytes(stmt, 3);
+            r->model = alloc->alloc(alloc->ctx, mlen + 1);
+            if (r->model)
+                memcpy(r->model, mdl, mlen + 1);
+        }
+        r->passed = (size_t)sqlite3_column_int(stmt, 4);
+        r->failed = (size_t)sqlite3_column_int(stmt, 5);
+        r->pass_rate = sqlite3_column_double(stmt, 6);
+        r->total_elapsed_ms = sqlite3_column_int64(stmt, 7);
         r->results = NULL;
         r->results_count = 0;
         count++;
     }
     sqlite3_finalize(stmt);
     *out_count = count;
+    return HU_OK;
+}
+
+hu_error_t hu_eval_detect_regression(sqlite3 *db, const char *suite_name,
+                                     double current_pass_rate, double threshold,
+                                     hu_eval_regression_t *out) {
+    if (!db || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+    out->current_pass_rate = current_pass_rate;
+
+    sqlite3_stmt *stmt = NULL;
+    const char *sql = suite_name
+        ? "SELECT AVG(pass_rate), COUNT(*) FROM eval_runs WHERE suite_name = ? ORDER BY created_at DESC LIMIT 10"
+        : "SELECT AVG(pass_rate), COUNT(*) FROM (SELECT pass_rate FROM eval_runs ORDER BY created_at DESC LIMIT 10)";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
+    if (suite_name)
+        sqlite3_bind_text(stmt, 1, suite_name, (int)strlen(suite_name), SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        out->baseline_pass_rate = sqlite3_column_double(stmt, 0);
+        out->baseline_runs = (size_t)sqlite3_column_int(stmt, 1);
+    }
+    sqlite3_finalize(stmt);
+
+    if (out->baseline_runs == 0) {
+        out->delta = 0.0;
+        out->regressed = false;
+        return HU_OK;
+    }
+
+    out->delta = current_pass_rate - out->baseline_pass_rate;
+    out->regressed = (out->delta < -threshold);
     return HU_OK;
 }
 #endif

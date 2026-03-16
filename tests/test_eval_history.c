@@ -99,12 +99,112 @@ static void test_eval_store_null_args_returns_error(void) {
     sqlite3_close(db);
 }
 
+static void test_eval_store_with_provider_and_model(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    HU_ASSERT_EQ(hu_eval_init_tables(db), HU_OK);
+
+    hu_eval_run_t run = {0};
+    run.suite_name = (char *)"reasoning";
+    run.provider = (char *)"gemini";
+    run.model = (char *)"gemini-2.5-pro";
+    run.passed = 8;
+    run.failed = 2;
+    run.pass_rate = 0.80;
+
+    HU_ASSERT_EQ(hu_eval_store_run(&alloc, db, &run), HU_OK);
+
+    hu_eval_run_t loaded[1];
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_eval_load_history(&alloc, db, loaded, 1, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_NOT_NULL(loaded[0].provider);
+    HU_ASSERT_STR_EQ(loaded[0].provider, "gemini");
+    HU_ASSERT_NOT_NULL(loaded[0].model);
+    HU_ASSERT_STR_EQ(loaded[0].model, "gemini-2.5-pro");
+
+    hu_eval_run_free(&alloc, &loaded[0]);
+    sqlite3_close(db);
+}
+
+static void test_eval_detect_regression_null_args(void) {
+    hu_eval_regression_t reg = {0};
+    HU_ASSERT_EQ(hu_eval_detect_regression(NULL, NULL, 0.8, 0.05, &reg), HU_ERR_INVALID_ARGUMENT);
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    HU_ASSERT_EQ(hu_eval_detect_regression(db, NULL, 0.8, 0.05, NULL), HU_ERR_INVALID_ARGUMENT);
+    sqlite3_close(db);
+}
+
+static void test_eval_detect_regression_no_history(void) {
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    HU_ASSERT_EQ(hu_eval_init_tables(db), HU_OK);
+
+    hu_eval_regression_t reg = {0};
+    HU_ASSERT_EQ(hu_eval_detect_regression(db, NULL, 0.90, 0.05, &reg), HU_OK);
+    HU_ASSERT_EQ(reg.baseline_runs, 0u);
+    HU_ASSERT_TRUE(!reg.regressed);
+    sqlite3_close(db);
+}
+
+static void test_eval_detect_regression_passes_when_stable(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    HU_ASSERT_EQ(hu_eval_init_tables(db), HU_OK);
+
+    for (int i = 0; i < 5; i++) {
+        hu_eval_run_t r = {0};
+        r.suite_name = (char *)"core";
+        r.passed = 9;
+        r.failed = 1;
+        r.pass_rate = 0.90;
+        HU_ASSERT_EQ(hu_eval_store_run(&alloc, db, &r), HU_OK);
+    }
+
+    hu_eval_regression_t reg = {0};
+    HU_ASSERT_EQ(hu_eval_detect_regression(db, "core", 0.88, 0.05, &reg), HU_OK);
+    HU_ASSERT_TRUE(!reg.regressed);
+    HU_ASSERT_EQ(reg.baseline_runs, 5u);
+    HU_ASSERT_FLOAT_EQ(reg.baseline_pass_rate, 0.90, 0.001);
+    sqlite3_close(db);
+}
+
+static void test_eval_detect_regression_triggers_on_drop(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    HU_ASSERT_EQ(hu_eval_init_tables(db), HU_OK);
+
+    for (int i = 0; i < 5; i++) {
+        hu_eval_run_t r = {0};
+        r.suite_name = (char *)"core";
+        r.passed = 9;
+        r.failed = 1;
+        r.pass_rate = 0.90;
+        HU_ASSERT_EQ(hu_eval_store_run(&alloc, db, &r), HU_OK);
+    }
+
+    hu_eval_regression_t reg = {0};
+    HU_ASSERT_EQ(hu_eval_detect_regression(db, "core", 0.80, 0.05, &reg), HU_OK);
+    HU_ASSERT_TRUE(reg.regressed);
+    HU_ASSERT_TRUE(reg.delta < -0.05);
+    sqlite3_close(db);
+}
+
 void run_eval_history_tests(void) {
     HU_TEST_SUITE("Eval History Storage");
     HU_RUN_TEST(test_eval_init_tables_succeeds);
     HU_RUN_TEST(test_eval_store_and_load_run);
     HU_RUN_TEST(test_eval_load_empty_history);
     HU_RUN_TEST(test_eval_store_null_args_returns_error);
+    HU_RUN_TEST(test_eval_store_with_provider_and_model);
+    HU_RUN_TEST(test_eval_detect_regression_null_args);
+    HU_RUN_TEST(test_eval_detect_regression_no_history);
+    HU_RUN_TEST(test_eval_detect_regression_passes_when_stable);
+    HU_RUN_TEST(test_eval_detect_regression_triggers_on_drop);
 }
 
 #else
