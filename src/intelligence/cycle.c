@@ -240,6 +240,35 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
         }
     }
 
+    /* Step 1b: Counterfactual analysis — evaluate alternatives for actioned findings */
+    {
+        const char *cf_sql = "SELECT suggested_action FROM research_findings "
+                             "WHERE status = 'actioned' AND priority = 'HIGH' LIMIT 5";
+        sqlite3_stmt *cf_stmt = NULL;
+        if (sqlite3_prepare_v2(db, cf_sql, -1, &cf_stmt, NULL) == SQLITE_OK) {
+            hu_world_model_t cf_wm = {0};
+            if (hu_world_model_create(alloc, db, &cf_wm) == HU_OK) {
+                while (sqlite3_step(cf_stmt) == SQLITE_ROW) {
+                    const char *action = (const char *)sqlite3_column_text(cf_stmt, 0);
+                    if (!action)
+                        continue;
+                    size_t action_len = strlen(action);
+                    static const char alt[] = "defer for more data";
+                    hu_wm_prediction_t cf_pred = {0};
+                    hu_error_t cf_err = hu_world_counterfactual(
+                        &cf_wm, action, action_len, alt, sizeof(alt) - 1,
+                        "intelligence_cycle", 18, &cf_pred);
+                    if (cf_err == HU_OK && cf_pred.confidence > 0.0) {
+                        hu_world_record_outcome(&cf_wm, "counterfactual_analysis",
+                            23, action, action_len, cf_pred.confidence, now_ts);
+                    }
+                }
+                hu_world_model_deinit(&cf_wm);
+            }
+            sqlite3_finalize(cf_stmt);
+        }
+    }
+
     /* Step 2: Populate current_events from recent feed items */
     {
         int64_t cutoff = now_ts - (24 * 3600);
