@@ -136,6 +136,56 @@ static void ab_evaluate_null_alloc(void) {
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
 
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+
+static void ab_record_selection_null_db_returns_error(void) {
+    hu_error_t err = hu_ab_record_selection(NULL, 0, 75, 3, 1000000);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+
+static void ab_record_selection_stores_row(void) {
+    sqlite3 *db = NULL;
+    int rc = sqlite3_open(":memory:", &db);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+
+    hu_error_t err = hu_ab_record_selection(db, 1, 82, 3, 1700000000);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    sqlite3_stmt *stmt = NULL;
+    rc = sqlite3_prepare_v2(db,
+        "SELECT best_idx, quality_score, candidate_count, timestamp FROM ab_selections",
+        -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    rc = sqlite3_step(stmt);
+    HU_ASSERT_EQ(rc, SQLITE_ROW);
+    HU_ASSERT_EQ(sqlite3_column_int(stmt, 0), 1);
+    HU_ASSERT_EQ(sqlite3_column_int(stmt, 1), 82);
+    HU_ASSERT_EQ(sqlite3_column_int(stmt, 2), 3);
+    HU_ASSERT_EQ(sqlite3_column_int64(stmt, 3), 1700000000LL);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+}
+
+static void ab_record_selection_multiple_rows(void) {
+    sqlite3 *db = NULL;
+    int rc = sqlite3_open(":memory:", &db);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+
+    hu_ab_record_selection(db, 0, 65, 2, 1700000000);
+    hu_ab_record_selection(db, 1, 90, 3, 1700001000);
+
+    sqlite3_stmt *stmt = NULL;
+    rc = sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM ab_selections", -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    rc = sqlite3_step(stmt);
+    HU_ASSERT_EQ(rc, SQLITE_ROW);
+    HU_ASSERT_EQ(sqlite3_column_int(stmt, 0), 2);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+}
+#endif
+
 void run_ab_response_tests(void) {
     HU_TEST_SUITE("ab_response");
     HU_RUN_TEST(ab_evaluate_picks_best);
@@ -146,4 +196,9 @@ void run_ab_response_tests(void) {
     HU_RUN_TEST(ab_evaluate_max_chars_zero);
     HU_RUN_TEST(ab_result_deinit_zeroed_safe);
     HU_RUN_TEST(ab_evaluate_null_alloc);
+#ifdef HU_ENABLE_SQLITE
+    HU_RUN_TEST(ab_record_selection_null_db_returns_error);
+    HU_RUN_TEST(ab_record_selection_stores_row);
+    HU_RUN_TEST(ab_record_selection_multiple_rows);
+#endif
 }

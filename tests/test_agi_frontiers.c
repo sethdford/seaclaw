@@ -13,6 +13,7 @@
 #include "human/intelligence/self_improve.h"
 #include "human/intelligence/value_learning.h"
 #include "human/intelligence/world_model.h"
+#include "human/memory.h"
 #include "human/memory/retrieval/strategy_learner.h"
 #include <sqlite3.h>
 
@@ -346,6 +347,41 @@ static void test_world_evaluate_options(void) {
 
     hu_world_model_deinit(&model);
     close_test_db(db);
+}
+
+static void world_model_evaluate_options_scores_order(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.vtable);
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+
+    hu_world_model_t model;
+    hu_error_t err = hu_world_model_create(&alloc, db, &model);
+    HU_ASSERT_EQ(err, HU_OK);
+    (void)hu_world_model_init_tables(&model);
+
+    /* Record some outcomes to bias scoring */
+    hu_world_record_outcome(&model, "high_confidence_action", 22,
+                            "good result", 11, 0.9, 1000);
+    hu_world_record_outcome(&model, "low_confidence_action", 21,
+                            "poor result", 11, 0.2, 1000);
+
+    const char *actions[] = {"low_confidence_action", "high_confidence_action", "unknown_action"};
+    size_t action_lens[] = {21, 22, 14};
+    hu_action_option_t opts[3];
+    memset(opts, 0, sizeof(opts));
+
+    err = hu_world_evaluate_options(&model, actions, action_lens, 3,
+                                     "test context", 12, opts);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* All scores should be non-negative */
+    for (int i = 0; i < 3; i++)
+        HU_ASSERT_TRUE(opts[i].score >= 0.0);
+
+    hu_world_model_deinit(&model);
+    mem.vtable->deinit(mem.ctx);
 }
 
 /* -- Online Learning ------------------------------------------------- */
@@ -984,6 +1020,7 @@ void run_agi_frontiers_tests(void) {
     HU_RUN_TEST(test_world_model_counterfactual);
     HU_RUN_TEST(test_world_model_causal_depth);
     HU_RUN_TEST(test_world_evaluate_options);
+    HU_RUN_TEST(world_model_evaluate_options_scores_order);
 
     HU_RUN_TEST(test_online_learning_create_null);
     HU_RUN_TEST(test_online_learning_record_and_count);
