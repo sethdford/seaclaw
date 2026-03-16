@@ -117,13 +117,13 @@ static hu_error_t shell_execute(void *ctx, hu_allocator_t *alloc, const hu_json_
         close(fds[1]);
 
         if (s->workspace_dir && s->workspace_dir_len > 0) {
-            char *wd = (char *)malloc(s->workspace_dir_len + 1);
+            char *wd = (char *)alloc->alloc(alloc->ctx, s->workspace_dir_len + 1);
             if (wd) {
                 memcpy(wd, s->workspace_dir, s->workspace_dir_len);
                 wd[s->workspace_dir_len] = '\0';
                 if (chdir(wd) != 0)
                     _exit(127);
-                free(wd);
+                alloc->free(alloc->ctx, wd, s->workspace_dir_len + 1);
             }
         }
 
@@ -145,7 +145,7 @@ static hu_error_t shell_execute(void *ctx, hu_allocator_t *alloc, const hu_json_
                         total += strlen(s->policy->net_proxy->allowed_domains[i]) + 1;
                 }
                 if (total > 0) {
-                    char *no_proxy = (char *)malloc(total + 1);
+                    char *no_proxy = (char *)alloc->alloc(alloc->ctx, total + 1);
                     if (no_proxy) {
                         size_t off = 0;
                         for (size_t i = 0; i < s->policy->net_proxy->allowed_domains_count; i++) {
@@ -161,7 +161,7 @@ static hu_error_t shell_execute(void *ctx, hu_allocator_t *alloc, const hu_json_
                         no_proxy[off] = '\0';
                         setenv("NO_PROXY", no_proxy, 1);
                         setenv("no_proxy", no_proxy, 1);
-                        free(no_proxy);
+                        alloc->free(alloc->ctx, no_proxy, total + 1);
                     }
                 }
             }

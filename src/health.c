@@ -134,6 +134,7 @@ void hu_health_snapshot(hu_health_snapshot_t *out) {
     time_t now = time(NULL);
     out->uptime_seconds = (uint64_t)(now > s_start_time ? now - s_start_time : 0);
     if (s_component_count > 0) {
+        /* no allocator in scope — raw malloc */
         out->components =
             (hu_component_health_t *)malloc(s_component_count * sizeof(hu_component_health_t));
         if (out->components) {

@@ -401,7 +401,7 @@ static void test_ws_server_is_upgrade_invalid(void) {
 }
 
 static void test_ws_server_send_null_conn(void) {
-    hu_error_t err = hu_ws_server_send(NULL, "x", 1);
+    hu_error_t err = hu_ws_server_send(NULL, NULL, "x", 1);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
 
@@ -506,7 +506,7 @@ static void test_control_send_event_no_ws(void) {
 }
 
 static void test_control_send_response_null(void) {
-    hu_error_t err = hu_control_send_response(NULL, "id", true, "{}");
+    hu_error_t err = hu_control_send_response(NULL, NULL, "id", true, "{}");
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
 
@@ -618,12 +618,16 @@ static void test_ws_server_is_upgrade_null(void) {
 }
 
 static void test_ws_server_send_inactive_conn(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_server_t srv;
+    hu_ws_server_init(&srv, &alloc, NULL, NULL, NULL);
     hu_ws_conn_t conn;
     memset(&conn, 0, sizeof(conn));
     conn.active = false;
     conn.fd = 999;
-    hu_error_t err = hu_ws_server_send(&conn, "test", 4);
+    hu_error_t err = hu_ws_server_send(&srv, &conn, "test", 4);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    hu_ws_server_deinit(&srv);
 }
 
 static void test_ws_server_broadcast_null_data(void) {

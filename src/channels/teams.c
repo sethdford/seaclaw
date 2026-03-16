@@ -2,6 +2,7 @@
 #include "human/channel.h"
 #include "human/channel_loop.h"
 #include "human/core/allocator.h"
+#include "human/core/string.h"
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
@@ -227,13 +228,11 @@ hu_error_t hu_teams_create(hu_allocator_t *alloc, const char *webhook_url, size_
     memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (webhook_url && webhook_url_len > 0) {
-        c->webhook_url = (char *)malloc(webhook_url_len + 1);
+        c->webhook_url = hu_strndup(alloc, webhook_url, webhook_url_len);
         if (!c->webhook_url) {
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->webhook_url, webhook_url, webhook_url_len);
-        c->webhook_url[webhook_url_len] = '\0';
         c->webhook_url_len = webhook_url_len;
     }
     out->ctx = c;
@@ -246,7 +245,7 @@ void hu_teams_destroy(hu_channel_t *ch) {
         hu_teams_ctx_t *c = (hu_teams_ctx_t *)ch->ctx;
         hu_allocator_t *a = c->alloc;
         if (c->webhook_url)
-            free(c->webhook_url);
+            hu_str_free(a, c->webhook_url);
         a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;

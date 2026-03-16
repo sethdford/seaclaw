@@ -316,7 +316,7 @@ static void ollama_deinit(void *ctx, hu_allocator_t *alloc) {
     if (!oc)
         return;
     if (oc->base_url)
-        free(oc->base_url);
+        hu_str_free(alloc, oc->base_url);
     alloc->free(alloc->ctx, oc, sizeof(*oc));
 }
 
@@ -410,21 +410,19 @@ hu_error_t hu_ollama_create(hu_allocator_t *alloc, const char *api_key, size_t a
         return HU_ERR_OUT_OF_MEMORY;
     memset(oc, 0, sizeof(*oc));
     if (base_url && base_url_len > 0) {
-        oc->base_url = (char *)malloc(base_url_len + 1);
+        oc->base_url = hu_strndup(alloc, base_url, base_url_len);
         if (!oc->base_url) {
             alloc->free(alloc->ctx, oc, sizeof(*oc));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(oc->base_url, base_url, base_url_len);
-        oc->base_url[base_url_len] = '\0';
         oc->base_url_len = base_url_len;
     } else {
-        oc->base_url = (char *)malloc(sizeof(HU_OLLAMA_DEFAULT_URL));
+        oc->base_url = hu_strndup(alloc, HU_OLLAMA_DEFAULT_URL,
+                                  sizeof(HU_OLLAMA_DEFAULT_URL) - 1);
         if (!oc->base_url) {
             alloc->free(alloc->ctx, oc, sizeof(*oc));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(oc->base_url, HU_OLLAMA_DEFAULT_URL, sizeof(HU_OLLAMA_DEFAULT_URL));
         oc->base_url_len = sizeof(HU_OLLAMA_DEFAULT_URL) - 1;
     }
     out->ctx = oc;

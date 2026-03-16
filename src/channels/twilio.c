@@ -2,6 +2,7 @@
 #include "human/channel.h"
 #include "human/channel_loop.h"
 #include "human/core/allocator.h"
+#include "human/core/string.h"
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/multimodal.h"
@@ -301,55 +302,47 @@ hu_error_t hu_twilio_create(hu_allocator_t *alloc, const char *account_sid, size
     memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (account_sid && account_sid_len > 0) {
-        c->account_sid = (char *)malloc(account_sid_len + 1);
+        c->account_sid = hu_strndup(alloc, account_sid, account_sid_len);
         if (!c->account_sid) {
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->account_sid, account_sid, account_sid_len);
-        c->account_sid[account_sid_len] = '\0';
         c->account_sid_len = account_sid_len;
     }
     if (auth_token && auth_token_len > 0) {
-        c->auth_token = (char *)malloc(auth_token_len + 1);
+        c->auth_token = hu_strndup(alloc, auth_token, auth_token_len);
         if (!c->auth_token) {
             if (c->account_sid)
-                free(c->account_sid);
+                hu_str_free(alloc, c->account_sid);
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->auth_token, auth_token, auth_token_len);
-        c->auth_token[auth_token_len] = '\0';
         c->auth_token_len = auth_token_len;
     }
     if (from_number && from_number_len > 0) {
-        c->from_number = (char *)malloc(from_number_len + 1);
+        c->from_number = hu_strndup(alloc, from_number, from_number_len);
         if (!c->from_number) {
             if (c->auth_token)
-                free(c->auth_token);
+                hu_str_free(alloc, c->auth_token);
             if (c->account_sid)
-                free(c->account_sid);
+                hu_str_free(alloc, c->account_sid);
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->from_number, from_number, from_number_len);
-        c->from_number[from_number_len] = '\0';
         c->from_number_len = from_number_len;
     }
     if (to_number && to_number_len > 0) {
-        c->to_number = (char *)malloc(to_number_len + 1);
+        c->to_number = hu_strndup(alloc, to_number, to_number_len);
         if (!c->to_number) {
             if (c->from_number)
-                free(c->from_number);
+                hu_str_free(alloc, c->from_number);
             if (c->auth_token)
-                free(c->auth_token);
+                hu_str_free(alloc, c->auth_token);
             if (c->account_sid)
-                free(c->account_sid);
+                hu_str_free(alloc, c->account_sid);
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->to_number, to_number, to_number_len);
-        c->to_number[to_number_len] = '\0';
         c->to_number_len = to_number_len;
     }
     out->ctx = c;
@@ -362,13 +355,13 @@ void hu_twilio_destroy(hu_channel_t *ch) {
         hu_twilio_ctx_t *c = (hu_twilio_ctx_t *)ch->ctx;
         hu_allocator_t *a = c->alloc;
         if (c->account_sid)
-            free(c->account_sid);
+            hu_str_free(a, c->account_sid);
         if (c->auth_token)
-            free(c->auth_token);
+            hu_str_free(a, c->auth_token);
         if (c->from_number)
-            free(c->from_number);
+            hu_str_free(a, c->from_number);
         if (c->to_number)
-            free(c->to_number);
+            hu_str_free(a, c->to_number);
         a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;

@@ -89,7 +89,7 @@ static char *run_git(hu_allocator_t *alloc, const char *cwd, const char **argv, 
                         total += strlen(policy->net_proxy->allowed_domains[i]) + 1;
                 }
                 if (total > 0) {
-                    char *no_proxy = (char *)malloc(total + 1);
+                    char *no_proxy = (char *)alloc->alloc(alloc->ctx, total + 1);
                     if (no_proxy) {
                         size_t off = 0;
                         for (size_t i = 0; i < policy->net_proxy->allowed_domains_count; i++) {
@@ -105,7 +105,7 @@ static char *run_git(hu_allocator_t *alloc, const char *cwd, const char **argv, 
                         no_proxy[off] = '\0';
                         setenv("NO_PROXY", no_proxy, 1);
                         setenv("no_proxy", no_proxy, 1);
-                        free(no_proxy);
+                        alloc->free(alloc->ctx, no_proxy, total + 1);
                     }
                 }
             }
@@ -131,7 +131,8 @@ static char *run_git(hu_allocator_t *alloc, const char *cwd, const char **argv, 
             }
         }
 
-        char **exec_argv = (char **)malloc((size_t)(argc + 1) * sizeof(char *));
+        size_t exec_argv_size = (size_t)(argc + 1) * sizeof(char *);
+        char **exec_argv = (char **)alloc->alloc(alloc->ctx, exec_argv_size);
         if (!exec_argv)
             _exit(127);
         for (int i = 0; i < argc; i++)
@@ -139,7 +140,7 @@ static char *run_git(hu_allocator_t *alloc, const char *cwd, const char **argv, 
         exec_argv[argc] = NULL;
         execv("/usr/bin/git", exec_argv);
         execv("/bin/git", exec_argv);
-        free(exec_argv);
+        alloc->free(alloc->ctx, exec_argv, exec_argv_size);
         _exit(127);
     }
     close(fds[1]);

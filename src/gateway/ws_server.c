@@ -389,20 +389,22 @@ static size_t build_server_frame(char *buf, size_t buf_size, const char *payload
     return pos + payload_len;
 }
 
-hu_error_t hu_ws_server_send(hu_ws_conn_t *conn, const char *data, size_t data_len) {
-    if (!conn || !conn->active || conn->fd < 0 || !data)
+hu_error_t hu_ws_server_send(hu_ws_server_t *srv, hu_ws_conn_t *conn, const char *data,
+                            size_t data_len) {
+    if (!srv || !conn || !conn->active || conn->fd < 0 || !data)
         return HU_ERR_INVALID_ARGUMENT;
 #ifndef HU_GATEWAY_POSIX
     (void)data_len;
     return HU_ERR_NOT_SUPPORTED;
 #else
     size_t frame_cap = data_len + 14;
-    char *buf = (char *)malloc(frame_cap);
+    hu_allocator_t *alloc = srv->alloc;
+    char *buf = (char *)alloc->alloc(alloc->ctx, frame_cap);
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
     size_t frame_len = build_server_frame(buf, frame_cap, data, data_len);
     if (frame_len == 0) {
-        free(buf);
+        alloc->free(alloc->ctx, buf, frame_cap);
         return HU_ERR_INVALID_ARGUMENT;
     }
 
@@ -410,12 +412,12 @@ hu_error_t hu_ws_server_send(hu_ws_conn_t *conn, const char *data, size_t data_l
     while (sent < frame_len) {
         ssize_t w = send(conn->fd, buf + sent, frame_len - sent, MSG_NOSIGNAL);
         if (w <= 0) {
-            free(buf);
+            alloc->free(alloc->ctx, buf, frame_cap);
             return HU_ERR_IO;
         }
         sent += (size_t)w;
     }
-    free(buf);
+    alloc->free(alloc->ctx, buf, frame_cap);
     return HU_OK;
 #endif
 }
@@ -425,7 +427,7 @@ void hu_ws_server_broadcast(hu_ws_server_t *srv, const char *data, size_t data_l
         return;
     for (int i = 0; i < HU_WS_SERVER_MAX_CONNS; i++) {
         if (srv->conns[i].active) {
-            hu_error_t err = hu_ws_server_send(&srv->conns[i], data, data_len);
+            hu_error_t err = hu_ws_server_send(srv, &srv->conns[i], data, data_len);
             if (err != HU_OK)
                 hu_ws_server_close_conn(srv, &srv->conns[i]);
         }
@@ -449,8 +451,8 @@ void hu_ws_server_close_conn(hu_ws_server_t *srv, hu_ws_conn_t *conn) {
 #endif
     if (srv && srv->on_close)
         srv->on_close(conn, srv->cb_ctx);
-    if (conn->recv_buf && conn->recv_buf != conn->inline_buf)
-        free(conn->recv_buf);
+    if (conn->recv_buf && conn->recv_buf != conn->inline_buf && srv->alloc)
+        srv->alloc->free(srv->alloc->ctx, conn->recv_buf, conn->recv_cap);
     conn->fd = -1;
     conn->active = false;
     conn->authenticated = false;
@@ -476,14 +478,15 @@ hu_error_t hu_ws_server_read_and_process(hu_ws_server_t *srv, hu_ws_conn_t *conn
         size_t new_cap = conn->recv_cap * 2;
         if (new_cap > HU_WS_SERVER_RECV_MAX)
             new_cap = HU_WS_SERVER_RECV_MAX;
-        char *new_buf = (char *)malloc(new_cap);
+        hu_allocator_t *alloc = srv->alloc;
+        char *new_buf = (char *)alloc->alloc(alloc->ctx, new_cap);
         if (!new_buf) {
             hu_ws_server_close_conn(srv, conn);
             return HU_ERR_IO;
         }
         memcpy(new_buf, conn->recv_buf, conn->recv_len);
         if (conn->recv_buf != conn->inline_buf)
-            free(conn->recv_buf);
+            alloc->free(alloc->ctx, conn->recv_buf, conn->recv_cap);
         conn->recv_buf = new_buf;
         conn->recv_cap = new_cap;
         space = new_cap - conn->recv_len;

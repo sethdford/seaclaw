@@ -356,7 +356,7 @@ static void openrouter_deinit(void *ctx, hu_allocator_t *alloc) {
     if (!orc)
         return;
     if (orc->api_key)
-        free(orc->api_key);
+        hu_str_free(alloc, orc->api_key);
     alloc->free(alloc->ctx, orc, sizeof(*orc));
 }
 
@@ -449,13 +449,11 @@ hu_error_t hu_openrouter_create(hu_allocator_t *alloc, const char *api_key, size
         return HU_ERR_OUT_OF_MEMORY;
     memset(orc, 0, sizeof(*orc));
     if (api_key && api_key_len > 0) {
-        orc->api_key = (char *)malloc(api_key_len + 1);
+        orc->api_key = hu_strndup(alloc, api_key, api_key_len);
         if (!orc->api_key) {
             alloc->free(alloc->ctx, orc, sizeof(*orc));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(orc->api_key, api_key, api_key_len);
-        orc->api_key[api_key_len] = '\0';
         orc->api_key_len = api_key_len;
     }
     out->ctx = orc;

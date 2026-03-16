@@ -370,9 +370,9 @@ static void compatible_deinit(void *ctx, hu_allocator_t *alloc) {
     if (!cc)
         return;
     if (cc->api_key)
-        free(cc->api_key);
+        hu_str_free(alloc, cc->api_key);
     if (cc->base_url)
-        free(cc->base_url);
+        hu_str_free(alloc, cc->base_url);
     alloc->free(alloc->ctx, cc, sizeof(*cc));
 }
 
@@ -463,25 +463,21 @@ hu_error_t hu_compatible_create(hu_allocator_t *alloc, const char *api_key, size
         return HU_ERR_OUT_OF_MEMORY;
     memset(cc, 0, sizeof(*cc));
     if (api_key && api_key_len > 0) {
-        cc->api_key = (char *)malloc(api_key_len + 1);
+        cc->api_key = hu_strndup(alloc, api_key, api_key_len);
         if (!cc->api_key) {
             alloc->free(alloc->ctx, cc, sizeof(*cc));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(cc->api_key, api_key, api_key_len);
-        cc->api_key[api_key_len] = '\0';
         cc->api_key_len = api_key_len;
     }
     if (base_url && base_url_len > 0) {
-        cc->base_url = (char *)malloc(base_url_len + 1);
+        cc->base_url = hu_strndup(alloc, base_url, base_url_len);
         if (!cc->base_url) {
             if (cc->api_key)
-                free(cc->api_key);
+                hu_str_free(alloc, cc->api_key);
             alloc->free(alloc->ctx, cc, sizeof(*cc));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(cc->base_url, base_url, base_url_len);
-        cc->base_url[base_url_len] = '\0';
         cc->base_url_len = base_url_len;
     }
     out->ctx = cc;

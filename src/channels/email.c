@@ -1,5 +1,7 @@
 #include "human/channels/email.h"
+#include "human/core/allocator.h"
 #include "human/core/process_util.h"
+#include "human/core/string.h"
 #include "human/platform.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -261,7 +263,8 @@ hu_error_t hu_email_set_auth(hu_channel_t *ch, const char *user, size_t user_len
     if (user && user_len > 0 && pass && pass_len > 0) {
         /* Store as "user:pass" for curl --user */
         size_t combo_len = user_len + 1 + pass_len;
-        c->smtp_user = (char *)malloc(combo_len + 1);
+        hu_allocator_t *a = c->alloc;
+        c->smtp_user = (char *)a->alloc(a->ctx, combo_len + 1);
         if (!c->smtp_user)
             return HU_ERR_OUT_OF_MEMORY;
         memcpy(c->smtp_user, user, user_len);
@@ -279,11 +282,9 @@ hu_error_t hu_email_set_imap(hu_channel_t *ch, const char *imap_host, size_t ima
         return HU_ERR_INVALID_ARGUMENT;
     hu_email_ctx_t *c = (hu_email_ctx_t *)ch->ctx;
     if (imap_host && imap_host_len > 0) {
-        c->imap_host = (char *)malloc(imap_host_len + 1);
+        c->imap_host = hu_strndup(c->alloc, imap_host, imap_host_len);
         if (!c->imap_host)
             return HU_ERR_OUT_OF_MEMORY;
-        memcpy(c->imap_host, imap_host, imap_host_len);
-        c->imap_host[imap_host_len] = '\0';
         c->imap_host_len = imap_host_len;
     }
     c->imap_port = imap_port > 0 ? imap_port : 993;
@@ -298,11 +299,11 @@ void hu_email_destroy(hu_channel_t *ch) {
             if (c->smtp_host)
                 a->free(a->ctx, c->smtp_host, c->smtp_host_len + 1);
             if (c->smtp_user)
-                a->free(a->ctx, c->smtp_user, c->smtp_user_len + 1);
+                hu_str_free(a, c->smtp_user);
             if (c->smtp_pass)
                 a->free(a->ctx, c->smtp_pass, c->smtp_pass_len + 1);
             if (c->imap_host)
-                a->free(a->ctx, c->imap_host, c->imap_host_len + 1);
+                hu_str_free(a, c->imap_host);
             if (c->from_address)
                 a->free(a->ctx, c->from_address, c->from_len + 1);
             a->free(a->ctx, c, sizeof(*c));

@@ -1,5 +1,7 @@
 #include "human/channels/qq.h"
+#include "human/core/allocator.h"
 #include "human/core/http.h"
+#include "human/core/string.h"
 #include "human/core/json.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -249,37 +251,31 @@ hu_error_t hu_qq_create_ex(hu_allocator_t *alloc, const char *app_id, size_t app
     c->alloc = alloc;
     c->sandbox = sandbox;
     if (app_id && app_id_len > 0) {
-        c->app_id = (char *)malloc(app_id_len + 1);
+        c->app_id = hu_strndup(alloc, app_id, app_id_len);
         if (!c->app_id) {
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->app_id, app_id, app_id_len);
-        c->app_id[app_id_len] = '\0';
     }
     if (bot_token && bot_token_len > 0) {
-        c->bot_token = (char *)malloc(bot_token_len + 1);
+        c->bot_token = hu_strndup(alloc, bot_token, bot_token_len);
         if (!c->bot_token) {
             if (c->app_id)
-                free(c->app_id);
+                hu_str_free(alloc, c->app_id);
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->bot_token, bot_token, bot_token_len);
-        c->bot_token[bot_token_len] = '\0';
     }
     if (channel_id && channel_id_len > 0) {
-        c->channel_id = (char *)malloc(channel_id_len + 1);
+        c->channel_id = hu_strndup(alloc, channel_id, channel_id_len);
         if (!c->channel_id) {
             if (c->bot_token)
-                free(c->bot_token);
+                hu_str_free(alloc, c->bot_token);
             if (c->app_id)
-                free(c->app_id);
+                hu_str_free(alloc, c->app_id);
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->channel_id, channel_id, channel_id_len);
-        c->channel_id[channel_id_len] = '\0';
         c->channel_id_len = channel_id_len;
     }
     out->ctx = c;
@@ -299,11 +295,11 @@ void hu_qq_destroy(hu_channel_t *ch) {
         hu_qq_ctx_t *c = (hu_qq_ctx_t *)ch->ctx;
         hu_allocator_t *a = c->alloc;
         if (c->app_id)
-            free(c->app_id);
+            hu_str_free(a, c->app_id);
         if (c->bot_token)
-            free(c->bot_token);
+            hu_str_free(a, c->bot_token);
         if (c->channel_id)
-            free(c->channel_id);
+            hu_str_free(a, c->channel_id);
         if (a)
             a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;

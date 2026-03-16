@@ -1,6 +1,7 @@
 #include "human/channel.h"
 #include "human/channel_loop.h"
 #include "human/core/allocator.h"
+#include "human/core/string.h"
 #include "human/core/error.h"
 #include <netdb.h>
 #include <stdint.h>
@@ -273,13 +274,11 @@ hu_error_t hu_irc_create(hu_allocator_t *alloc, const char *server, size_t serve
     memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (server && server_len > 0) {
-        c->server = (char *)malloc(server_len + 1);
+        c->server = hu_strndup(alloc, server, server_len);
         if (!c->server) {
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->server, server, server_len);
-        c->server[server_len] = '\0';
         c->server_len = server_len;
     }
     c->port = port > 0 ? port : 6667;
@@ -302,7 +301,7 @@ void hu_irc_destroy(hu_channel_t *ch) {
         c->connected = false;
 #endif
         if (c->server)
-            free(c->server);
+            hu_str_free(a, c->server);
         a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;

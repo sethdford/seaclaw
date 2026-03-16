@@ -1,6 +1,7 @@
 #include "human/channel.h"
 #include "human/channel_loop.h"
 #include "human/core/allocator.h"
+#include "human/core/string.h"
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
@@ -241,37 +242,31 @@ hu_error_t hu_lark_create(hu_allocator_t *alloc, const char *app_id_or_webhook, 
     c->alloc = alloc;
     if (app_id_or_webhook && app_id_len > 0) {
         if (app_id_len >= 8 && strncmp(app_id_or_webhook, "https://", 8) == 0) {
-            c->webhook_url = (char *)malloc(app_id_len + 1);
+            c->webhook_url = hu_strndup(alloc, app_id_or_webhook, app_id_len);
             if (!c->webhook_url) {
                 alloc->free(alloc->ctx, c, sizeof(*c));
                 return HU_ERR_OUT_OF_MEMORY;
             }
-            memcpy(c->webhook_url, app_id_or_webhook, app_id_len);
-            c->webhook_url[app_id_len] = '\0';
             c->webhook_url_len = app_id_len;
         } else {
-            c->app_id = (char *)malloc(app_id_len + 1);
+            c->app_id = hu_strndup(alloc, app_id_or_webhook, app_id_len);
             if (!c->app_id) {
                 alloc->free(alloc->ctx, c, sizeof(*c));
                 return HU_ERR_OUT_OF_MEMORY;
             }
-            memcpy(c->app_id, app_id_or_webhook, app_id_len);
-            c->app_id[app_id_len] = '\0';
             c->app_id_len = app_id_len;
         }
     }
     if (app_secret && app_secret_len > 0) {
-        c->app_secret = (char *)malloc(app_secret_len + 1);
+        c->app_secret = hu_strndup(alloc, app_secret, app_secret_len);
         if (!c->app_secret) {
             if (c->app_id)
-                free(c->app_id);
+                hu_str_free(alloc, c->app_id);
             if (c->webhook_url)
-                free(c->webhook_url);
-            free(c);
+                hu_str_free(alloc, c->webhook_url);
+            alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->app_secret, app_secret, app_secret_len);
-        c->app_secret[app_secret_len] = '\0';
         c->app_secret_len = app_secret_len;
     }
     out->ctx = c;
@@ -291,11 +286,11 @@ void hu_lark_destroy(hu_channel_t *ch) {
         hu_lark_ctx_t *c = (hu_lark_ctx_t *)ch->ctx;
         hu_allocator_t *a = c->alloc;
         if (c->webhook_url)
-            free(c->webhook_url);
+            hu_str_free(a, c->webhook_url);
         if (c->app_id)
-            free(c->app_id);
+            hu_str_free(a, c->app_id);
         if (c->app_secret)
-            free(c->app_secret);
+            hu_str_free(a, c->app_secret);
         a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;

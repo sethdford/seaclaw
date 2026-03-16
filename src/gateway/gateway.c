@@ -445,7 +445,8 @@ static void send_response(int fd, int status, const char *content_type, const ch
                      "Content-Length: %zu\r\n"
                      "X-Frame-Options: DENY\r\n"
                      "X-Content-Type-Options: nosniff\r\n"
-                     "Content-Security-Policy: default-src 'self'\r\n"
+                     "Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; "
+                     "script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:\r\n"
                      "Strict-Transport-Security: max-age=63072000; includeSubDomains\r\n"
                      "Referrer-Policy: strict-origin-when-cross-origin\r\n"
                      "%s"
@@ -497,7 +498,8 @@ static void send_json_with_cookie(int fd, int status, const char *body, const ch
                      "Content-Length: %zu\r\n"
                      "X-Frame-Options: DENY\r\n"
                      "X-Content-Type-Options: nosniff\r\n"
-                     "Content-Security-Policy: default-src 'self'\r\n"
+                     "Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; "
+                     "script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:\r\n"
                      "Strict-Transport-Security: max-age=63072000; includeSubDomains\r\n"
                      "Referrer-Policy: strict-origin-when-cross-origin\r\n"
                      "%s"
@@ -546,7 +548,8 @@ static const char *mime_for_ext(const char *path) {
 }
 
 #ifdef HU_GATEWAY_POSIX
-static bool serve_static_file(int fd, const char *base_dir, const char *url_path) {
+static bool serve_static_file(int fd, const char *base_dir, const char *url_path,
+                              hu_allocator_t *alloc) {
     if (!base_dir || !url_path)
         return false;
     if (hu_gateway_path_has_traversal(url_path))
@@ -590,7 +593,7 @@ static bool serve_static_file(int fd, const char *base_dir, const char *url_path
     }
 
     size_t fsize = (size_t)st.st_size;
-    char *buf = (char *)malloc(fsize);
+    char *buf = alloc ? (char *)alloc->alloc(alloc->ctx, fsize) : (char *)malloc(fsize);
     if (!buf) {
         fclose(f);
         return false;
@@ -599,13 +602,19 @@ static bool serve_static_file(int fd, const char *base_dir, const char *url_path
     fclose(f);
 
     if (rd != fsize) {
-        free(buf);
+        if (alloc)
+            alloc->free(alloc->ctx, buf, fsize);
+        else
+            free(buf);
         return false;
     }
 
     const char *mime = mime_for_ext(filepath);
     send_response(fd, 200, mime, buf, rd, 0);
-    free(buf);
+    if (alloc)
+        alloc->free(alloc->ctx, buf, fsize);
+    else
+        free(buf);
     return true;
 }
 #endif
@@ -1060,7 +1069,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
 
     /* Static file serving (Control UI) — SPA fallback for non-API routes */
     if (gw->config.control_ui_dir) {
-        if (serve_static_file(fd, gw->config.control_ui_dir, path))
+        if (serve_static_file(fd, gw->config.control_ui_dir, path, gw->alloc))
             return;
     }
 

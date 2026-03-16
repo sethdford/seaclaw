@@ -73,7 +73,7 @@ void hu_control_on_close(hu_ws_conn_t *conn, void *ctx);
 
 void hu_control_send_event(hu_control_protocol_t *proto, const char *event_name,
                            const char *payload_json);
-hu_error_t hu_control_send_response(hu_ws_conn_t *conn, const char *id, bool ok,
-                                    const char *payload_json);
+hu_error_t hu_control_send_response(hu_control_protocol_t *proto, hu_ws_conn_t *conn,
+                                    const char *id, bool ok, const char *payload_json);
 
 #endif /* HU_CONTROL_PROTOCOL_H */

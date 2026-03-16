@@ -183,7 +183,7 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
         proto->rpc_window_ms = now_ms;
     }
     if (++proto->rpc_count > 60) {
-        hu_control_send_response(conn, "0", false, "{\"error\":\"rate limited\"}");
+        hu_control_send_response(proto, conn, "0", false, "{\"error\":\"rate limited\"}");
         return;
     }
 
@@ -215,7 +215,7 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
     if (proto->require_pairing && !conn->authenticated && !is_public_method(method) &&
         strcmp(method, "auth.token") != 0) {
         hu_control_send_response(
-            conn, id_raw, false,
+            proto, conn, id_raw, false,
             "{\"error\":\"unauthorized\",\"message\":\"Authentication required\"}");
         hu_json_free(proto->alloc, root);
         return;
@@ -304,7 +304,7 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
             pos += payload_len;
             res_buf[pos++] = '}';
             res_buf[pos] = '\0';
-            hu_error_t send_err = hu_ws_server_send(conn, res_buf, pos);
+            hu_error_t send_err = hu_ws_server_send(proto->ws, conn, res_buf, pos);
             if (send_err != HU_OK) {
                 (void)fprintf(stderr, "[control] send response failed: %s\n",
                               hu_error_string(send_err));
@@ -354,19 +354,21 @@ void hu_control_send_event(hu_control_protocol_t *proto, const char *event_name,
 #endif
 }
 
-hu_error_t hu_control_send_response(hu_ws_conn_t *conn, const char *id, bool ok,
-                                    const char *payload_json) {
-    if (!conn || !id)
+hu_error_t hu_control_send_response(hu_control_protocol_t *proto, hu_ws_conn_t *conn,
+                                    const char *id, bool ok, const char *payload_json) {
+    if (!proto || !conn || !id)
         return HU_ERR_INVALID_ARGUMENT;
 
 #ifdef HU_GATEWAY_POSIX
-    hu_allocator_t alloc = hu_system_allocator();
+    hu_allocator_t *alloc = proto->alloc;
+    if (!alloc || !proto->ws)
+        return HU_ERR_INVALID_ARGUMENT;
     const char *payload = payload_json ? payload_json : "{}";
     size_t payload_len = strlen(payload);
     size_t id_len = strlen(id);
     size_t cap = 96 + id_len * 2 + payload_len;
 
-    char *buf = (char *)alloc.alloc(alloc.ctx, cap);
+    char *buf = (char *)alloc->alloc(alloc->ctx, cap);
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
 
@@ -383,11 +385,11 @@ hu_error_t hu_control_send_response(hu_ws_conn_t *conn, const char *id, bool ok,
     pos += (size_t)snprintf(buf + pos, cap - pos, "\",\"ok\":%s,\"payload\":%s}",
                             ok ? "true" : "false", payload);
 
-    hu_error_t err = hu_ws_server_send(conn, buf, pos);
+    hu_error_t err = hu_ws_server_send(proto->ws, conn, buf, pos);
     if (err != HU_OK) {
         (void)fprintf(stderr, "[control] send_response failed: %s\n", hu_error_string(err));
     }
-    alloc.free(alloc.ctx, buf, cap);
+    alloc->free(alloc->ctx, buf, cap);
     return err;
 #else
     (void)ok;

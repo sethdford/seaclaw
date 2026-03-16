@@ -46,12 +46,13 @@ static void *worker(void *arg) {
 hu_thread_pool_t *hu_thread_pool_create(size_t n) {
     if (n == 0)
         return NULL;
+    /* no allocator in scope — raw malloc */
     hu_thread_pool_t *pool = (hu_thread_pool_t *)malloc(sizeof(hu_thread_pool_t));
     if (!pool)
         return NULL;
     memset(pool, 0, sizeof(*pool));
     pool->thread_count = n;
-    pool->threads = (pthread_t *)malloc(n * sizeof(pthread_t));
+    pool->threads = (pthread_t *)malloc(n * sizeof(pthread_t)); /* no allocator in scope */
     if (!pool->threads) {
         free(pool);
         return NULL;

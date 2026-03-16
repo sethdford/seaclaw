@@ -2,6 +2,7 @@
 #include "human/channel.h"
 #include "human/channel_loop.h"
 #include "human/core/allocator.h"
+#include "human/core/string.h"
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
@@ -262,39 +263,33 @@ hu_error_t hu_onebot_create_ex(hu_allocator_t *alloc, const char *api_base, size
     memset(c, 0, sizeof(*c));
     c->alloc = alloc;
     if (api_base && api_base_len > 0) {
-        c->api_base = (char *)malloc(api_base_len + 1);
+        c->api_base = hu_strndup(alloc, api_base, api_base_len);
         if (!c->api_base) {
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->api_base, api_base, api_base_len);
-        c->api_base[api_base_len] = '\0';
         c->api_base_len = api_base_len;
     }
     if (access_token && access_token_len > 0) {
-        c->access_token = (char *)malloc(access_token_len + 1);
+        c->access_token = hu_strndup(alloc, access_token, access_token_len);
         if (!c->access_token) {
             if (c->api_base)
-                free(c->api_base);
+                hu_str_free(alloc, c->api_base);
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->access_token, access_token, access_token_len);
-        c->access_token[access_token_len] = '\0';
         c->access_token_len = access_token_len;
     }
     if (user_id && user_id_len > 0) {
-        c->user_id = (char *)malloc(user_id_len + 1);
+        c->user_id = hu_strndup(alloc, user_id, user_id_len);
         if (!c->user_id) {
             if (c->access_token)
-                free(c->access_token);
+                hu_str_free(alloc, c->access_token);
             if (c->api_base)
-                free(c->api_base);
+                hu_str_free(alloc, c->api_base);
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->user_id, user_id, user_id_len);
-        c->user_id[user_id_len] = '\0';
         c->user_id_len = user_id_len;
     }
     out->ctx = c;
@@ -314,11 +309,11 @@ void hu_onebot_destroy(hu_channel_t *ch) {
         hu_onebot_ctx_t *c = (hu_onebot_ctx_t *)ch->ctx;
         hu_allocator_t *a = c->alloc;
         if (c->api_base)
-            free(c->api_base);
+            hu_str_free(a, c->api_base);
         if (c->access_token)
-            free(c->access_token);
+            hu_str_free(a, c->access_token);
         if (c->user_id)
-            free(c->user_id);
+            hu_str_free(a, c->user_id);
         a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;

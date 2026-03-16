@@ -203,6 +203,7 @@ static hu_error_t policy_child_setup(void *raw) {
                     total += strlen(p->net_proxy->allowed_domains[i]) + 1;
             }
             if (total > 0) {
+                /* no allocator in scope — raw malloc */
                 char *no_proxy = (char *)malloc(total + 1);
                 if (no_proxy) {
                     size_t off = 0;

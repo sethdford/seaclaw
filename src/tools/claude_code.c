@@ -128,7 +128,7 @@ static hu_error_t run_claude_code(hu_allocator_t *alloc, hu_security_policy_t *p
                         total += strlen(policy->net_proxy->allowed_domains[np]) + 1;
                 }
                 if (total > 0) {
-                    char *no_proxy = (char *)malloc(total + 1);
+                    char *no_proxy = (char *)alloc->alloc(alloc->ctx, total + 1);
                     if (no_proxy) {
                         size_t off = 0;
                         for (size_t np = 0; np < policy->net_proxy->allowed_domains_count; np++) {
@@ -144,7 +144,7 @@ static hu_error_t run_claude_code(hu_allocator_t *alloc, hu_security_policy_t *p
                         no_proxy[off] = '\0';
                         setenv("NO_PROXY", no_proxy, 1);
                         setenv("no_proxy", no_proxy, 1);
-                        free(no_proxy);
+                        alloc->free(alloc->ctx, no_proxy, total + 1);
                     }
                 }
             }

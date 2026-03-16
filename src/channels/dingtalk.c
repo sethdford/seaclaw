@@ -1,6 +1,7 @@
 #include "human/channel.h"
 #include "human/channel_loop.h"
 #include "human/core/allocator.h"
+#include "human/core/string.h"
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
@@ -243,25 +244,24 @@ hu_error_t hu_dingtalk_create(hu_allocator_t *alloc, const char *webhook_or_toke
         return HU_OK;
     }
     if (webhook_or_token_len >= 8 && strncmp(webhook_or_token, "https://", 8) == 0) {
-        c->webhook_url = (char *)malloc(webhook_or_token_len + 1);
+        c->webhook_url = hu_strndup(alloc, webhook_or_token, webhook_or_token_len);
         if (!c->webhook_url) {
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
-        memcpy(c->webhook_url, webhook_or_token, webhook_or_token_len);
-        c->webhook_url[webhook_or_token_len] = '\0';
         c->webhook_url_len = webhook_or_token_len;
     } else {
         size_t base_len = sizeof(DINGTALK_WEBHOOK_BASE) - 1;
-        c->webhook_url = (char *)malloc(base_len + webhook_or_token_len + 1);
+        size_t total_len = base_len + webhook_or_token_len;
+        c->webhook_url = (char *)alloc->alloc(alloc->ctx, total_len + 1);
         if (!c->webhook_url) {
             alloc->free(alloc->ctx, c, sizeof(*c));
             return HU_ERR_OUT_OF_MEMORY;
         }
         memcpy(c->webhook_url, DINGTALK_WEBHOOK_BASE, base_len);
         memcpy(c->webhook_url + base_len, webhook_or_token, webhook_or_token_len);
-        c->webhook_url[base_len + webhook_or_token_len] = '\0';
-        c->webhook_url_len = base_len + webhook_or_token_len;
+        c->webhook_url[total_len] = '\0';
+        c->webhook_url_len = total_len;
     }
     out->ctx = c;
     out->vtable = &dingtalk_vtable;
@@ -280,7 +280,7 @@ void hu_dingtalk_destroy(hu_channel_t *ch) {
         hu_dingtalk_ctx_t *c = (hu_dingtalk_ctx_t *)ch->ctx;
         hu_allocator_t *a = c->alloc;
         if (c->webhook_url)
-            free(c->webhook_url);
+            a->free(a->ctx, c->webhook_url, c->webhook_url_len + 1);
         a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;
