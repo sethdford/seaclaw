@@ -21,6 +21,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test --config playwright-smoke.config.ts",
     "check:component": "bash scripts/check-component.sh",
     "check:components": "bash scripts/check-all-components.sh",
     "check:bundle-size": "bash scripts/check-bundle-size.sh",

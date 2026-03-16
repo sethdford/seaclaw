@@ -212,22 +212,69 @@ jobs:
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=Debug -DHU_BUILD_TESTS=OFF
           cmake --build build -j$(nproc)
-      - name: Start gateway
-        run: |
-          nohup ./build/human gateway --port 3000 &>/dev/null &
-          sleep 2
       - name: Install
         run: cd ui && npm ci
       - name: Install Playwright browsers
         run: cd ui && npx playwright install --with-deps chromium
-      - name: Build
+      - name: Build UI
         run: cd ui && npm run build
-      - name: E2E tests
-        run: cd ui && npx playwright test --ignore-snapshots --grep-invert "Visual Regression"
+      - name: E2E tests (demo mode)
+        run: cd ui && npx playwright test --ignore-snapshots --grep-invert "Visual Regression|Smoke"
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
+          path: ui/test-results/
+          retention-days: 7
+
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev libcurl4-openssl-dev
+      - name: Build gateway
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DHU_BUILD_TESTS=OFF -DHU_ENABLE_CURL=ON
+          cmake --build build -j$(nproc)
+      - name: Install UI deps
+        run: cd ui && npm ci
+      - name: Build UI
+        run: cd ui && npm run build
+      - name: Install Playwright browsers
+        run: cd ui && npx playwright install --with-deps chromium
+      - name: Create gateway config
+        run: |
+          mkdir -p ~/.human
+          UI_DIR="$(pwd)/ui/dist"
+          cat > ~/.human/config.json << CONF
+          {
+            "default_provider": "ollama",
+            "default_model": "test",
+            "gateway": {
+              "port": 3000,
+              "host": "127.0.0.1",
+              "require_pairing": false,
+              "control_ui_dir": "${UI_DIR}",
+              "rate_limit_requests": 1000,
+              "rate_limit_window": 60
+            }
+          }
+          CONF
+      - name: Start gateway
+        run: |
+          nohup ./build/human gateway &>/dev/null &
+          sleep 2
+          curl -sf http://127.0.0.1:3000/health || (echo "Gateway failed to start" && exit 1)
+      - name: E2E smoke tests
+        run: cd ui && npx playwright test --config playwright-smoke.config.ts
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: smoke-report
           path: ui/test-results/
           retention-days: 7
 
