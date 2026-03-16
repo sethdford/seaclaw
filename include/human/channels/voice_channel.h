@@ -18,8 +18,15 @@
 /** Callback invoked when TTS audio is ready for playback. */
 typedef void (*hu_voice_audio_callback_t)(const float *audio, size_t samples, void *user_data);
 
+typedef enum hu_voice_mode {
+    HU_VOICE_MODE_SONATA = 0,   /* Default: Sonata TTS/STT */
+    HU_VOICE_MODE_REALTIME,     /* OpenAI Realtime API (full-duplex) */
+    HU_VOICE_MODE_WEBRTC,       /* WebRTC-based voice */
+} hu_voice_mode_t;
+
 typedef struct hu_channel_voice_config {
-    const char *codec_model_path;             /* Path to codec weights */
+    hu_voice_mode_t mode;                      /* Sonata (default), Realtime, or WebRTC */
+    const char *codec_model_path;              /* Path to codec weights */
     const char *stt_model_path;               /* Path to STT weights */
     const char *tts_model_path;               /* Path to TTS weights */
     const char *cam_model_path;               /* Path to CAM++ weights */

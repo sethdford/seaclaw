@@ -3,11 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Voice channel uses Sonata TTS/STT for text-to-speech and speech-to-text.
- * For OpenAI Realtime API (full-duplex voice), see src/voice/realtime.c.
- * For WebRTC-based voice, see src/voice/webrtc.c.
- * Integration of realtime/WebRTC into this channel is a future enhancement
- * requiring a config flag to switch between Sonata and realtime modes. */
+/* Voice channel with configurable mode:
+ *   HU_VOICE_MODE_SONATA (default) — Sonata TTS/STT pipeline
+ *   HU_VOICE_MODE_REALTIME — OpenAI Realtime API (see src/voice/realtime.c)
+ *   HU_VOICE_MODE_WEBRTC — WebRTC voice (see src/voice/webrtc.c)
+ * Realtime and WebRTC modes return HU_ERR_NOT_SUPPORTED until fully integrated. */
 
 #ifdef HU_HAS_SONATA
 /* FFI declarations for Sonata Rust pipeline.
@@ -34,6 +34,12 @@ static hu_error_t voice_start(void *ctx) {
     hu_voice_ctx_t *v = (hu_voice_ctx_t *)ctx;
     if (!v)
         return HU_ERR_INVALID_ARGUMENT;
+
+    if (v->config.mode == HU_VOICE_MODE_REALTIME || v->config.mode == HU_VOICE_MODE_WEBRTC) {
+        fprintf(stderr, "[voice] mode %d selected but not yet integrated\n",
+                (int)v->config.mode);
+        return HU_ERR_NOT_SUPPORTED;
+    }
 
 #ifdef HU_HAS_SONATA
     if (!v->initialized) {
