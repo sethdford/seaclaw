@@ -92,6 +92,9 @@ static void parse_temporal_lines(const char *text, size_t text_len,
                 add_action(result, alloc, HU_ACTION_CELEBRATE, desc_start, desc_len, trigger_start,
                            trigger_len, rel, ts);
             }
+        } else {
+            while (p < end && *p != '\n')
+                p++;
         }
         if (p < end && *p == '\n')
             p++;
@@ -154,6 +157,9 @@ static void parse_causal_lines(const char *text, size_t text_len, hu_anticipator
                                    action_len, confidence, 0);
                 }
             }
+        } else {
+            while (p < end && *p != '\n')
+                p++;
         }
         if (p < end && *p == '\n')
             p++;

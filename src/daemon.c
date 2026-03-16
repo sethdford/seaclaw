@@ -6673,9 +6673,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     alloc->free(alloc->ctx, contact_ctx, contact_ctx_len + 1);
                 if (convo_ctx)
                     alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
-                if (history_entries)
-                    alloc->free(alloc->ctx, history_entries,
-                                history_count * sizeof(hu_channel_history_entry_t));
                 if (cross_entries)
                     alloc->free(alloc->ctx, cross_entries,
                                 cross_count * sizeof(hu_channel_history_entry_t));
@@ -6754,6 +6751,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
+
+                if (history_entries)
+                    alloc->free(alloc->ctx, history_entries,
+                                history_count * sizeof(hu_channel_history_entry_t));
+                history_entries = NULL;
+                history_count = 0;
 
                 /* Episodic: summarize this interaction */
                 if (err == HU_OK && response && response_len > 0 && agent->memory) {

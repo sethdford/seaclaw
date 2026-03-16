@@ -138,10 +138,23 @@ static hu_error_t load_contractions(const hu_json_value_t *obj) {
         const char *to = hu_json_get_string(item, "to");
 
         if (from && to) {
-            result[i].from = from;
-            result[i].from_len = strlen(from);
-            result[i].to = to;
-            result[i].to_len = strlen(to);
+            size_t flen = strlen(from);
+            size_t tlen = strlen(to);
+            char *from_copy = (char *)s_conv_alloc->alloc(s_conv_alloc->ctx, flen + 1);
+            char *to_copy = (char *)s_conv_alloc->alloc(s_conv_alloc->ctx, tlen + 1);
+            if (from_copy && to_copy) {
+                memcpy(from_copy, from, flen + 1);
+                memcpy(to_copy, to, tlen + 1);
+                result[i].from = from_copy;
+                result[i].from_len = flen;
+                result[i].to = to_copy;
+                result[i].to_len = tlen;
+            } else {
+                result[i].from = "";
+                result[i].from_len = 0;
+                result[i].to = "";
+                result[i].to_len = 0;
+            }
         } else {
             result[i].from = "";
             result[i].from_len = 0;

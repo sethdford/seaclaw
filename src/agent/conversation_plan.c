@@ -120,19 +120,28 @@ hu_error_t hu_plan_build_prompt(const hu_conversation_plan_t *plan, hu_allocator
 
     char buf[1024];
     size_t pos = 0;
+    const size_t cap = sizeof(buf);
 
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
+    pos += (size_t)snprintf(buf + pos, cap - pos,
                             "### Response Plan\nIntent: %s\nTone: %s\nTarget length: ~%zu chars\n",
                             intent_name(plan->primary_intent),
                             plan->tone_guidance && plan->tone_guidance_len > 0 ? plan->tone_guidance
                                                                                : "match context",
                             plan->target_length);
+    if (pos >= cap)
+        pos = cap - 1;
 
-    if (plan->should_ask_question)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Ask a follow-up question.\n");
-    if (plan->should_share_personal)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
+    if (plan->should_ask_question) {
+        pos += (size_t)snprintf(buf + pos, cap - pos, "Ask a follow-up question.\n");
+        if (pos >= cap)
+            pos = cap - 1;
+    }
+    if (plan->should_share_personal) {
+        pos += (size_t)snprintf(buf + pos, cap - pos,
                                 "Share something personal if relevant.\n");
+        if (pos >= cap)
+            pos = cap - 1;
+    }
 
     *out = hu_strndup(alloc, buf, pos);
     if (!*out)
