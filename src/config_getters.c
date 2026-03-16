@@ -26,6 +26,8 @@ bool hu_config_provider_requires_api_key(const char *provider) {
         return false;
     if (strcmp(provider, "sglang") == 0)
         return false;
+    if (strcmp(provider, "vertex") == 0)
+        return false;
     return true;
 }
 
@@ -44,9 +46,14 @@ hu_error_t hu_config_validate(const hu_config_t *cfg) {
         return HU_ERR_CONFIG_INVALID;
     if (hu_config_provider_requires_api_key(cfg->default_provider)) {
         const char *key = hu_config_default_provider_key(cfg);
-        if (!key || !key[0])
-            fprintf(stderr, "Warning: provider %s requires an API key but none is configured\n",
-                    cfg->default_provider ? cfg->default_provider : "(unknown)");
+        const char *burl = hu_config_get_provider_base_url(cfg, cfg->default_provider);
+        bool vertex_adc = burl && strstr(burl, "aiplatform.googleapis.com") != NULL;
+        if (!key || !key[0]) {
+            if (!vertex_adc)
+                fprintf(stderr,
+                        "Warning: provider %s requires an API key but none is configured\n",
+                        cfg->default_provider ? cfg->default_provider : "(unknown)");
+        }
     }
     return HU_OK;
 }

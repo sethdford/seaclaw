@@ -141,6 +141,9 @@ hu_error_t hu_provider_create(hu_allocator_t *alloc, const char *name, size_t na
     if (name_len == 13 && memcmp(name, "google-gemini", 13) == 0) {
         return hu_gemini_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
     }
+    if (name_len == 6 && memcmp(name, "vertex", 6) == 0) {
+        return hu_gemini_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
+    }
     if (name_len == 6 && memcmp(name, "ollama", 6) == 0) {
         return hu_ollama_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
     }

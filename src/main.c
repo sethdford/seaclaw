@@ -360,7 +360,12 @@ static hu_error_t cmd_doctor(hu_allocator_t *alloc, int argc, char **argv) {
     const char *prov = cfg.default_provider ? cfg.default_provider : "openai";
     if (hu_config_provider_requires_api_key(prov)) {
         const char *key = hu_config_default_provider_key(&cfg);
-        if (key && key[0]) {
+        const char *burl = hu_config_get_provider_base_url(&cfg, prov);
+        bool has_vertex_adc =
+            burl && strstr(burl, "aiplatform.googleapis.com") != NULL && (!key || !key[0]);
+        if (has_vertex_adc) {
+            printf("[doctor] provider (%s): ok (Vertex AI with ADC)\n", prov);
+        } else if (key && key[0]) {
             printf("[doctor] provider (%s): ok (API key configured)\n", prov);
         } else {
             printf("[doctor] provider (%s): warning — no API key\n", prov);

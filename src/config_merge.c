@@ -482,7 +482,8 @@ void hu_config_apply_env_overrides(hu_config_t *cfg) {
         else if (strcmp(cfg->default_provider, "anthropic") == 0)
             v = getenv("ANTHROPIC_API_KEY");
         else if (strcmp(cfg->default_provider, "gemini") == 0 ||
-                 strcmp(cfg->default_provider, "google") == 0)
+                 strcmp(cfg->default_provider, "google") == 0 ||
+                 strcmp(cfg->default_provider, "vertex") == 0)
             v = getenv("GEMINI_API_KEY");
         else if (strcmp(cfg->default_provider, "ollama") == 0)
             v = getenv("OLLAMA_HOST");
