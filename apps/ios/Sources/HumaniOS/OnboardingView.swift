@@ -47,7 +47,9 @@ struct OnboardingView: View {
                     .accessibilityLabel("\(page.1). \(page.2)")
                 }
             }
+            #if os(iOS)
             .tabViewStyle(.page(indexDisplayMode: .always))
+            #endif
 
             VStack(spacing: HUTokens.spaceMd) {
                 TextField("Gateway URL", text: $connectionManager.gatewayURL)

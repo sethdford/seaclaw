@@ -44,6 +44,8 @@ _human() {
                 persona:Persona management
                 pwa:PWA browser automation
                 sandbox:Sandbox management
+                eval:Run evaluation harness
+                feed:Feed management
             )'
             ;;
         args)

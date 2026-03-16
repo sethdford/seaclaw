@@ -1,6 +1,7 @@
 #include "test_framework.h"
 #include "human/intelligence/weakness.h"
 #include "human/eval.h"
+/* Tests cover both weakness.c and weakness_analyzer.c */
 #include <string.h>
 
 static void test_weakness_null_args(void) {

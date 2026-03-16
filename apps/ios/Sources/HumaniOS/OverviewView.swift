@@ -6,7 +6,7 @@ struct OverviewView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var appeared = false
 
-    private typealias TokenSet = (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
+    fileprivate typealias TokenSet = (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color)
 
     private var tokens: TokenSet {
         let dark: TokenSet = (

@@ -98,3 +98,5 @@ hu_error_t hu_multimodal_memory_search(hu_allocator_t *alloc, sqlite3 *db, const
 }
 
 #endif /* HU_ENABLE_SQLITE */
+
+typedef int hu_multimodal_index_unused_t;
