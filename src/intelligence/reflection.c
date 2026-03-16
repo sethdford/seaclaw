@@ -284,7 +284,30 @@ hu_error_t hu_reflection_weekly(hu_reflection_engine_t *engine, int64_t now_ts) 
         sqlite3_finalize(count_stmt);
 
         double health = (double)pos / ((double)pos + (double)neg + 1.0);
-        const char *rec = (health >= 0.5) ? "maintain" : "improve";
+
+        char rec_buf[256];
+        const char *rec = rec_buf;
+        if (neg > pos) {
+            snprintf(rec_buf, sizeof(rec_buf),
+                "High failure rate (%u neg vs %u pos). Simplify prompts and add error recovery.",
+                neg, pos);
+        } else if (neg > 0 && health < 0.8) {
+            snprintf(rec_buf, sizeof(rec_buf),
+                "Some failures (%u neg / %u total). Investigate failure patterns and add retries.",
+                neg, pos + neg);
+        } else if (pos + neg < 5) {
+            snprintf(rec_buf, sizeof(rec_buf),
+                "Low data volume (%u interactions). Increase cycle frequency to gather more signal.",
+                pos + neg);
+        } else if (health >= 0.95) {
+            snprintf(rec_buf, sizeof(rec_buf),
+                "Excellent (%u/%u success). Expand scope: try new source domains or deeper analysis.",
+                pos, pos + neg);
+        } else {
+            snprintf(rec_buf, sizeof(rec_buf),
+                "Good performance (%.0f%% health). Look for cross-domain connections in findings.",
+                health * 100);
+        }
 
         char metrics[256];
         int n = snprintf(metrics, sizeof(metrics),

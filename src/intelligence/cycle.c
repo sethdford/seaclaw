@@ -2,6 +2,7 @@
 
 #include "human/intelligence/cycle.h"
 #include "human/intelligence/distiller.h"
+#include "human/feeds/research_executor.h"
 #include "human/intelligence/online_learning.h"
 #include "human/intelligence/self_improve.h"
 #include "human/intelligence/value_learning.h"
@@ -9,13 +10,17 @@
 #include "human/intelligence/reflection.h"
 #include "human/intelligence/meta_learning.h"
 #include "human/intelligence/skills.h"
+#include <ctype.h>
 #include <sqlite3.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 
 #define WORD_BUF_SIZE 64
 #define MAX_WORDS 128
+
+static int is_cycle_stop_word(const char *w, size_t len);
 
 typedef struct word_count {
     char word[WORD_BUF_SIZE];
@@ -28,19 +33,55 @@ static void extract_first_significant_word(const char *text, size_t text_len,
     if (!text || out_cap == 0)
         return;
     size_t i = 0;
-    while (i < text_len && (text[i] == ' ' || text[i] == '\t' || text[i] == ',' || text[i] == '.'))
-        i++;
-    size_t start = i;
-    while (i < text_len && text[i] != ' ' && text[i] != '\t' && text[i] != ',' && text[i] != '.' && text[i] != '\0')
-        i++;
-    size_t word_len = i - start;
-    if (word_len < 5)
+    while (i < text_len) {
+        /* Skip whitespace, punctuation, and markdown artifacts */
+        while (i < text_len && (text[i] == ' ' || text[i] == '\t' || text[i] == ',' ||
+                                text[i] == '.' || text[i] == '*' || text[i] == '#' ||
+                                text[i] == '-' || text[i] == '[' || text[i] == ']' ||
+                                text[i] == '(' || text[i] == ')' || text[i] == ':'))
+            i++;
+        if (i >= text_len) break;
+        size_t start = i;
+        while (i < text_len && text[i] != ' ' && text[i] != '\t' && text[i] != ',' &&
+               text[i] != '.' && text[i] != '*' && text[i] != ':' && text[i] != '\0')
+            i++;
+        size_t word_len = i - start;
+        if (word_len < 5) continue;
+        if (is_cycle_stop_word(text + start, word_len)) continue;
+
+        if (word_len >= out_cap)
+            word_len = out_cap - 1;
+        memcpy(out, text + start, word_len);
+        out[word_len] = '\0';
+        *out_len = word_len;
         return;
-    if (word_len >= out_cap)
-        word_len = out_cap - 1;
-    memcpy(out, text + start, word_len);
-    out[word_len] = '\0';
-    *out_len = word_len;
+    }
+}
+
+static int is_cycle_stop_word(const char *w, size_t len) {
+    static const char *stops[] = {
+        "h-uman", "h-uman's", "human", "human's",
+        "should", "could", "would", "about", "their", "these", "those",
+        "which", "where", "there", "being", "other", "after", "before",
+        "between", "through", "during", "against", "above", "below",
+        "under", "using", "based", "focus", "consider", "ensure",
+        "implement", "implementation", "integrate", "integration",
+        "monitor", "investigate", "evaluate", "explore", "relevant",
+        "development", "developments", "approach", "system", "systems",
+        "findings", "finding", "research", "suggests", "recurring",
+        "theme", "across", "pattern", "potential", "current",
+        NULL
+    };
+    for (int i = 0; stops[i]; i++) {
+        if (strlen(stops[i]) == len && strncasecmp(w, stops[i], len) == 0)
+            return 1;
+    }
+    /* Also catch project name variants with any suffix (h-uman's, h-uman...) */
+    if (len >= 6 && strncasecmp(w, "h-uman", 6) == 0)
+        return 1;
+    if (len >= 5 && strncasecmp(w, "human", 5) == 0)
+        return 1;
+    return 0;
 }
 
 static void add_word_to_counts(word_count_t *counts, int *n, const char *word, size_t word_len) {
@@ -49,8 +90,17 @@ static void add_word_to_counts(word_count_t *counts, int *n, const char *word, s
     if (word_len >= WORD_BUF_SIZE)
         word_len = WORD_BUF_SIZE - 1;
     char w[WORD_BUF_SIZE];
-    memcpy(w, word, word_len);
+    for (size_t i = 0; i < word_len; i++)
+        w[i] = (char)tolower((unsigned char)word[i]);
     w[word_len] = '\0';
+
+    /* Skip project names, generic verbs, and meta-words */
+    if (is_cycle_stop_word(w, word_len))
+        return;
+    /* Skip words starting with markdown artifacts */
+    if (w[0] == '*' || w[0] == '#' || w[0] == '-' || w[0] == '[')
+        return;
+
     for (int i = 0; i < *n; i++) {
         if (strncmp(counts[i].word, w, word_len) == 0 && counts[i].word[word_len] == '\0') {
             counts[i].count++;
@@ -169,6 +219,16 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
                         result->findings_actioned++;
                     sqlite3_finalize(upd);
                 }
+
+                /* Classify and execute safe research actions */
+                if (suggested_len > 0) {
+                    hu_research_action_t research_action = {0};
+                    if (hu_research_classify_action(suggested, suggested_len,
+                                                     &research_action) == HU_OK &&
+                        research_action.is_safe) {
+                        (void)hu_research_execute_safe(alloc, db, &research_action);
+                    }
+                }
             }
             sqlite3_finalize(stmt);
             if (wm_err == HU_OK)
@@ -246,10 +306,10 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
                                  "VALUES (?, 0.5, ?, ?, ?)";
             if (sqlite3_prepare_v2(db, ins_sql, -1, &ins, NULL) == SQLITE_OK) {
                 for (int i = 0; i < n; i++) {
-                    if (counts[i].count >= 2) {
+                    if (counts[i].count >= 3) {
                         char lesson[256];
                         int ln = snprintf(lesson, sizeof(lesson),
-                                         "Research suggests: %s is a recurring theme across %d findings",
+                                         "Recurring topic: '%s' appears in %d actioned findings",
                                          counts[i].word, counts[i].count);
                         if (ln > 0 && (size_t)ln < sizeof(lesson)) {
                             sqlite3_bind_text(ins, 1, lesson, ln, SQLITE_STATIC);
