@@ -3,6 +3,55 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+static hu_error_t generate_sdp_offer(hu_allocator_t *alloc, const hu_webrtc_config_t *config,
+                                      char **out) {
+    char buf[2048];
+    bool audio = config ? config->audio_enabled : true;
+    bool video = config ? config->video_enabled : false;
+
+    int len = snprintf(buf, sizeof(buf),
+        "v=0\r\n"
+        "o=- %lld 2 IN IP4 127.0.0.1\r\n"
+        "s=human-webrtc\r\n"
+        "t=0 0\r\n"
+        "a=group:BUNDLE%s%s\r\n"
+        "a=ice-options:trickle\r\n"
+        "a=fingerprint:sha-256 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:"
+        "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00\r\n"
+        "a=setup:actpass\r\n"
+        "a=ice-ufrag:hu%04x\r\n"
+        "a=ice-pwd:hu%08x%08x\r\n"
+        "%s%s",
+        (long long)time(NULL),
+        audio ? " audio" : "", video ? " video" : "",
+        (unsigned)(time(NULL) & 0xFFFF),
+        (unsigned)(time(NULL) ^ 0xDEADBEEF), (unsigned)(time(NULL) + 0x12345678),
+        audio ?
+            "m=audio 9 UDP/TLS/RTP/SAVPF 111\r\n"
+            "c=IN IP4 0.0.0.0\r\n"
+            "a=rtcp:9 IN IP4 0.0.0.0\r\n"
+            "a=mid:audio\r\n"
+            "a=sendrecv\r\n"
+            "a=rtpmap:111 opus/48000/2\r\n"
+            "a=fmtp:111 minptime=10;useinbandfec=1\r\n" : "",
+        video ?
+            "m=video 9 UDP/TLS/RTP/SAVPF 96\r\n"
+            "c=IN IP4 0.0.0.0\r\n"
+            "a=rtcp:9 IN IP4 0.0.0.0\r\n"
+            "a=mid:video\r\n"
+            "a=sendrecv\r\n"
+            "a=rtpmap:96 VP8/90000\r\n" : "");
+    if (len <= 0 || (size_t)len >= sizeof(buf))
+        return HU_ERR_INVALID_ARGUMENT;
+    char *sdp = (char *)alloc->alloc(alloc->ctx, (size_t)len + 1);
+    if (!sdp)
+        return HU_ERR_OUT_OF_MEMORY;
+    memcpy(sdp, buf, (size_t)len + 1);
+    *out = sdp;
+    return HU_OK;
+}
 
 hu_error_t hu_webrtc_session_create(hu_allocator_t *alloc, const hu_webrtc_config_t *config, hu_webrtc_session_t **out) {
     if (!alloc || !out) return HU_ERR_INVALID_ARGUMENT;
@@ -13,6 +62,14 @@ hu_error_t hu_webrtc_session_create(hu_allocator_t *alloc, const hu_webrtc_confi
     if (config) s->config = *config;
 #ifdef HU_IS_TEST
     s->local_sdp = NULL;
+#else
+    {
+        hu_error_t err = generate_sdp_offer(alloc, config, &s->local_sdp);
+        if (err != HU_OK) {
+            alloc->free(alloc->ctx, s, sizeof(hu_webrtc_session_t));
+            return err;
+        }
+    }
 #endif
     *out = s;
     return HU_OK;
