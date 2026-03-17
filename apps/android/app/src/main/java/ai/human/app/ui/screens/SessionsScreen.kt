@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import ai.human.app.ui.HUTokens
 import ai.human.app.ui.StaggeredItem
 import ai.human.app.util.isReducedMotionEnabled
@@ -196,7 +197,7 @@ private fun SessionListItem(
                                     colorScheme.primary.copy(alpha = 0.2f),
                                     RoundedCornerShape(HUTokens.radiusSm),
                                 )
-                                .padding(horizontal = HUTokens.spaceXs, vertical = 2),
+                                .padding(horizontal = HUTokens.spaceXs, vertical = 2.dp),
                         )
                     }
                     Text(
