@@ -77,4 +77,43 @@ test.describe("Performance Latency Budgets", () => {
 
     expect(elapsed).toBeLessThan(150);
   });
+
+  test("no Long Animation Frame violations during navigation", async ({ page }) => {
+    const loafPromise = page.evaluate(() => {
+      return new Promise<{ duration: number }[]>((resolve) => {
+        const entries: { duration: number }[] = [];
+        if (typeof PerformanceObserver === "undefined") {
+          resolve([]);
+          return;
+        }
+        try {
+          const observer = new PerformanceObserver((list) => {
+            for (const entry of list.getEntries()) {
+              const e = entry as PerformanceEntry & { duration?: number };
+              if (e.duration != null && e.duration > 50) {
+                entries.push({ duration: e.duration });
+              }
+            }
+          });
+          observer.observe({ type: "long-animation-frame", buffered: true });
+          setTimeout(() => {
+            observer.disconnect();
+            resolve(entries);
+          }, 2500);
+        } catch {
+          resolve([]);
+        }
+      });
+    });
+
+    const chatNavBtn = page.locator(
+      'hu-app >> hu-sidebar >> button.nav-item[aria-label*="Chat" i]',
+    );
+    if (await chatNavBtn.isVisible().catch(() => false)) {
+      await chatNavBtn.click();
+    }
+
+    const loafViolations = await loafPromise;
+    expect(loafViolations).toHaveLength(0);
+  });
 });
