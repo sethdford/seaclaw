@@ -144,7 +144,9 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
     {
         hu_self_improve_t si = {0};
         if (hu_self_improve_create(alloc, db, &si) == HU_OK) {
-            (void)hu_self_improve_init_tables(&si);
+            hu_error_t tbl_err = hu_self_improve_init_tables(&si);
+            if (tbl_err != HU_OK)
+                fprintf(stderr, "[cycle] self_improve table init failed: %d\n", tbl_err);
             (void)hu_self_improve_apply_reflections(&si, now_ts);
 
             (void)hu_self_improve_record_tool_outcome(&si, "feed_digest", 11, true, now_ts);
@@ -166,10 +168,16 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
             hu_online_learning_t ol = {0};
             hu_error_t wm_err = hu_world_model_create(alloc, db, &wm);
             hu_error_t ol_err = hu_online_learning_create(alloc, db, 0.1, &ol);
-            if (wm_err == HU_OK)
-                (void)hu_world_model_init_tables(&wm);
-            if (ol_err == HU_OK)
-                (void)hu_online_learning_init_tables(&ol);
+            if (wm_err == HU_OK) {
+                hu_error_t tbl_err = hu_world_model_init_tables(&wm);
+                if (tbl_err != HU_OK)
+                    fprintf(stderr, "[cycle] world_model table init failed: %d\n", tbl_err);
+            }
+            if (ol_err == HU_OK) {
+                hu_error_t tbl_err = hu_online_learning_init_tables(&ol);
+                if (tbl_err != HU_OK)
+                    fprintf(stderr, "[cycle] online_learning table init failed: %d\n", tbl_err);
+            }
 
             while (sqlite3_step(stmt) == SQLITE_ROW) {
                 int64_t id = sqlite3_column_int64(stmt, 0);
@@ -364,7 +372,9 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
 
     /* Step 3b: Distill recurring experience patterns into lessons */
     {
-        (void)hu_distiller_init_tables(db);
+        hu_error_t tbl_err = hu_distiller_init_tables(db);
+        if (tbl_err != HU_OK)
+            fprintf(stderr, "[cycle] distiller table init failed: %d\n", tbl_err);
         size_t distilled = 0;
         if (hu_experience_distill(alloc, db, 2, now_ts, &distilled) == HU_OK)
             result->lessons_extracted += distilled;
@@ -374,7 +384,9 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
     {
         hu_value_engine_t ve = {0};
         if (hu_value_engine_create(alloc, db, &ve) == HU_OK) {
-            (void)hu_value_init_tables(&ve);
+            hu_error_t tbl_err = hu_value_init_tables(&ve);
+            if (tbl_err != HU_OK)
+                fprintf(stderr, "[cycle] value table init failed: %d\n", tbl_err);
             const char *sql = "SELECT finding, suggested_action FROM research_findings "
                               "WHERE priority = 'HIGH' AND status = 'actioned'";
             sqlite3_stmt *stmt = NULL;
@@ -586,7 +598,9 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
     {
         hu_online_learning_t ol = {0};
         if (hu_online_learning_create(alloc, db, 0.1, &ol) == HU_OK) {
-            (void)hu_online_learning_init_tables(&ol);
+            hu_error_t tbl_err = hu_online_learning_init_tables(&ol);
+            if (tbl_err != HU_OK)
+                fprintf(stderr, "[cycle] online_learning table init failed: %d\n", tbl_err);
             if (result->findings_actioned > 0)
                 (void)hu_online_learning_update_weight(&ol, "research_findings", 18,
                                                        1.0, now_ts);

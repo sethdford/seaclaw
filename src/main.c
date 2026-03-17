@@ -697,7 +697,9 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
     hu_bus_t svc_bus;
     hu_bus_init(&svc_bus);
     hu_awareness_t svc_awareness = {0};
-    (void)hu_awareness_init(&svc_awareness, &svc_bus);
+    hu_error_t init_err = hu_awareness_init(&svc_awareness, &svc_bus);
+    if (init_err != HU_OK)
+        fprintf(stderr, "[main] awareness init failed: %d\n", init_err);
     if (svc_awareness.bus && app_ctx.agent)
         hu_agent_set_awareness(app_ctx.agent, (struct hu_awareness *)&svc_awareness);
 
@@ -840,8 +842,11 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
             if (home) {
                 char graph_path[1024];
                 int np = snprintf(graph_path, sizeof(graph_path), "%s/.human/graph.db", home);
-                if (np > 0 && (size_t)np < sizeof(graph_path))
-                    (void)hu_graph_open(alloc, graph_path, (size_t)np, &svc_graph);
+                if (np > 0 && (size_t)np < sizeof(graph_path)) {
+                    hu_error_t graph_err = hu_graph_open(alloc, graph_path, (size_t)np, &svc_graph);
+                    if (graph_err != HU_OK)
+                        fprintf(stderr, "[main] graph open failed: %d\n", graph_err);
+                }
             }
         }
 #endif
@@ -1826,8 +1831,11 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
         if (home) {
             char graph_path[1024];
             int np = snprintf(graph_path, sizeof(graph_path), "%s/.human/graph.db", home);
-            if (np > 0 && (size_t)np < sizeof(graph_path))
-                (void)hu_graph_open(alloc, graph_path, (size_t)np, &gw_graph);
+            if (np > 0 && (size_t)np < sizeof(graph_path)) {
+                hu_error_t graph_err = hu_graph_open(alloc, graph_path, (size_t)np, &gw_graph);
+                if (graph_err != HU_OK)
+                    fprintf(stderr, "[main] graph open failed: %d\n", graph_err);
+            }
         }
     }
 #endif
@@ -1857,7 +1865,9 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
 
     if (with_agent && app.agent_ok && app.agent) {
         gw_app_ctx.agent = app.agent;
-        (void)hu_awareness_init(&gw_awareness, &bus);
+        hu_error_t init_err = hu_awareness_init(&gw_awareness, &bus);
+        if (init_err != HU_OK)
+            fprintf(stderr, "[main] awareness init failed: %d\n", init_err);
         if (gw_awareness.bus)
             hu_agent_set_awareness(app.agent, (struct hu_awareness *)&gw_awareness);
         agent_bridge.agent = app.agent;
