@@ -17,7 +17,15 @@ const SHORTCUTS: ShortcutCategory[] = [
     rows: [
       { shortcut: "Cmd+K / Ctrl+K", description: "Command palette" },
       { shortcut: "Cmd+B / Ctrl+B", description: "Toggle sidebar" },
+      { shortcut: "Cmd+Shift+T / Ctrl+Shift+T", description: "Toggle theme" },
+      { shortcut: "Cmd+Shift+E / Ctrl+Shift+E", description: "Export logs" },
       { shortcut: "?", description: "Keyboard shortcuts" },
+      { shortcut: "/", description: "Focus search (opens palette)" },
+      {
+        shortcut: "g then o/c/a/s/t/l",
+        description: "Go to Overview/Chat/Agents/Config/Tools/Logs",
+      },
+      { shortcut: "j / k", description: "Navigate sidebar up/down (Vim-style)" },
     ],
   },
   {

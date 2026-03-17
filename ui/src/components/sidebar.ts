@@ -1,5 +1,5 @@
 import { LitElement, html, css, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { icons } from "../icons.js";
 import "./hu-status-dot.js";
 
@@ -10,6 +10,26 @@ interface NavItem {
   label: string;
   icon: ReturnType<typeof html>;
 }
+
+const NAV_SHORTCUT_MAP: Record<string, string> = {
+  overview: "g o",
+  chat: "g c",
+  agents: "g a",
+  config: "g s",
+  tools: "g t",
+  logs: "g l",
+  models: "g m",
+  memory: "g e",
+  voice: "g v",
+  channels: "g h",
+  skills: "g k",
+  automations: "g u",
+  security: "g y",
+  nodes: "g n",
+  usage: "g g",
+  metrics: "g i",
+  sessions: "g r",
+};
 
 interface NavSection {
   title: string;
@@ -421,6 +441,40 @@ export class ScSidebar extends LitElement {
     .collapse-btn .label {
       margin-left: var(--hu-space-sm);
     }
+
+    .nav-item-wrap {
+      position: relative;
+    }
+
+    .shortcut-tooltip {
+      position: absolute;
+      left: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      margin-left: var(--hu-space-sm);
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      font-size: var(--hu-text-xs);
+      font-family: var(--hu-font-mono);
+      color: var(--hu-text-muted);
+      background: var(--hu-surface-container-highest);
+      border: 1px solid var(--hu-border);
+      border-radius: var(--hu-radius-sm);
+      box-shadow: var(--hu-shadow-md);
+      white-space: nowrap;
+      z-index: 100;
+      pointer-events: none;
+      animation: hu-fade-in var(--hu-duration-fast) var(--hu-ease-out);
+    }
+
+    :host([collapsed]) .shortcut-tooltip {
+      display: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .shortcut-tooltip {
+        animation: none;
+      }
+    }
   `;
 
   @property({ type: String }) activeTab = "overview";
@@ -433,6 +487,10 @@ export class ScSidebar extends LitElement {
       return "system";
     }
   })();
+
+  @state() private _hoveredItemId: string | null = null;
+  @state() private _showShortcutTooltip = false;
+  private _hoverTimer: ReturnType<typeof setTimeout> | null = null;
 
   override render() {
     return html`
@@ -486,17 +544,29 @@ export class ScSidebar extends LitElement {
                 <div class="section-title">${section.title}</div>
                 ${section.items.map(
                   (item) => html`
-                    <button
-                      class="nav-item"
-                      ?aria-current=${this.activeTab === item.id}
-                      aria-label=${item.label}
-                      title=${this.collapsed ? item.label : undefined}
-                      @click=${() => this._dispatchTabChange(item.id)}
-                      @mouseenter=${() => this._dispatchNavHover(item.id)}
+                    <div
+                      class="nav-item-wrap"
+                      @mouseenter=${() => this._onNavItemEnter(item.id)}
+                      @mouseleave=${() => this._onNavItemLeave()}
                     >
-                      <span class="icon">${item.icon}</span>
-                      <span class="label">${item.label}</span>
-                    </button>
+                      <button
+                        class="nav-item"
+                        data-nav-id=${item.id}
+                        ?aria-current=${this.activeTab === item.id}
+                        aria-label=${item.label}
+                        title=${this.collapsed ? item.label : undefined}
+                        @click=${() => this._dispatchTabChange(item.id)}
+                        @mouseenter=${() => this._dispatchNavHover(item.id)}
+                      >
+                        <span class="icon">${item.icon}</span>
+                        <span class="label">${item.label}</span>
+                      </button>
+                      ${this._showShortcutTooltip && this._hoveredItemId === item.id
+                        ? html`<span class="shortcut-tooltip" role="tooltip"
+                            >${NAV_SHORTCUT_MAP[item.id] ?? ""}</span
+                          >`
+                        : nothing}
+                    </div>
                   `,
                 )}
               </div>
@@ -577,6 +647,51 @@ export class ScSidebar extends LitElement {
   override connectedCallback() {
     super.connectedCallback();
     this._applyTheme();
+  }
+
+  private _onNavItemEnter(itemId: string): void {
+    if (this._hoverTimer) clearTimeout(this._hoverTimer);
+    this._hoverTimer = setTimeout(() => {
+      this._hoverTimer = null;
+      this._hoveredItemId = itemId;
+      this._showShortcutTooltip = !!NAV_SHORTCUT_MAP[itemId];
+    }, 1000);
+  }
+
+  private _onNavItemLeave(): void {
+    if (this._hoverTimer) {
+      clearTimeout(this._hoverTimer);
+      this._hoverTimer = null;
+    }
+    this._hoveredItemId = null;
+    this._showShortcutTooltip = false;
+  }
+
+  focusNextNavItem(): void {
+    const items = this._getNavItems();
+    if (items.length === 0) return;
+    const idx = items.findIndex((el) => el === document.activeElement);
+    const next = idx < 0 ? 0 : (idx + 1) % items.length;
+    items[next]?.focus();
+  }
+
+  focusPrevNavItem(): void {
+    const items = this._getNavItems();
+    if (items.length === 0) return;
+    const idx = items.findIndex((el) => el === document.activeElement);
+    const prev = idx <= 0 ? items.length - 1 : idx - 1;
+    items[prev]?.focus();
+  }
+
+  private _getNavItems(): HTMLElement[] {
+    const nav = this.renderRoot.querySelector(".nav");
+    if (!nav) return [];
+    return Array.from(nav.querySelectorAll<HTMLElement>("button.nav-item"));
+  }
+
+  override disconnectedCallback(): void {
+    this._onNavItemLeave();
+    super.disconnectedCallback();
   }
 
   private _dispatchTabChange(tabId: string): void {

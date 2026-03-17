@@ -1,5 +1,6 @@
 import { html, css } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { ref } from "lit/directives/ref.js";
 import { staggerMotion9Styles } from "../styles/scroll-entrance.js";
 import { GatewayClient } from "../gateway.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
@@ -13,9 +14,14 @@ import "../components/hu-empty-state.js";
 import "../components/hu-card.js";
 import "../components/hu-segmented-control.js";
 import "../components/hu-badge.js";
-import "../components/hu-timeline.js";
 import "../components/hu-skeleton.js";
+import "../components/hu-timeline.js";
 import type { TimelineItem } from "../components/hu-timeline.js";
+import { ScToast } from "../components/hu-toast.js";
+
+const ROW_HEIGHT = 32;
+const WINDOW_SIZE = 100;
+const BUFFER = 50;
 
 interface LogEntry {
   ts: string;
@@ -43,6 +49,14 @@ function formatRelativeTime(ts: string): string {
   } catch {
     return ts;
   }
+}
+
+function highlightText(text: string, query: string): (string | ReturnType<typeof html>)[] {
+  if (!query.trim()) return [text];
+  const q = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(${q})`, "gi");
+  const parts = text.split(re);
+  return parts.map((p, i) => (i % 2 === 1 ? html`<mark class="mark">${p}</mark>` : p));
 }
 
 @customElement("hu-logs-view")
@@ -111,17 +125,42 @@ export class ScLogsView extends GatewayAwareLitElement {
       .filter-input::placeholder {
         color: var(--hu-text-muted);
       }
-      .event.chat {
-        color: var(--hu-success);
+      .mark {
+        background: var(--hu-accent-subtle);
+        border-radius: var(--hu-radius-xs);
+        padding: 0 var(--hu-space-2xs);
       }
-      .event.tool-call {
-        color: var(--hu-info);
+      .log-row {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--hu-space-md);
+        min-height: 32px; /* ROW_HEIGHT for virtual scroll */
+        padding: var(--hu-space-2xs) 0;
+        font-size: var(--hu-text-sm);
+        line-height: 1.5;
       }
-      .event.error {
-        color: var(--hu-error);
+      .log-row .level-dot {
+        flex-shrink: 0;
+        width: 6px;
+        height: 6px;
+        border-radius: var(--hu-radius-full);
+        margin-top: 0.4em;
       }
-      .event.health {
-        color: var(--hu-warning);
+      .log-row .time {
+        flex-shrink: 0;
+        font-variant-numeric: tabular-nums;
+        color: var(--hu-text-faint);
+      }
+      .log-row .content {
+        flex: 1;
+        min-width: 0;
+        word-break: break-word;
+        color: var(--hu-text-secondary);
+      }
+      .sentinel {
+        height: 1px;
+        width: 100%;
+        pointer-events: none;
       }
       .log-card {
         flex: 1;
@@ -142,7 +181,7 @@ export class ScLogsView extends GatewayAwareLitElement {
         overflow-y: auto;
         font-family: var(--hu-font-mono);
         font-size: var(--hu-text-sm);
-        line-height: 1.6;
+        line-height: 1.5;
         color: var(--hu-text);
       }
       .log-area::-webkit-scrollbar {
@@ -220,6 +259,15 @@ export class ScLogsView extends GatewayAwareLitElement {
   @state() private _relativeTimeKey = 0;
   @state() private loading = true;
   @state() private error = "";
+  @state() private _visibleRange: { start: number; end: number } = {
+    start: 0,
+    end: WINDOW_SIZE + BUFFER * 2,
+  };
+
+  private _scrollContainer: HTMLDivElement | null = null;
+  private _topSentinel: HTMLDivElement | null = null;
+  private _bottomSentinel: HTMLDivElement | null = null;
+  private _observer: IntersectionObserver | null = null;
 
   private _tsInterval: ReturnType<typeof setInterval> | null = null;
   private _logsStatusHandler = ((e: CustomEvent<string>) => {
@@ -267,13 +315,31 @@ export class ScLogsView extends GatewayAwareLitElement {
   }
 
   override updated(): void {
-    // Auto-scroll to bottom when new log entries are added
-    if (!this._paused && this.filteredLogs.length > 0) {
+    const entries = this.filteredLogs;
+    const total = entries.length;
+    if (total === 0) return;
+    const { start, end } = this._visibleRange;
+    // Follow mode: keep visible range at bottom
+    if (!this._paused) {
+      const newEnd = total;
+      const newStart = Math.max(0, newEnd - WINDOW_SIZE - BUFFER * 2);
+      if (start !== newStart || end !== newEnd) {
+        this._visibleRange = { start: newStart, end: newEnd };
+      }
       this.scrollToBottom();
+    } else {
+      // Clamp when total shrinks (e.g. filter change)
+      const clampedEnd = Math.min(end, total);
+      const clampedStart = Math.min(start, Math.max(0, clampedEnd - 1));
+      if (clampedStart !== start || clampedEnd !== end) {
+        this._visibleRange = { start: clampedStart, end: clampedEnd };
+      }
     }
   }
 
   override disconnectedCallback(): void {
+    this._observer?.disconnect();
+    this._observer = null;
     this.gateway?.removeEventListener(GatewayClient.EVENT_STATUS, this._logsStatusHandler);
     if (this._tsInterval) {
       clearInterval(this._tsInterval);
@@ -281,6 +347,10 @@ export class ScLogsView extends GatewayAwareLitElement {
     }
     this.removeListener();
     super.disconnectedCallback();
+  }
+
+  override firstUpdated(): void {
+    this._setupIntersectionObserver();
   }
 
   protected override onGatewaySwapped(
@@ -345,6 +415,23 @@ export class ScLogsView extends GatewayAwareLitElement {
     this.requestUpdate();
   }
 
+  private _getLevelFromEntry(entry: LogEntry): string {
+    const p = entry.payload as { level?: string; severity?: string };
+    if (p?.level) return String(p.level).toUpperCase();
+    if (p?.severity) return String(p.severity).toUpperCase();
+    if (entry.event === EVENT_NAMES.ERROR) return "ERROR";
+    return "INFO";
+  }
+
+  private _getLevelColor(level: string): string {
+    const u = level.toUpperCase();
+    if (u === "ERROR" || u === "FATAL") return "var(--hu-error)";
+    if (u === "WARN" || u === "WARNING") return "var(--hu-accent-secondary)";
+    if (u === "INFO") return "var(--hu-text-secondary)";
+    if (u === "DEBUG") return "var(--hu-text-tertiary)";
+    return "var(--hu-text-secondary)";
+  }
+
   /** Map log event to hu-timeline status */
   private timelineStatus(event: string): TimelineItem["status"] {
     switch (event) {
@@ -373,6 +460,51 @@ export class ScLogsView extends GatewayAwareLitElement {
     });
   }
 
+  private _setupIntersectionObserver(): void {
+    if (!this._scrollContainer || !this._topSentinel || !this._bottomSentinel) return;
+    const total = this.filteredLogs.length;
+    if (total === 0) return;
+    this._observer?.disconnect();
+    this._observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const totalNow = this.filteredLogs.length;
+          if (e.target === this._topSentinel) {
+            this._visibleRange = {
+              start: Math.max(0, this._visibleRange.start - BUFFER),
+              end: this._visibleRange.end,
+            };
+          } else if (e.target === this._bottomSentinel) {
+            this._visibleRange = {
+              start: this._visibleRange.start,
+              end: Math.min(totalNow, this._visibleRange.end + BUFFER),
+            };
+          }
+        }
+      },
+      { root: this._scrollContainer, rootMargin: "0px", threshold: 0 },
+    );
+    if (this._topSentinel) this._observer.observe(this._topSentinel);
+    if (this._bottomSentinel) this._observer.observe(this._bottomSentinel);
+  }
+
+  private _exportLogs(): void {
+    const entries = this.filteredLogs;
+    const lines = entries.map((l) => {
+      const payloadStr = Object.keys(l.payload).length > 0 ? JSON.stringify(l.payload) : "";
+      return `${l.ts} [${l.event}] ${payloadStr}`.trim();
+    });
+    const text = lines.join("\n");
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `logs-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   private scrollToBottom(): void {
     this.updateComplete.then(() => {
       const el = this.shadowRoot?.querySelector(".log-area");
@@ -385,6 +517,21 @@ export class ScLogsView extends GatewayAwareLitElement {
   private clearLogs(): void {
     this.logs = [];
     this._buffer = [];
+  }
+
+  /** Public method for command palette / Ctrl+Shift+E */
+  exportLogs(): void {
+    const data = this.filteredLogs;
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `logs-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    ScToast.show({ message: "Logs exported", variant: "success" });
   }
 
   private get filteredLogs(): LogEntry[] {
@@ -448,12 +595,21 @@ export class ScLogsView extends GatewayAwareLitElement {
           <hu-input
             class="filter-input"
             type="text"
-            placeholder="Filter..."
-            aria-label="Filter log events"
+            placeholder="Search logs..."
+            aria-label="Search log events and payload"
             .value=${this.filter}
             @hu-input=${(e: CustomEvent<{ value: string }>) => (this.filter = e.detail.value)}
           ></hu-input>
           <hu-badge variant="neutral">${this.filteredLogs.length}</hu-badge>
+          <hu-button
+            variant="ghost"
+            size="sm"
+            ?disabled=${this.filteredLogs.length === 0}
+            @click=${this._exportLogs}
+            aria-label="Export logs to file"
+          >
+            ${icons.export} Export
+          </hu-button>
           <hu-button
             variant="ghost"
             size="sm"
@@ -470,33 +626,89 @@ export class ScLogsView extends GatewayAwareLitElement {
     `;
   }
 
+  private _renderLogRow(entry: LogEntry, index: number): ReturnType<typeof html> {
+    void index;
+    const level = this._getLevelFromEntry(entry);
+    const color = this._getLevelColor(level);
+    const payloadStr = Object.keys(entry.payload).length > 0 ? JSON.stringify(entry.payload) : "";
+    const fullLine = `[${entry.event}] ${payloadStr}`.trim();
+    const searchParts = highlightText(fullLine, this.filter.trim());
+    return html`
+      <div class="log-row" role="listitem">
+        <span class="level-dot" style="background: ${color}"></span>
+        <span class="time">${formatRelativeTime(entry.ts)}</span>
+        <span class="content">${searchParts}</span>
+      </div>
+    `;
+  }
+
   private _renderLogArea(): ReturnType<typeof html> {
     const entries = this.filteredLogs;
     void this._relativeTimeKey;
-    const timelineItems = this.toTimelineItems(entries);
-    return html`
-      <div class="hu-stagger-motion9">
+    const total = entries.length;
+
+    if (total === 0) {
+      return html`
         <hu-card class="log-card" glass>
           <div class="log-area-wrapper">
             <div class="log-area" role="log" aria-live="polite">
-              ${entries.length === 0
-                ? html`
-                    <hu-empty-state
-                      .icon=${icons["file-text"]}
-                      heading="Waiting for events..."
-                      description="Logs will stream here in real-time as the system processes requests."
-                    ></hu-empty-state>
-                  `
-                : html`
-                    <hu-timeline
-                      .items=${timelineItems}
-                      .max=${Math.max(entries.length, 10000)}
-                    ></hu-timeline>
-                  `}
+              <hu-empty-state
+                .icon=${icons["file-text"]}
+                heading="Waiting for events..."
+                description="Logs will stream here in real-time as the system processes requests."
+              ></hu-empty-state>
             </div>
           </div>
         </hu-card>
-      </div>
+      `;
+    }
+
+    const { start, end } = this._visibleRange;
+    const clampedStart = Math.max(0, Math.min(start, total - 1));
+    const clampedEnd = Math.min(total, Math.max(clampedStart, end));
+    const visibleEntries = entries.slice(clampedStart, clampedEnd);
+    const topHeight = clampedStart * ROW_HEIGHT;
+    const bottomHeight = (total - clampedEnd) * ROW_HEIGHT;
+
+    return html`
+      <hu-card class="log-card" glass>
+        <div class="log-area-wrapper">
+          <div
+            class="log-area"
+            role="log"
+            aria-live="polite"
+            aria-label="${total} log entries"
+            ${ref((el) => {
+              this._scrollContainer = el as HTMLDivElement;
+              if (this._scrollContainer && this._topSentinel && this._bottomSentinel) {
+                this.updateComplete.then(() => this._setupIntersectionObserver());
+              }
+            })}
+          >
+            <div style="height: ${topHeight}px" class="sentinel-spacer" aria-hidden="true"></div>
+            <div
+              class="sentinel"
+              ${ref((el) => {
+                this._topSentinel = el as HTMLDivElement;
+                if (this._scrollContainer && this._topSentinel && this._bottomSentinel) {
+                  this.updateComplete.then(() => this._setupIntersectionObserver());
+                }
+              })}
+            ></div>
+            ${visibleEntries.map((e, i) => this._renderLogRow(e, clampedStart + i))}
+            <div
+              class="sentinel"
+              ${ref((el) => {
+                this._bottomSentinel = el as HTMLDivElement;
+                if (this._scrollContainer && this._topSentinel && this._bottomSentinel) {
+                  this.updateComplete.then(() => this._setupIntersectionObserver());
+                }
+              })}
+            ></div>
+            <div style="height: ${bottomHeight}px" class="sentinel-spacer" aria-hidden="true"></div>
+          </div>
+        </div>
+      </hu-card>
     `;
   }
 

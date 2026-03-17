@@ -4,6 +4,12 @@
 @import "./scroll-driven.css";
 
 :root {
+  /* Canonical breakpoints (4-tier responsive system) */
+  --hu-breakpoint-compact: 600px;
+  --hu-breakpoint-medium: 904px;
+  --hu-breakpoint-expanded: 1239px;
+  --hu-breakpoint-wide: 1240px;
+  --hu-detail-panel-width: 400px;
   --hu-glass-card-bg-mix: 65%;
   --hu-surface: var(--hu-bg-surface);
   --hu-overlay: var(--hu-color-overlay, rgb(0 0 0 / 0.6));

@@ -56,6 +56,9 @@ const VALID_TABS: TabId[] = [
 
 const SIDEBAR_KEY = "hu-sidebar-collapsed";
 
+/** Tabs that use list-detail layout (show detail panel at wide breakpoint) */
+const LIST_DETAIL_TABS: TabId[] = ["sessions", "channels", "tools", "nodes"];
+
 const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   overview: () => Promise.resolve(),
   chat: () => import("./views/chat-view.js"),
@@ -137,6 +140,25 @@ export class ScApp extends LitElement {
 
     .layout.collapsed {
       grid-template-columns: var(--hu-sidebar-collapsed) 1fr;
+    }
+
+    /* Wide: detail panel for list-detail views */
+    .detail-panel {
+      display: none;
+      background: var(--hu-bg-surface);
+      border-left: 1px solid var(--hu-border);
+      overflow: auto;
+    }
+    @media (min-width: 1240px) /* --hu-breakpoint-wide */ {
+      .layout.has-detail {
+        grid-template-columns: var(--hu-sidebar-width) 1fr var(--hu-detail-panel-width);
+      }
+      .layout.has-detail.collapsed {
+        grid-template-columns: var(--hu-sidebar-collapsed) 1fr var(--hu-detail-panel-width);
+      }
+      .layout.has-detail .detail-panel {
+        display: block;
+      }
     }
 
     main {
@@ -299,13 +321,16 @@ export class ScApp extends LitElement {
       display: none;
     }
 
-    @media (max-width: var(--hu-breakpoint-lg)) /* --hu-breakpoint-lg */ {
+    /* Compact (<600px): mobile bottom nav, single column */
+    @media (max-width: 599px) /* --hu-breakpoint-compact */ {
       .layout {
         grid-template-columns: 1fr;
         grid-template-rows: 1fr auto;
       }
-      .layout.collapsed {
+      .layout.collapsed,
+      .layout.has-detail {
         grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
       }
       hu-sidebar {
         display: none;
@@ -353,6 +378,34 @@ export class ScApp extends LitElement {
       .mobile-tab .icon svg {
         width: 100%;
         height: 100%;
+      }
+    }
+
+    /* Medium (600–904px): collapsed sidebar, 2-column content */
+    @media (min-width: 600px) and (max-width: 904px) /* --hu-breakpoint-medium */ {
+      .layout {
+        grid-template-columns: var(--hu-sidebar-collapsed) 1fr;
+      }
+      .layout.collapsed {
+        grid-template-columns: var(--hu-sidebar-collapsed) 1fr;
+      }
+      .layout.has-detail {
+        grid-template-columns: var(--hu-sidebar-collapsed) 1fr;
+      }
+      hu-sidebar {
+        display: flex;
+      }
+      .mobile-nav {
+        display: none;
+      }
+      main {
+        padding: var(--hu-space-lg);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .layout {
+        transition: none;
       }
     }
 
@@ -432,6 +485,7 @@ export class ScApp extends LitElement {
   @state() private chatSessionKey = "default";
   @state() private connectionStatus: GatewayStatus = "disconnected";
   @state() private sidebarCollapsed = false;
+  @state() private _isMediumViewport = false;
   @state() private commandPaletteOpen = false;
   @state() private shortcutOverlayOpen = false;
   @state() private moreSheetOpen = false;
@@ -441,6 +495,9 @@ export class ScApp extends LitElement {
   gateway: GatewayClient | null = null;
   private _keyHandler = this._onGlobalKey.bind(this);
   private _hashHandler = this._onHashChange.bind(this);
+  private _resizeHandler = this._onResize.bind(this);
+  private _pendingGKey = false;
+  private _pendingGTimeout: ReturnType<typeof setTimeout> | null = null;
   private _moreSheetKeyHandler = this._onMoreSheetKeyDown.bind(this);
   private _moreSheetPreviousElement: HTMLElement | null = null;
   private readonly _moreSheetFocusableSelector =
@@ -458,6 +515,14 @@ export class ScApp extends LitElement {
     return new URLSearchParams(window.location.search).has("demo");
   }
 
+  private get _hasDetail(): boolean {
+    return LIST_DETAIL_TABS.includes(this.tab);
+  }
+
+  private get _effectiveSidebarCollapsed(): boolean {
+    return this.sidebarCollapsed || this._isMediumViewport;
+  }
+
   override connectedCallback(): void {
     super.connectedCallback();
     this.gateway = this._isDemo
@@ -467,6 +532,8 @@ export class ScApp extends LitElement {
     this.gateway.addEventListener("status", this._statusHandler);
 
     this.sidebarCollapsed = localStorage.getItem(SIDEBAR_KEY) === "true";
+    this._updateViewportBreakpoint();
+    window.addEventListener("resize", this._resizeHandler);
     document.addEventListener("keydown", this._keyHandler);
     document.addEventListener(AUTH_FAILED, this._authFailedHandler);
     window.addEventListener("hashchange", this._hashHandler);
@@ -565,12 +632,14 @@ export class ScApp extends LitElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._clearPendingG();
     if (this._navHoverTimer) {
       clearTimeout(this._navHoverTimer);
       this._navHoverTimer = null;
     }
     document.removeEventListener("keydown", this._moreSheetKeyHandler);
     document.removeEventListener("keydown", this._keyHandler);
+    window.removeEventListener("resize", this._resizeHandler);
     document.removeEventListener(AUTH_FAILED, this._authFailedHandler);
     window.removeEventListener("hashchange", this._hashHandler);
     dynamicLight.stop();
@@ -653,6 +722,7 @@ export class ScApp extends LitElement {
 
   private _onGlobalKey(e: KeyboardEvent): void {
     const mod = e.metaKey || e.ctrlKey;
+    const modShift = mod && e.shiftKey;
     if (mod && e.key === "k") {
       e.preventDefault();
       this.commandPaletteOpen = !this.commandPaletteOpen;
@@ -661,6 +731,14 @@ export class ScApp extends LitElement {
       e.preventDefault();
       this._toggleSidebar();
     }
+    if (modShift && e.key === "T") {
+      e.preventDefault();
+      this._dispatchToggleTheme();
+    }
+    if (modShift && e.key === "E") {
+      e.preventDefault();
+      this._dispatchExportLogs();
+    }
     if (e.key === "?") {
       e.preventDefault();
       this.shortcutOverlayOpen = !this.shortcutOverlayOpen;
@@ -668,6 +746,108 @@ export class ScApp extends LitElement {
     if (e.key === "Escape" && this.moreSheetOpen) {
       e.preventDefault();
       this.moreSheetOpen = false;
+    }
+    if (e.key === "Escape" && this._pendingGKey) {
+      this._clearPendingG();
+    }
+    if (!this._isInputFocused()) {
+      this._handleVimKeys(e);
+    }
+  }
+
+  private _isInputFocused(): boolean {
+    const el = document.activeElement;
+    if (!el) return false;
+    const tag = el.tagName?.toLowerCase();
+    const role = (el as HTMLElement).getAttribute?.("role");
+    if (tag === "input" || tag === "textarea" || tag === "select") return true;
+    if (role === "textbox" || (el as HTMLElement).isContentEditable) return true;
+    return false;
+  }
+
+  private _handleVimKeys(e: KeyboardEvent): void {
+    if (this.commandPaletteOpen || this.shortcutOverlayOpen || this.moreSheetOpen) return;
+    if (e.key === "/") {
+      e.preventDefault();
+      this.commandPaletteOpen = true;
+      return;
+    }
+    if (e.key === "j" || e.key === "k") {
+      const sidebar = this.shadowRoot?.querySelector("hu-sidebar") as {
+        focusNextNavItem?: () => void;
+        focusPrevNavItem?: () => void;
+      } | null;
+      if (sidebar?.focusNextNavItem && sidebar?.focusPrevNavItem) {
+        e.preventDefault();
+        if (e.key === "j") sidebar.focusNextNavItem();
+        else sidebar.focusPrevNavItem();
+      }
+      return;
+    }
+    if (e.key === "g") {
+      if (this._pendingGKey) {
+        this._clearPendingG();
+        return;
+      }
+      e.preventDefault();
+      this._pendingGKey = true;
+      this._pendingGTimeout = setTimeout(() => this._clearPendingG(), 1000);
+      return;
+    }
+    if (this._pendingGKey) {
+      e.preventDefault();
+      this._clearPendingG();
+      const map: Record<string, TabId> = {
+        o: "overview",
+        c: "chat",
+        a: "agents",
+        s: "config",
+        t: "tools",
+        l: "logs",
+      };
+      const tab = map[e.key.toLowerCase()];
+      if (tab && VALID_TABS.includes(tab)) {
+        this._switchTab(tab);
+      }
+    }
+  }
+
+  private _clearPendingG(): void {
+    this._pendingGKey = false;
+    if (this._pendingGTimeout) {
+      clearTimeout(this._pendingGTimeout);
+      this._pendingGTimeout = null;
+    }
+  }
+
+  private _dispatchToggleTheme(): void {
+    const sidebar = this.shadowRoot?.querySelector("hu-sidebar") as {
+      _cycleTheme?: () => void;
+    } | null;
+    sidebar?._cycleTheme?.();
+  }
+
+  private _dispatchExportLogs(): void {
+    this._switchTab("logs").then(() => {
+      this.updateComplete.then(() => {
+        const logsView = this.shadowRoot?.querySelector("hu-logs-view") as {
+          exportLogs?: () => void;
+        } | null;
+        logsView?.exportLogs?.();
+      });
+    });
+  }
+
+  private _onResize(): void {
+    this._updateViewportBreakpoint();
+  }
+
+  private _updateViewportBreakpoint(): void {
+    const w = window.innerWidth;
+    const was = this._isMediumViewport;
+    const now = w >= 601 && w <= 904;
+    if (was !== now) {
+      this._isMediumViewport = now;
     }
   }
 
@@ -771,6 +951,10 @@ export class ScApp extends LitElement {
       this._switchTab(id as TabId);
     } else if (action === "toggle-sidebar") {
       this._toggleSidebar();
+    } else if (action === "toggle-theme") {
+      this._dispatchToggleTheme();
+    } else if (action === "export-logs") {
+      this._dispatchExportLogs();
     } else if (action === "refresh") {
       const view = this.shadowRoot?.querySelector("main")?.firstElementChild;
       if (view && "load" in view && typeof (view as { load: () => void }).load === "function") {
@@ -795,11 +979,15 @@ export class ScApp extends LitElement {
             <button @click=${this._reconnect}>Reconnect</button>
           </div>`
         : nothing}
-      <div class="layout ${this.sidebarCollapsed ? "collapsed" : ""}">
+      <div
+        class="layout ${this._effectiveSidebarCollapsed ? "collapsed" : ""} ${this._hasDetail
+          ? "has-detail"
+          : ""}"
+      >
         <hu-sidebar
           class="hu-glass-scroll-aware"
           .activeTab=${this.tab}
-          ?collapsed=${this.sidebarCollapsed}
+          ?collapsed=${this._effectiveSidebarCollapsed}
           .connectionStatus=${this.connectionStatus}
           @tab-change=${this._onTabChange}
           @nav-hover=${this._handleNavHover}
@@ -814,6 +1002,10 @@ export class ScApp extends LitElement {
             </hu-error-boundary>
           </div>
         </main>
+
+        ${this._hasDetail
+          ? html`<aside class="detail-panel" role="complementary" aria-label="Detail"></aside>`
+          : nothing}
 
         <nav class="mobile-nav" aria-label="Mobile navigation">
           ${MOBILE_TABS.map(
