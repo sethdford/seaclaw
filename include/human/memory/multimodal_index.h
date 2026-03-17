@@ -23,6 +23,12 @@ hu_error_t hu_multimodal_memory_store(hu_allocator_t *alloc, sqlite3 *db, hu_mod
 hu_error_t hu_multimodal_memory_search(hu_allocator_t *alloc, sqlite3 *db, const char *query,
                                         size_t query_len, hu_multimodal_memory_entry_t *results,
                                         size_t max_results, size_t *out_count);
+
+hu_error_t hu_multimodal_memory_search_cross_modal(hu_allocator_t *alloc, sqlite3 *db,
+                                                     const char *query, size_t query_len,
+                                                     hu_modality_t target_modality,
+                                                     hu_multimodal_memory_entry_t *results,
+                                                     size_t max_results, size_t *out_count);
 #endif
 
 #endif
