@@ -81,6 +81,16 @@ typedef struct hu_feed_processor {
     double relevance_threshold;
     struct hu_embedder *embedder;      /* optional: generates embeddings on ingest */
     struct hu_vector_store *vec_store; /* optional: stores embeddings for semantic search */
+
+    /* Credentials from config — borrowed pointers, not owned */
+    const char *gmail_client_id;
+    size_t gmail_client_id_len;
+    const char *gmail_client_secret;
+    size_t gmail_client_secret_len;
+    const char *gmail_refresh_token;
+    size_t gmail_refresh_token_len;
+    const char *twitter_bearer_token;
+    size_t twitter_bearer_token_len;
 } hu_feed_processor_t;
 
 typedef struct hu_feed_item_stored {

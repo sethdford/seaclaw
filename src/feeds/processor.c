@@ -669,7 +669,9 @@ hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
             hu_feed_ingest_item_t gmail_items[10];
             size_t gmail_count = 0;
             if (hu_gmail_feed_fetch(proc->alloc,
-                    NULL, 0, NULL, 0, NULL, 0,
+                    proc->gmail_client_id, proc->gmail_client_id_len,
+                    proc->gmail_client_secret, proc->gmail_client_secret_len,
+                    proc->gmail_refresh_token, proc->gmail_refresh_token_len,
                     gmail_items, 10, &gmail_count) == HU_OK) {
                 for (size_t g = 0; g < gmail_count; g++) {
                     hu_feed_item_stored_t item = {0};
@@ -723,7 +725,8 @@ hu_error_t hu_feed_processor_poll(hu_feed_processor_t *proc,
             hu_feed_ingest_item_t tw_items[20];
             size_t tw_count = 0;
             if (hu_twitter_feed_fetch(proc->alloc,
-                    NULL, 0, tw_items, 20, &tw_count) == HU_OK) {
+                    proc->twitter_bearer_token, proc->twitter_bearer_token_len,
+                    tw_items, 20, &tw_count) == HU_OK) {
                 for (size_t t = 0; t < tw_count; t++) {
                     hu_feed_item_stored_t item = {0};
                     snprintf(item.source, sizeof(item.source), "%s", tw_items[t].source);

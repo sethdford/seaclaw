@@ -726,6 +726,19 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                             reg.current_pass_rate * 100.0,
                             reg.baseline_pass_rate * 100.0,
                             reg.delta * 100.0);
+                        /* --fail-on-regression: check if flag was passed */
+                        bool fail_on_reg = false;
+                        for (int fa = 0; fa < argc; fa++) {
+                            if (strcmp(argv[fa], "--fail-on-regression") == 0)
+                                fail_on_reg = true;
+                        }
+                        if (fail_on_reg) {
+                            hu_eval_run_free(alloc, &run);
+                            if (mem.vtable && mem.vtable->deinit)
+                                mem.vtable->deinit(mem.ctx);
+                            hu_config_deinit(&store_cfg);
+                            return 1;
+                        }
                     }
                 }
                 if (mem.vtable && mem.vtable->deinit)
@@ -1057,6 +1070,22 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
 
     if (strcmp(sub, "poll") == 0) {
         hu_feed_processor_t fp = {.alloc = alloc, .db = db};
+        if (cfg.feeds.gmail_client_id) {
+            fp.gmail_client_id = cfg.feeds.gmail_client_id;
+            fp.gmail_client_id_len = strlen(cfg.feeds.gmail_client_id);
+        }
+        if (cfg.feeds.gmail_client_secret) {
+            fp.gmail_client_secret = cfg.feeds.gmail_client_secret;
+            fp.gmail_client_secret_len = strlen(cfg.feeds.gmail_client_secret);
+        }
+        if (cfg.feeds.gmail_refresh_token) {
+            fp.gmail_refresh_token = cfg.feeds.gmail_refresh_token;
+            fp.gmail_refresh_token_len = strlen(cfg.feeds.gmail_refresh_token);
+        }
+        if (cfg.feeds.twitter_bearer_token) {
+            fp.twitter_bearer_token = cfg.feeds.twitter_bearer_token;
+            fp.twitter_bearer_token_len = strlen(cfg.feeds.twitter_bearer_token);
+        }
         hu_feed_config_t fconf;
         memset(&fconf, 0, sizeof(fconf));
         fconf.enabled[HU_FEED_NEWS_RSS]    = true;

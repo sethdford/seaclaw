@@ -2161,6 +2161,24 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 fp.interests_len = strlen(config->feeds.interests);
                                 fp.relevance_threshold = config->feeds.relevance_threshold;
                             }
+                            if (config) {
+                                if (config->feeds.gmail_client_id) {
+                                    fp.gmail_client_id = config->feeds.gmail_client_id;
+                                    fp.gmail_client_id_len = strlen(config->feeds.gmail_client_id);
+                                }
+                                if (config->feeds.gmail_client_secret) {
+                                    fp.gmail_client_secret = config->feeds.gmail_client_secret;
+                                    fp.gmail_client_secret_len = strlen(config->feeds.gmail_client_secret);
+                                }
+                                if (config->feeds.gmail_refresh_token) {
+                                    fp.gmail_refresh_token = config->feeds.gmail_refresh_token;
+                                    fp.gmail_refresh_token_len = strlen(config->feeds.gmail_refresh_token);
+                                }
+                                if (config->feeds.twitter_bearer_token) {
+                                    fp.twitter_bearer_token = config->feeds.twitter_bearer_token;
+                                    fp.twitter_bearer_token_len = strlen(config->feeds.twitter_bearer_token);
+                                }
+                            }
                             hu_feed_config_t fconf;
                             memset(&fconf, 0, sizeof(fconf));
                             fconf.enabled[HU_FEED_NEWS_RSS]    = true;
