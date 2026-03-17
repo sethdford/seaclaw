@@ -1103,9 +1103,106 @@ hu_error_t hu_tui_init(hu_tui_state_t *state, hu_allocator_t *alloc, hu_agent_t 
     return HU_OK;
 }
 
+/* Trim trailing newline from fgets buffer; return length without newline. */
+static size_t trim_newline(char *buf) {
+    size_t len = strlen(buf);
+    if (len > 0 && buf[len - 1] == '\n') {
+        buf[len - 1] = '\0';
+        return len - 1;
+    }
+    return len;
+}
+
+/* Check if trimmed line is "exit" or "quit" (case-insensitive). */
+static bool is_quit_command(const char *line, size_t len) {
+    size_t i = 0;
+    while (i < len && (line[i] == ' ' || line[i] == '\t'))
+        i++;
+    if (i >= len)
+        return false;
+    size_t j = len;
+    while (j > i && (line[j - 1] == ' ' || line[j - 1] == '\t'))
+        j--;
+    size_t word_len = j - i;
+    if (word_len == 4) {
+        const char *p = line + i;
+        if ((p[0] == 'e' || p[0] == 'E') && (p[1] == 'x' || p[1] == 'X') &&
+            (p[2] == 'i' || p[2] == 'I') && (p[3] == 't' || p[3] == 'T'))
+            return true;
+        if ((p[0] == 'q' || p[0] == 'Q') && (p[1] == 'u' || p[1] == 'U') &&
+            (p[2] == 'i' || p[2] == 'I') && (p[3] == 't' || p[3] == 'T'))
+            return true;
+    }
+    return false;
+}
+
 hu_error_t hu_tui_run(hu_tui_state_t *state) {
-    (void)state;
-    return HU_ERR_NOT_SUPPORTED;
+    if (!state)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    return HU_OK;
+#endif
+
+    if (!state->agent || !state->alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#define TUI_BUF_SIZE 4096
+    char buf[TUI_BUF_SIZE];
+
+    printf("human> ");
+    fflush(stdout);
+
+    while (fgets(buf, (int)sizeof(buf), stdin) != NULL) {
+        size_t len = trim_newline(buf);
+
+        /* Skip empty input */
+        if (len == 0) {
+            printf("human> ");
+            fflush(stdout);
+            continue;
+        }
+
+        /* Check exit/quit */
+        if (is_quit_command(buf, len)) {
+            break;
+        }
+
+        /* Slash commands: /clear, /help, /quit, /exit, etc. */
+        if (buf[0] == '/') {
+            char *resp = hu_agent_handle_slash_command(state->agent, buf, len);
+            if (resp) {
+                printf("%s\n", resp);
+                state->alloc->free(state->alloc->ctx, resp, strlen(resp) + 1);
+                if ((len >= 5 && (strncmp(buf, "/quit", 5) == 0 || strncmp(buf, "/exit", 5) == 0)))
+                    break;
+            }
+            printf("human> ");
+            fflush(stdout);
+            continue;
+        }
+
+        /* Agent turn */
+        state->agent->active_channel = "tui";
+        state->agent->active_channel_len = 3;
+
+        char *response = NULL;
+        size_t response_len = 0;
+        hu_error_t err = hu_agent_turn(state->agent, buf, len, &response, &response_len);
+
+        if (err != HU_OK) {
+            fprintf(stderr, "[error] %s\n", hu_error_string(err));
+        } else if (response && response_len > 0) {
+            fwrite(response, 1, response_len, stdout);
+            fputc('\n', stdout);
+            state->alloc->free(state->alloc->ctx, response, response_len + 1);
+        }
+
+        printf("human> ");
+        fflush(stdout);
+    }
+
+    return HU_OK;
 }
 
 void hu_tui_deinit(hu_tui_state_t *state) {
