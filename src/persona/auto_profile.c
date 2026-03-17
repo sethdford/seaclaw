@@ -43,6 +43,8 @@ char *hu_persona_profile_describe_style(hu_allocator_t *alloc,
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ". Mirror their energy and brevity.");
     else
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ".");
+    if (pos >= sizeof(buf))
+        pos = sizeof(buf) - 1;
 
     (void)contact_id;
     (void)contact_id_len;
@@ -70,7 +72,14 @@ hu_error_t hu_persona_auto_profile(hu_allocator_t *alloc, const char *contact_id
 #endif
 
 #if !defined(__APPLE__) || !defined(__MACH__)
-    return HU_ERR_NOT_SUPPORTED;
+    /* No iMessage on this platform — return neutral defaults */
+    overlay->formality = hu_strndup(alloc, "adaptive", 8);
+    overlay->avg_length = hu_strndup(alloc, "50", 2);
+    overlay->emoji_usage = hu_strndup(alloc, "moderate", 8);
+    overlay->message_splitting = false;
+    overlay->max_segment_chars = 300;
+    (void)contact_id_len;
+    return HU_OK;
 #endif
 
 #if defined(HU_ENABLE_SQLITE)

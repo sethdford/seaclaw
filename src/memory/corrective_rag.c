@@ -149,10 +149,11 @@ hu_error_t hu_crag_retrieve(hu_allocator_t *alloc, const hu_crag_config_t *confi
         }
     }
 
+    /* Sort by relevance ascending (RELEVANT first, then AMBIGUOUS, then IRRELEVANT), then by score desc */
     for (size_t i = 0; i < count; i++) {
         for (size_t j = i + 1; j < count; j++) {
             int cmp = (int)graded[j].relevance - (int)graded[i].relevance;
-            if (cmp > 0 || (cmp == 0 && graded[j].score > graded[i].score)) {
+            if (cmp < 0 || (cmp == 0 && graded[j].score > graded[i].score)) {
                 hu_rag_graded_doc_t tmp = graded[i];
                 graded[i] = graded[j];
                 graded[j] = tmp;
@@ -173,24 +174,33 @@ hu_error_t hu_crag_retrieve(hu_allocator_t *alloc, const hu_crag_config_t *confi
         return HU_ERR_OUT_OF_MEMORY;
     }
     size_t pos = 0;
-    for (size_t i = 0; i < count && pos < out_cap - 1; i++) {
-        if (graded[i].relevance == HU_RAG_IRRELEVANT &&
-            (i == 0 || graded[i - 1].relevance != HU_RAG_IRRELEVANT))
-            break;
-        const char *src = entries[i].content;
-        size_t src_len = entries[i].content_len;
-        if (!src)
-            continue;
-        if (src_len == 0)
-            src_len = strlen(src);
-        size_t to_copy = src_len;
-        if (pos + to_copy >= out_cap - 1)
-            to_copy = out_cap - 1 - pos;
-        if (to_copy > 0) {
-            memcpy(answer + pos, src, to_copy);
-            pos += to_copy;
-            if (pos < out_cap - 1 && i + 1 < count)
-                answer[pos++] = '\n';
+    if (count > 0 && graded[0].relevance == HU_RAG_IRRELEVANT) {
+        /* No RELEVANT or AMBIGUOUS docs — return empty with note */
+        const char *note = "No relevant documents found.";
+        size_t note_len = strlen(note);
+        if (note_len < out_cap) {
+            memcpy(answer, note, note_len + 1);
+            pos = note_len;
+        }
+    } else {
+        for (size_t i = 0; i < count && pos < out_cap - 1; i++) {
+            if (graded[i].relevance == HU_RAG_IRRELEVANT)
+                break;
+            const char *src = entries[i].content;
+            size_t src_len = entries[i].content_len;
+            if (!src)
+                continue;
+            if (src_len == 0)
+                src_len = strlen(src);
+            size_t to_copy = src_len;
+            if (pos + to_copy >= out_cap - 1)
+                to_copy = out_cap - 1 - pos;
+            if (to_copy > 0) {
+                memcpy(answer + pos, src, to_copy);
+                pos += to_copy;
+                if (pos < out_cap - 1 && i + 1 < count)
+                    answer[pos++] = '\n';
+            }
         }
     }
     answer[pos] = '\0';

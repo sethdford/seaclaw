@@ -246,6 +246,62 @@ static hu_error_t read_binary_file(hu_allocator_t *alloc, const char *path, size
 #endif
 }
 
+/* Extract printable text sequences from binary (e.g. PDF). Joins runs with newlines. */
+static hu_error_t extract_printable_text(hu_allocator_t *alloc, const void *raw, size_t raw_len,
+                                          char **out, size_t *out_len) {
+    if (!alloc || !raw || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
+
+    const unsigned char *p = (const unsigned char *)raw;
+    const unsigned char *end = p + raw_len;
+    size_t cap = 4096;
+    char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t len = 0;
+    bool in_run = false;
+
+    while (p < end) {
+        unsigned char ch = *p++;
+        bool printable = (ch >= 0x20 && ch <= 0x7E) || ch == '\t' || ch == '\n' || ch == '\r';
+        if (printable) {
+            if (len >= cap - 1) {
+                size_t new_cap = cap * 2;
+                if (new_cap > 1024 * 1024)
+                    new_cap = cap + 65536;
+                char *nbuf = (char *)alloc->realloc(alloc->ctx, buf, cap, new_cap);
+                if (!nbuf) {
+                    alloc->free(alloc->ctx, buf, cap);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                buf = nbuf;
+                cap = new_cap;
+            }
+            buf[len++] = (char)ch;
+            in_run = true;
+        } else if (in_run && len > 0 && buf[len - 1] != '\n') {
+            if (len >= cap - 1) {
+                size_t new_cap = cap * 2;
+                char *nbuf = (char *)alloc->realloc(alloc->ctx, buf, cap, new_cap);
+                if (!nbuf) {
+                    alloc->free(alloc->ctx, buf, cap);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                buf = nbuf;
+                cap = new_cap;
+            }
+            buf[len++] = '\n';
+            in_run = false;
+        }
+    }
+    buf[len] = '\0';
+    *out = buf;
+    *out_len = len;
+    return HU_OK;
+}
+
 static const char *mime_for_type(hu_ingest_file_type_t type, const char *path, size_t path_len) {
     (void)path;
     (void)path_len;
@@ -304,6 +360,29 @@ static void strip_md_json(const char *in, size_t in_len, const char **out, size_
         close--;
     *out = p;
     *out_len = (size_t)(close - p);
+}
+
+static hu_error_t store_raw_text(hu_allocator_t *alloc, hu_memory_t *memory, const char *content,
+                                  size_t content_len, const char *path, size_t path_len,
+                                  const char *fname, size_t fname_len) {
+    if (!content || content_len == 0)
+        return HU_ERR_PARSE;
+    char *key = hu_sprintf(alloc, "ingest:%.*s", (int)fname_len, fname);
+    char *source = hu_sprintf(alloc, "file://%.*s", (int)path_len, path);
+    if (!key || !source) {
+        if (key)
+            hu_str_free(alloc, key);
+        if (source)
+            hu_str_free(alloc, source);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_DAILY};
+    hu_error_t err =
+        hu_memory_store_with_source(memory, key, strlen(key), content, content_len, &cat, NULL, 0,
+                                    source, strlen(source));
+    hu_str_free(alloc, source);
+    hu_str_free(alloc, key);
+    return err;
 }
 
 static hu_error_t store_extracted(hu_allocator_t *alloc, hu_memory_t *memory, const char *response,
@@ -451,6 +530,38 @@ hu_error_t hu_ingest_file_with_provider(hu_allocator_t *alloc, hu_memory_t *memo
         } else {
             err = HU_ERR_PARSE;
         }
+        return err;
+    }
+
+    /* Fallback: extract or describe when provider lacks chat_with_system */
+    if (type == HU_INGEST_PDF) {
+        void *raw = NULL;
+        size_t raw_len = 0;
+        hu_error_t err = read_binary_file(alloc, path, path_len, &raw, &raw_len);
+        if (err != HU_OK)
+            return err;
+        char *text = NULL;
+        size_t text_len = 0;
+        err = extract_printable_text(alloc, raw, raw_len, &text, &text_len);
+        alloc->free(alloc->ctx, raw, raw_len);
+        if (err != HU_OK)
+            return err;
+        if (text_len > 0) {
+            err = store_raw_text(alloc, memory, text, text_len, path, path_len, fname, fname_len);
+            alloc->free(alloc->ctx, text, text_len + 1);
+            return err;
+        }
+        alloc->free(alloc->ctx, text, text_len + 1);
+    }
+
+    if (type == HU_INGEST_AUDIO || type == HU_INGEST_VIDEO) {
+        char *desc = hu_sprintf(alloc, "Ingested %s file: %.*s",
+                               type == HU_INGEST_AUDIO ? "audio" : "video", (int)fname_len, fname);
+        if (!desc)
+            return HU_ERR_OUT_OF_MEMORY;
+        hu_error_t err =
+            store_raw_text(alloc, memory, desc, strlen(desc), path, path_len, fname, fname_len);
+        hu_str_free(alloc, desc);
         return err;
     }
 
