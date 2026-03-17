@@ -20,6 +20,21 @@ typedef struct hu_mcp_transport {
 
 hu_error_t hu_mcp_transport_stdio_create(hu_allocator_t *alloc, int read_fd, int write_fd,
                                           hu_mcp_transport_t *out);
+
+/**
+ * Create stdio transport from command — stores command for later spawn.
+ * Call hu_mcp_transport_stdio_start to fork/exec the child. Requires HU_GATEWAY_POSIX.
+ */
+hu_error_t hu_mcp_transport_stdio_create_from_command(hu_allocator_t *alloc, const char *command,
+                                                      const char *const *args, size_t args_count,
+                                                      hu_mcp_transport_t *out);
+
+/**
+ * Start the child process (only for transport created from command).
+ * Returns HU_ERR_NOT_SUPPORTED in HU_IS_TEST. Requires HU_GATEWAY_POSIX.
+ */
+hu_error_t hu_mcp_transport_stdio_start(hu_allocator_t *alloc, hu_mcp_transport_t *t);
+
 hu_error_t hu_mcp_transport_sse_create(hu_allocator_t *alloc, const char *url, size_t url_len,
                                        hu_mcp_transport_t *out);
 hu_error_t hu_mcp_transport_http_create(hu_allocator_t *alloc, const char *url, size_t url_len,

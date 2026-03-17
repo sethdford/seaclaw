@@ -74,6 +74,36 @@ static void http_create_and_destroy(void) {
 #endif
 }
 
+static void stdio_create_from_command_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_mcp_transport_t t = {0};
+    HU_ASSERT_NEQ(hu_mcp_transport_stdio_create_from_command(NULL, "echo", NULL, 0, &t), HU_OK);
+    HU_ASSERT_NEQ(hu_mcp_transport_stdio_create_from_command(&alloc, NULL, NULL, 0, &t), HU_OK);
+    HU_ASSERT_NEQ(hu_mcp_transport_stdio_create_from_command(&alloc, "echo", NULL, 0, NULL), HU_OK);
+}
+
+static void stdio_create_from_command_and_start_in_test(void) {
+#ifdef HU_GATEWAY_POSIX
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_mcp_transport_t t = {0};
+    const char *args[] = {"hello"};
+    HU_ASSERT_EQ(hu_mcp_transport_stdio_create_from_command(&alloc, "echo", args, 1, &t), HU_OK);
+    HU_ASSERT_NOT_NULL(t.ctx);
+    HU_ASSERT_NOT_NULL(t.send);
+    HU_ASSERT_NOT_NULL(t.recv);
+    HU_ASSERT_NOT_NULL(t.close);
+    /* In HU_IS_TEST, start returns NOT_SUPPORTED (no real spawn) */
+    HU_ASSERT_EQ(hu_mcp_transport_stdio_start(&alloc, &t), HU_ERR_NOT_SUPPORTED);
+    hu_mcp_transport_destroy(&t, &alloc);
+#else
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_mcp_transport_t t = {0};
+    HU_ASSERT_EQ(hu_mcp_transport_stdio_create_from_command(&alloc, "echo", NULL, 0, &t),
+                 HU_ERR_NOT_SUPPORTED);
+    HU_ASSERT_EQ(hu_mcp_transport_stdio_start(&alloc, &t), HU_ERR_NOT_SUPPORTED);
+#endif
+}
+
 static void http_recv_without_send(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_mcp_transport_t t = {0};
@@ -96,6 +126,8 @@ void run_mcp_transport_tests(void) {
     HU_RUN_TEST(stdio_roundtrip);
     HU_RUN_TEST(null_safety);
     HU_RUN_TEST(invalid_fd);
+    HU_RUN_TEST(stdio_create_from_command_null_args);
+    HU_RUN_TEST(stdio_create_from_command_and_start_in_test);
     HU_RUN_TEST(http_create_null_args);
     HU_RUN_TEST(http_create_and_destroy);
     HU_RUN_TEST(http_recv_without_send);
