@@ -740,6 +740,23 @@ static void extract_topics_from_text(const char *text, size_t text_len, hu_callb
         }
         if (p + 6 <= end && strncasecmp(p, "about ", 6) == 0) {
             const char *trigger = p + 6;
+            /* Skip determiners/stopwords: the, a, an, my, our, your, his, her, its */
+            for (;;) {
+                while (trigger < end && *trigger == ' ') trigger++;
+                static const char *stops[] = {"the ", "a ", "an ", "my ", "our ",
+                                              "your ", "his ", "her ", "its "};
+                bool skipped = false;
+                for (size_t si = 0; si < sizeof(stops) / sizeof(stops[0]); si++) {
+                    size_t sl = strlen(stops[si]);
+                    if ((size_t)(end - trigger) >= sl &&
+                        strncasecmp(trigger, stops[si], sl) == 0) {
+                        trigger += sl;
+                        skipped = true;
+                        break;
+                    }
+                }
+                if (!skipped) break;
+            }
             p = trigger;
             while (p < end && (isalnum((unsigned char)*p) || *p == '_' || *p == '-'))
                 p++;
@@ -754,6 +771,22 @@ static void extract_topics_from_text(const char *text, size_t text_len, hu_callb
         }
         if (p + 10 <= end && strncasecmp(p, "regarding ", 10) == 0) {
             const char *trigger = p + 10;
+            for (;;) {
+                while (trigger < end && *trigger == ' ') trigger++;
+                static const char *stops[] = {"the ", "a ", "an ", "my ", "our ",
+                                              "your ", "his ", "her ", "its "};
+                bool skipped = false;
+                for (size_t si = 0; si < sizeof(stops) / sizeof(stops[0]); si++) {
+                    size_t sl = strlen(stops[si]);
+                    if ((size_t)(end - trigger) >= sl &&
+                        strncasecmp(trigger, stops[si], sl) == 0) {
+                        trigger += sl;
+                        skipped = true;
+                        break;
+                    }
+                }
+                if (!skipped) break;
+            }
             p = trigger;
             while (p < end && (isalnum((unsigned char)*p) || *p == '_' || *p == '-'))
                 p++;
