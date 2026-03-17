@@ -39,6 +39,35 @@ typedef struct hu_gui_state {
     bool verified;
 } hu_gui_state_t;
 
+/* Multi-step workflow: observation → plan → act → verify cycle */
+#define HU_GUI_WORKFLOW_MAX_STEPS 16
+#define HU_GUI_WORKFLOW_MAX_RETRIES 3
+
+typedef enum {
+    HU_GUI_STEP_OBSERVE = 0,
+    HU_GUI_STEP_ACT,
+    HU_GUI_STEP_VERIFY
+} hu_gui_step_phase_t;
+
+typedef struct hu_gui_workflow_step {
+    hu_gui_action_t action;
+    hu_gui_state_t expected_state;
+    bool has_expected;
+    int retries;
+    bool completed;
+    bool verified;
+} hu_gui_workflow_step_t;
+
+typedef struct hu_gui_workflow {
+    hu_gui_workflow_step_t steps[HU_GUI_WORKFLOW_MAX_STEPS];
+    size_t step_count;
+    size_t current_step;
+    int max_retries;
+    bool completed;
+    bool failed;
+    char failure_reason[256];
+} hu_gui_workflow_t;
+
 hu_error_t hu_gui_capture_state(hu_allocator_t *alloc, hu_gui_state_t *state);
 hu_error_t hu_gui_execute_action(hu_allocator_t *alloc, const hu_gui_action_t *action,
                                 hu_gui_state_t *new_state);
@@ -46,6 +75,11 @@ hu_error_t hu_gui_verify_state(const hu_gui_state_t *expected, const hu_gui_stat
                               bool *matches);
 bool hu_gui_app_allowed(const char *app_name, size_t name_len);
 const char *hu_gui_action_type_name(hu_gui_action_type_t type);
+
+hu_error_t hu_gui_workflow_init(hu_gui_workflow_t *wf, int max_retries);
+hu_error_t hu_gui_workflow_add_step(hu_gui_workflow_t *wf, const hu_gui_action_t *action,
+                                    const hu_gui_state_t *expected_state);
+hu_error_t hu_gui_workflow_run(hu_allocator_t *alloc, hu_gui_workflow_t *wf);
 
 hu_error_t hu_gui_agent_create(hu_allocator_t *alloc, hu_tool_t *out);
 

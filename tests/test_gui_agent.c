@@ -90,6 +90,94 @@ static void gui_null_args_returns_error(void) {
     HU_ASSERT_NEQ(hu_gui_verify_state(&state, &state, NULL), HU_OK);
 }
 
+static void gui_workflow_multi_step(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gui_workflow_t wf;
+    HU_ASSERT_EQ(hu_gui_workflow_init(&wf, 2), HU_OK);
+
+    hu_gui_action_t click = {0};
+    click.type = HU_GUI_ACTION_CLICK;
+    click.x = 100;
+    click.y = 200;
+
+    hu_gui_state_t expected = {0};
+    memcpy(expected.app_name, "Calculator", 10);
+    expected.element_count = 3;
+
+    HU_ASSERT_EQ(hu_gui_workflow_add_step(&wf, &click, &expected), HU_OK);
+
+    hu_gui_action_t type_act = {0};
+    type_act.type = HU_GUI_ACTION_TYPE;
+    memcpy(type_act.text, "hello", 5);
+    type_act.text_len = 5;
+    HU_ASSERT_EQ(hu_gui_workflow_add_step(&wf, &type_act, NULL), HU_OK);
+
+    hu_gui_action_t key_act = {0};
+    key_act.type = HU_GUI_ACTION_KEY;
+    memcpy(key_act.key_combo, "enter", 5);
+    key_act.key_combo_len = 5;
+    HU_ASSERT_EQ(hu_gui_workflow_add_step(&wf, &key_act, NULL), HU_OK);
+
+    HU_ASSERT_EQ(wf.step_count, 3u);
+    HU_ASSERT_EQ(hu_gui_workflow_run(&alloc, &wf), HU_OK);
+    HU_ASSERT(wf.completed);
+    HU_ASSERT(!wf.failed);
+    HU_ASSERT(wf.steps[0].verified);
+    HU_ASSERT(wf.steps[1].completed);
+    HU_ASSERT(wf.steps[2].completed);
+}
+
+static void gui_workflow_verify_mismatch_retries(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gui_workflow_t wf;
+    HU_ASSERT_EQ(hu_gui_workflow_init(&wf, 2), HU_OK);
+
+    hu_gui_action_t click = {0};
+    click.type = HU_GUI_ACTION_CLICK;
+    click.x = 100;
+    click.y = 200;
+
+    /* Expected state that won't match (different app name) */
+    hu_gui_state_t expected = {0};
+    memcpy(expected.app_name, "Safari", 6);
+    expected.element_count = 3;
+
+    HU_ASSERT_EQ(hu_gui_workflow_add_step(&wf, &click, &expected), HU_OK);
+    hu_error_t err = hu_gui_workflow_run(&alloc, &wf);
+    HU_ASSERT_EQ(err, HU_ERR_TOOL_VALIDATION);
+    HU_ASSERT(wf.failed);
+    HU_ASSERT(wf.steps[0].retries >= 2);
+    HU_ASSERT(wf.failure_reason[0] != '\0');
+}
+
+static void gui_workflow_empty_completes(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gui_workflow_t wf;
+    HU_ASSERT_EQ(hu_gui_workflow_init(&wf, 1), HU_OK);
+    HU_ASSERT_EQ(hu_gui_workflow_run(&alloc, &wf), HU_OK);
+    HU_ASSERT(wf.completed);
+}
+
+static void gui_workflow_null_args(void) {
+    hu_gui_workflow_t wf;
+    hu_gui_action_t action = {0};
+    HU_ASSERT_EQ(hu_gui_workflow_init(NULL, 1), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_gui_workflow_add_step(NULL, &action, NULL), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_gui_workflow_add_step(&wf, NULL, NULL), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_gui_workflow_run(NULL, &wf), HU_ERR_INVALID_ARGUMENT);
+}
+
+static void gui_workflow_max_steps_enforced(void) {
+    hu_gui_workflow_t wf;
+    HU_ASSERT_EQ(hu_gui_workflow_init(&wf, 1), HU_OK);
+    hu_gui_action_t action = {0};
+    action.type = HU_GUI_ACTION_CLICK;
+    for (int i = 0; i < HU_GUI_WORKFLOW_MAX_STEPS; i++) {
+        HU_ASSERT_EQ(hu_gui_workflow_add_step(&wf, &action, NULL), HU_OK);
+    }
+    HU_ASSERT_EQ(hu_gui_workflow_add_step(&wf, &action, NULL), HU_ERR_INVALID_ARGUMENT);
+}
+
 void run_gui_agent_tests(void) {
     HU_TEST_SUITE("GUI Agent");
     HU_RUN_TEST(gui_capture_state_mock);
@@ -100,4 +188,9 @@ void run_gui_agent_tests(void) {
     HU_RUN_TEST(gui_app_blocked_terminal);
     HU_RUN_TEST(gui_action_type_name);
     HU_RUN_TEST(gui_null_args_returns_error);
+    HU_RUN_TEST(gui_workflow_multi_step);
+    HU_RUN_TEST(gui_workflow_verify_mismatch_retries);
+    HU_RUN_TEST(gui_workflow_empty_completes);
+    HU_RUN_TEST(gui_workflow_null_args);
+    HU_RUN_TEST(gui_workflow_max_steps_enforced);
 }

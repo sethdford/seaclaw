@@ -4,6 +4,7 @@
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/tool.h"
+#include <stdio.h>
 #include <string.h>
 
 #if defined(__APPLE__) && !defined(HU_IS_TEST)
@@ -338,6 +339,113 @@ const char *hu_gui_action_type_name(hu_gui_action_type_t type) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+ * Multi-step workflow: observe → act → verify, with retry on failure
+ * ───────────────────────────────────────────────────────────────────────── */
+
+hu_error_t hu_gui_workflow_init(hu_gui_workflow_t *wf, int max_retries) {
+    if (!wf)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(wf, 0, sizeof(*wf));
+    wf->max_retries = (max_retries > 0 && max_retries <= HU_GUI_WORKFLOW_MAX_RETRIES)
+                          ? max_retries
+                          : HU_GUI_WORKFLOW_MAX_RETRIES;
+    return HU_OK;
+}
+
+hu_error_t hu_gui_workflow_add_step(hu_gui_workflow_t *wf, const hu_gui_action_t *action,
+                                    const hu_gui_state_t *expected_state) {
+    if (!wf || !action)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (wf->step_count >= HU_GUI_WORKFLOW_MAX_STEPS)
+        return HU_ERR_INVALID_ARGUMENT;
+    hu_gui_workflow_step_t *step = &wf->steps[wf->step_count];
+    memset(step, 0, sizeof(*step));
+    step->action = *action;
+    if (expected_state) {
+        step->expected_state = *expected_state;
+        step->has_expected = true;
+    }
+    wf->step_count++;
+    return HU_OK;
+}
+
+hu_error_t hu_gui_workflow_run(hu_allocator_t *alloc, hu_gui_workflow_t *wf) {
+    if (!alloc || !wf)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (wf->step_count == 0) {
+        wf->completed = true;
+        return HU_OK;
+    }
+
+    for (wf->current_step = 0; wf->current_step < wf->step_count; wf->current_step++) {
+        hu_gui_workflow_step_t *step = &wf->steps[wf->current_step];
+        bool step_ok = false;
+
+        for (int attempt = 0; attempt <= wf->max_retries && !step_ok; attempt++) {
+            step->retries = attempt;
+
+            /* Observe: capture current state */
+            hu_gui_state_t before;
+            hu_error_t err = hu_gui_capture_state(alloc, &before);
+            if (err != HU_OK) {
+                snprintf(wf->failure_reason, sizeof(wf->failure_reason),
+                         "capture failed at step %zu", wf->current_step);
+                wf->failed = true;
+                return err;
+            }
+
+            /* Check app whitelist */
+            if (before.app_name[0] &&
+                !hu_gui_app_allowed(before.app_name, strlen(before.app_name))) {
+                snprintf(wf->failure_reason, sizeof(wf->failure_reason),
+                         "app '%s' not in whitelist", before.app_name);
+                wf->failed = true;
+                return HU_ERR_PERMISSION_DENIED;
+            }
+
+            /* Act: execute the action */
+            hu_gui_state_t after;
+            err = hu_gui_execute_action(alloc, &step->action, &after);
+            if (err != HU_OK) {
+                if (attempt >= wf->max_retries) {
+                    snprintf(wf->failure_reason, sizeof(wf->failure_reason),
+                             "action failed at step %zu after %d retries",
+                             wf->current_step, attempt);
+                    wf->failed = true;
+                    return err;
+                }
+                continue;
+            }
+
+            /* Verify: check state if expected is provided */
+            if (step->has_expected) {
+                bool matches = false;
+                (void)hu_gui_verify_state(&step->expected_state, &after, &matches);
+                if (!matches) {
+                    if (attempt >= wf->max_retries) {
+                        snprintf(wf->failure_reason, sizeof(wf->failure_reason),
+                                 "verification failed at step %zu after %d retries",
+                                 wf->current_step, attempt);
+                        wf->failed = true;
+                        return HU_ERR_TOOL_VALIDATION;
+                    }
+                    continue;
+                }
+                step->verified = true;
+            } else {
+                step->verified = true;
+            }
+
+            step->completed = true;
+            step_ok = true;
+        }
+    }
+
+    wf->completed = true;
+    return HU_OK;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
  * Tool vtable
  * ───────────────────────────────────────────────────────────────────────── */
 
@@ -406,6 +514,37 @@ static hu_error_t gui_agent_execute(void *ctx, hu_allocator_t *alloc, const hu_j
             return HU_ERR_OUT_OF_MEMORY;
         }
         *out = hu_tool_result_ok_owned(json, 16);
+        return HU_OK;
+    }
+
+    if (strcmp(action, "verify") == 0) {
+        hu_gui_state_t current;
+        hu_error_t err = hu_gui_capture_state(alloc, &current);
+        if (err != HU_OK) {
+            *out = hu_tool_result_fail("capture for verify failed", 25);
+            return HU_OK;
+        }
+        hu_gui_state_t expected;
+        memset(&expected, 0, sizeof(expected));
+        const char *app_name = hu_json_get_string(args, "app_name");
+        if (app_name) {
+            size_t len = strlen(app_name);
+            if (len >= sizeof(expected.app_name))
+                len = sizeof(expected.app_name) - 1;
+            memcpy(expected.app_name, app_name, len);
+        }
+        expected.element_count = (size_t)hu_json_get_number(args, "element_count",
+                                                            (double)current.element_count);
+        bool matches = false;
+        (void)hu_gui_verify_state(&expected, &current, &matches);
+        const char *resp = matches ? "{\"verified\":true}" : "{\"verified\":false}";
+        size_t resp_len = matches ? 17 : 18;
+        char *json = hu_strndup(alloc, resp, resp_len);
+        if (!json) {
+            *out = hu_tool_result_fail("out of memory", 13);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        *out = hu_tool_result_ok_owned(json, resp_len);
         return HU_OK;
     }
 
