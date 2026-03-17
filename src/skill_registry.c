@@ -6,6 +6,7 @@
 #include "human/core/http.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -78,29 +79,31 @@ void hu_skill_registry_entries_free(hu_allocator_t *alloc, hu_skill_registry_ent
     alloc->free(alloc->ctx, entries, count * sizeof(hu_skill_registry_entry_t));
 }
 
-/* install/uninstall/update/publish: reserved for future remote registry support.
-   Currently no-ops — skills are loaded from disk via hu_skill_registry_search(). */
+/* install/uninstall/update/publish: local filesystem only.
+   Under HU_IS_TEST, validate input then return HU_OK with no side effects. */
 
-hu_error_t hu_skill_registry_install(hu_allocator_t *alloc, const char *name) {
-    (void)alloc;
-    (void)name;
-    return HU_ERR_NOT_SUPPORTED;
+hu_error_t hu_skill_registry_install(hu_allocator_t *alloc, const char *source_path) {
+    if (!alloc || !source_path || !source_path[0])
+        return HU_ERR_INVALID_ARGUMENT;
+    return HU_OK;
 }
 
 hu_error_t hu_skill_registry_uninstall(const char *name) {
-    (void)name;
-    return HU_ERR_NOT_SUPPORTED;
+    if (!name || !name[0])
+        return HU_ERR_INVALID_ARGUMENT;
+    return HU_OK;
 }
 
-hu_error_t hu_skill_registry_update(hu_allocator_t *alloc) {
-    (void)alloc;
-    return HU_ERR_NOT_SUPPORTED;
+hu_error_t hu_skill_registry_update(hu_allocator_t *alloc, const char *source_path) {
+    if (!alloc || !source_path || !source_path[0])
+        return HU_ERR_INVALID_ARGUMENT;
+    return HU_OK;
 }
 
 hu_error_t hu_skill_registry_publish(hu_allocator_t *alloc, const char *skill_dir) {
     if (!alloc || !skill_dir)
         return HU_ERR_INVALID_ARGUMENT;
-    return HU_ERR_NOT_SUPPORTED;
+    return HU_OK;
 }
 
 size_t hu_skill_registry_get_installed_dir(char *out, size_t out_len) {
@@ -265,249 +268,334 @@ void hu_skill_registry_entries_free(hu_allocator_t *alloc, hu_skill_registry_ent
     alloc->free(alloc->ctx, entries, count * sizeof(hu_skill_registry_entry_t));
 }
 
-/* Convert GitHub tree URL to raw URL base. */
-static void url_tree_to_raw(const char *tree_url, char *raw_base, size_t raw_len) {
-    const char *p = strstr(tree_url, "github.com/");
-    if (!p || raw_len < 32) {
-        if (raw_len > 0)
-            raw_base[0] = '\0';
-        return;
+#if defined(HU_GATEWAY_POSIX) && (!defined(HU_IS_TEST) || !HU_IS_TEST)
+
+/* Copy src_file to dst_file. Returns HU_OK on success. */
+static hu_error_t copy_file(const char *src_file, const char *dst_file) {
+    FILE *src = fopen(src_file, "rb");
+    if (!src)
+        return HU_ERR_IO;
+    FILE *dst = fopen(dst_file, "wb");
+    if (!dst) {
+        fclose(src);
+        return HU_ERR_IO;
     }
-    p += 11;
-    const char *tree = strstr(p, "/tree/");
-    if (!tree) {
-        if (raw_len > 0)
-            raw_base[0] = '\0';
-        return;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), src)) > 0) {
+        if (fwrite(buf, 1, n, dst) != n) {
+            fclose(src);
+            fclose(dst);
+            unlink(dst_file);
+            return HU_ERR_IO;
+        }
     }
-    size_t org_repo = (size_t)(tree - p);
-    const char *branch_start = tree + 6;
-    const char *slash = strchr(branch_start, '/');
-    size_t branch_len = slash ? (size_t)(slash - branch_start) : strlen(branch_start);
-    const char *path = slash ? slash + 1 : "";
-    int n = snprintf(raw_base, raw_len, "https://raw.githubusercontent.com/%.*s/%.*s/%s",
-                     (int)org_repo, p, (int)branch_len, branch_start, path);
-    if (n < 0 || (size_t)n >= raw_len)
-        raw_base[0] = '\0';
+    fclose(src);
+    fclose(dst);
+    return HU_OK;
 }
 
-hu_error_t hu_skill_registry_install(hu_allocator_t *alloc, const char *name) {
-    if (!alloc || !name || !name[0])
+/* Find manifest path in dir: .skill.json, manifest.json, or first *.skill.json. */
+static bool find_manifest_in_dir(const char *dir, char *out_path, size_t out_len) {
+    char path[512];
+    int n = snprintf(path, sizeof(path), "%s/.skill.json", dir);
+    if (n > 0 && (size_t)n < sizeof(path)) {
+        struct stat st;
+        if (stat(path, &st) == 0 && S_ISREG(st.st_mode)) {
+            snprintf(out_path, out_len, "%s", path);
+            return true;
+        }
+    }
+    n = snprintf(path, sizeof(path), "%s/manifest.json", dir);
+    if (n > 0 && (size_t)n < sizeof(path)) {
+        struct stat st;
+        if (stat(path, &st) == 0 && S_ISREG(st.st_mode)) {
+            snprintf(out_path, out_len, "%s", path);
+            return true;
+        }
+    }
+#ifndef _WIN32
+    {
+        DIR *d = opendir(dir);
+        if (!d)
+            return false;
+        struct dirent *e;
+        while ((e = readdir(d)) != NULL) {
+            size_t len = strlen(e->d_name);
+            if (len < 12 || strcmp(e->d_name + len - 11, ".skill.json") != 0)
+                continue;
+            n = snprintf(path, sizeof(path), "%s/%s", dir, e->d_name);
+            closedir(d);
+            if (n > 0 && (size_t)n < sizeof(path)) {
+                struct stat st;
+                if (stat(path, &st) == 0 && S_ISREG(st.st_mode)) {
+                    snprintf(out_path, out_len, "%s", path);
+                    return true;
+                }
+            }
+            return false;
+        }
+        closedir(d);
+    }
+#endif
+    return false;
+}
+
+/* Recursively remove directory contents and the directory. */
+static hu_error_t remove_dir_recursive(const char *path) {
+#ifndef _WIN32
+    DIR *d = opendir(path);
+    if (!d)
+        return (errno == ENOENT) ? HU_OK : HU_ERR_IO;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        if (e->d_name[0] == '.' && (e->d_name[1] == '\0' ||
+                                    (e->d_name[1] == '.' && e->d_name[2] == '\0')))
+            continue;
+        char sub[512];
+        int n = snprintf(sub, sizeof(sub), "%s/%s", path, e->d_name);
+        if (n <= 0 || (size_t)n >= sizeof(sub)) {
+            closedir(d);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        struct stat st;
+        if (stat(sub, &st) != 0)
+            continue;
+        if (S_ISDIR(st.st_mode)) {
+            hu_error_t err = remove_dir_recursive(sub);
+            if (err != HU_OK) {
+                closedir(d);
+                return err;
+            }
+        } else if (unlink(sub) != 0) {
+            closedir(d);
+            return HU_ERR_IO;
+        }
+    }
+    closedir(d);
+    if (rmdir(path) != 0)
+        return HU_ERR_IO;
+#endif
+    return HU_OK;
+}
+
+#endif /* HU_GATEWAY_POSIX && !HU_IS_TEST */
+
+hu_error_t hu_skill_registry_install(hu_allocator_t *alloc, const char *source_path) {
+    if (!alloc || !source_path || !source_path[0])
         return HU_ERR_INVALID_ARGUMENT;
 
-    hu_skill_registry_entry_t *entries = NULL;
-    size_t count = 0;
-    hu_error_t err = hu_skill_registry_search(alloc, NULL, &entries, &count);
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
+#ifdef HU_GATEWAY_POSIX
+    char manifest_path[512];
+    if (!find_manifest_in_dir(source_path, manifest_path, sizeof(manifest_path)))
+        return HU_ERR_NOT_FOUND;
+
+    char buf[8192];
+    FILE *f = fopen(manifest_path, "rb");
+    if (!f)
+        return HU_ERR_IO;
+    size_t nr = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    if (nr == 0 || nr >= sizeof(buf) - 1)
+        return HU_ERR_IO;
+    buf[nr] = '\0';
+
+    hu_json_value_t *parsed = NULL;
+    hu_error_t err = hu_json_parse(alloc, buf, nr, &parsed);
+    if (err != HU_OK || !parsed || parsed->type != HU_JSON_OBJECT) {
+        if (parsed)
+            hu_json_free(alloc, parsed);
+        return err != HU_OK ? err : HU_ERR_PARSE;
+    }
+    const char *name = hu_json_get_string(parsed, "name");
+    if (!name || !name[0]) {
+        hu_json_free(alloc, parsed);
+        return HU_ERR_PARSE;
+    }
+    hu_json_free(alloc, parsed);
+
+    const char *home = getenv("HOME");
+    if (!home || !home[0])
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char base_dir[512];
+    int n = snprintf(base_dir, sizeof(base_dir), "%s/.human/skills", home);
+    if (n <= 0 || (size_t)n >= sizeof(base_dir))
+        return HU_ERR_INVALID_ARGUMENT;
+    if (mkdir(base_dir, 0755) != 0 && errno != EEXIST)
+        return HU_ERR_IO;
+
+    char dest_dir[512];
+    n = snprintf(dest_dir, sizeof(dest_dir), "%s/.human/skills/%.256s", home, name);
+    if (n <= 0 || (size_t)n >= sizeof(dest_dir))
+        return HU_ERR_INVALID_ARGUMENT;
+    if (mkdir(dest_dir, 0755) != 0 && errno != EEXIST)
+        return HU_ERR_IO;
+
+    /* Copy manifest as manifest.json (skillforge discovers subdir/manifest.json) */
+    char dest_manifest[512];
+    n = snprintf(dest_manifest, sizeof(dest_manifest), "%s/manifest.json", dest_dir);
+    if (n <= 0 || (size_t)n >= sizeof(dest_manifest))
+        return HU_ERR_INVALID_ARGUMENT;
+    err = copy_file(manifest_path, dest_manifest);
     if (err != HU_OK)
         return err;
 
-    const char *url = NULL;
-    for (size_t i = 0; i < count; i++) {
-        if (entries[i].name && strcmp(entries[i].name, name) == 0) {
-            url = entries[i].url;
-            break;
+    /* Copy SKILL.md if present */
+    char src_md[512];
+    n = snprintf(src_md, sizeof(src_md), "%s/SKILL.md", source_path);
+    if (n > 0 && (size_t)n < sizeof(src_md)) {
+        struct stat st;
+        if (stat(src_md, &st) == 0 && S_ISREG(st.st_mode)) {
+            char dst_md[512];
+            n = snprintf(dst_md, sizeof(dst_md), "%s/SKILL.md", dest_dir);
+            if (n > 0 && (size_t)n < sizeof(dst_md))
+                copy_file(src_md, dst_md);
         }
     }
 
-    if (!url || !url[0]) {
-        hu_skill_registry_entries_free(alloc, entries, count);
-        return HU_ERR_NOT_FOUND;
-    }
-
-    char raw_base[512];
-    url_tree_to_raw(url, raw_base, sizeof(raw_base));
-    if (!raw_base[0]) {
-        hu_skill_registry_entries_free(alloc, entries, count);
-        return HU_ERR_INVALID_ARGUMENT;
-    }
-
-    /* Ensure path ends with / */
-    size_t lb = strlen(raw_base);
-    if (lb > 0 && raw_base[lb - 1] != '/') {
-        if (lb + 1 < sizeof(raw_base)) {
-            raw_base[lb] = '/';
-            raw_base[lb + 1] = '\0';
-        }
-    }
-
-    const char *home = getenv("HOME");
-    if (!home || !home[0]) {
-        hu_skill_registry_entries_free(alloc, entries, count);
-        return HU_ERR_INVALID_ARGUMENT;
-    }
-
-    char skill_path[512];
-    int n =
-        snprintf(skill_path, sizeof(skill_path), "%s/.human/skills/%s.skill.json", home, name);
-    if (n <= 0 || (size_t)n >= sizeof(skill_path)) {
-        hu_skill_registry_entries_free(alloc, entries, count);
-        return HU_ERR_INVALID_ARGUMENT;
-    }
-
-    char skill_json_url[640];
-    n = snprintf(skill_json_url, sizeof(skill_json_url), "%s%s.skill.json", raw_base, name);
-    if (n <= 0 || (size_t)n >= sizeof(skill_json_url)) {
-        hu_skill_registry_entries_free(alloc, entries, count);
-        return HU_ERR_INVALID_ARGUMENT;
-    }
-
+    /* Copy any other non-hidden files (e.g. supporting assets) */
 #ifndef _WIN32
-    char dir_path[512];
-    n = snprintf(dir_path, sizeof(dir_path), "%s/.human/skills", home);
-    if (n > 0 && (size_t)n < sizeof(dir_path))
-        mkdir(dir_path, 0755);
-#endif
-
-    hu_http_response_t resp = {0};
-    err = hu_http_get(alloc, skill_json_url, NULL, &resp);
-    if (err != HU_OK || !resp.body) {
-        hu_http_response_free(alloc, &resp);
-        hu_skill_registry_entries_free(alloc, entries, count);
-        return err != HU_OK ? err : HU_ERR_PROVIDER_RESPONSE;
-    }
-
-    FILE *f = fopen(skill_path, "wb");
-    if (!f) {
-        hu_http_response_free(alloc, &resp);
-        hu_skill_registry_entries_free(alloc, entries, count);
-        return HU_ERR_IO;
-    }
-    size_t written = fwrite(resp.body, 1, resp.body_len, f);
-    fclose(f);
-    hu_http_response_free(alloc, &resp);
-    if (written != resp.body_len) {
-        remove(skill_path);
-        hu_skill_registry_entries_free(alloc, entries, count);
-        return HU_ERR_IO;
-    }
-
-    /* Optionally fetch SKILL.md */
-    char skill_md_url[640];
-    n = snprintf(skill_md_url, sizeof(skill_md_url), "%sSKILL.md", raw_base);
-    if (n > 0 && (size_t)n < sizeof(skill_md_url)) {
-        hu_http_response_t md_resp = {0};
-        if (hu_http_get(alloc, skill_md_url, NULL, &md_resp) == HU_OK && md_resp.body &&
-            md_resp.body_len > 0) {
-            char md_path[512];
-            n = snprintf(md_path, sizeof(md_path), "%s/.human/skills/%s/SKILL.md", home, name);
-            if (n > 0 && (size_t)n < sizeof(md_path)) {
-#ifndef _WIN32
-                char skill_dir[512];
-                n = snprintf(skill_dir, sizeof(skill_dir), "%s/.human/skills/%s", home, name);
-                if (n > 0 && (size_t)n < sizeof(skill_dir))
-                    mkdir(skill_dir, 0755);
-#endif
-                FILE *mf = fopen(md_path, "wb");
-                if (mf) {
-                    fwrite(md_resp.body, 1, md_resp.body_len, mf);
-                    fclose(mf);
-                }
+    {
+        DIR *d = opendir(source_path);
+        if (d) {
+            struct dirent *e;
+            while ((e = readdir(d)) != NULL) {
+                if (e->d_name[0] == '.')
+                    continue;
+                if (strcmp(e->d_name, "SKILL.md") == 0)
+                    continue;
+                size_t len = strlen(e->d_name);
+                if (len >= 12 && strcmp(e->d_name + len - 11, ".skill.json") == 0)
+                    continue;
+                if (strcmp(e->d_name, "manifest.json") == 0)
+                    continue;
+                char src_file[512];
+                n = snprintf(src_file, sizeof(src_file), "%s/%s", source_path, e->d_name);
+                if (n <= 0 || (size_t)n >= sizeof(src_file))
+                    continue;
+                struct stat st;
+                if (stat(src_file, &st) != 0 || !S_ISREG(st.st_mode))
+                    continue;
+                char dst_file[512];
+                n = snprintf(dst_file, sizeof(dst_file), "%s/%s", dest_dir, e->d_name);
+                if (n > 0 && (size_t)n < sizeof(dst_file))
+                    copy_file(src_file, dst_file);
             }
-            hu_http_response_free(alloc, &md_resp);
+            closedir(d);
         }
     }
-
-    hu_skill_registry_entries_free(alloc, entries, count);
+#endif
     return HU_OK;
+#else
+    (void)alloc;
+    (void)source_path;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+#else
+    (void)alloc;
+    (void)source_path;
+    return HU_OK;
+#endif
 }
 
 hu_error_t hu_skill_registry_uninstall(const char *name) {
     if (!name || !name[0])
         return HU_ERR_INVALID_ARGUMENT;
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
+#ifdef HU_GATEWAY_POSIX
     const char *home = getenv("HOME");
     if (!home || !home[0])
         return HU_ERR_INVALID_ARGUMENT;
 
-    char path[512];
-    int n = snprintf(path, sizeof(path), "%s/.human/skills/%.256s.skill.json", home, name);
-    if (n <= 0 || (size_t)n >= sizeof(path))
+    char dir_path[512];
+    int n = snprintf(dir_path, sizeof(dir_path), "%s/.human/skills/%.256s", home, name);
+    if (n <= 0 || (size_t)n >= sizeof(dir_path))
         return HU_ERR_INVALID_ARGUMENT;
 
-    if (remove(path) != 0)
-        return HU_ERR_NOT_FOUND;
+    hu_error_t err = remove_dir_recursive(dir_path);
+    if (err != HU_OK)
+        return err;
+
+    /* Also remove flat .skill.json for backward compatibility */
+    char flat_path[512];
+    n = snprintf(flat_path, sizeof(flat_path), "%s/.human/skills/%.256s.skill.json", home, name);
+    if (n > 0 && (size_t)n < sizeof(flat_path))
+        unlink(flat_path);
 
     return HU_OK;
+#else
+    (void)name;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+#else
+    (void)name;
+    return HU_OK;
+#endif
 }
 
-hu_error_t hu_skill_registry_update(hu_allocator_t *alloc) {
-    if (!alloc)
+hu_error_t hu_skill_registry_update(hu_allocator_t *alloc, const char *source_path) {
+    if (!alloc || !source_path || !source_path[0])
         return HU_ERR_INVALID_ARGUMENT;
 
-    char dir_path[512];
-    size_t dlen = hu_skill_registry_get_installed_dir(dir_path, sizeof(dir_path));
-    if (dlen == 0)
-        return HU_OK;
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
+    char manifest_path[512];
+#ifdef HU_GATEWAY_POSIX
+    if (!find_manifest_in_dir(source_path, manifest_path, sizeof(manifest_path)))
+        return HU_ERR_NOT_FOUND;
 
-#if !defined(_WIN32)
-    {
-        DIR *d = opendir(dir_path);
-        if (!d)
-            return HU_OK;
-        struct dirent *e;
-        while ((e = readdir(d)) != NULL) {
-            if (e->d_name[0] == '.')
-                continue;
-            size_t nlen = strlen(e->d_name);
-            if (nlen < 12 || strcmp(e->d_name + nlen - 11, ".skill.json") != 0)
-                continue;
-            char skill_name[260];
-            if (nlen <= 11)
-                continue;
-            size_t name_len = nlen - 11;
-            if (name_len >= sizeof(skill_name))
-                continue;
-            memcpy(skill_name, e->d_name, name_len);
-            skill_name[name_len] = '\0';
+    char buf[8192];
+    FILE *f = fopen(manifest_path, "rb");
+    if (!f)
+        return HU_ERR_IO;
+    size_t nr = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    if (nr == 0 || nr >= sizeof(buf) - 1)
+        return HU_ERR_IO;
+    buf[nr] = '\0';
 
-            hu_skill_registry_install(alloc, skill_name);
-        }
-        closedir(d);
+    hu_json_value_t *parsed = NULL;
+    hu_error_t err = hu_json_parse(alloc, buf, nr, &parsed);
+    if (err != HU_OK || !parsed || parsed->type != HU_JSON_OBJECT) {
+        if (parsed)
+            hu_json_free(alloc, parsed);
+        return err != HU_OK ? err : HU_ERR_PARSE;
     }
+    const char *name = hu_json_get_string(parsed, "name");
+    if (!name || !name[0]) {
+        hu_json_free(alloc, parsed);
+        return HU_ERR_PARSE;
+    }
+    hu_json_free(alloc, parsed);
+
+    hu_skill_registry_uninstall(name);
+    return hu_skill_registry_install(alloc, source_path);
+#else
+    (void)alloc;
+    (void)source_path;
+    return HU_ERR_NOT_SUPPORTED;
 #endif
+#else
+    (void)alloc;
+    (void)source_path;
     return HU_OK;
+#endif
 }
 
 hu_error_t hu_skill_registry_publish(hu_allocator_t *alloc, const char *skill_dir) {
     if (!alloc || !skill_dir)
         return HU_ERR_INVALID_ARGUMENT;
 
-    char json_path[512];
-    char md_path[512];
-    int n = snprintf(json_path, sizeof(json_path), "%s/.skill.json", skill_dir);
-    if (n < 0 || (size_t)n >= sizeof(json_path))
-        return HU_ERR_INVALID_ARGUMENT;
-    n = snprintf(md_path, sizeof(md_path), "%s/SKILL.md", skill_dir);
-    if (n < 0 || (size_t)n >= sizeof(md_path))
-        return HU_ERR_INVALID_ARGUMENT;
-
-    bool has_json = false;
-    bool has_md = false;
-    {
-        FILE *fp = fopen(json_path, "rb");
-        if (fp) {
-            has_json = true;
-            fclose(fp);
-        }
-    }
-    {
-        FILE *fp = fopen(md_path, "rb");
-        if (fp) {
-            has_md = true;
-            fclose(fp);
-        }
-    }
-    if (!has_json && !has_md)
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
+#ifdef HU_GATEWAY_POSIX
+    char manifest_path[512];
+    if (!find_manifest_in_dir(skill_dir, manifest_path, sizeof(manifest_path)))
         return HU_ERR_NOT_FOUND;
 
-    if (!has_json) {
-        printf("To publish, submit a PR to https://github.com/human/skill-registry with your "
-               "skill manifest.\n");
-        return HU_OK;
-    }
-
-    char buf[4096];
-    FILE *f = fopen(json_path, "rb");
+    char buf[8192];
+    FILE *f = fopen(manifest_path, "rb");
     if (!f)
         return HU_ERR_IO;
     size_t read_len = fread(buf, 1, sizeof(buf) - 1, f);
@@ -532,9 +620,30 @@ hu_error_t hu_skill_registry_publish(hu_allocator_t *alloc, const char *skill_di
     }
     hu_json_free(alloc, parsed);
 
-    printf("To publish, submit a PR to https://github.com/human/skill-registry with your skill "
-           "manifest.\n");
+    /* Write manifest to .published marker (local-only publish) */
+    char published_path[512];
+    int n = snprintf(published_path, sizeof(published_path), "%s/.published", skill_dir);
+    if (n <= 0 || (size_t)n >= sizeof(published_path))
+        return HU_ERR_INVALID_ARGUMENT;
+    FILE *pf = fopen(published_path, "wb");
+    if (!pf)
+        return HU_ERR_IO;
+    size_t written = fwrite(buf, 1, read_len, pf);
+    fclose(pf);
+    if (written != read_len)
+        return HU_ERR_IO;
+
     return HU_OK;
+#else
+    (void)alloc;
+    (void)skill_dir;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+#else
+    (void)alloc;
+    (void)skill_dir;
+    return HU_OK;
+#endif
 }
 
 size_t hu_skill_registry_get_installed_dir(char *out, size_t out_len) {

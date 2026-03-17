@@ -97,13 +97,13 @@ static void test_skill_registry_search_mock(void) {
 
 static void test_skill_registry_install_mock(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_error_t err = hu_skill_registry_install(&alloc, "code-review");
-    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+    hu_error_t err = hu_skill_registry_install(&alloc, "/tmp/skill-dir");
+    HU_ASSERT_EQ(err, HU_OK);
 }
 
 static void test_skill_registry_uninstall_mock(void) {
     hu_error_t err = hu_skill_registry_uninstall("nonexistent");
-    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+    HU_ASSERT_EQ(err, HU_OK);
 }
 
 static void test_skill_registry_get_installed_dir(void) {
@@ -117,7 +117,7 @@ static void test_skill_registry_get_installed_dir(void) {
 static void test_skill_registry_publish_mock(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_error_t err = hu_skill_registry_publish(&alloc, "/tmp/skill");
-    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+    HU_ASSERT_EQ(err, HU_OK);
 }
 
 static void test_skill_registry_publish_null_dir(void) {
@@ -148,26 +148,32 @@ static void test_skill_registry_search_null_query(void) {
     hu_skill_registry_entries_free(&alloc, entries, count);
 }
 
-static void test_skill_registry_install_null_name(void) {
+static void test_skill_registry_install_null_path(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_error_t err = hu_skill_registry_install(&alloc, NULL);
-    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+    HU_ASSERT(err != HU_OK);
 }
 
-static void test_skill_registry_install_empty_name(void) {
+static void test_skill_registry_install_empty_path(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_error_t err = hu_skill_registry_install(&alloc, "");
-    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+    HU_ASSERT(err != HU_OK);
 }
 
 static void test_skill_registry_uninstall_null_name(void) {
     hu_error_t err = hu_skill_registry_uninstall(NULL);
-    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+    HU_ASSERT(err != HU_OK);
 }
 
 static void test_skill_registry_update_null_alloc(void) {
-    hu_error_t err = hu_skill_registry_update(NULL);
-    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+    hu_error_t err = hu_skill_registry_update(NULL, "/tmp/skill");
+    HU_ASSERT(err != HU_OK);
+}
+
+static void test_skill_registry_update_null_path(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_error_t err = hu_skill_registry_update(&alloc, NULL);
+    HU_ASSERT(err != HU_OK);
 }
 
 static void test_skill_registry_get_installed_dir_writes_path(void) {
@@ -222,10 +228,11 @@ void run_skills_tests(void) {
     HU_RUN_TEST(test_skill_registry_publish_null_dir);
     HU_RUN_TEST(test_skill_registry_search_empty_query);
     HU_RUN_TEST(test_skill_registry_search_null_query);
-    HU_RUN_TEST(test_skill_registry_install_null_name);
-    HU_RUN_TEST(test_skill_registry_install_empty_name);
+    HU_RUN_TEST(test_skill_registry_install_null_path);
+    HU_RUN_TEST(test_skill_registry_install_empty_path);
     HU_RUN_TEST(test_skill_registry_uninstall_null_name);
     HU_RUN_TEST(test_skill_registry_update_null_alloc);
+    HU_RUN_TEST(test_skill_registry_update_null_path);
     HU_RUN_TEST(test_skill_registry_get_installed_dir_writes_path);
     HU_RUN_TEST(test_skill_registry_get_installed_dir_small_buffer);
     HU_RUN_TEST(test_skill_registry_search_mock_returns_entries);

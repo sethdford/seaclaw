@@ -1715,9 +1715,17 @@ hu_error_t cp_admin_skills_update(hu_allocator_t *alloc, hu_app_context_t *app, 
     (void)app;
     (void)conn;
     (void)proto;
-    (void)root;
-    hu_error_t e = hu_skill_registry_update(alloc);
-    bool success = (e == HU_OK);
+    bool success = false;
+    const char *path = NULL;
+    if (root) {
+        hu_json_value_t *params = hu_json_object_get(root, "params");
+        if (params)
+            path = hu_json_get_string(params, "path");
+    }
+    if (path && path[0]) {
+        hu_error_t e = hu_skill_registry_update(alloc, path);
+        success = (e == HU_OK);
+    }
 
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)

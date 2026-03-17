@@ -32,22 +32,25 @@ void hu_skill_registry_entries_free(hu_allocator_t *alloc, hu_skill_registry_ent
                                     size_t count);
 
 /**
- * Install a skill from the registry by name.
- * Under HU_IS_TEST, returns HU_OK without network or filesystem.
+ * Install a skill from a local source path. Copies manifest and associated
+ * files to ~/.human/skills/<skill_name>/. Source must contain .skill.json,
+ * manifest.json, or <name>.skill.json.
+ * Under HU_IS_TEST, returns HU_OK without filesystem.
  */
-hu_error_t hu_skill_registry_install(hu_allocator_t *alloc, const char *name);
+hu_error_t hu_skill_registry_install(hu_allocator_t *alloc, const char *source_path);
 
 /**
  * Uninstall (remove) an installed skill from disk.
+ * Removes ~/.human/skills/<name>/ and ~/.human/skills/<name>.skill.json.
  * Under HU_IS_TEST, returns HU_OK without filesystem.
  */
 hu_error_t hu_skill_registry_uninstall(const char *name);
 
 /**
- * Update all installed skills from the registry.
- * Under HU_IS_TEST, returns HU_OK without network.
+ * Re-install a skill from source path (uninstall then install).
+ * Under HU_IS_TEST, returns HU_OK without filesystem.
  */
-hu_error_t hu_skill_registry_update(hu_allocator_t *alloc);
+hu_error_t hu_skill_registry_update(hu_allocator_t *alloc, const char *source_path);
 
 /**
  * Get the installed skills directory path (~/.human/skills).

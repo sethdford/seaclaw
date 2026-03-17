@@ -960,7 +960,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
 
     if (strcmp(sub, "install") == 0) {
         if (argc < 4 || !argv[3]) {
-            fprintf(stderr, "[%s] skills install <name>\n", HU_CODENAME);
+            fprintf(stderr, "[%s] skills install <path>\n", HU_CODENAME);
             return HU_ERR_INVALID_ARGUMENT;
         }
         hu_error_t err = hu_skill_registry_install(alloc, argv[3]);
@@ -968,7 +968,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
             fprintf(stderr, "[%s] skills install: %s\n", HU_CODENAME, hu_error_string(err));
             return err;
         }
-        printf("Installed skill: %s\n", argv[3]);
+        printf("Installed skill from %s\n", argv[3]);
         return HU_OK;
     }
 
@@ -987,21 +987,25 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
     }
 
     if (strcmp(sub, "update") == 0) {
-        hu_error_t err = hu_skill_registry_update(alloc);
+        if (argc < 4 || !argv[3]) {
+            fprintf(stderr, "[%s] skills update <path>\n", HU_CODENAME);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        hu_error_t err = hu_skill_registry_update(alloc, argv[3]);
         if (err != HU_OK) {
             fprintf(stderr, "[%s] skills update: %s\n", HU_CODENAME, hu_error_string(err));
             return err;
         }
-        printf("Updated all installed skills.\n");
+        printf("Updated skill from %s\n", argv[3]);
         return HU_OK;
     }
 
     fprintf(stderr, "[%s] skills: use list, search, install, uninstall, or update\n", HU_CODENAME);
     fprintf(stderr, "  human skills list\n");
     fprintf(stderr, "  human skills search <query>\n");
-    fprintf(stderr, "  human skills install <name>\n");
+    fprintf(stderr, "  human skills install <path>\n");
     fprintf(stderr, "  human skills uninstall <name>\n");
-    fprintf(stderr, "  human skills update\n");
+    fprintf(stderr, "  human skills update <path>\n");
     fprintf(stderr, "  human skills info <name>\n");
     fprintf(stderr, "  human skills publish [directory]\n");
     return HU_ERR_INVALID_ARGUMENT;
