@@ -1,10 +1,10 @@
 package ai.human.app
 
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -87,28 +88,42 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private fun isValidGatewayUrl(url: String): Boolean {
+    val trimmed = url.trim()
+    if (trimmed.isEmpty()) return false
+    return trimmed.startsWith("ws://") || trimmed.startsWith("wss://") ||
+        trimmed.startsWith("http://") || trimmed.startsWith("https://")
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HumanRoot(intent: Intent?) {
     var hasOnboarded by rememberSaveable { mutableStateOf(false) }
+    var gatewayUrl by rememberSaveable { mutableStateOf("http://localhost:3000") }
 
     if (hasOnboarded) {
-        HumanApp(intent = intent)
+        HumanApp(intent = intent, initialGatewayUrl = gatewayUrl)
     } else {
-        OnboardingScreen(onComplete = { hasOnboarded = true })
+        OnboardingScreen(
+            initialUrl = gatewayUrl,
+            onComplete = { url ->
+                gatewayUrl = url.trim()
+                hasOnboarded = true
+            },
+        )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HumanApp(intent: Intent?) {
+fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000") {
     var selectedTab by remember { mutableIntStateOf(0) }
     val gateway = remember { GatewayClient() }
     val connectionState by gateway.state.collectAsState()
 
     DisposableEffect(selectedTab) {
         if (selectedTab == 1) {
-            gateway.connectIfNeeded("http://localhost:3000")
+            gateway.connectIfNeeded(initialGatewayUrl)
         }
         onDispose { }
     }
@@ -240,7 +255,11 @@ fun HumanApp(intent: Intent?) {
                     1 -> ChatScreen(gateway = gateway)
                     2 -> SessionsScreen()
                     3 -> ToolsScreen()
-                    4 -> SettingsScreen(gateway = gateway, connectionState = connectionState)
+                    4 -> SettingsScreen(
+                        gateway = gateway,
+                        connectionState = connectionState,
+                        initialGatewayUrl = initialGatewayUrl,
+                    )
                     else -> OverviewScreen(gateway = gateway, connectionState = connectionState)
                 }
             }
@@ -249,16 +268,35 @@ fun HumanApp(intent: Intent?) {
 }
 
 @Composable
-private fun OnboardingScreen(onComplete: () -> Unit) {
+private fun OnboardingScreen(
+    initialUrl: String = "http://localhost:3000",
+    onComplete: (String) -> Unit,
+) {
     val colorScheme = MaterialTheme.colorScheme
-    var gatewayUrl by remember { mutableStateOf("ws://localhost:3000") }
+    var gatewayUrl by remember { mutableStateOf(initialUrl) }
+    val isValidUrl = isValidGatewayUrl(gatewayUrl)
 
+    val pageIcons = listOf(
+        R.drawable.ic_phosphor_house,
+        R.drawable.ic_phosphor_lightning,
+        R.drawable.ic_phosphor_chat_circle,
+    )
     val pages = listOf(
         Triple("Welcome to h-uman", "not quite human.", "Minimal footprint, maximum capability."),
         Triple("Lightning Fast", "~1696 KB binary, <6 MB RAM.", "<30 ms startup. Zero dependencies."),
         Triple("34 Channels", "Telegram, Discord, Slack, and more.", "Connect your preferred messaging platform."),
     )
     val pagerState = rememberPagerState(pageCount = { pages.size })
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* result not required for flow */ }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -270,12 +308,26 @@ private fun OnboardingScreen(onComplete: () -> Unit) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.weight(1f),
+            userScrollEnabled = true,
         ) { page ->
+            val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        alpha = 1f - kotlin.math.abs(pageOffset) * 0.4f
+                        translationX = pageOffset * 80f
+                    },
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                Icon(
+                    painter = painterResource(pageIcons[page]),
+                    contentDescription = null,
+                    modifier = Modifier.size(80.dp),
+                    tint = colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.height(HUTokens.spaceLg))
                 Text(
                     text = pages[page].first,
                     style = MaterialTheme.typography.headlineLarge,
@@ -312,7 +364,11 @@ private fun OnboardingScreen(onComplete: () -> Unit) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(HUTokens.radiusMd))
                     .background(colorScheme.surfaceContainerHigh)
-                    .border(1.dp, colorScheme.outlineVariant, RoundedCornerShape(HUTokens.radiusMd))
+                    .border(
+                        1.dp,
+                        if (isValidUrl) colorScheme.outlineVariant else colorScheme.error,
+                        RoundedCornerShape(HUTokens.radiusMd),
+                    )
                     .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm)
                     .semantics { contentDescription = "Gateway URL" },
                 textStyle = TextStyle(
@@ -327,23 +383,31 @@ private fun OnboardingScreen(onComplete: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(HUTokens.radiusMd))
-                    .background(colorScheme.primary)
-                    .clickable { onComplete() }
+                    .background(
+                        if (isValidUrl) colorScheme.primary
+                        else colorScheme.surfaceContainerHigh,
+                    )
+                    .then(
+                        if (isValidUrl) Modifier.clickable { onComplete(gatewayUrl) }
+                        else Modifier,
+                    )
                     .padding(HUTokens.spaceMd)
-                    .semantics { contentDescription = "Get started" },
+                    .semantics {
+                        contentDescription = if (isValidUrl) "Get started" else "Get started (enter valid URL first)"
+                    },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "Get Started",
                     style = MaterialTheme.typography.labelLarge,
-                    color = colorScheme.onPrimary,
+                    color = if (isValidUrl) colorScheme.onPrimary else colorScheme.onSurfaceVariant,
                 )
             }
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onComplete() }
+                    .clickable { onComplete("http://localhost:3000") }
                     .padding(HUTokens.spaceSm),
                 contentAlignment = Alignment.Center,
             ) {
