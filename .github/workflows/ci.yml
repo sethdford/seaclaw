@@ -207,10 +207,10 @@ jobs:
         with:
           node-version: "20"
       - name: Install system deps
-        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev libcurl4-openssl-dev
       - name: Build gateway
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DHU_BUILD_TESTS=OFF
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DHU_BUILD_TESTS=OFF -DHU_ENABLE_CURL=ON
           cmake --build build -j$(nproc)
       - name: Install
         run: cd ui && npm ci

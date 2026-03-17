@@ -700,6 +700,7 @@ export class ScApp extends LitElement {
     try {
       await VIEW_IMPORTS[tab]();
       loadedViews.add(tab);
+      this._viewError = null;
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e));
       this._viewError = err;

@@ -1654,10 +1654,10 @@ figcaption {
   grid-template-rows: auto 1fr;
 }
 .feature-card:has(.badge) {
-  border-color: var(--hu-web-accent);
+  border-color: var(--hu-accent);
 }
 .nav-item:has(> .active) {
-  color: var(--hu-web-accent);
+  color: var(--hu-accent);
 }
 
 /* 7. field-sizing — auto-growing textareas and inputs */
