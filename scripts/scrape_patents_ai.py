@@ -100,11 +100,36 @@ def main():
                         "scraped_at": scrape_ts,
                     })
 
+    if not all_items:
+        print("[patents] RSS returned 0 results, trying HTML fallback...", file=sys.stderr)
+        import re
+        for query in PATENT_QUERIES[:3]:
+            html = fetch_patent_search_html(query)
+            if not html:
+                continue
+            for m in re.finditer(r'<article[^>]*>.*?<a[^>]*href="(/patent/[^"]+)"[^>]*>([^<]+)</a>', html, re.DOTALL):
+                link = "https://patents.google.com" + m.group(1)
+                title = m.group(2).strip()
+                if link not in seen_urls and title:
+                    seen_urls.add(link)
+                    all_items.append({
+                        "source": "patents",
+                        "content_type": "patent",
+                        "content": title[:2000],
+                        "url": link,
+                        "author": "",
+                        "query": query,
+                        "pub_date": "",
+                        "scraped_at": scrape_ts,
+                    })
+
     with open(OUTPUT_FILE, "w") as f:
         for item in all_items:
             f.write(json.dumps(item) + "\n")
 
     print(f"[patents] {len(all_items)} AI patents from {len(PATENT_QUERIES)} queries -> {OUTPUT_FILE}")
+    if not all_items:
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
