@@ -1,5 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import type { PropertyValues } from "lit";
+import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
 import type { GatewayClient } from "../gateway.js";
 import { GatewayClient as GatewayClientClass } from "../gateway.js";
 import type { GatewayStatus } from "../gateway.js";
@@ -14,6 +16,8 @@ import "../components/hu-empty-state.js";
 import "../components/hu-status-dot.js";
 import "../components/hu-voice-orb.js";
 import "../components/hu-voice-conversation.js";
+import "../components/hu-empty-state.js";
+import { icons } from "../icons.js";
 
 type VoiceStatus = "idle" | "listening" | "processing" | "unsupported";
 
@@ -26,148 +30,167 @@ interface VoiceMessage {
 @customElement("hu-voice-view")
 export class ScVoiceView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
+  private _scrollEntranceObserver: IntersectionObserver | null = null;
 
-  static override styles = css`
-    :host {
-      view-transition-name: view-voice;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      max-height: calc(100vh - var(--hu-space-5xl));
-      contain: layout style;
-      container-type: inline-size;
-    }
-
-    .container {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      height: 100%;
-      max-width: 45rem;
-      margin: 0 auto;
-      position: relative;
-      width: 100%;
-      min-height: 0;
-    }
-
-    /* ── Status bar ─────────────────────────────────── */
-
-    .status-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: var(--hu-space-xs) var(--hu-space-md);
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-      background: color-mix(in srgb, var(--hu-bg-surface) 60%, transparent);
-      backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
-      -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
-      border-bottom: 1px solid var(--hu-border-subtle);
-      flex-shrink: 0;
-    }
-
-    .status-left,
-    .status-right {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-sm);
-    }
-
-    .status-title {
-      font-weight: var(--hu-weight-medium);
-      color: var(--hu-text);
-      font-size: var(--hu-text-sm);
-    }
-
-    .status-meta {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-    }
-
-    /* ── Error banner ───────────────────────────────── */
-
-    .error-banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: var(--hu-space-md);
-      background: var(--hu-error-dim);
-      border: 1px solid var(--hu-error);
-      border-radius: var(--hu-radius);
-      color: var(--hu-error);
-      font-size: var(--hu-text-base);
-      flex-shrink: 0;
-    }
-
-    /* ── Controls zone (orb + input bar) ────────────── */
-
-    .controls-zone {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--hu-space-sm);
-      padding: var(--hu-space-sm) var(--hu-space-md) var(--hu-space-md);
-      flex-shrink: 0;
-    }
-
-    .input-row {
-      display: flex;
-      gap: var(--hu-space-sm);
-      align-items: flex-end;
-      width: 100%;
-      padding: var(--hu-space-md);
-      background: var(--hu-bg-surface);
-      background-image: var(--hu-surface-gradient);
-      border: 1px solid var(--hu-border);
-      border-radius: var(--hu-radius-lg);
-      box-shadow: var(--hu-shadow-card);
-      backdrop-filter: blur(var(--hu-glass-subtle-blur));
-      -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur));
-      box-sizing: border-box;
-    }
-
-    .input-row hu-textarea {
-      flex: 1;
-      --hu-bg-elevated: var(--hu-bg);
-    }
-
-    .input-row hu-button {
-      min-height: 2.75rem;
-    }
-
-    /* ── Skeleton ────────────────────────────────────── */
-
-    .skeleton-bar {
-      height: 2.25rem;
-      margin-bottom: var(--hu-space-xs);
-    }
-
-    .skeleton-controls {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--hu-space-sm);
-      padding: var(--hu-space-md);
-    }
-
-    /* ── Responsive ──────────────────────────────────── */
-
-    @container (max-width: 480px) /* --hu-breakpoint-sm */ {
-      .input-row {
+  static override styles = [
+    scrollEntranceStyles,
+    css`
+      :host {
+        view-transition-name: view-voice;
+        display: flex;
         flex-direction: column;
-        align-items: stretch;
+        height: 100%;
+        max-height: calc(100vh - var(--hu-space-5xl));
+        contain: layout style;
+        container-type: inline-size;
       }
+
+      .container {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        height: 100%;
+        max-width: 45rem;
+        margin: 0 auto;
+        position: relative;
+        width: 100%;
+        min-height: 0;
+      }
+
+      /* ── Status bar ─────────────────────────────────── */
+
+      .status-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--hu-space-xs) var(--hu-space-md);
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+        background: color-mix(in srgb, var(--hu-bg-surface) 60%, transparent);
+        backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
+        -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
+        border-bottom: 1px solid var(--hu-border-subtle);
+        flex-shrink: 0;
+      }
+
+      .status-left,
+      .status-right {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-sm);
+      }
+
+      .status-title {
+        font-weight: var(--hu-weight-medium);
+        color: var(--hu-text);
+        font-size: var(--hu-text-sm);
+      }
+
+      .status-meta {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+      }
+
+      /* ── Error banner ───────────────────────────────── */
+
+      .error-banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--hu-space-md);
+        background: var(--hu-error-dim);
+        border: 1px solid var(--hu-error);
+        border-radius: var(--hu-radius);
+        color: var(--hu-error);
+        font-size: var(--hu-text-base);
+        flex-shrink: 0;
+      }
+
+      /* ── Conversation area (empty state) ───────────── */
+
+      .conversation-area {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
+      }
+
+      /* ── Controls zone (orb + input bar) ────────────── */
+
+      .controls-zone {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--hu-space-sm);
+        padding: var(--hu-space-sm) var(--hu-space-md) var(--hu-space-md);
+        flex-shrink: 0;
+      }
+
+      .input-row {
+        display: flex;
+        gap: var(--hu-space-sm);
+        align-items: flex-end;
+        width: 100%;
+        padding: var(--hu-space-md);
+        background: var(--hu-bg-surface);
+        background-image: var(--hu-surface-gradient);
+        border: 1px solid var(--hu-border);
+        border-radius: var(--hu-radius-lg);
+        box-shadow: var(--hu-shadow-card);
+        backdrop-filter: blur(var(--hu-glass-subtle-blur));
+        -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur));
+        box-sizing: border-box;
+      }
+
+      .input-row hu-textarea {
+        flex: 1;
+        --hu-bg-elevated: var(--hu-bg);
+      }
+
       .input-row hu-button {
-        min-height: 2.5rem;
+        min-height: 2.75rem;
       }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0s !important;
-        transition-duration: 0s !important;
+
+      /* ── Skeleton ────────────────────────────────────── */
+
+      .skeleton-bar {
+        height: 2.25rem;
+        margin-bottom: var(--hu-space-xs);
       }
-    }
-  `;
+
+      .skeleton-controls {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--hu-space-sm);
+        padding: var(--hu-space-md);
+      }
+
+      /* ── Responsive ──────────────────────────────────── */
+
+      @container (max-width: 480px) /* --hu-breakpoint-sm */ {
+        .input-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .input-row hu-button {
+          min-height: 2.5rem;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0s !important;
+          transition-duration: 0s !important;
+        }
+      }
+    `,
+  ];
+
+  override updated(changedProperties: PropertyValues): void {
+    super.updated(changedProperties);
+    this.updateComplete.then(() => this._setupScrollEntrance());
+  }
 
   @state() private transcript = "";
   @state() private voiceStatus: VoiceStatus = "idle";
@@ -294,6 +317,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
   }
 
   override disconnectedCallback(): void {
+    this._scrollEntranceObserver?.disconnect();
+    this._scrollEntranceObserver = null;
     this._stopDurationTimer();
     this._boundGateway?.removeEventListener(GatewayClientClass.EVENT_GATEWAY, this.gatewayHandler);
     this._boundGateway?.removeEventListener(
@@ -303,6 +328,28 @@ export class ScVoiceView extends GatewayAwareLitElement {
     this._boundGateway = null;
     this._recorder.dispose();
     super.disconnectedCallback();
+  }
+
+  private _setupScrollEntrance(): void {
+    if (typeof CSS !== "undefined" && CSS.supports?.("animation-timeline", "view()")) return;
+    const root = this.renderRoot;
+    if (!root) return;
+    const elements = root.querySelectorAll(".hu-scroll-reveal-stagger > *");
+    if (elements.length === 0) return;
+    if (!this._scrollEntranceObserver) {
+      this._scrollEntranceObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              (e.target as HTMLElement).classList.add("entered");
+              this._scrollEntranceObserver?.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
+    }
+    elements.forEach((el) => this._scrollEntranceObserver!.observe(el));
   }
 
   private _startDurationTimer(): void {
@@ -508,10 +555,22 @@ export class ScVoiceView extends GatewayAwareLitElement {
     return html`
       <div class="container">
         ${this._renderStatusBar()} ${this._renderErrorBanner()}
-        <hu-voice-conversation
-          .items=${this._chatItems}
-          .isWaiting=${this.voiceStatus === "processing"}
-        ></hu-voice-conversation>
+        ${this._messages.length === 0
+          ? html`
+              <div class="conversation-area hu-scroll-reveal-stagger">
+                <hu-empty-state
+                  .icon=${icons.mic}
+                  heading="No voice session"
+                  description="Start by speaking or typing a message below."
+                ></hu-empty-state>
+              </div>
+            `
+          : html`
+              <hu-voice-conversation
+                .items=${this._chatItems}
+                .isWaiting=${this.voiceStatus === "processing"}
+              ></hu-voice-conversation>
+            `}
         ${this._renderControls()}
       </div>
     `;
@@ -594,7 +653,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   private _renderControls() {
     const micDisabled = !this._recorder.isSupported || this._connectionStatus === "disconnected";
     return html`
-      <div class="controls-zone">
+      <div class="controls-zone hu-scroll-reveal-stagger">
         <hu-voice-orb
           .state=${this.voiceStatus}
           ?disabled=${micDisabled}

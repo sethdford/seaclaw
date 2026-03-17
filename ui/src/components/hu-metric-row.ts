@@ -4,7 +4,7 @@ import { customElement, property } from "lit/decorators.js";
 @customElement("hu-metric-row")
 export class ScMetricRow extends LitElement {
   @property({ type: Array })
-  items: Array<{ label: string; value: string; accent?: string }> = [];
+  items: Array<{ label: string; value: string; accent?: string; countTarget?: number }> = [];
 
   static override styles = css`
     :host {
@@ -70,7 +70,14 @@ export class ScMetricRow extends LitElement {
             ${i > 0 ? html`<div class="divider"></div>` : nothing}
             <div class="item" role="group" aria-label="${item.label}: ${item.value}">
               <span class="item-label">${item.label}</span>
-              <span class="item-value ${item.accent || ""}">${item.value}</span>
+              <span
+                class="item-value ${item.accent || ""}"
+                ?data-count-target=${item.countTarget}
+                data-format=${item.countTarget != null ? "number" : nothing}
+                role=${item.countTarget != null ? "status" : nothing}
+                aria-live=${item.countTarget != null ? "polite" : nothing}
+                >${item.countTarget != null ? "0" : item.value}</span
+              >
             </div>
           `,
         )}

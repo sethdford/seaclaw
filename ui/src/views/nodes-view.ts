@@ -49,6 +49,7 @@ export class ScNodesView extends GatewayAwareLitElement {
         view-transition-name: view-nodes;
         display: block;
         max-width: 75rem;
+        container-type: inline-size;
       }
       .header-actions {
         display: flex;
@@ -88,6 +89,14 @@ export class ScNodesView extends GatewayAwareLitElement {
         margin-bottom: var(--hu-space-lg);
         font-family: var(--hu-font-mono);
       }
+
+      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+        .header-actions {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         * {
           animation-duration: 0s !important;

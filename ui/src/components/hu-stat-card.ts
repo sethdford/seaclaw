@@ -18,6 +18,8 @@ export class ScStatCard extends LitElement {
   @property({ type: String }) accent: "primary" | "secondary" | "tertiary" | "error" = "primary";
   @property({ type: String }) suffix = "";
   @property({ type: String }) prefix = "";
+  /** When true, renders a span with data-count-target for parent-driven count-up animation. */
+  @property({ type: Boolean }) countUp = false;
 
   static override styles = css`
     :host {
@@ -145,13 +147,23 @@ export class ScStatCard extends LitElement {
           <div class="value">
             ${this.valueStr
               ? html`${this.prefix}${this.valueStr}${this.suffix}`
-              : html`
-                  <hu-animated-number
-                    .value=${this.value}
-                    .prefix=${this.prefix}
-                    .suffix=${this.suffix}
-                  ></hu-animated-number>
-                `}
+              : this.countUp
+                ? html`
+                    <span
+                      data-count-target=${this.value}
+                      data-format="number"
+                      role="status"
+                      aria-live="polite"
+                      >0</span
+                    >
+                  `
+                : html`
+                    <hu-animated-number
+                      .value=${this.value}
+                      .prefix=${this.prefix}
+                      .suffix=${this.suffix}
+                    ></hu-animated-number>
+                  `}
           </div>
           <div class="label">${this.label}</div>
           ${this.sparklineData.length >= 2

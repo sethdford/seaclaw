@@ -1,5 +1,7 @@
 import { html, css, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import type { PropertyValues } from "lit";
+import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { friendlyError } from "../utils/friendly-error.js";
 import { log } from "../lib/log.js";
@@ -74,140 +76,172 @@ function toRawConfig(edited: ConfigData): Record<string, unknown> {
 @customElement("hu-config-view")
 export class ScConfigView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
-  static override styles = css`
-    :host {
-      view-transition-name: view-config;
-      display: block;
-      max-width: 40rem;
-      contain: layout style;
-      container-type: inline-size;
-      margin: 0 auto;
-    }
-    .header-actions {
-      display: flex;
-      gap: var(--hu-space-sm);
-      align-items: center;
-    }
-    .form {
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-xl);
-    }
-    .section {
-      border: 1px solid var(--hu-border);
-      border-radius: var(--hu-radius);
-      overflow: hidden;
-      background: var(--hu-bg-elevated);
-    }
-    .section + .section {
-      margin-top: var(--hu-space-sm);
-    }
-    .section-header {
-      padding: var(--hu-space-md) var(--hu-space-md);
-      background: var(--hu-bg-elevated);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      user-select: none;
-      transition: background var(--hu-duration-fast);
+  private _scrollEntranceObserver: IntersectionObserver | null = null;
 
-      &:hover {
-        background: var(--hu-bg-overlay);
+  static override styles = [
+    scrollEntranceStyles,
+    css`
+      :host {
+        view-transition-name: view-config;
+        display: block;
+        max-width: 40rem;
+        contain: layout style;
+        container-type: inline-size;
+        margin: 0 auto;
       }
-
-      & .chevron {
-        transition: transform var(--hu-duration-normal) var(--hu-ease-out);
-        color: var(--hu-text-muted);
+      .header-actions {
         display: flex;
+        gap: var(--hu-space-sm);
+        align-items: center;
+      }
+      .form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-xl);
+      }
+      .section {
+        border: 1px solid var(--hu-border);
+        border-radius: var(--hu-radius);
+        overflow: hidden;
+        background: var(--hu-bg-elevated);
+      }
+      .section + .section {
+        margin-top: var(--hu-space-sm);
+      }
+      .section-header {
+        padding: var(--hu-space-md) var(--hu-space-md);
+        background: var(--hu-bg-elevated);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        user-select: none;
+        transition: background var(--hu-duration-fast);
 
-        & svg {
-          width: 0.875rem;
-          height: 0.875rem;
+        &:hover {
+          background: var(--hu-bg-overlay);
+        }
+
+        & .chevron {
+          transition: transform var(--hu-duration-normal) var(--hu-ease-out);
+          color: var(--hu-text-muted);
+          display: flex;
+
+          & svg {
+            width: 0.875rem;
+            height: 0.875rem;
+          }
+        }
+
+        &.collapsed .chevron {
+          transform: rotate(-90deg);
         }
       }
+      .section-content {
+        padding: var(--hu-space-md) var(--hu-space-lg);
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-md);
+        max-height: 37.5rem;
+        overflow: hidden;
+        transition:
+          max-height var(--hu-duration-slow) var(--hu-ease-out),
+          padding var(--hu-duration-normal),
+          opacity var(--hu-duration-normal);
+      }
+      .section.collapsed .section-content {
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        opacity: 0;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-xs);
 
-      &.collapsed .chevron {
-        transform: rotate(-90deg);
-      }
-    }
-    .section-content {
-      padding: var(--hu-space-md) var(--hu-space-lg);
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-md);
-      max-height: 37.5rem;
-      overflow: hidden;
-      transition:
-        max-height var(--hu-duration-slow) var(--hu-ease-out),
-        padding var(--hu-duration-normal),
-        opacity var(--hu-duration-normal);
-    }
-    .section.collapsed .section-content {
-      max-height: 0;
-      padding-top: 0;
-      padding-bottom: 0;
-      opacity: 0;
-    }
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-xs);
+        & label {
+          font-size: var(--hu-text-base);
+          font-weight: var(--hu-weight-medium);
+          color: var(--hu-text);
+        }
 
-      & label {
-        font-size: var(--hu-text-base);
-        font-weight: var(--hu-weight-medium);
-        color: var(--hu-text);
-      }
+        & .description {
+          font-size: var(--hu-text-xs);
+          color: var(--hu-text-muted);
+          margin-top: var(--hu-space-2xs);
+        }
 
-      & .description {
-        font-size: var(--hu-text-xs);
-        color: var(--hu-text-muted);
-        margin-top: var(--hu-space-2xs);
+        & .description-error {
+          color: var(--hu-error);
+        }
       }
+      .raw-area {
+        --hu-font: var(--hu-font-mono);
+        --hu-text-base: var(--hu-text-sm);
+        --hu-bg-elevated: var(--hu-bg-inset);
+        width: 100%;
+      }
+      .unsaved-banner {
+        position: sticky;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--hu-space-md) var(--hu-space-lg);
+        background: var(--hu-bg-surface);
+        border-top: 1px solid var(--hu-border);
+        box-shadow: 0 calc(-1 * var(--hu-space-xs)) var(--hu-space-md) var(--hu-shadow-lg);
+        z-index: 10;
+      }
+      .unsaved-banner-actions {
+        display: flex;
+        gap: var(--hu-space-sm);
+      }
+      @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+        :host {
+          max-width: 100%;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0s !important;
+          transition-duration: 0s !important;
+        }
+      }
+    `,
+  ];
 
-      & .description-error {
-        color: var(--hu-error);
-      }
+  override updated(changedProperties: PropertyValues): void {
+    super.updated(changedProperties);
+    this.updateComplete.then(() => this._setupScrollEntrance());
+  }
+
+  private _setupScrollEntrance(): void {
+    if (typeof CSS !== "undefined" && CSS.supports?.("animation-timeline", "view()")) return;
+    const root = this.renderRoot;
+    if (!root) return;
+    const elements = root.querySelectorAll(".hu-scroll-reveal-stagger > *");
+    if (elements.length === 0) return;
+    if (!this._scrollEntranceObserver) {
+      this._scrollEntranceObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              (e.target as HTMLElement).classList.add("entered");
+              this._scrollEntranceObserver?.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
     }
-    .raw-area {
-      --hu-font: var(--hu-font-mono);
-      --hu-text-base: var(--hu-text-sm);
-      --hu-bg-elevated: var(--hu-bg-inset);
-      width: 100%;
-    }
-    .unsaved-banner {
-      position: sticky;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: var(--hu-space-md) var(--hu-space-lg);
-      background: var(--hu-bg-surface);
-      border-top: 1px solid var(--hu-border);
-      box-shadow: 0 calc(-1 * var(--hu-space-xs)) var(--hu-space-md) var(--hu-shadow-lg);
-      z-index: 10;
-    }
-    .unsaved-banner-actions {
-      display: flex;
-      gap: var(--hu-space-sm);
-    }
-    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
-      :host {
-        max-width: 100%;
-      }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      *,
-      *::before,
-      *::after {
-        animation-duration: 0s !important;
-        transition-duration: 0s !important;
-      }
-    }
-  `;
+    elements.forEach((el) => this._scrollEntranceObserver!.observe(el));
+  }
 
   @state() private loading = true;
   @state() private config: ConfigData = {};
@@ -237,6 +271,8 @@ export class ScConfigView extends GatewayAwareLitElement {
   }
 
   override disconnectedCallback(): void {
+    this._scrollEntranceObserver?.disconnect();
+    this._scrollEntranceObserver = null;
     if (this._beforeUnloadHandler) {
       window.removeEventListener("beforeunload", this._beforeUnloadHandler);
     }
@@ -470,7 +506,7 @@ export class ScConfigView extends GatewayAwareLitElement {
           description="Manage your h-uman instance settings"
         ></hu-section-header>
       </hu-page-hero>
-      <div class="form hu-stagger">
+      <div class="form hu-scroll-reveal-stagger">
         <hu-skeleton variant="card" height="200px"></hu-skeleton>
         <hu-skeleton variant="card" height="200px"></hu-skeleton>
       </div>
@@ -589,7 +625,7 @@ export class ScConfigView extends GatewayAwareLitElement {
           </div>
         </hu-section-header>
       </hu-page-hero>
-      <div class="form hu-stagger">
+      <div class="form hu-scroll-reveal-stagger">
         <hu-card glass>
           <hu-form-group title="Provider Settings" description="Default AI provider and model">
             <hu-combobox

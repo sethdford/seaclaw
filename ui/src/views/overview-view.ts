@@ -2,6 +2,7 @@ import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { PropertyValues } from "lit";
 import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
+import { animateCountUp } from "../utils/animate.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { friendlyError } from "../utils/friendly-error.js";
 import { icons } from "../icons.js";
@@ -354,6 +355,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
   @state() private channelsExpanded = false;
   @state() private connectionStatus: "connected" | "connecting" | "disconnected" = "disconnected";
   private _scrollEntranceObserver: IntersectionObserver | null = null;
+  private _countUpDone = false;
 
   private _connectionStatusHandler = ((e: CustomEvent<string>) => {
     const s = e.detail as "connected" | "connecting" | "disconnected";
@@ -382,7 +384,10 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
   override updated(changedProperties: PropertyValues): void {
     super.updated(changedProperties);
-    this.updateComplete.then(() => this._setupScrollEntrance());
+    this.updateComplete.then(() => {
+      this._setupScrollEntrance();
+      this._setupCountUp();
+    });
   }
 
   override disconnectedCallback(): void {
@@ -413,6 +418,35 @@ export class ScOverviewView extends GatewayAwareLitElement {
       );
     }
     elements.forEach((el) => this._scrollEntranceObserver!.observe(el));
+  }
+
+  private _queryAllWithShadow(
+    root: DocumentFragment | HTMLElement,
+    selector: string,
+  ): HTMLElement[] {
+    const results: HTMLElement[] = [];
+    const matches = root.querySelectorAll(selector);
+    results.push(...(Array.from(matches) as HTMLElement[]));
+    root.querySelectorAll("*").forEach((el) => {
+      if (el.shadowRoot) {
+        results.push(...this._queryAllWithShadow(el.shadowRoot, selector));
+      }
+    });
+    return results;
+  }
+
+  private _setupCountUp(): void {
+    if (this.loading || this._countUpDone) return;
+    const root = this.renderRoot;
+    if (!root) return;
+    const elements = this._queryAllWithShadow(root, "[data-count-target]");
+    if (elements.length === 0) return;
+    this._countUpDone = true;
+    const duration = 800;
+    elements.forEach((el) => {
+      const target = parseInt(el.dataset.countTarget ?? "0", 10);
+      if (!Number.isNaN(target)) animateCountUp(el, target, duration);
+    });
   }
 
   protected override onGatewaySwapped(

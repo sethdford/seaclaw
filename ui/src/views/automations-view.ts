@@ -64,6 +64,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
         margin: 0 auto;
         font-family: var(--hu-font);
         color: var(--hu-text);
+        container-type: inline-size;
       }
 
       .job-list {
@@ -135,6 +136,16 @@ export class ScAutomationsView extends GatewayAwareLitElement {
         font-weight: var(--hu-weight-semibold);
         color: var(--hu-text);
       }
+
+      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+        .templates-grid {
+          grid-template-columns: 1fr;
+        }
+        .job-list {
+          flex-direction: column;
+        }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         * {
           animation-duration: 0s !important;

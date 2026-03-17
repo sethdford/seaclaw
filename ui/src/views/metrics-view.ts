@@ -1,5 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import type { PropertyValues } from "lit";
+import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import "../components/hu-page-hero.js";
 import "../components/hu-section-header.js";
@@ -81,85 +83,130 @@ function labelFromKey(key: string): string {
 @customElement("hu-metrics-view")
 export class ScMetricsView extends GatewayAwareLitElement {
   override autoRefreshInterval = 10_000;
+  private _scrollEntranceObserver: IntersectionObserver | null = null;
 
-  static override styles = css`
-    :host {
-      view-transition-name: view-metrics;
-      display: block;
-      color: var(--hu-text);
-      max-width: 60rem;
-    }
-    .section {
-      margin-bottom: var(--hu-space-2xl);
-    }
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-      gap: var(--hu-space-md);
-    }
-    .metric-item {
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-2xs);
-    }
-    .metric-label {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .metric-value {
-      font-family: var(--hu-font-mono);
-      font-size: var(--hu-text-base);
-      font-weight: var(--hu-weight-semibold);
-      color: var(--hu-text);
-      font-variant-numeric: tabular-nums;
-    }
-    .bth-group {
-      margin-bottom: var(--hu-space-xl);
-    }
-    .bth-group:last-child {
-      margin-bottom: 0;
-    }
-    .card-inner {
-      padding: var(--hu-space-md);
-    }
-    .intel-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--hu-space-sm);
-      align-items: center;
-    }
-    .intel-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--hu-space-2xs);
-      padding: var(--hu-space-2xs) var(--hu-space-sm);
-      border-radius: var(--hu-radius);
-      font-size: var(--hu-text-sm);
-      font-weight: var(--hu-weight-medium);
-    }
-    .intel-badge.enabled {
-      background: color-mix(in srgb, var(--hu-accent) 15%, transparent);
-      color: var(--hu-accent);
-    }
-    .intel-badge.enabled svg {
-      color: var(--hu-accent);
-    }
-    .intel-badge.disabled {
-      background: var(--hu-surface-dim);
-      color: var(--hu-text-muted);
-    }
-    .intel-badge.disabled svg {
-      color: var(--hu-text-muted);
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0s !important;
-        transition-duration: 0s !important;
+  static override styles = [
+    scrollEntranceStyles,
+    css`
+      :host {
+        view-transition-name: view-metrics;
+        display: block;
+        color: var(--hu-text);
+        max-width: 60rem;
+        container-type: inline-size;
       }
+      .section {
+        margin-bottom: var(--hu-space-2xl);
+      }
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+        gap: var(--hu-space-md);
+      }
+      .metric-item {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-2xs);
+      }
+      .metric-label {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .metric-value {
+        font-family: var(--hu-font-mono);
+        font-size: var(--hu-text-base);
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+        font-variant-numeric: tabular-nums;
+      }
+      .bth-group {
+        margin-bottom: var(--hu-space-xl);
+      }
+      .bth-group:last-child {
+        margin-bottom: 0;
+      }
+      .card-inner {
+        padding: var(--hu-space-md);
+      }
+      .intel-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--hu-space-sm);
+        align-items: center;
+      }
+      .intel-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--hu-space-2xs);
+        padding: var(--hu-space-2xs) var(--hu-space-sm);
+        border-radius: var(--hu-radius);
+        font-size: var(--hu-text-sm);
+        font-weight: var(--hu-weight-medium);
+      }
+      .intel-badge.enabled {
+        background: color-mix(in srgb, var(--hu-accent) 15%, transparent);
+        color: var(--hu-accent);
+      }
+      .intel-badge.enabled svg {
+        color: var(--hu-accent);
+      }
+      .intel-badge.disabled {
+        background: var(--hu-surface-dim);
+        color: var(--hu-text-muted);
+      }
+      .intel-badge.disabled svg {
+        color: var(--hu-text-muted);
+      }
+
+      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+        .metric-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0s !important;
+          transition-duration: 0s !important;
+        }
+      }
+    `,
+  ];
+
+  override updated(changedProperties: PropertyValues): void {
+    super.updated(changedProperties);
+    this.updateComplete.then(() => this._setupScrollEntrance());
+  }
+
+  override disconnectedCallback(): void {
+    this._scrollEntranceObserver?.disconnect();
+    this._scrollEntranceObserver = null;
+    super.disconnectedCallback();
+  }
+
+  private _setupScrollEntrance(): void {
+    if (typeof CSS !== "undefined" && CSS.supports?.("animation-timeline", "view()")) return;
+    const root = this.renderRoot;
+    if (!root) return;
+    const elements = root.querySelectorAll(".hu-scroll-reveal-stagger > *");
+    if (elements.length === 0) return;
+    if (!this._scrollEntranceObserver) {
+      this._scrollEntranceObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              (e.target as HTMLElement).classList.add("entered");
+              this._scrollEntranceObserver?.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
     }
-  `;
+    elements.forEach((el) => this._scrollEntranceObserver!.observe(el));
+  }
 
   @state() private snapshot: MetricsSnapshot = {};
   @state() private loading = false;

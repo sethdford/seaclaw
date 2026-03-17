@@ -1,5 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import type { PropertyValues } from "lit";
+import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { icons } from "../icons.js";
 import { ScToast } from "../components/hu-toast.js";
@@ -50,120 +52,152 @@ interface UsageSummary {
 @customElement("hu-models-view")
 export class ScModelsView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
-  static override styles = css`
-    :host {
-      view-transition-name: view-models;
-      display: block;
-      max-width: 75rem;
-      contain: layout style;
-      container-type: inline-size;
-    }
-    .info-section {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--hu-space-xl);
-      margin-bottom: var(--hu-space-2xl);
-    }
-    .info-item {
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-xs);
-    }
-    .chart-section {
-      margin-bottom: var(--hu-space-2xl);
-    }
-    .chart-header {
-      font-size: var(--hu-text-sm);
-      font-weight: var(--hu-weight-semibold);
-      color: var(--hu-text);
-      margin-bottom: var(--hu-space-md);
-    }
-    .section-label {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
-      gap: var(--hu-space-xl);
-    }
-    .card-header {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-sm);
-      margin-bottom: var(--hu-space-sm);
-      flex-wrap: wrap;
-    }
-    .card-name {
-      font-weight: var(--hu-weight-semibold);
-      font-size: var(--hu-text-lg);
-      color: var(--hu-text);
-    }
-    .card-name.default {
-      color: var(--hu-accent-text, var(--hu-accent));
-    }
-    .card-url {
-      font-size: var(--hu-text-xs);
-      font-family: var(--hu-font-mono);
-      color: var(--hu-text-muted);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      margin-top: var(--hu-space-xs);
-    }
-    .key-status {
-      font-size: var(--hu-text-sm);
-      margin-top: var(--hu-space-sm);
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-xs);
-    }
-    .key-status.has {
-      color: var(--hu-success);
-    }
-    .key-status.missing {
-      color: var(--hu-error);
-    }
-    .key-icon {
-      width: 0.875rem;
-      height: 0.875rem;
-      display: inline-block;
-      vertical-align: middle;
-    }
-    .card-actions {
-      margin-top: var(--hu-space-md);
-      display: flex;
-      justify-content: flex-end;
-    }
-    @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+  private _scrollEntranceObserver: IntersectionObserver | null = null;
+
+  static override styles = [
+    scrollEntranceStyles,
+    css`
+      :host {
+        view-transition-name: view-models;
+        display: block;
+        max-width: 75rem;
+        contain: layout style;
+        container-type: inline-size;
+      }
       .info-section {
-        grid-template-columns: 1fr;
-      }
-      .grid {
+        display: grid;
         grid-template-columns: 1fr 1fr;
+        gap: var(--hu-space-xl);
+        margin-bottom: var(--hu-space-2xl);
       }
-    }
-    @container (max-width: 40rem) /* --hu-breakpoint-md */ {
+      .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-xs);
+      }
+      .chart-section {
+        margin-bottom: var(--hu-space-2xl);
+      }
+      .chart-header {
+        font-size: var(--hu-text-sm);
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+        margin-bottom: var(--hu-space-md);
+      }
+      .section-label {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
       .grid {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
+        gap: var(--hu-space-xl);
       }
-    }
-    .search-wrap {
-      margin-bottom: var(--hu-space-xl);
-    }
-    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
-      .grid {
-        grid-template-columns: 1fr;
+      .card-header {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-sm);
+        margin-bottom: var(--hu-space-sm);
+        flex-wrap: wrap;
       }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0s !important;
+      .card-name {
+        font-weight: var(--hu-weight-semibold);
+        font-size: var(--hu-text-lg);
+        color: var(--hu-text);
       }
+      .card-name.default {
+        color: var(--hu-accent-text, var(--hu-accent));
+      }
+      .card-url {
+        font-size: var(--hu-text-xs);
+        font-family: var(--hu-font-mono);
+        color: var(--hu-text-muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        margin-top: var(--hu-space-xs);
+      }
+      .key-status {
+        font-size: var(--hu-text-sm);
+        margin-top: var(--hu-space-sm);
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-xs);
+      }
+      .key-status.has {
+        color: var(--hu-success);
+      }
+      .key-status.missing {
+        color: var(--hu-error);
+      }
+      .key-icon {
+        width: 0.875rem;
+        height: 0.875rem;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      .card-actions {
+        margin-top: var(--hu-space-md);
+        display: flex;
+        justify-content: flex-end;
+      }
+      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+        .info-section {
+          grid-template-columns: 1fr;
+        }
+        .grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      @container (max-width: 40rem) /* --hu-breakpoint-md */ {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .search-wrap {
+        margin-bottom: var(--hu-space-xl);
+      }
+      @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0s !important;
+        }
+      }
+    `,
+  ];
+
+  override updated(changedProperties: PropertyValues): void {
+    super.updated(changedProperties);
+    this.updateComplete.then(() => this._setupScrollEntrance());
+  }
+
+  private _setupScrollEntrance(): void {
+    if (typeof CSS !== "undefined" && CSS.supports?.("animation-timeline", "view()")) return;
+    const root = this.renderRoot;
+    if (!root) return;
+    const elements = root.querySelectorAll(".hu-scroll-reveal-stagger > *");
+    if (elements.length === 0) return;
+    if (!this._scrollEntranceObserver) {
+      this._scrollEntranceObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              (e.target as HTMLElement).classList.add("entered");
+              this._scrollEntranceObserver?.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
     }
-  `;
+    elements.forEach((el) => this._scrollEntranceObserver!.observe(el));
+  }
 
   @state() private defaultModel = "";
   @state() private defaultProvider = "";
@@ -284,6 +318,8 @@ export class ScModelsView extends GatewayAwareLitElement {
   }
 
   override disconnectedCallback(): void {
+    this._scrollEntranceObserver?.disconnect();
+    this._scrollEntranceObserver = null;
     super.disconnectedCallback();
   }
 
@@ -313,7 +349,7 @@ export class ScModelsView extends GatewayAwareLitElement {
           </hu-button>
         </hu-section-header>
       </hu-page-hero>
-      <hu-stats-row>
+      <hu-stats-row class="hu-scroll-reveal-stagger">
         <hu-stat-card
           .value=${this.providers.length}
           label="Providers"
@@ -366,7 +402,7 @@ export class ScModelsView extends GatewayAwareLitElement {
         <hu-skeleton variant="card" height="80px"></hu-skeleton>
         <hu-skeleton variant="card" height="80px"></hu-skeleton>
       </div>
-      <div class="grid hu-stagger">
+      <div class="grid hu-scroll-reveal-stagger">
         <hu-skeleton variant="card" height="120px"></hu-skeleton>
         <hu-skeleton variant="card" height="120px"></hu-skeleton>
         <hu-skeleton variant="card" height="120px"></hu-skeleton>
@@ -377,7 +413,7 @@ export class ScModelsView extends GatewayAwareLitElement {
   private _renderInfoSection() {
     return html`
       <hu-card>
-        <div class="info-section hu-stagger">
+        <div class="info-section hu-scroll-reveal-stagger">
           <div class="info-item">
             <span class="section-label">Default provider</span>
             <hu-combobox
@@ -410,7 +446,7 @@ export class ScModelsView extends GatewayAwareLitElement {
     const data = this.requestDistributionChartData;
     if (!data) return nothing;
     return html`
-      <div class="chart-section hu-stagger">
+      <div class="chart-section hu-scroll-reveal-stagger">
         <div class="chart-header">Request distribution by provider</div>
         <hu-chart type="doughnut" .data=${data} height="200"></hu-chart>
       </div>
@@ -420,7 +456,7 @@ export class ScModelsView extends GatewayAwareLitElement {
   private _renderGrid() {
     const filtered = this.filteredProviders;
     return html`
-      <div class="grid hu-stagger">
+      <div class="grid hu-scroll-reveal-stagger">
         ${filtered.length === 0
           ? html`
               <hu-empty-state

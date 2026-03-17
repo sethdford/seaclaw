@@ -15,12 +15,14 @@ export interface MetricRowItem {
   label: string;
   value: string;
   accent?: "success" | "error";
+  countTarget?: number;
 }
 
 @customElement("hu-overview-stats")
 export class ScOverviewStats extends LitElement {
   @property({ type: Array }) metrics: StatMetric[] = [];
   @property({ type: Array }) metricRowItems: MetricRowItem[] = [];
+  @property({ type: Boolean }) countUp = false;
 
   static override styles = css`
     :host {
@@ -43,6 +45,7 @@ export class ScOverviewStats extends LitElement {
                 .valueStr=${m.valueStr ?? ""}
                 .label=${m.label}
                 .sparklineData=${m.sparklineData ?? []}
+                .countUp=${this.countUp}
                 style="--hu-stagger-delay: ${i * 50}ms"
               ></hu-stat-card>
             `,

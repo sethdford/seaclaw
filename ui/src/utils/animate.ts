@@ -19,6 +19,36 @@ export function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/**
+ * Animates a numeric value from 0 to target in an element.
+ * Respects prefers-reduced-motion: skips animation and shows final value immediately.
+ */
+export function animateCountUp(element: HTMLElement, target: number, duration = 800): void {
+  if (prefersReducedMotion()) {
+    const format = element.dataset.format || "number";
+    if (format === "percent") element.textContent = target + "%";
+    else if (format === "time") element.textContent = target + "ms";
+    else element.textContent = target.toLocaleString();
+    return;
+  }
+  const start = performance.now();
+  const format = element.dataset.format || "number";
+
+  function update(now: number) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const current = Math.round(target * eased);
+
+    if (format === "percent") element.textContent = current + "%";
+    else if (format === "time") element.textContent = current + "ms";
+    else element.textContent = current.toLocaleString();
+
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
 /** Matches --hu-duration-normal (200ms). */
 const DURATION_NORMAL = 200;
 /** Matches --hu-duration-slow (350ms). */

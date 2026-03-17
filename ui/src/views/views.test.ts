@@ -80,14 +80,16 @@ describe("hu-chat-view", () => {
     el.remove();
   });
 
-  it("renders message thread component", async () => {
+  it("renders message thread or empty state", async () => {
     const el = document.createElement("hu-chat-view") as HTMLElement & {
       updateComplete: Promise<boolean>;
     };
     document.body.appendChild(el);
     await el.updateComplete;
     const thread = el.shadowRoot?.querySelector("hu-message-thread");
-    expect(thread).toBeTruthy();
+    const empty = el.shadowRoot?.querySelector("hu-empty-state");
+    const skeleton = el.shadowRoot?.querySelector("hu-skeleton");
+    expect(thread || empty || skeleton).toBeTruthy();
     el.remove();
   });
 

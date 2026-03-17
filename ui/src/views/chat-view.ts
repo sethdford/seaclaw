@@ -9,6 +9,7 @@ import { icons } from "../icons.js";
 import { log } from "../lib/log.js";
 import { ScToast } from "../components/hu-toast.js";
 import { ChatController, type ChatItem, type GatewayLike } from "../controllers/chat-controller.js";
+import { staggerMotion9Styles } from "../styles/scroll-entrance.js";
 import "../components/hu-button.js";
 import "../components/hu-chat-composer.js";
 import "../components/hu-message-thread.js";
@@ -17,129 +18,224 @@ import "../components/hu-chat-search.js";
 import "../components/hu-chat-sessions-panel.js";
 import "../components/hu-context-menu.js";
 import "../components/hu-status-dot.js";
+import "../components/hu-skeleton.js";
+import "../components/hu-empty-state.js";
 
 @customElement("hu-chat-view")
 export class ScChatView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
-  static override styles = css`
-    :host {
-      view-transition-name: view-chat;
-      display: flex;
-      flex-direction: column;
-      contain: layout style;
-      height: 100%;
-      max-height: calc(100vh - var(--hu-space-5xl));
-    }
-    .main-wrap {
-      display: flex;
-      flex-direction: row;
-      flex: 1;
-      min-width: 0;
-      position: relative;
-      width: 100%;
-    }
-    .container {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      height: 100%;
-      max-width: 45rem;
-      margin: 0 auto;
-      position: relative;
-      width: 100%;
-    }
-    .status-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: var(--hu-space-xs) var(--hu-space-md);
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-      background: color-mix(in srgb, var(--hu-bg-surface) 60%, transparent);
-      backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
-      -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
-      border-bottom: 1px solid var(--hu-border-subtle);
-    }
-    .status-left,
-    .status-right {
-      display: flex;
-      align-items: center;
-      gap: var(--hu-space-sm);
-    }
-    .status-title {
-      font-weight: var(--hu-weight-medium);
-      color: var(--hu-text);
-      font-size: var(--hu-text-sm);
-    }
-    .kbd-hint {
-      display: inline-flex;
-      align-items: center;
-      padding: var(--hu-space-2xs) var(--hu-space-xs);
-      font-size: var(--hu-text-2xs);
-      font-family: var(--hu-font);
-      background: var(--hu-bg-elevated);
-      border: 1px solid var(--hu-border);
-      border-radius: var(--hu-radius-sm);
-      color: var(--hu-text-muted);
-      line-height: 1;
-    }
-    .retry-btn {
-      margin-top: var(--hu-space-xs);
-    }
-    .error-banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: var(--hu-space-md);
-      background: var(--hu-error-dim);
-      border: 1px solid var(--hu-error);
-      border-radius: var(--hu-radius);
-      color: var(--hu-error);
-      font-size: var(--hu-text-base);
-    }
-    .error-banner button {
-      background: none;
-      border: none;
-      color: inherit;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      padding: var(--hu-space-2xs) var(--hu-space-xs);
-    }
-    .error-banner button svg {
-      width: 1rem;
-      height: 1rem;
-      line-height: 1;
-    }
-    .sessions-toggle {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: var(--hu-space-2xs) var(--hu-space-sm);
-      background: transparent;
-      border: 1px solid var(--hu-border);
-      border-radius: var(--hu-radius-sm);
-      color: var(--hu-text-muted);
-      cursor: pointer;
-      transition:
-        color var(--hu-duration-fast),
-        border-color var(--hu-duration-fast);
-    }
-    .sessions-toggle:hover {
-      color: var(--hu-text);
-      border-color: var(--hu-text-muted);
-    }
-    .sessions-toggle svg {
-      width: 1.125rem;
-      height: 1.125rem;
-    }
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0s !important;
-        transition-duration: 0s !important;
+  static override styles = [
+    staggerMotion9Styles,
+    css`
+      :host {
+        view-transition-name: view-chat;
+        display: flex;
+        flex-direction: column;
+        contain: layout style;
+        height: 100%;
+        max-height: calc(100vh - var(--hu-space-5xl));
       }
-    }
-  `;
+      .main-wrap {
+        display: flex;
+        flex-direction: row;
+        flex: 1;
+        min-width: 0;
+        position: relative;
+        width: 100%;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        height: 100%;
+        max-width: 45rem;
+        margin: 0 auto;
+        position: relative;
+        width: 100%;
+        container-type: inline-size;
+      }
+      .status-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--hu-space-xs) var(--hu-space-md);
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+        background: color-mix(in srgb, var(--hu-bg-surface) 60%, transparent);
+        backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
+        -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
+        border-bottom: 1px solid var(--hu-border-subtle);
+      }
+      .status-left,
+      .status-right {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-sm);
+      }
+      .status-title {
+        font-weight: var(--hu-weight-medium);
+        color: var(--hu-text);
+        font-size: var(--hu-text-sm);
+      }
+      .kbd-hint {
+        display: inline-flex;
+        align-items: center;
+        padding: var(--hu-space-2xs) var(--hu-space-xs);
+        font-size: var(--hu-text-2xs);
+        font-family: var(--hu-font);
+        background: var(--hu-bg-elevated);
+        border: 1px solid var(--hu-border);
+        border-radius: var(--hu-radius-sm);
+        color: var(--hu-text-muted);
+        line-height: 1;
+      }
+      .retry-btn {
+        margin-top: var(--hu-space-xs);
+      }
+      .error-banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--hu-space-md);
+        background: var(--hu-error-dim);
+        border: 1px solid var(--hu-error);
+        border-radius: var(--hu-radius);
+        color: var(--hu-error);
+        font-size: var(--hu-text-base);
+      }
+      .error-banner button {
+        background: none;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        padding: var(--hu-space-2xs) var(--hu-space-xs);
+      }
+      .error-banner button svg {
+        width: 1rem;
+        height: 1rem;
+        line-height: 1;
+      }
+      .sessions-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--hu-space-2xs) var(--hu-space-sm);
+        background: transparent;
+        border: 1px solid var(--hu-border);
+        border-radius: var(--hu-radius-sm);
+        color: var(--hu-text-muted);
+        cursor: pointer;
+        transition:
+          color var(--hu-duration-fast),
+          border-color var(--hu-duration-fast);
+      }
+      .sessions-toggle:hover {
+        color: var(--hu-text);
+        border-color: var(--hu-text-muted);
+      }
+      .sessions-toggle svg {
+        width: 1.125rem;
+        height: 1.125rem;
+      }
+      .skeleton-wrap {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .skeleton-toolbar {
+        width: 200px;
+      }
+      .skeleton-bubbles {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-lg);
+        padding: var(--hu-space-md);
+        flex: 1;
+      }
+      .skeleton-bubble {
+        max-width: 75%;
+      }
+      .skeleton-bubble.left {
+        align-self: flex-start;
+      }
+      .skeleton-bubble.right {
+        align-self: flex-end;
+      }
+      .skeleton-composer {
+        width: 100%;
+      }
+      .empty-state-wrap {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
+      }
+      .suggestion-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: var(--hu-space-sm) var(--hu-space-lg);
+        background: color-mix(in srgb, var(--hu-surface-container) 50%, transparent);
+        border: 1px solid var(--hu-border-subtle);
+        border-radius: var(--hu-radius-full);
+        font-family: var(--hu-font);
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text);
+        cursor: pointer;
+        transition:
+          border-color var(--hu-duration-fast),
+          background var(--hu-duration-fast),
+          transform var(--hu-duration-fast);
+      }
+      .suggestion-chip:hover {
+        border-color: var(--hu-accent);
+        background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
+        transform: translateY(calc(-1 * var(--hu-focus-ring-width, 2px)));
+      }
+      .suggestion-chip:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
+      }
+      .suggestion-chips {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: var(--hu-space-sm);
+        margin-top: var(--hu-space-md);
+      }
+      @container (max-width: 600px) /* --hu-breakpoint-md */ {
+        .container {
+          padding: 0 var(--hu-space-sm);
+        }
+        .status-bar {
+          padding: var(--hu-space-xs) var(--hu-space-sm);
+          flex-wrap: wrap;
+        }
+        .skeleton-bubbles {
+          padding: var(--hu-space-sm);
+        }
+      }
+      @container (max-width: 400px) /* --hu-breakpoint-sm */ {
+        .status-left span:not(.status-title),
+        .status-right .kbd-hint {
+          display: none;
+        }
+        .status-bar {
+          padding: var(--hu-space-2xs) var(--hu-space-xs);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0s !important;
+          transition-duration: 0s !important;
+        }
+      }
+    `,
+  ];
 
   @property() sessionKey = "default";
   private chat = new ChatController(this, () => this.gateway as GatewayLike | null);
@@ -497,99 +593,122 @@ export class ScChatView extends GatewayAwareLitElement {
         <div class="container">
           ${this._renderStatusBar()} ${this._renderErrorBanner()}
           ${this._renderHistoryErrorBanner()} ${this._renderSearch()}
-          <hu-message-thread
-            .items=${this.chat.items}
-            .isWaiting=${this.chat.isWaiting}
-            .streamElapsed=${this.chat.streamElapsed}
-            .historyLoading=${this.chat.historyLoading}
-            .hasEarlierMessages=${this.chat.hasEarlierMessages}
-            .loadingEarlier=${this.chat.loadingEarlier}
-            @hu-context-menu=${(e: CustomEvent<{ event: MouseEvent; item: ChatItem }>) =>
-              this._onMessageContextMenu(e.detail.event, e.detail.item)}
-            @hu-abort=${() => this.handleAbort()}
-            @hu-load-earlier=${() => this.chat.loadEarlier()}
-            @hu-branch-navigate=${(e: CustomEvent<{ index: number; direction: number }>) => {
-              const item = this.chat.items[e.detail.index];
-              if (item?.type === "message" && item.id && item.branchCount && item.branchCount > 1) {
-                const newIndex = (item.branchIndex ?? 0) + e.detail.direction;
-                if (newIndex >= 0 && newIndex < item.branchCount) {
-                  this.chat.items = [
-                    ...this.chat.items.slice(0, e.detail.index),
-                    { ...item, branchIndex: newIndex },
-                    ...this.chat.items.slice(e.detail.index + 1),
-                  ];
-                  this.requestUpdate();
-                }
-              }
-            }}
-            @hu-toggle-reaction=${(e: CustomEvent<{ index: number; value: string }>) =>
-              this.chat.toggleReaction?.(e.detail.index, e.detail.value)}
-            @hu-swipe-reply=${(e: CustomEvent<{ index: number; content: string }>) => {
-              this.inputValue = e.detail.content;
-              this.requestUpdate();
-              this.updateComplete.then(() => this._composer?.focus?.());
-            }}
-            @hu-swipe-copy=${(e: CustomEvent<{ index: number; content: string }>) => {
-              navigator.clipboard?.writeText(e.detail.content).then(
-                () => ScToast.show({ message: "Copied to clipboard", variant: "success" }),
-                () => ScToast.show({ message: "Failed to copy", variant: "error" }),
-              );
-            }}
-            @hu-retry=${(e: CustomEvent<{ content?: string; index?: number }>) => {
-              if (e.detail?.content != null) {
-                const idx = e.detail.index ?? -1;
-                const item = idx >= 0 ? this.chat.items[idx] : undefined;
-                if (item?.type === "message" && item.role === "user" && item.status === "failed") {
-                  this.chat.items = [
-                    ...this.chat.items.slice(0, idx),
-                    ...this.chat.items.slice(idx + 1),
-                  ];
-                  this.chat.cacheMessages(this.sessionKey);
-                }
-                this._handleSend(e.detail.content);
-              } else {
-                this._retry();
-              }
-            }}
-            @hu-regenerate=${(e: CustomEvent<{ content: string; index: number }>) => {
-              this._handleRegenerate(e.detail.index);
-            }}
-            @hu-edit=${(e: CustomEvent<{ content: string; index: number }>) => {
-              this._handleEdit(e.detail.content, e.detail.index);
-            }}
-            @hu-edit-message=${(e: CustomEvent<{ index: number }>) => {
-              const item = this.chat.items[e.detail.index];
-              if (item?.type === "message" && item.role === "user") {
-                this._handleEdit(item.content, e.detail.index);
-              }
-            }}
-            @hu-reply-message=${(e: CustomEvent<{ content: string }>) => {
-              this.inputValue = e.detail.content;
-              this.requestUpdate();
-              this.updateComplete.then(() => this._composer?.focus?.());
-            }}
-            @hu-copy-message=${() => {
-              ScToast.show({ message: "Copied to clipboard", variant: "success" });
-            }}
-            @hu-tapback=${(
-              e: CustomEvent<{ x: number; y: number; index: number; content: string }>,
-            ) => {
-              this._tapback = {
-                open: true,
-                x: e.detail.x,
-                y: e.detail.y,
-                index: e.detail.index,
-                content: e.detail.content,
-              };
-            }}
-            @hu-suggestion-click=${(e: CustomEvent<{ text: string }>) =>
-              this._handleSend(e.detail.text)}
-            @open-artifact=${async (e: CustomEvent<{ id: string }>) => {
-              await import("../components/hu-artifact-panel.js");
-              this.chat.openArtifact(e.detail.id);
-            }}
-            .artifacts=${Array.from(this.chat.artifacts.values())}
-          ></hu-message-thread>
+          ${this.chat.historyLoading
+            ? this._renderSkeleton()
+            : this.chat.items.length === 0
+              ? this._renderEmptyState()
+              : html`
+                  <div
+                    class="hu-stagger-motion9"
+                    style="flex: 1; display: flex; flex-direction: column; min-height: 0;"
+                  >
+                    <hu-message-thread
+                      .items=${this.chat.items}
+                      .isWaiting=${this.chat.isWaiting}
+                      .streamElapsed=${this.chat.streamElapsed}
+                      .historyLoading=${this.chat.historyLoading}
+                      .hasEarlierMessages=${this.chat.hasEarlierMessages}
+                      .loadingEarlier=${this.chat.loadingEarlier}
+                      @hu-context-menu=${(e: CustomEvent<{ event: MouseEvent; item: ChatItem }>) =>
+                        this._onMessageContextMenu(e.detail.event, e.detail.item)}
+                      @hu-abort=${() => this.handleAbort()}
+                      @hu-load-earlier=${() => this.chat.loadEarlier()}
+                      @hu-branch-navigate=${(
+                        e: CustomEvent<{ index: number; direction: number }>,
+                      ) => {
+                        const item = this.chat.items[e.detail.index];
+                        if (
+                          item?.type === "message" &&
+                          item.id &&
+                          item.branchCount &&
+                          item.branchCount > 1
+                        ) {
+                          const newIndex = (item.branchIndex ?? 0) + e.detail.direction;
+                          if (newIndex >= 0 && newIndex < item.branchCount) {
+                            this.chat.items = [
+                              ...this.chat.items.slice(0, e.detail.index),
+                              { ...item, branchIndex: newIndex },
+                              ...this.chat.items.slice(e.detail.index + 1),
+                            ];
+                            this.requestUpdate();
+                          }
+                        }
+                      }}
+                      @hu-toggle-reaction=${(e: CustomEvent<{ index: number; value: string }>) =>
+                        this.chat.toggleReaction?.(e.detail.index, e.detail.value)}
+                      @hu-swipe-reply=${(e: CustomEvent<{ index: number; content: string }>) => {
+                        this.inputValue = e.detail.content;
+                        this.requestUpdate();
+                        this.updateComplete.then(() => this._composer?.focus?.());
+                      }}
+                      @hu-swipe-copy=${(e: CustomEvent<{ index: number; content: string }>) => {
+                        navigator.clipboard?.writeText(e.detail.content).then(
+                          () =>
+                            ScToast.show({ message: "Copied to clipboard", variant: "success" }),
+                          () => ScToast.show({ message: "Failed to copy", variant: "error" }),
+                        );
+                      }}
+                      @hu-retry=${(e: CustomEvent<{ content?: string; index?: number }>) => {
+                        if (e.detail?.content != null) {
+                          const idx = e.detail.index ?? -1;
+                          const item = idx >= 0 ? this.chat.items[idx] : undefined;
+                          if (
+                            item?.type === "message" &&
+                            item.role === "user" &&
+                            item.status === "failed"
+                          ) {
+                            this.chat.items = [
+                              ...this.chat.items.slice(0, idx),
+                              ...this.chat.items.slice(idx + 1),
+                            ];
+                            this.chat.cacheMessages(this.sessionKey);
+                          }
+                          this._handleSend(e.detail.content);
+                        } else {
+                          this._retry();
+                        }
+                      }}
+                      @hu-regenerate=${(e: CustomEvent<{ content: string; index: number }>) => {
+                        this._handleRegenerate(e.detail.index);
+                      }}
+                      @hu-edit=${(e: CustomEvent<{ content: string; index: number }>) => {
+                        this._handleEdit(e.detail.content, e.detail.index);
+                      }}
+                      @hu-edit-message=${(e: CustomEvent<{ index: number }>) => {
+                        const item = this.chat.items[e.detail.index];
+                        if (item?.type === "message" && item.role === "user") {
+                          this._handleEdit(item.content, e.detail.index);
+                        }
+                      }}
+                      @hu-reply-message=${(e: CustomEvent<{ content: string }>) => {
+                        this.inputValue = e.detail.content;
+                        this.requestUpdate();
+                        this.updateComplete.then(() => this._composer?.focus?.());
+                      }}
+                      @hu-copy-message=${() => {
+                        ScToast.show({ message: "Copied to clipboard", variant: "success" });
+                      }}
+                      @hu-tapback=${(
+                        e: CustomEvent<{ x: number; y: number; index: number; content: string }>,
+                      ) => {
+                        this._tapback = {
+                          open: true,
+                          x: e.detail.x,
+                          y: e.detail.y,
+                          index: e.detail.index,
+                          content: e.detail.content,
+                        };
+                      }}
+                      @hu-suggestion-click=${(e: CustomEvent<{ text: string }>) =>
+                        this._handleSend(e.detail.text)}
+                      @open-artifact=${async (e: CustomEvent<{ id: string }>) => {
+                        await import("../components/hu-artifact-panel.js");
+                        this.chat.openArtifact(e.detail.id);
+                      }}
+                      .artifacts=${Array.from(this.chat.artifacts.values())}
+                    ></hu-message-thread>
+                  </div>
+                `}
           ${this._renderRetryButton()}
           <hu-chat-composer
             .value=${this.inputValue}
@@ -766,5 +885,78 @@ export class ScChatView extends GatewayAwareLitElement {
     >
       Retry last message
     </hu-button>`;
+  }
+
+  private _renderSkeleton() {
+    return html`
+      <div class="skeleton-wrap">
+        <div class="skeleton-toolbar">
+          <hu-skeleton variant="line" width="200px" height="var(--hu-space-md)"></hu-skeleton>
+        </div>
+        <div class="skeleton-bubbles">
+          <hu-skeleton
+            variant="line"
+            class="skeleton-bubble left"
+            width="60%"
+            height="var(--hu-space-xl)"
+          ></hu-skeleton>
+          <hu-skeleton
+            variant="line"
+            class="skeleton-bubble right"
+            width="70%"
+            height="var(--hu-space-2xl)"
+          ></hu-skeleton>
+          <hu-skeleton
+            variant="line"
+            class="skeleton-bubble left"
+            width="55%"
+            height="var(--hu-space-lg)"
+          ></hu-skeleton>
+          <hu-skeleton
+            variant="line"
+            class="skeleton-bubble right"
+            width="65%"
+            height="var(--hu-space-2xl)"
+          ></hu-skeleton>
+          <hu-skeleton
+            variant="line"
+            class="skeleton-bubble left"
+            width="50%"
+            height="var(--hu-space-xl)"
+          ></hu-skeleton>
+        </div>
+        <div class="skeleton-composer">
+          <hu-skeleton variant="line" width="100%" height="var(--hu-space-lg)"></hu-skeleton>
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderEmptyState() {
+    const suggestions = ["What can you help me with?", "Summarize a document", "Draft an email"];
+    return html`
+      <div class="empty-state-wrap hu-stagger-motion9">
+        <hu-empty-state
+          .icon=${icons["message-square"]}
+          heading="Start a conversation"
+          description="Ask anything — your AI assistant is ready to help."
+        >
+          <div class="suggestion-chips">
+            ${suggestions.map(
+              (text) => html`
+                <button
+                  type="button"
+                  class="suggestion-chip"
+                  @click=${() => this._handleSend(text)}
+                  aria-label=${`Suggest: ${text}`}
+                >
+                  ${text}
+                </button>
+              `,
+            )}
+          </div>
+        </hu-empty-state>
+      </div>
+    `;
   }
 }
