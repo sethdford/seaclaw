@@ -113,6 +113,8 @@ def main():
             f.write(json.dumps(item) + "\n")
 
     print(f"[semantic_scholar] {len(all_items)} papers from {len(QUERIES)} queries -> {OUTPUT_FILE}")
+    if not all_items:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

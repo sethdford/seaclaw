@@ -107,6 +107,8 @@ def extract_works(data, seen_ids):
         citations = work.get("cited_by_count", 0) or 0
         pub_date = work.get("publication_date", "") or ""
         doi = work.get("doi", "") or ""
+        if doi and not doi.startswith("http"):
+            doi = f"https://doi.org/{doi}"
         url = doi if doi else wid
 
         concepts = []
@@ -167,6 +169,8 @@ def main():
             f.write(json.dumps(item) + "\n")
 
     print(f"[openalex] {len(all_items)} works -> {OUTPUT_FILE}")
+    if not all_items:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
