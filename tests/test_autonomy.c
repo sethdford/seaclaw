@@ -77,6 +77,57 @@ static void test_autonomy_null_args_returns_error(void) {
     HU_ASSERT_EQ(hu_autonomy_consolidate(NULL), HU_ERR_INVALID_ARGUMENT);
 }
 
+static void test_autonomy_intrinsic_goal_on_failures(void) {
+    hu_autonomy_state_t state;
+    hu_autonomy_init(&state, 8192);
+    hu_error_t err = hu_autonomy_generate_intrinsic_goal(&state, 1, 5);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(state.goal_count, 1u);
+    HU_ASSERT_TRUE(strstr(state.goals[0].description, "failure") != NULL);
+    HU_ASSERT_TRUE(state.goals[0].priority >= 0.8);
+}
+
+static void test_autonomy_intrinsic_goal_proactive(void) {
+    hu_autonomy_state_t state;
+    hu_autonomy_init(&state, 8192);
+    hu_error_t err = hu_autonomy_generate_intrinsic_goal(&state, 0, 0);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(state.goal_count, 1u);
+    HU_ASSERT_TRUE(strstr(state.goals[0].description, "check") != NULL ||
+                   strstr(state.goals[0].description, "Proactively") != NULL);
+}
+
+static void test_autonomy_externalize_restore(void) {
+    hu_autonomy_state_t state;
+    hu_autonomy_init(&state, 4096);
+    hu_autonomy_add_goal(&state, "Build report", 12, 0.7);
+    hu_autonomy_add_goal(&state, "Review code", 11, 0.5);
+    state.context_tokens_used = 2000;
+
+    char buf[2048];
+    size_t out_len = 0;
+    HU_ASSERT_EQ(hu_autonomy_externalize_state(&state, buf, sizeof(buf), &out_len), HU_OK);
+    HU_ASSERT_TRUE(out_len > 0);
+
+    hu_autonomy_state_t restored;
+    hu_autonomy_init(&restored, 0);
+    HU_ASSERT_EQ(hu_autonomy_restore_state(&restored, buf, out_len), HU_OK);
+    HU_ASSERT_EQ(restored.goal_count, 2u);
+    HU_ASSERT_EQ(restored.context_budget, 4096u);
+    HU_ASSERT_EQ(restored.context_tokens_used, 2000u);
+    HU_ASSERT_TRUE(restored.goals[0].priority >= 0.6);
+}
+
+static void test_autonomy_externalize_null(void) {
+    hu_autonomy_state_t state;
+    hu_autonomy_init(&state, 8192);
+    char buf[64];
+    size_t len = 0;
+    HU_ASSERT_EQ(hu_autonomy_externalize_state(NULL, buf, 64, &len), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_autonomy_restore_state(NULL, buf, 1), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_autonomy_generate_intrinsic_goal(NULL, 0, 0), HU_ERR_INVALID_ARGUMENT);
+}
+
 void run_autonomy_tests(void) {
     HU_TEST_SUITE("Autonomy");
     HU_RUN_TEST(test_autonomy_init_defaults);
@@ -86,4 +137,8 @@ void run_autonomy_tests(void) {
     HU_RUN_TEST(test_autonomy_needs_consolidation_over_budget);
     HU_RUN_TEST(test_autonomy_consolidate_resets);
     HU_RUN_TEST(test_autonomy_null_args_returns_error);
+    HU_RUN_TEST(test_autonomy_intrinsic_goal_on_failures);
+    HU_RUN_TEST(test_autonomy_intrinsic_goal_proactive);
+    HU_RUN_TEST(test_autonomy_externalize_restore);
+    HU_RUN_TEST(test_autonomy_externalize_null);
 }

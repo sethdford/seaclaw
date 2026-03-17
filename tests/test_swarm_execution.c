@@ -76,6 +76,76 @@ static void swarm_null_args_returns_error(void) {
     HU_ASSERT_EQ(hu_swarm_execute(&alloc, NULL, NULL, 1, &result), HU_ERR_INVALID_ARGUMENT);
 }
 
+static void swarm_handles_agent_failure(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_swarm_config_t config = hu_swarm_config_default();
+    config.retry_on_failure = 1;
+    hu_swarm_task_t tasks[3];
+    memset(tasks, 0, sizeof(tasks));
+    strncpy(tasks[0].description, "normal_task", sizeof(tasks[0].description) - 1);
+    tasks[0].description_len = 11;
+    strncpy(tasks[1].description, "will_fail_task", sizeof(tasks[1].description) - 1);
+    tasks[1].description_len = 14;
+    strncpy(tasks[2].description, "another_task", sizeof(tasks[2].description) - 1);
+    tasks[2].description_len = 12;
+
+    hu_swarm_result_t result = {0};
+    hu_error_t err = hu_swarm_execute(&alloc, &config, tasks, 3, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(result.task_count, 3u);
+    HU_ASSERT_TRUE(result.failed >= 1);
+    HU_ASSERT_TRUE(result.tasks[1].failed);
+    hu_swarm_result_free(&alloc, &result);
+}
+
+static void swarm_aggregate_concatenate(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_swarm_task_t tasks[2];
+    memset(tasks, 0, sizeof(tasks));
+    strncpy(tasks[0].description, "task_a", sizeof(tasks[0].description) - 1);
+    tasks[0].description_len = 6;
+    strncpy(tasks[1].description, "task_b", sizeof(tasks[1].description) - 1);
+    tasks[1].description_len = 6;
+
+    hu_swarm_result_t result = {0};
+    hu_swarm_execute(&alloc, NULL, tasks, 2, &result);
+
+    char agg[4096];
+    size_t agg_len = 0;
+    HU_ASSERT_EQ(hu_swarm_aggregate(&result, HU_SWARM_AGG_CONCATENATE,
+                                     agg, sizeof(agg), &agg_len), HU_OK);
+    HU_ASSERT_TRUE(agg_len > 0);
+    hu_swarm_result_free(&alloc, &result);
+}
+
+static void swarm_aggregate_first_success(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_swarm_task_t tasks[2];
+    memset(tasks, 0, sizeof(tasks));
+    strncpy(tasks[0].description, "first", sizeof(tasks[0].description) - 1);
+    tasks[0].description_len = 5;
+    strncpy(tasks[1].description, "second", sizeof(tasks[1].description) - 1);
+    tasks[1].description_len = 6;
+
+    hu_swarm_result_t result = {0};
+    hu_swarm_execute(&alloc, NULL, tasks, 2, &result);
+
+    char agg[4096];
+    size_t agg_len = 0;
+    HU_ASSERT_EQ(hu_swarm_aggregate(&result, HU_SWARM_AGG_FIRST_SUCCESS,
+                                     agg, sizeof(agg), &agg_len), HU_OK);
+    HU_ASSERT_TRUE(agg_len > 0);
+    HU_ASSERT_STR_EQ(agg, "mock result");
+    hu_swarm_result_free(&alloc, &result);
+}
+
+static void swarm_aggregate_null_args(void) {
+    char buf[64];
+    size_t len = 0;
+    HU_ASSERT_EQ(hu_swarm_aggregate(NULL, HU_SWARM_AGG_CONCATENATE, buf, 64, &len),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+
 void run_swarm_execution_tests(void) {
     HU_TEST_SUITE("swarm_execution");
     HU_RUN_TEST(swarm_config_default_values);
@@ -83,4 +153,8 @@ void run_swarm_execution_tests(void) {
     HU_RUN_TEST(swarm_handles_empty_task_list);
     HU_RUN_TEST(swarm_tracks_results);
     HU_RUN_TEST(swarm_null_args_returns_error);
+    HU_RUN_TEST(swarm_handles_agent_failure);
+    HU_RUN_TEST(swarm_aggregate_concatenate);
+    HU_RUN_TEST(swarm_aggregate_first_success);
+    HU_RUN_TEST(swarm_aggregate_null_args);
 }

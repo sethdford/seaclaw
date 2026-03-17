@@ -128,6 +128,10 @@ hu_error_t hu_world_model_init_tables(hu_world_model_t *model) {
         "UNIQUE(source_id, target_id, edge_type))";
     const char *sql5 = "CREATE INDEX IF NOT EXISTS idx_edges_source ON causal_edges(source_id)";
     const char *sql6 = "CREATE INDEX IF NOT EXISTS idx_edges_target ON causal_edges(target_id)";
+    const char *sql7 =
+        "CREATE TABLE IF NOT EXISTS prediction_accuracy("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, predicted TEXT, actual TEXT, "
+        "predicted_confidence REAL, matched INTEGER, created_at INTEGER)";
 
     char *err = NULL;
     int rc = sqlite3_exec(model->db, sql1, NULL, NULL, &err);
@@ -166,6 +170,13 @@ hu_error_t hu_world_model_init_tables(hu_world_model_t *model) {
     }
     err = NULL;
     rc = sqlite3_exec(model->db, sql6, NULL, NULL, &err);
+    if (rc != SQLITE_OK) {
+        if (err)
+            sqlite3_free(err);
+        return HU_ERR_MEMORY_STORE;
+    }
+    err = NULL;
+    rc = sqlite3_exec(model->db, sql7, NULL, NULL, &err);
     if (rc != SQLITE_OK) {
         if (err)
             sqlite3_free(err);
@@ -1126,6 +1137,84 @@ hu_error_t hu_world_find_paths(hu_world_model_t *model, int64_t from, int64_t to
         (*out_len)++;
     }
 
+    return HU_OK;
+}
+
+hu_error_t hu_world_record_accuracy(hu_world_model_t *model,
+                                     const char *action, size_t action_len,
+                                     const char *predicted, size_t predicted_len,
+                                     const char *actual, size_t actual_len,
+                                     double predicted_confidence) {
+    if (!model || !model->db || !action || !predicted || !actual)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    /* Simple match: check if actual outcome contains key words from prediction */
+    int matched = 0;
+    if (predicted_len > 0 && actual_len > 0) {
+        char pred_lower[256];
+        size_t plen = predicted_len < sizeof(pred_lower) - 1
+                          ? predicted_len : sizeof(pred_lower) - 1;
+        memcpy(pred_lower, predicted, plen);
+        pred_lower[plen] = '\0';
+        for (size_t i = 0; i < plen; i++) {
+            if (pred_lower[i] >= 'A' && pred_lower[i] <= 'Z')
+                pred_lower[i] = (char)(pred_lower[i] + 32);
+        }
+
+        char act_lower[256];
+        size_t alen = actual_len < sizeof(act_lower) - 1
+                          ? actual_len : sizeof(act_lower) - 1;
+        memcpy(act_lower, actual, alen);
+        act_lower[alen] = '\0';
+        for (size_t i = 0; i < alen; i++) {
+            if (act_lower[i] >= 'A' && act_lower[i] <= 'Z')
+                act_lower[i] = (char)(act_lower[i] + 32);
+        }
+
+        matched = (strstr(act_lower, pred_lower) != NULL ||
+                   strstr(pred_lower, act_lower) != NULL) ? 1 : 0;
+    }
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(model->db,
+        "INSERT INTO prediction_accuracy(action, predicted, actual, "
+        "predicted_confidence, matched, created_at) VALUES(?1,?2,?3,?4,?5,?6)",
+        -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+    sqlite3_bind_text(stmt, 1, action, (int)action_len, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, predicted, (int)predicted_len, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, actual, (int)actual_len, SQLITE_STATIC);
+    sqlite3_bind_double(stmt, 4, predicted_confidence);
+    sqlite3_bind_int(stmt, 5, matched);
+    sqlite3_bind_int64(stmt, 6, (int64_t)time(NULL));
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_STORE;
+}
+
+hu_error_t hu_world_get_accuracy(hu_world_model_t *model,
+                                  double *accuracy_out, size_t *sample_count) {
+    if (!model || !model->db || !accuracy_out || !sample_count)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *accuracy_out = 0.0;
+    *sample_count = 0;
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(model->db,
+        "SELECT COUNT(*), SUM(matched) FROM prediction_accuracy",
+        -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        int64_t total = sqlite3_column_int64(stmt, 0);
+        int64_t correct = sqlite3_column_int64(stmt, 1);
+        *sample_count = (size_t)total;
+        if (total > 0)
+            *accuracy_out = (double)correct / (double)total;
+    }
+    sqlite3_finalize(stmt);
     return HU_OK;
 }
 

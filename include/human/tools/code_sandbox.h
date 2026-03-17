@@ -39,6 +39,19 @@ hu_error_t hu_code_sandbox_execute(hu_allocator_t *alloc,
                                    hu_code_sandbox_result_t *result);
 const char *hu_sandbox_language_name(hu_sandbox_language_t lang);
 
+typedef struct hu_code_sandbox_checkpoint {
+    char state_id[64];
+    hu_sandbox_language_t language;
+    int64_t elapsed_ms;
+    bool valid;
+} hu_code_sandbox_checkpoint_t;
+
+hu_error_t hu_code_sandbox_save_checkpoint(const hu_code_sandbox_result_t *result,
+                                            hu_sandbox_language_t language,
+                                            hu_code_sandbox_checkpoint_t *ckpt);
+hu_error_t hu_code_sandbox_restore_checkpoint(const hu_code_sandbox_checkpoint_t *ckpt,
+                                               hu_code_sandbox_config_t *config);
+
 hu_error_t hu_code_sandbox_create(hu_allocator_t *alloc, hu_tool_t *out);
 
 #endif

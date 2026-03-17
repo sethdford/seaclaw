@@ -63,6 +63,50 @@ static void sandbox_null_args_returns_error(void) {
     HU_ASSERT_NEQ(hu_code_sandbox_execute(&alloc, &config, code, 3, NULL), HU_OK);
 }
 
+static void sandbox_checkpoint_save_restore(void) {
+    hu_code_sandbox_result_t result;
+    memset(&result, 0, sizeof(result));
+    result.exit_code = 0;
+    result.elapsed_ms = 500;
+
+    hu_code_sandbox_checkpoint_t ckpt;
+    HU_ASSERT_EQ(hu_code_sandbox_save_checkpoint(&result, HU_SANDBOX_PYTHON, &ckpt), HU_OK);
+    HU_ASSERT_TRUE(ckpt.valid);
+    HU_ASSERT_EQ(ckpt.language, HU_SANDBOX_PYTHON);
+    HU_ASSERT_TRUE(ckpt.state_id[0] != '\0');
+
+    hu_code_sandbox_config_t config = hu_code_sandbox_config_default();
+    config.language = HU_SANDBOX_SHELL;
+    HU_ASSERT_EQ(hu_code_sandbox_restore_checkpoint(&ckpt, &config), HU_OK);
+    HU_ASSERT_EQ(config.language, HU_SANDBOX_PYTHON);
+}
+
+static void sandbox_checkpoint_invalid_rejects(void) {
+    hu_code_sandbox_result_t result;
+    memset(&result, 0, sizeof(result));
+    result.exit_code = 1;
+    result.timed_out = true;
+
+    hu_code_sandbox_checkpoint_t ckpt;
+    hu_code_sandbox_save_checkpoint(&result, HU_SANDBOX_PYTHON, &ckpt);
+    HU_ASSERT_FALSE(ckpt.valid);
+
+    hu_code_sandbox_config_t config = hu_code_sandbox_config_default();
+    HU_ASSERT_EQ(hu_code_sandbox_restore_checkpoint(&ckpt, &config), HU_ERR_INVALID_ARGUMENT);
+}
+
+static void sandbox_checkpoint_null_args(void) {
+    hu_code_sandbox_checkpoint_t ckpt;
+    hu_code_sandbox_config_t config;
+    hu_code_sandbox_result_t result;
+    memset(&result, 0, sizeof(result));
+    HU_ASSERT_EQ(hu_code_sandbox_save_checkpoint(NULL, HU_SANDBOX_PYTHON, &ckpt),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_code_sandbox_save_checkpoint(&result, HU_SANDBOX_PYTHON, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_code_sandbox_restore_checkpoint(NULL, &config), HU_ERR_INVALID_ARGUMENT);
+}
+
 void run_code_sandbox_tests(void) {
     HU_TEST_SUITE("Code Sandbox");
     HU_RUN_TEST(sandbox_config_defaults);
@@ -71,4 +115,7 @@ void run_code_sandbox_tests(void) {
     HU_RUN_TEST(sandbox_execute_shell);
     HU_RUN_TEST(sandbox_language_name);
     HU_RUN_TEST(sandbox_null_args_returns_error);
+    HU_RUN_TEST(sandbox_checkpoint_save_restore);
+    HU_RUN_TEST(sandbox_checkpoint_invalid_rejects);
+    HU_RUN_TEST(sandbox_checkpoint_null_args);
 }

@@ -32,6 +32,8 @@ sleep 2
 echo "[deploy] Installing binary..."
 cp "$BUILD_DIR/human" "$INSTALL_PATH"
 chmod +x "$INSTALL_PATH"
+codesign --force --sign - "$INSTALL_PATH" 2>/dev/null
+xattr -cr "$INSTALL_PATH" 2>/dev/null
 ls -lh "$INSTALL_PATH"
 
 echo "[deploy] Smoke test..."
