@@ -46,6 +46,7 @@ _human() {
                 sandbox:Sandbox management
                 eval:Run evaluation harness
                 feed:Feed management
+                ml:ML training and experiments
             )'
             ;;
         args)

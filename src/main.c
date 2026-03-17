@@ -269,7 +269,7 @@ static const hu_command_t commands[] = {
 #ifdef HU_HAS_PERSONA
     {"persona", "Create and manage persona profiles", cmd_persona},
 #endif
-#ifdef HU_ENABLE_FEEDS
+#if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
     {"feed", "Feed monitoring and ingestion", cmd_feed},
 #endif
     {"workspace", "Workspace management", cmd_workspace},
