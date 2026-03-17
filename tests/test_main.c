@@ -74,6 +74,7 @@ void run_persona_mood_tests(void);
 void run_persona_feedback_tests(void);
 void run_persona_cli_tests(void);
 void run_voice_maturity_tests(void);
+void run_style_learner_tests(void);
 #endif
 void run_lifecycle_tests(void);
 void run_observer_tests(void);
@@ -385,6 +386,7 @@ int main(int argc, char **argv) {
     run_persona_feedback_tests();
     run_persona_cli_tests();
     run_voice_maturity_tests();
+    run_style_learner_tests();
 #endif
     run_lifecycle_tests();
     run_observer_tests();
