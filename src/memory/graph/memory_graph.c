@@ -380,4 +380,117 @@ const char *hu_memory_graph_type_name(hu_memory_graph_type_t type) {
     }
 }
 
+hu_error_t hu_memory_graph_ingest(hu_memory_graph_t *g, const char *content, size_t content_len,
+                                   int64_t timestamp) {
+    if (!g || !g->db || !content || content_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    int64_t new_id = 0;
+    hu_error_t err = hu_memory_graph_add_node(g, content, content_len, &new_id);
+    if (err != HU_OK)
+        return err;
+
+    /* Temporal edges: link to recent nodes within a 5-minute window */
+    int64_t window = 5 * 60 * 1000;
+    int64_t cutoff = timestamp > window ? timestamp - window : 0;
+
+    const char *recent_sql =
+        "SELECT id FROM memory_nodes WHERE id != ? AND created_at >= ? ORDER BY created_at DESC LIMIT 5";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(g->db, recent_sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, new_id);
+        sqlite3_bind_int64(stmt, 2, cutoff);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int64_t neighbor_id = sqlite3_column_int64(stmt, 0);
+            (void)hu_memory_graph_add_edge(g, new_id, neighbor_id, HU_GRAPH_TEMPORAL, 0.8);
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    /* Entity edges: link to nodes sharing word overlap (lightweight entity matching) */
+    size_t preview_len = content_len > 50 ? 50 : content_len;
+    char pattern[64];
+    size_t pat_len = 0;
+    for (size_t i = 0; i < preview_len && pat_len < 50; i++) {
+        if ((unsigned char)content[i] >= 'a' && (unsigned char)content[i] <= 'z')
+            pattern[pat_len++] = content[i];
+        else if ((unsigned char)content[i] >= 'A' && (unsigned char)content[i] <= 'Z')
+            pattern[pat_len++] = (char)(content[i] + 32);
+        else if (pat_len > 0 && pattern[pat_len - 1] != '%')
+            pattern[pat_len++] = '%';
+    }
+    if (pat_len > 3) {
+        pattern[pat_len] = '\0';
+        const char *entity_sql =
+            "SELECT id FROM memory_nodes WHERE id != ? AND content_preview LIKE ? LIMIT 3";
+        if (sqlite3_prepare_v2(g->db, entity_sql, -1, &stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(stmt, 1, new_id);
+            sqlite3_bind_text(stmt, 2, pattern, (int)pat_len, SQLITE_STATIC);
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                int64_t eid = sqlite3_column_int64(stmt, 0);
+                (void)hu_memory_graph_add_edge(g, new_id, eid, HU_GRAPH_ENTITY, 0.6);
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    return HU_OK;
+}
+
+hu_error_t hu_memory_graph_build_context(hu_memory_graph_t *g, hu_allocator_t *alloc,
+                                          int64_t node_id, int max_hops,
+                                          char **out, size_t *out_len) {
+    if (!g || !alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *out = NULL;
+    *out_len = 0;
+
+    hu_memory_node_t results[32];
+    size_t total = 0;
+
+    /* Traverse each graph type and collect results */
+    hu_memory_graph_type_t types[] = {HU_GRAPH_SEMANTIC, HU_GRAPH_TEMPORAL,
+                                       HU_GRAPH_ENTITY, HU_GRAPH_CAUSAL};
+    for (int t = 0; t < 4 && total < 32; t++) {
+        hu_memory_node_t buf[8];
+        size_t count = 0;
+        if (hu_memory_graph_traverse(g, node_id, types[t], max_hops, buf,
+                                      8, &count) == HU_OK) {
+            for (size_t i = 0; i < count && total < 32; i++) {
+                bool dup = false;
+                for (size_t j = 0; j < total; j++)
+                    if (results[j].id == buf[i].id) { dup = true; break; }
+                if (!dup)
+                    results[total++] = buf[i];
+            }
+        }
+    }
+
+    if (total == 0)
+        return HU_OK;
+
+    /* Build context string from node previews */
+    size_t cap = 0;
+    for (size_t i = 0; i < total; i++)
+        cap += results[i].preview_len + 20;
+
+    char *buf = (char *)alloc->alloc(alloc->ctx, cap + 1);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    size_t pos = 0;
+    for (size_t i = 0; i < total; i++) {
+        int n = snprintf(buf + pos, cap - pos + 1, "- [%s] %.*s\n",
+                         hu_memory_graph_type_name(results[i].type),
+                         (int)results[i].preview_len, results[i].content_preview);
+        if (n > 0 && pos + (size_t)n < cap)
+            pos += (size_t)n;
+    }
+    buf[pos] = '\0';
+    *out = buf;
+    *out_len = pos;
+    return HU_OK;
+}
+
 #endif /* HU_ENABLE_SQLITE */

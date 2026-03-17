@@ -58,5 +58,12 @@ hu_error_t hu_memory_graph_find_bridges(hu_memory_graph_t *g, int64_t node_a, in
 
 const char *hu_memory_graph_type_name(hu_memory_graph_type_t type);
 
+hu_error_t hu_memory_graph_ingest(hu_memory_graph_t *g, const char *content, size_t content_len,
+                                   int64_t timestamp);
+
+hu_error_t hu_memory_graph_build_context(hu_memory_graph_t *g, hu_allocator_t *alloc,
+                                          int64_t node_id, int max_hops,
+                                          char **out, size_t *out_len);
+
 #endif /* HU_ENABLE_SQLITE */
 #endif /* HU_MEMORY_GRAPH_MAGMA_H */

@@ -209,6 +209,73 @@ static void graph_memory_null_args_returns_error(void) {
     sqlite3_close(db);
 }
 
+static void graph_memory_ingest_creates_temporal_edges(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    sqlite3_open(":memory:", &db);
+
+    hu_memory_graph_t g = {0};
+    hu_memory_graph_create(&alloc, db, &g);
+
+    int64_t ts = 1000000;
+    hu_error_t err = hu_memory_graph_ingest(&g, "first memory", 12, ts);
+    HU_ASSERT_EQ(err, HU_OK);
+    err = hu_memory_graph_ingest(&g, "second memory", 13, ts + 1000);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_memory_node_t results[8];
+    size_t count = 0;
+    err = hu_memory_graph_traverse(&g, 2, HU_GRAPH_TEMPORAL, 1, results, 8, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(count >= 1);
+
+    hu_memory_graph_deinit(&g);
+    sqlite3_close(db);
+}
+
+static void graph_memory_build_context_returns_text(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    sqlite3_open(":memory:", &db);
+
+    hu_memory_graph_t g = {0};
+    hu_memory_graph_create(&alloc, db, &g);
+
+    int64_t id_a = 0, id_b = 0;
+    hu_memory_graph_add_node(&g, "node about cats", 15, &id_a);
+    hu_memory_graph_add_node(&g, "node about dogs", 15, &id_b);
+    hu_memory_graph_add_edge(&g, id_a, id_b, HU_GRAPH_SEMANTIC, 1.0);
+
+    char *ctx = NULL;
+    size_t ctx_len = 0;
+    hu_error_t err = hu_memory_graph_build_context(&g, &alloc, id_a, 1, &ctx, &ctx_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(ctx);
+    HU_ASSERT_TRUE(ctx_len > 0);
+    HU_ASSERT_TRUE(strstr(ctx, "semantic") != NULL || strstr(ctx, "dogs") != NULL);
+
+    alloc.free(alloc.ctx, ctx, ctx_len + 1);
+    hu_memory_graph_deinit(&g);
+    sqlite3_close(db);
+}
+
+static void graph_memory_ingest_null_args(void) {
+    hu_error_t err = hu_memory_graph_ingest(NULL, "x", 1, 0);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    sqlite3_open(":memory:", &db);
+    hu_memory_graph_t g = {0};
+    hu_memory_graph_create(&alloc, db, &g);
+
+    err = hu_memory_graph_ingest(&g, NULL, 0, 0);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+
+    hu_memory_graph_deinit(&g);
+    sqlite3_close(db);
+}
+
 void run_memory_graph_tests(void) {
     HU_TEST_SUITE("memory_graph");
     HU_RUN_TEST(graph_memory_init_tables);
@@ -220,6 +287,9 @@ void run_memory_graph_tests(void) {
     HU_RUN_TEST(graph_memory_find_bridges);
     HU_RUN_TEST(graph_memory_type_name_correct);
     HU_RUN_TEST(graph_memory_null_args_returns_error);
+    HU_RUN_TEST(graph_memory_ingest_creates_temporal_edges);
+    HU_RUN_TEST(graph_memory_build_context_returns_text);
+    HU_RUN_TEST(graph_memory_ingest_null_args);
 }
 
 #else
