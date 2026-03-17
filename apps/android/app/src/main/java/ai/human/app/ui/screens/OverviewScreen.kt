@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -29,11 +32,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,6 +61,7 @@ private val listItemSpring = spring<IntOffset>(
     stiffness = Spring.StiffnessMediumLow,
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OverviewScreen(
     gateway: GatewayClient = GatewayClient(),
@@ -62,6 +69,9 @@ fun OverviewScreen(
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val reducedMotion = isReducedMotionEnabled()
+    val scope = rememberCoroutineScope()
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullToRefreshState = rememberPullToRefreshState()
     val events by gateway.events.collectAsState()
     val recentActivity = remember { mutableStateListOf<String>() }
 
@@ -92,6 +102,21 @@ fun OverviewScreen(
         ConnectionState.DISCONNECTED -> colorScheme.error
     }
 
+    PullToRefreshBox(
+        state = pullToRefreshState,
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            scope.launch {
+                if (connectionState == ConnectionState.CONNECTED) {
+                    gateway.prefetchSessions()
+                    gateway.prefetchTools()
+                }
+                delay(HUTokens.durationNormal.toLong())
+                isRefreshing = false
+            }
+        },
+    ) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -232,7 +257,7 @@ fun OverviewScreen(
             }
         }
 
-        items(recentActivity.size) { index ->
+        items(recentActivity.size, key = { it }) { index ->
             val activity = recentActivity[index]
             StaggeredItem(
                 index = 4 + index,

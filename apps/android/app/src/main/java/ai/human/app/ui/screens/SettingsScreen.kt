@@ -58,10 +58,11 @@ import ai.human.app.util.isReducedMotionEnabled
 fun SettingsScreen(
     gateway: GatewayClient,
     connectionState: ConnectionState,
+    initialGatewayUrl: String = "http://localhost:3000",
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val reducedMotion = isReducedMotionEnabled()
-    var gatewayUrl by remember { mutableStateOf("ws://localhost:3000") }
+    var gatewayUrl by remember(initialGatewayUrl) { mutableStateOf(initialGatewayUrl) }
     var advancedExpanded by remember { mutableStateOf(false) }
     val isConnected = connectionState == ConnectionState.CONNECTED
 
