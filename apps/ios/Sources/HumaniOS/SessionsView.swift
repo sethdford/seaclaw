@@ -18,6 +18,7 @@ struct ChatSession: Identifiable {
 }
 
 struct SessionsView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @State private var sessions: [ChatSession] = [
         ChatSession(title: "Weather & Planning", lastMessage: "I'll check the forecast for you.", timestamp: Date().addingTimeInterval(-300)),
@@ -96,8 +97,12 @@ struct SessionsView: View {
                             }
                         }
                         Button(role: .destructive) {
-                            withAnimation(HUTokens.springExpressive) {
+                            if reduceMotion {
                                 sessions.removeAll { $0.id == session.id }
+                            } else {
+                                withAnimation(HUTokens.springExpressive) {
+                                    sessions.removeAll { $0.id == session.id }
+                                }
                             }
                         } label: { Label("Delete", systemImage: "trash") }
                     }
@@ -107,8 +112,12 @@ struct SessionsView: View {
 #if os(iOS)
                             HUTokens.Haptic.medium.trigger()
 #endif
-                            withAnimation(HUTokens.springExpressive) {
+                            if reduceMotion {
                                 sessions.removeAll { $0.id == session.id }
+                            } else {
+                                withAnimation(HUTokens.springExpressive) {
+                                    sessions.removeAll { $0.id == session.id }
+                                }
                             }
                         } label: {
                             Label("Delete", systemImage: "trash")
@@ -117,9 +126,15 @@ struct SessionsView: View {
 #if os(iOS)
                             HUTokens.Haptic.light.trigger()
 #endif
-                            withAnimation(HUTokens.springExpressive) {
+                            if reduceMotion {
                                 if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
                                     sessions[idx].isArchived = true
+                                }
+                            } else {
+                                withAnimation(HUTokens.springExpressive) {
+                                    if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
+                                        sessions[idx].isArchived = true
+                                    }
                                 }
                             }
                         } label: {
@@ -155,8 +170,12 @@ struct SessionsView: View {
                                     }
                                 }
                                 Button(role: .destructive) {
-                                    withAnimation(HUTokens.springExpressive) {
+                                    if reduceMotion {
                                         sessions.removeAll { $0.id == session.id }
+                                    } else {
+                                        withAnimation(HUTokens.springExpressive) {
+                                            sessions.removeAll { $0.id == session.id }
+                                        }
                                     }
                                 } label: { Label("Delete", systemImage: "trash") }
                             }
@@ -166,8 +185,12 @@ struct SessionsView: View {
 #if os(iOS)
                                     HUTokens.Haptic.medium.trigger()
 #endif
-                                    withAnimation(HUTokens.springExpressive) {
+                                    if reduceMotion {
                                         sessions.removeAll { $0.id == session.id }
+                                    } else {
+                                        withAnimation(HUTokens.springExpressive) {
+                                            sessions.removeAll { $0.id == session.id }
+                                        }
                                     }
                                 } label: {
                                     Label("Delete", systemImage: "trash")
@@ -176,9 +199,15 @@ struct SessionsView: View {
 #if os(iOS)
                                     HUTokens.Haptic.light.trigger()
 #endif
-                                    withAnimation(HUTokens.springExpressive) {
+                                    if reduceMotion {
                                         if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
                                             sessions[idx].isArchived = false
+                                        }
+                                    } else {
+                                        withAnimation(HUTokens.springExpressive) {
+                                            if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
+                                                sessions[idx].isArchived = false
+                                            }
                                         }
                                     }
                                 } label: {

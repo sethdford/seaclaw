@@ -2,6 +2,7 @@ import SwiftUI
 import HumanChatUI
 
 struct SettingsView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var connectionManager: ConnectionManager
 
@@ -48,15 +49,23 @@ struct SettingsView: View {
                                 .foregroundStyle(tokens.textMuted)
                         }
                         .accessibilityLabel("Connection status: \(connectionManager.isConnected ? "Connected" : "Disconnected")")
-                        .animation(HUTokens.springInteractive, value: connectionManager.isConnected)
+                        .animation(reduceMotion ? nil : HUTokens.springInteractive, value: connectionManager.isConnected)
                     }
 
                     Button(connectionManager.isConnected ? "Disconnect" : "Connect") {
-                        withAnimation(HUTokens.springInteractive) {
+                        if reduceMotion {
                             if connectionManager.isConnected {
                                 connectionManager.disconnect()
                             } else {
                                 connectionManager.connect()
+                            }
+                        } else {
+                            withAnimation(HUTokens.springInteractive) {
+                                if connectionManager.isConnected {
+                                    connectionManager.disconnect()
+                                } else {
+                                    connectionManager.connect()
+                                }
                             }
                         }
                     }
@@ -65,8 +74,12 @@ struct SettingsView: View {
 
                     if connectionManager.isConnected {
                         Button("Reconnect") {
-                            withAnimation(HUTokens.springInteractive) {
+                            if reduceMotion {
                                 connectionManager.reconnect()
+                            } else {
+                                withAnimation(HUTokens.springInteractive) {
+                                    connectionManager.reconnect()
+                                }
                             }
                         }
                         .font(.custom("Avenir-Medium", size: HUTokens.textBase, relativeTo: .body))

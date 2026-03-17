@@ -7,6 +7,7 @@ enum AppTab: Int, CaseIterable {
 
 struct ContentView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject var connectionManager: ConnectionManager
     @State private var selectedTab: AppTab = .overview
 
@@ -47,17 +48,17 @@ struct ContentView: View {
         .overlay(alignment: .topLeading) {
             // iPad keyboard shortcuts: Cmd+1..5 for tabs, Cmd+N for new chat
             Group {
-                Button { selectedTab = .overview } label: { EmptyView() }
+                Button { selectTab(.overview) } label: { EmptyView() }
                     .keyboardShortcut("1", modifiers: .command)
-                Button { selectedTab = .chat } label: { EmptyView() }
+                Button { selectTab(.chat) } label: { EmptyView() }
                     .keyboardShortcut("2", modifiers: .command)
-                Button { selectedTab = .sessions } label: { EmptyView() }
+                Button { selectTab(.sessions) } label: { EmptyView() }
                     .keyboardShortcut("3", modifiers: .command)
-                Button { selectedTab = .tools } label: { EmptyView() }
+                Button { selectTab(.tools) } label: { EmptyView() }
                     .keyboardShortcut("4", modifiers: .command)
-                Button { selectedTab = .settings } label: { EmptyView() }
+                Button { selectTab(.settings) } label: { EmptyView() }
                     .keyboardShortcut("5", modifiers: .command)
-                Button { selectedTab = .chat } label: { EmptyView() }
+                Button { selectTab(.chat) } label: { EmptyView() }
                     .keyboardShortcut("n", modifiers: .command)
             }
             .frame(width: 0, height: 0)

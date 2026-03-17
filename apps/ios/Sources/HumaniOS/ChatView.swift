@@ -4,6 +4,7 @@ import HumanProtocol
 
 struct ChatView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject var connectionManager: ConnectionManager
     @FocusState private var isInputFocused: Bool
     @State private var messages: [ChatMessage] = []
@@ -68,8 +69,12 @@ struct ChatView: View {
                                     Label("Share", systemImage: "square.and.arrow.up")
                                 }
                                 Button(role: .destructive) {
-                                    withAnimation(HUTokens.springInteractive) {
+                                    if reduceMotion {
                                         messages.removeAll { $0.id == msg.id }
+                                    } else {
+                                        withAnimation(HUTokens.springInteractive) {
+                                            messages.removeAll { $0.id == msg.id }
+                                        }
                                     }
                                 } label: { Label("Delete", systemImage: "trash") }
                             }
@@ -81,12 +86,16 @@ struct ChatView: View {
                             .transition(messageTransition)
                     }
                 }
-                .animation(HUTokens.springInteractive, value: messages.count + toolCalls.count)
+                .animation(reduceMotion ? nil : HUTokens.springInteractive, value: messages.count + toolCalls.count)
                 .padding()
             }
             .onChange(of: messages.count) { _, _ in
                 if let last = messages.last {
-                    withAnimation(HUTokens.springInteractive) { proxy.scrollTo(last.id, anchor: .bottom) }
+                    if reduceMotion {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    } else {
+                        withAnimation(HUTokens.springInteractive) { proxy.scrollTo(last.id, anchor: .bottom) }
+                    }
                 }
             }
         }
@@ -148,8 +157,12 @@ struct ChatView: View {
         inputText = ""
         sendTrigger += 1
 
-        withAnimation(HUTokens.springInteractive) {
+        if reduceMotion {
             messages.append(ChatMessage(id: UUID(), text: trimmed, role: .user))
+        } else {
+            withAnimation(HUTokens.springInteractive) {
+                messages.append(ChatMessage(id: UUID(), text: trimmed, role: .user))
+            }
         }
 
         Task {
@@ -160,12 +173,20 @@ struct ChatView: View {
                 )
             } catch {
                 await MainActor.run {
-                    withAnimation(HUTokens.springInteractive) {
+                    if reduceMotion {
                         messages.append(ChatMessage(
                             id: UUID(),
                             text: "Failed to send: \(error.localizedDescription)",
                             role: .assistant
                         ))
+                    } else {
+                        withAnimation(HUTokens.springInteractive) {
+                            messages.append(ChatMessage(
+                                id: UUID(),
+                                text: "Failed to send: \(error.localizedDescription)",
+                                role: .assistant
+                            ))
+                        }
                     }
                 }
             }
@@ -184,7 +205,7 @@ struct ChatView: View {
                 let state = payload?["state"]?.value as? String
                 let content = payload?["message"]?.value as? String
                 if let content = content, !content.isEmpty {
-                    withAnimation(HUTokens.springExpressive) { // Page-level transition
+                    if reduceMotion {
                         switch state {
                         case "received":
                             messages.append(ChatMessage(id: UUID(), text: content, role: .user))
@@ -201,6 +222,25 @@ struct ChatView: View {
                         default:
                             break
                         }
+                    } else {
+                        withAnimation(HUTokens.springExpressive) {
+                            switch state {
+                            case "received":
+                                messages.append(ChatMessage(id: UUID(), text: content, role: .user))
+                            case "sent":
+                                messages.append(ChatMessage(id: UUID(), text: content, role: .assistant))
+                            case "chunk":
+                                if let last = messages.last, last.role == .assistant {
+                                    messages[messages.count - 1] = ChatMessage(
+                                        id: last.id, text: last.text + content, role: .assistant
+                                    )
+                                } else {
+                                    messages.append(ChatMessage(id: UUID(), text: content, role: .assistant))
+                                }
+                            default:
+                                break
+                            }
+                        }
                     }
                 }
             case "agent.tool":
@@ -208,7 +248,7 @@ struct ChatView: View {
                 let args = (payload?["arguments"]?.value as? [String: Any])
                     .flatMap { try? JSONSerialization.data(withJSONObject: $0) }
                     .flatMap { String(data: $0, encoding: .utf8) }
-                withAnimation(HUTokens.springInteractive) {
+                if reduceMotion {
                     if let ok = payload?["success"]?.value as? Bool, !toolCalls.isEmpty {
                         let idx = toolCalls.count - 1
                         let result = (payload?["detail"]?.value ?? payload?["message"]?.value).map { "\($0)" }
@@ -226,6 +266,27 @@ struct ChatView: View {
                             arguments: args,
                             status: .running
                         ))
+                    }
+                } else {
+                    withAnimation(HUTokens.springInteractive) {
+                    if let ok = payload?["success"]?.value as? Bool, !toolCalls.isEmpty {
+                        let idx = toolCalls.count - 1
+                        let result = (payload?["detail"]?.value ?? payload?["message"]?.value).map { "\($0)" }
+                        toolCalls[idx] = ToolCallInfo(
+                            id: toolCalls[idx].id,
+                            name: toolCalls[idx].name,
+                            arguments: toolCalls[idx].arguments,
+                            status: ok ? .completed : .failed,
+                            result: result
+                        )
+                    } else {
+                        toolCalls.append(ToolCallInfo(
+                            id: UUID(),
+                            name: name,
+                            arguments: args,
+                            status: .running
+                        ))
+                    }
                     }
                 }
             default:

@@ -2,6 +2,7 @@ import SwiftUI
 import HumanChatUI
 
 struct OverviewView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject var connectionManager: ConnectionManager
     @Environment(\.colorScheme) private var colorScheme
     @State private var appeared = false
@@ -49,8 +50,12 @@ struct OverviewView: View {
 #if os(iOS)
                                 HUTokens.Haptic.medium.trigger()
 #endif
-                                withAnimation(HUTokens.springExpressive) {
+                                if reduceMotion {
                                     connectionManager.reconnect()
+                                } else {
+                                    withAnimation(HUTokens.springExpressive) {
+                                        connectionManager.reconnect()
+                                    }
                                 }
                             } label: {
                                 Text("Retry")
@@ -73,7 +78,8 @@ struct OverviewView: View {
                             trendUp: true,
                             tokens: tokens,
                             appeared: appeared,
-                            delay: 0
+                            delay: 0,
+                            reduceMotion: reduceMotion
                         )
                         StatCard(
                             title: "Channels",
@@ -82,7 +88,8 @@ struct OverviewView: View {
                             trendUp: true,
                             tokens: tokens,
                             appeared: appeared,
-                            delay: 0.05
+                            delay: 0.05,
+                            reduceMotion: reduceMotion
                         )
                         StatCard(
                             title: "Uptime",
@@ -91,7 +98,8 @@ struct OverviewView: View {
                             trendUp: true,
                             tokens: tokens,
                             appeared: appeared,
-                            delay: 0.1
+                            delay: 0.1,
+                            reduceMotion: reduceMotion
                         )
                         StatCard(
                             title: "Latency",
@@ -100,7 +108,8 @@ struct OverviewView: View {
                             trendUp: false,
                             tokens: tokens,
                             appeared: appeared,
-                            delay: 0.15
+                            delay: 0.15,
+                            reduceMotion: reduceMotion
                         )
                     }
                     .padding(.horizontal)
@@ -124,7 +133,7 @@ struct OverviewView: View {
                                 )
                                 .opacity(appeared ? 1 : 0)
                                 .offset(y: appeared ? 0 : HUTokens.spaceSm)
-                                .animation(HUTokens.springExpressive.delay(min(Double(index) * 0.05, 0.3)), value: appeared)
+                                .animation(reduceMotion ? nil : HUTokens.springExpressive.delay(min(Double(index) * 0.05, 0.3)), value: appeared)
 
                                 if index < ActivityRow.activities.count - 1 {
                                     Divider()
@@ -149,8 +158,12 @@ struct OverviewView: View {
             .background(tokens.bgSurface)
             .navigationTitle("Overview")
             .onAppear {
-                withAnimation(HUTokens.springExpressive) {
+                if reduceMotion {
                     appeared = true
+                } else {
+                    withAnimation(HUTokens.springExpressive) {
+                        appeared = true
+                    }
                 }
             }
         }
@@ -165,6 +178,7 @@ private struct StatCard: View {
     let tokens: OverviewView.TokenSet
     let appeared: Bool
     let delay: Double
+    let reduceMotion: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: HUTokens.spaceXs) {
@@ -192,7 +206,7 @@ private struct StatCard: View {
         .accessibilityLabel("\(title): \(value), \(trend)")
         .scaleEffect(appeared ? 1 : 0.95)
         .opacity(appeared ? 1 : 0)
-        .animation(HUTokens.springExpressive.delay(delay), value: appeared)
+        .animation(reduceMotion ? nil : HUTokens.springExpressive.delay(delay), value: appeared)
     }
 }
 

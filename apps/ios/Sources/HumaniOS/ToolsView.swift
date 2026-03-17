@@ -18,6 +18,7 @@ enum ToolCategory: String, CaseIterable {
 }
 
 struct ToolsView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @State private var appeared = false
 
@@ -105,8 +106,12 @@ struct ToolsView: View {
             .navigationTitle("Tools")
         }
         .onAppear {
-            withAnimation(HUTokens.springInteractive) {
+            if reduceMotion {
                 appeared = true
+            } else {
+                withAnimation(HUTokens.springInteractive) {
+                    appeared = true
+                }
             }
         }
     }
@@ -130,7 +135,8 @@ struct ToolsView: View {
                         textMuted: tokens.textMuted,
                         accent: tokens.accent,
                         appeared: appeared,
-                        delay: Double(index) * 0.03
+                        delay: Double(index) * 0.03,
+                        reduceMotion: reduceMotion
                     )
                 }
             }
@@ -146,6 +152,7 @@ private struct ToolCard: View {
     let accent: Color
     let appeared: Bool
     let delay: Double
+    let reduceMotion: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
@@ -171,6 +178,6 @@ private struct ToolCard: View {
         .accessibilityLabel("\(tool.name): \(tool.description)")
         .opacity(appeared ? 1 : 0)
         .scaleEffect(appeared ? 1 : 0.95)
-        .animation(HUTokens.springInteractive.delay(delay), value: appeared)
+        .animation(reduceMotion ? nil : HUTokens.springInteractive.delay(delay), value: appeared)
     }
 }

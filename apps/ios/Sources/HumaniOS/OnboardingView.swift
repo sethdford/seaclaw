@@ -3,6 +3,7 @@ import HumanChatUI
 
 struct OnboardingView: View {
     @Binding var hasOnboarded: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject var connectionManager: ConnectionManager
     @Environment(\.colorScheme) private var colorScheme
     @State private var currentPage = 0
@@ -69,9 +70,14 @@ struct OnboardingView: View {
                     let impact = UIImpactFeedbackGenerator(style: .medium)
                     impact.impactOccurred()
 #endif
-                    withAnimation(HUTokens.springExpressive) {
+                    if reduceMotion {
                         connectionManager.connect()
                         hasOnboarded = true
+                    } else {
+                        withAnimation(HUTokens.springExpressive) {
+                            connectionManager.connect()
+                            hasOnboarded = true
+                        }
                     }
                 } label: {
                     Text("Get Started")
@@ -85,8 +91,12 @@ struct OnboardingView: View {
                 .accessibilityLabel("Get started and connect to gateway")
 
                 Button {
-                    withAnimation(HUTokens.springExpressive) {
+                    if reduceMotion {
                         hasOnboarded = true
+                    } else {
+                        withAnimation(HUTokens.springExpressive) {
+                            hasOnboarded = true
+                        }
                     }
                 } label: {
                     Text("Skip for now")
