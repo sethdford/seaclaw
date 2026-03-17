@@ -5,6 +5,7 @@
 #include "human/memory.h"
 #include "human/persona.h"
 #include "human/provider.h"
+#include <stdio.h>
 #include <string.h>
 
 #define HU_STYLE_REANALYZE_PROMPT_CAP 16384
@@ -143,7 +144,9 @@ hu_error_t hu_persona_style_reanalyze(hu_allocator_t *alloc, hu_provider_t *prov
             memset(&merged, 0, sizeof(merged));
             if (hu_persona_creator_synthesize(alloc, (const hu_persona_t[]){current, partial}, 2,
                                              persona_name, persona_name_len, &merged) == HU_OK) {
-                (void)hu_persona_creator_write(alloc, &merged);
+                hu_error_t write_err = hu_persona_creator_write(alloc, &merged);
+                if (write_err != HU_OK)
+                    fprintf(stderr, "[style_learner] persona write failed: %d\n", write_err);
                 hu_persona_deinit(alloc, &merged);
             }
             hu_persona_deinit(alloc, &current);

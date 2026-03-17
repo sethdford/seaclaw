@@ -157,7 +157,11 @@ static hu_error_t openai_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
         hu_json_free(alloc, root);
         return HU_ERR_OUT_OF_MEMORY;
     }
-    (void)hu_json_object_set(alloc, root, "messages", msgs_arr);
+    if (hu_json_object_set(alloc, root, "messages", msgs_arr) != HU_OK) {
+        hu_json_free(alloc, msgs_arr);
+        hu_json_free(alloc, root);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
 
     for (size_t i = 0; i < request->messages_count; i++) {
         const hu_chat_message_t *m = &request->messages[i];
@@ -766,7 +770,11 @@ static hu_error_t openai_stream_chat(void *ctx, hu_allocator_t *alloc,
         hu_json_free(alloc, root);
         return HU_ERR_OUT_OF_MEMORY;
     }
-    (void)hu_json_object_set(alloc, root, "messages", msgs_arr);
+    if (hu_json_object_set(alloc, root, "messages", msgs_arr) != HU_OK) {
+        hu_json_free(alloc, msgs_arr);
+        hu_json_free(alloc, root);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
 
     for (size_t i = 0; i < request->messages_count; i++) {
         const hu_chat_message_t *m = &request->messages[i];

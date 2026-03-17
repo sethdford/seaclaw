@@ -913,9 +913,12 @@ void hu_agent_internal_process_mailbox_messages(hu_agent_t *agent) {
         int n = snprintf(buf, sizeof(buf), "[Message from agent %llu]: %.*s",
                          (unsigned long long)msg.from_agent, (int)payload_len,
                          msg.payload ? msg.payload : "");
-        if (n > 0)
-            (void)hu_agent_internal_append_history(agent, HU_ROLE_USER, buf, (size_t)n, NULL, 0,
-                                                   NULL, 0);
+        if (n > 0) {
+            hu_error_t hist_err = hu_agent_internal_append_history(
+                agent, HU_ROLE_USER, buf, (size_t)n, NULL, 0, NULL, 0);
+            if (hist_err != HU_OK)
+                fprintf(stderr, "[agent] mailbox message history append failed: %d\n", hist_err);
+        }
         hu_message_free(agent->alloc, &msg);
     }
 }
