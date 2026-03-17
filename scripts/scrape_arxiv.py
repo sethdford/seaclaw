@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 OUTPUT_DIR = os.path.expanduser("~/.human/feeds/ingest")
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "arxiv.jsonl")
 
-ARXIV_API = "http://export.arxiv.org/api/query"
+ARXIV_API = "https://export.arxiv.org/api/query"
 
 QUERIES = [
     "all:autonomous AI agent",
@@ -124,6 +124,8 @@ def main():
             f.write(json.dumps(item) + "\n")
 
     print(f"[arxiv] {len(all_items)} papers from {len(QUERIES)} queries -> {OUTPUT_FILE}")
+    if not all_items:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
