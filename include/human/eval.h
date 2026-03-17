@@ -7,9 +7,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef struct hu_eval_task { char *id; char *prompt; size_t prompt_len; char *expected; size_t expected_len; char *category; int difficulty; int64_t timeout_ms; } hu_eval_task_t;
+typedef struct hu_eval_task { char *id; char *prompt; size_t prompt_len; char *expected; size_t expected_len; char *category; int difficulty; int64_t timeout_ms; char *rubric; size_t rubric_len; } hu_eval_task_t;
 typedef struct hu_eval_result { char *task_id; bool passed; char *actual_output; size_t actual_output_len; double score; int64_t elapsed_ms; int tool_calls_made; int tokens_used; char *error_msg; } hu_eval_result_t;
-typedef struct hu_eval_suite { char *name; hu_eval_task_t *tasks; size_t tasks_count; } hu_eval_suite_t;
+typedef struct hu_eval_suite { char *name; hu_eval_task_t *tasks; size_t tasks_count; char *default_rubric; size_t default_rubric_len; } hu_eval_suite_t;
 typedef struct hu_eval_run { char *suite_name; char *provider; char *model; hu_eval_result_t *results; size_t results_count; size_t passed; size_t failed; double pass_rate; int64_t total_elapsed_ms; int total_tokens; } hu_eval_run_t;
 typedef enum { HU_EVAL_EXACT=0, HU_EVAL_CONTAINS, HU_EVAL_NUMERIC_CLOSE, HU_EVAL_LLM_JUDGE } hu_eval_match_mode_t;
 

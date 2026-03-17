@@ -263,6 +263,7 @@ void run_experience_engine_tests(void);
 void run_self_improve_loop_tests(void);
 void run_a2a_tests(void);
 void run_eval_tests(void);
+void run_eval_judge_tests(void);
 void run_eval_benchmarks_tests(void);
 void run_eval_runner_tests(void);
 void run_eval_history_tests(void);
@@ -568,6 +569,7 @@ int main(int argc, char **argv) {
     run_self_improve_loop_tests();
     run_a2a_tests();
     run_eval_tests();
+    run_eval_judge_tests();
     run_eval_benchmarks_tests();
     run_eval_runner_tests();
     run_eval_history_tests();

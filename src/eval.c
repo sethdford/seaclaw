@@ -217,6 +217,8 @@ hu_error_t hu_eval_suite_load_json(hu_allocator_t *alloc, const char *json, size
                 t->difficulty = extract_int(obj_start, obj_end, "\"difficulty\"");
                 t->timeout_ms = extract_int64(obj_start, obj_end, "\"timeout_ms\"");
                 if (t->timeout_ms == 0) t->timeout_ms = 5000;
+                t->rubric = extract_str(alloc, obj_start, obj_end, "\"rubric\"");
+                if (t->rubric) t->rubric_len = strlen(t->rubric);
 
                 count++;
             }
@@ -225,6 +227,9 @@ hu_error_t hu_eval_suite_load_json(hu_allocator_t *alloc, const char *json, size
             out->tasks_count = count;
         }
     }
+    out->default_rubric = extract_str(alloc, json, json + json_len, "\"default_rubric\"");
+    if (out->default_rubric)
+        out->default_rubric_len = strlen(out->default_rubric);
     return HU_OK;
 }
 
@@ -713,10 +718,16 @@ void hu_eval_suite_free(hu_allocator_t *alloc, hu_eval_suite_t *suite) {
             if (t->prompt) { alloc->free(alloc->ctx, t->prompt, strlen(t->prompt) + 1); t->prompt = NULL; }
             if (t->expected) { alloc->free(alloc->ctx, t->expected, strlen(t->expected) + 1); t->expected = NULL; }
             if (t->category) { alloc->free(alloc->ctx, t->category, strlen(t->category) + 1); t->category = NULL; }
+            if (t->rubric) { alloc->free(alloc->ctx, t->rubric, strlen(t->rubric) + 1); t->rubric = NULL; }
         }
         alloc->free(alloc->ctx, suite->tasks, EVAL_MAX_TASKS * sizeof(hu_eval_task_t));
         suite->tasks = NULL;
         suite->tasks_count = 0;
+    }
+    if (suite->default_rubric) {
+        alloc->free(alloc->ctx, suite->default_rubric, suite->default_rubric_len + 1);
+        suite->default_rubric = NULL;
+        suite->default_rubric_len = 0;
     }
 }
 

@@ -685,6 +685,7 @@ list(APPEND HU_CORE_SOURCES src/security/wasi_sandbox.c)
 list(APPEND HU_CORE_SOURCES
     src/a2a.c
     src/eval.c
+    src/eval_judge.c
     src/eval_benchmarks.c
     src/eval_dashboard.c
     src/memory/corrective_rag.c
@@ -1954,6 +1955,7 @@ list(APPEND HU_TEST_SOURCES tests/test_pwa.c)
 list(APPEND HU_TEST_SOURCES
     tests/test_a2a.c
     tests/test_eval.c
+    tests/test_eval_judge.c
     tests/test_eval_benchmarks.c
     tests/test_eval_runner.c
     tests/test_eval_history.c

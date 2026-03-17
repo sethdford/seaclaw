@@ -583,11 +583,12 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv) {
 /* ── eval (run/list/compare) ────────────────────────────────────────────── */
 hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
-        printf("Usage: human eval <run|list|compare|dashboard> [args]\n");
+        printf("Usage: human eval <run|list|compare|dashboard|history> [args]\n");
         printf("  run <suite.json>     Load and run an eval suite, print report JSON\n");
         printf("  list                 List available eval suites in eval_suites/\n");
         printf("  compare <r1> <r2>    Compare two run report JSON files\n");
         printf("  dashboard [r1.json]  Render terminal dashboard from run report(s)\n");
+        printf("  history [--last N] [--benchmark X]  Show eval history from SQLite\n");
         return HU_OK;
     }
     const char *sub = argv[2];
@@ -702,6 +703,36 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             printf("%.*s\n", (int)report_len, report);
             alloc->free(alloc->ctx, report, report_len + 1);
         }
+
+#ifdef HU_ENABLE_SQLITE
+        {
+            hu_config_t store_cfg;
+            if (hu_config_load(alloc, &store_cfg) == HU_OK) {
+                const char *ws = store_cfg.workspace_dir ? store_cfg.workspace_dir : ".";
+                hu_memory_t mem = hu_memory_create_from_config(alloc, &store_cfg, ws);
+                sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
+                if (db) {
+                    (void)hu_eval_init_tables(db);
+                    if (hu_eval_store_run(alloc, db, &run) == HU_OK)
+                        fprintf(stderr, "eval: stored run to history\n");
+
+                    hu_eval_regression_t reg = {0};
+                    if (hu_eval_detect_regression(db, run.suite_name,
+                            run.pass_rate, 0.05, &reg) == HU_OK && reg.regressed) {
+                        fprintf(stderr,
+                            "WARNING: regression detected! pass_rate %.1f%% vs baseline %.1f%% (delta %.1f%%)\n",
+                            reg.current_pass_rate * 100.0,
+                            reg.baseline_pass_rate * 100.0,
+                            reg.delta * 100.0);
+                    }
+                }
+                if (mem.vtable && mem.vtable->deinit)
+                    mem.vtable->deinit(mem.ctx);
+                hu_config_deinit(&store_cfg);
+            }
+        }
+#endif
+
         hu_eval_run_free(alloc, &run);
         return err;
     }
@@ -913,6 +944,78 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             err = hu_eval_dashboard_render(alloc, stdout, NULL, 0);
         }
         return err;
+    }
+
+    if (strcmp(sub, "history") == 0) {
+#ifdef HU_ENABLE_SQLITE
+        size_t max_runs = 10;
+        const char *filter_suite = NULL;
+        for (int a = 3; a < argc; a++) {
+            if (strcmp(argv[a], "--last") == 0 && a + 1 < argc) {
+                max_runs = (size_t)atoi(argv[++a]);
+                if (max_runs == 0 || max_runs > 100)
+                    max_runs = 10;
+            } else if (strcmp(argv[a], "--benchmark") == 0 && a + 1 < argc) {
+                filter_suite = argv[++a];
+            }
+        }
+        hu_config_t cfg;
+        hu_error_t cfg_err = hu_config_load(alloc, &cfg);
+        if (cfg_err != HU_OK) {
+            fprintf(stderr, "eval history: config error\n");
+            return cfg_err;
+        }
+        const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
+        hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
+        sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
+        if (!db) {
+            fprintf(stderr, "eval history: no SQLite backend\n");
+            if (mem.vtable && mem.vtable->deinit)
+                mem.vtable->deinit(mem.ctx);
+            hu_config_deinit(&cfg);
+            return HU_ERR_NOT_FOUND;
+        }
+        (void)hu_eval_init_tables(db);
+        hu_eval_run_t *runs = alloc->alloc(alloc->ctx, max_runs * sizeof(hu_eval_run_t));
+        if (!runs) {
+            if (mem.vtable && mem.vtable->deinit)
+                mem.vtable->deinit(mem.ctx);
+            hu_config_deinit(&cfg);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        memset(runs, 0, max_runs * sizeof(hu_eval_run_t));
+        size_t count = 0;
+        hu_error_t err = hu_eval_load_history(alloc, db, runs, max_runs, &count);
+        if (err == HU_OK && count > 0) {
+            printf("%-20s %-12s %-10s %6s %6s %8s\n",
+                   "Suite", "Provider", "Model", "Pass", "Fail", "Rate");
+            printf("%-20s %-12s %-10s %6s %6s %8s\n",
+                   "----", "--------", "-----", "----", "----", "----");
+            for (size_t i = 0; i < count; i++) {
+                if (filter_suite && runs[i].suite_name &&
+                    strcmp(runs[i].suite_name, filter_suite) != 0)
+                    continue;
+                printf("%-20s %-12s %-10s %6zu %6zu %7.1f%%\n",
+                       runs[i].suite_name ? runs[i].suite_name : "-",
+                       runs[i].provider ? runs[i].provider : "-",
+                       runs[i].model ? runs[i].model : "-",
+                       runs[i].passed, runs[i].failed,
+                       runs[i].pass_rate * 100.0);
+            }
+        } else {
+            printf("No eval history found.\n");
+        }
+        for (size_t i = 0; i < count; i++)
+            hu_eval_run_free(alloc, &runs[i]);
+        alloc->free(alloc->ctx, runs, max_runs * sizeof(hu_eval_run_t));
+        if (mem.vtable && mem.vtable->deinit)
+            mem.vtable->deinit(mem.ctx);
+        hu_config_deinit(&cfg);
+        return err;
+#else
+        fprintf(stderr, "eval history: SQLite not enabled\n");
+        return HU_ERR_NOT_SUPPORTED;
+#endif
     }
 
     fprintf(stderr, "Unknown eval subcommand: %s\n", sub);
