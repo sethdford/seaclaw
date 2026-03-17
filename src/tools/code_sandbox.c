@@ -5,6 +5,7 @@
 #include "human/core/process_util.h"
 #include "human/core/string.h"
 #include "human/tool.h"
+#include <stdio.h>
 #include <string.h>
 
 #define SANDBOX_PARAMS                                                                             \
@@ -141,6 +142,30 @@ const char *hu_sandbox_language_name(hu_sandbox_language_t lang) {
         return "shell";
     }
     return "unknown";
+}
+
+hu_error_t hu_code_sandbox_save_checkpoint(const hu_code_sandbox_result_t *result,
+                                            hu_sandbox_language_t language,
+                                            hu_code_sandbox_checkpoint_t *ckpt) {
+    if (!result || !ckpt)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(ckpt, 0, sizeof(*ckpt));
+    snprintf(ckpt->state_id, sizeof(ckpt->state_id), "ckpt-%lld-%d",
+             (long long)result->elapsed_ms, result->exit_code);
+    ckpt->language = language;
+    ckpt->elapsed_ms = result->elapsed_ms;
+    ckpt->valid = (result->exit_code == 0 && !result->timed_out);
+    return HU_OK;
+}
+
+hu_error_t hu_code_sandbox_restore_checkpoint(const hu_code_sandbox_checkpoint_t *ckpt,
+                                               hu_code_sandbox_config_t *config) {
+    if (!ckpt || !config)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!ckpt->valid)
+        return HU_ERR_INVALID_ARGUMENT;
+    config->language = ckpt->language;
+    return HU_OK;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

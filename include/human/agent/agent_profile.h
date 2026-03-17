@@ -2,6 +2,7 @@
 #define HU_AGENT_AGENT_PROFILE_H
 
 #include "human/core/error.h"
+#include <stdbool.h>
 #include <stddef.h>
 
 /*
@@ -22,5 +23,9 @@ typedef struct hu_agent_profile {
 hu_error_t hu_agent_match_score(const hu_agent_profile_t *profile,
                                 const char *task_category, size_t cat_len,
                                 double *score);
+
+hu_error_t hu_agent_profile_update(hu_agent_profile_t *profile,
+                                    const char *task_category, size_t cat_len,
+                                    bool success);
 
 #endif /* HU_AGENT_AGENT_PROFILE_H */

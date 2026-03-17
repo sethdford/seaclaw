@@ -53,3 +53,24 @@ hu_error_t hu_agent_match_score(const hu_agent_profile_t *profile,
         *score = 0.5;
     return HU_OK;
 }
+
+hu_error_t hu_agent_profile_update(hu_agent_profile_t *profile,
+                                    const char *task_category, size_t cat_len,
+                                    bool success) {
+    if (!profile)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    int idx = category_index(task_category, cat_len);
+    if (idx < 0 || idx >= HU_AGENT_PROFILE_CATEGORIES)
+        idx = 3; /* general */
+
+    double current = profile->success_rates[idx];
+    if (current <= 0.0)
+        current = 0.5;
+
+    /* Exponential moving average with alpha=0.1 */
+    double outcome = success ? 1.0 : 0.0;
+    profile->success_rates[idx] = current * 0.9 + outcome * 0.1;
+    profile->task_count++;
+    return HU_OK;
+}

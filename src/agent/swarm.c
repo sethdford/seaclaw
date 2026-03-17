@@ -101,20 +101,45 @@ hu_error_t hu_swarm_execute(hu_allocator_t *alloc, const hu_swarm_config_t *conf
     result->task_count = task_count;
 
 #if defined(HU_IS_TEST) && HU_IS_TEST
-    /* Sequential execution under HU_IS_TEST — no real threads in tests */
-    (void)cfg;
     int64_t total_ms = 0;
+    int max_retries = cfg.retry_on_failure > 0 ? cfg.retry_on_failure : 0;
     for (size_t i = 0; i < task_count; i++) {
         hu_swarm_task_t *t = &result->tasks[i];
         *t = tasks[i];
-        t->completed = true;
-        t->failed = false;
-        t->elapsed_ms = 1;
+
+        /* Simulate failure for tasks containing "fail" in description */
+        bool sim_fail = (t->description_len >= 4 &&
+                         strstr(t->description, "fail") != NULL);
+        bool task_done = false;
+
+        for (int attempt = 0; attempt <= max_retries && !task_done; attempt++) {
+            t->elapsed_ms = 1;
+            if (sim_fail && attempt < max_retries) {
+                continue;
+            }
+            if (sim_fail) {
+                t->completed = false;
+                t->failed = true;
+                strncpy(t->result, "error: task failed", sizeof(t->result) - 1);
+                t->result_len = 18;
+                result->failed++;
+            } else {
+                t->completed = true;
+                t->failed = false;
+                strncpy(t->result, "mock result", sizeof(t->result) - 1);
+                t->result_len = 11;
+                result->completed++;
+            }
+            task_done = true;
+        }
+
+        /* Timeout enforcement: mark timed out if elapsed > timeout */
+        if (cfg.timeout_ms > 0 && t->elapsed_ms > cfg.timeout_ms) {
+            t->completed = false;
+            t->failed = true;
+        }
+
         total_ms += t->elapsed_ms;
-        strncpy(t->result, "mock result", sizeof(t->result) - 1);
-        t->result[sizeof(t->result) - 1] = '\0';
-        t->result_len = 11;
-        result->completed++;
     }
     result->total_elapsed_ms = total_ms;
 
@@ -195,6 +220,87 @@ hu_error_t hu_swarm_execute(hu_allocator_t *alloc, const hu_swarm_config_t *conf
     }
     result->total_elapsed_ms = total_ms;
 #endif
+
+    return HU_OK;
+}
+
+hu_error_t hu_swarm_aggregate(const hu_swarm_result_t *result, hu_swarm_aggregation_t strategy,
+                               char *out, size_t out_size, size_t *out_len) {
+    if (!result || !out || !out_len || out_size == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    out[0] = '\0';
+    *out_len = 0;
+
+    if (result->task_count == 0 || !result->tasks)
+        return HU_OK;
+
+    switch (strategy) {
+    case HU_SWARM_AGG_CONCATENATE: {
+        size_t pos = 0;
+        for (size_t i = 0; i < result->task_count && pos < out_size - 1; i++) {
+            if (!result->tasks[i].completed || result->tasks[i].result_len == 0)
+                continue;
+            if (pos > 0 && pos < out_size - 2) {
+                out[pos++] = '\n';
+            }
+            size_t to_copy = result->tasks[i].result_len;
+            if (to_copy > out_size - 1 - pos)
+                to_copy = out_size - 1 - pos;
+            memcpy(out + pos, result->tasks[i].result, to_copy);
+            pos += to_copy;
+        }
+        out[pos] = '\0';
+        *out_len = pos;
+        break;
+    }
+    case HU_SWARM_AGG_FIRST_SUCCESS: {
+        for (size_t i = 0; i < result->task_count; i++) {
+            if (result->tasks[i].completed && !result->tasks[i].failed &&
+                result->tasks[i].result_len > 0) {
+                size_t to_copy = result->tasks[i].result_len;
+                if (to_copy > out_size - 1)
+                    to_copy = out_size - 1;
+                memcpy(out, result->tasks[i].result, to_copy);
+                out[to_copy] = '\0';
+                *out_len = to_copy;
+                return HU_OK;
+            }
+        }
+        break;
+    }
+    case HU_SWARM_AGG_VOTE: {
+        /* Simple vote: find most common result */
+        size_t best_idx = 0;
+        int best_count = 0;
+        for (size_t i = 0; i < result->task_count; i++) {
+            if (!result->tasks[i].completed || result->tasks[i].result_len == 0)
+                continue;
+            int count = 0;
+            for (size_t j = 0; j < result->task_count; j++) {
+                if (result->tasks[j].completed && result->tasks[j].result_len > 0 &&
+                    result->tasks[i].result_len == result->tasks[j].result_len &&
+                    memcmp(result->tasks[i].result, result->tasks[j].result,
+                           result->tasks[i].result_len) == 0) {
+                    count++;
+                }
+            }
+            if (count > best_count) {
+                best_count = count;
+                best_idx = i;
+            }
+        }
+        if (best_count > 0 && result->tasks[best_idx].result_len > 0) {
+            size_t to_copy = result->tasks[best_idx].result_len;
+            if (to_copy > out_size - 1)
+                to_copy = out_size - 1;
+            memcpy(out, result->tasks[best_idx].result, to_copy);
+            out[to_copy] = '\0';
+            *out_len = to_copy;
+        }
+        break;
+    }
+    }
 
     return HU_OK;
 }

@@ -36,4 +36,13 @@ hu_error_t hu_autonomy_mark_complete(hu_autonomy_state_t *state, size_t goal_ind
 bool hu_autonomy_needs_consolidation(const hu_autonomy_state_t *state, int64_t now_ms);
 hu_error_t hu_autonomy_consolidate(hu_autonomy_state_t *state);
 
+hu_error_t hu_autonomy_generate_intrinsic_goal(hu_autonomy_state_t *state,
+                                                size_t completed_count, size_t failed_count);
+
+hu_error_t hu_autonomy_externalize_state(const hu_autonomy_state_t *state,
+                                          char *buf, size_t buf_size, size_t *out_len);
+
+hu_error_t hu_autonomy_restore_state(hu_autonomy_state_t *state,
+                                      const char *buf, size_t buf_len);
+
 #endif

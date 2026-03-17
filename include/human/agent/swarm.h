@@ -30,12 +30,19 @@ typedef struct hu_swarm_task {
     int64_t elapsed_ms;
 } hu_swarm_task_t;
 
+typedef enum {
+    HU_SWARM_AGG_CONCATENATE = 0,
+    HU_SWARM_AGG_FIRST_SUCCESS,
+    HU_SWARM_AGG_VOTE
+} hu_swarm_aggregation_t;
+
 typedef struct hu_swarm_result {
     hu_swarm_task_t *tasks;
     size_t task_count;
     size_t completed;
     size_t failed;
     int64_t total_elapsed_ms;
+    hu_swarm_aggregation_t aggregation;
 } hu_swarm_result_t;
 
 hu_swarm_config_t hu_swarm_config_default(void);
@@ -43,6 +50,9 @@ hu_swarm_config_t hu_swarm_config_default(void);
 hu_error_t hu_swarm_execute(hu_allocator_t *alloc, const hu_swarm_config_t *config,
                            hu_swarm_task_t *tasks, size_t task_count,
                            hu_swarm_result_t *result);
+
+hu_error_t hu_swarm_aggregate(const hu_swarm_result_t *result, hu_swarm_aggregation_t strategy,
+                               char *out, size_t out_size, size_t *out_len);
 
 void hu_swarm_result_free(hu_allocator_t *alloc, hu_swarm_result_t *result);
 
