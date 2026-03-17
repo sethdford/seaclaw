@@ -1941,7 +1941,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     hu_inbox_watcher_t inbox_watcher = {0};
     static int64_t last_inbox_poll_ms = 0;
     if (agent && agent->memory) {
-        (void)hu_inbox_init(&inbox_watcher, alloc, agent->memory, NULL, 0);
+        hu_error_t inbox_err = hu_inbox_init(&inbox_watcher, alloc, agent->memory, NULL, 0);
+        if (inbox_err != HU_OK)
+            fprintf(stderr, "[daemon] inbox init failed: %d\n", inbox_err);
         inbox_watcher.provider = &agent->provider;
         inbox_watcher.model = agent->model_name;
         inbox_watcher.model_len = agent->model_name_len;

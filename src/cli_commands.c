@@ -712,7 +712,9 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 hu_memory_t mem = hu_memory_create_from_config(alloc, &store_cfg, ws);
                 sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
                 if (db) {
-                    (void)hu_eval_init_tables(db);
+                    hu_error_t tbl_err = hu_eval_init_tables(db);
+                    if (tbl_err != HU_OK)
+                        fprintf(stderr, "eval: table init failed\n");
                     if (hu_eval_store_run(alloc, db, &run) == HU_OK)
                         fprintf(stderr, "eval: stored run to history\n");
 
@@ -975,7 +977,9 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             hu_config_deinit(&cfg);
             return HU_ERR_NOT_FOUND;
         }
-        (void)hu_eval_init_tables(db);
+        hu_error_t tbl_err = hu_eval_init_tables(db);
+        if (tbl_err != HU_OK)
+            fprintf(stderr, "eval: table init failed\n");
         hu_eval_run_t *runs = alloc->alloc(alloc->ctx, max_runs * sizeof(hu_eval_run_t));
         if (!runs) {
             if (mem.vtable && mem.vtable->deinit)

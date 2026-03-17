@@ -88,7 +88,9 @@ void hu_agent_internal_record_cost(hu_agent_t *agent, const hu_token_usage_t *us
     entry.total_tokens = usage->total_tokens;
     entry.cost_usd = 0.0;
     entry.timestamp_secs = (int64_t)time(NULL);
-    (void)hu_cost_record_usage(agent->cost_tracker, &entry, agent->active_job_id);
+    hu_error_t cost_err = hu_cost_record_usage(agent->cost_tracker, &entry, agent->active_job_id);
+    if (cost_err != HU_OK)
+        fprintf(stderr, "[agent] cost tracking failed: %d\n", cost_err);
 }
 
 #define HU_AGENT_HISTORY_INIT_CAP 16
@@ -518,7 +520,9 @@ void hu_agent_deinit(hu_agent_t *agent) {
     /* Promote important STM entities to persistent memory before cleanup */
     if (agent->memory && agent->memory->vtable) {
         hu_promotion_config_t promo_config = HU_PROMOTION_DEFAULTS;
-        (void)hu_promotion_run(agent->alloc, &agent->stm, agent->memory, &promo_config);
+        hu_error_t promo_err = hu_promotion_run(agent->alloc, &agent->stm, agent->memory, &promo_config);
+        if (promo_err != HU_OK)
+            fprintf(stderr, "[agent] STM promotion failed: %d\n", promo_err);
     }
     hu_stm_deinit(&agent->stm);
     hu_pattern_radar_deinit(&agent->radar);

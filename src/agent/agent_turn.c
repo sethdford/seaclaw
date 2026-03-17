@@ -330,10 +330,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         hu_memory_loader_t loader;
         hu_memory_loader_init(&loader, agent->alloc, agent->memory, agent->retrieval_engine, 10,
                               4000);
-        (void)hu_memory_loader_load(&loader, msg, msg_len,
+        hu_error_t load_err = hu_memory_loader_load(&loader, msg, msg_len,
                                     agent->memory_session_id ? agent->memory_session_id : "",
                                     agent->memory_session_id ? agent->memory_session_id_len : 0,
                                     &memory_ctx, &memory_ctx_len);
+        if (load_err != HU_OK)
+            fprintf(stderr, "[agent_turn] memory loader failed: %d\n", load_err);
     }
 
 #ifdef HU_ENABLE_SQLITE
@@ -389,7 +391,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     /* Build STM context for this turn */
     char *stm_ctx = NULL;
     size_t stm_ctx_len = 0;
-    (void)hu_stm_build_context(&agent->stm, agent->alloc, &stm_ctx, &stm_ctx_len);
+    hu_error_t stm_err = hu_stm_build_context(&agent->stm, agent->alloc, &stm_ctx, &stm_ctx_len);
+    if (stm_err != HU_OK)
+        fprintf(stderr, "[agent_turn] STM context build failed: %d\n", stm_err);
     if (stm_ctx_len > 0 && agent->bth_metrics)
         agent->bth_metrics->emotions_surfaced++;
 
