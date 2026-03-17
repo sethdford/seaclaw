@@ -304,9 +304,17 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
                 .custom_instructions = agent->custom_instructions,
                 .custom_instructions_len = agent->custom_instructions_len,
             };
-            (void)hu_prompt_build_static(agent->alloc, &pcfg, &agent->cached_static_prompt,
-                                         &agent->cached_static_prompt_len);
-            agent->cached_static_prompt_cap = agent->cached_static_prompt_len;
+            hu_error_t prompt_err = hu_prompt_build_static(agent->alloc, &pcfg,
+                &agent->cached_static_prompt, &agent->cached_static_prompt_len);
+            if (prompt_err != HU_OK) {
+                agent->cached_static_prompt = NULL;
+                agent->cached_static_prompt_len = 0;
+                agent->cached_static_prompt_cap = 0;
+                fprintf(stderr, "[agent] prompt rebuild after model switch failed: %d\n",
+                        prompt_err);
+            } else {
+                agent->cached_static_prompt_cap = agent->cached_static_prompt_len;
+            }
         }
         return hu_sprintf(agent->alloc, "Model: %.*s", (int)agent->model_name_len,
                           agent->model_name);

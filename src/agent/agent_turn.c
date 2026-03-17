@@ -320,8 +320,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     /* Load user preferences for prompt injection */
     char *pref_ctx = NULL;
     size_t pref_ctx_len = 0;
-    if (agent->memory)
-        (void)hu_preferences_load(agent->memory, agent->alloc, &pref_ctx, &pref_ctx_len);
+    if (agent->memory) {
+        hu_error_t pref_err = hu_preferences_load(agent->memory, agent->alloc, &pref_ctx, &pref_ctx_len);
+        if (pref_err != HU_OK)
+            fprintf(stderr, "[agent_turn] preferences load failed: %d\n", pref_err);
+    }
 
     /* Load memory context for this turn */
     char *memory_ctx = NULL;
@@ -441,9 +444,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         size_t commitment_count = 0;
         if (agent->commitment_store && agent->memory_session_id &&
             agent->memory_session_id_len > 0) {
-            (void)hu_commitment_store_list_active(
+            hu_error_t commit_err = hu_commitment_store_list_active(
                 agent->commitment_store, agent->alloc, agent->memory_session_id,
                 agent->memory_session_id_len, &commitments, &commitment_count);
+            if (commit_err != HU_OK)
+                fprintf(stderr, "[agent_turn] commitment list failed: %d\n", commit_err);
         }
         hu_error_t proactive_err =
             hu_proactive_check_extended(agent->alloc, session_count, hour, commitments,
@@ -931,6 +936,65 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
             hu_agent_clear_current_for_tools();
             return perr;
+        }
+    }
+    /* Sentiment-aware persona: detect user's emotional tone and adjust */
+    if (persona_prompt && msg && msg_len > 0) {
+        static const char *neg_words[] = {"sad", "frustrated", "angry", "upset", "worried",
+                                           "anxious", "stressed", "tired", "exhausted", "hurt",
+                                           "disappointed", "confused", "lost", "struggling"};
+        static const char *pos_words[] = {"happy", "excited", "great", "amazing", "wonderful",
+                                           "grateful", "thankful", "love", "celebrating"};
+        int neg_count = 0, pos_count = 0;
+        for (int w = 0; w < (int)(sizeof(neg_words) / sizeof(neg_words[0])); w++) {
+            size_t wlen = strlen(neg_words[w]);
+            for (size_t p = 0; p + wlen <= msg_len; p++) {
+                bool match = true;
+                for (size_t j = 0; j < wlen && match; j++) {
+                    char c = msg[p + j];
+                    char n = neg_words[w][j];
+                    if (c >= 'A' && c <= 'Z') c += 32;
+                    if (c != n) match = false;
+                }
+                if (match) { neg_count++; break; }
+            }
+        }
+        for (int w = 0; w < (int)(sizeof(pos_words) / sizeof(pos_words[0])); w++) {
+            size_t wlen = strlen(pos_words[w]);
+            for (size_t p = 0; p + wlen <= msg_len; p++) {
+                bool match = true;
+                for (size_t j = 0; j < wlen && match; j++) {
+                    char c = msg[p + j];
+                    char n = pos_words[w][j];
+                    if (c >= 'A' && c <= 'Z') c += 32;
+                    if (c != n) match = false;
+                }
+                if (match) { pos_count++; break; }
+            }
+        }
+        const char *sentiment_note = NULL;
+        if (neg_count >= 2)
+            sentiment_note = "\n\n[Emotional context: User seems distressed. "
+                             "Respond with extra warmth, empathy, and validation. "
+                             "Prioritize emotional support before problem-solving.]";
+        else if (neg_count == 1 && pos_count == 0)
+            sentiment_note = "\n\n[Emotional context: User may be having a tough time. "
+                             "Be warm and supportive in tone.]";
+        else if (pos_count >= 2)
+            sentiment_note = "\n\n[Emotional context: User is in a positive mood. "
+                             "Match their energy — be enthusiastic and celebratory.]";
+        if (sentiment_note) {
+            size_t note_len = strlen(sentiment_note);
+            size_t new_len = persona_prompt_len + note_len;
+            char *augmented = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
+            if (augmented) {
+                memcpy(augmented, persona_prompt, persona_prompt_len);
+                memcpy(augmented + persona_prompt_len, sentiment_note, note_len);
+                augmented[new_len] = '\0';
+                agent->alloc->free(agent->alloc->ctx, persona_prompt, persona_prompt_len + 1);
+                persona_prompt = augmented;
+                persona_prompt_len = new_len;
+            }
         }
     }
 #endif
@@ -1441,11 +1505,15 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         agent->alloc, msg, msg_len, resp.content, resp.content_len, &critique,
                         &critique_len);
                     if (cerr == HU_OK && critique) {
-                        (void)hu_agent_internal_append_history(agent, HU_ROLE_ASSISTANT,
+                        hu_error_t hist_err = hu_agent_internal_append_history(agent, HU_ROLE_ASSISTANT,
                                                                resp.content, resp.content_len, NULL,
                                                                0, NULL, 0);
-                        (void)hu_agent_internal_append_history(agent, HU_ROLE_USER, critique,
+                        if (hist_err != HU_OK)
+                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                        hist_err = hu_agent_internal_append_history(agent, HU_ROLE_USER, critique,
                                                                critique_len, NULL, 0, NULL, 0);
+                        if (hist_err != HU_OK)
+                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
                         agent->alloc->free(agent->alloc->ctx, critique, critique_len + 1);
                         hu_chat_response_free(agent->alloc, &resp);
                         iter++;
@@ -1632,8 +1700,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
 #endif
 
-                (void)hu_agent_internal_append_history(agent, HU_ROLE_ASSISTANT, final_content,
+                hu_error_t hist_err = hu_agent_internal_append_history(agent, HU_ROLE_ASSISTANT, final_content,
                                                        final_len, NULL, 0, NULL, 0);
+                if (hist_err != HU_OK)
+                    fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
                 *response_out = hu_strndup(agent->alloc, final_content, final_len);
                 if (ab_owned)
                     agent->alloc->free(agent->alloc->ctx, (void *)final_content, final_len + 1);
@@ -1775,18 +1845,31 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
 #endif
 #ifdef HU_HAS_PERSONA
-            /* Style learning: periodically re-analyze conversations to update persona */
-            if (agent->history_count >= 50 && agent->history_count % 50 == 0 &&
-                agent->persona_name && agent->persona_name_len > 0 && agent->memory) {
-                const char *ch = agent->active_channel ? agent->active_channel : "cli";
-                size_t ch_len = agent->active_channel_len ? agent->active_channel_len : 3;
-                const char *cid = agent->memory_session_id ? agent->memory_session_id : "";
-                size_t cid_len = agent->memory_session_id_len ? agent->memory_session_id_len : 0;
-                (void)hu_persona_style_reanalyze(agent->alloc, &agent->provider,
-                                                 agent->model_name, agent->model_name_len,
-                                                 agent->memory,
-                                                 agent->persona_name, agent->persona_name_len,
-                                                 ch, ch_len, cid, cid_len);
+            /* Style learning: adaptive schedule — early sessions learn faster,
+             * then settle into a steady cadence. Also triggers on corrections. */
+            {
+                bool should_reanalyze = false;
+                if (agent->persona_name && agent->persona_name_len > 0 && agent->memory) {
+                    if (agent->history_count <= 20 && agent->history_count % 10 == 0 &&
+                        agent->history_count > 0)
+                        should_reanalyze = true;
+                    else if (agent->history_count > 20 && agent->history_count <= 100 &&
+                             agent->history_count % 25 == 0)
+                        should_reanalyze = true;
+                    else if (agent->history_count > 100 && agent->history_count % 50 == 0)
+                        should_reanalyze = true;
+                }
+                if (should_reanalyze) {
+                    const char *ch = agent->active_channel ? agent->active_channel : "cli";
+                    size_t ch_len = agent->active_channel_len ? agent->active_channel_len : 3;
+                    const char *cid = agent->memory_session_id ? agent->memory_session_id : "";
+                    size_t cid_len = agent->memory_session_id_len ? agent->memory_session_id_len : 0;
+                    (void)hu_persona_style_reanalyze(agent->alloc, &agent->provider,
+                                                     agent->model_name, agent->model_name_len,
+                                                     agent->memory,
+                                                     agent->persona_name, agent->persona_name_len,
+                                                     ch, ch_len, cid, cid_len);
+                }
             }
 #endif
             if (system_prompt)
@@ -1835,9 +1918,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             if (agent->autonomy_level == HU_AUTONOMY_LOCKED) {
                 for (size_t tc = 0; tc < tc_count; tc++) {
                     const hu_tool_call_t *call = &calls[tc];
-                    (void)hu_agent_internal_append_history(
+                    hu_error_t hist_err = hu_agent_internal_append_history(
                         agent, HU_ROLE_TOOL, "Action blocked: agent is in locked mode", 38,
                         call->name, call->name_len, call->id, call->id_len);
+                    if (hist_err != HU_OK)
+                        fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
                     if (agent->cancel_requested)
                         break;
                 }
@@ -1917,8 +2002,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         hu_tool_result_t dag_result = hu_tool_result_fail("invalid", 7);
                                         hu_json_value_t *dag_args = NULL;
                                         if (node->args_json) {
-                                            (void)hu_json_parse(agent->alloc, node->args_json,
+                                            hu_error_t jerr = hu_json_parse(agent->alloc, node->args_json,
                                                               strlen(node->args_json), &dag_args);
+                                            if (jerr != HU_OK)
+                                                fprintf(stderr, "[agent_turn] tool args JSON parse failed\n");
                                         }
                                         if (dag_args && dag_tool->vtable->execute) {
                                             dag_tool->vtable->execute(dag_tool->ctx, agent->alloc,
@@ -1952,10 +2039,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         hu_dag_node_t *node = &dag.nodes[ni];
                                         const char *r = node->result ? node->result : (node->status == HU_DAG_DONE ? "ok" : "failed");
                                         size_t rlen = node->result ? node->result_len : strlen(r);
-                                        (void)hu_agent_internal_append_history(
+                                        hu_error_t hist_err = hu_agent_internal_append_history(
                                             agent, HU_ROLE_TOOL, r, rlen,
                                             node->tool_name, node->tool_name ? strlen(node->tool_name) : 0,
                                             node->id, node->id ? strlen(node->id) : 0);
+                                        if (hist_err != HU_OK)
+                                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
                                     }
                                 }
                             }
@@ -2006,8 +2095,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 hu_tool_result_t orch_result = hu_tool_result_fail("no args", 7);
                                 if (s < tc_count && calls[s].arguments_len > 0) {
                                     hu_json_value_t *orch_args = NULL;
-                                    (void)hu_json_parse(agent->alloc, calls[s].arguments,
+                                    hu_error_t jerr = hu_json_parse(agent->alloc, calls[s].arguments,
                                                         calls[s].arguments_len, &orch_args);
+                                    if (jerr != HU_OK)
+                                        fprintf(stderr, "[agent_turn] tool args JSON parse failed\n");
                                     if (orch_args && orch_tool->vtable->execute) {
                                         orch_tool->vtable->execute(orch_tool->ctx, agent->alloc,
                                                                    orch_args, &orch_result);
@@ -2031,9 +2122,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             size_t merged_len = 0;
                             if (hu_orchestrator_merge_results(&orch, agent->alloc, &merged, &merged_len) == HU_OK &&
                                 merged && merged_len > 0) {
-                                (void)hu_agent_internal_append_history(
+                                hu_error_t hist_err = hu_agent_internal_append_history(
                                     agent, HU_ROLE_TOOL, merged, merged_len,
                                     "orchestrator", 12, "orch_merge", 10);
+                                if (hist_err != HU_OK)
+                                    fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
                                 agent->alloc->free(agent->alloc->ctx, merged, merged_len + 1);
                             }
                             hu_observer_event_t ev = {
@@ -2175,9 +2268,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     hu_agent_internal_find_tool(agent, call->name, call->name_len);
                                 if (tool) {
                                     hu_json_value_t *retry_args = NULL;
-                                    if (call->arguments_len > 0)
-                                        (void)hu_json_parse(agent->alloc, call->arguments,
+                                    if (call->arguments_len > 0) {
+                                        hu_error_t jerr = hu_json_parse(agent->alloc, call->arguments,
                                                             call->arguments_len, &retry_args);
+                                        if (jerr != HU_OK)
+                                            fprintf(stderr, "[agent_turn] tool args JSON parse failed\n");
+                                    }
                                     *result = hu_tool_result_fail("invalid arguments", 16);
                                     if (retry_args) {
                                         if (tool->vtable->execute)
@@ -2252,9 +2348,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             result->success ? result->output : result->error_msg;
                         size_t res_len =
                             result->success ? result->output_len : result->error_msg_len;
-                        (void)hu_agent_internal_append_history(agent, HU_ROLE_TOOL, res_content,
+                        hu_error_t hist_err = hu_agent_internal_append_history(agent, HU_ROLE_TOOL, res_content,
                                                                res_len, call->name, call->name_len,
                                                                call->id, call->id_len);
+                        if (hist_err != HU_OK)
+                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
 
                         if (agent->audit_logger) {
                             hu_audit_event_t aev;
@@ -2279,9 +2377,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         hu_tool_t *tool =
                             hu_agent_internal_find_tool(agent, call->name, call->name_len);
                         if (!tool) {
-                            (void)hu_agent_internal_append_history(
+                            hu_error_t hist_err = hu_agent_internal_append_history(
                                 agent, HU_ROLE_TOOL, "tool not found", 14, call->name,
                                 call->name_len, call->id, call->id_len);
+                            if (hist_err != HU_OK)
+                                fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
                             continue;
                         }
                         char pol_tn[64];
@@ -2346,9 +2446,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 if (agent->policy)
                                     agent->policy->pre_approved = true;
                                 hu_json_value_t *retry_args = NULL;
-                                if (call->arguments_len > 0)
-                                    (void)hu_json_parse(agent->alloc, call->arguments,
+                                if (call->arguments_len > 0) {
+                                    hu_error_t jerr = hu_json_parse(agent->alloc, call->arguments,
                                                         call->arguments_len, &retry_args);
+                                    if (jerr != HU_OK)
+                                        fprintf(stderr, "[agent_turn] tool args JSON parse failed\n");
+                                }
                                 result = hu_tool_result_fail("invalid arguments", 16);
                                 if (retry_args) {
                                     tool->vtable->execute(tool->ctx, agent->alloc, retry_args,
@@ -2363,9 +2466,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
                         const char *res_content = result.success ? result.output : result.error_msg;
                         size_t res_len = result.success ? result.output_len : result.error_msg_len;
-                        (void)hu_agent_internal_append_history(agent, HU_ROLE_TOOL, res_content,
+                        hu_error_t hist_err = hu_agent_internal_append_history(agent, HU_ROLE_TOOL, res_content,
                                                                res_len, call->name, call->name_len,
                                                                call->id, call->id_len);
+                        if (hist_err != HU_OK)
+                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
 
                         if (agent->audit_logger) {
                             hu_audit_event_t aev;
@@ -2383,6 +2488,42 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         if (agent->cancel_requested)
                             break;
                     }
+                }
+            }
+        }
+        /* Mid-turn retrieval: after tool results, augment context with
+         * additional memory relevant to tool output before next LLM call */
+        if (agent->memory && agent->memory->vtable &&
+            agent->history_count > 1 &&
+            agent->history[agent->history_count - 1].role == HU_ROLE_TOOL &&
+            !agent->cancel_requested) {
+            const char *last_result = NULL;
+            size_t last_result_len = 0;
+            if (agent->history_count > 0) {
+                last_result = agent->history[agent->history_count - 1].content;
+                last_result_len = agent->history[agent->history_count - 1].content_len;
+            }
+            if (last_result && last_result_len > 20) {
+                char *mid_ctx = NULL;
+                size_t mid_ctx_len = 0;
+                hu_memory_loader_t mid_loader;
+                hu_memory_loader_init(&mid_loader, agent->alloc, agent->memory,
+                                       agent->retrieval_engine, 3, 1000);
+                if (hu_memory_loader_load(&mid_loader, last_result, last_result_len,
+                        agent->memory_session_id ? agent->memory_session_id : "",
+                        agent->memory_session_id ? agent->memory_session_id_len : 0,
+                        &mid_ctx, &mid_ctx_len) == HU_OK && mid_ctx && mid_ctx_len > 0) {
+                    char *note = hu_sprintf(agent->alloc,
+                        "[memory context from tool results]: %.*s",
+                        (int)(mid_ctx_len < 2000 ? mid_ctx_len : 2000), mid_ctx);
+                    if (note) {
+                        hu_error_t hist_err = hu_agent_internal_append_history(
+                            agent, HU_ROLE_SYSTEM, note, strlen(note), NULL, 0, NULL, 0);
+                        if (hist_err != HU_OK)
+                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                        agent->alloc->free(agent->alloc->ctx, note, strlen(note) + 1);
+                    }
+                    agent->alloc->free(agent->alloc->ctx, mid_ctx, mid_ctx_len + 1);
                 }
             }
         }
