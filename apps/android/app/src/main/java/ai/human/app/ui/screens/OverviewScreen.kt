@@ -52,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ai.human.app.ConnectionState
 import ai.human.app.GatewayClient
-import ai.human.app.SessionSummary
 import ai.human.app.ui.HUTokens
 import ai.human.app.ui.StaggeredItem
 import ai.human.app.util.isReducedMotionEnabled
@@ -316,32 +315,29 @@ fun OverviewScreen(
 }
 
 @Composable
-private fun StatCard(
-    title: String,
-    value: String,
-    modifier: Modifier = Modifier,
-) {
+private fun SkeletonPlaceholder() {
     val colorScheme = MaterialTheme.colorScheme
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(HUTokens.radiusLg))
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(HUTokens.radiusMd))
             .background(colorScheme.surfaceContainerLow)
-            .padding(HUTokens.spaceMd)
-            .semantics { contentDescription = "$title: $value" },
+            .padding(HUTokens.spaceMd),
     ) {
-        Column {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelMedium,
-                color = colorScheme.onSurfaceVariant,
+        Column(verticalArrangement = Arrangement.spacedBy(HUTokens.spaceSm)) {
+            Box(
+                modifier = Modifier
+                    .height(14.dp)
+                    .fillMaxWidth(0.8f)
+                    .clip(RoundedCornerShape(HUTokens.radiusSm))
+                    .background(colorScheme.surfaceContainerHigh),
             )
-            Spacer(modifier = Modifier.height(HUTokens.spaceXs))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.displaySmall.copy(
-                    letterSpacing = (-0.5).sp,
-                ),
-                color = colorScheme.onBackground,
+            Box(
+                modifier = Modifier
+                    .height(12.dp)
+                    .fillMaxWidth(0.5f)
+                    .clip(RoundedCornerShape(HUTokens.radiusSm))
+                    .background(colorScheme.surfaceContainerHigh),
             )
         }
     }
@@ -350,8 +346,9 @@ private fun StatCard(
 @Composable
 private fun StatCard(
     title: String,
-    value: Int,
+    value: String,
     modifier: Modifier = Modifier,
+    isSkeleton: Boolean = false,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     Box(
@@ -368,25 +365,79 @@ private fun StatCard(
                 color = colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(HUTokens.spaceXs))
-            AnimatedContent(
-                targetState = value,
-                transitionSpec = {
-                    val spec = spring<IntOffset>(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)
-                    if (targetState > initialState) {
-                        slideInVertically(animationSpec = spec) { -it } togetherWith slideOutVertically(animationSpec = spec) { it }
-                    } else {
-                        slideInVertically(animationSpec = spec) { it } togetherWith slideOutVertically(animationSpec = spec) { -it }
-                    }
-                },
-                label = "stat_counter",
-            ) { count ->
+            if (isSkeleton) {
+                Box(
+                    modifier = Modifier
+                        .height(28.dp)
+                        .fillMaxWidth(0.5f)
+                        .clip(RoundedCornerShape(HUTokens.radiusSm))
+                        .background(colorScheme.surfaceContainerHigh),
+                )
+            } else {
                 Text(
-                    text = "$count",
+                    text = value,
                     style = MaterialTheme.typography.displaySmall.copy(
                         letterSpacing = (-0.5).sp,
                     ),
                     color = colorScheme.onBackground,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatCard(
+    title: String,
+    value: Int?,
+    modifier: Modifier = Modifier,
+    isSkeleton: Boolean = false,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val displayValue = value ?: 0
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(HUTokens.radiusLg))
+            .background(colorScheme.surfaceContainerLow)
+            .padding(HUTokens.spaceMd)
+            .semantics { contentDescription = "$title: $displayValue" },
+    ) {
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                color = colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(HUTokens.spaceXs))
+            if (isSkeleton) {
+                Box(
+                    modifier = Modifier
+                        .height(28.dp)
+                        .fillMaxWidth(0.5f)
+                        .clip(RoundedCornerShape(HUTokens.radiusSm))
+                        .background(colorScheme.surfaceContainerHigh),
+                )
+            } else {
+                AnimatedContent(
+                    targetState = displayValue,
+                    transitionSpec = {
+                        val spec = spring<IntOffset>(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)
+                        if (targetState > initialState) {
+                            slideInVertically(animationSpec = spec) { -it } togetherWith slideOutVertically(animationSpec = spec) { it }
+                        } else {
+                            slideInVertically(animationSpec = spec) { it } togetherWith slideOutVertically(animationSpec = spec) { -it }
+                        }
+                    },
+                    label = "stat_counter",
+                ) { count ->
+                    Text(
+                        text = "$count",
+                        style = MaterialTheme.typography.displaySmall.copy(
+                            letterSpacing = (-0.5).sp,
+                        ),
+                        color = colorScheme.onBackground,
+                    )
+                }
             }
         }
     }
