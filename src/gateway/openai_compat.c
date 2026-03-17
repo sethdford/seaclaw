@@ -1,5 +1,6 @@
 #include "human/gateway/openai_compat.h"
 #include "human/agent.h"
+#include "../agent/agent_internal.h"
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
@@ -443,13 +444,20 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     if (app_ctx && app_ctx->agent) {
         const char *last_user_msg = NULL;
         size_t last_user_msg_len = 0;
-        for (size_t i = msg_count; i > 0; i--) {
-            if (msgs[i - 1].role == HU_ROLE_USER) {
-                last_user_msg = msgs[i - 1].content;
-                last_user_msg_len = msgs[i - 1].content_len;
-                break;
+
+        /* Inject prior conversation history into the agent so multi-turn works */
+        hu_agent_clear_history(app_ctx->agent);
+        for (size_t i = 0; i < msg_count; i++) {
+            if (msgs[i].role == HU_ROLE_USER) {
+                last_user_msg = msgs[i].content;
+                last_user_msg_len = msgs[i].content_len;
+            }
+            if (i < msg_count - 1 || msgs[i].role != HU_ROLE_USER) {
+                hu_agent_internal_append_history(app_ctx->agent, msgs[i].role,
+                    msgs[i].content, msgs[i].content_len, NULL, 0, NULL, 0);
             }
         }
+
         if (last_user_msg) {
             char *response = NULL;
             size_t response_len = 0;
