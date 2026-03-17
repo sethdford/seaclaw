@@ -93,6 +93,122 @@ static void trainer_null_args_returns_error(void)
     HU_ASSERT_NEQ(err, HU_OK);
 }
 
+static void trainer_converts_trajectories(void)
+{
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"state\":\"user wants help\",\"action\":\"provide answer\",\"reward\":0.8},"
+                       "{\"state\":\"follow up\",\"action\":\"clarify\",\"reward\":0.6}";
+    hu_training_triple_t triples[4];
+    size_t count = 0;
+
+    hu_error_t err = hu_training_convert_trajectory(&alloc, json, strlen(json),
+                                                     triples, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 2u);
+    HU_ASSERT_TRUE(triples[0].prompt_len > 0);
+    HU_ASSERT_TRUE(triples[0].response_len > 0);
+    HU_ASSERT_TRUE(triples[0].reward >= 0.7);
+    HU_ASSERT_TRUE(triples[1].reward >= 0.5);
+}
+
+static void trainer_replay_buffer_lifecycle(void)
+{
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_replay_buffer_t buf;
+    HU_ASSERT_EQ(hu_replay_buffer_create(&alloc, 8, &buf), HU_OK);
+    HU_ASSERT_EQ(buf.capacity, 8u);
+    HU_ASSERT_EQ(buf.count, 0u);
+
+    hu_training_triple_t t = {0};
+    memcpy(t.prompt, "state1", 6);
+    t.prompt_len = 6;
+    memcpy(t.response, "act1", 4);
+    t.response_len = 4;
+    t.reward = 0.9;
+    HU_ASSERT_EQ(hu_replay_buffer_add(&buf, &t), HU_OK);
+    HU_ASSERT_EQ(buf.count, 1u);
+
+    t.reward = 0.1;
+    HU_ASSERT_EQ(hu_replay_buffer_add(&buf, &t), HU_OK);
+    HU_ASSERT_EQ(buf.count, 2u);
+
+    hu_training_triple_t sampled[4];
+    size_t out_count = 0;
+    HU_ASSERT_EQ(hu_replay_buffer_sample(&buf, 2, 1.0, sampled, &out_count), HU_OK);
+    HU_ASSERT_EQ(out_count, 2u);
+    /* First sample should be higher-reward due to weighting */
+    HU_ASSERT_TRUE(sampled[0].reward >= sampled[1].reward);
+
+    hu_replay_buffer_destroy(&alloc, &buf);
+}
+
+static void trainer_replay_buffer_wraps(void)
+{
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_replay_buffer_t buf;
+    HU_ASSERT_EQ(hu_replay_buffer_create(&alloc, 4, &buf), HU_OK);
+
+    for (int i = 0; i < 6; i++) {
+        hu_training_triple_t t = {0};
+        t.reward = (double)i * 0.1;
+        HU_ASSERT_EQ(hu_replay_buffer_add(&buf, &t), HU_OK);
+    }
+    HU_ASSERT_EQ(buf.count, 4u);
+
+    hu_replay_buffer_destroy(&alloc, &buf);
+}
+
+static void trainer_checkpoint_roundtrip(void)
+{
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_training_checkpoint_t ckpt = {
+        .step = 500,
+        .loss = 0.125,
+        .avg_reward = 0.85,
+        .trajectories_seen = 1000,
+        .valid = true,
+    };
+    memcpy(ckpt.model_path, "/tmp/model.bin", 14);
+
+    char buf[512];
+    size_t out_len = 0;
+    HU_ASSERT_EQ(hu_training_save_checkpoint(&alloc, &ckpt, buf, sizeof(buf), &out_len), HU_OK);
+    HU_ASSERT_TRUE(out_len > 0);
+
+    hu_training_checkpoint_t loaded = {0};
+    HU_ASSERT_EQ(hu_training_load_checkpoint(&alloc, buf, out_len, &loaded), HU_OK);
+    HU_ASSERT_EQ(loaded.step, 500u);
+    HU_ASSERT_TRUE(loaded.loss >= 0.124 && loaded.loss <= 0.126);
+    HU_ASSERT_TRUE(loaded.avg_reward >= 0.84 && loaded.avg_reward <= 0.86);
+    HU_ASSERT_EQ(loaded.trajectories_seen, 1000u);
+    HU_ASSERT_TRUE(loaded.valid);
+    HU_ASSERT_STR_EQ(loaded.model_path, "/tmp/model.bin");
+}
+
+static void trainer_convert_null_args(void)
+{
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_training_triple_t triples[2];
+    size_t count = 0;
+
+    HU_ASSERT_EQ(hu_training_convert_trajectory(&alloc, NULL, 0, triples, 2, &count),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_training_convert_trajectory(&alloc, "x", 1, NULL, 2, &count),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_training_convert_trajectory(&alloc, "x", 1, triples, 0, &count),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+
+static void trainer_replay_null_args(void)
+{
+    hu_training_triple_t t = {0};
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_replay_buffer_t buf;
+    HU_ASSERT_EQ(hu_replay_buffer_create(NULL, 8, &buf), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_replay_buffer_create(&alloc, 0, &buf), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_replay_buffer_add(NULL, &t), HU_ERR_INVALID_ARGUMENT);
+}
+
 void run_agent_trainer_tests(void)
 {
     HU_TEST_SUITE("agent_trainer");
@@ -101,6 +217,12 @@ void run_agent_trainer_tests(void)
     HU_RUN_TEST(trainer_loss_decreases);
     HU_RUN_TEST(trainer_metrics_report);
     HU_RUN_TEST(trainer_null_args_returns_error);
+    HU_RUN_TEST(trainer_converts_trajectories);
+    HU_RUN_TEST(trainer_replay_buffer_lifecycle);
+    HU_RUN_TEST(trainer_replay_buffer_wraps);
+    HU_RUN_TEST(trainer_checkpoint_roundtrip);
+    HU_RUN_TEST(trainer_convert_null_args);
+    HU_RUN_TEST(trainer_replay_null_args);
 }
 
 #else
