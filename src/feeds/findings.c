@@ -288,13 +288,9 @@ hu_error_t hu_findings_parse_and_store(hu_allocator_t *alloc, sqlite3 *db,
         while (p < end) {
             size_t src_len = 0, find_len = 0, rel_len = 0, pri_len = 0, act_len = 0;
             const char *src_v = find_field_value(p, end, "Source", &src_len);
-            if (!src_v) {
-                /* Also try "Source" as part of bullet: "**<Title> (Source):**" */
-                src_v = find_field_value(p, end, "Finding", &find_len);
-                if (!src_v) break;
-            } else {
-                find_field_value(p, end, "Finding", &find_len);
-            }
+            const char *find_v = find_field_value(p, end, "Finding", &find_len);
+            if (!src_v && !find_v)
+                break;
 
             const char *pri_v = find_field_value(p, end, "Priority", &pri_len);
             const char *rel_v = find_field_value(p, end, "Relevance", &rel_len);
@@ -307,10 +303,8 @@ hu_error_t hu_findings_parse_and_store(hu_allocator_t *alloc, sqlite3 *db,
 
             if (src_v && src_len > 0)
                 copy_field(source, sizeof(source), src_v, src_len);
-            if (find_len > 0) {
-                const char *fv = find_field_value(p, end, "Finding", &find_len);
-                if (fv) copy_field(finding, sizeof(finding), fv, find_len);
-            }
+            if (find_v && find_len > 0)
+                copy_field(finding, sizeof(finding), find_v, find_len);
             if (rel_v && rel_len > 0)
                 copy_field(relevance, sizeof(relevance), rel_v, rel_len);
             if (act_v && act_len > 0)
@@ -327,7 +321,11 @@ hu_error_t hu_findings_parse_and_store(hu_allocator_t *alloc, sqlite3 *db,
             }
 
             /* Advance past this block (find next paragraph or bullet) */
-            const char *next = (pri_v && pri_len > 0) ? pri_v + pri_len : src_v + src_len;
+            const char *next = NULL;
+            if (pri_v && pri_len > 0) next = pri_v + pri_len;
+            else if (find_v && find_len > 0) next = find_v + find_len;
+            else if (src_v && src_len > 0) next = src_v + src_len;
+            else { p++; continue; }
             if (act_v && act_len > 0 && act_v + act_len > next)
                 next = act_v + act_len;
             while (next < end && *next != '\n') next++;
