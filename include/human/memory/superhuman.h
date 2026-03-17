@@ -149,4 +149,27 @@ hu_error_t hu_superhuman_extract_and_store(void *sqlite_ctx, hu_allocator_t *all
     const char *assistant_msg, size_t assistant_len,
     const char *history, size_t history_len);
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Per-contact style evolution — tracks how communication adapts over time
+ * ────────────────────────────────────────────────────────────────────────── */
+
+typedef struct hu_contact_style_stats {
+    char contact_id[128];
+    uint32_t message_count;
+    double avg_response_length;
+    double formality_score;     /* 0.0 = casual, 1.0 = formal */
+    double emoji_frequency;     /* emoji per message */
+    double question_rate;       /* fraction of messages ending with ? */
+    int64_t last_interaction;
+    int64_t first_interaction;
+} hu_contact_style_stats_t;
+
+hu_error_t hu_superhuman_style_record(void *sqlite_ctx, const char *contact_id,
+    size_t contact_id_len, size_t response_length, double formality,
+    bool used_emoji, bool asked_question);
+hu_error_t hu_superhuman_style_get(void *sqlite_ctx, hu_allocator_t *alloc,
+    const char *contact_id, size_t contact_id_len, hu_contact_style_stats_t *out);
+hu_error_t hu_superhuman_style_build_guidance(void *sqlite_ctx, hu_allocator_t *alloc,
+    const char *contact_id, size_t contact_id_len, char **out, size_t *out_len);
+
 #endif /* HU_MEMORY_SUPERHUMAN_H */

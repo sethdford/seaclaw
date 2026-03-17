@@ -156,6 +156,15 @@ static const char *const schema_parts[] = {
     "sentiment_baseline REAL,"
     "messages_sampled INTEGER,"
     "updated_at INTEGER)",
+    "CREATE TABLE IF NOT EXISTS contact_style_evolution("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "contact_id TEXT NOT NULL,"
+    "response_length INTEGER,"
+    "formality REAL,"
+    "used_emoji INTEGER,"
+    "asked_question INTEGER,"
+    "recorded_at INTEGER NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS idx_style_evo_contact ON contact_style_evolution(contact_id)",
     "CREATE TABLE IF NOT EXISTS mood_log("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
     "mood TEXT,"

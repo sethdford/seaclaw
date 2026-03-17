@@ -3,6 +3,7 @@
 #include "human/context/conversation.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/string.h"
 #include "human/memory.h"
 #include "human/memory/superhuman.h"
 #include <sqlite3.h>
@@ -1278,6 +1279,100 @@ hu_error_t hu_superhuman_memory_build_context(void *sqlite_ctx, hu_allocator_t *
     return HU_OK;
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Per-contact style evolution
+ * ────────────────────────────────────────────────────────────────────────── */
+
+hu_error_t hu_superhuman_style_record(void *sqlite_ctx, const char *contact_id,
+    size_t contact_id_len, size_t response_length, double formality,
+    bool used_emoji, bool asked_question) {
+    if (!sqlite_ctx || !contact_id || contact_id_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    sqlite3 *db = get_db(sqlite_ctx);
+    if (!db)
+        return HU_ERR_NOT_SUPPORTED;
+
+    const char *sql =
+        "INSERT INTO contact_style_evolution(contact_id,response_length,formality,"
+        "used_emoji,asked_question,recorded_at) VALUES(?,?,?,?,?,?)";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
+    sqlite3_bind_text(stmt, 1, contact_id, (int)contact_id_len, NULL);
+    sqlite3_bind_int64(stmt, 2, (int64_t)response_length);
+    sqlite3_bind_double(stmt, 3, formality);
+    sqlite3_bind_int(stmt, 4, used_emoji ? 1 : 0);
+    sqlite3_bind_int(stmt, 5, asked_question ? 1 : 0);
+    sqlite3_bind_int64(stmt, 6, (int64_t)time(NULL));
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_BACKEND;
+}
+
+hu_error_t hu_superhuman_style_get(void *sqlite_ctx, hu_allocator_t *alloc,
+    const char *contact_id, size_t contact_id_len, hu_contact_style_stats_t *out) {
+    if (!sqlite_ctx || !alloc || !contact_id || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+    sqlite3 *db = get_db(sqlite_ctx);
+    if (!db)
+        return HU_ERR_NOT_SUPPORTED;
+
+    const char *sql =
+        "SELECT COUNT(*), AVG(response_length), AVG(formality), "
+        "AVG(CAST(used_emoji AS REAL)), AVG(CAST(asked_question AS REAL)), "
+        "MIN(recorded_at), MAX(recorded_at) "
+        "FROM contact_style_evolution WHERE contact_id=?";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
+    sqlite3_bind_text(stmt, 1, contact_id, (int)contact_id_len, NULL);
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        HU_SUPERHUMAN_COPY_STR(out->contact_id, sizeof(out->contact_id), contact_id, contact_id_len);
+        out->message_count = (uint32_t)sqlite3_column_int(stmt, 0);
+        out->avg_response_length = sqlite3_column_double(stmt, 1);
+        out->formality_score = sqlite3_column_double(stmt, 2);
+        out->emoji_frequency = sqlite3_column_double(stmt, 3);
+        out->question_rate = sqlite3_column_double(stmt, 4);
+        out->first_interaction = sqlite3_column_int64(stmt, 5);
+        out->last_interaction = sqlite3_column_int64(stmt, 6);
+    }
+    sqlite3_finalize(stmt);
+    return HU_OK;
+}
+
+hu_error_t hu_superhuman_style_build_guidance(void *sqlite_ctx, hu_allocator_t *alloc,
+    const char *contact_id, size_t contact_id_len, char **out, size_t *out_len) {
+    if (!out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
+
+    hu_contact_style_stats_t stats;
+    hu_error_t err = hu_superhuman_style_get(sqlite_ctx, alloc, contact_id, contact_id_len, &stats);
+    if (err != HU_OK || stats.message_count < 5)
+        return HU_OK;
+
+    char buf[512];
+    int len = snprintf(buf, sizeof(buf),
+        "[Style adaptation for this contact: %u messages exchanged. "
+        "Avg response ~%.0f chars. Formality %.0f%%. Emoji usage %.0f%%. "
+        "Questions %.0f%% of turns.%s]",
+        stats.message_count, stats.avg_response_length,
+        stats.formality_score * 100.0, stats.emoji_frequency * 100.0,
+        stats.question_rate * 100.0,
+        stats.formality_score > 0.7 ? " Keep tone professional." :
+        stats.formality_score < 0.3 ? " Keep it casual and relaxed." : "");
+    if (len > 0 && (size_t)len < sizeof(buf)) {
+        *out = hu_strndup(alloc, buf, (size_t)len);
+        if (*out)
+            *out_len = (size_t)len;
+    }
+    return HU_OK;
+}
+
 #else /* !HU_ENABLE_SQLITE */
 
 #include "human/core/allocator.h"
@@ -1477,6 +1572,29 @@ hu_error_t hu_superhuman_memory_build_context(void *sqlite_ctx, hu_allocator_t *
     (void)sqlite_ctx; (void)alloc; (void)contact_id; (void)contact_id_len;
     (void)include_avoidance; (void)out; (void)out_len;
     return HU_OK;
+}
+
+hu_error_t hu_superhuman_style_record(void *sqlite_ctx, const char *contact_id,
+    size_t contact_id_len, size_t response_length, double formality,
+    bool used_emoji, bool asked_question) {
+    (void)sqlite_ctx; (void)contact_id; (void)contact_id_len;
+    (void)response_length; (void)formality; (void)used_emoji; (void)asked_question;
+    return HU_ERR_NOT_SUPPORTED;
+}
+
+hu_error_t hu_superhuman_style_get(void *sqlite_ctx, hu_allocator_t *alloc,
+    const char *contact_id, size_t contact_id_len, hu_contact_style_stats_t *out) {
+    if (out) memset(out, 0, sizeof(*out));
+    (void)sqlite_ctx; (void)alloc; (void)contact_id; (void)contact_id_len;
+    return HU_ERR_NOT_SUPPORTED;
+}
+
+hu_error_t hu_superhuman_style_build_guidance(void *sqlite_ctx, hu_allocator_t *alloc,
+    const char *contact_id, size_t contact_id_len, char **out, size_t *out_len) {
+    if (out) *out = NULL;
+    if (out_len) *out_len = 0;
+    (void)sqlite_ctx; (void)alloc; (void)contact_id; (void)contact_id_len;
+    return HU_ERR_NOT_SUPPORTED;
 }
 
 #endif /* HU_ENABLE_SQLITE */

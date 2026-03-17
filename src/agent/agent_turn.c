@@ -546,6 +546,37 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len);
             }
         }
+        /* Per-contact style evolution guidance */
+        if (agent->memory && agent->memory_session_id && agent->memory_session_id_len > 0) {
+            char *style_guidance = NULL;
+            size_t style_guidance_len = 0;
+            if (hu_superhuman_style_build_guidance(agent->memory, agent->alloc,
+                    agent->memory_session_id, agent->memory_session_id_len,
+                    &style_guidance, &style_guidance_len) == HU_OK &&
+                style_guidance && style_guidance_len > 0) {
+                if (superhuman_ctx && superhuman_ctx_len > 0) {
+                    size_t merged_len = superhuman_ctx_len + 1 + style_guidance_len + 1;
+                    char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, merged_len);
+                    if (merged) {
+                        memcpy(merged, superhuman_ctx, superhuman_ctx_len);
+                        merged[superhuman_ctx_len] = '\n';
+                        memcpy(merged + superhuman_ctx_len + 1, style_guidance, style_guidance_len);
+                        merged[merged_len - 1] = '\0';
+                        agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+                        agent->alloc->free(agent->alloc->ctx, style_guidance, style_guidance_len + 1);
+                        superhuman_ctx = merged;
+                        superhuman_ctx_len = merged_len;
+                    } else {
+                        agent->alloc->free(agent->alloc->ctx, style_guidance, style_guidance_len + 1);
+                    }
+                } else {
+                    superhuman_ctx = style_guidance;
+                    superhuman_ctx_len = style_guidance_len;
+                }
+            } else if (style_guidance) {
+                agent->alloc->free(agent->alloc->ctx, style_guidance, style_guidance_len + 1);
+            }
+        }
         /* Emotional moments due for check-in (contact-scoped) */
         if (agent->memory && agent->memory_session_id && agent->memory_session_id_len > 0) {
             hu_emotional_moment_t *due = NULL;
@@ -1869,6 +1900,34 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                      agent->memory,
                                                      agent->persona_name, agent->persona_name_len,
                                                      ch, ch_len, cid, cid_len);
+                }
+            }
+#endif
+#ifdef HU_ENABLE_SQLITE
+            /* Record per-contact style evolution data from last assistant message */
+            if (agent->memory && agent->memory_session_id && agent->memory_session_id_len > 0 &&
+                agent->history_count > 0 &&
+                agent->history[agent->history_count - 1].role == HU_ROLE_ASSISTANT) {
+                const char *resp_text = agent->history[agent->history_count - 1].content;
+                size_t resp_len = agent->history[agent->history_count - 1].content_len;
+                if (resp_text && resp_len > 0) {
+                    bool has_emoji = false;
+                    bool has_question = false;
+                    double formality = 0.5;
+                    for (size_t si = 0; si < resp_len; si++) {
+                        if (resp_text[si] == '?') has_question = true;
+                        if ((unsigned char)resp_text[si] > 127) has_emoji = true;
+                    }
+                    size_t upper = 0, alpha = 0;
+                    for (size_t si = 0; si < resp_len && si < 500; si++) {
+                        if (resp_text[si] >= 'A' && resp_text[si] <= 'Z') { upper++; alpha++; }
+                        else if (resp_text[si] >= 'a' && resp_text[si] <= 'z') alpha++;
+                    }
+                    if (alpha > 10)
+                        formality = (double)upper / (double)alpha;
+                    (void)hu_superhuman_style_record(agent->memory,
+                        agent->memory_session_id, agent->memory_session_id_len,
+                        resp_len, formality, has_emoji, has_question);
                 }
             }
 #endif
