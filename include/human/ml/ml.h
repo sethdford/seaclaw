@@ -70,6 +70,7 @@ typedef struct hu_training_config {
     float warmup_ratio;
     float warmdown_ratio;
     float final_lr_frac;
+    const char *checkpoint_path; /* Optional path for save/resume */
 } hu_training_config_t;
 
 typedef struct hu_ml_train_result {

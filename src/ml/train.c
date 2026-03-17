@@ -2,6 +2,7 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/ml/checkpoint.h"
 #include "human/ml/dataloader.h"
 #include "human/ml/evaluator.h"
 #include "human/ml/ml.h"
@@ -11,6 +12,7 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #if defined(__APPLE__) || defined(__linux__)
@@ -193,6 +195,13 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
         optimizer->vtable->step(optimizer->ctx, NULL, NULL, 0);
         optimizer->vtable->zero_grad(optimizer->ctx);
         num_steps++;
+    }
+
+    /* Save checkpoint if path configured */
+    if (config->checkpoint_path && config->checkpoint_path[0]) {
+        hu_error_t ck_err = hu_ml_checkpoint_save(alloc, config->checkpoint_path, model, optimizer);
+        if (ck_err != HU_OK)
+            fprintf(stderr, "[train] checkpoint save failed: %d\n", ck_err);
     }
 
     result->training_seconds = wall_seconds() - t_start;

@@ -6,6 +6,7 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/ml/checkpoint.h"
 #include "human/ml/dataloader.h"
 #include "human/ml/evaluator.h"
 #include "human/ml/experiment.h"
@@ -263,6 +264,14 @@ static hu_error_t run_single_experiment(hu_allocator_t *alloc,
         snprintf(result->description, sizeof(result->description),
                  "param registration failed: %d", (int)err);
         return HU_OK;
+    }
+
+    if (cfg->training.checkpoint_path && cfg->training.checkpoint_path[0]) {
+        hu_error_t ld_err = hu_ml_checkpoint_load(alloc, cfg->training.checkpoint_path,
+                                                   &model, &optimizer);
+        if (ld_err == HU_OK)
+            fprintf(stderr, "[experiment] resumed from checkpoint: %s\n",
+                    cfg->training.checkpoint_path);
     }
 
     hu_ml_train_result_t train_result = {0};
