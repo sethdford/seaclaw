@@ -12,9 +12,25 @@
  * Agent Dispatcher — parallel tool call execution
  * ────────────────────────────────────────────────────────────────────────── */
 
+/* Tool result cache — avoids re-executing identical (tool, args) pairs */
+#define HU_TOOL_CACHE_SLOTS 64
+
+typedef struct hu_tool_cache_entry {
+    uint64_t hash;
+    bool occupied;
+    hu_tool_result_t result;
+} hu_tool_cache_entry_t;
+
+typedef struct hu_tool_cache {
+    hu_tool_cache_entry_t slots[HU_TOOL_CACHE_SLOTS];
+    size_t hits;
+    size_t misses;
+} hu_tool_cache_t;
+
 typedef struct hu_dispatcher {
     uint32_t max_parallel; /* 1 = sequential; >1 = parallel (when supported) */
     uint32_t timeout_secs; /* per-tool timeout; 0 = no limit */
+    hu_tool_cache_t *cache; /* optional; NULL disables caching */
 } hu_dispatcher_t;
 
 typedef struct hu_dispatch_result {
@@ -41,5 +57,10 @@ hu_error_t hu_dispatcher_dispatch(hu_dispatcher_t *d, hu_allocator_t *alloc, hu_
 
 /* Free results from hu_dispatcher_dispatch. */
 void hu_dispatch_result_free(hu_allocator_t *alloc, hu_dispatch_result_t *r);
+
+/* Tool cache management */
+hu_error_t hu_tool_cache_create(hu_allocator_t *alloc, hu_tool_cache_t **out);
+void hu_tool_cache_destroy(hu_allocator_t *alloc, hu_tool_cache_t *cache);
+void hu_tool_cache_clear(hu_allocator_t *alloc, hu_tool_cache_t *cache);
 
 #endif /* HU_AGENT_DISPATCHER_H */
