@@ -1,13 +1,15 @@
 #include "human/channels/voice_channel.h"
+#include "human/core/string.h"
+#include "human/voice/realtime.h"
+#include "human/voice/webrtc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 /* Voice channel with configurable mode:
  *   HU_VOICE_MODE_SONATA (default) — Sonata TTS/STT pipeline
- *   HU_VOICE_MODE_REALTIME — OpenAI Realtime API (see src/voice/realtime.c)
- *   HU_VOICE_MODE_WEBRTC — WebRTC voice (see src/voice/webrtc.c)
- * Realtime and WebRTC modes return HU_ERR_NOT_SUPPORTED until fully integrated. */
+ *   HU_VOICE_MODE_REALTIME — OpenAI Realtime API (full-duplex WebSocket)
+ *   HU_VOICE_MODE_WEBRTC — WebRTC voice (SDP exchange + audio streaming) */
 
 #ifdef HU_HAS_SONATA
 /* FFI declarations for Sonata Rust pipeline.
@@ -28,6 +30,8 @@ typedef struct hu_voice_ctx {
     hu_channel_voice_config_t config;
     bool initialized;
     bool running;
+    hu_voice_rt_session_t *rt_session;
+    hu_webrtc_session_t *webrtc_session;
 } hu_voice_ctx_t;
 
 static hu_error_t voice_start(void *ctx) {
@@ -35,10 +39,40 @@ static hu_error_t voice_start(void *ctx) {
     if (!v)
         return HU_ERR_INVALID_ARGUMENT;
 
-    if (v->config.mode == HU_VOICE_MODE_REALTIME || v->config.mode == HU_VOICE_MODE_WEBRTC) {
-        fprintf(stderr, "[voice] mode %d selected but not yet integrated\n",
-                (int)v->config.mode);
-        return HU_ERR_NOT_SUPPORTED;
+    if (v->config.mode == HU_VOICE_MODE_REALTIME) {
+#if HU_IS_TEST
+        v->running = true;
+        return HU_OK;
+#else
+        hu_voice_rt_config_t rt_cfg = {0};
+        rt_cfg.sample_rate = (int)v->config.sample_rate;
+        hu_error_t err = hu_voice_rt_session_create(v->alloc, &rt_cfg, &v->rt_session);
+        if (err != HU_OK)
+            return err;
+        err = hu_voice_rt_connect(v->rt_session);
+        if (err != HU_OK) {
+            hu_voice_rt_session_destroy(v->rt_session);
+            v->rt_session = NULL;
+            return err;
+        }
+        v->running = true;
+        return HU_OK;
+#endif
+    }
+
+    if (v->config.mode == HU_VOICE_MODE_WEBRTC) {
+#if HU_IS_TEST
+        v->running = true;
+        return HU_OK;
+#else
+        hu_webrtc_config_t wc_cfg = {0};
+        wc_cfg.audio_enabled = true;
+        hu_error_t err = hu_webrtc_session_create(v->alloc, &wc_cfg, &v->webrtc_session);
+        if (err != HU_OK)
+            return err;
+        v->running = true;
+        return HU_OK;
+#endif
     }
 
 #ifdef HU_HAS_SONATA
@@ -60,6 +94,15 @@ static void voice_stop(void *ctx) {
         return;
     v->running = false;
 
+    if (v->rt_session) {
+        hu_voice_rt_session_destroy(v->rt_session);
+        v->rt_session = NULL;
+    }
+    if (v->webrtc_session) {
+        hu_webrtc_session_destroy(v->webrtc_session);
+        v->webrtc_session = NULL;
+    }
+
 #ifdef HU_HAS_SONATA
     if (v->initialized) {
         sonata_pipeline_deinit();
@@ -78,6 +121,14 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
     (void)target_len;
     (void)media;
     (void)media_count;
+
+    if (v->config.mode == HU_VOICE_MODE_REALTIME && v->rt_session) {
+        return hu_voice_rt_send_audio(v->rt_session, message, message_len);
+    }
+    if (v->config.mode == HU_VOICE_MODE_WEBRTC && v->webrtc_session) {
+        return hu_webrtc_send_audio(v->webrtc_session, message, message_len);
+    }
+
     (void)message_len;
 
 #ifdef HU_HAS_SONATA
@@ -122,6 +173,57 @@ static const char *voice_name(void *ctx) {
 static bool voice_health_check(void *ctx) {
     hu_voice_ctx_t *v = (hu_voice_ctx_t *)ctx;
     return v && v->running;
+}
+
+hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc,
+                         hu_channel_loop_msg_t *msgs, size_t max_msgs, size_t *out_count) {
+    hu_voice_ctx_t *v = (hu_voice_ctx_t *)channel_ctx;
+    if (!v || !alloc || !msgs || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_count = 0;
+
+    if (!v->running)
+        return HU_OK;
+
+#if HU_IS_TEST
+    (void)max_msgs;
+    return HU_OK;
+#else
+#ifdef HU_HAS_SONATA
+    if (!v->config.on_audio_input_request)
+        return HU_OK;
+
+    float audio_buf[VOICE_MAX_SAMPLES];
+    size_t samples = 0;
+    if (!v->config.on_audio_input_request(audio_buf, VOICE_MAX_SAMPLES, &samples,
+                                          v->config.callback_user_data) ||
+        samples == 0)
+        return HU_OK;
+
+    uint8_t text_buf[4096];
+    size_t text_len = sizeof(text_buf);
+    int32_t stt_err = sonata_stt(audio_buf, samples, text_buf, &text_len);
+    if (stt_err != 0 || text_len == 0)
+        return HU_OK;
+
+    if (max_msgs == 0)
+        return HU_OK;
+
+    memset(&msgs[0], 0, sizeof(msgs[0]));
+    if (text_len >= sizeof(msgs[0].content))
+        text_len = sizeof(msgs[0].content) - 1;
+    memcpy(msgs[0].content, text_buf, text_len);
+    msgs[0].content[text_len] = '\0';
+    memcpy(msgs[0].session_key, "voice-user", 10);
+    msgs[0].session_key[10] = '\0';
+    msgs[0].is_group = false;
+    msgs[0].message_id = -1;
+    *out_count = 1;
+#else
+    (void)max_msgs;
+#endif
+    return HU_OK;
+#endif
 }
 
 static const hu_channel_vtable_t voice_vtable = {

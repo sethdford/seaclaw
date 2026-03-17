@@ -486,6 +486,21 @@ static void test_voice_channel_health_check_before_start(void) {
     HU_ASSERT_FALSE(ch.vtable->health_check(ch.ctx));
     hu_channel_voice_destroy(&ch);
 }
+
+static void test_voice_poll_returns_zero_messages_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch = {0};
+    hu_error_t err = hu_channel_voice_create(&alloc, NULL, &ch);
+    HU_ASSERT_EQ(err, HU_OK);
+    err = ch.vtable->start(ch.ctx);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_channel_loop_msg_t msgs[4];
+    size_t count = 0;
+    err = hu_voice_poll(ch.ctx, &alloc, msgs, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+    hu_channel_voice_destroy(&ch);
+}
 #endif
 
 void run_channel_tests(void) {
@@ -545,5 +560,6 @@ void run_channel_tests(void) {
     HU_RUN_TEST(test_voice_channel_start_stop);
     HU_RUN_TEST(test_voice_channel_send);
     HU_RUN_TEST(test_voice_channel_health_check_before_start);
+    HU_RUN_TEST(test_voice_poll_returns_zero_messages_in_test);
 #endif
 }

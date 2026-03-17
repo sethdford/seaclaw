@@ -2,6 +2,7 @@
 #define HU_CHANNELS_VOICE_CHANNEL_H
 
 #include "human/channel.h"
+#include "human/channel_loop.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include <stdbool.h>
@@ -17,6 +18,11 @@
 
 /** Callback invoked when TTS audio is ready for playback. */
 typedef void (*hu_voice_audio_callback_t)(const float *audio, size_t samples, void *user_data);
+
+/** Callback to poll for audio input (microphone). Returns true if audio available.
+ * Fills buf with up to max_samples; sets *out_samples to actual count. */
+typedef bool (*hu_voice_audio_input_callback_t)(float *buf, size_t max_samples, size_t *out_samples,
+                                                void *user_data);
 
 typedef enum hu_voice_mode {
     HU_VOICE_MODE_SONATA = 0,   /* Default: Sonata TTS/STT */
@@ -38,7 +44,8 @@ typedef struct hu_channel_voice_config {
     bool enable_full_duplex;                  /* Enable overlapping speech */
     bool enable_backchanneling;               /* Enable hmm/right/oh responses */
     hu_voice_audio_callback_t on_audio_ready; /* Callback for generated audio */
-    void *callback_user_data;                 /* User data for callback */
+    hu_voice_audio_input_callback_t on_audio_input_request; /* Optional: poll for mic input */
+    void *callback_user_data;                 /* User data for callbacks */
 } hu_channel_voice_config_t;
 
 /**
@@ -56,5 +63,12 @@ hu_error_t hu_channel_voice_create(hu_allocator_t *alloc, const hu_channel_voice
  * Destroy a voice channel and release resources.
  */
 void hu_channel_voice_destroy(hu_channel_t *ch);
+
+/**
+ * Poll for voice input (STT). Used by channel loop when voice is configured
+ * with on_audio_input_request. Returns transcribed messages.
+ */
+hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc,
+                         hu_channel_loop_msg_t *msgs, size_t max_msgs, size_t *out_count);
 
 #endif /* HU_CHANNELS_VOICE_CHANNEL_H */
