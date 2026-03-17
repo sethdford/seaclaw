@@ -209,6 +209,54 @@ static void trainer_replay_null_args(void)
     HU_ASSERT_EQ(hu_replay_buffer_add(NULL, &t), HU_ERR_INVALID_ARGUMENT);
 }
 
+static void trainer_collector_lifecycle(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_training_collector_t tc;
+    HU_ASSERT_EQ(hu_training_collector_init(&alloc, &tc, 8), HU_OK);
+    HU_ASSERT_TRUE(tc.enabled);
+    HU_ASSERT_EQ(tc.capacity, 8u);
+
+    HU_ASSERT_EQ(hu_training_collector_record(&tc, "user said hello", 15,
+                                               "responded with greeting", 23, 0.9), HU_OK);
+    HU_ASSERT_EQ(tc.count, 1u);
+    HU_ASSERT_EQ(tc.buffer[0].reward, 0.9);
+
+    HU_ASSERT_EQ(hu_training_collector_record(&tc, "user asked Q", 12,
+                                               "answered correctly", 18, 1.0), HU_OK);
+    HU_ASSERT_EQ(tc.count, 2u);
+
+    char buf[4096];
+    size_t out_len = 0;
+    HU_ASSERT_EQ(hu_training_collector_export_json(&alloc, &tc, buf, sizeof(buf), &out_len), HU_OK);
+    HU_ASSERT_TRUE(out_len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "\"count\":2") != NULL);
+
+    hu_training_collector_destroy(&alloc, &tc);
+    HU_ASSERT_NULL(tc.buffer);
+    HU_ASSERT_FALSE(tc.enabled);
+}
+
+static void trainer_collector_wraps(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_training_collector_t tc;
+    hu_training_collector_init(&alloc, &tc, 4);
+
+    for (int i = 0; i < 6; i++) {
+        hu_training_collector_record(&tc, "s", 1, "a", 1, (double)i * 0.1);
+    }
+    HU_ASSERT_EQ(tc.count, 6u);
+
+    hu_training_collector_destroy(&alloc, &tc);
+}
+
+static void trainer_collector_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_training_collector_t tc;
+    HU_ASSERT_EQ(hu_training_collector_init(NULL, &tc, 8), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_training_collector_init(&alloc, NULL, 8), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_training_collector_record(NULL, "s", 1, "a", 1, 0.0), HU_ERR_INVALID_ARGUMENT);
+}
+
 void run_agent_trainer_tests(void)
 {
     HU_TEST_SUITE("agent_trainer");
@@ -223,6 +271,9 @@ void run_agent_trainer_tests(void)
     HU_RUN_TEST(trainer_checkpoint_roundtrip);
     HU_RUN_TEST(trainer_convert_null_args);
     HU_RUN_TEST(trainer_replay_null_args);
+    HU_RUN_TEST(trainer_collector_lifecycle);
+    HU_RUN_TEST(trainer_collector_wraps);
+    HU_RUN_TEST(trainer_collector_null_args);
 }
 
 #else

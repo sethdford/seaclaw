@@ -78,4 +78,23 @@ hu_error_t hu_training_load_checkpoint(hu_allocator_t *alloc,
                                        const char *buf, size_t buf_len,
                                        hu_training_checkpoint_t *ckpt);
 
+/* Training data collector: records (state, action, reward) from agent turns */
+typedef struct hu_training_collector {
+    hu_training_triple_t *buffer;
+    size_t capacity;
+    size_t count;
+    bool enabled;
+} hu_training_collector_t;
+
+hu_error_t hu_training_collector_init(hu_allocator_t *alloc, hu_training_collector_t *tc,
+                                       size_t capacity);
+hu_error_t hu_training_collector_record(hu_training_collector_t *tc,
+                                         const char *state, size_t state_len,
+                                         const char *action, size_t action_len,
+                                         double reward);
+hu_error_t hu_training_collector_export_json(hu_allocator_t *alloc,
+                                              const hu_training_collector_t *tc,
+                                              char *buf, size_t buf_size, size_t *out_len);
+void hu_training_collector_destroy(hu_allocator_t *alloc, hu_training_collector_t *tc);
+
 #endif

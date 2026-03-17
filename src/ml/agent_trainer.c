@@ -398,3 +398,104 @@ hu_error_t hu_training_load_checkpoint(hu_allocator_t *alloc,
 
     return HU_OK;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Training data collector
+ * ───────────────────────────────────────────────────────────────────────── */
+
+hu_error_t hu_training_collector_init(hu_allocator_t *alloc, hu_training_collector_t *tc,
+                                       size_t capacity) {
+    if (!alloc || !tc)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (capacity == 0)
+        capacity = 256;
+    if (capacity > HU_REPLAY_BUFFER_MAX)
+        capacity = HU_REPLAY_BUFFER_MAX;
+    tc->buffer = (hu_training_triple_t *)alloc->alloc(
+        alloc->ctx, capacity * sizeof(hu_training_triple_t));
+    if (!tc->buffer)
+        return HU_ERR_OUT_OF_MEMORY;
+    memset(tc->buffer, 0, capacity * sizeof(hu_training_triple_t));
+    tc->capacity = capacity;
+    tc->count = 0;
+    tc->enabled = true;
+    return HU_OK;
+}
+
+hu_error_t hu_training_collector_record(hu_training_collector_t *tc,
+                                         const char *state, size_t state_len,
+                                         const char *action, size_t action_len,
+                                         double reward) {
+    if (!tc || !tc->enabled)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!tc->buffer)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    size_t idx = tc->count < tc->capacity ? tc->count : (tc->count % tc->capacity);
+    hu_training_triple_t *t = &tc->buffer[idx];
+    memset(t, 0, sizeof(*t));
+
+    size_t sl = state_len > sizeof(t->prompt) - 1 ? sizeof(t->prompt) - 1 : state_len;
+    if (state && sl > 0)
+        memcpy(t->prompt, state, sl);
+    t->prompt[sl] = '\0';
+    t->prompt_len = sl;
+
+    size_t al = action_len > sizeof(t->response) - 1 ? sizeof(t->response) - 1 : action_len;
+    if (action && al > 0)
+        memcpy(t->response, action, al);
+    t->response[al] = '\0';
+    t->response_len = al;
+
+    t->reward = reward;
+    tc->count++;
+    return HU_OK;
+}
+
+hu_error_t hu_training_collector_export_json(hu_allocator_t *alloc,
+                                              const hu_training_collector_t *tc,
+                                              char *buf, size_t buf_size, size_t *out_len) {
+    (void)alloc;
+    if (!tc || !buf || !out_len || buf_size < 16)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    size_t count = tc->count < tc->capacity ? tc->count : tc->capacity;
+    int pos = snprintf(buf, buf_size, "{\"count\":%zu,\"data\":[", count);
+    if (pos < 0 || (size_t)pos >= buf_size) {
+        *out_len = 0;
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    for (size_t i = 0; i < count && (size_t)pos < buf_size - 128; i++) {
+        const hu_training_triple_t *t = &tc->buffer[i];
+        if (i > 0 && (size_t)pos < buf_size - 1)
+            buf[pos++] = ',';
+        int n = snprintf(buf + pos, buf_size - (size_t)pos,
+                         "{\"state\":\"%.*s\",\"action\":\"%.*s\",\"reward\":%.3f}",
+                         (int)(t->prompt_len < 64 ? t->prompt_len : 64), t->prompt,
+                         (int)(t->response_len < 64 ? t->response_len : 64), t->response,
+                         t->reward);
+        if (n > 0)
+            pos += n;
+    }
+
+    if ((size_t)pos < buf_size - 2) {
+        buf[pos++] = ']';
+        buf[pos++] = '}';
+        buf[pos] = '\0';
+    }
+    *out_len = (size_t)pos;
+    return HU_OK;
+}
+
+void hu_training_collector_destroy(hu_allocator_t *alloc, hu_training_collector_t *tc) {
+    if (!alloc || !tc)
+        return;
+    if (tc->buffer) {
+        alloc->free(alloc->ctx, tc->buffer, tc->capacity * sizeof(hu_training_triple_t));
+        tc->buffer = NULL;
+    }
+    tc->count = 0;
+    tc->capacity = 0;
+    tc->enabled = false;
+}
