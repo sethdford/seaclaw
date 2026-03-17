@@ -591,13 +591,6 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     hu_json_buf_append_raw(&buf, oc_choices, sizeof(oc_choices) - 1);
     if (resp.content && resp.content_len > 0)
         hu_json_append_string(&buf, resp.content, resp.content_len);
-    else
-        hu_json_buf_append_raw(&buf, "\"\"", 2);
-    hu_json_buf_append_raw(&buf, ",\"content\":", 11);
-    if (resp.content && resp.content_len > 0)
-        hu_json_append_string(&buf, resp.content, resp.content_len);
-    else
-        hu_json_buf_append_raw(&buf, "\"\"", 2);
     hu_json_buf_append_raw(&buf, oc_usage, sizeof(oc_usage) - 1);
     char usage_buf[24];
     snprintf(usage_buf, sizeof(usage_buf), "%u", resp.usage.prompt_tokens);
