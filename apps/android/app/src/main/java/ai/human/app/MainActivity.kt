@@ -125,6 +125,9 @@ fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000
         if (selectedTab == 1) {
             gateway.connectIfNeeded(initialGatewayUrl)
         }
+        if (selectedTab == 0 && connectionState == ConnectionState.CONNECTED) {
+            gateway.fetchOverviewData()
+        }
         onDispose { }
     }
 

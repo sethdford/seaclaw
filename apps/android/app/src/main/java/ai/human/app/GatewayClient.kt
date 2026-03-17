@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -21,6 +22,21 @@ enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED }
 
 @Immutable
 data class GatewayEvent(val type: String, val payload: JSONObject?)
+
+@Immutable
+data class SessionSummary(
+    val key: String,
+    val label: String,
+    val turnCount: Int,
+    val lastActive: Long,
+)
+
+@Immutable
+data class ActivityEvent(
+    val type: String,
+    val text: String,
+    val timestamp: Long = System.currentTimeMillis(),
+)
 
 class GatewayClient {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -37,6 +53,12 @@ class GatewayClient {
 
     private val _events = MutableStateFlow<GatewayEvent?>(null)
     val events: StateFlow<GatewayEvent?> = _events
+
+    private val _sessions = MutableStateFlow<List<SessionSummary>>(emptyList())
+    val sessions: StateFlow<List<SessionSummary>> = _sessions.asStateFlow()
+
+    private val _overviewActivity = MutableStateFlow<List<ActivityEvent>>(emptyList())
+    val overviewActivity: StateFlow<List<ActivityEvent>> = _overviewActivity.asStateFlow()
 
     /** Connect only when needed (e.g. when Chat tab is selected). Idempotent. */
     fun connectIfNeeded(url: String) {
@@ -63,11 +85,42 @@ class GatewayClient {
                         val json = JSONObject(text)
                         val type = json.optString("type", "")
                         if (type == "res") {
-                            val result = json.optJSONObject("result")
-                            val content = result?.optString("content", "")
-                                ?: result?.optString("text", "") ?: ""
+                            val result = json.optJSONObject("result") ?: JSONObject()
+                            val content = result.optString("content", "")
+                                .ifBlank { result.optString("text", "") }
                             if (content.isNotBlank()) {
                                 _events.value = GatewayEvent("response", result)
+                            }
+                            val sessionsArr = result.optJSONArray("sessions")
+                            if (sessionsArr != null) {
+                                val list = mutableListOf<SessionSummary>()
+                                for (i in 0 until sessionsArr.length()) {
+                                    val o = sessionsArr.optJSONObject(i) ?: continue
+                                    list.add(
+                                        SessionSummary(
+                                            key = o.optString("key", ""),
+                                            label = o.optString("label", "Untitled"),
+                                            turnCount = o.optInt("turn_count", 0),
+                                            lastActive = (o.optDouble("last_active", 0.0) * 1000).toLong(),
+                                        ),
+                                    )
+                                }
+                                _sessions.value = list
+                            }
+                            val eventsArr = result.optJSONArray("events")
+                            if (eventsArr != null) {
+                                val list = mutableListOf<ActivityEvent>()
+                                for (i in 0 until eventsArr.length()) {
+                                    val o = eventsArr.optJSONObject(i) ?: continue
+                                    list.add(
+                                        ActivityEvent(
+                                            type = o.optString("type", ""),
+                                            text = o.optString("text", o.optString("content", "")),
+                                            timestamp = (o.optDouble("timestamp", 0.0) * 1000).toLong(),
+                                        ),
+                                    )
+                                }
+                                _overviewActivity.value = list
                             }
                         } else if (type == "event") {
                             _events.value = GatewayEvent(
@@ -106,13 +159,19 @@ class GatewayClient {
         _state.value = ConnectionState.DISCONNECTED
     }
 
-    /** Prefetch sessions list for adjacent tab navigation. Placeholder until ViewModel caches. */
+    /** Prefetch sessions list for adjacent tab navigation. */
     fun prefetchSessions() {
         send("sessions.list", emptyMap())
     }
 
-    /** Prefetch tools catalog for adjacent tab navigation. Placeholder until ViewModel caches. */
+    /** Prefetch tools catalog for adjacent tab navigation. */
     fun prefetchTools() {
         send("tools.catalog", emptyMap())
+    }
+
+    /** Fetch overview data: sessions and activity. Call when connected. */
+    fun fetchOverviewData() {
+        send("sessions.list", emptyMap())
+        send("activity.recent", emptyMap())
     }
 }

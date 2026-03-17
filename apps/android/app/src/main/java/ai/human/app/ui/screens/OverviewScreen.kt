@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ai.human.app.ConnectionState
 import ai.human.app.GatewayClient
+import ai.human.app.SessionSummary
 import ai.human.app.ui.HUTokens
 import ai.human.app.ui.StaggeredItem
 import ai.human.app.util.isReducedMotionEnabled
@@ -73,7 +74,15 @@ fun OverviewScreen(
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
     val events by gateway.events.collectAsState()
+    val sessions by gateway.sessions.collectAsState()
+    val overviewActivity by gateway.overviewActivity.collectAsState()
     val recentActivity = remember { mutableStateListOf<String>() }
+
+    LaunchedEffect(connectionState) {
+        if (connectionState == ConnectionState.CONNECTED) {
+            gateway.fetchOverviewData()
+        }
+    }
 
     LaunchedEffect(events) {
         events?.let { event ->
@@ -102,6 +111,14 @@ fun OverviewScreen(
         ConnectionState.DISCONNECTED -> colorScheme.error
     }
 
+    val displayActivity = when {
+        connectionState == ConnectionState.CONNECTED && overviewActivity.isNotEmpty() ->
+            overviewActivity.map { "${it.type}: ${it.text.take(60)}" }
+        connectionState == ConnectionState.CONNECTED -> recentActivity
+        else -> emptyList<String>()
+    }
+    val showSkeletons = connectionState != ConnectionState.CONNECTED
+
     PullToRefreshBox(
         state = pullToRefreshState,
         isRefreshing = isRefreshing,
@@ -109,8 +126,7 @@ fun OverviewScreen(
             isRefreshing = true
             scope.launch {
                 if (connectionState == ConnectionState.CONNECTED) {
-                    gateway.prefetchSessions()
-                    gateway.prefetchTools()
+                    gateway.fetchOverviewData()
                 }
                 delay(HUTokens.durationNormal.toLong())
                 isRefreshing = false
@@ -197,11 +213,13 @@ fun OverviewScreen(
                         title = "Gateway",
                         value = statusLabel,
                         modifier = Modifier.weight(1f),
+                        isSkeleton = showSkeletons,
                     )
                     StatCard(
                         title = "Events",
-                        value = recentActivity.size,
+                        value = if (showSkeletons) null else displayActivity.size,
                         modifier = Modifier.weight(1f),
+                        isSkeleton = showSkeletons,
                     )
                 }
             }
@@ -225,11 +243,13 @@ fun OverviewScreen(
                         title = "Connection",
                         value = if (connectionState == ConnectionState.CONNECTED) "Active" else "Offline",
                         modifier = Modifier.weight(1f),
+                        isSkeleton = showSkeletons,
                     )
                     StatCard(
                         title = "Messages",
-                        value = recentActivity.size * 12,
+                        value = if (showSkeletons) null else sessions.sumOf { it.turnCount },
                         modifier = Modifier.weight(1f),
+                        isSkeleton = showSkeletons,
                     )
                 }
             }
@@ -250,27 +270,48 @@ fun OverviewScreen(
                     ),
             ) {
                 Text(
-                    text = if (recentActivity.isEmpty()) "No activity yet" else "Live activity",
+                    text = when {
+                        showSkeletons -> "Loading..."
+                        displayActivity.isEmpty() -> "No activity yet"
+                        else -> "Live activity"
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     color = colorScheme.onBackground,
                 )
             }
         }
 
-        items(recentActivity.size, key = { it }) { index ->
-            val activity = recentActivity[index]
-            StaggeredItem(
-                index = 4 + index,
-                reducedMotion = reducedMotion,
-                enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
-                    slideInVertically(
-                        animationSpec = listItemSpring,
-                        initialOffsetY = { it / 4 },
-                    ),
-            ) {
-                ActivityItem(text = activity)
+        if (showSkeletons) {
+            items(3) { index ->
+                StaggeredItem(
+                    index = 4 + index,
+                    reducedMotion = reducedMotion,
+                    enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
+                        slideInVertically(
+                            animationSpec = listItemSpring,
+                            initialOffsetY = { it / 4 },
+                        ),
+                ) {
+                    SkeletonPlaceholder()
+                }
+            }
+        } else {
+            items(displayActivity.size) { index ->
+                val activity = displayActivity[index]
+                StaggeredItem(
+                    index = 4 + index,
+                    reducedMotion = reducedMotion,
+                    enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
+                        slideInVertically(
+                            animationSpec = listItemSpring,
+                            initialOffsetY = { it / 4 },
+                        ),
+                ) {
+                    ActivityItem(text = activity)
+                }
             }
         }
+    }
     }
 }
 
