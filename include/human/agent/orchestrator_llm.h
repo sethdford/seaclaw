@@ -68,4 +68,20 @@ hu_error_t hu_decompose_task(hu_allocator_t *alloc, hu_provider_t *provider,
 hu_error_t hu_orchestrator_auto_assign(hu_orchestrator_t *orch,
                                         const hu_decomposition_t *decomposition);
 
+/* Re-decompose with failure context: takes the original prompt, the failed subtask
+ * description and failure reason, and produces a new decomposition that works around
+ * the failure. Under HU_IS_TEST, returns a mock re-plan. */
+hu_error_t hu_decompose_with_replan(hu_allocator_t *alloc, hu_provider_t *provider,
+                                     const char *model, size_t model_len,
+                                     const char *original_prompt, size_t original_prompt_len,
+                                     const char *failed_task, size_t failed_task_len,
+                                     const char *failure_reason, size_t failure_reason_len,
+                                     hu_decomposition_strategy_t strategy,
+                                     hu_decomposition_result_t *result);
+
+/* Check whether the subtasks in a decomposition plausibly cover the original goal.
+ * Returns true if coverage is sufficient (word overlap heuristic). */
+bool hu_decomposition_check_coverage(const char *goal, size_t goal_len,
+                                      const hu_decomposition_result_t *result);
+
 #endif

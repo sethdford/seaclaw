@@ -290,200 +290,230 @@ hu_error_t hu_tot_explore(hu_allocator_t *alloc, hu_provider_t *provider,
     if (!problem || problem_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
 
-    /* 1. Generate thoughts via chat_with_system */
-    char *gen_sys = hu_sprintf(alloc, TOT_GEN_SYS, num_branches);
-    if (!gen_sys)
-        return HU_ERR_OUT_OF_MEMORY;
+    int max_depth = config ? config->max_depth : 2;
+    int beam_width = config && config->beam_width > 0 ? config->beam_width : 3;
+    int node_limit = config && config->max_total_nodes > 0 ? config->max_total_nodes : 50;
+    if (max_depth > 5) max_depth = 5;
+    if (beam_width > HU_TOT_MAX_BRANCHES) beam_width = HU_TOT_MAX_BRANCHES;
 
-    char *gen_out = NULL;
-    size_t gen_out_len = 0;
     const char *gen_model = (model && model_len > 0) ? model : "gpt-4o-mini";
     size_t gen_model_len = (model && model_len > 0) ? model_len : 11;
-
-    hu_error_t err = provider->vtable->chat_with_system(
-        provider->ctx, alloc, gen_sys, strlen(gen_sys), problem, problem_len,
-        gen_model, gen_model_len, 0.7, &gen_out, &gen_out_len);
-    hu_str_free(alloc, gen_sys);
-
-    if (err != HU_OK) {
-        if (gen_out)
-            alloc->free(alloc->ctx, gen_out, gen_out_len + 1);
-        return err;
-    }
-    if (!gen_out || gen_out_len == 0) {
-        if (gen_out)
-            alloc->free(alloc->ctx, gen_out, gen_out_len + 1);
-        return HU_ERR_PROVIDER_RESPONSE;
-    }
-
-    /* 2. Parse thoughts from response */
-    hu_tot_branch_t branches[HU_TOT_MAX_BRANCHES];
-    memset(branches, 0, sizeof(branches));
-    size_t branch_count =
-        parse_thoughts(alloc, gen_out, gen_out_len, branches, HU_TOT_MAX_BRANCHES, 0);
-    alloc->free(alloc->ctx, gen_out, gen_out_len + 1);
-
-    if (branch_count == 0) {
-        result->branches_explored = 0;
-        result->branches_pruned = 0;
-        return HU_OK;
-    }
-
     const char *eval_sys = TOT_EVAL_SYS;
     size_t eval_sys_len = sizeof(TOT_EVAL_SYS) - 1;
-    const char *eval_model = (model && model_len > 0) ? model : "gpt-4o-mini";
-    size_t eval_model_len = (model && model_len > 0) ? model_len : 11;
 
     size_t pruned = 0;
-    size_t total_explored = branch_count;
-    int best_idx = -1;
+    size_t total_explored = 0;
+    int llm_calls = 0;
+    int max_depth_reached = 0;
     double best_score = -1.0;
-    char *current_best = NULL;
+    char *best_thought = NULL;
 
-    for (size_t i = 0; i < branch_count; i++) {
-        size_t user_cap = branches[i].thought_len + 64;
-        char *user_msg = (char *)alloc->alloc(alloc->ctx, user_cap);
-        if (!user_msg) {
-            for (size_t j = 0; j < branch_count; j++)
-                if (branches[j].thought)
-                    hu_str_free(alloc, branches[j].thought);
-            return HU_ERR_OUT_OF_MEMORY;
+    /* Beam frontier: the top-K branches surviving from the previous level */
+    hu_tot_branch_t beam[HU_TOT_MAX_BRANCHES];
+    int beam_count = 0;
+
+    /* Level 0: generate root thoughts */
+    {
+        char *gen_sys_str = hu_sprintf(alloc, TOT_GEN_SYS, num_branches);
+        if (!gen_sys_str) return HU_ERR_OUT_OF_MEMORY;
+
+        char *gen_out = NULL;
+        size_t gen_out_len = 0;
+        hu_error_t err = provider->vtable->chat_with_system(
+            provider->ctx, alloc, gen_sys_str, strlen(gen_sys_str), problem, problem_len,
+            gen_model, gen_model_len, 0.7, &gen_out, &gen_out_len);
+        hu_str_free(alloc, gen_sys_str);
+        llm_calls++;
+
+        if (err != HU_OK || !gen_out || gen_out_len == 0) {
+            if (gen_out) alloc->free(alloc->ctx, gen_out, gen_out_len + 1);
+            return gen_out ? HU_ERR_PROVIDER_RESPONSE : err;
         }
-        int n = snprintf(user_msg, user_cap, "Rate this approach on a scale of 0.0 to 1.0: %s",
-                         branches[i].thought);
-        size_t user_len = (n > 0 && (size_t)n < user_cap) ? (size_t)n : strlen(user_msg);
 
-        char *eval_out = NULL;
-        size_t eval_out_len = 0;
-        err = provider->vtable->chat_with_system(
-            provider->ctx, alloc, eval_sys, eval_sys_len, user_msg, user_len,
-            eval_model, eval_model_len, 0.0, &eval_out, &eval_out_len);
-        alloc->free(alloc->ctx, user_msg, user_cap);
+        hu_tot_branch_t roots[HU_TOT_MAX_BRANCHES];
+        memset(roots, 0, sizeof(roots));
+        size_t root_count = parse_thoughts(alloc, gen_out, gen_out_len, roots,
+                                            HU_TOT_MAX_BRANCHES, 0);
+        alloc->free(alloc->ctx, gen_out, gen_out_len + 1);
 
-        if (err == HU_OK && eval_out && eval_out_len > 0) {
-            double score = parse_score(eval_out, eval_out_len);
-            if (score >= 0.0)
-                branches[i].score = score;
+        /* Score each root */
+        for (size_t i = 0; i < root_count && total_explored < (size_t)node_limit; i++) {
+            total_explored++;
+            char *user_msg = hu_sprintf(alloc, "Rate this approach on a scale of 0.0 to 1.0: %s",
+                                         roots[i].thought);
+            if (!user_msg) continue;
+            char *eval_out = NULL;
+            size_t eval_out_len = 0;
+            err = provider->vtable->chat_with_system(
+                provider->ctx, alloc, eval_sys, eval_sys_len, user_msg, strlen(user_msg),
+                gen_model, gen_model_len, 0.0, &eval_out, &eval_out_len);
+            alloc->free(alloc->ctx, user_msg, strlen(user_msg) + 1);
+            llm_calls++;
+            if (err == HU_OK && eval_out && eval_out_len > 0) {
+                double s = parse_score(eval_out, eval_out_len);
+                if (s >= 0.0) roots[i].score = s;
+            }
+            if (eval_out) alloc->free(alloc->ctx, eval_out, eval_out_len + 1);
+
+            if (roots[i].score < prune_threshold)
+                pruned++;
+            else if (roots[i].score > best_score) {
+                best_score = roots[i].score;
+                if (best_thought) hu_str_free(alloc, best_thought);
+                best_thought = hu_strdup(alloc, roots[i].thought);
+            }
         }
-        if (eval_out)
-            alloc->free(alloc->ctx, eval_out, eval_out_len + 1);
 
-        if (branches[i].score < prune_threshold)
-            pruned++;
-        else if (branches[i].score > best_score) {
-            best_score = branches[i].score;
-            best_idx = (int)i;
+        /* Select top beam_width roots above threshold */
+        beam_count = 0;
+        memset(beam, 0, sizeof(beam));
+        for (int b = 0; b < beam_width && b < (int)root_count; b++) {
+            int best_idx = -1;
+            double best_s = -1.0;
+            for (size_t j = 0; j < root_count; j++) {
+                if (roots[j].score < prune_threshold) continue;
+                bool used = false;
+                for (int k = 0; k < beam_count; k++)
+                    if (beam[k].thought && roots[j].thought &&
+                        strcmp(beam[k].thought, roots[j].thought) == 0)
+                        used = true;
+                if (!used && roots[j].score > best_s) {
+                    best_s = roots[j].score;
+                    best_idx = (int)j;
+                }
+            }
+            if (best_idx < 0) break;
+            beam[beam_count].thought = hu_strdup(alloc, roots[best_idx].thought);
+            beam[beam_count].thought_len = roots[best_idx].thought_len;
+            beam[beam_count].score = roots[best_idx].score;
+            beam[beam_count].depth = 0;
+            beam_count++;
         }
+
+        for (size_t j = 0; j < root_count; j++)
+            if (roots[j].thought) hu_str_free(alloc, roots[j].thought);
     }
 
-    if (best_idx >= 0)
-        current_best = hu_strdup(alloc, branches[best_idx].thought);
+    /* Deeper levels: expand each beam member, collect children, select top-K */
+    for (int depth = 1; depth < max_depth && beam_count > 0 &&
+         total_explored < (size_t)node_limit; depth++) {
+        max_depth_reached = depth;
 
-    int max_depth = config ? config->max_depth : 2;
-    int node_limit = config && config->max_total_nodes > 0 ? config->max_total_nodes : 50;
-    int llm_calls = 1 + (int)branch_count;
-    int max_depth_reached = 0;
+        hu_tot_branch_t candidates[HU_TOT_MAX_BRANCHES * HU_TOT_MAX_BRANCHES];
+        memset(candidates, 0, sizeof(candidates));
+        int cand_count = 0;
 
-    if (max_depth > 1 && current_best && total_explored < (size_t)node_limit) {
-        for (int depth = 1; depth < max_depth; depth++) {
-            char *expand_sys = hu_sprintf(alloc, TOT_EXPAND_SYS, current_best, num_branches);
-            if (!expand_sys)
-                break;
+        for (int b = 0; b < beam_count && total_explored < (size_t)node_limit; b++) {
+            char *expand_sys = hu_sprintf(alloc, TOT_EXPAND_SYS, beam[b].thought,
+                                           num_branches);
+            if (!expand_sys) continue;
 
             char *expand_out = NULL;
             size_t expand_out_len = 0;
-            err = provider->vtable->chat_with_system(
+            hu_error_t err = provider->vtable->chat_with_system(
                 provider->ctx, alloc, expand_sys, strlen(expand_sys), problem, problem_len,
                 gen_model, gen_model_len, 0.7, &expand_out, &expand_out_len);
             hu_str_free(alloc, expand_sys);
             llm_calls++;
 
             if (err != HU_OK || !expand_out || expand_out_len == 0) {
-                if (expand_out)
-                    alloc->free(alloc->ctx, expand_out, expand_out_len + 1);
-                break;
+                if (expand_out) alloc->free(alloc->ctx, expand_out, expand_out_len + 1);
+                continue;
             }
 
-            hu_tot_branch_t sub_branches[HU_TOT_MAX_BRANCHES];
-            memset(sub_branches, 0, sizeof(sub_branches));
-            size_t sub_count = parse_thoughts(alloc, expand_out, expand_out_len, sub_branches,
-                                             HU_TOT_MAX_BRANCHES, depth);
+            hu_tot_branch_t children[HU_TOT_MAX_BRANCHES];
+            memset(children, 0, sizeof(children));
+            size_t child_count = parse_thoughts(alloc, expand_out, expand_out_len,
+                                                 children, HU_TOT_MAX_BRANCHES, depth);
             alloc->free(alloc->ctx, expand_out, expand_out_len + 1);
 
-            if (sub_count == 0)
-                break;
-
-            for (size_t i = 0; i < sub_count; i++) {
-                size_t user_cap = sub_branches[i].thought_len + 64;
-                char *user_msg = (char *)alloc->alloc(alloc->ctx, user_cap);
-                if (!user_msg) {
-                    for (size_t j = 0; j < sub_count; j++)
-                        if (sub_branches[j].thought)
-                            hu_str_free(alloc, sub_branches[j].thought);
-                    hu_str_free(alloc, current_best);
-                    for (size_t j = 0; j < branch_count; j++)
-                        if (branches[j].thought)
-                            hu_str_free(alloc, branches[j].thought);
-                    return HU_ERR_OUT_OF_MEMORY;
-                }
-                int sn = snprintf(user_msg, user_cap,
-                                 "Rate this approach on a scale of 0.0 to 1.0: %s",
-                                 sub_branches[i].thought);
-                size_t user_len = (sn > 0 && (size_t)sn < user_cap) ? (size_t)sn : strlen(user_msg);
-
+            for (size_t c = 0; c < child_count && total_explored < (size_t)node_limit; c++) {
+                total_explored++;
+                char *user_msg = hu_sprintf(alloc,
+                    "Rate this approach on a scale of 0.0 to 1.0: %s", children[c].thought);
+                if (!user_msg) continue;
                 char *eval_out = NULL;
                 size_t eval_out_len = 0;
                 err = provider->vtable->chat_with_system(
-                    provider->ctx, alloc, eval_sys, eval_sys_len, user_msg, user_len,
-                    eval_model, eval_model_len, 0.0, &eval_out, &eval_out_len);
-                alloc->free(alloc->ctx, user_msg, user_cap);
+                    provider->ctx, alloc, eval_sys, eval_sys_len, user_msg, strlen(user_msg),
+                    gen_model, gen_model_len, 0.0, &eval_out, &eval_out_len);
+                alloc->free(alloc->ctx, user_msg, strlen(user_msg) + 1);
                 llm_calls++;
-
                 if (err == HU_OK && eval_out && eval_out_len > 0) {
-                    double score = parse_score(eval_out, eval_out_len);
-                    if (score >= 0.0)
-                        sub_branches[i].score = score;
+                    double s = parse_score(eval_out, eval_out_len);
+                    if (s >= 0.0) children[c].score = s;
                 }
-                if (eval_out)
-                    alloc->free(alloc->ctx, eval_out, eval_out_len + 1);
+                if (eval_out) alloc->free(alloc->ctx, eval_out, eval_out_len + 1);
 
-                total_explored++;
-                if (sub_branches[i].score < prune_threshold)
+                if (children[c].score < prune_threshold) {
                     pruned++;
-                else if (sub_branches[i].score > best_score) {
-                    char *new_best = hu_strdup(alloc, sub_branches[i].thought);
-                    if (new_best) {
-                        hu_str_free(alloc, current_best);
-                        current_best = new_best;
-                        best_score = sub_branches[i].score;
+                } else {
+                    if (children[c].score > best_score) {
+                        best_score = children[c].score;
+                        if (best_thought) hu_str_free(alloc, best_thought);
+                        best_thought = hu_strdup(alloc, children[c].thought);
+                    }
+                    if (cand_count < (int)(sizeof(candidates) / sizeof(candidates[0]))) {
+                        candidates[cand_count].thought = hu_strdup(alloc, children[c].thought);
+                        candidates[cand_count].thought_len = children[c].thought_len;
+                        candidates[cand_count].score = children[c].score;
+                        candidates[cand_count].depth = depth;
+                        cand_count++;
                     }
                 }
             }
 
-            for (size_t j = 0; j < sub_count; j++)
-                if (sub_branches[j].thought)
-                    hu_str_free(alloc, sub_branches[j].thought);
-
-            max_depth_reached = depth;
-            if (total_explored >= (size_t)node_limit)
-                break;
+            for (size_t j = 0; j < child_count; j++)
+                if (children[j].thought) hu_str_free(alloc, children[j].thought);
         }
+
+        /* Free old beam */
+        for (int b = 0; b < beam_count; b++)
+            if (beam[b].thought) hu_str_free(alloc, beam[b].thought);
+
+        /* Select top beam_width from candidates */
+        beam_count = 0;
+        memset(beam, 0, sizeof(beam));
+        for (int bw = 0; bw < beam_width && bw < cand_count; bw++) {
+            int best_idx = -1;
+            double best_s = -1.0;
+            for (int j = 0; j < cand_count; j++) {
+                bool used = false;
+                for (int k = 0; k < beam_count; k++)
+                    if (beam[k].thought && candidates[j].thought &&
+                        strcmp(beam[k].thought, candidates[j].thought) == 0)
+                        used = true;
+                if (!used && candidates[j].score > best_s) {
+                    best_s = candidates[j].score;
+                    best_idx = j;
+                }
+            }
+            if (best_idx < 0) break;
+            beam[beam_count].thought = hu_strdup(alloc, candidates[best_idx].thought);
+            beam[beam_count].thought_len = candidates[best_idx].thought_len;
+            beam[beam_count].score = candidates[best_idx].score;
+            beam[beam_count].depth = candidates[best_idx].depth;
+            beam_count++;
+        }
+
+        for (int j = 0; j < cand_count; j++)
+            if (candidates[j].thought) hu_str_free(alloc, candidates[j].thought);
     }
+
+    /* Cleanup beam */
+    for (int b = 0; b < beam_count; b++)
+        if (beam[b].thought) hu_str_free(alloc, beam[b].thought);
 
     result->branches_explored = total_explored;
     result->branches_pruned = pruned;
     result->max_depth_reached = max_depth_reached;
     result->llm_calls_made = llm_calls;
 
-    if (current_best) {
-        result->best_thought = current_best;
-        result->best_thought_len = strlen(current_best);
+    if (best_thought) {
+        result->best_thought = best_thought;
+        result->best_thought_len = strlen(best_thought);
         result->best_score = best_score;
     }
-
-    for (size_t j = 0; j < branch_count; j++)
-        if (branches[j].thought)
-            hu_str_free(alloc, branches[j].thought);
 
     return HU_OK;
 #endif

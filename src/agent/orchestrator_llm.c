@@ -386,6 +386,125 @@ hu_error_t hu_decompose_task(hu_allocator_t *alloc, hu_provider_t *provider,
 #endif
 }
 
+hu_error_t hu_decompose_with_replan(hu_allocator_t *alloc, hu_provider_t *provider,
+                                     const char *model, size_t model_len,
+                                     const char *original_prompt, size_t original_prompt_len,
+                                     const char *failed_task, size_t failed_task_len,
+                                     const char *failure_reason, size_t failure_reason_len,
+                                     hu_decomposition_strategy_t strategy,
+                                     hu_decomposition_result_t *result) {
+    if (!alloc || !result)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    memset(result, 0, sizeof(*result));
+    result->strategy = strategy;
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)provider;
+    (void)model;
+    (void)model_len;
+    (void)original_prompt;
+    (void)original_prompt_len;
+    (void)failed_task;
+    (void)failed_task_len;
+    (void)failure_reason;
+    (void)failure_reason_len;
+
+    result->task_count = 2;
+    strncpy(result->tasks[0].description, "alternative approach A",
+            sizeof(result->tasks[0].description) - 1);
+    result->tasks[0].description[sizeof(result->tasks[0].description) - 1] = '\0';
+    result->tasks[0].description_len = 22;
+    result->tasks[0].depends_on = 0;
+
+    strncpy(result->tasks[1].description, "finalize with workaround",
+            sizeof(result->tasks[1].description) - 1);
+    result->tasks[1].description[sizeof(result->tasks[1].description) - 1] = '\0';
+    result->tasks[1].description_len = 24;
+    result->tasks[1].depends_on = 1;
+    return HU_OK;
+#else
+    /* Build a re-planning prompt that includes the failure context */
+    size_t prompt_cap = 512 + original_prompt_len + failed_task_len + failure_reason_len;
+    char *replan_prompt = (char *)alloc->alloc(alloc->ctx, prompt_cap);
+    if (!replan_prompt)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    int pos = snprintf(replan_prompt, prompt_cap,
+        "Re-decompose this task. A previous subtask failed.\n"
+        "Original goal: %.*s\n"
+        "Failed subtask: %.*s\n"
+        "Failure reason: %.*s\n"
+        "Create a new plan that works around this failure.",
+        (int)(original_prompt_len < 1000 ? original_prompt_len : 1000),
+        original_prompt ? original_prompt : "",
+        (int)(failed_task_len < 500 ? failed_task_len : 500),
+        failed_task ? failed_task : "",
+        (int)(failure_reason_len < 500 ? failure_reason_len : 500),
+        failure_reason ? failure_reason : "");
+
+    hu_error_t err = hu_decompose_task(alloc, provider, model, model_len,
+                                        replan_prompt, pos > 0 ? (size_t)pos : 0,
+                                        strategy, result);
+    alloc->free(alloc->ctx, replan_prompt, prompt_cap);
+    return err;
+#endif
+}
+
+static int tolower_orch(int c) {
+    return (c >= 'A' && c <= 'Z') ? (c + 32) : c;
+}
+
+bool hu_decomposition_check_coverage(const char *goal, size_t goal_len,
+                                      const hu_decomposition_result_t *result) {
+    if (!goal || goal_len == 0 || !result || result->task_count == 0)
+        return false;
+
+    /* Extract words from goal (>3 chars), count how many appear in subtask descriptions */
+    size_t goal_words = 0;
+    size_t matched_words = 0;
+    const char *p = goal;
+    const char *end = goal + goal_len;
+
+    while (p < end) {
+        while (p < end && (*p == ' ' || *p == '\t' || *p == '\n'))
+            p++;
+        if (p >= end) break;
+        const char *ws = p;
+        while (p < end && *p != ' ' && *p != '\t' && *p != '\n')
+            p++;
+        size_t wlen = (size_t)(p - ws);
+        if (wlen <= 3) continue; /* skip short words */
+        goal_words++;
+
+        /* Check if this word appears in any subtask */
+        bool found = false;
+        for (size_t t = 0; t < result->task_count && !found; t++) {
+            const char *desc = result->tasks[t].description;
+            size_t dlen = result->tasks[t].description_len;
+            if (dlen == 0) continue;
+            for (size_t d = 0; d + wlen <= dlen; d++) {
+                bool match = true;
+                for (size_t j = 0; j < wlen; j++) {
+                    if (tolower_orch((unsigned char)desc[d + j]) !=
+                        tolower_orch((unsigned char)ws[j])) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) { found = true; break; }
+            }
+        }
+        if (found)
+            matched_words++;
+    }
+
+    if (goal_words == 0)
+        return false;
+    /* Require at least 30% word coverage */
+    return ((double)matched_words / (double)goal_words) >= 0.3;
+}
+
 hu_error_t hu_orchestrator_auto_assign(hu_orchestrator_t *orch,
                                         const hu_decomposition_t *decomposition) {
     if (!orch || !decomposition || decomposition->task_count == 0)
