@@ -644,6 +644,52 @@ static void test_agent_turn_empty_message(void) {
     hu_agent_deinit(&agent);
 }
 
+static void test_agent_turn_null_agent(void) {
+    char *resp = NULL;
+    size_t resp_len = 0;
+    hu_error_t err = hu_agent_turn(NULL, "hi", 2, &resp, &resp_len);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_agent_turn_null_message(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    mock_provider_t mock_ctx;
+    hu_provider_t prov = mock_provider_create(&alloc, &mock_ctx);
+
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    hu_error_t err =
+        hu_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL, "gpt-4o", 6,
+                             "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    char *resp = NULL;
+    size_t resp_len = 0;
+    err = hu_agent_turn(&agent, NULL, 0, &resp, &resp_len);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+
+    hu_agent_deinit(&agent);
+}
+
+static void test_agent_turn_null_response(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    mock_provider_t mock_ctx;
+    hu_provider_t prov = mock_provider_create(&alloc, &mock_ctx);
+
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    hu_error_t err =
+        hu_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL, "gpt-4o", 6,
+                             "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    size_t resp_len = 0;
+    err = hu_agent_turn(&agent, "hi", 2, NULL, &resp_len);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+
+    hu_agent_deinit(&agent);
+}
+
 static void test_agent_with_observer(void) {
     hu_allocator_t alloc = hu_system_allocator();
     mock_provider_t mock_ctx;
@@ -1057,6 +1103,9 @@ void run_e2e_tests(void) {
     HU_RUN_TEST(test_agent_from_config_max_iterations);
     HU_RUN_TEST(test_agent_deinit_cleans);
     HU_RUN_TEST(test_agent_turn_empty_message);
+    HU_RUN_TEST(test_agent_turn_null_agent);
+    HU_RUN_TEST(test_agent_turn_null_message);
+    HU_RUN_TEST(test_agent_turn_null_response);
     HU_RUN_TEST(test_agent_with_observer);
     HU_RUN_TEST(test_provider_create_from_config);
     HU_RUN_TEST(test_config_validate_after_load);

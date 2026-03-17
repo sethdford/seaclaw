@@ -1950,6 +1950,7 @@ list(APPEND HU_TEST_SOURCES tests/test_agent_matching.c tests/test_agent_communi
 list(APPEND HU_TEST_SOURCES tests/test_world_simulation.c tests/test_world_context.c)
 list(APPEND HU_TEST_SOURCES tests/test_agent_registry.c)
 list(APPEND HU_TEST_SOURCES tests/test_pwa.c)
+list(APPEND HU_TEST_SOURCES tests/test_integration.c)
 
 # SOTA capability tests
 list(APPEND HU_TEST_SOURCES

@@ -134,6 +134,76 @@ static void test_parse_whitespace_around_json(void) {
     hu_text_tool_calls_free(&alloc, calls, count);
 }
 
+/* Error path: invalid JSON inside <tool_call> — should not crash, return 0 or skip. */
+static void test_tool_call_parser_malformed_json(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *text = "<tool_call>{invalid json here}</tool_call>";
+    hu_tool_call_t *calls = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_text_tool_calls_parse(&alloc, text, strlen(text), &calls, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0);
+    HU_ASSERT(calls == NULL);
+}
+
+/* Error path: opening <tool_call> with no closing </tool_call> — should not crash, return 0. */
+static void test_tool_call_parser_unclosed_tag(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *text = "<tool_call>{\"name\": \"foo\", \"arguments\": {}}";
+    hu_tool_call_t *calls = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_text_tool_calls_parse(&alloc, text, strlen(text), &calls, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0);
+    HU_ASSERT(calls == NULL);
+}
+
+/* Error path: empty string — should return 0 calls, no crash. */
+static void test_tool_call_parser_empty_content(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_call_t *calls = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_text_tool_calls_parse(&alloc, "", 0, &calls, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0);
+    HU_ASSERT(calls == NULL);
+}
+
+/* Error path: nested <tool_call> inside <tool_call> — should handle gracefully. */
+static void test_tool_call_parser_nested_tags(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *text =
+        "<tool_call><tool_call>{\"name\": \"inner\", \"arguments\": {}}</tool_call></tool_call>";
+    hu_tool_call_t *calls = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_text_tool_calls_parse(&alloc, text, strlen(text), &calls, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    /* Parser matches first </tool_call>, so JSON is "<tool_call>{\"name\":...}" — invalid. */
+    HU_ASSERT_EQ(count, 0);
+    HU_ASSERT(calls == NULL);
+}
+
+/* Error path: many tool calls exceeding HU_TEXT_TOOL_CALL_MAX — should not overflow. */
+static void test_tool_call_parser_max_calls(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char buf[4096];
+    size_t len = 0;
+    for (int i = 0; i < 20; i++) {
+        len += (size_t)snprintf(buf + len, sizeof(buf) - len,
+                               "<tool_call>{\"name\": \"tool_%d\", \"arguments\": {}}</tool_call>\n",
+                               i);
+    }
+    hu_tool_call_t *calls = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_text_tool_calls_parse(&alloc, buf, len, &calls, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT(count <= HU_TEXT_TOOL_CALL_MAX);
+    HU_ASSERT(count > 0);
+    if (calls) {
+        hu_text_tool_calls_free(&alloc, calls, count);
+    }
+}
+
 void run_tool_call_parser_tests(void) {
     HU_TEST_SUITE("tool_call_parser");
     HU_RUN_TEST(test_parse_single_tool_call);
@@ -147,4 +217,9 @@ void run_tool_call_parser_tests(void) {
     HU_RUN_TEST(test_strip_tool_calls);
     HU_RUN_TEST(test_strip_only_tool_calls);
     HU_RUN_TEST(test_parse_whitespace_around_json);
+    HU_RUN_TEST(test_tool_call_parser_malformed_json);
+    HU_RUN_TEST(test_tool_call_parser_unclosed_tag);
+    HU_RUN_TEST(test_tool_call_parser_empty_content);
+    HU_RUN_TEST(test_tool_call_parser_nested_tags);
+    HU_RUN_TEST(test_tool_call_parser_max_calls);
 }

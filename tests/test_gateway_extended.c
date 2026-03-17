@@ -1016,6 +1016,24 @@ static void test_openai_compat_chat_empty_messages_400(void) {
         alloc.free(alloc.ctx, resp, resp_len + 1);
 }
 
+static void test_gateway_missing_content_type(void) {
+    /* Handler must not crash when body is NULL or empty (e.g. request without body) */
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_config_t cfg = {0};
+    cfg.default_provider = "openai";
+    cfg.default_model = "gpt-4o";
+    hu_app_context_t app = {.config = &cfg};
+
+    int status = 200;
+    char *resp = NULL;
+    size_t resp_len = 0;
+    hu_openai_compat_handle_chat_completions(NULL, 0, &alloc, &app, &status, &resp, &resp_len,
+                                             NULL);
+    HU_ASSERT_EQ(status, 400);
+    if (resp)
+        alloc.free(alloc.ctx, resp, resp_len + 1);
+}
+
 static void test_openai_compat_chat_stream_has_delta_content(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_config_t cfg = {0};
@@ -1175,6 +1193,7 @@ void run_gateway_extended_tests(void) {
     HU_RUN_TEST(test_openai_compat_chat_stream_returns_sse);
     HU_RUN_TEST(test_openai_compat_chat_stream_has_delta_content);
     HU_RUN_TEST(test_openai_compat_chat_empty_messages_400);
+    HU_RUN_TEST(test_gateway_missing_content_type);
     HU_RUN_TEST(test_openai_compat_models_returns_list);
     HU_RUN_TEST(test_openai_compat_models_null_config_503);
 }

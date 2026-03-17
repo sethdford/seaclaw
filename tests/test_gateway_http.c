@@ -90,6 +90,13 @@ static void test_path_traversal_rejects_double_encoded(void) {
     HU_ASSERT_TRUE(hu_gateway_path_has_traversal("/%252E%252E/secret"));
 }
 
+static void test_gateway_path_traversal_encoded(void) {
+    /* URL-encoded path traversal %2e%2e%2f (= ../) must be rejected */
+    HU_ASSERT_TRUE(hu_gateway_path_has_traversal("/static/%2e%2e%2fetc/passwd"));
+    HU_ASSERT_TRUE(hu_gateway_path_has_traversal("/webhook/%2e%2e%2fsecret"));
+    HU_ASSERT_TRUE(hu_gateway_path_has_traversal("/%2e%2e%2findex.html"));
+}
+
 static void test_path_traversal_allows_safe_paths(void) {
     HU_ASSERT_FALSE(hu_gateway_path_has_traversal("/index.html"));
     HU_ASSERT_FALSE(hu_gateway_path_has_traversal("/static/app.js"));
@@ -199,6 +206,16 @@ static void test_content_length_null_args_rejected(void) {
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
 
+static void test_gateway_body_size_limit(void) {
+    /* Oversized request bodies must be rejected via Content-Length check */
+    size_t len = 0;
+    hu_error_t err =
+        hu_gateway_parse_content_length("70000", HU_GATEWAY_MAX_BODY_SIZE, &len);
+    HU_ASSERT_EQ(err, HU_ERR_GATEWAY_BODY_TOO_LARGE);
+    err = hu_gateway_parse_content_length("65537", HU_GATEWAY_MAX_BODY_SIZE, &len);
+    HU_ASSERT_EQ(err, HU_ERR_GATEWAY_BODY_TOO_LARGE);
+}
+
 void run_gateway_http_tests(void) {
     HU_TEST_SUITE("Gateway HTTP");
     HU_RUN_TEST(test_gateway_config_defaults);
@@ -214,6 +231,7 @@ void run_gateway_http_tests(void) {
     HU_RUN_TEST(test_path_traversal_rejects_percent_encoded);
     HU_RUN_TEST(test_path_traversal_rejects_null_byte);
     HU_RUN_TEST(test_path_traversal_rejects_double_encoded);
+    HU_RUN_TEST(test_gateway_path_traversal_encoded);
     HU_RUN_TEST(test_path_traversal_allows_safe_paths);
 
     HU_TEST_SUITE("Webhook Path");
@@ -236,4 +254,5 @@ void run_gateway_http_tests(void) {
     HU_RUN_TEST(test_content_length_exceeds_max_rejected);
     HU_RUN_TEST(test_content_length_empty_rejected);
     HU_RUN_TEST(test_content_length_null_args_rejected);
+    HU_RUN_TEST(test_gateway_body_size_limit);
 }
