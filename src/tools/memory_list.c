@@ -28,8 +28,8 @@ static hu_error_t memory_list_execute(void *ctx, hu_allocator_t *alloc, const hu
 #if HU_IS_TEST
     char *msg = hu_strndup(alloc, "(memory_list stub)", 18);
     if (!msg) {
-        *out = hu_tool_result_fail("out of memory", 12);
-        return HU_OK;
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_ERR_OUT_OF_MEMORY;
     }
     *out = hu_tool_result_ok_owned(msg, 18);
     return HU_OK;
@@ -49,8 +49,8 @@ static hu_error_t memory_list_execute(void *ctx, hu_allocator_t *alloc, const hu
     if (!entries || count == 0) {
         char *msg = hu_strndup(alloc, "[]", 2);
         if (!msg) {
-            *out = hu_tool_result_fail("out of memory", 12);
-            return HU_OK;
+            *out = hu_tool_result_fail("out of memory", 13);
+            return HU_ERR_OUT_OF_MEMORY;
         }
         *out = hu_tool_result_ok_owned(msg, 2);
         return HU_OK;
@@ -61,8 +61,8 @@ static hu_error_t memory_list_execute(void *ctx, hu_allocator_t *alloc, const hu
         for (size_t i = 0; i < count; i++)
             hu_memory_entry_free_fields(alloc, &entries[i]);
         alloc->free(alloc->ctx, entries, count * sizeof(hu_memory_entry_t));
-        *out = hu_tool_result_fail("out of memory", 12);
-        return HU_OK;
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_ERR_OUT_OF_MEMORY;
     }
     size_t pos = 0;
     buf[pos++] = '[';

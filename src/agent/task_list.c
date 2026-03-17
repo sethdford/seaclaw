@@ -158,7 +158,7 @@ static hu_error_t task_list_load(hu_task_list_t *list) {
     char path[HU_TASK_LIST_MAX_PATH];
     size_t dlen = strlen(list->dir_path);
     if (dlen + 20 >= sizeof(path))
-        return HU_OK;
+        return HU_ERR_INVALID_ARGUMENT;
     if (dlen > 0 && list->dir_path[dlen - 1] == '/')
         snprintf(path, sizeof(path), "%s%s", list->dir_path, HU_TASK_LIST_JSON_FILENAME);
     else

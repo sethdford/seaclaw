@@ -57,7 +57,7 @@ static hu_error_t shell_execute(void *ctx, hu_allocator_t *alloc, const hu_json_
         char *msg = hu_strndup(alloc, stub, stub_len);
         if (!msg) {
             *out = hu_tool_result_fail("out of memory", 13);
-            return HU_OK;
+            return HU_ERR_OUT_OF_MEMORY;
         }
         *out = hu_tool_result_ok_owned(msg, stub_len);
     }

@@ -130,6 +130,8 @@ static void track_free(void *ctx, void *ptr, size_t size) {
 
 hu_tracking_allocator_t *hu_tracking_allocator_create(void) {
     hu_tracking_allocator_t *ta = (hu_tracking_allocator_t *)calloc(1, sizeof(*ta));
+    if (!ta)
+        return NULL;
     return ta;
 }
 
