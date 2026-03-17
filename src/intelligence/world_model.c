@@ -389,6 +389,40 @@ hu_error_t hu_world_simulate_with_context(hu_world_model_t *model,
         return HU_OK;
     }
 
+    /* Check simulation cache before querying observations */
+    uint64_t ctx_action_hash = simple_hash(keyword, kw_len);
+    char ctx_keyword[256];
+    size_t ctx_kw_len2 = 0;
+    if (ctx_len > 0)
+        extract_keyword(ctx_str, ctx_len, ctx_keyword, sizeof(ctx_keyword), &ctx_kw_len2);
+    uint64_t ctx_context_hash = ctx_kw_len2 > 0 ? simple_hash(ctx_keyword, ctx_kw_len2) : 0;
+
+    int64_t now_ts = (int64_t)time(NULL);
+    int64_t cache_cutoff = now_ts - 3600;
+    {
+        sqlite3_stmt *cache_stmt = NULL;
+        if (sqlite3_prepare_v2(model->db,
+                               "SELECT predicted_outcome, confidence FROM simulation_cache "
+                               "WHERE action_hash = ?1 AND context_hash = ?2 AND created_at > ?3",
+                               -1, &cache_stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(cache_stmt, 1, (int64_t)ctx_action_hash);
+            sqlite3_bind_int64(cache_stmt, 2, (int64_t)ctx_context_hash);
+            sqlite3_bind_int64(cache_stmt, 3, cache_cutoff);
+            if (sqlite3_step(cache_stmt) == SQLITE_ROW) {
+                const char *cached = (const char *)sqlite3_column_text(cache_stmt, 0);
+                double cached_conf = sqlite3_column_double(cache_stmt, 1);
+                if (cached && cached_conf > 0.0) {
+                    size_t olen = (size_t)sqlite3_column_bytes(cache_stmt, 0);
+                    copy_to_prediction(out, cached, olen, cached_conf,
+                                       "from simulation cache (context)", 31);
+                    sqlite3_finalize(cache_stmt);
+                    return HU_OK;
+                }
+            }
+            sqlite3_finalize(cache_stmt);
+        }
+    }
+
     char pattern[512];
     int n = snprintf(pattern, sizeof(pattern), "%%%s%%", keyword);
     if (n < 0 || (size_t)n >= sizeof(pattern)) {
@@ -400,7 +434,6 @@ hu_error_t hu_world_simulate_with_context(hu_world_model_t *model,
     size_t best_outcome_len = 0;
     double best_confidence = 0.0;
     int match_count = 0;
-    int64_t now_ts = (int64_t)time(NULL);
     int64_t tw_start = ctx ? ctx->time_window_start : (now_ts - 3600);
     int64_t tw_end = ctx ? ctx->time_window_end : (now_ts + 3600);
 
@@ -493,6 +526,21 @@ hu_error_t hu_world_simulate_with_context(hu_world_model_t *model,
             "Based on %d matching observation(s)", match_count);
         copy_to_prediction(out, best_outcome, best_outcome_len, best_confidence,
             reasoning, rn > 0 ? (size_t)rn : 0);
+
+        /* Store in simulation cache for future lookups */
+        sqlite3_stmt *ins_stmt = NULL;
+        if (sqlite3_prepare_v2(model->db,
+                               "INSERT INTO simulation_cache(action_hash, context_hash, "
+                               "predicted_outcome, confidence, created_at) VALUES(?1,?2,?3,?4,?5)",
+                               -1, &ins_stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(ins_stmt, 1, (int64_t)ctx_action_hash);
+            sqlite3_bind_int64(ins_stmt, 2, (int64_t)ctx_context_hash);
+            sqlite3_bind_text(ins_stmt, 3, best_outcome, (int)best_outcome_len, SQLITE_STATIC);
+            sqlite3_bind_double(ins_stmt, 4, best_confidence);
+            sqlite3_bind_int64(ins_stmt, 5, now_ts);
+            (void)sqlite3_step(ins_stmt);
+            sqlite3_finalize(ins_stmt);
+        }
         return HU_OK;
     }
 

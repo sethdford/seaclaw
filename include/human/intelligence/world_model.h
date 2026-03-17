@@ -150,5 +150,14 @@ hu_error_t hu_world_find_paths(hu_world_model_t *model, int64_t from, int64_t to
                                int max_depth, hu_causal_node_t *path, size_t max_path,
                                size_t *out_len);
 
+hu_error_t hu_world_record_accuracy(hu_world_model_t *model,
+                                     const char *action, size_t action_len,
+                                     const char *predicted, size_t predicted_len,
+                                     const char *actual, size_t actual_len,
+                                     double predicted_confidence);
+
+hu_error_t hu_world_get_accuracy(hu_world_model_t *model,
+                                  double *accuracy_out, size_t *sample_count);
+
 #endif /* HU_ENABLE_SQLITE */
 #endif /* HU_INTELLIGENCE_WORLD_MODEL_H */
