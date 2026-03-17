@@ -49,6 +49,7 @@ void run_multimodal_tests(void);
 void run_multimodal_pipeline_tests(void);
 void run_multimodal_memory_tests(void);
 void run_voice_duplex_tests(void);
+void run_voice_realtime_tests(void);
 void run_autonomy_tests(void);
 void run_retrieval_tests(void);
 void run_vector_tests(void);
@@ -201,7 +202,11 @@ void run_social_graph_tests(void);
 void run_skill_system_tests(void);
 void run_feeds_tests(void);
 #ifdef HU_ENABLE_FEEDS
+void run_apple_feeds_tests(void);
 void run_news_health_email_tests(void);
+#endif
+#ifdef HU_ENABLE_SOCIAL
+void run_social_feeds_tests(void);
 #endif
 #ifdef HU_ENABLE_FEEDS
 void run_google_feeds_tests(void);
@@ -361,6 +366,7 @@ int main(int argc, char **argv) {
     run_multimodal_pipeline_tests();
     run_multimodal_memory_tests();
     run_voice_duplex_tests();
+    run_voice_realtime_tests();
     run_autonomy_tests();
     run_retrieval_tests();
     run_multigraph_tests();
@@ -517,11 +523,15 @@ int main(int argc, char **argv) {
     run_skill_system_tests();
     run_feeds_tests();
 #ifdef HU_ENABLE_FEEDS
+    run_apple_feeds_tests();
     run_news_health_email_tests();
     run_google_feeds_tests();
     run_music_feeds_tests();
     run_research_feeds_tests();
     run_research_executor_tests();
+#endif
+#ifdef HU_ENABLE_SOCIAL
+    run_social_feeds_tests();
 #endif
     run_feed_processor_tests();
     run_forgetting_curve_tests();

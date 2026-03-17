@@ -234,7 +234,7 @@ if(HU_ENABLE_GMAIL)
     list(APPEND CHANNEL_SOURCES src/channels/gmail_base64.c src/channels/gmail.c)
 endif()
 if(HU_ENABLE_VOICE)
-    list(APPEND CHANNEL_SOURCES src/channels/voice_channel.c)
+    list(APPEND CHANNEL_SOURCES src/channels/voice_channel.c src/channels/voice_realtime.c)
 endif()
 if(HU_ENABLE_MQTT)
     list(APPEND CHANNEL_SOURCES src/channels/mqtt.c)
@@ -1774,6 +1774,7 @@ set(HU_TEST_SOURCES
     tests/test_multimodal_pipeline.c
     tests/test_multimodal_memory.c
     tests/test_voice_duplex.c
+    tests/test_voice_realtime.c
     tests/test_autonomy.c
     tests/test_retrieval.c
     tests/test_prompt.c
@@ -1895,6 +1896,8 @@ set(HU_TEST_SOURCES
     tests/test_social_graph.c
     tests/test_skill_system.c
     tests/test_feeds.c
+    tests/test_apple_feeds.c
+    tests/test_social_feeds.c
     tests/test_feed_processor.c
     tests/test_forgetting_curve.c
     tests/test_weather_fetch.c
