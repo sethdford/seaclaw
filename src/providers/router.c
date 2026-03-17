@@ -48,6 +48,52 @@ static void resolve_model(hu_router_ctx_t *r, const char *model, size_t model_le
     out->model_len = model_len;
 }
 
+/* Estimate task complexity from message content for auto model selection.
+ * Returns 0 (simple), 1 (medium), 2 (complex). */
+static int estimate_complexity(const hu_chat_request_t *request) {
+    if (!request || request->messages_count == 0)
+        return 1;
+    const hu_chat_message_t *last = &request->messages[request->messages_count - 1];
+    if (!last->content || last->content_len == 0)
+        return 1;
+    size_t len = last->content_len;
+    size_t word_count = 1;
+    for (size_t i = 0; i < len; i++)
+        if (last->content[i] == ' ') word_count++;
+
+    bool has_tools = request->tools_count > 0;
+    bool has_code = false;
+    for (size_t i = 0; i + 3 < len; i++) {
+        if (last->content[i] == '`' && last->content[i+1] == '`' && last->content[i+2] == '`') {
+            has_code = true;
+            break;
+        }
+    }
+
+    if (word_count <= 8 && !has_tools && !has_code)
+        return 0;
+    if (has_tools || has_code || word_count > 100 || request->messages_count > 10)
+        return 2;
+    return 1;
+}
+
+/* Auto-select: if the router has a "fast" hint route and the task is simple,
+ * downgrade to the fast model. */
+static void auto_select_model(hu_router_ctx_t *r, const hu_chat_request_t *request,
+                               hu_router_resolved_t *resolved) {
+    int complexity = estimate_complexity(request);
+    if (complexity == 0) {
+        for (size_t i = 0; i < r->route_count; i++) {
+            if (r->routes[i].hint_len == 4 && memcmp(r->routes[i].hint, "fast", 4) == 0) {
+                resolved->provider_index = r->routes[i].provider_index;
+                resolved->model = r->routes[i].model;
+                resolved->model_len = r->routes[i].model_len;
+                return;
+            }
+        }
+    }
+}
+
 static hu_error_t router_chat_with_system(void *ctx, hu_allocator_t *alloc,
                                           const char *system_prompt, size_t system_prompt_len,
                                           const char *message, size_t message_len,
@@ -72,6 +118,7 @@ static hu_error_t router_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
     hu_router_ctx_t *r = (hu_router_ctx_t *)ctx;
     hu_router_resolved_t res;
     resolve_model(r, model, model_len, &res);
+    auto_select_model(r, request, &res);
     if (res.provider_index >= r->provider_count)
         return HU_ERR_PROVIDER_RESPONSE;
     const hu_provider_vtable_t *vt = r->providers[res.provider_index].vtable;
