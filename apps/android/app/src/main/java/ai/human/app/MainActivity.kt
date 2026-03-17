@@ -125,6 +125,24 @@ fun HumanApp(intent: Intent?) {
         }
     }
 
+    LaunchedEffect(selectedTab) {
+        // Prefetch adjacent tabs for perceived instant navigation
+        val prev = (selectedTab - 1).coerceIn(0, 4)
+        val next = (selectedTab + 1).coerceIn(0, 4)
+        if (connectionState == ConnectionState.CONNECTED) {
+            when (prev) {
+                2 -> gateway.prefetchSessions()
+                3 -> gateway.prefetchTools()
+                else -> { }
+            }
+            when (next) {
+                2 -> gateway.prefetchSessions()
+                3 -> gateway.prefetchTools()
+                else -> { }
+            }
+        }
+    }
+
     BackHandler(enabled = selectedTab != 0) {
         selectedTab = 0
     }

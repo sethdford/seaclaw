@@ -105,4 +105,14 @@ class GatewayClient {
         webSocket = null
         _state.value = ConnectionState.DISCONNECTED
     }
+
+    /** Prefetch sessions list for adjacent tab navigation. Placeholder until ViewModel caches. */
+    fun prefetchSessions() {
+        send("sessions.list", emptyMap())
+    }
+
+    /** Prefetch tools catalog for adjacent tab navigation. Placeholder until ViewModel caches. */
+    fun prefetchTools() {
+        send("tools.catalog", emptyMap())
+    }
 }
