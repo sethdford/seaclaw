@@ -250,6 +250,8 @@ hu_error_t hu_mirror_build_directive(hu_allocator_t *alloc, const hu_mirror_anal
                                "Keep messages around %d chars.", n);
         first = 0;
     }
+    if (pos >= sizeof(buf))
+        pos = sizeof(buf) - 1;
 
     if (pos == prefix_len) {
         *out = NULL;

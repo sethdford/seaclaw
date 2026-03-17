@@ -374,6 +374,8 @@ hu_error_t hu_control_send_response(hu_control_protocol_t *proto, hu_ws_conn_t *
 
     size_t pos = 0;
     pos += (size_t)snprintf(buf + pos, cap - pos, "{\"type\":\"res\",\"id\":\"");
+    if (pos >= cap)
+        pos = cap - 1;
     for (size_t i = 0; i < id_len && pos + 4 < cap; i++) {
         char c = id[i];
         if (c == '"' || c == '\\') {
@@ -384,6 +386,8 @@ hu_error_t hu_control_send_response(hu_control_protocol_t *proto, hu_ws_conn_t *
     }
     pos += (size_t)snprintf(buf + pos, cap - pos, "\",\"ok\":%s,\"payload\":%s}",
                             ok ? "true" : "false", payload);
+    if (pos >= cap)
+        pos = cap - 1;
 
     hu_error_t err = hu_ws_server_send(proto->ws, conn, buf, pos);
     if (err != HU_OK) {

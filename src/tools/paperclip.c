@@ -73,12 +73,17 @@ static hu_error_t paperclip_execute(void *raw_ctx, hu_allocator_t *alloc,
             return HU_ERR_OUT_OF_MEMORY;
         }
         size_t pos = 0;
-        pos += (size_t)snprintf(buf + pos, 4096 - pos, "Found %zu task(s):\n", list.count);
+        const size_t cap = 4096;
+        pos += (size_t)snprintf(buf + pos, cap - pos, "Found %zu task(s):\n", list.count);
+        if (pos >= cap)
+            pos = cap - 1;
         for (size_t i = 0; i < list.count && pos < 3900; i++) {
-            pos += (size_t)snprintf(buf + pos, 4096 - pos, "- [%s] %s (status: %s)\n",
+            pos += (size_t)snprintf(buf + pos, cap - pos, "- [%s] %s (status: %s)\n",
                                     list.tasks[i].id ? list.tasks[i].id : "?",
                                     list.tasks[i].title ? list.tasks[i].title : "(untitled)",
                                     list.tasks[i].status ? list.tasks[i].status : "?");
+            if (pos >= cap)
+                pos = cap - 1;
         }
         out->success = true;
         out->output = buf;
@@ -155,13 +160,25 @@ static hu_error_t paperclip_execute(void *raw_ctx, hu_allocator_t *alloc,
             return HU_ERR_OUT_OF_MEMORY;
         }
         size_t pos = 0;
-        pos += (size_t)snprintf(buf + pos, 2048 - pos, "Task: %s\n", t.title ? t.title : "?");
-        if (t.status)
-            pos += (size_t)snprintf(buf + pos, 2048 - pos, "Status: %s\n", t.status);
-        if (t.priority)
-            pos += (size_t)snprintf(buf + pos, 2048 - pos, "Priority: %s\n", t.priority);
-        if (t.description)
-            pos += (size_t)snprintf(buf + pos, 2048 - pos, "Description:\n%s\n", t.description);
+        const size_t cap = 2048;
+        pos += (size_t)snprintf(buf + pos, cap - pos, "Task: %s\n", t.title ? t.title : "?");
+        if (pos >= cap)
+            pos = cap - 1;
+        if (t.status) {
+            pos += (size_t)snprintf(buf + pos, cap - pos, "Status: %s\n", t.status);
+            if (pos >= cap)
+                pos = cap - 1;
+        }
+        if (t.priority) {
+            pos += (size_t)snprintf(buf + pos, cap - pos, "Priority: %s\n", t.priority);
+            if (pos >= cap)
+                pos = cap - 1;
+        }
+        if (t.description) {
+            pos += (size_t)snprintf(buf + pos, cap - pos, "Description:\n%s\n", t.description);
+            if (pos >= cap)
+                pos = cap - 1;
+        }
         out->success = true;
         out->output = buf;
         out->output_len = pos;

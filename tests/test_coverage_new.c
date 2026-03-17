@@ -61,7 +61,10 @@ static void test_expanded_query_free_null_alloc(void) {
 /* ─── Temporal Decay ─────────────────────────────────────────────────────── */
 
 static void test_temporal_decay_recent(void) {
-    const char *ts = "2026-03-06T12:00:00Z";
+    time_t now = time(NULL);
+    struct tm *gm = gmtime(&now);
+    char ts[32];
+    strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%SZ", gm);
     double score = hu_temporal_decay_score(1.0, 0.01, ts, strlen(ts));
     HU_ASSERT_TRUE(score > 0.9);
     HU_ASSERT_TRUE(score <= 1.0);

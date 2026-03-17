@@ -21,34 +21,57 @@ hu_error_t hu_status_run(hu_allocator_t *alloc, char *buf, size_t buf_size) {
     }
 
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "Human Status\n\n");
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "Version:     %s\n",
+    const size_t cap = buf_size;
+    pos += (size_t)snprintf(buf + pos, cap - pos, "Human Status\n\n");
+    if (pos >= cap)
+        pos = cap - 1;
+    pos += (size_t)snprintf(buf + pos, cap - pos, "Version:     %s\n",
                             hu_version_string() ? hu_version_string() : "");
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "Workspace:   %s\n",
+    if (pos >= cap)
+        pos = cap - 1;
+    pos += (size_t)snprintf(buf + pos, cap - pos, "Workspace:   %s\n",
                             cfg.workspace_dir ? cfg.workspace_dir : "");
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "Config:      %s\n\n",
+    if (pos >= cap)
+        pos = cap - 1;
+    pos += (size_t)snprintf(buf + pos, cap - pos, "Config:      %s\n\n",
                             cfg.config_path ? cfg.config_path : "");
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "Provider:    %s\n",
+    if (pos >= cap)
+        pos = cap - 1;
+    pos += (size_t)snprintf(buf + pos, cap - pos, "Provider:    %s\n",
                             cfg.default_provider ? cfg.default_provider : "");
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "Model:       %s\n",
+    if (pos >= cap)
+        pos = cap - 1;
+    pos += (size_t)snprintf(buf + pos, cap - pos, "Model:       %s\n",
                             cfg.default_model ? cfg.default_model : "(default)");
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "Temperature: %.1f\n\n",
+    if (pos >= cap)
+        pos = cap - 1;
+    pos += (size_t)snprintf(buf + pos, cap - pos, "Temperature: %.1f\n\n",
                             cfg.default_temperature);
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "Memory:      %s (auto-save: %s)\n",
+    if (pos >= cap)
+        pos = cap - 1;
+    pos += (size_t)snprintf(buf + pos, cap - pos, "Memory:      %s (auto-save: %s)\n",
                             cfg.memory_backend ? cfg.memory_backend : "",
                             cfg.memory_auto_save ? "on" : "off");
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "Gateway:     %s:%u\n",
+    if (pos >= cap)
+        pos = cap - 1;
+    pos += (size_t)snprintf(buf + pos, cap - pos, "Gateway:     %s:%u\n",
                             cfg.gateway_host ? cfg.gateway_host : "127.0.0.1",
                             (unsigned)cfg.gateway.port);
+    if (pos >= cap)
+        pos = cap - 1;
 
     size_t n_meta;
     const hu_channel_meta_t *meta = hu_channel_catalog_all(&n_meta);
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "\nChannels:\n");
+    pos += (size_t)snprintf(buf + pos, cap - pos, "\nChannels:\n");
+    if (pos >= cap)
+        pos = cap - 1;
     char status_buf[64];
-    for (size_t i = 0; i < n_meta && pos < buf_size - 64; i++) {
+    for (size_t i = 0; i < n_meta && pos < cap - 64; i++) {
         const char *st =
             hu_channel_catalog_status_text(&cfg, &meta[i], status_buf, sizeof(status_buf));
-        pos += (size_t)snprintf(buf + pos, buf_size - pos, "  %s: %s\n", meta[i].label, st);
+        pos += (size_t)snprintf(buf + pos, cap - pos, "  %s: %s\n", meta[i].label, st);
+        if (pos >= cap)
+            pos = cap - 1;
     }
 
     hu_config_deinit(&cfg);

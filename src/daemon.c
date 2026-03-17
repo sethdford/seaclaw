@@ -5067,23 +5067,35 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                    &jokes_ctx, &jokes_count) == HU_OK &&
                     jokes_ctx && jokes_count > 0) {
                     char jokes_buf[768];
-                    size_t jokes_pos = snprintf(jokes_buf, sizeof(jokes_buf),
-                                                "Inside jokes with this contact: ");
+                    const size_t jokes_cap = sizeof(jokes_buf);
+                    size_t jokes_pos = (size_t)snprintf(jokes_buf, jokes_cap,
+                                                        "Inside jokes with this contact: ");
+                    if (jokes_pos >= jokes_cap)
+                        jokes_pos = jokes_cap - 1;
                     for (size_t j = 0; j < jokes_count && jokes_pos < 700; j++) {
-                        if (j > 0)
-                            jokes_pos += snprintf(jokes_buf + jokes_pos,
-                                                  sizeof(jokes_buf) - jokes_pos, "; ");
+                        if (j > 0) {
+                            jokes_pos += (size_t)snprintf(jokes_buf + jokes_pos,
+                                                          jokes_cap - jokes_pos, "; ");
+                            if (jokes_pos >= jokes_cap)
+                                jokes_pos = jokes_cap - 1;
+                        }
                         size_t ctx_len = strnlen(jokes_ctx[j].context, 80);
                         size_t pl_len = strnlen(jokes_ctx[j].punchline, 60);
-                        jokes_pos += snprintf(jokes_buf + jokes_pos,
-                                              sizeof(jokes_buf) - jokes_pos,
-                                              "[%.*s] %.*s", (int)ctx_len, jokes_ctx[j].context,
-                                              (int)pl_len, jokes_ctx[j].punchline);
+                        jokes_pos += (size_t)snprintf(jokes_buf + jokes_pos,
+                                                      jokes_cap - jokes_pos,
+                                                      "[%.*s] %.*s", (int)ctx_len,
+                                                      jokes_ctx[j].context,
+                                                      (int)pl_len, jokes_ctx[j].punchline);
+                        if (jokes_pos >= jokes_cap)
+                            jokes_pos = jokes_cap - 1;
                     }
-                    if (jokes_pos < sizeof(jokes_buf) - 32)
-                        jokes_pos += snprintf(jokes_buf + jokes_pos,
-                                              sizeof(jokes_buf) - jokes_pos,
-                                              ". Use naturally when relevant.");
+                    if (jokes_pos < jokes_cap - 32) {
+                        jokes_pos += (size_t)snprintf(jokes_buf + jokes_pos,
+                                                      jokes_cap - jokes_pos,
+                                                      ". Use naturally when relevant.");
+                        if (jokes_pos >= jokes_cap)
+                            jokes_pos = jokes_cap - 1;
+                    }
                     if (jokes_pos > 0 && jokes_pos < sizeof(jokes_buf)) {
                         char *jokes_str =
                             (char *)alloc->alloc(alloc->ctx, jokes_pos + 1);

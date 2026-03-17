@@ -128,8 +128,12 @@ char *hu_awareness_context(const hu_awareness_t *aw, hu_allocator_t *alloc, size
                         HU_AWARENESS_MAX_RECENT_ERRORS;
             pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "  - %s\n",
                                     s->recent_errors[idx].text);
+            if (pos >= sizeof(buf))
+                pos = sizeof(buf) - 1;
         }
     }
+    if (pos >= sizeof(buf))
+        pos = sizeof(buf) - 1;
 
     if (pos == 0)
         return NULL;

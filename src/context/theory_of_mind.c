@@ -506,6 +506,8 @@ char *hu_theory_of_mind_build_inference(hu_allocator_t *alloc,
     pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
                             ". May be upset or distracted. Use natural probing like 'hey you "
                             "okay?' — never cite data.]");
+    if (pos >= sizeof(buf))
+        pos = sizeof(buf) - 1;
 
     char *out = hu_strndup(alloc, buf, pos);
     if (out)

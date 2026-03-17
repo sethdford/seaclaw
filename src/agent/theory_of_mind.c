@@ -135,9 +135,13 @@ hu_error_t hu_tom_build_context(const hu_belief_state_t *state, hu_allocator_t *
         }
         if (!first)
             pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "\n");
-        if (pos >= sizeof(buf))
+        if (pos >= sizeof(buf)) {
+            pos = sizeof(buf) - 1;
             break;
+        }
     }
+    if (pos >= sizeof(buf))
+        pos = sizeof(buf) - 1;
 
     char *result = hu_strndup(alloc, buf, pos);
     if (!result)

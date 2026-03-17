@@ -113,6 +113,8 @@ char *hu_humor_build_persona_directive(hu_allocator_t *alloc,
 
     pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
                             "Rule of three, misdirection when appropriate.]");
+    if (pos >= sizeof(buf))
+        pos = sizeof(buf) - 1;
 
     char *result = hu_strndup(alloc, buf, pos);
     if (result)

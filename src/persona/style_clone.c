@@ -255,6 +255,8 @@ hu_error_t hu_style_fingerprint_to_prompt(hu_allocator_t *alloc,
     pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
                             "- Sends follow-up messages %.0f%% of the time\n",
                             fp->double_text_ratio * 100.0);
+    if (pos >= sizeof(buf))
+        pos = sizeof(buf) - 1;
 
     *out = hu_strndup(alloc, buf, pos);
     if (!*out)

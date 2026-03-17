@@ -274,6 +274,8 @@ char *hu_anticipatory_build_directive(hu_allocator_t *alloc,
     }
 
     pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " Consider checking in.]");
+    if (pos >= sizeof(buf))
+        pos = sizeof(buf) - 1;
 
     char *result = hu_strndup(alloc, buf, pos);
     if (result)

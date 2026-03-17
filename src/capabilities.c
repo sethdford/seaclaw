@@ -21,18 +21,26 @@ static size_t append_json_string_array(char *out, size_t cap, size_t *pos, const
     if (*pos >= cap)
         return 0;
     size_t written = 0;
-    written += (size_t)snprintf(out + *pos, cap - *pos, "[");
+    written = (size_t)snprintf(out + *pos, cap - *pos, "[");
     *pos += written;
+    if (*pos >= cap)
+        *pos = cap - 1;
     for (size_t i = 0; i < n && *pos < cap; i++) {
         if (i > 0) {
             written = (size_t)snprintf(out + *pos, cap - *pos, ", ");
             *pos += written;
+            if (*pos >= cap)
+                *pos = cap - 1;
         }
         written = (size_t)snprintf(out + *pos, cap - *pos, "\"%s\"", names[i]);
         *pos += written;
+        if (*pos >= cap)
+            *pos = cap - 1;
     }
     written = (size_t)snprintf(out + *pos, cap - *pos, "]");
     *pos += written;
+    if (*pos >= cap)
+        *pos = cap - 1;
     return *pos;
 }
 
@@ -95,6 +103,8 @@ hu_error_t hu_capabilities_build_manifest_json(hu_allocator_t *alloc, const hu_c
     pos += (size_t)snprintf(buf + pos, cap - pos, ",\n    \"estimated_enabled_from_config\": ");
     append_json_string_array(buf, cap, &pos, CORE_TOOL_NAMES, N_CORE_TOOLS);
     pos += (size_t)snprintf(buf + pos, cap - pos, "\n  }\n}\n");
+    if (pos >= cap)
+        pos = cap - 1;
 
     *out_json = buf;
     return HU_OK;

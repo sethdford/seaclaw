@@ -278,6 +278,8 @@ hu_error_t hu_prospective_build_prompt(hu_allocator_t *alloc,
         return HU_ERR_OUT_OF_MEMORY;
     size_t pos = 0;
     pos += (size_t)snprintf(buf + pos, total - pos, "[PENDING REMINDERS]:");
+    if (pos >= total)
+        pos = total - 1;
     for (size_t i = 0; i < count && pos < total - 2; i++) {
         const char *d = items[i].description ? items[i].description : "";
         size_t dl = items[i].description_len;
@@ -287,6 +289,8 @@ hu_error_t hu_prospective_build_prompt(hu_allocator_t *alloc,
         size_t tv_len = items[i].trigger_value_len;
         pos += (size_t)snprintf(buf + pos, total - pos, " - %.*s (%.*s: %.*s)", (int)dl, d,
                                (int)tt_len, tt, (int)tv_len, tv);
+        if (pos >= total)
+            pos = total - 1;
     }
     *out = buf;
     *out_len = strlen(buf);
@@ -387,6 +391,8 @@ hu_error_t hu_residue_build_prompt(hu_allocator_t *alloc,
         return HU_ERR_OUT_OF_MEMORY;
     size_t pos = 0;
     pos += (size_t)snprintf(buf + pos, total - pos, "[EMOTIONAL RESIDUE]:");
+    if (pos >= total)
+        pos = total - 1;
     for (size_t i = 0; i < count && pos < total - 2; i++) {
         const char *e = residues[i].emotion ? residues[i].emotion : "";
         size_t el = residues[i].emotion_len;
@@ -395,6 +401,8 @@ hu_error_t hu_residue_build_prompt(hu_allocator_t *alloc,
                                          hours_elapsed);
         pos += (size_t)snprintf(buf + pos, total - pos, " - %.*s (intensity: %.2f)", (int)el, e,
                                cur);
+        if (pos >= total)
+            pos = total - 1;
     }
     *out = buf;
     *out_len = strlen(buf);

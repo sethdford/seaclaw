@@ -5,6 +5,8 @@
 
 typedef struct sse_ctx {
     char *url;
+    char *pending_data;
+    size_t pending_len;
 } sse_ctx_t;
 
 #ifdef HU_HTTP_CURL
@@ -21,11 +23,56 @@ static hu_error_t sse_send(void *ctx, const char *data, size_t len) {
 }
 
 static hu_error_t sse_recv(void *ctx, hu_allocator_t *alloc, char **out, size_t *out_len) {
-    (void)ctx;
-    (void)alloc;
-    (void)out;
-    (void)out_len;
-    return HU_ERR_NOT_SUPPORTED;
+    sse_ctx_t *c = (sse_ctx_t *)ctx;
+    if (!c || !c->url || !alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    hu_http_response_t resp = {0};
+    char accept_hdr[] = "Accept: text/event-stream";
+    hu_error_t err = hu_http_get(alloc, c->url, accept_hdr, &resp);
+    if (err != HU_OK || !resp.body || resp.body_len == 0) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return err != HU_OK ? err : HU_ERR_IO;
+    }
+
+    /* Extract the last "data:" line from the SSE stream */
+    const char *last_data = NULL;
+    size_t last_data_len = 0;
+    const char *p = resp.body;
+    const char *end = resp.body + resp.body_len;
+    while (p < end) {
+        if (end - p >= 5 && memcmp(p, "data:", 5) == 0) {
+            const char *val = p + 5;
+            while (val < end && *val == ' ')
+                val++;
+            const char *eol = val;
+            while (eol < end && *eol != '\n' && *eol != '\r')
+                eol++;
+            last_data = val;
+            last_data_len = (size_t)(eol - val);
+            p = eol;
+        }
+        while (p < end && *p != '\n')
+            p++;
+        if (p < end)
+            p++;
+    }
+
+    if (!last_data || last_data_len == 0) {
+        hu_http_response_free(alloc, &resp);
+        *out = NULL;
+        *out_len = 0;
+        return HU_OK;
+    }
+
+    char *result = hu_strndup(alloc, last_data, last_data_len);
+    hu_http_response_free(alloc, &resp);
+    if (!result)
+        return HU_ERR_OUT_OF_MEMORY;
+    *out = result;
+    *out_len = last_data_len;
+    return HU_OK;
 }
 
 static void sse_close(void *ctx, hu_allocator_t *alloc) {

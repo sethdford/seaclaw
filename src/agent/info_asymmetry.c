@@ -191,6 +191,8 @@ hu_error_t hu_info_asymmetry_build_guidance(const hu_info_asymmetry_t *asym, hu_
     }
     if (!first)
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "\n");
+    if (pos >= sizeof(buf))
+        pos = sizeof(buf) - 1;
 
     /* Shared knowledge */
     first = true;
@@ -211,6 +213,8 @@ hu_error_t hu_info_asymmetry_build_guidance(const hu_info_asymmetry_t *asym, hu_
     }
     if (!first)
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "\n");
+    if (pos >= sizeof(buf))
+        pos = sizeof(buf) - 1;
 
     *out = hu_strndup(alloc, buf, pos);
     if (!*out)

@@ -303,9 +303,12 @@ hu_error_t hu_visual_build_prompt(hu_allocator_t *alloc,
             pos += (size_t)n;
     }
 
-    if (pos + 50 < sizeof(buf))
+    if (pos + 50 < sizeof(buf)) {
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
                                 "\nYou may include one of these naturally if relevant.");
+        if (pos >= sizeof(buf))
+            pos = sizeof(buf) - 1;
+    }
 
     char *s = hu_strndup(alloc, buf, pos);
     if (!s)
