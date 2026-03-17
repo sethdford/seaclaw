@@ -97,10 +97,15 @@ char *hu_awareness_context(const hu_awareness_t *aw, hu_allocator_t *alloc, size
     size_t pos = 0;
 
     pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "## Situational Awareness\n");
+    if (pos >= sizeof(buf))
+        pos = sizeof(buf) - 1;
 
-    if (s->health_degraded)
+    if (s->health_degraded) {
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
                                 "- WARNING: System health is degraded\n");
+        if (pos >= sizeof(buf))
+            pos = sizeof(buf) - 1;
+    }
 
     if (has_stats) {
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
@@ -108,18 +113,29 @@ char *hu_awareness_context(const hu_awareness_t *aw, hu_allocator_t *alloc, size
                                 (unsigned long long)s->messages_received,
                                 (unsigned long long)s->messages_sent,
                                 (unsigned long long)s->tool_calls);
+        if (pos >= sizeof(buf))
+            pos = sizeof(buf) - 1;
     }
 
     if (s->active_channel_count > 0) {
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "- Active channels:");
-        for (size_t i = 0; i < s->active_channel_count && pos < sizeof(buf) - 40; i++)
+        if (pos >= sizeof(buf))
+            pos = sizeof(buf) - 1;
+        for (size_t i = 0; i < s->active_channel_count && pos < sizeof(buf) - 40; i++) {
             pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %s", s->active_channels[i]);
+            if (pos >= sizeof(buf))
+                pos = sizeof(buf) - 1;
+        }
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "\n");
+        if (pos >= sizeof(buf))
+            pos = sizeof(buf) - 1;
     }
 
     if (has_errors) {
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "- Recent errors (%llu total):\n",
                                 (unsigned long long)s->total_errors);
+        if (pos >= sizeof(buf))
+            pos = sizeof(buf) - 1;
         size_t nerr = s->total_errors < HU_AWARENESS_MAX_RECENT_ERRORS
                           ? s->total_errors
                           : HU_AWARENESS_MAX_RECENT_ERRORS;
