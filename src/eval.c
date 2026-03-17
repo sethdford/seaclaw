@@ -265,6 +265,7 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
         hu_eval_result_t *res = &out->results[i];
         char *response = NULL;
         size_t response_len = 0;
+        int64_t task_start_ms = (int64_t)time(NULL) * 1000;
 
 #if defined(HU_IS_TEST) && HU_IS_TEST
         {
@@ -287,13 +288,34 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
             hu_error_t err = provider->vtable->chat_with_system(provider->ctx, alloc, NULL, 0,
                 task->prompt ? task->prompt : "", task->prompt ? task->prompt_len : 0,
                 model ? model : "", model_len, 0.0, &response, &response_len);
+            int64_t task_end_ms = (int64_t)time(NULL) * 1000;
+            int64_t task_elapsed = task_end_ms - task_start_ms;
+
+            /* Timeout enforcement: if task exceeded timeout_ms, treat as failure */
+            if (task->timeout_ms > 0 && task_elapsed > task->timeout_ms) {
+                res->task_id = task->id ? hu_strdup(alloc, task->id) : NULL;
+                res->passed = false;
+                res->score = 0.0;
+                res->actual_output = NULL;
+                res->actual_output_len = 0;
+                res->elapsed_ms = task_elapsed;
+                res->tool_calls_made = 0;
+                res->tokens_used = 0;
+                res->error_msg = hu_sprintf(alloc, "timeout: %lld ms > %lld ms limit",
+                                            (long long)task_elapsed, (long long)task->timeout_ms);
+                if (response)
+                    alloc->free(alloc->ctx, response, response_len + 1);
+                out->failed++;
+                continue;
+            }
+
             if (err != HU_OK) {
                 res->task_id = task->id ? hu_strdup(alloc, task->id) : NULL;
                 res->passed = false;
                 res->score = 0.0;
                 res->actual_output = NULL;
                 res->actual_output_len = 0;
-                res->elapsed_ms = 0;
+                res->elapsed_ms = task_elapsed;
                 res->tool_calls_made = 0;
                 res->tokens_used = 0;
                 res->error_msg = hu_sprintf(alloc, "provider error: %d", (int)err);
@@ -325,7 +347,7 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
         res->score = score_val;
         res->actual_output = response;
         res->actual_output_len = response_len;
-        res->elapsed_ms = 0;
+        res->elapsed_ms = (int64_t)time(NULL) * 1000 - task_start_ms;
         res->tool_calls_made = 0;
         res->tokens_used = 0;
         res->error_msg = NULL;
