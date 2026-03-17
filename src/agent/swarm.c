@@ -187,9 +187,10 @@ hu_error_t hu_swarm_execute(hu_allocator_t *alloc, const hu_swarm_config_t *conf
         t->failed = false;
         t->elapsed_ms = 1;
         total_ms += t->elapsed_ms;
-        strncpy(t->result, "mock result", sizeof(t->result) - 1);
-        t->result[sizeof(t->result) - 1] = '\0';
-        t->result_len = 11;
+        int n = snprintf(t->result, sizeof(t->result), "processed: %.*s",
+                         (int)(t->description_len > 80 ? 80 : t->description_len),
+                         t->description);
+        t->result_len = (n > 0 && (size_t)n < sizeof(t->result)) ? (size_t)n : 0;
         result->completed++;
     }
     result->total_elapsed_ms = total_ms;
