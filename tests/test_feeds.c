@@ -1006,7 +1006,7 @@ static void cycle_populates_current_events(void) {
 
     sqlite3_stmt *chk = NULL;
     sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM current_events", -1, &chk, NULL);
-    sqlite3_step(chk);
+    HU_ASSERT_EQ(sqlite3_step(chk), SQLITE_ROW);
     HU_ASSERT_EQ(sqlite3_column_int(chk, 0), 5);
     sqlite3_finalize(chk);
 
@@ -1029,7 +1029,7 @@ static void cycle_populates_opinions(void) {
 
     sqlite3_stmt *chk = NULL;
     sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM opinions", -1, &chk, NULL);
-    sqlite3_step(chk);
+    HU_ASSERT_EQ(sqlite3_step(chk), SQLITE_ROW);
     HU_ASSERT_TRUE(sqlite3_column_int(chk, 0) >= 1);
     sqlite3_finalize(chk);
 
@@ -1054,7 +1054,7 @@ static void cycle_records_cognitive_load(void) {
 
     sqlite3_stmt *chk = NULL;
     sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM cognitive_load_log", -1, &chk, NULL);
-    sqlite3_step(chk);
+    HU_ASSERT_EQ(sqlite3_step(chk), SQLITE_ROW);
     HU_ASSERT_TRUE(sqlite3_column_int(chk, 0) >= 1);
     sqlite3_finalize(chk);
 
@@ -1133,43 +1133,43 @@ static void e2e_ingest_findings_cycle_learns(void) {
 
     sqlite3_stmt *chk = NULL;
     sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM general_lessons", -1, &chk, NULL);
-    sqlite3_step(chk);
+    HU_ASSERT_EQ(sqlite3_step(chk), SQLITE_ROW);
     int lessons = sqlite3_column_int(chk, 0);
     sqlite3_finalize(chk);
     HU_ASSERT_TRUE(lessons >= 0);
 
     sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM current_events", -1, &chk, NULL);
-    sqlite3_step(chk);
+    HU_ASSERT_EQ(sqlite3_step(chk), SQLITE_ROW);
     int events = sqlite3_column_int(chk, 0);
     sqlite3_finalize(chk);
     HU_ASSERT_TRUE(events >= 1);
 
     sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM inferred_values", -1, &chk, NULL);
-    sqlite3_step(chk);
+    HU_ASSERT_EQ(sqlite3_step(chk), SQLITE_ROW);
     int values = sqlite3_column_int(chk, 0);
     sqlite3_finalize(chk);
     HU_ASSERT_TRUE(values >= 0);
 
     sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM opinions", -1, &chk, NULL);
-    sqlite3_step(chk);
+    HU_ASSERT_EQ(sqlite3_step(chk), SQLITE_ROW);
     int opinions = sqlite3_column_int(chk, 0);
     sqlite3_finalize(chk);
     HU_ASSERT_TRUE(opinions >= 0);
 
     sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM behavioral_feedback", -1, &chk, NULL);
-    sqlite3_step(chk);
+    HU_ASSERT_EQ(sqlite3_step(chk), SQLITE_ROW);
     int feedback = sqlite3_column_int(chk, 0);
     sqlite3_finalize(chk);
     HU_ASSERT_TRUE(feedback >= 0);
 
     sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM cognitive_load_log", -1, &chk, NULL);
-    sqlite3_step(chk);
+    HU_ASSERT_EQ(sqlite3_step(chk), SQLITE_ROW);
     int cog = sqlite3_column_int(chk, 0);
     sqlite3_finalize(chk);
     HU_ASSERT_TRUE(cog >= 1);
 
     sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM growth_milestones", -1, &chk, NULL);
-    sqlite3_step(chk);
+    HU_ASSERT_EQ(sqlite3_step(chk), SQLITE_ROW);
     int milestones = sqlite3_column_int(chk, 0);
     sqlite3_finalize(chk);
     HU_ASSERT_TRUE(milestones >= 1);
