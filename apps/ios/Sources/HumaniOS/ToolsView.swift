@@ -20,6 +20,7 @@ enum ToolCategory: String, CaseIterable {
 struct ToolsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject var connectionManager: ConnectionManager
     @State private var appeared = false
 
     private var tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color) {
@@ -77,20 +78,23 @@ struct ToolsView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: HUTokens.spaceXl) {
+                    if connectionManager.isConnected {
                     ForEach(ToolCategory.allCases, id: \.self) { category in
                         if let tools = toolsByCategory[category], !tools.isEmpty {
                             categorySection(category: category, tools: tools)
                         }
+                    }
+                    } else {
+                        ToolCardSkeletonGrid()
                     }
                 }
                 .padding(HUTokens.spaceMd)
             }
             .background(tokens.bgSurface)
             .overlay {
-                if !hasAnyTools {
+                if connectionManager.isConnected && !hasAnyTools {
                     VStack(spacing: HUTokens.spaceMd) {
-                        Image(systemName: "wrench.and.screwdriver")
-                            .font(.custom("Avenir-Book", size: HUTokens.textXl))
+                        PhosphorIcon(name: .wrench, size: HUTokens.text3Xl)
                             .foregroundStyle(tokens.textMuted)
                         Text("No tools available")
                             .font(.custom("Avenir-Medium", size: HUTokens.textLg))
@@ -144,6 +148,56 @@ struct ToolsView: View {
     }
 }
 
+private struct ToolCardSkeletonGrid: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: HUTokens.spaceXl) {
+            ForEach(0..<3, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
+                    RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                        .fill(.secondary)
+                        .frame(width: 80, height: HUTokens.textBase)
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: HUTokens.spaceMd),
+                        GridItem(.flexible(), spacing: HUTokens.spaceMd),
+                    ], spacing: HUTokens.spaceMd) {
+                        ForEach(0..<4, id: \.self) { _ in
+                            ToolCardSkeleton()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ToolCardSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
+            HStack {
+                RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                    .fill(.secondary)
+                    .frame(width: 24, height: 24)
+                Spacer()
+            }
+            RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                .fill(.secondary)
+                .frame(width: 80, height: HUTokens.textBase)
+            RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                .fill(.secondary)
+                .frame(maxWidth: .infinity)
+                .frame(height: HUTokens.textXs)
+            RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                .fill(.secondary)
+                .frame(width: 120, height: HUTokens.textXs)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(HUTokens.spaceMd)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
+        .redacted(reason: .placeholder)
+    }
+}
+
 private struct ToolCard: View {
     let tool: ToolItem
     let surfaceContainer: Color
@@ -154,12 +208,32 @@ private struct ToolCard: View {
     let delay: Double
     let reduceMotion: Bool
 
+    @ViewBuilder
+    private var toolIcon: some View {
+        if let phosphor = phosphorIcon(for: tool.icon) {
+            PhosphorIcon(name: phosphor, size: HUTokens.textLg)
+                .foregroundStyle(textMuted)
+        } else {
+            Image(systemName: tool.icon)
+                .font(.custom("Avenir-Medium", size: HUTokens.textLg, relativeTo: .body))
+                .foregroundStyle(textMuted)
+        }
+    }
+
+    private func phosphorIcon(for name: String) -> PhosphorIconName? {
+        switch name {
+        case "terminal": return .terminal
+        case "clock": return .clock
+        case "wrench.and.screwdriver": return .wrench
+        case "gear": return .gear
+        default: return nil
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
             HStack {
-                Image(systemName: tool.icon)
-                    .font(.custom("Avenir-Medium", size: HUTokens.textLg, relativeTo: .body))
-                    .foregroundStyle(textMuted)
+                toolIcon
                 Spacer()
             }
             Text(tool.name)
@@ -172,7 +246,7 @@ private struct ToolCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(HUTokens.spaceMd)
-        .background(surfaceContainer)
+        .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(tool.name): \(tool.description)")

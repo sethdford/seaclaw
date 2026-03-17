@@ -189,7 +189,7 @@ private fun ToolCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(HUTokens.radiusLg))
-            .background(colorScheme.primaryContainer)
+            .background(colorScheme.surfaceContainer)
             .padding(HUTokens.spaceMd)
             .semantics(mergeDescendants = true) {
                 contentDescription = "$name: $description"

@@ -88,6 +88,13 @@ fun SettingsScreen(
         }
 
         StaggeredItem(index = 1, reducedMotion = reducedMotion, enter = enterTransition) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(HUTokens.radiusLg))
+                .background(colorScheme.surfaceContainerHigh)
+                .padding(HUTokens.spaceMd),
+        ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -118,6 +125,7 @@ fun SettingsScreen(
                     },
                 )
             }
+        }
         }
         }
 

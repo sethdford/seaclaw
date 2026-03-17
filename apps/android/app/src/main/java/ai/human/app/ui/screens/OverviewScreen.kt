@@ -259,7 +259,7 @@ private fun StatCard(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(HUTokens.radiusLg))
-            .background(colorScheme.surfaceContainerHigh)
+            .background(colorScheme.surfaceContainerLow)
             .padding(HUTokens.spaceMd)
             .semantics { contentDescription = "$title: $value" },
     ) {
@@ -291,7 +291,7 @@ private fun StatCard(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(HUTokens.radiusLg))
-            .background(colorScheme.surfaceContainerHigh)
+            .background(colorScheme.surfaceContainerLow)
             .padding(HUTokens.spaceMd)
             .semantics { contentDescription = "$title: $value" },
     ) {
@@ -333,7 +333,7 @@ private fun ActivityItem(text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(HUTokens.radiusMd))
-            .background(colorScheme.surfaceContainerHigh)
+            .background(colorScheme.surfaceContainerLow)
             .padding(HUTokens.spaceMd),
     ) {
         Text(

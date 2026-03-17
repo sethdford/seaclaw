@@ -181,7 +181,7 @@ private fun ChatBubble(
     val (backgroundColor, textColor) = if (isUser) {
         colorScheme.primary to colorScheme.onPrimary
     } else {
-        colorScheme.primaryContainer to colorScheme.onSurface
+        colorScheme.surface to colorScheme.onSurface
     }
 
     val role = if (isUser) "You" else "Assistant"

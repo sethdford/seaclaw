@@ -167,7 +167,7 @@ private fun SessionListItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(HUTokens.radiusLg))
-                .background(colorScheme.primaryContainer)
+                .background(colorScheme.surfaceContainer)
                 .padding(HUTokens.spaceMd)
                 .semantics(mergeDescendants = true) {
                     contentDescription = "${session.title}, ${session.messageCount} messages, ${session.timestamp}, preview: ${session.preview}"

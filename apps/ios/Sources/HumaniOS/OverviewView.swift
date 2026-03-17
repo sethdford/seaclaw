@@ -69,8 +69,9 @@ struct OverviewView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("Gateway \(connectionManager.isConnected ? "connected" : "disconnected")")
 
-                    // Stat cards grid
+                    // Stat cards grid (or skeletons when disconnected)
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: HUTokens.spaceMd) {
+                        if connectionManager.isConnected {
                         StatCard(
                             title: "Messages",
                             value: "1,247",
@@ -79,7 +80,8 @@ struct OverviewView: View {
                             tokens: tokens,
                             appeared: appeared,
                             delay: 0,
-                            reduceMotion: reduceMotion
+                            reduceMotion: reduceMotion,
+                            icon: .chat
                         )
                         StatCard(
                             title: "Channels",
@@ -89,7 +91,8 @@ struct OverviewView: View {
                             tokens: tokens,
                             appeared: appeared,
                             delay: 0.05,
-                            reduceMotion: reduceMotion
+                            reduceMotion: reduceMotion,
+                            icon: .grid
                         )
                         StatCard(
                             title: "Uptime",
@@ -99,7 +102,8 @@ struct OverviewView: View {
                             tokens: tokens,
                             appeared: appeared,
                             delay: 0.1,
-                            reduceMotion: reduceMotion
+                            reduceMotion: reduceMotion,
+                            icon: .clock
                         )
                         StatCard(
                             title: "Latency",
@@ -109,12 +113,18 @@ struct OverviewView: View {
                             tokens: tokens,
                             appeared: appeared,
                             delay: 0.15,
-                            reduceMotion: reduceMotion
+                            reduceMotion: reduceMotion,
+                            icon: .terminal
                         )
+                        } else {
+                            ForEach(0..<4, id: \.self) { _ in
+                                StatCardSkeleton()
+                            }
+                        }
                     }
                     .padding(.horizontal)
 
-                    // Recent activity
+                    // Recent activity (or skeleton when disconnected)
                     VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
                         Text("Recent Activity")
                             .font(.custom("Avenir-Heavy", size: HUTokens.textLg, relativeTo: .body))
@@ -122,6 +132,7 @@ struct OverviewView: View {
                             .padding(.horizontal)
 
                         VStack(spacing: 0) {
+                            if connectionManager.isConnected {
                             ForEach(Array(ActivityRow.activities.enumerated()), id: \.offset) { index, activity in
                                 ActivityRow(
                                     title: activity.0,
@@ -141,8 +152,20 @@ struct OverviewView: View {
                                         .padding(.leading, HUTokens.space2xl)
                                 }
                             }
+                            } else {
+                                ForEach(0..<5, id: \.self) { i in
+                                    VStack(spacing: 0) {
+                                        ActivityRowSkeleton()
+                                        if i < 4 {
+                                            Divider()
+                                                .background(tokens.textMuted.opacity(HUTokens.opacityOverlayMedium))
+                                                .padding(.leading, HUTokens.space2xl)
+                                        }
+                                    }
+                                }
+                            }
                         }
-                        .background(tokens.surfaceContainerHigh)
+                        .background(.regularMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
                     }
                 }
@@ -170,6 +193,50 @@ struct OverviewView: View {
     }
 }
 
+private struct StatCardSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: HUTokens.spaceXs) {
+            RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                .fill(.secondary)
+                .frame(width: 60, height: HUTokens.textXs)
+            RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                .fill(.secondary)
+                .frame(width: 80, height: HUTokens.textXl)
+            RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                .fill(.secondary)
+                .frame(width: 40, height: HUTokens.textXs)
+        }
+        .padding(HUTokens.spaceMd)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .redacted(reason: .placeholder)
+    }
+}
+
+private struct ActivityRowSkeleton: View {
+    var body: some View {
+        HStack(spacing: HUTokens.spaceMd) {
+            Circle()
+                .fill(.secondary)
+                .frame(width: 32, height: 32)
+            VStack(alignment: .leading, spacing: HUTokens.spaceXs) {
+                RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                    .fill(.secondary)
+                    .frame(width: 140, height: HUTokens.textSm)
+                RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                    .fill(.secondary)
+                    .frame(width: 50, height: HUTokens.textXs)
+            }
+            Spacer()
+            RoundedRectangle(cornerRadius: HUTokens.radiusSm)
+                .fill(.secondary)
+                .frame(width: 36, height: HUTokens.textXs)
+        }
+        .padding(.horizontal, HUTokens.spaceMd)
+        .padding(.vertical, HUTokens.spaceXs)
+        .redacted(reason: .placeholder)
+    }
+}
+
 private struct StatCard: View {
     let title: String
     let value: String
@@ -179,9 +246,12 @@ private struct StatCard: View {
     let appeared: Bool
     let delay: Double
     let reduceMotion: Bool
+    var icon: PhosphorIconName = .grid
 
     var body: some View {
         VStack(alignment: .leading, spacing: HUTokens.spaceXs) {
+            PhosphorIcon(name: icon, size: HUTokens.textLg)
+                .foregroundStyle(tokens.accent)
             Text(title)
                 .font(.custom("Avenir-Medium", size: HUTokens.textXs, relativeTo: .caption))
                 .foregroundStyle(tokens.textMuted)
@@ -200,7 +270,7 @@ private struct StatCard: View {
         }
         .padding(HUTokens.spaceMd)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(tokens.surfaceContainerHigh)
+        .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusMd, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value), \(trend)")

@@ -12,12 +12,15 @@ struct ChatView: View {
     @State private var toolCalls: [ToolCallInfo] = []
     @State private var errorBanner: String?
     @State private var sendTrigger: Int = 0
+    @State private var isSending = false
 
-    private var tokens: (bgSurface: Color, error: Color, errorDim: Color, success: Color) {
+    private static let suggestionChips = ["What can you do?", "Summarize my notes", "Help me plan my day"]
+
+    private var tokens: (bgSurface: Color, error: Color, errorDim: Color, success: Color, text: Color, textMuted: Color, accent: Color) {
         if colorScheme == .dark {
-            return (HUTokens.Dark.bgSurface, HUTokens.Dark.error, HUTokens.Dark.errorDim, HUTokens.Dark.success)
+            return (HUTokens.Dark.bgSurface, HUTokens.Dark.error, HUTokens.Dark.errorDim, HUTokens.Dark.success, HUTokens.Dark.text, HUTokens.Dark.textMuted, HUTokens.Dark.accent)
         } else {
-            return (HUTokens.Light.bgSurface, HUTokens.Light.error, HUTokens.Light.errorDim, HUTokens.Light.success)
+            return (HUTokens.Light.bgSurface, HUTokens.Light.error, HUTokens.Light.errorDim, HUTokens.Light.success, HUTokens.Light.text, HUTokens.Light.textMuted, HUTokens.Light.accent)
         }
     }
 
@@ -44,61 +47,121 @@ struct ChatView: View {
     private var mainContent: some View {
         VStack(spacing: 0) {
             messageList
+            if isSending {
+                HStack(spacing: HUTokens.spaceSm) {
+                    ProgressView()
+                        .scaleEffect(0.9)
+                    Text("Sending…")
+                        .font(.custom("Avenir-Book", size: HUTokens.textXs, relativeTo: .caption))
+                        .foregroundStyle(tokens.textMuted)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, HUTokens.spaceSm)
+            }
             if let err = errorBanner { errorBannerView(err) }
             ChatInputBar(text: $inputText, onSend: { sendMessage() }, sendTrigger: sendTrigger, focus: $isInputFocused)
-                .background(tokens.bgSurface)
+                .background(.thinMaterial)
         }
     }
 
     @ViewBuilder
     private var messageList: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: HUTokens.spaceMd) {
-                    ForEach(messages) { msg in
-                        ChatBubble(text: msg.text, role: msg.role)
-                            .id(msg.id)
-                            .transition(messageTransition)
-                            .accessibilityLabel(msg.text)
+        Group {
+            if messages.isEmpty && toolCalls.isEmpty && !isSending {
+                emptyStateView
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: HUTokens.spaceMd) {
+                            ForEach(messages) { msg in
+                                ChatBubble(text: msg.text, role: msg.role)
+                                    .id(msg.id)
+                                    .transition(messageTransition)
+                                    .accessibilityLabel(msg.text)
 #if os(iOS)
-                            .contextMenu {
-                                Button {
-                                    UIPasteboard.general.string = msg.text
-                                } label: { Label("Copy", systemImage: "doc.on.doc") }
-                                ShareLink(item: msg.text) {
-                                    Label("Share", systemImage: "square.and.arrow.up")
-                                }
-                                Button(role: .destructive) {
-                                    if reduceMotion {
-                                        messages.removeAll { $0.id == msg.id }
-                                    } else {
-                                        withAnimation(HUTokens.springInteractive) {
-                                            messages.removeAll { $0.id == msg.id }
+                                    .contextMenu {
+                                        Button {
+                                            UIPasteboard.general.string = msg.text
+                                        } label: { Label("Copy", systemImage: "doc.on.doc") }
+                                        ShareLink(item: msg.text) {
+                                            Label("Share", systemImage: "square.and.arrow.up")
                                         }
+                                        Button(role: .destructive) {
+                                            if reduceMotion {
+                                                messages.removeAll { $0.id == msg.id }
+                                            } else {
+                                                withAnimation(HUTokens.springInteractive) {
+                                                    messages.removeAll { $0.id == msg.id }
+                                                }
+                                            }
+                                        } label: { Label("Delete", systemImage: "trash") }
                                     }
-                                } label: { Label("Delete", systemImage: "trash") }
-                            }
 #endif
+                            }
+                            ForEach(toolCalls) { tc in
+                                ToolCallCard(name: tc.name, arguments: tc.arguments, status: tc.status, result: tc.result)
+                                    .id(tc.id)
+                                    .transition(messageTransition)
+                            }
+                        }
+                        .animation(reduceMotion ? nil : HUTokens.springInteractive, value: messages.count + toolCalls.count)
+                        .padding()
                     }
-                    ForEach(toolCalls) { tc in
-                        ToolCallCard(name: tc.name, arguments: tc.arguments, status: tc.status, result: tc.result)
-                            .id(tc.id)
-                            .transition(messageTransition)
-                    }
-                }
-                .animation(reduceMotion ? nil : HUTokens.springInteractive, value: messages.count + toolCalls.count)
-                .padding()
-            }
-            .onChange(of: messages.count) { _, _ in
-                if let last = messages.last {
-                    if reduceMotion {
-                        proxy.scrollTo(last.id, anchor: .bottom)
-                    } else {
-                        withAnimation(HUTokens.springInteractive) { proxy.scrollTo(last.id, anchor: .bottom) }
+                    .onChange(of: messages.count) { _, _ in
+                        if let last = messages.last {
+                            if reduceMotion {
+                                proxy.scrollTo(last.id, anchor: .bottom)
+                            } else {
+                                withAnimation(HUTokens.springInteractive) { proxy.scrollTo(last.id, anchor: .bottom) }
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var emptyStateView: some View {
+        VStack(spacing: HUTokens.spaceLg) {
+            Spacer()
+            VStack(spacing: HUTokens.spaceMd) {
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: HUTokens.text3Xl))
+                    .foregroundStyle(tokens.accent)
+                Text("Start a conversation")
+                    .font(.custom("Avenir-Heavy", size: HUTokens.textLg, relativeTo: .body))
+                    .foregroundStyle(tokens.text)
+                Text("Send a message or tap a suggestion below")
+                    .font(.custom("Avenir-Book", size: HUTokens.textSm, relativeTo: .subheadline))
+                    .foregroundStyle(tokens.textMuted)
+                VStack(spacing: HUTokens.spaceSm) {
+                    ForEach(Self.suggestionChips, id: \.self) { chip in
+                        Button {
+#if os(iOS)
+                            HUTokens.Haptic.selection.trigger()
+#endif
+                            inputText = chip
+                            isInputFocused = true
+                        } label: {
+                            Text(chip)
+                                .font(.custom("Avenir-Medium", size: HUTokens.textSm, relativeTo: .subheadline))
+                                .foregroundStyle(tokens.accent)
+                                .padding(.horizontal, HUTokens.spaceMd)
+                                .padding(.vertical, HUTokens.spaceSm)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, HUTokens.spaceXs)
+            }
+            .padding(HUTokens.spaceXl)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusXl, style: .continuous))
+            .padding(.horizontal, HUTokens.spaceLg)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -156,6 +219,7 @@ struct ChatView: View {
 
         inputText = ""
         sendTrigger += 1
+        isSending = true
 
         if reduceMotion {
             messages.append(ChatMessage(id: UUID(), text: trimmed, role: .user))
@@ -173,6 +237,7 @@ struct ChatView: View {
                 )
             } catch {
                 await MainActor.run {
+                    isSending = false
                     if reduceMotion {
                         messages.append(ChatMessage(
                             id: UUID(),
@@ -197,6 +262,7 @@ struct ChatView: View {
         DispatchQueue.main.async {
             switch event {
             case "error":
+                isSending = false
                 let msg = payload?["message"]?.value as? String ?? payload?["error"]?.value as? String ?? "Unknown error"
                 errorBanner = msg.isEmpty ? "Unknown error" : msg
             case "health":
@@ -205,6 +271,7 @@ struct ChatView: View {
                 let state = payload?["state"]?.value as? String
                 let content = payload?["message"]?.value as? String
                 if let content = content, !content.isEmpty {
+                    if state == "sent" || state == "chunk" { isSending = false }
                     if reduceMotion {
                         switch state {
                         case "received":

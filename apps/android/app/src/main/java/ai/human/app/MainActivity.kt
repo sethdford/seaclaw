@@ -1,8 +1,11 @@
 package ai.human.app
 
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -64,6 +67,7 @@ import ai.human.app.ui.screens.SettingsScreen
 import ai.human.app.ui.screens.ToolsScreen
 import ai.human.app.ui.theme.HumanTheme
 import ai.human.app.ui.HUTokens
+import ai.human.app.ui.glassSurface
 import ai.human.app.R
 
 class MainActivity : ComponentActivity() {
@@ -295,6 +299,10 @@ private fun OnboardingScreen(onComplete: () -> Unit) {
         }
 
         Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .glassSurface()
+                .padding(HUTokens.spaceMd),
             verticalArrangement = Arrangement.spacedBy(HUTokens.spaceMd),
         ) {
             BasicTextField(

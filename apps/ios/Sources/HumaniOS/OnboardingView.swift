@@ -7,6 +7,11 @@ struct OnboardingView: View {
     @EnvironmentObject var connectionManager: ConnectionManager
     @Environment(\.colorScheme) private var colorScheme
     @State private var currentPage = 0
+    @State private var urlValidationError: String?
+
+    private var isGatewayURLValid: Bool {
+        urlValidationError == nil && !connectionManager.gatewayURL.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     private var tokens: (bgSurface: Color, surfaceContainer: Color, text: Color, textMuted: Color, accent: Color, success: Color, error: Color) {
         if colorScheme == .dark {
@@ -17,7 +22,7 @@ struct OnboardingView: View {
     }
 
     private let pages: [(String, String, String)] = [
-        ("antenna.radiowaves.left.and.right", "Welcome to h-uman", "Your autonomous AI assistant runtime. Minimal footprint, maximum capability."),
+        ("sparkles", "Welcome to h-uman", "Your autonomous AI assistant runtime. Minimal footprint, maximum capability."),
         ("bolt.fill", "Lightning Fast", "~1696 KB binary, <6 MB RAM, <30 ms startup. Zero dependencies beyond libc."),
         ("bubble.left.and.bubble.right.fill", "34 Channels", "Connect Telegram, Discord, Slack, email, and 30 more messaging platforms."),
     ]
@@ -29,7 +34,7 @@ struct OnboardingView: View {
                     VStack(spacing: HUTokens.spaceLg) {
                         Spacer()
                         Image(systemName: page.0)
-                            .font(.system(size: 64))
+                            .font(.system(size: HUTokens.space2xl + HUTokens.spaceLg))
                             .foregroundStyle(tokens.accent)
                             .frame(height: 100)
                         Text(page.1)
@@ -64,6 +69,18 @@ struct OnboardingView: View {
                     .keyboardType(.URL)
 #endif
                     .accessibilityLabel("Gateway URL")
+                    .onChange(of: connectionManager.gatewayURL) { _, newValue in
+                        urlValidationError = Self.validateGatewayURL(newValue)
+                    }
+                    .onAppear {
+                        urlValidationError = Self.validateGatewayURL(connectionManager.gatewayURL)
+                    }
+
+                if let err = urlValidationError, !err.isEmpty {
+                    Text(err)
+                        .font(.custom("Avenir-Book", size: HUTokens.textXs, relativeTo: .caption))
+                        .foregroundStyle(tokens.error)
+                }
 
                 Button {
 #if os(iOS)
@@ -88,6 +105,8 @@ struct OnboardingView: View {
                         .background(tokens.accent)
                         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusMd, style: .continuous))
                 }
+                .disabled(!isGatewayURLValid)
+                .opacity(isGatewayURLValid ? 1 : HUTokens.opacityDisabled)
                 .accessibilityLabel("Get started and connect to gateway")
 
                 Button {
@@ -108,5 +127,26 @@ struct OnboardingView: View {
             .padding(HUTokens.spaceLg)
         }
         .background(tokens.bgSurface)
+    }
+
+    private static func validateGatewayURL(_ url: String) -> String? {
+        let trimmed = url.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return "Enter a gateway URL" }
+        guard trimmed.hasPrefix("ws://") || trimmed.hasPrefix("wss://") else {
+            return "URL must start with ws:// or wss://"
+        }
+        let withoutScheme = trimmed.hasPrefix("wss://")
+            ? String(trimmed.dropFirst(6))
+            : String(trimmed.dropFirst(5))
+        guard !withoutScheme.isEmpty else { return "URL must include host" }
+        let hostPart = withoutScheme.split(separator: "/").first ?? Substring(withoutScheme)
+        guard !hostPart.isEmpty else { return "URL must include host" }
+        if hostPart.contains(":") {
+            let parts = hostPart.split(separator: ":")
+            guard parts.count == 2, let port = Int(parts[1]), (1...65535).contains(port) else {
+                return "Invalid port"
+            }
+        }
+        return nil
     }
 }
