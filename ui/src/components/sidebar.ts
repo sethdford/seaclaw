@@ -492,6 +492,7 @@ export class ScSidebar extends LitElement {
                       aria-label=${item.label}
                       title=${this.collapsed ? item.label : undefined}
                       @click=${() => this._dispatchTabChange(item.id)}
+                      @mouseenter=${() => this._dispatchNavHover(item.id)}
                     >
                       <span class="icon">${item.icon}</span>
                       <span class="label">${item.label}</span>
@@ -581,6 +582,16 @@ export class ScSidebar extends LitElement {
   private _dispatchTabChange(tabId: string): void {
     this.dispatchEvent(
       new CustomEvent("tab-change", {
+        detail: tabId,
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _dispatchNavHover(tabId: string): void {
+    this.dispatchEvent(
+      new CustomEvent("nav-hover", {
         detail: tabId,
         bubbles: true,
         composed: true,

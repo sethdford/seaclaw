@@ -449,6 +449,7 @@ export class ScApp extends LitElement {
     this.connectionStatus = e.detail;
   }) as EventListener;
   private _fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+  private _navHoverTimer: ReturnType<typeof setTimeout> | null = null;
   private _authFailedHandler = (() => {
     if (!this._isDemo) this._switchToDemo();
   }) as EventListener;
@@ -472,13 +473,6 @@ export class ScApp extends LitElement {
     this._onHashChange();
     dynamicLight.start();
     this._initAmbientIntelligence();
-
-    if ("requestIdleCallback" in window) {
-      requestIdleCallback(() => {
-        import("./views/chat-view.js");
-        import("./views/agents-view.js");
-      });
-    }
 
     const wsUrl =
       typeof window !== "undefined" &&
@@ -561,8 +555,20 @@ export class ScApp extends LitElement {
     }
   }
 
+  override firstUpdated(): void {
+    if ("requestIdleCallback" in window) {
+      requestIdleCallback(() => this._prefetchOnIdle());
+    } else {
+      setTimeout(() => this._prefetchOnIdle(), 0);
+    }
+  }
+
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    if (this._navHoverTimer) {
+      clearTimeout(this._navHoverTimer);
+      this._navHoverTimer = null;
+    }
     document.removeEventListener("keydown", this._moreSheetKeyHandler);
     document.removeEventListener("keydown", this._keyHandler);
     document.removeEventListener(AUTH_FAILED, this._authFailedHandler);
@@ -707,6 +713,33 @@ export class ScApp extends LitElement {
     }
   }
 
+  private _prefetchSilent(tab: TabId): void {
+    if (loadedViews.has(tab)) return;
+    this._ensureLoaded(tab).catch(() => {});
+  }
+
+  private _prefetchOnIdle(): void {
+    const targets: TabId[] = ["chat", "agents", "config"];
+    for (const t of targets) this._prefetchSilent(t);
+  }
+
+  private _handleNavHover(e: CustomEvent<string>): void {
+    const tab = e.detail as TabId;
+    if (!VALID_TABS.includes(tab)) return;
+    if (this._navHoverTimer) clearTimeout(this._navHoverTimer);
+    this._navHoverTimer = setTimeout(() => {
+      this._navHoverTimer = null;
+      this._prefetchSilent(tab);
+    }, 200);
+  }
+
+  private _prefetchAdjacent(tab: TabId): void {
+    const idx = VALID_TABS.indexOf(tab);
+    if (idx < 0) return;
+    if (idx > 0) this._prefetchSilent(VALID_TABS[idx - 1]!);
+    if (idx < VALID_TABS.length - 1) this._prefetchSilent(VALID_TABS[idx + 1]!);
+  }
+
   private async _switchTab(tab: TabId): Promise<void> {
     if (this.tab === tab) return;
     await this._ensureLoaded(tab);
@@ -714,12 +747,14 @@ export class ScApp extends LitElement {
     window.history.replaceState(null, "", hash);
     if (!document.startViewTransition) {
       this.tab = tab;
+      this._prefetchAdjacent(tab);
       return;
     }
     document.startViewTransition(() => {
       this.tab = tab;
       return this.updateComplete;
     });
+    this._prefetchAdjacent(tab);
   }
 
   private _onTabChange(e: CustomEvent<string>): void {
@@ -762,10 +797,12 @@ export class ScApp extends LitElement {
         : nothing}
       <div class="layout ${this.sidebarCollapsed ? "collapsed" : ""}">
         <hu-sidebar
+          class="hu-glass-scroll-aware"
           .activeTab=${this.tab}
           ?collapsed=${this.sidebarCollapsed}
           .connectionStatus=${this.connectionStatus}
           @tab-change=${this._onTabChange}
+          @nav-hover=${this._handleNavHover}
           @toggle-collapse=${() => this._toggleSidebar()}
         ></hu-sidebar>
 

@@ -79,17 +79,40 @@ export class ScStatusDot extends LitElement {
       }
     }
 
+    /* Status breathing — pulses when connected, frozen when disconnected */
+    @keyframes hu-status-breathe {
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.7;
+        transform: scale(1.05);
+      }
+    }
+    .dot.hu-status-breathing {
+      animation: hu-status-breathe calc(var(--hu-duration-slow) * 8) var(--hu-ease-in-out) infinite;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .dot.status-connecting {
+        animation: none;
+      }
+      .dot.hu-status-breathing {
         animation: none;
       }
     }
   `;
 
   override render() {
+    const breathing =
+      this.status === "connected" || this.status === "operational" || this.status === "online";
     return html`
       <span
-        class="dot size-${this.size} status-${this.status}"
+        class="dot size-${this.size} status-${this.status} ${breathing
+          ? "hu-status-breathing"
+          : ""}"
         role="status"
         aria-label="Status: ${this.status}"
       ></span>

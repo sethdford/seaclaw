@@ -333,6 +333,54 @@ hu-card.hu-entrance.hu-visible {
   background: var(--hu-border);
 }
 
+/* ─── Status Breathing (ambient intelligence) ─────────────────────────── */
+@keyframes hu-status-breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+.hu-status-breathing {
+  animation: hu-status-breathe calc(var(--hu-duration-slow) * 8) var(--hu-ease-in-out) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hu-status-breathing {
+    animation: none;
+  }
+}
+
+/* ─── Glass Blur by Scroll Depth (scroll-driven) ──────────────────────── */
+@keyframes hu-glass-scroll-deepen {
+  from {
+    backdrop-filter: blur(8px) saturate(1.2);
+    -webkit-backdrop-filter: blur(8px) saturate(1.2);
+  }
+  to {
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  }
+}
+@supports (animation-timeline: scroll()) {
+  .hu-glass-scroll-aware {
+    animation: hu-glass-scroll-deepen linear forwards;
+    animation-timeline: scroll(nearest block);
+  }
+}
+
+/* ─── Time-Aware Theming ────────────────────────────────────────────── */
+:root {
+  --hu-time-hue-shift: 0deg;
+  --hu-time-warmth: 0;
+}
+.hu-evening-mode {
+  filter: sepia(0.03) hue-rotate(5deg);
+}
+
 /* ─── Keyframes ────────────────────────────────────────────────────── */
 @keyframes hu-shimmer {
   0% {
@@ -1311,7 +1359,7 @@ hu-card.hu-entrance.hu-visible {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  :root {
+  :root:not(.hu-evening-mode) {
     filter: sepia(var(--hu-ambient-warmth)) saturate(calc(1 + var(--hu-ambient-warmth) * 0.2));
     transition: filter 3s ease;
   }
