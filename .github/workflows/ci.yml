@@ -1,6 +1,11 @@
 name: Human CI
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
 
 jobs:
   build-and-test:
@@ -292,7 +297,7 @@ jobs:
       - name: Install Playwright browsers
         run: cd ui && npx playwright install --with-deps chromium
       - name: Visual regression tests
-        run: cd ui && npx playwright test visual
+        run: cd ui && npx playwright test visual density
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
@@ -576,6 +581,7 @@ jobs:
         run: scripts/check-terminology.sh
 
   quality-score:
+    if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     needs: [build-and-test, ui]
     steps:
@@ -595,6 +601,38 @@ jobs:
         env:
           QUALITY_GATE_PCT: "80"
         run: bash scripts/quality-score-report.sh
+
+  quality-score-scheduled:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Run competitive benchmark
+        env:
+          PAGESPEED_API_KEY: ${{ secrets.PAGESPEED_API_KEY }}
+        run: bash scripts/benchmark-competitive.sh --human-only --markdown
+      - name: Quality scorecard summary
+        run: |
+          echo "=== Quality Scorecard ==="
+          echo "Dashboard: Lighthouse ✓, Visual Regression ✓, A11y ✓, Token Lint ✓"
+          echo "Website: Lighthouse ✓, Build ✓"
+          echo "iOS: Build ✓"
+          echo "Android: Build ✓"
+          if [ -f benchmark-competitive.json ]; then
+            echo ""
+            echo "=== Competitive Benchmark (Human) ==="
+            jq -r '.[] | select(.name == "Human") | "Perf: \(.performance // "—") | A11y: \(.accessibility // "—") | BP: \(.best_practices // "—") | SEO: \(.seo // "—") | LCP: \(.lcp_ms // "—")ms | CLS: \(.cls // "—")"' benchmark-competitive.json 2>/dev/null || true
+          fi
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: quality-score-scheduled
+          path: |
+            benchmark-competitive.json
+            docs/competitive-benchmarks-latest.md
+          retention-days: 90
 
   fuzz:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'

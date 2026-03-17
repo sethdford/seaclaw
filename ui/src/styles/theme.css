@@ -71,6 +71,18 @@ select {
   transition: all var(--hu-duration-fast) var(--hu-ease-out);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  .skip-link,
+  .hu-skip-link {
+    transition: none;
+  }
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -1337,6 +1349,13 @@ hu-card.hu-entrance.hu-visible {
 
 .skip-link:focus {
   top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link,
+  .hu-skip-link {
+    transition: none;
+  }
 }
 
 .hu-skip-link {
