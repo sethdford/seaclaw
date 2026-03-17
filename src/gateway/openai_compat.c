@@ -467,7 +467,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                         "\",\"object\":\"chat.completion\",\"created\":";
                     static const char oc_choices[] =
                         "\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\","
-                        "\"content\":\"";
+                        "\"content\":";
                     static const char oc_usage[] =
                         "},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":";
                     if (hu_json_buf_append_raw(&buf, "{\"id\":\"", 7) == HU_OK &&
@@ -569,7 +569,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
 
     static const char oc_hdr[] = "\",\"object\":\"chat.completion\",\"created\":";
     static const char oc_choices[] =
-        "\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"";
+        "\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":";
     static const char oc_usage[] = "},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":";
     if (hu_json_buf_append_raw(&buf, "{\"id\":\"", 7) != HU_OK ||
         hu_json_buf_append_raw(&buf, id_buf, strlen(id_buf)) != HU_OK ||
@@ -591,6 +591,8 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     hu_json_buf_append_raw(&buf, oc_choices, sizeof(oc_choices) - 1);
     if (resp.content && resp.content_len > 0)
         hu_json_append_string(&buf, resp.content, resp.content_len);
+    else
+        hu_json_buf_append_raw(&buf, "\"\"", 2);
     hu_json_buf_append_raw(&buf, oc_usage, sizeof(oc_usage) - 1);
     char usage_buf[24];
     snprintf(usage_buf, sizeof(usage_buf), "%u", resp.usage.prompt_tokens);
