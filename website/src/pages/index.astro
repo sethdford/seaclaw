@@ -68,6 +68,9 @@ const tools = [
 
 <html lang="en">
   <head>
+    <script is:inline>
+      (function(){var s=localStorage.getItem("hu-theme");var m=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s||m})();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="canonical" href="https://h-uman.ai/" />
@@ -86,7 +89,15 @@ const tools = [
       type="font/woff2"
       crossorigin
     />
+    <link
+      rel="preload"
+      href="/fonts/avenir/Avenir-Heavy.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <link rel="preconnect" href="https://github.com" />
+    <link rel="preconnect" href="https://img.shields.io" />
     <title>h-uman — not quite human.</title>
     <meta
       name="description"
@@ -167,7 +178,15 @@ const tools = [
       })}
     />
     <style is:global>
-      /* Critical hero CSS — inline for fast LCP */
+      /* Critical hero CSS — inline for fast LCP (paint before external CSS) */
+      :root { --color-bg-inline: #fafaf9; }
+      @media (prefers-color-scheme: dark) { :root { --color-bg-inline: #0a0a0a; } }
+      body {
+        font-family: "Avenir", "Avenir Next", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background: var(--color-bg-inline);
+      }
       section.relative.min-h-screen {
         display: flex;
         flex-direction: column;
@@ -181,6 +200,12 @@ const tools = [
         max-width: 56rem;
         margin-left: auto;
         margin-right: auto;
+      }
+      .hero-wordmark {
+        font-size: clamp(4rem, 12vw, 9rem);
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        line-height: 1;
       }
     </style>
     <style is:global>
@@ -334,6 +359,107 @@ const tools = [
                   ></path></svg
                 >
               </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ SOCIAL PROOF (Built for) ═══ */}
+      <section class="social-proof py-16 md:py-20 px-6" aria-label="Capabilities">
+        <div class="max-w-5xl mx-auto">
+          <p
+            class="social-proof-label text-[11px] font-semibold uppercase tracking-[0.15em] mb-8 text-center"
+            style="color: var(--color-text-tertiary)"
+          >
+            Built for
+          </p>
+          <div class="proof-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 md:gap-6">
+            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 0">
+              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
+                <path d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z" />
+              </svg>
+              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">CLI Automation</span>
+            </div>
+            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 1">
+              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
+                <path d="M208,40H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208ZM208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,64H48V152H208Zm-36-40a12,12,0,1,1-12,12A12,12,0,0,1,172,160Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,160Zm36-96a12,12,0,1,1-12,12A12,12,0,0,1,172,64Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,64Z" />
+              </svg>
+              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">DevOps</span>
+            </div>
+            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 2">
+              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
+                <path d="M208,40H48A16,16,0,0,0,32,56v58.77c0,89.61,75.82,119.34,91,124.39a15.53,15.53,0,0,0,10,0c15.2-5.05,91-34.78,91-124.39V56A16,16,0,0,0,208,40Zm0,74.79c0,78.42-66.35,104.62-80,109.18-13.53-4.52-80-30.69-80-109.18V56H208Z" />
+              </svg>
+              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">Security</span>
+            </div>
+            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 3">
+              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
+                <path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z" />
+              </svg>
+              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">Research</span>
+            </div>
+            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 4">
+              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
+                <path d="M208,40H48A16,16,0,0,0,32,56V72a16,16,0,0,0,16,16H80V56a8,8,0,0,1,16,0V72h48V56a8,8,0,0,1,16,0V72h32a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V120A16,16,0,0,0,208,104Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V184A16,16,0,0,0,208,168ZM56,112H72v8a8,8,0,0,1-16,0v-8Zm0,64H72v8a8,8,0,0,1-16,0v-8Zm128-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Zm-48-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Z" />
+              </svg>
+              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">IoT</span>
+            </div>
+            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 5">
+              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
+                <path d="M224,200h-8V40a8,8,0,0,0-16,0V200H168V96a8,8,0,0,0-16,0V200H104V136a8,8,0,0,0-16,0v64H40V168a8,8,0,0,0-16,0v32H16a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z" />
+              </svg>
+              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">Enterprise</span>
+            </div>
+          </div>
+          <div class="github-badge mt-10 flex justify-center">
+            <a
+              href="https://github.com/sethdford/h-uman"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub stars"
+            >
+              <img
+                src="https://img.shields.io/github/stars/sethdford/h-uman?style=social"
+                alt="GitHub stars"
+                loading="lazy"
+                width="96"
+                height="20"
+              />
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ INTERACTIVE DEMO (Terminal replay) ═══ */}
+      <section class="demo-section py-20 md:py-28 px-6 cv-defer" aria-label="Product demo">
+        <div class="max-w-4xl mx-auto">
+          <h2
+            class="font-sans font-extrabold text-[clamp(2rem,5vw,3rem)] mb-8 text-center"
+            style="color: var(--color-text); letter-spacing: -0.03em;"
+            data-reveal
+          >
+            See it in action
+          </h2>
+          <div
+            class="terminal-demo rounded-xl overflow-hidden"
+            aria-label="Terminal demonstration"
+            data-reveal="scale"
+            style="background: var(--color-terminal-bg); box-shadow: var(--hu-shadow-lg);"
+          >
+            <div
+              class="terminal-header flex items-center gap-2 px-4 py-3"
+              style="background: var(--color-terminal-chrome); border-bottom: 1px solid var(--color-terminal-border);"
+            >
+              <span class="terminal-dot red w-3 h-3 rounded-full shrink-0" style="background: var(--hu-terminal-close)"></span>
+              <span class="terminal-dot yellow w-3 h-3 rounded-full shrink-0" style="background: var(--hu-terminal-minimize)"></span>
+              <span class="terminal-dot green w-3 h-3 rounded-full shrink-0" style="background: var(--hu-terminal-maximize)"></span>
+              <span class="terminal-title ml-2 text-[13px] font-medium" style="color: var(--hu-web-text-tertiary)">human</span>
+            </div>
+            <div class="terminal-body px-6 py-5 font-mono text-[14px] leading-relaxed" style="color: var(--hu-web-text);">
+              <div class="terminal-line" style="--line-delay: 0"><span style="color: var(--color-accent)">$</span> human chat</div>
+              <div class="terminal-line" style="--line-delay: 1"><span style="color: var(--color-accent)">human&gt;</span> Summarize the latest commits</div>
+              <div class="terminal-line response" style="--line-delay: 2">Analyzing 12 commits from the last 24 hours...</div>
+              <div class="terminal-line response" style="--line-delay: 3">3 features, 2 fixes, 1 refactor. Key changes: agent loop optimization, new Discord channel, security hardening for tool execution.</div>
             </div>
           </div>
         </div>
@@ -2816,20 +2942,27 @@ const tools = [
           barObs.observe(barSection);
         }
 
-        // ═══ Floating Particles ═══
-        const particlesContainer = document.getElementById("hu-particles");
-        if (particlesContainer) {
-          for (let i = 0; i < 25; i++) {
-            const p = document.createElement("div");
-            p.className = "hu-particle";
-            p.style.left = Math.random() * 100 + "%";
-            p.style.animationDuration = 8 + Math.random() * 16 + "s";
-            p.style.animationDelay = Math.random() * 10 + "s";
-            const size = 1 + Math.random() * 2;
-            p.style.width = size + "px";
-            p.style.height = size + "px";
-            particlesContainer.appendChild(p);
+        // ═══ Floating Particles — defer until idle to avoid blocking LCP ═══
+        const initParticles = () => {
+          const particlesContainer = document.getElementById("hu-particles");
+          if (particlesContainer) {
+            for (let i = 0; i < 25; i++) {
+              const p = document.createElement("div");
+              p.className = "hu-particle";
+              p.style.left = Math.random() * 100 + "%";
+              p.style.animationDuration = 8 + Math.random() * 16 + "s";
+              p.style.animationDelay = Math.random() * 10 + "s";
+              const size = 1 + Math.random() * 2;
+              p.style.width = size + "px";
+              p.style.height = size + "px";
+              particlesContainer.appendChild(p);
+            }
           }
+        };
+        if ("requestIdleCallback" in window) {
+          (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(initParticles, { timeout: 2000 });
+        } else {
+          setTimeout(initParticles, 2000);
         }
 
         // ═══ Dependency Tree Animation ═══
