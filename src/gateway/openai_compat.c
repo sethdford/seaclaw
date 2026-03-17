@@ -1,4 +1,5 @@
 #include "human/gateway/openai_compat.h"
+#include "human/agent.h"
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
@@ -438,6 +439,78 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     hu_json_buf_free(&buf);
     return;
 #else
+    /* Route through agent for full capability (tools, memory, persona) when available */
+    if (app_ctx && app_ctx->agent) {
+        const char *last_user_msg = NULL;
+        size_t last_user_msg_len = 0;
+        for (size_t i = msg_count; i > 0; i--) {
+            if (msgs[i - 1].role == HU_ROLE_USER) {
+                last_user_msg = msgs[i - 1].content;
+                last_user_msg_len = msgs[i - 1].content_len;
+                break;
+            }
+        }
+        if (last_user_msg) {
+            char *response = NULL;
+            size_t response_len = 0;
+            hu_error_t agent_err =
+                hu_agent_turn(app_ctx->agent, last_user_msg, last_user_msg_len, &response,
+                              &response_len);
+            alloc->free(alloc->ctx, msgs, msg_count * sizeof(hu_chat_message_t));
+            hu_json_free(alloc, root);
+            if (agent_err == HU_OK && response) {
+                hu_json_buf_t buf;
+                if (hu_json_buf_init(&buf, alloc) == HU_OK) {
+                    now = time(NULL);
+                    snprintf(id_buf, sizeof(id_buf), "chatcmpl-%lx", (unsigned long)now);
+                    static const char oc_hdr[] =
+                        "\",\"object\":\"chat.completion\",\"created\":";
+                    static const char oc_choices[] =
+                        "\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\","
+                        "\"content\":\"";
+                    static const char oc_usage[] =
+                        "},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":";
+                    if (hu_json_buf_append_raw(&buf, "{\"id\":\"", 7) == HU_OK &&
+                        hu_json_buf_append_raw(&buf, id_buf, strlen(id_buf)) == HU_OK &&
+                        hu_json_buf_append_raw(&buf, oc_hdr, sizeof(oc_hdr) - 1) == HU_OK) {
+                        char created_buf[24];
+                        snprintf(created_buf, sizeof(created_buf), "%ld", (long)now);
+                        hu_json_buf_append_raw(&buf, created_buf, strlen(created_buf));
+                        hu_json_buf_append_raw(&buf, ",\"model\":\"", 10);
+                        hu_json_buf_append_raw(&buf, model, model_len_out);
+                        hu_json_buf_append_raw(&buf, oc_choices, sizeof(oc_choices) - 1);
+                        hu_json_append_string(&buf, response, response_len);
+                        hu_json_buf_append_raw(&buf, oc_usage, sizeof(oc_usage) - 1);
+                        hu_json_buf_append_raw(&buf, "0,\"completion_tokens\":", 21);
+                        char usage_buf[24];
+                        snprintf(usage_buf, sizeof(usage_buf), "%zu", response_len / 4);
+                        hu_json_buf_append_raw(&buf, usage_buf, strlen(usage_buf));
+                        hu_json_buf_append_raw(&buf, ",\"total_tokens\":", 16);
+                        hu_json_buf_append_raw(&buf, usage_buf, strlen(usage_buf));
+                        hu_json_buf_append_raw(&buf, "}}", 2);
+                        size_t n = buf.len + 1;
+                        char *resp_body = (char *)alloc->alloc(alloc->ctx, n);
+                        if (resp_body) {
+                            memcpy(resp_body, buf.ptr, buf.len);
+                            resp_body[buf.len] = '\0';
+                            *out_status = 200;
+                            *out_body = resp_body;
+                            *out_body_len = buf.len;
+                        }
+                    }
+                    hu_json_buf_free(&buf);
+                }
+                app_ctx->agent->alloc->free(app_ctx->agent->alloc->ctx, response,
+                                            response_len + 1);
+                return;
+            }
+            if (agent_err != HU_OK) {
+                error_response(alloc, 502, "Agent error", out_status, out_body, out_body_len);
+                return;
+            }
+        }
+    }
+
     hu_provider_t provider = {0};
     err =
         hu_provider_create_from_config(alloc, cfg, provider_name, strlen(provider_name), &provider);

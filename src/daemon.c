@@ -769,11 +769,20 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
                 }
             }
 #ifdef HU_ENABLE_SQLITE
-            /* Parse research agent output for findings */
+            /* Parse research agent output for findings, then run intelligence cycle */
             if (strstr(prompt, "research") && agent->memory) {
                 sqlite3 *fdb = hu_sqlite_memory_get_db(agent->memory);
-                if (fdb)
+                if (fdb) {
                     (void)hu_findings_parse_and_store(alloc, fdb, response, response_len);
+#ifdef HU_HAS_SKILLS
+                    hu_intelligence_cycle_result_t cron_cycle = {0};
+                    if (hu_intelligence_run_cycle(alloc, fdb, &cron_cycle) == HU_OK &&
+                        (cron_cycle.findings_actioned > 0 || cron_cycle.lessons_extracted > 0)) {
+                        fprintf(stderr, "[human] post-research cycle: %zu findings, %zu lessons\n",
+                                cron_cycle.findings_actioned, cron_cycle.lessons_extracted);
+                    }
+#endif
+                }
             }
 #endif
         }
@@ -6758,13 +6767,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 history_entries = NULL;
                 history_count = 0;
 
-                /* Episodic: summarize this interaction */
+                /* Episodic: summarize this interaction (LLM when provider available, else rule-based) */
                 if (err == HU_OK && response && response_len > 0 && agent->memory) {
                     const char *ep_msgs[2] = {combined, response};
                     size_t ep_lens[2] = {combined_len, response_len};
                     size_t summary_len = 0;
-                    char *summary =
-                        hu_episodic_summarize_session(alloc, ep_msgs, ep_lens, 2, &summary_len);
+                    char *summary = hu_episodic_summarize_session_llm(
+                        alloc, &agent->provider, ep_msgs, ep_lens, 2, &summary_len);
                     if (summary && summary_len > 0) {
                         if (hu_episodic_store(agent->memory, alloc, batch_key, key_len, summary,
                                               summary_len) != HU_OK)
@@ -7225,24 +7234,43 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
 #if !defined(HU_IS_TEST) && defined(HU_HAS_PERSONA)
                 /* F9: Double-text — natural afterthought follow-up */
-                if (response && response_len > 0 && agent->persona && ch->channel->vtable->send) {
+                if (response && response_len > 0 && agent->persona && ch->channel->vtable->send &&
+                    agent->provider.vtable &&
+                    agent->provider.vtable->chat_with_system) {
                     float dt_prob = agent->persona->humanization.double_text_probability;
                     uint32_t dt_seed = (uint32_t)time(NULL) * 1103515245u + 12345u +
                                        (uint32_t)(uintptr_t)response;
                     if (hu_conversation_should_double_text(
                             response, response_len, history_entries, history_count,
                             bth_hour, dt_seed, dt_prob)) {
-                        char *dt_prompt = NULL;
-                        size_t dt_prompt_len = 0;
-                        if (hu_double_text_build_prompt(alloc, &dt_prompt, &dt_prompt_len) == HU_OK &&
-                            dt_prompt) {
-                            unsigned int dt_delay = 10000u + (dt_seed % 35000u);
-                            usleep((useconds_t)(dt_delay * 1000u));
-                            ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
-                                                      dt_prompt, dt_prompt_len, NULL, 0);
-                            if (agent->bth_metrics)
-                                agent->bth_metrics->double_texts++;
-                            alloc->free(alloc->ctx, dt_prompt, dt_prompt_len + 1);
+                        char dt_user[512];
+                        int dt_n = snprintf(dt_user, sizeof(dt_user),
+                            "You just sent this iMessage: \"%.*s\"\n"
+                            "Add a brief, natural follow-up thought (1 short sentence max). "
+                            "Something you'd double-text a moment later.",
+                            (int)(response_len > 200 ? 200 : response_len), response);
+                        if (dt_n > 0 && (size_t)dt_n < sizeof(dt_user)) {
+                            char *dt_resp = NULL;
+                            size_t dt_resp_len = 0;
+                            const char *dt_model = agent->model_name ? agent->model_name : "gemini-3.1-flash-lite-preview";
+                            size_t dt_model_len = agent->model_name ? agent->model_name_len : 31;
+                            hu_error_t dt_err = agent->provider.vtable->chat_with_system(
+                                agent->provider.ctx, alloc,
+                                "You are texting as this person. Keep it casual, short, lowercase. "
+                                "No quotes, no explanation, just the follow-up text.", 93,
+                                dt_user, (size_t)dt_n, dt_model, dt_model_len,
+                                0.9, &dt_resp, &dt_resp_len);
+                            if (dt_err == HU_OK && dt_resp && dt_resp_len > 0 &&
+                                dt_resp_len < 200) {
+                                unsigned int dt_delay = 10000u + (dt_seed % 35000u);
+                                usleep((useconds_t)(dt_delay * 1000u));
+                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                                          dt_resp, dt_resp_len, NULL, 0);
+                                if (agent->bth_metrics)
+                                    agent->bth_metrics->double_texts++;
+                            }
+                            if (dt_resp)
+                                alloc->free(alloc->ctx, dt_resp, dt_resp_len + 1);
                         }
                     }
                 }
