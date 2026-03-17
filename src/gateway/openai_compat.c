@@ -250,15 +250,13 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     resolve_model(model_req, model_len, default_provider, default_model, provider_name,
                   sizeof(provider_name), &model, &model_len_out);
 
-    /* Copy model string before freeing JSON tree (model may point into it) */
+    /* Copy model string so it survives past JSON tree free */
     char model_buf[256];
     if (model_len_out >= sizeof(model_buf))
         model_len_out = sizeof(model_buf) - 1;
     memcpy(model_buf, model, model_len_out);
     model_buf[model_len_out] = '\0';
     model = model_buf;
-
-    hu_json_free(alloc, root);
 
     time_t now = time(NULL);
     char id_buf[32];
@@ -270,6 +268,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
         hu_json_buf_t buf;
         if (hu_json_buf_init(&buf, alloc) != HU_OK) {
             alloc->free(alloc->ctx, msgs, msg_count * sizeof(hu_chat_message_t));
+            hu_json_free(alloc, root);
             error_response(alloc, 500, "Out of memory", out_status, out_body, out_body_len);
             return;
         }
@@ -277,6 +276,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
         (void)temperature;
         (void)max_tokens;
         alloc->free(alloc->ctx, msgs, msg_count * sizeof(hu_chat_message_t));
+        hu_json_free(alloc, root);
         /* Mock: emit chunks "m","o","c","k" then [DONE] */
         const char *mock_chunks[] = {"m", "o", "c", "k"};
         for (size_t i = 0; i < sizeof(mock_chunks) / sizeof(mock_chunks[0]); i++) {
@@ -309,6 +309,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
         }
         if (err != HU_OK) {
             alloc->free(alloc->ctx, msgs, msg_count * sizeof(hu_chat_message_t));
+            hu_json_free(alloc, root);
             hu_json_buf_free(&buf);
             error_response(alloc, 503, "Provider not available", out_status, out_body,
                            out_body_len);
@@ -328,6 +329,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
         err = provider.vtable->chat(provider.ctx, alloc, &req, model, model_len_out, temperature,
                                     &resp);
         alloc->free(alloc->ctx, msgs, msg_count * sizeof(hu_chat_message_t));
+        hu_json_free(alloc, root);
         if (provider.vtable && provider.vtable->deinit)
             provider.vtable->deinit(provider.ctx, alloc);
         if (err != HU_OK) {
@@ -399,6 +401,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     (void)temperature;
     (void)max_tokens;
     alloc->free(alloc->ctx, msgs, msg_count * sizeof(hu_chat_message_t));
+    hu_json_free(alloc, root);
     hu_json_buf_t buf;
     if (hu_json_buf_init(&buf, alloc) != HU_OK) {
         error_response(alloc, 500, "Out of memory", out_status, out_body, out_body_len);
@@ -449,6 +452,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
 
     if (err != HU_OK) {
         alloc->free(alloc->ctx, msgs, msg_count * sizeof(hu_chat_message_t));
+        hu_json_free(alloc, root);
         error_response(alloc, 503, "Provider not available", out_status, out_body, out_body_len);
         return;
     }
@@ -468,6 +472,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     err =
         provider.vtable->chat(provider.ctx, alloc, &req, model, model_len_out, temperature, &resp);
     alloc->free(alloc->ctx, msgs, msg_count * sizeof(hu_chat_message_t));
+    hu_json_free(alloc, root);
 
     if (provider.vtable && provider.vtable->deinit)
         provider.vtable->deinit(provider.ctx, alloc);
