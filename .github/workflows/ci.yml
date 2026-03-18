@@ -41,10 +41,9 @@ jobs:
         run: |
           COUNT=$(./build/human_tests 2>&1 | grep -oE '[0-9]+/[0-9]+ passed' | head -1 | cut -d/ -f1)
           echo "Test count: $COUNT"
-          # macOS has 2 more platform-specific tests than Linux (3199 vs 3197)
-          BASELINE=4700
+          BASELINE=5600
           if [ "$COUNT" -lt "$BASELINE" ]; then
-            echo "Test count regression: $COUNT < $BASELINE baseline"
+            echo "::error::Test count regression: $COUNT < $BASELINE baseline"
             exit 1
           fi
       - name: Check for untested modules
@@ -139,11 +138,15 @@ jobs:
       - name: iOS simulator test
         run: |
           cd apps/ios
-          xcodebuild test \
-            -scheme Human \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
-            -resultBundlePath TestResults \
-            CODE_SIGNING_ALLOWED=NO 2>&1 || echo "Simulator tests skipped (no Xcode project)"
+          if [ -f Package.swift ] || [ -d Human.xcodeproj ]; then
+            xcodebuild test \
+              -scheme Human \
+              -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+              -resultBundlePath TestResults \
+              CODE_SIGNING_ALLOWED=NO 2>&1
+          else
+            echo "::notice::No Xcode project found — skipping simulator tests"
+          fi
 
   build-android:
     runs-on: ubuntu-latest
@@ -155,7 +158,7 @@ jobs:
           distribution: temurin
       - run: cd apps/android && chmod +x gradlew && ./gradlew assembleDebug
       - name: Android lint + unit tests
-        run: cd apps/android && ./gradlew lint test 2>&1 || echo "Lint/test completed with warnings"
+        run: cd apps/android && ./gradlew lint test
 
   build-macos:
     runs-on: macos-latest
@@ -426,12 +429,11 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           files: coverage.info
-          fail_ci_if_error: false
+          fail_ci_if_error: true
       - uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage.info
-        continue-on-error: true
 
   docker:
     runs-on: ubuntu-latest
@@ -654,20 +656,32 @@ jobs:
       - name: Build (fuzz)
         run: cmake --build build-fuzz -j$(nproc)
       - name: Run fuzz harnesses
-        continue-on-error: true
         run: |
+          FUZZ_FAIL=0
           mkdir -p fuzz/corpus/url
-          ./build-fuzz/fuzz_json_parse fuzz/corpus/json -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_config_load fuzz/corpus/config -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_tool_params -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_base64 -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_json fuzz/corpus/json -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_config fuzz/corpus/config -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_url_encode fuzz/corpus/url -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_persona_json -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_persona_parse -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_graph -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_fast_capture -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_sse -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_http_parse -max_total_time=30 -print_final_stats=1 || true
-          ./build-fuzz/fuzz_prompt_injection -max_total_time=30 -print_final_stats=1 || true
+          for harness in \
+            "fuzz_json_parse fuzz/corpus/json" \
+            "fuzz_config_load fuzz/corpus/config" \
+            "fuzz_tool_params" \
+            "fuzz_base64" \
+            "fuzz_json fuzz/corpus/json" \
+            "fuzz_config fuzz/corpus/config" \
+            "fuzz_url_encode fuzz/corpus/url" \
+            "fuzz_persona_json" \
+            "fuzz_persona_parse" \
+            "fuzz_graph" \
+            "fuzz_fast_capture" \
+            "fuzz_sse" \
+            "fuzz_http_parse" \
+            "fuzz_prompt_injection"; do
+            NAME=$(echo "$harness" | cut -d' ' -f1)
+            echo "--- Running $NAME ---"
+            if ! ./build-fuzz/$harness -max_total_time=30 -print_final_stats=1; then
+              echo "::error::Fuzz harness $NAME found a crash"
+              FUZZ_FAIL=1
+            fi
+          done
+          if [ "$FUZZ_FAIL" -ne 0 ]; then
+            echo "::error::One or more fuzz harnesses found crashes"
+            exit 1
+          fi
