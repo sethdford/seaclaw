@@ -162,12 +162,11 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
     v->alloc->free(v->alloc->ctx, audio_buf, buf_bytes);
     return HU_OK;
 #else
-    /* Cloud TTS fallback: deliver text as-is to the audio callback.
-     * Callers that provide on_audio_ready can use a cloud TTS service
-     * (e.g., Google Cloud TTS, AWS Polly) to synthesize the text.
-     * Without Sonata or a callback, voice output is not available. */
-    if (v->config.on_audio_ready) {
-        v->config.on_audio_ready((const float *)message, message_len, v->config.callback_user_data);
+    /* Cloud TTS fallback: deliver text to the text callback for external
+     * TTS synthesis (e.g., Google Cloud TTS, AWS Polly).
+     * on_audio_ready is for float audio only — never pass text through it. */
+    if (v->config.on_text_ready) {
+        v->config.on_text_ready(message, message_len, v->config.callback_user_data);
         return HU_OK;
     }
 #if HU_IS_TEST
