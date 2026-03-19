@@ -36,7 +36,7 @@
   src: url("/fonts/avenir/Avenir-Black.woff2") format("woff2");
   font-weight: 900;
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
 }
 
 /* ── Native View Transitions (cross-document, no JS needed) ── */
@@ -455,6 +455,9 @@
         color-mix(in srgb, var(--hu-accent-tertiary) 10%, transparent) 0%,
         transparent 50%
       );
+    animation: none;
+  }
+  .hu-lcp-done .hero-gradient::before {
     animation: mesh-drift 25s ease-in-out infinite alternate;
   }
 
@@ -1669,7 +1672,7 @@
   --hu-scroll-depth: 0;
 }
 
-body {
+body.hu-ambient-ready {
   filter: sepia(var(--hu-ambient-warmth))
     saturate(calc(1 + var(--hu-ambient-warmth) * 0.3));
   transition: filter 2s ease;

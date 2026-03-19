@@ -82,22 +82,6 @@ const tools = [
       crossorigin
       fetchpriority="high"
     />
-    <link
-      rel="preload"
-      href="/fonts/avenir/Avenir-Book.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
-    />
-    <link
-      rel="preload"
-      href="/fonts/avenir/Avenir-Heavy.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
-    />
-    <link rel="preconnect" href="https://github.com" />
-    <link rel="preconnect" href="https://img.shields.io" />
     <title>h-uman — not quite human.</title>
     <meta
       name="description"
@@ -270,11 +254,11 @@ const tools = [
           >
             <img
               src={`${base}human.svg`}
-              alt=""
+              alt="human"
               width="512"
               height="512"
               loading="eager"
-              decoding="async"
+              decoding="sync"
               fetchpriority="high"
               class="hero-mark w-14 h-14 md:w-20 md:h-20"
               style={`filter: drop-shadow(0 0 40px var(--color-accent-glow));`}
@@ -3436,6 +3420,20 @@ const tools = [
           root.style.setProperty("--hu-scroll-depth", "0");
         }
       }
+    </script>
+    <script is:inline>
+      /* Defer heavy visual effects until after LCP */
+      new PerformanceObserver(function(list) {
+        list.getEntries().forEach(function() {
+          document.documentElement.classList.add('hu-lcp-done');
+          document.body.classList.add('hu-ambient-ready');
+        });
+      }).observe({type: 'largest-contentful-paint', buffered: true});
+      /* Fallback for browsers without LCP observer */
+      setTimeout(function() {
+        document.documentElement.classList.add('hu-lcp-done');
+        document.body.classList.add('hu-ambient-ready');
+      }, 1500);
     </script>
   </body>
 </html>
