@@ -788,7 +788,12 @@ hu-card.hu-entrance.hu-visible {
   border-radius: var(--hu-radius-lg);
   box-shadow:
     var(--hu-elevation-1),
-    inset 0 1px 0 color-mix(in srgb, var(--hu-color-white) var(--hu-glass-standard-inset-opacity, 6%), transparent);
+    inset 0 1px 0
+      color-mix(
+        in srgb,
+        var(--hu-color-white) var(--hu-glass-standard-inset-opacity, 6%),
+        transparent
+      );
 }
 
 .hu-glass-prominent {
@@ -807,7 +812,11 @@ hu-card.hu-entrance.hu-visible {
   box-shadow:
     var(--hu-elevation-3),
     inset 0 1px 0
-      color-mix(in srgb, var(--hu-color-white) var(--hu-glass-prominent-inset-opacity, 10%), transparent),
+      color-mix(
+        in srgb,
+        var(--hu-color-white) var(--hu-glass-prominent-inset-opacity, 10%),
+        transparent
+      ),
     inset 0 -1px 0 color-mix(in srgb, var(--hu-color-white) 3%, transparent);
   filter: url(#hu-refract);
 }

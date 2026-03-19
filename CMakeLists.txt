@@ -1983,6 +1983,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_process_reward.c
     tests/test_dpo.c
     tests/test_sota_e2e.c
+    tests/test_sota_adversarial.c
     tests/test_otel.c
     tests/test_cot_audit.c
     tests/test_moderation.c
@@ -2430,6 +2431,38 @@ if(HU_ENABLE_FUZZ)
     target_link_libraries(fuzz_url_validation PRIVATE human_core ${FUZZ_EXTRA_LIBS})
     target_compile_options(fuzz_url_validation PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
     target_link_options(fuzz_url_validation PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
+
+    add_executable(fuzz_prm fuzz/fuzz_prm.c)
+    set_target_properties(fuzz_prm PROPERTIES LINKER_LANGUAGE CXX)
+    target_compile_definitions(fuzz_prm PRIVATE HU_IS_TEST=1)
+    target_compile_options(fuzz_prm PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(fuzz_prm PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
+    target_compile_options(fuzz_prm PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
+    target_link_options(fuzz_prm PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
+
+    add_executable(fuzz_adaptive_rag fuzz/fuzz_adaptive_rag.c)
+    set_target_properties(fuzz_adaptive_rag PROPERTIES LINKER_LANGUAGE CXX)
+    target_compile_definitions(fuzz_adaptive_rag PRIVATE HU_IS_TEST=1)
+    target_compile_options(fuzz_adaptive_rag PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(fuzz_adaptive_rag PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
+    target_compile_options(fuzz_adaptive_rag PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
+    target_link_options(fuzz_adaptive_rag PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
+
+    add_executable(fuzz_self_rag fuzz/fuzz_self_rag.c)
+    set_target_properties(fuzz_self_rag PROPERTIES LINKER_LANGUAGE CXX)
+    target_compile_definitions(fuzz_self_rag PRIVATE HU_IS_TEST=1)
+    target_compile_options(fuzz_self_rag PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(fuzz_self_rag PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
+    target_compile_options(fuzz_self_rag PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
+    target_link_options(fuzz_self_rag PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
+
+    add_executable(fuzz_memory_tiers fuzz/fuzz_memory_tiers.c)
+    set_target_properties(fuzz_memory_tiers PROPERTIES LINKER_LANGUAGE CXX)
+    target_compile_definitions(fuzz_memory_tiers PRIVATE HU_IS_TEST=1)
+    target_compile_options(fuzz_memory_tiers PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(fuzz_memory_tiers PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
+    target_compile_options(fuzz_memory_tiers PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
+    target_link_options(fuzz_memory_tiers PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
 endif()
 
 # Benchmark suite (micro-benchmarks of core operations)
