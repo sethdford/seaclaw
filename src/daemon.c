@@ -2922,6 +2922,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             adjusted = (int32_t)blended;
                         }
                     }
+                    if (adjusted > 60000)
+                        adjusted = 60000;
                     fprintf(stderr, "[human] reading delay: %dms (hour=%d)\n", (int)adjusted,
                             bth_hour);
                     usleep((useconds_t)((unsigned int)adjusted * 1000));
