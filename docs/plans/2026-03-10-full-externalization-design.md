@@ -1,5 +1,5 @@
 ---
-status: approved
+status: complete
 ---
 
 # Full Codebase Externalization Design
