@@ -69,6 +69,8 @@ typedef struct hu_prompt_config {
     const char *skills_context;         /* available SkillForge skills for this agent */
     size_t skills_context_len;
     bool native_tools;                  /* provider supports structured tool calls */
+    const char *constitutional_principles; /* formatted principles for prompt injection */
+    size_t constitutional_principles_len;
 } hu_prompt_config_t;
 
 /* Build the full system prompt. Caller owns returned string; free with alloc. */

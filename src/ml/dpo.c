@@ -263,13 +263,3 @@ hu_error_t hu_dpo_clear(hu_dpo_collector_t *collector) {
     return HU_OK;
 }
 
-void hu_dpo_export_free(hu_allocator_t *alloc, hu_dpo_export_t *export_data) {
-    if (!alloc || !export_data)
-        return;
-    if (export_data->pairs) {
-        alloc->free(alloc->ctx, export_data->pairs,
-                    export_data->count * sizeof(hu_preference_pair_t));
-        export_data->pairs = NULL;
-    }
-    export_data->count = 0;
-}

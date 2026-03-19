@@ -7,6 +7,7 @@
 #include "human/agent/commitment_store.h"
 #include "human/agent/compaction.h"
 #include "human/agent/dag.h"
+#include "human/agent/dag_executor.h"
 #include "human/agent/dispatcher.h"
 #include "human/agent/input_guard.h"
 #include "human/agent/llm_compiler.h"
@@ -1412,6 +1413,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
             if (plan_ctx)
                 agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
+            if (routed_specs)
+                agent->alloc->free(agent->alloc->ctx, routed_specs,
+                                   routed_specs_count * sizeof(hu_tool_spec_t));
+            if (turn_cache)
+                hu_tool_cache_destroy(agent->alloc, turn_cache);
             if (agent->turn_arena)
                 hu_arena_reset(agent->turn_arena);
             return HU_ERR_CANCELLED;
@@ -1559,7 +1565,6 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
         /* PRM: score reasoning chain from ToT scratchpad if available */
         double prm_turn_score = 0.0;
-        (void)prm_turn_score;
 
         /* Adaptive model selection: use per-turn override when set by the daemon's
          * model router, falling back to the agent's default model. */
@@ -1608,6 +1613,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
             if (plan_ctx)
                 agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
+            if (routed_specs)
+                agent->alloc->free(agent->alloc->ctx, routed_specs,
+                                   routed_specs_count * sizeof(hu_tool_spec_t));
+            if (turn_cache)
+                hu_tool_cache_destroy(agent->alloc, turn_cache);
             if (agent->turn_arena)
                 hu_arena_reset(agent->turn_arena);
             return err;
@@ -1674,6 +1684,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     quality =
                         hu_reflection_evaluate_llm(agent->alloc, &agent->provider, msg, msg_len,
                                                    resp.content, resp.content_len, quality);
+                }
+
+                /* PRM quality gate: low step-level score triggers retry */
+                if (prm_turn_score > 0.0 && prm_turn_score < 0.3 &&
+                    quality == HU_QUALITY_ACCEPTABLE &&
+                    agent->reflection.enabled && reflection_retries_left > 0) {
+                    quality = HU_QUALITY_NEEDS_RETRY;
                 }
 
                 if (quality == HU_QUALITY_NEEDS_RETRY && agent->reflection.enabled &&
@@ -1922,6 +1939,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                            dpo_rejected_resp_len + 1);
                     if (system_prompt)
                         agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+                    if (plan_ctx)
+                        agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
+                    if (routed_specs)
+                        agent->alloc->free(agent->alloc->ctx, routed_specs,
+                                           routed_specs_count * sizeof(hu_tool_spec_t));
+                    if (turn_cache)
+                        hu_tool_cache_destroy(agent->alloc, turn_cache);
                     if (agent->turn_arena)
                         hu_arena_reset(agent->turn_arena);
                     return HU_ERR_OUT_OF_MEMORY;
@@ -2264,6 +2288,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
             if (plan_ctx)
                 agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
+            if (routed_specs)
+                agent->alloc->free(agent->alloc->ctx, routed_specs,
+                                   routed_specs_count * sizeof(hu_tool_spec_t));
+            if (turn_cache)
+                hu_tool_cache_destroy(agent->alloc, turn_cache);
             if (agent->turn_arena)
                 hu_arena_reset(agent->turn_arena);
             return err;
@@ -2300,11 +2329,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         break;
                 }
             } else {
-                /* LLMCompiler: when enabled, compile tool calls into a DAG for parallel execution.
-                 * Note: LLMCompiler is opt-in via config; the existing dispatcher handles
-                 * parallelism. */
+                bool compiler_dag_complete = false;
 #ifndef HU_IS_TEST
-                /* LLMCompiler: if enabled and 3+ tool calls, use DAG-based execution */
+                /* LLMCompiler: if enabled and 3+ tool calls, compile into a DAG
+                 * and execute in parallel batches using the DAG executor. */
                 if (agent->llm_compiler_enabled && tc_count >= 3) {
                     const char *tool_names[32];
                     size_t tn_count = 0;
@@ -2315,9 +2343,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     }
                     char *compiler_prompt = NULL;
                     size_t compiler_prompt_len = 0;
-                    const char *goal_text = msg;
-                    size_t goal_text_len = msg_len;
-                    if (hu_llm_compiler_build_prompt(agent->alloc, goal_text, goal_text_len,
+                    if (hu_llm_compiler_build_prompt(agent->alloc, msg, msg_len,
                                                     tool_names, tn_count, &compiler_prompt,
                                                     &compiler_prompt_len) == HU_OK) {
                         hu_chat_message_t compiler_msgs[1] = {{
@@ -2345,40 +2371,49 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                            compiler_resp.content_len,
                                                            &dag) == HU_OK &&
                                 dag.node_count > 0) {
-                                /* Execute DAG: process nodes in dependency order */
-                                bool dag_executed = false;
+                                /* Batch execution: get ready nodes, resolve $tN vars,
+                                 * execute batch in parallel, repeat until complete. */
                                 size_t max_dag_iters = dag.node_count * 2;
+                                bool any_executed = false;
                                 for (size_t di = 0; di < max_dag_iters && !hu_dag_is_complete(&dag); di++) {
-                                    for (size_t ni = 0; ni < dag.node_count; ni++) {
-                                        hu_dag_node_t *node = &dag.nodes[ni];
-                                        if (node->status != HU_DAG_PENDING)
-                                            continue;
-                                        /* Check all deps are done */
-                                        bool deps_met = true;
-                                        for (size_t d = 0; d < node->dep_count; d++) {
-                                            hu_dag_node_t *dep = hu_dag_find_node(&dag, node->deps[d],
-                                                                                   node->deps[d] ? strlen(node->deps[d]) : 0);
-                                            if (!dep || dep->status != HU_DAG_DONE) {
-                                                deps_met = false;
-                                                break;
-                                            }
-                                        }
-                                        if (!deps_met)
-                                            continue;
+                                    hu_dag_batch_t batch;
+                                    if (hu_dag_next_batch(&dag, &batch) != HU_OK || batch.count == 0)
+                                        break;
+
+                                    for (size_t bi = 0; bi < batch.count; bi++) {
+                                        hu_dag_node_t *node = batch.nodes[bi];
                                         node->status = HU_DAG_RUNNING;
+
+                                        /* Resolve $tN variable references in args */
+                                        char *resolved_args = NULL;
+                                        size_t resolved_len = 0;
+                                        if (node->args_json) {
+                                            hu_dag_resolve_vars(agent->alloc, &dag, node->args_json,
+                                                                strlen(node->args_json),
+                                                                &resolved_args, &resolved_len);
+                                        }
+
                                         hu_tool_t *dag_tool = hu_agent_internal_find_tool(
-                                            agent, node->tool_name, node->tool_name ? strlen(node->tool_name) : 0);
+                                            agent, node->tool_name,
+                                            node->tool_name ? strlen(node->tool_name) : 0);
                                         if (!dag_tool) {
                                             node->status = HU_DAG_FAILED;
+                                            if (resolved_args)
+                                                hu_str_free(agent->alloc, resolved_args);
                                             continue;
                                         }
+
+                                        const char *args_str = resolved_args ? resolved_args : node->args_json;
+                                        size_t args_len = resolved_args ? resolved_len
+                                            : (node->args_json ? strlen(node->args_json) : 0);
+
                                         hu_tool_result_t dag_result = hu_tool_result_fail("invalid", 7);
                                         hu_json_value_t *dag_args = NULL;
-                                        if (node->args_json) {
-                                            hu_error_t jerr = hu_json_parse(agent->alloc, node->args_json,
-                                                              strlen(node->args_json), &dag_args);
+                                        if (args_str && args_len > 0) {
+                                            hu_error_t jerr = hu_json_parse(agent->alloc, args_str,
+                                                                            args_len, &dag_args);
                                             if (jerr != HU_OK)
-                                                fprintf(stderr, "[agent_turn] tool args JSON parse failed\n");
+                                                fprintf(stderr, "[agent_turn] DAG tool args parse failed\n");
                                         }
                                         if (dag_args && dag_tool->vtable->execute) {
                                             dag_tool->vtable->execute(dag_tool->ctx, agent->alloc,
@@ -2386,38 +2421,44 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         }
                                         if (dag_args)
                                             hu_json_free(agent->alloc, dag_args);
+                                        if (resolved_args)
+                                            hu_str_free(agent->alloc, resolved_args);
+
                                         if (dag_result.success) {
                                             node->status = HU_DAG_DONE;
                                             if (dag_result.output && dag_result.output_len > 0) {
-                                                node->result = hu_strndup(agent->alloc, dag_result.output,
-                                                                          dag_result.output_len);
+                                                node->result = hu_strndup(agent->alloc,
+                                                    dag_result.output, dag_result.output_len);
                                                 node->result_len = dag_result.output_len;
                                             }
                                         } else {
                                             node->status = HU_DAG_FAILED;
                                         }
                                         hu_tool_result_free(agent->alloc, &dag_result);
-                                        dag_executed = true;
+                                        any_executed = true;
                                     }
                                 }
-                                if (dag_executed) {
+
+                                if (any_executed) {
+                                    compiler_dag_complete = hu_dag_is_complete(&dag);
                                     hu_observer_event_t ev = {
                                         .tag = HU_OBSERVER_EVENT_TOOL_CALL, .data = {{0}}};
                                     ev.data.tool_call.tool = "llm_compiler";
                                     ev.data.tool_call.duration_ms = 0;
-                                    ev.data.tool_call.success = hu_dag_is_complete(&dag);
+                                    ev.data.tool_call.success = compiler_dag_complete;
                                     HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
-                                    /* Append DAG results to history so the LLM sees them */
+
                                     for (size_t ni = 0; ni < dag.node_count; ni++) {
                                         hu_dag_node_t *node = &dag.nodes[ni];
-                                        const char *r = node->result ? node->result : (node->status == HU_DAG_DONE ? "ok" : "failed");
+                                        const char *r = node->result ? node->result :
+                                            (node->status == HU_DAG_DONE ? "ok" : "failed");
                                         size_t rlen = node->result ? node->result_len : strlen(r);
                                         hu_error_t hist_err = hu_agent_internal_append_history(
                                             agent, HU_ROLE_TOOL, r, rlen,
                                             node->tool_name, node->tool_name ? strlen(node->tool_name) : 0,
                                             node->id, node->id ? strlen(node->id) : 0);
                                         if (hist_err != HU_OK)
-                                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                                            fprintf(stderr, "[agent_turn] DAG history append failed: %d\n", hist_err);
                                     }
                                 }
                             }
@@ -2427,6 +2468,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     }
                 }
 #endif
+                (void)compiler_dag_complete;
                 /* Multi-agent orchestrator: when enabled with 2+ independent tool calls and
                  * registered agents, delegate subtasks via the orchestrator. Results are merged
                  * and appended as tool results before falling through to the normal path. */
@@ -2568,7 +2610,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     }
                 }
 
-                /* Use dispatcher for parallel execution when enabled (Tier 1.3) */
+                /* Use dispatcher for parallel execution when enabled (Tier 1.3).
+                 * Skip if LLMCompiler DAG already executed all tool calls. */
+                if (compiler_dag_complete)
+                    goto skip_dispatcher;
                 hu_dispatcher_t dispatcher;
                 hu_dispatcher_default(&dispatcher);
                 if (tc_count > 1)
@@ -2925,6 +2970,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             break;
                     }
                 }
+                skip_dispatcher: (void)0;
             }
         }
         /* Replan on tool failure: if any tool failed and we have a plan, generate

@@ -630,6 +630,21 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
     if (err != HU_OK)
         goto fail;
 
+    /* Constitutional AI principles */
+    if (config->constitutional_principles && config->constitutional_principles_len > 0) {
+        static const char const_hdr[] = "\n## Core Principles\n\n";
+        err = append(alloc, &buf, &len, &cap, const_hdr, sizeof(const_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->constitutional_principles,
+                     config->constitutional_principles_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+
     /* Custom instructions */
     if (config->custom_instructions && config->custom_instructions_len > 0) {
         err = append(alloc, &buf, &len, &cap, config->custom_instructions,

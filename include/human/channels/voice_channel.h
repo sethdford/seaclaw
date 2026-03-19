@@ -19,6 +19,10 @@
 /** Callback invoked when TTS audio is ready for playback. */
 typedef void (*hu_voice_audio_callback_t)(const float *audio, size_t samples, void *user_data);
 
+/** Callback invoked with text that needs external TTS synthesis.
+ * Used by cloud fallback when Sonata is not available. */
+typedef void (*hu_voice_text_callback_t)(const char *text, size_t len, void *user_data);
+
 /** Callback to poll for audio input (microphone). Returns true if audio available.
  * Fills buf with up to max_samples; sets *out_samples to actual count. */
 typedef bool (*hu_voice_audio_input_callback_t)(float *buf, size_t max_samples, size_t *out_samples,
@@ -44,6 +48,7 @@ typedef struct hu_channel_voice_config {
     bool enable_full_duplex;                  /* Enable overlapping speech */
     bool enable_backchanneling;               /* Enable hmm/right/oh responses */
     hu_voice_audio_callback_t on_audio_ready; /* Callback for generated audio */
+    hu_voice_text_callback_t on_text_ready;   /* Cloud fallback: text for external TTS */
     hu_voice_audio_input_callback_t on_audio_input_request; /* Optional: poll for mic input */
     void *callback_user_data;                 /* User data for callbacks */
 } hu_channel_voice_config_t;
