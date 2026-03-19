@@ -35,7 +35,7 @@ export class ScEmptyState extends LitElement {
 
     .description {
       font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       max-width: 20rem;
       line-height: var(--hu-leading-relaxed);
       animation: hu-fade-in var(--hu-duration-normal) var(--hu-ease-out) var(--hu-duration-fast)

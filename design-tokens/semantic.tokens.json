@@ -77,6 +77,11 @@
       "$value": "{color.neutral.750}",
       "$type": "color"
     },
+    "text-secondary": {
+      "$value": "{color.neutral.600}",
+      "$type": "color",
+      "$description": "Informational text — WCAG AA 4.5:1 on dark surfaces"
+    },
     "text-muted": {
       "$value": "{color.neutral.500}",
       "$type": "color"
@@ -372,6 +377,11 @@
       "$value": "#333333",
       "$type": "color"
     },
+    "text-secondary": {
+      "$value": "#4a4a4a",
+      "$type": "color",
+      "$description": "Informational text — WCAG AA 4.5:1 on light surfaces"
+    },
     "text-muted": {
       "$value": "#666666",
       "$type": "color"
@@ -641,6 +651,10 @@
     },
     "text": {
       "$value": "{color.neutral.1000}",
+      "$type": "color"
+    },
+    "text-secondary": {
+      "$value": "{color.neutral.800}",
       "$type": "color"
     },
     "text-muted": {

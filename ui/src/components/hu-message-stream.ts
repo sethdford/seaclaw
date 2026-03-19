@@ -73,7 +73,7 @@ export class ScMessageStream extends LitElement {
       border-radius: inherit;
       background: radial-gradient(
         circle at var(--hu-light-x, 50%) var(--hu-light-y, 50%),
-        color-mix(in srgb, white 4%, transparent),
+        color-mix(in srgb, var(--hu-color-white) 4%, transparent),
         transparent 60%
       );
       pointer-events: none;

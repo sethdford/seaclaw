@@ -171,7 +171,7 @@ export class ScChart extends LitElement {
     const textMuted = cs.getPropertyValue("--hu-text-muted").trim() || "hsl(207 24% 47%)";
     const borderSubtle =
       cs.getPropertyValue("--hu-border-subtle").trim() ||
-      "color-mix(in srgb, white 6%, transparent)";
+      "color-mix(in srgb, var(--hu-color-white) 6%, transparent)";
 
     const chartType = this.type === "area" ? "line" : this.type;
     const config = {

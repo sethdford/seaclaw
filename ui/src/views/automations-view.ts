@@ -119,13 +119,13 @@ export class ScAutomationsView extends GatewayAwareLitElement {
 
       .template-card .template-desc {
         font-size: var(--hu-text-sm);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
         margin-bottom: var(--hu-space-xs);
       }
 
       .template-card .template-schedule {
         font-size: var(--hu-text-xs);
-        color: var(--hu-text-faint);
+        color: var(--hu-text-secondary);
       }
       .run-chart-card {
         margin-bottom: var(--hu-space-xl);

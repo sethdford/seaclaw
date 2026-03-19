@@ -119,7 +119,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
       }
       .description {
         font-size: var(--hu-text-sm);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
         line-height: 1.5;
       }
       .policy-row {
@@ -134,7 +134,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
         border-bottom: none;
       }
       .policy-label {
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
       }
       .policy-value {
         font-weight: var(--hu-weight-medium);
@@ -145,7 +145,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
         color: var(--hu-success);
       }
       .policy-value.disabled {
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
       }
       .policy-value.warning {
         color: var(--hu-warning);
@@ -174,7 +174,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
         padding: var(--hu-space-2xs) var(--hu-space-xs);
         background: var(--hu-bg-elevated);
         border-radius: var(--hu-radius-sm);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
       }
       .section-title {
         font-size: var(--hu-text-base);
@@ -192,7 +192,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
         align-items: center;
         gap: var(--hu-space-sm);
         font-size: var(--hu-text-sm);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
       }
       .check-icon {
         flex-shrink: 0;
@@ -214,7 +214,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
       }
       .pairing-info {
         font-size: var(--hu-text-sm);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
         margin-top: var(--hu-space-xs);
       }
       @container (max-width: 48rem) /* --hu-breakpoint-lg */ {

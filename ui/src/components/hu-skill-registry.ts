@@ -166,7 +166,7 @@ export class ScSkillRegistry extends LitElement {
 
     .section-count {
       font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
     }
 
     .registry-search-row {
@@ -191,12 +191,12 @@ export class ScSkillRegistry extends LitElement {
       cursor: pointer;
       border: 1px solid var(--hu-border);
       background: transparent;
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       font-family: var(--hu-font);
       transition: all var(--hu-duration-fast) var(--hu-ease-out);
       &:hover {
         color: var(--hu-text);
-        border-color: var(--hu-text-muted);
+        border-color: var(--hu-text-secondary);
       }
       &:focus-visible {
         outline: 2px solid var(--hu-accent);

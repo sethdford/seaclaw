@@ -84,7 +84,7 @@ export class ScButton extends LitElement {
       border: 1px solid var(--hu-border);
       box-shadow:
         var(--hu-shadow-xs),
-        inset 0 1px 0 color-mix(in srgb, white 80%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--hu-color-white) 80%, transparent),
         inset 0 -1px 0 color-mix(in srgb, var(--hu-text) 4%, transparent);
     }
     button.variant-secondary:hover:not(:disabled) {

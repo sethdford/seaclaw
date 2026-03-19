@@ -272,7 +272,7 @@ export class ScChatBubble extends LitElement {
       border-left: 3px solid var(--hu-accent);
       padding-left: var(--hu-space-md);
       margin: var(--hu-space-sm) 0;
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       font-style: italic;
     }
 
@@ -432,7 +432,7 @@ export class ScChatBubble extends LitElement {
       opacity: 0;
       transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
       font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
     }
 
     .bubble.role-user .meta-slot {
@@ -472,7 +472,7 @@ export class ScChatBubble extends LitElement {
     .reply-role {
       display: block;
       font-size: var(--hu-text-2xs, 0.625rem);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       text-transform: capitalize;
       margin-bottom: var(--hu-space-2xs);
     }

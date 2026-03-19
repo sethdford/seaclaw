@@ -3,6 +3,14 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { waitForViewReady, ANIMATION_SETTLE_MS } from "./helpers.js";
 
+/**
+ * Visual regression tests require platform-specific baselines.
+ *
+ * Skip behavior: Tests are skipped in non-CI environments when no baseline
+ * exists for the current platform (browser + OS). CI runs these with
+ * `--update-snapshots` to generate baselines; local runs need
+ * `npx playwright test visual.spec.ts --update-snapshots` to create them.
+ */
 const CROSS_PLATFORM_THRESHOLD = 0.12;
 
 function snapshotExists(testInfo: { snapshotDir: string }, name: string): boolean {
@@ -38,6 +46,7 @@ test.describe("Visual Regression — Dark Theme", () => {
       const viewTag = view.hash ? `hu-${view.name}-view` : "hu-overview-view";
       await waitForViewReady(page, viewTag);
       const updating = testInfo.config.updateSnapshots !== "none";
+      // Skipped in non-CI when no baseline exists; CI generates with --update-snapshots
       if (!updating && !snapshotExists(testInfo, snapName)) {
         test.skip(
           true,
@@ -65,6 +74,7 @@ test.describe("Visual Regression — Light Theme", () => {
       // Brief wait for theme CSS variables to propagate
       await page.waitForTimeout(ANIMATION_SETTLE_MS);
       const updating = testInfo.config.updateSnapshots !== "none";
+      // Skipped in non-CI when no baseline exists; CI generates with --update-snapshots
       if (!updating && !snapshotExists(testInfo, snapName)) {
         test.skip(
           true,
@@ -85,6 +95,7 @@ test.describe("Visual Regression — Catalog", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("body")).toBeVisible({ timeout: 5000 });
     const updating = testInfo.config.updateSnapshots !== "none";
+    // Skipped in non-CI when no baseline exists; CI generates with --update-snapshots
     if (!updating && !snapshotExists(testInfo, snapName)) {
       test.skip(
         true,

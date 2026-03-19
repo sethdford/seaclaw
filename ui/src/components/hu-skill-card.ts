@@ -83,7 +83,7 @@ export class ScSkillCard extends LitElement {
 
     .skill-desc {
       font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       flex: 1;
       display: -webkit-box;
       -webkit-line-clamp: 2;
@@ -108,7 +108,7 @@ export class ScSkillCard extends LitElement {
 
     .registry-meta {
       font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       display: flex;
       align-items: center;
       gap: var(--hu-space-sm);

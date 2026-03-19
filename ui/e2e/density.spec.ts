@@ -7,6 +7,11 @@ import { waitForViewReady } from "./helpers.js";
  * Multi-breakpoint density E2E tests — captures viewport screenshots at all 4
  * breakpoints (compact, medium, expanded, wide) for visual regression and
  * information density validation per quality-scorecard.md.
+ *
+ * Skip behavior: Tests are skipped in non-CI environments when no baseline
+ * exists for the current platform (browser + OS). CI runs these with
+ * `--update-snapshots` to generate baselines; local runs need
+ * `npx playwright test density.spec.ts --update-snapshots` to create them.
  */
 
 function snapshotExists(testInfo: { snapshotDir: string }, name: string): boolean {
@@ -29,6 +34,7 @@ for (const bp of BREAKPOINTS) {
     await waitForViewReady(page, "hu-overview-view");
     const snapName = `density-${bp.name}-${testInfo.project.name}-${process.platform}.png`;
     const updating = testInfo.config.updateSnapshots !== "none";
+    // Skipped in non-CI when no baseline exists; CI generates with --update-snapshots
     if (!updating && !snapshotExists(testInfo, snapName)) {
       test.skip(
         true,

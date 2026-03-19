@@ -2,6 +2,7 @@ import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { icons } from "../icons.js";
 import { formatRelative } from "../utils.js";
+import "./hu-empty-state.js";
 
 export interface ChatSession {
   id: string;
@@ -141,7 +142,7 @@ export class ScChatSessionsPanel extends LitElement {
       display: block;
       font-size: var(--hu-text-2xs, 0.625rem);
       font-weight: var(--hu-weight-medium);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       text-transform: uppercase;
       letter-spacing: 0.05em;
       padding: var(--hu-space-sm) var(--hu-space-md);
@@ -207,7 +208,7 @@ export class ScChatSessionsPanel extends LitElement {
 
     .session-ts {
       font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
     }
 
     .delete-btn {
@@ -248,34 +249,6 @@ export class ScChatSessionsPanel extends LitElement {
     .delete-btn svg {
       width: 0.875rem;
       height: 0.875rem;
-    }
-
-    .empty-state {
-      padding: var(--hu-space-lg);
-      text-align: center;
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
-      font-family: var(--hu-font);
-    }
-
-    .empty-sessions {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: var(--hu-space-xs);
-      padding: var(--hu-space-xl) var(--hu-space-md);
-      text-align: center;
-    }
-    .empty-sessions .empty-text {
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
-      font-family: var(--hu-font);
-    }
-    .empty-sessions .empty-hint {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-faint);
-      font-family: var(--hu-font);
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -430,7 +403,7 @@ export class ScChatSessionsPanel extends LitElement {
         </div>
         <div
           class="session-list"
-          role="listbox"
+          role=${filteredGroups.length > 0 ? "listbox" : "list"}
           tabindex="0"
           aria-label="Session list"
           @keydown=${this._onListKeydown}
@@ -438,15 +411,22 @@ export class ScChatSessionsPanel extends LitElement {
           ${filteredGroups.length === 0
             ? this.sessions.length === 0 && !this._searchQuery
               ? html`
-                  <div class="empty-sessions">
-                    <span class="empty-text">No conversations yet</span>
-                    <span class="empty-hint">Start a new chat to begin</span>
-                  </div>
+                  <hu-empty-state
+                    heading="No conversations yet"
+                    description="Start a new chat to begin."
+                    .icon=${icons["chat-circle"] ?? icons["message-square"]}
+                  ></hu-empty-state>
                 `
-              : html`<div class="empty-state">No sessions found</div>`
+              : html`
+                  <hu-empty-state
+                    heading="No sessions"
+                    description="Start a new chat to begin a session."
+                    .icon=${icons["chat-circle"] ?? icons["message-square"]}
+                  ></hu-empty-state>
+                `
             : groupsWithIndices.map((group) => {
                 return html`
-                  <div class="session-group">
+                  <div class="session-group" role="group" aria-label=${group.label}>
                     <span class="group-label">${group.label}</span>
                     ${group.sessions.map((s, si) => {
                       const flatIndex = group.startIndex + si;

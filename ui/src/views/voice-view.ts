@@ -65,7 +65,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
         justify-content: space-between;
         padding: var(--hu-space-xs) var(--hu-space-md);
         font-size: var(--hu-text-xs);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
         background: color-mix(in srgb, var(--hu-bg-surface) 60%, transparent);
         backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
         -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
@@ -88,7 +88,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
       .status-meta {
         font-size: var(--hu-text-xs);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
       }
 
       /* ── Error banner ───────────────────────────────── */

@@ -67,7 +67,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
       }
       .staleness {
         font-size: var(--hu-text-xs);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
       }
       .section {
         margin-bottom: var(--hu-space-2xl);
@@ -86,7 +86,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
       }
       .section-count {
         font-size: var(--hu-text-sm);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
       }
       .tag-chips {
         display: flex;
@@ -104,7 +104,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
         cursor: pointer;
         border: 1px solid var(--hu-border);
         background: transparent;
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
         font-family: var(--hu-font);
         transition: all var(--hu-duration-fast) var(--hu-ease-out);
       }

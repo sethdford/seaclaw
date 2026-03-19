@@ -54,6 +54,7 @@ public enum HUTokens {
         public static let text = Color(hex: 0xD8E4F0)
         public static let textFaint = Color(hex: 0x3D5468)
         public static let textMuted = Color(hex: 0x7A96B0)
+        public static let textSecondary = Color(hex: 0x8AA0B8)
         public static let warning = Color(hex: 0xEAB308)
         public static let warningDim = Color(red: 0.9176, green: 0.702, blue: 0.0314, opacity: 0.15)
     }
@@ -112,6 +113,7 @@ public enum HUTokens {
         public static let text = Color(hex: 0x333333)
         public static let textFaint = Color(hex: 0x999999)
         public static let textMuted = Color(hex: 0x666666)
+        public static let textSecondary = Color(hex: 0x4A4A4A)
         public static let warning = Color(hex: 0xCA8A04)
         public static let warningDim = Color(red: 0.7922, green: 0.5412, blue: 0.0157, opacity: 0.1)
     }

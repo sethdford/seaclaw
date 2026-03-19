@@ -54,7 +54,7 @@ export class ScAvatar extends LitElement {
       align-items: center;
       justify-content: center;
       font-weight: var(--hu-weight-semibold);
-      color: white;
+      color: var(--hu-color-white);
       flex-shrink: 0;
     }
 

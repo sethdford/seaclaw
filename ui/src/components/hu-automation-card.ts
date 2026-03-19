@@ -213,7 +213,7 @@ export class ScAutomationCard extends LitElement {
       padding: var(--hu-space-2xs) var(--hu-space-sm);
       font-size: var(--hu-text-xs);
       font-weight: var(--hu-weight-medium);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       background: var(--hu-bg-elevated);
       border: 1px solid var(--hu-border-subtle);
       border-radius: var(--hu-radius);
@@ -233,7 +233,7 @@ export class ScAutomationCard extends LitElement {
     .schedule-expr {
       font-family: var(--hu-font-mono);
       font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
     }
 
     .preview-block {
@@ -241,7 +241,7 @@ export class ScAutomationCard extends LitElement {
       background: var(--hu-bg-inset);
       border-radius: var(--hu-radius);
       font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
@@ -265,7 +265,7 @@ export class ScAutomationCard extends LitElement {
 
     .status-item {
       font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
     }
 
     .status-item.channel {
@@ -296,7 +296,7 @@ export class ScAutomationCard extends LitElement {
     .run-history-label {
       font-size: var(--hu-text-sm);
       font-weight: var(--hu-weight-medium);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       margin-bottom: var(--hu-space-sm);
     }
 
@@ -349,7 +349,7 @@ export class ScAutomationCard extends LitElement {
       background: transparent;
       border: none;
       border-radius: var(--hu-radius);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       cursor: pointer;
       transition:
         color var(--hu-duration-fast) var(--hu-ease-out),
@@ -373,7 +373,7 @@ export class ScAutomationCard extends LitElement {
 
     .created-at {
       font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       font-variant-numeric: tabular-nums;
     }
 

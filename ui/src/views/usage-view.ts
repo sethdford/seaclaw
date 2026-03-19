@@ -79,7 +79,7 @@ export class ScUsageView extends GatewayAwareLitElement {
       }
       .section-label {
         font-size: var(--hu-text-xs);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
         text-transform: uppercase;
         letter-spacing: 0.06em;
         margin-bottom: var(--hu-space-sm);
@@ -140,7 +140,7 @@ export class ScUsageView extends GatewayAwareLitElement {
       }
       .provider-pct {
         font-size: var(--hu-text-xs);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
         min-width: 2.5rem;
         text-align: right;
       }

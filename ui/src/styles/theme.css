@@ -4,6 +4,8 @@
 @import "./scroll-driven.css";
 
 :root {
+  --hu-color-white: #fff;
+  --hu-color-black: #000;
   /* Canonical breakpoints (4-tier responsive system) */
   --hu-breakpoint-compact: 600px;
   --hu-breakpoint-medium: 904px;
@@ -786,7 +788,7 @@ hu-card.hu-entrance.hu-visible {
   border-radius: var(--hu-radius-lg);
   box-shadow:
     var(--hu-elevation-1),
-    inset 0 1px 0 color-mix(in srgb, white var(--hu-glass-standard-inset-opacity, 6%), transparent);
+    inset 0 1px 0 color-mix(in srgb, var(--hu-color-white) var(--hu-glass-standard-inset-opacity, 6%), transparent);
 }
 
 .hu-glass-prominent {
@@ -805,8 +807,8 @@ hu-card.hu-entrance.hu-visible {
   box-shadow:
     var(--hu-elevation-3),
     inset 0 1px 0
-      color-mix(in srgb, white var(--hu-glass-prominent-inset-opacity, 10%), transparent),
-    inset 0 -1px 0 color-mix(in srgb, white 3%, transparent);
+      color-mix(in srgb, var(--hu-color-white) var(--hu-glass-prominent-inset-opacity, 10%), transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--hu-color-white) 3%, transparent);
   filter: url(#hu-refract);
 }
 
@@ -907,7 +909,7 @@ hu-card.hu-entrance.hu-visible {
   border-radius: inherit;
   background: radial-gradient(
     circle at var(--hu-light-x, 50%) var(--hu-light-y, 50%),
-    color-mix(in srgb, white 4%, transparent),
+    color-mix(in srgb, var(--hu-color-white) 4%, transparent),
     transparent 60%
   );
   pointer-events: none;
@@ -924,7 +926,7 @@ hu-card.hu-entrance.hu-visible {
   .hu-glass-floating::after {
     background: radial-gradient(
       circle at var(--hu-light-x, 50%) var(--hu-light-y, 50%),
-      color-mix(in srgb, white 6%, transparent),
+      color-mix(in srgb, var(--hu-color-white) 6%, transparent),
       transparent 60%
     );
   }

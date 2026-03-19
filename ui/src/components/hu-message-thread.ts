@@ -188,7 +188,7 @@ export class ScMessageThread extends LitElement {
     }
     .time-divider span {
       font-size: var(--hu-text-xs);
-      color: var(--hu-text-faint);
+      color: var(--hu-text-secondary);
       white-space: nowrap;
     }
     @keyframes hu-pill-bounce {
@@ -243,7 +243,7 @@ export class ScMessageThread extends LitElement {
     .abort-btn {
       padding: var(--hu-space-xs) var(--hu-space-md);
       background: transparent;
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       border: 1px solid var(--hu-border);
       border-radius: var(--hu-radius);
       cursor: pointer;
@@ -266,7 +266,7 @@ export class ScMessageThread extends LitElement {
       gap: var(--hu-space-2xs);
       margin-top: var(--hu-space-2xs);
       font-size: var(--hu-text-2xs, 0.625rem);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       font-family: var(--hu-font);
     }
     .branch-btn {
@@ -279,7 +279,7 @@ export class ScMessageThread extends LitElement {
       background: var(--hu-bg-elevated);
       border: 1px solid var(--hu-border-subtle);
       border-radius: var(--hu-radius-full);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       cursor: pointer;
     }
     .branch-btn:hover {
@@ -333,10 +333,10 @@ export class ScMessageThread extends LitElement {
     }
     .reaction-fallback {
       font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
     }
     .reaction-count {
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
     }
     @container (max-width: 640px) /* --hu-breakpoint-md */ {
       .messages {
@@ -353,7 +353,7 @@ export class ScMessageThread extends LitElement {
       padding: var(--hu-space-sm) 0;
       font-size: var(--hu-text-xs);
       font-family: var(--hu-font);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       transform-origin: center top;
       transition: transform var(--hu-duration-normal)
         var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
@@ -369,7 +369,7 @@ export class ScMessageThread extends LitElement {
     .load-earlier-btn {
       padding: var(--hu-space-xs) var(--hu-space-md);
       background: transparent;
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       border: 1px solid var(--hu-border-subtle);
       border-radius: var(--hu-radius);
       font-size: var(--hu-text-xs);
@@ -423,7 +423,7 @@ export class ScMessageThread extends LitElement {
         justify-content: center;
         width: var(--hu-icon-sm);
         height: var(--hu-icon-sm);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
         & svg {
           width: 100%;
           height: 100%;
@@ -464,7 +464,7 @@ export class ScMessageThread extends LitElement {
     .hero-sub {
       font-family: var(--hu-font);
       font-size: var(--hu-text-base);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       max-width: var(--hu-toast-max-width, 400px);
     }
     .hero-suggestions {
@@ -534,7 +534,7 @@ export class ScMessageThread extends LitElement {
       border-radius: var(--hu-radius-full);
       font-size: var(--hu-text-sm);
       font-family: var(--hu-font);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       cursor: pointer;
       transition:
         border-color var(--hu-duration-fast),

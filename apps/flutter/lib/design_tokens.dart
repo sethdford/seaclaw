@@ -224,6 +224,7 @@ abstract final class HUTokens {
   static const dark_text = Color(0xFFD8E4F0);
   static const dark_text_faint = Color(0xFF3D5468);
   static const dark_text_muted = Color(0xFF7A96B0);
+  static const dark_text_secondary = Color(0xFF8AA0B8);
   static const dark_warning = Color(0xFFEAB308);
   static const dropdown_item_padding_x = 8;
   static const dropdown_item_padding_y = 4;
@@ -305,6 +306,7 @@ abstract final class HUTokens {
   static const high_contrast_text = Color(0xFFFFFFFF);
   static const high_contrast_text_faint = Color(0xFF8AA0B8);
   static const high_contrast_text_muted = Color(0xFFC0D0E0);
+  static const high_contrast_text_secondary = Color(0xFFE6EDF4);
   static const high_contrast_warning = Color(0xFFFDE047);
   static const icon_2xl = 36;
   static const icon_lg = 24;
@@ -364,6 +366,7 @@ abstract final class HUTokens {
   static const light_text = Color(0xFF333333);
   static const light_text_faint = Color(0xFF999999);
   static const light_text_muted = Color(0xFF666666);
+  static const light_text_secondary = Color(0xFF4A4A4A);
   static const light_warning = Color(0xFFCA8A04);
   static const line_height_none = 1;
   static const line_height_normal = 1.5;

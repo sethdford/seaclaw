@@ -60,7 +60,7 @@ export class ScChatView extends GatewayAwareLitElement {
         justify-content: space-between;
         padding: var(--hu-space-xs) var(--hu-space-md);
         font-size: var(--hu-text-xs);
-        color: var(--hu-text-muted);
+        color: var(--hu-text);
         background: color-mix(in srgb, var(--hu-bg-surface) 60%, transparent);
         backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
         -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
@@ -86,7 +86,7 @@ export class ScChatView extends GatewayAwareLitElement {
         background: var(--hu-bg-elevated);
         border: 1px solid var(--hu-border);
         border-radius: var(--hu-radius-sm);
-        color: var(--hu-text-muted);
+        color: var(--hu-text);
         line-height: 1;
       }
       .retry-btn {
@@ -125,7 +125,7 @@ export class ScChatView extends GatewayAwareLitElement {
         background: transparent;
         border: 1px solid var(--hu-border);
         border-radius: var(--hu-radius-sm);
-        color: var(--hu-text-muted);
+        color: var(--hu-text);
         cursor: pointer;
         transition:
           color var(--hu-duration-fast),

@@ -48,12 +48,12 @@ export class ScCard extends LitElement {
         transparent 60%
       );
       mask:
-        linear-gradient(white 0 0) content-box,
-        linear-gradient(white 0 0);
+        linear-gradient(var(--hu-color-white) 0 0) content-box,
+        linear-gradient(var(--hu-color-white) 0 0);
       mask-composite: exclude;
       -webkit-mask:
-        linear-gradient(white 0 0) content-box,
-        linear-gradient(white 0 0);
+        linear-gradient(var(--hu-color-white) 0 0) content-box,
+        linear-gradient(var(--hu-color-white) 0 0);
       -webkit-mask-composite: xor;
       padding: 1px;
       pointer-events: none;
@@ -129,7 +129,7 @@ export class ScCard extends LitElement {
       border: 1px solid color-mix(in srgb, var(--hu-border-subtle) 40%, transparent);
       box-shadow:
         var(--hu-shadow-card),
-        inset 0 1px 0 color-mix(in srgb, white 60%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--hu-color-white) 60%, transparent),
         inset 0 -1px 0 color-mix(in srgb, var(--hu-text) 3%, transparent);
     }
     .card.glass::before {

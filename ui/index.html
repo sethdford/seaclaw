@@ -42,7 +42,9 @@
     <script type="module" src="/src/main.ts"></script>
     <script>
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("/sw.js").catch(() => {});
+        window.addEventListener("load", function() {
+          navigator.serviceWorker.register("/sw.js").catch(function() {});
+        });
       }
     </script>
   </body>

@@ -26,7 +26,7 @@ export class ScMessageActions extends LitElement {
       background: color-mix(in srgb, var(--hu-bg-overlay, var(--hu-bg-surface)) 65%, transparent);
       backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
       -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
-      border: 1px solid color-mix(in srgb, white 8%, transparent);
+      border: 1px solid color-mix(in srgb, var(--hu-color-white) 8%, transparent);
       border-radius: var(--hu-radius-full);
       box-shadow: var(--hu-shadow-sm);
       opacity: 0;

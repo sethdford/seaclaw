@@ -34,6 +34,10 @@ test.describe("Performance Latency Budgets", () => {
     await expect(chatNavBtn).toBeVisible({ timeout: 5000 });
 
     const isVisible = await chatNavBtn.isVisible().catch(() => false);
+    // Environment-dependent: sidebar may be hidden on compact viewports, or demo mode
+    // may not have fully rendered. CI uses fixed viewport (1280x720) where sidebar is visible.
+    // Selector: hu-app >> hu-sidebar >> button.nav-item[aria-label*="Chat" i] — correct when sidebar
+    // is expanded; skip when sidebar is collapsed or not yet rendered.
     if (!isVisible) {
       test.skip(true, "No chat nav button found in sidebar");
       return;

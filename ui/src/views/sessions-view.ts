@@ -50,7 +50,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
 
       .staleness {
         font-size: var(--hu-text-xs);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
       }
 
       .search-row {
@@ -96,7 +96,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
 
       .session-card-preview {
         font-size: var(--hu-text-sm);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
         line-height: var(--hu-leading-relaxed);
         overflow: hidden;
         text-overflow: ellipsis;
@@ -113,7 +113,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
         flex-wrap: wrap;
         gap: var(--hu-space-xs);
         font-size: var(--hu-text-xs);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
       }
 
       @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
