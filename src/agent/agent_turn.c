@@ -1971,6 +1971,15 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 if (response_len_out)
                     *response_len_out = final_len;
 
+                /* Store in semantic response cache for future lookups */
+                if (agent->response_cache && final_len > 0) {
+                    const char *mname = agent->model_name ? agent->model_name : "";
+                    size_t mname_len = agent->model_name ? agent->model_name_len : 0;
+                    hu_semantic_cache_put(agent->response_cache, agent->alloc,
+                                          msg, msg_len, mname, mname_len,
+                                          final_content, final_len, 0, msg, msg_len);
+                }
+
                 /* Speculative: predict follow-ups and pre-cache them */
                 if (agent->speculative_cache && *response_out) {
                     char *preds[HU_SPEC_MAX_PREDICTIONS];

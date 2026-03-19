@@ -6331,6 +6331,23 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #ifndef HU_IS_TEST
                 {
                     hu_model_router_config_t mr_cfg = hu_model_router_default_config();
+                    if (config && config->agent.mr_reflexive_model) {
+                        mr_cfg.reflexive_model = config->agent.mr_reflexive_model;
+                        mr_cfg.reflexive_model_len = strlen(config->agent.mr_reflexive_model);
+                    }
+                    if (config && config->agent.mr_conversational_model) {
+                        mr_cfg.conversational_model = config->agent.mr_conversational_model;
+                        mr_cfg.conversational_model_len =
+                            strlen(config->agent.mr_conversational_model);
+                    }
+                    if (config && config->agent.mr_analytical_model) {
+                        mr_cfg.analytical_model = config->agent.mr_analytical_model;
+                        mr_cfg.analytical_model_len = strlen(config->agent.mr_analytical_model);
+                    }
+                    if (config && config->agent.mr_deep_model) {
+                        mr_cfg.deep_model = config->agent.mr_deep_model;
+                        mr_cfg.deep_model_len = strlen(config->agent.mr_deep_model);
+                    }
                     const char *rel = NULL;
                     size_t rel_len = 0;
                     if (agent->persona) {
