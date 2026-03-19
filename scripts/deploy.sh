@@ -32,8 +32,14 @@ sleep 2
 echo "[deploy] Installing binary..."
 cp "$BUILD_DIR/human" "$INSTALL_PATH"
 chmod +x "$INSTALL_PATH"
-codesign --force --sign - "$INSTALL_PATH" 2>/dev/null
-xattr -cr "$INSTALL_PATH" 2>/dev/null
+
+APP_BUNDLE="$HOME/Applications/Human.app"
+if [ -d "$APP_BUNDLE" ]; then
+    cp "$BUILD_DIR/human" "$APP_BUNDLE/Contents/MacOS/human-service"
+    chmod +x "$APP_BUNDLE/Contents/MacOS/human-service"
+    codesign --force --deep --sign - --identifier ai.human.service "$APP_BUNDLE" 2>/dev/null
+    echo "[deploy] Updated Human.app bundle"
+fi
 ls -lh "$INSTALL_PATH"
 
 echo "[deploy] Smoke test..."
