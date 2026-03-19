@@ -39,6 +39,7 @@ public struct ChatBubble: View {
             if role == .assistant { Spacer(minLength: HUTokens.space2xl) }
         }
         .padding(.horizontal, HUTokens.spaceXs)
+        .accessibilityLabel("\(role == .user ? "You" : "Assistant") said: \(text)")
     }
 }
 

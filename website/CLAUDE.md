@@ -2,6 +2,15 @@
 
 Astro static site at h-uman.ai.
 
+## Pages
+
+```
+src/pages/index.astro   Homepage
+src/pages/brand.astro   Brand guidelines
+src/pages/design.astro  Design system showcase
+src/pages/404.astro     Not found page
+```
+
 ## Rules
 
 - Font: Avenir via `var(--hu-font)`. Never import Google Fonts.

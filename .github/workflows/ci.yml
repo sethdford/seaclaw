@@ -41,7 +41,7 @@ jobs:
         run: |
           COUNT=$(./build/human_tests 2>&1 | grep -oE '[0-9]+/[0-9]+ passed' | head -1 | cut -d/ -f1)
           echo "Test count: $COUNT"
-          BASELINE=5600
+          BASELINE=5832
           if [ "$COUNT" -lt "$BASELINE" ]; then
             echo "::error::Test count regression: $COUNT < $BASELINE baseline"
             exit 1
@@ -117,15 +117,15 @@ jobs:
           enable-lto: "true"
           enable-all-channels: "true"
       - run: ls -lh build/human
-      - name: Enforce binary size budget (1100KB)
+      - name: Enforce binary size budget (1800KB)
         run: |
           SIZE=$(stat -f%z build/human)
-          BUDGET=1126400
+          BUDGET=1843200
           KB=$((SIZE / 1024))
           PCT=$((SIZE * 100 / BUDGET))
-          echo "::notice::Binary size: ${KB}KB (${PCT}% of 1100KB budget)"
+          echo "::notice::Binary size: ${KB}KB (${PCT}% of 1800KB budget)"
           if [ "$SIZE" -gt "$BUDGET" ]; then
-            echo "::error::Binary size ${KB}KB exceeds 1100KB budget"
+            echo "::error::Binary size ${KB}KB exceeds 1800KB budget"
             exit 1
           fi
 

@@ -1,6 +1,6 @@
 # human
 
-Autonomous AI assistant runtime in C11. 239 KB binary. Zero dependencies. 50+ providers.
+Autonomous AI assistant runtime in C11. ~1696 KB binary. Zero dependencies. 50+ providers.
 
 ## Install
 
@@ -22,7 +22,7 @@ human agent -m "hello"       # send a message
 
 ```bash
 git clone https://github.com/sethdford/h-uman.git
-cd human && mkdir -p build && cd build
+cd h-uman && mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON
 cmake --build .
 ```

@@ -7,6 +7,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+/* text aliases into the reasoning buffer passed to hu_prm_score_chain.
+ * Caller must keep reasoning alive until hu_prm_result_free. */
 typedef struct hu_prm_step {
     const char *text;
     size_t text_len;

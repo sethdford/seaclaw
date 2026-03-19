@@ -13,6 +13,7 @@ openai_compat.c        OpenAI-compatible API endpoint
 tenant.c               Multi-tenant isolation
 rate_limit.c           Per-endpoint rate limiting
 thread_pool.c          Worker thread pool for request handling
+push.c                 Push notification delivery
 ```
 
 ## Control Protocol

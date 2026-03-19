@@ -1,6 +1,6 @@
 # src/channels/ — Messaging Channels
 
-34 channel implementations, each connecting the agent to an external messaging platform. Every channel implements the `hu_channel_t` vtable.
+38 channel implementations, each connecting the agent to an external messaging platform. Every channel implements the `hu_channel_t` vtable.
 
 ## Vtable Contract
 
@@ -82,6 +82,12 @@ voice_channel.c      Voice call channel
 voice_integration.c  Voice subsystem integration
 voice_realtime.c     Real-time voice streaming
 maixcam.c            MaixCAM IoT device
+```
+
+### PWA
+
+```
+pwa.c                Progressive Web App bridge channel
 ```
 
 ### Infrastructure

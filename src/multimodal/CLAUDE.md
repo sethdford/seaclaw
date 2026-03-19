@@ -4,6 +4,7 @@ Multimodal content handling: image format detection, vision prompts, document pa
 
 ## Key Files
 
+- `multimodal.c` — multimodal pipeline coordination
 - `image.c` — format detection (JPEG, PNG, GIF, WebP), MIME types, vision prompt building
 - `document.c` — document parsing
 - `calendar.c` — calendar/event extraction

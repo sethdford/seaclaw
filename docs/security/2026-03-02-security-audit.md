@@ -7,7 +7,7 @@ updated: 2026-03-02
 # human Security Audit Report
 
 **Date:** 2026-03-02
-**Scope:** Full codebase (~52K lines C, ~415 source + header files)
+**Scope:** Full codebase (~52K lines C, ~415 source + header files as of 2026-03-02; current codebase is ~192K lines, 1,054 files)
 **Standard:** OWASP Top 10 (2021), CWE, defense-industry readiness
 **Methodology:** Manual static analysis across 4 parallel audit streams
 

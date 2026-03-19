@@ -100,7 +100,7 @@ Each extension point is a struct of function pointers. Your plugin allocates con
 | Extension  | Vtable Type              | Header                            | Key Methods                                           |
 | ---------- | ------------------------ | --------------------------------- | ----------------------------------------------------- |
 | Provider   | `hu_provider_vtable_t`   | `include/human/provider.h`        | `chat`, `supports_native_tools`, `get_name`, `deinit` |
-| Channel    | `hu_channel_vtable_t`    | `include/human/channel.h`         | `send`, `listen`, `name`, `is_configured`, `react`    |
+| Channel    | `hu_channel_vtable_t`    | `include/human/channel.h`         | `start`, `stop`, `send`, `name`, `health_check`       |
 | Tool       | `hu_tool_vtable_t`       | `include/human/tool.h`            | `execute`, `name`, `description`, `parameters_json`   |
 | Memory     | `hu_memory_vtable_t`     | `include/human/memory/memory.h`   | `store`, `recall`, `forget`, `health`, `search`       |
 | Runtime    | `hu_runtime_vtable_t`    | `include/human/runtime/runtime.h` | `has_filesystem`, `has_network`, `spawn`, `name`      |
@@ -112,7 +112,7 @@ Each extension point is a struct of function pointers. Your plugin allocates con
 | ------------------------ | ------- | ----------------------------------------- |
 | `HU_ENABLE_SQLITE`       | ON      | SQLite memory engine, knowledge graph     |
 | `HU_ENABLE_CURL`         | OFF     | HTTP client (libcurl)                     |
-| `HU_ENABLE_ALL_CHANNELS` | OFF     | All 35 channel implementations            |
+| `HU_ENABLE_ALL_CHANNELS` | OFF     | All 38 channel implementations            |
 | `HU_ENABLE_PERSONA`      | OFF     | Persona system (profiles, prompt builder) |
 | `HU_ENABLE_SKILLS`       | OFF     | Skill system (matching, chains, feedback) |
 | `HU_ENABLE_LTO`          | OFF     | Link-time optimization (release builds)   |
@@ -120,12 +120,12 @@ Each extension point is a struct of function pointers. Your plugin allocates con
 
 ## Performance Baseline
 
-| Metric            | Value (MinSizeRel+LTO, all flags) |
-| ----------------- | --------------------------------- |
-| Binary size       | ~918 KB                           |
-| Cold start        | ~24 ms                            |
-| Peak RSS          | ~5.7 MB                           |
-| Test suite (4643) | ~4.2 s (~1400 tests/sec)          |
+| Metric             | Value (MinSizeRel+LTO, all flags) |
+| ------------------ | --------------------------------- |
+| Binary size        | ~1696 KB                          |
+| Cold start         | 4–27 ms avg                       |
+| Peak RSS           | ~5.7 MB                           |
+| Test suite (5,844) | 700+ tests/sec                    |
 
 ## See Also
 

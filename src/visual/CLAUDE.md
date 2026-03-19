@@ -4,8 +4,7 @@ Visual content indexing and search. Builds SQL queries for image/video metadata 
 
 ## Key Files
 
-- `visual_index.c` — SQL query builders for visual content search
-- `visual_content.c` — Content type detection and metadata extraction
+- `content.c` — Content type detection, metadata extraction, and SQL query builders for visual content search
 
 ## Rules
 

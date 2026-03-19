@@ -9,14 +9,21 @@ On-device ML training for autonomous experimentation. Gated behind `HU_ENABLE_ML
 ## Architecture
 
 ```
-tokenizer_bpe.c   BPE tokenizer (byte-pair encoding, train/save/load)
-dataloader.c      Binary token data loader with BOS-aligned packing
-prepare.c        Data preparation (tokenize files, build token_bytes lookup, default config)
-evaluator.c      BPB (bits per byte) evaluation metric
-experiment.c     Autonomous experiment loop (config mutation, train/eval, keep/discard)
-gpt.c            GPT model: RMSNorm, RoPE, CausalSelfAttention, MLP, residual lambdas, logit soft-cap
-muon_adamw.c     MuonAdamW optimizer: AdamW for scalars, Muon for matrices
-train.c          Time-budgeted training loop
+tokenizer_bpe.c     BPE tokenizer (byte-pair encoding, train/save/load)
+dataloader.c        Binary token data loader with BOS-aligned packing
+prepare.c           Data preparation (tokenize files, build token_bytes lookup, default config)
+evaluator.c         BPB (bits per byte) evaluation metric
+experiment.c        Autonomous experiment loop (config mutation, train/eval, keep/discard)
+experiment_store.c  Experiment result persistence
+gpt.c              GPT model: RMSNorm, RoPE, CausalSelfAttention, MLP, residual lambdas, logit soft-cap
+muon_adamw.c       MuonAdamW optimizer: AdamW for scalars, Muon for matrices
+train.c            Time-budgeted training loop
+training_data.c    Training data management and loading
+dpo.c              Direct Preference Optimization
+lora.c             Low-Rank Adaptation fine-tuning
+agent_trainer.c    Agent-driven training orchestration
+checkpoint.c       Model checkpoint save/load
+cli.c              ML CLI subcommands
 ```
 
 ## Headers

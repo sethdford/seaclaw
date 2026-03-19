@@ -166,8 +166,8 @@ Sprint 12 changes (SOTA UX push): **Foundation** — Anticipatory UX engine (idl
 - [x] **Axe rules tightened**: 5 exclusions removed, sessions view added.
 - [ ] **Native Performance 9→10**: Instruments profiling, 60fps scroll verification, <100ms tap response.
 - [ ] **VoiceOver/TalkBack manual testing**: Full screen reader audit on real devices.
-- [ ] **color-contrast axe rule**: Fix remaining low-contrast elements (empty-state description, chat bubbles).
-- [ ] **aria-required-children axe rule**: Fix empty listbox in chat session selector.
+- [x] **color-contrast axe rule**: Fixed — upgraded chat bubble blockquote/meta/reply to full-contrast tokens.
+- [x] **aria-required-children axe rule**: Fixed — empty session list uses `role="region"` instead of `role="list"`.
 - [ ] **Native Brand 9→10**: Pixel-perfect cross-platform consistency audit.
 
 ## Related

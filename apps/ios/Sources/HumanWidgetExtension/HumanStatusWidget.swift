@@ -32,7 +32,7 @@ struct HumanWidgetEntryView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Circle()
-                    .fill(entry.isConnected ? Color.green : Color.gray)
+                    .fill(entry.isConnected ? Color(red: 122/255, green: 182/255, blue: 72/255) : Color(red: 138/255, green: 160/255, blue: 184/255))
                     .frame(width: 8, height: 8)
                 Text("h-uman")
                     .font(.custom("Avenir-Heavy", size: 14))

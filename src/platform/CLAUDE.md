@@ -4,7 +4,7 @@ Platform-specific integrations that only compile on their target OS. Currently m
 
 ## Key Files
 
-- `macos_calendar.c` — macOS EventKit bridge for calendar events
+- `calendar_macos.c` — macOS EventKit bridge for calendar events
 
 ## Rules
 

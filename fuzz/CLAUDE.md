@@ -18,18 +18,24 @@ cmake --build build-fuzz -j$(nproc)
 - Keep harnesses small and focused — one entry point per file
 - New harnesses must be added to both `CMakeLists.txt` and CI (`ci.yml` fuzz job)
 
-## Existing Harnesses
+## Existing Harnesses (17)
 
-| Harness              | Target                                       |
-| -------------------- | -------------------------------------------- |
-| `fuzz_json_parse`    | JSON parser                                  |
-| `fuzz_config_load`   | Config loader                                |
-| `fuzz_base64`        | Base64 codec                                 |
-| `fuzz_url_encode`    | URL encoder                                  |
-| `fuzz_persona_json`  | Persona JSON parser                          |
-| `fuzz_persona_parse` | Persona JSON parsing (alias)                 |
-| `fuzz_graph`         | Graph entity/relation upsert                 |
-| `fuzz_fast_capture`  | Fast capture entity/emotion/topic extraction |
-| `fuzz_sse`           | SSE stream parser                            |
-| `fuzz_http_parse`    | HTTP request parser                          |
-| `fuzz_tool_params`   | Tool parameter parser                        |
+| Harness                 | Target                                       |
+| ----------------------- | -------------------------------------------- |
+| `fuzz_json`             | JSON lexer/tokenizer                         |
+| `fuzz_json_parse`       | JSON parser                                  |
+| `fuzz_config`           | Config parser                                |
+| `fuzz_config_load`      | Config loader                                |
+| `fuzz_base64`           | Base64 codec                                 |
+| `fuzz_url_encode`       | URL encoder                                  |
+| `fuzz_query_param`      | Query parameter parser                       |
+| `fuzz_persona_json`     | Persona JSON parser                          |
+| `fuzz_persona_parse`    | Persona JSON parsing (alias)                 |
+| `fuzz_graph`            | Graph entity/relation upsert                 |
+| `fuzz_fast_capture`     | Fast capture entity/emotion/topic extraction |
+| `fuzz_sse`              | SSE stream parser                            |
+| `fuzz_http_parse`       | HTTP request parser                          |
+| `fuzz_tool_params`      | Tool parameter parser                        |
+| `fuzz_control_protocol` | Gateway control protocol parser              |
+| `fuzz_openai_compat`    | OpenAI-compatible API parser                 |
+| `fuzz_prompt_injection` | Prompt injection detection                   |

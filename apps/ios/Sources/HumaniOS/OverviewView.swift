@@ -286,7 +286,7 @@ private struct StatCard: View {
                 .monospacedDigit()
             HStack(spacing: 4) {
                 Image(systemName: trendUp ? "arrow.up.right" : "arrow.down.right")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.custom("Avenir-Heavy", size: 10))
                     .foregroundStyle(trendUp ? tokens.accent : tokens.textMuted)
                 Text(trend)
                     .font(.custom("Avenir-Medium", size: HUTokens.textXs, relativeTo: .caption))

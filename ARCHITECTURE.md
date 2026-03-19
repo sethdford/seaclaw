@@ -28,7 +28,7 @@ graph TB
     end
 
     subgraph execution [Execution Layer]
-        Tools[67+ Tools]
+        Tools[85 Tools]
         Runtime[Runtime Adapters]
         Security[Security / Policy]
     end
@@ -126,8 +126,8 @@ graph TD
     subgraph implementations [Implementations - src/]
         ProvImpl["providers/ - 50+"]
         ChanImpl["channels/ - 38"]
-        ToolImpl["tools/ - 83"]
-        MemImpl["memory/ - 6 engines"]
+        ToolImpl["tools/ - 85"]
+        MemImpl["memory/ - 10 engines"]
         RTImpl["runtime/ - 5 adapters"]
         SecImpl["security/ - 11 sandboxes"]
         PersImpl["persona/ - 17 files"]
@@ -198,9 +198,9 @@ Components: BPE tokenizer, GPT model, MuonAdamW optimizer, data loader, training
 ```
 src/
   agent/       Agent loop, planner, DAG, context, prompt assembly
-  channels/    34 messaging channel implementations
+  channels/    38 messaging channel implementations
   providers/   50+ AI provider implementations
-  tools/       67+ tool implementations
+  tools/       85 tool implementations
   memory/      Memory engines, retrieval, vector, lifecycle
   ml/          ML training (BPE, GPT, MuonAdamW, experiment loop) — HU_ENABLE_ML
   security/    Policy, pairing, secrets, 11 sandbox backends
@@ -210,7 +210,7 @@ src/
   core/        Allocator, arena, JSON, string, HTTP, error
 
 include/human/  Public C headers (vtable definitions)
-tests/          131 test files, 4,640+ tests
+tests/          273 test files, 5,844+ tests
 fuzz/           libFuzzer harnesses
 ui/             LitElement web dashboard
 website/        Astro marketing site

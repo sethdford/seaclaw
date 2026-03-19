@@ -1,6 +1,6 @@
 # src/tools/ — Tool Implementations
 
-67+ tools that the agent can execute. Each tool implements the `hu_tool_t` vtable.
+85 tools that the agent can execute. Each tool implements the `hu_tool_t` vtable.
 
 ## Vtable Contract
 
@@ -38,7 +38,17 @@ shell.c           Execute shell commands (sandboxed)
 ```
 http_request.c    Make HTTP requests
 web_fetch.c       Fetch and parse web pages
-tavily.c          Tavily web search
+web_search.c      Unified web search dispatcher
+web_search_providers/
+  brave.c         Brave Search
+  duckduckgo.c    DuckDuckGo Search
+  exa.c           Exa Search
+  firecrawl.c     Firecrawl Search
+  jina.c          Jina Search
+  perplexity.c    Perplexity Search
+  searxng.c       SearXNG Search
+  tavily.c        Tavily Search
+  common.c        Shared web search utilities
 ```
 
 ### Memory
@@ -46,6 +56,8 @@ tavily.c          Tavily web search
 ```
 memory_recall.c   Recall from memory
 memory_store.c    Store to memory
+memory_list.c     List memories
+memory_forget.c   Remove memories
 save_for_later.c  Save content for later retrieval
 ```
 
@@ -83,21 +95,75 @@ crm.c             CRM operations
 firebase.c        Firebase operations
 gcloud.c          Google Cloud operations
 facebook.c        Facebook API
+instagram.c       Instagram API
+twitter.c         Twitter/X API
 analytics.c       Analytics operations
 composio.c        Composio integration
+jira.c            Jira issue operations
+invoice.c         Invoice generation/parsing
+social.c          Social media operations
+spreadsheet.c     CSV/TSV spreadsheet operations
+report.c          Structured report generation
+workflow.c        DAG-based workflow execution
+homeassistant.c   Home Assistant integration
 ```
 
-### Advanced
+### Code & Development
+
+```
+git.c             Git operations
+lsp.c             Language Server Protocol operations
+code_sandbox.c    Sandboxed code execution
+claude_code.c     Claude Code integration
+apply_patch.c     Apply code patches
+```
+
+### Skills & Agents
+
+```
+skill_run.c       Run installed skills
+skill_write.c     Create/write skills
+persona.c         Persona management
+schedule.c        Scheduling operations
+```
+
+### Browser & GUI
 
 ```
 browser.c         Browser automation (HU_ENABLE_TOOLS_BROWSER)
 browser_open.c    Open URL in browser
+computer_use.c    Computer use automation
+gui_agent.c       GUI agent operations
 screenshot.c      Take screenshots
 canvas.c          Canvas rendering
 notebook.c        Notebook operations
+pwa.c             PWA bridge operations
+```
+
+### Data & Hardware
+
+```
 database.c        Database queries
-claude_code.c     Claude Code integration
-apply_patch.c     Apply code patches
+pdf.c             PDF extraction
+image.c           Image operations
+hardware_info.c   Hardware information
+hardware_memory.c Hardware memory operations
+i2c.c             I2C bus operations (Linux)
+spi.c             SPI bus operations (Linux)
+peripheral_ctrl.c Peripheral control
+```
+
+### Utility
+
+```
+schema.c          JSON Schema operations
+schema_clean.c    Schema cleanup utilities
+pushover.c        Pushover notifications
+message.c         Message formatting
+validation.c      Input validation
+path_security.c   Path security checks
+spawn.c           Process spawning
+cli_wrapper_common.c  CLI wrapper shared code
 ```
 
 ## Security Rules (High Risk)

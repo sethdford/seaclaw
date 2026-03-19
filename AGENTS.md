@@ -28,7 +28,7 @@ Key extension points:
 - `src/peripherals/` (`hu_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **993 source + header files, ~192K lines of C, ~84K lines of tests, 5,087 tests, 38 channels**.
+Current scale: **1,054 source + header files, ~192K lines of C, ~98K lines of tests, 5,844+ tests, 38 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -76,7 +76,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `HU_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 5,087+ tests must pass at zero ASan errors**
+5. **All 5,844+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `HU_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -97,7 +97,7 @@ src/
   agent/                agent loop, context, planner, compaction, dispatcher
   channels/             38 channel implementations (cli, telegram, discord, slack, ...)
   providers/            50+ AI provider implementations (9 core + 41 compatible services)
-  tools/                83 tool implementations
+  tools/                85 tool implementations
   memory/               SQLite + markdown + LRU + LanceDB + Lucid backends, embeddings, vector search, connections, consolidation, multimodal ingest
   security/             policy, pairing, secrets, sandbox backends (landlock, firejail, bwrap)
   runtime/              runtime adapters (native, docker, wasm, cloudflare)
@@ -118,13 +118,13 @@ src/
 
 include/human/       public C headers
 
-tests/                 236 test files, 5,087+ tests
+tests/                 273 test files, 5,844+ tests
 
 apps/                  iOS, macOS, Android, Flutter, shared (5 app directories)
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 
-fuzz/                  libFuzzer harnesses (JSON, base64, URL encode, config)
+fuzz/                  17 libFuzzer harnesses
 
 archive/zig-reference/ archived Zig source (build.zig, src/)
 ```

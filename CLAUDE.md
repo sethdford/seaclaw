@@ -15,7 +15,7 @@ cmake --build --preset dev
 # Other presets: test (no ASan), release (MinSizeRel+LTO), fuzz (Clang), minimal
 cmake --list-presets               # show all available presets
 
-# Run tests (5,087+ tests, must be 0 failures, 0 ASan errors)
+# Run tests (5,844+ tests, must be 0 failures, 0 ASan errors)
 ./build/human_tests                          # full suite
 ./build/human_tests --suite=JSON             # run suites matching "JSON"
 ./build/human_tests --filter=config_parse    # run tests matching "config_parse"
@@ -75,7 +75,7 @@ Types: `feat fix refactor test docs chore perf ci build style`
 
 | Workflow                    | What it checks                                                                                                                                    |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ci.yml`                    | C build + ~5,087 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
+| `ci.yml`                    | C build + ~5,844 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
 | `benchmark.yml`             | Performance regression (binary size, startup time, RSS)                                                                                           |
 | `codeql.yml`                | Static analysis security scanning                                                                                                                 |
 | `security.yml`              | Dependency audit, SBOM generation                                                                                                                 |
@@ -98,9 +98,9 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 
 | Path                              | What                                                                  |
 | --------------------------------- | --------------------------------------------------------------------- |
-| `src/`                            | All C source (~993 files, ~192K lines)                                |
+| `src/`                            | All C source (~1,054 files, ~192K lines)                              |
 | `include/human/`                  | Public headers                                                        |
-| `tests/`                          | 236 test files, 5,087+ tests                                          |
+| `tests/`                          | 273 test files, 5,844+ tests                                          |
 | `fuzz/`                           | libFuzzer harnesses                                                   |
 | `ui/`                             | LitElement web dashboard                                              |
 | `website/`                        | Astro marketing site                                                  |
@@ -134,7 +134,6 @@ All project standards live in `docs/standards/`. This is the single source of tr
 | Operations  | `docs/standards/operations/`  | Incident response, monitoring                                                                     |
 | Quality     | `docs/standards/quality/`     | Governance, ceremonies, code review, channel testing                                              |
 | Security    | `docs/standards/security/`    | Threat model, sandbox, AI safety, data privacy                                                    |
-| Security    | `docs/standards/security/`    | Threat model, sandbox                                                                             |
 
 ## Risk Tiers
 

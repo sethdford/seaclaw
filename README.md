@@ -22,7 +22,7 @@
 The smallest fully autonomous AI assistant infrastructure — a static C binary that fits on any $5 board, boots in milliseconds, and requires nothing but libc.
 
 ```
-~1696 KB binary · <30 ms startup · 5,087+ tests · 50+ providers · 38 channels · 83+ tools · Pluggable everything
+~1696 KB binary · <30 ms startup · 5,844+ tests · 50+ providers · 38 channels · 85 tools · Pluggable everything
 ```
 
 ### Features
@@ -61,7 +61,7 @@ Human's verified numbers (measured on macOS arm64, March 2026):
 Binary size:   ~1696 KB (MinSizeRel + LTO, all channels)
 Peak RSS:      ~5.7 MB (--version), ~5.9 MB (test suite)
 Startup:       6–27 ms avg (Apple Silicon M4 Max)
-Tests:         5,087 passing, 0 ASan errors
+Tests:         5,844+ passing, 0 ASan errors
 ```
 
 ### Why Switch from OpenClaw?
@@ -615,7 +615,7 @@ Build and tests require a C11 compiler and CMake 3.16+. One-time setup:
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Debug -DHU_ENABLE_ALL_CHANNELS=ON
 cmake --build .                            # Dev build
-./human_tests                             # 5,087+ tests
+./human_tests                             # 5,844+ tests
 cd ..
 ```
 
@@ -650,10 +650,10 @@ Channel CJM coverage (ingress parsing/filtering, session key routing, account pr
 ```
 
 Language: C11 + ASM (aarch64, x86_64)
-Source files: 993
+Source files: 1,054
 Lines of code: ~192K
-Test files: 236
-Tests: 5,087
+Test files: 273
+Tests: 5,844+
 Binary: ~1696 KB (MinSizeRel + LTO, all channels)
 Peak RSS: ~5.7 MB
 Startup: 6–27 ms avg (Apple Silicon)
@@ -687,7 +687,7 @@ config.c Config loading/merging (~/.human/config.json)
 ...
 
 include/human/ Public C headers
-tests/ 236 test files, 5,087+ tests
+tests/ 273 test files, 5,844+ tests
 asm/ Platform-specific assembly (aarch64, x86_64, generic C)
 
 ui/ Web UI (LitElement + Vite)

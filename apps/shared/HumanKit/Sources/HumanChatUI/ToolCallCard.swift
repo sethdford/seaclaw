@@ -61,6 +61,7 @@ public struct ToolCallCard: View {
         .padding(HUTokens.spaceMd)
         .background(tokens.bgElevated)
         .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     private var statusIcon: String {

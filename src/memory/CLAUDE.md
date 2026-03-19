@@ -6,12 +6,15 @@ The memory system manages how the agent stores, retrieves, and evolves knowledge
 
 ```
 factory.c           Engine registry and creation (hu_memory_t vtable)
-  engines/           Backend implementations
+  engines/           Backend implementations (10 engines)
     sqlite.c         SQLite-backed persistent memory
     markdown.c       Markdown file memory
     memory_lru.c     In-memory LRU cache
     sqlite_lucid.c   SQLite + optional lucid CLI backend
     sqlite_fts.c     SQLite + FTS5 full-text search backend
+    postgres.c       PostgreSQL-backed memory (HU_ENABLE_POSTGRES)
+    redis.c          Redis-backed memory (HU_ENABLE_REDIS_ENGINE)
+    api.c            Remote API memory backend
     none.c           No-op backend
     registry.c       Engine registration
 

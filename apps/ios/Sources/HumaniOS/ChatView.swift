@@ -129,6 +129,7 @@ struct ChatView: View {
                 Image(systemName: "bubble.left.and.bubble.right")
                     .font(.system(size: HUTokens.text3Xl))
                     .foregroundStyle(tokens.accent)
+                    .accessibilityHidden(true)
                 Text("Start a conversation")
                     .font(.custom("Avenir-Heavy", size: HUTokens.textLg, relativeTo: .body))
                     .foregroundStyle(tokens.text)
@@ -200,11 +201,13 @@ struct ChatView: View {
                 .font(.caption)
                 .foregroundStyle(connectionManager.isConnected ? tokens.success : tokens.error)
                 .contentTransition(.symbolEffect(.replace))
+                .accessibilityLabel(connectionManager.isConnected ? "Connected" : "Disconnected")
         } else {
             // Intentional small indicator size; HUTokens.spaceSm (8pt) is the closest token
             Circle()
                 .fill(connectionManager.isConnected ? tokens.success : tokens.error)
                 .frame(width: HUTokens.spaceSm, height: HUTokens.spaceSm)
+                .accessibilityLabel(connectionManager.isConnected ? "Connected" : "Disconnected")
         }
     }
 

@@ -1,29 +1,28 @@
 # Human — Project Status
 
-Last updated: 2026-03-11
+Last updated: 2026-03-19
 
 ## Summary
 
-| Metric                         | Value                  |
-| ------------------------------ | ---------------------- |
-| Source files (src/ + include/) | **~715**               |
-| Lines of C/H code              | **~139K**              |
-| Test files                     | 131                    |
-| Tests passing                  | **4640/4640 (100%)**   |
-| Binary size (MinSizeRel+LTO)   | **918 KB (all flags)** |
-| Text section                   | **848 KB**             |
-| Cold start (--version)         | **~24 ms avg**         |
-| Peak RSS (--version)           | **~5.7 MB**            |
-| Peak RSS (test suite)          | **~8.5 MB**            |
-| Test throughput                | **~1400 tests/sec**    |
+| Metric                         | Value                    |
+| ------------------------------ | ------------------------ |
+| Source files (src/ + include/) | **1,054**                |
+| Lines of C/H code              | **~192K**                |
+| Test files                     | 273                      |
+| Tests passing                  | **5,844+/5,844+ (100%)** |
+| Binary size (MinSizeRel+LTO)   | **~1696 KB (all flags)** |
+| Cold start (--version)         | **4–27 ms avg**          |
+| Peak RSS (--version)           | **~5.7 MB**              |
+| Peak RSS (test suite)          | **~6.0 MB**              |
+| Test throughput                | **700+ tests/sec**       |
 
 ## Module Parity
 
 | Subsystem        | Baseline | Human | Status                      |
 | ---------------- | -------- | ----- | --------------------------- |
 | Providers        | 20       | 20    | **Full parity**             |
-| Channels         | 35       | 35    | **Full parity**             |
-| Tools            | 68       | 68    | **Full parity**             |
+| Channels         | 38       | 38    | **Full parity**             |
+| Tools            | 85       | 85    | **Full parity**             |
 | Security         | 11       | 13    | **Full parity** (+2 extras) |
 | Agent            | 8        | 11    | **Full parity** (+3 extras) |
 | Memory Engines   | 10       | 10    | **Full parity**             |
@@ -39,8 +38,8 @@ Last updated: 2026-03-11
 
 - **Full agent loop**: `human agent` — interactive turn-based conversation
 - **Config loading**: JSON config parsing, env var overrides, validation
-- **68 tools registered** (build-config dependent): All execute with proper vtable dispatch
-- **35 channels** (catalog): CLI fully functional, others have send() via HTTP client
+- **85 tools registered** (build-config dependent): All execute with proper vtable dispatch
+- **38 channels** (catalog): CLI fully functional, others have send() via HTTP client
 - **20 providers**: OpenAI, Anthropic, Gemini, Ollama, OpenRouter, Compatible, Claude CLI, Codex CLI, OpenAI Codex + reliable/router wrappers
 - **HTTP client**: libcurl-based, with SSE streaming support
 - **WebSocket**: basic `ws://` support; `wss://` TLS via OpenSSL when `HU_ENABLE_TLS=ON`

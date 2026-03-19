@@ -204,10 +204,32 @@ hu_error_t hu_dpo_export_jsonl(hu_dpo_collector_t *collector,
         const char *rejected = (const char *)sqlite3_column_text(stmt, 2);
         double margin = sqlite3_column_double(stmt, 3);
         const char *source = (const char *)sqlite3_column_text(stmt, 4);
-        fprintf(f, "{\"prompt\":\"%s\",\"chosen\":\"%s\",\"rejected\":\"%s\","
-                   "\"margin\":%.2f,\"source\":\"%s\"}\n",
-                prompt ? prompt : "", chosen ? chosen : "",
-                rejected ? rejected : "", margin, source ? source : "");
+
+        const char *fields[] = {prompt, chosen, rejected, NULL, source};
+        const char *keys[] = {"prompt", "chosen", "rejected", NULL, "source"};
+        fputc('{', f);
+        for (int fi = 0; fi < 5; fi++) {
+            if (fi == 3) {
+                fprintf(f, "\"margin\":%.2f", margin);
+            } else {
+                const char *val = fields[fi] ? fields[fi] : "";
+                fprintf(f, "\"%s\":\"", keys[fi]);
+                for (const char *c = val; *c; c++) {
+                    switch (*c) {
+                    case '"':  fputs("\\\"", f); break;
+                    case '\\': fputs("\\\\", f); break;
+                    case '\n': fputs("\\n", f);  break;
+                    case '\r': fputs("\\r", f);  break;
+                    case '\t': fputs("\\t", f);  break;
+                    default:   fputc(*c, f);     break;
+                    }
+                }
+                fputc('"', f);
+            }
+            if (fi < 4)
+                fputc(',', f);
+        }
+        fputs("}\n", f);
         count++;
     }
     sqlite3_finalize(stmt);

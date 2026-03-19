@@ -5,6 +5,8 @@ title: Silent Failures Audit — human Codebase
 
 This document catalogs silent failures, ignored error codes, and inadequate error handling found across the C gateway, WebSocket server, UI controllers/components, and config/main entry points.
 
+> **Note:** Line numbers in this audit may have drifted since the original analysis. Verify line references against current source before making fixes.
+
 ---
 
 ## 1. C Gateway (`src/gateway/`)

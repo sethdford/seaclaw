@@ -645,28 +645,36 @@
     );
   }
 
-  /* ── Hero choreographed entrance (CSS-only — visible before JS loads) ── */
-  .hero-logo {
-    animation: hu-hero-rise var(--hu-duration-slowest, 700ms)
-      var(--hu-ease-spring-gentle, cubic-bezier(0.22, 1.2, 0.36, 1)) both;
-  }
+  /* ── Hero choreographed entrance ── */
+  /* LCP-critical: hero-logo and hero-headline render immediately (no animation).
+   * Secondary elements animate in after LCP fires via .hu-lcp-done gate. */
+  .hero-logo,
   .hero-headline {
-    animation: hu-hero-rise var(--hu-duration-slower, 500ms)
-      var(--hu-ease-spring-gentle, cubic-bezier(0.22, 1.2, 0.36, 1)) 120ms both;
+    opacity: 1;
+    transform: none;
   }
-  .hero-desc,
-  .hero-mission {
+  .hu-lcp-done .hero-desc,
+  .hu-lcp-done .hero-mission {
     animation: hu-hero-rise var(--hu-duration-slower, 500ms)
+      var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) 80ms both;
+  }
+  .hu-lcp-done .hero-proof {
+    animation: hu-hero-rise var(--hu-duration-slower, 500ms)
+      var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) 160ms both;
+  }
+  .hu-lcp-done .hero-buttons,
+  .hu-lcp-done .hero-fade-in {
+    animation: hu-hero-rise var(--hu-duration-slow, 350ms)
       var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) 240ms both;
   }
-  .hero-proof {
-    animation: hu-hero-rise var(--hu-duration-slower, 500ms)
-      var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) 320ms both;
-  }
+  /* Before LCP fires, secondary elements are hidden */
+  .hero-desc,
+  .hero-mission,
+  .hero-proof,
   .hero-buttons,
   .hero-fade-in {
-    animation: hu-hero-rise var(--hu-duration-slow, 350ms)
-      var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) 400ms both;
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
   }
   @keyframes hu-hero-rise {
     from {

@@ -215,7 +215,7 @@ struct MacOverviewPane: View {
         ScrollView {
             VStack(alignment: .leading, spacing: HUTokens.spaceLg) {
                 Text("Overview")
-                    .font(.custom("Avenir-Heavy", size: 24))
+                    .font(.custom("Avenir-Heavy", size: 24, relativeTo: .title2))
                     .kerning(-0.5)
                     .foregroundStyle(tokens.text)
 

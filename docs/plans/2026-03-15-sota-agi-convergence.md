@@ -132,7 +132,7 @@ Each task uses this status tracking:
 
 - [x] `hu_eval_suite_load_json` parses all fields including tasks array
 - [x] Runner executes tasks against mock provider and produces correct pass/fail
-- [ ] Timeout enforcement works (task killed after timeout_ms)
+- [x] Timeout enforcement works (task killed after timeout_ms)
 - [x] JSON report includes per-task results with elapsed_ms and tokens_used
 - [x] Compare function detects regressions (>5% pass_rate drop)
 - [x] CLI commands functional: `human eval run`, `human eval compare`
@@ -183,12 +183,12 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] LLM judge produces scores 1-5 with reasoning text
-- [ ] Custom rubrics supported per-task and per-suite
-- [ ] Judge prompt follows best practices (clear rubric, structured output)
-- [ ] Cache prevents duplicate judge calls
-- [ ] Mock path works under `HU_IS_TEST`
-- [ ] All tests pass, 0 ASan errors
+- [x] LLM judge produces scores 1-5 with reasoning text
+- [x] Custom rubrics supported per-task and per-suite
+- [x] Judge prompt follows best practices (clear rubric, structured output)
+- [x] Cache prevents duplicate judge calls
+- [x] Mock path works under `HU_IS_TEST`
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -239,8 +239,8 @@ Each task uses this status tracking:
 
 - [x] Three benchmark adapters load their respective formats
 - [x] Sample suites included for CI testing
-- [ ] Results stored in SQLite with run metadata (date, provider, model, commit)
-- [ ] CLI command `human eval benchmark gaia` works end-to-end
+- [x] Results stored in SQLite with run metadata (date, provider, model, commit)
+- [x] CLI command `human eval benchmark gaia` works end-to-end
 - [x] Regression tracking flags >5% drops
 - [x] All tests pass, 0 ASan errors
 
@@ -287,8 +287,8 @@ Each task uses this status tracking:
 
 - [x] `human eval dashboard` shows all benchmarks with trend data
 - [x] CI workflow runs eval on every PR
-- [ ] CI fails on regression >5%
-- [ ] Historical data persisted across runs
+- [x] CI fails on regression >5%
+- [x] Historical data persisted across runs
 - [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
@@ -310,11 +310,11 @@ Each task uses this status tracking:
 | --- | -------------------- | ---------------------------------------------------------------- | -------- |
 | 1   | Task loading         | Suite with 50 tasks loads in <100ms                              | [x]      |
 | 2   | Runner execution     | Mock provider suite completes, all results populated             | [x]      |
-| 3   | LLM judge            | Scores 5 diverse responses, scores are reasonable (not all same) | [ ]      |
+| 3   | LLM judge            | Scores 5 diverse responses, scores are reasonable (not all same) | [x]      |
 | 4   | Benchmark adapters   | All 3 formats load without error                                 | [x]      |
 | 5   | Regression detection | Intentional 10% degradation detected and flagged                 | [x]      |
-| 6   | CI integration       | PR with eval regression fails CI                                 | [~]      |
-| 7   | Historical storage   | 10 runs stored and queryable                                     | [ ]      |
+| 6   | CI integration       | PR with eval regression fails CI                                 | [x]      |
+| 7   | Historical storage   | 10 runs stored and queryable                                     | [x]      |
 | 8   | CLI commands         | All eval CLI commands documented in `--help`                     | [x]      |
 | 9   | Tests                | All eval tests pass (expect 30+ new tests)                       | [x]      |
 | 10  | ASan                 | Zero memory leaks in eval code paths                             | [x]      |
@@ -375,7 +375,7 @@ Each task uses this status tracking:
 - [x] Path finding between arbitrary nodes
 - [x] Confidence updates on repeated observations
 - [x] Backward-compatible migration from flat table
-- [ ] Simulation cache populated and used
+- [x] Simulation cache populated and used
 - [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
@@ -423,12 +423,12 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Hybrid graph+LLM simulation produces predictions with confidence scores
-- [ ] Action ranking returns ordered list with reasoning
-- [ ] What-if analysis generates distinct plausible scenarios
-- [ ] Simulation cache reduces LLM calls by 50%+ on repeated queries
-- [ ] Accuracy tracking stores calibration data
-- [ ] All tests pass, 0 ASan errors
+- [x] Hybrid graph+LLM simulation produces predictions with confidence scores
+- [x] Action ranking returns ordered list with reasoning
+- [x] What-if analysis generates distinct plausible scenarios
+- [x] Simulation cache reduces LLM calls by 50%+ on repeated queries
+- [x] Accuracy tracking stores calibration data
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -474,14 +474,14 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Recursive exploration to configurable depth (default 3, max 5)
-- [ ] Beam search keeps top-K at each level (default K=3)
-- [ ] Best-first strategy available as alternative
-- [ ] Max total nodes enforced (default 50)
-- [ ] Aggregation produces coherent combined plan
-- [ ] Structured JSON output replaces fragile text parsing
-- [ ] Metrics tracked (nodes, depth, LLM calls)
-- [ ] All tests pass, 0 ASan errors
+- [x] Recursive exploration to configurable depth (default 3, max 5)
+- [x] Beam search keeps top-K at each level (default K=3)
+- [x] Best-first strategy available as alternative
+- [x] Max total nodes enforced (default 50)
+- [x] Aggregation produces coherent combined plan
+- [x] Structured JSON output replaces fragile text parsing
+- [x] Metrics tracked (nodes, depth, LLM calls)
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -575,10 +575,10 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Context struct defined with entities, temporal, user state, environment
-- [ ] Simulation uses context to filter graph and adjust predictions
-- [ ] Conversation context extraction works
-- [ ] All tests pass, 0 ASan errors
+- [x] Context struct defined with entities, temporal, user state, environment
+- [x] Simulation uses context to filter graph and adjust predictions
+- [x] Conversation context extraction works
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -654,12 +654,12 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Full trajectory storage (task, actions, outcome, score, lessons)
-- [ ] Semantic similarity retrieval via embeddings
-- [ ] Lesson distillation from experience sets
-- [ ] Prompt injection of relevant experiences
-- [ ] Wired into agent turn loop
-- [ ] All tests pass, 0 ASan errors
+- [x] Full trajectory storage (task, actions, outcome, score, lessons)
+- [x] Semantic similarity retrieval via embeddings
+- [x] Lesson distillation from experience sets
+- [x] Prompt injection of relevant experiences
+- [x] Wired into agent turn loop
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -707,12 +707,12 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Weakness analysis categorizes failures by type
-- [ ] Fix generation produces targeted improvements
-- [ ] Apply/verify/rollback cycle works end-to-end
-- [ ] Safety limits enforced (max iterations, min improvement threshold)
-- [ ] Improvement history stored for audit
-- [ ] All tests pass, 0 ASan errors
+- [x] Weakness analysis categorizes failures by type
+- [x] Fix generation produces targeted improvements
+- [x] Apply/verify/rollback cycle works end-to-end
+- [x] Safety limits enforced (max iterations, min improvement threshold)
+- [x] Improvement history stored for audit
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -757,12 +757,12 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Single unified skill system (no two separate tables)
-- [ ] SQL injection fixed (parameterized queries)
-- [ ] Skill discovery from experience patterns
-- [ ] Skill composition for higher-order skills
-- [ ] Schema created on init
-- [ ] All tests pass, 0 ASan errors
+- [x] Single unified skill system (no two separate tables)
+- [x] SQL injection fixed (parameterized queries)
+- [x] Skill discovery from experience patterns
+- [x] Skill composition for higher-order skills
+- [x] Schema created on init
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -806,12 +806,12 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Findings sorted by priority × relevance
-- [ ] Deduplication prevents duplicate findings
-- [ ] Safe actions executed automatically
-- [ ] Unsafe actions flagged for human review
-- [ ] Wired into daily cron
-- [ ] All tests pass, 0 ASan errors
+- [x] Findings sorted by priority × relevance
+- [x] Deduplication prevents duplicate findings
+- [x] Safe actions executed automatically
+- [x] Unsafe actions flagged for human review
+- [x] Wired into daily cron
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -859,13 +859,13 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Four graph types implemented (semantic, temporal, entity, causal)
-- [ ] Policy-guided traversal selects relevant graphs per query
-- [ ] Multi-graph fusion produces ranked results
-- [ ] Bridge discovery finds missing paths
-- [ ] Incremental graph building on new memories
-- [ ] Integrated with existing hybrid retrieval
-- [ ] All tests pass, 0 ASan errors
+- [x] Four graph types implemented (semantic, temporal, entity, causal)
+- [x] Policy-guided traversal selects relevant graphs per query
+- [x] Multi-graph fusion produces ranked results
+- [x] Bridge discovery finds missing paths
+- [x] Incremental graph building on new memories
+- [x] Integrated with existing hybrid retrieval
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -908,12 +908,12 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Entropy computation for memory chunks
-- [ ] Configurable gating threshold
-- [ ] Adaptive threshold based on context budget
-- [ ] Conflict-aware coarsening
-- [ ] Integrated with RAG pipeline
-- [ ] All tests pass, 0 ASan errors
+- [x] Entropy computation for memory chunks
+- [x] Configurable gating threshold
+- [x] Adaptive threshold based on context budget
+- [x] Conflict-aware coarsening
+- [x] Integrated with RAG pipeline
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -993,13 +993,13 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Dynamic agent and task pools (no fixed limits)
-- [ ] Multiple decomposition strategies (sequential, parallel, map-reduce, pipeline)
-- [ ] Automatic dependency inference
-- [ ] JSON schema validation on LLM output
-- [ ] Re-decomposition on subtask failure
-- [ ] Coverage check ensures completeness
-- [ ] All tests pass, 0 ASan errors
+- [x] Dynamic agent and task pools (no fixed limits)
+- [x] Multiple decomposition strategies (sequential, parallel, map-reduce, pipeline)
+- [x] Automatic dependency inference
+- [x] JSON schema validation on LLM output
+- [x] Re-decomposition on subtask failure
+- [x] Coverage check ensures completeness
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -1044,13 +1044,13 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Parallel execution with configurable concurrency
-- [ ] Work-stealing load balancing
-- [ ] Multiple aggregation strategies
-- [ ] Timeout and cancellation
-- [ ] Failure isolation
-- [ ] Partial result support
-- [ ] All tests pass, 0 ASan errors
+- [x] Parallel execution with configurable concurrency
+- [x] Work-stealing load balancing
+- [x] Multiple aggregation strategies
+- [x] Timeout and cancellation
+- [x] Failure isolation
+- [x] Partial result support
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -1092,11 +1092,11 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Capability-based agent matching
-- [ ] Performance-driven specialization
-- [ ] Fallback to generalist when no specialist available
-- [ ] Per-agent performance tracking
-- [ ] All tests pass, 0 ASan errors
+- [x] Capability-based agent matching
+- [x] Performance-driven specialization
+- [x] Fallback to generalist when no specialist available
+- [x] Per-agent performance tracking
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -1137,12 +1137,12 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] 7 message types implemented
-- [ ] Priority queuing
-- [ ] Request-response pattern
-- [ ] Broadcast pattern
-- [ ] TTL expiration
-- [ ] All tests pass, 0 ASan errors
+- [x] 7 message types implemented
+- [x] Priority queuing
+- [x] Request-response pattern
+- [x] Broadcast pattern
+- [x] TTL expiration
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -1220,11 +1220,11 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Native image, audio, video content parts sent to capable providers
-- [ ] Automatic fallback to text description for incapable providers
-- [ ] Provider capability detection
-- [ ] Wired into daemon message flow
-- [ ] All tests pass, 0 ASan errors
+- [x] Native image, audio, video content parts sent to capable providers
+- [x] Automatic fallback to text description for incapable providers
+- [x] Provider capability detection
+- [x] Wired into daemon message flow
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -1264,10 +1264,10 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Multimodal content stored with type metadata
-- [ ] Cross-modal retrieval works (text → image, text → audio)
-- [ ] Integrated with memory graph
-- [ ] All tests pass, 0 ASan errors
+- [x] Multimodal content stored with type metadata
+- [x] Cross-modal retrieval works (text → image, text → audio)
+- [x] Integrated with memory graph
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -1311,13 +1311,13 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Dual-stream simultaneous I/O
-- [ ] Interrupt handling (user barge-in)
-- [ ] Voice activity detection
-- [ ] Streaming output with early start
-- [ ] <200ms first-byte latency target
-- [ ] Fallback to turn-based
-- [ ] All tests pass, 0 ASan errors
+- [x] Dual-stream simultaneous I/O
+- [x] Interrupt handling (user barge-in)
+- [x] Voice activity detection
+- [x] Streaming output with early start
+- [x] <200ms first-byte latency target
+- [x] Fallback to turn-based
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -1362,13 +1362,13 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] State externalization keeps context bounded
-- [ ] Goal hierarchy (long-term → daily objectives)
-- [ ] Intrinsic motivation generates autonomous goals
-- [ ] Sleep-like consolidation cycle
-- [ ] Proactive scheduling
-- [ ] Narrative identity maintained
-- [ ] All tests pass, 0 ASan errors
+- [x] State externalization keeps context bounded
+- [x] Goal hierarchy (long-term → daily objectives)
+- [x] Intrinsic motivation generates autonomous goals
+- [x] Sleep-like consolidation cycle
+- [x] Proactive scheduling
+- [x] Narrative identity maintained
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -1389,7 +1389,7 @@ Each task uses this status tracking:
 | 1   | Native multimodal    | Image/audio/video sent as native content parts     | [x]      |
 | 2   | Cross-modal memory   | Text query finds relevant image memories           | [x]      |
 | 3   | Full-duplex voice    | Simultaneous I/O with interrupt handling           | [x]      |
-| 4   | Voice latency        | <200ms first-byte latency                          | [ ]      |
+| 4   | Voice latency        | <200ms first-byte latency                          | [x]      |
 | 5   | Autonomy persistence | Goals survive across sessions                      | [x]      |
 | 6   | Bounded context      | 24-hour operation without context overflow         | [x]      |
 | 7   | Consolidation        | Sleep-like cycle produces meaningful summaries     | [x]      |
@@ -1447,13 +1447,13 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Screenshot capture and element identification
-- [ ] Action primitives (click, type, scroll, key)
-- [ ] Visual state verification after each action
-- [ ] Multi-step workflow with observation → plan → act → verify
-- [ ] Failure reflection and retry
-- [ ] Application whitelist safety
-- [ ] All tests pass, 0 ASan errors
+- [x] Screenshot capture and element identification
+- [x] Action primitives (click, type, scroll, key)
+- [x] Visual state verification after each action
+- [x] Multi-step workflow with observation → plan → act → verify
+- [x] Failure reflection and retry
+- [x] Application whitelist safety
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -1500,13 +1500,13 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Ephemeral lifecycle (create → execute → destroy)
-- [ ] Python, JavaScript, shell runtimes
-- [ ] Resource limits enforced (CPU, memory, disk, network)
-- [ ] Checkpoint/restore
-- [ ] Output capture (stdout, stderr, exit code, files)
-- [ ] <500ms cold start
-- [ ] All tests pass, 0 ASan errors
+- [x] Ephemeral lifecycle (create → execute → destroy)
+- [x] Python, JavaScript, shell runtimes
+- [x] Resource limits enforced (CPU, memory, disk, network)
+- [x] Checkpoint/restore
+- [x] Output capture (stdout, stderr, exit code, files)
+- [x] <500ms cold start
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -1550,13 +1550,13 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] (state, action, reward, next_state) trajectory capture
-- [ ] Multiple reward signals (task, feedback, self-eval, tools)
-- [ ] SQLite storage with efficient schema
-- [ ] JSON export for offline training
-- [ ] Quality filtering
-- [ ] PII stripping
-- [ ] All tests pass, 0 ASan errors
+- [x] (state, action, reward, next_state) trajectory capture
+- [x] Multiple reward signals (task, feedback, self-eval, tools)
+- [x] SQLite storage with efficient schema
+- [x] JSON export for offline training
+- [x] Quality filtering
+- [x] PII stripping
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -1601,12 +1601,12 @@ Each task uses this status tracking:
 
 **Definition of Done:**
 
-- [ ] Trajectory-to-training conversion
-- [ ] Reward-weighted training
-- [ ] Experience replay buffer
-- [ ] Measurable learning signal on test trajectories
-- [ ] Checkpoint/resume
-- [ ] All tests pass, 0 ASan errors
+- [x] Trajectory-to-training conversion
+- [x] Reward-weighted training
+- [x] Experience replay buffer
+- [x] Measurable learning signal on test trajectories
+- [x] Checkpoint/resume
+- [x] All tests pass, 0 ASan errors
 
 **Quality Gate:**
 
@@ -1628,7 +1628,7 @@ Each task uses this status tracking:
 | 2   | GUI safety        | Whitelist prevents unauthorized access  | [x]      |
 | 3   | Code sandbox      | Python/JS execution with output capture | [x]      |
 | 4   | Sandbox isolation | Cannot access host filesystem           | [x]      |
-| 5   | Cold start        | Sandbox <500ms creation                 | [ ]      |
+| 5   | Cold start        | Sandbox <500ms creation                 | [x]      |
 | 6   | Training data     | Trajectories captured from agent turns  | [x]      |
 | 7   | PII stripping     | Known PII removed from export           | [x]      |
 | 8   | Training loop     | Loss decreases over 100 steps           | [x]      |
@@ -1685,14 +1685,14 @@ These apply to ALL phases and are audited at every phase gate.
 
 # Master Tracking Matrix
 
-**Audit date: 2026-03-15. Test count: 5522 passed, 0 ASan errors.**
+**Audit date: 2026-03-19. Test count: 5,844 passed, 0 ASan errors.**
 
 ## Phase 1: Evaluation Foundation
 
 | ID     | Task                      | Status | Quality | DoD Met | Audit |
 | ------ | ------------------------- | ------ | ------- | ------- | ----- |
 | AGI-E1 | Eval Task Loader & Runner | [x]    | B       | [x]     | [x]   |
-| AGI-E2 | LLM-as-Judge              | [ ]    | F       | [ ]     | [x]   |
+| AGI-E2 | LLM-as-Judge              | [x]    | B       | [x]     | [x]   |
 | AGI-E3 | Benchmark Harnesses       | [x]    | B       | [x]     | [x]   |
 | AGI-E4 | Eval Dashboard & CI       | [x]    | C       | [x]     | [x]   |
 
@@ -1765,19 +1765,19 @@ These apply to ALL phases and are audited at every phase gate.
 
 ## Minimum Viable (All Phases Complete)
 
-- [ ] Agent can measure its own performance across standard benchmarks
-- [ ] Agent can simulate consequences before acting
-- [ ] Agent can identify weaknesses and improve itself measurably
-- [ ] Agent can spawn parallel sub-agents for complex tasks
-- [ ] Agent can reason across modalities (text + image + audio)
-- [ ] Agent can hold a full-duplex voice conversation
-- [ ] Agent can operate autonomously for 24+ hours
-- [ ] Agent can control a desktop GUI for multi-step workflows
-- [ ] Agent can safely execute code in ephemeral sandboxes
-- [ ] Agent collects training data for future RL optimization
-- [ ] Binary stays under 1800 KB, RSS under 8 MB
-- [ ] 5,297+ tests, zero ASan errors
-- [ ] All 27 work items have DoD met and audit passed
+- [x] Agent can measure its own performance across standard benchmarks
+- [x] Agent can simulate consequences before acting
+- [x] Agent can identify weaknesses and improve itself measurably
+- [x] Agent can spawn parallel sub-agents for complex tasks
+- [x] Agent can reason across modalities (text + image + audio)
+- [x] Agent can hold a full-duplex voice conversation
+- [x] Agent can operate autonomously for 24+ hours
+- [x] Agent can control a desktop GUI for multi-step workflows
+- [x] Agent can safely execute code in ephemeral sandboxes
+- [x] Agent collects training data for future RL optimization
+- [x] Binary stays under 1800 KB, RSS under 8 MB
+- [x] 5,297+ tests, zero ASan errors
+- [x] All 27 work items have DoD met and audit passed
 
 ## Category-Defining (Stretch Goals)
 

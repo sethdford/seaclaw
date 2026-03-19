@@ -46,7 +46,7 @@ https://raw.githubusercontent.com/human/skill-registry/main/skills/code-review/c
 
 ## Publishing a Skill
 
-1. **Fork** the [human/skill-registry](https://github.com/human/skill-registry) repo.
+1. **Fork** the skill-registry repo (or use the in-tree `skill-registry/` directory).
 2. **Add** your skill under `skills/<skill-name>/`:
    - `<skill-name>.skill.json`
    - `SKILL.md`

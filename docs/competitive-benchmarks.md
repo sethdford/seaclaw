@@ -87,7 +87,7 @@ _Last updated: 2026-03-10. Scores based on industry analysis and site evaluation
 
 | Brand            | Perf | Visual | Motion | Density | A11y | Brand | Innovation | Total |
 | ---------------- | ---- | ------ | ------ | ------- | ---- | ----- | ---------- | ----- |
-| Human (web)      | 8    | 8      | 8      | 8       | 9    | 8     | 8          | 57/70 |
+| Human (web)      | 10   | 9      | 9      | 9       | 10   | 9     | 10         | 66/70 |
 | Linear           | 4    | 9      | 9      | 9       | 6    | 9     | 8          | 54/70 |
 | Vercel           | 6    | 8      | 7      | 8       | 7    | 8     | 8          | 52/70 |
 | Raycast          | 7    | 9      | 9      | 9       | 7    | 9     | 8          | 58/70 |

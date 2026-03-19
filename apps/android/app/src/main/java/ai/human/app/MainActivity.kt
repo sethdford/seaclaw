@@ -326,7 +326,7 @@ private fun OnboardingScreen(
             ) {
                 Icon(
                     painter = painterResource(pageIcons[page]),
-                    contentDescription = null,
+                    contentDescription = "Illustration",
                     modifier = Modifier.size(80.dp),
                     tint = colorScheme.primary,
                 )

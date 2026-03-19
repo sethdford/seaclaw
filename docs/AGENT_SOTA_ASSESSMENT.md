@@ -81,7 +81,7 @@ The human runtime is a **mature, production-grade** autonomous agent system with
 
 | Capability                  | Evidence                                                                           |
 | --------------------------- | ---------------------------------------------------------------------------------- |
-| **67+ tools**               | `factory.c` — file, shell, web, memory, calendar, messaging, analytics, etc.       |
+| **85 tools**                | `factory.c` — file, shell, web, memory, calendar, messaging, analytics, etc.       |
 | **Parallel tool execution** | `dispatcher.c` — pthread-based parallel dispatch when `tc_count > 1`               |
 | **Tool routing**            | `tool_router.c` — keyword-based relevance scoring for tool subset selection        |
 | **DAG executor**            | `dag_executor.c` — `hu_dag_next_batch`, `hu_dag_resolve_vars` for `$tN` references |
@@ -318,9 +318,9 @@ The human runtime is a **mature, production-grade** autonomous agent system with
 | Agent turn   | `src/agent/agent_turn.c`                                                                       |
 | Orchestrator | `src/agent/orchestrator.c`, `include/human/agent/orchestrator.h`                               |
 | Memory       | `src/memory/`, `include/human/memory.h`                                                        |
-| Tools        | `src/tools/factory.c`, 67+ tools                                                               |
+| Tools        | `src/tools/factory.c`, 85 tools                                                                |
 | Intelligence | `src/intelligence/` (self_improve, online_learning, value_learning, meta_learning, reflection) |
 | Security     | `src/security/` (policy_engine, input_guard, sandbox)                                          |
 | Context      | `src/agent/compaction.c`, `include/human/context_tokens.h`                                     |
-| Channels     | 34 channels (CLAUDE.md)                                                                        |
+| Channels     | 38 channels (CLAUDE.md)                                                                        |
 | Persona      | `include/human/persona.h`, `src/persona/`                                                      |

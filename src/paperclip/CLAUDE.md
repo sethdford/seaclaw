@@ -4,7 +4,7 @@ Integration with the Paperclip task management API. Provides task creation, hear
 
 ## Key Files
 
-- `paperclip.c` — API client (create task, heartbeat, complete)
+- `client.c` — API client (create task, heartbeat, complete)
 - `heartbeat.c` — Periodic heartbeat sender for active tasks
 
 ## Rules

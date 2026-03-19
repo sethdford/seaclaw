@@ -232,8 +232,10 @@ hu_error_t hu_tier_manager_build_core_prompt(hu_tier_manager_t *mgr,
 
     size_t written = 0;
     int n = snprintf(out, out_cap, "[Core Memory]\n");
-    if (n > 0)
+    if (n > 0 && (size_t)n < out_cap)
         written = (size_t)n;
+    else if (n > 0)
+        written = out_cap - 1;
 
     struct { const char *label; const char *value; } items[] = {
         {"Name",         mgr->core.user_name},
@@ -244,14 +246,18 @@ hu_error_t hu_tier_manager_build_core_prompt(hu_tier_manager_t *mgr,
     };
 
     for (size_t i = 0; i < sizeof(items) / sizeof(items[0]); i++) {
-        if (items[i].value[0] != '\0' && written < out_cap) {
+        if (items[i].value[0] != '\0' && written + 1 < out_cap) {
             n = snprintf(out + written, out_cap - written, "%s: %s\n", items[i].label, items[i].value);
-            if (n > 0)
+            if (n > 0 && written + (size_t)n < out_cap)
                 written += (size_t)n;
+            else if (n > 0) {
+                written = out_cap - 1;
+                break;
+            }
         }
     }
 
-    *out_len = written < out_cap ? written : out_cap - 1;
+    *out_len = written;
     return HU_OK;
 }
 
