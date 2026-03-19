@@ -2,6 +2,7 @@
 #include "config_parse_internal.h"
 #include "human/config.h"
 #include "human/core/string.h"
+#include <stdio.h>
 #include <string.h>
 
 hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
