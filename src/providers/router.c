@@ -77,12 +77,18 @@ static int estimate_complexity(const hu_chat_request_t *request) {
     return 1;
 }
 
-/* Auto-select: if the router has a "fast" hint route and the task is simple,
- * downgrade to the fast model. */
+/* Auto-select: route to fast model for simple tasks, or when budget is tight. */
 static void auto_select_model(hu_router_ctx_t *r, const hu_chat_request_t *request,
                                hu_router_resolved_t *resolved) {
     int complexity = estimate_complexity(request);
-    if (complexity == 0) {
+    bool use_fast = (complexity == 0);
+
+    if (!use_fast && request->budget_remaining_usd > 0.0 &&
+        request->budget_remaining_usd < 0.10 && complexity <= 1) {
+        use_fast = true;
+    }
+
+    if (use_fast) {
         for (size_t i = 0; i < r->route_count; i++) {
             if (r->routes[i].hint_len == 4 && memcmp(r->routes[i].hint, "fast", 4) == 0) {
                 resolved->provider_index = r->routes[i].provider_index;

@@ -775,6 +775,11 @@ static void anthropic_deinit(void *ctx, hu_allocator_t *alloc) {
     alloc->free(alloc->ctx, ac, sizeof(*ac));
 }
 
+static bool anthropic_supports_vision(void *ctx) {
+    (void)ctx;
+    return true;
+}
+
 static const hu_provider_vtable_t anthropic_vtable = {
     .chat_with_system = anthropic_chat_with_system,
     .chat = anthropic_chat,
@@ -784,7 +789,7 @@ static const hu_provider_vtable_t anthropic_vtable = {
     .warmup = NULL,
     .chat_with_tools = NULL,
     .supports_streaming = anthropic_supports_streaming,
-    .supports_vision = NULL,
+    .supports_vision = anthropic_supports_vision,
     .supports_vision_for_model = NULL,
     .stream_chat = anthropic_stream_chat,
 };

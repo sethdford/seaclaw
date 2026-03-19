@@ -909,6 +909,11 @@ static void openai_deinit(void *ctx, hu_allocator_t *alloc) {
     alloc->free(alloc->ctx, oc, sizeof(*oc));
 }
 
+static bool openai_supports_vision(void *ctx) {
+    (void)ctx;
+    return true;
+}
+
 static const hu_provider_vtable_t openai_vtable = {
     .chat_with_system = openai_chat_with_system,
     .chat = openai_chat,
@@ -918,7 +923,7 @@ static const hu_provider_vtable_t openai_vtable = {
     .warmup = NULL,
     .chat_with_tools = NULL,
     .supports_streaming = openai_supports_streaming,
-    .supports_vision = NULL,
+    .supports_vision = openai_supports_vision,
     .supports_vision_for_model = NULL,
     .stream_chat = openai_stream_chat,
 };
