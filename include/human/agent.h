@@ -220,6 +220,7 @@ struct hu_agent {
     bool constitutional_enabled;
     bool multi_agent_enabled;
     struct hu_speculative_cache *speculative_cache;
+    struct hu_semantic_cache *response_cache; /* optional; embedding-based response cache */
 
 #ifdef HU_ENABLE_SQLITE
     hu_meta_params_t meta_params;

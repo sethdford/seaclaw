@@ -9,6 +9,7 @@
 #include "human/agent/dag.h"
 #include "human/agent/dag_executor.h"
 #include "human/agent/dispatcher.h"
+#include "human/memory/lifecycle/semantic_cache.h"
 #include "human/agent/input_guard.h"
 #include "human/agent/llm_compiler.h"
 #include "human/agent/mailbox.h"
@@ -94,6 +95,23 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 hu_agent_clear_current_for_tools();
                 return HU_OK;
             }
+        }
+    }
+
+    /* Semantic response cache: check for semantically similar past query */
+    if (agent->response_cache) {
+        hu_semantic_cache_hit_t cache_hit;
+        memset(&cache_hit, 0, sizeof(cache_hit));
+        if (hu_semantic_cache_get(agent->response_cache, agent->alloc, msg, msg_len,
+                                  msg, msg_len, &cache_hit) == HU_OK && cache_hit.response) {
+            if (cache_hit.similarity >= 0.92f) {
+                *response_out = cache_hit.response;
+                if (response_len_out)
+                    *response_len_out = strlen(cache_hit.response);
+                hu_agent_clear_current_for_tools();
+                return HU_OK;
+            }
+            hu_semantic_cache_hit_free(agent->alloc, &cache_hit);
         }
     }
 
