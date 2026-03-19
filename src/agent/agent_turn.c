@@ -43,6 +43,7 @@
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
 #endif
+#include "human/cost.h"
 #include "human/provider.h"
 #include "human/voice.h"
 #ifdef HU_ENABLE_SQLITE
