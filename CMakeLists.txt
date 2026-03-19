@@ -1982,6 +1982,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_memory_tiers.c
     tests/test_process_reward.c
     tests/test_dpo.c
+    tests/test_sota_e2e.c
     tests/test_otel.c
     tests/test_cot_audit.c
     tests/test_moderation.c
