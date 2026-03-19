@@ -24,6 +24,11 @@
 #ifdef HU_ENABLE_SQLITE
 #include "human/intelligence/meta_learning.h"
 #endif
+#include "human/memory/self_rag.h"
+#include "human/memory/adaptive_rag.h"
+#include "human/memory/tiers.h"
+#include "human/agent/process_reward.h"
+#include "human/ml/dpo.h"
 #include "human/memory/stm.h"
 #include "human/observability/bth_metrics.h"
 #include "human/observer.h"
@@ -227,6 +232,14 @@ struct hu_agent {
 #endif
     char *persona_name;
     size_t persona_name_len;
+
+    /* SOTA neural subsystems */
+    hu_srag_config_t srag_config;
+    hu_adaptive_rag_t adaptive_rag;
+    hu_tier_manager_t tier_manager;
+    hu_prm_config_t prm_config;
+    hu_dpo_collector_t dpo_collector;
+    bool sota_initialized;
 };
 
 /* Create agent from minimal config (no full config loader yet).

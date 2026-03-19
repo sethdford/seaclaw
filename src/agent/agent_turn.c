@@ -328,10 +328,21 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             fprintf(stderr, "[agent_turn] preferences load failed: %d\n", pref_err);
     }
 
-    /* Load memory context for this turn */
+    /* Self-RAG gate: decide whether retrieval is needed before loading memory */
+    hu_srag_assessment_t srag_assessment;
+    memset(&srag_assessment, 0, sizeof(srag_assessment));
+    bool srag_skip_retrieval = false;
+    if (agent->sota_initialized && agent->srag_config.enabled) {
+        hu_srag_should_retrieve(agent->alloc, &agent->srag_config, msg, msg_len,
+                                NULL, 0, &srag_assessment);
+        if (srag_assessment.decision == HU_SRAG_NO_RETRIEVAL)
+            srag_skip_retrieval = true;
+    }
+
+    /* Load memory context for this turn (gated by Self-RAG) */
     char *memory_ctx = NULL;
     size_t memory_ctx_len = 0;
-    if (agent->memory && agent->memory->vtable) {
+    if (agent->memory && agent->memory->vtable && !srag_skip_retrieval) {
         hu_memory_loader_t loader;
         hu_memory_loader_init(&loader, agent->alloc, agent->memory, agent->retrieval_engine, 10,
                               4000);
@@ -341,6 +352,25 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     &memory_ctx, &memory_ctx_len);
         if (load_err != HU_OK)
             fprintf(stderr, "[agent_turn] memory loader failed: %d\n", load_err);
+
+        /* Self-RAG: verify relevance of retrieved content */
+        if (srag_assessment.decision == HU_SRAG_RETRIEVE_AND_VERIFY && memory_ctx && memory_ctx_len > 0) {
+            double relevance = 0.0;
+            bool should_use = false;
+            hu_srag_verify_relevance(agent->alloc, &agent->srag_config, msg, msg_len,
+                                     memory_ctx, memory_ctx_len, &relevance, &should_use);
+            if (!should_use) {
+                agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
+                memory_ctx = NULL;
+                memory_ctx_len = 0;
+            }
+        }
+    }
+
+    /* Adaptive RAG: select strategy and record for learning */
+    hu_rag_strategy_t rag_strategy_used = HU_RAG_NONE;
+    if (agent->sota_initialized && !srag_skip_retrieval) {
+        rag_strategy_used = hu_adaptive_rag_select(&agent->adaptive_rag, msg, msg_len);
     }
 
 #ifdef HU_ENABLE_SQLITE
@@ -1109,6 +1139,31 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 #endif
 #endif /* HU_HAS_SKILLS */
 
+    /* Memory Tiers: inject core memory into prompt context */
+    if (agent->sota_initialized) {
+        char core_buf[2048];
+        size_t core_len = 0;
+        if (hu_tier_manager_build_core_prompt(&agent->tier_manager, core_buf, sizeof(core_buf),
+                                              &core_len) == HU_OK && core_len > 0) {
+            if (memory_ctx && memory_ctx_len > 0) {
+                size_t merged_len = core_len + 1 + memory_ctx_len;
+                char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, merged_len + 1);
+                if (merged) {
+                    memcpy(merged, core_buf, core_len);
+                    merged[core_len] = '\n';
+                    memcpy(merged + core_len + 1, memory_ctx, memory_ctx_len);
+                    merged[merged_len] = '\0';
+                    agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
+                    memory_ctx = merged;
+                    memory_ctx_len = merged_len;
+                }
+            } else if (!memory_ctx) {
+                memory_ctx = hu_strndup(agent->alloc, core_buf, core_len);
+                memory_ctx_len = memory_ctx ? core_len : 0;
+            }
+        }
+    }
+
     /* Build system prompt using cached static portion when available */
     char *system_prompt = NULL;
     size_t system_prompt_len = 0;
@@ -1475,6 +1530,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
 #endif
 
+        /* PRM: score reasoning chain from ToT scratchpad if available */
+        double prm_turn_score = 0.0;
+        (void)prm_turn_score;
+
         /* Adaptive model selection: use per-turn override when set by the daemon's
          * model router, falling back to the agent's default model. */
         const char *turn_model = agent->model_name;
@@ -1556,6 +1615,17 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
             }
             if (resp.content && resp.content_len > 0) {
+                /* PRM: score response reasoning chain for quality */
+                if (agent->sota_initialized && agent->prm_config.enabled &&
+                    resp.content_len > 100) {
+                    hu_prm_result_t prm_res;
+                    if (hu_prm_score_chain(agent->alloc, &agent->prm_config,
+                            resp.content, resp.content_len, &prm_res) == HU_OK) {
+                        prm_turn_score = prm_res.aggregate_score;
+                        hu_prm_result_free(agent->alloc, &prm_res);
+                    }
+                }
+
                 /* Reflection: evaluate response quality and retry if needed */
                 hu_reflection_quality_t quality = hu_reflection_evaluate(
                     msg, msg_len, resp.content, resp.content_len, &agent->reflection);
@@ -1586,6 +1656,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         if (hist_err != HU_OK)
                             fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
                         agent->alloc->free(agent->alloc->ctx, critique, critique_len + 1);
+
+                        /* DPO: record the rejected response for preference learning.
+                         * The chosen response will be the next LLM output after retry. */
+                        if (agent->sota_initialized) {
+                            hu_dpo_record_from_feedback(&agent->dpo_collector,
+                                msg, msg_len, resp.content, resp.content_len, false);
+                        }
+
                         hu_chat_response_free(agent->alloc, &resp);
                         iter++;
                         continue; /* retry with critique feedback */
@@ -1947,11 +2025,25 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         if (strstr(msg, "detail") || strstr(msg, "elaborate") || strstr(msg, "more"))
                             (void)hu_value_learn_from_correction(&ve, "thoroughness", 12,
                                 "User prefers detailed responses", 31, 0.2, now_vl);
+                        /* DPO: record user feedback as preference signal */
+                        if (agent->sota_initialized && agent->history_count >= 2) {
+                            const char *last_resp = agent->history[agent->history_count - 2].content;
+                            size_t last_resp_len = agent->history[agent->history_count - 2].content_len;
+                            if (last_resp && last_resp_len > 0 && (is_positive || is_negative))
+                                hu_dpo_record_from_feedback(&agent->dpo_collector,
+                                    msg, msg_len, last_resp, last_resp_len, is_positive);
+                        }
+
                         hu_value_engine_deinit(&ve);
                     }
                 }
             }
 #endif
+            /* Adaptive RAG: record retrieval quality for learning */
+            if (agent->sota_initialized && rag_strategy_used != HU_RAG_NONE && memory_ctx_len > 0)
+                hu_adaptive_rag_record_outcome(&agent->adaptive_rag, rag_strategy_used,
+                    memory_ctx_len > 100 ? 0.8 : 0.4);
+
 #ifdef HU_HAS_PERSONA
             /* Style learning: adaptive schedule — early sessions learn faster,
              * then settle into a steady cadence. Also triggers on corrections. */

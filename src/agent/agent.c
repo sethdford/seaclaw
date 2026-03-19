@@ -354,6 +354,24 @@ hu_error_t hu_agent_from_config(
         (void)hu_superhuman_register(&out->superhuman, svc);
     }
 
+    /* SOTA neural subsystems initialization */
+    out->srag_config = hu_srag_config_default();
+    out->prm_config = hu_prm_config_default();
+    {
+#ifdef HU_ENABLE_SQLITE
+        sqlite3 *sota_db = memory ? hu_sqlite_memory_get_db(memory) : NULL;
+#else
+        void *sota_db = NULL;
+#endif
+        hu_adaptive_rag_create(alloc, sota_db, &out->adaptive_rag);
+        hu_tier_manager_create(alloc, sota_db, &out->tier_manager);
+        hu_tier_manager_init_tables(&out->tier_manager);
+        hu_tier_manager_load_core(&out->tier_manager);
+        hu_dpo_collector_create(alloc, sota_db, 10000, &out->dpo_collector);
+        hu_dpo_init_tables(&out->dpo_collector);
+    }
+    out->sota_initialized = true;
+
     return HU_OK;
 }
 
@@ -525,6 +543,12 @@ void hu_agent_deinit(hu_agent_t *agent) {
             fprintf(stderr, "[agent] STM promotion failed: %d\n", promo_err);
     }
     hu_stm_deinit(&agent->stm);
+    if (agent->sota_initialized) {
+        hu_adaptive_rag_deinit(&agent->adaptive_rag);
+        hu_tier_manager_deinit(&agent->tier_manager);
+        hu_dpo_collector_deinit(&agent->dpo_collector);
+        agent->sota_initialized = false;
+    }
     hu_pattern_radar_deinit(&agent->radar);
     if (agent->commitment_store) {
         hu_commitment_store_destroy(agent->commitment_store);
