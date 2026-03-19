@@ -122,7 +122,7 @@ fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
                     .padding(HUTokens.spaceMd)
                     .clip(RoundedCornerShape(HUTokens.radiusLg))
                     .background(colorScheme.surfaceContainerHigh)
-                    .border(1.dp, colorScheme.outlineVariant, RoundedCornerShape(HUTokens.radiusLg))
+                    .border(HUTokens.spaceXs / 4, colorScheme.outlineVariant, RoundedCornerShape(HUTokens.radiusLg))
                     .padding(HUTokens.spaceSm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(HUTokens.spaceSm),

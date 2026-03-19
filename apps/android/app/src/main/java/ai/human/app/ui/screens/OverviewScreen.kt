@@ -48,7 +48,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ai.human.app.ConnectionState
 import ai.human.app.GatewayClient
@@ -176,7 +175,7 @@ fun OverviewScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(HUTokens.spaceSm)
                                 .clip(CircleShape)
                                 .background(statusColor)
                                 .clearAndSetSemantics { },
@@ -328,14 +327,14 @@ private fun SkeletonPlaceholder() {
         Column(verticalArrangement = Arrangement.spacedBy(HUTokens.spaceSm)) {
             Box(
                 modifier = Modifier
-                    .height(14.dp)
+                    .height(HUTokens.spaceMd)
                     .fillMaxWidth(0.8f)
                     .clip(RoundedCornerShape(HUTokens.radiusSm))
                     .background(colorScheme.surfaceContainerHigh),
             )
             Box(
                 modifier = Modifier
-                    .height(12.dp)
+                    .height(HUTokens.spaceSm + HUTokens.spaceXs)
                     .fillMaxWidth(0.5f)
                     .clip(RoundedCornerShape(HUTokens.radiusSm))
                     .background(colorScheme.surfaceContainerHigh),
@@ -368,9 +367,9 @@ private fun StatCard(
             Spacer(modifier = Modifier.height(HUTokens.spaceXs))
             if (isSkeleton) {
                 Box(
-                    modifier = Modifier
-                        .height(28.dp)
-                        .fillMaxWidth(0.5f)
+                        modifier = Modifier
+                            .height(HUTokens.spaceLg + HUTokens.spaceXs)
+                            .fillMaxWidth(0.5f)
                         .clip(RoundedCornerShape(HUTokens.radiusSm))
                         .background(colorScheme.surfaceContainerHigh),
                 )
@@ -413,7 +412,7 @@ private fun StatCard(
             if (isSkeleton) {
                 Box(
                     modifier = Modifier
-                        .height(28.dp)
+                        .height(HUTokens.spaceLg + HUTokens.spaceXs)
                         .fillMaxWidth(0.5f)
                         .clip(RoundedCornerShape(HUTokens.radiusSm))
                         .background(colorScheme.surfaceContainerHigh),

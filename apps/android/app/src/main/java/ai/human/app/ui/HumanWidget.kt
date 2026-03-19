@@ -23,7 +23,6 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import android.graphics.Color as AndroidColor
 
 class HumanWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -40,8 +39,8 @@ private fun WidgetContent() {
     Column(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .padding(16.dp)
-            .background(AndroidColor.parseColor("#1c1c1e")),
+            .padding(HUTokens.spaceMd)
+            .background(HUTokens.Dark.bgSurface.value.toInt()),
         horizontalAlignment = Alignment.Start,
     ) {
         Row(
@@ -51,8 +50,8 @@ private fun WidgetContent() {
             Text(
                 text = "h-uman",
                 style = TextStyle(
-                    color = ColorProvider(AndroidColor.parseColor("#f5f5f7")),
-                    fontSize = 16.sp,
+                    color = ColorProvider(HUTokens.Dark.text),
+                    fontSize = HUTokens.textBase,
                     fontWeight = FontWeight.Bold,
                 ),
             )
@@ -60,12 +59,12 @@ private fun WidgetContent() {
             Text(
                 text = "Ready",
                 style = TextStyle(
-                    color = ColorProvider(AndroidColor.parseColor("#7AB648")),
-                    fontSize = 12.sp,
+                    color = ColorProvider(HUTokens.Dark.accent),
+                    fontSize = HUTokens.textSm,
                 ),
             )
         }
-        Spacer(modifier = GlanceModifier.height(12.dp))
+        Spacer(modifier = GlanceModifier.height(HUTokens.spaceSm))
         StatRow("Providers", "50+")
         StatRow("Channels", "34")
         StatRow("Tools", "67+")
@@ -75,21 +74,21 @@ private fun WidgetContent() {
 @Composable
 private fun StatRow(label: String, value: String) {
     Row(
-        modifier = GlanceModifier.fillMaxWidth().padding(vertical = 2.dp),
+        modifier = GlanceModifier.fillMaxWidth().padding(vertical = HUTokens.spaceXs / 2),
     ) {
         Text(
             text = label,
             style = TextStyle(
-                color = ColorProvider(AndroidColor.parseColor("#86868b")),
-                fontSize = 12.sp,
+                color = ColorProvider(HUTokens.Dark.textMuted),
+                fontSize = HUTokens.textSm,
             ),
         )
         Spacer(modifier = GlanceModifier.defaultWeight())
         Text(
             text = value,
             style = TextStyle(
-                color = ColorProvider(AndroidColor.parseColor("#f5f5f7")),
-                fontSize = 12.sp,
+                color = ColorProvider(HUTokens.Dark.text),
+                fontSize = HUTokens.textSm,
                 fontWeight = FontWeight.Bold,
             ),
         )

@@ -368,7 +368,7 @@ private fun OnboardingScreen(
                     .clip(RoundedCornerShape(HUTokens.radiusMd))
                     .background(colorScheme.surfaceContainerHigh)
                     .border(
-                        1.dp,
+                        HUTokens.spaceXs / 4,
                         if (isValidUrl) colorScheme.outlineVariant else colorScheme.error,
                         RoundedCornerShape(HUTokens.radiusMd),
                     )

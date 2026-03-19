@@ -212,7 +212,7 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(HUTokens.radiusMd))
                         .background(colorScheme.surfaceContainerHigh)
-                        .border(1.dp, colorScheme.outlineVariant, RoundedCornerShape(HUTokens.radiusMd))
+                        .border(HUTokens.spaceXs / 4, colorScheme.outlineVariant, RoundedCornerShape(HUTokens.radiusMd))
                         .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm)
                         .semantics { contentDescription = "Gateway URL: $gatewayUrl" },
                     textStyle = TextStyle(

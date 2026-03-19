@@ -233,7 +233,7 @@ private fun SessionListItem(
                                     colorScheme.primary.copy(alpha = 0.2f),
                                     RoundedCornerShape(HUTokens.radiusSm),
                                 )
-                                .padding(horizontal = HUTokens.spaceXs, vertical = 2.dp),
+                                .padding(horizontal = HUTokens.spaceXs, vertical = HUTokens.spaceXs / 2),
                         )
                     }
                     Text(
