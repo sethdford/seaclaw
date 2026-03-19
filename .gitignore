@@ -116,4 +116,9 @@ data/imessage/
 data/facebook/
 data/merged/
 *.safetensors
+src/data/data_*_safetensors.c
+src/data/data_imessage_*.c
+src/data/data_eval_blinded_ab_json.c
+src/data/data_eval_golden_set_jsonl.c
+src/data/data_eval_results_json.c
 .lighthouseci/
