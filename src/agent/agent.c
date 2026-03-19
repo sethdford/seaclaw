@@ -9,6 +9,7 @@
 #include "human/agent/superhuman_silence.h"
 #include "human/memory/consolidation.h"
 #include "human/memory/promotion.h"
+#include "human/memory/tiers.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/intelligence/meta_learning.h"
 #endif
@@ -590,7 +591,16 @@ hu_error_t hu_agent_consolidate_memory(hu_agent_t *agent) {
     config.provider = &agent->provider;
     config.model = agent->model_name;
     config.model_len = agent->model_name_len;
-    return hu_memory_consolidate(agent->alloc, agent->memory, &config);
+    hu_error_t err = hu_memory_consolidate(agent->alloc, agent->memory, &config);
+
+    /* After consolidation, demote stale recall-tier entries to archival.
+     * Uses a sentinel key to trigger a sweep of entries older than the threshold. */
+    if (agent->sota_initialized) {
+        hu_tier_manager_demote(&agent->tier_manager,
+            "__consolidation_sweep__", 23,
+            HU_TIER_RECALL, HU_TIER_ARCHIVAL);
+    }
+    return err;
 }
 
 hu_error_t hu_agent_internal_ensure_history_cap(hu_agent_t *agent, size_t need) {

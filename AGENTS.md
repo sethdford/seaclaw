@@ -28,7 +28,7 @@ Key extension points:
 - `src/peripherals/` (`hu_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **1,054 source + header files, ~192K lines of C, ~98K lines of tests, 5,879+ tests, 38 channels**.
+Current scale: **1,054 source + header files, ~192K lines of C, ~98K lines of tests, 5,897+ tests, 38 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -76,7 +76,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `HU_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 5,879+ tests must pass at zero ASan errors**
+5. **All 5,897+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `HU_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -118,7 +118,7 @@ src/
 
 include/human/       public C headers
 
-tests/                 292 test files, 5,879+ tests
+tests/                 292 test files, 5,897+ tests
 
 apps/                  iOS, macOS, Android, Flutter, shared (5 app directories)
 
@@ -329,6 +329,18 @@ Drift detection scripts:
 Full details: `docs/standards/engineering/anti-patterns.md`
 
 Critical reminders: no vtable pointers to temporaries (dangling), no skipping `free()` (ASan catches), no `SQLITE_TRANSIENT` (use `SQLITE_STATIC`), no cross-subsystem coupling, no speculative flags, one concern per change.
+
+## 10.1) AI Model Version Policy (Required)
+
+- **Never reference Gemini 2.0 or 2.5 models** — they are deprecated/end-of-life. Always use Gemini 3.0+ (currently 3.1 series).
+- **Always verify model IDs before writing code.** Do a web search for current Vertex AI model availability. Model names change frequently (previews rotate, versions get deprecated).
+- **Current canonical models (as of March 2026):**
+  - `gemini-3.1-pro-preview` — highest capability, reasoning, emotional nuance (global endpoint only)
+  - `gemini-3.1-flash-lite-preview` — fastest, cheapest, high-volume tasks
+  - `gemini-3-flash-preview` — balanced speed/quality
+- **All Gemini access uses Vertex AI** with Application Default Credentials (ADC). Never use raw API keys for Gemini.
+- **Python eval scripts**: use `google.cloud.aiplatform` or direct REST to `https://{region}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:generateContent`. Authenticate with ADC OAuth2 tokens.
+- **Model router**: `src/agent/model_router.c` selects tier based on message complexity. Emotional/vulnerable messages MUST route to a higher-tier model (pro or flash, never flash-lite alone).
 
 ## 11) Handoff Template (Agent → Agent / Maintainer)
 

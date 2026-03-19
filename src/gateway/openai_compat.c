@@ -464,6 +464,79 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
             hu_error_t agent_err =
                 hu_agent_turn(app_ctx->agent, last_user_msg, last_user_msg_len, &response,
                               &response_len);
+
+            /* AI-tell filter: retry once if known robotic phrases detected */
+            if (agent_err == HU_OK && response && response_len > 0) {
+                static const char *ai_tells[] = {
+                    "I understand how you", "I am here to support",
+                    "I am here for you", "that must be really",
+                    "I appreciate you sharing", "feel free to",
+                    "I hear you", "I'd be happy to",
+                    "I am sorry to hear", "I can only imagine",
+                    "sorry to hear", "going through that",
+                    "I'm here for you", "here to support",
+                };
+                bool has_tell = false;
+                for (size_t ati = 0; ati < sizeof(ai_tells) / sizeof(ai_tells[0]); ati++) {
+                    if (strcasestr(response, ai_tells[ati])) {
+                        has_tell = true;
+                        break;
+                    }
+                }
+                if (has_tell) {
+                    fprintf(stderr, "[openai-compat] ai-tell retry for: %.60s\n",
+                            response);
+                    app_ctx->agent->alloc->free(app_ctx->agent->alloc->ctx, response,
+                                                response_len + 1);
+                    response = NULL;
+                    response_len = 0;
+                    static const char hint[] =
+                        "[CRITICAL OVERRIDE: Your response was REJECTED because it sounded "
+                        "like a therapy chatbot. You MUST respond in 3-8 words MAXIMUM. "
+                        "Pick ONE of these exact patterns:\n"
+                        "- 'damn I'm sorry'\n"
+                        "- 'ugh that's the worst'\n"
+                        "- 'yeah I've been there too'\n"
+                        "- 'that's rough'\n"
+                        "- 'I'm sorry dude'\n"
+                        "DO NOT use 'I understand', 'going through', 'sorry to hear', "
+                        "'here for you', or any therapeutic language. "
+                        "Be BRIEF. Be REAL. Be a FRIEND not a counselor.]";
+                    hu_agent_internal_append_history(app_ctx->agent, HU_ROLE_SYSTEM,
+                        hint, sizeof(hint) - 1, NULL, 0, NULL, 0);
+                    agent_err = hu_agent_turn(app_ctx->agent, last_user_msg, last_user_msg_len,
+                                              &response, &response_len);
+                }
+            }
+
+            /* Post-process: if response still has AI tells after retry, truncate to
+             * the first clause before the offending phrase. This is a last-resort
+             * defense against models that stubbornly produce therapy-speak. */
+            if (agent_err == HU_OK && response && response_len > 0) {
+                static const char *kill_phrases[] = {
+                    "I understand how", "going through that",
+                    "sorry to hear", "here for you", "here to support",
+                    "I can only imagine", "that must be", "how difficult",
+                };
+                for (size_t ki = 0; ki < sizeof(kill_phrases) / sizeof(kill_phrases[0]); ki++) {
+                    char *found = strcasestr(response, kill_phrases[ki]);
+                    if (found && found > response) {
+                        /* Walk back to the start of this clause (after ';', '.', or ',') */
+                        char *cut = found;
+                        while (cut > response && cut[-1] != ';' && cut[-1] != '.' && cut[-1] != ',')
+                            cut--;
+                        if (cut > response && (size_t)(cut - response) >= 4) {
+                            while (cut > response && (cut[-1] == ' ' || cut[-1] == ';' ||
+                                                       cut[-1] == ',' || cut[-1] == '.'))
+                                cut--;
+                            *cut = '\0';
+                            response_len = (size_t)(cut - response);
+                        }
+                        break;
+                    }
+                }
+            }
+
             alloc->free(alloc->ctx, msgs, msg_count * sizeof(hu_chat_message_t));
             hu_json_free(alloc, root);
             if (agent_err == HU_OK && response) {

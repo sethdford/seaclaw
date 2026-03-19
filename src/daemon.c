@@ -6577,6 +6577,67 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         ch->channel->vtable->stop_typing(ch->channel->ctx, batch_key, key_len);
                     }
 
+                    /* AI-tell filter: catch known robotic phrases and force retry */
+                    if (err == HU_OK && response && response_len > 0 && !retried) {
+                        static const char *ai_tells[] = {
+                            "I understand how you",
+                            "I am here to support",
+                            "I am here for you",
+                            "that must be really",
+                            "I appreciate you sharing",
+                            "feel free to",
+                            "I hear you",
+                            "I'd be happy to",
+                            "sorry to hear",
+                            "going through that",
+                            "here to support",
+                            "I can only imagine",
+                        };
+                        bool has_ai_tell = false;
+                        for (size_t ati = 0; ati < sizeof(ai_tells) / sizeof(ai_tells[0]); ati++) {
+                            if (strcasestr(response, ai_tells[ati])) {
+                                has_ai_tell = true;
+                                fprintf(stderr,
+                                        "[human] ai-tell detected: \"%s\" in response\n",
+                                        ai_tells[ati]);
+                                break;
+                            }
+                        }
+                        if (has_ai_tell) {
+                            retried = true;
+                            agent->alloc->free(agent->alloc->ctx, response, response_len + 1);
+                            response = NULL;
+                            response_len = 0;
+                            if (convo_ctx) {
+                                static const char tell_hint[] =
+                                    "[CRITICAL OVERRIDE: Your response was REJECTED because it "
+                                    "sounded like a therapy chatbot. You MUST respond in 3-8 "
+                                    "words MAXIMUM. Pick ONE of these patterns: "
+                                    "'damn I'm sorry', 'ugh that's the worst', "
+                                    "'yeah I've been there too', 'that's rough'. "
+                                    "DO NOT use 'I understand', 'going through', 'sorry to hear', "
+                                    "'here for you'. Be BRIEF. Be a FRIEND not a counselor.]";
+                                size_t new_len = sizeof(tell_hint) - 1 + 1 + convo_ctx_len + 1;
+                                char *new_convo = (char *)alloc->alloc(alloc->ctx, new_len);
+                                if (new_convo) {
+                                    memcpy(new_convo, tell_hint, sizeof(tell_hint) - 1);
+                                    new_convo[sizeof(tell_hint) - 1] = '\n';
+                                    memcpy(new_convo + sizeof(tell_hint), convo_ctx, convo_ctx_len);
+                                    new_convo[new_len - 1] = '\0';
+                                    alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                    convo_ctx = new_convo;
+                                    convo_ctx_len = new_len - 1;
+                                    agent->conversation_context = convo_ctx;
+                                    agent->conversation_context_len = convo_ctx_len;
+                                }
+                            }
+                            if (ch->channel->vtable->start_typing)
+                                ch->channel->vtable->start_typing(ch->channel->ctx, batch_key,
+                                                                  key_len);
+                            continue;
+                        }
+                    }
+
                     /* Quality gate: check response for unnatural patterns.
                      * If needs_revision, retry once with hint. */
                     if (err == HU_OK && response && response_len > 0 && history_entries) {

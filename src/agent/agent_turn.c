@@ -1461,6 +1461,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                              agent->max_history_messages, &hist_msgs, &hist_count);
             if (err != HU_OK) {
                 hu_agent_clear_current_for_tools();
+                if (dpo_rejected_resp)
+                    agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
+                                       dpo_rejected_resp_len + 1);
                 if (system_prompt)
                     agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
                 if (plan_ctx)
@@ -1472,6 +1475,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 turn_alloc.ctx, total * sizeof(hu_chat_message_t));
             if (!all) {
                 hu_agent_clear_current_for_tools();
+                if (dpo_rejected_resp)
+                    agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
+                                       dpo_rejected_resp_len + 1);
                 if (system_prompt)
                     agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
                 if (plan_ctx)
@@ -1595,6 +1601,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
             }
             hu_agent_clear_current_for_tools();
+            if (dpo_rejected_resp)
+                agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
+                                   dpo_rejected_resp_len + 1);
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
             if (plan_ctx)
@@ -1645,6 +1654,15 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         prm_turn_score = prm_res.aggregate_score;
                         hu_prm_result_free(agent->alloc, &prm_res);
                     }
+                }
+
+                /* PRM per-step: score response quality as a reasoning step */
+                if (agent->sota_initialized && agent->prm_config.enabled &&
+                    resp.content_len > 50) {
+                    double step_score = 0.0;
+                    hu_prm_score_step(agent->alloc, &agent->prm_config,
+                        resp.content, resp.content_len, msg, msg_len, &step_score);
+                    prm_turn_score = step_score;
                 }
 
                 /* Reflection: evaluate response quality and retry if needed */
@@ -1911,18 +1929,27 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 if (response_len_out)
                     *response_len_out = final_len;
 
-                /* Speculative: predict follow-ups and cache them */
+                /* Speculative: predict follow-ups and pre-cache them */
                 if (agent->speculative_cache && *response_out) {
                     char *preds[HU_SPEC_MAX_PREDICTIONS];
                     size_t pred_lens[HU_SPEC_MAX_PREDICTIONS];
                     double confs[HU_SPEC_MAX_PREDICTIONS];
                     size_t pred_count = 0;
                     memset(preds, 0, sizeof(preds));
+                    int64_t now_spec = (int64_t)time(NULL);
                     if (hu_speculative_predict(agent->alloc, msg, msg_len,
                                                *response_out, final_len,
                                                preds, pred_lens, confs,
                                                HU_SPEC_MAX_PREDICTIONS, &pred_count) == HU_OK) {
+                        hu_speculative_cache_evict(agent->speculative_cache,
+                                                   now_spec, 300);
                         for (size_t pi = 0; pi < pred_count; pi++) {
+                            if (preds[pi] && pred_lens[pi] > 0 && confs[pi] >= 0.5) {
+                                hu_speculative_cache_store(agent->speculative_cache,
+                                    preds[pi], pred_lens[pi],
+                                    *response_out, final_len,
+                                    confs[pi], now_spec);
+                            }
                             if (preds[pi])
                                 agent->alloc->free(agent->alloc->ctx, preds[pi], pred_lens[pi] + 1);
                         }
@@ -2230,6 +2257,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         if (err != HU_OK) {
             hu_agent_clear_current_for_tools();
             hu_chat_response_free(agent->alloc, &resp);
+            if (dpo_rejected_resp)
+                agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
+                                   dpo_rejected_resp_len + 1);
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
             if (plan_ctx)

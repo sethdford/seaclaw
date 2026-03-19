@@ -15,7 +15,7 @@ cmake --build --preset dev
 # Other presets: test (no ASan), release (MinSizeRel+LTO), fuzz (Clang), minimal
 cmake --list-presets               # show all available presets
 
-# Run tests (5,879+ tests, must be 0 failures, 0 ASan errors)
+# Run tests (5,897+ tests, must be 0 failures, 0 ASan errors)
 ./build/human_tests                          # full suite
 ./build/human_tests --suite=JSON             # run suites matching "JSON"
 ./build/human_tests --filter=config_parse    # run tests matching "config_parse"
@@ -58,6 +58,7 @@ Vtable-driven and modular. Extend by implementing vtable structs + factory regis
 - Security: deny-by-default, HTTPS-only for outbound, never log secrets.
 - KISS/YAGNI: no speculative abstractions or config flags without a caller.
 - One concern per change. Don't mix feature + refactor + infra.
+- **AI Model Versions**: Never reference or use Gemini 2.0 or 2.5 models — they are deprecated. Always use Gemini 3.0+ (currently 3.1). Before writing any code that references a model version, do a web search to verify the latest available model IDs on Vertex AI. Current canonical models: `gemini-3.1-pro-preview`, `gemini-3.1-flash-lite-preview`, `gemini-3-flash-preview`. All Gemini access uses Vertex AI with Application Default Credentials (ADC), not API keys.
 - Use `--hu-surface-container*` for branded tonal surfaces, `--hu-bg-surface` for neutral.
 - Use tinted state overlays (`--hu-hover-overlay`, etc.) — they are primary-colored, not neutral.
 
@@ -100,7 +101,7 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 | --------------------------------- | --------------------------------------------------------------------- |
 | `src/`                            | All C source (~1,054 files, ~192K lines)                              |
 | `include/human/`                  | Public headers                                                        |
-| `tests/`                          | 292 test files, 5,879+ tests                                          |
+| `tests/`                          | 292 test files, 5,897+ tests                                          |
 | `fuzz/`                           | libFuzzer harnesses                                                   |
 | `ui/`                             | LitElement web dashboard                                              |
 | `website/`                        | Astro marketing site                                                  |
