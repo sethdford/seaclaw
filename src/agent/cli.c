@@ -32,6 +32,7 @@
 #ifdef HU_HAS_OTEL
 #include "human/observability/otel.h"
 #endif
+#include "human/agent/model_router.h"
 #include "human/plugin.h"
 #include "human/provider.h"
 #include "human/providers/factory.h"
@@ -816,6 +817,22 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         g_cancel = 0;
         agent.cancel_requested = 0;
         cli_stream_started = 0;
+
+        /* Adaptive model routing for CLI */
+#ifndef HU_IS_TEST
+        {
+            hu_model_router_config_t mr_cfg = hu_model_router_default_config();
+            time_t now_rt = time(NULL);
+            struct tm *lt = localtime(&now_rt);
+            int hour = lt ? lt->tm_hour : 12;
+            hu_model_selection_t sel = hu_model_route(
+                &mr_cfg, line, line_len, NULL, 0, hour, agent.history_count);
+            agent.turn_model = sel.model;
+            agent.turn_model_len = sel.model_len;
+            agent.turn_temperature = sel.temperature;
+            agent.turn_thinking_budget = sel.thinking_budget;
+        }
+#endif
 
 #if HU_CLI_ASYNC
         agent_turn_ctx_t tctx;

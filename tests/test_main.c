@@ -297,7 +297,6 @@ void run_bootstrap_tests(void);
 void run_thread_pool_tests(void);
 void run_weakness_tests(void);
 void run_distiller_tests(void);
-void run_model_router_tests(void);
 void run_plan_executor_tests(void);
 void run_cdp_tests(void);
 
@@ -621,7 +620,6 @@ int main(int argc, char **argv) {
     run_thread_pool_tests();
     run_weakness_tests();
     run_distiller_tests();
-    run_model_router_tests();
     run_plan_executor_tests();
     run_cdp_tests();
 

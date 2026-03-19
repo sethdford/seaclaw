@@ -278,12 +278,160 @@ static void shell_deinit(void *ctx, hu_allocator_t *alloc) {
         alloc->free(alloc->ctx, s, sizeof(*s));
 }
 
+static hu_error_t shell_execute_streaming(void *ctx, hu_allocator_t *alloc,
+                                          const hu_json_value_t *args,
+                                          void (*on_chunk)(void *cb_ctx, const char *data, size_t len),
+                                          void *cb_ctx,
+                                          hu_tool_result_t *out) {
+    if (!on_chunk)
+        return shell_execute(ctx, alloc, args, out);
+
+    hu_shell_ctx_t *s = (hu_shell_ctx_t *)ctx;
+    if (!s || !args || !out) {
+        *out = hu_tool_result_fail("invalid args", 13);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+#if HU_IS_TEST
+    const char *stub = "(shell disabled in test mode)";
+    on_chunk(cb_ctx, stub, strlen(stub));
+    char *msg = hu_strndup(alloc, stub, strlen(stub));
+    if (!msg) {
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    *out = hu_tool_result_ok_owned(msg, strlen(stub));
+    return HU_OK;
+#else
+#ifndef _WIN32
+    if (s->policy && !hu_security_shell_allowed(s->policy)) {
+        *out = hu_tool_result_fail("shell execution not allowed by policy", 38);
+        return HU_OK;
+    }
+
+    const char *cmd = hu_json_get_string(args, "command");
+    if (!cmd || strlen(cmd) == 0) {
+        *out = hu_tool_result_fail("missing command", 15);
+        return HU_OK;
+    }
+    size_t cmd_len = strlen(cmd);
+    if (cmd_len > HU_SHELL_CMD_MAX) {
+        *out = hu_tool_result_fail("command too long", 16);
+        return HU_OK;
+    }
+
+    if (s->policy) {
+        bool approved = s->policy->pre_approved;
+        s->policy->pre_approved = false;
+        hu_command_risk_level_t risk;
+        hu_error_t perr = hu_policy_validate_command(s->policy, cmd, approved, &risk);
+        if (perr == HU_ERR_SECURITY_APPROVAL_REQUIRED) {
+            *out = hu_tool_result_fail("approval required", 17);
+            out->needs_approval = true;
+            return HU_OK;
+        }
+        if (perr != HU_OK) {
+            *out = hu_tool_result_fail("command blocked by policy", 25);
+            return HU_OK;
+        }
+    }
+
+    int fds[2];
+    if (pipe(fds) != 0) {
+        *out = hu_tool_result_fail("pipe failed", 11);
+        return HU_OK;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        close(fds[0]);
+        close(fds[1]);
+        *out = hu_tool_result_fail("fork failed", 11);
+        return HU_OK;
+    }
+
+    if (pid == 0) {
+        close(fds[0]);
+        dup2(fds[1], STDOUT_FILENO);
+        dup2(fds[1], STDERR_FILENO);
+        close(fds[1]);
+        if (s->workspace_dir && s->workspace_dir_len > 0) {
+            char *wd = (char *)alloc->alloc(alloc->ctx, s->workspace_dir_len + 1);
+            if (wd) {
+                memcpy(wd, s->workspace_dir, s->workspace_dir_len);
+                wd[s->workspace_dir_len] = '\0';
+                if (chdir(wd) != 0)
+                    _exit(127);
+                alloc->free(alloc->ctx, wd, s->workspace_dir_len + 1);
+            }
+        }
+        setenv("PATH", "/usr/bin:/bin", 1);
+        execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
+        _exit(127);
+    }
+
+    close(fds[1]);
+    size_t cap = 4096;
+    char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+    if (!buf) {
+        close(fds[0]);
+        waitpid(pid, NULL, 0);
+        *out = hu_tool_result_fail("out of memory", 12);
+        return HU_OK;
+    }
+    size_t total = 0;
+    for (;;) {
+        if (total >= cap - 1)
+            break;
+        ssize_t n = read(fds[0], buf + total, cap - total - 1);
+        if (n <= 0)
+            break;
+        on_chunk(cb_ctx, buf + total, (size_t)n);
+        total += (size_t)n;
+    }
+    buf[total] = '\0';
+    close(fds[0]);
+
+    int status;
+    waitpid(pid, &status, 0);
+
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+        char *out_copy = hu_strndup(alloc, buf, total);
+        alloc->free(alloc->ctx, buf, cap);
+        if (!out_copy) {
+            *out = hu_tool_result_fail("out of memory", 12);
+            return HU_OK;
+        }
+        *out = hu_tool_result_ok_owned(out_copy, total);
+    } else {
+        int code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+        alloc->free(alloc->ctx, buf, cap);
+        char err[64];
+        int n = snprintf(err, sizeof(err), "exit code %d", code);
+        char *err_dup = hu_strndup(alloc, err, (size_t)n);
+        if (err_dup)
+            *out = hu_tool_result_fail_owned(err_dup, (size_t)n);
+        else
+            *out = hu_tool_result_fail("command failed", 14);
+    }
+    return HU_OK;
+#else
+    (void)alloc;
+    (void)on_chunk;
+    (void)cb_ctx;
+    *out = hu_tool_result_fail("shell not supported on this platform", 38);
+    return HU_OK;
+#endif
+#endif
+}
+
 static const hu_tool_vtable_t shell_vtable = {
     .execute = shell_execute,
     .name = shell_name,
     .description = shell_description,
     .parameters_json = shell_parameters_json,
     .deinit = shell_deinit,
+    .execute_streaming = shell_execute_streaming,
 };
 
 hu_error_t hu_shell_create(hu_allocator_t *alloc, const char *workspace_dir,

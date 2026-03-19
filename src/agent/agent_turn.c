@@ -14,6 +14,7 @@
 #include "human/agent/memory_loader.h"
 #include "human/agent/outcomes.h"
 #include "human/agent/pattern_radar.h"
+#include "human/agent/plan_executor.h"
 #include "human/agent/planner.h"
 #include "human/agent/preferences.h"
 #include "human/agent/proactive.h"
@@ -129,7 +130,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
-    /* Automatic planning for complex tasks */
+    /* Automatic planning + execution for complex tasks */
     char *plan_ctx = NULL;
     size_t plan_ctx_len = 0;
 #ifndef HU_IS_TEST
@@ -145,11 +146,25 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         if (hu_planner_generate(agent->alloc, &agent->provider, agent->model_name,
                                  agent->model_name_len, msg, msg_len,
                                  tool_names, tn_count, &plan) == HU_OK && plan) {
-            char plan_buf[1024];
-            int pn = snprintf(plan_buf, sizeof(plan_buf), "[PLAN]: %zu steps planned", plan->steps_count);
-            if (pn > 0 && (size_t)pn < sizeof(plan_buf)) {
-                plan_ctx = hu_strndup(agent->alloc, plan_buf, (size_t)pn);
-                plan_ctx_len = (size_t)pn;
+            hu_plan_executor_t exec;
+            hu_plan_executor_init(&exec, agent->alloc, &agent->provider,
+                                  agent->model_name, agent->model_name_len,
+                                  agent->tools, agent->tools_count);
+            hu_plan_exec_result_t exec_result;
+            memset(&exec_result, 0, sizeof(exec_result));
+            hu_error_t pe = hu_plan_executor_run(&exec, plan, msg, msg_len, &exec_result);
+            if (pe == HU_OK && exec_result.summary_len > 0) {
+                plan_ctx = hu_strndup(agent->alloc, exec_result.summary, exec_result.summary_len);
+                plan_ctx_len = exec_result.summary_len;
+            } else {
+                char plan_buf[1024];
+                int pn = snprintf(plan_buf, sizeof(plan_buf),
+                                  "[PLAN]: %zu steps planned, %zu completed",
+                                  plan->steps_count, exec_result.steps_completed);
+                if (pn > 0 && (size_t)pn < sizeof(plan_buf)) {
+                    plan_ctx = hu_strndup(agent->alloc, plan_buf, (size_t)pn);
+                    plan_ctx_len = (size_t)pn;
+                }
             }
             hu_plan_free(agent->alloc, plan);
         }

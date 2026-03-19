@@ -113,7 +113,11 @@ static void execute_one_cached(hu_allocator_t *alloc, hu_tool_t *tools, size_t t
     }
     *result_out = hu_tool_result_fail("invalid arguments", 16);
     if (args) {
-        tool->vtable->execute(tool->ctx, alloc, args, result_out);
+        if (tool->vtable->execute_streaming) {
+            tool->vtable->execute_streaming(tool->ctx, alloc, args, NULL, NULL, result_out);
+        } else {
+            tool->vtable->execute(tool->ctx, alloc, args, result_out);
+        }
         hu_json_free(alloc, args);
         if (cache)
             tool_cache_store(cache, alloc, call->name, call->name_len,

@@ -10,6 +10,9 @@
 #if defined(__APPLE__) && !defined(HU_IS_TEST)
 #include <ApplicationServices/ApplicationServices.h>
 #endif
+#include "human/pwa/cdp.h"
+
+#define HU_GUI_MAX_ELEMENTS_CDP 16
 
 #define GUI_AGENT_PARAMS                                                                           \
     "{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"enum\":[\"capture\"," \
@@ -171,6 +174,44 @@ hu_error_t hu_gui_capture_state(hu_allocator_t *alloc, hu_gui_state_t *state) {
     CFRelease(focused_app);
     return HU_OK;
 #else
+    /* Cross-platform fallback: use CDP to query the browser */
+    {
+        hu_cdp_session_t cdp;
+        hu_error_t cdp_err = hu_cdp_connect(alloc, "localhost", 9222, &cdp);
+        if (cdp_err == HU_OK) {
+            memset(state, 0, sizeof(*state));
+            state->screen_width = 1920;
+            state->screen_height = 1080;
+            char *title = NULL;
+            size_t title_len = 0;
+            if (hu_cdp_get_title(&cdp, &title, &title_len) == HU_OK && title) {
+                size_t copy = title_len < sizeof(state->app_name) - 1 ? title_len : sizeof(state->app_name) - 1;
+                memcpy(state->app_name, title, copy);
+                alloc->free(alloc->ctx, title, title_len + 1);
+            }
+            hu_cdp_element_t elems[HU_GUI_MAX_ELEMENTS_CDP];
+            size_t elem_count = 0;
+            if (hu_cdp_query_elements(&cdp, "*", 1, elems, HU_GUI_MAX_ELEMENTS_CDP, &elem_count) == HU_OK) {
+                for (size_t ei = 0; ei < elem_count && state->element_count < 32; ei++) {
+                    hu_gui_element_t *ge = &state->elements[state->element_count];
+                    ge->x = elems[ei].x;
+                    ge->y = elems[ei].y;
+                    ge->width = elems[ei].width;
+                    ge->height = elems[ei].height;
+                    size_t tl = elems[ei].text_len < sizeof(ge->label) - 1 ? elems[ei].text_len : sizeof(ge->label) - 1;
+                    memcpy(ge->label, elems[ei].text, tl);
+                    ge->label_len = tl;
+                    size_t tag_len = strlen(elems[ei].tag);
+                    size_t tc = tag_len < sizeof(ge->type) - 1 ? tag_len : sizeof(ge->type) - 1;
+                    memcpy(ge->type, elems[ei].tag, tc);
+                    state->element_count++;
+                }
+            }
+            state->verified = true;
+            hu_cdp_disconnect(&cdp);
+            return HU_OK;
+        }
+    }
     (void)alloc;
     (void)state;
     return HU_ERR_NOT_SUPPORTED;
@@ -289,6 +330,27 @@ hu_error_t hu_gui_execute_action(hu_allocator_t *alloc, const hu_gui_action_t *a
     err = hu_gui_capture_state(alloc, new_state);
     return err;
 #else
+    /* Cross-platform fallback: CDP browser automation */
+    {
+        hu_cdp_session_t cdp;
+        hu_error_t cdp_err = hu_cdp_connect(alloc, "localhost", 9222, &cdp);
+        if (cdp_err == HU_OK) {
+            switch (action->type) {
+            case HU_GUI_ACTION_CLICK:
+                hu_cdp_click(&cdp, action->x, action->y);
+                break;
+            case HU_GUI_ACTION_TYPE:
+                hu_cdp_type(&cdp, action->text, action->text_len);
+                break;
+            case HU_GUI_ACTION_KEY:
+            case HU_GUI_ACTION_SCROLL:
+            case HU_GUI_ACTION_SCREENSHOT:
+                break;
+            }
+            hu_cdp_disconnect(&cdp);
+            return hu_gui_capture_state(alloc, new_state);
+        }
+    }
     (void)alloc;
     (void)action;
     (void)new_state;
