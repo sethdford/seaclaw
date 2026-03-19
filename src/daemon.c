@@ -2358,6 +2358,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     fprintf(stderr,
                                             "[human] weekly DPO export: %zu pairs -> %s\n",
                                             exported, dpo_path);
+                                    hu_dpo_clear(&agent->dpo_collector);
                                 }
                             }
                             dpo_exported_this_week = true;
@@ -6592,6 +6593,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             "going through that",
                             "here to support",
                             "I can only imagine",
+                            "According to the available",
+                            "According to my",
+                            "significant negative impact",
+                            "fail to account for",
                         };
                         bool has_ai_tell = false;
                         for (size_t ati = 0; ati < sizeof(ai_tells) / sizeof(ai_tells[0]); ati++) {
@@ -6694,6 +6699,18 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                     break;
                 } while (1);
+
+                /* Text naturalizer: lowercase first char, strip trailing period */
+                if (err == HU_OK && response && response_len > 0) {
+                    if (response_len > 1 && response[0] >= 'A' && response[0] <= 'Z' &&
+                        response[1] >= 'a' && response[1] <= 'z' && response[0] != 'I') {
+                        response[0] = (char)(response[0] + 32);
+                    }
+                    if (response_len > 1 && response[response_len - 1] == '.') {
+                        response[response_len - 1] = '\0';
+                        response_len--;
+                    }
+                }
 
 #ifdef HU_HAS_PERSONA
                 /* Replay learning: analyze conversation and store insights for future prompts */

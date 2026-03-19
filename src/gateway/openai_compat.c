@@ -475,6 +475,10 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                     "I am sorry to hear", "I can only imagine",
                     "sorry to hear", "going through that",
                     "I'm here for you", "here to support",
+                    "According to the available",
+                    "According to my",
+                    "significant negative impact",
+                    "fail to account for",
                 };
                 bool has_tell = false;
                 for (size_t ati = 0; ati < sizeof(ai_tells) / sizeof(ai_tells[0]); ati++) {
@@ -534,6 +538,21 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                         }
                         break;
                     }
+                }
+            }
+
+            /* Text naturalizer: lowercase first char, strip trailing periods
+             * to match real texting style. Real Seth doesn't capitalize or punctuate. */
+            if (agent_err == HU_OK && response && response_len > 0) {
+                /* Lowercase first character unless it's "I" alone or ALL CAPS word */
+                if (response_len > 1 && response[0] >= 'A' && response[0] <= 'Z' &&
+                    response[1] >= 'a' && response[1] <= 'z' && response[0] != 'I') {
+                    response[0] = (char)(response[0] + 32);
+                }
+                /* Strip trailing period (real texters don't use them) */
+                if (response_len > 1 && response[response_len - 1] == '.') {
+                    response[response_len - 1] = '\0';
+                    response_len--;
                 }
             }
 
