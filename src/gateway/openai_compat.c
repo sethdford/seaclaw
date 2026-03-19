@@ -489,7 +489,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                         hu_json_buf_append_raw(&buf, oc_choices, sizeof(oc_choices) - 1);
                         hu_json_append_string(&buf, response, response_len);
                         hu_json_buf_append_raw(&buf, oc_usage, sizeof(oc_usage) - 1);
-                        hu_json_buf_append_raw(&buf, "0,\"completion_tokens\":", 21);
+                        hu_json_buf_append_raw(&buf, "0,\"completion_tokens\":", 22);
                         char usage_buf[24];
                         snprintf(usage_buf, sizeof(usage_buf), "%zu", response_len / 4);
                         hu_json_buf_append_raw(&buf, usage_buf, strlen(usage_buf));
