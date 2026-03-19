@@ -28,6 +28,7 @@
 #endif
 #include "human/agent/orchestrator.h"
 #include "human/agent/reflection.h"
+#include "human/agent/swarm.h"
 #include "human/skillforge.h"
 #include "human/context.h"
 #include "human/context/conversation.h"
@@ -1258,15 +1259,27 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     /* Tool routing: if enabled, select relevant subset of tools for this message */
     hu_tool_selection_t tool_selection;
     memset(&tool_selection, 0, sizeof(tool_selection));
+    hu_tool_spec_t *routed_specs = NULL;
+    size_t routed_specs_count = 0;
     if (agent->tool_routing_enabled && agent->tools_count > HU_TOOL_ROUTER_MAX_SELECTED) {
         hu_error_t rerr = hu_tool_router_select(agent->alloc, msg, msg_len, agent->tools,
                                                 agent->tools_count, &tool_selection);
         if (rerr == HU_OK && tool_selection.count > 0) {
-            /* Use only selected tools for this turn; tool_specs are pre-built, placeholder for now
-             */
-            (void)tool_selection.count;
+            routed_specs = (hu_tool_spec_t *)agent->alloc->alloc(
+                agent->alloc->ctx, tool_selection.count * sizeof(hu_tool_spec_t));
+            if (routed_specs) {
+                for (size_t ri = 0; ri < tool_selection.count; ri++) {
+                    size_t idx = tool_selection.indices[ri];
+                    if (idx < agent->tool_specs_count)
+                        routed_specs[routed_specs_count++] = agent->tool_specs[idx];
+                }
+            }
         }
     }
+
+    /* Tool cache: create per-turn cache to avoid re-executing identical tool calls */
+    hu_tool_cache_t *turn_cache = NULL;
+    hu_tool_cache_create(agent->alloc, &turn_cache);
 
     hu_chat_message_t *msgs = NULL;
     size_t msgs_count = 0;
@@ -1276,8 +1289,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     req.model = agent->model_name;
     req.model_len = agent->model_name_len;
     req.temperature = agent->temperature;
-    req.tools = (agent->tool_specs_count > 0) ? agent->tool_specs : NULL;
-    req.tools_count = agent->tool_specs_count;
+    if (routed_specs_count > 0) {
+        req.tools = routed_specs;
+        req.tools_count = routed_specs_count;
+    } else {
+        req.tools = (agent->tool_specs_count > 0) ? agent->tool_specs : NULL;
+        req.tools_count = agent->tool_specs_count;
+    }
 
     uint32_t iter = 0;
     size_t turn_tool_results_count = 0;
@@ -1935,6 +1953,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
             if (plan_ctx)
                 agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
+            if (routed_specs)
+                agent->alloc->free(agent->alloc->ctx, routed_specs,
+                                   routed_specs_count * sizeof(hu_tool_spec_t));
+            if (turn_cache)
+                hu_tool_cache_destroy(agent->alloc, turn_cache);
             if (agent->turn_arena)
                 hu_arena_reset(agent->turn_arena);
             return HU_OK;
@@ -2139,42 +2162,97 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         orch.agents[s % orch.agent_count].agent_id_len);
                                 }
                             }
-                            /* Execute orchestrated tasks using agent's tools */
-                            for (size_t s = 0; s < orch.task_count; s++) {
-                                hu_orchestrator_task_t *task = &orch.tasks[s];
-                                if (task->status != HU_TASK_ASSIGNED)
-                                    continue;
-                                task->status = HU_TASK_IN_PROGRESS;
-                                hu_tool_t *orch_tool = hu_agent_internal_find_tool(
-                                    agent, task->description, task->description_len);
-                                if (!orch_tool) {
-                                    hu_orchestrator_fail_task(&orch, task->id, "tool not found", 14);
-                                    continue;
-                                }
-                                hu_tool_result_t orch_result = hu_tool_result_fail("no args", 7);
-                                if (s < tc_count && calls[s].arguments_len > 0) {
-                                    hu_json_value_t *orch_args = NULL;
-                                    hu_error_t jerr = hu_json_parse(agent->alloc, calls[s].arguments,
-                                                        calls[s].arguments_len, &orch_args);
-                                    if (jerr != HU_OK)
-                                        fprintf(stderr, "[agent_turn] tool args JSON parse failed\n");
-                                    if (orch_args && orch_tool->vtable->execute) {
-                                        orch_tool->vtable->execute(orch_tool->ctx, agent->alloc,
-                                                                   orch_args, &orch_result);
+                            /* Use swarm for parallel execution when multiple tasks are assigned */
+                            if (orch.task_count >= 2) {
+                                hu_swarm_config_t swarm_cfg = hu_swarm_config_default();
+                                hu_swarm_task_t swarm_tasks[HU_ORCHESTRATOR_MAX_TASKS];
+                                memset(swarm_tasks, 0, sizeof(swarm_tasks));
+                                size_t swarm_n = 0;
+                                for (size_t s = 0; s < orch.task_count && s < HU_ORCHESTRATOR_MAX_TASKS; s++) {
+                                    if (orch.tasks[s].status == HU_TASK_ASSIGNED) {
+                                        size_t dlen = orch.tasks[s].description_len;
+                                        if (dlen >= sizeof(swarm_tasks[swarm_n].description))
+                                            dlen = sizeof(swarm_tasks[swarm_n].description) - 1;
+                                        memcpy(swarm_tasks[swarm_n].description, orch.tasks[s].description, dlen);
+                                        swarm_tasks[swarm_n].description[dlen] = '\0';
+                                        swarm_tasks[swarm_n].description_len = dlen;
+                                        swarm_n++;
                                     }
-                                    if (orch_args)
-                                        hu_json_free(agent->alloc, orch_args);
                                 }
-                                if (orch_result.success) {
-                                    hu_orchestrator_complete_task(&orch, task->id,
-                                        orch_result.output ? orch_result.output : "ok",
-                                        orch_result.output ? orch_result.output_len : 2);
-                                } else {
-                                    hu_orchestrator_fail_task(&orch, task->id,
-                                        orch_result.error_msg ? orch_result.error_msg : "failed",
-                                        orch_result.error_msg ? orch_result.error_msg_len : 6);
+                                if (swarm_n > 0) {
+                                    hu_swarm_result_t swarm_result = {0};
+                                    hu_error_t swarm_err = hu_swarm_execute(agent->alloc, &swarm_cfg,
+                                                                             swarm_tasks, swarm_n, &swarm_result);
+                                    if (swarm_err == HU_OK) {
+                                        char swarm_merged[4096];
+                                        size_t swarm_merged_len = 0;
+                                        hu_swarm_aggregate(&swarm_result, HU_SWARM_AGG_CONCATENATE,
+                                                           swarm_merged, sizeof(swarm_merged), &swarm_merged_len);
+                                        if (swarm_merged_len > 0) {
+                                            hu_error_t hist_err = hu_agent_internal_append_history(
+                                                agent, HU_ROLE_TOOL, swarm_merged, swarm_merged_len,
+                                                "swarm", 5, "swarm_parallel", 14);
+                                            if (hist_err != HU_OK)
+                                                fprintf(stderr, "[agent_turn] swarm history append failed: %d\n", hist_err);
+                                        }
+                                        for (size_t s = 0; s < swarm_n; s++) {
+                                            size_t task_idx = 0;
+                                            for (size_t t = 0; t < orch.task_count; t++) {
+                                                if (orch.tasks[t].status == HU_TASK_ASSIGNED) {
+                                                    if (task_idx == s) {
+                                                        if (swarm_result.tasks[s].completed)
+                                                            hu_orchestrator_complete_task(&orch, orch.tasks[t].id,
+                                                                swarm_result.tasks[s].result, swarm_result.tasks[s].result_len);
+                                                        else
+                                                            hu_orchestrator_fail_task(&orch, orch.tasks[t].id,
+                                                                "swarm failed", 12);
+                                                        break;
+                                                    }
+                                                    task_idx++;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    hu_swarm_result_free(agent->alloc, &swarm_result);
                                 }
-                                hu_tool_result_free(agent->alloc, &orch_result);
+                            } else {
+                                /* Execute orchestrated tasks sequentially (single-task fallback) */
+                                for (size_t s = 0; s < orch.task_count; s++) {
+                                    hu_orchestrator_task_t *task = &orch.tasks[s];
+                                    if (task->status != HU_TASK_ASSIGNED)
+                                        continue;
+                                    task->status = HU_TASK_IN_PROGRESS;
+                                    hu_tool_t *orch_tool = hu_agent_internal_find_tool(
+                                        agent, task->description, task->description_len);
+                                    if (!orch_tool) {
+                                        hu_orchestrator_fail_task(&orch, task->id, "tool not found", 14);
+                                        continue;
+                                    }
+                                    hu_tool_result_t orch_result = hu_tool_result_fail("no args", 7);
+                                    if (s < tc_count && calls[s].arguments_len > 0) {
+                                        hu_json_value_t *orch_args = NULL;
+                                        hu_error_t jerr = hu_json_parse(agent->alloc, calls[s].arguments,
+                                                            calls[s].arguments_len, &orch_args);
+                                        if (jerr != HU_OK)
+                                            fprintf(stderr, "[agent_turn] tool args JSON parse failed\n");
+                                        if (orch_args && orch_tool->vtable->execute) {
+                                            orch_tool->vtable->execute(orch_tool->ctx, agent->alloc,
+                                                                       orch_args, &orch_result);
+                                        }
+                                        if (orch_args)
+                                            hu_json_free(agent->alloc, orch_args);
+                                    }
+                                    if (orch_result.success) {
+                                        hu_orchestrator_complete_task(&orch, task->id,
+                                            orch_result.output ? orch_result.output : "ok",
+                                            orch_result.output ? orch_result.output_len : 2);
+                                    } else {
+                                        hu_orchestrator_fail_task(&orch, task->id,
+                                            orch_result.error_msg ? orch_result.error_msg : "failed",
+                                            orch_result.error_msg ? orch_result.error_msg_len : 6);
+                                    }
+                                    hu_tool_result_free(agent->alloc, &orch_result);
+                                }
                             }
                             /* Merge and append orchestrated results */
                             char *merged = NULL;
@@ -2205,6 +2283,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 if (tc_count > 1)
                     dispatcher.max_parallel = 4;
                 dispatcher.timeout_secs = 30;
+                dispatcher.cache = turn_cache;
 
                 const hu_tool_call_t *calls_to_dispatch = calls;
 #ifdef HU_ENABLE_SQLITE
@@ -2604,6 +2683,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     hu_agent_clear_current_for_tools();
     if (system_prompt)
         agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+    if (routed_specs)
+        agent->alloc->free(agent->alloc->ctx, routed_specs,
+                           routed_specs_count * sizeof(hu_tool_spec_t));
+    if (turn_cache)
+        hu_tool_cache_destroy(agent->alloc, turn_cache);
     if (agent->turn_arena)
         hu_arena_reset(agent->turn_arena);
     return HU_ERR_TIMEOUT;
