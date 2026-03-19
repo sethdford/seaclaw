@@ -1260,6 +1260,61 @@
     }
   }
 
+  /* ── Mobile menu popover (native popover) ── */
+  .mobile-menu-popover {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    padding: var(--hu-space-2xl);
+    background: var(--hu-web-bg);
+    border: none;
+    z-index: var(--hu-z-popover);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .mobile-menu-popover::backdrop {
+    background: color-mix(in srgb, var(--hu-web-text) 50%, transparent);
+    backdrop-filter: blur(var(--hu-blur-sm));
+    -webkit-backdrop-filter: blur(var(--hu-blur-sm));
+  }
+
+  .mobile-menu-popover:popover-open {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @supports (selector(:popover-open)) {
+    .mobile-menu-popover {
+      @starting-style {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      transition:
+        opacity var(--hu-duration-normal) var(--hu-ease-out),
+        transform var(--hu-duration-normal) var(--hu-ease-out),
+        overlay var(--hu-duration-normal) var(--hu-ease-out) allow-discrete,
+        display var(--hu-duration-normal) var(--hu-ease-out) allow-discrete;
+    }
+  }
+
+  .mobile-menu-inner {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hu-space-md);
+  }
+
+  /* Fallback for browsers without popover support */
+  @supports not selector(:popover-open) {
+    .mobile-menu-popover {
+      display: none;
+    }
+    .mobile-menu-popover.is-open {
+      display: flex;
+    }
+  }
+
   .terminal-line,
   .dash-preview .flex {
     @starting-style {

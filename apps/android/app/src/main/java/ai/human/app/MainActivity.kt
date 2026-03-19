@@ -122,7 +122,7 @@ fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000
     val connectionState by gateway.state.collectAsState()
 
     DisposableEffect(selectedTab) {
-        if (selectedTab == 1) {
+        if (selectedTab in 0..3) {
             gateway.connectIfNeeded(initialGatewayUrl)
         }
         if (selectedTab == 0 && connectionState == ConnectionState.CONNECTED) {
@@ -256,8 +256,8 @@ fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000
                 when (tab) {
                     0 -> OverviewScreen(gateway = gateway, connectionState = connectionState)
                     1 -> ChatScreen(gateway = gateway)
-                    2 -> SessionsScreen()
-                    3 -> ToolsScreen()
+                    2 -> SessionsScreen(gateway = gateway, connectionState = connectionState)
+                    3 -> ToolsScreen(gateway = gateway, connectionState = connectionState)
                     4 -> SettingsScreen(
                         gateway = gateway,
                         connectionState = connectionState,

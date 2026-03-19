@@ -1,33 +1,11 @@
 import SwiftUI
 import HumanChatUI
 
-struct ChatSession: Identifiable {
-    let id: UUID
-    let title: String
-    let lastMessage: String?
-    let timestamp: Date
-    var isArchived: Bool
-
-    init(id: UUID = UUID(), title: String, lastMessage: String? = nil, timestamp: Date, isArchived: Bool = false) {
-        self.id = id
-        self.title = title
-        self.lastMessage = lastMessage
-        self.timestamp = timestamp
-        self.isArchived = isArchived
-    }
-}
-
 struct SessionsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var connectionManager: ConnectionManager
-    @State private var sessions: [ChatSession] = [
-        ChatSession(title: "Weather & Planning", lastMessage: "I'll check the forecast for you.", timestamp: Date().addingTimeInterval(-300)),
-        ChatSession(title: "Code Review Help", lastMessage: "Here's my suggested refactor...", timestamp: Date().addingTimeInterval(-3600)),
-        ChatSession(title: "Travel Ideas", lastMessage: "Based on your preferences...", timestamp: Date().addingTimeInterval(-86400)),
-        ChatSession(title: "Quick Questions", lastMessage: "Sure, I can help with that.", timestamp: Date().addingTimeInterval(-172800), isArchived: true),
-    ]
-    @State private var selectedSession: ChatSession?
+    @State private var selectedSession: SessionSummary?
     @State private var searchText = ""
 
     private var tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color) {
@@ -52,17 +30,17 @@ struct SessionsView: View {
         }
     }
 
-    private var activeSessions: [ChatSession] {
-        let active = sessions.filter { !$0.isArchived }
+    private var activeSessions: [SessionSummary] {
+        let active = connectionManager.sessions.filter { !$0.isArchived }
         if searchText.isEmpty { return active }
         return active.filter {
             $0.title.localizedCaseInsensitiveContains(searchText) ||
-            ($0.lastMessage?.localizedCaseInsensitiveContains(searchText) ?? false)
+            $0.lastMessage.localizedCaseInsensitiveContains(searchText)
         }
     }
 
-    private var archivedSessions: [ChatSession] {
-        sessions.filter { $0.isArchived }
+    private var archivedSessions: [SessionSummary] {
+        connectionManager.sessions.filter { $0.isArchived }
     }
 
     private func formatTimestamp(_ date: Date) -> String {
@@ -91,36 +69,24 @@ struct SessionsView: View {
 #if os(iOS)
                     .contextMenu {
                         Button {
-                            UIPasteboard.general.string = [session.title, session.lastMessage].compactMap { $0 }.joined(separator: "\n")
+                            UIPasteboard.general.string = [session.title, session.lastMessage].joined(separator: "\n")
                         } label: { Label("Copy", systemImage: "doc.on.doc") }
-                        if let msg = session.lastMessage {
-                            ShareLink(item: "\(session.title)\n\n\(msg)") {
+                        if !session.lastMessage.isEmpty {
+                            ShareLink(item: "\(session.title)\n\n\(session.lastMessage)") {
                                 Label("Share", systemImage: "square.and.arrow.up")
                             }
                         }
                         Button(role: .destructive) {
-                            if reduceMotion {
-                                sessions.removeAll { $0.id == session.id }
-                            } else {
-                                withAnimation(HUTokens.springExpressive) {
-                                    sessions.removeAll { $0.id == session.id }
-                                }
-                            }
+                            connectionManager.deleteSession(key: session.id)
                         } label: { Label("Delete", systemImage: "trash") }
                     }
 #endif
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    .swipeActions(edge: HorizontalEdge.trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
 #if os(iOS)
                             HUTokens.Haptic.medium.trigger()
 #endif
-                            if reduceMotion {
-                                sessions.removeAll { $0.id == session.id }
-                            } else {
-                                withAnimation(HUTokens.springExpressive) {
-                                    sessions.removeAll { $0.id == session.id }
-                                }
-                            }
+                            connectionManager.deleteSession(key: session.id)
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
@@ -128,17 +94,7 @@ struct SessionsView: View {
 #if os(iOS)
                             HUTokens.Haptic.light.trigger()
 #endif
-                            if reduceMotion {
-                                if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
-                                    sessions[idx].isArchived = true
-                                }
-                            } else {
-                                withAnimation(HUTokens.springExpressive) {
-                                    if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
-                                        sessions[idx].isArchived = true
-                                    }
-                                }
-                            }
+                            connectionManager.fetchSessions()
                         } label: {
                             Label("Archive", systemImage: "archivebox")
                         }
@@ -169,36 +125,24 @@ struct SessionsView: View {
 #if os(iOS)
                             .contextMenu {
                                 Button {
-                                    UIPasteboard.general.string = [session.title, session.lastMessage].compactMap { $0 }.joined(separator: "\n")
+                                    UIPasteboard.general.string = [session.title, session.lastMessage].joined(separator: "\n")
                                 } label: { Label("Copy", systemImage: "doc.on.doc") }
-                                if let msg = session.lastMessage {
-                                    ShareLink(item: "\(session.title)\n\n\(msg)") {
+                                if !session.lastMessage.isEmpty {
+                                    ShareLink(item: "\(session.title)\n\n\(session.lastMessage)") {
                                         Label("Share", systemImage: "square.and.arrow.up")
                                     }
                                 }
                                 Button(role: .destructive) {
-                                    if reduceMotion {
-                                        sessions.removeAll { $0.id == session.id }
-                                    } else {
-                                        withAnimation(HUTokens.springExpressive) {
-                                            sessions.removeAll { $0.id == session.id }
-                                        }
-                                    }
+                                    connectionManager.deleteSession(key: session.id)
                                 } label: { Label("Delete", systemImage: "trash") }
                             }
 #endif
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            .swipeActions(edge: HorizontalEdge.trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
 #if os(iOS)
                                     HUTokens.Haptic.medium.trigger()
 #endif
-                                    if reduceMotion {
-                                        sessions.removeAll { $0.id == session.id }
-                                    } else {
-                                        withAnimation(HUTokens.springExpressive) {
-                                            sessions.removeAll { $0.id == session.id }
-                                        }
-                                    }
+                                    connectionManager.deleteSession(key: session.id)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -206,17 +150,7 @@ struct SessionsView: View {
 #if os(iOS)
                                     HUTokens.Haptic.light.trigger()
 #endif
-                                    if reduceMotion {
-                                        if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
-                                            sessions[idx].isArchived = false
-                                        }
-                                    } else {
-                                        withAnimation(HUTokens.springExpressive) {
-                                            if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
-                                                sessions[idx].isArchived = false
-                                            }
-                                        }
-                                    }
+                                    connectionManager.fetchSessions()
                                 } label: {
                                     Label("Unarchive", systemImage: "archivebox.fill")
                                 }
@@ -291,7 +225,7 @@ private struct SessionRowSkeleton: View {
 }
 
 private struct SessionRow: View {
-    let session: ChatSession
+    let session: SessionSummary
     let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color)
     let formatTimestamp: (Date) -> String
 
@@ -306,8 +240,8 @@ private struct SessionRow: View {
                 Text(session.title)
                     .font(.custom("Avenir-Heavy", size: HUTokens.textBase, relativeTo: .body))
                     .foregroundStyle(tokens.text)
-                if let msg = session.lastMessage {
-                    Text(msg)
+                if !session.lastMessage.isEmpty {
+                    Text(session.lastMessage)
                         .font(.custom("Avenir-Book", size: HUTokens.textSm, relativeTo: .subheadline))
                         .foregroundStyle(tokens.textMuted)
                         .lineLimit(1)
@@ -327,12 +261,12 @@ private struct SessionRow: View {
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(session.title), \(session.lastMessage ?? "no messages"), \(formatTimestamp(session.timestamp))")
+        .accessibilityLabel("\(session.title), \(session.lastMessage.isEmpty ? "no messages" : session.lastMessage), \(formatTimestamp(session.timestamp))")
     }
 }
 
 private struct SessionDetailView: View {
-    let session: ChatSession
+    let session: SessionSummary
     let tokens: (bgSurface: Color, surfaceContainer: Color, surfaceContainerHigh: Color, text: Color, textMuted: Color, accent: Color)
 
     var body: some View {
@@ -351,8 +285,8 @@ private struct SessionDetailView: View {
                 .background(.thickMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: HUTokens.radiusLg, style: .continuous))
 
-                if let msg = session.lastMessage {
-                    Text(msg)
+                if !session.lastMessage.isEmpty {
+                    Text(session.lastMessage)
                         .font(.custom("Avenir-Book", size: HUTokens.textBase, relativeTo: .body))
                         .foregroundStyle(tokens.text)
                 }
@@ -368,12 +302,12 @@ private struct SessionDetailView: View {
     }
 }
 
-extension ChatSession: Hashable {
-    func hash(into hasher: inout Hasher) {
+extension SessionSummary: Hashable {
+    public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
 
-    static func == (lhs: ChatSession, rhs: ChatSession) -> Bool {
+    public static func == (lhs: SessionSummary, rhs: SessionSummary) -> Bool {
         lhs.id == rhs.id
     }
 }

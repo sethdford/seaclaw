@@ -440,6 +440,7 @@ set(HU_CORE_SOURCES
     src/agent/weather_fetch.c
     src/agent/timing.c
     src/agent/governor.c
+    src/agent/relationship_dynamics.c
     src/agent/arbitrator.c
     src/agent/planning.c
     src/agent/collab_planning.c
@@ -1865,6 +1866,7 @@ set(HU_TEST_SOURCES
     tests/test_weather_awareness.c
     tests/test_timing.c
     tests/test_governor.c
+    tests/test_relationship_dynamics.c
     tests/test_arbitrator.c
     tests/test_planning.c
     tests/test_rel_dynamics.c

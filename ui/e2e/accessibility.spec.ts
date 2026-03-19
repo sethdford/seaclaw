@@ -2,20 +2,23 @@ import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { shadowInteractiveRects, waitForViewReady, POLL } from "./helpers.js";
 
-const SHADOW_DOM_EXCLUDED_RULES = [
-  "color-contrast",
-  "link-in-text-block",
-  "scrollable-region-focusable",
-  "nested-interactive",
-  "label",
-  "aria-required-children",
-  "aria-required-parent",
-];
+/**
+ * Axe rules excluded due to known issues. Remove when fixed.
+ *
+ * - color-contrast: Some views (Chat, Automations, Skills, Security) have elements
+ *   below WCAG 2 AA 4.5:1 (e.g. hu-empty-state description #9b9b9b on #f5f5f5).
+ *   TODO: Fix contrast in empty states and secondary text.
+ *
+ * - aria-required-children: Chat session list uses role="listbox" but when empty
+ *   has no option/group children. TODO: Use role="list" or add placeholder option.
+ */
+const SHADOW_DOM_EXCLUDED_RULES = ["color-contrast", "aria-required-children"];
 
 const VIEWS = [
   { path: "/", name: "Overview" },
   { path: "/#chat", name: "Chat" },
   { path: "/#agents", name: "Agents" },
+  { path: "/#sessions", name: "Sessions" },
   { path: "/#models", name: "Models" },
   { path: "/#config", name: "Config" },
   { path: "/#tools", name: "Tools" },

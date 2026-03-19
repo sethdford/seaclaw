@@ -1,6 +1,5 @@
 package ai.human.app.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -20,35 +19,25 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
+import ai.human.app.ConnectionState
+import ai.human.app.GatewayClient
+import ai.human.app.ToolInfo
 import ai.human.app.ui.HUTokens
 import ai.human.app.ui.StaggeredItem
 import ai.human.app.util.isReducedMotionEnabled
-
-private data class ToolItem(
-    val id: String,
-    val name: String,
-    val description: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-)
-
-private data class ToolCategory(
-    val title: String,
-    val tools: List<ToolItem>,
-)
 
 private val listItemSpring = spring<IntOffset>(
     dampingRatio = 0.86f,
@@ -56,35 +45,20 @@ private val listItemSpring = spring<IntOffset>(
 )
 
 @Composable
-fun ToolsScreen() {
+fun ToolsScreen(
+    gateway: GatewayClient = GatewayClient(),
+    connectionState: ConnectionState = ConnectionState.DISCONNECTED,
+) {
     val colorScheme = MaterialTheme.colorScheme
-    val categories = remember {
-        listOf(
-            ToolCategory(
-                title = "Communication",
-                tools = listOf(
-                    ToolItem("1", "Slack", "Send and receive Slack messages", Icons.Filled.Build),
-                    ToolItem("2", "Email", "Read and send emails", Icons.Filled.Build),
-                ),
-            ),
-            ToolCategory(
-                title = "Development",
-                tools = listOf(
-                    ToolItem("3", "Shell", "Execute shell commands", Icons.Filled.Terminal),
-                    ToolItem("4", "Code Search", "Search across codebases", Icons.Filled.Search),
-                    ToolItem("5", "Git", "Run git operations", Icons.Filled.Code),
-                ),
-            ),
-            ToolCategory(
-                title = "Utilities",
-                tools = listOf(
-                    ToolItem("6", "Web Search", "Search the web", Icons.Filled.Search),
-                    ToolItem("7", "Calculator", "Perform calculations", Icons.Filled.Build),
-                ),
-            ),
-        )
-    }
+    val tools by gateway.tools.collectAsState()
     val reducedMotion = isReducedMotionEnabled()
+    val categories = tools.groupBy { it.category }.map { (title, list) -> title to list }
+
+    LaunchedEffect(Unit) {
+        if (connectionState == ConnectionState.CONNECTED) {
+            gateway.fetchTools()
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -116,8 +90,8 @@ fun ToolsScreen() {
             }
         }
 
-        categories.forEachIndexed { index, category ->
-            item(key = "header_${category.title}") {
+        categories.forEachIndexed { index, (categoryTitle, categoryTools) ->
+            item(key = "header_$categoryTitle") {
                 StaggeredItem(
                     index = 1 + index * 2,
                     reducedMotion = reducedMotion,
@@ -128,17 +102,17 @@ fun ToolsScreen() {
                         ),
                 ) {
                     Text(
-                        text = category.title,
+                        text = categoryTitle,
                         style = MaterialTheme.typography.titleMedium,
                         color = colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .padding(top = HUTokens.spaceMd)
-                            .semantics { contentDescription = "Category: ${category.title}" },
+                            .semantics { contentDescription = "Category: $categoryTitle" },
                     )
                 }
             }
 
-            item(key = "grid_${category.title}") {
+            item(key = "grid_$categoryTitle") {
                 StaggeredItem(
                     index = 2 + index * 2,
                     reducedMotion = reducedMotion,
@@ -151,7 +125,7 @@ fun ToolsScreen() {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(HUTokens.spaceMd),
                     ) {
-                        category.tools.chunked(2).forEach { rowTools ->
+                        categoryTools.chunked(2).forEach { rowTools ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(HUTokens.spaceMd),
@@ -161,7 +135,7 @@ fun ToolsScreen() {
                                         ToolCard(
                                             name = tool.name,
                                             description = tool.description,
-                                            icon = tool.icon,
+                                            icon = Icons.Filled.Build,
                                         )
                                     }
                                 }

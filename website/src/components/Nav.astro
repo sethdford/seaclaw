@@ -78,8 +78,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       <button
         id="mobile-menu-btn"
         type="button"
-        class="md:hidden flex items-center justify-center w-8 h-8 nav-link"
-        aria-label="Open menu"
+        class="mobile-menu-toggle md:hidden flex items-center justify-center w-8 h-8 nav-link"
+        aria-label="Menu"
         aria-expanded="false"
         aria-controls="mobile-menu"
         popovertarget="mobile-menu"
@@ -103,13 +103,13 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       </button>
     </div>
   </div>
-  <div
+  <nav
     id="mobile-menu"
-    class="mobile-menu-popover md:hidden"
     popover="auto"
-    style="background: var(--hu-web-surface-elevated); backdrop-filter: blur(24px) saturate(1.8); -webkit-backdrop-filter: blur(24px) saturate(1.8); border-bottom: 1px solid var(--hu-web-border);"
+    class="mobile-menu-popover md:hidden"
+    aria-label="Mobile navigation"
   >
-    <div class="max-w-6xl mx-auto px-6 py-4 flex flex-col gap-3">
+    <div class="mobile-menu-inner">
       <a
         href="#use-cases"
         class="mobile-menu-link text-[15px] py-2 transition-colors"
@@ -135,8 +135,15 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         class="mobile-menu-link text-[15px] py-2 transition-colors"
         style="color: var(--hu-web-text-secondary)">Docs</a
       >
+      <a
+        href="https://github.com/sethdford/h-uman"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="mobile-menu-link text-[15px] py-2 transition-colors"
+        style="color: var(--hu-web-text-secondary)">GitHub</a
+      >
     </div>
-  </div>
+  </nav>
 </nav>
 
 <style>
@@ -158,13 +165,6 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
   }
   .theme-icon-moon {
     display: block;
-  }
-  .mobile-menu-popover {
-    position: fixed;
-    top: 56px;
-    left: 0;
-    right: 0;
-    margin: 0;
   }
 </style>
 
@@ -211,14 +211,14 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       link.addEventListener("click", () => menu.hidePopover());
     });
   } else {
-    if (menu) menu.classList.add("hidden");
+    if (menu) menu.classList.remove("is-open");
     btn?.addEventListener("click", () => {
-      const open = menu?.classList.toggle("hidden") === false;
+      const open = menu?.classList.toggle("is-open") ?? false;
       setExpanded(open);
     });
     menu?.querySelectorAll(".mobile-menu-link").forEach((link) => {
       link.addEventListener("click", () => {
-        menu.classList.add("hidden");
+        menu.classList.remove("is-open");
         setExpanded(false);
       });
     });

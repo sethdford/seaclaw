@@ -1,6 +1,5 @@
 package ai.human.app.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -29,9 +28,9 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,17 +45,23 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import ai.human.app.ConnectionState
+import ai.human.app.GatewayClient
+import ai.human.app.SessionSummary
 import ai.human.app.ui.HUTokens
 import ai.human.app.ui.StaggeredItem
 import ai.human.app.util.isReducedMotionEnabled
 
-private data class SessionItem(
-    val id: String,
-    val title: String,
-    val timestamp: String,
-    val messageCount: Int,
-    val preview: String,
-)
+private fun formatRelativeTime(ms: Long): String {
+    val diff = System.currentTimeMillis() - ms
+    return when {
+        diff < 60_000 -> "Just now"
+        diff < 3600_000 -> "${diff / 60_000} min ago"
+        diff < 86_400_000 -> "${diff / 3600_000} hours ago"
+        diff < 172_800_000 -> "Yesterday"
+        else -> "${diff / 86_400_000} days ago"
+    }
+}
 
 private val listItemSpring = spring<IntOffset>(
     dampingRatio = 0.86f,
@@ -65,21 +70,22 @@ private val listItemSpring = spring<IntOffset>(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SessionsScreen() {
+fun SessionsScreen(
+    gateway: GatewayClient = GatewayClient(),
+    connectionState: ConnectionState = ConnectionState.DISCONNECTED,
+) {
     val colorScheme = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
-    val sessions = remember {
-        mutableStateListOf(
-            SessionItem("1", "CLI conversation", "2 min ago", 12, "I'll check the forecast for you."),
-            SessionItem("2", "Telegram support", "1 hour ago", 8, "Here's my suggested refactor..."),
-            SessionItem("3", "Discord channel sync", "3 hours ago", 24, "Based on your preferences..."),
-            SessionItem("4", "Slack workspace", "Yesterday", 15, "Sure, I can help with that."),
-            SessionItem("5", "Email thread", "2 days ago", 6, "Let me look into this."),
-        )
-    }
+    val sessions by gateway.sessions.collectAsState()
     val reducedMotion = isReducedMotionEnabled()
+
+    LaunchedEffect(connectionState) {
+        if (connectionState == ConnectionState.CONNECTED) {
+            gateway.fetchSessions()
+        }
+    }
 
     PullToRefreshBox(
         state = pullToRefreshState,
@@ -87,6 +93,9 @@ fun SessionsScreen() {
         onRefresh = {
             isRefreshing = true
             scope.launch {
+                if (connectionState == ConnectionState.CONNECTED) {
+                    gateway.fetchSessions()
+                }
                 delay(HUTokens.durationNormal.toLong())
                 isRefreshing = false
             }
@@ -124,7 +133,7 @@ fun SessionsScreen() {
 
         itemsIndexed(
             items = sessions,
-            key = { _, it -> it.id },
+            key = { _, it -> it.key },
         ) { index, session ->
             StaggeredItem(
                 index = 1 + index,
@@ -137,7 +146,13 @@ fun SessionsScreen() {
             ) {
                 SessionListItem(
                     session = session,
-                    onDismiss = { sessions.remove(session) },
+                    onDismiss = {
+                        gateway.send("sessions.delete", mapOf("key" to session.key))
+                        scope.launch {
+                            delay(300)
+                            gateway.fetchSessions()
+                        }
+                    },
                 )
             }
         }
@@ -148,7 +163,7 @@ fun SessionsScreen() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SessionListItem(
-    session: SessionItem,
+    session: SessionSummary,
     onDismiss: () -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -176,7 +191,7 @@ private fun SessionListItem(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Delete,
-                    contentDescription = "Delete session ${session.title}",
+                    contentDescription = "Delete session ${session.label}",
                     tint = colorScheme.onError,
                 )
             }
@@ -191,7 +206,7 @@ private fun SessionListItem(
                 .background(colorScheme.surfaceContainer)
                 .padding(HUTokens.spaceMd)
                 .semantics(mergeDescendants = true) {
-                    contentDescription = "${session.title}, ${session.messageCount} messages, ${session.timestamp}, preview: ${session.preview}"
+                    contentDescription = "${session.label}, ${session.turnCount} messages, ${formatRelativeTime(session.lastActive)}"
                 },
         ) {
             Row(
@@ -205,12 +220,12 @@ private fun SessionListItem(
                         horizontalArrangement = Arrangement.spacedBy(HUTokens.spaceXs),
                     ) {
                         Text(
-                            text = session.title,
+                            text = session.label,
                             style = MaterialTheme.typography.titleMedium,
                             color = colorScheme.onSurface,
                         )
                         Text(
-                            text = "${session.messageCount}",
+                            text = "${session.turnCount}",
                             style = MaterialTheme.typography.labelSmall,
                             color = colorScheme.primary,
                             modifier = Modifier
@@ -222,18 +237,18 @@ private fun SessionListItem(
                         )
                     }
                     Text(
-                        text = (session.preview.take(40) + if (session.preview.length > 40) "…" else ""),
+                        text = "—",
                         style = MaterialTheme.typography.bodySmall,
                         color = colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = session.timestamp,
+                        text = formatRelativeTime(session.lastActive),
                         style = MaterialTheme.typography.labelSmall,
                         color = colorScheme.onSurfaceVariant,
                     )
                 }
                 Text(
-                    text = "${session.messageCount} msgs",
+                    text = "${session.turnCount} msgs",
                     style = MaterialTheme.typography.labelMedium,
                     color = colorScheme.onSurfaceVariant,
                 )

@@ -33,15 +33,40 @@ struct OverviewView: View {
         return colorScheme == .dark ? dark : light
     }
 
+    private var overviewStatusColor: Color {
+        if !connectionManager.isConnected { return tokens.error }
+        switch connectionManager.healthStatus {
+        case .healthy, .unknown: return tokens.success
+        case .degraded: return tokens.accent
+        case .unhealthy: return tokens.error
+        }
+    }
+
+    private var overviewStatusText: String {
+        if !connectionManager.isConnected { return "Disconnected" }
+        switch connectionManager.healthStatus {
+        case .healthy: return "Connected"
+        case .degraded: return "Degraded"
+        case .unhealthy: return "Unhealthy"
+        case .unknown: return "Connected"
+        }
+    }
+
+    private func formatTimeAgo(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: HUTokens.spaceLg) {
                     HStack(spacing: HUTokens.spaceSm) {
                         Circle()
-                            .fill(connectionManager.isConnected ? tokens.success : tokens.error)
+                            .fill(overviewStatusColor)
                             .frame(width: 8, height: 8)
-                        Text(connectionManager.isConnected ? "Connected" : "Disconnected")
+                        Text(overviewStatusText)
                             .font(.custom("Avenir-Medium", size: HUTokens.textSm, relativeTo: .subheadline))
                             .foregroundStyle(tokens.textMuted)
                         Spacer()
@@ -132,27 +157,7 @@ struct OverviewView: View {
                             .padding(.horizontal)
 
                         VStack(spacing: 0) {
-                            if connectionManager.isConnected {
-                            ForEach(Array(ActivityRow.activities.enumerated()), id: \.offset) { index, activity in
-                                ActivityRow(
-                                    title: activity.0,
-                                    source: activity.1,
-                                    timeAgo: activity.2,
-                                    accent: tokens.accent,
-                                    text: tokens.text,
-                                    textMuted: tokens.textMuted
-                                )
-                                .opacity(appeared ? 1 : 0)
-                                .offset(y: appeared ? 0 : HUTokens.spaceSm)
-                                .animation(reduceMotion ? nil : HUTokens.springExpressive.delay(min(Double(index) * 0.05, 0.3)), value: appeared)
-
-                                if index < ActivityRow.activities.count - 1 {
-                                    Divider()
-                                        .background(tokens.textMuted.opacity(HUTokens.opacityOverlayMedium))
-                                        .padding(.leading, HUTokens.space2xl)
-                                }
-                            }
-                            } else {
+                            if !connectionManager.isConnected || (connectionManager.recentActivity.isEmpty && connectionManager.isConnected) {
                                 ForEach(0..<5, id: \.self) { i in
                                     VStack(spacing: 0) {
                                         ActivityRowSkeleton()
@@ -161,6 +166,26 @@ struct OverviewView: View {
                                                 .background(tokens.textMuted.opacity(HUTokens.opacityOverlayMedium))
                                                 .padding(.leading, HUTokens.space2xl)
                                         }
+                                    }
+                                }
+                            } else {
+                                ForEach(Array(connectionManager.recentActivity.enumerated()), id: \.element.id) { index, activity in
+                                    ActivityRow(
+                                        title: activity.description,
+                                        source: activity.type.capitalized,
+                                        timeAgo: formatTimeAgo(activity.timestamp),
+                                        accent: tokens.accent,
+                                        text: tokens.text,
+                                        textMuted: tokens.textMuted
+                                    )
+                                    .opacity(appeared ? 1 : 0)
+                                    .offset(y: appeared ? 0 : HUTokens.spaceSm)
+                                    .animation(reduceMotion ? nil : HUTokens.springExpressive.delay(min(Double(index) * 0.05, 0.3)), value: appeared)
+
+                                    if index < connectionManager.recentActivity.count - 1 {
+                                        Divider()
+                                            .background(tokens.textMuted.opacity(HUTokens.opacityOverlayMedium))
+                                            .padding(.leading, HUTokens.space2xl)
                                     }
                                 }
                             }
@@ -287,14 +312,6 @@ private struct ActivityRow: View {
     let accent: Color
     let text: Color
     let textMuted: Color
-
-    static let activities: [(String, String, String)] = [
-        ("Chat message received", "Slack", "2m ago"),
-        ("Tool executed: web_search", "Agent", "5m ago"),
-        ("Session started", "CLI", "12m ago"),
-        ("Memory consolidated", "System", "1h ago"),
-        ("Channel connected", "Discord", "2h ago"),
-    ]
 
     var body: some View {
         HStack(spacing: HUTokens.spaceMd) {

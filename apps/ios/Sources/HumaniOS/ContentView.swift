@@ -66,6 +66,9 @@ struct ContentView: View {
             .allowsHitTesting(false)
         }
 #endif
+        .task {
+            connectionManager.prefetchDataForTab(selectedTab)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToTab)) { notification in
             if let tab = notification.userInfo?["tab"] as? AppTab {
                 withAnimation(HUTokens.springExpressive) {
@@ -73,21 +76,26 @@ struct ContentView: View {
                 }
             }
         }
-        .onChange(of: selectedTab) { _, _ in
+        .onChange(of: selectedTab) { _, tab in
 #if os(iOS)
             HUTokens.Haptic.selection.trigger()
 #endif
+            connectionManager.prefetchDataForTab(tab)
         }
         .onChange(of: connectionManager.isConnected) { _, isConnected in
             withAnimation(HUTokens.springExpressive) {
-#if os(iOS)
-                let notification = UINotificationFeedbackGenerator()
                 if isConnected {
+#if os(iOS)
+                    let notification = UINotificationFeedbackGenerator()
                     notification.notificationOccurred(.success)
-                } else {
-                    notification.notificationOccurred(.error)
-                }
 #endif
+                    connectionManager.prefetchDataForTab(selectedTab)
+                } else {
+#if os(iOS)
+                    let notification = UINotificationFeedbackGenerator()
+                    notification.notificationOccurred(.error)
+#endif
+                }
             }
         }
     }

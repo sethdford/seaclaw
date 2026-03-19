@@ -167,6 +167,7 @@ void run_proactive_tests(void);
 void run_weather_awareness_tests(void);
 void run_timing_tests(void);
 void run_governor_tests(void);
+void run_relationship_dynamics_tests(void);
 void run_arbitrator_tests(void);
 void run_planning_tests(void);
 void run_rel_dynamics_tests(void);
@@ -486,6 +487,7 @@ int main(int argc, char **argv) {
     run_weather_awareness_tests();
     run_timing_tests();
     run_governor_tests();
+    run_relationship_dynamics_tests();
     run_arbitrator_tests();
     run_planning_tests();
     run_rel_dynamics_tests();

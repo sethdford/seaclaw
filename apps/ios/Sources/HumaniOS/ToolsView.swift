@@ -1,22 +1,6 @@
 import SwiftUI
 import HumanChatUI
 
-struct ToolItem: Identifiable {
-    let id: String
-    let name: String
-    let description: String
-    let icon: String
-    let category: ToolCategory
-}
-
-enum ToolCategory: String, CaseIterable {
-    case system = "System"
-    case files = "Files"
-    case network = "Network"
-    case search = "Search"
-    case other = "Other"
-}
-
 struct ToolsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
@@ -45,33 +29,23 @@ struct ToolsView: View {
         }
     }
 
-    private let toolsByCategory: [ToolCategory: [ToolItem]] = [
-        .system: [
-            ToolItem(id: "shell", name: "Shell", description: "Execute shell commands", icon: "terminal", category: .system),
-            ToolItem(id: "eval", name: "Eval", description: "Evaluate expressions", icon: "function", category: .system),
-            ToolItem(id: "time", name: "Time", description: "Get current time", icon: "clock", category: .system),
-        ],
-        .files: [
-            ToolItem(id: "read_file", name: "Read File", description: "Read file contents", icon: "doc.text", category: .files),
-            ToolItem(id: "write_file", name: "Write File", description: "Write to a file", icon: "doc.badge.plus", category: .files),
-            ToolItem(id: "list_dir", name: "List Directory", description: "List directory contents", icon: "folder", category: .files),
-        ],
-        .network: [
-            ToolItem(id: "fetch", name: "Fetch", description: "HTTP request", icon: "network", category: .network),
-            ToolItem(id: "curl", name: "Curl", description: "URL transfer", icon: "arrow.down.circle", category: .network),
-        ],
-        .search: [
-            ToolItem(id: "grep", name: "Grep", description: "Search text patterns", icon: "magnifyingglass", category: .search),
-            ToolItem(id: "codebase_search", name: "Codebase Search", description: "Semantic code search", icon: "doc.text.magnifyingglass", category: .search),
-        ],
-        .other: [
-            ToolItem(id: "browser", name: "Browser", description: "Web navigation", icon: "globe", category: .other),
-            ToolItem(id: "memory", name: "Memory", description: "Store and recall", icon: "brain", category: .other),
-        ],
-    ]
+    private var toolsByCategory: [(category: String, tools: [ToolInfo])] {
+        let grouped = Dictionary(grouping: connectionManager.tools, by: { $0.category })
+        let order = ["System", "Files", "Network", "Search", "Other"]
+        var result: [(category: String, tools: [ToolInfo])] = []
+        for cat in order {
+            if let tools = grouped[cat], !tools.isEmpty {
+                result.append((category: cat, tools: tools))
+            }
+        }
+        for (cat, tools) in grouped where !order.contains(cat) {
+            result.append((category: cat, tools: tools))
+        }
+        return result
+    }
 
     private var hasAnyTools: Bool {
-        toolsByCategory.values.contains { !$0.isEmpty }
+        !connectionManager.tools.isEmpty
     }
 
     var body: some View {
@@ -79,10 +53,8 @@ struct ToolsView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: HUTokens.spaceXl) {
                     if connectionManager.isConnected {
-                    ForEach(ToolCategory.allCases, id: \.self) { category in
-                        if let tools = toolsByCategory[category], !tools.isEmpty {
-                            categorySection(category: category, tools: tools)
-                        }
+                    ForEach(toolsByCategory, id: \.category) { group in
+                        categorySection(category: group.category, tools: group.tools)
                     }
                     } else {
                         ToolCardSkeletonGrid()
@@ -121,9 +93,9 @@ struct ToolsView: View {
     }
 
     @ViewBuilder
-    private func categorySection(category: ToolCategory, tools: [ToolItem]) -> some View {
+    private func categorySection(category: String, tools: [ToolInfo]) -> some View {
         VStack(alignment: .leading, spacing: HUTokens.spaceSm) {
-            Text(category.rawValue)
+            Text(category)
                 .font(.custom("Avenir-Heavy", size: HUTokens.textXl, relativeTo: .body))
                 .foregroundStyle(tokens.text)
 
@@ -132,7 +104,7 @@ struct ToolsView: View {
                 GridItem(.flexible(), spacing: HUTokens.spaceMd),
             ], spacing: HUTokens.spaceMd) {
                 ForEach(Array(tools.enumerated()), id: \.element.id) { index, tool in
-                        ToolCard(
+                    ToolCard(
                         tool: tool,
                         surfaceContainer: tokens.surfaceContainerHigh,
                         text: tokens.text,
@@ -199,7 +171,7 @@ private struct ToolCardSkeleton: View {
 }
 
 private struct ToolCard: View {
-    let tool: ToolItem
+    let tool: ToolInfo
     let surfaceContainer: Color
     let text: Color
     let textMuted: Color
@@ -210,24 +182,24 @@ private struct ToolCard: View {
 
     @ViewBuilder
     private var toolIcon: some View {
-        if let phosphor = phosphorIcon(for: tool.icon) {
+        if let phosphor = phosphorIcon(for: tool.name) {
             PhosphorIcon(name: phosphor, size: HUTokens.textLg)
                 .foregroundStyle(textMuted)
         } else {
-            Image(systemName: tool.icon)
+            Image(systemName: "wrench.and.screwdriver")
                 .font(.custom("Avenir-Medium", size: HUTokens.textLg, relativeTo: .body))
                 .foregroundStyle(textMuted)
         }
     }
 
     private func phosphorIcon(for name: String) -> PhosphorIconName? {
-        switch name {
-        case "terminal": return .terminal
-        case "clock": return .clock
-        case "wrench.and.screwdriver": return .wrench
-        case "gear": return .gear
-        default: return nil
-        }
+        let lower = name.lowercased()
+        if lower.contains("shell") || lower.contains("terminal") { return .terminal }
+        if lower.contains("time") || lower.contains("clock") { return .clock }
+        if lower.contains("file") || lower.contains("read") || lower.contains("write") { return .gear }
+        if lower.contains("fetch") || lower.contains("curl") || lower.contains("http") { return .terminal }
+        if lower.contains("grep") || lower.contains("search") { return .gear }
+        return .wrench
     }
 
     var body: some View {

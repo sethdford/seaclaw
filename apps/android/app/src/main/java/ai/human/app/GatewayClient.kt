@@ -33,9 +33,24 @@ data class SessionSummary(
 
 @Immutable
 data class ActivityEvent(
+    val id: String,
     val type: String,
-    val text: String,
+    val description: String,
     val timestamp: Long = System.currentTimeMillis(),
+)
+
+@Immutable
+data class ToolInfo(
+    val id: String,
+    val name: String,
+    val description: String,
+    val category: String,
+)
+
+@Immutable
+data class HealthStatus(
+    val status: String,
+    val uptimeSecs: Long = 0,
 )
 
 class GatewayClient {
@@ -57,8 +72,17 @@ class GatewayClient {
     private val _sessions = MutableStateFlow<List<SessionSummary>>(emptyList())
     val sessions: StateFlow<List<SessionSummary>> = _sessions.asStateFlow()
 
-    private val _overviewActivity = MutableStateFlow<List<ActivityEvent>>(emptyList())
-    val overviewActivity: StateFlow<List<ActivityEvent>> = _overviewActivity.asStateFlow()
+    private val _activity = MutableStateFlow<List<ActivityEvent>>(emptyList())
+    val activity: StateFlow<List<ActivityEvent>> = _activity.asStateFlow()
+
+    private val _tools = MutableStateFlow<List<ToolInfo>>(emptyList())
+    val tools: StateFlow<List<ToolInfo>> = _tools.asStateFlow()
+
+    private val _healthStatus = MutableStateFlow<HealthStatus?>(null)
+    val healthStatus: StateFlow<HealthStatus?> = _healthStatus.asStateFlow()
+
+    private val _overviewLoading = MutableStateFlow(false)
+    val overviewLoading: StateFlow<Boolean> = _overviewLoading.asStateFlow()
 
     /** Connect only when needed (e.g. when Chat tab is selected). Idempotent. */
     fun connectIfNeeded(url: String) {
@@ -85,7 +109,7 @@ class GatewayClient {
                         val json = JSONObject(text)
                         val type = json.optString("type", "")
                         if (type == "res") {
-                            val result = json.optJSONObject("result") ?: JSONObject()
+                            val result = json.optJSONObject("result") ?: json.optJSONObject("payload") ?: JSONObject()
                             val content = result.optString("content", "")
                                 .ifBlank { result.optString("text", "") }
                             if (content.isNotBlank()) {
@@ -106,21 +130,51 @@ class GatewayClient {
                                     )
                                 }
                                 _sessions.value = list
+                                _overviewLoading.value = false
                             }
                             val eventsArr = result.optJSONArray("events")
                             if (eventsArr != null) {
                                 val list = mutableListOf<ActivityEvent>()
                                 for (i in 0 until eventsArr.length()) {
                                     val o = eventsArr.optJSONObject(i) ?: continue
+                                    val tsRaw = o.optDouble("time", o.optDouble("timestamp", 0.0))
+                                    val tsMs = if (tsRaw > 1e12) tsRaw.toLong() else (tsRaw * 1000).toLong()
+                                    val desc = o.optString("message", o.optString("text", o.optString("content", o.optString("preview", ""))))
                                     list.add(
                                         ActivityEvent(
+                                            id = o.optString("id", "ev-$i-${tsMs}"),
                                             type = o.optString("type", ""),
-                                            text = o.optString("text", o.optString("content", "")),
-                                            timestamp = (o.optDouble("timestamp", 0.0) * 1000).toLong(),
+                                            description = desc,
+                                            timestamp = tsMs,
                                         ),
                                     )
                                 }
-                                _overviewActivity.value = list
+                                _activity.value = list
+                                _overviewLoading.value = false
+                            }
+                            val toolsArr = result.optJSONArray("tools")
+                            if (toolsArr != null) {
+                                val list = mutableListOf<ToolInfo>()
+                                for (i in 0 until toolsArr.length()) {
+                                    val o = toolsArr.optJSONObject(i) ?: continue
+                                    val name = o.optString("name", "")
+                                    if (name.isBlank()) continue
+                                    list.add(
+                                        ToolInfo(
+                                            id = o.optString("id", name),
+                                            name = name,
+                                            description = o.optString("description", ""),
+                                            category = o.optString("category", "General"),
+                                        ),
+                                    )
+                                }
+                                _tools.value = list
+                            }
+                            if (result.has("uptime_secs")) {
+                                _healthStatus.value = HealthStatus(
+                                    status = result.optString("status", "unknown"),
+                                    uptimeSecs = result.optLong("uptime_secs", 0),
+                                )
                             }
                         } else if (type == "event") {
                             _events.value = GatewayEvent(
@@ -159,19 +213,41 @@ class GatewayClient {
         _state.value = ConnectionState.DISCONNECTED
     }
 
+    /** Fetch sessions list. Updates _sessions when response received. */
+    fun fetchSessions() {
+        send("sessions.list", emptyMap())
+    }
+
+    /** Fetch tools catalog. Updates _tools when response received. */
+    fun fetchTools() {
+        send("tools.catalog", emptyMap())
+    }
+
+    /** Fetch recent activity. Updates _activity when response received. */
+    fun fetchRecentActivity() {
+        send("activity.recent", emptyMap())
+    }
+
+    /** Fetch health status. Updates _healthStatus when response received. */
+    fun fetchHealthStatus() {
+        send("health", emptyMap())
+    }
+
     /** Prefetch sessions list for adjacent tab navigation. */
     fun prefetchSessions() {
-        send("sessions.list", emptyMap())
+        fetchSessions()
     }
 
     /** Prefetch tools catalog for adjacent tab navigation. */
     fun prefetchTools() {
-        send("tools.catalog", emptyMap())
+        fetchTools()
     }
 
-    /** Fetch overview data: sessions and activity. Call when connected. */
+    /** Fetch overview data: sessions, activity, and health. Call when connected. */
     fun fetchOverviewData() {
+        _overviewLoading.value = true
         send("sessions.list", emptyMap())
         send("activity.recent", emptyMap())
+        send("health", emptyMap())
     }
 }

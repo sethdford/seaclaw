@@ -74,7 +74,8 @@ fun OverviewScreen(
     val pullToRefreshState = rememberPullToRefreshState()
     val events by gateway.events.collectAsState()
     val sessions by gateway.sessions.collectAsState()
-    val overviewActivity by gateway.overviewActivity.collectAsState()
+    val activity by gateway.activity.collectAsState()
+    val overviewLoading by gateway.overviewLoading.collectAsState()
     val recentActivity = remember { mutableStateListOf<String>() }
 
     LaunchedEffect(connectionState) {
@@ -111,12 +112,12 @@ fun OverviewScreen(
     }
 
     val displayActivity = when {
-        connectionState == ConnectionState.CONNECTED && overviewActivity.isNotEmpty() ->
-            overviewActivity.map { "${it.type}: ${it.text.take(60)}" }
+        connectionState == ConnectionState.CONNECTED && activity.isNotEmpty() ->
+            activity.map { "${it.type}: ${it.description.take(60)}" }
         connectionState == ConnectionState.CONNECTED -> recentActivity
         else -> emptyList<String>()
     }
-    val showSkeletons = connectionState != ConnectionState.CONNECTED
+    val showSkeletons = connectionState != ConnectionState.CONNECTED || overviewLoading
 
     PullToRefreshBox(
         state = pullToRefreshState,
