@@ -9,8 +9,9 @@ static void *test_alloc_fn(void *ctx, size_t size) {
     return malloc(size);
 }
 
-static void test_free_fn(void *ctx, void *ptr) {
+static void test_free_fn(void *ctx, void *ptr, size_t size) {
     (void)ctx;
+    (void)size;
     free(ptr);
 }
 
