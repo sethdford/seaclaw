@@ -403,7 +403,7 @@ export class ScChatSessionsPanel extends LitElement {
         </div>
         <div
           class="session-list"
-          role=${filteredGroups.length > 0 ? "listbox" : "list"}
+          role=${filteredGroups.length > 0 ? "listbox" : "region"}
           tabindex="0"
           aria-label="Session list"
           @keydown=${this._onListKeydown}
