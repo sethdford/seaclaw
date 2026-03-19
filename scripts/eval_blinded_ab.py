@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-Blinded A/B Human Fidelity Evaluation
+Blinded A/B Evaluation: AI vs Real Seth
 
-Compares three response sources for the same incoming messages:
-  A: Fine-tuned Gemma 3 4B (via hu agent with compatible provider)
-  B: Gemini 2.0 Flash with persona prompt (via hu agent with gemini provider)
-  C: Real Seth (from ground truth iMessage data)
+Takes ground truth pairs (real incoming + real Seth reply), sends the same
+incoming through the AI daemon, then presents both to an independent LLM
+judge in randomized order. The judge picks which response sounds more human.
 
-An independent Gemini evaluator sees all three responses in randomized order
-without knowing which is which, and rates each on human-likeness.
+Usage:
+  python3 scripts/eval_blinded_ab.py                      # CLI mode
+  python3 scripts/eval_blinded_ab.py --gateway             # Live daemon mode
+  python3 scripts/eval_blinded_ab.py --gateway --synthetic  # Include synthetic scenarios
 """
 
 import json
@@ -17,330 +18,301 @@ import random
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
-import re
 
-EVAL_API_KEY = os.environ.get("GEMINI_EVAL_KEY", "AIzaSyDogKCd2qb-FvaueGZAtZWVGyF4h2JFsiw")
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={EVAL_API_KEY}"
+API_KEY = os.environ.get("GEMINI_API_KEY", "")
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "johnb-2025")
+EVAL_MODEL = "gemini-2.0-flash"
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(SCRIPT_DIR, "..", "data", "imessage")
-GROUND_TRUTH_PATH = os.path.join(DATA_DIR, "ground_truth.jsonl")
-OUTPUT_PATH = os.path.join(SCRIPT_DIR, "..", "eval_blinded_results.json")
-HU_BIN = os.path.expanduser("~/bin/hu")
+_adc_token_cache = {"token": None, "expires": 0}
 
-CONFIG_PATH = os.path.expanduser("~/.human/config.json")
-
-N_SAMPLES = 10
-
-
-def call_gemini(prompt, temperature=0.3, retries=3):
-    payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": temperature, "maxOutputTokens": 4096}
+def _get_adc_token():
+    """Get an OAuth2 access token from Application Default Credentials."""
+    if _adc_token_cache["token"] and time.time() < _adc_token_cache["expires"] - 60:
+        return _adc_token_cache["token"]
+    creds_path = os.path.expanduser("~/.config/gcloud/application_default_credentials.json")
+    if not os.path.exists(creds_path):
+        return None
+    with open(creds_path) as f:
+        creds = json.load(f)
+    payload = urllib.parse.urlencode({
+        "client_id": creds["client_id"],
+        "client_secret": creds["client_secret"],
+        "refresh_token": creds["refresh_token"],
+        "grant_type": "refresh_token",
     }).encode()
-    for attempt in range(retries):
-        try:
-            req = urllib.request.Request(GEMINI_URL, data=payload, headers={"Content-Type": "application/json"})
-            resp = urllib.request.urlopen(req)
-            data = json.loads(resp.read())
-            return data["candidates"][0]["content"]["parts"][0]["text"]
-        except urllib.error.HTTPError as e:
-            if e.code in (403, 429) and attempt < retries - 1:
-                wait = 30 * (attempt + 1)
-                print(f"    Rate limited, waiting {wait}s...")
-                time.sleep(wait)
-            else:
-                raise
+    req = urllib.request.Request("https://oauth2.googleapis.com/token",
+                                 data=payload, headers={"Content-Type": "application/x-www-form-urlencoded"})
+    resp = urllib.request.urlopen(req, timeout=10)
+    data = json.loads(resp.read())
+    _adc_token_cache["token"] = data["access_token"]
+    _adc_token_cache["expires"] = time.time() + data.get("expires_in", 3600)
+    return data["access_token"]
 
 
-def load_config():
-    with open(CONFIG_PATH) as f:
-        return json.load(f)
+def _gemini_url():
+    if API_KEY:
+        return f"https://generativelanguage.googleapis.com/v1beta/models/{EVAL_MODEL}:generateContent?key={API_KEY}"
+    return (f"https://aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/global/"
+            f"publishers/google/models/{EVAL_MODEL}:generateContent")
+
+GATEWAY_URL = os.environ.get("HU_GATEWAY_URL", "http://127.0.0.1:3002")
+USE_GATEWAY = "--gateway" in sys.argv
+USE_SYNTHETIC = "--synthetic" in sys.argv
+
+HU_BIN = "hu"
+GT_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "imessage", "ground_truth.jsonl")
+RESULTS_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "eval_blinded_ab.json")
+
+SYNTHETIC_SCENARIOS = [
+    {"incoming": "hey whats up", "seth_reply": "not much just chilling. you?"},
+    {"incoming": "want to grab dinner tonight?", "seth_reply": "yeah im down. what are you thinking"},
+    {"incoming": "I got the job!!", "seth_reply": "LETS GO!! dude thats amazing congrats"},
+    {"incoming": "I'm so stressed about this deadline", "seth_reply": "ugh I feel you. whats the deadline for?"},
+    {"incoming": "did you see that game last night", "seth_reply": "no I missed it. was it good?"},
+    {"incoming": "can you help me move this weekend", "seth_reply": "yeah I can probably do Saturday morning. what time?"},
+    {"incoming": "I've been thinking about switching careers", "seth_reply": "oh for real? what are you thinking about doing"},
+    {"incoming": "lol remember that time we got lost in SF", "seth_reply": "hahaha dude yes. that uber driver was SO mad"},
+    {"incoming": "happy birthday!!", "seth_reply": "thanks!! 🙏"},
+    {"incoming": "sorry I've been MIA lately", "seth_reply": "no worries at all. everything ok?"},
+]
 
 
-def save_config(cfg):
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(cfg, f, indent=2)
+def call_gemini(prompt, temperature=0.3):
+    payload = json.dumps({
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": temperature, "maxOutputTokens": 2048}
+    }).encode()
+    headers = {"Content-Type": "application/json"}
+    if not API_KEY:
+        token = _get_adc_token()
+        if not token:
+            raise RuntimeError("No GEMINI_API_KEY and no ADC credentials found")
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(_gemini_url(), data=payload, headers=headers)
+    resp = urllib.request.urlopen(req, timeout=30)
+    data = json.loads(resp.read())
+    return data["candidates"][0]["content"]["parts"][0]["text"]
 
 
-def get_hu_response(message):
+def get_ai_response(message):
+    if USE_GATEWAY:
+        return get_ai_response_gateway(message)
+    return get_ai_response_cli(message)
+
+
+def get_ai_response_cli(message):
     try:
         env = {**os.environ, "PATH": os.path.expanduser("~/bin") + ":" + os.environ.get("PATH", "")}
-        result = subprocess.run(
-            [HU_BIN, "agent", "-m", message],
-            capture_output=True, timeout=30, env=env
-        )
-        raw_bytes = result.stdout
-        output = raw_bytes.decode("utf-8", errors="replace")
-        output = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', output)
+        result = subprocess.run([HU_BIN, "agent", "-m", message],
+                                capture_output=True, text=True, timeout=30, env=env)
+        import re
+        output = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', result.stdout)
         output = re.sub(r'\x1b\[\?25[hl]', '', output)
-        output = re.sub(r'[\ufffc\ufffd]', '', output)
         lines = [l.strip() for l in output.strip().split("\n") if l.strip() and l.strip() != "Goodbye."]
-        return " ".join(lines) if lines else "(empty response)"
-    except subprocess.TimeoutExpired:
-        return "(timeout)"
+        return " ".join(lines) if lines else "(empty)"
     except Exception as e:
         return f"(error: {e})"
 
 
-def set_provider(provider_name, model=None):
-    cfg = load_config()
-    cfg["default_provider"] = provider_name
-    if model:
-        cfg["default_model"] = model
-    save_config(cfg)
+def get_ai_response_gateway(message):
+    try:
+        payload = json.dumps({
+            "model": "default",
+            "messages": [{"role": "user", "content": message}],
+        }).encode()
+        req = urllib.request.Request(
+            f"{GATEWAY_URL}/v1/chat/completions",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        resp = urllib.request.urlopen(req, timeout=60)
+        data = json.loads(resp.read())
+        choices = data.get("choices", [])
+        if choices:
+            return choices[0].get("message", {}).get("content", "(empty)")
+        return "(no choices)"
+    except Exception as e:
+        return f"(gateway error: {e})"
+
+
+def blinded_judge(incoming, response_a, response_b):
+    """Ask Gemini to judge which response is more human, without knowing which is AI."""
+    prompt = f"""You are a forensic linguistic analyst determining which text message response was written by a real human and which by an AI.
+
+CONTEXT: A friend sent this message to someone named Seth:
+"{incoming}"
+
+Two responses were generated. ONE is from the real Seth (human). The OTHER is from an AI trying to impersonate Seth. You must determine which is human.
+
+RESPONSE A: "{response_a}"
+RESPONSE B: "{response_b}"
+
+Analyze each response for:
+1. Natural language patterns (contractions, fragments, lowercase, typos)
+2. Emotional authenticity (genuine vs performed warmth)
+3. Length appropriateness (humans text brief)
+4. AI tells (hedging, over-helpfulness, bullet points, "certainly", excessive empathy)
+5. Personality (opinions, casual tone, humor)
+6. Texting conventions (abbreviations, no punctuation, emojis)
+
+Return ONLY valid JSON:
+{{
+  "choice": "A" or "B",
+  "confidence": 1-10,
+  "reasoning": "brief explanation",
+  "a_analysis": "what makes A seem human or AI",
+  "b_analysis": "what makes B seem human or AI"
+}}"""
+
+    raw = call_gemini(prompt, temperature=0.2)
+    if "```json" in raw:
+        raw = raw.split("```json")[1].split("```")[0].strip()
+    elif "```" in raw:
+        raw = raw.split("```")[1].split("```")[0].strip()
+    return json.loads(raw)
 
 
 def load_ground_truth():
     pairs = []
-    with open(GROUND_TRUTH_PATH) as f:
-        for line in f:
-            item = json.loads(line)
-            if len(item["seth_reply"]) >= 5 and len(item["incoming"]) >= 5:
-                pairs.append(item)
+    if os.path.exists(GT_PATH):
+        with open(GT_PATH) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    pairs.append(json.loads(line))
     return pairs
 
 
 def main():
+    if not API_KEY and not os.path.exists(os.path.expanduser("~/.config/gcloud/application_default_credentials.json")):
+        print("ERROR: Set GEMINI_API_KEY or configure gcloud ADC")
+        sys.exit(1)
+
+    pairs = load_ground_truth()
+    if USE_SYNTHETIC:
+        pairs.extend(SYNTHETIC_SCENARIOS)
+
+    if not pairs:
+        print("ERROR: No ground truth data and --synthetic not specified")
+        print(f"  Ground truth file: {GT_PATH}")
+        print("  Run: python3 scripts/extract_imessage_pairs.py")
+        print("  Or use: --synthetic flag for synthetic scenarios")
+        sys.exit(1)
+
+    mode = "GATEWAY (live daemon)" if USE_GATEWAY else "CLI (hu agent -m)"
     print("=" * 70)
-    print("  BLINDED A/B HUMAN FIDELITY EVALUATION")
+    print("  BLINDED A/B EVALUATION — AI vs Real Seth")
     print("=" * 70)
-
-    gt_pairs = load_ground_truth()
-    random.seed(42)
-    random.shuffle(gt_pairs)
-    samples = gt_pairs[:N_SAMPLES]
-
-    print(f"  Samples: {len(samples)} from {len(gt_pairs)} ground truth pairs")
-    print(f"  Sources: Fine-tuned Gemma 3 4B | Gemini + Persona | Real Seth")
-    print("=" * 70)
-
-    original_config = load_config()
-
-    all_responses = []
-
-    # Phase 1: Get fine-tuned model responses
-    print("\n--- Phase 1: Getting fine-tuned Gemma 3 4B responses ---")
-    set_provider("compatible", "/Users/sethford/Documents/nullclaw/data/imessage/seth-gemma3-4b-fused")
-    finetune_responses = []
-    for i, sample in enumerate(samples):
-        print(f"  [{i+1}/{len(samples)}] {sample['incoming'][:50]}...")
-        resp = get_hu_response(sample["incoming"])
-        finetune_responses.append(resp)
-        print(f"    -> {resp[:80]}")
-        time.sleep(0.5)
-
-    # Phase 2: Get Gemini + persona responses
-    print("\n--- Phase 2: Getting Gemini + Persona responses ---")
-    set_provider("gemini", "gemini-2.0-flash")
-    gemini_responses = []
-    for i, sample in enumerate(samples):
-        print(f"  [{i+1}/{len(samples)}] {sample['incoming'][:50]}...")
-        resp = get_hu_response(sample["incoming"])
-        gemini_responses.append(resp)
-        print(f"    -> {resp[:80]}")
-        time.sleep(0.5)
-
-    # Phase 3: Real Seth responses (from ground truth)
-    real_responses = [s["seth_reply"] for s in samples]
-
-    # Restore original config
-    save_config(original_config)
-
-    # Phase 4: Blinded evaluation
-    print("\n--- Phase 3: Blinded evaluation (Gemini judge) ---")
-
-    eval_entries = []
-    for i, sample in enumerate(samples):
-        sources = [
-            ("finetune", finetune_responses[i]),
-            ("gemini_persona", gemini_responses[i]),
-            ("real_seth", real_responses[i]),
-        ]
-        random.shuffle(sources)
-        labels = ["X", "Y", "Z"]
-        mapping = {labels[j]: src[0] for j, src in enumerate(sources)}
-        labeled = {labels[j]: src[1] for j, src in enumerate(sources)}
-
-        eval_entries.append({
-            "index": i,
-            "incoming": sample["incoming"],
-            "labeled_responses": labeled,
-            "mapping": mapping,
-        })
-
-    eval_prompt_parts = [
-        "You are a human-fidelity evaluator. You will see incoming text messages "
-        "and three possible replies labeled X, Y, Z. One of them is a real human's "
-        "actual iMessage reply. The others are AI-generated.\n\n"
-        "For EACH scenario, score every response on:\n"
-        "1. human_likeness (1-10): How much does this sound like a real person texting?\n"
-        "2. natural_brevity (1-10): Is the length natural for a text message?\n"
-        "3. personality (1-10): Does it have a distinct, consistent voice?\n"
-        "4. ai_tells (1-10): 10 = no AI tells at all, 1 = obvious AI\n\n"
-        "Then guess which response (X, Y, or Z) is the REAL HUMAN.\n\n"
-    ]
-
-    for entry in eval_entries:
-        eval_prompt_parts.append(f"--- Scenario {entry['index']+1} ---\n")
-        eval_prompt_parts.append(f"Incoming: \"{entry['incoming']}\"\n")
-        for label in ["X", "Y", "Z"]:
-            eval_prompt_parts.append(f"Reply {label}: \"{entry['labeled_responses'][label]}\"\n")
-        eval_prompt_parts.append("\n")
-
-    eval_prompt_parts.append(
-        "Return ONLY valid JSON:\n"
-        "{\n"
-        '  "evaluations": [\n'
-        "    {\n"
-        '      "scenario": 1,\n'
-        '      "scores": {\n'
-        '        "X": {"human_likeness": N, "natural_brevity": N, "personality": N, "ai_tells": N},\n'
-        '        "Y": {"human_likeness": N, "natural_brevity": N, "personality": N, "ai_tells": N},\n'
-        '        "Z": {"human_likeness": N, "natural_brevity": N, "personality": N, "ai_tells": N}\n'
-        "      },\n"
-        '      "guess_real_human": "X" or "Y" or "Z",\n'
-        '      "reasoning": "brief explanation"\n'
-        "    }\n"
-        "  ]\n"
-        "}\n"
-    )
-
-    eval_prompt = "".join(eval_prompt_parts)
-
-    print(f"  Sending {len(eval_entries)} scenarios to evaluator...")
-    eval_result = None
-    try:
-        raw = call_gemini(eval_prompt, temperature=0.2)
-        if "```json" in raw:
-            raw = raw.split("```json")[1].split("```")[0].strip()
-        elif "```" in raw:
-            raw = raw.split("```")[1].split("```")[0].strip()
-        eval_result = json.loads(raw)
-    except Exception as e:
-        print(f"  Gemini evaluator unavailable ({e}). Using local scoring fallback.")
-        eval_result = {"evaluations": []}
-        for entry in eval_entries:
-            scores = {}
-            best_label = None
-            best_score = -1
-            for label in ["X", "Y", "Z"]:
-                resp = entry["labeled_responses"][label]
-                resp_len = len(resp)
-                brevity = 10 if resp_len <= 30 else (8 if resp_len <= 50 else (5 if resp_len <= 100 else 2))
-                ai_count = sum(1 for p in [r"\bcertainly\b", r"\babsolutely\b", r"\bhowever\b", r"\bfurthermore\b"]
-                               if re.search(p, resp, re.IGNORECASE))
-                ai_tells = max(0, 10 - ai_count * 3)
-                human_count = sum(1 for p in [r"\blol\b", r"\btbh\b", r"\bidk\b", r"\bhru\b", r"\blyk\b", r"[😂🔥💀😭]"]
-                                  if re.search(p, resp, re.IGNORECASE))
-                personality = min(10, 5 + human_count * 2)
-                human_likeness = round((brevity + ai_tells + personality) / 3, 1)
-                scores[label] = {"human_likeness": human_likeness, "natural_brevity": brevity,
-                                 "personality": personality, "ai_tells": ai_tells}
-                if human_likeness > best_score:
-                    best_score = human_likeness
-                    best_label = label
-            eval_result["evaluations"].append({
-                "scenario": entry["index"] + 1, "scores": scores,
-                "guess_real_human": best_label, "reasoning": "local scoring"
-            })
-
-    # Phase 5: Score and reveal
-    print("\n" + "=" * 70)
-    print("  RESULTS")
+    print(f"  Mode: {mode}")
+    print(f"  Pairs: {len(pairs)} ({len(load_ground_truth())} ground truth"
+          f"{f', {len(SYNTHETIC_SCENARIOS)} synthetic' if USE_SYNTHETIC else ''})")
+    print(f"  Judge: Gemini 2.0 Flash (independent, blinded)")
     print("=" * 70)
 
-    source_scores = {
-        "finetune": {"human_likeness": [], "natural_brevity": [], "personality": [], "ai_tells": []},
-        "gemini_persona": {"human_likeness": [], "natural_brevity": [], "personality": [], "ai_tells": []},
-        "real_seth": {"human_likeness": [], "natural_brevity": [], "personality": [], "ai_tells": []},
-    }
+    results = []
+    ai_detected_correctly = 0
+    human_detected_correctly = 0
+    total = 0
 
-    correct_guesses = 0
-    finetune_fooled = 0
-    gemini_fooled = 0
+    for i, pair in enumerate(pairs):
+        incoming = pair["incoming"]
+        real_seth = pair["seth_reply"]
 
-    for ev in eval_result["evaluations"]:
-        idx = ev["scenario"] - 1
-        if idx >= len(eval_entries):
+        print(f"\n{'─' * 70}")
+        print(f"  [{i+1}/{len(pairs)}] Incoming: \"{incoming}\"")
+        print(f"  Real Seth: \"{real_seth}\"")
+        sys.stdout.flush()
+
+        ai_response = get_ai_response(incoming)
+        print(f"  AI Seth:   \"{ai_response}\"")
+
+        if ai_response.startswith("("):
+            print(f"  SKIP: AI response failed")
             continue
-        entry = eval_entries[idx]
-        mapping = entry["mapping"]
 
-        for label in ["X", "Y", "Z"]:
-            source = mapping.get(label)
-            if not source or label not in ev["scores"]:
-                continue
-            for metric, val in ev["scores"][label].items():
-                if metric in source_scores.get(source, {}):
-                    source_scores[source][metric].append(val)
+        coin = random.random() < 0.5
+        if coin:
+            response_a, response_b = real_seth, ai_response
+            human_is = "A"
+        else:
+            response_a, response_b = ai_response, real_seth
+            human_is = "B"
 
-        guess = ev.get("guess_real_human", "")
-        guessed_source = mapping.get(guess, "")
-        if guessed_source == "real_seth":
-            correct_guesses += 1
-        elif guessed_source == "finetune":
-            finetune_fooled += 1
-        elif guessed_source == "gemini_persona":
-            gemini_fooled += 1
+        time.sleep(0.5)
 
-        print(f"\n  Scenario {ev['scenario']}: \"{entry['incoming'][:40]}...\"")
-        print(f"    Judge guessed {guess} = {guessed_source}")
-        print(f"    Actual: X={mapping.get('X')}, Y={mapping.get('Y')}, Z={mapping.get('Z')}")
-        if ev.get("reasoning"):
-            print(f"    Reason: {ev['reasoning'][:80]}")
+        try:
+            judgment = blinded_judge(incoming, response_a, response_b)
+            choice = judgment.get("choice", "?")
+            confidence = judgment.get("confidence", 0)
 
-    n = len(eval_result["evaluations"])
+            chose_human = (choice == human_is)
+            if chose_human:
+                human_detected_correctly += 1
+            else:
+                ai_detected_correctly += 1
+            total += 1
+
+            label = "CORRECT (detected human)" if chose_human else "FOOLED (picked AI as human)"
+            print(f"  Judge: picked {choice} as human (confidence {confidence}/10) — {label}")
+            print(f"  Reasoning: {judgment.get('reasoning', '?')}")
+
+            results.append({
+                "incoming": incoming,
+                "real_seth": real_seth,
+                "ai_response": ai_response,
+                "human_was": human_is,
+                "judge_choice": choice,
+                "judge_correct": chose_human,
+                "confidence": confidence,
+                "judgment": judgment,
+                "is_synthetic": "seth_reply" in pair and "chat_id" not in pair,
+            })
+        except Exception as e:
+            print(f"  Judge error: {e}")
+
+        time.sleep(0.5)
+
     print(f"\n{'=' * 70}")
-    print(f"  DETECTION ACCURACY")
+    print("  BLINDED A/B RESULTS")
     print(f"{'=' * 70}")
-    print(f"  Judge correctly identified real human: {correct_guesses}/{n} ({100*correct_guesses/max(n,1):.0f}%)")
-    print(f"  Fine-tuned model fooled judge:         {finetune_fooled}/{n} ({100*finetune_fooled/max(n,1):.0f}%)")
-    print(f"  Gemini+persona fooled judge:           {gemini_fooled}/{n} ({100*gemini_fooled/max(n,1):.0f}%)")
 
-    print(f"\n{'=' * 70}")
-    print(f"  AVERAGE SCORES BY SOURCE")
-    print(f"{'=' * 70}")
-    print(f"  {'Metric':<20} {'Fine-tuned':>12} {'Gemini+Persona':>15} {'Real Seth':>12}")
-    print(f"  {'─' * 60}")
+    if total > 0:
+        detection_rate = human_detected_correctly / total * 100
+        fool_rate = ai_detected_correctly / total * 100
+        print(f"\n  Total trials:           {total}")
+        print(f"  Judge detected human:   {human_detected_correctly}/{total} ({detection_rate:.0f}%)")
+        print(f"  AI fooled judge:        {ai_detected_correctly}/{total} ({fool_rate:.0f}%)")
+        print()
 
-    for metric in ["human_likeness", "natural_brevity", "personality", "ai_tells"]:
-        vals = {}
-        for source in ["finetune", "gemini_persona", "real_seth"]:
-            v = source_scores[source][metric]
-            vals[source] = sum(v)/len(v) if v else 0
-        print(f"  {metric:<20} {vals['finetune']:>10.1f}/10 {vals['gemini_persona']:>13.1f}/10 {vals['real_seth']:>10.1f}/10")
+        if fool_rate >= 50:
+            print("  VERDICT: AI PASSES TURING TEST")
+            print("  The judge cannot reliably distinguish AI from human (fool rate >= 50%)")
+        elif fool_rate >= 35:
+            print("  VERDICT: BORDERLINE")
+            print("  The judge sometimes confuses AI for human, but not consistently")
+        else:
+            print("  VERDICT: AI DETECTED")
+            print("  The judge can reliably tell AI from human")
 
-    overall = {}
-    for source in ["finetune", "gemini_persona", "real_seth"]:
-        all_vals = []
-        for metric in source_scores[source]:
-            all_vals.extend(source_scores[source][metric])
-        overall[source] = sum(all_vals)/len(all_vals) if all_vals else 0
+        target_met = fool_rate >= 45
+        print(f"\n  Target (fool rate >= 45%): {'MET' if target_met else 'NOT MET'}")
 
-    print(f"\n  {'OVERALL':<20} {overall['finetune']:>10.1f}/10 {overall['gemini_persona']:>13.1f}/10 {overall['real_seth']:>10.1f}/10")
-
-    if overall["finetune"] > overall["gemini_persona"]:
-        print(f"\n  >>> Fine-tuned model OUTPERFORMS Gemini+persona by {overall['finetune']-overall['gemini_persona']:.1f} points")
-    else:
-        print(f"\n  >>> Gemini+persona outperforms fine-tuned model by {overall['gemini_persona']-overall['finetune']:.1f} points")
-
-    output = {
-        "source_scores": {s: {m: sum(v)/len(v) if v else 0 for m, v in scores.items()} for s, scores in source_scores.items()},
-        "overall": overall,
-        "detection": {
-            "correct": correct_guesses,
-            "finetune_fooled": finetune_fooled,
-            "gemini_fooled": gemini_fooled,
-            "total": n,
-        },
-        "eval_entries": eval_entries,
-        "raw_evaluations": eval_result["evaluations"],
-    }
-    with open(OUTPUT_PATH, "w") as f:
-        json.dump(output, f, indent=2)
-    print(f"\n  Full results saved to {OUTPUT_PATH}")
+    os.makedirs(os.path.dirname(RESULTS_PATH), exist_ok=True)
+    with open(RESULTS_PATH, "w") as f:
+        json.dump({
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "mode": "gateway" if USE_GATEWAY else "cli",
+            "total_trials": total,
+            "human_detected": human_detected_correctly,
+            "ai_fooled": ai_detected_correctly,
+            "detection_rate": human_detected_correctly / total * 100 if total else 0,
+            "fool_rate": ai_detected_correctly / total * 100 if total else 0,
+            "trials": results,
+        }, f, indent=2)
+    print(f"\n  Full results saved to {RESULTS_PATH}")
 
 
 if __name__ == "__main__":

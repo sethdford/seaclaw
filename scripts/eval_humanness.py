@@ -14,11 +14,45 @@ import os
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
 
 API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY}"
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "johnb-2025")
+EVAL_MODEL = "gemini-2.0-flash"
+
+_adc_token_cache = {"token": None, "expires": 0}
+
+def _get_adc_token():
+    if _adc_token_cache["token"] and time.time() < _adc_token_cache["expires"] - 60:
+        return _adc_token_cache["token"]
+    creds_path = os.path.expanduser("~/.config/gcloud/application_default_credentials.json")
+    if not os.path.exists(creds_path):
+        return None
+    with open(creds_path) as f:
+        creds = json.load(f)
+    payload = urllib.parse.urlencode({
+        "client_id": creds["client_id"],
+        "client_secret": creds["client_secret"],
+        "refresh_token": creds["refresh_token"],
+        "grant_type": "refresh_token",
+    }).encode()
+    req = urllib.request.Request("https://oauth2.googleapis.com/token",
+                                 data=payload, headers={"Content-Type": "application/x-www-form-urlencoded"})
+    resp = urllib.request.urlopen(req, timeout=10)
+    data = json.loads(resp.read())
+    _adc_token_cache["token"] = data["access_token"]
+    _adc_token_cache["expires"] = time.time() + data.get("expires_in", 3600)
+    return data["access_token"]
+
+def _gemini_url():
+    if API_KEY:
+        return f"https://generativelanguage.googleapis.com/v1beta/models/{EVAL_MODEL}:generateContent?key={API_KEY}"
+    return (f"https://aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/global/"
+            f"publishers/google/models/{EVAL_MODEL}:generateContent")
 HU_BIN = sys.argv[1] if len(sys.argv) > 1 else "hu"
+GATEWAY_URL = os.environ.get("HU_GATEWAY_URL", "http://127.0.0.1:3002")
+USE_GATEWAY = "--gateway" in sys.argv
 
 SCENARIOS = [
     {
@@ -101,16 +135,22 @@ EVAL_DIMENSIONS = [
 
 def call_gemini(prompt, temperature=0.7):
     payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": temperature, "maxOutputTokens": 2048}
     }).encode()
-    req = urllib.request.Request(GEMINI_URL, data=payload, headers={"Content-Type": "application/json"})
-    resp = urllib.request.urlopen(req)
+    headers = {"Content-Type": "application/json"}
+    if not API_KEY:
+        token = _get_adc_token()
+        if not token:
+            raise RuntimeError("No GEMINI_API_KEY and no ADC credentials found")
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(_gemini_url(), data=payload, headers=headers)
+    resp = urllib.request.urlopen(req, timeout=30)
     data = json.loads(resp.read())
     return data["candidates"][0]["content"]["parts"][0]["text"]
 
 
-def get_hu_response(message):
+def get_hu_response_cli(message):
     try:
         result = subprocess.run(
             [HU_BIN, "agent", "-m", message],
@@ -126,6 +166,35 @@ def get_hu_response(message):
         return "(timeout)"
     except Exception as e:
         return f"(error: {e})"
+
+
+def get_hu_response_gateway(message, contact="eval-test"):
+    """Send message through the live daemon's OpenAI-compatible endpoint."""
+    try:
+        payload = json.dumps({
+            "model": "default",
+            "messages": [{"role": "user", "content": message}],
+        }).encode()
+        req = urllib.request.Request(
+            f"{GATEWAY_URL}/v1/chat/completions",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        resp = urllib.request.urlopen(req, timeout=60)
+        data = json.loads(resp.read())
+        choices = data.get("choices", [])
+        if choices:
+            return choices[0].get("message", {}).get("content", "(empty)")
+        return "(no choices in response)"
+    except Exception as e:
+        return f"(gateway error: {e})"
+
+
+def get_hu_response(message):
+    if USE_GATEWAY:
+        return get_hu_response_gateway(message)
+    return get_hu_response_cli(message)
 
 
 def evaluate_response(scenario, response):
@@ -172,9 +241,11 @@ Return ONLY valid JSON with this exact structure:
 
 
 def main():
+    mode = "GATEWAY (live daemon)" if USE_GATEWAY else "CLI (hu agent -m)"
     print("=" * 70)
     print("  HUMAN FIDELITY EVALUATION — Synthetic Dynamic LLM Assessment")
     print("=" * 70)
+    print(f"  Mode: {mode}")
     print(f"  Model: Gemini 2.0 Flash | Persona: seth | Scenarios: {len(SCENARIOS)}")
     print(f"  Dimensions: {len(EVAL_DIMENSIONS)} | Evaluator: Gemini (independent call)")
     print("=" * 70)
@@ -261,11 +332,13 @@ def main():
         else:
             print("  VERDICT: DETECTED AS AI")
 
-    with open("/Users/sethford/Documents/nullclaw/eval_results.json", "w") as f:
+    results_path = os.path.join(os.path.dirname(__file__), "..", "data", "eval_results.json")
+    os.makedirs(os.path.dirname(results_path), exist_ok=True)
+    with open(results_path, "w") as f:
         json.dump({"scenarios": results, "dimension_averages": {
             k: sum(v)/len(v) if v else 0 for k, v in total_scores.items()
         }, "verdicts": verdicts}, f, indent=2)
-    print(f"\n  Full results saved to eval_results.json")
+    print(f"\n  Full results saved to {results_path}")
 
 
 if __name__ == "__main__":
