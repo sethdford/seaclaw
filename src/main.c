@@ -272,6 +272,7 @@ static const hu_command_t commands[] = {
 #if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
     {"feed", "Feed monitoring and ingestion", cmd_feed},
 #endif
+    {"research", "Run research agent", cmd_research},
     {"workspace", "Workspace management", cmd_workspace},
     {"capabilities", "Show available capabilities", cmd_capabilities},
     {"models", "List available models", cmd_models},
@@ -1005,7 +1006,18 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
         return HU_OK;
     }
 
-    fprintf(stderr, "[%s] skills: use list, search, install, uninstall, or update\n", HU_CODENAME);
+    if (strcmp(sub, "publish") == 0) {
+        const char *dir = (argc >= 4 && argv[3]) ? argv[3] : ".";
+        hu_error_t err = hu_skill_registry_publish(alloc, dir);
+        if (err != HU_OK) {
+            fprintf(stderr, "[%s] skills publish: %s\n", HU_CODENAME, hu_error_string(err));
+            return err;
+        }
+        printf("Published skill from %s\n", dir);
+        return HU_OK;
+    }
+
+    fprintf(stderr, "[%s] skills: use list, search, install, uninstall, update, or publish\n", HU_CODENAME);
     fprintf(stderr, "  human skills list\n");
     fprintf(stderr, "  human skills search <query>\n");
     fprintf(stderr, "  human skills install <path>\n");
@@ -1876,6 +1888,8 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
         hu_bus_subscribe(&bus, gw_agent_on_message, &agent_bridge, HU_BUS_MESSAGE_RECEIVED);
         fprintf(stderr, "[%s] gateway+agent mode (provider=%s tools=%zu)\n", HU_CODENAME,
                 app.cfg->default_provider ? app.cfg->default_provider : "openai", app.tools_count);
+        if (gw_graph && app.agent && app.agent->retrieval_engine)
+            hu_retrieval_set_graph(app.agent->retrieval_engine, gw_graph);
     } else {
         fprintf(stderr, "[%s] gateway-only mode (use --with-agent for full agent)\n", HU_CODENAME);
     }

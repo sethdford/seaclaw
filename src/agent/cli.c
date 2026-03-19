@@ -25,6 +25,7 @@
 #include "human/intelligence/self_improve.h"
 #endif
 #include "human/memory/factory.h"
+#include "human/memory/graph.h"
 #include "human/memory/retrieval.h"
 #include "human/memory/vector.h"
 #include "human/observability/log_observer.h"
@@ -384,6 +385,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     hu_vector_store_t vector_store = hu_vector_store_mem_create(alloc);
     hu_retrieval_engine_t retrieval_engine =
         hu_retrieval_create_with_vector(alloc, &memory, &embedder, &vector_store);
+    hu_graph_t *cli_graph = NULL;
 
 #ifdef HU_HAS_CRON
     hu_cron_scheduler_t *cron = hu_cron_create(alloc, 64, true);
@@ -405,6 +407,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             hu_cron_destroy(cron, alloc);
         if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
             retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);
+#ifdef HU_ENABLE_SQLITE
+        if (cli_graph) { hu_graph_close(cli_graph, alloc); cli_graph = NULL; }
+#endif
         if (vector_store.vtable && vector_store.vtable->deinit)
             vector_store.vtable->deinit(vector_store.ctx, alloc);
         if (embedder.vtable && embedder.vtable->deinit)
@@ -449,6 +454,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             hu_cron_destroy(cron, alloc);
         if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
             retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);
+#ifdef HU_ENABLE_SQLITE
+        if (cli_graph) { hu_graph_close(cli_graph, alloc); cli_graph = NULL; }
+#endif
         if (vector_store.vtable && vector_store.vtable->deinit)
             vector_store.vtable->deinit(vector_store.ctx, alloc);
         if (embedder.vtable && embedder.vtable->deinit)
@@ -522,6 +530,19 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
 #endif
 
     hu_agent_set_retrieval_engine(&agent, &retrieval_engine);
+#ifdef HU_ENABLE_SQLITE
+    {
+        const char *home = getenv("HOME");
+        if (home) {
+            char graph_path[1024];
+            int np = snprintf(graph_path, sizeof(graph_path), "%s/.human/graph.db", home);
+            if (np > 0 && (size_t)np < sizeof(graph_path))
+                (void)hu_graph_open(alloc, graph_path, (size_t)np, &cli_graph);
+        }
+    }
+    if (cli_graph)
+        hu_retrieval_set_graph(&retrieval_engine, cli_graph);
+#endif
     if (cli_awareness.bus)
         hu_agent_set_awareness(&agent, (struct hu_awareness *)&cli_awareness);
 
@@ -543,6 +564,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         hu_agent_deinit(&agent);
         if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
             retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);
+#ifdef HU_ENABLE_SQLITE
+        if (cli_graph) { hu_graph_close(cli_graph, alloc); cli_graph = NULL; }
+#endif
         if (vector_store.vtable && vector_store.vtable->deinit)
             vector_store.vtable->deinit(vector_store.ctx, alloc);
         if (embedder.vtable && embedder.vtable->deinit)
@@ -700,6 +724,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         hu_agent_deinit(&agent);
         if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
             retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);
+#ifdef HU_ENABLE_SQLITE
+        if (cli_graph) { hu_graph_close(cli_graph, alloc); cli_graph = NULL; }
+#endif
         if (vector_store.vtable && vector_store.vtable->deinit)
             vector_store.vtable->deinit(vector_store.ctx, alloc);
         if (embedder.vtable && embedder.vtable->deinit)
@@ -871,6 +898,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     hu_agent_deinit(&agent);
     if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
         retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);
+#ifdef HU_ENABLE_SQLITE
+    if (cli_graph) { hu_graph_close(cli_graph, alloc); cli_graph = NULL; }
+#endif
     if (vector_store.vtable && vector_store.vtable->deinit)
         vector_store.vtable->deinit(vector_store.ctx, alloc);
     if (embedder.vtable && embedder.vtable->deinit)
