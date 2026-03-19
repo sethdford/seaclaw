@@ -132,7 +132,8 @@ fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
                     onValueChange = { inputText = it },
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm),
+                        .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm)
+                        .semantics { contentDescription = "Message input" },
                     textStyle = TextStyle(
                         color = colorScheme.onSurface,
                         fontSize = HUTokens.textBase,

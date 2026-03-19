@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+typedef struct hu_ws_client hu_ws_client_t;
+
 typedef struct hu_cdp_session {
     hu_allocator_t *alloc;
     char *ws_url;
@@ -15,6 +17,7 @@ typedef struct hu_cdp_session {
     bool connected;
     char *debug_url;
     size_t debug_url_len;
+    hu_ws_client_t *ws;
 } hu_cdp_session_t;
 
 typedef struct hu_cdp_screenshot {

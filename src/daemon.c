@@ -105,6 +105,10 @@
 #include "human/context/behavioral.h"
 #include "human/agent/collab_planning.h"
 #include "human/persona/training.h"
+/* Forward declaration — avoids type conflict with context/style_tracker.h hu_style_fingerprint_t */
+hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc,
+                                       const char **own_messages, size_t own_msg_count,
+                                       char **prompt_out, size_t *prompt_len);
 #endif
 #ifdef HU_HAS_CRON
 #include "human/cron.h"
@@ -2266,12 +2270,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (hu_replay_auto_tune(alloc, agent->memory, NULL, 0, &tune_summary,
                                                 &tune_len) == HU_OK &&
                             tune_summary && tune_len > 0) {
-                            size_t copy_len = tune_len < sizeof(replay_insights) - 1
-                                                  ? tune_len
+                            size_t ctx_len = 0;
+                            char *tone_ctx = hu_replay_tune_build_context(
+                                alloc, tune_summary, tune_len, &ctx_len);
+                            const char *src = tone_ctx ? tone_ctx : tune_summary;
+                            size_t src_len = tone_ctx ? ctx_len : tune_len;
+                            size_t copy_len = src_len < sizeof(replay_insights) - 1
+                                                  ? src_len
                                                   : sizeof(replay_insights) - 1;
-                            memcpy(replay_insights, tune_summary, copy_len);
+                            memcpy(replay_insights, src, copy_len);
                             replay_insights[copy_len] = '\0';
                             replay_insights_len = copy_len;
+                            if (tone_ctx)
+                                alloc->free(alloc->ctx, tone_ctx, ctx_len + 1);
                             fprintf(stderr, "[human] daily replay auto-tune completed\n");
                         }
                         if (tune_summary)
@@ -2913,11 +2924,20 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             adjusted = 1000;
                     }
 #endif
-                    /* F157 (Pillar 31): Statistical timing model overlay */
+                    /* F157 (Pillar 31): Statistical timing model overlay — learned distribution */
                     {
                         uint32_t tm_seed = (uint32_t)((uintptr_t)batch_key ^ (uint32_t)time(NULL));
-                        uint64_t stm_delay = hu_timing_model_sample_default(
-                            (uint8_t)bth_hour, tm_seed);
+                        int tm_dow = 0;
+                        {
+                            time_t tm_now = time(NULL);
+                            struct tm tm_buf2;
+                            struct tm *lt2 = hu_platform_localtime_r(&tm_now, &tm_buf2);
+                            if (lt2)
+                                tm_dow = lt2->tm_wday;
+                        }
+                        uint64_t stm_delay = hu_timing_model_sample(
+                            agent->timing_model, (uint8_t)bth_hour, (uint8_t)tm_dow,
+                            combined_len, tm_seed);
                         if (stm_delay > 0 && stm_delay < 120000) {
                             uint64_t blended = ((uint64_t)adjusted + stm_delay) / 2;
                             adjusted = (int32_t)blended;
@@ -2925,6 +2945,29 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                     if (adjusted > 60000)
                         adjusted = 60000;
+                    /* F157b: Context-aware timing adjustment */
+                    {
+                        uint8_t conv_depth =
+                            (uint8_t)(agent->history_count > 255 ? 255 : agent->history_count);
+                        double emo_intensity = 0.0;
+                        if (combined_len > 0) {
+                            const char *emo_words[] = {"love", "hate", "angry", "sad", "worried",
+                                                       "scared", "happy", "excited", "miss",
+                                                       "frustrated", "hurt", "crying"};
+                            for (size_t ew = 0; ew < 12; ew++) {
+                                if (strstr(combined, emo_words[ew]))
+                                    emo_intensity += 0.15;
+                            }
+                            if (emo_intensity > 1.0)
+                                emo_intensity = 1.0;
+                        }
+                        adjusted = (int32_t)hu_timing_adjust(
+                            (uint64_t)adjusted, conv_depth, emo_intensity, false, 0);
+                        if (adjusted < 1000)
+                            adjusted = 1000;
+                        if (adjusted > 60000)
+                            adjusted = 60000;
+                    }
                     fprintf(stderr, "[human] reading delay: %dms (hour=%d)\n", (int)adjusted,
                             bth_hour);
                     usleep((useconds_t)((unsigned int)adjusted * 1000));
@@ -4506,6 +4549,46 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
+
+                /* F32b: Rich style clone — detailed texting patterns from chat history */
+#ifdef HU_HAS_PERSONA
+                if (history_entries && history_count > 10) {
+                    const char *own_msgs[512];
+                    size_t own_count = 0;
+                    for (size_t hi = 0; hi < history_count && own_count < 512; hi++) {
+                        if (history_entries[hi].from_me && history_entries[hi].text[0] != '\0')
+                            own_msgs[own_count++] = history_entries[hi].text;
+                    }
+                    if (own_count >= 10) {
+                        char *clone_prompt = NULL;
+                        size_t clone_len = 0;
+                        if (hu_style_clone_from_history(alloc, own_msgs, own_count,
+                                                        &clone_prompt, &clone_len) == HU_OK &&
+                            clone_prompt && clone_len > 0) {
+                            if (style_ctx && style_ctx_len > 0) {
+                                size_t merged_len = style_ctx_len + clone_len + 2;
+                                char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
+                                if (merged) {
+                                    memcpy(merged, style_ctx, style_ctx_len);
+                                    merged[style_ctx_len] = '\n';
+                                    memcpy(merged + style_ctx_len + 1, clone_prompt, clone_len);
+                                    merged[merged_len - 1] = '\n';
+                                    merged[merged_len] = '\0';
+                                    alloc->free(alloc->ctx, style_ctx, style_ctx_len + 1);
+                                    style_ctx = merged;
+                                    style_ctx_len = merged_len;
+                                }
+                            } else {
+                                style_ctx = clone_prompt;
+                                style_ctx_len = clone_len;
+                                clone_prompt = NULL;
+                            }
+                            if (clone_prompt)
+                                alloc->free(alloc->ctx, clone_prompt, clone_len + 1);
+                        }
+                    }
+                }
+#endif
 
                 /* Merge style context into conversation context */
                 if (style_ctx && convo_ctx) {

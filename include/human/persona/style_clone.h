@@ -52,4 +52,8 @@ hu_error_t hu_style_fingerprint_to_prompt(hu_allocator_t *alloc,
 
 void hu_style_fingerprint_deinit(hu_allocator_t *alloc, hu_style_fingerprint_t *fp);
 
+hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc,
+                                       const char **own_messages, size_t own_msg_count,
+                                       char **prompt_out, size_t *prompt_len);
+
 #endif

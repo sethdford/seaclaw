@@ -55,6 +55,32 @@ static void test_from_assessment_empty_run(void) {
     sqlite3_close(db);
 }
 
+static void test_self_improve_produces_at_least_one_patch(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = open_mem_db();
+    hu_self_improve_t engine = {0};
+    HU_ASSERT_EQ(hu_self_improve_create(&alloc, db, &engine), HU_OK);
+    HU_ASSERT_EQ(hu_self_improve_init_tables(&engine), HU_OK);
+
+    hu_eval_task_t tasks[1] = {
+        {.id = "t1", .prompt = "2+2", .prompt_len = 3, .expected = "4", .expected_len = 1, .category = "math"},
+    };
+    hu_eval_suite_t suite = {.name = "audit", .tasks = tasks, .tasks_count = 1};
+    hu_eval_result_t results[1] = {
+        {.task_id = "t1", .passed = false, .actual_output = "5", .actual_output_len = 1},
+    };
+    hu_eval_run_t run = {.results = results, .results_count = 1, .failed = 1, .pass_rate = 0.0};
+
+    HU_ASSERT_EQ(hu_self_improve_from_assessment(&engine, &run, &suite, 1000), HU_OK);
+
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_self_improve_active_patch_count(&engine, &count), HU_OK);
+    HU_ASSERT_TRUE(count > 0u);
+
+    hu_self_improve_deinit(&engine);
+    sqlite3_close(db);
+}
+
 static void test_from_assessment_generates_patches(void) {
     hu_allocator_t alloc = hu_system_allocator();
     sqlite3 *db = open_mem_db();
@@ -194,6 +220,7 @@ void run_self_improve_loop_tests(void) {
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(test_from_assessment_null_args);
     HU_RUN_TEST(test_from_assessment_empty_run);
+    HU_RUN_TEST(test_self_improve_produces_at_least_one_patch);
     HU_RUN_TEST(test_from_assessment_generates_patches);
     HU_RUN_TEST(test_verify_patch_keeps);
     HU_RUN_TEST(test_verify_patch_rollback_on_worse);

@@ -502,12 +502,35 @@ static void browser_deinit(void *ctx, hu_allocator_t *alloc) {
     alloc->free(alloc->ctx, bc, sizeof(*bc));
 }
 
+static hu_error_t browser_execute_streaming(void *ctx, hu_allocator_t *alloc,
+                                            const hu_json_value_t *args,
+                                            void (*on_chunk)(void *cb_ctx, const char *data, size_t len),
+                                            void *cb_ctx,
+                                            hu_tool_result_t *out) {
+    if (!on_chunk)
+        return browser_execute(ctx, alloc, args, out);
+
+    hu_error_t err = browser_execute(ctx, alloc, args, out);
+    if (err == HU_OK && out->success && out->output && out->output_len > 0) {
+        size_t remaining = out->output_len;
+        size_t offset = 0;
+        while (remaining > 0) {
+            size_t chunk_size = remaining > 4096 ? 4096 : remaining;
+            on_chunk(cb_ctx, out->output + offset, chunk_size);
+            offset += chunk_size;
+            remaining -= chunk_size;
+        }
+    }
+    return err;
+}
+
 static const hu_tool_vtable_t browser_vtable = {
     .execute = browser_execute,
     .name = browser_name,
     .description = browser_desc,
     .parameters_json = browser_params,
     .deinit = browser_deinit,
+    .execute_streaming = browser_execute_streaming,
 };
 
 hu_error_t hu_browser_create(hu_allocator_t *alloc, bool enabled, hu_security_policy_t *policy,

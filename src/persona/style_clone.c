@@ -275,3 +275,25 @@ void hu_style_fingerprint_deinit(hu_allocator_t *alloc, hu_style_fingerprint_t *
         fp->contact_id_len = 0;
     }
 }
+
+hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc,
+                                       const char **own_messages, size_t own_msg_count,
+                                       char **prompt_out, size_t *prompt_len) {
+    if (!alloc || !own_messages || !prompt_out || !prompt_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (own_msg_count < 10)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *prompt_out = NULL;
+    *prompt_len = 0;
+
+    hu_style_fingerprint_t fp;
+    memset(&fp, 0, sizeof(fp));
+    hu_error_t err = hu_style_analyze_messages(alloc, own_messages, own_msg_count, &fp);
+    if (err != HU_OK)
+        return err;
+
+    err = hu_style_fingerprint_to_prompt(alloc, &fp, prompt_out, prompt_len);
+    hu_style_fingerprint_deinit(alloc, &fp);
+    return err;
+}

@@ -194,6 +194,44 @@ static void test_eval_detect_regression_triggers_on_drop(void) {
     sqlite3_close(db);
 }
 
+static void test_eval_improvement_exceeds_10_percent(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    HU_ASSERT_EQ(hu_eval_init_tables(db), HU_OK);
+
+    hu_eval_run_t run1 = {0};
+    run1.suite_name = (char *)"audit-suite";
+    run1.passed = 5;
+    run1.failed = 5;
+    run1.pass_rate = 0.5;
+    HU_ASSERT_EQ(hu_eval_store_run(&alloc, db, &run1), HU_OK);
+
+    hu_eval_run_t run2 = {0};
+    run2.suite_name = (char *)"audit-suite";
+    run2.passed = 13;
+    run2.failed = 7;
+    run2.pass_rate = 0.65;
+    HU_ASSERT_EQ(hu_eval_store_run(&alloc, db, &run2), HU_OK);
+
+    hu_eval_run_t loaded[4];
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_eval_load_history(&alloc, db, loaded, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 2u);
+
+    /* Improvement from lower to higher pass rate (order may vary with same-second inserts) */
+    double a = loaded[0].pass_rate;
+    double b = loaded[1].pass_rate;
+    double lower = a < b ? a : b;
+    double higher = a > b ? a : b;
+    double improvement = (higher - lower) / lower;
+    HU_ASSERT_TRUE(improvement > 0.10);
+
+    hu_eval_run_free(&alloc, &loaded[0]);
+    hu_eval_run_free(&alloc, &loaded[1]);
+    sqlite3_close(db);
+}
+
 void run_eval_history_tests(void) {
     HU_TEST_SUITE("Eval History Storage");
     HU_RUN_TEST(test_eval_init_tables_succeeds);
@@ -205,6 +243,7 @@ void run_eval_history_tests(void) {
     HU_RUN_TEST(test_eval_detect_regression_no_history);
     HU_RUN_TEST(test_eval_detect_regression_passes_when_stable);
     HU_RUN_TEST(test_eval_detect_regression_triggers_on_drop);
+    HU_RUN_TEST(test_eval_improvement_exceeds_10_percent);
 }
 
 #else

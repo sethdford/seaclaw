@@ -14,6 +14,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -69,6 +71,7 @@ import ai.human.app.ui.screens.ToolsScreen
 import ai.human.app.ui.theme.HumanTheme
 import ai.human.app.ui.HUTokens
 import ai.human.app.ui.glassSurface
+import ai.human.app.util.isReducedMotionEnabled
 import ai.human.app.R
 
 class MainActivity : ComponentActivity() {
@@ -242,13 +245,18 @@ fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000
             }
         },
     ) { padding ->
+        val reducedMotion = isReducedMotionEnabled()
         Box(modifier = Modifier.padding(padding)) {
             AnimatedContent(
                 targetState = selectedTab,
                 transitionSpec = {
-                    (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) +
-                        slideInVertically { it / 20 }) togetherWith
-                        fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                    if (reducedMotion) {
+                        EnterTransition.None togetherWith ExitTransition.None
+                    } else {
+                        (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) +
+                            slideInVertically { it / 20 }) togetherWith
+                            fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                    }
                 },
                 modifier = Modifier.fillMaxSize(),
                 label = "screen_transition",

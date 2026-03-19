@@ -169,6 +169,67 @@ static void plan_executor_streaming_vtable_field(void) {
     HU_ASSERT_NULL(vt.execute_streaming);
 }
 
+static size_t stream_chunk_count;
+static size_t stream_total_bytes;
+static void test_on_chunk(void *ctx, const char *data, size_t len) {
+    (void)ctx; (void)data;
+    stream_chunk_count++;
+    stream_total_bytes += len;
+}
+
+static hu_error_t mock_exec_streaming(void *ctx, hu_allocator_t *alloc,
+                                       const hu_json_value_t *args,
+                                       void (*on_chunk)(void *cb, const char *data, size_t len),
+                                       void *cb_ctx,
+                                       hu_tool_result_t *out) {
+    (void)ctx; (void)alloc; (void)args;
+    if (on_chunk) {
+        on_chunk(cb_ctx, "partial1", 8);
+        on_chunk(cb_ctx, "partial2", 8);
+    }
+    *out = hu_tool_result_ok("partial1partial2", 16);
+    return HU_OK;
+}
+
+static const char *mock_name_stream(void *ctx) { (void)ctx; return "stream_tool"; }
+static const hu_tool_vtable_t mock_stream_vt = {
+    .execute = mock_exec_ok, .name = mock_name_stream,
+    .description = mock_desc, .parameters_json = mock_params,
+    .execute_streaming = mock_exec_streaming,
+};
+
+static void plan_executor_streaming_tool_integration(void) {
+    tpe_setup();
+    hu_tool_t tools[1] = {{.ctx = NULL, .vtable = &mock_stream_vt}};
+    hu_provider_t prov = {.ctx = NULL, .vtable = &mock_prov_vt};
+    hu_plan_executor_t exec;
+    hu_plan_executor_init(&exec, &tpe_alloc, &prov, "test", 4, tools, 1);
+
+    const char *json = "{\"steps\":[{\"tool\":\"stream_tool\",\"args\":{}}]}";
+    hu_plan_t *plan = NULL;
+    HU_ASSERT_EQ(hu_planner_create_plan(&tpe_alloc, json, strlen(json), &plan), HU_OK);
+
+    hu_plan_exec_result_t result;
+    HU_ASSERT_EQ(hu_plan_executor_run(&exec, plan, "test streaming", 14, &result), HU_OK);
+    HU_ASSERT_EQ(result.steps_completed, 1);
+    HU_ASSERT(result.goal_achieved);
+    hu_plan_free(&tpe_alloc, plan);
+}
+
+static void plan_executor_dispatcher_prefers_streaming(void) {
+    stream_chunk_count = 0;
+    stream_total_bytes = 0;
+    hu_tool_vtable_t vt;
+    memset(&vt, 0, sizeof(vt));
+    vt.execute = mock_exec_ok;
+    vt.execute_streaming = mock_exec_streaming;
+    vt.name = mock_name_stream;
+    vt.description = mock_desc;
+    vt.parameters_json = mock_params;
+    HU_ASSERT_NOT_NULL(vt.execute_streaming);
+    HU_ASSERT_NOT_NULL(vt.execute);
+}
+
 void run_plan_executor_tests(void) {
     HU_TEST_SUITE("PlanExecutor");
     HU_RUN_TEST(plan_executor_init_defaults);
@@ -179,4 +240,6 @@ void run_plan_executor_tests(void) {
     HU_RUN_TEST(plan_executor_null_args);
     HU_RUN_TEST(plan_executor_multi_step);
     HU_RUN_TEST(plan_executor_streaming_vtable_field);
+    HU_RUN_TEST(plan_executor_streaming_tool_integration);
+    HU_RUN_TEST(plan_executor_dispatcher_prefers_streaming);
 }

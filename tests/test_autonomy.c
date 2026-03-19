@@ -97,6 +97,21 @@ static void test_autonomy_intrinsic_goal_proactive(void) {
                    strstr(state.goals[0].description, "Proactively") != NULL);
 }
 
+static void test_autonomy_intrinsic_goal_generated_daily_target(void) {
+    hu_autonomy_state_t state;
+    hu_autonomy_init(&state, 8192);
+    hu_error_t err = hu_autonomy_generate_intrinsic_goal(&state, 0, 0);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(state.goal_count > 0u);
+
+    hu_autonomy_state_t state2;
+    hu_autonomy_init(&state2, 8192);
+    err = hu_autonomy_generate_intrinsic_goal(&state2, 2, 5);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(state2.goal_count > 0u);
+    HU_ASSERT_TRUE(state2.goals[0].priority >= 0.8);
+}
+
 static void test_autonomy_externalize_restore(void) {
     hu_autonomy_state_t state;
     hu_autonomy_init(&state, 4096);
@@ -139,6 +154,7 @@ void run_autonomy_tests(void) {
     HU_RUN_TEST(test_autonomy_null_args_returns_error);
     HU_RUN_TEST(test_autonomy_intrinsic_goal_on_failures);
     HU_RUN_TEST(test_autonomy_intrinsic_goal_proactive);
+    HU_RUN_TEST(test_autonomy_intrinsic_goal_generated_daily_target);
     HU_RUN_TEST(test_autonomy_externalize_restore);
     HU_RUN_TEST(test_autonomy_externalize_null);
 }

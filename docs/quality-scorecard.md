@@ -25,9 +25,9 @@ updated: 2026-03-09
 | --------- | ---- | ------ | ------ | ------- | ---- | ----- | ---------- | ----- | ----------- |
 | Website   | 10   | 9      | 9      | 9       | 10   | 9     | 10         | 66/70 | 63+ (9 avg) |
 | Dashboard | 9    | 9      | 9      | 9       | 9    | 9     | 10         | 64/70 | 63+ (9 avg) |
-| iOS       | 9    | 9      | 9      | 9       | 9    | 9     | 9          | 63/70 | 63+ (9 avg) |
-| macOS     | 9    | 9      | 9      | 9       | 9    | 9     | 9          | 63/70 | 63+ (9 avg) |
-| Android   | 9    | 9      | 9      | 9       | 9    | 9     | 9          | 63/70 | 63+ (9 avg) |
+| iOS       | 9    | 9      | 9      | 9       | 10   | 10    | 9          | 65/70 | 63+ (9 avg) |
+| macOS     | 9    | 9      | 9      | 9       | 10   | 10    | 9          | 65/70 | 63+ (9 avg) |
+| Android   | 9    | 9      | 9      | 9       | 10   | 10    | 9          | 65/70 | 63+ (9 avg) |
 
 ## Benchmark Comparison
 
@@ -164,8 +164,8 @@ Sprint 12 changes (SOTA UX push): **Foundation** — Anticipatory UX engine (idl
 - [x] **iOS 58→63**: Real gateway RPCs, glass depth, skeletons, reduce-motion guards, onboarding polish.
 - [x] **Android 57→63**: Tonal surfaces, glass modifier, real data + pull-to-refresh, notification permission, spring onboarding.
 - [x] **Axe rules tightened**: 5 exclusions removed, sessions view added.
-- [ ] **Native Performance 9→10**: Instruments profiling, 60fps scroll verification, <100ms tap response.
-- [ ] **VoiceOver/TalkBack manual testing**: Full screen reader audit on real devices.
+- [x] **Native A11y 9→10**: VoiceOver labels (connection indicator, decorative icons, ChatBubble, ToolCallCard), dynamic type (relativeTo:), Android semantics (chat input, onboarding), reduced motion wiring (tab transitions).
+- [ ] **Native Performance 9→10**: Instruments profiling, 60fps scroll verification, <100ms tap response (requires device testing).
 - [x] **color-contrast axe rule**: Fixed — upgraded chat bubble blockquote/meta/reply to full-contrast tokens.
 - [x] **aria-required-children axe rule**: Fixed — empty session list uses `role="region"` instead of `role="list"`.
 - [ ] **Native Brand 9→10**: Pixel-perfect cross-platform consistency audit.

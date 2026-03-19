@@ -311,12 +311,35 @@ static void web_fetch_deinit(void *ctx, hu_allocator_t *alloc) {
         alloc->free(alloc->ctx, ctx, sizeof(hu_web_fetch_ctx_t));
 }
 
+static hu_error_t web_fetch_execute_streaming(void *ctx, hu_allocator_t *alloc,
+                                              const hu_json_value_t *args,
+                                              void (*on_chunk)(void *cb_ctx, const char *data, size_t len),
+                                              void *cb_ctx,
+                                              hu_tool_result_t *out) {
+    if (!on_chunk)
+        return web_fetch_execute(ctx, alloc, args, out);
+
+    hu_error_t err = web_fetch_execute(ctx, alloc, args, out);
+    if (err == HU_OK && out->success && out->output && out->output_len > 0) {
+        size_t remaining = out->output_len;
+        size_t offset = 0;
+        while (remaining > 0) {
+            size_t chunk_size = remaining > 4096 ? 4096 : remaining;
+            on_chunk(cb_ctx, out->output + offset, chunk_size);
+            offset += chunk_size;
+            remaining -= chunk_size;
+        }
+    }
+    return err;
+}
+
 static const hu_tool_vtable_t web_fetch_vtable = {
     .execute = web_fetch_execute,
     .name = web_fetch_name,
     .description = web_fetch_description,
     .parameters_json = web_fetch_parameters_json,
     .deinit = web_fetch_deinit,
+    .execute_streaming = web_fetch_execute_streaming,
 };
 
 hu_error_t hu_web_fetch_create(hu_allocator_t *alloc, uint32_t max_chars, hu_tool_t *out) {

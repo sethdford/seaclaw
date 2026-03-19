@@ -160,9 +160,21 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
     }
 
     v->alloc->free(v->alloc->ctx, audio_buf, buf_bytes);
-#endif
-
     return HU_OK;
+#else
+    /* Cloud TTS fallback: deliver text as-is to the audio callback.
+     * Callers that provide on_audio_ready can use a cloud TTS service
+     * (e.g., Google Cloud TTS, AWS Polly) to synthesize the text.
+     * Without Sonata or a callback, voice output is not available. */
+    if (v->config.on_audio_ready) {
+        v->config.on_audio_ready((const float *)message, message_len, v->config.callback_user_data);
+        return HU_OK;
+    }
+#if !HU_IS_TEST
+    fprintf(stderr, "voice_channel: no TTS backend available (Sonata not built, no audio callback)\n");
+#endif
+    return HU_ERR_NOT_SUPPORTED;
+#endif
 }
 
 static const char *voice_name(void *ctx) {
@@ -220,6 +232,29 @@ hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc,
     msgs[0].message_id = -1;
     *out_count = 1;
 #else
+    /* Cloud STT fallback: if an audio input callback is provided,
+     * request audio and pass it through as raw text for external
+     * STT processing. Without Sonata, the caller is responsible
+     * for running speech recognition on the raw audio. */
+    if (v->config.on_audio_input_request && max_msgs > 0) {
+        float audio_buf[VOICE_MAX_SAMPLES];
+        size_t samples = 0;
+        if (v->config.on_audio_input_request(audio_buf, VOICE_MAX_SAMPLES, &samples,
+                                              v->config.callback_user_data) &&
+            samples > 0) {
+            memset(&msgs[0], 0, sizeof(msgs[0]));
+            int n = snprintf(msgs[0].content, sizeof(msgs[0].content),
+                             "[voice:%zu samples, needs external STT]", samples);
+            if (n > 0)
+                msgs[0].content[(size_t)n < sizeof(msgs[0].content) ? (size_t)n : sizeof(msgs[0].content) - 1] = '\0';
+            memcpy(msgs[0].session_key, "voice-user", 10);
+            msgs[0].session_key[10] = '\0';
+            msgs[0].is_group = false;
+            msgs[0].message_id = -1;
+            *out_count = 1;
+            return HU_OK;
+        }
+    }
     (void)max_msgs;
 #endif
     return HU_OK;

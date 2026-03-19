@@ -101,6 +101,50 @@ static void cdp_disconnected_rejects(void) {
     HU_ASSERT_EQ(hu_cdp_navigate(&s, "url", 3), HU_ERR_INVALID_ARGUMENT);
 }
 
+static void cdp_full_workflow(void) {
+    cdp_setup();
+    hu_cdp_session_t s;
+    HU_ASSERT_EQ(hu_cdp_connect(&cdp_alloc, "localhost", 9222, &s), HU_OK);
+
+    HU_ASSERT_EQ(hu_cdp_navigate(&s, "https://example.com", 19), HU_OK);
+
+    char *title = NULL;
+    size_t title_len = 0;
+    HU_ASSERT_EQ(hu_cdp_get_title(&s, &title, &title_len), HU_OK);
+    HU_ASSERT_NOT_NULL(title);
+    HU_ASSERT(title_len > 0);
+    cdp_alloc.free(cdp_alloc.ctx, title, title_len + 1);
+
+    HU_ASSERT_EQ(hu_cdp_click(&s, 50, 75), HU_OK);
+    HU_ASSERT_EQ(hu_cdp_type(&s, "test input", 10), HU_OK);
+
+    hu_cdp_element_t elems[8];
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_cdp_query_elements(&s, "button", 6, elems, 8, &count), HU_OK);
+    HU_ASSERT(count >= 1);
+
+    hu_cdp_screenshot_t shot;
+    HU_ASSERT_EQ(hu_cdp_screenshot(&s, &shot), HU_OK);
+    HU_ASSERT_NOT_NULL(shot.data_base64);
+    cdp_alloc.free(cdp_alloc.ctx, shot.data_base64, shot.data_len + 1);
+
+    char *eval_result = NULL;
+    size_t eval_len = 0;
+    HU_ASSERT_EQ(hu_cdp_evaluate(&s, "1+1", 3, &eval_result, &eval_len), HU_OK);
+    HU_ASSERT_NOT_NULL(eval_result);
+    cdp_alloc.free(cdp_alloc.ctx, eval_result, eval_len + 1);
+
+    hu_cdp_disconnect(&s);
+}
+
+static void cdp_session_ws_field_null_in_test(void) {
+    cdp_setup();
+    hu_cdp_session_t s;
+    HU_ASSERT_EQ(hu_cdp_connect(&cdp_alloc, "localhost", 9222, &s), HU_OK);
+    HU_ASSERT_NULL(s.ws);
+    hu_cdp_disconnect(&s);
+}
+
 void run_cdp_tests(void) {
     HU_TEST_SUITE("CDP");
     HU_RUN_TEST(cdp_connect_returns_mock);
@@ -112,4 +156,6 @@ void run_cdp_tests(void) {
     HU_RUN_TEST(cdp_query_elements);
     HU_RUN_TEST(cdp_null_args_rejected);
     HU_RUN_TEST(cdp_disconnected_rejects);
+    HU_RUN_TEST(cdp_full_workflow);
+    HU_RUN_TEST(cdp_session_ws_field_null_in_test);
 }

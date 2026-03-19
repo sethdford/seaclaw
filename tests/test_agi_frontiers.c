@@ -5,6 +5,8 @@
 #include "human/agent/uncertainty.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/json.h"
+#include "human/tools/delegate.h"
 #include <string.h>
 
 #ifdef HU_ENABLE_SQLITE
@@ -985,6 +987,84 @@ static void test_integration_speculative_roundtrip(void) {
     hu_speculative_cache_deinit(&cache);
 }
 
+/* -- Delegate E2E ---------------------------------------------------- */
+
+static void *agi_alloc_fn(void *ctx, size_t size) { (void)ctx; return malloc(size); }
+static void *agi_realloc_fn(void *ctx, void *ptr, size_t old_size, size_t new_size) {
+    (void)ctx; (void)old_size; return realloc(ptr, new_size);
+}
+static void agi_free_fn(void *ctx, void *ptr, size_t size) { (void)ctx; (void)size; free(ptr); }
+
+static void test_delegate_e2e_roundtrip(void) {
+    hu_allocator_t alloc = {
+        .alloc = agi_alloc_fn, .realloc = agi_realloc_fn, .free = agi_free_fn, .ctx = NULL,
+    };
+    hu_tool_t delegate;
+    HU_ASSERT_EQ(hu_delegate_create(&alloc, NULL, NULL, NULL, &delegate), HU_OK);
+    HU_ASSERT_STR_EQ(delegate.vtable->name(delegate.ctx), "delegate");
+
+    const char *args_json = "{\"agent\":\"test_agent\",\"prompt\":\"summarize this\"}";
+    hu_json_value_t *args = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc, args_json, strlen(args_json), &args), HU_OK);
+
+    hu_tool_result_t result;
+    memset(&result, 0, sizeof(result));
+    HU_ASSERT_EQ(delegate.vtable->execute(delegate.ctx, &alloc, args, &result), HU_OK);
+    HU_ASSERT(result.output != NULL);
+    HU_ASSERT(result.output_len > 0);
+    HU_ASSERT(strstr(result.output, "test_agent") != NULL);
+    HU_ASSERT(strstr(result.output, "summarize this") != NULL);
+
+    hu_json_free(&alloc, args);
+    hu_tool_result_free(&alloc, &result);
+    if (delegate.vtable->deinit)
+        delegate.vtable->deinit(delegate.ctx, &alloc);
+}
+
+static void test_delegate_missing_agent(void) {
+    hu_allocator_t alloc = {
+        .alloc = agi_alloc_fn, .realloc = agi_realloc_fn, .free = agi_free_fn, .ctx = NULL,
+    };
+    hu_tool_t delegate;
+    HU_ASSERT_EQ(hu_delegate_create(&alloc, NULL, NULL, NULL, &delegate), HU_OK);
+
+    const char *args_json = "{\"prompt\":\"do stuff\"}";
+    hu_json_value_t *args = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc, args_json, strlen(args_json), &args), HU_OK);
+
+    hu_tool_result_t result;
+    memset(&result, 0, sizeof(result));
+    HU_ASSERT_EQ(delegate.vtable->execute(delegate.ctx, &alloc, args, &result), HU_OK);
+    HU_ASSERT(!result.success);
+
+    hu_json_free(&alloc, args);
+    hu_tool_result_free(&alloc, &result);
+    if (delegate.vtable->deinit)
+        delegate.vtable->deinit(delegate.ctx, &alloc);
+}
+
+static void test_delegate_missing_prompt(void) {
+    hu_allocator_t alloc = {
+        .alloc = agi_alloc_fn, .realloc = agi_realloc_fn, .free = agi_free_fn, .ctx = NULL,
+    };
+    hu_tool_t delegate;
+    HU_ASSERT_EQ(hu_delegate_create(&alloc, NULL, NULL, NULL, &delegate), HU_OK);
+
+    const char *args_json = "{\"agent\":\"test_agent\"}";
+    hu_json_value_t *args = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc, args_json, strlen(args_json), &args), HU_OK);
+
+    hu_tool_result_t result;
+    memset(&result, 0, sizeof(result));
+    HU_ASSERT_EQ(delegate.vtable->execute(delegate.ctx, &alloc, args, &result), HU_OK);
+    HU_ASSERT(!result.success);
+
+    hu_json_free(&alloc, args);
+    hu_tool_result_free(&alloc, &result);
+    if (delegate.vtable->deinit)
+        delegate.vtable->deinit(delegate.ctx, &alloc);
+}
+
 /* -- Test runner ----------------------------------------------------- */
 
 void run_agi_frontiers_tests(void) {
@@ -1057,4 +1137,8 @@ void run_agi_frontiers_tests(void) {
 
     HU_RUN_TEST(test_orchestrator_decompose_goal_test_mode);
     HU_RUN_TEST(test_decomposition_free_handles_null);
+
+    HU_RUN_TEST(test_delegate_e2e_roundtrip);
+    HU_RUN_TEST(test_delegate_missing_agent);
+    HU_RUN_TEST(test_delegate_missing_prompt);
 }

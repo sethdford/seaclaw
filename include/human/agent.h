@@ -11,6 +11,7 @@
 #include "human/agent/mailbox.h"
 #include "human/agent/spawn.h"
 #include "human/agent/task_list.h"
+#include "human/agent/timing.h"
 #include "human/agent/team.h"
 #include "human/agent/worktree.h"
 #include "human/channel.h"
@@ -130,6 +131,7 @@ struct hu_agent {
     size_t turn_model_len;
     double turn_temperature;  /* 0.0 = use agent default */
     int turn_thinking_budget; /* 0 = no thinking config */
+    hu_timing_model_t *timing_model;
 
     /* Per-turn A/B evaluation: channel history for quality scoring (set by daemon, not owned) */
     const hu_channel_history_entry_t *ab_history_entries;

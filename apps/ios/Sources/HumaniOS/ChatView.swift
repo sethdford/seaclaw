@@ -127,7 +127,7 @@ struct ChatView: View {
             Spacer()
             VStack(spacing: HUTokens.spaceMd) {
                 Image(systemName: "bubble.left.and.bubble.right")
-                    .font(.system(size: HUTokens.text3Xl))
+                    .font(.custom("Avenir-Medium", size: HUTokens.text3Xl, relativeTo: .title))
                     .foregroundStyle(tokens.accent)
                     .accessibilityHidden(true)
                 Text("Start a conversation")
@@ -198,7 +198,7 @@ struct ChatView: View {
     private var connectionIndicator: some View {
         if #available(iOS 17, *) {
             Image(systemName: connectionManager.isConnected ? "antenna.radiowaves.left.and.right" : "wifi.slash")
-                .font(.caption)
+                .font(.custom("Avenir-Book", size: HUTokens.textXs, relativeTo: .caption))
                 .foregroundStyle(connectionManager.isConnected ? tokens.success : tokens.error)
                 .contentTransition(.symbolEffect(.replace))
                 .accessibilityLabel(connectionManager.isConnected ? "Connected" : "Disconnected")

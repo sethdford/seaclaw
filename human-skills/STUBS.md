@@ -9,7 +9,7 @@ Last updated: 2026-03-19
 | Source files (src/ + include/) | **1,054**                |
 | Lines of C/H code              | **~192K**                |
 | Test files                     | 273                      |
-| Tests passing                  | **5,844+/5,844+ (100%)** |
+| Tests passing                  | **5,860+/5,860+ (100%)** |
 | Binary size (MinSizeRel+LTO)   | **~1696 KB (all flags)** |
 | Cold start (--version)         | **4–27 ms avg**          |
 | Peak RSS (--version)           | **~5.7 MB**              |
