@@ -55,6 +55,15 @@ hu_error_t hu_dispatcher_dispatch(hu_dispatcher_t *d, hu_allocator_t *alloc, hu_
                                   size_t tools_count, const hu_tool_call_t *calls,
                                   size_t calls_count, hu_dispatch_result_t *out);
 
+/* Streaming dispatch — same as hu_dispatcher_dispatch but passes on_chunk/cb_ctx
+ * to tools that implement execute_streaming. Tools without streaming fall back
+ * to execute(). on_chunk may be NULL (equivalent to non-streaming dispatch). */
+hu_error_t hu_dispatcher_dispatch_streaming(hu_dispatcher_t *d, hu_allocator_t *alloc,
+                                            hu_tool_t *tools, size_t tools_count,
+                                            const hu_tool_call_t *calls, size_t calls_count,
+                                            void (*on_chunk)(void *ctx, const char *data, size_t len),
+                                            void *cb_ctx, hu_dispatch_result_t *out);
+
 /* Free results from hu_dispatcher_dispatch. */
 void hu_dispatch_result_free(hu_allocator_t *alloc, hu_dispatch_result_t *r);
 

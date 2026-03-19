@@ -40,6 +40,7 @@
 #include "human/memory/emotional_moments.h"
 #include "human/memory/fast_capture.h"
 #include "human/memory/stm.h"
+#include "human/memory/tiers.h"
 #include "human/memory/superhuman.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
@@ -1371,6 +1372,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     uint32_t iter = 0;
     size_t turn_tool_results_count = 0;
     int reflection_retries_left = agent->reflection.max_retries;
+    char *dpo_rejected_resp = NULL;
+    size_t dpo_rejected_resp_len = 0;
     uint64_t max_tokens =
         agent->token_limit ? agent->token_limit
                            : hu_context_tokens_resolve(0, agent->model_name, agent->model_name_len);
@@ -1402,6 +1405,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
     while (iter < agent->max_tool_iterations) {
         if (agent->cancel_requested) {
+            if (dpo_rejected_resp)
+                agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
+                                   dpo_rejected_resp_len + 1);
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
             if (plan_ctx)
@@ -1672,9 +1678,15 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
                         agent->alloc->free(agent->alloc->ctx, critique, critique_len + 1);
 
-                        /* DPO: record the rejected response for preference learning.
-                         * The chosen response will be the next LLM output after retry. */
-                        if (agent->sota_initialized) {
+                        /* DPO: save the rejected response for pairing with the
+                         * chosen response after retry succeeds. */
+                        if (agent->sota_initialized && resp.content && resp.content_len > 0) {
+                            if (dpo_rejected_resp)
+                                agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
+                                                   dpo_rejected_resp_len + 1);
+                            dpo_rejected_resp = hu_strndup(agent->alloc, resp.content,
+                                                           resp.content_len);
+                            dpo_rejected_resp_len = resp.content_len;
                             hu_dpo_record_from_feedback(&agent->dpo_collector,
                                 msg, msg_len, resp.content, resp.content_len, false);
                         }
@@ -1685,6 +1697,19 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     }
                     if (critique)
                         agent->alloc->free(agent->alloc->ctx, critique, critique_len + 1);
+                }
+
+                /* DPO retry pair: record chosen vs rejected when reflection retry succeeded */
+                if (agent->sota_initialized && dpo_rejected_resp && dpo_rejected_resp_len > 0 &&
+                    resp.content && resp.content_len > 0) {
+                    hu_dpo_record_from_retry(&agent->dpo_collector,
+                        msg, msg_len,
+                        dpo_rejected_resp, dpo_rejected_resp_len,
+                        resp.content, resp.content_len);
+                    agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
+                                       dpo_rejected_resp_len + 1);
+                    dpo_rejected_resp = NULL;
+                    dpo_rejected_resp_len = 0;
                 }
 
                 /* A/B: when first response quality < 70 and channel history available,
@@ -1874,6 +1899,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 if (!*response_out) {
                     hu_agent_clear_current_for_tools();
                     hu_chat_response_free(agent->alloc, &resp);
+                    if (dpo_rejected_resp)
+                        agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
+                                           dpo_rejected_resp_len + 1);
                     if (system_prompt)
                         agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
                     if (agent->turn_arena)
@@ -1938,6 +1966,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 if (store_err != HU_OK && store_err != HU_ERR_NOT_SUPPORTED)
                                     fprintf(stderr, "[agent] memory store failed: %d\n",
                                             (int)store_err);
+                                if (agent->sota_initialized) {
+                                    hu_memory_tier_t assigned;
+                                    hu_tier_manager_auto_tier(&agent->tier_manager,
+                                        key_buf, (size_t)n, f->object, strlen(f->object),
+                                        &assigned);
+                                }
                             }
                         }
                     }
@@ -2110,6 +2144,17 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
             }
 
+            /* Tier management: promote frequently-accessed memories, periodic consolidation */
+            if (agent->sota_initialized && agent->memory) {
+                if (memory_ctx && memory_ctx_len > 20) {
+                    hu_tier_manager_promote(&agent->tier_manager,
+                        memory_ctx, memory_ctx_len < 128 ? memory_ctx_len : 128,
+                        HU_TIER_ARCHIVAL, HU_TIER_RECALL);
+                }
+                if (agent->history_count % 10 == 0)
+                    hu_agent_consolidate_memory(agent);
+            }
+
             /* Self-eval feedback: score this turn's output and feed into
              * the self-improvement pipeline for continuous learning */
             if (agent->memory && agent->history_count > 0 &&
@@ -2162,6 +2207,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
             }
 #endif
+            if (dpo_rejected_resp)
+                agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
+                                   dpo_rejected_resp_len + 1);
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
             if (plan_ctx)
@@ -2546,9 +2594,16 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 #endif
                 hu_dispatch_result_t dispatch_result;
                 memset(&dispatch_result, 0, sizeof(dispatch_result));
-                err = hu_dispatcher_dispatch(&dispatcher, agent->alloc, agent->tools,
-                                             agent->tools_count, calls_to_dispatch, tc_count,
-                                             &dispatch_result);
+                if (agent->tool_stream_cb) {
+                    err = hu_dispatcher_dispatch_streaming(
+                        &dispatcher, agent->alloc, agent->tools, agent->tools_count,
+                        calls_to_dispatch, tc_count,
+                        agent->tool_stream_cb, agent->tool_stream_ctx, &dispatch_result);
+                } else {
+                    err = hu_dispatcher_dispatch(&dispatcher, agent->alloc, agent->tools,
+                                                 agent->tools_count, calls_to_dispatch, tc_count,
+                                                 &dispatch_result);
+                }
                 if (err == HU_OK)
                     turn_tool_results_count += tc_count;
                 (void)(turn_tool_results_count | 0); /* read to satisfy -Wunused-but-set-variable */
@@ -2967,6 +3022,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
     }
     hu_agent_clear_current_for_tools();
+    if (dpo_rejected_resp)
+        agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp, dpo_rejected_resp_len + 1);
     if (system_prompt)
         agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
     if (routed_specs)

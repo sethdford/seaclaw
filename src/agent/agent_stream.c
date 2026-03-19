@@ -21,6 +21,19 @@ typedef struct stream_token_wrap {
     void *token_ctx;
 } stream_token_wrap_t;
 
+/* Adapter: tool execute_streaming callback → agent token callback.
+ * Tool chunks use (void *ctx, const char *, size_t); agent tokens use (const char *, size_t, void *ctx). */
+typedef struct tool_stream_adapter {
+    hu_agent_stream_token_cb on_token;
+    void *token_ctx;
+} tool_stream_adapter_t;
+
+static void tool_chunk_to_token(void *ctx, const char *data, size_t len) {
+    tool_stream_adapter_t *a = (tool_stream_adapter_t *)ctx;
+    if (a->on_token && data && len > 0)
+        a->on_token(data, len, a->token_ctx);
+}
+
 static void stream_chunk_to_token_cb(void *ctx, const hu_stream_chunk_t *chunk) {
     stream_token_wrap_t *w = (stream_token_wrap_t *)ctx;
     if (chunk->is_final || !w->on_token)
@@ -72,13 +85,17 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
         return fallback_err;
     }
 
-    /* When tools are present, fall back to hu_agent_turn but simulate
-     * streaming by chunking the final response to the callback.
-     * This keeps the TUI responsive while tools execute. (Tier 2.4) */
+    /* When tools are present, fall back to hu_agent_turn but enable tool-level
+     * streaming so execute_streaming tools emit partial output in real time. */
     bool has_tools = (agent->tool_specs_count > 0);
     if (has_tools) {
+        tool_stream_adapter_t tsa = {.on_token = on_token, .token_ctx = token_ctx};
+        agent->tool_stream_cb = tool_chunk_to_token;
+        agent->tool_stream_ctx = &tsa;
         hu_error_t fallback_err =
             hu_agent_turn(agent, msg, msg_len, response_out, response_len_out);
+        agent->tool_stream_cb = NULL;
+        agent->tool_stream_ctx = NULL;
         if (fallback_err == HU_OK && on_token && *response_out && response_len_out &&
             *response_len_out > 0) {
             size_t chunk_size = 8;

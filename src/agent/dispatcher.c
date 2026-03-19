@@ -92,9 +92,11 @@ static hu_tool_t *find_tool(hu_tool_t *tools, size_t tools_count, const char *na
     return NULL;
 }
 
-static void execute_one_cached(hu_allocator_t *alloc, hu_tool_t *tools, size_t tools_count,
-                               const hu_tool_call_t *call, hu_tool_result_t *result_out,
-                               hu_tool_cache_t *cache) {
+static void execute_one_impl(hu_allocator_t *alloc, hu_tool_t *tools, size_t tools_count,
+                             const hu_tool_call_t *call, hu_tool_result_t *result_out,
+                             hu_tool_cache_t *cache,
+                             void (*on_chunk)(void *ctx, const char *data, size_t len),
+                             void *cb_ctx) {
     hu_tool_t *tool = find_tool(tools, tools_count, call->name, call->name_len);
     if (!tool) {
         *result_out = hu_tool_result_fail("tool not found", 14);
@@ -113,9 +115,9 @@ static void execute_one_cached(hu_allocator_t *alloc, hu_tool_t *tools, size_t t
     }
     *result_out = hu_tool_result_fail("invalid arguments", 16);
     if (args) {
-        if (tool->vtable->execute_streaming) {
-            tool->vtable->execute_streaming(tool->ctx, alloc, args, NULL, NULL, result_out);
-        } else {
+        if (on_chunk && tool->vtable->execute_streaming) {
+            tool->vtable->execute_streaming(tool->ctx, alloc, args, on_chunk, cb_ctx, result_out);
+        } else if (tool->vtable->execute) {
             tool->vtable->execute(tool->ctx, alloc, args, result_out);
         }
         hu_json_free(alloc, args);
@@ -123,6 +125,12 @@ static void execute_one_cached(hu_allocator_t *alloc, hu_tool_t *tools, size_t t
             tool_cache_store(cache, alloc, call->name, call->name_len,
                              call->arguments, call->arguments_len, result_out);
     }
+}
+
+static void execute_one_cached(hu_allocator_t *alloc, hu_tool_t *tools, size_t tools_count,
+                               const hu_tool_call_t *call, hu_tool_result_t *result_out,
+                               hu_tool_cache_t *cache) {
+    execute_one_impl(alloc, tools, tools_count, call, result_out, cache, NULL, NULL);
 }
 
 
@@ -341,6 +349,33 @@ hu_error_t hu_dispatcher_dispatch(hu_dispatcher_t *d, hu_allocator_t *alloc, hu_
     return dispatch_sequential_ex(alloc, tools, tools_count, calls, calls_count,
                                    d->timeout_secs, d->cache, out);
 #endif
+}
+
+hu_error_t hu_dispatcher_dispatch_streaming(hu_dispatcher_t *d, hu_allocator_t *alloc,
+                                            hu_tool_t *tools, size_t tools_count,
+                                            const hu_tool_call_t *calls, size_t calls_count,
+                                            void (*on_chunk)(void *ctx, const char *data, size_t len),
+                                            void *cb_ctx, hu_dispatch_result_t *out) {
+    if (!d || !alloc || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    out->results = NULL;
+    out->count = 0;
+    if (calls_count == 0)
+        return HU_OK;
+    if (!on_chunk)
+        return hu_dispatcher_dispatch(d, alloc, tools, tools_count, calls, calls_count, out);
+
+    hu_tool_result_t *results =
+        (hu_tool_result_t *)alloc->alloc(alloc->ctx, calls_count * sizeof(hu_tool_result_t));
+    if (!results)
+        return HU_ERR_OUT_OF_MEMORY;
+    for (size_t i = 0; i < calls_count; i++) {
+        execute_one_impl(alloc, tools, tools_count, &calls[i], &results[i],
+                         d->cache, on_chunk, cb_ctx);
+    }
+    out->results = results;
+    out->count = calls_count;
+    return HU_OK;
 }
 
 void hu_dispatch_result_free(hu_allocator_t *alloc, hu_dispatch_result_t *r) {

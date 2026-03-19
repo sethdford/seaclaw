@@ -235,6 +235,10 @@ struct hu_agent {
     char *persona_name;
     size_t persona_name_len;
 
+    /* Tool-level streaming: set before turn to enable tool execute_streaming callbacks */
+    void (*tool_stream_cb)(void *ctx, const char *data, size_t len);
+    void *tool_stream_ctx;
+
     /* SOTA neural subsystems */
     hu_srag_config_t srag_config;
     hu_adaptive_rag_t adaptive_rag;

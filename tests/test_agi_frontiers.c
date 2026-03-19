@@ -1,11 +1,19 @@
 #include "test_framework.h"
+#include "human/agent/constitutional.h"
+#include "human/agent/dispatcher.h"
 #include "human/agent/orchestrator.h"
 #include "human/agent/orchestrator_llm.h"
+#include "human/agent/process_reward.h"
 #include "human/agent/speculative.h"
+#include "human/agent/tree_of_thought.h"
 #include "human/agent/uncertainty.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
+#include "human/memory/adaptive_rag.h"
+#include "human/memory/self_rag.h"
+#include "human/memory/tiers.h"
+#include "human/ml/dpo.h"
 #include "human/tools/delegate.h"
 #include <string.h>
 
@@ -1065,6 +1073,286 @@ static void test_delegate_missing_prompt(void) {
         delegate.vtable->deinit(delegate.ctx, &alloc);
 }
 
+/* ─── Integration: Self-RAG assess + verify roundtrip ──────────────── */
+
+static void test_srag_assess_and_verify_roundtrip(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_srag_config_t cfg = hu_srag_config_default();
+    cfg.enabled = true;
+
+    hu_srag_assessment_t assess;
+    memset(&assess, 0, sizeof(assess));
+    hu_error_t err = hu_srag_should_retrieve(&alloc, &cfg,
+        "What is the height of the Eiffel Tower?", 39, NULL, 0, &assess);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(assess.is_factual_query);
+    HU_ASSERT_TRUE(assess.decision == HU_SRAG_RETRIEVE ||
+                   assess.decision == HU_SRAG_RETRIEVE_AND_VERIFY);
+
+    double relevance = 0.0;
+    bool should_use = false;
+    err = hu_srag_verify_relevance(&alloc, &cfg,
+        "What is the height of the Eiffel Tower?", 39,
+        "The Eiffel Tower is 330 meters tall, completed in 1889.", 55,
+        &relevance, &should_use);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(relevance > 0.0);
+    HU_ASSERT_TRUE(should_use);
+}
+
+static void test_srag_creative_query_skips_retrieval(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_srag_config_t cfg = hu_srag_config_default();
+    cfg.enabled = true;
+
+    hu_srag_assessment_t assess;
+    memset(&assess, 0, sizeof(assess));
+    hu_srag_should_retrieve(&alloc, &cfg,
+        "Write me a poem about the ocean", 31, NULL, 0, &assess);
+    HU_ASSERT_TRUE(assess.is_creative_query);
+}
+
+/* ─── Integration: PRM score_step + score_chain ───────────────────── */
+
+static void test_prm_score_step_standalone(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_prm_config_t cfg = hu_prm_config_default();
+    cfg.enabled = true;
+
+    double score = 0.0;
+    hu_error_t err = hu_prm_score_step(&alloc, &cfg,
+        "First, let's identify the key variables: x=5, y=10", 51,
+        "Calculate x+y given x=5, y=10", 30, &score);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(score > 0.0);
+}
+
+static void test_prm_chain_with_multi_step(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_prm_config_t cfg = hu_prm_config_default();
+    cfg.enabled = true;
+
+    hu_prm_result_t result;
+    memset(&result, 0, sizeof(result));
+    const char *chain =
+        "Step 1: Identify the problem.\n\n"
+        "Step 2: Break it down.\n\n"
+        "Step 3: Solve each part.\n\n"
+        "Step 4: Combine and verify.";
+    hu_error_t err = hu_prm_score_chain(&alloc, &cfg, chain, strlen(chain), &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.step_count >= 2);
+    HU_ASSERT_TRUE(result.aggregate_score > 0.0);
+    hu_prm_result_free(&alloc, &result);
+}
+
+/* ─── Integration: Constitutional critique in test mode ───────────── */
+
+static void test_constitutional_critique_roundtrip(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_constitutional_config_t cfg = hu_constitutional_config_default();
+    cfg.enabled = true;
+
+    hu_critique_result_t result;
+    memset(&result, 0, sizeof(result));
+    hu_error_t err = hu_constitutional_critique(&alloc, NULL, NULL, 0,
+        "How do I fix my code?", 21,
+        "Here's a helpful explanation of the issue and how to fix it.", 60,
+        &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.verdict == HU_CRITIQUE_PASS ||
+                   result.verdict == HU_CRITIQUE_MINOR);
+    hu_critique_result_free(&alloc, &result);
+}
+
+/* ─── Integration: Adaptive RAG select + record + learn cycle ─────── */
+
+static void test_adaptive_rag_select_and_learn(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_adaptive_rag_t rag;
+    hu_error_t err = hu_adaptive_rag_create(&alloc, NULL, &rag);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_rag_strategy_t s1 = hu_adaptive_rag_select(&rag, "What is X?", 10);
+    HU_ASSERT_TRUE(s1 < HU_RAG_STRATEGY_COUNT);
+    hu_adaptive_rag_record_outcome(&rag, s1, 0.9);
+
+    hu_rag_strategy_t s2 = hu_adaptive_rag_select(&rag,
+        "Tell me about person Y's preferences", 37);
+    HU_ASSERT_TRUE(s2 < HU_RAG_STRATEGY_COUNT);
+    hu_adaptive_rag_record_outcome(&rag, s2, 0.3);
+
+    const char *name = hu_rag_strategy_str(s1);
+    HU_ASSERT_NOT_NULL(name);
+    HU_ASSERT_TRUE(strlen(name) > 0);
+
+    hu_adaptive_rag_deinit(&rag);
+}
+
+/* ─── Integration: DPO record_from_retry ──────────────────────────── */
+
+#ifdef HU_ENABLE_SQLITE
+static void test_dpo_record_from_retry_roundtrip(void) {
+    sqlite3 *db = open_test_db();
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_dpo_collector_t collector;
+    hu_error_t err = hu_dpo_collector_create(&alloc, db, 100, &collector);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_dpo_init_tables(&collector);
+
+    err = hu_dpo_record_from_retry(&collector,
+        "Explain quantum computing", 25,
+        "Quantum computing is magic.", 27,
+        "Quantum computing uses qubits which can exist in superposition states.", 70);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    size_t count = 0;
+    hu_dpo_pair_count(&collector, &count);
+    HU_ASSERT_TRUE(count >= 1);
+
+    hu_dpo_collector_deinit(&collector);
+    sqlite3_close(db);
+}
+#endif
+
+/* ─── Integration: Tier manager promote/demote roundtrip ──────────── */
+
+#ifdef HU_ENABLE_SQLITE
+static void test_tier_promote_demote_roundtrip(void) {
+    sqlite3 *db = open_test_db();
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tier_manager_t mgr;
+    hu_error_t err = hu_tier_manager_create(&alloc, db, &mgr);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_tier_manager_init_tables(&mgr);
+
+    hu_tier_manager_store(&mgr, HU_TIER_ARCHIVAL, "fact:sky:blue", 13,
+                          "The sky is blue", 15);
+
+    err = hu_tier_manager_promote(&mgr, "fact:sky:blue", 13,
+                                  HU_TIER_ARCHIVAL, HU_TIER_RECALL);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    err = hu_tier_manager_demote(&mgr, "fact:sky:blue", 13,
+                                 HU_TIER_RECALL, HU_TIER_ARCHIVAL);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_memory_tier_t assigned;
+    err = hu_tier_manager_auto_tier(&mgr, "important_key", 13,
+        "user's favorite color is green", 30, &assigned);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    const char *tier_name = hu_memory_tier_str(assigned);
+    HU_ASSERT_NOT_NULL(tier_name);
+
+    hu_tier_manager_deinit(&mgr);
+    sqlite3_close(db);
+}
+#endif
+
+/* ─── Integration: Streaming dispatcher calls execute_streaming ───── */
+
+static size_t test_stream_chunks_received;
+static void test_stream_chunk_counter(void *ctx, const char *data, size_t len) {
+    (void)ctx; (void)data; (void)len;
+    test_stream_chunks_received++;
+}
+
+static hu_error_t mock_streaming_execute(void *ctx, hu_allocator_t *alloc,
+    const hu_json_value_t *args,
+    void (*on_chunk)(void *cb_ctx, const char *data, size_t len),
+    void *cb_ctx, hu_tool_result_t *out) {
+    (void)ctx; (void)args;
+    if (on_chunk) {
+        on_chunk(cb_ctx, "chunk1", 6);
+        on_chunk(cb_ctx, "chunk2", 6);
+    }
+    char *buf = (char *)alloc->alloc(alloc->ctx, 13);
+    memcpy(buf, "chunk1chunk2", 13);
+    *out = hu_tool_result_ok_owned(buf, 12);
+    return HU_OK;
+}
+
+static const char *mock_stream_name(void *ctx) { (void)ctx; return "mock_stream"; }
+static const char *mock_stream_desc(void *ctx) { (void)ctx; return "mock streaming tool"; }
+static const char *mock_stream_params(void *ctx) { (void)ctx; return "{}"; }
+
+static const hu_tool_vtable_t mock_stream_vtable = {
+    .execute = NULL,
+    .name = mock_stream_name,
+    .description = mock_stream_desc,
+    .parameters_json = mock_stream_params,
+    .deinit = NULL,
+    .execute_streaming = mock_streaming_execute,
+};
+
+static void test_streaming_dispatcher_calls_execute_streaming(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t tool = {.ctx = NULL, .vtable = &mock_stream_vtable};
+
+    hu_tool_call_t call = {
+        .id = "c1", .id_len = 2,
+        .name = "mock_stream", .name_len = 11,
+        .arguments = "{}", .arguments_len = 2,
+    };
+
+    hu_dispatcher_t disp;
+    hu_dispatcher_default(&disp);
+    hu_dispatch_result_t dres;
+    test_stream_chunks_received = 0;
+
+    hu_error_t err = hu_dispatcher_dispatch_streaming(&disp, &alloc, &tool, 1,
+        &call, 1, test_stream_chunk_counter, NULL, &dres);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(dres.count, 1u);
+    HU_ASSERT_TRUE(dres.results[0].success);
+    HU_ASSERT_EQ(test_stream_chunks_received, 2u);
+    HU_ASSERT_TRUE(strstr(dres.results[0].output, "chunk1") != NULL);
+
+    hu_dispatch_result_free(&alloc, &dres);
+}
+
+static void test_streaming_dispatcher_null_callback_falls_back(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t tool = {.ctx = NULL, .vtable = &mock_stream_vtable};
+
+    hu_tool_call_t call = {
+        .id = "c1", .id_len = 2,
+        .name = "mock_stream", .name_len = 11,
+        .arguments = "{}", .arguments_len = 2,
+    };
+
+    hu_dispatcher_t disp;
+    hu_dispatcher_default(&disp);
+    hu_dispatch_result_t dres;
+
+    hu_error_t err = hu_dispatcher_dispatch_streaming(&disp, &alloc, &tool, 1,
+        &call, 1, NULL, NULL, &dres);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(dres.count, 1u);
+
+    hu_dispatch_result_free(&alloc, &dres);
+}
+
+/* ─── Integration: Tree of Thought explore + config ───────────────── */
+
+static void test_tot_explore_generates_branches(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tot_config_t cfg = hu_tot_config_default();
+    cfg.enabled = true;
+
+    hu_tot_result_t result;
+    memset(&result, 0, sizeof(result));
+    hu_error_t err = hu_tot_explore(&alloc, NULL, NULL, 0,
+        "How should we design a caching layer for this system?", 53,
+        &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.branches_explored >= 1);
+    HU_ASSERT_TRUE(result.best_thought != NULL);
+    HU_ASSERT_TRUE(result.best_thought_len > 0);
+    hu_tot_result_free(&alloc, &result);
+}
+
 /* -- Test runner ----------------------------------------------------- */
 
 void run_agi_frontiers_tests(void) {
@@ -1141,4 +1429,19 @@ void run_agi_frontiers_tests(void) {
     HU_RUN_TEST(test_delegate_e2e_roundtrip);
     HU_RUN_TEST(test_delegate_missing_agent);
     HU_RUN_TEST(test_delegate_missing_prompt);
+
+    HU_RUN_TEST(test_srag_assess_and_verify_roundtrip);
+    HU_RUN_TEST(test_srag_creative_query_skips_retrieval);
+    HU_RUN_TEST(test_prm_score_step_standalone);
+    HU_RUN_TEST(test_prm_chain_with_multi_step);
+    HU_RUN_TEST(test_constitutional_critique_roundtrip);
+    HU_RUN_TEST(test_adaptive_rag_select_and_learn);
+    HU_RUN_TEST(test_tot_explore_generates_branches);
+    HU_RUN_TEST(test_streaming_dispatcher_calls_execute_streaming);
+    HU_RUN_TEST(test_streaming_dispatcher_null_callback_falls_back);
+
+#ifdef HU_ENABLE_SQLITE
+    HU_RUN_TEST(test_dpo_record_from_retry_roundtrip);
+    HU_RUN_TEST(test_tier_promote_demote_roundtrip);
+#endif
 }
