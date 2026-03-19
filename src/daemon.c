@@ -3923,28 +3923,30 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                             }
 
-                            /* 11. Episodic context — last 3 episodes for this contact */
+                            /* 11. Episodic context — last 5 episodes for this contact */
                             {
                                 hu_episode_sqlite_t *episodes = NULL;
                                 size_t ep_count = 0;
-                                if (hu_episode_get_by_contact(alloc, db, batch_key, key_len, 3, 0,
+                                if (hu_episode_get_by_contact(alloc, db, batch_key, key_len, 5, 0,
                                                               &episodes, &ep_count) == HU_OK &&
                                     episodes && ep_count > 0) {
-                                    char ep_buf[2048];
+                                    char ep_buf[4096];
                                     size_t ep_pos = 0;
-                                    int n = snprintf(ep_buf, sizeof(ep_buf),
-                                                    "[EPISODIC MEMORY: Recent episodes: ");
+                                    static const char ep_hdr[] =
+                                        "[SHARED HISTORY with this person — reference specific "
+                                        "details when relevant, not generic empathy: ";
+                                    int n = snprintf(ep_buf, sizeof(ep_buf), "%s", ep_hdr);
                                     if (n > 0)
                                         ep_pos = (size_t)n;
                                     for (size_t ei = 0; ei < ep_count && ep_pos < sizeof(ep_buf) - 64; ei++) {
                                         if (ei > 0) {
                                             ep_buf[ep_pos++] = ' ';
-                                            ep_buf[ep_pos++] = ';';
+                                            ep_buf[ep_pos++] = '|';
                                             ep_buf[ep_pos++] = ' ';
                                         }
                                         size_t add = episodes[ei].summary_len;
-                                        if (add > 120)
-                                            add = 120;
+                                        if (add > 250)
+                                            add = 250;
                                         if (ep_pos + add + 2 < sizeof(ep_buf)) {
                                             memcpy(ep_buf + ep_pos, episodes[ei].summary, add);
                                             ep_pos += add;

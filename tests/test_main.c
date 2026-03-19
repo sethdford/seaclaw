@@ -351,6 +351,7 @@ int main(int argc, char **argv) {
     run_security_tests();
     run_vault_tests();
     run_provider_tests();
+    run_provider_http_tests();
     run_api_key_tests();
     run_channel_tests();
     run_tool_tests();
