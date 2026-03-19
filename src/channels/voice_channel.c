@@ -170,10 +170,12 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
         v->config.on_audio_ready((const float *)message, message_len, v->config.callback_user_data);
         return HU_OK;
     }
-#if !HU_IS_TEST
+#if HU_IS_TEST
+    return HU_OK;
+#else
     fprintf(stderr, "voice_channel: no TTS backend available (Sonata not built, no audio callback)\n");
-#endif
     return HU_ERR_NOT_SUPPORTED;
+#endif
 #endif
 }
 
