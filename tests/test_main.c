@@ -194,6 +194,7 @@ void run_superhuman_tests(void);
 void run_tool_call_parser_tests(void);
 void run_tool_router_tests(void);
 void run_dag_tests(void);
+void run_sota_features_tests(void);
 void run_mood_tests(void);
 void run_style_tracker_tests(void);
 void run_theory_of_mind_tests(void);
@@ -528,6 +529,7 @@ int main(int argc, char **argv) {
     run_tool_call_parser_tests();
     run_tool_router_tests();
     run_dag_tests();
+    run_sota_features_tests();
     run_mood_tests();
     run_style_tracker_tests();
     run_theory_of_mind_tests();

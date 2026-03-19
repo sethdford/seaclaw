@@ -1897,6 +1897,7 @@ set(HU_TEST_SOURCES
     tests/test_tool_call_parser.c
     tests/test_tool_router.c
     tests/test_dag.c
+    tests/test_sota_features.c
     tests/test_mood.c
     tests/test_bth_e2e.c
     tests/test_style_tracker.c

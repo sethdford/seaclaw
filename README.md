@@ -22,7 +22,7 @@
 The smallest fully autonomous AI assistant infrastructure — a static C binary that fits on any $5 board, boots in milliseconds, and requires nothing but libc.
 
 ```
-~1696 KB binary · <30 ms startup · 5,897+ tests · 97 providers · 38 channels · 85 tools · Pluggable everything
+~1696 KB binary · <30 ms startup · 5,922+ tests · 97 providers · 38 channels · 85 tools · Pluggable everything
 ```
 
 ### Features
@@ -61,7 +61,7 @@ Human's verified numbers (measured on macOS arm64, March 2026):
 Binary size:   ~1696 KB (MinSizeRel + LTO, all channels)
 Peak RSS:      ~5.7 MB (--version), ~5.9 MB (test suite)
 Startup:       6–27 ms avg (Apple Silicon M4 Max)
-Tests:         5,897+ passing, 0 ASan errors
+Tests:         5,922+ passing, 0 ASan errors
 ```
 
 ### Why Switch from OpenClaw?
@@ -615,7 +615,7 @@ Build and tests require a C11 compiler and CMake 3.16+. One-time setup:
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Debug -DHU_ENABLE_ALL_CHANNELS=ON
 cmake --build .                            # Dev build
-./human_tests                             # 5,897+ tests
+./human_tests                             # 5,922+ tests
 cd ..
 ```
 
@@ -653,7 +653,7 @@ Language: C11 + ASM (aarch64, x86_64)
 Source files: 1,054
 Lines of code: ~192K
 Test files: 273
-Tests: 5,897+
+Tests: 5,922+
 Binary: ~1696 KB (MinSizeRel + LTO, all channels)
 Peak RSS: ~5.7 MB
 Startup: 6–27 ms avg (Apple Silicon)
@@ -687,7 +687,7 @@ config.c Config loading/merging (~/.human/config.json)
 ...
 
 include/human/ Public C headers
-tests/ 292 test files, 5,897+ tests
+tests/ 292 test files, 5,922+ tests
 asm/ Platform-specific assembly (aarch64, x86_64, generic C)
 
 ui/ Web UI (LitElement + Vite)
