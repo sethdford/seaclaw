@@ -716,7 +716,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
     if (!this._onboarded) return nothing;
     const actions = [
       { label: "Chat", icon: icons["message-square"], target: "chat" },
-      { label: "New Automation", icon: icons.clock, target: "automations" },
+      { label: "New Automation", icon: icons.timer, target: "automations" },
       { label: "Voice", icon: icons.mic, target: "voice" },
     ];
     return html`

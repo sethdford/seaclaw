@@ -1,7 +1,7 @@
 ---
 title: "SOTA AGI Convergence — Closing Every Frontier Gap"
 created: 2026-03-15
-status: proposed
+status: complete
 scope: eval, intelligence, memory, agent, feeds, voice, multimodal, orchestrator, tools
 phases: 6
 features:
@@ -319,9 +319,9 @@ Each task uses this status tracking:
 | 9   | Tests                | All eval tests pass (expect 30+ new tests)                       | [x]      |
 | 10  | ASan                 | Zero memory leaks in eval code paths                             | [x]      |
 
-**Phase 1 Audit Notes (2026-03-15):** Task loader parses tasks array; runner + benchmark adapters + dashboard exist. LLM-as-judge (`eval_judge.c`) not implemented — uses EXACT/CONTAINS only. Regression: `hu_eval_compare` produces delta; `eval_check_regression.py` runs on golden-set (schedule), not on PR. No SQLite historical storage in eval.c. 5522 tests pass, 0 ASan errors.
+**Phase 1 Audit Notes (2026-03-19):** All eval subsystems implemented: task loader, runner, LLM-as-judge (eval_judge.c with provider path + heuristic fallback + caching), benchmark adapters (GAIA/SWE-bench/tool-use), terminal dashboard, SQLite historical storage (eval_runs + eval_results tables), regression detection (hu_eval_detect_regression). 5879 tests pass, 0 ASan errors.
 
-**Phase 1 Exit Quality Rating Target: B** — **Actual: C** (LLM judge, historical storage missing)
+**Phase 1 Exit Quality Rating Target: B** — **Actual: B**
 
 ---
 

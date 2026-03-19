@@ -3,7 +3,6 @@ import { customElement, property } from "lit/decorators.js";
 import { icons } from "../icons.js";
 import "./hu-card.js";
 import "./hu-button.js";
-import "./hu-data-table-v2.js";
 
 interface CronJob {
   id: number;
@@ -412,6 +411,27 @@ export class ScAutomationCard extends LitElement {
     this._fire("automation-delete");
   }
 
+  private _renderRunDots() {
+    const dots = [];
+    const last7 = this.runs.slice(-7);
+    for (let i = 0; i < 7; i++) {
+      const run = last7[i];
+      if (run) {
+        const ts = new Date(run.started_at * 1000).toLocaleString(undefined, {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const cls = run.status === "completed" ? "completed" : run.status === "failed" ? "failed" : "empty";
+        dots.push(html`<span class="run-dot ${cls}" title="${run.status} — ${ts}"></span>`);
+      } else {
+        dots.push(html`<span class="run-dot empty"></span>`);
+      }
+    }
+    return dots;
+  }
+
   override render() {
     const job = this.job;
     if (!job) return nothing;
@@ -422,19 +442,6 @@ export class ScAutomationCard extends LitElement {
     const nextRunStr = job.next_run > 0 ? relativeTime(job.next_run) : "—";
     const lastStatusClass =
       job.last_status === "completed" ? "completed" : job.last_status === "failed" ? "failed" : "";
-    const runRows = this.runs
-      .map((r) => ({
-        time: new Date(r.started_at * 1000).toLocaleString(undefined, {
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        status: r.status,
-        duration:
-          r.finished_at > r.started_at ? `${Math.round(r.finished_at - r.started_at)}s` : "—",
-      }))
-      .reverse();
     const createdStr =
       job.created_at > 0
         ? new Date(job.created_at * 1000).toLocaleDateString(undefined, {
@@ -494,23 +501,12 @@ export class ScAutomationCard extends LitElement {
               </span>
             </div>
 
-            ${this.runs.length > 0
-              ? html`
-                  <div class="run-history-section">
-                    <div class="run-history-label">Run history</div>
-                    <hu-data-table-v2
-                      .columns=${[
-                        { key: "time", label: "Time", sortable: true },
-                        { key: "status", label: "Status", sortable: true },
-                        { key: "duration", label: "Duration", align: "right" as const },
-                      ]}
-                      .rows=${runRows}
-                      .pageSize=${5}
-                      paginated
-                    ></hu-data-table-v2>
-                  </div>
-                `
-              : nothing}
+            <div class="run-history-section">
+              <div class="run-history-label">Run history</div>
+              <div class="run-history" title=${this.runs.map((r) => `${r.status}`).join(", ")}>
+                ${this._renderRunDots()}
+              </div>
+            </div>
 
             <div class="footer-row">
               <div class="footer-actions">

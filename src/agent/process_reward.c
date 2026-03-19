@@ -148,7 +148,8 @@ static size_t split_steps(const char *text, size_t text_len,
     while (p < end) {
         if (*p == '\n' && p + 1 < end) {
             char next = p[1];
-            bool is_list = (next >= '0' && next <= '9') || next == '-' || next == '*';
+            bool is_list = (next >= '0' && next <= '9') || next == '-' || next == '*'
+                || (next >= 'A' && next <= 'Z');
             if (is_list) {
                 size_t seg_len = (size_t)(p - seg_start);
                 while (seg_len > 0 && (seg_start[0] == ' ' || seg_start[0] == '\n')) {
