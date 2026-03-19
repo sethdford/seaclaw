@@ -1,4 +1,5 @@
 #include "human/context/conversation.h"
+#include "human/core/allocator.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/data/loader.h"
@@ -5838,61 +5839,138 @@ bool hu_conversation_check_ai_disclosure(const char *response, size_t response_l
 
 /* ── Banned AI phrases post-processor ─────────────────────────────────── */
 
+typedef struct {
+    const char *from;
+    size_t from_len;
+    const char *to;
+    size_t to_len;
+} hu_ai_phrase_replacement_t;
+
+/* Hardcoded fallback when conversation/ai_phrases.json cannot be loaded */
+static const hu_ai_phrase_replacement_t s_ai_phrases_fallback[] = {
+    {"Great question! ", 16, "", 0},
+    {"Great question. ", 16, "", 0},
+    {"That's a great point! ", 22, "", 0},
+    {"That's a great point. ", 22, "", 0},
+    {"I appreciate you sharing that. ", 31, "", 0},
+    {"I appreciate you sharing that! ", 31, "", 0},
+    {"Let me break this down. ", 24, "", 0},
+    {"Let me break this down: ", 24, "", 0},
+    {"Here's the thing: ", 18, "", 0},
+    {"Here's the thing, ", 18, "", 0},
+    {"That's a fantastic ", 19, "That's a good ", 14},
+    {"I think that's a great ", 23, "", 0},
+    {"I think that's great! ", 22, "", 0},
+    {"crucial", 7, "important", 9},
+    {"comprehensive", 13, "thorough", 8},
+    {"pivotal", 7, "key", 3},
+    {"delve", 5, "dig", 3},
+    {"facilitate", 10, "help", 4},
+    {"leverage", 8, "use", 3},
+    {"utilize", 7, "use", 3},
+    {"I completely understand", 23, "I get it", 8},
+    {"Absolutely! ", 12, "", 0},
+    {"Certainly! ", 11, "", 0},
+    {"Of course! ", 11, "", 0},
+    {"Feel free to ", 13, "", 0},
+    {"Don't hesitate to ", 18, "", 0},
+    {"I'd be happy to ", 16, "", 0},
+    {"I'm here to help", 16, "I'm here", 8},
+    {"I'm here for you! ", 18, "I'm here ", 9},
+    {"That said, ", 11, "", 0},
+    {"That being said, ", 17, "", 0},
+    {"It's worth noting ", 18, "", 0},
+    {"It's important to note ", 23, "", 0},
+    {"In any case, ", 13, "", 0},
+    {"At the end of the day, ", 23, "", 0},
+    {"To be honest, ", 14, "", 0},
+    {"I want you to know ", 19, "", 0},
+    {"navigating", 10, "handling", 8},
+    {"resonate", 8, "hit home", 8},
+    {"boundaries", 10, "limits", 6},
+    {"self-care", 9, "rest", 4},
+    {"impactful", 9, "big", 3},
+    {"!! ", 3, "! ", 2},
+};
+
+static hu_ai_phrase_replacement_t *s_ai_phrases_cache = NULL;
+static size_t s_ai_phrases_cache_len = 0;
+static bool s_ai_phrases_loaded = false;
+
+static void load_ai_phrases_once(void) {
+    if (s_ai_phrases_loaded)
+        return;
+    s_ai_phrases_loaded = true;
+
+    hu_allocator_t alloc_val = hu_system_allocator();
+    hu_allocator_t *alloc = &alloc_val;
+    char *json_data = NULL;
+    size_t json_len = 0;
+    hu_error_t err = hu_data_load(alloc, "conversation/ai_phrases.json", &json_data, &json_len);
+    if (err != HU_OK || !json_data || json_len == 0)
+        goto use_fallback;
+
+    hu_json_value_t *root = NULL;
+    err = hu_json_parse(alloc, json_data, json_len, &root);
+    alloc->free(alloc->ctx, json_data, json_len);
+    if (err != HU_OK || !root || root->type != HU_JSON_ARRAY)
+        goto use_fallback;
+
+    size_t arr_len = root->data.array.len;
+    if (arr_len == 0)
+        goto use_fallback;
+
+    hu_ai_phrase_replacement_t *cache =
+        (hu_ai_phrase_replacement_t *)alloc->alloc(alloc->ctx, arr_len * sizeof(hu_ai_phrase_replacement_t));
+    if (!cache) {
+        hu_json_free(alloc, root);
+        goto use_fallback;
+    }
+
+    size_t valid = 0;
+    for (size_t i = 0; i < arr_len; i++) {
+        hu_json_value_t *item = root->data.array.items[i];
+        if (!item || item->type != HU_JSON_OBJECT)
+            continue;
+        const char *from = hu_json_get_string(item, "from");
+        const char *to = hu_json_get_string(item, "to");
+        if (!from)
+            continue;
+        size_t flen = strlen(from);
+        char *from_copy = (char *)alloc->alloc(alloc->ctx, flen + 1);
+        char *to_copy = to ? (char *)alloc->alloc(alloc->ctx, strlen(to) + 1) : NULL;
+        if (!from_copy)
+            continue;
+        memcpy(from_copy, from, flen + 1);
+        if (to && to_copy)
+            memcpy(to_copy, to, strlen(to) + 1);
+        cache[valid].from = from_copy;
+        cache[valid].from_len = flen;
+        cache[valid].to = (to && to_copy) ? to_copy : "";
+        cache[valid].to_len = (to && to_copy) ? strlen(to) : 0;
+        valid++;
+    }
+    hu_json_free(alloc, root);
+
+    if (valid > 0) {
+        s_ai_phrases_cache = cache;
+        s_ai_phrases_cache_len = valid;
+        return;
+    }
+    alloc->free(alloc->ctx, cache, arr_len * sizeof(hu_ai_phrase_replacement_t));
+
+use_fallback:
+    s_ai_phrases_cache = (hu_ai_phrase_replacement_t *)s_ai_phrases_fallback;
+    s_ai_phrases_cache_len = sizeof(s_ai_phrases_fallback) / sizeof(s_ai_phrases_fallback[0]);
+}
+
 size_t hu_conversation_strip_ai_phrases(char *buf, size_t len) {
     if (!buf || len == 0)
         return len;
 
-    struct {
-        const char *from;
-        size_t from_len;
-        const char *to;
-        size_t to_len;
-    } replacements[] = {
-        {"Great question! ", 16, "", 0},
-        {"Great question. ", 16, "", 0},
-        {"That's a great point! ", 22, "", 0},
-        {"That's a great point. ", 22, "", 0},
-        {"I appreciate you sharing that. ", 31, "", 0},
-        {"I appreciate you sharing that! ", 31, "", 0},
-        {"Let me break this down. ", 24, "", 0},
-        {"Let me break this down: ", 24, "", 0},
-        {"Here's the thing: ", 18, "", 0},
-        {"Here's the thing, ", 18, "", 0},
-        {"That's a fantastic ", 19, "That's a good ", 14},
-        {"I think that's a great ", 23, "", 0},
-        {"I think that's great! ", 22, "", 0},
-        {"crucial", 7, "important", 9},
-        {"comprehensive", 13, "thorough", 8},
-        {"pivotal", 7, "key", 3},
-        {"delve", 5, "dig", 3},
-        {"facilitate", 10, "help", 4},
-        {"leverage", 8, "use", 3},
-        {"utilize", 7, "use", 3},
-        {"I completely understand", 23, "I get it", 8},
-        {"Absolutely! ", 12, "", 0},
-        {"Certainly! ", 11, "", 0},
-        {"Of course! ", 11, "", 0},
-        {"Feel free to ", 13, "", 0},
-        {"Don't hesitate to ", 18, "", 0},
-        {"I'd be happy to ", 16, "", 0},
-        {"I'm here to help", 16, "I'm here", 8},
-        {"I'm here for you! ", 18, "I'm here ", 9},
-        {"That said, ", 11, "", 0},
-        {"That being said, ", 17, "", 0},
-        {"It's worth noting ", 18, "", 0},
-        {"It's important to note ", 23, "", 0},
-        {"In any case, ", 13, "", 0},
-        {"At the end of the day, ", 23, "", 0},
-        {"To be honest, ", 14, "", 0},
-        {"I want you to know ", 19, "", 0},
-        {"navigating", 10, "handling", 8},
-        {"resonate", 8, "hit home", 8},
-        {"boundaries", 10, "limits", 6},
-        {"self-care", 9, "rest", 4},
-        {"impactful", 9, "big", 3},
-        {"!! ", 3, "! ", 2},
-    };
-    size_t n_rep = sizeof(replacements) / sizeof(replacements[0]);
+    load_ai_phrases_once();
+    const hu_ai_phrase_replacement_t *replacements = s_ai_phrases_cache;
+    size_t n_rep = s_ai_phrases_cache_len;
 
     for (size_t r = 0; r < n_rep; r++) {
         for (size_t i = 0; i + replacements[r].from_len <= len; i++) {
