@@ -11,6 +11,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
+#include "human/agent.h"
+#include "human/feeds/findings.h"
+#include "human/feeds/processor.h"
+#include "human/intelligence/cycle.h"
+#include <sqlite3.h>
+#include <time.h>
+#endif
+
 static const char RESEARCH_PROMPT[] =
     "You are the h-uman Research Agent. Your job is to analyze today's feed items "
     "from all connected platforms (Gmail, iMessage, Twitter/X, Facebook, TikTok, "
@@ -181,3 +190,52 @@ hu_error_t hu_research_build_action_prompt(hu_allocator_t *alloc,
     *out_len = pos;
     return HU_OK;
 }
+
+#if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
+hu_error_t hu_research_agent_run(hu_allocator_t *alloc, hu_agent_t *agent, sqlite3 *db) {
+    if (!alloc || !agent || !db)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char *digest = NULL;
+    size_t digest_len = 0;
+    int64_t since = (int64_t)time(NULL) - 86400;
+    hu_error_t err = hu_feed_build_daily_digest(alloc, db, since, 4000, &digest, &digest_len);
+    if (err != HU_OK)
+        return err;
+
+    char *prompt = NULL;
+    size_t prompt_len = 0;
+    err = hu_research_build_prompt(alloc, digest ? digest : "(No feed items today)",
+                                   digest ? digest_len : 20, &prompt, &prompt_len);
+    if (digest)
+        alloc->free(alloc->ctx, digest, digest_len + 1);
+    if (err != HU_OK)
+        return err;
+
+    char *response = NULL;
+    size_t response_len = 0;
+#ifndef HU_IS_TEST
+    err = hu_agent_turn(agent, prompt, prompt_len, &response, &response_len);
+#else
+    (void)agent;
+    err = HU_OK;
+    response = hu_strndup(alloc, "[research-agent-test]", 21);
+    response_len = 21;
+#endif
+    alloc->free(alloc->ctx, prompt, prompt_len + 1);
+    if (err != HU_OK)
+        return err;
+
+    if (response && response_len > 0)
+        (void)hu_findings_parse_and_store(alloc, db, response, response_len);
+
+#ifdef HU_HAS_SKILLS
+    hu_intelligence_cycle_result_t cycle_result = {0};
+    (void)hu_intelligence_run_cycle(alloc, db, &cycle_result);
+#endif
+
+    if (response)
+        alloc->free(alloc->ctx, response, response_len + 1);
+    return HU_OK;
+}
+#endif

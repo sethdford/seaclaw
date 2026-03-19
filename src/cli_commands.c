@@ -1,4 +1,5 @@
 #include "human/cli_commands.h"
+#include "human/bootstrap.h"
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/eval.h"
@@ -10,6 +11,7 @@
 #ifdef HU_ENABLE_FEEDS
 #include "human/feeds/processor.h"
 #include "human/feeds/findings.h"
+#include "human/feeds/research.h"
 #include "human/feeds/trends.h"
 #include "human/intelligence/cycle.h"
 #endif
@@ -1038,6 +1040,48 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     fprintf(stderr, "Unknown eval subcommand: %s\n", sub);
     return HU_ERR_INVALID_ARGUMENT;
 }
+
+/* ── research ───────────────────────────────────────────────────────────── */
+#if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
+hu_error_t cmd_research(hu_allocator_t *alloc, int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+    hu_app_ctx_t app_ctx;
+    hu_error_t err = hu_app_bootstrap(&app_ctx, alloc, NULL, true, false);
+    if (err != HU_OK) {
+        fprintf(stderr, "Research bootstrap failed: %s\n", hu_error_string(err));
+        return err;
+    }
+    if (!app_ctx.agent_ok || !app_ctx.agent) {
+        fprintf(stderr, "Research requires an agent. Configure a provider first.\n");
+        hu_app_teardown(&app_ctx);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    hu_memory_t *mem = app_ctx.memory;
+    sqlite3 *db = mem ? hu_sqlite_memory_get_db(mem) : NULL;
+    if (!db) {
+        fprintf(stderr, "Research requires SQLite memory backend.\n");
+        hu_app_teardown(&app_ctx);
+        return HU_ERR_NOT_SUPPORTED;
+    }
+    printf("Running research agent...\n");
+    err = hu_research_agent_run(alloc, app_ctx.agent, db);
+    hu_app_teardown(&app_ctx);
+    if (err == HU_OK)
+        printf("Research complete.\n");
+    else
+        fprintf(stderr, "Research failed: %s\n", hu_error_string(err));
+    return err;
+}
+#else
+hu_error_t cmd_research(hu_allocator_t *alloc, int argc, char **argv) {
+    (void)alloc;
+    (void)argc;
+    (void)argv;
+    fprintf(stderr, "Research requires --enable-feeds and --enable-sqlite.\n");
+    return HU_ERR_NOT_SUPPORTED;
+}
+#endif
 
 /* ── feed ──────────────────────────────────────────────────────────────── */
 #if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)

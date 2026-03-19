@@ -54,6 +54,16 @@ hu_error_t hu_research_build_action_prompt(hu_allocator_t *alloc,
     const char *suggested_action, size_t action_len,
     char **out, size_t *out_len);
 
+#if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
+#include <sqlite3.h>
+struct hu_agent;
+/**
+ * Run the research agent: build feed digest, run agent turn, parse findings,
+ * run intelligence cycle. Caller must have bootstrapped agent with SQLite memory.
+ */
+hu_error_t hu_research_agent_run(hu_allocator_t *alloc, struct hu_agent *agent, sqlite3 *db);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
