@@ -32,7 +32,8 @@ type TabId =
   | "metrics"
   | "memory"
   | "security"
-  | "logs";
+  | "logs"
+  | "turing";
 
 const VALID_TABS: TabId[] = [
   "overview",
@@ -52,6 +53,7 @@ const VALID_TABS: TabId[] = [
   "memory",
   "security",
   "logs",
+  "turing",
 ];
 
 const SIDEBAR_KEY = "hu-sidebar-collapsed";
@@ -77,6 +79,7 @@ const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   memory: () => import("./views/memory-view.js"),
   security: () => import("./views/security-view.js"),
   logs: () => import("./views/logs-view.js"),
+  turing: () => import("./views/turing-view.js"),
 };
 
 const loadedViews = new Set<TabId>(["overview"]);
@@ -100,6 +103,7 @@ const MORE_TABS: { id: TabId; label: string; icon: ReturnType<typeof html> }[] =
   { id: "metrics", label: "Observability", icon: icons["chart-line"] },
   { id: "security", label: "Security", icon: icons.shield },
   { id: "logs", label: "Logs", icon: icons.terminal },
+  { id: "turing", label: "Turing", icon: icons["chart-line"] },
 ];
 
 @customElement("hu-app")
@@ -1140,6 +1144,8 @@ export class ScApp extends LitElement {
         return html`<hu-security-view></hu-security-view>`;
       case "logs":
         return html`<hu-logs-view></hu-logs-view>`;
+      case "turing":
+        return html`<hu-turing-view></hu-turing-view>`;
       default:
         return html`<hu-overview-view></hu-overview-view>`;
     }

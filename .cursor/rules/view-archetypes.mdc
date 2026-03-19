@@ -29,6 +29,7 @@ Read `docs/standards/design/ux-patterns.md` before creating or modifying any vie
 | `skills-view.ts` | Marketplace | Sticky search -> responsive card grid |
 | `logs-view.ts` | Log/Terminal | Controls top -> monospace output fills remaining space |
 | `automations-view.ts` | List-Detail | Dual-pane expanded; single-pane compact |
+| `turing-view.ts` | Dashboard (Feed) | Compact hero -> dimension card grid -> scores table |
 
 ## Required States (All Views)
 

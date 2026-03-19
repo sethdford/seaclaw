@@ -28,6 +28,7 @@ const NAV_ICON_MAP: Record<string, TemplateResult> = {
   usage: icons["bar-chart"],
   metrics: icons["chart-line"],
   logs: icons.terminal,
+  turing: icons["chart-line"],
 };
 
 const NAV_ITEMS: { id: string; label: string }[] = [
@@ -47,6 +48,7 @@ const NAV_ITEMS: { id: string; label: string }[] = [
   { id: "usage", label: "Usage" },
   { id: "metrics", label: "Observability" },
   { id: "logs", label: "Logs" },
+  { id: "turing", label: "Turing" },
 ];
 
 const COMMANDS: Command[] = [

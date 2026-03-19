@@ -689,6 +689,7 @@ list(APPEND HU_CORE_SOURCES src/security/wasi_sandbox.c)
 list(APPEND HU_CORE_SOURCES
     src/a2a.c
     src/eval.c
+    src/eval/turing_score.c
     src/eval_judge.c
     src/eval_benchmarks.c
     src/eval_dashboard.c
@@ -1972,6 +1973,7 @@ list(APPEND HU_TEST_SOURCES tests/test_integration.c)
 list(APPEND HU_TEST_SOURCES
     tests/test_a2a.c
     tests/test_eval.c
+    tests/test_turing_score.c
     tests/test_eval_judge.c
     tests/test_eval_benchmarks.c
     tests/test_eval_runner.c

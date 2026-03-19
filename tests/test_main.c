@@ -169,6 +169,7 @@ void run_timing_tests(void);
 void run_governor_tests(void);
 void run_relationship_dynamics_tests(void);
 void run_model_router_tests(void);
+void run_turing_score_tests(void);
 void run_arbitrator_tests(void);
 void run_planning_tests(void);
 void run_rel_dynamics_tests(void);
@@ -499,6 +500,7 @@ int main(int argc, char **argv) {
     run_governor_tests();
     run_relationship_dynamics_tests();
     run_model_router_tests();
+    run_turing_score_tests();
     run_arbitrator_tests();
     run_planning_tests();
     run_rel_dynamics_tests();

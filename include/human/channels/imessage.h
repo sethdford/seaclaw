@@ -25,6 +25,13 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
  * Returns NULL for HU_REACTION_NONE or unknown. */
 const char *hu_imessage_reaction_to_tapback_name(hu_reaction_type_t reaction);
 
+/** Build tapback context string for recent reactions on our messages from this contact.
+ * Returns allocated string like "[REACTIONS on your recent messages: 2 hearts, 1 like]" or NULL.
+ * Caller owns. Stub returns NULL on non-macOS or when SQLite unavailable. */
+hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
+                                            const char *contact_id, size_t contact_id_len,
+                                            char **out, size_t *out_len);
+
 #ifndef HU_IS_TEST
 /** Check if the real user sent a message to `handle` within the last
  * `within_seconds` seconds.  Queries chat.db for is_from_me=1 rows.

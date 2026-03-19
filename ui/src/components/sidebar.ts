@@ -29,6 +29,7 @@ const NAV_SHORTCUT_MAP: Record<string, string> = {
   usage: "g g",
   metrics: "g i",
   sessions: "g r",
+  turing: "g f",
 };
 
 interface NavSection {
@@ -51,6 +52,7 @@ const SECTIONS: NavSection[] = [
       { id: "models", label: "Models", icon: icons.cpu },
       { id: "memory", label: "Memory", icon: icons.brain },
       { id: "voice", label: "Voice", icon: icons.mic },
+      { id: "turing", label: "Turing", icon: icons["chart-line"] },
     ],
   },
   {

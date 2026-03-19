@@ -49,6 +49,7 @@
 #include "human/observability/bth_metrics.h"
 #include "human/agent/governor.h"
 #include "human/agent/timing.h"
+#include "human/eval/turing_score.h"
 #include "human/memory/rag_pipeline.h"
 #include "human/memory/knowledge.h"
 #include "human/memory/compression.h"
@@ -2255,14 +2256,116 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #ifdef HU_HAS_PERSONA
                 {
                     static bool tuned_today = false;
+                    static bool turing_eval_today = false;
                     struct tm tm_tune;
 #if defined(_WIN32) && !defined(__CYGWIN__)
                     struct tm *lt_tune = (localtime_s(&tm_tune, &t) == 0) ? &tm_tune : NULL;
 #else
                     struct tm *lt_tune = localtime_r(&t, &tm_tune);
 #endif
-                    if (lt_tune && lt_tune->tm_hour == 5)
+                    if (lt_tune && lt_tune->tm_hour == 5) {
                         tuned_today = false;
+                        turing_eval_today = false;
+                    }
+                    /* Turing evaluation cron: daily at 3 AM */
+                    if (lt_tune && lt_tune->tm_hour == 3 && lt_tune->tm_min == 0 &&
+                        agent && agent->memory && !turing_eval_today) {
+#ifdef HU_ENABLE_SQLITE
+                        sqlite3 *tdb = hu_sqlite_memory_get_db(agent->memory);
+                        if (tdb) {
+                            (void)hu_turing_init_tables(tdb);
+                            int dim_avgs[HU_TURING_DIM_COUNT];
+                            if (hu_turing_get_weakest_dimensions(tdb, dim_avgs) == HU_OK) {
+                                int worst_dim = 0;
+                                int worst_val = dim_avgs[0];
+                                for (int d = 1; d < HU_TURING_DIM_COUNT; d++) {
+                                    if (dim_avgs[d] < worst_val && dim_avgs[d] > 0) {
+                                        worst_val = dim_avgs[d];
+                                        worst_dim = d;
+                                    }
+                                }
+                                fprintf(stderr,
+                                        "[human] turing eval: weakest dimension = %s (%d/10)\n",
+                                        hu_turing_dimension_name((hu_turing_dimension_t)worst_dim),
+                                        worst_val);
+                                /* Auto-correct: adjust humanization params based on weak dimensions */
+#ifdef HU_HAS_PERSONA
+                                if (agent->persona) {
+                                    /* non_robotic or natural_language low: increase disfluency */
+                                    if ((dim_avgs[HU_TURING_NON_ROBOTIC] > 0 &&
+                                         dim_avgs[HU_TURING_NON_ROBOTIC] < 6) ||
+                                        (dim_avgs[HU_TURING_NATURAL_LANGUAGE] > 0 &&
+                                         dim_avgs[HU_TURING_NATURAL_LANGUAGE] < 6)) {
+                                        float old = agent->persona->humanization.disfluency_frequency;
+                                        agent->persona->humanization.disfluency_frequency =
+                                            old < 0.30f ? old + 0.05f : 0.30f;
+                                        fprintf(stderr,
+                                                "[human] auto-tune: disfluency %.2f -> %.2f\n",
+                                                (double)old,
+                                                (double)agent->persona->humanization.disfluency_frequency);
+                                    }
+                                    /* imperfection low: increase disfluency and double-text */
+                                    if (dim_avgs[HU_TURING_IMPERFECTION] > 0 &&
+                                        dim_avgs[HU_TURING_IMPERFECTION] < 6) {
+                                        float old_dt = agent->persona->humanization.double_text_probability;
+                                        agent->persona->humanization.double_text_probability =
+                                            old_dt < 0.15f ? old_dt + 0.02f : 0.15f;
+                                        fprintf(stderr,
+                                                "[human] auto-tune: double_text %.2f -> %.2f\n",
+                                                (double)old_dt,
+                                                (double)agent->persona->humanization.double_text_probability);
+                                    }
+                                    /* energy_matching low: increase backchannel for narrative flow */
+                                    if (dim_avgs[HU_TURING_ENERGY_MATCHING] > 0 &&
+                                        dim_avgs[HU_TURING_ENERGY_MATCHING] < 6) {
+                                        float old_bc = agent->persona->humanization.backchannel_probability;
+                                        agent->persona->humanization.backchannel_probability =
+                                            old_bc < 0.45f ? old_bc + 0.05f : 0.45f;
+                                        fprintf(stderr,
+                                                "[human] auto-tune: backchannel %.2f -> %.2f\n",
+                                                (double)old_bc,
+                                                (double)agent->persona->humanization.backchannel_probability);
+                                    }
+                                    /* humor_naturalness high: scores are good, slightly reduce to avoid overdoing */
+                                    if (dim_avgs[HU_TURING_HUMOR_NATURALNESS] > 8 &&
+                                        agent->persona->humanization.disfluency_frequency > 0.10f) {
+                                        agent->persona->humanization.disfluency_frequency -= 0.02f;
+                                    }
+                                }
+#endif
+                            }
+                        }
+#endif
+                        turing_eval_today = true;
+                        fprintf(stderr, "[human] daily turing evaluation completed\n");
+                    }
+
+                    /* Weekly DPO export: Sunday at 2 AM */
+                    {
+                        static bool dpo_exported_this_week = false;
+                        if (lt_tune && lt_tune->tm_wday == 0 && lt_tune->tm_hour == 2 &&
+                            lt_tune->tm_min == 0 && agent && agent->dpo_collector.alloc &&
+                            !dpo_exported_this_week) {
+                            size_t pair_count = 0;
+                            hu_dpo_pair_count(&agent->dpo_collector, &pair_count);
+                            if (pair_count > 0) {
+                                static const char dpo_path[] =
+                                    "data/imessage/dpo_preferences.jsonl";
+                                size_t exported = 0;
+                                if (hu_dpo_export_jsonl(&agent->dpo_collector, dpo_path,
+                                                        sizeof(dpo_path) - 1,
+                                                        &exported) == HU_OK) {
+                                    fprintf(stderr,
+                                            "[human] weekly DPO export: %zu pairs -> %s\n",
+                                            exported, dpo_path);
+                                }
+                            }
+                            dpo_exported_this_week = true;
+                        }
+                        if (lt_tune && lt_tune->tm_wday != 0)
+                            dpo_exported_this_week = false;
+                    }
+
                     if (lt_tune && lt_tune->tm_hour == 4 && lt_tune->tm_min == 0 && agent &&
                         agent->memory && !tuned_today) {
                         char *tune_summary = NULL;
@@ -4613,6 +4716,36 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
                 if (style_ctx)
                     alloc->free(alloc->ctx, style_ctx, style_ctx_len + 1);
+
+                /* Tapback awareness: inject recent reaction context */
+                {
+                    char *tapback_ctx = NULL;
+                    size_t tapback_len = 0;
+                    hu_imessage_build_tapback_context(alloc, batch_key, key_len,
+                                                      &tapback_ctx, &tapback_len);
+                    if (tapback_ctx && tapback_len > 0) {
+                        if (convo_ctx) {
+                            size_t merged_len = convo_ctx_len + tapback_len + 2;
+                            char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
+                            if (merged) {
+                                memcpy(merged, convo_ctx, convo_ctx_len);
+                                merged[convo_ctx_len] = '\n';
+                                memcpy(merged + convo_ctx_len + 1, tapback_ctx, tapback_len);
+                                merged[merged_len - 1] = '\n';
+                                merged[merged_len] = '\0';
+                                alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                convo_ctx = merged;
+                                convo_ctx_len = merged_len;
+                            }
+                        } else {
+                            convo_ctx = tapback_ctx;
+                            convo_ctx_len = tapback_len;
+                            tapback_ctx = NULL;
+                        }
+                        if (tapback_ctx)
+                            alloc->free(alloc->ctx, tapback_ctx, tapback_len + 1);
+                    }
+                }
 
                 /* Narrative, engagement, emotion: inject when meaningful */
                 if (history_entries && history_count > 0) {
@@ -7393,6 +7526,29 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (agent->memory && batch_key && key_len > 0 && response && response_len > 0)
                     (void)hu_style_fingerprint_update(agent->memory, alloc, batch_key, key_len,
                                                       response, response_len);
+
+#if !defined(HU_IS_TEST) && defined(HU_ENABLE_SQLITE)
+                /* Turing score: evaluate response human-likeness post-send */
+                if (response && response_len > 0 && agent->memory) {
+                    hu_turing_score_t tscore;
+                    hu_error_t ts_err = hu_turing_score_heuristic(
+                        response, response_len, combined, combined_len, &tscore);
+                    if (ts_err == HU_OK) {
+                        fprintf(stderr,
+                                "[human] turing: %d/10 [%s] for %.*s\n",
+                                tscore.overall, hu_turing_verdict_name(tscore.verdict),
+                                (int)(key_len > 20 ? 20 : key_len), batch_key);
+                        sqlite3 *ts_db = hu_sqlite_memory_get_db(agent->memory);
+                        if (ts_db) {
+                            (void)hu_turing_init_tables(ts_db);
+                            (void)hu_turing_store_score(ts_db, batch_key, key_len,
+                                                        (int64_t)time(NULL), &tscore);
+                        }
+                        if (agent->bth_metrics)
+                            agent->bth_metrics->total_turns++;
+                    }
+                }
+#endif
 
 #if !defined(HU_IS_TEST) && defined(HU_HAS_PERSONA)
                 /* F9: Double-text — natural afterthought follow-up */

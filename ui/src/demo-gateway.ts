@@ -1729,6 +1729,66 @@ export class DemoGatewayClient extends EventTarget {
           ],
         };
 
+      // --- Turing score API (mirrors REST /api/turing/*) ---
+      case "turing.scores": {
+        const baseTs = Math.floor(Date.now() / 1000);
+        const contacts = ["+18018285260", "+15551234567", "alice@example.com", "bob#discord"];
+        const verdicts = ["HUMAN", "HUMAN", "BORDERLINE", "AI_DETECTED", "HUMAN"] as const;
+        const scores = Array.from({ length: 20 }, (_, i) => ({
+          contact_id: contacts[i % contacts.length],
+          timestamp: baseTs - i * 3600 - (i % 3) * 86400,
+          overall: 6 + (i % 5),
+          verdict: verdicts[i % verdicts.length],
+          dimensions: {
+            natural_language: 7 + (i % 3),
+            emotional_intelligence: 6 + (i % 4),
+            appropriate_length: 7 + (i % 2),
+            personality_consistency: 6 + (i % 3),
+            vulnerability_willingness: 5 + (i % 4),
+            humor_naturalness: 5 + (i % 3),
+            imperfection: 6 + (i % 3),
+            opinion_having: 6 + (i % 2),
+            energy_matching: 7 + (i % 2),
+            context_awareness: 6 + (i % 3),
+            non_robotic: 7 + (i % 3),
+            genuine_warmth: 6 + (i % 3),
+          },
+        }));
+        return { scores };
+      }
+      case "turing.trend":
+        return {
+          trend: [
+            {
+              contact_id: "+18018285260",
+              timestamp: Math.floor(Date.now() / 1000),
+              overall: 8,
+            },
+            {
+              contact_id: "+18018285260",
+              timestamp: Math.floor(Date.now() / 1000) - 86400,
+              overall: 7,
+            },
+          ],
+        };
+      case "turing.dimensions":
+        return {
+          dimensions: {
+            natural_language: 8,
+            emotional_intelligence: 7,
+            appropriate_length: 8,
+            personality_consistency: 6,
+            vulnerability_willingness: 5,
+            humor_naturalness: 6,
+            imperfection: 7,
+            opinion_having: 6,
+            energy_matching: 7,
+            context_awareness: 7,
+            non_robotic: 8,
+            genuine_warmth: 7,
+          },
+        };
+
       default:
         return {};
     }

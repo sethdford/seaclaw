@@ -20,6 +20,7 @@ import "./metrics-view.js";
 import "./security-view.js";
 import "./logs-view.js";
 import "./memory-view.js";
+import "./turing-view.js";
 
 const VIEW_TAGS = [
   "hu-overview-view",
@@ -39,6 +40,7 @@ const VIEW_TAGS = [
   "hu-security-view",
   "hu-logs-view",
   "hu-memory-view",
+  "hu-turing-view",
 ];
 
 describe("views", () => {

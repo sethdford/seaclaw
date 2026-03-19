@@ -73,9 +73,12 @@ hu_error_t hu_turing_init_tables(sqlite3 *db);
 hu_error_t hu_turing_store_score(sqlite3 *db, const char *contact_id, size_t contact_id_len,
                                  int64_t timestamp, const hu_turing_score_t *score);
 
+#define HU_TURING_CONTACT_ID_MAX 128
+
 hu_error_t hu_turing_get_trend(hu_allocator_t *alloc, sqlite3 *db, const char *contact_id,
                                size_t contact_id_len, size_t max_entries,
                                hu_turing_score_t *scores, int64_t *timestamps,
+                               char (*out_contact_ids)[HU_TURING_CONTACT_ID_MAX],
                                size_t *out_count);
 
 hu_error_t hu_turing_get_weakest_dimensions(sqlite3 *db, int *dimension_averages);

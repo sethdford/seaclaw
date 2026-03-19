@@ -1,3 +1,4 @@
+#include "human/agent.h"
 #include "human/gateway.h"
 #include "human/config.h"
 #include "human/core/allocator.h"
@@ -5,6 +6,8 @@
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/crypto.h"
+#include "human/eval/turing_score.h"
+#include "human/memory.h"
 #include "human/gateway/control_protocol.h"
 #include "human/gateway/event_bridge.h"
 #include "human/gateway/oauth.h"
@@ -848,6 +851,140 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         send_json(fd, 200, resp);
         return;
     }
+
+#ifdef HU_ENABLE_SQLITE
+    /* API endpoint: Turing scores (latest per-contact) */
+    if (path_is(path, "/api/turing/scores") && method && strcmp(method, "GET") == 0) {
+        hu_app_context_t *ctx = (hu_app_context_t *)gw->config.app_ctx;
+        if (!ctx || !ctx->agent || !ctx->agent->memory) {
+            send_json(fd, 503, "{\"error\":\"service unavailable\"}");
+            return;
+        }
+        sqlite3 *db = hu_sqlite_memory_get_db(ctx->agent->memory);
+        if (!db) {
+            send_json(fd, 503, "{\"error\":\"service unavailable\"}");
+            return;
+        }
+        if (hu_turing_init_tables(db) != HU_OK) {
+            send_json(fd, 500, "{\"error\":\"internal\"}");
+            return;
+        }
+        hu_turing_score_t scores[50];
+        int64_t timestamps[50];
+        char contact_ids[50][HU_TURING_CONTACT_ID_MAX];
+        size_t count = 0;
+        if (hu_turing_get_trend(gw->alloc, db, NULL, 0, 50, scores, timestamps, contact_ids,
+                                &count) != HU_OK) {
+            send_json(fd, 500, "{\"error\":\"internal\"}");
+            return;
+        }
+        size_t cap = 2048 + count * 512;
+        char *buf = (char *)gw->alloc->alloc(gw->alloc->ctx, cap);
+        if (!buf) {
+            send_json(fd, 503, "{\"error\":\"out of memory\"}");
+            return;
+        }
+        size_t off = (size_t)snprintf(buf, cap, "{\"scores\":[");
+        for (size_t i = 0; i < count && off < cap - 256; i++) {
+            if (i > 0)
+                off += (size_t)snprintf(buf + off, cap - off, ",");
+            off += (size_t)snprintf(buf + off, cap - off,
+                                   "{\"contact_id\":\"%s\",\"timestamp\":%lld,\"overall\":%d,"
+                                   "\"verdict\":\"%s\",\"dimensions\":{",
+                                   contact_ids[i], (long long)timestamps[i], scores[i].overall,
+                                   hu_turing_verdict_name(scores[i].verdict));
+            for (int d = 0; d < HU_TURING_DIM_COUNT && off < cap - 64; d++) {
+                if (d > 0)
+                    off += (size_t)snprintf(buf + off, cap - off, ",");
+                off += (size_t)snprintf(buf + off, cap - off, "\"%s\":%d",
+                                       hu_turing_dimension_name((hu_turing_dimension_t)d),
+                                       scores[i].dimensions[d]);
+            }
+            off += (size_t)snprintf(buf + off, cap - off, "}}");
+        }
+        off += (size_t)snprintf(buf + off, cap - off, "]}");
+        send_json(fd, 200, buf);
+        gw->alloc->free(gw->alloc->ctx, buf, cap);
+        return;
+    }
+
+    /* API endpoint: Turing trend (score history over time) */
+    if (path_is(path, "/api/turing/trend") && method && strcmp(method, "GET") == 0) {
+        hu_app_context_t *ctx = (hu_app_context_t *)gw->config.app_ctx;
+        if (!ctx || !ctx->agent || !ctx->agent->memory) {
+            send_json(fd, 503, "{\"error\":\"service unavailable\"}");
+            return;
+        }
+        sqlite3 *db = hu_sqlite_memory_get_db(ctx->agent->memory);
+        if (!db) {
+            send_json(fd, 503, "{\"error\":\"service unavailable\"}");
+            return;
+        }
+        if (hu_turing_init_tables(db) != HU_OK) {
+            send_json(fd, 500, "{\"error\":\"internal\"}");
+            return;
+        }
+        hu_turing_score_t scores[50];
+        int64_t timestamps[50];
+        char contact_ids[50][HU_TURING_CONTACT_ID_MAX];
+        size_t count = 0;
+        if (hu_turing_get_trend(gw->alloc, db, NULL, 0, 50, scores, timestamps, contact_ids,
+                                &count) != HU_OK) {
+            send_json(fd, 500, "{\"error\":\"internal\"}");
+            return;
+        }
+        size_t cap = 2048 + count * 256;
+        char *buf = (char *)gw->alloc->alloc(gw->alloc->ctx, cap);
+        if (!buf) {
+            send_json(fd, 503, "{\"error\":\"out of memory\"}");
+            return;
+        }
+        size_t off = (size_t)snprintf(buf, cap, "{\"trend\":[");
+        for (size_t i = 0; i < count && off < cap - 128; i++) {
+            if (i > 0)
+                off += (size_t)snprintf(buf + off, cap - off, ",");
+            off += (size_t)snprintf(buf + off, cap - off,
+                                   "{\"contact_id\":\"%s\",\"timestamp\":%lld,\"overall\":%d}",
+                                   contact_ids[i], (long long)timestamps[i], scores[i].overall);
+        }
+        off += (size_t)snprintf(buf + off, cap - off, "]}");
+        send_json(fd, 200, buf);
+        gw->alloc->free(gw->alloc->ctx, buf, cap);
+        return;
+    }
+
+    /* API endpoint: Turing weakest dimensions (averages) */
+    if (path_is(path, "/api/turing/dimensions") && method && strcmp(method, "GET") == 0) {
+        hu_app_context_t *ctx = (hu_app_context_t *)gw->config.app_ctx;
+        if (!ctx || !ctx->agent || !ctx->agent->memory) {
+            send_json(fd, 503, "{\"error\":\"service unavailable\"}");
+            return;
+        }
+        sqlite3 *db = hu_sqlite_memory_get_db(ctx->agent->memory);
+        if (!db) {
+            send_json(fd, 503, "{\"error\":\"service unavailable\"}");
+            return;
+        }
+        if (hu_turing_init_tables(db) != HU_OK) {
+            send_json(fd, 500, "{\"error\":\"internal\"}");
+            return;
+        }
+        int dim_avgs[HU_TURING_DIM_COUNT];
+        hu_turing_get_weakest_dimensions(db, dim_avgs);
+        char buf[1024];
+        size_t off = (size_t)snprintf(buf, sizeof(buf), "{\"dimensions\":{");
+        for (int d = 0; d < HU_TURING_DIM_COUNT; d++) {
+            if (d > 0)
+                off += (size_t)snprintf(buf + off, sizeof(buf) - off, ",");
+            off += (size_t)snprintf(buf + off, sizeof(buf) - off, "\"%s\":%d",
+                                   hu_turing_dimension_name((hu_turing_dimension_t)d),
+                                   dim_avgs[d]);
+        }
+        off += (size_t)snprintf(buf + off, sizeof(buf) - off, "}}");
+        send_json(fd, 200, buf);
+        return;
+    }
+#endif
 
     /* API endpoint: pairing (POST with JSON {"code":"12345678"}) */
     if (path_is(path, "/api/pair") && method && strcmp(method, "POST") == 0) {

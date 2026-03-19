@@ -740,6 +740,229 @@ static hu_error_t imessage_load_conversation_history(void *ctx, hu_allocator_t *
 #endif
 }
 
+#if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__) && defined(HU_ENABLE_SQLITE)
+hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
+                                             const char *contact_id, size_t contact_id_len,
+                                             char **out, size_t *out_len) {
+    if (!alloc || !contact_id || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
+
+    char db_path[512];
+    const char *home = getenv("HOME");
+    if (!home)
+        return HU_ERR_IO;
+    snprintf(db_path, sizeof(db_path), "%s/Library/Messages/chat.db", home);
+
+    sqlite3 *db = NULL;
+    if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK)
+        return HU_ERR_IO;
+
+    const char *sql =
+        "SELECT m.associated_message_type, COUNT(*) "
+        "FROM message m "
+        "WHERE m.is_from_me = 0 "
+        "  AND m.associated_message_type BETWEEN 2000 AND 2005 "
+        "  AND m.associated_message_guid IN ("
+        "    SELECT m2.guid FROM message m2 "
+        "    WHERE m2.is_from_me = 1 "
+        "    AND m2.handle_id = (SELECT ROWID FROM handle WHERE id = ?1) "
+        "    ORDER BY m2.date DESC LIMIT 5"
+        "  ) "
+        "  AND m.date > (strftime('%s', 'now') - 86400) * 1000000000 - 978307200000000000 "
+        "GROUP BY m.associated_message_type";
+
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        sqlite3_close(db);
+        return HU_ERR_IO;
+    }
+
+    char contact_buf[128];
+    size_t clen = contact_id_len < sizeof(contact_buf) - 1 ? contact_id_len : sizeof(contact_buf) - 1;
+    memcpy(contact_buf, contact_id, clen);
+    contact_buf[clen] = '\0';
+    sqlite3_bind_text(stmt, 1, contact_buf, (int)clen, SQLITE_STATIC);
+
+    int hearts = 0, likes = 0, dislikes = 0, laughs = 0, emphasis = 0, questions = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        int type = sqlite3_column_int(stmt, 0);
+        int cnt = sqlite3_column_int(stmt, 1);
+        switch (type) {
+        case 2000: hearts = cnt; break;
+        case 2001: likes = cnt; break;
+        case 2002: dislikes = cnt; break;
+        case 2003: laughs = cnt; break;
+        case 2004: emphasis = cnt; break;
+        case 2005: questions = cnt; break;
+        }
+    }
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    int total = hearts + likes + dislikes + laughs + emphasis + questions;
+    if (total == 0)
+        return HU_OK;
+
+    char buf[256];
+    size_t pos = 0;
+    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
+                            "[REACTIONS on your recent messages:");
+    if (hearts > 0)
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d heart%s", hearts, hearts > 1 ? "s" : "");
+    if (likes > 0)
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d like%s", likes, likes > 1 ? "s" : "");
+    if (laughs > 0)
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d laugh%s", laughs, laughs > 1 ? "s" : "");
+    if (emphasis > 0)
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d emphasis", emphasis);
+    if (questions > 0)
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d question%s", questions, questions > 1 ? "s" : "");
+    if (dislikes > 0)
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d dislike%s", dislikes, dislikes > 1 ? "s" : "");
+    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "]");
+
+    *out = hu_strndup(alloc, buf, pos);
+    if (!*out)
+        return HU_ERR_OUT_OF_MEMORY;
+    *out_len = pos;
+    return HU_OK;
+}
+
+hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
+                                                  const char *contact_id, size_t contact_id_len,
+                                                  char **out, size_t *out_len) {
+    if (!alloc || !contact_id || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
+
+    char db_path[512];
+    const char *home = getenv("HOME");
+    if (!home)
+        return HU_ERR_IO;
+    snprintf(db_path, sizeof(db_path), "%s/Library/Messages/chat.db", home);
+
+    sqlite3 *db = NULL;
+    if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK)
+        return HU_ERR_IO;
+
+    /* Find our last sent message to this contact and check its read status */
+    const char *sql =
+        "SELECT m.date, m.date_delivered, m.date_read, m.text "
+        "FROM message m "
+        "JOIN handle h ON m.handle_id = h.ROWID "
+        "WHERE h.id = ?1 AND m.is_from_me = 1 "
+        "ORDER BY m.date DESC LIMIT 1";
+
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        sqlite3_close(db);
+        return HU_ERR_IO;
+    }
+
+    char contact_buf[128];
+    size_t clen = contact_id_len < sizeof(contact_buf) - 1 ? contact_id_len : sizeof(contact_buf) - 1;
+    memcpy(contact_buf, contact_id, clen);
+    contact_buf[clen] = '\0';
+    sqlite3_bind_text(stmt, 1, contact_buf, (int)clen, SQLITE_STATIC);
+
+    char buf[256];
+    buf[0] = '\0';
+    size_t pos = 0;
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        int64_t sent_date = sqlite3_column_int64(stmt, 0);
+        int64_t delivered = sqlite3_column_int64(stmt, 1);
+        int64_t read_date = sqlite3_column_int64(stmt, 2);
+
+        /* Convert Apple epoch (nanoseconds since 2001-01-01) to Unix epoch */
+        int64_t apple_epoch = 978307200LL;
+        int64_t sent_unix = apple_epoch + sent_date / 1000000000LL;
+        int64_t now_unix = (int64_t)time(NULL);
+        int64_t age_seconds = now_unix - sent_unix;
+
+        /* Also check: has there been a reply from them after our message? */
+        sqlite3_stmt *reply_stmt = NULL;
+        const char *reply_sql =
+            "SELECT COUNT(*) FROM message m "
+            "JOIN handle h ON m.handle_id = h.ROWID "
+            "WHERE h.id = ?1 AND m.is_from_me = 0 AND m.date > ?2 "
+            "AND m.associated_message_type = 0";
+        bool has_reply = false;
+        if (sqlite3_prepare_v2(db, reply_sql, -1, &reply_stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_text(reply_stmt, 1, contact_buf, (int)clen, SQLITE_STATIC);
+            sqlite3_bind_int64(reply_stmt, 2, sent_date);
+            if (sqlite3_step(reply_stmt) == SQLITE_ROW)
+                has_reply = sqlite3_column_int(reply_stmt, 0) > 0;
+            sqlite3_finalize(reply_stmt);
+        }
+
+        if (!has_reply && read_date > 0 && age_seconds > 300 && age_seconds < 86400) {
+            /* Read but no reply — they saw it but haven't responded */
+            int64_t read_unix = apple_epoch + read_date / 1000000000LL;
+            int64_t since_read = now_unix - read_unix;
+            if (since_read > 60) {
+                int mins = (int)(since_read / 60);
+                if (mins > 60) {
+                    pos = (size_t)snprintf(buf, sizeof(buf),
+                        "[READ RECEIPT: They read your last message %dh ago but haven't replied. "
+                        "Don't mention this — just be natural, don't guilt-trip.]",
+                        mins / 60);
+                } else {
+                    pos = (size_t)snprintf(buf, sizeof(buf),
+                        "[READ RECEIPT: They read your last message %d min ago but haven't replied. "
+                        "Don't mention this — just be natural, don't guilt-trip.]",
+                        mins);
+                }
+            }
+        } else if (!has_reply && delivered > 0 && read_date == 0 && age_seconds > 600) {
+            /* Delivered but not read */
+            pos = (size_t)snprintf(buf, sizeof(buf),
+                "[READ RECEIPT: Your last message was delivered but not yet read. They may be busy.]");
+        }
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    if (pos > 0 && pos < sizeof(buf)) {
+        *out = hu_strndup(alloc, buf, pos);
+        if (!*out)
+            return HU_ERR_OUT_OF_MEMORY;
+        *out_len = pos;
+    }
+    return HU_OK;
+}
+#else
+hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
+                                             const char *contact_id, size_t contact_id_len,
+                                             char **out, size_t *out_len) {
+    (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
+    if (out)
+        *out = NULL;
+    if (out_len)
+        *out_len = 0;
+    return HU_OK;
+}
+#endif
+
+hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
+                                                  const char *contact_id, size_t contact_id_len,
+                                                  char **out, size_t *out_len) {
+    (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
+    if (out)
+        *out = NULL;
+    if (out_len)
+        *out_len = 0;
+    return HU_OK;
+}
+
 static hu_error_t imessage_get_response_constraints(void *ctx,
                                                     hu_channel_response_constraints_t *out) {
     (void)ctx;
