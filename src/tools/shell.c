@@ -366,6 +366,63 @@ static hu_error_t shell_execute_streaming(void *ctx, hu_allocator_t *alloc,
             }
         }
         setenv("PATH", "/usr/bin:/bin", 1);
+
+        if (s->policy && s->policy->net_proxy && s->policy->net_proxy->enabled) {
+            const char *addr = s->policy->net_proxy->proxy_addr;
+            if (!addr)
+                addr = "http://127.0.0.1:0";
+            setenv("HTTP_PROXY", addr, 1);
+            setenv("HTTPS_PROXY", addr, 1);
+            setenv("http_proxy", addr, 1);
+            setenv("https_proxy", addr, 1);
+            if (s->policy->net_proxy->allowed_domains_count > 0) {
+                size_t nd_total = 0;
+                for (size_t i = 0; i < s->policy->net_proxy->allowed_domains_count; i++) {
+                    if (s->policy->net_proxy->allowed_domains[i])
+                        nd_total += strlen(s->policy->net_proxy->allowed_domains[i]) + 1;
+                }
+                if (nd_total > 0) {
+                    char *no_proxy = (char *)alloc->alloc(alloc->ctx, nd_total + 1);
+                    if (no_proxy) {
+                        size_t off = 0;
+                        for (size_t i = 0; i < s->policy->net_proxy->allowed_domains_count; i++) {
+                            const char *d = s->policy->net_proxy->allowed_domains[i];
+                            if (!d)
+                                continue;
+                            size_t dlen = strlen(d);
+                            if (off > 0)
+                                no_proxy[off++] = ',';
+                            memcpy(no_proxy + off, d, dlen);
+                            off += dlen;
+                        }
+                        no_proxy[off] = '\0';
+                        setenv("NO_PROXY", no_proxy, 1);
+                        setenv("no_proxy", no_proxy, 1);
+                        alloc->free(alloc->ctx, no_proxy, nd_total + 1);
+                    }
+                }
+            }
+        }
+
+        if (s->policy && s->policy->sandbox && s->policy->sandbox->vtable &&
+            s->policy->sandbox->vtable->apply) {
+            hu_error_t serr = s->policy->sandbox->vtable->apply(s->policy->sandbox->ctx);
+            if (serr != HU_OK && serr != HU_ERR_NOT_SUPPORTED)
+                _exit(125);
+        }
+
+        if (s->policy && s->policy->sandbox && hu_sandbox_is_available(s->policy->sandbox)) {
+            const char *orig_argv[] = {"/bin/sh", "-c", cmd, NULL};
+            const char *wrapped[16];
+            size_t wrapped_count = 0;
+            if (hu_sandbox_wrap_command(s->policy->sandbox, orig_argv, 3, wrapped, 15,
+                                        &wrapped_count) == HU_OK &&
+                wrapped_count > 0) {
+                wrapped[wrapped_count] = NULL;
+                execvp(wrapped[0], (char *const *)wrapped);
+                _exit(127);
+            }
+        }
         execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
         _exit(127);
     }
@@ -403,14 +460,23 @@ static hu_error_t shell_execute_streaming(void *ctx, hu_allocator_t *alloc,
             return HU_OK;
         }
         *out = hu_tool_result_ok_owned(out_copy, total);
+    } else if (WIFSIGNALED(status)) {
+        alloc->free(alloc->ctx, buf, cap);
+        char err[64];
+        int en = snprintf(err, sizeof(err), "killed by signal %d", WTERMSIG(status));
+        char *err_dup = hu_strndup(alloc, err, (size_t)en);
+        if (err_dup)
+            *out = hu_tool_result_fail_owned(err_dup, (size_t)en);
+        else
+            *out = hu_tool_result_fail("killed by signal", 16);
     } else {
         int code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
         alloc->free(alloc->ctx, buf, cap);
         char err[64];
-        int n = snprintf(err, sizeof(err), "exit code %d", code);
-        char *err_dup = hu_strndup(alloc, err, (size_t)n);
+        int en = snprintf(err, sizeof(err), "exit code %d", code);
+        char *err_dup = hu_strndup(alloc, err, (size_t)en);
         if (err_dup)
-            *out = hu_tool_result_fail_owned(err_dup, (size_t)n);
+            *out = hu_tool_result_fail_owned(err_dup, (size_t)en);
         else
             *out = hu_tool_result_fail("command failed", 14);
     }

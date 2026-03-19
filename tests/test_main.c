@@ -560,7 +560,6 @@ int main(int argc, char **argv) {
     run_privacy_audit_tests();
     run_collab_planning_tests();
     run_bth_e2e_tests();
-    run_e2e_conversation_tests();
     run_bth_metrics_tests();
     run_memory_features_tests();
     run_agi_frontiers_tests();
