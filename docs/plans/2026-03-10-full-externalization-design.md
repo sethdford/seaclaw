@@ -1,3 +1,7 @@
+---
+status: approved
+---
+
 # Full Codebase Externalization Design
 
 **Goal:** Remove all hardcoded strings, word lists, prompt templates, thresholds, and paths from C code. Embed defaults at compile time via `xxd`, allow runtime overrides from `~/.human/data/`.

@@ -41,7 +41,11 @@ Recurring checkpoints that prevent standards drift. Each ceremony has a cadence,
    ```bash
    ./scripts/check-standards-drift.sh
    ```
-7. Log results as a commit message or in the remediation PR description
+7. Verify doc stats (source files, test counts, etc.) match .md files:
+   ```bash
+   bash scripts/doc-stats.sh
+   ```
+8. Log results as a commit message or in the remediation PR description
 
 ### What "Pass" Looks Like
 
@@ -51,6 +55,7 @@ Recurring checkpoints that prevent standards drift. Each ceremony has a cadence,
 - Zero raw hex colors outside token definition files
 - Zero orphaned `.md` files
 - Agent files (`CLAUDE.md`, `AGENTS.md`) reference current standards
+- Doc stats (test count, source file count, tool count, etc.) match current values
 
 ---
 

@@ -1,3 +1,7 @@
+---
+status: superseded
+---
+
 # Project Scalpel — Chat Page Architectural Rewrite
 
 **Date:** 2026-03-07

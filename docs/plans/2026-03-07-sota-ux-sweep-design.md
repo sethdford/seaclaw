@@ -1,3 +1,7 @@
+---
+status: approved
+---
+
 # SOTA UX Sweep — Design Document
 
 **Date:** 2026-03-07

@@ -1,3 +1,7 @@
+---
+status: superseded
+---
+
 # SOTA Design Overhaul — Approved Design
 
 **Direction:** Holo AI-style clean minimalism — precision spacing, subtle gradients, understated elegance. Avenir everywhere. Dark-mode-first.

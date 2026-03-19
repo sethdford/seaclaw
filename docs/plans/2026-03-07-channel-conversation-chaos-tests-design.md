@@ -1,3 +1,7 @@
+---
+status: approved
+---
+
 # Channel Conversation & Chaos Tests Design
 
 **Date:** 2026-03-07

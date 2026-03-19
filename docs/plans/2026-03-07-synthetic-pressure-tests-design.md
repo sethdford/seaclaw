@@ -1,3 +1,7 @@
+---
+status: complete
+---
+
 # Synthetic Pressure Tests Design
 
 **Date:** 2026-03-07

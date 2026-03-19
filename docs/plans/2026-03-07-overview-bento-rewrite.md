@@ -1,3 +1,7 @@
+---
+status: approved
+---
+
 # Overview Page Bento Rewrite
 
 **Date**: 2026-03-07

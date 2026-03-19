@@ -1,3 +1,7 @@
+---
+status: superseded
+---
+
 # Chat SOTA — Wire & Polish
 
 Date: 2026-03-07

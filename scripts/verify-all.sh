@@ -88,6 +88,11 @@ if [ -f "ui/package.json" ] && command -v npm &>/dev/null && [ -d "ui/node_modul
   run_check "Token Lint (UI)" npm run lint:tokens --prefix ui 2>/dev/null || true
 fi
 
+# 8. Doc stats (display for manual review)
+if [ -f "scripts/doc-stats.sh" ]; then
+  run_check "Doc Stats" bash scripts/doc-stats.sh
+fi
+
 # Summary
 echo ""
 echo "=============================="

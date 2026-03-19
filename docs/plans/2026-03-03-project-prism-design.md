@@ -1,3 +1,7 @@
+---
+status: superseded
+---
+
 # Project Prism — SOTA Chat Design Overhaul
 
 ## Problem
