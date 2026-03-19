@@ -19,12 +19,12 @@ updated: 2026-03-09
 | 9     | Category-defining (Awwwards winner tier) |
 | 10    | Sets the standard others measure against |
 
-## Current Scores (Q1 2026 — Sprint 11)
+## Current Scores (Q1 2026 — Sprint 12, post-SOTA)
 
 | Surface   | Perf | Visual | Motion | Density | A11y | Brand | Innovation | Total | Target      |
 | --------- | ---- | ------ | ------ | ------- | ---- | ----- | ---------- | ----- | ----------- |
-| Website   | 10   | 9      | 9      | 9       | 10   | 9     | 9          | 65/70 | 63+ (9 avg) |
-| Dashboard | 9    | 9      | 9      | 9       | 9    | 9     | 9          | 63/70 | 63+ (9 avg) |
+| Website   | 10   | 9      | 9      | 9       | 10   | 9     | 10         | 66/70 | 63+ (9 avg) |
+| Dashboard | 9    | 9      | 9      | 9       | 9    | 9     | 10         | 64/70 | 63+ (9 avg) |
 | iOS       | 9    | 9      | 9      | 9       | 9    | 9     | 9          | 63/70 | 63+ (9 avg) |
 | macOS     | 9    | 9      | 9      | 9       | 9    | 9     | 9          | 63/70 | 63+ (9 avg) |
 | Android   | 9    | 9      | 9      | 9       | 9    | 9     | 9          | 63/70 | 63+ (9 avg) |
@@ -128,6 +128,7 @@ Detailed rubrics for each of the 7 dimensions, with concrete criteria for achiev
 | Q1 2026 (sprint 7) | 59      | 58        | 51  | 50    | 49      |
 | Q1 2026 (sprint 8) | 63      | 61        | 56  | 55    | 55      |
 | Q1 2026 (sprint 9) | 63      | 62        | 58  | 57    | 57      |
+| Q1 2026 (sprint 12) | 66     | 64        | 63  | 63    | 63      |
 
 Sprint 3 changes: macOS app fully tokenized (HUTokens, Avenir, spring animations, tonal surfaces). Android Compose UI built from scratch (Overview, Chat, Settings screens with Material 3 + HUTokens, spring animations). Website hardcoded hex replaced with tokens. Lighthouse thresholds tightened (98+ performance, 100 a11y). Bundle budget reduced to 300KB. Automated quality score reporting in CI. Award-winning quality criteria document created. Component quality check bug fixed.
 
@@ -140,6 +141,8 @@ Sprint 8 changes: **C Runtime** — Fixed 8+ compile errors (mcp.c, forgetting.c
 Sprint 9 changes: **Native Density 8→9** — iOS: `.contentTransition(.numericText())` on stat values, `DisclosureGroup` for Advanced settings, connection latency display, message count badges + preview text on sessions. macOS: `SparklineView` (7-point Path) next to stat cards, uptime/model/memory metadata, message count + preview + relative timestamps on sessions, usage counts on tools, `DisclosureGroup` Advanced settings. Android: `AnimatedContent` with `slideInVertically` for stat transitions, message count badges + preview text, `AnimatedVisibility` collapsible Advanced section with latency. Flutter: `AnimatedSwitcher` on stat values, `ExpansionTile` Advanced section, message count badges, truncated previews. **Native Accessibility 8→9** — iOS: `.accessibilityHidden(true)` on decorative icons, `.accessibilitySortPriority(1)` on stats grid, `.accessibilityAction(.escape)` on modals. macOS: `.focusSection()` on sidebar and detail panes, `.accessibilityElement(children: .contain)` on card groups. Android: `Modifier.semantics { heading() }` on screen titles, `stateDescription` on connection indicator, `clearAndSetSemantics` on decorative dots. Flutter: `Semantics(header: true)` on titles, `ExcludeSemantics` on decorative elements, `Semantics(label:)` on icon-only buttons. **Dashboard Visual** — Sidebar: active item gets 3px left accent border, `surfaceContainerHigh` background, spring transitions. Glass: dark mode card bg 75% mix, light mode 65%. Container queries on 7 views. CSS nesting on composer and automation card. **Deploy CI** — Vercel workflow for website, Cloudflare Pages workflow for dashboard, both with design-token build step.
 
 Sprint 7 changes: **Website** — SOTA CSS features: `:has()` selector for contextual card/nav styling, `field-sizing: content` for auto-growing inputs, Anchor Positioning API for tooltip placement with `@position-try` fallback, `text-wrap: balance` on headings. **Dashboard** — Accessibility pass on 12 components (aria-label, role attributes for sparkline, stat-card, timeline, empty-state, latex, message-stream, metric-row, overview-stats, skill-detail, status-dot, stats-row, form-group); native `<dialog>` cancel event fix (eager dispatch); dependency updates (vitest 4.1, dompurify, katex, shiki, happy-dom). **iOS** — `matchedGeometryEffect` hero transitions on Sessions (list→detail) and Tools (card→expanded overlay) with spring physics (response: 0.35, dampingFraction: 0.86). **macOS** — Full Chat view (message list, TextEditor input, Cmd+Return to send, gateway integration), Sessions view (searchable list, split detail, Cmd+Delete), Tools view (LazyVGrid, toggle cards, hover effects). **Android** — GatewayClient `request()` method for JSON-RPC; Sessions and Tools screens wired to live gateway data with refresh buttons; TalkBack accessibility maintained. **Infra** — npm audit fix (flatted vuln), Cloudflare deploy workflow fixed (design-tokens install/build step added), CMake parallel build race fixed (pre-create object dirs), version string unified to 0.4.0 across all 5 sources (main.c, version.c, mcp_server.c, status.c, cli_commands.c, main_wasi.c), `rope_theta` added to GPT config struct.
+
+Sprint 12 changes (SOTA UX push): **Foundation** — Anticipatory UX engine (idle/hover/adjacent prefetch on dashboard, iOS, Android). Ambient intelligence (status breathing, glass-by-scroll via `animation-timeline: scroll()`, time-aware evening warmth). Interaction latency contract (INP/TTI Lighthouse assertions, Long Animation Frame E2E). **Dashboard** — Complete state matrix: chat view skeleton + branded empty state + suggestion chips + container queries + entrance animations. Responsive container queries on automations/channels/metrics/nodes. Scroll entrance on config/metrics/models/voice. Voice empty state. Metric count-up with ease-out cubic. Keyboard-first: vim j/k, / search, g+key two-key combos, shortcut hints on hover (1s delay). Command palette expanded with theme/export. Virtual scroll logs with IntersectionObserver windowing, search highlighting, .txt export, level color coding. 4-breakpoint responsive (compact <600px mobile bottom nav, medium, expanded, wide 1240px+ detail panel). 11 responsive E2E tests. **Website** — Social proof (6 capability cards + GitHub stars). Theme toggle (localStorage + View Transitions API). Terminal demo (animated conversation replay). LCP optimization (inline critical CSS, font preload, content-visibility, deferred particles/cursor). Native popover mobile menu with `::backdrop` and `@starting-style`. **iOS** — `@Environment(\.accessibilityReduceMotion)` guards on ALL view animations (7 files). Chat empty state + sending indicator + `.thinMaterial` composer. Material hierarchy (ultraThin/thin/regular/thick). `.redacted(reason: .placeholder)` skeletons. Onboarding: illustrations, URL validation, haptics. PhosphorIcon SwiftUI component. Real gateway RPCs (sessions, tools, activity, health). Auto-fetch on tab appear. **Android** — M3 tonal surfaces (surfaceContainerLow/Container/ContainerHigh). GlassModifier. Onboarding: Phosphor illustrations, spring transitions, URL validation, notification permission. Pull-to-refresh on Overview + Sessions. Real gateway RPCs with StateFlow. **Flutter** — Deprecated in favor of native apps. **CI/Quality** — Reduced-motion E2E (verify no animations). Density screenshots at 4 breakpoints. Weekly quality-score CI job. 5 axe rule exclusions removed (link-in-text-block, scrollable-region-focusable, nested-interactive, label, aria-required-parent). Sessions view added to axe coverage.
 
 ## Action Items
 
@@ -157,12 +160,17 @@ Sprint 7 changes: **Website** — SOTA CSS features: `:has()` selector for conte
 - [x] **Native Accessibility**: 8→9. `.accessibilityLabel` on icon-only buttons, `Modifier.semantics { heading() }` on screen titles, `.accessibilityHidden(true)` on decorative elements, `.focusSection()` on macOS sidebar/detail, `stateDescription` on toggles, `clearAndSetSemantics` on status dots.
 - [x] **Dashboard Visual**: Sidebar active state (left border indicator, `surfaceContainerHigh` bg, spring transition), glass card depth (dark mode `color-mix` 75%), container queries on 7 views, CSS nesting.
 - [x] **Deploy workflows**: Vercel (website) and Cloudflare Pages (dashboard) CI/CD.
+- [x] **Dashboard Innovation 9→10**: Anticipatory UX, ambient intelligence, vim navigation, virtual scroll, 4-breakpoint responsive, narrative motion.
+- [x] **Website Innovation 9→10**: Native popover, terminal demo, social proof, theme toggle, LCP optimization.
+- [x] **iOS 58→63**: Real gateway RPCs, glass depth, skeletons, reduce-motion guards, onboarding polish.
+- [x] **Android 57→63**: Tonal surfaces, glass modifier, real data + pull-to-refresh, notification permission, spring onboarding.
+- [x] **Axe rules tightened**: 5 exclusions removed, sessions view added.
 - [ ] **Production deployment**: Set secrets + trigger first deploys (VERCEL_TOKEN, CLOUDFLARE_API_TOKEN).
-- [ ] **Native Performance 7→9**: Instruments profiling, 60fps scroll verification, <100ms tap response.
+- [ ] **Native Performance 9→10**: Instruments profiling, 60fps scroll verification, <100ms tap response.
 - [ ] **VoiceOver/TalkBack manual testing**: Full screen reader audit on real devices.
-- [ ] **Dashboard to 63/70**: Need Density 9→10 or Innovation 9→10.
-- [ ] **Website Visual 8→9**: Editorial typography, glass depth treatment.
-- [ ] **Native Brand 8→9**: Pixel-perfect cross-platform consistency audit.
+- [ ] **color-contrast axe rule**: Fix remaining low-contrast elements (empty-state description, chat bubbles).
+- [ ] **aria-required-children axe rule**: Fix empty listbox in chat session selector.
+- [ ] **Native Brand 9→10**: Pixel-perfect cross-platform consistency audit.
 
 ## Related
 
