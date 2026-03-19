@@ -102,14 +102,14 @@ static int relationship_weight(const char *rel, size_t rel_len) {
 hu_model_router_config_t hu_model_router_default_config(void) {
     hu_model_router_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
-    cfg.reflexive_model = "gemini-2.0-flash-lite";
+    cfg.reflexive_model = "gemini-3.0-flash-lite";
     cfg.reflexive_model_len = 21;
-    cfg.conversational_model = "gemini-2.5-flash";
+    cfg.conversational_model = "gemini-3.0-flash";
     cfg.conversational_model_len = 16;
-    cfg.analytical_model = "gemini-2.5-flash";
-    cfg.analytical_model_len = 16;
-    cfg.deep_model = "gemini-2.5-pro";
-    cfg.deep_model_len = 14;
+    cfg.analytical_model = "gemini-3.1-flash-preview";
+    cfg.analytical_model_len = 24;
+    cfg.deep_model = "gemini-3.1-pro-preview";
+    cfg.deep_model_len = 22;
     return cfg;
 }
 
@@ -121,7 +121,7 @@ hu_model_selection_t hu_model_route(const hu_model_router_config_t *cfg,
     memset(&sel, 0, sizeof(sel));
 
     if (!cfg || !msg || msg_len == 0) {
-        sel.model = cfg ? cfg->conversational_model : "gemini-2.5-flash";
+        sel.model = cfg ? cfg->conversational_model : "gemini-3.0-flash";
         sel.model_len = cfg ? cfg->conversational_model_len : 16;
         sel.tier = HU_TIER_CONVERSATIONAL;
         return sel;
