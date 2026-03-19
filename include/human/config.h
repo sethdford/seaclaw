@@ -474,6 +474,8 @@ typedef struct hu_config {
     char *workspace_dir;
     char *config_path;
     char *workspace_dir_override;
+    char *data_dir;   /* overrides ~/.human/data/ for hu_data_load() */
+    char *temp_dir;   /* overrides platform temp dir */
     char *api_key;
     hu_provider_entry_t *providers;
     size_t providers_len;

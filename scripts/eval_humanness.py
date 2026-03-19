@@ -19,7 +19,7 @@ import urllib.request
 
 API_KEY = os.environ.get("GEMINI_API_KEY", "")
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "johnb-2025")
-EVAL_MODEL = "gemini-2.0-flash"
+EVAL_MODEL = "gemini-3.1-pro-preview"
 
 _adc_token_cache = {"token": None, "expires": 0}
 
@@ -246,7 +246,7 @@ def main():
     print("  HUMAN FIDELITY EVALUATION — Synthetic Dynamic LLM Assessment")
     print("=" * 70)
     print(f"  Mode: {mode}")
-    print(f"  Model: Gemini 2.0 Flash | Persona: seth | Scenarios: {len(SCENARIOS)}")
+    print(f"  Model: Gemini 3.1 Pro | Persona: seth | Scenarios: {len(SCENARIOS)}")
     print(f"  Dimensions: {len(EVAL_DIMENSIONS)} | Evaluator: Gemini (independent call)")
     print("=" * 70)
 

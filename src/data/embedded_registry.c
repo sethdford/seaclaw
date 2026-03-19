@@ -46,6 +46,8 @@ extern const unsigned char data_conversation_starters_json[];
 extern const size_t data_conversation_starters_json_len;
 extern const unsigned char data_conversation_ai_disclosure_patterns_json[];
 extern const size_t data_conversation_ai_disclosure_patterns_json_len;
+extern const unsigned char data_conversation_ai_phrases_json[];
+extern const size_t data_conversation_ai_phrases_json_len;
 extern const unsigned char data_conversation_contractions_json[];
 extern const size_t data_conversation_contractions_json_len;
 extern const unsigned char data_conversation_crisis_keywords_json[];
@@ -94,6 +96,7 @@ static const hu_embedded_data_entry_t hu_embedded_data_registry[] = {
     { "conversation/personal_sharing.json", data_conversation_personal_sharing_json, &data_conversation_personal_sharing_json_len },
     { "conversation/starters.json", data_conversation_starters_json, &data_conversation_starters_json_len },
     { "conversation/ai_disclosure_patterns.json", data_conversation_ai_disclosure_patterns_json, &data_conversation_ai_disclosure_patterns_json_len },
+    { "conversation/ai_phrases.json", data_conversation_ai_phrases_json, &data_conversation_ai_phrases_json_len },
     { "conversation/contractions.json", data_conversation_contractions_json, &data_conversation_contractions_json_len },
     { "conversation/crisis_keywords.json", data_conversation_crisis_keywords_json, &data_conversation_crisis_keywords_json_len },
     { "conversation/engage_words.json", data_conversation_engage_words_json, &data_conversation_engage_words_json_len },
@@ -106,7 +109,7 @@ static const hu_embedded_data_entry_t hu_embedded_data_registry[] = {
     { NULL, NULL, NULL }  /* Sentinel */
 };
 
-static const size_t hu_embedded_data_count = 31;  /* excluding sentinel */
+static const size_t hu_embedded_data_count = 32;  /* excluding sentinel */
 
 typedef struct {
     const char *path;

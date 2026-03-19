@@ -16,7 +16,19 @@ extern const hu_embedded_data_result_t *hu_embedded_data_lookup(const char *path
 
 #define HU_DATA_MAX_FILE_SIZE (1024 * 1024)  /* 1MB limit */
 
+static const char *s_data_dir = NULL;
+
+void hu_data_set_dir(const char *dir) {
+    s_data_dir = dir;
+}
+
 static hu_error_t hu_data_expand_home(const char *path, char *buf, size_t buflen) {
+    if (s_data_dir) {
+        int written = snprintf(buf, buflen, "%s/%s", s_data_dir, path);
+        if (written < 0 || (size_t)written >= buflen)
+            return HU_ERR_IO;
+        return HU_OK;
+    }
     const char *home = getenv("HOME");
     if (home == NULL)
         return HU_ERR_NOT_FOUND;

@@ -23,7 +23,7 @@ import urllib.request
 
 API_KEY = os.environ.get("GEMINI_API_KEY", "")
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "johnb-2025")
-EVAL_MODEL = "gemini-2.0-flash"
+EVAL_MODEL = "gemini-3.1-pro-preview"
 
 _adc_token_cache = {"token": None, "expires": 0}
 
@@ -209,7 +209,7 @@ def main():
     print(f"  Mode: {mode}")
     print(f"  Pairs: {len(pairs)} ({len(load_ground_truth())} ground truth"
           f"{f', {len(SYNTHETIC_SCENARIOS)} synthetic' if USE_SYNTHETIC else ''})")
-    print(f"  Judge: Gemini 2.0 Flash (independent, blinded)")
+    print(f"  Judge: Gemini 3.1 Pro (independent, blinded)")
     print("=" * 70)
 
     results = []

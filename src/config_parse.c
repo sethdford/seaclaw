@@ -780,6 +780,20 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
         cfg->workspace_dir = hu_strdup(a, workspace);
     }
 
+    const char *data_dir = hu_json_get_string(root, "data_dir");
+    if (data_dir && !strstr(data_dir, "..")) {
+        if (cfg->data_dir)
+            a->free(a->ctx, cfg->data_dir, strlen(cfg->data_dir) + 1);
+        cfg->data_dir = hu_strdup(a, data_dir);
+    }
+
+    const char *temp_dir = hu_json_get_string(root, "temp_dir");
+    if (temp_dir && !strstr(temp_dir, "..")) {
+        if (cfg->temp_dir)
+            a->free(a->ctx, cfg->temp_dir, strlen(cfg->temp_dir) + 1);
+        cfg->temp_dir = hu_strdup(a, temp_dir);
+    }
+
     const char *prov = hu_json_get_string(root, "default_provider");
     if (!prov) prov = hu_json_get_string(root, "provider");
     if (prov) {

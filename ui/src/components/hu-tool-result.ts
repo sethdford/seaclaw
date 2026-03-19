@@ -33,7 +33,15 @@ export class ScToolResult extends LitElement {
     }
 
     .container {
-      background: var(--hu-bg-surface);
+      background: color-mix(
+        in srgb,
+        var(--hu-surface, var(--hu-bg-surface)) var(--hu-glass-subtle-bg-opacity, 4%),
+        transparent
+      );
+      backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
+        saturate(var(--hu-glass-subtle-saturate, 120%));
+      -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
+        saturate(var(--hu-glass-subtle-saturate, 120%));
       border: 1px solid var(--hu-border);
       border-left: 0.1875rem solid var(--hu-info);
       border-radius: var(--hu-radius);

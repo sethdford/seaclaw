@@ -212,6 +212,9 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->behavior.decay_days = 30;
     cfg->behavior.dedup_threshold = 70;
     cfg->behavior.missed_msg_threshold_sec = 1800;
+    cfg->behavior.callback_window = 300;
+    cfg->behavior.pattern_threshold = 50;
+    cfg->behavior.tapback_skip_pct = 20;
     cfg->nodes_len = 1;
     cfg->nodes[0].name = hu_strdup(a, "local");
     cfg->nodes[0].status = hu_strdup(a, "online");

@@ -42,7 +42,15 @@ export class ScToast extends LitElement {
       align-items: flex-start;
       gap: var(--hu-space-md);
       padding: var(--hu-space-md) var(--hu-space-lg);
-      background: var(--hu-bg-overlay);
+      background: color-mix(
+        in srgb,
+        var(--hu-surface, var(--hu-bg-surface)) var(--hu-glass-standard-bg-opacity, 6%),
+        transparent
+      );
+      backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
+        saturate(var(--hu-glass-standard-saturate, 180%));
+      -webkit-backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
+        saturate(var(--hu-glass-standard-saturate, 180%));
       border-radius: var(--hu-radius-lg);
       box-shadow: var(--hu-shadow-lg);
       border: 1px solid var(--hu-border);

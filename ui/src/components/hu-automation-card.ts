@@ -423,7 +423,8 @@ export class ScAutomationCard extends LitElement {
           hour: "2-digit",
           minute: "2-digit",
         });
-        const cls = run.status === "completed" ? "completed" : run.status === "failed" ? "failed" : "empty";
+        const cls =
+          run.status === "completed" ? "completed" : run.status === "failed" ? "failed" : "empty";
         dots.push(html`<span class="run-dot ${cls}" title="${run.status} — ${ts}"></span>`);
       } else {
         dots.push(html`<span class="run-dot empty"></span>`);

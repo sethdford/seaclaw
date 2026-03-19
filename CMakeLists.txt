@@ -912,6 +912,7 @@ list(APPEND HU_CORE_SOURCES
     src/data/data_prompts_autonomy_supervised_txt.c
     src/data/data_prompts_persona_reinforcement_txt.c
     src/data/data_conversation_ai_disclosure_patterns_json.c
+    src/data/data_conversation_ai_phrases_json.c
     src/data/data_conversation_backchannel_phrases_json.c
     src/data/data_conversation_contractions_json.c
     src/data/data_conversation_conversation_intros_json.c
