@@ -1,6 +1,6 @@
 ---
 title: Palette Expansion Design
-status: approved
+status: complete
 ---
 
 # Palette Expansion — Unify on Ocean-Teal + Add Amber & Indigo

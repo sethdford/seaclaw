@@ -1,5 +1,5 @@
 ---
-status: approved
+status: complete
 ---
 
 # SOTA UX Sweep — Design Document

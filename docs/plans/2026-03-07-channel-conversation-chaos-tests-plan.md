@@ -1,5 +1,5 @@
 ---
-status: approved
+status: complete
 ---
 
 # Channel Conversation & Chaos Tests Implementation Plan
