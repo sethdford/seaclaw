@@ -1427,7 +1427,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
         }
 
-        /* Tree-of-Thought: for complex queries, explore reasoning branches first */
+        /* Extended reasoning: for complex queries on first iteration, run a
+         * structured reasoning phase — ToT exploration + scratchpad synthesis.
+         * The scratchpad captures hypotheses, evidence, and approach before
+         * the main LLM call, giving it a richer starting context. */
 #ifndef HU_IS_TEST
         if (agent->tree_of_thought_enabled && iter == 1 && msg_len > 200) {
             hu_tot_config_t tot_cfg = hu_tot_config_default();
@@ -1437,22 +1440,26 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                agent->model_name_len, msg, msg_len, &tot_cfg, &tot_result) ==
                     HU_OK &&
                 tot_result.best_thought && tot_result.best_thought_len > 0) {
-                static const char tot_prefix[] = "\n\n[Reasoning approach: ";
-                static const char tot_suffix[] = "]\n";
-                size_t hint_len =
-                    sizeof(tot_prefix) - 1 + tot_result.best_thought_len + sizeof(tot_suffix) - 1;
-                if (hint_len < 2048 && system_prompt) {
-                    size_t new_sys_len = system_prompt_len + hint_len;
+
+                /* Build structured scratchpad from ToT exploration results */
+                char scratchpad[4096];
+                int sp_len = snprintf(scratchpad, sizeof(scratchpad),
+                    "\n\n[REASONING SCRATCHPAD]\n"
+                    "Branches explored: %zu | Best confidence: %.0f%%\n"
+                    "Approach: %.*s\n"
+                    "[/REASONING SCRATCHPAD]\n",
+                    tot_result.branches_explored,
+                    tot_result.best_score * 100.0,
+                    (int)(tot_result.best_thought_len < 2048 ? tot_result.best_thought_len : 2048),
+                    tot_result.best_thought);
+
+                if (sp_len > 0 && (size_t)sp_len < sizeof(scratchpad) && system_prompt) {
+                    size_t new_sys_len = system_prompt_len + (size_t)sp_len;
                     char *new_sys =
                         (char *)agent->alloc->alloc(agent->alloc->ctx, new_sys_len + 1);
                     if (new_sys) {
                         memcpy(new_sys, system_prompt, system_prompt_len);
-                        memcpy(new_sys + system_prompt_len, tot_prefix, sizeof(tot_prefix) - 1);
-                        memcpy(new_sys + system_prompt_len + sizeof(tot_prefix) - 1,
-                               tot_result.best_thought, tot_result.best_thought_len);
-                        memcpy(new_sys + system_prompt_len + sizeof(tot_prefix) - 1 +
-                                   tot_result.best_thought_len,
-                               tot_suffix, sizeof(tot_suffix) - 1);
+                        memcpy(new_sys + system_prompt_len, scratchpad, (size_t)sp_len);
                         new_sys[new_sys_len] = '\0';
                         agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
                         system_prompt = new_sys;
@@ -1923,6 +1930,31 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
 #endif
 #ifdef HU_ENABLE_SQLITE
+            /* Self-eval feedback: score this turn's output and feed into
+             * the self-improvement pipeline for continuous learning */
+            if (agent->memory && agent->history_count > 0 &&
+                agent->history[agent->history_count - 1].role == HU_ROLE_ASSISTANT) {
+                sqlite3 *eval_db = hu_sqlite_memory_get_db(agent->memory);
+                if (eval_db) {
+                    const char *resp_text = agent->history[agent->history_count - 1].content;
+                    size_t resp_len2 = agent->history[agent->history_count - 1].content_len;
+                    hu_reflection_quality_t self_q = hu_reflection_evaluate(
+                        msg, msg_len, resp_text, resp_len2, &agent->reflection);
+                    hu_self_improve_t si;
+                    if (hu_self_improve_create(agent->alloc, eval_db, &si) == HU_OK) {
+                        hu_self_improve_init_tables(&si);
+                        bool quality_good = (self_q == HU_QUALITY_GOOD);
+                        hu_self_improve_record_tool_outcome(
+                            &si, "agent_turn", 10, quality_good,
+                            (int64_t)time(NULL));
+                        if (turn_tool_results_count > 0)
+                            (void)hu_self_improve_apply_reflections(
+                                &si, (int64_t)time(NULL));
+                        hu_self_improve_deinit(&si);
+                    }
+                }
+            }
+
             /* Record per-contact style evolution data from last assistant message */
             if (agent->memory && agent->memory_session_id && agent->memory_session_id_len > 0 &&
                 agent->history_count > 0 &&
@@ -2630,8 +2662,57 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
             }
         }
+        /* Replan on tool failure: if any tool failed and we have a plan, generate
+         * a revised plan and inject it as context for the next iteration */
+        if (plan_ctx && !agent->cancel_requested) {
+            size_t fail_count = 0;
+            char fail_detail[512];
+            size_t fail_pos = 0;
+            for (size_t hi = agent->history_count; hi > 0 && hi > agent->history_count - 8; hi--) {
+                if (agent->history[hi - 1].role == HU_ROLE_TOOL &&
+                    agent->history[hi - 1].content &&
+                    agent->history[hi - 1].content_len > 0) {
+                    const char *c = agent->history[hi - 1].content;
+                    if ((c[0] == 'E' || c[0] == 'e') ||
+                        (agent->history[hi - 1].content_len > 6 &&
+                         memcmp(c, "denied", 6) == 0)) {
+                        fail_count++;
+                        if (fail_pos < sizeof(fail_detail) - 2) {
+                            size_t chunk = agent->history[hi - 1].content_len;
+                            if (chunk > 80) chunk = 80;
+                            if (fail_pos + chunk + 2 < sizeof(fail_detail)) {
+                                memcpy(fail_detail + fail_pos, c, chunk);
+                                fail_pos += chunk;
+                                fail_detail[fail_pos++] = '\n';
+                            }
+                        }
+                    }
+                }
+            }
+            if (fail_count >= 2) {
+                fail_detail[fail_pos] = '\0';
+                hu_plan_t *revised = NULL;
+                hu_error_t rp_err = hu_planner_replan(
+                    agent->alloc, &agent->provider, agent->model_name, agent->model_name_len,
+                    msg, msg_len, "partial progress", 16,
+                    fail_detail, fail_pos, NULL, 0, &revised);
+                if (rp_err == HU_OK && revised && revised->steps_count > 0) {
+                    char replan_note[1024];
+                    int rn = snprintf(replan_note, sizeof(replan_note),
+                        "[REPLAN after %zu tool failures]: %zu new steps",
+                        fail_count, revised->steps_count);
+                    if (rn > 0) {
+                        hu_agent_internal_append_history(
+                            agent, HU_ROLE_SYSTEM, replan_note, (size_t)rn, NULL, 0, NULL, 0);
+                    }
+                }
+                if (revised)
+                    hu_plan_free(agent->alloc, revised);
+            }
+        }
+
         /* Mid-turn retrieval: after tool results, augment context with
-         * additional memory relevant to tool output before next LLM call */
+         * memory relevant to both tool output and the evolving conversation */
         if (agent->memory && agent->memory->vtable &&
             agent->history_count > 1 &&
             agent->history[agent->history_count - 1].role == HU_ROLE_TOOL &&
@@ -2647,7 +2728,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 size_t mid_ctx_len = 0;
                 hu_memory_loader_t mid_loader;
                 hu_memory_loader_init(&mid_loader, agent->alloc, agent->memory,
-                                       agent->retrieval_engine, 3, 1000);
+                                       agent->retrieval_engine, 5, 2000);
                 if (hu_memory_loader_load(&mid_loader, last_result, last_result_len,
                         agent->memory_session_id ? agent->memory_session_id : "",
                         agent->memory_session_id ? agent->memory_session_id_len : 0,
@@ -2663,6 +2744,30 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         agent->alloc->free(agent->alloc->ctx, note, strlen(note) + 1);
                     }
                     agent->alloc->free(agent->alloc->ctx, mid_ctx, mid_ctx_len + 1);
+                }
+
+                /* Iterative retrieval: also retrieve against original user message
+                 * to maintain relevance to the goal across iterations */
+                if (iter > 1 && msg_len > 10) {
+                    char *goal_ctx = NULL;
+                    size_t goal_ctx_len = 0;
+                    hu_memory_loader_t goal_loader;
+                    hu_memory_loader_init(&goal_loader, agent->alloc, agent->memory,
+                                          agent->retrieval_engine, 3, 1000);
+                    if (hu_memory_loader_load(&goal_loader, msg, msg_len,
+                            agent->memory_session_id ? agent->memory_session_id : "",
+                            agent->memory_session_id ? agent->memory_session_id_len : 0,
+                            &goal_ctx, &goal_ctx_len) == HU_OK && goal_ctx && goal_ctx_len > 0) {
+                        char *gnote = hu_sprintf(agent->alloc,
+                            "[goal-relevant memory]: %.*s",
+                            (int)(goal_ctx_len < 1000 ? goal_ctx_len : 1000), goal_ctx);
+                        if (gnote) {
+                            hu_agent_internal_append_history(
+                                agent, HU_ROLE_SYSTEM, gnote, strlen(gnote), NULL, 0, NULL, 0);
+                            agent->alloc->free(agent->alloc->ctx, gnote, strlen(gnote) + 1);
+                        }
+                        agent->alloc->free(agent->alloc->ctx, goal_ctx, goal_ctx_len + 1);
+                    }
                 }
             }
         }
