@@ -32,6 +32,10 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
                                             const char *contact_id, size_t contact_id_len,
                                             char **out, size_t *out_len);
 
+hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
+                                                  const char *contact_id, size_t contact_id_len,
+                                                  char **out, size_t *out_len);
+
 #ifndef HU_IS_TEST
 /** Check if the real user sent a message to `handle` within the last
  * `within_seconds` seconds.  Queries chat.db for is_from_me=1 rows.

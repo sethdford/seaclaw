@@ -948,7 +948,6 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
         *out_len = 0;
     return HU_OK;
 }
-#endif
 
 hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
                                                   const char *contact_id, size_t contact_id_len,
@@ -962,6 +961,7 @@ hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
         *out_len = 0;
     return HU_OK;
 }
+#endif
 
 static hu_error_t imessage_get_response_constraints(void *ctx,
                                                     hu_channel_response_constraints_t *out) {

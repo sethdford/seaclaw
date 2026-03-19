@@ -118,7 +118,7 @@ hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc,
 #if HU_HAS_PWA
 #include "human/pwa_learner.h"
 #endif
-#if defined(HU_ENABLE_IMESSAGE) && !defined(HU_IS_TEST)
+#if defined(HU_HAS_IMESSAGE) && !defined(HU_IS_TEST)
 #include "human/channels/imessage.h"
 #endif
 #if defined(HU_ENABLE_CARTESIA)
@@ -2495,7 +2495,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     const char *content_to_add = msgs[m].content;
                     size_t mlen = strlen(content_to_add);
 #ifndef HU_IS_TEST
-#if defined(HU_ENABLE_IMESSAGE)
+#if defined(HU_HAS_IMESSAGE)
                     /* Per-message vision: when has_attachment and message_id, describe
                      * image and inject "[They sent a photo: {description}]" into context. */
                     if (msgs[m].has_attachment && msgs[m].message_id > 0 && agent &&
@@ -3175,7 +3175,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* Real-user-response window: if the real user already replied to
                  * this contact during our delay, stay silent.  Only applies to
                  * iMessage where we impersonate the user. */
-#if defined(HU_ENABLE_IMESSAGE)
+#if defined(HU_HAS_IMESSAGE)
                 {
                     const char *chn = ch->channel->vtable->name
                                           ? ch->channel->vtable->name(ch->channel->ctx)
@@ -4747,6 +4747,41 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
+                /* Read receipt awareness: inject read/delivered status */
+                {
+                    const char *chn = ch->channel->vtable->name
+                                          ? ch->channel->vtable->name(ch->channel->ctx)
+                                          : NULL;
+                if (chn && strcmp(chn, "imessage") == 0) {
+                    char *rr_ctx = NULL;
+                    size_t rr_len = 0;
+                    hu_imessage_build_read_receipt_context(alloc, batch_key, key_len,
+                                                           &rr_ctx, &rr_len);
+                    if (rr_ctx && rr_len > 0) {
+                        if (convo_ctx) {
+                            size_t merged_len = convo_ctx_len + rr_len + 2;
+                            char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
+                            if (merged) {
+                                memcpy(merged, convo_ctx, convo_ctx_len);
+                                merged[convo_ctx_len] = '\n';
+                                memcpy(merged + convo_ctx_len + 1, rr_ctx, rr_len);
+                                merged[merged_len - 1] = '\n';
+                                merged[merged_len] = '\0';
+                                alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                convo_ctx = merged;
+                                convo_ctx_len = merged_len;
+                            }
+                        } else {
+                            convo_ctx = rr_ctx;
+                            convo_ctx_len = rr_len;
+                            rr_ctx = NULL;
+                        }
+                        if (rr_ctx)
+                            alloc->free(alloc->ctx, rr_ctx, rr_len + 1);
+                    }
+                }
+                }
+
                 /* Narrative, engagement, emotion: inject when meaningful */
                 if (history_entries && history_count > 0) {
                     hu_narrative_phase_t narr =
@@ -5164,7 +5199,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     char *attach_ctx = hu_conversation_attachment_context(
                         alloc, history_entries, history_count, &attach_ctx_len);
 #ifndef HU_IS_TEST
-#if defined(HU_ENABLE_IMESSAGE)
+#if defined(HU_HAS_IMESSAGE)
                     /* Vision: if provider supports vision and we have iMessage, try to
                      * get the latest attachment path and describe it. */
                     if (attach_ctx && attach_ctx_len > 0 && agent->provider.vtable &&
@@ -7273,7 +7308,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     /* ── F40: Inline reply (quoted text fallback) ─────────────
                      * When classifier says inline reply, prepend "> {quoted}\n\n"
                      * to response. iMessage AppleScript has no native reply API. */
-#if defined(HU_ENABLE_IMESSAGE) && !defined(HU_IS_TEST)
+#if defined(HU_HAS_IMESSAGE) && !defined(HU_IS_TEST)
                     {
                         const char *chn = ch->channel->vtable->name
                                               ? ch->channel->vtable->name(ch->channel->ctx)
@@ -7302,7 +7337,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     /* ── Pre-send re-check: abort if real user responded while
                      * we were generating.  Prevents piling onto a conversation
                      * the user is actively handling. ─────────────────────────── */
-#if defined(HU_ENABLE_IMESSAGE) && !defined(HU_IS_TEST)
+#if defined(HU_HAS_IMESSAGE) && !defined(HU_IS_TEST)
                     {
                         const char *chn_name = ch->channel->vtable->name
                                                    ? ch->channel->vtable->name(ch->channel->ctx)
@@ -7594,7 +7629,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 
-#if defined(HU_ENABLE_IMESSAGE) && !defined(HU_IS_TEST)
+#if defined(HU_HAS_IMESSAGE) && !defined(HU_IS_TEST)
             skip_send:
 #endif
                 if (response) {
