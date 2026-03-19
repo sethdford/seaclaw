@@ -2483,6 +2483,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     (int)(key_len > 20 ? 20 : key_len), batch_key);
                         continue;
                     }
+                    /* Never respond to messages from the persona owner's own number */
+                    if (cp_gate->relationship &&
+                        strcmp(cp_gate->relationship, "self") == 0) {
+                        if (getenv("HU_DEBUG"))
+                            fprintf(stderr, "[human] ignoring message from self: %.*s\n",
+                                    (int)(key_len > 20 ? 20 : key_len), batch_key);
+                        continue;
+                    }
                 }
 #endif
 
