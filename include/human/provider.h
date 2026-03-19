@@ -158,6 +158,7 @@ typedef struct hu_chat_request {
     const char *response_format; /* optional: "json_object", "json_schema", NULL = default */
     size_t response_format_len;
     double budget_remaining_usd;  /* 0.0 = unlimited; router may downgrade model when low */
+    int thinking_budget;          /* 0 = no thinking; >0 = token budget for model reasoning */
 } hu_chat_request_t;
 
 /* ──────────────────────────────────────────────────────────────────────────

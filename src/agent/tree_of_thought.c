@@ -22,8 +22,8 @@
 
 static TOT_UNUSED const char TOT_GEN_SYS[] =
     "You are a reasoning assistant. Given a problem, produce exactly %d different "
-    "reasoning approaches. Each approach must be on its own line, prefixed with "
-    "\"THOUGHT N:\" where N is 1, 2, 3, etc. Be concise. No other text.";
+    "reasoning approaches. Respond with a JSON object: {\"thoughts\":[\"approach 1\",\"approach 2\",...]}. "
+    "No other text outside the JSON.";
 
 static TOT_UNUSED const char TOT_EVAL_SYS[] =
     "Rate how promising this reasoning path is for solving the problem, from 0.0 to 1.0. "
@@ -31,7 +31,8 @@ static TOT_UNUSED const char TOT_EVAL_SYS[] =
 
 static TOT_UNUSED const char TOT_EXPAND_SYS[] =
     "Given this reasoning approach: %s, generate exactly %d more specific sub-approaches. "
-    "Each on its own line, prefixed with \"THOUGHT N:\" where N is 1, 2, 3, etc. Be concise.";
+    "Respond with a JSON object: {\"thoughts\":[\"sub-approach 1\",\"sub-approach 2\",...]}. "
+    "No other text outside the JSON.";
 
 hu_tot_config_t hu_tot_config_default(void) {
     return (hu_tot_config_t){
@@ -60,10 +61,60 @@ void hu_tot_result_free(hu_allocator_t *alloc, hu_tot_result_t *result) {
     result->llm_calls_made = 0;
 }
 
-/* Parse "THOUGHT N: content" lines from response. Returns count of branches parsed.
+/* Parse JSON {"thoughts":["...","..."]} from response. Returns count parsed, 0 on failure. */
+static TOT_UNUSED size_t parse_thoughts_json(hu_allocator_t *alloc, const char *resp, size_t resp_len,
+                                  hu_tot_branch_t *branches, size_t max_branches, int depth_hint) {
+    if (!resp || resp_len == 0 || !branches || max_branches == 0)
+        return 0;
+
+    const char *arr = NULL;
+    for (size_t i = 0; i + 11 < resp_len; i++) {
+        if (memcmp(resp + i, "\"thoughts\"", 10) == 0) {
+            const char *p = resp + i + 10;
+            while (p < resp + resp_len && (*p == ' ' || *p == ':' || *p == '\t'))
+                p++;
+            if (p < resp + resp_len && *p == '[') {
+                arr = p + 1;
+                break;
+            }
+        }
+    }
+    if (!arr) return 0;
+
+    size_t count = 0;
+    const char *end = resp + resp_len;
+    const char *p = arr;
+
+    while (p < end && count < max_branches) {
+        while (p < end && *p != '"' && *p != ']') p++;
+        if (p >= end || *p == ']') break;
+        p++; /* skip opening quote */
+
+        const char *start = p;
+        while (p < end && *p != '"') {
+            if (*p == '\\' && p + 1 < end) p++; /* skip escaped chars */
+            p++;
+        }
+        size_t len = (size_t)(p - start);
+        if (len > 0) {
+            char *thought = hu_strndup(alloc, start, len);
+            if (thought) {
+                branches[count].thought = thought;
+                branches[count].thought_len = strlen(thought);
+                branches[count].score = 0.0;
+                branches[count].depth = depth_hint;
+                count++;
+            }
+        }
+        if (p < end) p++; /* skip closing quote */
+    }
+    return count;
+}
+
+/* Parse "THOUGHT N: content" lines (legacy fallback). Returns count of branches parsed.
  * depth_hint: depth to assign to parsed branches (0 for root, 1 for expansion). */
-static TOT_UNUSED size_t parse_thoughts(hu_allocator_t *alloc, const char *resp, size_t resp_len,
-                             hu_tot_branch_t *branches, size_t max_branches, int depth_hint) {
+static TOT_UNUSED size_t parse_thoughts_text(hu_allocator_t *alloc, const char *resp, size_t resp_len,
+                              hu_tot_branch_t *branches, size_t max_branches, int depth_hint) {
     if (!resp || resp_len == 0 || !branches || max_branches == 0)
         return 0;
 
@@ -112,6 +163,14 @@ static TOT_UNUSED size_t parse_thoughts(hu_allocator_t *alloc, const char *resp,
         }
     }
     return count;
+}
+
+/* Unified parser: tries JSON first, falls back to text format for robustness. */
+static TOT_UNUSED size_t parse_thoughts(hu_allocator_t *alloc, const char *resp, size_t resp_len,
+                             hu_tot_branch_t *branches, size_t max_branches, int depth_hint) {
+    size_t count = parse_thoughts_json(alloc, resp, resp_len, branches, max_branches, depth_hint);
+    if (count > 0) return count;
+    return parse_thoughts_text(alloc, resp, resp_len, branches, max_branches, depth_hint);
 }
 
 /* Parse a single float 0.0-1.0 from response. Returns -1.0 on parse failure. */

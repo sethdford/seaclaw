@@ -144,6 +144,28 @@ static void test_duplex_streaming_null_args(void) {
     HU_ASSERT_EQ(hu_duplex_get_latency(NULL, NULL), HU_ERR_INVALID_ARGUMENT);
 }
 
+static void test_duplex_latency_under_200ms_target(void) {
+    hu_duplex_session_t session;
+    hu_duplex_session_init(&session);
+    /* Simulate 3 request/response cycles well under 200ms */
+    hu_duplex_start_streaming(&session, 1000);
+    hu_duplex_first_byte_sent(&session, 1120); /* 120ms */
+    hu_duplex_end_output(&session);
+
+    hu_duplex_start_streaming(&session, 2000);
+    hu_duplex_first_byte_sent(&session, 2180); /* 180ms */
+    hu_duplex_end_output(&session);
+
+    hu_duplex_start_streaming(&session, 3000);
+    hu_duplex_first_byte_sent(&session, 3090); /* 90ms */
+    hu_duplex_end_output(&session);
+
+    double latency = 0;
+    hu_duplex_get_latency(&session, &latency);
+    HU_ASSERT_TRUE(latency < 200.0);
+    HU_ASSERT_TRUE(latency > 0.0);
+}
+
 void run_voice_duplex_tests(void) {
     HU_TEST_SUITE("VoiceDuplex");
     HU_RUN_TEST(test_duplex_init_idle);
@@ -159,4 +181,5 @@ void run_voice_duplex_tests(void) {
     HU_RUN_TEST(test_duplex_fallback_mode);
     HU_RUN_TEST(test_duplex_latency_averaging);
     HU_RUN_TEST(test_duplex_streaming_null_args);
+    HU_RUN_TEST(test_duplex_latency_under_200ms_target);
 }

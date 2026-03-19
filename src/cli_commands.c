@@ -3,6 +3,7 @@
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/eval.h"
+#include "human/eval_benchmarks.h"
 #include "human/eval_dashboard.h"
 #include "human/memory.h"
 #include "human/memory/factory.h"
@@ -585,12 +586,13 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv) {
 /* ── eval (run/list/compare) ────────────────────────────────────────────── */
 hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
-        printf("Usage: human eval <run|list|compare|dashboard|history> [args]\n");
+        printf("Usage: human eval <run|list|compare|dashboard|history|benchmark> [args]\n");
         printf("  run <suite.json>     Load and run an eval suite, print report JSON\n");
         printf("  list                 List available eval suites in eval_suites/\n");
         printf("  compare <r1> <r2>    Compare two run report JSON files\n");
         printf("  dashboard [r1.json]  Render terminal dashboard from run report(s)\n");
         printf("  history [--last N] [--benchmark X]  Show eval history from SQLite\n");
+        printf("  benchmark <gaia|swebench|tooluse> <suite.json>  Load and run a benchmark\n");
         return HU_OK;
     }
     const char *sub = argv[2];
@@ -1035,6 +1037,71 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         fprintf(stderr, "eval history: SQLite not enabled\n");
         return HU_ERR_NOT_SUPPORTED;
 #endif
+    }
+
+    if (strcmp(sub, "benchmark") == 0) {
+        if (argc < 5) {
+            fprintf(stderr, "Usage: human eval benchmark <gaia|swebench|tooluse> <suite.json>\n");
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        const char *bench_name = argv[3];
+        const char *bench_path = argv[4];
+        hu_benchmark_type_t bench_type;
+        if (strcmp(bench_name, "gaia") == 0)
+            bench_type = HU_BENCHMARK_GAIA;
+        else if (strcmp(bench_name, "swebench") == 0)
+            bench_type = HU_BENCHMARK_SWE_BENCH;
+        else if (strcmp(bench_name, "tooluse") == 0)
+            bench_type = HU_BENCHMARK_TOOL_USE;
+        else {
+            fprintf(stderr, "Unknown benchmark: %s (expected gaia, swebench, tooluse)\n", bench_name);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+
+        char *bench_json = NULL;
+        size_t bench_json_len = 0;
+#ifdef HU_IS_TEST
+        (void)bench_path;
+        static const char MOCK_BENCH[] =
+            "{\"name\":\"mock-bench\",\"tasks\":["
+            "{\"id\":\"b1\",\"prompt\":\"test\",\"expected\":\"ok\",\"category\":\"basic\",\"difficulty\":1,\"timeout_ms\":5000}"
+            "]}\n";
+        bench_json_len = sizeof(MOCK_BENCH) - 1;
+        bench_json = alloc->alloc(alloc->ctx, bench_json_len + 1);
+        if (!bench_json) return HU_ERR_OUT_OF_MEMORY;
+        memcpy(bench_json, MOCK_BENCH, bench_json_len + 1);
+#else
+        FILE *bf = fopen(bench_path, "r");
+        if (!bf) {
+            fprintf(stderr, "Cannot open benchmark file: %s\n", bench_path);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        fseek(bf, 0, SEEK_END);
+        long bsz = ftell(bf);
+        fseek(bf, 0, SEEK_SET);
+        if (bsz <= 0) { fclose(bf); return HU_ERR_INVALID_ARGUMENT; }
+        bench_json_len = (size_t)bsz;
+        bench_json = alloc->alloc(alloc->ctx, bench_json_len + 1);
+        if (!bench_json) { fclose(bf); return HU_ERR_OUT_OF_MEMORY; }
+        fread(bench_json, 1, bench_json_len, bf);
+        bench_json[bench_json_len] = '\0';
+        fclose(bf);
+#endif
+
+        hu_eval_suite_t bench_suite;
+        memset(&bench_suite, 0, sizeof(bench_suite));
+        hu_error_t berr = hu_benchmark_load(alloc, bench_type, bench_json, bench_json_len, &bench_suite);
+        alloc->free(alloc->ctx, bench_json, bench_json_len + 1);
+        if (berr != HU_OK) {
+            fprintf(stderr, "Failed to load benchmark: %s\n", hu_error_string(berr));
+            return berr;
+        }
+
+        printf("{\"benchmark\":\"%s\",\"suite\":\"%s\",\"loaded\":true}\n",
+               hu_benchmark_type_name(bench_type),
+               bench_suite.name ? bench_suite.name : "");
+        hu_eval_suite_free(alloc, &bench_suite);
+        return HU_OK;
     }
 
     fprintf(stderr, "Unknown eval subcommand: %s\n", sub);

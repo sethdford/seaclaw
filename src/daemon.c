@@ -14,6 +14,7 @@
 #include "human/agent/conversation_plan.h"
 #include "human/agent/episodic.h"
 #include "human/agent/info_asymmetry.h"
+#include "human/agent/model_router.h"
 #include "human/agent/outcomes.h"
 #include "human/agent/proactive.h"
 #include "human/agent/theory_of_mind.h"
@@ -6071,6 +6072,38 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 agent->ab_history_count = history_count;
                 agent->max_response_chars = max_chars;
 
+                /* Adaptive model selection: route to optimal model + thinking budget
+                 * based on message content, relationship, and time of day */
+#ifndef HU_IS_TEST
+                {
+                    hu_model_router_config_t mr_cfg = hu_model_router_default_config();
+                    const char *rel = NULL;
+                    size_t rel_len = 0;
+                    if (agent->persona) {
+                        const hu_contact_profile_t *cp_mr =
+                            hu_persona_find_contact(agent->persona, batch_key, key_len);
+                        if (cp_mr && cp_mr->relationship) {
+                            rel = cp_mr->relationship;
+                            rel_len = strlen(cp_mr->relationship);
+                        }
+                    }
+                    hu_model_selection_t sel = hu_model_route(
+                        &mr_cfg, combined, combined_len, rel, rel_len,
+                        bth_hour, history_count);
+                    agent->turn_model = sel.model;
+                    agent->turn_model_len = sel.model_len;
+                    agent->turn_temperature = sel.temperature;
+                    agent->turn_thinking_budget = sel.thinking_budget;
+                    static const char *tier_names[] = {"reflexive", "conversational",
+                                                       "analytical", "deep"};
+                    fprintf(stderr, "[human] model route: %.*s (tier=%s, thinking=%d) for %.*s\n",
+                            (int)sel.model_len, sel.model,
+                            tier_names[sel.tier < 4 ? sel.tier : 0],
+                            sel.thinking_budget,
+                            (int)(key_len > 20 ? 20 : key_len), batch_key);
+                }
+#endif
+
                 /* Scope memory to this contact */
                 agent->memory_session_id = batch_key;
                 agent->memory_session_id_len = key_len;
@@ -6713,6 +6746,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 agent->conversation_context_len = 0;
                 agent->ab_history_entries = NULL;
                 agent->ab_history_count = 0;
+                agent->turn_model = NULL;
+                agent->turn_model_len = 0;
+                agent->turn_temperature = 0.0;
+                agent->turn_thinking_budget = 0;
                 agent->max_response_chars = 0;
                 agent->memory_session_id = NULL;
                 agent->memory_session_id_len = 0;

@@ -109,6 +109,15 @@ typedef struct hu_tool_vtable {
 
     /* Optional — may be NULL. Clean up heap-allocated tool struct. */
     void (*deinit)(void *ctx, hu_allocator_t *alloc);
+
+    /* Optional streaming execute — emits partial output via callback.
+     * When non-NULL, the dispatcher may prefer this over execute() for
+     * long-running tools (shell, research, web_fetch). */
+    hu_error_t (*execute_streaming)(void *ctx, hu_allocator_t *alloc,
+                                    const hu_json_value_t *args,
+                                    void (*on_chunk)(void *cb_ctx, const char *data, size_t len),
+                                    void *cb_ctx,
+                                    hu_tool_result_t *out);
 } hu_tool_vtable_t;
 
 /* ──────────────────────────────────────────────────────────────────────────

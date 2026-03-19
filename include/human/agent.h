@@ -120,6 +120,12 @@ struct hu_agent {
     size_t conversation_context_len;
     uint32_t max_response_chars;
 
+    /* Per-turn model override (set by daemon, not owned; NULL = use default) */
+    const char *turn_model;
+    size_t turn_model_len;
+    double turn_temperature;  /* 0.0 = use agent default */
+    int turn_thinking_budget; /* 0 = no thinking config */
+
     /* Per-turn A/B evaluation: channel history for quality scoring (set by daemon, not owned) */
     const hu_channel_history_entry_t *ab_history_entries;
     size_t ab_history_count;

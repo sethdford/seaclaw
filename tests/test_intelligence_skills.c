@@ -556,6 +556,43 @@ static void test_skill_get_by_name_found(void) {
     mem.vtable->deinit(mem.ctx);
 }
 
+static void test_skill_compose_combines_strategies(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+    ensure_skills_table(db);
+
+    int64_t now = (int64_t)time(NULL);
+    int64_t id_a = 0, id_b = 0;
+    HU_ASSERT_EQ(hu_skill_insert(&alloc, db, "alpha", 5, "test", 4, NULL, 0,
+                                  "alpha_cond", 10, "strategy_A", 10, "discovery", 9,
+                                  0, now, &id_a), HU_OK);
+    HU_ASSERT_EQ(hu_skill_insert(&alloc, db, "beta", 4, "test", 4, NULL, 0,
+                                  "beta_cond", 9, "strategy_B", 10, "discovery", 9,
+                                  0, now, &id_b), HU_OK);
+
+    int64_t ids[2] = {id_a, id_b};
+    int64_t composed_id = 0;
+    HU_ASSERT_EQ(hu_skill_compose(&alloc, db, ids, 2, "combined", 8, &composed_id), HU_OK);
+    HU_ASSERT_TRUE(composed_id > 0);
+
+    hu_skill_t out = {0};
+    HU_ASSERT_EQ(hu_skill_get_by_name(&alloc, db, "combined", 8, &out), HU_OK);
+    HU_ASSERT_TRUE(strstr(out.strategy, "strategy_A") != NULL);
+    HU_ASSERT_TRUE(strstr(out.strategy, "strategy_B") != NULL);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_skill_compose_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    int64_t ids[1] = {1};
+    int64_t out_id = 0;
+    HU_ASSERT_EQ(hu_skill_compose(NULL, NULL, ids, 1, "x", 1, &out_id), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_skill_compose(&alloc, NULL, NULL, 0, "x", 1, &out_id), HU_ERR_INVALID_ARGUMENT);
+}
+
 void run_intelligence_skills_tests(void) {
     HU_TEST_SUITE("intelligence_skills");
     HU_RUN_TEST(test_skill_insert_load_active_by_contact_found);
@@ -572,6 +609,8 @@ void run_intelligence_skills_tests(void) {
     HU_RUN_TEST(test_transfer_skill_creates_universal_with_parent_skill_id);
     HU_RUN_TEST(test_resolve_chain_skill_basics_expanded_includes_basics_strategy);
     HU_RUN_TEST(test_resolve_chain_depth_gt_3_stops_recursion);
+    HU_RUN_TEST(test_skill_compose_combines_strategies);
+    HU_RUN_TEST(test_skill_compose_null_args);
 }
 
 #else

@@ -609,6 +609,14 @@ static hu_error_t gemini_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
             hu_json_object_set(alloc, gen_cfg, "responseMimeType",
                                hu_json_string_new(alloc, "application/json", 16));
         }
+        if (request->thinking_budget > 0) {
+            hu_json_value_t *think_cfg = hu_json_object_new(alloc);
+            if (think_cfg) {
+                hu_json_object_set(alloc, think_cfg, "thinkingBudget",
+                                   hu_json_number_new(alloc, (double)request->thinking_budget));
+                hu_json_object_set(alloc, gen_cfg, "thinkingConfig", think_cfg);
+            }
+        }
     }
 
     /* Safety settings: BLOCK_NONE for minimal filtering (matching Zig default) */
@@ -972,6 +980,14 @@ static hu_error_t gemini_stream_chat(void *ctx, hu_allocator_t *alloc,
         uint32_t max_tok = request->max_tokens ? request->max_tokens : HU_GEMINI_DEFAULT_MAX_TOKENS;
         hu_json_object_set(alloc, gen_cfg, "maxOutputTokens",
                            hu_json_number_new(alloc, (double)max_tok));
+        if (request->thinking_budget > 0) {
+            hu_json_value_t *think_cfg = hu_json_object_new(alloc);
+            if (think_cfg) {
+                hu_json_object_set(alloc, think_cfg, "thinkingBudget",
+                                   hu_json_number_new(alloc, (double)request->thinking_budget));
+                hu_json_object_set(alloc, gen_cfg, "thinkingConfig", think_cfg);
+            }
+        }
     }
 
     char *body = NULL;

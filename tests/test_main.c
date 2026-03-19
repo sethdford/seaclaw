@@ -168,6 +168,7 @@ void run_weather_awareness_tests(void);
 void run_timing_tests(void);
 void run_governor_tests(void);
 void run_relationship_dynamics_tests(void);
+void run_model_router_tests(void);
 void run_arbitrator_tests(void);
 void run_planning_tests(void);
 void run_rel_dynamics_tests(void);
@@ -276,6 +277,11 @@ void run_eval_benchmarks_tests(void);
 void run_eval_runner_tests(void);
 void run_eval_history_tests(void);
 void run_corrective_rag_tests(void);
+void run_adaptive_rag_tests(void);
+void run_self_rag_tests(void);
+void run_memory_tiers_tests(void);
+void run_process_reward_tests(void);
+void run_dpo_tests(void);
 void run_otel_tests(void);
 void run_cot_audit_tests(void);
 void run_moderation_tests(void);
@@ -290,6 +296,9 @@ void run_bootstrap_tests(void);
 void run_thread_pool_tests(void);
 void run_weakness_tests(void);
 void run_distiller_tests(void);
+void run_model_router_tests(void);
+void run_plan_executor_tests(void);
+void run_cdp_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -488,6 +497,7 @@ int main(int argc, char **argv) {
     run_timing_tests();
     run_governor_tests();
     run_relationship_dynamics_tests();
+    run_model_router_tests();
     run_arbitrator_tests();
     run_planning_tests();
     run_rel_dynamics_tests();
@@ -590,6 +600,11 @@ int main(int argc, char **argv) {
     run_eval_runner_tests();
     run_eval_history_tests();
     run_corrective_rag_tests();
+    run_adaptive_rag_tests();
+    run_self_rag_tests();
+    run_memory_tiers_tests();
+    run_process_reward_tests();
+    run_dpo_tests();
     run_otel_tests();
     run_cot_audit_tests();
     run_moderation_tests();
@@ -604,6 +619,9 @@ int main(int argc, char **argv) {
     run_thread_pool_tests();
     run_weakness_tests();
     run_distiller_tests();
+    run_model_router_tests();
+    run_plan_executor_tests();
+    run_cdp_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

@@ -4018,9 +4018,24 @@ hu_response_action_t hu_conversation_classify_response(const char *msg, size_t m
 
 /* ── Active listening backchannels (F29) ───────────────────────────────── */
 
+static bool has_negative_sentiment(const char *msg, size_t msg_len) {
+    if (!msg || msg_len == 0)
+        return false;
+    static const char *neg[] = {"frustrated", "angry", "ugh", "hate", "not working",
+        "doesn't work", "annoyed", "upset", "stressed", "awful", "terrible",
+        "disappointed", "broken", "failing", "can't believe"};
+    for (size_t i = 0; i < sizeof(neg) / sizeof(neg[0]); i++) {
+        if (str_contains_ci(msg, msg_len, neg[i]))
+            return true;
+    }
+    return false;
+}
+
 static bool is_narrative_or_venting(const char *msg, size_t msg_len,
                                     const hu_channel_history_entry_t *entries, size_t count) {
     if (!msg || msg_len < 80)
+        return false;
+    if (has_negative_sentiment(msg, msg_len))
         return false;
     if (memchr(msg, '?', msg_len) != NULL)
         return false;

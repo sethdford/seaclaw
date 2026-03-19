@@ -107,6 +107,13 @@ hu_error_t hu_skill_discover_from_pattern(hu_allocator_t *alloc, sqlite3 *db,
                                            double success_rate, const char *name, size_t name_len,
                                            int64_t *out_id);
 
+/* AGI-S3: Compose multiple skills into a higher-order skill.
+ * Concatenates strategies of component skills, averages success rates. Max 10 components. */
+hu_error_t hu_skill_compose(hu_allocator_t *alloc, sqlite3 *db,
+                            const int64_t *skill_ids, size_t skill_count,
+                            const char *name, size_t name_len,
+                            int64_t *out_id);
+
 #endif /* HU_ENABLE_SQLITE */
 
 #endif /* HU_INTELLIGENCE_SKILLS_H */

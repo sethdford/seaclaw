@@ -1475,12 +1475,26 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
 #endif
 
+        /* Adaptive model selection: use per-turn override when set by the daemon's
+         * model router, falling back to the agent's default model. */
+        const char *turn_model = agent->model_name;
+        size_t turn_model_len = agent->model_name_len;
+        double turn_temp = agent->temperature;
+        if (agent->turn_model && agent->turn_model_len > 0) {
+            turn_model = agent->turn_model;
+            turn_model_len = agent->turn_model_len;
+        }
+        if (agent->turn_temperature > 0.0)
+            turn_temp = agent->turn_temperature;
+        if (agent->turn_thinking_budget > 0)
+            req.thinking_budget = agent->turn_thinking_budget;
+
         clock_t llm_start = clock();
         hu_chat_response_t resp;
         memset(&resp, 0, sizeof(resp));
         err =
-            agent->provider.vtable->chat(agent->provider.ctx, agent->alloc, &req, agent->model_name,
-                                         agent->model_name_len, agent->temperature, &resp);
+            agent->provider.vtable->chat(agent->provider.ctx, agent->alloc, &req, turn_model,
+                                         turn_model_len, turn_temp, &resp);
         uint64_t llm_duration_ms = hu_agent_internal_clock_diff_ms(llm_start, clock());
 
         {
@@ -1878,24 +1892,61 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     hu_experience_store_deinit(&exp_store);
                 }
             }
-            /* Value learning from user feedback signals */
+            /* Value learning: detect approval, correction, re-asks, content-specific signals */
             if (agent->memory) {
                 sqlite3 *vl_db = hu_sqlite_memory_get_db(agent->memory);
                 if (vl_db) {
                     hu_value_engine_t ve;
                     if (hu_value_engine_create(agent->alloc, vl_db, &ve) == HU_OK) {
                         int64_t now_vl = (int64_t)time(NULL);
+
                         bool is_positive = (msg_len >= 4 && (
                             strstr(msg, "good") || strstr(msg, "great") ||
                             strstr(msg, "thanks") || strstr(msg, "perfect") ||
                             strstr(msg, "exactly")));
                         bool is_negative = (msg_len >= 2 && (
                             strstr(msg, "wrong") || strstr(msg, "bad") ||
-                            strstr(msg, "incorrect") || strstr(msg, "no")));
+                            strstr(msg, "incorrect") || strstr(msg, "no,")));
+                        bool is_value_correction = (msg_len >= 6 && (
+                            strstr(msg, "actually") || strstr(msg, "I meant") ||
+                            strstr(msg, "not what") || strstr(msg, "try again")));
+
+                        /* Re-ask detection: user repeats a similar message = previous answer was wrong */
+                        bool is_reask = false;
+                        if (agent->history_count >= 4 && msg_len > 10) {
+                            for (size_t hi = agent->history_count - 2; hi > 0 && hi > agent->history_count - 8; hi--) {
+                                if (agent->history[hi].role == HU_ROLE_USER &&
+                                    agent->history[hi].content_len > 10) {
+                                    size_t min_l = msg_len < agent->history[hi].content_len
+                                                       ? msg_len : agent->history[hi].content_len;
+                                    size_t match = 0;
+                                    for (size_t ci = 0; ci < min_l && ci < 100; ci++) {
+                                        if (msg[ci] == agent->history[hi].content[ci])
+                                            match++;
+                                    }
+                                    if (min_l > 0 && match * 100 / min_l > 70) {
+                                        is_reask = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
                         if (is_positive)
-                            (void)hu_value_learn_from_approval(&ve, "helpfulness", 11, 0.1, now_vl);
-                        if (is_negative)
-                            (void)hu_value_weaken(&ve, "helpfulness", 11, 0.1, now_vl);
+                            (void)hu_value_learn_from_approval(&ve, "helpfulness", 11, 0.15, now_vl);
+                        if (is_negative || is_reask)
+                            (void)hu_value_weaken(&ve, "helpfulness", 11, 0.15, now_vl);
+                        if (is_value_correction)
+                            (void)hu_value_learn_from_correction(&ve, "accuracy", 8,
+                                "User corrected a factual or intent error", 42, 0.3, now_vl);
+                        if (strstr(msg, "privacy") || strstr(msg, "private"))
+                            (void)hu_value_learn_from_approval(&ve, "privacy", 7, 0.2, now_vl);
+                        if (strstr(msg, "brief") || strstr(msg, "concise") || strstr(msg, "shorter"))
+                            (void)hu_value_learn_from_correction(&ve, "conciseness", 11,
+                                "User prefers shorter responses", 30, 0.2, now_vl);
+                        if (strstr(msg, "detail") || strstr(msg, "elaborate") || strstr(msg, "more"))
+                            (void)hu_value_learn_from_correction(&ve, "thoroughness", 12,
+                                "User prefers detailed responses", 31, 0.2, now_vl);
                         hu_value_engine_deinit(&ve);
                     }
                 }
@@ -1930,6 +1981,28 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
 #endif
 #ifdef HU_ENABLE_SQLITE
+            /* Goal progress: advance active goals based on turn output */
+            if (agent->memory) {
+                sqlite3 *goal_db = hu_sqlite_memory_get_db(agent->memory);
+                if (goal_db) {
+                    hu_goal_engine_t ge;
+                    if (hu_goal_engine_create(agent->alloc, goal_db, &ge) == HU_OK) {
+                        hu_goal_t active_goal;
+                        bool gfound = false;
+                        if (hu_goal_select_next(&ge, &active_goal, &gfound) == HU_OK && gfound) {
+                            double pdelta = (turn_tool_results_count > 0)
+                                ? 0.15 + 0.05 * (double)turn_tool_results_count
+                                : 0.1;
+                            double nprog = active_goal.progress + pdelta;
+                            if (nprog > 1.0) nprog = 1.0;
+                            (void)hu_goal_update_progress(&ge, active_goal.id,
+                                                          nprog, (int64_t)time(NULL));
+                        }
+                        hu_goal_engine_deinit(&ge);
+                    }
+                }
+            }
+
             /* Self-eval feedback: score this turn's output and feed into
              * the self-improvement pipeline for continuous learning */
             if (agent->memory && agent->history_count > 0 &&

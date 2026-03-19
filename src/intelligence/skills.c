@@ -866,4 +866,62 @@ static hu_error_t resolve_chain_recursive(hu_allocator_t *alloc, sqlite3 *db,
     return HU_OK;
 }
 
+hu_error_t hu_skill_compose(hu_allocator_t *alloc, sqlite3 *db,
+                            const int64_t *skill_ids, size_t skill_count,
+                            const char *name, size_t name_len,
+                            int64_t *out_id) {
+    if (!alloc || !db || !skill_ids || skill_count == 0 || !name || name_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (skill_count > 10)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char combined_strategy[4096];
+    size_t written = 0;
+
+    for (size_t i = 0; i < skill_count; i++) {
+        sqlite3_stmt *stmt = NULL;
+        int rc = sqlite3_prepare_v2(db,
+            "SELECT strategy FROM skills WHERE id = ? AND retired = 0",
+            -1, &stmt, NULL);
+        if (rc != SQLITE_OK) return HU_ERR_MEMORY_BACKEND;
+
+        sqlite3_bind_int64(stmt, 1, skill_ids[i]);
+        rc = sqlite3_step(stmt);
+        if (rc == SQLITE_ROW) {
+            const char *strat = (const char *)sqlite3_column_text(stmt, 0);
+            size_t slen = strat ? strlen(strat) : 0;
+            if (i > 0 && written < sizeof(combined_strategy) - 1) {
+                combined_strategy[written++] = ' ';
+                combined_strategy[written++] = '+';
+                combined_strategy[written++] = ' ';
+            }
+            if (slen > sizeof(combined_strategy) - 1 - written)
+                slen = sizeof(combined_strategy) - 1 - written;
+            if (strat && slen > 0) {
+                memcpy(combined_strategy + written, strat, slen);
+                written += slen;
+            }
+        }
+        sqlite3_finalize(stmt);
+    }
+    combined_strategy[written] = '\0';
+
+    double avg_rate = 0.0;
+    for (size_t i = 0; i < skill_count; i++) {
+        sqlite3_stmt *stmt = NULL;
+        int rc = sqlite3_prepare_v2(db,
+            "SELECT success_rate FROM skills WHERE id = ?",
+            -1, &stmt, NULL);
+        if (rc != SQLITE_OK) continue;
+        sqlite3_bind_int64(stmt, 1, skill_ids[i]);
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            avg_rate += sqlite3_column_double(stmt, 0);
+        sqlite3_finalize(stmt);
+    }
+    avg_rate /= (double)skill_count;
+
+    return hu_skill_discover_from_pattern(alloc, db,
+        combined_strategy, written, avg_rate, name, name_len, out_id);
+}
+
 #endif /* HU_ENABLE_SQLITE */

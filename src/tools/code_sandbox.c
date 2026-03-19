@@ -41,16 +41,19 @@ hu_error_t hu_code_sandbox_execute(hu_allocator_t *alloc,
         memcpy(result->stdout_buf, "Hello World\n", 12);
         result->stdout_len = 12;
         result->exit_code = 0;
+        result->elapsed_ms = 85;
         break;
     case HU_SANDBOX_JAVASCRIPT:
         memcpy(result->stdout_buf, "42\n", 3);
         result->stdout_len = 3;
         result->exit_code = 0;
+        result->elapsed_ms = 45;
         break;
     case HU_SANDBOX_SHELL:
         memcpy(result->stdout_buf, "total 0\n", 8);
         result->stdout_len = 8;
         result->exit_code = 0;
+        result->elapsed_ms = 30;
         break;
     }
     return HU_OK;

@@ -1262,10 +1262,29 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
     addr.sin_port = htons(cfg.port);
     inet_pton(AF_INET, cfg.host, &addr.sin_addr);
 
-    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        hu_health_mark_error("gateway", "bind failed");
-        err = HU_ERR_IO;
-        goto cleanup;
+    {
+        int bind_ok = 0;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0) {
+                bind_ok = 1;
+                break;
+            }
+            if (errno == EADDRINUSE && attempt < 2) {
+                usleep(100000);
+                close(fd);
+                fd = socket(AF_INET, SOCK_STREAM, 0);
+                if (fd < 0)
+                    break;
+                setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+                continue;
+            }
+            break;
+        }
+        if (!bind_ok) {
+            hu_health_mark_error("gateway", "bind failed");
+            err = HU_ERR_IO;
+            goto cleanup;
+        }
     }
 
     if (listen(fd, 64) < 0) {

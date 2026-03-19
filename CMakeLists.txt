@@ -396,6 +396,7 @@ set(HU_CORE_SOURCES
     src/agent/task_list.c
     src/agent/profile.c
     src/agent/planner.c
+    src/agent/plan_executor.c
     src/agent/mcts_planner.c
     src/agent/dag.c
     src/agent/dag_executor.c
@@ -404,6 +405,7 @@ set(HU_CORE_SOURCES
     src/agent/orchestrator_llm.c
     src/agent/swarm.c
     src/agent/agent_profile.c
+    src/agent/model_router.c
     src/agent/registry.c
     src/agent/undo.c
     src/agent/cli.c
@@ -573,6 +575,7 @@ set(HU_CORE_SOURCES
     src/tools/skill_write.c
     src/tools/pwa.c
     src/pwa/bridge.c
+    src/pwa/cdp.c
     src/pwa/context.c
     src/pwa/drivers.c
     src/pwa/learner.c
@@ -690,6 +693,11 @@ list(APPEND HU_CORE_SOURCES
     src/eval_benchmarks.c
     src/eval_dashboard.c
     src/memory/corrective_rag.c
+    src/memory/adaptive_rag.c
+    src/memory/self_rag.c
+    src/memory/tiers.c
+    src/agent/process_reward.c
+    src/ml/dpo.c
     src/security/cot_audit.c
     src/security/moderation.c
     src/tools/code_sandbox.c
@@ -1928,6 +1936,9 @@ set(HU_TEST_SOURCES
     tests/test_self_improve_loop.c
     tests/test_weakness.c
     tests/test_distiller.c
+    tests/test_model_router.c
+    tests/test_plan_executor.c
+    tests/test_cdp.c
 )
 if(HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_SOURCES tests/test_google_feeds.c tests/test_music_feeds.c
@@ -1966,6 +1977,11 @@ list(APPEND HU_TEST_SOURCES
     tests/test_eval_runner.c
     tests/test_eval_history.c
     tests/test_corrective_rag.c
+    tests/test_adaptive_rag.c
+    tests/test_self_rag.c
+    tests/test_memory_tiers.c
+    tests/test_process_reward.c
+    tests/test_dpo.c
     tests/test_otel.c
     tests/test_cot_audit.c
     tests/test_moderation.c

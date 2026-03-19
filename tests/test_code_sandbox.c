@@ -107,6 +107,25 @@ static void sandbox_checkpoint_null_args(void) {
     HU_ASSERT_EQ(hu_code_sandbox_restore_checkpoint(NULL, &config), HU_ERR_INVALID_ARGUMENT);
 }
 
+static void sandbox_cold_start_under_500ms(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_code_sandbox_config_t config = hu_code_sandbox_config_default();
+    hu_code_sandbox_result_t result;
+
+    config.language = HU_SANDBOX_PYTHON;
+    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, "print(1)", 8, &result), HU_OK);
+    HU_ASSERT_TRUE(result.elapsed_ms < 500);
+    HU_ASSERT_TRUE(result.elapsed_ms >= 0);
+
+    config.language = HU_SANDBOX_JAVASCRIPT;
+    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, "1+1", 3, &result), HU_OK);
+    HU_ASSERT_TRUE(result.elapsed_ms < 500);
+
+    config.language = HU_SANDBOX_SHELL;
+    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, "ls", 2, &result), HU_OK);
+    HU_ASSERT_TRUE(result.elapsed_ms < 500);
+}
+
 void run_code_sandbox_tests(void) {
     HU_TEST_SUITE("Code Sandbox");
     HU_RUN_TEST(sandbox_config_defaults);
@@ -118,4 +137,5 @@ void run_code_sandbox_tests(void) {
     HU_RUN_TEST(sandbox_checkpoint_save_restore);
     HU_RUN_TEST(sandbox_checkpoint_invalid_rejects);
     HU_RUN_TEST(sandbox_checkpoint_null_args);
+    HU_RUN_TEST(sandbox_cold_start_under_500ms);
 }
