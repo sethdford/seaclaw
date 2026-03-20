@@ -111,6 +111,62 @@ void hu_audio_cleanup_temp(const char *audio_path) {
         (void)unlink(audio_path);
 }
 
+hu_error_t hu_audio_tts_bytes_to_temp(hu_allocator_t *alloc,
+    const unsigned char *bytes, size_t bytes_len,
+    const char *file_ext_no_dot,
+    char *out_path, size_t out_cap) {
+    (void)alloc;
+    if (!bytes || bytes_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!out_path || out_cap == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!file_ext_no_dot || !file_ext_no_dot[0])
+        return HU_ERR_INVALID_ARGUMENT;
+    if (strcmp(file_ext_no_dot, "mp3") != 0 && strcmp(file_ext_no_dot, "wav") != 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    int n = snprintf(out_path, out_cap, "/tmp/human-tts-bytes-test.%s", file_ext_no_dot);
+    if (n < 0 || (size_t)n >= out_cap)
+        return HU_ERR_INVALID_ARGUMENT;
+    FILE *f = fopen(out_path, "wb");
+    if (!f)
+        return HU_ERR_IO;
+    if (fwrite(bytes, 1, bytes_len, f) != bytes_len) {
+        fclose(f);
+        return HU_ERR_IO;
+    }
+    fclose(f);
+    return HU_OK;
+#else
+    char path_template[256];
+    size_t elen = strlen(file_ext_no_dot);
+    if (elen > 16)
+        return HU_ERR_INVALID_ARGUMENT;
+    int nt = snprintf(path_template, sizeof(path_template), "/tmp/human-tts-XXXXXX.%s",
+        file_ext_no_dot);
+    if (nt < 0 || (size_t)nt >= sizeof(path_template))
+        return HU_ERR_IO;
+
+    int suffix_len = (int)(1 + elen); /* .ext */
+    int fd = mkstemps(path_template, suffix_len);
+    if (fd < 0)
+        return HU_ERR_IO;
+    ssize_t nw = write(fd, bytes, bytes_len);
+    close(fd);
+    if (nw < 0 || (size_t)nw != bytes_len) {
+        unlink(path_template);
+        return HU_ERR_IO;
+    }
+    int no = snprintf(out_path, out_cap, "%s", path_template);
+    if (no < 0 || (size_t)no >= out_cap) {
+        unlink(path_template);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    return HU_OK;
+#endif
+}
+
 typedef enum {
     AUDIO_FMT_UNKNOWN,
     AUDIO_FMT_MP3,
@@ -285,6 +341,19 @@ hu_error_t hu_audio_mp3_to_caf(hu_allocator_t *alloc,
 
 void hu_audio_cleanup_temp(const char *audio_path) {
     (void)audio_path;
+}
+
+hu_error_t hu_audio_tts_bytes_to_temp(hu_allocator_t *alloc,
+    const unsigned char *bytes, size_t bytes_len,
+    const char *file_ext_no_dot,
+    char *out_path, size_t out_cap) {
+    (void)alloc;
+    (void)bytes;
+    (void)bytes_len;
+    (void)file_ext_no_dot;
+    (void)out_path;
+    (void)out_cap;
+    return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t hu_audio_pipeline_process(hu_allocator_t *alloc, const void *input,

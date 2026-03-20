@@ -20,6 +20,7 @@ interface MetricsSnapshot {
     tree_of_thought?: boolean;
     constitutional_ai?: boolean;
     llm_compiler?: boolean;
+    mcts_planner?: boolean;
     speculative_cache?: boolean;
   };
   metrics?: {
@@ -298,6 +299,7 @@ export class ScMetricsView extends GatewayAwareLitElement {
       { key: "tree_of_thought", label: "Tree of Thought" },
       { key: "constitutional_ai", label: "Constitutional AI" },
       { key: "llm_compiler", label: "LLM Compiler" },
+      { key: "mcts_planner", label: "MCTS Planner" },
       { key: "speculative_cache", label: "Speculative Cache" },
     ];
 
@@ -320,6 +322,42 @@ export class ScMetricsView extends GatewayAwareLitElement {
                   </span>
                 `,
               )}
+            </div>
+          </div>
+        </hu-card>
+      </div>
+    `;
+  }
+
+  private _renderEvalCalibration() {
+    const bth = this.snapshot.bth;
+    if (!bth) return nothing;
+    const ab = typeof bth.ab_evaluations === "number" ? bth.ab_evaluations : 0;
+    const alt = typeof bth.ab_alternates_chosen === "number" ? bth.ab_alternates_chosen : 0;
+    const altRate = ab > 0 ? ((alt / ab) * 100).toFixed(1) : "—";
+    const altRateStr = altRate === "—" ? "—" : `${altRate}%`;
+
+    return html`
+      <div class="section hu-cv-defer hu-scroll-reveal" role="region" aria-label="Evaluation metrics">
+        <hu-section-header
+          heading="Evaluation &amp; A/B"
+          description="Live BTH counters from the runtime. For SQLite pass-rate history, run human eval trend on the gateway host."
+        ></hu-section-header>
+        <hu-card glass>
+          <div class="card-inner">
+            <div class="metric-grid">
+              <div class="metric-item">
+                <span class="metric-label">A/B evaluations</span>
+                <span class="metric-value">${ab.toLocaleString()}</span>
+              </div>
+              <div class="metric-item">
+                <span class="metric-label">Alternates chosen</span>
+                <span class="metric-value">${alt.toLocaleString()}</span>
+              </div>
+              <div class="metric-item">
+                <span class="metric-label">Alternate rate</span>
+                <span class="metric-value">${altRateStr}</span>
+              </div>
             </div>
           </div>
         </hu-card>
@@ -433,7 +471,7 @@ export class ScMetricsView extends GatewayAwareLitElement {
       ${this.loading
         ? this._renderSkeleton()
         : html`
-            ${this._renderIntelligenceStats()} ${this._renderSystemHealth()}
+            ${this._renderIntelligenceStats()} ${this._renderEvalCalibration()} ${this._renderSystemHealth()}
             ${this._renderIntelligencePipeline()}
           `}
     `;

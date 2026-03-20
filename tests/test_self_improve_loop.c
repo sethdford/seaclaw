@@ -213,6 +213,27 @@ static void test_verify_null_args(void) {
     HU_ASSERT_EQ(hu_self_improve_kept_patch_count(NULL, NULL), HU_ERR_INVALID_ARGUMENT);
 }
 
+static void test_closed_loop_null_alloc_returns_error(void) {
+    sqlite3 *db = open_mem_db();
+    HU_ASSERT_EQ(hu_self_improve_closed_loop(NULL, db, NULL, NULL, 0, "suite.json"),
+                 HU_ERR_INVALID_ARGUMENT);
+    sqlite3_close(db);
+}
+
+static void test_closed_loop_simulated_improvement_keeps_patch(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = open_mem_db();
+    HU_ASSERT_EQ(hu_self_improve_closed_loop(&alloc, db, NULL, NULL, 0, "suite.json"), HU_OK);
+
+    hu_self_improve_t engine = {0};
+    HU_ASSERT_EQ(hu_self_improve_create(&alloc, db, &engine), HU_OK);
+    size_t kept = 0;
+    HU_ASSERT_EQ(hu_self_improve_kept_patch_count(&engine, &kept), HU_OK);
+    HU_ASSERT_EQ(kept, 1u);
+    hu_self_improve_deinit(&engine);
+    sqlite3_close(db);
+}
+
 #endif /* HU_ENABLE_SQLITE */
 
 void run_self_improve_loop_tests(void) {
@@ -227,5 +248,7 @@ void run_self_improve_loop_tests(void) {
     HU_RUN_TEST(test_rollback_patch);
     HU_RUN_TEST(test_verify_patch_not_found);
     HU_RUN_TEST(test_verify_null_args);
+    HU_RUN_TEST(test_closed_loop_null_alloc_returns_error);
+    HU_RUN_TEST(test_closed_loop_simulated_improvement_keeps_patch);
 #endif
 }

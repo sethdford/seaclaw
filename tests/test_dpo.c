@@ -1,6 +1,9 @@
 #include "test_framework.h"
 #include "human/ml/dpo.h"
 #include <string.h>
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+#endif
 
 static void dpo_create_and_init_tables(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -101,7 +104,78 @@ static void dpo_clear_removes_all(void) {
     hu_dpo_collector_deinit(&col);
 }
 
+static void dpo_get_best_examples_invalid_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_dpo_collector_t col;
+    HU_ASSERT_EQ(hu_dpo_collector_create(&alloc, NULL, 0, &col), HU_OK);
+    char *frag = NULL;
+    size_t len = 0;
+    HU_ASSERT_EQ(hu_dpo_get_best_examples(NULL, &alloc, 5, &frag, &len), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_dpo_get_best_examples(&col, NULL, 5, &frag, &len), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_dpo_get_best_examples(&col, &alloc, 5, NULL, &len), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_dpo_get_best_examples(&col, &alloc, 5, &frag, NULL), HU_ERR_INVALID_ARGUMENT);
+    hu_dpo_collector_deinit(&col);
+}
+
+static void dpo_get_best_examples_no_db_returns_empty(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_dpo_collector_t col;
+    HU_ASSERT_EQ(hu_dpo_collector_create(&alloc, NULL, 0, &col), HU_OK);
+    char *frag = NULL;
+    size_t len = 999;
+    HU_ASSERT_EQ(hu_dpo_get_best_examples(&col, &alloc, 5, &frag, &len), HU_OK);
+    HU_ASSERT_TRUE(frag == NULL);
+    HU_ASSERT_EQ(len, 0u);
+    HU_ASSERT_EQ(hu_dpo_get_best_examples(&col, &alloc, 0, &frag, &len), HU_OK);
+    HU_ASSERT_TRUE(frag == NULL);
+    HU_ASSERT_EQ(len, 0u);
+    hu_dpo_collector_deinit(&col);
+}
+
 #ifdef HU_ENABLE_SQLITE
+static void dpo_get_best_examples_sqlite_orders_by_margin(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    hu_dpo_collector_t col;
+    HU_ASSERT_EQ(hu_dpo_collector_create(&alloc, db, 100, &col), HU_OK);
+    HU_ASSERT_EQ(hu_dpo_init_tables(&col), HU_OK);
+
+    hu_preference_pair_t low = {0};
+    memcpy(low.prompt, "low", 3);
+    low.prompt_len = 3;
+    memcpy(low.chosen, "c1", 2);
+    low.chosen_len = 2;
+    low.margin = 0.4;
+    HU_ASSERT_EQ(hu_dpo_record_pair(&col, &low), HU_OK);
+
+    hu_preference_pair_t high = {0};
+    memcpy(high.prompt, "high prompt", 11);
+    high.prompt_len = 11;
+    memcpy(high.chosen, "good", 4);
+    high.chosen_len = 4;
+    memcpy(high.rejected, "bad", 3);
+    high.rejected_len = 3;
+    high.margin = 0.9;
+    HU_ASSERT_EQ(hu_dpo_record_pair(&col, &high), HU_OK);
+
+    char *frag = NULL;
+    size_t frag_len = 0;
+    HU_ASSERT_EQ(hu_dpo_get_best_examples(&col, &alloc, 5, &frag, &frag_len), HU_OK);
+    HU_ASSERT_NOT_NULL(frag);
+    HU_ASSERT_TRUE(frag_len > 0);
+    HU_ASSERT_TRUE(strstr(frag, "Learned preferences") != NULL);
+    HU_ASSERT_TRUE(strstr(frag, "high prompt") != NULL);
+    HU_ASSERT_TRUE(strstr(frag, "GOOD") != NULL);
+    HU_ASSERT_TRUE(strstr(frag, "BAD") != NULL);
+    HU_ASSERT_TRUE(strstr(frag, "low") == NULL);
+
+    alloc.free(alloc.ctx, frag, frag_len + 1);
+
+    hu_dpo_collector_deinit(&col);
+    sqlite3_close(db);
+}
+
 static void dpo_max_pairs_ring_buffer(void) {
     hu_allocator_t alloc = hu_system_allocator();
     sqlite3 *db = NULL;
@@ -163,7 +237,10 @@ void run_dpo_tests(void) {
     HU_RUN_TEST(dpo_export_jsonl_format);
     HU_RUN_TEST(dpo_pair_count_accurate);
     HU_RUN_TEST(dpo_clear_removes_all);
+    HU_RUN_TEST(dpo_get_best_examples_invalid_args);
+    HU_RUN_TEST(dpo_get_best_examples_no_db_returns_empty);
 #ifdef HU_ENABLE_SQLITE
+    HU_RUN_TEST(dpo_get_best_examples_sqlite_orders_by_margin);
     HU_RUN_TEST(dpo_max_pairs_ring_buffer);
 #endif
     HU_RUN_TEST(dpo_null_collector_returns_error);

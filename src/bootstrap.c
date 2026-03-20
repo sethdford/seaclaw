@@ -652,6 +652,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             .pressure_compact = bi->cfg.agent.context_pressure_compact,
             .compact_target = bi->cfg.agent.context_compact_target,
             .llm_compiler_enabled = bi->cfg.agent.llm_compiler_enabled,
+            .mcts_planner_enabled = bi->cfg.agent.mcts_planner_enabled,
             .tree_of_thought = bi->cfg.agent.tree_of_thought,
             .constitutional_ai = bi->cfg.agent.constitutional_ai,
             .speculative_cache = bi->cfg.agent.speculative_cache,
@@ -742,7 +743,14 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                 bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;
                 bi->channels[ch_count].channel = &bi->channel_slots[ch_count];
                 bi->channels[ch_count].poll_fn = hu_imessage_poll;
-                bi->channels[ch_count].interval_ms = 3000;
+                {
+                    int poll_sec = cfg->channels.imessage.daemon.poll_interval_sec;
+                    if (poll_sec <= 0)
+                        poll_sec = cfg->channels.imessage.poll_interval_sec;
+                    if (poll_sec <= 0)
+                        poll_sec = 3;
+                    bi->channels[ch_count].interval_ms = (uint32_t)(poll_sec * 1000);
+                }
                 bi->channels[ch_count].last_poll_ms = 0;
                 bi->channel_destroys[ch_count] = destroy_imessage_wrap;
                 ch_count++;

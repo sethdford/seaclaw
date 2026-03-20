@@ -3,6 +3,7 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/security.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -116,5 +117,31 @@ void hu_visual_should_share(const hu_visual_entry_t *entry, const char *context,
 
 void hu_visual_entries_free(hu_allocator_t *alloc, hu_visual_entry_t *entries,
                              size_t count);
+
+/* ── Proactive outbound media (image URL / screenshot path) ─────────────── */
+
+typedef enum hu_visual_proactive_media_kind {
+    HU_VISUAL_MEDIA_NONE = 0,
+    HU_VISUAL_MEDIA_IMAGE_SEARCH,
+    HU_VISUAL_MEDIA_SCREENSHOT,
+} hu_visual_proactive_media_kind_t;
+
+/* Heuristic: should we attach media to the outbound send? Sets *out_kind and a static *out_reason. */
+bool hu_visual_should_send_media(const char *conversation_context, size_t context_len,
+                                 hu_visual_proactive_media_kind_t *out_kind,
+                                 const char **out_reason);
+
+/* Proactive-style governor: daily/weekly caps + minimum gap (mirrors hu_proactive_budget_t spirit). */
+bool hu_visual_proactive_media_governor_allow(uint64_t now_ms);
+void hu_visual_proactive_media_governor_record(uint64_t now_ms);
+
+/* Image: test → fixed example URL; else → DALL-E 3 URL when OPENAI_API_KEY is set, otherwise
+ * legacy DuckDuckGo image search URL. Prefer `image_generate` for in-turn generation. */
+hu_error_t hu_visual_search_image(hu_allocator_t *alloc, const char *query, size_t query_len,
+                                  char *out_url, size_t out_url_len);
+
+/* Screenshot: test → "/tmp/mock-screenshot.png"; else macOS → temp PNG via computer_use (policy required). */
+hu_error_t hu_visual_generate_screenshot(hu_allocator_t *alloc, hu_security_policy_t *policy,
+                                         char *out_path, size_t out_path_len);
 
 #endif

@@ -50,6 +50,10 @@ public final class ConnectionManager: ObservableObject {
     @Published public private(set) var tools: [ToolInfo] = []
     @Published public private(set) var recentActivity: [ActivityEvent] = []
     @Published public private(set) var healthStatus: HealthStatus = .unknown
+    /// Gateway process uptime when `health` returns `uptime_seconds`.
+    @Published public private(set) var uptimeSeconds: UInt64?
+    @Published public private(set) var channelCount: Int?
+    @Published public private(set) var toolCount: Int?
 
     private var connection: HumanConnection?
     private var eventHandlerStorage: ((String, [String: AnyCodable]?) -> Void)?
@@ -68,9 +72,14 @@ public final class ConnectionManager: ObservableObject {
                 DispatchQueue.main.async {
                     let connected = (state == .connected)
                     self?.isConnected = connected
-                    self?.latencyMs = connected ? 42 : nil
-                    self?.modelName = connected ? "claude-sonnet" : nil
-                    if !connected { self?.lastMessageTimestamp = nil }
+                    if connected {
+                        self?.fetchHealthStatus()
+                        self?.fetchRecentActivity()
+                    } else {
+                        self?.latencyMs = nil
+                        self?.modelName = nil
+                        self?.lastMessageTimestamp = nil
+                    }
                 }
             }
             conn.eventHandler = self.eventHandlerStorage
@@ -92,6 +101,9 @@ public final class ConnectionManager: ObservableObject {
                 self?.tools = []
                 self?.recentActivity = []
                 self?.healthStatus = .unknown
+                self?.uptimeSeconds = nil
+                self?.channelCount = nil
+                self?.toolCount = nil
             }
         }
     }
@@ -152,6 +164,20 @@ public final class ConnectionManager: ObservableObject {
         }
     }
 
+    /// `archived: true` moves the session to archived; `false` restores to active (gateway `sessions.patch` + `status`).
+    public func updateSessionArchive(key: String, archived: Bool) {
+        Task {
+            do {
+                let status = archived ? "archived" : "active"
+                _ = try await request(
+                    method: Methods.sessionsPatch,
+                    params: ["key": AnyCodable(key), "status": AnyCodable(status)]
+                )
+                fetchSessions()
+            } catch { /* ignore */ }
+        }
+    }
+
     public func fetchTools() {
         Task {
             do {
@@ -189,7 +215,10 @@ public final class ConnectionManager: ObservableObject {
                     return
                 }
                 let status = parseHealthStatus(payload)
-                await MainActor.run { healthStatus = status }
+                await MainActor.run {
+                    healthStatus = status
+                    applyHealthMetrics(payload)
+                }
             } catch {
                 await MainActor.run { healthStatus = .unknown }
             }
@@ -202,6 +231,8 @@ public final class ConnectionManager: ObservableObject {
         case .overview:
             if recentActivity.isEmpty { fetchRecentActivity() }
             fetchHealthStatus()
+            if sessions.isEmpty { fetchSessions() }
+            if tools.isEmpty { fetchTools() }
         case .sessions:
             if sessions.isEmpty { fetchSessions() }
         case .tools:
@@ -293,5 +324,45 @@ public final class ConnectionManager: ObservableObject {
         if s == "degraded" || s == "warning" { return .degraded }
         if s == "error" || s == "unhealthy" || s == "down" { return .unhealthy }
         return .unknown
+    }
+
+    private func applyHealthMetrics(_ payload: [String: AnyCodable]) {
+        if let u = payload["uptime_seconds"]?.value as? UInt64 {
+            uptimeSeconds = u
+        } else if let u = payload["uptime_seconds"]?.value as? Int {
+            uptimeSeconds = UInt64(max(0, u))
+        } else if let u = payload["uptime_seconds"]?.value as? Double {
+            uptimeSeconds = UInt64(max(0, u))
+        } else if let u = payload["uptime_seconds"]?.value as? NSNumber {
+            uptimeSeconds = u.uint64Value
+        }
+        if let c = payload["channel_count"]?.value as? Int {
+            channelCount = c
+        } else if let c = payload["channel_count"]?.value as? Double {
+            channelCount = Int(c)
+        } else if let c = payload["channel_count"]?.value as? NSNumber {
+            channelCount = c.intValue
+        }
+        if let t = payload["tool_count"]?.value as? Int {
+            toolCount = t
+        } else if let t = payload["tool_count"]?.value as? Double {
+            toolCount = Int(t)
+        } else if let t = payload["tool_count"]?.value as? NSNumber {
+            toolCount = t.intValue
+        }
+        if let ms = payload["latency_ms"]?.value as? Int {
+            latencyMs = ms
+        } else if let ms = payload["latency_ms"]?.value as? Double {
+            latencyMs = Int(ms)
+        } else if let ms = payload["latency_ms"]?.value as? NSNumber {
+            latencyMs = ms.intValue
+        }
+        if let m = payload["model"]?.value as? String, !m.isEmpty {
+            modelName = m
+        } else if let m = payload["default_model"]?.value as? String, !m.isEmpty {
+            modelName = m
+        } else if let m = payload["default_provider"]?.value as? String, !m.isEmpty {
+            modelName = m
+        }
     }
 }

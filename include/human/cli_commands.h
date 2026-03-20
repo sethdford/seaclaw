@@ -19,5 +19,6 @@ hu_error_t cmd_init(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv);
 #endif
 hu_error_t cmd_research(hu_allocator_t *alloc, int argc, char **argv);
+hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv);
 
 #endif /* HU_CLI_COMMANDS_H */

@@ -37,5 +37,10 @@ let package = Package(
             dependencies: ["HumanClient"],
             path: "Tests/HumanClientTests"
         ),
+        .testTarget(
+            name: "HumanChatUITests",
+            dependencies: ["HumanChatUI"],
+            path: "Tests/HumanChatUITests"
+        ),
     ]
 )

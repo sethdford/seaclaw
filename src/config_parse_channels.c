@@ -4,6 +4,28 @@
 #include "human/core/string.h"
 #include <string.h>
 
+static void parse_daemon_config(hu_allocator_t *a, hu_channel_daemon_config_t *dcfg,
+                                const hu_json_value_t *obj) {
+    if (!obj || obj->type != HU_JSON_OBJECT)
+        return;
+    hu_json_value_t *daemon_obj = hu_json_object_get(obj, "daemon");
+    if (!daemon_obj || daemon_obj->type != HU_JSON_OBJECT)
+        return;
+
+    const char *rm = hu_json_get_string(daemon_obj, "response_mode");
+    if (rm) {
+        if (dcfg->response_mode)
+            a->free(a->ctx, dcfg->response_mode, strlen(dcfg->response_mode) + 1);
+        dcfg->response_mode = hu_strdup(a, rm);
+    }
+    dcfg->user_response_window_sec =
+        (int)hu_json_get_number(daemon_obj, "user_response_window_sec",
+                                (double)dcfg->user_response_window_sec);
+    dcfg->poll_interval_sec =
+        (int)hu_json_get_number(daemon_obj, "poll_interval_sec", (double)dcfg->poll_interval_sec);
+    dcfg->voice_enabled = hu_json_get_bool(daemon_obj, "voice_enabled", dcfg->voice_enabled);
+}
+
 static void parse_email_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
     if (!obj || obj->type != HU_JSON_OBJECT)
         return;
@@ -118,6 +140,18 @@ static void parse_imessage_channel(hu_allocator_t *a, hu_config_t *cfg,
                     strlen(cfg->channels.imessage.response_mode) + 1);
         cfg->channels.imessage.response_mode = hu_strdup(a, rm);
     }
+
+    parse_daemon_config(a, &cfg->channels.imessage.daemon, obj);
+    if (!cfg->channels.imessage.daemon.response_mode && cfg->channels.imessage.response_mode)
+        cfg->channels.imessage.daemon.response_mode =
+            hu_strdup(a, cfg->channels.imessage.response_mode);
+    if (cfg->channels.imessage.daemon.user_response_window_sec == 0 &&
+        cfg->channels.imessage.user_response_window_sec > 0)
+        cfg->channels.imessage.daemon.user_response_window_sec =
+            cfg->channels.imessage.user_response_window_sec;
+    if (cfg->channels.imessage.daemon.poll_interval_sec == 0 &&
+        cfg->channels.imessage.poll_interval_sec > 0)
+        cfg->channels.imessage.daemon.poll_interval_sec = cfg->channels.imessage.poll_interval_sec;
 }
 
 static void parse_gmail_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -181,6 +215,7 @@ static void parse_telegram_channel(hu_allocator_t *a, hu_config_t *cfg,
                 t->allow_from[t->allow_from_count++] = hu_strdup(a, item->data.string.ptr);
         }
     }
+    parse_daemon_config(a, &t->daemon, val);
 }
 
 static void parse_discord_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -229,6 +264,7 @@ static void parse_discord_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_
             }
         }
     }
+    parse_daemon_config(a, &d->daemon, val);
 }
 
 static void parse_slack_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -260,6 +296,7 @@ static void parse_slack_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_js
                 sl->channel_ids[sl->channel_ids_count++] = hu_strdup(a, item->data.string.ptr);
         }
     }
+    parse_daemon_config(a, &sl->daemon, val);
 }
 
 static void parse_whatsapp_channel(hu_allocator_t *a, hu_config_t *cfg,
@@ -291,6 +328,7 @@ static void parse_whatsapp_channel(hu_allocator_t *a, hu_config_t *cfg,
             a->free(a->ctx, wa->verify_token, strlen(wa->verify_token) + 1);
         wa->verify_token = hu_strdup(a, s);
     }
+    parse_daemon_config(a, &wa->daemon, val);
 }
 
 static void parse_line_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {

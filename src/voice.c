@@ -385,6 +385,9 @@ tts_fail:
     "Transcribe the following audio exactly, word for word. " \
     "Output only the spoken words, nothing else. "            \
     "If the audio is silent or unintelligible, output an empty string."
+#define HU_VOICE_GEMINI_VIDEO_PROMPT                                                   \
+    "Describe this video: summarize visible scenes, actions, people or objects, and "  \
+    "any readable text. Be concise but complete."
 
 hu_error_t hu_voice_stt_gemini(hu_allocator_t *alloc, const hu_voice_config_t *config,
                                const char *audio_base64, size_t audio_base64_len,
@@ -446,12 +449,16 @@ hu_error_t hu_voice_stt_gemini(hu_allocator_t *alloc, const hu_voice_config_t *c
         alloc->free(alloc->ctx, url, url_cap);
         return HU_ERR_OUT_OF_MEMORY;
     }
+    const char *prompt = HU_VOICE_GEMINI_PROMPT;
+    if (mime_type && strncmp(mime_type, "video/", 6) == 0)
+        prompt = HU_VOICE_GEMINI_VIDEO_PROMPT;
+
     n = snprintf(json, json_cap,
                  "{\"contents\":[{\"parts\":["
                  "{\"text\":\"%s\"},"
                  "{\"inline_data\":{\"mime_type\":\"%s\",\"data\":\"%.*s\"}}"
                  "]}]}",
-                 HU_VOICE_GEMINI_PROMPT, mime_type, (int)audio_base64_len, audio_base64);
+                 prompt, mime_type, (int)audio_base64_len, audio_base64);
     if (n < 0 || (size_t)n >= json_cap) {
         alloc->free(alloc->ctx, json, json_cap);
         alloc->free(alloc->ctx, url, url_cap);

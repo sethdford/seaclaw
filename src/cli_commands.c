@@ -1,5 +1,7 @@
 #include "human/cli_commands.h"
 #include "human/bootstrap.h"
+#include "human/calibration.h"
+#include "human/calibration/clone.h"
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/eval.h"
@@ -586,12 +588,13 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv) {
 /* ── eval (run/list/compare) ────────────────────────────────────────────── */
 hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
-        printf("Usage: human eval <run|list|compare|dashboard|history|benchmark> [args]\n");
+        printf("Usage: human eval <run|list|compare|dashboard|history|trend|benchmark> [args]\n");
         printf("  run <suite.json>     Load and run an eval suite, print report JSON\n");
         printf("  list                 List available eval suites in eval_suites/\n");
         printf("  compare <r1> <r2>    Compare two run report JSON files\n");
         printf("  dashboard [r1.json]  Render terminal dashboard from run report(s)\n");
         printf("  history [--last N] [--benchmark X]  Show eval history from SQLite\n");
+        printf("  trend [--last N]     Pass-rate trend (oldest→newest) from eval history\n");
         printf("  benchmark <gaia|swebench|tooluse> <suite.json>  Load and run a benchmark\n");
         return HU_OK;
     }
@@ -761,6 +764,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         printf("eval_suites/reasoning_basic.json\n");
         printf("eval_suites/tool_use_basic.json\n");
         printf("eval_suites/coding_basic.json\n");
+        printf("eval_suites/fidelity.json\n");
+        printf("eval_suites/intelligence.json\n");
         return HU_OK;
 #else
         {
@@ -1039,6 +1044,72 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
 #endif
     }
 
+    if (strcmp(sub, "trend") == 0) {
+#ifdef HU_ENABLE_SQLITE
+        size_t max_runs = 30;
+        for (int a = 3; a < argc; a++) {
+            if (strcmp(argv[a], "--last") == 0 && a + 1 < argc) {
+                max_runs = (size_t)atoi(argv[++a]);
+                if (max_runs == 0 || max_runs > 200)
+                    max_runs = 30;
+            }
+        }
+        hu_config_t cfg;
+        hu_error_t cfg_err = hu_config_load(alloc, &cfg);
+        if (cfg_err != HU_OK) {
+            fprintf(stderr, "eval trend: config error\n");
+            return cfg_err;
+        }
+        const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
+        hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
+        sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
+        if (!db) {
+            fprintf(stderr, "eval trend: no SQLite backend\n");
+            if (mem.vtable && mem.vtable->deinit)
+                mem.vtable->deinit(mem.ctx);
+            hu_config_deinit(&cfg);
+            return HU_ERR_NOT_FOUND;
+        }
+        (void)hu_eval_init_tables(db);
+        hu_eval_run_t *runs = alloc->alloc(alloc->ctx, max_runs * sizeof(hu_eval_run_t));
+        if (!runs) {
+            if (mem.vtable && mem.vtable->deinit)
+                mem.vtable->deinit(mem.ctx);
+            hu_config_deinit(&cfg);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        memset(runs, 0, max_runs * sizeof(hu_eval_run_t));
+        size_t count = 0;
+        hu_error_t err = hu_eval_load_history(alloc, db, runs, max_runs, &count);
+        if (err == HU_OK && count > 0) {
+            printf("Eval pass-rate trend (oldest → newest, %zu runs)\n", count);
+            printf("%-20s %8s %8s\n", "Suite", "Rate%", "Δ");
+            printf("%-20s %8s %8s\n", "----", "-----", "--");
+            double prev = -1.0;
+            for (size_t rev = count; rev > 0; rev--) {
+                size_t i = rev - 1;
+                double rate = runs[i].pass_rate * 100.0;
+                double delta = (prev < 0) ? 0.0 : (rate - prev);
+                printf("%-20s %7.1f%% %+7.1f\n",
+                       runs[i].suite_name ? runs[i].suite_name : "-", rate, delta);
+                prev = rate;
+            }
+        } else {
+            printf("No eval history for trend.\n");
+        }
+        for (size_t i = 0; i < count; i++)
+            hu_eval_run_free(alloc, &runs[i]);
+        alloc->free(alloc->ctx, runs, max_runs * sizeof(hu_eval_run_t));
+        if (mem.vtable && mem.vtable->deinit)
+            mem.vtable->deinit(mem.ctx);
+        hu_config_deinit(&cfg);
+        return err;
+#else
+        fprintf(stderr, "eval trend: SQLite not enabled\n");
+        return HU_ERR_NOT_SUPPORTED;
+#endif
+    }
+
     if (strcmp(sub, "benchmark") == 0) {
         if (argc < 5) {
             fprintf(stderr, "Usage: human eval benchmark <gaia|swebench|tooluse> <suite.json>\n");
@@ -1149,6 +1220,66 @@ hu_error_t cmd_research(hu_allocator_t *alloc, int argc, char **argv) {
     return HU_ERR_NOT_SUPPORTED;
 }
 #endif
+
+/* ── calibrate ─────────────────────────────────────────────────────────── */
+hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv) {
+    if (argc < 3) {
+        printf("Usage: human calibrate <run|clone> [args]\n");
+        printf("  run [db_path] [contact]  - Analyze messaging patterns and produce recommendations\n");
+        printf("  clone [db_path] [contact] [persona_path] - Extract behavioral patterns and update persona\n");
+        return HU_OK;
+    }
+    const char *sub = argv[2];
+
+    if (strcmp(sub, "run") == 0) {
+        const char *db_path = argc >= 4 ? argv[3] : NULL;
+        const char *contact = argc >= 5 ? argv[4] : NULL;
+        char *recommendations = NULL;
+        hu_error_t err = hu_calibrate(alloc, db_path, contact, &recommendations);
+        if (err != HU_OK) {
+            fprintf(stderr, "Calibration failed: %d\n", (int)err);
+            return err;
+        }
+        if (recommendations) {
+            printf("%s\n", recommendations);
+            alloc->free(alloc->ctx, recommendations, strlen(recommendations) + 1);
+        }
+        return HU_OK;
+    }
+
+    if (strcmp(sub, "clone") == 0) {
+        const char *db_path = argc >= 4 ? argv[3] : NULL;
+        const char *contact = argc >= 5 ? argv[4] : NULL;
+        const char *persona_path = argc >= 6 ? argv[5] : NULL;
+
+        hu_clone_patterns_t patterns;
+        memset(&patterns, 0, sizeof(patterns));
+        hu_error_t err = hu_behavioral_clone_extract(alloc, db_path, contact, &patterns);
+        if (err != HU_OK) {
+            fprintf(stderr, "Clone extraction failed: %d\n", (int)err);
+            return err;
+        }
+
+        printf("Behavioral patterns extracted:\n");
+        printf("  Initiation frequency: %.2f/day\n", patterns.initiation_frequency_per_day);
+        printf("  Double-text probability: %.2f\n", patterns.double_text_probability);
+        printf("  Topic starters: %zu\n", patterns.topic_starter_count);
+        printf("  Sign-offs: %zu\n", patterns.sign_off_count);
+
+        if (persona_path) {
+            err = hu_behavioral_clone_update_persona(alloc, &patterns, persona_path);
+            if (err != HU_OK) {
+                fprintf(stderr, "Persona update failed: %d\n", (int)err);
+                return err;
+            }
+            printf("Persona recommendations written to: %s\n", persona_path);
+        }
+        return HU_OK;
+    }
+
+    fprintf(stderr, "Unknown calibrate subcommand: %s\n", sub);
+    return HU_ERR_INVALID_ARGUMENT;
+}
 
 /* ── feed ──────────────────────────────────────────────────────────────── */
 #if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)

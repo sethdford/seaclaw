@@ -3,7 +3,7 @@ import HumanProtocol
 
 /// WebSocket client for the Human gateway control protocol.
 /// Uses URLSessionWebSocketTask with reconnection support.
-public final class HumanConnection {
+public final class HumanConnection: @unchecked Sendable {
     public enum ConnectionState: Equatable {
         case disconnected
         case connecting
@@ -26,7 +26,14 @@ public final class HumanConnection {
     private let queue = DispatchQueue(label: "com.human.connection")
     private var reconnectWorkItem: DispatchWorkItem?
     private var pendingRequests: [String: CheckedContinuation<ControlResponse, Error>] = [:]
+    private var requestTimeouts: [String: DispatchWorkItem] = [:]
     private let pendingLock = NSLock()
+    private var reconnectAttempt: UInt = 0
+    private var pingWorkItem: DispatchWorkItem?
+    /// RPC wait timeout (matches web client default).
+    public static var requestTimeoutSeconds: TimeInterval = 10
+    private static let maxReconnectDelay: TimeInterval = 30
+    private static let baseReconnectDelay: TimeInterval = 3
 
     public init(url: URL) {
         self.url = url
@@ -47,11 +54,13 @@ public final class HumanConnection {
     /// Disconnect and cancel reconnection.
     public func disconnect() {
         queue.async { [weak self] in
+            self?.cancelPingSchedule()
             self?.reconnectWorkItem?.cancel()
             self?.reconnectWorkItem = nil
             self?.task?.cancel(with: .goingAway, reason: nil)
             self?.task = nil
             self?.failPendingRequests()
+            self?.reconnectAttempt = 0
             self?.state = .disconnected
         }
     }
@@ -64,23 +73,23 @@ public final class HumanConnection {
 
     /// Register a push token with the gateway for push notifications.
     public func registerPushToken(token: String) {
-        let payload: [String: Any] = [
-            "action": "push.register",
-            "token": token,
-            "provider": "apns"
+        let id = "push-\(UUID().uuidString)"
+        let params: [String: AnyCodable] = [
+            "token": AnyCodable(token),
+            "provider": AnyCodable("apns")
         ]
-        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+        let req = ControlRequest(id: id, method: Methods.pushRegister, params: params)
+        guard let data = try? JSONEncoder().encode(req),
               let text = String(data: data, encoding: .utf8) else { return }
         sendMessage(text)
     }
 
     /// Unregister a push token from the gateway.
     public func unregisterPushToken(token: String) {
-        let payload: [String: Any] = [
-            "action": "push.unregister",
-            "token": token
-        ]
-        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+        let id = "pushu-\(UUID().uuidString)"
+        let params: [String: AnyCodable] = ["token": AnyCodable(token)]
+        let req = ControlRequest(id: id, method: Methods.pushUnregister, params: params)
+        guard let data = try? JSONEncoder().encode(req),
               let text = String(data: data, encoding: .utf8) else { return }
         sendMessage(text)
     }
@@ -100,11 +109,26 @@ public final class HumanConnection {
         return try await withCheckedThrowingContinuation { cont in
             pendingLock.lock()
             pendingRequests[id] = cont
+            let timeout = DispatchWorkItem { [weak self] in
+                guard let self = self else { return }
+                self.pendingLock.lock()
+                self.requestTimeouts.removeValue(forKey: id)
+                guard let c = self.pendingRequests.removeValue(forKey: id) else {
+                    self.pendingLock.unlock()
+                    return
+                }
+                self.pendingLock.unlock()
+                c.resume(throwing: HumanConnectionError.timeout)
+            }
+            requestTimeouts[id] = timeout
             pendingLock.unlock()
+            queue.asyncAfter(deadline: .now() + Self.requestTimeoutSeconds, execute: timeout)
 
             task?.send(.string(text)) { [weak self] error in
                 if let error = error {
                     self?.pendingLock.lock()
+                    self?.requestTimeouts[id]?.cancel()
+                    self?.requestTimeouts.removeValue(forKey: id)
                     _ = self?.pendingRequests.removeValue(forKey: id)
                     self?.pendingLock.unlock()
                     cont.resume(throwing: error)
@@ -116,6 +140,7 @@ public final class HumanConnection {
     // MARK: - Private
 
     private func _connect() {
+        if state == .connecting, task != nil { return }
         state = .connecting
         task?.cancel(with: .goingAway, reason: nil)
         var request = URLRequest(url: url)
@@ -167,15 +192,25 @@ public final class HumanConnection {
               let type = json["type"] as? String else { return }
 
         switch type {
+        case "hello-ok":
+            queue.async { [weak self] in
+                self?.reconnectAttempt = 0
+                self?.state = .connected
+                self?.schedulePing()
+            }
         case "res":
             if let payload = json["payload"] as? [String: Any],
                payload["type"] as? String == "hello-ok" {
                 queue.async { [weak self] in
+                    self?.reconnectAttempt = 0
                     self?.state = .connected
+                    self?.schedulePing()
                 }
             }
             if let id = json["id"] as? String {
                 pendingLock.lock()
+                requestTimeouts[id]?.cancel()
+                requestTimeouts.removeValue(forKey: id)
                 if let cont = pendingRequests.removeValue(forKey: id) {
                     pendingLock.unlock()
                     do {
@@ -207,6 +242,8 @@ public final class HumanConnection {
 
     private func failPendingRequests() {
         pendingLock.lock()
+        for (_, tw) in requestTimeouts { tw.cancel() }
+        requestTimeouts.removeAll()
         let pending = pendingRequests
         pendingRequests.removeAll()
         pendingLock.unlock()
@@ -215,13 +252,35 @@ public final class HumanConnection {
         }
     }
 
+    private func cancelPingSchedule() {
+        pingWorkItem?.cancel()
+        pingWorkItem = nil
+    }
+
+    private func schedulePing() {
+        cancelPingSchedule()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            if self.state == .connected {
+                self.task?.sendPing { _ in }
+            }
+            self.schedulePing()
+        }
+        pingWorkItem = work
+        queue.asyncAfter(deadline: .now() + 25, execute: work)
+    }
+
     private func scheduleReconnect() {
         reconnectWorkItem?.cancel()
+        reconnectAttempt += 1
+        let exp = min(Self.maxReconnectDelay, Self.baseReconnectDelay * pow(2.0, Double(min(reconnectAttempt, 4))))
+        let jitter = Double.random(in: 0...0.5)
+        let delay = exp + jitter
         let work = DispatchWorkItem { [weak self] in
             self?._connect()
         }
         reconnectWorkItem = work
-        queue.asyncAfter(deadline: .now() + 3, execute: work)
+        queue.asyncAfter(deadline: .now() + delay, execute: work)
     }
 }
 
@@ -229,4 +288,5 @@ public enum HumanConnectionError: Error {
     case notConnected
     case encodingFailed
     case disconnected
+    case timeout
 }

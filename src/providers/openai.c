@@ -655,7 +655,7 @@ static hu_error_t openai_stream_ws(hu_openai_ctx_t *oc, hu_allocator_t *alloc, c
     for (;;) {
         char *frame = NULL;
         size_t frame_len = 0;
-        err = hu_ws_recv(ws, alloc, &frame, &frame_len);
+        err = hu_ws_recv(ws, alloc, &frame, &frame_len, -1);
         if (err != HU_OK || !frame)
             break;
 

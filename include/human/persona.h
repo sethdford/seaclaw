@@ -330,6 +330,8 @@ typedef struct hu_persona {
     char *identity;
     char **traits;
     size_t traits_count;
+    char **principles; /* Constitutional AI principles */
+    size_t principles_count;
     char **preferred_vocab;
     size_t preferred_vocab_count;
     char **avoided_vocab;
@@ -408,6 +410,14 @@ typedef struct hu_persona {
     size_t core_values_count;
     hu_relationship_t relationships[16];
     size_t relationships_count;
+
+    /* Behavioral calibration data (from behavioral_calibration JSON or hu_behavioral_clone) */
+    double avg_message_length; /* 0 = not set */
+    double emoji_frequency;    /* 0.0–1.0, fraction of messages with emoji */
+    double avg_response_time_sec;
+    char **signature_phrases;
+    size_t signature_phrases_count;
+    bool calibrated;
 } hu_persona_t;
 
 /* Returns persona base directory path in buf (either HU_PERSONA_DIR or ~/.human/personas).

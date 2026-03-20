@@ -716,6 +716,7 @@ list(APPEND HU_CORE_SOURCES
     src/tools/code_sandbox.c
     src/tools/computer_use.c
     src/tools/image_gen.c
+    src/tools/visual_grounding.c
     src/tools/browser_use.c
     src/tools/gui_agent.c
     src/tools/lsp.c
@@ -2027,6 +2028,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_compaction_hierarchical.c
     tests/test_computer_use.c
     tests/test_image_gen.c
+    tests/test_visual_grounding.c
     tests/test_browser_use.c
     tests/test_gui_agent.c
     tests/test_lsp.c

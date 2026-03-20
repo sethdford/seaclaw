@@ -136,6 +136,36 @@ static void test_persona_load_json_basic(void) {
     hu_persona_deinit(&alloc, &p);
 }
 
+static void test_persona_behavioral_calibration_load_and_prompt(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{"
+                       "\"name\":\"cal\","
+                       "\"core\":{\"identity\":\"x\",\"traits\":[\"kind\"]},"
+                       "\"behavioral_calibration\":{"
+                       "\"avg_message_length\":120,"
+                       "\"emoji_frequency\":0.25,"
+                       "\"avg_response_time_sec\":90,"
+                       "\"signature_phrases\":[\"on it\",\"ttyl\"],"
+                       "\"calibrated\":true}"
+                       "}";
+    hu_persona_t p = {0};
+    HU_ASSERT_EQ(hu_persona_load_json(&alloc, json, strlen(json), &p), HU_OK);
+    HU_ASSERT_TRUE(p.calibrated);
+    HU_ASSERT_FLOAT_EQ(p.avg_message_length, 120.0, 0.01);
+    HU_ASSERT_FLOAT_EQ(p.emoji_frequency, 0.25, 0.01);
+    HU_ASSERT_FLOAT_EQ(p.avg_response_time_sec, 90.0, 0.01);
+    HU_ASSERT_EQ(p.signature_phrases_count, 2u);
+    char *prompt = NULL;
+    size_t plen = 0;
+    HU_ASSERT_EQ(hu_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &prompt, &plen), HU_OK);
+    HU_ASSERT_NOT_NULL(prompt);
+    HU_ASSERT_TRUE(strstr(prompt, "Communication style calibration") != NULL);
+    HU_ASSERT_TRUE(strstr(prompt, "120") != NULL);
+    HU_ASSERT_TRUE(strstr(prompt, "on it") != NULL);
+    alloc.free(alloc.ctx, prompt, plen + 1);
+    hu_persona_deinit(&alloc, &p);
+}
+
 static void test_persona_load_json_empty(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_persona_t p = {0};
@@ -742,6 +772,74 @@ static void test_persona_build_prompt_core(void) {
     HU_ASSERT_NOT_NULL(strstr(out, "direct"));
     HU_ASSERT_NOT_NULL(strstr(out, "Keep it short"));
     alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_load_json_parses_core_principles(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{"
+                       "  \"version\": 1,"
+                       "  \"name\": \"p\","
+                       "  \"core\": {"
+                       "    \"identity\": \"Test\","
+                       "    \"traits\": [\"calm\"],"
+                       "    \"principles\": [\"Be helpful\", \"Admit uncertainty\"]"
+                       "  }"
+                       "}";
+
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(p.principles_count, 2u);
+    HU_ASSERT_NOT_NULL(p.principles);
+    HU_ASSERT_STR_EQ(p.principles[0], "Be helpful");
+    HU_ASSERT_STR_EQ(p.principles[1], "Admit uncertainty");
+    hu_persona_deinit(&alloc, &p);
+}
+
+static void test_persona_build_prompt_includes_principles_section(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char *principles[] = {"Rule one", "Rule two"};
+    hu_persona_t p = {
+        .name = "n",
+        .name_len = 1,
+        .identity = "ID",
+        .principles = principles,
+        .principles_count = 2,
+    };
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(strstr(out, "## Principles"));
+    HU_ASSERT_NOT_NULL(strstr(out, "- Rule one"));
+    HU_ASSERT_NOT_NULL(strstr(out, "- Rule two"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_principles_empty_array_no_prompt_section(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{"
+                       "  \"version\": 1,"
+                       "  \"name\": \"e\","
+                       "  \"core\": {"
+                       "    \"identity\": \"X\","
+                       "    \"traits\": [],"
+                       "    \"principles\": []"
+                       "  }"
+                       "}";
+
+    hu_persona_t p = {0};
+    HU_ASSERT_EQ(hu_persona_load_json(&alloc, json, strlen(json), &p), HU_OK);
+    HU_ASSERT_EQ(p.principles_count, 0u);
+    HU_ASSERT_NULL(p.principles);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    HU_ASSERT_EQ(hu_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &out, &out_len), HU_OK);
+    HU_ASSERT_NULL(strstr(out, "## Principles"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_persona_deinit(&alloc, &p);
 }
 
 static void test_agent_persona_prompt_injected(void) {
@@ -3487,6 +3585,7 @@ void run_persona_tests(void) {
     HU_RUN_TEST(test_persona_find_overlay_not_found);
     HU_RUN_TEST(test_persona_deinit_null_safe);
     HU_RUN_TEST(test_persona_load_json_basic);
+    HU_RUN_TEST(test_persona_behavioral_calibration_load_and_prompt);
     HU_RUN_TEST(test_persona_load_json_empty);
     HU_RUN_TEST(test_persona_load_json_phase6_fields);
     HU_RUN_TEST(test_persona_load_json_minimal_phase6_defaults);
@@ -3495,6 +3594,9 @@ void run_persona_tests(void) {
     HU_RUN_TEST(test_spawn_config_has_persona);
     HU_RUN_TEST(test_config_persona_field);
     HU_RUN_TEST(test_persona_build_prompt_core);
+    HU_RUN_TEST(test_persona_load_json_parses_core_principles);
+    HU_RUN_TEST(test_persona_build_prompt_includes_principles_section);
+    HU_RUN_TEST(test_persona_principles_empty_array_no_prompt_section);
     HU_RUN_TEST(test_persona_prompt_respects_size_cap);
     HU_RUN_TEST(test_persona_build_prompt_includes_examples);
     HU_RUN_TEST(test_persona_prompt_with_channel_overlay);

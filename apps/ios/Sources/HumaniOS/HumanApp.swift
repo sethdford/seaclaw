@@ -25,6 +25,13 @@ struct HumanApp: App {
         switch url.host {
         case "chat":
             NotificationCenter.default.post(name: .navigateToTab, object: nil, userInfo: ["tab": AppTab.chat])
+            if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+               let q = components.queryItems?.first(where: { $0.name == "message" })?.value,
+               !q.isEmpty {
+                UserDefaults.standard.set(q, forKey: "Human.pendingChatMessage")
+            }
+        case "overview":
+            NotificationCenter.default.post(name: .navigateToTab, object: nil, userInfo: ["tab": AppTab.overview])
         case "settings":
             NotificationCenter.default.post(name: .navigateToTab, object: nil, userInfo: ["tab": AppTab.settings])
         case "sessions":

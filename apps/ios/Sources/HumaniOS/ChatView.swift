@@ -39,6 +39,12 @@ struct ChatView: View {
                         handleEvent(event, payload: payload)
                     }
                     connectionManager.connect()
+                    if let pending = UserDefaults.standard.string(forKey: "Human.pendingChatMessage"),
+                       !pending.isEmpty {
+                        UserDefaults.standard.removeObject(forKey: "Human.pendingChatMessage")
+                        inputText = pending
+                        isInputFocused = true
+                    }
                 }
         }
     }

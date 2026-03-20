@@ -75,7 +75,7 @@ hu_error_t hu_synth_run_ws(hu_allocator_t *alloc, const hu_synth_config_t *cfg,
             }
             char *rd = NULL;
             size_t rl = 0;
-            err = hu_ws_recv(ws, alloc, &rd, &rl);
+            err = hu_ws_recv(ws, alloc, &rd, &rl, -1);
             if (err != HU_OK) {
                 v = HU_SYNTH_ERROR;
                 break;

@@ -29,6 +29,7 @@ data class SessionSummary(
     val label: String,
     val turnCount: Int,
     val lastActive: Long,
+    val archived: Boolean = false,
 )
 
 @Immutable
@@ -84,6 +85,9 @@ class GatewayClient {
     private val _overviewLoading = MutableStateFlow(false)
     val overviewLoading: StateFlow<Boolean> = _overviewLoading.asStateFlow()
 
+    private val _lastError = MutableStateFlow<String?>(null)
+    val lastError: StateFlow<String?> = _lastError.asStateFlow()
+
     /** Connect only when needed (e.g. when Chat tab is selected). Idempotent. */
     fun connectIfNeeded(url: String) {
         if (_state.value == ConnectionState.CONNECTING || _state.value == ConnectionState.CONNECTED) return
@@ -100,7 +104,10 @@ class GatewayClient {
         val request = Request.Builder().url(wsUrl).build()
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                scope.launch { _state.value = ConnectionState.CONNECTED }
+                scope.launch {
+                    _lastError.value = null
+                    _state.value = ConnectionState.CONNECTED
+                }
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -120,12 +127,14 @@ class GatewayClient {
                                 val list = mutableListOf<SessionSummary>()
                                 for (i in 0 until sessionsArr.length()) {
                                     val o = sessionsArr.optJSONObject(i) ?: continue
+                                    val st = o.optString("status", "active")
                                     list.add(
                                         SessionSummary(
                                             key = o.optString("key", ""),
                                             label = o.optString("label", "Untitled"),
                                             turnCount = o.optInt("turn_count", 0),
                                             lastActive = (o.optDouble("last_active", 0.0) * 1000).toLong(),
+                                            archived = st.equals("archived", ignoreCase = true),
                                         ),
                                     )
                                 }
@@ -170,10 +179,15 @@ class GatewayClient {
                                 }
                                 _tools.value = list
                             }
-                            if (result.has("uptime_secs")) {
+                            if (result.has("status") || result.has("uptime_seconds") || result.has("uptime_secs")) {
+                                val up = when {
+                                    result.has("uptime_seconds") -> result.optLong("uptime_seconds", 0L)
+                                    result.has("uptime_secs") -> result.optLong("uptime_secs", 0L)
+                                    else -> 0L
+                                }
                                 _healthStatus.value = HealthStatus(
                                     status = result.optString("status", "unknown"),
-                                    uptimeSecs = result.optLong("uptime_secs", 0),
+                                    uptimeSecs = up,
                                 )
                             }
                         } else if (type == "event") {
@@ -187,7 +201,10 @@ class GatewayClient {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                scope.launch { _state.value = ConnectionState.DISCONNECTED }
+                scope.launch {
+                    _lastError.value = t.message ?: "Connection failed"
+                    _state.value = ConnectionState.DISCONNECTED
+                }
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
@@ -216,6 +233,11 @@ class GatewayClient {
     /** Fetch sessions list. Updates _sessions when response received. */
     fun fetchSessions() {
         send("sessions.list", emptyMap())
+    }
+
+    fun setSessionArchived(key: String, archived: Boolean) {
+        val status = if (archived) "archived" else "active"
+        send("sessions.patch", mapOf("key" to key, "status" to status))
     }
 
     /** Fetch tools catalog. Updates _tools when response received. */

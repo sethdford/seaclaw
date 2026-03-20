@@ -18,8 +18,9 @@ hu_error_t hu_ws_connect(hu_allocator_t *alloc, const char *url, hu_ws_client_t 
 
 hu_error_t hu_ws_send(hu_ws_client_t *ws, const char *data, size_t data_len);
 
+/* timeout_ms: -1 = block until a data frame arrives; 0 = poll once; >0 = wait up to N ms per frame */
 hu_error_t hu_ws_recv(hu_ws_client_t *ws, hu_allocator_t *alloc, char **data_out,
-                      size_t *data_len_out);
+                      size_t *data_len_out, int timeout_ms);
 
 void hu_ws_close(hu_ws_client_t *ws, hu_allocator_t *alloc);
 

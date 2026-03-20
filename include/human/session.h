@@ -3,6 +3,7 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -24,6 +25,7 @@ typedef struct hu_session {
     int64_t created_at;
     int64_t last_active;
     uint64_t turn_count;
+    bool archived;
     hu_session_message_t *messages;
     size_t message_count;
     size_t message_cap;
@@ -35,6 +37,7 @@ typedef struct hu_session_summary {
     int64_t created_at;
     int64_t last_active;
     uint64_t turn_count;
+    bool archived;
 } hu_session_summary_t;
 
 typedef struct hu_session_entry {
@@ -69,6 +72,9 @@ hu_session_summary_t *hu_session_list(hu_session_manager_t *mgr, hu_allocator_t 
 hu_error_t hu_session_delete(hu_session_manager_t *mgr, const char *session_key);
 
 hu_error_t hu_session_patch(hu_session_manager_t *mgr, const char *session_key, const char *label);
+
+/* Mark session archived (excluded from default lists in UIs that filter). */
+hu_error_t hu_session_set_archived(hu_session_manager_t *mgr, const char *session_key, bool archived);
 
 hu_error_t hu_session_save(hu_session_manager_t *mgr, const char *path);
 hu_error_t hu_session_load(hu_session_manager_t *mgr, const char *path);

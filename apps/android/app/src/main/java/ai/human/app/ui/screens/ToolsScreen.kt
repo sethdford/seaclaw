@@ -54,7 +54,7 @@ fun ToolsScreen(
     val reducedMotion = isReducedMotionEnabled()
     val categories = tools.groupBy { it.category }.map { (title, list) -> title to list }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(connectionState) {
         if (connectionState == ConnectionState.CONNECTED) {
             gateway.fetchTools()
         }

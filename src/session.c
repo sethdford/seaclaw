@@ -2,6 +2,7 @@
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/util.h"
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -243,6 +244,16 @@ hu_error_t hu_session_patch(hu_session_manager_t *mgr, const char *session_key, 
     return HU_OK;
 }
 
+hu_error_t hu_session_set_archived(hu_session_manager_t *mgr, const char *session_key, bool archived) {
+    if (!mgr || !session_key)
+        return HU_ERR_INVALID_ARGUMENT;
+    hu_session_t *s = find_session(mgr, session_key);
+    if (!s)
+        return HU_ERR_NOT_FOUND;
+    s->archived = archived;
+    return HU_OK;
+}
+
 static void json_esc(FILE *f, const char *s) {
     for (; s && *s; s++) {
         if (*s == '"')
@@ -284,9 +295,9 @@ hu_error_t hu_session_save(hu_session_manager_t *mgr, const char *path) {
             json_esc(f, s->label);
             fprintf(f,
                     "\",\"created_at\":%lld,\"last_active\":%lld,"
-                    "\"turn_count\":%llu,\"messages\":[",
+                    "\"turn_count\":%llu,\"archived\":%s,\"messages\":[",
                     (long long)s->created_at, (long long)s->last_active,
-                    (unsigned long long)s->turn_count);
+                    (unsigned long long)s->turn_count, s->archived ? "true" : "false");
             for (size_t m = 0; m < s->message_count; m++) {
                 if (m > 0)
                     fputc(',', f);
@@ -356,6 +367,7 @@ hu_error_t hu_session_load(hu_session_manager_t *mgr, const char *path) {
         s->created_at = (int64_t)hu_json_get_number(item, "created_at", 0);
         s->last_active = (int64_t)hu_json_get_number(item, "last_active", 0);
         s->turn_count = (uint64_t)hu_json_get_number(item, "turn_count", 0);
+        s->archived = hu_json_get_bool(item, "archived", false);
         hu_json_value_t *msgs = hu_json_object_get(item, "messages");
         if (msgs && msgs->type == HU_JSON_ARRAY) {
             for (size_t m = 0; m < msgs->data.array.len; m++) {

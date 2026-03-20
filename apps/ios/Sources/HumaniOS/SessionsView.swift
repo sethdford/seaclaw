@@ -94,7 +94,7 @@ struct SessionsView: View {
 #if os(iOS)
                             HUTokens.Haptic.light.trigger()
 #endif
-                            connectionManager.fetchSessions()
+                            connectionManager.updateSessionArchive(key: session.id, archived: true)
                         } label: {
                             Label("Archive", systemImage: "archivebox")
                         }
@@ -150,7 +150,7 @@ struct SessionsView: View {
 #if os(iOS)
                                     HUTokens.Haptic.light.trigger()
 #endif
-                                    connectionManager.fetchSessions()
+                                    connectionManager.updateSessionArchive(key: session.id, archived: false)
                                 } label: {
                                     Label("Unarchive", systemImage: "archivebox.fill")
                                 }

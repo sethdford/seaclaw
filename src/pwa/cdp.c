@@ -192,7 +192,7 @@ static hu_error_t cdp_send_and_recv(hu_cdp_session_t *s, const char *method,
     for (int tries = 0; tries < 30; tries++) {
         char *data = NULL;
         size_t data_len = 0;
-        err = hu_ws_recv(s->ws, s->alloc, &data, &data_len);
+        err = hu_ws_recv(s->ws, s->alloc, &data, &data_len, -1);
         if (err != HU_OK)
             return err;
         if (!data)

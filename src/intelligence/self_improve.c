@@ -11,9 +11,14 @@
 #include "human/core/slice.h"
 #include "human/core/string.h"
 #include <sqlite3.h>
+#include <errno.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+#include "human/eval.h"
 
 #define PATCH_TEXT_MAX 2048
 #define TOOL_NAME_MAX  128
@@ -672,6 +677,351 @@ hu_error_t hu_self_improve_kept_patch_count(hu_self_improve_t *engine, size_t *o
         *out = (size_t)sqlite3_column_int64(stmt, 0);
     sqlite3_finalize(stmt);
     return HU_OK;
+}
+
+/* --- Closed-loop eval → weakness → patch → re-eval → keep/rollback --- */
+
+static hu_error_t ensure_eval_patches_table(sqlite3 *db) {
+    const char *ddl =
+        "CREATE TABLE IF NOT EXISTS eval_patches("
+        "id INTEGER PRIMARY KEY, weakness_type TEXT, task_id TEXT, "
+        "patch_text TEXT, applied INTEGER DEFAULT 0, "
+        "pass_rate_before REAL, pass_rate_after REAL, "
+        "kept INTEGER DEFAULT 0, created_at INTEGER)";
+    if (sqlite3_exec(db, ddl, NULL, NULL, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+    return HU_OK;
+}
+
+static const hu_weakness_t *pick_weakest_weakness(hu_allocator_t *alloc,
+                                                  const hu_weakness_report_t *report,
+                                                  const hu_eval_run_t *run,
+                                                  const hu_eval_suite_t *suite) {
+    if (!report || report->count == 0)
+        return NULL;
+
+    hu_weakness_summary_t summaries[8];
+    size_t nsum = 0;
+    if (hu_weakness_analyze_summary(alloc, run, suite, summaries,
+                                    sizeof(summaries) / sizeof(summaries[0]), &nsum) != HU_OK ||
+        nsum == 0)
+        return &report->items[0];
+
+    int max_fail = -1;
+    hu_weakness_type_t best_ty = HU_WEAKNESS_UNKNOWN;
+    for (size_t i = 0; i < nsum; i++) {
+        if (summaries[i].failed_count > max_fail) {
+            max_fail = summaries[i].failed_count;
+            best_ty = summaries[i].type;
+        }
+    }
+    for (size_t i = 0; i < report->count; i++) {
+        if (report->items[i].type == best_ty)
+            return &report->items[i];
+    }
+    return &report->items[0];
+}
+
+static hu_error_t insert_single_eval_patch(hu_self_improve_t *engine,
+                                           const hu_weakness_t *w, double pass_rate_before,
+                                           int64_t now_ts, int64_t *patch_id_out) {
+    if (!engine || !engine->db || !w || !patch_id_out)
+        return HU_ERR_INVALID_ARGUMENT;
+    *patch_id_out = 0;
+
+    hu_error_t err = ensure_eval_patches_table(engine->db);
+    if (err != HU_OK)
+        return err;
+
+    const char *ins_eval =
+        "INSERT INTO eval_patches (weakness_type, task_id, patch_text, "
+        "applied, pass_rate_before, kept, created_at) "
+        "VALUES (?1, ?2, ?3, 0, ?4, 0, ?5)";
+    const char *ins_prompt =
+        "INSERT INTO prompt_patches (source, patch_text, active, applied_at) "
+        "VALUES (?1, ?2, 1, ?3)";
+    sqlite3_stmt *s_eval = NULL, *s_prompt = NULL;
+    int rc = sqlite3_prepare_v2(engine->db, ins_eval, -1, &s_eval, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+    rc = sqlite3_prepare_v2(engine->db, ins_prompt, -1, &s_prompt, NULL);
+    if (rc != SQLITE_OK) {
+        sqlite3_finalize(s_eval);
+        return HU_ERR_MEMORY_STORE;
+    }
+
+    sqlite3_bind_text(s_eval, 1, hu_weakness_type_str(w->type), -1, SQLITE_STATIC);
+    sqlite3_bind_text(s_eval, 2, w->task_id, -1, SQLITE_STATIC);
+    sqlite3_bind_text(s_eval, 3, w->suggested_fix, (int)w->suggested_fix_len, SQLITE_STATIC);
+    sqlite3_bind_double(s_eval, 4, pass_rate_before);
+    sqlite3_bind_int64(s_eval, 5, now_ts);
+    rc = sqlite3_step(s_eval);
+    sqlite3_finalize(s_eval);
+    if (rc != SQLITE_DONE) {
+        sqlite3_finalize(s_prompt);
+        return HU_ERR_MEMORY_STORE;
+    }
+
+    *patch_id_out = sqlite3_last_insert_rowid(engine->db);
+
+    char source[256];
+    snprintf(source, sizeof(source), "assessment:%s", w->task_id);
+    sqlite3_bind_text(s_prompt, 1, source, -1, SQLITE_STATIC);
+    sqlite3_bind_text(s_prompt, 2, w->suggested_fix, (int)w->suggested_fix_len, SQLITE_STATIC);
+    sqlite3_bind_int64(s_prompt, 3, now_ts);
+    rc = sqlite3_step(s_prompt);
+    sqlite3_finalize(s_prompt);
+    if (rc != SQLITE_DONE)
+        return HU_ERR_MEMORY_STORE;
+
+    return HU_OK;
+}
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+static hu_error_t self_improve_closed_loop_simulate(hu_allocator_t *alloc, sqlite3 *db) {
+    hu_self_improve_t engine = {0};
+    hu_error_t err = hu_self_improve_create(alloc, db, &engine);
+    if (err != HU_OK)
+        return err;
+    err = hu_self_improve_init_tables(&engine);
+    if (err != HU_OK)
+        return err;
+
+    hu_eval_task_t tasks[5] = {
+        {.id = "t1",
+         .prompt = "2+2",
+         .prompt_len = 3,
+         .expected = "4",
+         .expected_len = 1,
+         .category = "math"},
+        {.id = "t2",
+         .prompt = "capital of France",
+         .prompt_len = 17,
+         .expected = "Paris",
+         .expected_len = 5,
+         .category = "geography"},
+        {.id = "t3",
+         .prompt = "1+1",
+         .prompt_len = 3,
+         .expected = "2",
+         .expected_len = 1,
+         .category = "math"},
+        {.id = "t4",
+         .prompt = "3*3",
+         .prompt_len = 3,
+         .expected = "9",
+         .expected_len = 1,
+         .category = "math"},
+        {.id = "t5",
+         .prompt = "tone",
+         .prompt_len = 4,
+         .expected = "brief",
+         .expected_len = 5,
+         .category = "format"},
+    };
+    hu_eval_result_t results[5] = {
+        {.task_id = "t1", .passed = false, .actual_output = "5", .actual_output_len = 1},
+        {.task_id = "t2", .passed = false, .actual_output = "London", .actual_output_len = 6},
+        {.task_id = "t3", .passed = true, .actual_output = "2", .actual_output_len = 1},
+        {.task_id = "t4", .passed = true, .actual_output = "9", .actual_output_len = 1},
+        {.task_id = "t5", .passed = true, .actual_output = "ok", .actual_output_len = 2},
+    };
+    hu_eval_run_t run = {.results = results,
+                         .results_count = 5,
+                         .passed = 3,
+                         .failed = 2,
+                         .pass_rate = 0.6};
+    hu_eval_suite_t suite = {.name = "closed_loop_sim", .tasks = tasks, .tasks_count = 5};
+
+    hu_weakness_report_t report = {0};
+    err = hu_weakness_analyze(alloc, &run, &suite, &report);
+    if (err != HU_OK)
+        return err;
+    if (report.count == 0) {
+        hu_weakness_report_free(alloc, &report);
+        return HU_ERR_INTERNAL;
+    }
+
+    const hu_weakness_t *w = pick_weakest_weakness(alloc, &report, &run, &suite);
+    if (!w) {
+        hu_weakness_report_free(alloc, &report);
+        return HU_ERR_INTERNAL;
+    }
+
+    int64_t patch_id = 0;
+    err = insert_single_eval_patch(&engine, w, run.pass_rate, 424242, &patch_id);
+    hu_weakness_report_free(alloc, &report);
+    if (err != HU_OK)
+        return err;
+
+    err = hu_self_improve_verify_patch(&engine, patch_id, 0.75);
+    if (err != HU_OK)
+        return err;
+
+    fprintf(stderr,
+            "[self_improve] closed_loop: suite=sim baseline=60.0%% after=75.0%% action=kept patch_id=%lld\n",
+            (long long)patch_id);
+    return HU_OK;
+}
+#endif /* HU_IS_TEST */
+
+hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db_void,
+                                       hu_provider_t *provider, const char *model, size_t model_len,
+                                       const char *eval_suite_path) {
+    if (!alloc || !db_void)
+        return HU_ERR_INVALID_ARGUMENT;
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
+    if (!provider || !eval_suite_path || !eval_suite_path[0])
+        return HU_ERR_INVALID_ARGUMENT;
+#else
+    (void)eval_suite_path;
+#endif
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)provider;
+    (void)model;
+    (void)model_len;
+    return self_improve_closed_loop_simulate(alloc, (sqlite3 *)db_void);
+#else
+    sqlite3 *db = (sqlite3 *)db_void;
+    hu_self_improve_t engine = {0};
+    hu_error_t err = hu_self_improve_create(alloc, db, &engine);
+    if (err != HU_OK)
+        return err;
+    err = hu_self_improve_init_tables(&engine);
+    if (err != HU_OK)
+        return err;
+
+    FILE *f = fopen(eval_suite_path, "rb");
+    if (!f) {
+        fprintf(stderr, "[self_improve] closed_loop: cannot open %s: %s\n", eval_suite_path,
+                strerror(errno));
+        return HU_ERR_IO;
+    }
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return HU_ERR_IO;
+    }
+    long sz = ftell(f);
+    if (sz <= 0 || sz > 1024 * 1024) {
+        fclose(f);
+        fprintf(stderr, "[self_improve] closed_loop: invalid suite file size\n");
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return HU_ERR_IO;
+    }
+    size_t json_len = (size_t)sz;
+    char *json = (char *)alloc->alloc(alloc->ctx, json_len + 1);
+    if (!json) {
+        fclose(f);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    size_t nread = fread(json, 1, json_len, f);
+    fclose(f);
+    if (nread != json_len) {
+        alloc->free(alloc->ctx, json, json_len + 1);
+        return HU_ERR_IO;
+    }
+    json[json_len] = '\0';
+
+    hu_eval_suite_t suite = {0};
+    err = hu_eval_suite_load_json(alloc, json, json_len, &suite);
+    alloc->free(alloc->ctx, json, json_len + 1);
+    if (err != HU_OK) {
+        fprintf(stderr, "[self_improve] closed_loop: load suite failed (%d)\n", (int)err);
+        return err;
+    }
+
+    hu_eval_run_t baseline = {0};
+    err = hu_eval_run_suite(alloc, provider, model, model_len, &suite, HU_EVAL_CONTAINS, &baseline);
+    if (err != HU_OK) {
+        hu_eval_suite_free(alloc, &suite);
+        fprintf(stderr, "[self_improve] closed_loop: baseline eval failed (%d)\n", (int)err);
+        return err;
+    }
+
+    double baseline_rate = baseline.pass_rate;
+
+    hu_weakness_report_t report = {0};
+    err = hu_weakness_analyze(alloc, &baseline, &suite, &report);
+    if (err != HU_OK) {
+        hu_eval_run_free(alloc, &baseline);
+        hu_eval_suite_free(alloc, &suite);
+        return err;
+    }
+    if (report.count == 0) {
+        hu_weakness_report_free(alloc, &report);
+        hu_eval_run_free(alloc, &baseline);
+        hu_eval_suite_free(alloc, &suite);
+        fprintf(stderr,
+                "[self_improve] closed_loop: suite=%s baseline=%.1f%% no weaknesses; skip patch\n",
+                suite.name ? suite.name : "", baseline_rate * 100.0);
+        return HU_OK;
+    }
+
+    const hu_weakness_t *w = pick_weakest_weakness(alloc, &report, &baseline, &suite);
+    if (!w) {
+        hu_weakness_report_free(alloc, &report);
+        hu_eval_run_free(alloc, &baseline);
+        hu_eval_suite_free(alloc, &suite);
+        return HU_ERR_INTERNAL;
+    }
+
+    int64_t now_ts = (int64_t)time(NULL);
+    if (now_ts <= 0)
+        now_ts = 1;
+    int64_t patch_id = 0;
+    err = insert_single_eval_patch(&engine, w, baseline_rate, now_ts, &patch_id);
+    hu_weakness_report_free(alloc, &report);
+    if (err != HU_OK) {
+        hu_eval_run_free(alloc, &baseline);
+        hu_eval_suite_free(alloc, &suite);
+        return err;
+    }
+
+    hu_eval_run_t after = {0};
+    err = hu_eval_run_suite(alloc, provider, model, model_len, &suite, HU_EVAL_CONTAINS, &after);
+    if (err != HU_OK) {
+        hu_self_improve_rollback_patch(&engine, patch_id);
+        hu_eval_run_free(alloc, &baseline);
+        hu_eval_suite_free(alloc, &suite);
+        fprintf(stderr, "[self_improve] closed_loop: re-eval failed (%d); rolled back\n", (int)err);
+        return err;
+    }
+
+    double after_rate = after.pass_rate;
+    hu_eval_run_free(alloc, &after);
+
+    const char *action = "rolled_back";
+    if (after_rate > baseline_rate) {
+        err = hu_self_improve_verify_patch(&engine, patch_id, after_rate);
+        if (err != HU_OK) {
+            hu_self_improve_rollback_patch(&engine, patch_id);
+            hu_eval_run_free(alloc, &baseline);
+            hu_eval_suite_free(alloc, &suite);
+            return err;
+        }
+        action = "kept";
+    } else {
+        err = hu_self_improve_rollback_patch(&engine, patch_id);
+        if (err != HU_OK) {
+            hu_eval_run_free(alloc, &baseline);
+            hu_eval_suite_free(alloc, &suite);
+            return err;
+        }
+    }
+
+    fprintf(stderr,
+            "[self_improve] closed_loop: suite=%s baseline=%.1f%% after=%.1f%% action=%s patch_id=%lld\n",
+            suite.name ? suite.name : "", baseline_rate * 100.0, after_rate * 100.0, action,
+            (long long)patch_id);
+
+    hu_eval_run_free(alloc, &baseline);
+    hu_eval_suite_free(alloc, &suite);
+    return HU_OK;
+#endif /* !HU_IS_TEST */
 }
 
 #endif /* HU_ENABLE_SQLITE */

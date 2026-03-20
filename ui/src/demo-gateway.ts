@@ -1268,7 +1268,15 @@ export class DemoGatewayClient extends EventTarget {
           features: { methods: [], sessions: true, cron: true, skills: true, cost_tracking: true },
         };
       case "health":
-        return { status: "operational", uptime_secs: 172800 };
+        return {
+          status: "ok",
+          uptime_seconds: 172800,
+          pid: 4242,
+          tool_count: 53,
+          channel_count: 4,
+          default_model: "claude-sonnet-4-20250514",
+          default_provider: "anthropic",
+        };
       case "capabilities":
         return { version: "0.42.0", tools: 53, channels: 20, providers: 50, peak_rss_mb: 5.9 };
       case "channels.status":
@@ -1504,6 +1512,7 @@ export class DemoGatewayClient extends EventTarget {
             tree_of_thought: true,
             constitutional_ai: true,
             llm_compiler: true,
+            mcts_planner: false,
             speculative_cache: true,
           },
           metrics: {

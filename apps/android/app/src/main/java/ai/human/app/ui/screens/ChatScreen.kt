@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,7 +61,7 @@ private val listItemSpring = spring<IntOffset>(
 fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
     val colorScheme = MaterialTheme.colorScheme
     val reducedMotion = isReducedMotionEnabled()
-    var nextId = remember { 1 }
+    val nextId = remember { mutableIntStateOf(1) }
     val messages = remember { mutableStateListOf<ChatMessage>() }
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -73,7 +74,7 @@ fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
                     ?: event.payload?.optString("text", "")
                     ?: ""
                 if (text.isNotBlank()) {
-                    messages.add(ChatMessage(nextId++, text, false))
+                    messages.add(ChatMessage(nextId.intValue++, text, false))
                 }
             }
         }
@@ -158,7 +159,7 @@ fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(
                         onSend = {
                             if (inputText.isNotBlank()) {
-                                messages.add(ChatMessage(nextId++, inputText, true))
+                                messages.add(ChatMessage(nextId.intValue++, inputText, true))
                                 gateway.send("chat.send", mapOf("message" to inputText))
                                 inputText = ""
                             }

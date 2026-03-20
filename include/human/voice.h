@@ -29,7 +29,8 @@ hu_error_t hu_voice_play(hu_allocator_t *alloc, const void *audio_data, size_t a
 
 /*
  * Gemini STT — transcribe audio via Gemini generateContent with inline_data.
- * Takes base64-encoded audio directly (no decode needed).
+ * Takes base64-encoded payload directly (no decode needed).
+ * When mime_type begins with "video/", uses a video-description prompt instead of transcription.
  * config->api_key is used as the Gemini API key.
  * config->stt_model defaults to "gemini-2.0-flash" if NULL.
  * config->stt_endpoint defaults to Gemini API URL if NULL.

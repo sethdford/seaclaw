@@ -123,7 +123,6 @@ hu_error_t cp_admin_connect(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
 hu_error_t cp_admin_health(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                            const hu_control_protocol_t *proto, const hu_json_value_t *root,
                            char **out, size_t *out_len) {
-    (void)app;
     (void)conn;
     (void)proto;
     (void)root;
@@ -131,6 +130,36 @@ hu_error_t cp_admin_health(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
     cp_json_set_str(alloc, obj, "status", "ok");
+
+    hu_health_snapshot_t snap;
+    hu_health_snapshot(&snap);
+    hu_json_object_set(alloc, obj, "uptime_seconds",
+                       hu_json_number_new(alloc, (double)snap.uptime_seconds));
+    hu_json_object_set(alloc, obj, "pid", hu_json_number_new(alloc, (double)snap.pid));
+    if (snap.components)
+        free(snap.components);
+
+    size_t tool_count = app ? app->tools_count : 0;
+    hu_json_object_set(alloc, obj, "tool_count", hu_json_number_new(alloc, (double)tool_count));
+
+    size_t ch_count = 0;
+    if (app && app->config) {
+        size_t total = 0;
+        const hu_channel_meta_t *catalog = hu_channel_catalog_all(&total);
+        for (size_t i = 0; i < total; i++) {
+            if (hu_channel_catalog_is_configured(app->config, catalog[i].id))
+                ch_count++;
+        }
+    }
+    hu_json_object_set(alloc, obj, "channel_count", hu_json_number_new(alloc, (double)ch_count));
+
+    if (app && app->config) {
+        if (app->config->default_model && app->config->default_model[0])
+            cp_json_set_str(alloc, obj, "default_model", app->config->default_model);
+        if (app->config->default_provider && app->config->default_provider[0])
+            cp_json_set_str(alloc, obj, "default_provider", app->config->default_provider);
+    }
+
     hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
     hu_json_free(alloc, obj);
     return err;
@@ -202,6 +231,7 @@ hu_error_t cp_admin_sessions_list(hu_allocator_t *alloc, hu_app_context_t *app, 
                                    hu_json_number_new(alloc, (double)summaries[i].last_active));
                 hu_json_object_set(alloc, s, "turn_count",
                                    hu_json_number_new(alloc, (double)summaries[i].turn_count));
+                cp_json_set_str(alloc, s, "status", summaries[i].archived ? "archived" : "active");
                 hu_json_array_push(alloc, arr, s);
             }
             alloc->free(alloc->ctx, summaries, count * sizeof(hu_session_summary_t));
@@ -228,9 +258,19 @@ hu_error_t cp_admin_sessions_patch(hu_allocator_t *alloc, hu_app_context_t *app,
         if (params) {
             const char *key = hu_json_get_string(params, "key");
             const char *label = hu_json_get_string(params, "label");
+            const char *status = hu_json_get_string(params, "status");
             if (key && label) {
                 hu_error_t e = hu_session_patch(app->sessions, key, label);
-                patched = (e == HU_OK);
+                if (e == HU_OK)
+                    patched = true;
+            }
+            if (key && status) {
+                bool want_archived = (strcmp(status, "archived") == 0);
+                if (want_archived || strcmp(status, "active") == 0) {
+                    hu_error_t e = hu_session_set_archived(app->sessions, key, want_archived);
+                    if (e == HU_OK)
+                        patched = true;
+                }
             }
         }
     }
@@ -698,6 +738,8 @@ hu_error_t cp_admin_metrics_snapshot(hu_allocator_t *alloc, hu_app_context_t *ap
                                hu_json_bool_new(alloc, app->agent->constitutional_enabled));
             hu_json_object_set(alloc, intel_obj, "llm_compiler",
                                hu_json_bool_new(alloc, app->agent->llm_compiler_enabled));
+            hu_json_object_set(alloc, intel_obj, "mcts_planner",
+                               hu_json_bool_new(alloc, app->agent->mcts_planner_enabled));
             hu_json_object_set(alloc, intel_obj, "speculative_cache",
                                hu_json_bool_new(alloc, app->agent->speculative_cache != NULL));
             hu_json_object_set(alloc, intel_obj, "multi_agent",

@@ -99,4 +99,11 @@ struct ContentView: View {
             }
         }
     }
+
+    private func selectTab(_ tab: AppTab) {
+        withAnimation(HUTokens.springExpressive) {
+            selectedTab = tab
+        }
+        connectionManager.prefetchDataForTab(tab)
+    }
 }

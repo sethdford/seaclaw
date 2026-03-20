@@ -71,4 +71,9 @@ hu_error_t hu_dpo_pair_count(hu_dpo_collector_t *collector, size_t *out);
 hu_error_t hu_dpo_clear(hu_dpo_collector_t *collector);
 void hu_dpo_export_free(hu_allocator_t *alloc, hu_dpo_export_t *export_data);
 
+/* Build a prompt fragment from top-margin preference pairs (few-shot injection). */
+hu_error_t hu_dpo_get_best_examples(hu_dpo_collector_t *collector, hu_allocator_t *alloc,
+                                    size_t max_examples, char **out_prompt_fragment,
+                                    size_t *out_len);
+
 #endif /* HU_ML_DPO_H */

@@ -209,7 +209,7 @@ static void test_ws_recv_null_client_fails(void) {
     hu_allocator_t alloc = hu_system_allocator();
     char *data = NULL;
     size_t len = 0;
-    hu_error_t err = hu_ws_recv(NULL, &alloc, &data, &len);
+    hu_error_t err = hu_ws_recv(NULL, &alloc, &data, &len, -1);
     HU_ASSERT_NEQ(err, HU_OK);
     HU_ASSERT_NULL(data);
     HU_ASSERT_EQ(len, 0u);

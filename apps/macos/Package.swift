@@ -11,6 +11,7 @@ let package = Package(
         .executableTarget(
             name: "Human",
             dependencies: [
+                .product(name: "HumanClient", package: "HumanKit"),
                 .product(name: "HumanChatUI", package: "HumanKit"),
             ],
             path: "Sources/HumanApp"

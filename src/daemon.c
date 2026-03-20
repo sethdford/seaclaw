@@ -26,6 +26,8 @@
 #include "human/context/style_tracker.h"
 #include "human/context/mood.h"
 #include "human/context/vision.h"
+#include "human/channels/format.h"
+#include "human/multimodal.h"
 #include "human/core/error.h"
 #include "human/core/process_util.h"
 #include "human/core/string.h"
@@ -46,6 +48,10 @@
 #include "human/memory/promotion.h"
 #include "human/memory/retrieval.h"
 #include "human/memory/superhuman.h"
+#ifdef HU_ENABLE_SQLITE
+#include "human/memory.h"
+#include "human/memory/contact_graph.h"
+#endif
 #include "human/observability/bth_metrics.h"
 #include "human/agent/governor.h"
 #include "human/agent/timing.h"
@@ -55,6 +61,7 @@
 #include "human/memory/compression.h"
 #include "human/visual/content.h"
 #include "human/feeds/processor.h"
+#include "human/feeds/awareness.h"
 #include "human/feeds/findings.h"
 #include "human/feeds/research.h"
 #include "human/agent/arbitrator.h"
@@ -118,8 +125,8 @@ hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc,
 #if HU_HAS_PWA
 #include "human/pwa_learner.h"
 #endif
-#if defined(HU_HAS_IMESSAGE) && !defined(HU_IS_TEST)
-#include "human/channels/imessage.h"
+#if defined(__APPLE__)
+#include "human/calibration/clone.h"
 #endif
 #if defined(HU_ENABLE_CARTESIA)
 #include "human/context/voice_decision.h"
@@ -148,6 +155,160 @@ hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc,
 #define HU_DAEMON_PID_DIR  ".human"
 #define HU_DAEMON_PID_FILE "human.pid"
 #define HU_MAX_PATH        1024
+
+/* Emotion call sites are under #ifndef HU_IS_TEST in several branches; test lib still compiles
+ * daemon.c with HU_IS_TEST=1, so the helper may be unreferenced. */
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((unused))
+#endif
+static hu_emotional_state_t hu_daemon_detect_emotion(hu_allocator_t *alloc, hu_agent_t *agent,
+                                                     const hu_channel_history_entry_t *entries,
+                                                     size_t count) {
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)alloc;
+    (void)agent;
+    return hu_conversation_detect_emotion(entries, count);
+#else
+    if (agent && agent->provider.vtable && agent->provider.vtable->chat_with_system)
+        return hu_conversation_detect_emotion_llm(alloc, &agent->provider, agent->model_name,
+                                                  agent->model_name_len, entries, count);
+    return hu_conversation_detect_emotion(entries, count);
+#endif
+}
+
+#ifndef HU_IS_TEST
+/* Per-channel daemon.* config for the active messaging channel (NULL if unknown). */
+static const hu_channel_daemon_config_t *get_active_daemon_config(const hu_config_t *config,
+                                                                  const char *ch_name) {
+    if (!config || !ch_name)
+        return NULL;
+    if (strcmp(ch_name, "imessage") == 0)
+        return &config->channels.imessage.daemon;
+    if (strcmp(ch_name, "discord") == 0)
+        return &config->channels.discord.daemon;
+    if (strcmp(ch_name, "telegram") == 0)
+        return &config->channels.telegram.daemon;
+    if (strcmp(ch_name, "slack") == 0)
+        return &config->channels.slack.daemon;
+    if (strcmp(ch_name, "whatsapp") == 0)
+        return &config->channels.whatsapp.daemon;
+    return NULL;
+}
+#endif /* !HU_IS_TEST */
+
+#ifndef HU_IS_TEST
+/* Proactive-style budget for outbound visual attachments (separate from check-in governor). */
+static hu_proactive_budget_t hu_daemon_visual_attach_gov;
+static bool hu_daemon_visual_attach_gov_init;
+
+static bool hu_daemon_visual_attach_gov_allow(uint64_t now_ms) {
+    if (!hu_daemon_visual_attach_gov_init) {
+        hu_proactive_budget_config_t cfg = {
+            .daily_max = 4,
+            .weekly_max = 14,
+            .relationship_multiplier = 1.0,
+            .cool_off_after_unanswered = 255,
+            .cool_off_hours = 0,
+        };
+        hu_governor_init(&cfg, &hu_daemon_visual_attach_gov);
+        hu_daemon_visual_attach_gov_init = true;
+    }
+    return hu_governor_has_budget(&hu_daemon_visual_attach_gov, now_ms);
+}
+
+static void hu_daemon_visual_attach_gov_after_send(uint64_t now_ms) {
+    if (hu_daemon_visual_attach_gov_init)
+        (void)hu_governor_record_sent(&hu_daemon_visual_attach_gov, now_ms);
+}
+#endif /* !HU_IS_TEST */
+
+#if defined(HU_ENABLE_SQLITE) && !defined(HU_IS_TEST)
+static void cross_channel_format_when(char *out, size_t out_sz, const char *ts) {
+    if (!out || out_sz == 0)
+        return;
+    out[0] = '\0';
+    if (!ts || !ts[0]) {
+        if (out_sz > 7)
+            memcpy(out, "recent", 7);
+        return;
+    }
+    char ts_work[48];
+    size_t tl = strlen(ts);
+    if (tl >= sizeof(ts_work))
+        tl = sizeof(ts_work) - 1;
+    memcpy(ts_work, ts, tl);
+    ts_work[tl] = '\0';
+
+    struct tm tm_buf;
+    memset(&tm_buf, 0, sizeof(tm_buf));
+    static const char *const fmts[] = {"%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", NULL};
+    time_t msg_t = (time_t)-1;
+    for (int fi = 0; fmts[fi]; fi++) {
+        memset(&tm_buf, 0, sizeof(tm_buf));
+        if (strptime(ts_work, fmts[fi], &tm_buf)) {
+            msg_t = mktime(&tm_buf);
+            if (msg_t != (time_t)-1)
+                break;
+        }
+    }
+    if (msg_t == (time_t)-1) {
+        (void)snprintf(out, out_sz, "%s", ts_work);
+        return;
+    }
+    time_t now = time(NULL);
+    double diff = difftime(now, msg_t);
+    if (diff < 60.0)
+        (void)snprintf(out, out_sz, "just now");
+    else if (diff < 3600.0)
+        (void)snprintf(out, out_sz, "%dm ago", (int)(diff / 60.0));
+    else if (diff < 86400.0)
+        (void)snprintf(out, out_sz, "%dh ago", (int)(diff / 3600.0));
+    else if (diff < 86400.0 * 7.0)
+        (void)snprintf(out, out_sz, "%dd ago", (int)(diff / 86400.0));
+    else
+        (void)snprintf(out, out_sz, "%.10s", ts_work);
+}
+
+static void cross_channel_platform_label(const char *plat, char *out, size_t out_sz) {
+    if (!plat || !out || out_sz < 2) {
+        if (out && out_sz)
+            out[0] = '\0';
+        return;
+    }
+    size_t i = 0;
+    for (; plat[i] && i + 1 < out_sz; i++) {
+        if (i == 0 && plat[i] >= 'a' && plat[i] <= 'z')
+            out[i] = (char)(plat[i] - 'a' + 'A');
+        else
+            out[i] = plat[i];
+    }
+    out[i] = '\0';
+}
+
+static bool daemon_cross_ctx_append_line(hu_allocator_t *alloc, char **buf, size_t *buf_len,
+                                         const char *line, size_t line_len) {
+    if (!alloc || !buf || !buf_len || !line || line_len == 0)
+        return true;
+    size_t new_len = *buf_len ? *buf_len + 1 + line_len : line_len;
+    char *n = (char *)alloc->alloc(alloc->ctx, new_len + 1);
+    if (!n)
+        return false;
+    if (*buf && *buf_len > 0) {
+        memcpy(n, *buf, *buf_len);
+        n[*buf_len] = '\n';
+        memcpy(n + *buf_len + 1, line, line_len);
+        n[new_len] = '\0';
+        alloc->free(alloc->ctx, *buf, *buf_len + 1);
+    } else {
+        memcpy(n, line, line_len);
+        n[line_len] = '\0';
+        new_len = line_len;
+    }
+    *buf = n;
+    *buf_len = new_len;
+    return true;
+}
+#endif /* HU_ENABLE_SQLITE && !HU_IS_TEST */
 
 /* GCC's warn_unused_result is not suppressed by (void) casts */
 #define HU_IGNORE_RESULT(expr)   \
@@ -811,6 +972,149 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
 
 #if defined(HU_HAS_PERSONA) && !defined(HU_IS_TEST)
 
+/* Last inbound channel per persona contact — proactive routing prefers recent activity (48h). */
+#define HU_DAEMON_CONTACT_ACTIVITY_CAP 256
+#define HU_DAEMON_ACTIVITY_FRESH_SECS (48 * 3600)
+
+typedef struct {
+    char contact_id[128];
+    char last_channel[64];
+    char last_session_key[128];
+    time_t last_activity;
+    uint64_t lru_seq;
+} daemon_contact_activity_t;
+
+static daemon_contact_activity_t g_contact_activity[HU_DAEMON_CONTACT_ACTIVITY_CAP];
+static size_t g_contact_activity_count;
+static uint64_t g_contact_activity_seq;
+
+static bool daemon_channel_list_has_name(const hu_service_channel_t *channels, size_t channel_count,
+                                         const char *name) {
+    if (!name || !name[0])
+        return false;
+    for (size_t i = 0; i < channel_count; i++) {
+        if (!channels[i].channel || !channels[i].channel->vtable ||
+            !channels[i].channel->vtable->name)
+            continue;
+        const char *n = channels[i].channel->vtable->name(channels[i].channel->ctx);
+        if (n && strcmp(n, name) == 0)
+            return true;
+    }
+    return false;
+}
+
+static void daemon_contact_activity_record(const char *contact_id, const char *channel_name,
+                                           const char *session_key) {
+    if (!contact_id || !contact_id[0] || !channel_name || !channel_name[0] || !session_key ||
+        !session_key[0])
+        return;
+
+    size_t slot = (size_t)-1;
+    for (size_t i = 0; i < g_contact_activity_count; i++) {
+        if (strcmp(g_contact_activity[i].contact_id, contact_id) == 0) {
+            slot = i;
+            break;
+        }
+    }
+
+    if (slot == (size_t)-1) {
+        if (g_contact_activity_count < HU_DAEMON_CONTACT_ACTIVITY_CAP) {
+            slot = g_contact_activity_count++;
+        } else {
+            size_t lru = 0;
+            for (size_t j = 1; j < HU_DAEMON_CONTACT_ACTIVITY_CAP; j++) {
+                if (g_contact_activity[j].lru_seq < g_contact_activity[lru].lru_seq)
+                    lru = j;
+            }
+            slot = lru;
+        }
+    }
+
+    size_t cid_len = strlen(contact_id);
+    if (cid_len >= sizeof(g_contact_activity[slot].contact_id))
+        cid_len = sizeof(g_contact_activity[slot].contact_id) - 1;
+    memcpy(g_contact_activity[slot].contact_id, contact_id, cid_len);
+    g_contact_activity[slot].contact_id[cid_len] = '\0';
+
+    size_t ch_len = strlen(channel_name);
+    if (ch_len >= sizeof(g_contact_activity[slot].last_channel))
+        ch_len = sizeof(g_contact_activity[slot].last_channel) - 1;
+    memcpy(g_contact_activity[slot].last_channel, channel_name, ch_len);
+    g_contact_activity[slot].last_channel[ch_len] = '\0';
+
+    size_t sk_len = strlen(session_key);
+    if (sk_len >= sizeof(g_contact_activity[slot].last_session_key))
+        sk_len = sizeof(g_contact_activity[slot].last_session_key) - 1;
+    memcpy(g_contact_activity[slot].last_session_key, session_key, sk_len);
+    g_contact_activity[slot].last_session_key[sk_len] = '\0';
+
+    g_contact_activity[slot].last_activity = time(NULL);
+    g_contact_activity[slot].lru_seq = ++g_contact_activity_seq;
+}
+
+/* Parse proactive_channel (+ contact_id) into fixed buffers for routing. */
+static void daemon_proactive_parse_route(const hu_contact_profile_t *cp, char *ch_buf,
+                                         char *target_buf) {
+    memset(ch_buf, 0, 64);
+    memset(target_buf, 0, 128);
+    const char *colon = strchr(cp->proactive_channel, ':');
+    if (colon) {
+        size_t ch_len = (size_t)(colon - cp->proactive_channel);
+        if (ch_len < 64) {
+            memcpy(ch_buf, cp->proactive_channel, ch_len);
+            ch_buf[ch_len] = '\0';
+        }
+        size_t tgt_len = strlen(colon + 1);
+        if (tgt_len >= 128)
+            tgt_len = 127;
+        memcpy(target_buf, colon + 1, tgt_len);
+        target_buf[tgt_len] = '\0';
+    } else {
+        size_t plen = strlen(cp->proactive_channel);
+        if (plen >= 64)
+            plen = 63;
+        memcpy(ch_buf, cp->proactive_channel, plen);
+        ch_buf[plen] = '\0';
+        size_t cid_len = strlen(cp->contact_id);
+        if (cid_len >= 128)
+            cid_len = 127;
+        memcpy(target_buf, cp->contact_id, cid_len);
+        target_buf[cid_len] = '\0';
+    }
+}
+
+/* If contact has fresh inbound activity on an enabled channel, override route. */
+static void daemon_contact_activity_apply_route(const char *contact_id, time_t now,
+                                                const hu_service_channel_t *channels,
+                                                size_t channel_count, char *ch_buf, char *target_buf,
+                                                size_t *target_len) {
+    for (size_t i = 0; i < g_contact_activity_count; i++) {
+        if (strcmp(g_contact_activity[i].contact_id, contact_id) != 0)
+            continue;
+        if (g_contact_activity[i].last_session_key[0] == '\0')
+            return;
+        if (difftime(now, g_contact_activity[i].last_activity) > (double)HU_DAEMON_ACTIVITY_FRESH_SECS)
+            return;
+        if (!daemon_channel_list_has_name(channels, channel_count,
+                                          g_contact_activity[i].last_channel))
+            return;
+
+        size_t ch_len = strlen(g_contact_activity[i].last_channel);
+        if (ch_len >= 64)
+            ch_len = 63;
+        memcpy(ch_buf, g_contact_activity[i].last_channel, ch_len);
+        ch_buf[ch_len] = '\0';
+
+        size_t sk_len = strlen(g_contact_activity[i].last_session_key);
+        if (sk_len >= 128)
+            sk_len = 127;
+        memcpy(target_buf, g_contact_activity[i].last_session_key, sk_len);
+        target_buf[sk_len] = '\0';
+        *target_len = sk_len;
+        return;
+    }
+}
+
 static char *proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *agent,
                                           hu_memory_t *memory, const hu_contact_profile_t *cp,
                                           size_t *out_len) {
@@ -887,6 +1191,72 @@ static char *proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *age
     }
 #endif /* HU_HAS_PERSONA weather */
 
+#ifdef HU_ENABLE_SQLITE
+    /* Recent feeds → natural bring-up hooks for this contact (high relevance only). */
+    char *feed_aware_ctx = NULL;
+    size_t feed_aware_ctx_len = 0;
+    if (memory && agent && agent->persona) {
+        sqlite3 *fdb = hu_sqlite_memory_get_db(memory);
+        if (fdb) {
+            int64_t since_feed = (int64_t)time(NULL) - (int64_t)172800;
+            hu_feed_item_stored_t *stored = NULL;
+            size_t scount = 0;
+            if (hu_feed_processor_get_all_recent(alloc, fdb, since_feed, 32, &stored, &scount) ==
+                    HU_OK &&
+                stored && scount > 0) {
+                hu_feed_item_t *fitems =
+                    (hu_feed_item_t *)alloc->alloc(alloc->ctx, scount * sizeof(*fitems));
+                if (fitems) {
+                    memset(fitems, 0, scount * sizeof(*fitems));
+                    for (size_t fi = 0; fi < scount; fi++)
+                        hu_feed_awareness_item_from_stored(&stored[fi], &fitems[fi]);
+                    hu_awareness_topic_t *topics = NULL;
+                    size_t tcount = 0;
+                    if (hu_feed_awareness_synthesize(alloc, fitems, scount, agent->persona, &topics,
+                                                     &tcount) == HU_OK &&
+                        topics && tcount > 0) {
+                        size_t need = 96;
+                        for (size_t ti = 0; ti < tcount; ti++) {
+                            if (topics[ti].relevance < 0.65)
+                                continue;
+                            if (!hu_feed_awareness_should_share(&topics[ti], cp))
+                                continue;
+                            need += strlen(topics[ti].text) + strlen(topics[ti].source) + 64;
+                        }
+                        if (need > 96) {
+                            char *abuf = (char *)alloc->alloc(alloc->ctx, need);
+                            if (abuf) {
+                                size_t ap = (size_t)snprintf(
+                                    abuf, need,
+                                    "FEED AWARENESS — optional natural bring-up (high relevance):\n");
+                                for (size_t ti = 0; ti < tcount; ti++) {
+                                    if (topics[ti].relevance < 0.65)
+                                        continue;
+                                    if (!hu_feed_awareness_should_share(&topics[ti], cp))
+                                        continue;
+                                    int nw = snprintf(abuf + ap, need - ap, "- [%s | %.2f] %s\n",
+                                                      topics[ti].source, topics[ti].relevance,
+                                                      topics[ti].text);
+                                    if (nw > 0 && (size_t)nw < need - ap)
+                                        ap += (size_t)nw;
+                                }
+                                if (strstr(abuf, "- [") != NULL) {
+                                    feed_aware_ctx = abuf;
+                                    feed_aware_ctx_len = ap;
+                                } else
+                                    alloc->free(alloc->ctx, abuf, need);
+                            }
+                        }
+                    }
+                    hu_feed_awareness_topics_free(alloc, topics, tcount);
+                    alloc->free(alloc->ctx, fitems, scount * sizeof(*fitems));
+                }
+                hu_feed_items_free(alloc, stored, scount);
+            }
+        }
+    }
+#endif /* HU_ENABLE_SQLITE feed awareness */
+
     static const char HU_DEFAULT_PROACTIVE_RULES[] =
         "\nRules: "
         "1. One short natural message (not 'hey how are you' — too generic). "
@@ -920,6 +1290,10 @@ static char *proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *age
         total += 2 + mem_ctx_len; /* "\n\n" + mem_ctx */
     if (weather_ctx && weather_ctx_len > 0)
         total += 2 + weather_ctx_len; /* "\n\n" + weather */
+#ifdef HU_ENABLE_SQLITE
+    if (feed_aware_ctx && feed_aware_ctx_len > 0)
+        total += 2 + feed_aware_ctx_len;
+#endif
     if (calendar_ctx && calendar_ctx_len > 0)
         total += 2 + calendar_ctx_len; /* "\n\n" + calendar_ctx */
 
@@ -931,6 +1305,10 @@ static char *proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *age
             alloc->free(alloc->ctx, mem_ctx, mem_ctx_len + 1);
         if (weather_ctx)
             alloc->free(alloc->ctx, weather_ctx, weather_ctx_len + 1);
+#ifdef HU_ENABLE_SQLITE
+        if (feed_aware_ctx)
+            alloc->free(alloc->ctx, feed_aware_ctx, feed_aware_ctx_len + 1);
+#endif
         if (calendar_ctx)
             alloc->free(alloc->ctx, calendar_ctx, calendar_ctx_len + 1);
         *out_len = 0;
@@ -962,6 +1340,15 @@ static char *proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *age
         pos += weather_ctx_len;
         alloc->free(alloc->ctx, weather_ctx, weather_ctx_len + 1);
     }
+#ifdef HU_ENABLE_SQLITE
+    if (feed_aware_ctx && feed_aware_ctx_len > 0) {
+        result[pos++] = '\n';
+        result[pos++] = '\n';
+        memcpy(result + pos, feed_aware_ctx, feed_aware_ctx_len);
+        pos += feed_aware_ctx_len;
+        alloc->free(alloc->ctx, feed_aware_ctx, feed_aware_ctx_len + 1);
+    }
+#endif
     if (calendar_ctx && calendar_ctx_len > 0) {
         result[pos++] = '\n';
         result[pos++] = '\n';
@@ -1043,21 +1430,14 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     if (!match)
                         continue;
 
-                    const char *ch_part = cp->proactive_channel;
-                    const char *target_part = cp->contact_id;
-                    size_t target_len = strlen(target_part);
                     char ch_buf[64] = {0};
-                    const char *colon = strchr(cp->proactive_channel, ':');
-                    if (colon) {
-                        size_t ch_len = (size_t)(colon - cp->proactive_channel);
-                        if (ch_len < sizeof(ch_buf)) {
-                            memcpy(ch_buf, cp->proactive_channel, ch_len);
-                            ch_buf[ch_len] = '\0';
-                            ch_part = ch_buf;
-                            target_part = colon + 1;
-                            target_len = strlen(target_part);
-                        }
-                    }
+                    char target_route_buf[128] = {0};
+                    daemon_proactive_parse_route(cp, ch_buf, target_route_buf);
+                    size_t target_len = strlen(target_route_buf);
+                    daemon_contact_activity_apply_route(cp->contact_id, now, channels, channel_count,
+                                                        ch_buf, target_route_buf, &target_len);
+                    const char *ch_part = ch_buf;
+                    const char *target_part = target_route_buf;
 
                     for (size_t c = 0; c < channel_count; c++) {
                         if (!channels[c].channel || !channels[c].channel->vtable ||
@@ -1111,22 +1491,14 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
         if (!cp->proactive_checkin || !cp->proactive_channel || !cp->contact_id)
             continue;
 
-        /* Parse channel:target format */
-        const char *ch_part = cp->proactive_channel;
-        const char *target_part = cp->contact_id;
-        size_t target_len = strlen(target_part);
-        const char *colon = strchr(cp->proactive_channel, ':');
         char ch_buf[64] = {0};
-        if (colon) {
-            size_t ch_len = (size_t)(colon - cp->proactive_channel);
-            if (ch_len < sizeof(ch_buf)) {
-                memcpy(ch_buf, cp->proactive_channel, ch_len);
-                ch_buf[ch_len] = '\0';
-                ch_part = ch_buf;
-                target_part = colon + 1;
-                target_len = strlen(target_part);
-            }
-        }
+        char target_route_buf[128] = {0};
+        daemon_proactive_parse_route(cp, ch_buf, target_route_buf);
+        size_t target_len = strlen(target_route_buf);
+        daemon_contact_activity_apply_route(cp->contact_id, now, channels, channel_count, ch_buf,
+                                            target_route_buf, &target_len);
+        const char *ch_part = ch_buf;
+        const char *target_part = target_route_buf;
 
 #ifdef HU_ENABLE_SQLITE
         /* F64: Anticipatory predictions — run for each contact in proactive cycle */
@@ -1176,8 +1548,8 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
             hu_channel_history_entry_t *entries = NULL;
             size_t entry_count = 0;
             hu_error_t hist_err = channels[c].channel->vtable->load_conversation_history(
-                channels[c].channel->ctx, alloc, cp->contact_id, strlen(cp->contact_id), 15,
-                &entries, &entry_count);
+                channels[c].channel->ctx, alloc, target_part, target_len, 15, &entries,
+                &entry_count);
             if (hist_err != HU_OK)
                 fprintf(stderr, "[daemon] proactive: history load failed for %s: %d\n",
                         cp->contact_id, (int)hist_err);
@@ -1194,6 +1566,17 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                         should_checkin = false;
                 }
             }
+
+#ifdef HU_ENABLE_SQLITE
+            /* Strong feed–contact match can justify outreach before the 24h window. */
+            if (!should_checkin && agent->memory && agent->persona) {
+                sqlite3 *aware_db = hu_sqlite_memory_get_db(agent->memory);
+                if (aware_db &&
+                    hu_feed_awareness_contact_has_high_topics(alloc, aware_db, agent->persona, cp,
+                                                              0.72))
+                    should_checkin = true;
+            }
+#endif
 
             /* Build combined text from user messages for event extraction */
             char combined[4096];
@@ -1873,6 +2256,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     }
     if (graph && agent && agent->retrieval_engine)
         hu_retrieval_set_graph(agent->retrieval_engine, graph);
+    /* Initialize contact identity graph for cross-channel resolution */
+    if (agent && agent->memory) {
+        sqlite3 *cg_db = hu_sqlite_memory_get_db(agent->memory);
+        if (cg_db)
+            hu_contact_graph_init(alloc, cg_db);
+    }
 #endif
 
     {
@@ -2349,11 +2738,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             size_t pair_count = 0;
                             hu_dpo_pair_count(&agent->dpo_collector, &pair_count);
                             if (pair_count > 0) {
-                                static const char dpo_path[] =
-                                    "data/imessage/dpo_preferences.jsonl";
+                                char dpo_path[HU_MAX_PATH];
+                                const char *dpo_ch =
+                                    (agent->active_channel && agent->active_channel[0])
+                                        ? agent->active_channel
+                                        : "imessage";
+                                int dpo_plen = snprintf(dpo_path, sizeof(dpo_path),
+                                                          "data/%s/dpo_preferences.jsonl", dpo_ch);
                                 size_t exported = 0;
-                                if (hu_dpo_export_jsonl(&agent->dpo_collector, dpo_path,
-                                                        sizeof(dpo_path) - 1,
+                                if (dpo_plen > 0 && (size_t)dpo_plen < sizeof(dpo_path) &&
+                                    hu_dpo_export_jsonl(&agent->dpo_collector, dpo_path,
+                                                        (size_t)dpo_plen,
                                                         &exported) == HU_OK) {
                                     fprintf(stderr,
                                             "[human] weekly DPO export: %zu pairs -> %s\n",
@@ -2495,45 +2890,106 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     const char *content_to_add = msgs[m].content;
                     size_t mlen = strlen(content_to_add);
 #ifndef HU_IS_TEST
-#if defined(HU_HAS_IMESSAGE)
-                    /* Per-message vision: when has_attachment and message_id, describe
-                     * image and inject "[They sent a photo: {description}]" into context. */
+                    /* Per-message attachment: images via vision; local audio/video via multimodal
+                     * route. Injects description or transcription into batch text. */
                     if (msgs[m].has_attachment && msgs[m].message_id > 0 && agent &&
-                        agent->provider.vtable && agent->provider.vtable->supports_vision &&
-                        agent->provider.vtable->supports_vision(agent->provider.ctx)) {
-                        const char *ch_name = ch->channel->vtable->name
-                                                  ? ch->channel->vtable->name(ch->channel->ctx)
-                                                  : NULL;
-                        if (ch_name && strcmp(ch_name, "imessage") == 0) {
-                            char *path = hu_imessage_get_attachment_path(alloc, msgs[m].message_id);
-                            if (path) {
+                        agent->provider.vtable &&
+                        ch->channel->vtable->get_attachment_path) {
+                        char *path = ch->channel->vtable->get_attachment_path(
+                            ch->channel->ctx, alloc, msgs[m].message_id);
+                        if (path) {
+                            const char *model =
+                                agent->model_name ? agent->model_name : "gpt-4o";
+                            size_t model_len = agent->model_name_len > 0
+                                                   ? agent->model_name_len
+                                                   : (size_t)strlen(model);
+                            size_t plen = strlen(path);
+                            const char *ext = NULL;
+                            for (size_t ei = plen; ei > 0; ei--) {
+                                if (path[ei - 1] == '.') {
+                                    ext = &path[ei - 1];
+                                    break;
+                                }
+                            }
+                            bool is_audio =
+                                ext &&
+                                (strcmp(ext, ".mp3") == 0 || strcmp(ext, ".wav") == 0 ||
+                                 strcmp(ext, ".ogg") == 0 || strcmp(ext, ".m4a") == 0 ||
+                                 strcmp(ext, ".caf") == 0);
+                            bool is_video = ext && (strcmp(ext, ".mp4") == 0 ||
+                                                    strcmp(ext, ".mov") == 0 ||
+                                                    strcmp(ext, ".webm") == 0);
+
+                            if (is_audio || is_video) {
+                                char *media_desc = NULL;
+                                size_t media_desc_len = 0;
+                                if (hu_multimodal_route_local_media(
+                                        alloc, path, plen, &agent->provider, model, model_len,
+                                        &media_desc, &media_desc_len) == HU_OK &&
+                                    media_desc && media_desc_len > 0) {
+                                    static char attachment_augmented[4096];
+                                    size_t desc_copy =
+                                        media_desc_len > 3800 ? 3800 : media_desc_len;
+                                    int n;
+                                    if (is_audio) {
+                                        if (mlen > 0 && strcmp(content_to_add, "[Audio]") != 0) {
+                                            n = snprintf(
+                                                attachment_augmented, sizeof(attachment_augmented),
+                                                "%.*s\n[Audio transcription: %.*s]", (int)mlen,
+                                                content_to_add, (int)desc_copy, media_desc);
+                                        } else {
+                                            n = snprintf(
+                                                attachment_augmented, sizeof(attachment_augmented),
+                                                "[Audio transcription: %.*s]", (int)desc_copy,
+                                                media_desc);
+                                        }
+                                    } else {
+                                        if (mlen > 0 && strcmp(content_to_add, "[Video]") != 0) {
+                                            n = snprintf(
+                                                attachment_augmented, sizeof(attachment_augmented),
+                                                "%.*s\n[Video transcription: %.*s]", (int)mlen,
+                                                content_to_add, (int)desc_copy, media_desc);
+                                        } else {
+                                            n = snprintf(
+                                                attachment_augmented, sizeof(attachment_augmented),
+                                                "[Video transcription: %.*s]", (int)desc_copy,
+                                                media_desc);
+                                        }
+                                    }
+                                    alloc->free(alloc->ctx, media_desc, media_desc_len + 1);
+                                    if (n > 0 && (size_t)n < sizeof(attachment_augmented)) {
+                                        content_to_add = attachment_augmented;
+                                        mlen = (size_t)n;
+                                    }
+                                } else if (media_desc) {
+                                    alloc->free(alloc->ctx, media_desc, media_desc_len + 1);
+                                }
+                            } else if (agent->provider.vtable->supports_vision &&
+                                       agent->provider.vtable->supports_vision(
+                                           agent->provider.ctx)) {
                                 char *desc = NULL;
                                 size_t desc_len = 0;
-                                const char *model =
-                                    agent->model_name ? agent->model_name : "gpt-4o";
-                                size_t model_len = agent->model_name_len > 0
-                                                       ? agent->model_name_len
-                                                       : (size_t)strlen(model);
                                 hu_error_t verr = hu_vision_describe_image(
-                                    alloc, &agent->provider, path, strlen(path), model, model_len,
-                                    &desc, &desc_len);
-                                alloc->free(alloc->ctx, path, strlen(path) + 1);
+                                    alloc, &agent->provider, path, plen, model, model_len, &desc,
+                                    &desc_len);
                                 if (verr == HU_OK && desc && desc_len > 0) {
-                                    static char vision_augmented[4096];
+                                    static char attachment_augmented[4096];
                                     size_t desc_copy = desc_len > 3800 ? 3800 : desc_len;
                                     int n;
                                     if (mlen > 0 && strcmp(content_to_add, "[Photo]") != 0) {
-                                        n = snprintf(vision_augmented, sizeof(vision_augmented),
-                                                     "%.*s\n[They sent a photo: %.*s]", (int)mlen,
-                                                     content_to_add, (int)desc_copy, desc);
+                                        n = snprintf(
+                                            attachment_augmented, sizeof(attachment_augmented),
+                                            "%.*s\n[They sent a photo: %.*s]", (int)mlen,
+                                            content_to_add, (int)desc_copy, desc);
                                     } else {
-                                        n = snprintf(vision_augmented, sizeof(vision_augmented),
+                                        n = snprintf(attachment_augmented,
+                                                     sizeof(attachment_augmented),
                                                      "[They sent a photo: %.*s]", (int)desc_copy,
                                                      desc);
                                     }
                                     alloc->free(alloc->ctx, desc, desc_len + 1);
-                                    if (n > 0 && (size_t)n < sizeof(vision_augmented)) {
-                                        content_to_add = vision_augmented;
+                                    if (n > 0 && (size_t)n < sizeof(attachment_augmented)) {
+                                        content_to_add = attachment_augmented;
                                         mlen = (size_t)n;
                                         if (agent->bth_metrics)
                                             agent->bth_metrics->vision_descriptions++;
@@ -2542,10 +2998,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     alloc->free(alloc->ctx, desc, desc_len + 1);
                                 }
                             }
+                            alloc->free(alloc->ctx, path, plen + 1);
                         }
-                    }
-                    /* F7: Video context — no vision in Phase 1; inject "[They sent a video]" */
-                    else if (msgs[m].has_video) {
+                    } else if (msgs[m].has_video) {
+                        /* F7: Video context — no vision in Phase 1; inject "[They sent a video]" */
                         static char video_augmented[4096];
                         int n;
                         if (mlen > 0 && strcmp(content_to_add, "[Video]") != 0) {
@@ -2560,7 +3016,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             mlen = (size_t)n;
                         }
                     }
-#endif
 #endif
                     if (mlen == 0) {
                         m++;
@@ -2676,12 +3131,20 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 hu_response_action_t action = hu_conversation_classify_response(
                     combined, combined_len, early_history, early_history_count, &extra_delay_ms);
 
-                /* Apply response_mode override from iMessage config.
+                /* Apply response_mode override from active channel's daemon config.
                  * "selective" (default): FULL→BRIEF for non-questions.
                  * "eager": BRIEF/SKIP→FULL (respond to almost everything).
                  * "normal": no override. */
                 {
-                    const char *rmode = config ? config->channels.imessage.response_mode : NULL;
+                    const char *ch_name_rm = ch->channel->vtable->name
+                                                 ? ch->channel->vtable->name(ch->channel->ctx)
+                                                 : NULL;
+                    const hu_channel_daemon_config_t *dcfg_rm =
+                        get_active_daemon_config(config, ch_name_rm);
+                    const char *rmode =
+                        (dcfg_rm && dcfg_rm->response_mode && dcfg_rm->response_mode[0])
+                            ? dcfg_rm->response_mode
+                            : NULL;
                     if (!rmode || !rmode[0] || strcmp(rmode, "selective") == 0) {
                         if (action == HU_RESPONSE_FULL && !memchr(combined, '?', combined_len))
                             action = HU_RESPONSE_BRIEF;
@@ -3173,37 +3636,38 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                 /* Real-user-response window: if the real user already replied to
-                 * this contact during our delay, stay silent.  Only applies to
-                 * iMessage where we impersonate the user. */
-#if defined(HU_HAS_IMESSAGE)
+                 * this contact during our delay, stay silent (channels that implement
+                 * human_active_recently). */
                 {
                     const char *chn = ch->channel->vtable->name
                                           ? ch->channel->vtable->name(ch->channel->ctx)
                                           : NULL;
-                    if (chn && strcmp(chn, "imessage") == 0) {
-                        int window = 120;
-                        if (config && config->channels.imessage.user_response_window_sec > 0)
-                            window = config->channels.imessage.user_response_window_sec;
-                        if (hu_imessage_user_responded_recently(ch->channel->ctx, batch_key,
-                                                                key_len, window)) {
-                            fprintf(stderr,
-                                    "[human] real user responded to %.*s within %ds — "
-                                    "staying silent\n",
-                                    (int)(key_len > 20 ? 20 : key_len), batch_key, window);
-                            /* Reset consecutive counter — real user is active */
-                            for (size_t ci = 0; ci < consec_contact_count; ci++) {
-                                if (key_len < sizeof(consec_contact_keys[0]) &&
-                                    memcmp(consec_contact_keys[ci], batch_key, key_len) == 0 &&
-                                    consec_contact_keys[ci][key_len] == '\0') {
-                                    consec_response_count[ci] = 0;
-                                    break;
-                                }
+                    const hu_channel_daemon_config_t *dcfg_hu =
+                        get_active_daemon_config(config, chn);
+                    int window = 120;
+                    if (dcfg_hu && dcfg_hu->user_response_window_sec > 0)
+                        window = dcfg_hu->user_response_window_sec;
+                    else if (config && config->channels.imessage.user_response_window_sec > 0)
+                        window = config->channels.imessage.user_response_window_sec;
+                    if (ch->channel->vtable->human_active_recently &&
+                        ch->channel->vtable->human_active_recently(ch->channel->ctx, batch_key,
+                                                                   key_len, window)) {
+                        fprintf(stderr,
+                                "[human] real user responded to %.*s within %ds — "
+                                "staying silent\n",
+                                (int)(key_len > 20 ? 20 : key_len), batch_key, window);
+                        /* Reset consecutive counter — real user is active */
+                        for (size_t ci = 0; ci < consec_contact_count; ci++) {
+                            if (key_len < sizeof(consec_contact_keys[0]) &&
+                                memcmp(consec_contact_keys[ci], batch_key, key_len) == 0 &&
+                                consec_contact_keys[ci][key_len] == '\0') {
+                                consec_response_count[ci] = 0;
+                                break;
                             }
-                            continue;
                         }
+                        continue;
                     }
                 }
-#endif
 #else
                 bool brief_mode = false;
 #endif
@@ -3317,6 +3781,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 size_t convo_ctx_len = 0;
                 hu_channel_history_entry_t *history_entries = NULL;
                 size_t history_count = 0;
+                char *cross_channel_ctx = NULL;
+                size_t cross_channel_ctx_len = 0;
 #ifdef HU_HAS_PERSONA
                 const hu_contact_profile_t *contact_for_tapback = NULL;
 #endif
@@ -3329,6 +3795,23 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         hu_persona_find_contact(agent->persona, batch_key, key_len);
                     if (cp) {
                         contact_for_tapback = cp;
+                        if (ch->channel->vtable->name && cp->contact_id) {
+                            const char *act_ch = ch->channel->vtable->name(ch->channel->ctx);
+                            if (act_ch) {
+                                daemon_contact_activity_record(cp->contact_id, act_ch, batch_key);
+#ifdef HU_ENABLE_SQLITE
+                                /* Link this platform handle to canonical contact ID */
+                                if (agent->memory) {
+                                    sqlite3 *link_db = hu_sqlite_memory_get_db(agent->memory);
+                                    if (link_db) {
+                                        hu_contact_graph_link(link_db, cp->contact_id, act_ch,
+                                                              batch_key,
+                                                              cp->name ? cp->name : "", 1.0);
+                                    }
+                                }
+#endif
+                            }
+                        }
                         hu_contact_profile_build_context(alloc, cp, &contact_ctx, &contact_ctx_len);
 
                         size_t iw_len = 0;
@@ -3532,56 +4015,90 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 
-                /* 2b. Cross-channel awareness: load history from OTHER channels
-                 * for the same contact (e.g. Gmail history when texting via iMessage) */
-                hu_channel_history_entry_t *cross_entries = NULL;
-                size_t cross_count = 0;
-#ifdef HU_HAS_PERSONA
-                {
-                    const hu_contact_profile_t *cp_cross = NULL;
-                    if (agent->persona)
-                        cp_cross = hu_persona_find_contact(agent->persona, batch_key, key_len);
-                    if (cp_cross && cp_cross->email) {
-                        size_t email_len = strlen(cp_cross->email);
-                        for (size_t ci = 0; ci < channel_count; ci++) {
-                            if (&channels[ci] == ch)
-                                continue;
-                            if (!channels[ci].channel->vtable->load_conversation_history)
-                                continue;
-                            channels[ci].channel->vtable->load_conversation_history(
-                                channels[ci].channel->ctx, alloc, cp_cross->email, email_len, 5,
-                                &cross_entries, &cross_count);
-                            if (cross_entries && cross_count > 0)
-                                break;
-                        }
-                    }
-                }
-#endif
+                /* Primary-channel history only for ToM / awareness (no cross-merge). */
+                const hu_channel_history_entry_t *ctx_entries = history_entries;
+                size_t ctx_count = history_count;
 
-                /* Merge primary + cross-channel history for Phase 6 ToM and awareness. */
-                hu_channel_history_entry_t *merged_history = NULL;
-                const hu_channel_history_entry_t *ctx_entries = NULL;
-                size_t ctx_count = 0;
-                if (history_count > 0 || cross_count > 0) {
-                    size_t total = history_count + cross_count;
-                    if (cross_count > 0 && history_count > 0) {
-                        merged_history = (hu_channel_history_entry_t *)alloc->alloc(
-                            alloc->ctx, total * sizeof(hu_channel_history_entry_t));
-                        if (merged_history) {
-                            if (cross_entries)
-                                memcpy(merged_history, cross_entries,
-                                       cross_count * sizeof(hu_channel_history_entry_t));
-                            memcpy(merged_history + cross_count, history_entries,
-                                   history_count * sizeof(hu_channel_history_entry_t));
+#if defined(HU_ENABLE_SQLITE) && !defined(HU_IS_TEST)
+                /* 2b. Cross-channel awareness: other platforms for the same contact (contact graph).
+                 * Formatted lines are prepended to convo_ctx for the LLM, not merged into history. */
+                if (agent->memory && ch->channel->vtable->name && batch_key && key_len > 0 &&
+                    key_len < 512) {
+                    sqlite3 *cg_db = hu_sqlite_memory_get_db(agent->memory);
+                    if (cg_db) {
+                        const char *cur_plat = ch->channel->vtable->name(ch->channel->ctx);
+                        if (cur_plat && cur_plat[0]) {
+                            char handle_buf[512];
+                            memcpy(handle_buf, batch_key, key_len);
+                            handle_buf[key_len] = '\0';
+                            char canonical[128];
+                            if (hu_contact_graph_resolve(cg_db, cur_plat, handle_buf, canonical,
+                                                         sizeof(canonical)) == HU_OK) {
+                                hu_contact_identity_t *idents = NULL;
+                                size_t id_count = 0;
+                                if (hu_contact_graph_list(alloc, cg_db, canonical, &idents,
+                                                          &id_count) == HU_OK &&
+                                    idents && id_count > 0) {
+                                    for (size_t ci = 0; ci < channel_count; ci++) {
+                                        if (&channels[ci] == ch)
+                                            continue;
+                                        hu_channel_t *och = channels[ci].channel;
+                                        if (!och || !och->vtable ||
+                                            !och->vtable->load_conversation_history ||
+                                            !och->vtable->name)
+                                            continue;
+                                        const char *oname = och->vtable->name(och->ctx);
+                                        if (!oname || !oname[0] || strcmp(oname, cur_plat) == 0)
+                                            continue;
+                                        const char *ohandle = NULL;
+                                        for (size_t ij = 0; ij < id_count; ij++) {
+                                            if (strcmp(idents[ij].platform, oname) == 0 &&
+                                                idents[ij].platform_handle[0]) {
+                                                ohandle = idents[ij].platform_handle;
+                                                break;
+                                            }
+                                        }
+                                        if (!ohandle)
+                                            continue;
+                                        hu_channel_history_entry_t *oent = NULL;
+                                        size_t onc = 0;
+                                        hu_error_t oh = och->vtable->load_conversation_history(
+                                            och->ctx, alloc, ohandle, strlen(ohandle), 5, &oent,
+                                            &onc);
+                                        if (oh == HU_OK && oent && onc > 0) {
+                                            size_t start = onc > 5 ? onc - 5 : 0;
+                                            char plabel[64];
+                                            cross_channel_platform_label(oname, plabel,
+                                                                         sizeof(plabel));
+                                            for (size_t ei = start; ei < onc; ei++) {
+                                                char when[48];
+                                                cross_channel_format_when(
+                                                    when, sizeof(when), oent[ei].timestamp);
+                                                const char *role =
+                                                    oent[ei].from_me ? " (you)" : "";
+                                                char line[768];
+                                                int lw = snprintf(
+                                                    line, sizeof(line),
+                                                    "[From %s, %s]%s %s", plabel, when, role,
+                                                    oent[ei].text);
+                                                if (lw > 0 && (size_t)lw < sizeof(line)) {
+                                                    (void)daemon_cross_ctx_append_line(
+                                                        alloc, &cross_channel_ctx,
+                                                        &cross_channel_ctx_len, line, (size_t)lw);
+                                                }
+                                            }
+                                            alloc->free(alloc->ctx, oent,
+                                                        onc * sizeof(hu_channel_history_entry_t));
+                                        }
+                                    }
+                                    alloc->free(alloc->ctx, idents,
+                                                id_count * sizeof(hu_contact_identity_t));
+                                }
+                            }
                         }
                     }
-                    ctx_entries = merged_history ? merged_history
-                                    : history_entries ? history_entries
-                                    : cross_entries;
-                    ctx_count = merged_history ? total
-                                 : history_entries ? history_count
-                                 : cross_count;
                 }
+#endif /* HU_ENABLE_SQLITE && !HU_IS_TEST */
 
                 /* Phase 6 (F59–F69): Build prefix context before awareness.
                  * Order: life sim, mood, ToM, anticipatory, self-awareness, life chapter,
@@ -3808,7 +4325,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (agent->persona && agent->persona->humor.type) {
                         hu_emotional_state_t emo_humor =
                             history_entries && history_count > 0
-                                ? hu_conversation_detect_emotion(history_entries, history_count)
+                                ? hu_daemon_detect_emotion(alloc, agent, history_entries, history_count)
                                 : (hu_emotional_state_t){0};
                         bool playful = (combined_len > 0) && (
                             strstr(combined, "lol") || strstr(combined, "haha") ||
@@ -4582,9 +5099,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                                      tb_len, true);
                         }
                     }
-                    if (merged_history)
-                        alloc->free(alloc->ctx, merged_history,
-                                    ctx_count * sizeof(hu_channel_history_entry_t));
                 }
 
                 /* 2c. Length calibration fallback for channels without history.
@@ -4603,6 +5117,34 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
+
+#if defined(HU_ENABLE_SQLITE) && !defined(HU_IS_TEST)
+                /* Prepend cross-channel snippets before other conversation context for the LLM. */
+                if (cross_channel_ctx && cross_channel_ctx_len > 0) {
+                    if (convo_ctx && convo_ctx_len > 0) {
+                        size_t total = cross_channel_ctx_len + convo_ctx_len + 2;
+                        char *merged = (char *)alloc->alloc(alloc->ctx, total + 1);
+                        if (merged) {
+                            memcpy(merged, cross_channel_ctx, cross_channel_ctx_len);
+                            merged[cross_channel_ctx_len] = '\n';
+                            merged[cross_channel_ctx_len + 1] = '\n';
+                            memcpy(merged + cross_channel_ctx_len + 2, convo_ctx, convo_ctx_len);
+                            merged[total] = '\0';
+                            alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                            alloc->free(alloc->ctx, cross_channel_ctx, cross_channel_ctx_len + 1);
+                            convo_ctx = merged;
+                            convo_ctx_len = total;
+                            cross_channel_ctx = NULL;
+                            cross_channel_ctx_len = 0;
+                        }
+                    } else {
+                        convo_ctx = cross_channel_ctx;
+                        convo_ctx_len = cross_channel_ctx_len;
+                        cross_channel_ctx = NULL;
+                        cross_channel_ctx_len = 0;
+                    }
+                }
+#endif
 
                 /* 2d. Style analysis: analyze their texting patterns for mirroring */
                 char *style_ctx = NULL;
@@ -4719,70 +5261,75 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (style_ctx)
                     alloc->free(alloc->ctx, style_ctx, style_ctx_len + 1);
 
-                /* Tapback awareness: inject recent reaction context */
+                /* Tapback / reaction awareness via channel vtable (e.g. iMessage chat.db). */
+#ifndef HU_IS_TEST
                 {
-                    char *tapback_ctx = NULL;
-                    size_t tapback_len = 0;
-                    hu_imessage_build_tapback_context(alloc, batch_key, key_len,
-                                                      &tapback_ctx, &tapback_len);
-                    if (tapback_ctx && tapback_len > 0) {
-                        if (convo_ctx) {
-                            size_t merged_len = convo_ctx_len + tapback_len + 2;
-                            char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
-                            if (merged) {
-                                memcpy(merged, convo_ctx, convo_ctx_len);
-                                merged[convo_ctx_len] = '\n';
-                                memcpy(merged + convo_ctx_len + 1, tapback_ctx, tapback_len);
-                                merged[merged_len - 1] = '\n';
-                                merged[merged_len] = '\0';
-                                alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
-                                convo_ctx = merged;
-                                convo_ctx_len = merged_len;
+                    if (ch->channel->vtable->build_reaction_context) {
+                        char *tapback_ctx = NULL;
+                        size_t tapback_len = 0;
+                        if (ch->channel->vtable->build_reaction_context(
+                                ch->channel->ctx, alloc, batch_key, key_len, &tapback_ctx,
+                                &tapback_len) == HU_OK &&
+                            tapback_ctx && tapback_len > 0) {
+                            if (convo_ctx) {
+                                size_t merged_len = convo_ctx_len + tapback_len + 2;
+                                char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
+                                if (merged) {
+                                    memcpy(merged, convo_ctx, convo_ctx_len);
+                                    merged[convo_ctx_len] = '\n';
+                                    memcpy(merged + convo_ctx_len + 1, tapback_ctx, tapback_len);
+                                    merged[merged_len - 1] = '\n';
+                                    merged[merged_len] = '\0';
+                                    alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                    convo_ctx = merged;
+                                    convo_ctx_len = merged_len;
+                                }
+                            } else {
+                                convo_ctx = tapback_ctx;
+                                convo_ctx_len = tapback_len;
+                                tapback_ctx = NULL;
                             }
-                        } else {
-                            convo_ctx = tapback_ctx;
-                            convo_ctx_len = tapback_len;
-                            tapback_ctx = NULL;
+                            if (tapback_ctx)
+                                alloc->free(alloc->ctx, tapback_ctx, tapback_len + 1);
                         }
-                        if (tapback_ctx)
-                            alloc->free(alloc->ctx, tapback_ctx, tapback_len + 1);
                     }
                 }
+#endif
 
-                /* Read receipt awareness: inject read/delivered status */
+                /* Read receipt awareness via channel vtable. */
+#ifndef HU_IS_TEST
                 {
-                    const char *chn = ch->channel->vtable->name
-                                          ? ch->channel->vtable->name(ch->channel->ctx)
-                                          : NULL;
-                if (chn && strcmp(chn, "imessage") == 0) {
-                    char *rr_ctx = NULL;
-                    size_t rr_len = 0;
-                    hu_imessage_build_read_receipt_context(alloc, batch_key, key_len,
-                                                           &rr_ctx, &rr_len);
-                    if (rr_ctx && rr_len > 0) {
-                        if (convo_ctx) {
-                            size_t merged_len = convo_ctx_len + rr_len + 2;
-                            char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
-                            if (merged) {
-                                memcpy(merged, convo_ctx, convo_ctx_len);
-                                merged[convo_ctx_len] = '\n';
-                                memcpy(merged + convo_ctx_len + 1, rr_ctx, rr_len);
-                                merged[merged_len - 1] = '\n';
-                                merged[merged_len] = '\0';
-                                alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
-                                convo_ctx = merged;
-                                convo_ctx_len = merged_len;
+                    if (ch->channel->vtable->build_read_receipt_context) {
+                        char *rr_ctx = NULL;
+                        size_t rr_len = 0;
+                        if (ch->channel->vtable->build_read_receipt_context(
+                                ch->channel->ctx, alloc, batch_key, key_len, &rr_ctx, &rr_len) ==
+                                HU_OK &&
+                            rr_ctx && rr_len > 0) {
+                            if (convo_ctx) {
+                                size_t merged_len = convo_ctx_len + rr_len + 2;
+                                char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
+                                if (merged) {
+                                    memcpy(merged, convo_ctx, convo_ctx_len);
+                                    merged[convo_ctx_len] = '\n';
+                                    memcpy(merged + convo_ctx_len + 1, rr_ctx, rr_len);
+                                    merged[merged_len - 1] = '\n';
+                                    merged[merged_len] = '\0';
+                                    alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                    convo_ctx = merged;
+                                    convo_ctx_len = merged_len;
+                                }
+                            } else {
+                                convo_ctx = rr_ctx;
+                                convo_ctx_len = rr_len;
+                                rr_ctx = NULL;
                             }
-                        } else {
-                            convo_ctx = rr_ctx;
-                            convo_ctx_len = rr_len;
-                            rr_ctx = NULL;
+                            if (rr_ctx)
+                                alloc->free(alloc->ctx, rr_ctx, rr_len + 1);
                         }
-                        if (rr_ctx)
-                            alloc->free(alloc->ctx, rr_ctx, rr_len + 1);
                     }
                 }
-                }
+#endif
 
                 /* Narrative, engagement, emotion: inject when meaningful */
                 if (history_entries && history_count > 0) {
@@ -4791,7 +5338,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     hu_engagement_level_t eng =
                         hu_conversation_detect_engagement(history_entries, history_count);
                     hu_emotional_state_t emo =
-                        hu_conversation_detect_emotion(history_entries, history_count);
+                        hu_daemon_detect_emotion(alloc, agent, history_entries, history_count);
 
                     bool narr_meaningful =
                         (narr != HU_NARRATIVE_OPENING && narr != HU_NARRATIVE_BUILDING);
@@ -4987,7 +5534,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* F27: Comfort pattern — when emotion is negative, inject learned preference. */
                 if (history_entries && history_count > 0 && agent->memory) {
                     hu_emotional_state_t emo_f27 =
-                        hu_conversation_detect_emotion(history_entries, history_count);
+                        hu_daemon_detect_emotion(alloc, agent, history_entries, history_count);
                     bool emo_negative =
                         emo_f27.concerning || (emo_f27.dominant_emotion &&
                                                (strcmp(emo_f27.dominant_emotion, "sad") == 0 ||
@@ -5044,7 +5591,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                  */
                 if (history_entries && history_count > 0) {
                     hu_emotional_state_t emo_ctx =
-                        hu_conversation_detect_emotion(history_entries, history_count);
+                        hu_daemon_detect_emotion(alloc, agent, history_entries, history_count);
                     const hu_context_modifiers_t *mods =
                         (agent && agent->persona) ? &agent->persona->context_modifiers : NULL;
                     char mod_buf[512];
@@ -5201,20 +5748,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     char *attach_ctx = hu_conversation_attachment_context(
                         alloc, history_entries, history_count, &attach_ctx_len);
 #ifndef HU_IS_TEST
-#if defined(HU_HAS_IMESSAGE)
-                    /* Vision: if provider supports vision and we have iMessage, try to
-                     * get the latest attachment path and describe it. */
+                    /* Vision: provider supports vision and channel exposes latest attachment path. */
                     if (attach_ctx && attach_ctx_len > 0 && agent->provider.vtable &&
                         agent->provider.vtable->supports_vision &&
-                        agent->provider.vtable->supports_vision(agent->provider.ctx)) {
-                        const char *ch_name = ch->channel->vtable->name
-                                                  ? ch->channel->vtable->name(ch->channel->ctx)
-                                                  : NULL;
-                        if (ch_name && strcmp(ch_name, "imessage") == 0 && batch_key &&
-                            key_len > 0) {
-                            char *img_path =
-                                hu_imessage_get_latest_attachment_path(alloc, batch_key, key_len);
-                            if (img_path) {
+                        agent->provider.vtable->supports_vision(agent->provider.ctx) &&
+                        ch->channel->vtable->get_latest_attachment_path && batch_key &&
+                        key_len > 0) {
+                        char *img_path = ch->channel->vtable->get_latest_attachment_path(
+                            ch->channel->ctx, alloc, batch_key, key_len);
+                        if (img_path) {
                                 char *desc = NULL;
                                 size_t desc_len = 0;
                                 const char *model =
@@ -5243,9 +5785,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     alloc->free(alloc->ctx, desc, desc_len + 1);
                                 }
                             }
-                        }
                     }
-#endif
 #endif
                     if (attach_ctx && attach_ctx_len > 0) {
 #ifndef HU_IS_TEST
@@ -5810,7 +6350,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     /* F25: Record emotional moments for 1–3 day check-ins */
                     if (agent->memory && history_entries && history_count > 0) {
                         hu_emotional_state_t emo_rec =
-                            hu_conversation_detect_emotion(history_entries, history_count);
+                            hu_daemon_detect_emotion(alloc, agent, history_entries, history_count);
                         hu_escalation_state_t esc_rec =
                             hu_conversation_detect_escalation(history_entries, history_count);
                         hu_energy_level_t energy_rec = hu_conversation_detect_energy(
@@ -7014,9 +7554,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     alloc->free(alloc->ctx, contact_ctx, contact_ctx_len + 1);
                 if (convo_ctx)
                     alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
-                if (cross_entries)
-                    alloc->free(alloc->ctx, cross_entries,
-                                cross_count * sizeof(hu_channel_history_entry_t));
+#if defined(HU_ENABLE_SQLITE) && !defined(HU_IS_TEST)
+                if (cross_channel_ctx)
+                    alloc->free(alloc->ctx, cross_channel_ctx, cross_channel_ctx_len + 1);
+#endif
 #endif
 
                 /* Persist each individual message + the single response */
@@ -7058,7 +7599,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (err == HU_OK && response && response_len > 0 && agent->memory &&
                     history_entries && history_count > 0) {
                     hu_emotional_state_t emo_pend =
-                        hu_conversation_detect_emotion(history_entries, history_count);
+                        hu_daemon_detect_emotion(alloc, agent, history_entries, history_count);
                     bool should_pend = emo_pend.concerning ||
                                        (emo_pend.dominant_emotion &&
                                         (strcmp(emo_pend.dominant_emotion, "sad") == 0 ||
@@ -7192,6 +7733,45 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 (void)typo_seed;
 #endif
                 if (err == HU_OK && response && response_len > 0) {
+                    const char *proactive_vis_m[1] = {NULL};
+                    size_t proactive_vis_n = 0;
+                    char proactive_vis_storage[1024];
+                    proactive_vis_storage[0] = '\0';
+                    if (ch->channel && ch->channel->vtable && ch->channel->vtable->send &&
+                        combined_len > 0) {
+                        hu_visual_proactive_media_kind_t pv_kind = HU_VISUAL_MEDIA_NONE;
+                        const char *pv_reason = NULL;
+                        (void)pv_reason;
+                        uint64_t pv_now = (uint64_t)time(NULL) * 1000ULL;
+                        bool pv_pro_gov = true;
+#ifndef HU_IS_TEST
+                        pv_pro_gov = hu_daemon_visual_attach_gov_allow(pv_now);
+#endif
+                        if (hu_visual_should_send_media(combined, combined_len, &pv_kind,
+                                                         &pv_reason) &&
+                            pv_kind != HU_VISUAL_MEDIA_NONE &&
+                            hu_visual_proactive_media_governor_allow(pv_now) && pv_pro_gov) {
+                            if (pv_kind == HU_VISUAL_MEDIA_IMAGE_SEARCH) {
+                                size_t qlen = combined_len > 160 ? 160 : combined_len;
+                                while (qlen > 0 &&
+                                       (combined[qlen - 1] == ' ' || combined[qlen - 1] == '\n' ||
+                                        combined[qlen - 1] == '\t' || combined[qlen - 1] == '\r'))
+                                    qlen--;
+                                if (qlen > 0 &&
+                                    hu_visual_search_image(alloc, combined, qlen, proactive_vis_storage,
+                                                          sizeof proactive_vis_storage) == HU_OK) {
+                                    proactive_vis_m[0] = proactive_vis_storage;
+                                    proactive_vis_n = 1;
+                                }
+                            } else if (pv_kind == HU_VISUAL_MEDIA_SCREENSHOT) {
+                                if (hu_visual_generate_screenshot(alloc, agent->policy, proactive_vis_storage,
+                                                                  sizeof proactive_vis_storage) == HU_OK) {
+                                    proactive_vis_m[0] = proactive_vis_storage;
+                                    proactive_vis_n = 1;
+                                }
+                            }
+                        }
+                    }
 #ifndef HU_IS_TEST
 #ifdef HU_HAS_PERSONA
                     /* BTH: Banned AI phrases filter — strip giveaway language */
@@ -7228,8 +7808,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             }
                         }
                         const char *ch_name =
-                            agent->active_channel ? agent->active_channel : "imessage";
-                        size_t ch_name_len = agent->active_channel ? agent->active_channel_len : 8;
+                            agent->active_channel ? agent->active_channel : "unknown";
+                        size_t ch_name_len =
+                            agent->active_channel ? agent->active_channel_len : 7;
                         response_len = hu_conversation_apply_fillers(
                             response, response_len, filler_cap, (uint32_t)time(NULL), ch_name,
                             ch_name_len);
@@ -7309,13 +7890,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
                     /* ── F40: Inline reply (quoted text fallback) ─────────────
                      * When classifier says inline reply, prepend "> {quoted}\n\n"
-                     * to response. iMessage AppleScript has no native reply API. */
-#if defined(HU_HAS_IMESSAGE) && !defined(HU_IS_TEST)
+                     * (text-quote fallback for channels without native threading). */
+#ifndef HU_IS_TEST
                     {
-                        const char *chn = ch->channel->vtable->name
-                                              ? ch->channel->vtable->name(ch->channel->ctx)
-                                              : NULL;
-                        if (chn && strcmp(chn, "imessage") == 0 && response && response_len > 0 &&
+                        if (response && response_len > 0 &&
                             hu_conversation_should_inline_reply(history_entries, history_count,
                                                                 combined, combined_len)) {
                             size_t quote_len = combined_len > 80 ? 80 : combined_len;
@@ -7339,23 +7917,26 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     /* ── Pre-send re-check: abort if real user responded while
                      * we were generating.  Prevents piling onto a conversation
                      * the user is actively handling. ─────────────────────────── */
-#if defined(HU_HAS_IMESSAGE) && !defined(HU_IS_TEST)
+#ifndef HU_IS_TEST
                     {
                         const char *chn_name = ch->channel->vtable->name
                                                    ? ch->channel->vtable->name(ch->channel->ctx)
                                                    : NULL;
-                        if (chn_name && strcmp(chn_name, "imessage") == 0) {
-                            int window = 120;
-                            if (config && config->channels.imessage.user_response_window_sec > 0)
-                                window = config->channels.imessage.user_response_window_sec;
-                            if (hu_imessage_user_responded_recently(ch->channel->ctx, batch_key,
-                                                                    key_len, window)) {
-                                fprintf(stderr,
-                                        "[human] pre-send abort: real user active "
-                                        "for %.*s — dropping generated response\n",
-                                        (int)(key_len > 20 ? 20 : key_len), batch_key);
-                                goto skip_send;
-                            }
+                        const hu_channel_daemon_config_t *dcfg_ps =
+                            get_active_daemon_config(config, chn_name);
+                        int window = 120;
+                        if (dcfg_ps && dcfg_ps->user_response_window_sec > 0)
+                            window = dcfg_ps->user_response_window_sec;
+                        else if (config && config->channels.imessage.user_response_window_sec > 0)
+                            window = config->channels.imessage.user_response_window_sec;
+                        if (chn_name && ch->channel->vtable->human_active_recently &&
+                            ch->channel->vtable->human_active_recently(ch->channel->ctx, batch_key,
+                                                                       key_len, window)) {
+                            fprintf(stderr,
+                                    "[human] pre-send abort: real user active "
+                                    "for %.*s — dropping generated response\n",
+                                    (int)(key_len > 20 ? 20 : key_len), batch_key);
+                            goto skip_send;
                         }
                     }
 #endif
@@ -7367,8 +7948,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             ch->channel->vtable->name
                                 ? ch->channel->vtable->name(ch->channel->ctx)
                                 : NULL;
-                        if (chn_voice && strcmp(chn_voice, "imessage") == 0 &&
-                            agent->persona && agent->persona->voice.voice_id[0] &&
+                        const hu_channel_daemon_config_t *dcfg_voice =
+                            get_active_daemon_config(config, chn_voice);
+                        bool voice_channel_ok =
+                            dcfg_voice && dcfg_voice->voice_enabled;
+                        if (!voice_channel_ok && chn_voice &&
+                            strcmp(chn_voice, "imessage") == 0)
+                            voice_channel_ok = true; /* legacy before daemon.voice_enabled */
+                        if (voice_channel_ok && agent->persona &&
+                            agent->persona->voice.voice_id[0] &&
                             agent->persona->voice_messages.enabled) {
                             hu_voice_decision_t vdec = hu_voice_decision_classify(
                                 response, response_len, combined, combined_len,
@@ -7405,17 +7993,31 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         .nonverbals = agent->persona->voice.nonverbals,
                                     };
 
-                                    unsigned char *mp3 = NULL;
-                                    size_t mp3_len = 0;
+                                    const char *voice_fmt = hu_tts_format_for_channel(chn_voice);
+                                    unsigned char *audio_bytes = NULL;
+                                    size_t audio_len = 0;
                                     hu_error_t tts_err = hu_cartesia_tts_synthesize(
                                         alloc, cartesia_key, strlen(cartesia_key), voice_transcript,
-                                        vt_len, &tts_cfg, &mp3, &mp3_len);
-                                    if (tts_err == HU_OK && mp3 && mp3_len > 0) {
+                                        vt_len, &tts_cfg, voice_fmt, &audio_bytes, &audio_len);
+                                    if (tts_err == HU_OK && audio_bytes && audio_len > 0) {
                                         char audio_path[512];
-                                        hu_error_t pipe_err =
-                                            hu_audio_mp3_to_caf(alloc, mp3, mp3_len, audio_path,
-                                                                sizeof(audio_path));
-                                        hu_cartesia_tts_free_bytes(alloc, mp3, mp3_len);
+                                        hu_error_t pipe_err;
+                                        if (strcmp(voice_fmt, "caf") == 0) {
+                                            pipe_err = hu_audio_mp3_to_caf(
+                                                alloc, audio_bytes, audio_len, audio_path,
+                                                sizeof(audio_path));
+                                        } else {
+                                            const char *temp_ext = "mp3";
+                                            if (strcmp(voice_fmt, "wav") == 0)
+                                                temp_ext = "wav";
+                                            else if (strcmp(voice_fmt, "ogg") == 0)
+                                                /* Cartesia has no OGG; WAV on disk until Opus encode */
+                                                temp_ext = "wav";
+                                            pipe_err = hu_audio_tts_bytes_to_temp(
+                                                alloc, audio_bytes, audio_len, temp_ext, audio_path,
+                                                sizeof(audio_path));
+                                        }
+                                        hu_cartesia_tts_free_bytes(alloc, audio_bytes, audio_len);
                                         if (pipe_err == HU_OK) {
                                             const char *media_paths[] = {audio_path};
                                             hu_error_t send_err = ch->channel->vtable->send(
@@ -7425,8 +8027,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             if (send_err == HU_OK)
                                                 sent_voice = true;
                                         }
-                                    } else if (mp3) {
-                                        hu_cartesia_tts_free_bytes(alloc, mp3, mp3_len);
+                                    } else if (audio_bytes) {
+                                        hu_cartesia_tts_free_bytes(alloc, audio_bytes, audio_len);
                                     }
                                 }
                             }
@@ -7434,6 +8036,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 #endif
                     if (!sent_voice) {
+                    const char *eff_ch = ch->channel->vtable->name
+                                             ? ch->channel->vtable->name(ch->channel->ctx)
+                                             : "unknown";
                     /* F10: Missed-message acknowledgment — prepend if delay > 30 min */
                     const char *send_ptr = response;
                     size_t send_len = response_len;
@@ -7463,9 +8068,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                     /* Split response into natural multi-message fragments */
+                    uint32_t split_max = 0;
+                    if (ch->channel->vtable->get_response_constraints) {
+                        hu_channel_response_constraints_t constraints = {0};
+                        if (ch->channel->vtable->get_response_constraints(ch->channel->ctx,
+                                                                          &constraints) == HU_OK) {
+                            split_max = constraints.max_chars;
+                        }
+                    }
                     hu_message_fragment_t fragments[4];
-                    size_t frag_count =
-                        hu_conversation_split_response(alloc, send_ptr, send_len, fragments, 4);
+                    size_t frag_count = hu_conversation_split_response(
+                        alloc, send_ptr, send_len, fragments, 4, split_max);
                     if (frag_count > 0) {
                         /* Stephanie2 active waiting: thinking + typing time per fragment */
                         for (size_t f = 0; f < frag_count; f++) {
@@ -7493,16 +8106,26 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 const char *eff = hu_conversation_classify_effect(
                                     fragments[f].text, fragments[f].text_len);
                                 if (eff)
-                                    fprintf(stderr, "[human] imessage effect: %s (%.*s)\n", eff,
+                                    fprintf(stderr, "[human] %s effect: %s (%.*s)\n", eff_ch, eff,
                                             (int)(fragments[f].text_len > 60
                                                       ? 60
                                                       : fragments[f].text_len),
                                             fragments[f].text);
                             }
 #endif
+                            const char *const *pv_ptr =
+                                (f == 0 && proactive_vis_n > 0) ? proactive_vis_m : NULL;
+                            size_t pv_cnt = (f == 0 && proactive_vis_n > 0) ? proactive_vis_n : 0;
                             ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
                                                       fragments[f].text, fragments[f].text_len,
-                                                      NULL, 0);
+                                                      pv_ptr, pv_cnt);
+                            if (pv_cnt > 0) {
+                                uint64_t pv_rec = (uint64_t)time(NULL) * 1000ULL;
+                                hu_visual_proactive_media_governor_record(pv_rec);
+#ifndef HU_IS_TEST
+                                hu_daemon_visual_attach_gov_after_send(pv_rec);
+#endif
+                            }
                         }
                         for (size_t f = 0; f < frag_count; f++) {
                             if (fragments[f].text)
@@ -7514,12 +8137,40 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         {
                             const char *eff = hu_conversation_classify_effect(send_ptr, send_len);
                             if (eff)
-                                fprintf(stderr, "[human] imessage effect: %s (%.*s)\n", eff,
+                                fprintf(stderr, "[human] %s effect: %s (%.*s)\n", eff_ch, eff,
                                         (int)(send_len > 60 ? 60 : send_len), send_ptr);
                         }
 #endif
-                        ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, send_ptr,
-                                                  send_len, NULL, 0);
+                        {
+                            char *fmt_text = NULL;
+                            size_t fmt_len = 0;
+                            const char *send_text = send_ptr;
+                            size_t send_text_len = send_len;
+                            if (ch->channel->vtable->name) {
+                                const char *fmt_ch = ch->channel->vtable->name(ch->channel->ctx);
+                                if (fmt_ch &&
+                                    hu_channel_format_outbound(alloc, fmt_ch, strlen(fmt_ch),
+                                                               send_ptr, send_len, &fmt_text,
+                                                               &fmt_len) == HU_OK &&
+                                    fmt_text) {
+                                    send_text = fmt_text;
+                                    send_text_len = fmt_len;
+                                }
+                            }
+                            const char *const *pv_ptr = proactive_vis_n > 0 ? proactive_vis_m : NULL;
+                            size_t pv_cnt = proactive_vis_n;
+                            ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                                      send_text, send_text_len, pv_ptr, pv_cnt);
+                            if (fmt_text)
+                                alloc->free(alloc->ctx, fmt_text, fmt_len + 1);
+                            if (pv_cnt > 0) {
+                                uint64_t pv_rec = (uint64_t)time(NULL) * 1000ULL;
+                                hu_visual_proactive_media_governor_record(pv_rec);
+#ifndef HU_IS_TEST
+                                hu_daemon_visual_attach_gov_after_send(pv_rec);
+#endif
+                            }
+                        }
                     }
 #ifdef HU_HAS_PERSONA
                     /* Send correction after main message (2.5–5s delay) */
@@ -7546,12 +8197,40 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         {
                             const char *eff = hu_conversation_classify_effect(send_ptr, send_len);
                             if (eff)
-                                fprintf(stderr, "[human] imessage effect: %s (%.*s)\n", eff,
+                                fprintf(stderr, "[human] %s effect: %s (%.*s)\n", eff_ch, eff,
                                         (int)(send_len > 60 ? 60 : send_len), send_ptr);
                         }
 #endif
-                        ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, send_ptr,
-                                                  send_len, NULL, 0);
+                        {
+                            char *fmt_text = NULL;
+                            size_t fmt_len = 0;
+                            const char *send_text = send_ptr;
+                            size_t send_text_len = send_len;
+                            if (ch->channel->vtable->name) {
+                                const char *fmt_ch = ch->channel->vtable->name(ch->channel->ctx);
+                                if (fmt_ch &&
+                                    hu_channel_format_outbound(alloc, fmt_ch, strlen(fmt_ch),
+                                                               send_ptr, send_len, &fmt_text,
+                                                               &fmt_len) == HU_OK &&
+                                    fmt_text) {
+                                    send_text = fmt_text;
+                                    send_text_len = fmt_len;
+                                }
+                            }
+                            const char *const *pv_ptr = proactive_vis_n > 0 ? proactive_vis_m : NULL;
+                            size_t pv_cnt = proactive_vis_n;
+                            ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                                      send_text, send_text_len, pv_ptr, pv_cnt);
+                            if (fmt_text)
+                                alloc->free(alloc->ctx, fmt_text, fmt_len + 1);
+                            if (pv_cnt > 0) {
+                                uint64_t pv_rec = (uint64_t)time(NULL) * 1000ULL;
+                                hu_visual_proactive_media_governor_record(pv_rec);
+#ifndef HU_IS_TEST
+                                hu_daemon_visual_attach_gov_after_send(pv_rec);
+#endif
+                            }
+                        }
 #endif
                     if (send_buf_ack)
                         alloc->free(alloc->ctx, send_buf_ack, send_len + 1);
@@ -7600,7 +8279,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             bth_hour, dt_seed, dt_prob)) {
                         char dt_user[512];
                         int dt_n = snprintf(dt_user, sizeof(dt_user),
-                            "You just sent this iMessage: \"%.*s\"\n"
+                            "You just sent this message: \"%.*s\"\n"
                             "Add a brief, natural follow-up thought (1 short sentence max). "
                             "Something you'd double-text a moment later.",
                             (int)(response_len > 200 ? 200 : response_len), response);
@@ -7631,7 +8310,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 
-#if defined(HU_HAS_IMESSAGE) && !defined(HU_IS_TEST)
+#ifndef HU_IS_TEST
             skip_send:
 #endif
                 if (response) {

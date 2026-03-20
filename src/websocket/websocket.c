@@ -9,6 +9,7 @@
 #if defined(HU_GATEWAY_POSIX) && !HU_IS_TEST
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
@@ -489,19 +490,40 @@ hu_error_t hu_ws_send(hu_ws_client_t *ws, const char *data, size_t data_len) {
 }
 
 hu_error_t hu_ws_recv(hu_ws_client_t *ws, hu_allocator_t *alloc, char **data_out,
-                      size_t *data_len_out) {
+                      size_t *data_len_out, int timeout_ms) {
     if (!ws || !alloc || !data_out || !data_len_out)
         return HU_ERR_INVALID_ARGUMENT;
     *data_out = NULL;
     *data_len_out = 0;
 
 #if HU_IS_TEST
+    (void)timeout_ms;
     return HU_ERR_NOT_SUPPORTED;
 #elif defined(HU_GATEWAY_POSIX)
     if (ws->sockfd == HU_WS_INVALID_SOCK)
         return HU_ERR_IO;
 
     for (;;) {
+        if (timeout_ms >= 0) {
+            int ready = 0;
+#ifdef HU_HAS_TLS
+            if (ws->ssl && SSL_pending(ws->ssl) > 0)
+                ready = 1;
+#endif
+            if (!ready) {
+                struct pollfd pfd = {0};
+                pfd.fd = ws->sockfd;
+                pfd.events = POLLIN;
+                int pr = poll(&pfd, 1, timeout_ms);
+                if (pr == 0)
+                    return HU_ERR_TIMEOUT;
+                if (pr < 0)
+                    return HU_ERR_IO;
+                if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))
+                    return HU_ERR_IO;
+            }
+        }
+
         char hdr_buf[14];
         size_t hdr_read = 0;
         while (hdr_read < 2) {
@@ -708,6 +730,7 @@ hu_error_t hu_ws_recv(hu_ws_client_t *ws, hu_allocator_t *alloc, char **data_out
         }
     }
 #else
+    (void)timeout_ms;
     return HU_ERR_NOT_SUPPORTED;
 #endif
 }

@@ -35,6 +35,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -68,11 +70,14 @@ import ai.human.app.ui.screens.OverviewScreen
 import ai.human.app.ui.screens.SessionsScreen
 import ai.human.app.ui.screens.SettingsScreen
 import ai.human.app.ui.screens.ToolsScreen
+import ai.human.app.data.readGatewayUrl
+import ai.human.app.data.saveGatewayUrl
 import ai.human.app.ui.theme.HumanTheme
 import ai.human.app.ui.HUTokens
 import ai.human.app.ui.glassSurface
 import ai.human.app.util.isReducedMotionEnabled
 import ai.human.app.R
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -101,8 +106,26 @@ private fun isValidGatewayUrl(url: String): Boolean {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HumanRoot(intent: Intent?) {
-    var hasOnboarded by rememberSaveable { mutableStateOf(false) }
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var prefsLoaded by remember { mutableStateOf(false) }
     var gatewayUrl by rememberSaveable { mutableStateOf("http://localhost:3000") }
+    var hasOnboarded by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        gatewayUrl = ctx.readGatewayUrl()
+        prefsLoaded = true
+    }
+
+    if (!prefsLoaded) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        }
+        return
+    }
 
     if (hasOnboarded) {
         HumanApp(intent = intent, initialGatewayUrl = gatewayUrl)
@@ -111,6 +134,9 @@ fun HumanRoot(intent: Intent?) {
             initialUrl = gatewayUrl,
             onComplete = { url ->
                 gatewayUrl = url.trim()
+                scope.launch {
+                    ctx.saveGatewayUrl(gatewayUrl)
+                }
                 hasOnboarded = true
             },
         )

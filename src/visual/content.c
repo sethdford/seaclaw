@@ -1,11 +1,229 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/string.h"
+#include "human/tool.h"
+#include "human/tools/computer_use.h"
+#include "human/tools/image_gen.h"
+#include "human/tools/web_search_providers.h"
 #include "human/visual/content.h"
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#if defined(__APPLE__) && !(defined(HU_IS_TEST) && HU_IS_TEST)
+#include <unistd.h>
+#endif
+
+#define HU_VISUAL_GOV_MS_DAY       86400000ULL
+#define HU_VISUAL_GOV_MIN_GAP_MS   (12ULL * 60ULL * 1000ULL)
+#define HU_VISUAL_GOV_DAILY_MAX    3u
+#define HU_VISUAL_GOV_WEEKLY_MAX   10u
+
+static uint64_t s_vis_gov_day;
+static uint64_t s_vis_gov_week;
+static uint8_t s_vis_gov_daily;
+static uint8_t s_vis_gov_weekly;
+static uint64_t s_vis_gov_last_ms;
+
+static void visual_gov_apply_resets(uint64_t now_ms) {
+    uint64_t day = now_ms / HU_VISUAL_GOV_MS_DAY;
+    uint64_t week = day / 7;
+    if (day > s_vis_gov_day) {
+        s_vis_gov_day = day;
+        s_vis_gov_daily = 0;
+    }
+    if (week > s_vis_gov_week) {
+        s_vis_gov_week = week;
+        s_vis_gov_weekly = 0;
+    }
+}
+
+bool hu_visual_proactive_media_governor_allow(uint64_t now_ms) {
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)now_ms;
+    return true;
+#else
+    visual_gov_apply_resets(now_ms);
+    if (s_vis_gov_daily >= HU_VISUAL_GOV_DAILY_MAX ||
+        s_vis_gov_weekly >= HU_VISUAL_GOV_WEEKLY_MAX)
+        return false;
+    if (s_vis_gov_last_ms != 0 && now_ms - s_vis_gov_last_ms < HU_VISUAL_GOV_MIN_GAP_MS)
+        return false;
+    return true;
+#endif
+}
+
+void hu_visual_proactive_media_governor_record(uint64_t now_ms) {
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)now_ms;
+#else
+    visual_gov_apply_resets(now_ms);
+    if (s_vis_gov_daily < 255)
+        s_vis_gov_daily++;
+    if (s_vis_gov_weekly < 255)
+        s_vis_gov_weekly++;
+    s_vis_gov_last_ms = now_ms;
+#endif
+}
+
+static bool visual_haystack_contains_ci(const char *hay, size_t hay_len, const char *needle) {
+    if (!hay || !needle || hay_len == 0)
+        return false;
+    size_t nlen = strlen(needle);
+    if (nlen == 0 || hay_len < nlen)
+        return false;
+    for (size_t i = 0; i + nlen <= hay_len; i++) {
+        bool match = true;
+        for (size_t j = 0; j < nlen; j++) {
+            if (tolower((unsigned char)hay[i + j]) != tolower((unsigned char)needle[j])) {
+                match = false;
+                break;
+            }
+        }
+        if (match)
+            return true;
+    }
+    return false;
+}
+
+bool hu_visual_should_send_media(const char *conversation_context, size_t context_len,
+                                 hu_visual_proactive_media_kind_t *out_kind,
+                                 const char **out_reason) {
+    if (!out_kind || !out_reason) {
+        if (out_kind)
+            *out_kind = HU_VISUAL_MEDIA_NONE;
+        if (out_reason)
+            *out_reason = "invalid arguments";
+        return false;
+    }
+    *out_kind = HU_VISUAL_MEDIA_NONE;
+    *out_reason = "no visual cue";
+
+    if (!conversation_context || context_len == 0) {
+        *out_reason = "empty context";
+        return false;
+    }
+
+    static const char *const shot_needles[] = {
+        "screenshot",   "my screen",     "on my screen", "what's on my screen",
+        "full screen",  "my desktop",    "the desktop",  "share my screen",
+    };
+    for (size_t i = 0; i < sizeof(shot_needles) / sizeof(shot_needles[0]); i++) {
+        if (visual_haystack_contains_ci(conversation_context, context_len, shot_needles[i])) {
+            *out_kind = HU_VISUAL_MEDIA_SCREENSHOT;
+            *out_reason = "screen or screenshot referenced";
+            return true;
+        }
+    }
+
+    static const char *const img_needles[] = {
+        "look at this", "have you seen", "check this out", "picture of",
+        "photo of",     "image of",      "show you",       "here's a",
+        "diagram",      "meme",          "what it looks",  "looks like",
+        "visual",       "illustration",
+    };
+    for (size_t i = 0; i < sizeof(img_needles) / sizeof(img_needles[0]); i++) {
+        if (visual_haystack_contains_ci(conversation_context, context_len, img_needles[i])) {
+            *out_kind = HU_VISUAL_MEDIA_IMAGE_SEARCH;
+            *out_reason = "visual or sharing cue in message";
+            return true;
+        }
+    }
+
+    return false;
+}
+
+hu_error_t hu_visual_search_image(hu_allocator_t *alloc, const char *query, size_t query_len,
+                                  char *out_url, size_t out_url_len) {
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)alloc;
+    (void)query;
+    (void)query_len;
+    static const char mock[] = "https://example.com/mock-image.jpg";
+    size_t ml = sizeof(mock) - 1;
+    if (!out_url || out_url_len <= ml)
+        return HU_ERR_INVALID_ARGUMENT;
+    memcpy(out_url, mock, ml + 1);
+    return HU_OK;
+#else
+    if (!alloc || !query || query_len == 0 || !out_url || out_url_len < 64)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const char *okey = getenv("OPENAI_API_KEY");
+    if (okey && okey[0] &&
+        hu_image_gen_url_into_buffer(alloc, query, query_len, out_url, out_url_len) == HU_OK)
+        return HU_OK;
+
+    char *encoded = NULL;
+    size_t enc_len = 0;
+    hu_error_t err = hu_web_search_url_encode(alloc, query, query_len, &encoded, &enc_len);
+    if (err != HU_OK)
+        return err;
+    if (!encoded) {
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+
+    int n = snprintf(out_url, out_url_len,
+                     "https://duckduckgo.com/?q=%s&iax=images&ia=images", encoded);
+    alloc->free(alloc->ctx, encoded, enc_len + 1);
+    if (n <= 0 || (size_t)n >= out_url_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    return HU_OK;
+#endif
+}
+
+hu_error_t hu_visual_generate_screenshot(hu_allocator_t *alloc, hu_security_policy_t *policy,
+                                         char *out_path, size_t out_path_len) {
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)alloc;
+    (void)policy;
+    static const char mock[] = "/tmp/mock-screenshot.png";
+    size_t ml = sizeof(mock) - 1;
+    if (!out_path || out_path_len <= ml)
+        return HU_ERR_INVALID_ARGUMENT;
+    memcpy(out_path, mock, ml + 1);
+    return HU_OK;
+#else
+#if !defined(__APPLE__)
+    (void)alloc;
+    (void)policy;
+    (void)out_path;
+    (void)out_path_len;
+    return HU_ERR_NOT_SUPPORTED;
+#else
+    if (!alloc || !out_path || out_path_len < 48)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char tmpl[64] = "/tmp/hu_visXXXXXX.png";
+    int fd = mkstemps(tmpl, 4);
+    if (fd < 0)
+        return HU_ERR_IO;
+    (void)close(fd);
+    if (unlink(tmpl) != 0)
+        return HU_ERR_IO;
+
+    hu_tool_result_t tr = {0};
+    hu_error_t e = hu_computer_use_screenshot_to_path(alloc, policy, tmpl, &tr);
+    if (e != HU_OK) {
+        hu_tool_result_free(alloc, &tr);
+        return e;
+    }
+    if (!tr.success) {
+        hu_tool_result_free(alloc, &tr);
+        return HU_ERR_IO;
+    }
+    hu_tool_result_free(alloc, &tr);
+
+    size_t tlen = strlen(tmpl);
+    if (out_path_len <= tlen)
+        return HU_ERR_INVALID_ARGUMENT;
+    memcpy(out_path, tmpl, tlen + 1);
+    return HU_OK;
+#endif
+#endif
+}
 
 #ifdef HU_ENABLE_SQLITE
 #include <sqlite3.h>

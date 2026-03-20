@@ -273,6 +273,7 @@ static const hu_command_t commands[] = {
     {"feed", "Feed monitoring and ingestion", cmd_feed},
 #endif
     {"research", "Run research agent", cmd_research},
+    {"calibrate", "Analyze messaging patterns and calibrate persona", cmd_calibrate},
     {"workspace", "Workspace management", cmd_workspace},
     {"capabilities", "Show available capabilities", cmd_capabilities},
     {"models", "List available models", cmd_models},

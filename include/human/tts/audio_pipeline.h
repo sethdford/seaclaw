@@ -15,6 +15,13 @@ hu_error_t hu_audio_mp3_to_caf(hu_allocator_t *alloc,
 /* Clean up temp file. Call when done sending. */
 void hu_audio_cleanup_temp(const char *audio_path);
 
+/* Write raw audio bytes to a temp file. file_ext_no_dot must be "mp3" or "wav".
+ * Caller must hu_audio_cleanup_temp(out_path) when done. */
+hu_error_t hu_audio_tts_bytes_to_temp(hu_allocator_t *alloc,
+    const unsigned char *bytes, size_t bytes_len,
+    const char *file_ext_no_dot,
+    char *out_path, size_t out_cap);
+
 /* Generic pipeline process (stub for tests). Returns NOT_SUPPORTED. */
 hu_error_t hu_audio_pipeline_process(hu_allocator_t *alloc, const void *input,
     size_t input_len, void **out, size_t *out_len);

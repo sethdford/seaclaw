@@ -554,6 +554,9 @@ hu_error_t hu_persona_creator_write(hu_allocator_t *alloc, const hu_persona_t *p
     fputs(",\n    \"traits\": [", f);
     if (write_json_string_array(f, persona->traits, persona->traits_count) != HU_OK)
         goto fail;
+    fputs("],\n    \"principles\": [", f);
+    if (write_json_string_array(f, persona->principles, persona->principles_count) != HU_OK)
+        goto fail;
     fputs("],\n    \"vocabulary\": {\n      \"preferred\": [", f);
     if (write_json_string_array(f, persona->preferred_vocab, persona->preferred_vocab_count) !=
         HU_OK)

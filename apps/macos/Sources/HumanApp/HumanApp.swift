@@ -1,5 +1,6 @@
-import SwiftUI
+import AppKit
 import HumanChatUI
+import SwiftUI
 
 /// Motion 9 spring for all interactive animations.
 private let springMotion9 = Animation.spring(response: 0.35, dampingFraction: 0.86)
@@ -26,7 +27,7 @@ struct HumanApp: App {
             }
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates...") {
-                    // Placeholder: app update check
+                    Task { await status.checkForUpdates() }
                 }
                 .accessibilityLabel("Check for updates")
             }
@@ -99,12 +100,13 @@ struct HumanApp: App {
         MenuBarExtra {
             VStack(alignment: .leading, spacing: 0) {
                 Button("Open Dashboard") {
-                    if let url = URL(string: "http://localhost:3000") {
-                        NSWorkspace.shared.open(url)
+                    NSApp.activate(ignoringOtherApps: true)
+                    for window in NSApp.windows {
+                        window.makeKeyAndOrderFront(nil)
                     }
                 }
                 .keyboardShortcut("d")
-                .accessibilityLabel("Open h-uman dashboard in browser")
+                .accessibilityLabel("Bring h-uman dashboard to front")
                 Button("Start Service") {
                     withAnimation(springMotion9) {
                         status.startService()

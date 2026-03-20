@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ── F150-F152: Real-Time Voice Calls ───────────────────────────────────────── */
+/* F150-F152: channel voice session (SQL, state machine). OpenAI Realtime API: test_voice_rt_openai.c */
 
 static void create_table_sql_valid(void)
 {

@@ -15,6 +15,7 @@
  */
 
 #ifdef HU_ENABLE_SQLITE
+#include "human/provider.h"
 #include <sqlite3.h>
 
 typedef struct hu_prompt_patch {
@@ -88,6 +89,11 @@ hu_error_t hu_self_improve_rollback_patch(hu_self_improve_t *engine, int64_t pat
 
 /* Get count of assessment-derived patches (kept=1). */
 hu_error_t hu_self_improve_kept_patch_count(hu_self_improve_t *engine, size_t *out);
+
+/* Closed loop: eval → weakness → patch → re-run → keep or rollback (db is sqlite3 *). */
+hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db,
+                                       hu_provider_t *provider, const char *model, size_t model_len,
+                                       const char *eval_suite_path);
 
 #endif /* HU_ENABLE_SQLITE */
 #endif /* HU_INTELLIGENCE_SELF_IMPROVE_H */

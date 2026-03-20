@@ -1,8 +1,12 @@
+import AppKit
 import Foundation
 
 class ProcessManager {
     private var process: Process?
     private let queue = DispatchQueue(label: "com.human.process")
+
+    /// Surface start failures to the UI (e.g. binary missing).
+    var onStartFailure: ((String) -> Void)?
 
     var isRunning: Bool {
         queue.sync {
@@ -32,14 +36,25 @@ class ProcessManager {
         queue.async { [weak self] in
             guard let self = self else { return }
             guard self.process == nil || (self.process?.isRunning == false) else { return }
-            guard let path = self.humanPath() else { return }
+            guard let path = self.humanPath() else {
+                DispatchQueue.main.async {
+                    self.onStartFailure?("human binary not found in PATH.")
+                }
+                return
+            }
             let p = Process()
             p.executableURL = URL(fileURLWithPath: path)
             p.arguments = ["service"]
             p.standardOutput = nil
             p.standardError = nil
-            try? p.run()
-            self.process = p
+            do {
+                try p.run()
+                self.process = p
+            } catch {
+                DispatchQueue.main.async {
+                    self.onStartFailure?(error.localizedDescription)
+                }
+            }
         }
     }
 

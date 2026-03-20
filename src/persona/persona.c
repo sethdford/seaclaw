@@ -161,11 +161,13 @@ void hu_persona_deinit(hu_allocator_t *alloc, hu_persona_t *persona) {
         alloc->free(alloc->ctx, persona->identity, len + 1);
     }
     free_string_array(alloc, persona->traits, persona->traits_count);
+    free_string_array(alloc, persona->principles, persona->principles_count);
     free_string_array(alloc, persona->preferred_vocab, persona->preferred_vocab_count);
     free_string_array(alloc, persona->avoided_vocab, persona->avoided_vocab_count);
     free_string_array(alloc, persona->slang, persona->slang_count);
     free_string_array(alloc, persona->communication_rules, persona->communication_rules_count);
     free_string_array(alloc, persona->values, persona->values_count);
+    free_string_array(alloc, persona->signature_phrases, persona->signature_phrases_count);
     if (persona->decision_style) {
         size_t len = strlen(persona->decision_style);
         alloc->free(alloc->ctx, persona->decision_style, len + 1);
@@ -820,6 +822,15 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 return err;
             }
         }
+        hu_json_value_t *principles = hu_json_object_get(core, "principles");
+        if (principles) {
+            err = parse_string_array(alloc, principles, &out->principles, &out->principles_count);
+            if (err != HU_OK) {
+                hu_persona_deinit(alloc, out);
+                hu_json_free(alloc, root);
+                return err;
+            }
+        }
         hu_json_value_t *vocab = hu_json_object_get(core, "vocabulary");
         if (vocab && vocab->type == HU_JSON_OBJECT) {
             hu_json_value_t *pref = hu_json_object_get(vocab, "preferred");
@@ -891,6 +902,27 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
         hu_json_value_t *ms = hu_json_object_get(core, "mood_states");
         if (ms)
             parse_string_array(alloc, ms, &out->mood_states, &out->mood_states_count);
+    }
+
+    /* behavioral_calibration — measured style (human calibrate clone / manual JSON) */
+    {
+        hu_json_value_t *bc = hu_json_object_get(root, "behavioral_calibration");
+        if (bc && bc->type == HU_JSON_OBJECT) {
+            out->avg_message_length = hu_json_get_number(bc, "avg_message_length", 0.0);
+            out->emoji_frequency = hu_json_get_number(bc, "emoji_frequency", 0.0);
+            out->avg_response_time_sec = hu_json_get_number(bc, "avg_response_time_sec", 0.0);
+            hu_json_value_t *sp = hu_json_object_get(bc, "signature_phrases");
+            if (sp) {
+                err = parse_string_array(alloc, sp, &out->signature_phrases,
+                                         &out->signature_phrases_count);
+                if (err != HU_OK) {
+                    hu_persona_deinit(alloc, out);
+                    hu_json_free(alloc, root);
+                    return err;
+                }
+            }
+            out->calibrated = hu_json_get_bool(bc, "calibrated", true);
+        }
     }
 
     /* Parse inner_world */
@@ -1973,6 +2005,14 @@ hu_error_t hu_persona_validate_json(hu_allocator_t *alloc, const char *json, siz
         return set_err_msg(alloc, err_msg, err_msg_len, "core.values must be array of strings");
     }
 
+    /* Optional: core.principles — array of strings */
+    hu_json_value_t *principles_val = hu_json_object_get(core, "principles");
+    if (principles_val && !is_string_array(principles_val)) {
+        hu_json_free(alloc, root);
+        return set_err_msg(alloc, err_msg, err_msg_len,
+                           "core.principles must be array of strings");
+    }
+
     /* Optional: core.decision_style — string */
     hu_json_value_t *ds_val = hu_json_object_get(core, "decision_style");
     if (ds_val && ds_val->type != HU_JSON_STRING) {
@@ -2300,6 +2340,111 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
         err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
         if (err != HU_OK)
             goto fail;
+    }
+
+    /* Behavioral calibration: inject measured communication patterns */
+    if (persona->calibrated) {
+        const char *cal_hdr =
+            "\nCommunication style calibration (match these patterns precisely):\n";
+        err = append_prompt(alloc, &buf, &len, &cap, cal_hdr, strlen(cal_hdr));
+        if (err != HU_OK)
+            goto fail;
+
+        if (persona->avg_message_length > 0.0) {
+            char ml_buf[128];
+            int ml_n =
+                snprintf(ml_buf, sizeof(ml_buf),
+                         "- Average message length: %.0f characters. Keep responses close to this "
+                         "length.\n",
+                         persona->avg_message_length);
+            if (ml_n > 0 && (size_t)ml_n < sizeof(ml_buf)) {
+                err = append_prompt(alloc, &buf, &len, &cap, ml_buf, (size_t)ml_n);
+                if (err != HU_OK)
+                    goto fail;
+            }
+        }
+
+        if (persona->emoji_frequency > 0.001) {
+            char ef_buf[128];
+            int ef_n = snprintf(ef_buf, sizeof(ef_buf),
+                                "- Emoji usage: %.0f%% of messages contain emoji. Match this "
+                                "frequency.\n",
+                                persona->emoji_frequency * 100.0);
+            if (ef_n > 0 && (size_t)ef_n < sizeof(ef_buf)) {
+                err = append_prompt(alloc, &buf, &len, &cap, ef_buf, (size_t)ef_n);
+                if (err != HU_OK)
+                    goto fail;
+            }
+        }
+
+        if (persona->avg_response_time_sec > 0.0) {
+            const char *engagement;
+            if (persona->avg_response_time_sec < 60.0)
+                engagement = "quick, casual";
+            else if (persona->avg_response_time_sec < 300.0)
+                engagement = "moderate";
+            else
+                engagement = "deliberate, thoughtful";
+            char rt_buf[160];
+            int rt_n =
+                snprintf(rt_buf, sizeof(rt_buf),
+                         "- Typical response speed suggests %s engagement style.\n", engagement);
+            if (rt_n > 0 && (size_t)rt_n < sizeof(rt_buf)) {
+                err = append_prompt(alloc, &buf, &len, &cap, rt_buf, (size_t)rt_n);
+                if (err != HU_OK)
+                    goto fail;
+            }
+        }
+
+        if (persona->signature_phrases && persona->signature_phrases_count > 0) {
+            const char *sig_lbl = "- Signature expressions to naturally incorporate: ";
+            err = append_prompt(alloc, &buf, &len, &cap, sig_lbl, strlen(sig_lbl));
+            if (err != HU_OK)
+                goto fail;
+            for (size_t sp = 0; sp < persona->signature_phrases_count && sp < 10; sp++) {
+                if (sp > 0) {
+                    err = append_prompt(alloc, &buf, &len, &cap, ", ", 2);
+                    if (err != HU_OK)
+                        goto fail;
+                }
+                err = append_prompt(alloc, &buf, &len, &cap, "\"", 1);
+                if (err != HU_OK)
+                    goto fail;
+                const char *phrase = persona->signature_phrases[sp];
+                if (phrase) {
+                    err = append_prompt(alloc, &buf, &len, &cap, phrase, strlen(phrase));
+                    if (err != HU_OK)
+                        goto fail;
+                }
+                err = append_prompt(alloc, &buf, &len, &cap, "\"", 1);
+                if (err != HU_OK)
+                    goto fail;
+            }
+            err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+            if (err != HU_OK)
+                goto fail;
+        }
+    }
+
+    if (persona->principles && persona->principles_count > 0) {
+        err = append_prompt(alloc, &buf, &len, &cap, "## Principles\n",
+                            sizeof("## Principles\n") - 1);
+        if (err != HU_OK)
+            goto fail;
+        for (size_t i = 0; i < persona->principles_count; i++) {
+            const char *pr = persona->principles[i];
+            if (!pr)
+                continue;
+            err = append_prompt(alloc, &buf, &len, &cap, "- ", 2);
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap, pr, strlen(pr));
+            if (err != HU_OK)
+                goto fail;
+            err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+            if (err != HU_OK)
+                goto fail;
+        }
     }
 
     if (persona->preferred_vocab && persona->preferred_vocab_count > 0) {

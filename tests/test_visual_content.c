@@ -334,6 +334,53 @@ static void test_visual_match_for_contact_no_match(void) {
 }
 #endif
 
+static void test_visual_should_send_media_image_cue(void) {
+    hu_visual_proactive_media_kind_t k = HU_VISUAL_MEDIA_NONE;
+    const char *r = NULL;
+    bool ok = hu_visual_should_send_media("can you look at this thing", 26, &k, &r);
+    HU_ASSERT_TRUE(ok);
+    HU_ASSERT_EQ((int)k, (int)HU_VISUAL_MEDIA_IMAGE_SEARCH);
+    HU_ASSERT_NOT_NULL(r);
+}
+
+static void test_visual_should_send_media_screenshot_cue(void) {
+    hu_visual_proactive_media_kind_t k = HU_VISUAL_MEDIA_NONE;
+    const char *r = NULL;
+    bool ok = hu_visual_should_send_media("what's on my screen right now", 29, &k, &r);
+    HU_ASSERT_TRUE(ok);
+    HU_ASSERT_EQ((int)k, (int)HU_VISUAL_MEDIA_SCREENSHOT);
+    HU_ASSERT_NOT_NULL(r);
+}
+
+static void test_visual_should_send_media_no_cue(void) {
+    hu_visual_proactive_media_kind_t k = HU_VISUAL_MEDIA_IMAGE_SEARCH;
+    const char *r = NULL;
+    bool ok = hu_visual_should_send_media("just checking in", 16, &k, &r);
+    HU_ASSERT_FALSE(ok);
+    HU_ASSERT_EQ((int)k, (int)HU_VISUAL_MEDIA_NONE);
+    HU_ASSERT_NOT_NULL(r);
+}
+
+static void test_visual_search_image_test_mode(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char url[256];
+    HU_ASSERT_EQ(hu_visual_search_image(&alloc, "cats", 4, url, sizeof(url)), HU_OK);
+    HU_ASSERT_STR_EQ(url, "https://example.com/mock-image.jpg");
+}
+
+static void test_visual_generate_screenshot_test_mode(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char path[256];
+    HU_ASSERT_EQ(hu_visual_generate_screenshot(&alloc, NULL, path, sizeof(path)), HU_OK);
+    HU_ASSERT_STR_EQ(path, "/tmp/mock-screenshot.png");
+}
+
+static void test_visual_proactive_media_governor_test_always_allows(void) {
+    HU_ASSERT_TRUE(hu_visual_proactive_media_governor_allow(1000));
+    hu_visual_proactive_media_governor_record(1000);
+    HU_ASSERT_TRUE(hu_visual_proactive_media_governor_allow(2000));
+}
+
 void run_visual_content_tests(void) {
     HU_TEST_SUITE("visual_content");
     HU_RUN_TEST(test_visual_create_table_sql_valid);
@@ -356,6 +403,12 @@ void run_visual_content_tests(void) {
     HU_RUN_TEST(test_visual_candidate_deinit_frees);
     HU_RUN_TEST(test_visual_should_share_high_relevance);
     HU_RUN_TEST(test_visual_should_share_low_relevance);
+    HU_RUN_TEST(test_visual_should_send_media_image_cue);
+    HU_RUN_TEST(test_visual_should_send_media_screenshot_cue);
+    HU_RUN_TEST(test_visual_should_send_media_no_cue);
+    HU_RUN_TEST(test_visual_search_image_test_mode);
+    HU_RUN_TEST(test_visual_generate_screenshot_test_mode);
+    HU_RUN_TEST(test_visual_proactive_media_governor_test_always_allows);
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(test_visual_scan_recent_empty_returns_zero);
     HU_RUN_TEST(test_visual_match_for_contact_no_match);

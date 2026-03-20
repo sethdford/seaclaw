@@ -58,6 +58,49 @@ struct OverviewView: View {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 
+    private func formatUptime(_ seconds: UInt64) -> String {
+        let d = seconds / 86400
+        let h = (seconds % 86400) / 3600
+        let m = (seconds % 3600) / 60
+        if d > 0 { return "\(d)d \(h)h" }
+        if h > 0 { return "\(h)h \(m)m" }
+        return "\(m)m"
+    }
+
+    private var totalSessionTurns: Int {
+        connectionManager.sessions.reduce(0) { $0 + $1.messageCount }
+    }
+
+    private var messagesStat: String {
+        guard connectionManager.isConnected else { return "—" }
+        let n = totalSessionTurns
+        return n > 0 ? "\(n)" : "0"
+    }
+
+    private var channelsStat: String {
+        guard connectionManager.isConnected else { return "—" }
+        if let c = connectionManager.channelCount { return "\(c)" }
+        return "—"
+    }
+
+    private var toolsStat: String {
+        guard connectionManager.isConnected else { return "—" }
+        if !connectionManager.tools.isEmpty { return "\(connectionManager.tools.count)" }
+        if let t = connectionManager.toolCount { return "\(t)" }
+        return "—"
+    }
+
+    private var uptimeStat: String {
+        guard connectionManager.isConnected else { return "—" }
+        if let u = connectionManager.uptimeSeconds { return formatUptime(u) }
+        return "—"
+    }
+
+    private var modelStat: String {
+        guard connectionManager.isConnected else { return "—" }
+        return connectionManager.modelName ?? "—"
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -98,9 +141,9 @@ struct OverviewView: View {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: HUTokens.spaceMd) {
                         if connectionManager.isConnected {
                         StatCard(
-                            title: "Messages",
-                            value: "1,247",
-                            trend: "+12%",
+                            title: "Turns",
+                            value: messagesStat,
+                            trend: "sessions",
                             trendUp: true,
                             tokens: tokens,
                             appeared: appeared,
@@ -110,8 +153,8 @@ struct OverviewView: View {
                         )
                         StatCard(
                             title: "Channels",
-                            value: "8",
-                            trend: "Active",
+                            value: channelsStat,
+                            trend: "configured",
                             trendUp: true,
                             tokens: tokens,
                             appeared: appeared,
@@ -120,26 +163,26 @@ struct OverviewView: View {
                             icon: .grid
                         )
                         StatCard(
-                            title: "Uptime",
-                            value: "99.8%",
-                            trend: "30d",
+                            title: "Tools",
+                            value: toolsStat,
+                            trend: "catalog",
                             trendUp: true,
                             tokens: tokens,
                             appeared: appeared,
                             delay: 0.1,
                             reduceMotion: reduceMotion,
-                            icon: .clock
+                            icon: .terminal
                         )
                         StatCard(
-                            title: "Latency",
-                            value: "42ms",
-                            trend: "avg",
-                            trendUp: false,
+                            title: "Model",
+                            value: modelStat,
+                            trend: uptimeStat != "—" ? "up \(uptimeStat)" : "from gateway",
+                            trendUp: true,
                             tokens: tokens,
                             appeared: appeared,
                             delay: 0.15,
                             reduceMotion: reduceMotion,
-                            icon: .terminal
+                            icon: .clock
                         )
                         } else {
                             ForEach(0..<4, id: \.self) { _ in
@@ -157,7 +200,7 @@ struct OverviewView: View {
                             .padding(.horizontal)
 
                         VStack(spacing: 0) {
-                            if !connectionManager.isConnected || (connectionManager.recentActivity.isEmpty && connectionManager.isConnected) {
+                            if !connectionManager.isConnected {
                                 ForEach(0..<5, id: \.self) { i in
                                     VStack(spacing: 0) {
                                         ActivityRowSkeleton()
@@ -168,6 +211,14 @@ struct OverviewView: View {
                                         }
                                     }
                                 }
+                            } else if connectionManager.recentActivity.isEmpty {
+                                Text("No recent activity yet.")
+                                    .font(.custom("Avenir-Book", size: HUTokens.textSm, relativeTo: .subheadline))
+                                    .foregroundStyle(tokens.textMuted)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, HUTokens.spaceMd)
+                                    .padding(.vertical, HUTokens.spaceSm)
+                                    .accessibilityLabel("No recent activity")
                             } else {
                                 ForEach(Array(connectionManager.recentActivity.enumerated()), id: \.element.id) { index, activity in
                                     ActivityRow(

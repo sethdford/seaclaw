@@ -77,6 +77,7 @@ typedef struct hu_persona_channel_entry {
 
 typedef struct hu_agent_config {
     bool llm_compiler_enabled;
+    bool mcts_planner_enabled;
     bool tool_routing_enabled;
     bool tree_of_thought;
     bool constitutional_ai;
@@ -141,6 +142,15 @@ typedef struct hu_heartbeat_config {
 
 #define HU_CHANNEL_CONFIG_MAX 24
 
+/* Shared daemon behavior config — embedded in per-channel config structs.
+ * Daemon reads from the active channel's config, falling back to defaults. */
+typedef struct hu_channel_daemon_config {
+    char *response_mode;          /* "selective" (default), "normal", "eager" */
+    int user_response_window_sec; /* 0 = use default (120s) */
+    int poll_interval_sec;        /* 0 = use channel-specific default (see bootstrap) */
+    bool voice_enabled;           /* enable TTS on this channel */
+} hu_channel_daemon_config_t;
+
 typedef struct hu_email_channel_config {
     char *smtp_host;
     uint16_t smtp_port;
@@ -165,8 +175,9 @@ typedef struct hu_imessage_channel_config {
     char **allow_from;
     size_t allow_from_count;
     int poll_interval_sec;
-    int user_response_window_sec; /* 0 = use default (45s); how long to wait for real user */
-    char *response_mode;          /* "selective" (default), "normal", "eager" */
+    int user_response_window_sec; /* DEPRECATED: use daemon.user_response_window_sec */
+    char *response_mode;          /* DEPRECATED: use daemon.response_mode */
+    hu_channel_daemon_config_t daemon;
 } hu_imessage_channel_config_t;
 
 typedef struct hu_gmail_channel_config {
@@ -183,6 +194,7 @@ typedef struct hu_discord_channel_config {
     char *bot_id;
     char *channel_ids[HU_DISCORD_CHANNEL_IDS_MAX];
     size_t channel_ids_count;
+    hu_channel_daemon_config_t daemon;
 } hu_discord_channel_config_t;
 
 #define HU_TELEGRAM_ALLOW_FROM_MAX 16
@@ -190,6 +202,7 @@ typedef struct hu_telegram_channel_config {
     char *token;
     char *allow_from[HU_TELEGRAM_ALLOW_FROM_MAX];
     size_t allow_from_count;
+    hu_channel_daemon_config_t daemon;
 } hu_telegram_channel_config_t;
 
 #define HU_MCP_SERVERS_MAX     16
@@ -214,12 +227,14 @@ typedef struct hu_slack_channel_config {
     char *token;
     char *channel_ids[HU_SLACK_CHANNEL_IDS_MAX];
     size_t channel_ids_count;
+    hu_channel_daemon_config_t daemon;
 } hu_slack_channel_config_t;
 
 typedef struct hu_whatsapp_channel_config {
     char *phone_number_id;
     char *token;
     char *verify_token;
+    hu_channel_daemon_config_t daemon;
 } hu_whatsapp_channel_config_t;
 
 typedef struct hu_line_channel_config {

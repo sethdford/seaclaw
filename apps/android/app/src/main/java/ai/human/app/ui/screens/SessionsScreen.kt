@@ -80,6 +80,8 @@ fun SessionsScreen(
     val pullToRefreshState = rememberPullToRefreshState()
     val sessions by gateway.sessions.collectAsState()
     val reducedMotion = isReducedMotionEnabled()
+    val activeSessions = sessions.filter { !it.archived }
+    val archivedSessions = sessions.filter { it.archived }
 
     LaunchedEffect(connectionState) {
         if (connectionState == ConnectionState.CONNECTED) {
@@ -132,7 +134,7 @@ fun SessionsScreen(
         }
 
         itemsIndexed(
-            items = sessions,
+            items = activeSessions,
             key = { _, it -> it.key },
         ) { index, session ->
             StaggeredItem(
@@ -154,6 +156,38 @@ fun SessionsScreen(
                         }
                     },
                 )
+            }
+        }
+
+        if (archivedSessions.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Archived",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = HUTokens.spaceMd, bottom = HUTokens.spaceSm),
+                )
+            }
+            itemsIndexed(
+                items = archivedSessions,
+                key = { _, it -> "arch-${it.key}" },
+            ) { index, session ->
+                StaggeredItem(
+                    index = 100 + index,
+                    reducedMotion = reducedMotion,
+                    enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)),
+                ) {
+                    SessionListItem(
+                        session = session,
+                        onDismiss = {
+                            gateway.send("sessions.delete", mapOf("key" to session.key))
+                            scope.launch {
+                                delay(300)
+                                gateway.fetchSessions()
+                            }
+                        },
+                    )
+                }
             }
         }
     }

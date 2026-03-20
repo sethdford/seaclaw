@@ -1,0 +1,255 @@
+#include "human/providers/ensemble.h"
+#include <string.h>
+
+typedef struct {
+    hu_ensemble_config_t config;
+    size_t round_robin_idx;
+} ensemble_ctx_t;
+
+static bool msg_has_kw(const char *message, size_t msg_len, const char *kw, size_t kw_len) {
+    if (!message || msg_len < kw_len || kw_len == 0)
+        return false;
+    for (size_t i = 0; i + kw_len <= msg_len; i++) {
+        if (memcmp(message + i, kw, kw_len) == 0)
+            return true;
+    }
+    return false;
+}
+
+/* Task classification heuristics for routing */
+static size_t classify_best_provider(const ensemble_ctx_t *ctx, const char *message, size_t msg_len) {
+    if (ctx->config.provider_count == 0)
+        return 0;
+
+    bool needs_code = msg_has_kw(message, msg_len, "code", 4) ||
+                      msg_has_kw(message, msg_len, "func", 4) ||
+                      msg_has_kw(message, msg_len, "impl", 4) ||
+                      msg_has_kw(message, msg_len, "bug", 3);
+    bool needs_reasoning = msg_has_kw(message, msg_len, "why", 3) ||
+                           msg_has_kw(message, msg_len, "math", 4) ||
+                           msg_has_kw(message, msg_len, "prov", 4) ||
+                           msg_has_kw(message, msg_len, "logic", 5);
+    bool needs_creative = msg_has_kw(message, msg_len, "write", 5) ||
+                          msg_has_kw(message, msg_len, "story", 5) ||
+                          msg_has_kw(message, msg_len, "creat", 5);
+
+    for (size_t p = 0; p < ctx->config.provider_count; p++) {
+        const char *name = ctx->config.providers[p].vtable && ctx->config.providers[p].vtable->get_name
+                               ? ctx->config.providers[p].vtable->get_name(ctx->config.providers[p].ctx)
+                               : "";
+        if (!name)
+            continue;
+        if (needs_code && (strstr(name, "openai") != NULL || strstr(name, "anthropic") != NULL))
+            return p;
+        if (needs_reasoning &&
+            (strstr(name, "anthropic") != NULL || strstr(name, "deepseek") != NULL))
+            return p;
+        if (needs_creative &&
+            (strstr(name, "google") != NULL || strstr(name, "gemini") != NULL))
+            return p;
+    }
+    return 0;
+}
+
+static hu_error_t ensemble_chat_with_system(void *ctx, hu_allocator_t *alloc,
+                                            const char *system_prompt, size_t system_prompt_len,
+                                            const char *message, size_t message_len, const char *model,
+                                            size_t model_len, double temperature, char **out,
+                                            size_t *out_len) {
+    ensemble_ctx_t *ectx = (ensemble_ctx_t *)ctx;
+    (void)system_prompt;
+    (void)system_prompt_len;
+    if (ectx->config.provider_count == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    size_t idx;
+    if (ectx->config.strategy == HU_ENSEMBLE_ROUND_ROBIN) {
+        idx = ectx->round_robin_idx % ectx->config.provider_count;
+        ectx->round_robin_idx++;
+    } else if (ectx->config.strategy == HU_ENSEMBLE_CONSENSUS) {
+        char *responses[HU_ENSEMBLE_MAX_PROVIDERS] = {0};
+        size_t resp_lens[HU_ENSEMBLE_MAX_PROVIDERS] = {0};
+        size_t valid = 0;
+
+        for (size_t p = 0; p < ectx->config.provider_count; p++) {
+            hu_provider_t *prov = &ectx->config.providers[p];
+            if (prov->vtable && prov->vtable->chat_with_system) {
+                hu_error_t err = prov->vtable->chat_with_system(
+                    prov->ctx, alloc, system_prompt, system_prompt_len, message, message_len, model,
+                    model_len, temperature, &responses[p], &resp_lens[p]);
+                if (err == HU_OK && responses[p])
+                    valid++;
+            }
+        }
+
+        if (valid == 0)
+            return HU_ERR_IO;
+
+        size_t best = 0;
+        size_t best_len = 0;
+        for (size_t p = 0; p < ectx->config.provider_count; p++) {
+            if (responses[p] && resp_lens[p] > best_len) {
+                best = p;
+                best_len = resp_lens[p];
+            }
+        }
+
+        *out = responses[best];
+        *out_len = resp_lens[best];
+        responses[best] = NULL;
+
+        for (size_t p = 0; p < ectx->config.provider_count; p++) {
+            if (responses[p])
+                alloc->free(alloc->ctx, responses[p], resp_lens[p] + 1);
+        }
+        return HU_OK;
+    } else {
+        idx = classify_best_provider(ectx, message, message_len);
+    }
+
+    hu_provider_t *selected = &ectx->config.providers[idx];
+    if (!selected->vtable || !selected->vtable->chat_with_system)
+        return HU_ERR_INVALID_ARGUMENT;
+    return selected->vtable->chat_with_system(selected->ctx, alloc, system_prompt, system_prompt_len,
+                                              message, message_len, model, model_len, temperature,
+                                              out, out_len);
+}
+
+static void last_user_message(const hu_chat_request_t *request, const char **msg, size_t *msg_len) {
+    *msg = "";
+    *msg_len = 0;
+    if (!request || request->messages_count == 0)
+        return;
+    for (size_t i = request->messages_count; i > 0; i--) {
+        size_t j = i - 1;
+        if (request->messages[j].role == HU_ROLE_USER && request->messages[j].content) {
+            *msg = request->messages[j].content;
+            *msg_len = request->messages[j].content_len;
+            return;
+        }
+    }
+}
+
+static hu_error_t ensemble_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_request_t *request,
+                                const char *model, size_t model_len, double temperature,
+                                hu_chat_response_t *out) {
+    ensemble_ctx_t *ectx = (ensemble_ctx_t *)ctx;
+    if (ectx->config.provider_count == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+
+    if (ectx->config.strategy == HU_ENSEMBLE_CONSENSUS) {
+        hu_chat_response_t responses[HU_ENSEMBLE_MAX_PROVIDERS];
+        memset(responses, 0, sizeof(responses));
+        size_t best = 0;
+        size_t best_len = 0;
+        bool any = false;
+
+        for (size_t p = 0; p < ectx->config.provider_count; p++) {
+            hu_provider_t *prov = &ectx->config.providers[p];
+            if (!prov->vtable || !prov->vtable->chat)
+                continue;
+            hu_error_t e =
+                prov->vtable->chat(prov->ctx, alloc, request, model, model_len, temperature, &responses[p]);
+            if (e != HU_OK) {
+                hu_chat_response_free(alloc, &responses[p]);
+                continue;
+            }
+            if (responses[p].content && responses[p].content_len > best_len) {
+                best_len = responses[p].content_len;
+                best = p;
+                any = true;
+            }
+        }
+
+        if (!any) {
+            for (size_t p = 0; p < ectx->config.provider_count; p++)
+                hu_chat_response_free(alloc, &responses[p]);
+            return HU_ERR_IO;
+        }
+
+        for (size_t p = 0; p < ectx->config.provider_count; p++) {
+            if (p != best)
+                hu_chat_response_free(alloc, &responses[p]);
+        }
+        *out = responses[best];
+        memset(&responses[best], 0, sizeof(responses[best]));
+        return HU_OK;
+    }
+
+    size_t idx;
+    if (ectx->config.strategy == HU_ENSEMBLE_ROUND_ROBIN) {
+        idx = ectx->round_robin_idx % ectx->config.provider_count;
+        ectx->round_robin_idx++;
+    } else {
+        const char *umsg = NULL;
+        size_t ulen = 0;
+        last_user_message(request, &umsg, &ulen);
+        idx = classify_best_provider(ectx, umsg, ulen);
+    }
+
+    hu_provider_t *sel = &ectx->config.providers[idx];
+    if (!sel->vtable || !sel->vtable->chat)
+        return HU_ERR_INVALID_ARGUMENT;
+    return sel->vtable->chat(sel->ctx, alloc, request, model, model_len, temperature, out);
+}
+
+static bool ensemble_supports_native_tools(void *ctx) {
+    ensemble_ctx_t *ectx = (ensemble_ctx_t *)ctx;
+    for (size_t i = 0; i < ectx->config.provider_count; i++) {
+        if (ectx->config.providers[i].vtable &&
+            ectx->config.providers[i].vtable->supports_native_tools &&
+            ectx->config.providers[i].vtable->supports_native_tools(ectx->config.providers[i].ctx))
+            return true;
+    }
+    return false;
+}
+
+static const char *ensemble_get_name(void *ctx) {
+    (void)ctx;
+    return "ensemble";
+}
+
+static void ensemble_deinit(void *ctx, hu_allocator_t *alloc) {
+    ensemble_ctx_t *ectx = (ensemble_ctx_t *)ctx;
+    for (size_t i = 0; i < ectx->config.provider_count; i++) {
+        if (ectx->config.providers[i].vtable && ectx->config.providers[i].vtable->deinit)
+            ectx->config.providers[i].vtable->deinit(ectx->config.providers[i].ctx, alloc);
+    }
+    alloc->free(alloc->ctx, ectx, sizeof(ensemble_ctx_t));
+}
+
+static bool ensemble_supports_vision(void *ctx) {
+    ensemble_ctx_t *ectx = (ensemble_ctx_t *)ctx;
+    for (size_t i = 0; i < ectx->config.provider_count; i++) {
+        if (ectx->config.providers[i].vtable &&
+            ectx->config.providers[i].vtable->supports_vision &&
+            ectx->config.providers[i].vtable->supports_vision(ectx->config.providers[i].ctx))
+            return true;
+    }
+    return false;
+}
+
+static const hu_provider_vtable_t ensemble_vtable = {
+    .chat_with_system = ensemble_chat_with_system,
+    .chat = ensemble_chat,
+    .supports_native_tools = ensemble_supports_native_tools,
+    .get_name = ensemble_get_name,
+    .deinit = ensemble_deinit,
+    .supports_vision = ensemble_supports_vision,
+};
+
+hu_error_t hu_ensemble_create(hu_allocator_t *alloc, const hu_ensemble_config_t *config,
+                              hu_provider_t *out) {
+    if (!alloc || !config || !out || config->provider_count == 0 ||
+        config->provider_count > HU_ENSEMBLE_MAX_PROVIDERS)
+        return HU_ERR_INVALID_ARGUMENT;
+    ensemble_ctx_t *ectx = (ensemble_ctx_t *)alloc->alloc(alloc->ctx, sizeof(ensemble_ctx_t));
+    if (!ectx)
+        return HU_ERR_OUT_OF_MEMORY;
+    ectx->config = *config;
+    ectx->round_robin_idx = 0;
+    out->vtable = &ensemble_vtable;
+    out->ctx = ectx;
+    return HU_OK;
+}

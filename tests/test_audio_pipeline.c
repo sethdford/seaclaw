@@ -68,6 +68,40 @@ static void test_audio_cleanup_temp_empty_path_safe(void) {
     hu_audio_cleanup_temp("");
 }
 
+static void test_audio_tts_bytes_to_temp_writes_mp3(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    static const unsigned char data[] = {0xFF, 0xFB, 0x90, 0x00};
+    char out_path[256] = {0};
+    hu_error_t err =
+        hu_audio_tts_bytes_to_temp(&alloc, data, sizeof(data), "mp3", out_path, sizeof(out_path));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(out_path, "/tmp/human-tts-bytes-test.mp3");
+    FILE *f = fopen(out_path, "rb");
+    HU_ASSERT_NOT_NULL(f);
+    fclose(f);
+    hu_audio_cleanup_temp(out_path);
+}
+
+static void test_audio_tts_bytes_to_temp_writes_wav(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    static const unsigned char data[] = {'R', 'I', 'F', 'F'};
+    char out_path[256] = {0};
+    hu_error_t err =
+        hu_audio_tts_bytes_to_temp(&alloc, data, sizeof(data), "wav", out_path, sizeof(out_path));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(out_path, "/tmp/human-tts-bytes-test.wav");
+    hu_audio_cleanup_temp(out_path);
+}
+
+static void test_audio_tts_bytes_to_temp_rejects_bad_ext(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    static const unsigned char data[] = {0x01};
+    char out_path[256] = {0};
+    hu_error_t err =
+        hu_audio_tts_bytes_to_temp(&alloc, data, 1, "ogg", out_path, sizeof(out_path));
+    HU_ASSERT_NEQ(err, HU_OK);
+}
+
 static void test_audio_pipeline_process_null_alloc_returns_error(void) {
     static const unsigned char buf[] = {0x01, 0x02};
     void *out = NULL;
@@ -144,6 +178,9 @@ void run_audio_pipeline_tests(void) {
     HU_RUN_TEST(test_audio_mp3_to_caf_null_out_path_returns_error);
     HU_RUN_TEST(test_audio_cleanup_temp_null_safe);
     HU_RUN_TEST(test_audio_cleanup_temp_empty_path_safe);
+    HU_RUN_TEST(test_audio_tts_bytes_to_temp_writes_mp3);
+    HU_RUN_TEST(test_audio_tts_bytes_to_temp_writes_wav);
+    HU_RUN_TEST(test_audio_tts_bytes_to_temp_rejects_bad_ext);
     HU_RUN_TEST(test_audio_pipeline_process_null_alloc_returns_error);
     HU_RUN_TEST(test_audio_pipeline_process_null_out_returns_error);
     HU_RUN_TEST(test_audio_pipeline_process_null_out_len_returns_error);

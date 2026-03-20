@@ -9,18 +9,30 @@ struct SendMessageIntent: AppIntent {
     @Parameter(title: "Message")
     var message: String
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        return .result(dialog: "Sending '\(message)' to h-uman...")
+    @Dependency(\.openURL) private var openURL
+
+    func perform() async throws -> some IntentResult {
+        var c = URLComponents(string: "human://chat")!
+        c.queryItems = [URLQueryItem(name: "message", value: message)]
+        if let url = c.url {
+            await openURL(url)
+        }
+        return .result()
     }
 }
 
 struct CheckStatusIntent: AppIntent {
     static var title: LocalizedStringResource = "Check h-uman Status"
-    static var description = IntentDescription("Check whether your h-uman AI assistant is connected and running.")
-    static var openAppWhenRun = false
+    static var description = IntentDescription("Open h-uman and jump to Overview to see connection status.")
+    static var openAppWhenRun = true
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        return .result(dialog: "h-uman is ready.")
+    @Dependency(\.openURL) private var openURL
+
+    func perform() async throws -> some IntentResult {
+        if let url = URL(string: "human://overview") {
+            await openURL(url)
+        }
+        return .result()
     }
 }
 

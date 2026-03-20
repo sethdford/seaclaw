@@ -1,4 +1,8 @@
 #include "human/ml/dpo.h"
+#ifdef HU_ENABLE_SQLITE
+#include "human/core/json.h"
+#include "human/core/string.h"
+#endif
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
@@ -242,6 +246,101 @@ hu_error_t hu_dpo_export_jsonl(hu_dpo_collector_t *collector,
     (void)path_len;
     return HU_ERR_NOT_SUPPORTED;
 #endif
+#endif
+}
+
+hu_error_t hu_dpo_get_best_examples(hu_dpo_collector_t *collector, hu_allocator_t *alloc,
+                                    size_t max_examples, char **out_prompt_fragment,
+                                    size_t *out_len) {
+    if (!collector || !alloc || !out_prompt_fragment || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_prompt_fragment = NULL;
+    *out_len = 0;
+    if (max_examples == 0)
+        return HU_OK;
+
+#ifdef HU_ENABLE_SQLITE
+    if (!collector->db)
+        return HU_OK;
+
+    sqlite3_stmt *stmt = NULL;
+    const char *sql = "SELECT prompt, chosen, rejected FROM dpo_pairs "
+                      "WHERE margin > 0.5 ORDER BY margin DESC LIMIT ?";
+    if (sqlite3_prepare_v2(collector->db, sql, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_IO;
+
+    int lim = (int)(max_examples > 10 ? 10 : max_examples);
+    if (lim < 1)
+        lim = 1;
+    sqlite3_bind_int(stmt, 1, lim);
+
+    hu_json_buf_t buf;
+    hu_error_t err = hu_json_buf_init(&buf, alloc);
+    if (err != HU_OK) {
+        sqlite3_finalize(stmt);
+        return err;
+    }
+
+    static const char header[] = "\n\n[Learned preferences from past conversations]\n";
+    err = hu_json_buf_append_raw(&buf, header, sizeof(header) - 1u);
+    if (err != HU_OK) {
+        hu_json_buf_free(&buf);
+        sqlite3_finalize(stmt);
+        return err;
+    }
+
+    size_t found = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW && found < max_examples) {
+        const char *prompt = (const char *)sqlite3_column_text(stmt, 0);
+        const char *chosen = (const char *)sqlite3_column_text(stmt, 1);
+        const char *rejected = (const char *)sqlite3_column_text(stmt, 2);
+        if (!prompt || !chosen)
+            continue;
+
+        char entry[1024];
+        int n;
+        if (rejected && rejected[0]) {
+            n = snprintf(entry, sizeof(entry),
+                "When asked: \"%.*s\"\n  GOOD response: \"%.*s\"\n  BAD response: \"%.*s\"\n\n",
+                (int)(strlen(prompt) < 200 ? strlen(prompt) : 200), prompt,
+                (int)(strlen(chosen) < 300 ? strlen(chosen) : 300), chosen,
+                (int)(strlen(rejected) < 200 ? strlen(rejected) : 200), rejected);
+        } else {
+            n = snprintf(entry, sizeof(entry),
+                "When asked: \"%.*s\"\n  GOOD response: \"%.*s\"\n\n",
+                (int)(strlen(prompt) < 200 ? strlen(prompt) : 200), prompt,
+                (int)(strlen(chosen) < 300 ? strlen(chosen) : 300), chosen);
+        }
+        if (n > 0) {
+            err = hu_json_buf_append_raw(&buf, entry, (size_t)n);
+            if (err != HU_OK) {
+                hu_json_buf_free(&buf);
+                sqlite3_finalize(stmt);
+                return err;
+            }
+        }
+        found++;
+    }
+    sqlite3_finalize(stmt);
+
+    if (found == 0) {
+        hu_json_buf_free(&buf);
+        return HU_OK;
+    }
+
+    size_t frag_len = buf.len;
+    char *dup = hu_strndup(alloc, buf.ptr, frag_len);
+    hu_json_buf_free(&buf);
+    if (!dup)
+        return HU_ERR_OUT_OF_MEMORY;
+    *out_prompt_fragment = dup;
+    *out_len = frag_len;
+    return HU_OK;
+#else
+    (void)collector;
+    (void)alloc;
+    (void)max_examples;
+    return HU_OK;
 #endif
 }
 

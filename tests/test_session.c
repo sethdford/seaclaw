@@ -306,6 +306,29 @@ static void test_session_patch_not_found(void) {
     hu_session_manager_deinit(&mgr);
 }
 
+static void test_session_set_archived_and_list(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_session_manager_t mgr;
+    hu_session_manager_init(&mgr, &alloc);
+    HU_ASSERT_NOT_NULL(hu_session_get_or_create(&mgr, "a1"));
+    HU_ASSERT_EQ(hu_session_set_archived(&mgr, "a1", true), HU_OK);
+
+    size_t count = 0;
+    hu_session_summary_t *summaries = hu_session_list(&mgr, &alloc, &count);
+    HU_ASSERT_NOT_NULL(summaries);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_TRUE(summaries[0].archived);
+    alloc.free(alloc.ctx, summaries, count * sizeof(hu_session_summary_t));
+
+    HU_ASSERT_EQ(hu_session_set_archived(&mgr, "a1", false), HU_OK);
+    summaries = hu_session_list(&mgr, &alloc, &count);
+    HU_ASSERT_NOT_NULL(summaries);
+    HU_ASSERT_FALSE(summaries[0].archived);
+    alloc.free(alloc.ctx, summaries, count * sizeof(hu_session_summary_t));
+
+    hu_session_manager_deinit(&mgr);
+}
+
 static void test_session_save_load_roundtrip(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_session_manager_t mgr;
@@ -314,6 +337,7 @@ static void test_session_save_load_roundtrip(void) {
     hu_session_t *s = hu_session_get_or_create(&mgr, "persist_test");
     HU_ASSERT_NOT_NULL(s);
     hu_session_patch(&mgr, "persist_test", "my-label");
+    HU_ASSERT_EQ(hu_session_set_archived(&mgr, "persist_test", true), HU_OK);
     hu_session_append_message(s, &alloc, "user", "hello world");
     hu_session_append_message(s, &alloc, "assistant", "hi there");
 
@@ -335,6 +359,7 @@ static void test_session_save_load_roundtrip(void) {
     hu_session_t *loaded = hu_session_get_or_create(&mgr2, "persist_test");
     HU_ASSERT_NOT_NULL(loaded);
     HU_ASSERT_STR_EQ(loaded->label, "my-label");
+    HU_ASSERT_TRUE(loaded->archived);
     HU_ASSERT_EQ(loaded->message_count, 2u);
     HU_ASSERT_STR_EQ(loaded->messages[0].role, "user");
     HU_ASSERT_STR_EQ(loaded->messages[0].content, "hello world");
@@ -450,6 +475,7 @@ void run_session_tests(void) {
     HU_RUN_TEST(test_session_delete_not_found);
     HU_RUN_TEST(test_session_patch);
     HU_RUN_TEST(test_session_patch_not_found);
+    HU_RUN_TEST(test_session_set_archived_and_list);
     HU_RUN_TEST(test_session_save_load_roundtrip);
     HU_RUN_TEST(test_session_save_null_args);
     HU_RUN_TEST(test_session_load_null_args);

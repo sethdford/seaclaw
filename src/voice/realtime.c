@@ -1,29 +1,36 @@
 #include "human/voice/realtime.h"
+#include "human/core/json.h"
+#include "human/core/string.h"
 #include "human/multimodal.h"
 #include "human/websocket/websocket.h"
 #include <stdio.h>
 #include <string.h>
 
-hu_error_t hu_voice_rt_session_create(hu_allocator_t *alloc, const hu_voice_rt_config_t *config, hu_voice_rt_session_t **out) {
-    if (!alloc || !out) return HU_ERR_INVALID_ARGUMENT;
+hu_error_t hu_voice_rt_session_create(hu_allocator_t *alloc, const hu_voice_rt_config_t *config,
+                                      hu_voice_rt_session_t **out) {
+    if (!alloc || !out)
+        return HU_ERR_INVALID_ARGUMENT;
     hu_voice_rt_session_t *s = alloc->alloc(alloc->ctx, sizeof(hu_voice_rt_session_t));
-    if (!s) return HU_ERR_OUT_OF_MEMORY;
+    if (!s)
+        return HU_ERR_OUT_OF_MEMORY;
     memset(s, 0, sizeof(*s));
     s->alloc = alloc;
-    if (config) s->config = *config;
+    if (config)
+        s->config = *config;
     *out = s;
     return HU_OK;
 }
 
 hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
-    if (!session) return HU_ERR_INVALID_ARGUMENT;
-#ifdef HU_IS_TEST
+    if (!session)
+        return HU_ERR_INVALID_ARGUMENT;
+#if HU_IS_TEST
     session->connected = true;
     return HU_OK;
 #elif defined(HU_HTTP_CURL)
     const char *base = session->config.base_url && session->config.base_url[0]
-                          ? session->config.base_url
-                          : "wss://api.openai.com/v1/realtime";
+                           ? session->config.base_url
+                           : "wss://api.openai.com/v1/realtime";
     char url[512];
     int n;
     if (session->config.model && session->config.model[0])
@@ -40,6 +47,30 @@ hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
 
     session->ws_client = ws;
     session->connected = true;
+
+    {
+        char session_update[1024];
+        const char *mdl = (session->config.model && session->config.model[0])
+                              ? session->config.model
+                              : "gpt-4o-realtime-preview";
+        const char *voice = (session->config.voice && session->config.voice[0])
+                                ? session->config.voice
+                                : "alloy";
+        int su = snprintf(session_update, sizeof(session_update),
+                          "{\"type\":\"session.update\",\"session\":{"
+                          "\"model\":\"%s\","
+                          "\"modalities\":[\"text\",\"audio\"],"
+                          "\"voice\":\"%s\","
+                          "\"input_audio_format\":\"pcm16\","
+                          "\"output_audio_format\":\"pcm16\","
+                          "\"input_audio_transcription\":{\"model\":\"whisper-1\"},"
+                          "\"turn_detection\":{\"type\":\"server_vad\",\"threshold\":0.5,"
+                          "\"prefix_padding_ms\":300,\"silence_duration_ms\":500}"
+                          "}}",
+                          mdl, voice);
+        if (su > 0 && (size_t)su < sizeof(session_update))
+            (void)hu_ws_send(ws, session_update, (size_t)su);
+    }
     return HU_OK;
 #else
     return HU_ERR_NOT_SUPPORTED;
@@ -47,8 +78,9 @@ hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
 }
 
 hu_error_t hu_voice_rt_send_audio(hu_voice_rt_session_t *session, const void *data, size_t data_len) {
-    if (!session || !data) return HU_ERR_INVALID_ARGUMENT;
-#ifdef HU_IS_TEST
+    if (!session || !data)
+        return HU_ERR_INVALID_ARGUMENT;
+#if HU_IS_TEST
     (void)data_len;
     return HU_OK;
 #elif defined(HU_HTTP_CURL)
@@ -84,8 +116,174 @@ hu_error_t hu_voice_rt_send_audio(hu_voice_rt_session_t *session, const void *da
 #endif
 }
 
+static void copy_event_type(const char *type, hu_voice_rt_event_t *out) {
+    if (type) {
+        strncpy(out->type, type, sizeof(out->type) - 1);
+        out->type[sizeof(out->type) - 1] = '\0';
+    }
+}
+
+hu_error_t hu_voice_rt_recv_event(hu_voice_rt_session_t *session, hu_allocator_t *alloc,
+                                  hu_voice_rt_event_t *out, int timeout_ms) {
+    if (!session || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+#if HU_IS_TEST
+    if (!alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    (void)alloc;
+    (void)timeout_ms;
+    if (!session->connected)
+        return HU_ERR_IO;
+    copy_event_type("response.audio.done", out);
+    out->done = true;
+    return HU_OK;
+#elif defined(HU_HTTP_CURL)
+    if (!alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!session->connected || !session->ws_client)
+        return HU_ERR_IO;
+
+    char *msg = NULL;
+    size_t msg_len = 0;
+    hu_error_t err =
+        hu_ws_recv((hu_ws_client_t *)session->ws_client, alloc, &msg, &msg_len, timeout_ms);
+    if (err != HU_OK || !msg) {
+        if (msg)
+            alloc->free(alloc->ctx, msg, msg_len + 1);
+        return err;
+    }
+
+    hu_json_value_t *json = NULL;
+    err = hu_json_parse(alloc, msg, msg_len, &json);
+    if (err != HU_OK || !json) {
+        alloc->free(alloc->ctx, msg, msg_len + 1);
+        return err != HU_OK ? err : HU_ERR_IO;
+    }
+
+    const char *type = NULL;
+    if (json->type == HU_JSON_OBJECT)
+        type = hu_json_get_string(json, "type");
+    copy_event_type(type, out);
+
+    if (type) {
+        if (strcmp(type, "response.audio.delta") == 0 ||
+            strcmp(type, "response.output_audio.delta") == 0) {
+            const char *delta = hu_json_get_string(json, "delta");
+            if (delta && delta[0]) {
+                size_t dlen = strlen(delta);
+                out->audio_base64 = hu_strndup(alloc, delta, dlen);
+                if (!out->audio_base64) {
+                    hu_json_free(alloc, json);
+                    alloc->free(alloc->ctx, msg, msg_len + 1);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                out->audio_base64_len = dlen;
+            }
+        }
+
+        if (strcmp(type, "response.audio_transcript.delta") == 0 ||
+            strcmp(type, "response.output_audio_transcript.delta") == 0 ||
+            strcmp(type, "conversation.item.input_audio_transcription.completed") == 0) {
+            const char *text = hu_json_get_string(json, "transcript");
+            if (!text)
+                text = hu_json_get_string(json, "delta");
+            if (text && text[0]) {
+                size_t tlen = strlen(text);
+                out->transcript = hu_strndup(alloc, text, tlen);
+                if (!out->transcript) {
+                    hu_json_free(alloc, json);
+                    alloc->free(alloc->ctx, msg, msg_len + 1);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                out->transcript_len = tlen;
+            }
+        }
+
+        if (strcmp(type, "response.audio.done") == 0 || strcmp(type, "response.done") == 0 ||
+            strcmp(type, "response.output_audio.done") == 0)
+            out->done = true;
+    }
+
+    hu_json_free(alloc, json);
+    alloc->free(alloc->ctx, msg, msg_len + 1);
+    return HU_OK;
+#else
+    (void)alloc;
+    (void)timeout_ms;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
+void hu_voice_rt_event_free(hu_allocator_t *alloc, hu_voice_rt_event_t *event) {
+    if (!alloc || !event)
+        return;
+    if (event->audio_base64)
+        alloc->free(alloc->ctx, event->audio_base64, event->audio_base64_len + 1);
+    if (event->transcript)
+        alloc->free(alloc->ctx, event->transcript, event->transcript_len + 1);
+    memset(event, 0, sizeof(*event));
+}
+
+hu_error_t hu_voice_rt_add_tool(hu_voice_rt_session_t *session, const char *name,
+                                const char *description, const char *parameters_json) {
+    if (!session || !name)
+        return HU_ERR_INVALID_ARGUMENT;
+#if HU_IS_TEST
+    (void)description;
+    (void)parameters_json;
+    return HU_OK;
+#elif defined(HU_HTTP_CURL)
+    if (!session->connected || !session->ws_client)
+        return HU_ERR_IO;
+    const char *params = parameters_json && parameters_json[0] ? parameters_json : "{}";
+    static const char k_sess_tool_head[] =
+        "{\"type\":\"session.update\",\"session\":{\"tools\":[{\"type\":\"function\"";
+    hu_json_buf_t buf = {0};
+    hu_error_t err = hu_json_buf_init(&buf, session->alloc);
+    if (err != HU_OK)
+        return err;
+    err = hu_json_buf_append_raw(&buf, k_sess_tool_head, sizeof(k_sess_tool_head) - 1);
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_buf_append_raw(&buf, ",", 1);
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_append_key_value(&buf, "name", 4, name, strlen(name));
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_buf_append_raw(&buf, ",", 1);
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_append_key_value(&buf, "description", 11, description ? description : "",
+                                   description ? strlen(description) : 0);
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_buf_append_raw(&buf, ",\"parameters\":", 16);
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_buf_append_raw(&buf, params, strlen(params));
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_buf_append_raw(&buf, "}]}}", 4);
+    if (err != HU_OK)
+        goto fail;
+    err = hu_ws_send((hu_ws_client_t *)session->ws_client, buf.ptr, buf.len);
+fail:
+    hu_json_buf_free(&buf);
+    return err;
+#else
+    (void)session;
+    (void)name;
+    (void)description;
+    (void)parameters_json;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
 void hu_voice_rt_session_destroy(hu_voice_rt_session_t *session) {
-    if (!session) return;
+    if (!session)
+        return;
     hu_allocator_t *alloc = session->alloc;
 #if defined(HU_HTTP_CURL) && !HU_IS_TEST
     if (session->ws_client) {
@@ -93,6 +291,7 @@ void hu_voice_rt_session_destroy(hu_voice_rt_session_t *session) {
         session->ws_client = NULL;
     }
 #endif
-    if (session->session_id) alloc->free(alloc->ctx, session->session_id, strlen(session->session_id)+1);
+    if (session->session_id)
+        alloc->free(alloc->ctx, session->session_id, strlen(session->session_id) + 1);
     alloc->free(alloc->ctx, session, sizeof(hu_voice_rt_session_t));
 }

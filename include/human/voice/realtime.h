@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 typedef struct hu_voice_rt_config {
-    char *base_url;   /* e.g. wss://api.openai.com/v1/realtime; NULL = default */
+    char *base_url; /* e.g. wss://api.openai.com/v1/realtime; NULL = default */
     char *model;
     char *voice;
     int sample_rate;
@@ -18,8 +18,24 @@ typedef struct hu_voice_rt_session {
     char *session_id;
     void *ws_client; /* hu_ws_client_t * when connected; opaque */
 } hu_voice_rt_session_t;
-hu_error_t hu_voice_rt_session_create(hu_allocator_t *alloc, const hu_voice_rt_config_t *config, hu_voice_rt_session_t **out);
+
+typedef struct hu_voice_rt_event {
+    char type[64]; /* event type: "response.audio.delta", "response.audio.done", etc. */
+    char *audio_base64; /* base64-encoded audio delta (caller frees via hu_voice_rt_event_free) */
+    size_t audio_base64_len;
+    char *transcript; /* text transcript (caller frees) */
+    size_t transcript_len;
+    bool done; /* true if this is an end-of-response event */
+} hu_voice_rt_event_t;
+
+hu_error_t hu_voice_rt_session_create(hu_allocator_t *alloc, const hu_voice_rt_config_t *config,
+                                      hu_voice_rt_session_t **out);
 hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session);
 hu_error_t hu_voice_rt_send_audio(hu_voice_rt_session_t *session, const void *data, size_t data_len);
+hu_error_t hu_voice_rt_recv_event(hu_voice_rt_session_t *session, hu_allocator_t *alloc,
+                                  hu_voice_rt_event_t *out, int timeout_ms);
+void hu_voice_rt_event_free(hu_allocator_t *alloc, hu_voice_rt_event_t *event);
+hu_error_t hu_voice_rt_add_tool(hu_voice_rt_session_t *session, const char *name,
+                                const char *description, const char *parameters_json);
 void hu_voice_rt_session_destroy(hu_voice_rt_session_t *session);
 #endif

@@ -135,7 +135,7 @@ private val AvenirTypography = Typography(
 @Composable
 fun HumanTheme(
     darkTheme: Boolean = androidx.compose.foundation.isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
