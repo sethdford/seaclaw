@@ -417,7 +417,7 @@ static hu_error_t signal_get_response_constraints(void *ctx,
     (void)ctx;
     if (!out)
         return HU_ERR_INVALID_ARGUMENT;
-    out->max_chars = 0;
+    out->max_chars = 2000;
     return HU_OK;
 }
 

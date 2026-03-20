@@ -75,3 +75,163 @@ hu_error_t hu_eval_dashboard_render(hu_allocator_t *alloc, FILE *out,
 
     return HU_OK;
 }
+
+static const char *eval_suite_key(const hu_eval_run_t *r) {
+    if (!r || !r->suite_name)
+        return "(unnamed)";
+    return r->suite_name;
+}
+
+static double eval_run_pass_rate(const hu_eval_run_t *r) {
+    if (!r)
+        return 0.0;
+    size_t total = r->passed + r->failed;
+    if (total > 0)
+        return 100.0 * (double)r->passed / (double)total;
+    return 0.0;
+}
+
+static void eval_format_rate_cell(char *buf, size_t buf_size, const hu_eval_run_t *r, bool present) {
+    if (!present || !r) {
+        snprintf(buf, buf_size, "   —   ");
+        return;
+    }
+    double rate = eval_run_pass_rate(r);
+    snprintf(buf, buf_size, "%5.1f%%", rate);
+}
+
+static long eval_find_unused_current_match(const hu_eval_run_t *current, size_t current_count,
+                                           const unsigned char *used, const hu_eval_run_t *baseline_row) {
+    if (!current || current_count == 0 || !used || !baseline_row)
+        return -1;
+    const char *want = eval_suite_key(baseline_row);
+    for (size_t j = 0; j < current_count; j++) {
+        if (used[j])
+            continue;
+        if (strcmp(want, eval_suite_key(&current[j])) == 0)
+            return (long)j;
+    }
+    return -1;
+}
+
+static void eval_aggregate_pass_totals(const hu_eval_run_t *runs, size_t runs_count, size_t *passed_out,
+                                       size_t *failed_out) {
+    *passed_out = 0;
+    *failed_out = 0;
+    if (!runs || runs_count == 0)
+        return;
+    for (size_t i = 0; i < runs_count; i++) {
+        *passed_out += runs[i].passed;
+        *failed_out += runs[i].failed;
+    }
+}
+
+hu_error_t hu_eval_dashboard_render_trend(hu_allocator_t *alloc, FILE *out,
+                                          const hu_eval_run_t *baseline, size_t baseline_count,
+                                          const hu_eval_run_t *current, size_t current_count) {
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    if ((baseline_count > 0 && !baseline) || (current_count > 0 && !current))
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const bool need_used = baseline_count > 0 && current_count > 0;
+    unsigned char *used = NULL;
+    if (need_used) {
+        if (!alloc || !alloc->alloc || !alloc->free)
+            return HU_ERR_INVALID_ARGUMENT;
+        used = (unsigned char *)alloc->alloc(alloc->ctx, current_count);
+        if (!used)
+            return HU_ERR_OUT_OF_MEMORY;
+        memset(used, 0, current_count);
+    }
+
+    fprintf(out, "╔═══════════════════════════════════════════════════════════╗\n");
+    fprintf(out, "║              EVAL DASHBOARD — TREND                     ║\n");
+    fprintf(out, "╠═══════════════════╤══════════╤══════════╤════════════════╣\n");
+    fprintf(out, "║ Suite             │ Baseline │ Current  │   Δ (pp)       ║\n");
+    fprintf(out, "╠═══════════════════╪══════════╪══════════╪════════════════╣\n");
+
+    if (baseline_count == 0 && current_count == 0) {
+        fprintf(out, "║ (no runs)                                               ║\n");
+        fprintf(out, "╠═══════════════════╧══════════╧══════════╧════════════════╣\n");
+        fprintf(out, "║ Overall: baseline — | current — | Δ —                    ║\n");
+        fprintf(out, "╚═══════════════════════════════════════════════════════════╝\n");
+        if (used)
+            alloc->free(alloc->ctx, used, current_count);
+        return HU_OK;
+    }
+
+    for (size_t i = 0; i < baseline_count; i++) {
+        const hu_eval_run_t *b = &baseline[i];
+        long j = -1;
+        if (current && current_count > 0 && used)
+            j = eval_find_unused_current_match(current, current_count, used, b);
+        if (j >= 0)
+            used[(size_t)j] = 1;
+
+        const hu_eval_run_t *c = (j >= 0) ? &current[(size_t)j] : NULL;
+
+        char suite_buf[SUITE_COL_WIDTH + 1];
+        truncate_suite_name(suite_buf, sizeof(suite_buf), eval_suite_key(b));
+
+        char bcell[16];
+        char ccell[16];
+        char dcell[24];
+        eval_format_rate_cell(bcell, sizeof(bcell), b, true);
+        eval_format_rate_cell(ccell, sizeof(ccell), c, c != NULL);
+
+        if (c) {
+            double delta = eval_run_pass_rate(c) - eval_run_pass_rate(b);
+            snprintf(dcell, sizeof(dcell), "%+7.1f", delta);
+        } else {
+            snprintf(dcell, sizeof(dcell), "   —   ");
+        }
+
+        fprintf(out, "║ %-15s │ %8s │ %8s │ %14s ║\n", suite_buf, bcell, ccell, dcell);
+    }
+
+    if (current && current_count > 0) {
+        for (size_t j = 0; j < current_count; j++) {
+            if (used && used[j])
+                continue;
+
+            const hu_eval_run_t *c = &current[j];
+            char suite_buf[SUITE_COL_WIDTH + 1];
+            truncate_suite_name(suite_buf, sizeof(suite_buf), eval_suite_key(c));
+
+            char bcell[16];
+            char ccell[16];
+            eval_format_rate_cell(bcell, sizeof(bcell), NULL, false);
+            eval_format_rate_cell(ccell, sizeof(ccell), c, true);
+
+            fprintf(out, "║ %-15s │ %8s │ %8s │ %14s ║\n", suite_buf, bcell, ccell, "   —   ");
+        }
+    }
+
+    size_t bp = 0, bf = 0, cp = 0, cf = 0;
+    eval_aggregate_pass_totals(baseline, baseline_count, &bp, &bf);
+    eval_aggregate_pass_totals(current, current_count, &cp, &cf);
+
+    size_t bt = bp + bf;
+    size_t ct = cp + cf;
+    double brate = bt > 0 ? (100.0 * (double)bp / (double)bt) : 0.0;
+    double crate = ct > 0 ? (100.0 * (double)cp / (double)ct) : 0.0;
+    double odelta = crate - brate;
+
+    fprintf(out, "╠═══════════════════╧══════════╧══════════╧════════════════╣\n");
+    if (bt == 0 && ct == 0) {
+        fprintf(out, "║ Overall: baseline — | current — | Δ —                    ║\n");
+    } else if (bt == 0) {
+        fprintf(out, "║ Overall: baseline — | current %5.1f%% | Δ —               ║\n", crate);
+    } else if (ct == 0) {
+        fprintf(out, "║ Overall: baseline %5.1f%% | current — | Δ —               ║\n", brate);
+    } else {
+        fprintf(out, "║ Overall: baseline %5.1f%% | current %5.1f%% | Δ %+6.1f pp        ║\n", brate, crate,
+                odelta);
+    }
+    fprintf(out, "╚═══════════════════════════════════════════════════════════╝\n");
+
+    if (used)
+        alloc->free(alloc->ctx, used, current_count);
+    return HU_OK;
+}

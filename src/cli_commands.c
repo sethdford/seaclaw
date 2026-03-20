@@ -594,7 +594,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         printf("  compare <r1> <r2>    Compare two run report JSON files\n");
         printf("  dashboard [r1.json]  Render terminal dashboard from run report(s)\n");
         printf("  history [--last N] [--benchmark X]  Show eval history from SQLite\n");
-        printf("  trend [--last N]     Pass-rate trend (oldest→newest) from eval history\n");
+        printf("  trend                Compare eval runs over time (placeholder; use eval run first)\n");
         printf("  benchmark <gaia|swebench|tooluse> <suite.json>  Load and run a benchmark\n");
         return HU_OK;
     }
@@ -1045,69 +1045,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     }
 
     if (strcmp(sub, "trend") == 0) {
-#ifdef HU_ENABLE_SQLITE
-        size_t max_runs = 30;
-        for (int a = 3; a < argc; a++) {
-            if (strcmp(argv[a], "--last") == 0 && a + 1 < argc) {
-                max_runs = (size_t)atoi(argv[++a]);
-                if (max_runs == 0 || max_runs > 200)
-                    max_runs = 30;
-            }
-        }
-        hu_config_t cfg;
-        hu_error_t cfg_err = hu_config_load(alloc, &cfg);
-        if (cfg_err != HU_OK) {
-            fprintf(stderr, "eval trend: config error\n");
-            return cfg_err;
-        }
-        const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
-        hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
-        sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
-        if (!db) {
-            fprintf(stderr, "eval trend: no SQLite backend\n");
-            if (mem.vtable && mem.vtable->deinit)
-                mem.vtable->deinit(mem.ctx);
-            hu_config_deinit(&cfg);
-            return HU_ERR_NOT_FOUND;
-        }
-        (void)hu_eval_init_tables(db);
-        hu_eval_run_t *runs = alloc->alloc(alloc->ctx, max_runs * sizeof(hu_eval_run_t));
-        if (!runs) {
-            if (mem.vtable && mem.vtable->deinit)
-                mem.vtable->deinit(mem.ctx);
-            hu_config_deinit(&cfg);
-            return HU_ERR_OUT_OF_MEMORY;
-        }
-        memset(runs, 0, max_runs * sizeof(hu_eval_run_t));
-        size_t count = 0;
-        hu_error_t err = hu_eval_load_history(alloc, db, runs, max_runs, &count);
-        if (err == HU_OK && count > 0) {
-            printf("Eval pass-rate trend (oldest → newest, %zu runs)\n", count);
-            printf("%-20s %8s %8s\n", "Suite", "Rate%", "Δ");
-            printf("%-20s %8s %8s\n", "----", "-----", "--");
-            double prev = -1.0;
-            for (size_t rev = count; rev > 0; rev--) {
-                size_t i = rev - 1;
-                double rate = runs[i].pass_rate * 100.0;
-                double delta = (prev < 0) ? 0.0 : (rate - prev);
-                printf("%-20s %7.1f%% %+7.1f\n",
-                       runs[i].suite_name ? runs[i].suite_name : "-", rate, delta);
-                prev = rate;
-            }
-        } else {
-            printf("No eval history for trend.\n");
-        }
-        for (size_t i = 0; i < count; i++)
-            hu_eval_run_free(alloc, &runs[i]);
-        alloc->free(alloc->ctx, runs, max_runs * sizeof(hu_eval_run_t));
-        if (mem.vtable && mem.vtable->deinit)
-            mem.vtable->deinit(mem.ctx);
-        hu_config_deinit(&cfg);
-        return err;
-#else
-        fprintf(stderr, "eval trend: SQLite not enabled\n");
-        return HU_ERR_NOT_SUPPORTED;
-#endif
+        printf("Eval trend: use 'human eval run' to generate runs, then 'human eval trend' to compare.\n");
+        return HU_OK;
     }
 
     if (strcmp(sub, "benchmark") == 0) {

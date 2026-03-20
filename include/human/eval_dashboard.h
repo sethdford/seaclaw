@@ -8,4 +8,8 @@
 hu_error_t hu_eval_dashboard_render(hu_allocator_t *alloc, FILE *out,
                                      const hu_eval_run_t *runs, size_t runs_count);
 
+hu_error_t hu_eval_dashboard_render_trend(hu_allocator_t *alloc, FILE *out,
+                                          const hu_eval_run_t *baseline, size_t baseline_count,
+                                          const hu_eval_run_t *current, size_t current_count);
+
 #endif

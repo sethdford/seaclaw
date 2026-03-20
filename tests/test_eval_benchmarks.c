@@ -84,6 +84,77 @@ static void dashboard_render_no_runs(void) {
     fclose(f);
 }
 
+static void dashboard_render_trend_null_out_errors(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_eval_run_t a = {0};
+    a.suite_name = "x";
+    hu_error_t err = hu_eval_dashboard_render_trend(&alloc, NULL, &a, 1, &a, 1);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+
+static void dashboard_render_trend_null_array_with_count_errors(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    FILE *f = tmpfile();
+    HU_ASSERT(f != NULL);
+    hu_eval_run_t c = {0};
+    c.suite_name = "only-current";
+    hu_error_t err = hu_eval_dashboard_render_trend(&alloc, f, NULL, 1, &c, 1);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    fclose(f);
+}
+
+static void dashboard_render_trend_empty_both_ok(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    FILE *f = tmpfile();
+    HU_ASSERT(f != NULL);
+    hu_error_t err = hu_eval_dashboard_render_trend(&alloc, f, NULL, 0, NULL, 0);
+    HU_ASSERT_EQ(err, HU_OK);
+    fclose(f);
+}
+
+static void dashboard_render_trend_pairs_by_name_and_orphans(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_eval_run_t b_match = {0};
+    b_match.suite_name = "suite-a";
+    b_match.passed = 8;
+    b_match.failed = 2;
+    hu_eval_run_t b_orphan = {0};
+    b_orphan.suite_name = "suite-b";
+    b_orphan.passed = 5;
+    b_orphan.failed = 5;
+    hu_eval_run_t c_match = {0};
+    c_match.suite_name = "suite-a";
+    c_match.passed = 9;
+    c_match.failed = 1;
+    hu_eval_run_t c_orphan = {0};
+    c_orphan.suite_name = "suite-c";
+    c_orphan.passed = 10;
+    c_orphan.failed = 0;
+
+    const hu_eval_run_t baseline[] = {b_match, b_orphan};
+    const hu_eval_run_t current[] = {c_match, c_orphan};
+
+    FILE *f = tmpfile();
+    HU_ASSERT(f != NULL);
+    hu_error_t err = hu_eval_dashboard_render_trend(&alloc, f, baseline, 2, current, 2);
+    HU_ASSERT_EQ(err, HU_OK);
+    rewind(f);
+    char line[256];
+    bool saw_a = false, saw_b = false, saw_c = false;
+    while (fgets(line, sizeof(line), f)) {
+        if (strstr(line, "suite-a"))
+            saw_a = true;
+        if (strstr(line, "suite-b"))
+            saw_b = true;
+        if (strstr(line, "suite-c"))
+            saw_c = true;
+    }
+    HU_ASSERT_TRUE(saw_a);
+    HU_ASSERT_TRUE(saw_b);
+    HU_ASSERT_TRUE(saw_c);
+    fclose(f);
+}
+
 void run_eval_benchmarks_tests(void) {
     HU_TEST_SUITE("eval_bench");
     HU_RUN_TEST(benchmark_load_gaia_format);
@@ -92,4 +163,8 @@ void run_eval_benchmarks_tests(void) {
     HU_RUN_TEST(benchmark_type_name_returns_correct);
     HU_RUN_TEST(dashboard_render_single_run);
     HU_RUN_TEST(dashboard_render_no_runs);
+    HU_RUN_TEST(dashboard_render_trend_null_out_errors);
+    HU_RUN_TEST(dashboard_render_trend_null_array_with_count_errors);
+    HU_RUN_TEST(dashboard_render_trend_empty_both_ok);
+    HU_RUN_TEST(dashboard_render_trend_pairs_by_name_and_orphans);
 }
