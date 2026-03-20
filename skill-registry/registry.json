@@ -398,5 +398,109 @@
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/environment-setup",
     "tags": ["migration", "setup", "environment"]
+  },
+  {
+    "name": "twin-identity-sync",
+    "description": "Keep voice, facts, and stated preferences consistent across sessions like a digital mirror",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-identity-sync",
+    "tags": ["digital-twin", "identity", "continuity"]
+  },
+  {
+    "name": "twin-boundary-guard",
+    "description": "Protect stated boundaries: decline, defer, and suggest scripts when overload or misalignment appears",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-boundary-guard",
+    "tags": ["digital-twin", "boundaries", "wellbeing"]
+  },
+  {
+    "name": "twin-relationship-memory",
+    "description": "Maintain relationship context: who people are, how the user relates, and tone per contact",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-relationship-memory",
+    "tags": ["digital-twin", "relationships", "context"]
+  },
+  {
+    "name": "twin-decision-log",
+    "description": "Capture decisions with rationale and optional revisit dates for future-you",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-decision-log",
+    "tags": ["digital-twin", "decisions", "memory"]
+  },
+  {
+    "name": "twin-meeting-wingman",
+    "description": "Prep briefs, agendas, and follow-up capture before and after meetings",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-meeting-wingman",
+    "tags": ["digital-twin", "meetings", "productivity"]
+  },
+  {
+    "name": "twin-inbox-partner",
+    "description": "Triage messages, draft replies in the user's voice, and flag risk or urgency",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-inbox-partner",
+    "tags": ["digital-twin", "email", "communication"]
+  },
+  {
+    "name": "twin-weekly-debrief",
+    "description": "Structured weekly reflection: wins, drains, carryovers, and next-week focus",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-weekly-debrief",
+    "tags": ["digital-twin", "reflection", "planning"]
+  },
+  {
+    "name": "twin-values-check",
+    "description": "Compare plans and drafts against stated values and surface tensions explicitly",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-values-check",
+    "tags": ["digital-twin", "values", "ethics"]
+  },
+  {
+    "name": "twin-focus-shield",
+    "description": "Deep-work support: batching, interruption scripts, and scope control",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-focus-shield",
+    "tags": ["digital-twin", "focus", "deep-work"]
+  },
+  {
+    "name": "twin-learning-loop",
+    "description": "Turn conversations into durable notes, spaced review prompts, and links to active goals",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-learning-loop",
+    "tags": ["digital-twin", "learning", "notes"]
+  },
+  {
+    "name": "twin-energy-budget",
+    "description": "Track social and cognitive bandwidth; suggest realistic commitments",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-energy-budget",
+    "tags": ["digital-twin", "energy", "planning"]
+  },
+  {
+    "name": "twin-continuity-handoff",
+    "description": "Session handoffs for future-you: state, blockers, and the next concrete action",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-continuity-handoff",
+    "tags": ["digital-twin", "handoff", "continuity"]
+  },
+  {
+    "name": "twin-voice-calibrator",
+    "description": "Mirror the user's writing style from samples; avoid generic assistant cadence",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-voice-calibrator",
+    "tags": ["digital-twin", "voice", "writing"]
   }
 ]

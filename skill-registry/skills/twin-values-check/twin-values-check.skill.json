@@ -1,0 +1,9 @@
+{
+  "name": "twin-values-check",
+  "description": "Compare plans and drafts against stated values and surface tensions explicitly",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

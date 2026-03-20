@@ -28,7 +28,7 @@ Key extension points:
 - `src/peripherals/` (`hu_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **1,054 source + header files, ~192K lines of C, ~98K lines of tests, 6006+ tests, 38 channels**.
+Current scale: **1,054 source + header files, ~192K lines of C, ~98K lines of tests, 6032+ tests, 38 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -76,7 +76,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `HU_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 6006+ tests must pass at zero ASan errors**
+5. **All 6032+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `HU_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -118,7 +118,7 @@ src/
 
 include/human/       public C headers
 
-tests/                 290 test files, 6006+ tests
+tests/                 291 test files, 6032+ tests
 
 apps/                  iOS, macOS, Android, Flutter, shared (5 app directories)
 

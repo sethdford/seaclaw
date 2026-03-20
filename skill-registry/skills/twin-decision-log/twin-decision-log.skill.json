@@ -1,0 +1,9 @@
+{
+  "name": "twin-decision-log",
+  "description": "Capture decisions with rationale and optional revisit dates for future-you",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

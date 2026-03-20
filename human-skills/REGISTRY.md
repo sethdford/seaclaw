@@ -22,6 +22,10 @@ bash scripts/validate-skill-registry.sh
 
 This is also run as part of **`./scripts/verify-all.sh`** (“Skill Registry” step).
 
+## Digital twin cluster
+
+Skills whose names start with **`twin-`** are oriented toward **personal continuity**: mirroring the user’s voice, boundaries, relationships, decisions, and energy. In `registry.json` they are tagged with **`digital-twin`** (plus specific tags). Install the ones that match how you want your runtime to behave.
+
 ## registry.json Format
 
 Array of skill entries:

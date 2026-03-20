@@ -1,0 +1,9 @@
+{
+  "name": "twin-continuity-handoff",
+  "description": "Session handoffs for future-you: state, blockers, and the next concrete action",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

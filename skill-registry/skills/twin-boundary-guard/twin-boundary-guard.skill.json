@@ -1,0 +1,9 @@
+{
+  "name": "twin-boundary-guard",
+  "description": "Protect stated boundaries: decline, defer, and suggest scripts when overload or misalignment appears",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

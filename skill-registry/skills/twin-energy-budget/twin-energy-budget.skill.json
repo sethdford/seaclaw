@@ -1,0 +1,9 @@
+{
+  "name": "twin-energy-budget",
+  "description": "Track social and cognitive bandwidth; suggest realistic commitments",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

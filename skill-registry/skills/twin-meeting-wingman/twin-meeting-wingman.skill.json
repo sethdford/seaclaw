@@ -1,0 +1,9 @@
+{
+  "name": "twin-meeting-wingman",
+  "description": "Prep briefs, agendas, and follow-up capture before and after meetings",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

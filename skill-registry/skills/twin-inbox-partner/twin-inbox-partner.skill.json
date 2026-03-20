@@ -1,0 +1,9 @@
+{
+  "name": "twin-inbox-partner",
+  "description": "Triage messages, draft replies in the user's voice, and flag risk or urgency",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

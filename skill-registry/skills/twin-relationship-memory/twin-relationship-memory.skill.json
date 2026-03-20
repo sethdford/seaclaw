@@ -1,0 +1,9 @@
+{
+  "name": "twin-relationship-memory",
+  "description": "Maintain relationship context: who people are, how the user relates, and tone per contact",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

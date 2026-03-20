@@ -1,0 +1,9 @@
+{
+  "name": "twin-weekly-debrief",
+  "description": "Structured weekly reflection: wins, drains, carryovers, and next-week focus",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

@@ -80,7 +80,7 @@ This document benchmarks the `human` runtime against state-of-the-art AI agent p
 | **Security policy** | — | Deny-by-default, autonomy levels, AEAD encryption, pairing, HTTPS-only | **SOTA** | First-class security model exceeding any open-source agent platform |
 | **Eval framework** | SWE-bench, GAIA | Suite runner with LLM-as-judge, per-task match_mode, SQLite history | **COMPETITIVE** | Now honors match_mode from JSON. Supports exact, contains, numeric_close, and LLM judge. |
 | **Observability** | LangSmith | hu_observer_t vtable, metrics, structured logging | **COMPETITIVE** | Real implementation. No hosted dashboard or trace visualization. |
-| **CI/CD** | — | 6006+ tests, ASan, clang-tidy, Lighthouse, visual regression, competitive benchmarks | **SOTA** | More comprehensive than any comparable open-source project |
+| **CI/CD** | — | 6032+ tests, ASan, clang-tidy, Lighthouse, visual regression, competitive benchmarks | **SOTA** | More comprehensive than any comparable open-source project |
 
 ---
 
@@ -152,7 +152,7 @@ These are projected scores based on architecture capability analysis, not measur
 3. **Typo simulation** with QWERTY adjacency modeling
 4. **Spaced-repetition forgetting curves** for memory (not just LRU or sliding window)
 5. **Constitutional AI principles** injected from persona config
-6. **1696 KB binary** with 6006 tests — zero-dependency C11 runtime (vs. 100+ MB for Node.js agents)
+6. **1696 KB binary** with 6032 tests — zero-dependency C11 runtime (vs. 100+ MB for Node.js agents)
 7. **MCTS-driven planning** that produces plans directly from tree search (not just hint-based)
 8. **Proactive cross-channel routing** — messages routed to the contact's most recently active channel
 9. **Feed-driven outreach** — news/social feed relevance scoring triggers relationship-appropriate check-ins
@@ -168,6 +168,6 @@ These are projected scores based on architecture capability analysis, not measur
 |------|-------|-------------|
 | 2026-03-20 (initial) | 5975 | Baseline audit: identified 10 gaps (5 must-fix, 5 nice-to-have) |
 | 2026-03-20 (round 2) | 5975 | Fixed: DAG parallel, real swarm, eval match_mode, structured reflection, style transfer, video, MCTS direct, plan persistence |
-| 2026-03-20 (round 3) | 6006 | Closed all 9 remaining gaps: recursive agents, image gen, DPO closure, realtime voice, Linux computer use, ensemble, native video, LLM emotion, visual grounding |
+| 2026-03-20 (round 3) | 6032 | Closed all 9 remaining gaps: recursive agents, image gen, DPO closure, realtime voice, Linux computer use, ensemble, native video, LLM emotion, visual grounding |
 
 _This benchmark should be re-evaluated after each major release. Run `human eval run eval_suites/fidelity.json` and `human eval run eval_suites/intelligence.json` to generate measured scores._

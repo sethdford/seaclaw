@@ -3,7 +3,7 @@
 **Date:** 2026-03-11 (revised)  
 **Scope:** All plan documents in `docs/plans/`  
 **Focus:** Status markers, implementation verification, contradictions, stale items  
-**Test baseline:** 6006/6006 passed, 0 ASan errors
+**Test baseline:** 6032/6032 passed, 0 ASan errors
 
 ---
 
