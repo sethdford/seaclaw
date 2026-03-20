@@ -143,7 +143,7 @@ static hu_error_t cdp_send_command(hu_browser_ctx_t *bc, hu_allocator_t *alloc, 
     for (int tries = 0; tries < 20; tries++) {
         char *data = NULL;
         size_t data_len = 0;
-        err = hu_ws_recv(bc->cdp_ws, alloc, &data, &data_len);
+        err = hu_ws_recv(bc->cdp_ws, alloc, &data, &data_len, -1);
         if (err != HU_OK)
             return err;
         if (!data)

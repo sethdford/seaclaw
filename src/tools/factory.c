@@ -37,6 +37,9 @@
 #include "human/tools/file_edit.h"
 #include "human/tools/file_read.h"
 #include "human/tools/file_write.h"
+#include "human/tools/computer_use.h"
+#include "human/tools/image_gen.h"
+#include "human/tools/browser_use.h"
 #include "human/tools/gui_agent.h"
 #include "human/tools/git.h"
 #ifdef HU_HAS_PERIPHERALS
@@ -108,8 +111,8 @@
 #define HU_TOOLS_PERSONA_COUNT 0
 #endif
 #define HU_TOOLS_COUNT_BASE         \
-    (48 + HU_TOOLS_CRON_COUNT - 1 + \
-     HU_TOOLS_PERSONA_COUNT) /* 46 base + gui_agent + code_sandbox + skill_run + pwa + ... */
+    (51 + HU_TOOLS_CRON_COUNT - 1 + \
+     HU_TOOLS_PERSONA_COUNT) /* base tools + computer_use + image_generate + browser_use + ... */
 #ifdef HU_HAS_TOOLS_BROWSER
 #define HU_TOOLS_BROWSER_COUNT 3
 #else
@@ -340,6 +343,21 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     idx++;
 
     err = hu_gui_agent_create(alloc, &tools[idx]);
+    if (err != HU_OK)
+        goto fail;
+    idx++;
+
+    err = hu_computer_use_create(alloc, policy, &tools[idx]);
+    if (err != HU_OK)
+        goto fail;
+    idx++;
+
+    err = hu_image_gen_create(alloc, &tools[idx]);
+    if (err != HU_OK)
+        goto fail;
+    idx++;
+
+    err = hu_browser_use_create(alloc, &tools[idx]);
     if (err != HU_OK)
         goto fail;
     idx++;
