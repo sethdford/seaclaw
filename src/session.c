@@ -206,6 +206,7 @@ hu_session_summary_t *hu_session_list(hu_session_manager_t *mgr, hu_allocator_t 
             arr[idx].created_at = s->created_at;
             arr[idx].last_active = s->last_active;
             arr[idx].turn_count = s->turn_count;
+            arr[idx].archived = s->archived;
             idx++;
         }
     }
