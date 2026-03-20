@@ -1,14 +1,40 @@
 /*
- * Gateway handler for voice.transcribe — delegates to hu_voice_stt_gemini().
+ * Gateway handler for voice.transcribe — routes to the configured STT provider.
+ * Supports: cartesia (file-based), groq (file-based), gemini (inline base64).
  */
 #include "cp_internal.h"
 #include "human/config.h"
+#include "human/multimodal.h"
+#include "human/platform.h"
 #include "human/voice.h"
+#include <stdio.h>
 #include <string.h>
+
+#if defined(__unix__) || defined(__APPLE__)
+#include <unistd.h>
+#endif
 
 #ifdef HU_GATEWAY_POSIX
 
 #define CP_VOICE_MAX_AUDIO_LEN (10 * 1024 * 1024) /* 10 MB base64 limit */
+
+#if !HU_IS_TEST
+static const char *mime_ext(const char *mime) {
+    if (!mime)
+        return ".webm";
+    if (strstr(mime, "wav"))
+        return ".wav";
+    if (strstr(mime, "mp3") || strstr(mime, "mpeg"))
+        return ".mp3";
+    if (strstr(mime, "ogg"))
+        return ".ogg";
+    if (strstr(mime, "flac"))
+        return ".flac";
+    if (strstr(mime, "mp4"))
+        return ".mp4";
+    return ".webm";
+}
+#endif /* !HU_IS_TEST */
 
 hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                                const hu_control_protocol_t *proto, const hu_json_value_t *root,
@@ -21,7 +47,6 @@ hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     if (!app || !app->config)
         return HU_ERR_INVALID_ARGUMENT;
 
-    /* Extract params */
     hu_json_value_t *params = hu_json_object_get((hu_json_value_t *)root, "params");
     if (!params)
         return HU_ERR_INVALID_ARGUMENT;
@@ -31,7 +56,6 @@ hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_
 
     if (!audio_val || audio_val->type != HU_JSON_STRING || audio_val->data.string.len == 0)
         return HU_ERR_INVALID_ARGUMENT;
-
     if (audio_val->data.string.len > CP_VOICE_MAX_AUDIO_LEN)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -42,23 +66,97 @@ hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     if (mime_val && mime_val->type == HU_JSON_STRING && mime_val->data.string.len > 0)
         mime_type = mime_val->data.string.ptr;
 
-    /* Get Gemini API key from config */
-    const char *api_key = hu_config_get_provider_key((const hu_config_t *)app->config, "gemini");
-    if (!api_key || api_key[0] == '\0')
-        return HU_ERR_PROVIDER_AUTH;
+    const hu_config_t *cfg = (const hu_config_t *)app->config;
+    const char *stt_provider = cfg->voice.stt_provider;
 
     hu_voice_config_t voice_cfg = {0};
-    voice_cfg.api_key = api_key;
-    voice_cfg.api_key_len = strlen(api_key);
+    if (cfg->voice.stt_model && cfg->voice.stt_model[0])
+        voice_cfg.stt_model = cfg->voice.stt_model;
+    if (cfg->voice.local_stt_endpoint && cfg->voice.local_stt_endpoint[0])
+        voice_cfg.local_stt_endpoint = cfg->voice.local_stt_endpoint;
+    voice_cfg.stt_provider = stt_provider;
+    voice_cfg.language = NULL;
 
     char *text = NULL;
     size_t text_len = 0;
-    hu_error_t err = hu_voice_stt_gemini(alloc, &voice_cfg, audio_b64, audio_b64_len, mime_type,
-                                         &text, &text_len);
+    hu_error_t err;
+
+    /* Cartesia and Groq need a file, not inline base64. Gemini takes base64 directly. */
+    bool use_file = (stt_provider && (strcmp(stt_provider, "cartesia") == 0 ||
+                                      strcmp(stt_provider, "groq") == 0 ||
+                                      strcmp(stt_provider, "local") == 0));
+
+    if (use_file) {
+        /* Populate API key for the chosen provider */
+        if (strcmp(stt_provider, "cartesia") == 0) {
+            const char *ckey = hu_config_get_provider_key(cfg, "cartesia");
+            if (ckey && ckey[0]) {
+                voice_cfg.cartesia_api_key = ckey;
+                voice_cfg.cartesia_api_key_len = strlen(ckey);
+            }
+        } else if (strcmp(stt_provider, "groq") == 0) {
+            const char *gkey = hu_config_get_provider_key(cfg, "groq");
+            if (gkey && gkey[0]) {
+                voice_cfg.api_key = gkey;
+                voice_cfg.api_key_len = strlen(gkey);
+            }
+        }
+
+#if HU_IS_TEST
+        err = hu_voice_stt_file(alloc, &voice_cfg, "/tmp/test.webm", &text, &text_len);
+#else
+        /* Decode base64 → temp file → hu_voice_stt_file */
+        void *decoded = NULL;
+        size_t decoded_len = 0;
+        err = hu_multimodal_decode_base64(alloc, audio_b64, audio_b64_len, &decoded, &decoded_len);
+        if (err != HU_OK)
+            return err;
+
+        char *tmp_dir = hu_platform_get_temp_dir(alloc);
+        if (!tmp_dir) {
+            alloc->free(alloc->ctx, decoded, decoded_len);
+            return HU_ERR_IO;
+        }
+        const char *ext = mime_ext(mime_type);
+        char tmp_path[256];
+        int n = snprintf(tmp_path, sizeof(tmp_path), "%s/human_stt_gw%s", tmp_dir, ext);
+        alloc->free(alloc->ctx, tmp_dir, strlen(tmp_dir) + 1);
+        if (n < 0 || (size_t)n >= sizeof(tmp_path)) {
+            alloc->free(alloc->ctx, decoded, decoded_len);
+            return HU_ERR_IO;
+        }
+
+        FILE *f = fopen(tmp_path, "wb");
+        if (!f) {
+            alloc->free(alloc->ctx, decoded, decoded_len);
+            return HU_ERR_IO;
+        }
+        if (decoded_len > 0 && fwrite(decoded, 1, decoded_len, f) != decoded_len) {
+            fclose(f);
+            unlink(tmp_path);
+            alloc->free(alloc->ctx, decoded, decoded_len);
+            return HU_ERR_IO;
+        }
+        fclose(f);
+        alloc->free(alloc->ctx, decoded, decoded_len);
+
+        err = hu_voice_stt_file(alloc, &voice_cfg, tmp_path, &text, &text_len);
+        unlink(tmp_path);
+#endif
+    } else {
+        /* Default: Gemini inline base64 transcription */
+        const char *api_key = hu_config_get_provider_key(cfg, "gemini");
+        if (!api_key || api_key[0] == '\0')
+            return HU_ERR_PROVIDER_AUTH;
+        voice_cfg.api_key = api_key;
+        voice_cfg.api_key_len = strlen(api_key);
+        err = hu_voice_stt_gemini(alloc, &voice_cfg, audio_b64, audio_b64_len, mime_type, &text,
+                                  &text_len);
+    }
+
     if (err != HU_OK)
         return err;
 
-    /* Build response: {"text":"..."} */
     hu_json_value_t *resp = hu_json_object_new(alloc);
     if (!resp) {
         alloc->free(alloc->ctx, text, text_len + 1);

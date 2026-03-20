@@ -47,4 +47,19 @@ hu_error_t hu_cartesia_tts_synthesize(hu_allocator_t *alloc,
 
 void hu_cartesia_tts_free_bytes(hu_allocator_t *alloc, unsigned char *bytes, size_t len);
 
+/* --- Cartesia STT (Ink Whisper) --- */
+
+typedef struct hu_cartesia_stt_config {
+    const char *model;    /* "ink-whisper" (default) */
+    const char *language; /* ISO-639-1, e.g. "en"; NULL = auto */
+} hu_cartesia_stt_config_t;
+
+/* Transcribe an audio file via Cartesia's /stt endpoint.
+ * Auth: X-API-Key header. Response: {"text":"..."}.
+ * Caller must free *out_text via alloc->free(ctx, ptr, *out_len + 1). */
+hu_error_t hu_cartesia_stt_transcribe(hu_allocator_t *alloc, const char *api_key,
+                                      size_t api_key_len, const char *audio_path,
+                                      const hu_cartesia_stt_config_t *config, char **out_text,
+                                      size_t *out_len);
+
 #endif

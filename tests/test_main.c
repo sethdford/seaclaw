@@ -265,8 +265,8 @@ void run_pwa_tests(void);
 #ifdef HU_ENABLE_CURL
 void run_paperclip_tests(void);
 #endif
-#ifdef HU_ENABLE_CARTESIA
 void run_cartesia_tests(void);
+#ifdef HU_ENABLE_CARTESIA
 void run_audio_pipeline_tests(void);
 void run_voice_decision_tests(void);
 void run_emotion_map_tests(void);
@@ -607,8 +607,8 @@ int main(int argc, char **argv) {
 #ifdef HU_ENABLE_CURL
     run_paperclip_tests();
 #endif
-#ifdef HU_ENABLE_CARTESIA
     run_cartesia_tests();
+#ifdef HU_ENABLE_CARTESIA
     run_audio_pipeline_tests();
     run_voice_decision_tests();
     run_emotion_map_tests();

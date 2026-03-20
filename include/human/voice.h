@@ -16,6 +16,10 @@ typedef struct hu_voice_config {
     const char *language;     /* NULL = auto-detect */
     const char *local_stt_endpoint; /* NULL = skip; if set, tried before cloud STT */
     const char *local_tts_endpoint; /* NULL = skip; if set, tried before cloud TTS */
+    const char *stt_provider; /* NULL = auto; "cartesia", "groq", "gemini", "local" */
+    const char *tts_provider; /* NULL = auto; "cartesia", "openai", "local" */
+    const char *cartesia_api_key; /* NULL = use CARTESIA_API_KEY env; for Cartesia STT/TTS */
+    size_t cartesia_api_key_len;
 } hu_voice_config_t;
 
 hu_error_t hu_voice_stt_file(hu_allocator_t *alloc, const hu_voice_config_t *config,

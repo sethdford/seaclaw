@@ -803,13 +803,15 @@ if(HU_ENABLE_CURL)
     )
 endif()
 
-# Cartesia TTS (requires libcurl for API calls)
+# cartesia.c is always compiled (stubs return HU_ERR_NOT_SUPPORTED when disabled)
+list(APPEND HU_CORE_SOURCES src/tts/cartesia.c)
+
+# Cartesia full pipeline (requires libcurl for API calls)
 if(HU_ENABLE_CARTESIA)
     if(NOT HU_ENABLE_CURL)
         message(FATAL_ERROR "HU_ENABLE_CARTESIA requires HU_ENABLE_CURL=ON")
     endif()
     list(APPEND HU_CORE_SOURCES
-        src/tts/cartesia.c
         src/tts/audio_pipeline.c
         src/context/voice_decision.c
         src/tts/emotion_map.c
@@ -1568,7 +1570,7 @@ if(NOT HU_ENABLE_PERSONA)
 endif()
 if(NOT HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_EXTRA_MODULES
-        src/tts/cartesia.c src/tts/audio_pipeline.c
+        src/tts/audio_pipeline.c
         src/context/voice_decision.c src/tts/emotion_map.c)
 endif()
 if(NOT HU_ENABLE_ML)
@@ -1985,8 +1987,9 @@ endif()
 if(HU_ENABLE_PERSONA)
     list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c tests/test_persona_feedback.c tests/test_persona_cli.c tests/test_voice_maturity.c tests/test_style_learner.c)
 endif()
+list(APPEND HU_TEST_SOURCES tests/test_cartesia.c)
 if(HU_ENABLE_CARTESIA)
-    list(APPEND HU_TEST_SOURCES tests/test_cartesia.c tests/test_audio_pipeline.c tests/test_voice_decision.c tests/test_emotion_map.c)
+    list(APPEND HU_TEST_SOURCES tests/test_audio_pipeline.c tests/test_voice_decision.c tests/test_emotion_map.c)
 endif()
 if(HU_ENABLE_AUTHENTIC)
     list(APPEND HU_TEST_SOURCES tests/test_cognitive_load.c tests/test_phase9_integration.c)

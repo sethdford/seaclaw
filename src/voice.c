@@ -3,6 +3,7 @@
  * In HU_IS_TEST mode, returns mock data without spawning curl.
  */
 #include "human/voice.h"
+#include "human/tts/cartesia.h"
 #include "human/voice/local_stt.h"
 #include "human/voice/local_tts.h"
 #include "human/core/allocator.h"
@@ -12,6 +13,7 @@
 #include "human/core/string.h"
 #include "human/platform.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #if defined(__unix__) || defined(__APPLE__)
@@ -53,6 +55,16 @@ hu_error_t hu_voice_stt_file(hu_allocator_t *alloc, const hu_voice_config_t *con
                                     .language = config->language};
         return hu_local_stt_transcribe(alloc, &lc, file_path, out_text, out_len);
     }
+    if (config->stt_provider && strcmp(config->stt_provider, "cartesia") == 0) {
+        const char *ckey = config->cartesia_api_key;
+        size_t cklen = config->cartesia_api_key_len;
+        if (!ckey || cklen == 0) {
+            ckey = "test-cartesia-key";
+            cklen = 17;
+        }
+        hu_cartesia_stt_config_t sc = {.model = config->stt_model, .language = config->language};
+        return hu_cartesia_stt_transcribe(alloc, ckey, cklen, file_path, &sc, out_text, out_len);
+    }
     if (!config->api_key || config->api_key_len == 0)
         return HU_ERR_PROVIDER_AUTH;
     {
@@ -84,6 +96,22 @@ hu_error_t hu_voice_stt_file(hu_allocator_t *alloc, const hu_voice_config_t *con
             *out_text = NULL;
             *out_len = 0;
         }
+    }
+
+    if (config->stt_provider && strcmp(config->stt_provider, "cartesia") == 0) {
+        const char *ckey = config->cartesia_api_key;
+        size_t cklen = config->cartesia_api_key_len;
+        if ((!ckey || cklen == 0)) {
+            const char *env = getenv("CARTESIA_API_KEY");
+            if (env && env[0]) {
+                ckey = env;
+                cklen = strlen(env);
+            }
+        }
+        if (!ckey || cklen == 0)
+            return HU_ERR_PROVIDER_AUTH;
+        hu_cartesia_stt_config_t sc = {.model = config->stt_model, .language = config->language};
+        return hu_cartesia_stt_transcribe(alloc, ckey, cklen, file_path, &sc, out_text, out_len);
     }
 
     if (!config->api_key || config->api_key_len == 0)
@@ -306,6 +334,25 @@ hu_error_t hu_voice_tts(hu_allocator_t *alloc, const hu_voice_config_t *config, 
         *out_audio_len = 0;
         return HU_OK;
     }
+    if (config->tts_provider && strcmp(config->tts_provider, "cartesia") == 0) {
+        const char *ckey = config->cartesia_api_key;
+        size_t cklen = config->cartesia_api_key_len;
+        if (!ckey || cklen == 0) {
+            ckey = "test-cartesia-key";
+            cklen = 17;
+        }
+        hu_cartesia_tts_config_t tc = {
+            .model_id = config->tts_model, .voice_id = config->tts_voice};
+        unsigned char *bytes = NULL;
+        size_t blen = 0;
+        hu_error_t ce =
+            hu_cartesia_tts_synthesize(alloc, ckey, cklen, text, text_len, &tc, "mp3", &bytes, &blen);
+        if (ce != HU_OK)
+            return ce;
+        *out_audio = bytes;
+        *out_audio_len = blen;
+        return HU_OK;
+    }
     if (!config->api_key || config->api_key_len == 0)
         return HU_ERR_PROVIDER_AUTH;
     {
@@ -383,6 +430,31 @@ hu_error_t hu_voice_tts(hu_allocator_t *alloc, const hu_voice_config_t *config, 
                 }
             }
         }
+    }
+
+    if (config->tts_provider && strcmp(config->tts_provider, "cartesia") == 0) {
+        const char *ckey = config->cartesia_api_key;
+        size_t cklen = config->cartesia_api_key_len;
+        if ((!ckey || cklen == 0)) {
+            const char *env = getenv("CARTESIA_API_KEY");
+            if (env && env[0]) {
+                ckey = env;
+                cklen = strlen(env);
+            }
+        }
+        if (!ckey || cklen == 0)
+            return HU_ERR_PROVIDER_AUTH;
+        hu_cartesia_tts_config_t tc = {
+            .model_id = config->tts_model, .voice_id = config->tts_voice};
+        unsigned char *bytes = NULL;
+        size_t blen = 0;
+        hu_error_t ce =
+            hu_cartesia_tts_synthesize(alloc, ckey, cklen, text, text_len, &tc, "mp3", &bytes, &blen);
+        if (ce != HU_OK)
+            return ce;
+        *out_audio = bytes;
+        *out_audio_len = blen;
+        return HU_OK;
     }
 
     if (!config->api_key || config->api_key_len == 0)
