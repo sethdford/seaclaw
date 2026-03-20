@@ -356,7 +356,7 @@ static void test_skill_run_missing_skill_fails(void) {
     hu_skillforge_discover(&sf, "/tmp");
 
     hu_tool_t tool;
-    hu_skill_run_create(&alloc, &tool, &sf);
+    hu_skill_run_create(&alloc, &tool, &sf, NULL, 0, NULL);
 
     hu_json_value_t *args = hu_json_object_new(&alloc);
     hu_json_object_set(&alloc, args, "skill",

@@ -15,7 +15,7 @@ hu_error_t hu_local_stt_transcribe(hu_allocator_t *alloc, const hu_local_stt_con
     *out_text = NULL;
     *out_len = 0;
 
-#if defined(HU_IS_TEST) && HU_IS_TEST
+#if HU_IS_TEST
     (void)audio_path;
     const char *mock = "Hello world";
     size_t mlen = strlen(mock);
@@ -25,7 +25,7 @@ hu_error_t hu_local_stt_transcribe(hu_allocator_t *alloc, const hu_local_stt_con
     *out_text = dup;
     *out_len = mlen;
     return HU_OK;
-#else
+#else /* !HU_IS_TEST */
     const char *model =
         (config->model && config->model[0]) ? config->model : HU_LOCAL_STT_DEFAULT_MODEL;
 

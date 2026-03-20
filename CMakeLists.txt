@@ -342,6 +342,8 @@ set(HU_CORE_SOURCES
     src/skill_registry.c
     src/subagent.c
     src/voice.c
+    src/voice/local_stt.c
+    src/voice/local_tts.c
     src/portable_atomic.c
     src/agent_routing.c
     src/health.c
@@ -1850,6 +1852,7 @@ set(HU_TEST_SOURCES
     tests/test_subagent.c
     tests/test_mcp.c
     tests/test_voice.c
+    tests/test_local_voice.c
     tests/test_vector_stores.c
     tests/test_cli.c
     tests/test_memory_engines_ext.c

@@ -304,6 +304,7 @@ void run_computer_use_tests(void);
 void run_image_gen_tests(void);
 void run_visual_grounding_tests(void);
 void run_browser_use_tests(void);
+void run_local_voice_tests(void);
 void run_gui_agent_tests(void);
 void run_lsp_tests(void);
 void run_webrtc_tests(void);
@@ -644,6 +645,7 @@ int main(int argc, char **argv) {
     run_image_gen_tests();
     run_visual_grounding_tests();
     run_browser_use_tests();
+    run_local_voice_tests();
     run_gui_agent_tests();
     run_lsp_tests();
     run_webrtc_tests();

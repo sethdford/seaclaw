@@ -10,16 +10,6 @@
 #include <unistd.h>
 #endif
 
-#if !defined(HU_IS_TEST) || !HU_IS_TEST
-static int local_tts_pid(void) {
-#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
-    return (int)getpid();
-#else
-    return 0;
-#endif
-}
-#endif
-
 hu_error_t hu_local_tts_synthesize(hu_allocator_t *alloc, const hu_local_tts_config_t *config,
                                    const char *text, char **out_path) {
     if (!alloc || !config || !config->endpoint || !config->endpoint[0] || !out_path)
@@ -28,7 +18,7 @@ hu_error_t hu_local_tts_synthesize(hu_allocator_t *alloc, const hu_local_tts_con
     if (!text || !text[0])
         return HU_ERR_INVALID_ARGUMENT;
 
-#if defined(HU_IS_TEST) && HU_IS_TEST
+#if HU_IS_TEST
     char tmpl[] = "/tmp/hu_lttsXXXXXX.raw";
     int fd = mkstemps(tmpl, 4);
     if (fd < 0)
@@ -76,8 +66,13 @@ hu_error_t hu_local_tts_synthesize(hu_allocator_t *alloc, const hu_local_tts_con
         hu_json_buf_free(&body);
         return HU_ERR_IO;
     }
+#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
+    int pid = (int)getpid();
+#else
+    int pid = 0;
+#endif
     char json_path[256];
-    int n = snprintf(json_path, sizeof(json_path), "%s/hu_ltts_%d.json", tmp_dir, local_tts_pid());
+    int n = snprintf(json_path, sizeof(json_path), "%s/hu_ltts_%d.json", tmp_dir, pid);
     alloc->free(alloc->ctx, tmp_dir, strlen(tmp_dir) + 1);
     if (n < 0 || (size_t)n >= sizeof(json_path)) {
         hu_json_buf_free(&body);

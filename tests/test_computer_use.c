@@ -78,10 +78,36 @@ static void test_cu_execute_unknown_action(void) {
         tool.vtable->deinit(tool.ctx, &alloc);
 }
 
+static void computer_use_target_resolves_via_visual_grounding(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t tool;
+    HU_ASSERT_EQ(hu_computer_use_create(&alloc, NULL, &tool), HU_OK);
+
+    hu_json_value_t *args = NULL;
+    const char *js =
+        "{\"action\":\"click\",\"target\":\"the blue submit button\",\"x\":0,\"y\":0}";
+    HU_ASSERT_EQ(hu_json_parse(&alloc, js, strlen(js), &args), HU_OK);
+
+    hu_tool_result_t result;
+    memset(&result, 0, sizeof(result));
+    HU_ASSERT_EQ(tool.vtable->execute(tool.ctx, &alloc, args, &result), HU_OK);
+    HU_ASSERT(result.success);
+    HU_ASSERT_NOT_NULL(result.output);
+    HU_ASSERT(strstr(result.output, "via_visual_grounding") != NULL);
+    HU_ASSERT(strstr(result.output, "\"x\":100") != NULL);
+    HU_ASSERT(strstr(result.output, "\"y\":200") != NULL);
+
+    hu_tool_result_free(&alloc, &result);
+    hu_json_free(&alloc, args);
+    if (tool.vtable->deinit)
+        tool.vtable->deinit(tool.ctx, &alloc);
+}
+
 void run_computer_use_tests(void) {
     HU_TEST_SUITE("Computer Use Tool");
     HU_RUN_TEST(test_cu_create);
     HU_RUN_TEST(test_cu_execute_screenshot_mock);
     HU_RUN_TEST(test_cu_execute_click_mock);
+    HU_RUN_TEST(computer_use_target_resolves_via_visual_grounding);
     HU_RUN_TEST(test_cu_execute_unknown_action);
 }

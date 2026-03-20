@@ -14,6 +14,8 @@ typedef struct hu_voice_config {
     const char *tts_model;    /* NULL = "tts-1" */
     const char *tts_voice;    /* NULL = "alloy" */
     const char *language;     /* NULL = auto-detect */
+    const char *local_stt_endpoint; /* NULL = skip; if set, tried before cloud STT */
+    const char *local_tts_endpoint; /* NULL = skip; if set, tried before cloud TTS */
 } hu_voice_config_t;
 
 hu_error_t hu_voice_stt_file(hu_allocator_t *alloc, const hu_voice_config_t *config,

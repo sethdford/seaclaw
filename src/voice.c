@@ -47,8 +47,8 @@ hu_error_t hu_voice_stt_file(hu_allocator_t *alloc, const hu_voice_config_t *con
         return HU_ERR_INVALID_ARGUMENT;
 
 #if HU_IS_TEST
-    if (config->stt_endpoint && config->stt_endpoint[0]) {
-        hu_local_stt_config_t lc = {.endpoint = config->stt_endpoint,
+    if (config->local_stt_endpoint && config->local_stt_endpoint[0]) {
+        hu_local_stt_config_t lc = {.endpoint = config->local_stt_endpoint,
                                     .model = config->stt_model,
                                     .language = config->language};
         return hu_local_stt_transcribe(alloc, &lc, file_path, out_text, out_len);
@@ -72,8 +72,8 @@ hu_error_t hu_voice_stt_file(hu_allocator_t *alloc, const hu_voice_config_t *con
         return HU_OK;
     }
 #else
-    if (config->stt_endpoint && config->stt_endpoint[0]) {
-        hu_local_stt_config_t lc = {.endpoint = config->stt_endpoint,
+    if (config->local_stt_endpoint && config->local_stt_endpoint[0]) {
+        hu_local_stt_config_t lc = {.endpoint = config->local_stt_endpoint,
                                     .model = config->stt_model,
                                     .language = config->language};
         hu_error_t le = hu_local_stt_transcribe(alloc, &lc, file_path, out_text, out_len);
@@ -85,6 +85,9 @@ hu_error_t hu_voice_stt_file(hu_allocator_t *alloc, const hu_voice_config_t *con
             *out_len = 0;
         }
     }
+
+    if (!config->api_key || config->api_key_len == 0)
+        return HU_ERR_PROVIDER_AUTH;
 
     const char *endpoint = config->stt_endpoint && config->stt_endpoint[0]
                                ? config->stt_endpoint
@@ -278,12 +281,9 @@ hu_error_t hu_voice_tts(hu_allocator_t *alloc, const hu_voice_config_t *config, 
     *out_audio = NULL;
     *out_audio_len = 0;
 
-    if (!config->api_key || config->api_key_len == 0)
-        return HU_ERR_PROVIDER_AUTH;
-
 #if HU_IS_TEST
-    if (config->tts_endpoint && config->tts_endpoint[0]) {
-        hu_local_tts_config_t lc = {.endpoint = config->tts_endpoint,
+    if (config->local_tts_endpoint && config->local_tts_endpoint[0]) {
+        hu_local_tts_config_t lc = {.endpoint = config->local_tts_endpoint,
                                     .model = config->tts_model,
                                     .voice = config->tts_voice};
         char *path = NULL;
@@ -321,8 +321,8 @@ hu_error_t hu_voice_tts(hu_allocator_t *alloc, const hu_voice_config_t *config, 
         return HU_OK;
     }
 #else
-    if (config->tts_endpoint && config->tts_endpoint[0]) {
-        hu_local_tts_config_t lc = {.endpoint = config->tts_endpoint,
+    if (config->local_tts_endpoint && config->local_tts_endpoint[0]) {
+        hu_local_tts_config_t lc = {.endpoint = config->local_tts_endpoint,
                                     .model = config->tts_model,
                                     .voice = config->tts_voice};
         char *path = NULL;
@@ -356,7 +356,8 @@ hu_error_t hu_voice_tts(hu_allocator_t *alloc, const hu_voice_config_t *config, 
                             alloc->free(alloc->ctx, path, strlen(path) + 1);
                         } else {
                             size_t audio_sz = (size_t)sz;
-                            void *raw = alloc->alloc(alloc->ctx, audio_sz ? audio_sz : 1);
+                            size_t raw_cap = audio_sz ? audio_sz : 1;
+                            void *raw = alloc->alloc(alloc->ctx, raw_cap);
                             if (!raw) {
                                 fclose(af);
                                 (void)unlink(path);
@@ -367,7 +368,7 @@ hu_error_t hu_voice_tts(hu_allocator_t *alloc, const hu_voice_config_t *config, 
                                     fclose(af);
                                     (void)unlink(path);
                                     alloc->free(alloc->ctx, path, strlen(path) + 1);
-                                    alloc->free(alloc->ctx, raw, audio_sz);
+                                    alloc->free(alloc->ctx, raw, raw_cap);
                                 } else {
                                     fclose(af);
                                     (void)unlink(path);
