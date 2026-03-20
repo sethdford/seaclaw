@@ -474,14 +474,13 @@ static hu_error_t browser_use_execute(void *ctx, hu_allocator_t *alloc, const hu
             }
             cx = el.x + (el.width > 0 ? el.width / 2 : 0);
             cy = el.y + (el.height > 0 ? el.height / 2 : 0);
-            report_sel = sel;
             err = hu_cdp_click(&session, cx, cy);
             if (err != HU_OK) {
                 *out = hu_tool_result_fail("click failed", 12);
                 goto done;
             }
             char *msg0 = hu_sprintf(alloc, "{\"status\":\"ok\",\"selector\":\"%s\"}",
-                                    report_sel ? report_sel : "");
+                                    sel ? sel : "");
             if (!msg0) {
                 *out = hu_tool_result_fail("out of memory", 13);
                 goto done;

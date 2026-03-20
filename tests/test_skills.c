@@ -2,7 +2,10 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/skill_registry.h"
+#include "human/skillforge.h"
 #include "human/skills.h"
+#include "human/tools/skill_run.h"
+#include "human/core/json.h"
 #include "test_framework.h"
 #include <string.h>
 
@@ -13,7 +16,7 @@ static void test_skills_list_delegates_to_skillforge(void) {
     hu_error_t err = hu_skills_list(&alloc, "/tmp", &skills, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(skills);
-    HU_ASSERT_EQ(count, 3u);
+    HU_ASSERT_EQ(count, 4u);
     HU_ASSERT_STR_EQ(skills[0].name, "test-skill");
     hu_skills_free(&alloc, skills, count);
 }
@@ -25,7 +28,7 @@ static void test_skills_list_null_workspace_uses_dot(void) {
     hu_error_t err = hu_skills_list(&alloc, NULL, &skills, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(skills);
-    HU_ASSERT_EQ(count, 3u);
+    HU_ASSERT_EQ(count, 4u);
     hu_skills_free(&alloc, skills, count);
 }
 
@@ -46,7 +49,7 @@ static void test_skills_list_resets_output(void) {
     hu_error_t err = hu_skills_list(&alloc, ".", &skills, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(skills);
-    HU_ASSERT_EQ(count, 3u);
+    HU_ASSERT_EQ(count, 4u);
     hu_skills_free(&alloc, skills, count);
 }
 
@@ -78,7 +81,7 @@ static void test_skills_list_dot_workspace(void) {
     hu_error_t err = hu_skills_list(&alloc, ".", &skills, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(skills);
-    HU_ASSERT_EQ(count, 3u);
+    HU_ASSERT_EQ(count, 4u);
     hu_skills_free(&alloc, skills, count);
 }
 
@@ -229,6 +232,119 @@ static void test_skill_registry_entries_free_null_safe(void) {
     hu_skill_registry_entries_free(&alloc, NULL, 5);
 }
 
+static void test_skillforge_load_instructions_from_path(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_skillforge_t sf;
+    hu_skillforge_create(&alloc, &sf);
+    hu_skillforge_discover(&sf, "/tmp");
+    hu_skill_t *s = hu_skillforge_get_skill(&sf, "skill-md-mock");
+    HU_ASSERT_NOT_NULL(s);
+    char *ins = NULL;
+    size_t ilen = 0;
+    HU_ASSERT_EQ(hu_skillforge_load_instructions(&alloc, s, &ins, &ilen), HU_OK);
+    HU_ASSERT_NOT_NULL(ins);
+    HU_ASSERT_TRUE(strstr(ins, "Mock SKILL.md") != NULL);
+    alloc.free(alloc.ctx, ins, ilen + 1);
+    hu_skillforge_destroy(&sf);
+}
+
+static void test_skillforge_load_instructions_fallback_to_description(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_skillforge_t sf;
+    hu_skillforge_create(&alloc, &sf);
+    hu_skillforge_discover(&sf, "/tmp");
+    hu_skill_t *s = hu_skillforge_get_skill(&sf, "test-skill");
+    HU_ASSERT_NOT_NULL(s);
+    HU_ASSERT_NULL(s->instructions_path);
+    char *ins = NULL;
+    HU_ASSERT_EQ(hu_skillforge_load_instructions(&alloc, s, &ins, NULL), HU_OK);
+    HU_ASSERT_NOT_NULL(ins);
+    HU_ASSERT_STR_EQ(ins, "A test skill for unit tests");
+    alloc.free(alloc.ctx, ins, strlen(ins) + 1);
+    hu_skillforge_destroy(&sf);
+}
+
+static void test_skillforge_read_resource_validates_path(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_skillforge_t sf;
+    hu_skillforge_create(&alloc, &sf);
+    hu_skillforge_discover(&sf, "/tmp");
+    hu_skill_t *s = hu_skillforge_get_skill(&sf, "skill-md-mock");
+    HU_ASSERT_NOT_NULL(s);
+    char *buf = NULL;
+    size_t n = 0;
+    HU_ASSERT_EQ(hu_skillforge_read_resource(&alloc, s, "../secret", &buf, &n),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_NULL(buf);
+    hu_skillforge_destroy(&sf);
+}
+
+static void test_skillforge_read_resource_not_found(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_skillforge_t sf;
+    hu_skillforge_create(&alloc, &sf);
+    hu_skillforge_discover(&sf, "/tmp");
+    hu_skill_t *s = hu_skillforge_get_skill(&sf, "skill-md-mock");
+    HU_ASSERT_NOT_NULL(s);
+    char *buf = NULL;
+    size_t n = 0;
+    HU_ASSERT_EQ(hu_skillforge_read_resource(&alloc, s, "missing.txt", &buf, &n), HU_ERR_NOT_FOUND);
+    HU_ASSERT_NULL(buf);
+    hu_skillforge_destroy(&sf);
+}
+
+static void test_skillforge_read_resource_fixture_ok(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_skillforge_t sf;
+    hu_skillforge_create(&alloc, &sf);
+    hu_skillforge_discover(&sf, "/tmp");
+    hu_skill_t *s = hu_skillforge_get_skill(&sf, "skill-md-mock");
+    HU_ASSERT_NOT_NULL(s);
+    char *buf = NULL;
+    size_t n = 0;
+    HU_ASSERT_EQ(hu_skillforge_read_resource(&alloc, s, "fixture.txt", &buf, &n), HU_OK);
+    HU_ASSERT_NOT_NULL(buf);
+    HU_ASSERT_TRUE(strstr(buf, "fixture resource") != NULL);
+    alloc.free(alloc.ctx, buf, n + 1);
+    hu_skillforge_destroy(&sf);
+}
+
+static void test_skillforge_execute_prefers_instructions(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_skillforge_t sf;
+    hu_skillforge_create(&alloc, &sf);
+    hu_skillforge_discover(&sf, "/tmp");
+    char *out = NULL;
+    HU_ASSERT_EQ(hu_skillforge_execute(&alloc, &sf, "skill-md-mock", &out), HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(strstr(out, "Do the thing") != NULL);
+    alloc.free(alloc.ctx, out, strlen(out) + 1);
+    hu_skillforge_destroy(&sf);
+}
+
+static void test_skill_run_returns_instructions_content(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_skillforge_t sf;
+    hu_skillforge_create(&alloc, &sf);
+    hu_skillforge_discover(&sf, "/tmp");
+    hu_tool_t tool;
+    HU_ASSERT_EQ(hu_skill_run_create(&alloc, &tool, &sf, NULL, 0, NULL), HU_OK);
+    hu_json_value_t *args = hu_json_object_new(&alloc);
+    hu_json_object_set(&alloc, args, "skill",
+                       hu_json_string_new(&alloc, "skill-md-mock", 14));
+    hu_tool_result_t result = {0};
+    HU_ASSERT_EQ(tool.vtable->execute(tool.ctx, &alloc, args, &result), HU_OK);
+    HU_ASSERT_TRUE(result.success);
+    HU_ASSERT_NOT_NULL(result.output);
+    HU_ASSERT_TRUE(strstr(result.output, "Instructions:") != NULL);
+    HU_ASSERT_TRUE(strstr(result.output, "Mock SKILL.md") != NULL);
+    if (result.output_owned)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    hu_json_free(&alloc, args);
+    tool.vtable->deinit(tool.ctx, &alloc);
+    hu_skillforge_destroy(&sf);
+}
+
 void run_skills_tests(void) {
     HU_TEST_SUITE("Skills");
     HU_RUN_TEST(test_skills_list_delegates_to_skillforge);
@@ -259,4 +375,11 @@ void run_skills_tests(void) {
     HU_RUN_TEST(test_skill_registry_get_installed_dir_small_buffer);
     HU_RUN_TEST(test_skill_registry_search_mock_returns_entries);
     HU_RUN_TEST(test_skill_registry_entries_free_null_safe);
+    HU_RUN_TEST(test_skillforge_load_instructions_from_path);
+    HU_RUN_TEST(test_skillforge_load_instructions_fallback_to_description);
+    HU_RUN_TEST(test_skillforge_read_resource_validates_path);
+    HU_RUN_TEST(test_skillforge_read_resource_not_found);
+    HU_RUN_TEST(test_skillforge_read_resource_fixture_ok);
+    HU_RUN_TEST(test_skillforge_execute_prefers_instructions);
+    HU_RUN_TEST(test_skill_run_returns_instructions_content);
 }

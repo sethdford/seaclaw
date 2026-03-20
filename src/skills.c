@@ -48,6 +48,7 @@ hu_error_t hu_skills_list(hu_allocator_t *alloc, const char *workspace_dir, hu_s
         copy[i].enabled = from[i].enabled;
         if (!copy[i].name || !copy[i].description ||
             (from[i].command && !copy[i].command) ||
+            (from[i].parameters && !copy[i].parameters) ||
             (from[i].skill_dir && !copy[i].skill_dir) ||
             (from[i].instructions_path && !copy[i].instructions_path)) {
             hu_skills_free(alloc, copy, n);

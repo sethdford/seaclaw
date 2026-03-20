@@ -622,7 +622,7 @@ static void test_skillforge_discover_adds_test_skills(void) {
     hu_skillforge_create(&alloc, &sf);
     hu_error_t err = hu_skillforge_discover(&sf, "/tmp");
     HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_EQ(sf.skills_len, 3u); /* test-skill, another-skill, cli-helper */
+    HU_ASSERT_EQ(sf.skills_len, 4u); /* + skill-md-mock for progressive disclosure tests */
     hu_skillforge_destroy(&sf);
 }
 
@@ -691,7 +691,7 @@ static void test_skillforge_list_skills(void) {
     size_t count = 0;
     hu_error_t err = hu_skillforge_list_skills(&sf, &out, &count);
     HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_EQ(count, 3u);
+    HU_ASSERT_EQ(count, 4u);
     HU_ASSERT_NOT_NULL(out);
     hu_skillforge_destroy(&sf);
 }

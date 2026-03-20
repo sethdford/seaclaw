@@ -3,6 +3,8 @@
  * In HU_IS_TEST mode, returns mock data without spawning curl.
  */
 #include "human/voice.h"
+#include "human/voice/local_stt.h"
+#include "human/voice/local_tts.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
@@ -44,10 +46,15 @@ hu_error_t hu_voice_stt_file(hu_allocator_t *alloc, const hu_voice_config_t *con
     if (!file_path || file_path[0] == '\0')
         return HU_ERR_INVALID_ARGUMENT;
 
+#if HU_IS_TEST
+    if (config->stt_endpoint && config->stt_endpoint[0]) {
+        hu_local_stt_config_t lc = {.endpoint = config->stt_endpoint,
+                                    .model = config->stt_model,
+                                    .language = config->language};
+        return hu_local_stt_transcribe(alloc, &lc, file_path, out_text, out_len);
+    }
     if (!config->api_key || config->api_key_len == 0)
         return HU_ERR_PROVIDER_AUTH;
-
-#if HU_IS_TEST
     {
         (void)file_path;
         const char *prefix = "This is a mock transcription of ";
@@ -65,6 +72,20 @@ hu_error_t hu_voice_stt_file(hu_allocator_t *alloc, const hu_voice_config_t *con
         return HU_OK;
     }
 #else
+    if (config->stt_endpoint && config->stt_endpoint[0]) {
+        hu_local_stt_config_t lc = {.endpoint = config->stt_endpoint,
+                                    .model = config->stt_model,
+                                    .language = config->language};
+        hu_error_t le = hu_local_stt_transcribe(alloc, &lc, file_path, out_text, out_len);
+        if (le == HU_OK && *out_text && *out_len > 0)
+            return HU_OK;
+        if (*out_text) {
+            alloc->free(alloc->ctx, *out_text, *out_len + 1);
+            *out_text = NULL;
+            *out_len = 0;
+        }
+    }
+
     const char *endpoint = config->stt_endpoint && config->stt_endpoint[0]
                                ? config->stt_endpoint
                                : HU_VOICE_STT_DEFAULT_ENDPOINT;
@@ -261,6 +282,32 @@ hu_error_t hu_voice_tts(hu_allocator_t *alloc, const hu_voice_config_t *config, 
         return HU_ERR_PROVIDER_AUTH;
 
 #if HU_IS_TEST
+    if (config->tts_endpoint && config->tts_endpoint[0]) {
+        hu_local_tts_config_t lc = {.endpoint = config->tts_endpoint,
+                                    .model = config->tts_model,
+                                    .voice = config->tts_voice};
+        char *path = NULL;
+        hu_error_t le = hu_local_tts_synthesize(alloc, &lc, text, &path);
+        if (le != HU_OK) {
+            if (path) {
+                (void)unlink(path);
+                alloc->free(alloc->ctx, path, strlen(path) + 1);
+            }
+            return le;
+        }
+        if (path) {
+            (void)unlink(path);
+            alloc->free(alloc->ctx, path, strlen(path) + 1);
+        }
+        void *buf = alloc->alloc(alloc->ctx, 1);
+        if (!buf)
+            return HU_ERR_OUT_OF_MEMORY;
+        *out_audio = buf;
+        *out_audio_len = 0;
+        return HU_OK;
+    }
+    if (!config->api_key || config->api_key_len == 0)
+        return HU_ERR_PROVIDER_AUTH;
     {
         (void)text;
         (void)text_len;
@@ -274,6 +321,72 @@ hu_error_t hu_voice_tts(hu_allocator_t *alloc, const hu_voice_config_t *config, 
         return HU_OK;
     }
 #else
+    if (config->tts_endpoint && config->tts_endpoint[0]) {
+        hu_local_tts_config_t lc = {.endpoint = config->tts_endpoint,
+                                    .model = config->tts_model,
+                                    .voice = config->tts_voice};
+        char *path = NULL;
+        hu_error_t le = hu_local_tts_synthesize(alloc, &lc, text, &path);
+        if (le != HU_OK) {
+            if (path) {
+                (void)unlink(path);
+                alloc->free(alloc->ctx, path, strlen(path) + 1);
+            }
+            /* fall through to cloud */
+        } else if (path) {
+            FILE *af = fopen(path, "rb");
+            if (!af) {
+                (void)unlink(path);
+                alloc->free(alloc->ctx, path, strlen(path) + 1);
+            } else {
+                if (fseek(af, 0, SEEK_END) != 0) {
+                    fclose(af);
+                    (void)unlink(path);
+                    alloc->free(alloc->ctx, path, strlen(path) + 1);
+                } else {
+                    long sz = ftell(af);
+                    if (sz < 0) {
+                        fclose(af);
+                        (void)unlink(path);
+                        alloc->free(alloc->ctx, path, strlen(path) + 1);
+                    } else {
+                        if (fseek(af, 0, SEEK_SET) != 0) {
+                            fclose(af);
+                            (void)unlink(path);
+                            alloc->free(alloc->ctx, path, strlen(path) + 1);
+                        } else {
+                            size_t audio_sz = (size_t)sz;
+                            void *raw = alloc->alloc(alloc->ctx, audio_sz ? audio_sz : 1);
+                            if (!raw) {
+                                fclose(af);
+                                (void)unlink(path);
+                                alloc->free(alloc->ctx, path, strlen(path) + 1);
+                            } else {
+                                if (audio_sz > 0 &&
+                                    fread(raw, 1, audio_sz, af) != audio_sz) {
+                                    fclose(af);
+                                    (void)unlink(path);
+                                    alloc->free(alloc->ctx, path, strlen(path) + 1);
+                                    alloc->free(alloc->ctx, raw, audio_sz);
+                                } else {
+                                    fclose(af);
+                                    (void)unlink(path);
+                                    alloc->free(alloc->ctx, path, strlen(path) + 1);
+                                    *out_audio = raw;
+                                    *out_audio_len = audio_sz;
+                                    return HU_OK;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (!config->api_key || config->api_key_len == 0)
+        return HU_ERR_PROVIDER_AUTH;
+
     const char *endpoint = config->tts_endpoint && config->tts_endpoint[0]
                                ? config->tts_endpoint
                                : HU_VOICE_TTS_DEFAULT_ENDPOINT;

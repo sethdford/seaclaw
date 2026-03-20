@@ -1022,10 +1022,67 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
         return HU_OK;
     }
 
-    fprintf(stderr, "[%s] skills: use list, search, install, uninstall, update, or publish\n", HU_CODENAME);
+    if (strcmp(sub, "info") == 0) {
+        if (argc < 4 || !argv[3]) {
+            fprintf(stderr, "[%s] skills info <name>\n", HU_CODENAME);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        char dir_path[512];
+        size_t dlen = hu_skill_registry_get_installed_dir(dir_path, sizeof(dir_path));
+        const char *dir = (dlen > 0) ? dir_path : ".";
+        hu_skillforge_t sf;
+        hu_error_t err = hu_skillforge_create(alloc, &sf);
+        if (err != HU_OK)
+            return err;
+        err = hu_skillforge_discover(&sf, dir);
+        if (err == HU_OK) {
+            hu_skill_t *skill = hu_skillforge_get_skill(&sf, argv[3]);
+            if (skill) {
+                printf("Name:        %s\n", skill->name);
+                printf("Description: %s\n", skill->description ? skill->description : "");
+                printf("Command:     %s\n", skill->command ? skill->command : "(none)");
+                printf("Parameters:  %s\n", skill->parameters ? skill->parameters : "(none)");
+                printf("Enabled:     %s\n", skill->enabled ? "yes" : "no");
+                if (skill->instructions_path)
+                    printf("SKILL.md:    %s\n", skill->instructions_path);
+                if (skill->skill_dir)
+                    printf("Directory:   %s\n", skill->skill_dir);
+                hu_skillforge_destroy(&sf);
+                return HU_OK;
+            }
+        }
+        hu_skillforge_destroy(&sf);
+
+        hu_skill_registry_entry_t *entries = NULL;
+        size_t count = 0;
+        err = hu_skill_registry_search(alloc, argv[3], &entries, &count);
+        if (err == HU_OK && count > 0) {
+            for (size_t i = 0; i < count; i++) {
+                if (entries[i].name && strcmp(entries[i].name, argv[3]) == 0) {
+                    printf("Name:        %s\n", entries[i].name);
+                    printf("Description: %s\n",
+                           entries[i].description ? entries[i].description : "");
+                    printf("Version:     %s\n", entries[i].version ? entries[i].version : "?");
+                    printf("Author:      %s\n", entries[i].author ? entries[i].author : "?");
+                    printf("URL:         %s\n", entries[i].url ? entries[i].url : "?");
+                    printf("Tags:        %s\n", entries[i].tags ? entries[i].tags : "");
+                    printf("Status:      not installed\n");
+                    hu_skill_registry_entries_free(alloc, entries, count);
+                    return HU_OK;
+                }
+            }
+        }
+        if (entries)
+            hu_skill_registry_entries_free(alloc, entries, count);
+        fprintf(stderr, "[%s] skill '%s' not found\n", HU_CODENAME, argv[3]);
+        return HU_ERR_NOT_FOUND;
+    }
+
+    fprintf(stderr, "[%s] skills: use list, search, install, info, uninstall, update, or publish\n",
+            HU_CODENAME);
     fprintf(stderr, "  human skills list\n");
     fprintf(stderr, "  human skills search <query>\n");
-    fprintf(stderr, "  human skills install <path>\n");
+    fprintf(stderr, "  human skills install <name-or-path>\n");
     fprintf(stderr, "  human skills uninstall <name>\n");
     fprintf(stderr, "  human skills update <path>\n");
     fprintf(stderr, "  human skills info <name>\n");

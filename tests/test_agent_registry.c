@@ -339,6 +339,7 @@ static void test_skill_run_finds_skill(void) {
     HU_ASSERT_TRUE(result.success);
     HU_ASSERT_NOT_NULL(result.output);
     HU_ASSERT_TRUE(strstr(result.output, "test-skill") != NULL);
+    HU_ASSERT_TRUE(strstr(result.output, "Instructions:") != NULL);
     HU_ASSERT_TRUE(strstr(result.output, "echo test") != NULL);
 
     if (result.output_owned)
