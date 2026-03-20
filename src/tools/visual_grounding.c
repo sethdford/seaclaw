@@ -23,16 +23,18 @@ hu_error_t hu_visual_ground_action(hu_allocator_t *alloc, hu_provider_t *provide
     (void)provider;
     (void)model;
     (void)model_len;
-    *out_x = 100.0;
-    *out_y = 200.0;
     if (out_selector) {
         size_t sl = sizeof(k_hu_vg_mock_selector) - 1;
         char *dup = hu_strndup(alloc, k_hu_vg_mock_selector, sl);
+        if (!dup)
+            return HU_ERR_OUT_OF_MEMORY;
         *out_selector = dup;
         if (out_selector_len)
-            *out_selector_len = dup ? sl : 0;
+            *out_selector_len = sl;
     } else if (out_selector_len)
         *out_selector_len = 0;
+    *out_x = 100.0;
+    *out_y = 200.0;
     return HU_OK;
 #else
     if (!alloc || !provider || !screenshot_path || path_len == 0 || !action_description ||
