@@ -9,15 +9,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,7 +25,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -48,7 +38,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -59,8 +48,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -75,8 +65,12 @@ import ai.human.app.data.saveGatewayUrl
 import ai.human.app.ui.theme.HumanTheme
 import ai.human.app.ui.HUTokens
 import ai.human.app.ui.glassSurface
-import ai.human.app.util.isReducedMotionEnabled
 import ai.human.app.R
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -101,6 +95,14 @@ private fun isValidGatewayUrl(url: String): Boolean {
     if (trimmed.isEmpty()) return false
     return trimmed.startsWith("ws://") || trimmed.startsWith("wss://") ||
         trimmed.startsWith("http://") || trimmed.startsWith("https://")
+}
+
+private object MainRoutes {
+    const val Overview = "overview"
+    const val Chat = "chat"
+    const val Sessions = "sessions"
+    const val Tools = "tools"
+    const val Settings = "settings"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -146,56 +148,67 @@ fun HumanRoot(intent: Intent?) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000") {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    val gateway = remember { GatewayClient() }
+    val vm: MainViewModel = viewModel()
+    val gateway = vm.gateway
+    val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.Overview
     val connectionState by gateway.state.collectAsState()
 
-    DisposableEffect(selectedTab) {
-        if (selectedTab in 0..3) {
+    fun navigateTo(route: String) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.startDestinationId) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    DisposableEffect(currentRoute) {
+        if (currentRoute in listOf(MainRoutes.Overview, MainRoutes.Chat, MainRoutes.Sessions, MainRoutes.Tools)) {
             gateway.connectIfNeeded(initialGatewayUrl)
         }
-        if (selectedTab == 0 && connectionState == ConnectionState.CONNECTED) {
+        if (currentRoute == MainRoutes.Overview && connectionState == ConnectionState.CONNECTED) {
             gateway.fetchOverviewData()
         }
         onDispose { }
     }
 
-    DisposableEffect(Unit) {
-        onDispose { gateway.disconnect() }
-    }
-
-    LaunchedEffect(intent) {
+    LaunchedEffect(intent?.data) {
         val uri = intent?.data ?: return@LaunchedEffect
         if (uri.scheme == "human") {
             when (uri.host) {
-                "chat" -> selectedTab = 1
-                "sessions" -> selectedTab = 2
-                "tools" -> selectedTab = 3
-                "settings" -> selectedTab = 4
+                "chat" -> navigateTo(MainRoutes.Chat)
+                "sessions" -> navigateTo(MainRoutes.Sessions)
+                "tools" -> navigateTo(MainRoutes.Tools)
+                "settings" -> navigateTo(MainRoutes.Settings)
+                "overview" -> navigateTo(MainRoutes.Overview)
             }
         }
     }
 
-    LaunchedEffect(selectedTab) {
-        // Prefetch adjacent tabs for perceived instant navigation
-        val prev = (selectedTab - 1).coerceIn(0, 4)
-        val next = (selectedTab + 1).coerceIn(0, 4)
-        if (connectionState == ConnectionState.CONNECTED) {
-            when (prev) {
-                2 -> gateway.prefetchSessions()
-                3 -> gateway.prefetchTools()
-                else -> { }
+    LaunchedEffect(currentRoute) {
+        if (connectionState != ConnectionState.CONNECTED) return@LaunchedEffect
+        when (currentRoute) {
+            MainRoutes.Sessions -> {
+                gateway.prefetchSessions()
+                gateway.prefetchTools()
             }
-            when (next) {
-                2 -> gateway.prefetchSessions()
-                3 -> gateway.prefetchTools()
-                else -> { }
+            MainRoutes.Tools -> {
+                gateway.prefetchSessions()
+                gateway.prefetchTools()
             }
+            MainRoutes.Overview -> {
+                gateway.prefetchSessions()
+                gateway.prefetchTools()
+            }
+            else -> { }
         }
     }
 
-    BackHandler(enabled = selectedTab != 0) {
-        selectedTab = 0
+    BackHandler(enabled = currentRoute != MainRoutes.Overview) {
+        navigateTo(MainRoutes.Overview)
     }
 
     Scaffold(
@@ -204,65 +217,65 @@ fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
                 NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
+                    selected = currentRoute == MainRoutes.Overview,
+                    onClick = { navigateTo(MainRoutes.Overview) },
                     icon = {
                         Icon(
                             painter = painterResource(R.drawable.ic_phosphor_house),
                             contentDescription = "Overview",
-                            tint = if (selectedTab == 0) MaterialTheme.colorScheme.primary
+                            tint = if (currentRoute == MainRoutes.Overview) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     },
                     label = { Text("Overview") },
                 )
                 NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
+                    selected = currentRoute == MainRoutes.Chat,
+                    onClick = { navigateTo(MainRoutes.Chat) },
                     icon = {
                         Icon(
                             painter = painterResource(R.drawable.ic_phosphor_chat_circle),
                             contentDescription = "Chat",
-                            tint = if (selectedTab == 1) MaterialTheme.colorScheme.primary
+                            tint = if (currentRoute == MainRoutes.Chat) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     },
                     label = { Text("Chat") },
                 )
                 NavigationBarItem(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
+                    selected = currentRoute == MainRoutes.Sessions,
+                    onClick = { navigateTo(MainRoutes.Sessions) },
                     icon = {
                         Icon(
                             painter = painterResource(R.drawable.ic_phosphor_clock),
                             contentDescription = "Sessions",
-                            tint = if (selectedTab == 2) MaterialTheme.colorScheme.primary
+                            tint = if (currentRoute == MainRoutes.Sessions) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     },
                     label = { Text("Sessions") },
                 )
                 NavigationBarItem(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 },
+                    selected = currentRoute == MainRoutes.Tools,
+                    onClick = { navigateTo(MainRoutes.Tools) },
                     icon = {
                         Icon(
                             painter = painterResource(R.drawable.ic_phosphor_wrench),
                             contentDescription = "Tools",
-                            tint = if (selectedTab == 3) MaterialTheme.colorScheme.primary
+                            tint = if (currentRoute == MainRoutes.Tools) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     },
                     label = { Text("Tools") },
                 )
                 NavigationBarItem(
-                    selected = selectedTab == 4,
-                    onClick = { selectedTab = 4 },
+                    selected = currentRoute == MainRoutes.Settings,
+                    onClick = { navigateTo(MainRoutes.Settings) },
                     icon = {
                         Icon(
                             painter = painterResource(R.drawable.ic_phosphor_gear),
                             contentDescription = "Settings",
-                            tint = if (selectedTab == 4) MaterialTheme.colorScheme.primary
+                            tint = if (currentRoute == MainRoutes.Settings) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     },
@@ -271,33 +284,30 @@ fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000
             }
         },
     ) { padding ->
-        val reducedMotion = isReducedMotionEnabled()
         Box(modifier = Modifier.padding(padding)) {
-            AnimatedContent(
-                targetState = selectedTab,
-                transitionSpec = {
-                    if (reducedMotion) {
-                        EnterTransition.None togetherWith ExitTransition.None
-                    } else {
-                        (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) +
-                            slideInVertically { it / 20 }) togetherWith
-                            fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
-                    }
-                },
+            NavHost(
+                navController = navController,
+                startDestination = MainRoutes.Overview,
                 modifier = Modifier.fillMaxSize(),
-                label = "screen_transition",
-            ) { tab ->
-                when (tab) {
-                    0 -> OverviewScreen(gateway = gateway, connectionState = connectionState)
-                    1 -> ChatScreen(gateway = gateway)
-                    2 -> SessionsScreen(gateway = gateway, connectionState = connectionState)
-                    3 -> ToolsScreen(gateway = gateway, connectionState = connectionState)
-                    4 -> SettingsScreen(
+            ) {
+                composable(MainRoutes.Overview) {
+                    OverviewScreen(gateway = gateway, connectionState = connectionState)
+                }
+                composable(MainRoutes.Chat) {
+                    ChatScreen(gateway = gateway)
+                }
+                composable(MainRoutes.Sessions) {
+                    SessionsScreen(gateway = gateway, connectionState = connectionState)
+                }
+                composable(MainRoutes.Tools) {
+                    ToolsScreen(gateway = gateway, connectionState = connectionState)
+                }
+                composable(MainRoutes.Settings) {
+                    SettingsScreen(
                         gateway = gateway,
                         connectionState = connectionState,
                         initialGatewayUrl = initialGatewayUrl,
                     )
-                    else -> OverviewScreen(gateway = gateway, connectionState = connectionState)
                 }
             }
         }

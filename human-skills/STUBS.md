@@ -117,6 +117,18 @@ Previously stubbed, now **real**:
 | OpenSSL            | Optional (ON)  | WSS, TLS for WebSocket            |
 | math (-lm)         | Linked         | Vector math, retrieval algorithms |
 
+## Verification (local)
+
+After changing runtime, UI, or apps:
+
+```bash
+cmake --preset dev && cmake --build --preset dev && ./build/human_tests
+./scripts/verify-all.sh   # full gate: C + UI + docs + standards
+cd apps/ios && swift build
+cd apps/macos && swift build
+cd apps/android && ./gradlew :app:compileDebugKotlin   # needs JDK 17+
+```
+
 ## Audit (2026-03-20)
 
 Source file counts verified against `src/` and `include/`:

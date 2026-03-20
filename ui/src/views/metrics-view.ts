@@ -338,7 +338,11 @@ export class ScMetricsView extends GatewayAwareLitElement {
     const altRateStr = altRate === "—" ? "—" : `${altRate}%`;
 
     return html`
-      <div class="section hu-cv-defer hu-scroll-reveal" role="region" aria-label="Evaluation metrics">
+      <div
+        class="section hu-cv-defer hu-scroll-reveal"
+        role="region"
+        aria-label="Evaluation metrics"
+      >
         <hu-section-header
           heading="Evaluation &amp; A/B"
           description="Live BTH counters from the runtime. For SQLite pass-rate history, run human eval trend on the gateway host."
@@ -471,8 +475,8 @@ export class ScMetricsView extends GatewayAwareLitElement {
       ${this.loading
         ? this._renderSkeleton()
         : html`
-            ${this._renderIntelligenceStats()} ${this._renderEvalCalibration()} ${this._renderSystemHealth()}
-            ${this._renderIntelligencePipeline()}
+            ${this._renderIntelligenceStats()} ${this._renderEvalCalibration()}
+            ${this._renderSystemHealth()} ${this._renderIntelligencePipeline()}
           `}
     `;
   }

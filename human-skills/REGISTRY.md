@@ -2,6 +2,26 @@
 
 The skill registry is a JSON index of publishable skills. Users run `human skills search`, `install`, and `update` against this index.
 
+## In-tree canonical index
+
+The repository’s **checked-in** registry JSON lives at:
+
+- [`../skill-registry/registry.json`](../skill-registry/registry.json)
+
+Use that file (and matching `skills/<name>/` trees under `skill-registry/`) as the source of truth when validating or extending skills in CI. This `human-skills/` folder documents the format and publishing flow; it is not a second registry.
+
+See also: [`STUBS.md`](STUBS.md) (project status), [`SKILL_FORMAT.md`](SKILL_FORMAT.md) (authoring).
+
+## Local validation
+
+From the **h-uman repo root** (same checks as `skill-registry/.github/workflows/validate.yml`):
+
+```bash
+bash scripts/validate-skill-registry.sh
+```
+
+This is also run as part of **`./scripts/verify-all.sh`** (“Skill Registry” step).
+
 ## registry.json Format
 
 Array of skill entries:

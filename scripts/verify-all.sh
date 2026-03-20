@@ -68,27 +68,32 @@ if [ -f "scripts/check-doc-index.sh" ]; then
   run_check "Doc Index" bash scripts/check-doc-index.sh
 fi
 
-# 5. Standards drift
+# 5. Skill registry (in-tree index + skill.json parity)
+if [ -f "scripts/validate-skill-registry.sh" ]; then
+  run_check "Skill Registry" bash scripts/validate-skill-registry.sh
+fi
+
+# 6. Standards drift
 if [ -f "scripts/check-standards-drift.sh" ]; then
   run_check "Standards Drift" bash scripts/check-standards-drift.sh
 fi
 
-# 6. Terminology compliance
+# 7. Terminology compliance
 if [ -f "scripts/check-terminology.sh" ]; then
   run_check "Terminology" bash scripts/check-terminology.sh
 fi
 
-# 7. Token lint (raw colors)
+# 8. Token lint (raw colors)
 if [ -f "scripts/lint-raw-colors.sh" ]; then
   run_check "Token Lint (colors)" bash scripts/lint-raw-colors.sh --all
 fi
 
-# 7. UI token lint
+# 9. UI token lint
 if [ -f "ui/package.json" ] && command -v npm &>/dev/null && [ -d "ui/node_modules" ]; then
   run_check "Token Lint (UI)" npm run lint:tokens --prefix ui 2>/dev/null || true
 fi
 
-# 8. Doc stats (display for manual review)
+# 10. Doc stats (display for manual review)
 if [ -f "scripts/doc-stats.sh" ]; then
   run_check "Doc Stats" bash scripts/doc-stats.sh
 fi

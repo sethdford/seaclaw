@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 import HumanChatUI
 
@@ -7,6 +8,7 @@ struct SettingsView: View {
     @EnvironmentObject var status: StatusViewModel
     @State private var gatewayURL: String = "ws://localhost:3000"
     @State private var autoStartOnLogin: Bool = false
+    @State private var loginItemBanner: String?
     @State private var binaryPath: String = ""
     @State private var appeared = false
     @State private var advancedExpanded = false
@@ -64,6 +66,24 @@ struct SettingsView: View {
                 Toggle("Auto-start on login", isOn: $autoStartOnLogin)
                     .accessibilityLabel("Auto-start on login")
                     .accessibilityValue(autoStartOnLogin ? "On" : "Off")
+                    .onChange(of: autoStartOnLogin) { _, wantsOn in
+                        if let msg = MacLoginItem.setEnabled(wantsOn) {
+                            loginItemBanner = msg
+                        } else {
+                            loginItemBanner = nil
+                        }
+                        if SMAppService.mainApp.status == .requiresApproval {
+                            autoStartOnLogin = true
+                        } else {
+                            autoStartOnLogin = MacLoginItem.isEnabled
+                        }
+                    }
+                if let note = loginItemBanner {
+                    Text(note)
+                        .font(.custom("Avenir-Book", size: HUTokens.textXs))
+                        .foregroundStyle(tokens.textMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } label: {
                 Text("Advanced")
                     .font(.custom("Avenir-Medium", size: HUTokens.textSm))
@@ -94,6 +114,8 @@ struct SettingsView: View {
         .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.86), value: appeared)
         .onAppear {
             appeared = true
+            autoStartOnLogin = MacLoginItem.isEnabled
+            loginItemBanner = nil
             let pm = ProcessManager()
             binaryPath = pm.humanPath() ?? ""
         }
