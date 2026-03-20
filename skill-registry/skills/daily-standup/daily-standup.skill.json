@@ -1,0 +1,9 @@
+{
+  "name": "daily-standup",
+  "description": "Generate and track daily standup notes",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

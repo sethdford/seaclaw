@@ -1,0 +1,9 @@
+{
+  "name": "report-generator",
+  "description": "Generate data reports and visualizations",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

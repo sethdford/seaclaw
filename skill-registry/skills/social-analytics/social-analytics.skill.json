@@ -1,0 +1,9 @@
+{
+  "name": "social-analytics",
+  "description": "Analyze social media engagement metrics",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

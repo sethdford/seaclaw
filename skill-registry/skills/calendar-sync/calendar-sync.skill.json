@@ -1,0 +1,9 @@
+{
+  "name": "calendar-sync",
+  "description": "Sync and manage calendar events across providers",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

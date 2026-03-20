@@ -1,0 +1,9 @@
+{
+  "name": "health-checker",
+  "description": "Run health checks on gateway and provider connectivity",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "git-workflow",
+  "description": "Git branch strategy, merge workflows, and PR automation",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

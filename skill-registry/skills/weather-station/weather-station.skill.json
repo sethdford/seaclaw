@@ -1,0 +1,9 @@
+{
+  "name": "weather-station",
+  "description": "Aggregate and display weather data from sensors",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

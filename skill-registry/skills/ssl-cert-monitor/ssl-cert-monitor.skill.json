@@ -1,0 +1,9 @@
+{
+  "name": "ssl-cert-monitor",
+  "description": "Monitor SSL/TLS certificate expiration and renewal",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

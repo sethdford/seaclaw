@@ -1,0 +1,9 @@
+{
+  "name": "data-analysis",
+  "description": "Analyze datasets and generate insights",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

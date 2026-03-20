@@ -1136,7 +1136,7 @@ cmake --build build && ./build/human_tests --filter="authentic_existence\|phase9
 
 1. Update `PROJECT_STATUS.md`:
    - Add Phase 9 to the feature roadmap
-   - Mark as "Designed — Not Started" with 14 features
+   - Mark as **complete** (code-complete; see `docs/plans/AUDIT-REPORT-2026-03-11.md`) with F102–F115
    - Note dependencies on Phase 6-7
 
 2. Update `AGENTS.md` section 7.5 or appropriate section:

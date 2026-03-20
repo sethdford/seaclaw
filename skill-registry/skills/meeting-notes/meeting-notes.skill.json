@@ -1,0 +1,9 @@
+{
+  "name": "meeting-notes",
+  "description": "Summarize meetings and extract action items",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

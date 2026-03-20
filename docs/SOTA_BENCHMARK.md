@@ -80,7 +80,7 @@ This document benchmarks the `human` runtime against state-of-the-art AI agent p
 | **Security policy** | — | Deny-by-default, autonomy levels, AEAD encryption, pairing, HTTPS-only | **SOTA** | First-class security model exceeding any open-source agent platform |
 | **Eval framework** | SWE-bench, GAIA | Suite runner with LLM-as-judge, per-task match_mode, SQLite history | **COMPETITIVE** | Now honors match_mode from JSON. Supports exact, contains, numeric_close, and LLM judge. |
 | **Observability** | LangSmith | hu_observer_t vtable, metrics, structured logging | **COMPETITIVE** | Real implementation. No hosted dashboard or trace visualization. |
-| **CI/CD** | — | 5975 tests, ASan, clang-tidy, Lighthouse, visual regression, competitive benchmarks | **SOTA** | More comprehensive than any comparable open-source project |
+| **CI/CD** | — | 6006+ tests, ASan, clang-tidy, Lighthouse, visual regression, competitive benchmarks | **SOTA** | More comprehensive than any comparable open-source project |
 
 ---
 

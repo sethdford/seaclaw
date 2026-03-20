@@ -1,0 +1,9 @@
+{
+  "name": "code-documenter",
+  "description": "Generate docs, READMEs, and API documentation from code",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

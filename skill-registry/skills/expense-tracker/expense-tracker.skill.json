@@ -1,0 +1,9 @@
+{
+  "name": "expense-tracker",
+  "description": "Track expenses and categorize spending",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

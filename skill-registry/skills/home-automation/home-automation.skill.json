@@ -1,0 +1,9 @@
+{
+  "name": "home-automation",
+  "description": "Control smart home devices and automation rules",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

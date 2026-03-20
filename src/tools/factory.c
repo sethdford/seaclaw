@@ -484,7 +484,8 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     idx++;
 
 #ifdef HU_HAS_SKILLS
-    err = hu_skill_run_create(alloc, &tools[idx], skillforge);
+    err = hu_skill_run_create(alloc, &tools[idx], skillforge, workspace_dir, workspace_dir_len,
+                              policy);
     if (err != HU_OK)
         goto fail;
     idx++;

@@ -1,0 +1,9 @@
+{
+  "name": "code-formatter",
+  "description": "Format and lint code according to project conventions",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "uptime-checker",
+  "description": "Monitor endpoint uptime and availability",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

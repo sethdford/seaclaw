@@ -1,0 +1,9 @@
+{
+  "name": "research-assistant",
+  "description": "Research topics and compile summaries from multiple sources",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

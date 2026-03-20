@@ -1,0 +1,9 @@
+{
+  "name": "csv-transformer",
+  "description": "Transform, filter, and reshape CSV data",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

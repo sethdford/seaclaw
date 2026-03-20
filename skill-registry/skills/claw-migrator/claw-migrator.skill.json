@@ -1,0 +1,9 @@
+{
+  "name": "claw-migrator",
+  "description": "Migrate configs and skills between Human instances",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

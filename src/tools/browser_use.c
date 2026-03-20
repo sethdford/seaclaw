@@ -528,7 +528,6 @@ static hu_error_t browser_use_execute(void *ctx, hu_allocator_t *alloc, const hu
             }
             cx = (int)gx;
             cy = (int)gy;
-            report_sel = "coords";
 
             int selector_ok = 0;
             if (gsel && gsel[0] && gsel_len <= HU_BU_MAX_SELECTOR &&

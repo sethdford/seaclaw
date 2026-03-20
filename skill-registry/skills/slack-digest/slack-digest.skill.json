@@ -1,0 +1,9 @@
+{
+  "name": "slack-digest",
+  "description": "Daily Slack channel digest and highlights",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}
