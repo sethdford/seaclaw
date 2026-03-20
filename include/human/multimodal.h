@@ -7,7 +7,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "human/provider.h"
+
 #define HU_MULTIMODAL_MAX_IMAGE_SIZE (5 * 1024 * 1024)
+#define HU_MULTIMODAL_MAX_AUDIO_SIZE (25 * 1024 * 1024)
 
 typedef enum {
     HU_MODALITY_TEXT = 0,
@@ -91,5 +94,11 @@ hu_error_t hu_multimodal_build_anthropic_image(hu_allocator_t *alloc, const char
 hu_error_t hu_multimodal_build_gemini_image(hu_allocator_t *alloc, const char *mime_type,
                                             const char *base64_data, size_t base64_len,
                                             char **out_json, size_t *out_json_len);
+
+/* Route a local file path to audio/video handlers by extension (.mp3/.wav/… or .mp4/…). */
+hu_error_t hu_multimodal_route_local_media(hu_allocator_t *alloc, const char *file_path,
+                                           size_t path_len, hu_provider_t *provider,
+                                           const char *model, size_t model_len, char **out_text,
+                                           size_t *out_text_len);
 
 #endif /* HU_MULTIMODAL_H */

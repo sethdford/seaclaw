@@ -98,6 +98,9 @@ const char *hu_multimodal_detect_audio_mime(const char *path, size_t path_len) {
     if (ext_len == 3 && to_lower(ext[0]) == 'm' && to_lower(ext[1]) == '4' &&
         to_lower(ext[2]) == 'a')
         return "audio/mp4";
+    if (ext_len == 3 && to_lower(ext[0]) == 'c' && to_lower(ext[1]) == 'a' &&
+        to_lower(ext[2]) == 'f')
+        return "audio/x-caf";
     if (ext_len == 4 && to_lower(ext[0]) == 'f' && to_lower(ext[1]) == 'l' &&
         to_lower(ext[2]) == 'a' && to_lower(ext[3]) == 'c')
         return "audio/flac";

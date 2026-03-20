@@ -313,6 +313,10 @@ static void test_multimodal_detect_audio_mime_m4a(void) {
     HU_ASSERT_STR_EQ(hu_multimodal_detect_audio_mime("song.m4a", 8), "audio/mp4");
 }
 
+static void test_multimodal_detect_audio_mime_caf(void) {
+    HU_ASSERT_STR_EQ(hu_multimodal_detect_audio_mime("rec.caf", 7), "audio/x-caf");
+}
+
 static void test_multimodal_detect_audio_mime_flac(void) {
     HU_ASSERT_STR_EQ(hu_multimodal_detect_audio_mime("lossless.flac", 13), "audio/flac");
 }
@@ -355,6 +359,7 @@ void run_multimodal_tests(void) {
     HU_RUN_TEST(test_multimodal_detect_audio_mime_mp3);
     HU_RUN_TEST(test_multimodal_detect_audio_mime_ogg);
     HU_RUN_TEST(test_multimodal_detect_audio_mime_m4a);
+    HU_RUN_TEST(test_multimodal_detect_audio_mime_caf);
     HU_RUN_TEST(test_multimodal_detect_audio_mime_flac);
     HU_RUN_TEST(test_multimodal_detect_audio_mime_unknown);
     HU_RUN_TEST(test_multimodal_detect_audio_mime_path);

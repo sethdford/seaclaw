@@ -1,4 +1,6 @@
 #include "human/multimodal.h"
+#include "human/multimodal/audio.h"
+#include "human/multimodal/video.h"
 #include <string.h>
 
 static bool match_prefix(const char *mime, size_t mime_len, const char *prefix, size_t prefix_len) {
@@ -69,4 +71,51 @@ const char *hu_modality_name(hu_modality_t type) {
     default:
         return "text";
     }
+}
+
+static int path_to_lower(int c) {
+    return (c >= 'A' && c <= 'Z') ? (c + 32) : c;
+}
+
+static bool path_match_ext(const char *filename, size_t filename_len, const char *ext,
+                           size_t ext_len) {
+    if (filename_len < ext_len + 1)
+        return false;
+    if (filename[filename_len - ext_len - 1] != '.')
+        return false;
+    for (size_t i = 0; i < ext_len; i++) {
+        if (path_to_lower((unsigned char)filename[filename_len - ext_len + i]) !=
+            (unsigned char)ext[i])
+            return false;
+    }
+    return true;
+}
+
+static bool path_is_audio_media(const char *path, size_t path_len) {
+    return path_match_ext(path, path_len, "mp3", 3) || path_match_ext(path, path_len, "wav", 3) ||
+           path_match_ext(path, path_len, "ogg", 3) || path_match_ext(path, path_len, "m4a", 3) ||
+           path_match_ext(path, path_len, "caf", 3);
+}
+
+static bool path_is_video_media(const char *path, size_t path_len) {
+    return path_match_ext(path, path_len, "mp4", 3) || path_match_ext(path, path_len, "mov", 3) ||
+           path_match_ext(path, path_len, "webm", 4) || path_match_ext(path, path_len, "avi", 3);
+}
+
+hu_error_t hu_multimodal_route_local_media(hu_allocator_t *alloc, const char *file_path,
+                                           size_t path_len, hu_provider_t *provider,
+                                           const char *model, size_t model_len, char **out_text,
+                                           size_t *out_text_len) {
+    if (!alloc || !file_path || path_len == 0 || !provider || !out_text || !out_text_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_text = NULL;
+    *out_text_len = 0;
+
+    if (path_is_audio_media(file_path, path_len))
+        return hu_multimodal_process_audio(alloc, file_path, path_len, provider, model, model_len,
+                                           out_text, out_text_len);
+    if (path_is_video_media(file_path, path_len))
+        return hu_multimodal_process_video(alloc, file_path, path_len, provider, model, model_len,
+                                           out_text, out_text_len);
+    return HU_ERR_INVALID_ARGUMENT;
 }
