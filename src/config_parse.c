@@ -581,6 +581,75 @@ static hu_error_t parse_reliability(hu_allocator_t *a, hu_config_t *cfg,
     return HU_OK;
 }
 
+static hu_error_t parse_ensemble(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
+    if (!obj || obj->type != HU_JSON_OBJECT)
+        return HU_OK;
+
+    for (size_t i = 0; i < HU_ENSEMBLE_CONFIG_PROVIDER_NAMES_MAX; i++) {
+        if (cfg->ensemble.providers[i]) {
+            a->free(a->ctx, cfg->ensemble.providers[i], strlen(cfg->ensemble.providers[i]) + 1);
+            cfg->ensemble.providers[i] = NULL;
+        }
+    }
+    cfg->ensemble.providers_len = 0;
+
+    hu_json_value_t *pa = hu_json_object_get(obj, "providers");
+    if (pa && pa->type == HU_JSON_ARRAY) {
+        size_t n = 0;
+        for (size_t i = 0;
+             i < pa->data.array.len && n < HU_ENSEMBLE_CONFIG_PROVIDER_NAMES_MAX; i++) {
+            const hu_json_value_t *v = pa->data.array.items[i];
+            if (!v || v->type != HU_JSON_STRING)
+                continue;
+            const char *s = v->data.string.ptr;
+            if (!s || !s[0])
+                continue;
+            cfg->ensemble.providers[n] = hu_strdup(a, s);
+            if (!cfg->ensemble.providers[n])
+                return HU_ERR_OUT_OF_MEMORY;
+            n++;
+        }
+        cfg->ensemble.providers_len = n;
+    }
+
+    const char *strat = hu_json_get_string(obj, "strategy");
+    if (strat) {
+        if (cfg->ensemble.strategy)
+            a->free(a->ctx, cfg->ensemble.strategy, strlen(cfg->ensemble.strategy) + 1);
+        cfg->ensemble.strategy = hu_strdup(a, strat);
+        if (!cfg->ensemble.strategy)
+            return HU_ERR_OUT_OF_MEMORY;
+    }
+    return HU_OK;
+}
+
+static hu_error_t parse_voice(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
+    if (!obj || obj->type != HU_JSON_OBJECT)
+        return HU_OK;
+
+#define HU_PARSE_VOICE_STR(field, json_key)                                                        \
+    do {                                                                                           \
+        const char *s = hu_json_get_string(obj, json_key);                                         \
+        if (s) {                                                                                   \
+            if (cfg->voice.field)                                                                  \
+                a->free(a->ctx, cfg->voice.field, strlen(cfg->voice.field) + 1);                   \
+            cfg->voice.field = hu_strdup(a, s);                                                    \
+            if (!cfg->voice.field)                                                                 \
+                return HU_ERR_OUT_OF_MEMORY;                                                       \
+        }                                                                                          \
+    } while (0)
+
+    HU_PARSE_VOICE_STR(local_stt_endpoint, "local_stt_endpoint");
+    HU_PARSE_VOICE_STR(local_tts_endpoint, "local_tts_endpoint");
+    HU_PARSE_VOICE_STR(stt_provider, "stt_provider");
+    HU_PARSE_VOICE_STR(tts_provider, "tts_provider");
+    HU_PARSE_VOICE_STR(tts_voice, "tts_voice");
+    HU_PARSE_VOICE_STR(tts_model, "tts_model");
+    HU_PARSE_VOICE_STR(stt_model, "stt_model");
+#undef HU_PARSE_VOICE_STR
+    return HU_OK;
+}
+
 static hu_error_t parse_session(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
     (void)a;
     if (!obj || obj->type != HU_JSON_OBJECT)
@@ -817,6 +886,10 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
     if (router_obj)
         parse_router(a, cfg, router_obj);
 
+    hu_json_value_t *ensemble_obj = hu_json_object_get(root, "ensemble");
+    if (ensemble_obj)
+        parse_ensemble(a, cfg, ensemble_obj);
+
     hu_json_value_t *aut = hu_json_object_get(root, "autonomy");
     if (aut)
         parse_autonomy(a, cfg, aut);
@@ -832,6 +905,10 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
     hu_json_value_t *tools_obj = hu_json_object_get(root, "tools");
     if (tools_obj)
         parse_tools(a, cfg, tools_obj);
+
+    hu_json_value_t *voice_obj = hu_json_object_get(root, "voice");
+    if (voice_obj)
+        parse_voice(a, cfg, voice_obj);
 
     hu_json_value_t *cron_obj = hu_json_object_get(root, "cron");
     if (cron_obj)

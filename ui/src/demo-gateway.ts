@@ -1600,8 +1600,20 @@ export class DemoGatewayClient extends EventTarget {
       case "chat.abort":
         return { aborted: true };
 
+      /* Mirrors gateway voice.transcribe result; server uses config.voice for STT routing. */
       case "voice.transcribe":
         return { text: "Demo transcription of your audio" };
+
+      case "voice.config":
+        return {
+          local_stt_endpoint: "http://localhost:8000/v1/audio/transcriptions",
+          local_tts_endpoint: "http://localhost:8880/v1/audio/speech",
+          stt_provider: "local",
+          tts_provider: "local",
+          tts_voice: "af_heart",
+          tts_model: "kokoro",
+          stt_model: "whisper-large-v3",
+        };
 
       case "persona.set":
         return { ok: true };

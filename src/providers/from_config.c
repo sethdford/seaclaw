@@ -2,6 +2,7 @@
 #include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/providers/ensemble.h"
 #include "human/providers/factory.h"
 #include "human/providers/reliable.h"
 #include "human/providers/router.h"
@@ -148,6 +149,57 @@ hu_error_t hu_provider_create_from_config(hu_allocator_t *alloc, const hu_config
             return err;
         }
         return HU_OK;
+    }
+
+    if (name_len == 8 && memcmp(name, "ensemble", 8) == 0) {
+        const char *names_buf[HU_ENSEMBLE_MAX_PROVIDERS];
+        size_t name_count = 0;
+
+        if (cfg->ensemble.providers_len > 0) {
+            for (size_t i = 0; i < cfg->ensemble.providers_len && name_count < HU_ENSEMBLE_MAX_PROVIDERS;
+                 i++) {
+                const char *pname = cfg->ensemble.providers[i];
+                if (pname && pname[0])
+                    names_buf[name_count++] = pname;
+            }
+        } else {
+            if (cfg->default_provider && cfg->default_provider[0])
+                names_buf[name_count++] = cfg->default_provider;
+            if (cfg->reliability.fallback_providers_len > 0 &&
+                cfg->reliability.fallback_providers[0] &&
+                cfg->reliability.fallback_providers[0][0] &&
+                name_count < HU_ENSEMBLE_MAX_PROVIDERS)
+                names_buf[name_count++] = cfg->reliability.fallback_providers[0];
+        }
+
+        hu_ensemble_spec_t ecfg = {0};
+        hu_error_t err = HU_OK;
+        for (size_t i = 0; i < name_count; i++) {
+            err = create_provider_from_name(alloc, cfg, names_buf[i],
+                                            &ecfg.providers[ecfg.provider_count]);
+            if (err == HU_OK)
+                ecfg.provider_count++;
+        }
+
+        if (ecfg.provider_count == 0)
+            return HU_ERR_INVALID_ARGUMENT;
+
+        const char *strat = cfg->ensemble.strategy;
+        if (strat && strcmp(strat, "best_for_task") == 0)
+            ecfg.strategy = HU_ENSEMBLE_BEST_FOR_TASK;
+        else if (strat && strcmp(strat, "consensus") == 0)
+            ecfg.strategy = HU_ENSEMBLE_CONSENSUS;
+        else
+            ecfg.strategy = HU_ENSEMBLE_ROUND_ROBIN;
+
+        err = hu_ensemble_create(alloc, &ecfg, out);
+        if (err != HU_OK) {
+            for (size_t i = 0; i < ecfg.provider_count; i++) {
+                if (ecfg.providers[i].vtable && ecfg.providers[i].vtable->deinit)
+                    ecfg.providers[i].vtable->deinit(ecfg.providers[i].ctx, alloc);
+            }
+        }
+        return err;
     }
 
     return HU_ERR_NOT_SUPPORTED;

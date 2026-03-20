@@ -70,6 +70,14 @@ typedef struct hu_router_config {
     int complexity_high; /* above this -> powerful (default 500) */
 } hu_router_config_t;
 
+#define HU_ENSEMBLE_CONFIG_PROVIDER_NAMES_MAX 8
+
+typedef struct hu_ensemble_config {
+    char *providers[HU_ENSEMBLE_CONFIG_PROVIDER_NAMES_MAX]; /* e.g. "openai", "anthropic" */
+    size_t providers_len;
+    char *strategy; /* "round_robin", "best_for_task", "consensus"; default round_robin if NULL */
+} hu_ensemble_config_t;
+
 typedef struct hu_persona_channel_entry {
     char *channel;
     char *persona;
@@ -457,6 +465,16 @@ typedef struct hu_tools_config {
     size_t model_overrides_len;
 } hu_tools_config_t;
 
+typedef struct hu_voice_settings {
+    char *local_stt_endpoint; /* e.g. "http://localhost:8000/v1/audio/transcriptions" */
+    char *local_tts_endpoint; /* e.g. "http://localhost:8880/v1/audio/speech" */
+    char *stt_provider;       /* "gemini", "groq", "local" — NULL = auto */
+    char *tts_provider;       /* "openai", "cartesia", "local" — NULL = auto */
+    char *tts_voice;          /* voice name, NULL = default */
+    char *tts_model;          /* model name, NULL = default */
+    char *stt_model;          /* model name, NULL = default */
+} hu_voice_settings_t;
+
 typedef struct hu_identity_config {
     char *format;
 } hu_identity_config_t;
@@ -511,6 +529,7 @@ typedef struct hu_config {
     hu_runtime_config_t runtime;
     hu_reliability_config_t reliability;
     hu_router_config_t router;
+    hu_ensemble_config_t ensemble;
     hu_agent_config_t agent;
     hu_heartbeat_config_t heartbeat;
     hu_channels_config_t channels;
@@ -521,6 +540,7 @@ typedef struct hu_config {
     hu_browser_config_t browser;
     hu_security_config_t security;
     hu_tools_config_t tools;
+    hu_voice_settings_t voice;
     hu_session_config_t session;
     hu_identity_config_t identity;
     hu_cost_config_t cost;

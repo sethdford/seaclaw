@@ -718,6 +718,29 @@ static void test_config_behavior_defaults(void) {
     hu_arena_destroy(arena);
 }
 
+static void test_config_parse_voice_section(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg_local;
+    memset(&cfg_local, 0, sizeof(cfg_local));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg_local.arena = arena;
+    cfg_local.allocator = hu_arena_allocator(arena);
+    const char *json =
+        "{\"voice\":{\"local_stt_endpoint\":\"http://localhost:8000/v1/audio/transcriptions\","
+        "\"tts_voice\":\"af_heart\",\"stt_model\":\"whisper-large-v3\"}}";
+    hu_error_t err = hu_config_parse_json(&cfg_local, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(cfg_local.voice.local_stt_endpoint);
+    HU_ASSERT_STR_EQ(cfg_local.voice.local_stt_endpoint,
+                     "http://localhost:8000/v1/audio/transcriptions");
+    HU_ASSERT_NOT_NULL(cfg_local.voice.tts_voice);
+    HU_ASSERT_STR_EQ(cfg_local.voice.tts_voice, "af_heart");
+    HU_ASSERT_NOT_NULL(cfg_local.voice.stt_model);
+    HU_ASSERT_STR_EQ(cfg_local.voice.stt_model, "whisper-large-v3");
+    hu_arena_destroy(arena);
+}
+
 static void test_config_parse_feeds_section(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_config_t cfg_local; memset(&cfg_local, 0, sizeof(cfg_local));
@@ -784,4 +807,6 @@ void run_config_parse_tests(void) {
     HU_RUN_TEST(test_config_behavior_defaults);
     HU_TEST_SUITE("Feeds config");
     HU_RUN_TEST(test_config_parse_feeds_section);
+    HU_TEST_SUITE("Voice config");
+    HU_RUN_TEST(test_config_parse_voice_section);
 }

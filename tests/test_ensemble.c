@@ -86,7 +86,7 @@ static void ensemble_round_robin_rotates_chat_with_system(void) {
     hu_allocator_t alloc = hu_system_allocator();
     mock_prov_ctx_t a = {.name = "openai", .reply_ws = "A", .reply_ws_len = 1, .reply_chat = "a"};
     mock_prov_ctx_t b = {.name = "google", .reply_ws = "B", .reply_ws_len = 1, .reply_chat = "b"};
-    hu_ensemble_config_t cfg = {.strategy = HU_ENSEMBLE_ROUND_ROBIN, .provider_count = 2};
+    hu_ensemble_spec_t cfg = {.strategy = HU_ENSEMBLE_ROUND_ROBIN, .provider_count = 2};
     cfg.providers[0] = (hu_provider_t){.ctx = &a, .vtable = &mock_vtable};
     cfg.providers[1] = (hu_provider_t){.ctx = &b, .vtable = &mock_vtable};
 
@@ -117,7 +117,7 @@ static void ensemble_best_for_task_routes_creative_to_gemini(void) {
     hu_allocator_t alloc = hu_system_allocator();
     mock_prov_ctx_t openai = {.name = "openai", .reply_ws = "from-openai", .reply_chat = "x"};
     mock_prov_ctx_t gemini = {.name = "gemini", .reply_ws = "from-gemini", .reply_chat = "y"};
-    hu_ensemble_config_t cfg = {.strategy = HU_ENSEMBLE_BEST_FOR_TASK, .provider_count = 2};
+    hu_ensemble_spec_t cfg = {.strategy = HU_ENSEMBLE_BEST_FOR_TASK, .provider_count = 2};
     cfg.providers[0] = (hu_provider_t){.ctx = &openai, .vtable = &mock_vtable};
     cfg.providers[1] = (hu_provider_t){.ctx = &gemini, .vtable = &mock_vtable};
 
@@ -142,7 +142,7 @@ static void ensemble_consensus_chat_with_system_picks_longest(void) {
     mock_prov_ctx_t p1 = {.name = "p1", .reply_ws = "short", .reply_chat = "a"};
     mock_prov_ctx_t p2 = {.name = "p2", .reply_ws = "much longer reply", .reply_chat = "bb"};
     mock_prov_ctx_t p3 = {.name = "p3", .reply_ws = "mid", .reply_chat = "c"};
-    hu_ensemble_config_t cfg = {.strategy = HU_ENSEMBLE_CONSENSUS, .provider_count = 3};
+    hu_ensemble_spec_t cfg = {.strategy = HU_ENSEMBLE_CONSENSUS, .provider_count = 3};
     cfg.providers[0] = (hu_provider_t){.ctx = &p1, .vtable = &mock_vtable};
     cfg.providers[1] = (hu_provider_t){.ctx = &p2, .vtable = &mock_vtable};
     cfg.providers[2] = (hu_provider_t){.ctx = &p3, .vtable = &mock_vtable};
@@ -167,7 +167,7 @@ static void ensemble_consensus_chat_picks_longest_content(void) {
     hu_allocator_t alloc = hu_system_allocator();
     mock_prov_ctx_t p1 = {.name = "p1", .reply_ws = "x", .reply_chat = "aa"};
     mock_prov_ctx_t p2 = {.name = "p2", .reply_ws = "x", .reply_chat = "longer"};
-    hu_ensemble_config_t cfg = {.strategy = HU_ENSEMBLE_CONSENSUS, .provider_count = 2};
+    hu_ensemble_spec_t cfg = {.strategy = HU_ENSEMBLE_CONSENSUS, .provider_count = 2};
     cfg.providers[0] = (hu_provider_t){.ctx = &p1, .vtable = &mock_vtable};
     cfg.providers[1] = (hu_provider_t){.ctx = &p2, .vtable = &mock_vtable};
 
@@ -206,7 +206,7 @@ static void ensemble_consensus_chat_picks_longest_content(void) {
 static void ensemble_create_rejects_empty_config(void) {
     hu_allocator_t alloc = hu_system_allocator();
     mock_prov_ctx_t a = {.name = "a", .reply_ws = "z", .reply_chat = "z"};
-    hu_ensemble_config_t cfg = {.strategy = HU_ENSEMBLE_ROUND_ROBIN, .provider_count = 0};
+    hu_ensemble_spec_t cfg = {.strategy = HU_ENSEMBLE_ROUND_ROBIN, .provider_count = 0};
     hu_provider_t ens = {0};
     HU_ASSERT_EQ(hu_ensemble_create(&alloc, &cfg, &ens), HU_ERR_INVALID_ARGUMENT);
     (void)a;
@@ -215,7 +215,7 @@ static void ensemble_create_rejects_empty_config(void) {
 static void ensemble_supports_native_tools_if_any_child_does(void) {
     hu_allocator_t alloc = hu_system_allocator();
     mock_prov_ctx_t a = {.name = "a", .reply_ws = "z", .reply_chat = "z"};
-    hu_ensemble_config_t cfg = {.strategy = HU_ENSEMBLE_ROUND_ROBIN, .provider_count = 1};
+    hu_ensemble_spec_t cfg = {.strategy = HU_ENSEMBLE_ROUND_ROBIN, .provider_count = 1};
     cfg.providers[0] = (hu_provider_t){.ctx = &a, .vtable = &mock_vtable};
 
     hu_provider_t ens = {0};

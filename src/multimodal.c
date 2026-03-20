@@ -70,6 +70,95 @@ hu_error_t hu_multimodal_encode_base64(hu_allocator_t *alloc, const void *data, 
     return HU_OK;
 }
 
+static int8_t b64_value(unsigned char c) {
+    if (c >= 'A' && c <= 'Z')
+        return (int8_t)(c - 'A');
+    if (c >= 'a' && c <= 'z')
+        return (int8_t)(26 + (c - 'a'));
+    if (c >= '0' && c <= '9')
+        return (int8_t)(52 + (c - '0'));
+    if (c == '+')
+        return 62;
+    if (c == '/')
+        return 63;
+    return -1;
+}
+
+hu_error_t hu_multimodal_decode_base64(hu_allocator_t *alloc, const char *b64, size_t b64_len,
+                                       void **out_bytes, size_t *out_len) {
+    if (!alloc || !out_bytes || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_bytes = NULL;
+    *out_len = 0;
+    if (!b64 || b64_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    size_t body = b64_len;
+    while (body > 0 && b64[body - 1] == '=')
+        body--;
+    if (body % 4 == 1)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    size_t out_cap = (body / 4) * 3;
+    if (body % 4 == 2)
+        out_cap += 1;
+    else if (body % 4 == 3)
+        out_cap += 2;
+
+    if (out_cap > HU_MULTIMODAL_MAX_AUDIO_SIZE)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    unsigned char *out = (unsigned char *)alloc->alloc(alloc->ctx, out_cap ? out_cap : 1);
+    if (!out)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    size_t o = 0;
+    size_t i = 0;
+    while (i + 4 <= body) {
+        int8_t v0 = b64_value((unsigned char)b64[i]);
+        int8_t v1 = b64_value((unsigned char)b64[i + 1]);
+        int8_t v2 = b64_value((unsigned char)b64[i + 2]);
+        int8_t v3 = b64_value((unsigned char)b64[i + 3]);
+        if (v0 < 0 || v1 < 0 || v2 < 0 || v3 < 0) {
+            alloc->free(alloc->ctx, out, out_cap ? out_cap : 1);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        uint32_t triple =
+            ((uint32_t)(uint8_t)v0 << 18) | ((uint32_t)(uint8_t)v1 << 12) |
+            ((uint32_t)(uint8_t)v2 << 6) | (uint32_t)(uint8_t)v3;
+        out[o++] = (unsigned char)(triple >> 16);
+        out[o++] = (unsigned char)((triple >> 8) & 0xFF);
+        out[o++] = (unsigned char)(triple & 0xFF);
+        i += 4;
+    }
+    if (body % 4 == 2) {
+        int8_t v0 = b64_value((unsigned char)b64[i]);
+        int8_t v1 = b64_value((unsigned char)b64[i + 1]);
+        if (v0 < 0 || v1 < 0) {
+            alloc->free(alloc->ctx, out, out_cap ? out_cap : 1);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        out[o++] =
+            (unsigned char)(((uint32_t)(uint8_t)v0 << 2) | ((uint32_t)(uint8_t)v1 >> 4));
+    } else if (body % 4 == 3) {
+        int8_t v0 = b64_value((unsigned char)b64[i]);
+        int8_t v1 = b64_value((unsigned char)b64[i + 1]);
+        int8_t v2 = b64_value((unsigned char)b64[i + 2]);
+        if (v0 < 0 || v1 < 0 || v2 < 0) {
+            alloc->free(alloc->ctx, out, out_cap ? out_cap : 1);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        out[o++] =
+            (unsigned char)(((uint32_t)(uint8_t)v0 << 2) | ((uint32_t)(uint8_t)v1 >> 4));
+        out[o++] =
+            (unsigned char)(((uint32_t)(uint8_t)v1 << 4) | ((uint32_t)(uint8_t)v2 >> 2));
+    }
+
+    *out_bytes = out;
+    *out_len = o;
+    return HU_OK;
+}
+
 const char *hu_multimodal_detect_audio_mime(const char *path, size_t path_len) {
     if (!path || path_len == 0)
         return "audio/wav";

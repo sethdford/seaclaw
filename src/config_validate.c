@@ -20,13 +20,15 @@ static const char *const hu_config_top_keys[] = {
     "tunnel",        "channels",
     "agent",         "heartbeat",
     "reliability",   "router",
-    "diagnostics",   "session",
-    "peripherals",   "hardware",
-    "browser",       "cost",
-    "mcp_servers",   "nodes",
-    "policy",        "plugins",
-    "security",      "secrets",
-    "identity",      "feeds",
+    "ensemble",      "diagnostics",
+    "session",       "peripherals",
+    "hardware",      "browser",
+    "cost",          "mcp_servers",
+    "nodes",         "policy",
+    "plugins",       "security",
+    "secrets",       "identity",
+    "feeds",
+    "voice",
     "provider",      "model",
 };
 static const size_t hu_config_top_keys_len =
@@ -58,6 +60,23 @@ static const char *const hu_memory_keys[] = {
 };
 static const size_t hu_memory_keys_len = sizeof(hu_memory_keys) / sizeof(hu_memory_keys[0]);
 
+static const char *const hu_ensemble_keys[] = {
+    "providers",
+    "strategy",
+};
+static const size_t hu_ensemble_keys_len = sizeof(hu_ensemble_keys) / sizeof(hu_ensemble_keys[0]);
+
+static const char *const hu_voice_keys[] = {
+    "local_stt_endpoint",
+    "local_tts_endpoint",
+    "stt_provider",
+    "tts_provider",
+    "tts_voice",
+    "tts_model",
+    "stt_model",
+};
+static const size_t hu_voice_keys_len = sizeof(hu_voice_keys) / sizeof(hu_voice_keys[0]);
+
 static const char *const hu_security_keys[] = {
     "autonomy_level", "sandbox", "sandbox_config", "resources", "audit",
 };
@@ -68,6 +87,7 @@ static const char *const hu_known_providers[] = {
     "openai",       "anthropic",  "gemini",     "google",     "google-gemini",
     "ollama",       "openrouter", "compatible", "claude_cli", "codex_cli",
     "openai-codex", "router",     "reliable",
+    "ensemble",
 };
 static const size_t hu_known_providers_len =
     sizeof(hu_known_providers) / sizeof(hu_known_providers[0]);
@@ -168,6 +188,14 @@ hu_error_t hu_config_validate_strict(const hu_config_t *cfg, const hu_json_value
         if (sec)
             check_unknown_nested_keys(sec, "security", hu_security_keys, hu_security_keys_len,
                                       strict, &has_error);
+        hu_json_value_t *ens = hu_json_object_get(root, "ensemble");
+        if (ens)
+            check_unknown_nested_keys(ens, "ensemble", hu_ensemble_keys, hu_ensemble_keys_len,
+                                      strict, &has_error);
+        hu_json_value_t *voice = hu_json_object_get(root, "voice");
+        if (voice)
+            check_unknown_nested_keys(voice, "voice", hu_voice_keys, hu_voice_keys_len, strict,
+                                      &has_error);
     }
 
     /* Type checking */

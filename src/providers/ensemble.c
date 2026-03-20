@@ -2,7 +2,7 @@
 #include <string.h>
 
 typedef struct {
-    hu_ensemble_config_t config;
+    hu_ensemble_spec_t config;
     size_t round_robin_idx;
 } ensemble_ctx_t;
 
@@ -239,7 +239,7 @@ static const hu_provider_vtable_t ensemble_vtable = {
     .supports_vision = ensemble_supports_vision,
 };
 
-hu_error_t hu_ensemble_create(hu_allocator_t *alloc, const hu_ensemble_config_t *config,
+hu_error_t hu_ensemble_create(hu_allocator_t *alloc, const hu_ensemble_spec_t *config,
                               hu_provider_t *out) {
     if (!alloc || !config || !out || config->provider_count == 0 ||
         config->provider_count > HU_ENSEMBLE_MAX_PROVIDERS)

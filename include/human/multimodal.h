@@ -64,6 +64,11 @@ typedef struct hu_image_ref {
 hu_error_t hu_multimodal_encode_base64(hu_allocator_t *alloc, const void *data, size_t data_len,
                                        char **out_base64, size_t *out_len);
 
+/* Decode standard RFC 4648 base64 (no PEM headers). Rejects inputs larger than
+ * HU_MULTIMODAL_MAX_AUDIO_SIZE when decoded. Caller frees *out_bytes with alloc->free. */
+hu_error_t hu_multimodal_decode_base64(hu_allocator_t *alloc, const char *b64, size_t b64_len,
+                                       void **out_bytes, size_t *out_len);
+
 /* Detect MIME type from first few bytes */
 const char *hu_multimodal_detect_mime(const void *header, size_t header_len);
 

@@ -42,6 +42,30 @@ static void test_base64_encode_padding(void) {
     alloc.free(alloc.ctx, out, len + 1);
 }
 
+static void test_base64_decode_roundtrip_hello(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char msg[] = "Hello";
+    char *enc = NULL;
+    size_t enc_len = 0;
+    HU_ASSERT_EQ(hu_multimodal_encode_base64(&alloc, msg, sizeof(msg) - 1, &enc, &enc_len), HU_OK);
+    void *dec = NULL;
+    size_t dec_len = 0;
+    HU_ASSERT_EQ(hu_multimodal_decode_base64(&alloc, enc, enc_len, &dec, &dec_len), HU_OK);
+    HU_ASSERT_EQ(dec_len, 5u);
+    HU_ASSERT(memcmp(dec, msg, 5) == 0);
+    alloc.free(alloc.ctx, enc, enc_len + 1);
+    alloc.free(alloc.ctx, dec, dec_len);
+}
+
+static void test_base64_decode_invalid_char_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    void *dec = NULL;
+    size_t dec_len = 0;
+    hu_error_t err = hu_multimodal_decode_base64(&alloc, "SGVsbG8!", 8, &dec, &dec_len);
+    HU_ASSERT(err != HU_OK);
+    HU_ASSERT(dec == NULL);
+}
+
 static void test_detect_mime_png(void) {
     unsigned char png[] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
     HU_ASSERT_STR_EQ(hu_multimodal_detect_mime(png, 8), "image/png");
@@ -334,6 +358,8 @@ void run_multimodal_tests(void) {
     HU_RUN_TEST(test_base64_encode_empty);
     HU_RUN_TEST(test_base64_encode_hello);
     HU_RUN_TEST(test_base64_encode_padding);
+    HU_RUN_TEST(test_base64_decode_roundtrip_hello);
+    HU_RUN_TEST(test_base64_decode_invalid_char_returns_error);
     HU_RUN_TEST(test_detect_mime_png);
     HU_RUN_TEST(test_detect_mime_jpeg);
     HU_RUN_TEST(test_detect_mime_unknown);

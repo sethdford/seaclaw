@@ -28,6 +28,8 @@ bool hu_config_provider_requires_api_key(const char *provider) {
         return false;
     if (strcmp(provider, "vertex") == 0)
         return false;
+    if (strcmp(provider, "ensemble") == 0)
+        return false;
     return true;
 }
 

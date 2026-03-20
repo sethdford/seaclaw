@@ -667,6 +667,33 @@ static void test_from_config_reliable_creates_provider(void) {
     hu_arena_destroy(arena);
 }
 
+static void test_from_config_ensemble_creates_provider(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    hu_config_t cfg = {0};
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json =
+        "{\"providers\":["
+        "{\"name\":\"openai\",\"api_key\":\"sk-test\"},"
+        "{\"name\":\"anthropic\",\"api_key\":\"sk-ant-test\"}],"
+        "\"ensemble\":{\"providers\":[\"openai\",\"anthropic\"],\"strategy\":\"round_robin\"}}";
+    hu_error_t perr = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(perr, HU_OK);
+
+    hu_provider_t out = {0};
+    hu_error_t err =
+        hu_provider_create_from_config(&backing, &cfg, "ensemble", 8, &out);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out.ctx);
+    HU_ASSERT_NOT_NULL(out.vtable);
+    HU_ASSERT_STR_EQ(out.vtable->get_name(out.ctx), "ensemble");
+    if (out.vtable->deinit)
+        out.vtable->deinit(out.ctx, &backing);
+    hu_arena_destroy(arena);
+}
+
 /* ─── helpers.c ───────────────────────────────────────────────────────────── */
 static void test_helpers_is_reasoning_model_o1(void) {
     HU_ASSERT_TRUE(hu_helpers_is_reasoning_model("o1", 2));
@@ -790,6 +817,7 @@ void run_provider_tests(void) {
     HU_RUN_TEST(test_from_config_unknown_provider_returns_not_supported);
     HU_RUN_TEST(test_from_config_router_creates_provider);
     HU_RUN_TEST(test_from_config_reliable_creates_provider);
+    HU_RUN_TEST(test_from_config_ensemble_creates_provider);
 
     HU_RUN_TEST(test_helpers_is_reasoning_model_o1);
     HU_RUN_TEST(test_helpers_is_reasoning_model_o3);
