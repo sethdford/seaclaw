@@ -1,0 +1,14 @@
+{
+  "name": "Tool Use Benchmark",
+  "description": "Tasks that expect tool-aware answers (heuristic check)",
+  "match_mode": "contains",
+  "tasks": [
+    {
+      "id": "tool-001",
+      "category": "calculator",
+      "difficulty": 1,
+      "prompt": "What is 17 times 3? Reply with just the number.",
+      "expected": "51"
+    }
+  ]
+}

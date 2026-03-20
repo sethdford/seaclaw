@@ -1,0 +1,21 @@
+{
+  "name": "Reasoning Benchmark",
+  "description": "Multi-step reasoning smoke tasks",
+  "match_mode": "contains",
+  "tasks": [
+    {
+      "id": "reason-001",
+      "category": "logic",
+      "difficulty": 2,
+      "prompt": "If all bloops are razzles and this is a bloop, what is it?",
+      "expected": "razzle"
+    },
+    {
+      "id": "reason-002",
+      "category": "counting",
+      "difficulty": 1,
+      "prompt": "How many letters are in the word 'human'? Reply with just the digit.",
+      "expected": "5"
+    }
+  ]
+}

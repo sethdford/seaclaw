@@ -11,6 +11,31 @@ static void test_eval_load(void) {
     HU_ASSERT(suite.name != NULL);
     HU_ASSERT_STR_EQ(suite.name, "test-suite");
     HU_ASSERT_EQ(suite.tasks_count, 0u);
+    HU_ASSERT_EQ(suite.default_match_mode, HU_EVAL_CONTAINS);
+    hu_eval_suite_free(&alloc, &suite);
+}
+
+static void test_eval_load_match_mode_defaults(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"name\":\"m\",\"match_mode\":\"llm_judge\",\"tasks\":["
+                       "{\"id\":\"t1\",\"prompt\":\"p\",\"expected\":\"e\"}]}";
+    hu_eval_suite_t suite;
+    hu_error_t err = hu_eval_suite_load_json(&alloc, json, strlen(json), &suite);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(suite.default_match_mode, HU_EVAL_LLM_JUDGE);
+    HU_ASSERT_EQ(suite.tasks_count, 1u);
+    HU_ASSERT_EQ(suite.tasks[0].match_mode, HU_EVAL_LLM_JUDGE);
+    hu_eval_suite_free(&alloc, &suite);
+}
+
+static void test_eval_load_task_match_mode_override(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"name\":\"m\",\"match_mode\":\"exact\",\"tasks\":["
+                       "{\"id\":\"t1\",\"prompt\":\"p\",\"expected\":\"e\",\"match_mode\":\"contains\"}]}";
+    hu_eval_suite_t suite;
+    HU_ASSERT_EQ(hu_eval_suite_load_json(&alloc, json, strlen(json), &suite), HU_OK);
+    HU_ASSERT_EQ(suite.default_match_mode, HU_EVAL_EXACT);
+    HU_ASSERT_EQ(suite.tasks[0].match_mode, HU_EVAL_CONTAINS);
     hu_eval_suite_free(&alloc, &suite);
 }
 
@@ -306,6 +331,8 @@ static void test_eval_run_free(void) {
 void run_eval_tests(void) {
     HU_TEST_SUITE("Evaluation Harness");
     HU_RUN_TEST(test_eval_load);
+    HU_RUN_TEST(test_eval_load_match_mode_defaults);
+    HU_RUN_TEST(test_eval_load_task_match_mode_override);
     HU_RUN_TEST(test_eval_load_tasks);
     HU_RUN_TEST(test_eval_exact);
     HU_RUN_TEST(test_eval_contains);

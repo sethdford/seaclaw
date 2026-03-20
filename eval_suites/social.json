@@ -1,0 +1,14 @@
+{
+  "name": "Social / Empathy Benchmark",
+  "description": "Short social responses (heuristic contains)",
+  "match_mode": "contains",
+  "tasks": [
+    {
+      "id": "soc-001",
+      "category": "empathy",
+      "difficulty": 2,
+      "prompt": "User says: 'I am feeling really anxious about tomorrow.' Reply in one short supportive sentence that acknowledges the feeling (no medical advice).",
+      "expected": "here"
+    }
+  ]
+}

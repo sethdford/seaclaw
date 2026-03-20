@@ -1,4 +1,5 @@
 #include "human/eval.h"
+#include "human/core/json.h"
 #include "human/core/string.h"
 #include <ctype.h>
 #include <inttypes.h>
@@ -12,6 +13,43 @@
 #endif
 
 #define EVAL_MAX_TASKS 256
+
+static hu_eval_match_mode_t eval_match_mode_from_cstr(const char *mm) {
+    if (!mm)
+        return HU_EVAL_CONTAINS;
+    if (strcmp(mm, "llm_judge") == 0)
+        return HU_EVAL_LLM_JUDGE;
+    if (strcmp(mm, "exact") == 0)
+        return HU_EVAL_EXACT;
+    if (strcmp(mm, "numeric_close") == 0)
+        return HU_EVAL_NUMERIC_CLOSE;
+    return HU_EVAL_CONTAINS;
+}
+
+static void eval_free_task_strings(hu_allocator_t *alloc, hu_eval_task_t *t) {
+    if (!alloc || !t)
+        return;
+    if (t->id) {
+        alloc->free(alloc->ctx, t->id, strlen(t->id) + 1);
+        t->id = NULL;
+    }
+    if (t->prompt) {
+        alloc->free(alloc->ctx, t->prompt, strlen(t->prompt) + 1);
+        t->prompt = NULL;
+    }
+    if (t->expected) {
+        alloc->free(alloc->ctx, t->expected, strlen(t->expected) + 1);
+        t->expected = NULL;
+    }
+    if (t->category) {
+        alloc->free(alloc->ctx, t->category, strlen(t->category) + 1);
+        t->category = NULL;
+    }
+    if (t->rubric) {
+        alloc->free(alloc->ctx, t->rubric, strlen(t->rubric) + 1);
+        t->rubric = NULL;
+    }
+}
 
 static int tolower_c(int c) {
     return (c >= 'A' && c <= 'Z') ? (c + 32) : c;
@@ -62,55 +100,7 @@ static size_t count_words(const char *s, size_t len) {
     return n;
 }
 
-static char *extract_str(hu_allocator_t *alloc, const char *obj_start, const char *obj_end, const char *key) {
-    const char *k = strstr(obj_start, key);
-    if (!k || k >= obj_end) return NULL;
-    const char *colon = strchr(k + strlen(key), ':');
-    if (!colon || colon >= obj_end) return NULL;
-    const char *vs = colon + 1;
-    while (vs < obj_end && (*vs == ' ' || *vs == '\t')) vs++;
-    if (vs >= obj_end || *vs != '"') return NULL;
-    vs++;
-    const char *ve = vs;
-    while (ve < obj_end && *ve != '"') {
-        if (*ve == '\\') ve++;
-        ve++;
-    }
-    if (ve >= obj_end) return NULL;
-    size_t n = (size_t)(ve - vs);
-    char *out = alloc->alloc(alloc->ctx, n + 1);
-    if (!out) return NULL;
-    memcpy(out, vs, n);
-    out[n] = 0;
-    return out;
-}
-
-static int extract_int(const char *obj_start, const char *obj_end, const char *key) {
-    const char *k = strstr(obj_start, key);
-    if (!k || k >= obj_end) return 0;
-    const char *colon = strchr(k + strlen(key), ':');
-    if (!colon || colon >= obj_end) return 0;
-    const char *vs = colon + 1;
-    while (vs < obj_end && (*vs == ' ' || *vs == '\t')) vs++;
-    int v = 0;
-    (void)sscanf(vs, "%d", &v);
-    return v;
-}
-
-static int64_t extract_int64(const char *obj_start, const char *obj_end, const char *key) {
-    const char *k = strstr(obj_start, key);
-    if (!k || k >= obj_end) return 0;
-    const char *colon = strchr(k + strlen(key), ':');
-    if (!colon || colon >= obj_end) return 0;
-    const char *vs = colon + 1;
-    while (vs < obj_end && (*vs == ' ' || *vs == '\t')) vs++;
-    int64_t v = 0;
-    (void)sscanf(vs, "%" SCNd64, &v);
-    return v;
-}
-
-static bool extract_bool(const char *obj_start, const char *obj_end, const char *key)
-    __attribute__((unused));
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static bool extract_bool(const char *obj_start, const char *obj_end, const char *key) {
     const char *k = strstr(obj_start, key);
     if (!k || k >= obj_end) return false;
@@ -122,8 +112,6 @@ static bool extract_bool(const char *obj_start, const char *obj_end, const char 
     return false;
 }
 
-static double extract_double(const char *obj_start, const char *obj_end, const char *key)
-    __attribute__((unused));
 static double extract_double(const char *obj_start, const char *obj_end, const char *key) {
     const char *k = strstr(obj_start, key);
     if (!k || k >= obj_end) return 0.0;
@@ -135,6 +123,7 @@ static double extract_double(const char *obj_start, const char *obj_end, const c
     (void)sscanf(vs, "%lf", &v);
     return v;
 }
+#endif
 
 static void hu_eval_heuristic_judge(const char *actual, size_t actual_len, const char *expected,
                                    size_t expected_len, bool *passed_out, double *score_out) {
@@ -155,81 +144,121 @@ static void hu_eval_heuristic_judge(const char *actual, size_t actual_len, const
 }
 
 hu_error_t hu_eval_suite_load_json(hu_allocator_t *alloc, const char *json, size_t json_len, hu_eval_suite_t *out) {
-    if (!alloc || !json || !json_len || !out) return HU_ERR_INVALID_ARGUMENT;
+    if (!alloc || !json || !json_len || !out)
+        return HU_ERR_INVALID_ARGUMENT;
     memset(out, 0, sizeof(*out));
-    (void)json_len;
-    const char *name_key = "\"name\"";
-    const char *found = strstr(json, name_key);
-    if (found) {
-        const char *vs = strchr(found + strlen(name_key), '"');
-        if (vs) { vs++;
-            const char *ve = strchr(vs, '"');
-            if (ve) {
-                size_t nlen = (size_t)(ve - vs);
-                out->name = alloc->alloc(alloc->ctx, nlen + 1);
-                if (out->name) { memcpy(out->name, vs, nlen); out->name[nlen] = 0; }
-            }
+    out->default_match_mode = HU_EVAL_CONTAINS;
+
+    hu_json_value_t *root = NULL;
+    hu_error_t perr = hu_json_parse(alloc, json, json_len, &root);
+    if (perr != HU_OK || !root)
+        return perr != HU_OK ? perr : HU_ERR_INVALID_ARGUMENT;
+    if (root->type != HU_JSON_OBJECT) {
+        hu_json_free(alloc, root);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    const char *nm = hu_json_get_string(root, "name");
+    if (nm) {
+        out->name = hu_strdup(alloc, nm);
+        if (!out->name) {
+            hu_json_free(alloc, root);
+            return HU_ERR_OUT_OF_MEMORY;
         }
     }
-    if (!out->name) { out->name = alloc->alloc(alloc->ctx, 5); if (out->name) memcpy(out->name, "eval", 5); }
-
-    const char *tasks_key = "\"tasks\"";
-    const char *tasks_start = strstr(json, tasks_key);
-    if (tasks_start) {
-        const char *arr_start = strchr(tasks_start + strlen(tasks_key), '[');
-        if (arr_start) {
-            const char *p = arr_start + 1;
-            hu_eval_task_t *tasks = alloc->alloc(alloc->ctx, EVAL_MAX_TASKS * sizeof(hu_eval_task_t));
-            if (!tasks) return HU_ERR_OUT_OF_MEMORY;
-            memset(tasks, 0, EVAL_MAX_TASKS * sizeof(hu_eval_task_t));
-            size_t count = 0;
-
-            while (count < EVAL_MAX_TASKS) {
-                while (*p == ' ' || *p == '\t' || *p == '\n' || *p == ',') p++;
-                if (*p == ']') break;
-                if (*p != '{') break;
-
-                const char *obj_start = p;
-                int brace = 1;
-                p++;
-                while (*p && brace > 0) {
-                    if (*p == '"') {
-                        p++;
-                        while (*p && *p != '"') {
-                            if (*p == '\\') p++;
-                            p++;
-                        }
-                        if (*p) p++;
-                    } else if (*p == '{') { brace++; p++; }
-                    else if (*p == '}') { brace--; p++; }
-                    else p++;
-                }
-                const char *obj_end = p;
-                if (brace != 0) break;
-
-                hu_eval_task_t *t = &tasks[count];
-                t->id = extract_str(alloc, obj_start, obj_end, "\"id\"");
-                t->prompt = extract_str(alloc, obj_start, obj_end, "\"prompt\"");
-                if (t->prompt) t->prompt_len = strlen(t->prompt);
-                t->expected = extract_str(alloc, obj_start, obj_end, "\"expected\"");
-                if (t->expected) t->expected_len = strlen(t->expected);
-                t->category = extract_str(alloc, obj_start, obj_end, "\"category\"");
-                t->difficulty = extract_int(obj_start, obj_end, "\"difficulty\"");
-                t->timeout_ms = extract_int64(obj_start, obj_end, "\"timeout_ms\"");
-                if (t->timeout_ms == 0) t->timeout_ms = 5000;
-                t->rubric = extract_str(alloc, obj_start, obj_end, "\"rubric\"");
-                if (t->rubric) t->rubric_len = strlen(t->rubric);
-
-                count++;
-            }
-
-            out->tasks = tasks;
-            out->tasks_count = count;
+    if (!out->name) {
+        out->name = alloc->alloc(alloc->ctx, 5);
+        if (!out->name) {
+            hu_json_free(alloc, root);
+            return HU_ERR_OUT_OF_MEMORY;
         }
+        memcpy(out->name, "eval", 5);
     }
-    out->default_rubric = extract_str(alloc, json, json + json_len, "\"default_rubric\"");
-    if (out->default_rubric)
+
+    const char *mm = hu_json_get_string(root, "match_mode");
+    if (mm)
+        out->default_match_mode = eval_match_mode_from_cstr(mm);
+
+    hu_json_value_t *tasks_val = hu_json_object_get(root, "tasks");
+    if (tasks_val && tasks_val->type == HU_JSON_ARRAY) {
+        hu_eval_task_t *tasks = alloc->alloc(alloc->ctx, EVAL_MAX_TASKS * sizeof(hu_eval_task_t));
+        if (!tasks) {
+            hu_json_free(alloc, root);
+            alloc->free(alloc->ctx, out->name, strlen(out->name) + 1);
+            out->name = NULL;
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        memset(tasks, 0, EVAL_MAX_TASKS * sizeof(hu_eval_task_t));
+        size_t count = 0;
+
+        for (size_t i = 0; i < tasks_val->data.array.len && count < EVAL_MAX_TASKS; i++) {
+            hu_json_value_t *tj = tasks_val->data.array.items[i];
+            if (!tj || tj->type != HU_JSON_OBJECT)
+                continue;
+
+            hu_eval_task_t *t = &tasks[count];
+
+#define EVAL_TASK_DUP(field, key)                                                                  \
+    do {                                                                                           \
+        const char *sx = hu_json_get_string(tj, key);                                              \
+        if (sx) {                                                                                  \
+            t->field = hu_strdup(alloc, sx);                                                       \
+            if (!t->field) {                                                                       \
+                eval_free_task_strings(alloc, t);                                                  \
+                for (size_t k = 0; k < count; k++)                                                 \
+                    eval_free_task_strings(alloc, &tasks[k]);                                      \
+                alloc->free(alloc->ctx, tasks, EVAL_MAX_TASKS * sizeof(hu_eval_task_t));            \
+                hu_json_free(alloc, root);                                                         \
+                alloc->free(alloc->ctx, out->name, strlen(out->name) + 1);                        \
+                out->name = NULL;                                                                  \
+                return HU_ERR_OUT_OF_MEMORY;                                                       \
+            }                                                                                      \
+        }                                                                                          \
+    } while (0)
+
+            EVAL_TASK_DUP(id, "id");
+            EVAL_TASK_DUP(prompt, "prompt");
+            if (t->prompt)
+                t->prompt_len = strlen(t->prompt);
+            EVAL_TASK_DUP(expected, "expected");
+            if (t->expected)
+                t->expected_len = strlen(t->expected);
+            EVAL_TASK_DUP(category, "category");
+            t->difficulty = (int)hu_json_get_number(tj, "difficulty", 0.0);
+            t->timeout_ms = (int64_t)hu_json_get_number(tj, "timeout_ms", 0.0);
+            if (t->timeout_ms == 0)
+                t->timeout_ms = 5000;
+            EVAL_TASK_DUP(rubric, "rubric");
+            if (t->rubric)
+                t->rubric_len = strlen(t->rubric);
+
+            const char *task_mm = hu_json_get_string(tj, "match_mode");
+            if (task_mm)
+                t->match_mode = eval_match_mode_from_cstr(task_mm);
+            else
+                t->match_mode = out->default_match_mode;
+
+            count++;
+        }
+#undef EVAL_TASK_DUP
+
+        out->tasks = tasks;
+        out->tasks_count = count;
+    }
+
+    const char *dr = hu_json_get_string(root, "default_rubric");
+    if (dr) {
+        out->default_rubric = hu_strdup(alloc, dr);
+        if (!out->default_rubric) {
+            hu_eval_suite_free(alloc, out);
+            memset(out, 0, sizeof(*out));
+            hu_json_free(alloc, root);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
         out->default_rubric_len = strlen(out->default_rubric);
+    }
+
+    hu_json_free(alloc, root);
     return HU_OK;
 }
 
@@ -333,13 +362,19 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
         size_t actual_str_len = response ? response_len : 0;
         const char *expected_str = task->expected ? task->expected : "";
         size_t expected_str_len = task->expected ? task->expected_len : 0;
-        if (mode == HU_EVAL_LLM_JUDGE) {
+        hu_eval_match_mode_t task_mode = task->match_mode;
+        if (task_mode == HU_EVAL_MATCH_INHERIT)
+            task_mode = mode;
+        else if (task_mode == HU_EVAL_CONTAINS && mode != HU_EVAL_CONTAINS)
+            task_mode = mode;
+
+        if (task_mode == HU_EVAL_LLM_JUDGE) {
             hu_eval_check_with_provider(alloc, actual_str, actual_str_len, expected_str,
-                                        expected_str_len, mode, provider, model, model_len,
+                                        expected_str_len, task_mode, provider, model, model_len,
                                         &passed, &score_val);
         } else {
             hu_eval_check_with_provider(alloc, actual_str, actual_str_len, expected_str,
-                                        expected_str_len, mode, NULL, NULL, 0, &passed, NULL);
+                                        expected_str_len, task_mode, NULL, NULL, 0, &passed, NULL);
         }
 
         res->task_id = task->id ? hu_strdup(alloc, task->id) : NULL;
@@ -447,11 +482,16 @@ hu_error_t hu_eval_check_with_provider(hu_allocator_t *alloc, const char *actual
     *passed = false;
     if (score_out) *score_out = 0.0;
 
-    switch (mode) {
+    hu_eval_match_mode_t effective = mode;
+    if (effective == HU_EVAL_MATCH_INHERIT)
+        effective = HU_EVAL_CONTAINS;
+
+    switch (effective) {
         case HU_EVAL_EXACT:
             *passed = (actual_len == expected_len && memcmp(actual, expected, actual_len) == 0);
             if (score_out) *score_out = *passed ? 1.0 : 0.0;
             return HU_OK;
+        case HU_EVAL_MATCH_INHERIT:
         case HU_EVAL_CONTAINS: {
             bool found = false;
             if (expected_len <= actual_len) {

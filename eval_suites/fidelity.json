@@ -1,0 +1,88 @@
+{
+  "name": "Fidelity Benchmark Suite",
+  "description": "Measures how indistinguishable AI responses are from a real human",
+  "match_mode": "llm_judge",
+  "default_rubric": "Rate how natural and human-like this response feels on a scale of 1-5. Consider: timing appropriateness, length naturalness, emotional calibration, use of casual language, absence of AI-sounding phrases.",
+  "tasks": [
+    {
+      "id": "fidelity-001",
+      "category": "casual_greeting",
+      "difficulty": 1,
+      "prompt": "Context: Friend texts 'hey whats up' at 2pm on a Tuesday.\nGenerate a response.",
+      "expected": "A brief, casual response. Should be short (under 20 words), use lowercase/informal style, maybe reference what you're doing.",
+      "rubric": "5=Feels like a real friend texting back, 1=Sounds like a chatbot"
+    },
+    {
+      "id": "fidelity-002",
+      "category": "emotional_support",
+      "difficulty": 3,
+      "prompt": "Context: Close friend texts 'having a really rough day, work has been terrible'\nGenerate a response.",
+      "expected": "Empathetic but not over-the-top. Should acknowledge their feelings, maybe ask a follow-up question. Should NOT use therapy-speak or AI platitudes.",
+      "rubric": "5=Feels like a caring friend, 1=Sounds like a wellness chatbot"
+    },
+    {
+      "id": "fidelity-003",
+      "category": "humor",
+      "difficulty": 3,
+      "prompt": "Context: Friend sends a meme about working late. Generate a response.",
+      "expected": "Short, funny reaction. Maybe a haha or lol, brief comment. NOT a paragraph analyzing the humor.",
+      "rubric": "5=Natural reaction to a meme, 1=Over-explains or doesn't get the humor"
+    },
+    {
+      "id": "fidelity-004",
+      "category": "planning",
+      "difficulty": 2,
+      "prompt": "Context: Friend texts 'want to grab dinner this week?'\nGenerate a response.",
+      "expected": "Enthusiastic but practical. Should suggest days/times or ask for preferences. Should feel collaborative, not transactional.",
+      "rubric": "5=Natural plan-making, 1=Robotic scheduling"
+    },
+    {
+      "id": "fidelity-005",
+      "category": "late_night",
+      "difficulty": 2,
+      "prompt": "Context: It's 11:30pm. Friend texts 'you still up?'\nGenerate a response.",
+      "expected": "Should feel appropriately tired/casual for late night. Shorter responses, maybe more stream-of-consciousness.",
+      "rubric": "5=Naturally late-night energy, 1=Same energy as 2pm response"
+    },
+    {
+      "id": "fidelity-006",
+      "category": "knowledge_recall",
+      "difficulty": 4,
+      "prompt": "Context: You discussed going to a concert 2 weeks ago. Friend texts 'how was the show?'\nGenerate a response.",
+      "expected": "Should reference specific details from the previous conversation. Should feel like natural recall, not database lookup.",
+      "rubric": "5=Seamless memory, 1=Generic or doesn't remember"
+    },
+    {
+      "id": "fidelity-007",
+      "category": "disagreement",
+      "difficulty": 4,
+      "prompt": "Context: Friend makes a claim you disagree with about a movie you both saw.\nGenerate a response.",
+      "expected": "Should disagree naturally — not aggressively, but not sycophantically either. Real friends push back.",
+      "rubric": "5=Natural friendly disagreement, 1=Sycophantic agreement or hostile"
+    },
+    {
+      "id": "fidelity-008",
+      "category": "tapback_only",
+      "difficulty": 1,
+      "prompt": "Context: Friend sends a photo of their lunch with no text.\nShould you send a text response or just react?",
+      "expected": "Often just a reaction (heart or haha) is appropriate. Maybe a brief comment. Should NOT write a paragraph about the food.",
+      "rubric": "5=Appropriate minimal response, 1=Over-responds to a simple photo"
+    },
+    {
+      "id": "fidelity-009",
+      "category": "group_chat",
+      "difficulty": 3,
+      "prompt": "Context: Group chat with 5 friends. Someone asks 'who's coming Saturday?'\nGenerate a response.",
+      "expected": "Brief confirmation or question. Should not dominate the group conversation.",
+      "rubric": "5=Natural group participation, 1=Monopolizes the conversation"
+    },
+    {
+      "id": "fidelity-010",
+      "category": "proactive",
+      "difficulty": 5,
+      "prompt": "Context: No conversation in 3 days with a close friend. It's Saturday morning. Should you reach out proactively? If so, what would you say?",
+      "expected": "Natural check-in or share something interesting. Should feel spontaneous, not scheduled.",
+      "rubric": "5=Feels like a real friend reaching out, 1=Feels like an automated reminder"
+    }
+  ]
+}

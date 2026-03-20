@@ -1,0 +1,14 @@
+{
+  "name": "Memory Recall Benchmark",
+  "description": "Recall-style prompts (judge against expected substring)",
+  "match_mode": "contains",
+  "tasks": [
+    {
+      "id": "mem-001",
+      "category": "instruction",
+      "difficulty": 1,
+      "prompt": "The secret codeword is BLUEBIRD. What is the codeword? Reply with one word.",
+      "expected": "BLUEBIRD"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "name": "Intelligence Benchmark Suite",
+  "description": "Measures AGI-grade reasoning, memory, tool use, and social intelligence",
+  "tasks": [
+    {
+      "id": "intel-001",
+      "category": "reasoning",
+      "difficulty": 3,
+      "prompt": "A farmer has a fox, a chicken, and a bag of grain. He needs to cross a river with a boat that can only carry him and one item. The fox will eat the chicken if left alone, and the chicken will eat the grain. How should he cross?",
+      "expected": "Classic river-crossing puzzle. Correct solution involves taking chicken first, then grain (bring chicken back), then fox, then chicken again.",
+      "match_mode": "contains",
+      "match_value": "chicken"
+    },
+    {
+      "id": "intel-002",
+      "category": "tool_use",
+      "difficulty": 4,
+      "prompt": "Find the current weather in San Francisco and compose a message to a friend suggesting outdoor activities based on the forecast.",
+      "expected": "Should use weather tool, then compose natural message. Should demonstrate tool chaining.",
+      "match_mode": "llm_judge",
+      "rubric": "5=Uses tools effectively and writes natural message, 1=Fails to use tools or writes robotic message"
+    },
+    {
+      "id": "intel-003",
+      "category": "memory",
+      "difficulty": 5,
+      "prompt": "Given this conversation history: [User mentioned they're allergic to shellfish 15 messages ago, then asked for restaurant recommendations]. Generate restaurant recommendations.",
+      "expected": "Must remember and apply the shellfish allergy constraint. Should not recommend seafood restaurants.",
+      "match_mode": "llm_judge",
+      "rubric": "5=Perfectly recalls constraint, 1=Ignores allergy"
+    },
+    {
+      "id": "intel-004",
+      "category": "social_intelligence",
+      "difficulty": 4,
+      "prompt": "Your friend just told you they didn't get the job they interviewed for last week. They say 'oh well, it wasn't meant to be I guess'. Are they actually okay?",
+      "expected": "Should recognize the friend is likely disappointed despite the dismissive language. Theory of mind test.",
+      "match_mode": "llm_judge",
+      "rubric": "5=Reads between the lines, acknowledges hidden disappointment, 1=Takes statement at face value"
+    },
+    {
+      "id": "intel-005",
+      "category": "multi_step",
+      "difficulty": 5,
+      "prompt": "Plan a surprise birthday party for a friend: find a venue, create an invite list from contacts, suggest a theme based on their interests, and draft invitation messages for each guest.",
+      "expected": "Should decompose into subtasks, use multiple tools, maintain coherent plan across steps.",
+      "match_mode": "llm_judge",
+      "rubric": "5=Comprehensive multi-step plan with tool use, 1=Shallow single-step response"
+    }
+  ]
+}

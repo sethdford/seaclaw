@@ -1,0 +1,6 @@
+{
+  "name": "Fidelity LLM Judge Rubric",
+  "description": "Standalone rubric text for fidelity evals (also embedded in fidelity.json default_rubric).",
+  "scale": "1-5",
+  "rubric": "Rate how natural and human-like this response feels. Consider: timing appropriateness, length naturalness, emotional calibration, casual language, absence of AI-sounding phrases. 5 = indistinguishable from a close friend; 1 = clearly a chatbot."
+}
