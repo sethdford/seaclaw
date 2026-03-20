@@ -78,6 +78,7 @@ typedef struct hu_agent_context_config {
     float pressure_compact; /* auto-compact at this ratio (default 0.95) */
     float compact_target;   /* compact until below this ratio (default 0.70) */
     bool llm_compiler_enabled;
+    bool mcts_planner_enabled;
     bool tree_of_thought;
     bool constitutional_ai;
     bool speculative_cache;
@@ -214,6 +215,7 @@ struct hu_agent {
     hu_superhuman_silence_ctx_t superhuman_silence_ctx;
 
     bool llm_compiler_enabled;
+    bool mcts_planner_enabled;
     bool tool_routing_enabled;
     bool tree_of_thought_enabled;
 

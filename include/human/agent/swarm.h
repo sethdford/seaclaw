@@ -3,6 +3,8 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/provider.h"
+#include "human/tool.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -18,6 +20,11 @@ typedef struct hu_swarm_config {
     int max_parallel;        /* default 4 */
     int64_t timeout_ms;     /* per-agent timeout, default 30000 */
     int retry_on_failure;    /* default 1 */
+    hu_provider_t *provider; /* LLM provider for sub-agent calls (NULL = echo fallback) */
+    const char *model;     /* model name */
+    size_t model_len;
+    hu_tool_t *tools; /* tool registry (reserved; single-round chat may use later) */
+    size_t tools_count;
 } hu_swarm_config_t;
 
 typedef struct hu_swarm_task {

@@ -1,7 +1,81 @@
 #include "human/agent/orchestrator.h"
 #include "human/agent/registry.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+
+#define HU_ORCH_WORD_MAX 64
+#define HU_ORCH_WORD_SZ 48
+#define HU_ORCH_CONSENSUS_DICE_MIN 0.28
+
+static bool orch_is_word_char(unsigned char c) {
+    return (bool)((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'));
+}
+
+static size_t orch_collect_words(const char *s, size_t len, char words[][HU_ORCH_WORD_SZ]) {
+    size_t n = 0;
+    size_t i = 0;
+    while (i < len && n < HU_ORCH_WORD_MAX) {
+        while (i < len && !orch_is_word_char((unsigned char)s[i]))
+            i++;
+        if (i >= len)
+            break;
+        size_t start = i;
+        while (i < len && orch_is_word_char((unsigned char)s[i]))
+            i++;
+        size_t wlen = i - start;
+        if (wlen >= HU_ORCH_WORD_SZ)
+            wlen = HU_ORCH_WORD_SZ - 1;
+        memcpy(words[n], s + start, wlen);
+        words[n][wlen] = '\0';
+        for (size_t j = 0; j < wlen; j++)
+            words[n][j] = (char)tolower((unsigned char)words[n][j]);
+        n++;
+    }
+    return n;
+}
+
+static bool orch_word_in_table(const char *w, char words[][HU_ORCH_WORD_SZ], size_t nw) {
+    for (size_t i = 0; i < nw; i++) {
+        if (strcmp(w, words[i]) == 0)
+            return true;
+    }
+    return false;
+}
+
+static double orch_token_dice(const char *a, size_t alen, const char *b, size_t blen) {
+    char wa[HU_ORCH_WORD_MAX][HU_ORCH_WORD_SZ];
+    char wb[HU_ORCH_WORD_MAX][HU_ORCH_WORD_SZ];
+    size_t na = orch_collect_words(a, alen, wa);
+    size_t nb = orch_collect_words(b, blen, wb);
+    if (na == 0 && nb == 0)
+        return 1.0;
+    if (na == 0 || nb == 0)
+        return 0.0;
+    size_t inter = 0;
+    for (size_t i = 0; i < na; i++) {
+        if (orch_word_in_table(wa[i], wb, nb))
+            inter++;
+    }
+    return (double)(2u * inter) / (double)(na + nb);
+}
+
+static double orch_min_pairwise_dice(const hu_orchestrator_task_t *tasks, const size_t *idx,
+                                     size_t nidx) {
+    if (nidx < 2)
+        return 1.0;
+    double min_d = 1.0;
+    for (size_t i = 0; i < nidx; i++) {
+        for (size_t j = i + 1; j < nidx; j++) {
+            const hu_orchestrator_task_t *ti = &tasks[idx[i]];
+            const hu_orchestrator_task_t *tj = &tasks[idx[j]];
+            double d = orch_token_dice(ti->result, ti->result_len, tj->result, tj->result_len);
+            if (d < min_d)
+                min_d = d;
+        }
+    }
+    return min_d;
+}
 
 hu_error_t hu_orchestrator_create(hu_allocator_t *alloc, hu_orchestrator_t *out) {
     if (!alloc || !out)
@@ -175,6 +249,91 @@ hu_error_t hu_orchestrator_merge_results(hu_orchestrator_t *orch, hu_allocator_t
             continue;
         int n = snprintf(buf + pos, total + 1 - pos, "Task %u: %.*s\n",
                          (unsigned)t->id, (int)t->result_len, t->result);
+        if (n > 0 && pos + (size_t)n <= total)
+            pos += (size_t)n;
+    }
+    buf[pos] = '\0';
+    *out = buf;
+    *out_len = pos;
+    return HU_OK;
+}
+
+hu_error_t hu_orchestrator_merge_results_consensus(hu_orchestrator_t *orch, hu_allocator_t *alloc,
+                                                   char **out, size_t *out_len) {
+    if (!orch || !alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *out = NULL;
+    *out_len = 0;
+
+    size_t idx[HU_ORCHESTRATOR_MAX_TASKS];
+    size_t nidx = 0;
+    for (size_t i = 0; i < orch->task_count && nidx < HU_ORCHESTRATOR_MAX_TASKS; i++) {
+        if (orch->tasks[i].status == HU_TASK_COMPLETED)
+            idx[nidx++] = i;
+    }
+    if (nidx == 0)
+        return HU_OK;
+
+    if (nidx == 1) {
+        const hu_orchestrator_task_t *t = &orch->tasks[idx[0]];
+        size_t cap = t->result_len + 1;
+        char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+        if (!buf)
+            return HU_ERR_OUT_OF_MEMORY;
+        if (t->result_len > 0)
+            memcpy(buf, t->result, t->result_len);
+        buf[t->result_len] = '\0';
+        *out = buf;
+        *out_len = t->result_len;
+        return HU_OK;
+    }
+
+    double min_dice = orch_min_pairwise_dice(orch->tasks, idx, nidx);
+    bool consensus = min_dice >= HU_ORCH_CONSENSUS_DICE_MIN;
+
+    if (consensus) {
+        size_t win_i = 0;
+        size_t best_len = 0;
+        for (size_t k = 0; k < nidx; k++) {
+            const hu_orchestrator_task_t *t = &orch->tasks[idx[k]];
+            if (t->result_len >= best_len) {
+                best_len = t->result_len;
+                win_i = k;
+            }
+        }
+        const hu_orchestrator_task_t *w = &orch->tasks[idx[win_i]];
+        size_t cap = w->result_len + 1;
+        char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+        if (!buf)
+            return HU_ERR_OUT_OF_MEMORY;
+        if (w->result_len > 0)
+            memcpy(buf, w->result, w->result_len);
+        buf[w->result_len] = '\0';
+        *out = buf;
+        *out_len = w->result_len;
+        return HU_OK;
+    }
+
+    static const char diverge_note[] =
+        "Multiple perspectives (sub-agents diverged):\n";
+    size_t note_len = sizeof(diverge_note) - 1;
+    size_t total = note_len;
+    for (size_t k = 0; k < nidx; k++) {
+        const hu_orchestrator_task_t *t = &orch->tasks[idx[k]];
+        total += 32 + t->result_len;
+    }
+
+    char *buf = (char *)alloc->alloc(alloc->ctx, total + 1);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    memcpy(buf, diverge_note, note_len);
+    size_t pos = note_len;
+    for (size_t k = 0; k < nidx; k++) {
+        const hu_orchestrator_task_t *t = &orch->tasks[idx[k]];
+        int n = snprintf(buf + pos, total + 1 - pos, "Task %u: %.*s\n", (unsigned)t->id,
+                         (int)t->result_len, t->result);
         if (n > 0 && pos + (size_t)n <= total)
             pos += (size_t)n;
     }

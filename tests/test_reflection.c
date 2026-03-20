@@ -125,6 +125,25 @@ static void test_reflection_result_free_null_safe(void) {
     hu_reflection_result_free(&alloc, &r);
 }
 
+static void test_reflection_structured_null_args(void) {
+    hu_reflection_result_t r;
+    HU_ASSERT_EQ(hu_reflection_evaluate_structured(NULL, NULL, NULL, 0, "q", 1, "r", 1, &r),
+                 HU_ERR_INVALID_ARGUMENT);
+    hu_allocator_t alloc = hu_system_allocator();
+    HU_ASSERT_EQ(hu_reflection_evaluate_structured(&alloc, NULL, NULL, 0, NULL, 0, NULL, 0, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_reflection_structured_no_provider_heuristic(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_reflection_result_t r;
+    HU_ASSERT_EQ(hu_reflection_evaluate_structured(&alloc, NULL, "m", 1, "q", 1, "ok", 2, &r), HU_OK);
+    HU_ASSERT_EQ(r.quality, HU_QUALITY_NEEDS_RETRY);
+    HU_ASSERT_FLOAT_EQ(r.accuracy, -1.0, 0.001);
+    HU_ASSERT_NULL(r.feedback);
+    hu_reflection_result_free(&alloc, &r);
+}
+
 static void test_reflection_result_free_with_feedback(void) {
     hu_allocator_t alloc = hu_system_allocator();
     char *fb = (char *)alloc.alloc(alloc.ctx, 16);
@@ -156,6 +175,8 @@ void run_reflection_tests(void) {
     HU_RUN_TEST(test_reflection_critique_prompt_null);
     HU_RUN_TEST(test_reflection_critique_prompt_basic);
     HU_RUN_TEST(test_reflection_critique_prompt_empty_query);
+    HU_RUN_TEST(test_reflection_structured_null_args);
+    HU_RUN_TEST(test_reflection_structured_no_provider_heuristic);
     HU_RUN_TEST(test_reflection_result_free_null_safe);
     HU_RUN_TEST(test_reflection_result_free_with_feedback);
 }

@@ -22,8 +22,14 @@ typedef enum hu_reflection_quality {
 
 typedef struct hu_reflection_result {
     hu_reflection_quality_t quality;
-    char *feedback; /* optional textual self-critique */
+    char *feedback;
     size_t feedback_len;
+    /* Structured rubric scores (0.0–1.0, -1.0 = not scored) */
+    double accuracy;      /* factual correctness */
+    double relevance;     /* addresses the user's question */
+    double tone;        /* appropriate tone/style */
+    double completeness; /* comprehensive coverage */
+    double conciseness;   /* not verbose or padded */
 } hu_reflection_result_t;
 
 /* Run rule-based self-evaluation on a response.
@@ -41,9 +47,17 @@ hu_error_t hu_reflection_build_critique_prompt(hu_allocator_t *alloc, const char
 
 void hu_reflection_result_free(hu_allocator_t *alloc, hu_reflection_result_t *result);
 
-/* LLM-driven evaluation: sends the critique prompt to the provider and parses
- * the response for GOOD/ACCEPTABLE/NEEDS_RETRY keywords.
- * Falls back to heuristic_quality on provider failure. */
+/* Structured LLM evaluation: JSON rubric + quality. On provider/parse failure,
+ * fills `out` from the heuristic evaluator (same as hu_reflection_evaluate).
+ * When non-NULL, `out->feedback` is allocated with the system allocator; free with
+ * `hu_allocator_t a = hu_system_allocator(); hu_reflection_result_free(&a, out)`. */
+hu_error_t hu_reflection_evaluate_structured(hu_allocator_t *alloc, hu_provider_t *provider,
+                                             const char *model, size_t model_len,
+                                             const char *user_query, size_t user_query_len,
+                                             const char *response, size_t response_len,
+                                             hu_reflection_result_t *out);
+
+/* LLM-driven evaluation: uses structured evaluator internally; returns quality only. */
 hu_reflection_quality_t hu_reflection_evaluate_llm(hu_allocator_t *alloc, hu_provider_t *provider,
                                                    const char *user_query, size_t user_query_len,
                                                    const char *response, size_t response_len,

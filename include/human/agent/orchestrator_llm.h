@@ -43,16 +43,6 @@ typedef struct hu_decomposition {
     size_t reasoning_len;
 } hu_decomposition_t;
 
-/* Use LLM to decompose a goal into subtasks.
- * Each subtask includes a description, required capability, and dependencies.
- * Caller must free with hu_decomposition_free. */
-hu_error_t hu_orchestrator_decompose_goal(hu_allocator_t *alloc, hu_provider_t *provider,
-                                           const char *model, size_t model_len,
-                                           const char *goal, size_t goal_len,
-                                           const hu_agent_capability_t *capabilities,
-                                           size_t capability_count,
-                                           hu_decomposition_t *result);
-
 void hu_decomposition_free(hu_allocator_t *alloc, hu_decomposition_t *result);
 
 /* Dynamic task decomposition by strategy. When provider is non-NULL, uses LLM;

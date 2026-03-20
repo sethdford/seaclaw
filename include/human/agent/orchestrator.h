@@ -12,6 +12,9 @@
  * result merging, and conflict resolution among multiple agents.
  */
 
+struct hu_provider;
+struct hu_decomposition;
+
 #define HU_ORCHESTRATOR_MAX_AGENTS 8
 #define HU_ORCHESTRATOR_MAX_TASKS 32
 
@@ -87,6 +90,23 @@ hu_error_t hu_orchestrator_fail_task(hu_orchestrator_t *orch, uint32_t task_id,
 hu_error_t hu_orchestrator_merge_results(hu_orchestrator_t *orch,
                                          hu_allocator_t *alloc,
                                          char **out, size_t *out_len);
+
+/* Merge completed task results with a light consensus step: when outputs are
+ * word-similar (Dice on tokens), keep the longest / most detailed line; when
+ * they diverge, include every result with a short preamble. Caller frees *out. */
+hu_error_t hu_orchestrator_merge_results_consensus(hu_orchestrator_t *orch,
+                                                    hu_allocator_t *alloc,
+                                                    char **out, size_t *out_len);
+
+/* LLM-driven goal decomposition into subtasks (full struct in orchestrator_llm.h).
+ * Caller must hu_decomposition_free when done. Under HU_IS_TEST returns a fixed plan. */
+hu_error_t hu_orchestrator_decompose_goal(hu_allocator_t *alloc,
+                                          struct hu_provider *provider,
+                                          const char *model, size_t model_len,
+                                          const char *goal, size_t goal_len,
+                                          const hu_agent_capability_t *capabilities,
+                                          size_t capability_count,
+                                          struct hu_decomposition *result);
 
 /* Check if all tasks are completed. */
 bool hu_orchestrator_all_complete(const hu_orchestrator_t *orch);

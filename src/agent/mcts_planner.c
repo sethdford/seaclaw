@@ -54,6 +54,97 @@ static double mock_simulate(int depth) {
 }
 #endif
 
+void hu_mcts_result_free_path(hu_allocator_t *alloc, hu_mcts_result_t *result) {
+    if (!alloc || !result)
+        return;
+    if (result->actions && result->action_count > 0) {
+        for (size_t i = 0; i < result->action_count; i++) {
+            if (result->actions[i])
+                alloc->free(alloc->ctx, result->actions[i], result->action_lens[i] + 1);
+        }
+        alloc->free(alloc->ctx, result->actions, result->action_count * sizeof(char *));
+    }
+    if (result->action_lens)
+        alloc->free(alloc->ctx, result->action_lens, result->action_count * sizeof(size_t));
+    result->actions = NULL;
+    result->action_lens = NULL;
+    result->action_count = 0;
+}
+
+/* Walk from root's best first child, always choosing the visited child with highest mean value. */
+static hu_error_t mcts_build_best_path(hu_allocator_t *alloc, hu_mcts_node_t *nodes, int node_count,
+                                       int root_best_child, hu_mcts_result_t *result) {
+    if (!alloc || !nodes || !result || root_best_child < 0)
+        return HU_OK;
+
+    int path_nodes[HU_MCTS_MAX_NODES];
+    size_t path_len = 0;
+    int cur = root_best_child;
+
+    while (cur >= 0 && path_len < HU_MCTS_MAX_NODES) {
+        if (nodes[cur].action_len > 0)
+            path_nodes[path_len++] = cur;
+
+        hu_mcts_node_t *n = &nodes[cur];
+        if (n->children_count <= 0)
+            break;
+
+        int best_next = -1;
+        double best_mean = -1.0;
+        for (int i = 0; i < n->children_count; i++) {
+            int cidx = n->children_start + i;
+            if (cidx < 0 || cidx >= node_count)
+                break;
+            hu_mcts_node_t *c = &nodes[cidx];
+            if (c->visit_count == 0)
+                continue;
+            double mean = c->total_value / (double)c->visit_count;
+            if (best_next < 0 || mean > best_mean) {
+                best_next = cidx;
+                best_mean = mean;
+            }
+        }
+        if (best_next < 0)
+            break;
+        cur = best_next;
+    }
+
+    if (path_len == 0)
+        return HU_OK;
+
+    char **acts = (char **)alloc->alloc(alloc->ctx, path_len * sizeof(char *));
+    size_t *lens = (size_t *)alloc->alloc(alloc->ctx, path_len * sizeof(size_t));
+    if (!acts || !lens) {
+        if (acts)
+            alloc->free(alloc->ctx, acts, path_len * sizeof(char *));
+        if (lens)
+            alloc->free(alloc->ctx, lens, path_len * sizeof(size_t));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+
+    for (size_t i = 0; i < path_len; i++) {
+        hu_mcts_node_t *nd = &nodes[path_nodes[i]];
+        size_t L = nd->action_len;
+        char *copy = (char *)alloc->alloc(alloc->ctx, L + 1);
+        if (!copy) {
+            for (size_t j = 0; j < i; j++)
+                alloc->free(alloc->ctx, acts[j], lens[j] + 1);
+            alloc->free(alloc->ctx, acts, path_len * sizeof(char *));
+            alloc->free(alloc->ctx, lens, path_len * sizeof(size_t));
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        memcpy(copy, nd->action, L);
+        copy[L] = '\0';
+        acts[i] = copy;
+        lens[i] = L;
+    }
+
+    result->actions = acts;
+    result->action_lens = lens;
+    result->action_count = path_len;
+    return HU_OK;
+}
+
 /* UCB1 score: value/visits + C * sqrt(ln(parent_visits)/visits).
  * For unvisited (visit_count==0) return a large value to prefer exploration. */
 static double ucb1_score(double total_value, int visit_count, int parent_visits,
@@ -394,6 +485,8 @@ hu_error_t hu_mcts_plan(hu_allocator_t *alloc, const char *goal, size_t goal_len
         result->best_action[len] = '\0';
         result->best_action_len = len;
         result->best_value = best_mean;
+        if (mcts_build_best_path(alloc, nodes, node_count, best_child, result) != HU_OK)
+            hu_mcts_result_free_path(alloc, result);
     } else if (root->visit_count > 0) {
         result->best_action[0] = '\0';
         result->best_action_len = 0;
@@ -516,6 +609,8 @@ hu_error_t hu_mcts_plan(hu_allocator_t *alloc, const char *goal, size_t goal_len
         result->best_action[len] = '\0';
         result->best_action_len = len;
         result->best_value = best_mean;
+        if (mcts_build_best_path(alloc, nodes, node_count, best_child, result) != HU_OK)
+            hu_mcts_result_free_path(alloc, result);
     } else if (root->visit_count > 0) {
         result->best_action[0] = '\0';
         result->best_action_len = 0;

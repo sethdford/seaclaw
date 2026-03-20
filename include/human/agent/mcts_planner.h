@@ -32,14 +32,20 @@ typedef struct hu_mcts_node {
 typedef struct hu_mcts_result {
     char best_action[512];
     size_t best_action_len;
-    double best_value;
+    double best_value; /* mean rollout value of best root child (first action) */
     int total_iterations;
     int total_nodes;
     int max_depth_reached;
     int llm_calls_used;
+    /* Best path from root through highest-mean children (heap-owned; free via hu_mcts_result_free_path) */
+    char **actions;
+    size_t *action_lens;
+    size_t action_count;
 } hu_mcts_result_t;
 
 hu_mcts_config_t hu_mcts_config_default(void);
+
+void hu_mcts_result_free_path(hu_allocator_t *alloc, hu_mcts_result_t *result);
 
 hu_error_t hu_mcts_plan(hu_allocator_t *alloc, const char *goal, size_t goal_len,
                        const char *context, size_t context_len,

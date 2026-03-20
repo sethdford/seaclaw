@@ -41,6 +41,10 @@ static void mcts_plan_finds_best_action(void) {
     HU_ASSERT_TRUE(result.best_action_len > 0);
     HU_ASSERT_TRUE(result.best_action[0] != '\0');
     HU_ASSERT_TRUE(result.best_value > 0.0);
+    HU_ASSERT_TRUE(result.action_count > 0);
+    HU_ASSERT_NOT_NULL(result.actions);
+    HU_ASSERT_NOT_NULL(result.action_lens);
+    hu_mcts_result_free_path(&alloc, &result);
 }
 
 static void mcts_plan_respects_max_iterations(void) {
@@ -55,6 +59,7 @@ static void mcts_plan_respects_max_iterations(void) {
 
     HU_ASSERT_EQ(hu_mcts_plan(&alloc, goal, 4, ctx, 3, &config, &result), HU_OK);
     HU_ASSERT_TRUE(result.total_iterations <= config.max_iterations);
+    hu_mcts_result_free_path(&alloc, &result);
 }
 
 static void mcts_plan_respects_max_depth(void) {
@@ -70,6 +75,7 @@ static void mcts_plan_respects_max_depth(void) {
 
     HU_ASSERT_EQ(hu_mcts_plan(&alloc, goal, 4, ctx, 3, &config, &result), HU_OK);
     HU_ASSERT_TRUE(result.max_depth_reached <= config.max_depth);
+    hu_mcts_result_free_path(&alloc, &result);
 }
 
 static void mcts_plan_explores_multiple_nodes(void) {
@@ -84,6 +90,7 @@ static void mcts_plan_explores_multiple_nodes(void) {
 
     HU_ASSERT_EQ(hu_mcts_plan(&alloc, goal, 7, ctx, 7, &config, &result), HU_OK);
     HU_ASSERT_TRUE(result.total_nodes > 1);
+    hu_mcts_result_free_path(&alloc, &result);
 }
 
 static void mcts_backpropagation_updates_values(void) {
@@ -99,6 +106,7 @@ static void mcts_backpropagation_updates_values(void) {
     HU_ASSERT_EQ(hu_mcts_plan(&alloc, goal, 8, ctx, 3, &config, &result), HU_OK);
     HU_ASSERT_TRUE(result.total_iterations > 0);
     HU_ASSERT_TRUE(result.total_nodes > 0);
+    hu_mcts_result_free_path(&alloc, &result);
 }
 
 void run_mcts_planner_tests(void) {

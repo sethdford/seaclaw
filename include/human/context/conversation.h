@@ -5,6 +5,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/memory.h"
+#include "human/provider.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
 #else
@@ -110,6 +111,11 @@ typedef struct hu_emotional_state {
 
 hu_emotional_state_t hu_conversation_detect_emotion(const hu_channel_history_entry_t *entries,
                                                     size_t count);
+
+/* LLM-backed emotion analysis with heuristic fallback when no provider or low confidence. */
+hu_emotional_state_t hu_conversation_detect_emotion_llm(
+    hu_allocator_t *alloc, hu_provider_t *provider, const char *model, size_t model_len,
+    const hu_channel_history_entry_t *entries, size_t count);
 
 /* Energy level for matching emotional energy of incoming message.
  * Used to inject [ENERGY: ...] directive into the prompt. */
@@ -286,6 +292,8 @@ size_t hu_conversation_generate_correction(const char *original, size_t original
 /* Split a single response into multiple message fragments for natural delivery.
  * Analyzes sentence boundaries, conjunctions, and interjections to break
  * a response into the kind of rapid-fire fragments real humans send.
+ * max_chars: per-channel bubble size hint (e.g. from get_response_constraints).
+ * When 0, uses the historical default (~300 chars, iMessage-style thresholds).
  * Returns fragment count. Each fragment.text is a separately allocated copy;
  * caller must free each fragment.text via alloc->free(ctx, text, text_len+1).
  * Returns 0 on error or if response is empty/NULL. */
@@ -297,7 +305,7 @@ typedef struct hu_message_fragment {
 
 size_t hu_conversation_split_response(hu_allocator_t *alloc, const char *response,
                                       size_t response_len, hu_message_fragment_t *fragments,
-                                      size_t max_fragments);
+                                      size_t max_fragments, uint32_t max_chars);
 
 /* ── Situational length calibration ───────────────────────────────────── */
 

@@ -33,7 +33,7 @@ static hu_channel_history_entry_t make_entry(bool from_me, const char *text, con
 static void split_short_response_stays_single(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_message_fragment_t frags[4];
-    size_t n = hu_conversation_split_response(&alloc, "yeah for sure", 13, frags, 4);
+    size_t n = hu_conversation_split_response(&alloc, "yeah for sure", 13, frags, 4, 0);
     HU_ASSERT_EQ(n, 1u);
     HU_ASSERT_STR_EQ(frags[0].text, "yeah for sure");
     HU_ASSERT_EQ(frags[0].delay_ms, 0u);
@@ -42,14 +42,14 @@ static void split_short_response_stays_single(void) {
 
 static void split_null_input_returns_zero(void) {
     hu_message_fragment_t frags[4];
-    size_t n = hu_conversation_split_response(NULL, "hello", 5, frags, 4);
+    size_t n = hu_conversation_split_response(NULL, "hello", 5, frags, 4, 0);
     HU_ASSERT_EQ(n, 0u);
 }
 
 static void split_empty_returns_zero(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_message_fragment_t frags[4];
-    size_t n = hu_conversation_split_response(&alloc, "", 0, frags, 4);
+    size_t n = hu_conversation_split_response(&alloc, "", 0, frags, 4, 0);
     HU_ASSERT_EQ(n, 0u);
 }
 
@@ -57,7 +57,7 @@ static void split_on_newlines(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_message_fragment_t frags[4];
     const char *resp = "hey how are you\n\nso i was thinking about that thing";
-    size_t n = hu_conversation_split_response(&alloc, resp, strlen(resp), frags, 4);
+    size_t n = hu_conversation_split_response(&alloc, resp, strlen(resp), frags, 4, 0);
     HU_ASSERT_TRUE(n >= 2);
     HU_ASSERT_TRUE(frags[0].text_len > 0);
     HU_ASSERT_TRUE(frags[1].text_len > 0);
@@ -70,7 +70,7 @@ static void split_on_conjunction_starter(void) {
     hu_message_fragment_t frags[4];
     const char *resp =
         "that sounds really fun honestly. but i think we should check the weather first";
-    size_t n = hu_conversation_split_response(&alloc, resp, strlen(resp), frags, 4);
+    size_t n = hu_conversation_split_response(&alloc, resp, strlen(resp), frags, 4, 0);
     HU_ASSERT_TRUE(n >= 2);
     /* First fragment should end with the sentence before "but" */
     HU_ASSERT_TRUE(strstr(frags[0].text, "honestly") != NULL);
@@ -84,7 +84,7 @@ static void split_respects_max_fragments(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_message_fragment_t frags[2];
     const char *resp = "first thing.\nsecond thing.\nthird thing.\nfourth thing.";
-    size_t n = hu_conversation_split_response(&alloc, resp, strlen(resp), frags, 2);
+    size_t n = hu_conversation_split_response(&alloc, resp, strlen(resp), frags, 2, 0);
     HU_ASSERT_TRUE(n <= 2);
     for (size_t i = 0; i < n; i++)
         alloc.free(alloc.ctx, frags[i].text, frags[i].text_len + 1);
@@ -94,7 +94,7 @@ static void split_inter_message_delay_nonzero_for_later_fragments(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_message_fragment_t frags[4];
     const char *resp = "omg that's wild.\noh wait also did you hear about the thing at work";
-    size_t n = hu_conversation_split_response(&alloc, resp, strlen(resp), frags, 4);
+    size_t n = hu_conversation_split_response(&alloc, resp, strlen(resp), frags, 4, 0);
     if (n >= 2) {
         HU_ASSERT_EQ(frags[0].delay_ms, 0u);
         HU_ASSERT_TRUE(frags[1].delay_ms > 0);

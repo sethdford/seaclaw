@@ -1,6 +1,10 @@
 #include "human/agent/planner.h"
+#include "human/agent/mcts_planner.h"
 #include "human/agent/orchestrator_llm.h"
+#include "human/core/json.h"
 #include "human/core/string.h"
+#include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +45,26 @@ static hu_error_t parse_step(hu_allocator_t *alloc, const hu_json_value_t *step_
     const char *desc = hu_json_get_string(step_obj, "description");
     out->description = desc ? hu_strdup(alloc, desc) : NULL;
     out->status = HU_PLAN_STEP_PENDING;
+
+    out->depends_count = 0;
+    hu_json_value_t *deps_val = hu_json_object_get(step_obj, "depends_on");
+    if (deps_val && deps_val->type == HU_JSON_ARRAY) {
+        size_t dn = deps_val->data.array.len;
+        if (dn > HU_PLAN_STEP_MAX_DEPS)
+            dn = HU_PLAN_STEP_MAX_DEPS;
+        for (size_t di = 0; di < dn; di++) {
+            hu_json_value_t *v = deps_val->data.array.items[di];
+            if (v && v->type == HU_JSON_NUMBER && out->depends_count < HU_PLAN_STEP_MAX_DEPS) {
+                double d = v->data.number;
+                if (d >= 0.0 && d <= (double)INT_MAX)
+                    out->depends_on[out->depends_count++] = (int)d;
+            }
+        }
+    } else if (deps_val && deps_val->type == HU_JSON_NUMBER && out->depends_count < HU_PLAN_STEP_MAX_DEPS) {
+        double d = deps_val->data.number;
+        if (d >= 0.0 && d <= (double)INT_MAX)
+            out->depends_on[out->depends_count++] = (int)d;
+    }
 
     return HU_OK;
 }
@@ -150,7 +174,9 @@ bool hu_planner_is_complete(const hu_plan_t *plan) {
     "You are a task planner. Decompose the user's goal into a sequence of tool calls.\n"   \
     "Return ONLY valid JSON with this exact format:\n"                                     \
     "{\"steps\":[{\"tool\":\"tool_name\",\"args\":{...},\"description\":\"what this step " \
-    "does\"}]}\n"                                                                          \
+    "does\",\"depends_on\":[]}]}\n"                                                        \
+    "depends_on is optional ([] or omitted = none); otherwise 0-based indices of prior "   \
+    "steps this step depends on. "                                                         \
     "Available tools: "
 
 #define HU_PLANNER_SYS_SUFFIX "\nKeep plans minimal — fewest steps that accomplish the goal."
@@ -251,12 +277,217 @@ hu_error_t hu_planner_generate(hu_allocator_t *alloc, hu_provider_t *provider, c
 #endif
 }
 
+bool hu_planner_plan_needs_mcts(const hu_plan_t *plan) {
+    if (!plan || plan->steps_count < 5)
+        return false;
+    for (size_t i = 0; i < plan->steps_count; i++) {
+        if (plan->steps[i].depends_count > 0)
+            return true;
+    }
+    return false;
+}
+
+/* Build structured plan JSON from MCTS action strings ("tool: description" or plain text). */
+static hu_error_t planner_create_plan_from_mcts(hu_allocator_t *alloc, const hu_mcts_result_t *mr,
+                                                hu_plan_t **out) {
+    if (!alloc || !mr || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+
+    hu_json_value_t *root = hu_json_object_new(alloc);
+    if (!root)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_json_value_t *steps_arr = hu_json_array_new(alloc);
+    if (!steps_arr) {
+        hu_json_free(alloc, root);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    hu_error_t err = hu_json_object_set(alloc, root, "steps", steps_arr);
+    if (err != HU_OK) {
+        hu_json_free(alloc, steps_arr);
+        hu_json_free(alloc, root);
+        return err;
+    }
+
+    for (size_t ai = 0; ai < mr->action_count; ai++) {
+        const char *action = mr->actions[ai];
+        size_t alen = mr->action_lens[ai];
+        if (!action || alen == 0)
+            continue;
+
+        hu_json_value_t *step_obj = hu_json_object_new(alloc);
+        hu_json_value_t *args_obj = hu_json_object_new(alloc);
+        if (!step_obj || !args_obj) {
+            if (step_obj)
+                hu_json_free(alloc, step_obj);
+            if (args_obj)
+                hu_json_free(alloc, args_obj);
+            hu_json_free(alloc, root);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+
+        const char *colon = memchr(action, ':', alen);
+        hu_json_value_t *tool_val;
+        hu_json_value_t *desc_val;
+
+        if (colon && (size_t)(colon - action) > 0 && (size_t)(colon - action) < 64) {
+            size_t tool_len = (size_t)(colon - action);
+            const char *desc_start = colon + 1;
+            size_t rest = alen - tool_len - 1;
+            if (rest > 0 && desc_start[0] == ' ') {
+                desc_start++;
+                rest--;
+            }
+            tool_val = hu_json_string_new(alloc, action, tool_len);
+            desc_val = hu_json_string_new(alloc, desc_start, rest);
+        } else {
+            size_t desc_clip = alen < 200 ? alen : 200;
+            tool_val = hu_json_string_new(alloc, "shell", 5);
+            desc_val = hu_json_string_new(alloc, action, desc_clip);
+        }
+
+        if (!tool_val || !desc_val) {
+            if (tool_val)
+                hu_json_free(alloc, tool_val);
+            if (desc_val)
+                hu_json_free(alloc, desc_val);
+            hu_json_free(alloc, args_obj);
+            hu_json_free(alloc, step_obj);
+            hu_json_free(alloc, root);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+
+        err = hu_json_object_set(alloc, step_obj, "tool", tool_val);
+        if (err != HU_OK) {
+            hu_json_free(alloc, tool_val);
+            hu_json_free(alloc, desc_val);
+            hu_json_free(alloc, args_obj);
+            hu_json_free(alloc, step_obj);
+            hu_json_free(alloc, root);
+            return err;
+        }
+        err = hu_json_object_set(alloc, step_obj, "args", args_obj);
+        if (err != HU_OK) {
+            hu_json_free(alloc, desc_val);
+            hu_json_free(alloc, step_obj);
+            hu_json_free(alloc, root);
+            return err;
+        }
+        err = hu_json_object_set(alloc, step_obj, "description", desc_val);
+        if (err != HU_OK) {
+            hu_json_free(alloc, step_obj);
+            hu_json_free(alloc, root);
+            return err;
+        }
+        err = hu_json_array_push(alloc, steps_arr, step_obj);
+        if (err != HU_OK) {
+            hu_json_free(alloc, step_obj);
+            hu_json_free(alloc, root);
+            return err;
+        }
+    }
+
+    char *json_str = NULL;
+    size_t json_len = 0;
+    err = hu_json_stringify(alloc, root, &json_str, &json_len);
+    hu_json_free(alloc, root);
+    if (err != HU_OK)
+        return err;
+
+    err = hu_planner_create_plan(alloc, json_str, json_len, out);
+    alloc->free(alloc->ctx, json_str, json_len + 1);
+    return err;
+}
+
+hu_error_t hu_planner_plan_mcts(hu_allocator_t *alloc, hu_provider_t *provider, const char *model,
+                                size_t model_len, const char *goal, size_t goal_len,
+                                const char *const *tool_names, size_t tool_count, hu_plan_t **out) {
+    if (!alloc || !goal || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    if (!provider || !provider->vtable)
+        return hu_planner_generate(alloc, provider, model, model_len, goal, goal_len, tool_names,
+                                   tool_count, out);
+
+    char ctx_buf[512];
+    size_t cp = 0;
+    for (size_t i = 0; i < tool_count && cp + 1 < sizeof(ctx_buf); i++) {
+        if (!tool_names[i])
+            continue;
+        size_t nl = strlen(tool_names[i]);
+        if (cp > 0) {
+            if (cp + 2 >= sizeof(ctx_buf))
+                break;
+            ctx_buf[cp++] = ',';
+            ctx_buf[cp++] = ' ';
+        }
+        if (cp + nl >= sizeof(ctx_buf))
+            break;
+        memcpy(ctx_buf + cp, tool_names[i], nl);
+        cp += nl;
+    }
+    ctx_buf[cp] = '\0';
+
+    hu_mcts_config_t mcfg = hu_mcts_config_default();
+#ifndef HU_IS_TEST
+    mcfg.provider = provider;
+    mcfg.model = model;
+    mcfg.model_len = model_len;
+#endif
+
+    hu_mcts_result_t mr;
+    memset(&mr, 0, sizeof(mr));
+    hu_error_t merr = hu_mcts_plan(alloc, goal, goal_len, ctx_buf, cp, &mcfg, &mr);
+    if (merr != HU_OK || mr.best_action_len == 0) {
+        hu_mcts_result_free_path(alloc, &mr);
+        return hu_planner_generate(alloc, provider, model, model_len, goal, goal_len, tool_names,
+                                   tool_count, out);
+    }
+
+    if (mr.best_value > 0.7 && mr.actions && mr.action_count > 0) {
+        hu_plan_t *direct = NULL;
+        hu_error_t perr = planner_create_plan_from_mcts(alloc, &mr, &direct);
+        if (perr == HU_OK && direct) {
+            hu_mcts_result_free_path(alloc, &mr);
+            *out = direct;
+            return HU_OK;
+        }
+        if (direct)
+            hu_plan_free(alloc, direct);
+    }
+    hu_mcts_result_free_path(alloc, &mr);
+
+    static const char prefix[] = "\n\n[MCTS suggested first focus]: ";
+    const size_t prefix_len = sizeof(prefix) - 1;
+    if (mr.best_action_len > SIZE_MAX - prefix_len || goal_len > SIZE_MAX - prefix_len - mr.best_action_len - 1)
+        return hu_planner_generate(alloc, provider, model, model_len, goal, goal_len, tool_names,
+                                   tool_count, out);
+
+    size_t aug_len = goal_len + prefix_len + mr.best_action_len;
+    size_t aug_cap = aug_len + 1;
+    char *aug = (char *)alloc->alloc(alloc->ctx, aug_cap);
+    if (!aug)
+        return HU_ERR_OUT_OF_MEMORY;
+    memcpy(aug, goal, goal_len);
+    memcpy(aug + goal_len, prefix, prefix_len);
+    memcpy(aug + goal_len + prefix_len, mr.best_action, mr.best_action_len);
+    aug[aug_len] = '\0';
+
+    hu_error_t gerr =
+        hu_planner_generate(alloc, provider, model, model_len, aug, aug_len, tool_names, tool_count, out);
+    alloc->free(alloc->ctx, aug, aug_cap);
+    return gerr;
+}
+
 /* ── Replan after step failure ───────────────────────────────────────────── */
 
 #define HU_REPLAN_SYS_PREFIX                                                          \
     "You are a task planner. A plan step failed. Create a REVISED plan to achieve "   \
     "the remaining goal.\nReturn ONLY valid JSON with this exact format:\n"           \
-    "{\"steps\":[{\"tool\":\"tool_name\",\"args\":{...},\"description\":\"...\"}]}\n" \
+    "{\"steps\":[{\"tool\":\"tool_name\",\"args\":{...},\"description\":\"...\",\""     \
+    "depends_on\":[]}]}\n"                                                            \
+    "depends_on is optional ([] or omitted = none); otherwise 0-based indices of "     \
+    "prior steps. "                                                                   \
     "Available tools: "
 
 #define HU_REPLAN_SYS_SUFFIX "\nKeep plans minimal — fewest steps that accomplish the goal."

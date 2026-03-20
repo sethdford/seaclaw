@@ -97,7 +97,7 @@ hu_error_t hu_orchestrator_decompose_goal(hu_allocator_t *alloc, hu_provider_t *
                                            const char *goal, size_t goal_len,
                                            const hu_agent_capability_t *capabilities,
                                            size_t capability_count,
-                                           hu_decomposition_t *result) {
+                                           struct hu_decomposition *result) {
     if (!alloc || !result)
         return HU_ERR_INVALID_ARGUMENT;
     memset(result, 0, sizeof(*result));
@@ -115,10 +115,10 @@ hu_error_t hu_orchestrator_decompose_goal(hu_allocator_t *alloc, hu_provider_t *
     result->tasks[0].status = HU_TASK_UNASSIGNED;
     result->tasks[0].depends_on = 0;
     result->tasks[0].priority = 1.0;
-    strncpy(result->tasks[0].description, "research the topic",
+    strncpy(result->tasks[0].description, "research",
             sizeof(result->tasks[0].description) - 1);
     result->tasks[0].description[sizeof(result->tasks[0].description) - 1] = '\0';
-    result->tasks[0].description_len = 18;
+    result->tasks[0].description_len = 8;
 
     strncpy(result->capabilities[0], "research", sizeof(result->capabilities[0]) - 1);
     result->capabilities[0][sizeof(result->capabilities[0]) - 1] = '\0';
@@ -126,12 +126,12 @@ hu_error_t hu_orchestrator_decompose_goal(hu_allocator_t *alloc, hu_provider_t *
     result->tasks[1].status = HU_TASK_UNASSIGNED;
     result->tasks[1].depends_on = 1; /* 1 = index of dependency (task 0) */
     result->tasks[1].priority = 1.0;
-    strncpy(result->tasks[1].description, "synthesize findings",
+    strncpy(result->tasks[1].description, "synthesize",
             sizeof(result->tasks[1].description) - 1);
     result->tasks[1].description[sizeof(result->tasks[1].description) - 1] = '\0';
-    result->tasks[1].description_len = 19;
+    result->tasks[1].description_len = 10;
 
-    strncpy(result->capabilities[1], "synthesis", sizeof(result->capabilities[1]) - 1);
+    strncpy(result->capabilities[1], "synthesize", sizeof(result->capabilities[1]) - 1);
     result->capabilities[1][sizeof(result->capabilities[1]) - 1] = '\0';
 
     result->reasoning = hu_strndup(alloc, "Split into research and synthesis phases", 40);
@@ -179,7 +179,12 @@ hu_error_t hu_orchestrator_decompose_goal(hu_allocator_t *alloc, hu_provider_t *
     if (n > 0 && pos + n < (int)prompt_cap)
         pos += n;
 
-    const char *sys = "You are a task decomposition assistant. Output valid JSON only.";
+    const char *sys =
+        "You are a multi-agent orchestration planner. Each listed agent has an id, role, and "
+        "comma-separated skills. Break the user's goal into ordered subtasks. For every subtask, "
+        "set \"capability\" to a short token that matches one agent's role or skills when "
+        "possible, or \"general\". Prefer descriptions that name a concrete tool or actionable "
+        "step sub-agents can run. Reply with JSON only — no markdown, no prose outside the object.";
     char *llm_out = NULL;
     size_t llm_out_len = 0;
 

@@ -59,4 +59,14 @@ hu_error_t hu_context_compact_for_pressure(hu_allocator_t *alloc, hu_owned_messa
                                            size_t *history_count, size_t *history_cap,
                                            size_t max_tokens, float target_pressure);
 
+/* Hierarchical summarization: session (~200 words) → chapter (~100 words) → overall (~50 words).
+ * Each stage uses the provider's chat_with_system (or fixed mocks when HU_IS_TEST).
+ * Caller frees *session_summary, *chapter_summary, *overall_summary. */
+hu_error_t hu_compact_hierarchical(hu_allocator_t *alloc, hu_provider_t *provider,
+                                   const char *model, size_t model_len,
+                                   const char *conversation, size_t conversation_len,
+                                   char **session_summary, size_t *session_len,
+                                   char **chapter_summary, size_t *chapter_len,
+                                   char **overall_summary, size_t *overall_len);
+
 #endif /* HU_AGENT_COMPACTION_H */

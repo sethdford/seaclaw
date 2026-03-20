@@ -1,6 +1,7 @@
 #include "human/context/conversation.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include "human/provider.h"
 #include "human/data/loader.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
@@ -1882,6 +1883,155 @@ hu_emotional_state_t hu_conversation_detect_emotion(const hu_channel_history_ent
     return state;
 }
 
+/* Parse outermost JSON object span (handles ```json fences or leading prose). */
+static bool conversation_json_object_span(const char *s, size_t n, size_t *start_out, size_t *len_out) {
+    size_t start = SIZE_MAX;
+    for (size_t i = 0; i < n; i++) {
+        if (s[i] == '{') {
+            start = i;
+            break;
+        }
+    }
+    if (start == SIZE_MAX)
+        return false;
+    int depth = 0;
+    size_t end = 0;
+    for (size_t i = start; i < n; i++) {
+        if (s[i] == '{')
+            depth++;
+        else if (s[i] == '}') {
+            depth--;
+            if (depth == 0) {
+                end = i + 1;
+                break;
+            }
+        }
+    }
+    if (end <= start)
+        return false;
+    *start_out = start;
+    *len_out = end - start;
+    return true;
+}
+
+static void conversation_map_llm_emotion_label(const char *emotion, hu_emotional_state_t *base) {
+    if (!emotion || !emotion[0])
+        return;
+    if (strcmp(emotion, "happy") == 0 || strcmp(emotion, "excited") == 0 ||
+        strcmp(emotion, "grateful") == 0)
+        base->dominant_emotion = "positive";
+    else if (strcmp(emotion, "sad") == 0 || strcmp(emotion, "hurt") == 0)
+        base->dominant_emotion = "sad";
+    else if (strcmp(emotion, "angry") == 0 || strcmp(emotion, "frustrated") == 0)
+        base->dominant_emotion = "angry";
+    else if (strcmp(emotion, "anxious") == 0)
+        base->dominant_emotion = "anxious";
+    else if (strcmp(emotion, "loving") == 0)
+        base->dominant_emotion = "affectionate";
+    else
+        base->dominant_emotion = "neutral";
+}
+
+hu_emotional_state_t hu_conversation_detect_emotion_llm(
+    hu_allocator_t *alloc, hu_provider_t *provider, const char *model, size_t model_len,
+    const hu_channel_history_entry_t *entries, size_t count) {
+    hu_emotional_state_t base = hu_conversation_detect_emotion(entries, count);
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)alloc;
+    (void)provider;
+    (void)model;
+    (void)model_len;
+    return base;
+#else
+    if (!alloc || !provider || !provider->vtable || !provider->vtable->chat_with_system)
+        return base;
+
+    char context[2048];
+    int cpos = 0;
+    size_t hist_start = count > 5 ? count - 5 : 0;
+    for (size_t i = hist_start; i < count && cpos < 1800; i++) {
+        const char *t = entries[i].text;
+        if (!t || t[0] == '\0')
+            continue;
+        size_t tl = strlen(t);
+        if (tl > 200)
+            tl = 200;
+        const char *role = entries[i].from_me ? "Me" : "Them";
+        int added = snprintf(context + (size_t)cpos, sizeof(context) - (size_t)cpos, "%s: %.*s\n",
+                             role, (int)tl, t);
+        if (added < 0)
+            break;
+        if ((size_t)added >= sizeof(context) - (size_t)cpos) {
+            cpos = (int)(sizeof(context) - 1);
+            break;
+        }
+        cpos += added;
+    }
+    if (cpos == 0)
+        return base;
+
+    static const char sys[] =
+        "Analyze the emotional state of the last message in this conversation. "
+        "Return ONLY valid JSON: "
+        "{\"valence\": -1.0 to 1.0, \"intensity\": 0.0 to 1.0, "
+        "\"emotion\": \"happy|sad|angry|anxious|excited|neutral|grateful|frustrated|loving|hurt\", "
+        "\"concerning\": true/false, "
+        "\"confidence\": 0.0 to 1.0}";
+
+    char *llm_out = NULL;
+    size_t llm_out_len = 0;
+    const char *use_model = model ? model : "";
+    hu_error_t err = provider->vtable->chat_with_system(
+        provider->ctx, alloc, sys, sizeof(sys) - 1, context, (size_t)cpos, use_model, model_len, 0.0,
+        &llm_out, &llm_out_len);
+
+    if (err != HU_OK || !llm_out || llm_out_len == 0) {
+        if (llm_out)
+            alloc->free(alloc->ctx, llm_out, llm_out_len + 1);
+        return base;
+    }
+
+    size_t jstart = 0;
+    size_t jlen = llm_out_len;
+    if (!conversation_json_object_span(llm_out, llm_out_len, &jstart, &jlen)) {
+        jstart = 0;
+        jlen = llm_out_len;
+    }
+
+    hu_json_value_t *json = NULL;
+    hu_error_t jerr = hu_json_parse(alloc, llm_out + jstart, jlen, &json);
+    alloc->free(alloc->ctx, llm_out, llm_out_len + 1);
+    llm_out = NULL;
+
+    if (jerr == HU_OK && json) {
+        double valence = hu_json_get_number(json, "valence", (double)base.valence);
+        double intensity = hu_json_get_number(json, "intensity", (double)base.intensity);
+        const char *emotion = hu_json_get_string(json, "emotion");
+        double confidence = hu_json_get_number(json, "confidence", 0.0);
+
+        if (confidence > 0.5) {
+            if (valence < -1.0)
+                valence = -1.0;
+            if (valence > 1.0)
+                valence = 1.0;
+            if (intensity < 0.0)
+                intensity = 0.0;
+            if (intensity > 2.0)
+                intensity = 2.0;
+            base.valence = (float)valence;
+            base.intensity = (float)intensity;
+            if (emotion && emotion[0])
+                conversation_map_llm_emotion_label(emotion, &base);
+            base.concerning = hu_json_get_bool(json, "concerning", base.concerning);
+        }
+        hu_json_free(alloc, json);
+    }
+
+    return base;
+#endif
+}
+
 /* ── Energy level detection (F13) ─────────────────────────────────────── */
 
 static size_t count_exclamations(const char *msg, size_t msg_len) {
@@ -2915,12 +3065,21 @@ static bool is_split_starter(const char *s, size_t len) {
 
 size_t hu_conversation_split_response(hu_allocator_t *alloc, const char *response,
                                       size_t response_len, hu_message_fragment_t *fragments,
-                                      size_t max_fragments) {
+                                      size_t max_fragments, uint32_t max_chars) {
     if (!alloc || !response || response_len == 0 || !fragments || max_fragments == 0)
         return 0;
 
+    /* Length thresholds scale with max_chars; 0 => ~300-char reference (legacy default). */
+    const uint32_t limit = max_chars != 0 ? max_chars : 300u;
+    const uint64_t base = 300u;
+    const size_t thr_short = (size_t)((40ull * (uint64_t)limit + base - 1ull) / base);
+    const size_t thr_long = (size_t)((80ull * (uint64_t)limit + base - 1ull) / base);
+    const size_t thr_scan = (size_t)((30ull * (uint64_t)limit + base - 1ull) / base);
+    const size_t thr_tail = (size_t)((15ull * (uint64_t)limit + base - 1ull) / base);
+    const size_t thr_rem = (size_t)((10ull * (uint64_t)limit + base - 1ull) / base);
+
     /* Short responses stay as one message */
-    if (response_len < 40 || max_fragments == 1) {
+    if (response_len < thr_short || max_fragments == 1) {
         char *copy = (char *)alloc->alloc(alloc->ctx, response_len + 1);
         if (!copy)
             return 0;
@@ -2956,7 +3115,7 @@ size_t hu_conversation_split_response(hu_allocator_t *alloc, const char *respons
             char prev = response[i - 1];
             if ((prev == '.' || prev == '!' || prev == '?') && response[i] == ' ') {
                 size_t remaining = response_len - (i + 1);
-                if (remaining > 10 && is_split_starter(response + i + 1, remaining)) {
+                if (remaining > thr_rem && is_split_starter(response + i + 1, remaining)) {
                     split_points[split_count++] = i + 1;
                 }
             }
@@ -2964,8 +3123,8 @@ size_t hu_conversation_split_response(hu_allocator_t *alloc, const char *respons
     }
 
     /* If still nothing, split at sentence boundaries for long responses */
-    if (split_count == 0 && response_len > 80) {
-        for (size_t i = 30; i < response_len - 15 && split_count < 3; i++) {
+    if (split_count == 0 && response_len > thr_long) {
+        for (size_t i = thr_scan; i + thr_tail < response_len && split_count < 3; i++) {
             char prev = response[i - 1];
             if ((prev == '.' || prev == '!' || prev == '?') && response[i] == ' ') {
                 split_points[split_count++] = i + 1;

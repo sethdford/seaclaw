@@ -186,6 +186,7 @@ hu_error_t hu_agent_from_config(
         if (ctx_cfg->compact_target > 0.0f)
             out->context_compact_target = ctx_cfg->compact_target;
         out->llm_compiler_enabled = ctx_cfg->llm_compiler_enabled;
+        out->mcts_planner_enabled = ctx_cfg->mcts_planner_enabled;
         out->tool_routing_enabled = ctx_cfg->tool_routing_enabled;
         out->tree_of_thought_enabled = ctx_cfg->tree_of_thought;
         out->constitutional_enabled = ctx_cfg->constitutional_ai;

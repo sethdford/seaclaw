@@ -7,6 +7,7 @@
 #include "human/agent/commitment_store.h"
 #include "human/agent/compaction.h"
 #include "human/agent/dag.h"
+#include "human/agent/dag_executor.h"
 #include "human/agent/dispatcher.h"
 #include "human/agent/input_guard.h"
 #include "human/agent/llm_compiler.h"
@@ -28,6 +29,7 @@
 #include "human/persona/relationship.h"
 #endif
 #include "human/agent/orchestrator.h"
+#include "human/agent/orchestrator_llm.h"
 #include "human/agent/reflection.h"
 #include "human/agent/swarm.h"
 #include "human/skillforge.h"
@@ -56,6 +58,9 @@
 #include "human/intelligence/world_model.h"
 #include "human/experience.h"
 #include "human/agent/goals.h"
+#include "human/memory.h"
+#include "human/memory/contact_graph.h"
+#include <sqlite3.h>
 #endif
 #include "human/agent/constitutional.h"
 #include "human/agent/speculative.h"
@@ -68,6 +73,86 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#if (defined(__unix__) || defined(__APPLE__)) && !defined(HU_IS_TEST)
+#include <pthread.h>
+
+typedef struct dag_parallel_work {
+    hu_agent_t *agent;
+    hu_dag_node_t *node;
+    hu_dag_t *dag;
+} dag_parallel_work_t;
+
+static void *dag_parallel_worker(void *arg) {
+    dag_parallel_work_t *w = (dag_parallel_work_t *)arg;
+    hu_dag_node_t *node = w->node;
+    node->status = HU_DAG_RUNNING;
+
+    char *resolved_args = NULL;
+    size_t resolved_len = 0;
+    const char *use_args = node->args_json;
+    if (node->args_json) {
+        if (hu_dag_resolve_vars(w->agent->alloc, w->dag, node->args_json,
+                strlen(node->args_json), &resolved_args, &resolved_len) == HU_OK && resolved_args)
+            use_args = resolved_args;
+    }
+
+    hu_tool_t *dag_tool = hu_agent_internal_find_tool(
+        w->agent, node->tool_name, node->tool_name ? strlen(node->tool_name) : 0);
+    if (!dag_tool) {
+        node->status = HU_DAG_FAILED;
+        if (resolved_args)
+            w->agent->alloc->free(w->agent->alloc->ctx, resolved_args, resolved_len + 1);
+        return NULL;
+    }
+
+    hu_tool_result_t dag_result = hu_tool_result_fail("invalid", 7);
+    hu_json_value_t *dag_args = NULL;
+    if (use_args) {
+        hu_error_t jerr = hu_json_parse(w->agent->alloc, use_args, strlen(use_args), &dag_args);
+        if (jerr != HU_OK)
+            fprintf(stderr, "[agent_turn] DAG tool args parse failed\n");
+    }
+    if (dag_args && dag_tool->vtable->execute)
+        dag_tool->vtable->execute(dag_tool->ctx, w->agent->alloc, dag_args, &dag_result);
+    if (dag_args)
+        hu_json_free(w->agent->alloc, dag_args);
+    if (resolved_args)
+        w->agent->alloc->free(w->agent->alloc->ctx, resolved_args, resolved_len + 1);
+
+    if (dag_result.success) {
+        node->status = HU_DAG_DONE;
+        if (dag_result.output && dag_result.output_len > 0) {
+            node->result = hu_strndup(w->agent->alloc, dag_result.output, dag_result.output_len);
+            node->result_len = dag_result.output_len;
+        }
+    } else {
+        node->status = HU_DAG_FAILED;
+    }
+    hu_tool_result_free(w->agent->alloc, &dag_result);
+    return NULL;
+}
+#endif
+
+static bool message_looks_multistep_for_orchestrator(const char *m, size_t mlen) {
+    if (!m || mlen < 48)
+        return false;
+    static const char *const needles[] = {
+        " first ", " then ", " finally", " step ", " steps ", "step 1", "step 2",
+        "\n1.", "\n2.", "1) ", "2) ",
+    };
+    for (size_t ni = 0; ni < sizeof(needles) / sizeof(needles[0]); ni++) {
+        const char *n = needles[ni];
+        size_t nl = strlen(n);
+        if (nl > mlen)
+            continue;
+        for (size_t j = 0; j + nl <= mlen; j++) {
+            if (memcmp(m + j, n, nl) == 0)
+                return true;
+        }
+    }
+    return false;
+}
 
 hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, char **response_out,
                          size_t *response_len_out) {
@@ -135,6 +220,24 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     char *plan_ctx = NULL;
     size_t plan_ctx_len = 0;
 #ifndef HU_IS_TEST
+    if (agent->history_count > 0) {
+        size_t scan_n = agent->history_count < 10 ? agent->history_count : 10;
+        for (size_t k = 0; k < scan_n; k++) {
+            size_t hi = agent->history_count - 1 - k;
+            if (agent->history[hi].role != HU_ROLE_SYSTEM || !agent->history[hi].content)
+                continue;
+            const char *hc = agent->history[hi].content;
+            if (strncmp(hc, "[ACTIVE_PLAN]", 13) != 0)
+                continue;
+            if (plan_ctx == NULL) {
+                size_t clen = strlen(hc);
+                plan_ctx = hu_strndup(agent->alloc, hc, clen);
+                if (plan_ctx)
+                    plan_ctx_len = clen;
+            }
+            break;
+        }
+    }
     if (msg_len > 200 && agent->tools_count >= 5 && agent->provider.vtable &&
         agent->provider.vtable->chat) {
         const char *tool_names[32];
@@ -147,6 +250,18 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         if (hu_planner_generate(agent->alloc, &agent->provider, agent->model_name,
                                  agent->model_name_len, msg, msg_len,
                                  tool_names, tn_count, &plan) == HU_OK && plan) {
+            /* MCTS refinement for complex plans */
+            if (agent->mcts_planner_enabled && plan &&
+                hu_planner_plan_needs_mcts(plan)) {
+                hu_plan_t *mcts_plan = NULL;
+                if (hu_planner_plan_mcts(agent->alloc, &agent->provider,
+                                         agent->model_name, agent->model_name_len,
+                                         msg, msg_len, tool_names, tn_count,
+                                         &mcts_plan) == HU_OK && mcts_plan) {
+                    hu_plan_free(agent->alloc, plan);
+                    plan = mcts_plan;
+                }
+            }
             hu_plan_executor_t exec;
             hu_plan_executor_init(&exec, agent->alloc, &agent->provider,
                                   agent->model_name, agent->model_name_len,
@@ -165,6 +280,28 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 if (pn > 0 && (size_t)pn < sizeof(plan_buf)) {
                     plan_ctx = hu_strndup(agent->alloc, plan_buf, (size_t)pn);
                     plan_ctx_len = (size_t)pn;
+                }
+            }
+            if (plan && exec_result.steps_completed < plan->steps_count) {
+                char plan_mem[2048];
+                int pm = snprintf(plan_mem, sizeof(plan_mem),
+                                  "[ACTIVE_PLAN] %zu/%zu steps completed. Remaining: ",
+                                  exec_result.steps_completed, plan->steps_count);
+                for (size_t si = exec_result.steps_completed;
+                     si < plan->steps_count && pm > 0 && (size_t)pm < sizeof(plan_mem) - 128;
+                     si++) {
+                    const char *desc = plan->steps[si].description;
+                    size_t dlen = desc ? strlen(desc) : 0;
+                    if (dlen > 100)
+                        dlen = 100;
+                    int add = snprintf(plan_mem + (size_t)pm, sizeof(plan_mem) - (size_t)pm,
+                                       "\n  Step %zu: %.*s", si + 1, (int)dlen, desc ? desc : "");
+                    if (add > 0)
+                        pm += add;
+                }
+                if (pm > 0 && (size_t)pm < sizeof(plan_mem)) {
+                    (void)hu_agent_internal_append_history(agent, HU_ROLE_SYSTEM, plan_mem,
+                                                            (size_t)pm, NULL, 0, NULL, 0);
                 }
             }
             hu_plan_free(agent->alloc, plan);
@@ -623,6 +760,53 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
             } else if (style_guidance) {
                 agent->alloc->free(agent->alloc->ctx, style_guidance, style_guidance_len + 1);
+            }
+        }
+        /* Cross-channel identity: merge canonical contact id from contact graph into superhuman ctx */
+        if (agent->memory && agent->active_channel && agent->active_channel_len > 0 &&
+            agent->memory_session_id && agent->memory_session_id_len > 0) {
+            sqlite3 *cg_db = hu_sqlite_memory_get_db(agent->memory);
+            if (cg_db) {
+                char plat[64];
+                char handle[256];
+                size_t pl = agent->active_channel_len < sizeof(plat) - 1 ? agent->active_channel_len
+                                                                       : sizeof(plat) - 1;
+                memcpy(plat, agent->active_channel, pl);
+                plat[pl] = '\0';
+                size_t hl = agent->memory_session_id_len < sizeof(handle) - 1
+                                ? agent->memory_session_id_len
+                                : sizeof(handle) - 1;
+                memcpy(handle, agent->memory_session_id, hl);
+                handle[hl] = '\0';
+                char canon[128];
+                if (hu_contact_graph_resolve(cg_db, plat, handle, canon, sizeof(canon)) == HU_OK) {
+                    char line[320];
+                    int nw = snprintf(line, sizeof(line), "Cross-channel identity (canonical): %s", canon);
+                    if (nw > 0 && (size_t)nw < sizeof(line)) {
+                        size_t line_len = (size_t)nw;
+                        if (superhuman_ctx && superhuman_ctx_len > 0) {
+                            size_t merged_len = superhuman_ctx_len + 1 + line_len + 1;
+                            char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, merged_len);
+                            if (merged) {
+                                memcpy(merged, superhuman_ctx, superhuman_ctx_len);
+                                merged[superhuman_ctx_len] = '\n';
+                                memcpy(merged + superhuman_ctx_len + 1, line, line_len);
+                                merged[merged_len - 1] = '\0';
+                                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+                                superhuman_ctx = merged;
+                                superhuman_ctx_len = merged_len;
+                            }
+                        } else {
+                            char *dup = (char *)agent->alloc->alloc(agent->alloc->ctx, line_len + 1);
+                            if (dup) {
+                                memcpy(dup, line, line_len);
+                                dup[line_len] = '\0';
+                                superhuman_ctx = dup;
+                                superhuman_ctx_len = line_len + 1;
+                            }
+                        }
+                    }
+                }
             }
         }
         /* Emotional moments due for check-in (contact-scoped) */
@@ -1328,6 +1512,26 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     if (pref_ctx)
         agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
 
+    /* Inject learned DPO preferences as few-shot examples */
+    if (agent->sota_initialized && agent->dpo_collector.db && system_prompt) {
+        char *dpo_examples = NULL;
+        size_t dpo_len = 0;
+        if (hu_dpo_get_best_examples(&agent->dpo_collector, agent->alloc, 5, &dpo_examples,
+                                     &dpo_len) == HU_OK &&
+            dpo_examples) {
+            size_t new_len = system_prompt_len + dpo_len;
+            char *new_sp = (char *)agent->alloc->realloc(agent->alloc->ctx, system_prompt,
+                                                         system_prompt_len + 1, new_len + 1);
+            if (new_sp) {
+                memcpy(new_sp + system_prompt_len, dpo_examples, dpo_len);
+                new_sp[new_len] = '\0';
+                system_prompt = new_sp;
+                system_prompt_len = new_len;
+            }
+            agent->alloc->free(agent->alloc->ctx, dpo_examples, dpo_len + 1);
+        }
+    }
+
     /* Tool routing: if enabled, select relevant subset of tools for this message */
     hu_tool_selection_t tool_selection;
     memset(&tool_selection, 0, sizeof(tool_selection));
@@ -1427,6 +1631,51 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         if (hu_should_compact(agent->history, agent->history_count, &compact_cfg)) {
             hu_compact_history_llm(agent->alloc, agent->history, &agent->history_count,
                                    &agent->history_cap, &compact_cfg, &agent->provider);
+
+            /* Hierarchical summarization for deeper memory */
+            if (agent->provider.vtable && agent->provider.vtable->chat) {
+                char *session_sum = NULL, *chapter_sum = NULL, *overall_sum = NULL;
+                size_t session_len = 0, chapter_len = 0, overall_len = 0;
+                if (agent->history_count > 0) {
+                    const char *last_content = agent->history[agent->history_count - 1].content;
+                    size_t last_len = last_content ? strlen(last_content) : 0;
+                    if (last_len > 0 &&
+                        hu_compact_hierarchical(agent->alloc, &agent->provider,
+                                                 agent->model_name, agent->model_name_len,
+                                                 last_content, last_len, &session_sum, &session_len,
+                                                 &chapter_sum, &chapter_len, &overall_sum,
+                                                 &overall_len) == HU_OK) {
+#if defined(HU_ENABLE_SQLITE)
+                        if (agent->memory && agent->memory->vtable &&
+                            agent->memory->vtable->store && agent->memory_session_id &&
+                            agent->memory_session_id_len > 0) {
+                            hu_memory_category_t hcat = {.tag = HU_MEMORY_CATEGORY_CONVERSATION};
+                            const char *hsid = agent->memory_session_id;
+                            size_t hsid_len = agent->memory_session_id_len;
+                            static const char src[] = "compaction";
+                            if (session_sum && session_len > 0)
+                                (void)hu_memory_store_with_source(
+                                    agent->memory, "hierarchical_session", 20, session_sum,
+                                    session_len, &hcat, hsid, hsid_len, src, sizeof(src) - 1);
+                            if (chapter_sum && chapter_len > 0)
+                                (void)hu_memory_store_with_source(
+                                    agent->memory, "hierarchical_chapter", 21, chapter_sum,
+                                    chapter_len, &hcat, hsid, hsid_len, src, sizeof(src) - 1);
+                            if (overall_sum && overall_len > 0)
+                                (void)hu_memory_store_with_source(
+                                    agent->memory, "hierarchical_overall", 21, overall_sum,
+                                    overall_len, &hcat, hsid, hsid_len, src, sizeof(src) - 1);
+                        }
+#endif
+                    }
+                    if (session_sum)
+                        agent->alloc->free(agent->alloc->ctx, session_sum, session_len + 1);
+                    if (chapter_sum)
+                        agent->alloc->free(agent->alloc->ctx, chapter_sum, chapter_len + 1);
+                    if (overall_sum)
+                        agent->alloc->free(agent->alloc->ctx, overall_sum, overall_len + 1);
+                }
+            }
         }
 
         /* Context pressure: estimate tokens, check thresholds, auto-compact if needed */
@@ -2270,6 +2519,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         break;
                 }
             } else {
+                bool used_llm_compiler = false;
                 /* LLMCompiler: when enabled, compile tool calls into a DAG for parallel execution.
                  * Note: LLMCompiler is opt-in via config; the existing dispatcher handles
                  * parallelism. */
@@ -2315,40 +2565,70 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                            compiler_resp.content_len,
                                                            &dag) == HU_OK &&
                                 dag.node_count > 0) {
-                                /* Execute DAG: process nodes in dependency order */
+                                /* Execute DAG in dependency batches; parallelize ready nodes (POSIX) */
                                 bool dag_executed = false;
                                 size_t max_dag_iters = dag.node_count * 2;
                                 for (size_t di = 0; di < max_dag_iters && !hu_dag_is_complete(&dag); di++) {
-                                    for (size_t ni = 0; ni < dag.node_count; ni++) {
-                                        hu_dag_node_t *node = &dag.nodes[ni];
-                                        if (node->status != HU_DAG_PENDING)
-                                            continue;
-                                        /* Check all deps are done */
-                                        bool deps_met = true;
-                                        for (size_t d = 0; d < node->dep_count; d++) {
-                                            hu_dag_node_t *dep = hu_dag_find_node(&dag, node->deps[d],
-                                                                                   node->deps[d] ? strlen(node->deps[d]) : 0);
-                                            if (!dep || dep->status != HU_DAG_DONE) {
-                                                deps_met = false;
-                                                break;
-                                            }
+                                    hu_dag_batch_t batch;
+                                    memset(&batch, 0, sizeof(batch));
+                                    if (hu_dag_next_batch(&dag, &batch) != HU_OK || batch.count == 0)
+                                        break;
+#if (defined(__unix__) || defined(__APPLE__)) && !defined(HU_IS_TEST)
+                                    if (batch.count > 1) {
+                                        dag_parallel_work_t works[HU_DAG_MAX_BATCH_SIZE];
+                                        pthread_t tids[HU_DAG_MAX_BATCH_SIZE];
+                                        bool thread_started[HU_DAG_MAX_BATCH_SIZE];
+                                        memset(thread_started, 0, sizeof(thread_started));
+                                        for (size_t bi = 0; bi < batch.count; bi++) {
+                                            works[bi].agent = agent;
+                                            works[bi].node = batch.nodes[bi];
+                                            works[bi].dag = &dag;
+                                            if (pthread_create(&tids[bi], NULL, dag_parallel_worker,
+                                                               &works[bi]) == 0)
+                                                thread_started[bi] = true;
+                                            else
+                                                dag_parallel_worker(&works[bi]);
                                         }
-                                        if (!deps_met)
-                                            continue;
+                                        for (size_t bi = 0; bi < batch.count; bi++) {
+                                            if (thread_started[bi])
+                                                (void)pthread_join(tids[bi], NULL);
+                                        }
+                                        for (size_t bi = 0; bi < batch.count; bi++) {
+                                            if (batch.nodes[bi]->status == HU_DAG_DONE)
+                                                dag_executed = true;
+                                        }
+                                        continue;
+                                    }
+#endif
+                                    for (size_t bi = 0; bi < batch.count; bi++) {
+                                        hu_dag_node_t *node = batch.nodes[bi];
                                         node->status = HU_DAG_RUNNING;
+                                        char *resolved_args = NULL;
+                                        size_t resolved_len = 0;
+                                        const char *use_args = node->args_json;
+                                        if (node->args_json) {
+                                            if (hu_dag_resolve_vars(agent->alloc, &dag,
+                                                    node->args_json, strlen(node->args_json),
+                                                    &resolved_args, &resolved_len) == HU_OK && resolved_args)
+                                                use_args = resolved_args;
+                                        }
                                         hu_tool_t *dag_tool = hu_agent_internal_find_tool(
-                                            agent, node->tool_name, node->tool_name ? strlen(node->tool_name) : 0);
+                                            agent, node->tool_name,
+                                            node->tool_name ? strlen(node->tool_name) : 0);
                                         if (!dag_tool) {
                                             node->status = HU_DAG_FAILED;
+                                            if (resolved_args)
+                                                agent->alloc->free(agent->alloc->ctx, resolved_args,
+                                                                     resolved_len + 1);
                                             continue;
                                         }
                                         hu_tool_result_t dag_result = hu_tool_result_fail("invalid", 7);
                                         hu_json_value_t *dag_args = NULL;
-                                        if (node->args_json) {
-                                            hu_error_t jerr = hu_json_parse(agent->alloc, node->args_json,
-                                                              strlen(node->args_json), &dag_args);
+                                        if (use_args) {
+                                            hu_error_t jerr = hu_json_parse(agent->alloc, use_args,
+                                                              strlen(use_args), &dag_args);
                                             if (jerr != HU_OK)
-                                                fprintf(stderr, "[agent_turn] tool args JSON parse failed\n");
+                                                fprintf(stderr, "[agent_turn] DAG tool args parse failed\n");
                                         }
                                         if (dag_args && dag_tool->vtable->execute) {
                                             dag_tool->vtable->execute(dag_tool->ctx, agent->alloc,
@@ -2356,8 +2636,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         }
                                         if (dag_args)
                                             hu_json_free(agent->alloc, dag_args);
+                                        if (resolved_args)
+                                            agent->alloc->free(agent->alloc->ctx, resolved_args,
+                                                                 resolved_len + 1);
                                         if (dag_result.success) {
                                             node->status = HU_DAG_DONE;
+                                            dag_executed = true;
                                             if (dag_result.output && dag_result.output_len > 0) {
                                                 node->result = hu_strndup(agent->alloc, dag_result.output,
                                                                           dag_result.output_len);
@@ -2367,10 +2651,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                             node->status = HU_DAG_FAILED;
                                         }
                                         hu_tool_result_free(agent->alloc, &dag_result);
-                                        dag_executed = true;
                                     }
                                 }
                                 if (dag_executed) {
+                                    used_llm_compiler = true;
                                     hu_observer_event_t ev = {
                                         .tag = HU_OBSERVER_EVENT_TOOL_CALL, .data = {{0}}};
                                     ev.data.tool_call.tool = "llm_compiler";
@@ -2397,35 +2681,63 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     }
                 }
 #endif
-                /* Multi-agent orchestrator: when enabled with 2+ independent tool calls and
-                 * registered agents, delegate subtasks via the orchestrator. Results are merged
-                 * and appended as tool results before falling through to the normal path. */
-                if (agent->multi_agent_enabled && tc_count >= 2 && agent->agent_registry) {
+                /* Multi-agent orchestrator: decompose the user goal with the LLM when possible,
+                 * then assign to registry agents; otherwise split on tool-call names. Consensus
+                 * merge prefers the longest agreeing sub-agent output. */
+                if (agent->multi_agent_enabled && agent->agent_registry &&
+                    (tc_count >= 2 ||
+                     (tc_count >= 1 && message_looks_multistep_for_orchestrator(msg, msg_len)))) {
                     hu_orchestrator_t orch;
                     if (hu_orchestrator_create(agent->alloc, &orch) == HU_OK) {
                         hu_orchestrator_load_from_registry(&orch, agent->agent_registry);
                         if (orch.agent_count > 0) {
-                            const char *subtask_descs[HU_ORCHESTRATOR_MAX_TASKS];
-                            size_t subtask_lens[HU_ORCHESTRATOR_MAX_TASKS];
-                            size_t sub_n = tc_count < HU_ORCHESTRATOR_MAX_TASKS
-                                               ? tc_count : HU_ORCHESTRATOR_MAX_TASKS;
-                            for (size_t s = 0; s < sub_n; s++) {
-                                subtask_descs[s] = calls[s].name;
-                                subtask_lens[s] = calls[s].name_len;
-                            }
-                            hu_orchestrator_propose_split(&orch, msg, msg_len,
-                                                          subtask_descs, subtask_lens, sub_n);
-                            for (size_t s = 0; s < orch.task_count && s < sub_n; s++) {
-                                if (orch.agents[s % orch.agent_count].agent_id_len > 0) {
-                                    hu_orchestrator_assign_task(
-                                        &orch, orch.tasks[s].id,
-                                        orch.agents[s % orch.agent_count].agent_id,
-                                        orch.agents[s % orch.agent_count].agent_id_len);
+                            bool have_plan = false;
+                            if (agent->provider.vtable && agent->provider.vtable->chat_with_system &&
+                                (tc_count >= 2 ||
+                                 message_looks_multistep_for_orchestrator(msg, msg_len))) {
+                                hu_decomposition_t decomp;
+                                memset(&decomp, 0, sizeof(decomp));
+                                hu_error_t derr = hu_orchestrator_decompose_goal(
+                                    agent->alloc, &agent->provider, agent->model_name,
+                                    agent->model_name_len, msg, msg_len, orch.agents,
+                                    orch.agent_count, &decomp);
+                                if (derr == HU_OK && decomp.task_count > 0) {
+                                    hu_error_t aerr = hu_orchestrator_auto_assign(&orch, &decomp);
+                                    if (aerr == HU_OK)
+                                        have_plan = true;
                                 }
+                                hu_decomposition_free(agent->alloc, &decomp);
                             }
+                            if (!have_plan && tc_count >= 2) {
+                                const char *subtask_descs[HU_ORCHESTRATOR_MAX_TASKS];
+                                size_t subtask_lens[HU_ORCHESTRATOR_MAX_TASKS];
+                                size_t sub_n = tc_count < HU_ORCHESTRATOR_MAX_TASKS
+                                                   ? tc_count : HU_ORCHESTRATOR_MAX_TASKS;
+                                for (size_t s = 0; s < sub_n; s++) {
+                                    subtask_descs[s] = calls[s].name;
+                                    subtask_lens[s] = calls[s].name_len;
+                                }
+                                hu_orchestrator_propose_split(&orch, msg, msg_len, subtask_descs,
+                                                              subtask_lens, sub_n);
+                                for (size_t s = 0; s < orch.task_count && s < sub_n; s++) {
+                                    if (orch.agents[s % orch.agent_count].agent_id_len > 0) {
+                                        hu_orchestrator_assign_task(
+                                            &orch, orch.tasks[s].id,
+                                            orch.agents[s % orch.agent_count].agent_id,
+                                            orch.agents[s % orch.agent_count].agent_id_len);
+                                    }
+                                }
+                                have_plan = orch.task_count > 0;
+                            }
+                            if (have_plan) {
                             /* Use swarm for parallel execution when multiple tasks are assigned */
                             if (orch.task_count >= 2) {
                                 hu_swarm_config_t swarm_cfg = hu_swarm_config_default();
+                                swarm_cfg.provider = &agent->provider;
+                                swarm_cfg.model = agent->model_name;
+                                swarm_cfg.model_len = agent->model_name_len;
+                                swarm_cfg.tools = agent->tools;
+                                swarm_cfg.tools_count = agent->tools_count;
                                 hu_swarm_task_t swarm_tasks[HU_ORCHESTRATOR_MAX_TASKS];
                                 memset(swarm_tasks, 0, sizeof(swarm_tasks));
                                 size_t swarm_n = 0;
@@ -2518,7 +2830,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             /* Merge and append orchestrated results */
                             char *merged = NULL;
                             size_t merged_len = 0;
-                            if (hu_orchestrator_merge_results(&orch, agent->alloc, &merged, &merged_len) == HU_OK &&
+                            if (hu_orchestrator_merge_results_consensus(&orch, agent->alloc, &merged,
+                                                                        &merged_len) == HU_OK &&
                                 merged && merged_len > 0) {
                                 hu_error_t hist_err = hu_agent_internal_append_history(
                                     agent, HU_ROLE_TOOL, merged, merged_len,
@@ -2533,11 +2846,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             ev.data.tool_call.duration_ms = 0;
                             ev.data.tool_call.success = hu_orchestrator_all_complete(&orch);
                             HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
+                            }
                         }
                         hu_orchestrator_deinit(&orch);
                     }
                 }
 
+                if (!used_llm_compiler) {
                 /* Use dispatcher for parallel execution when enabled (Tier 1.3) */
                 hu_dispatcher_t dispatcher;
                 hu_dispatcher_default(&dispatcher);
@@ -2894,6 +3209,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         if (agent->cancel_requested)
                             break;
                     }
+                }
                 }
             }
         }
