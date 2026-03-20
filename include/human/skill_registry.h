@@ -40,6 +40,14 @@ void hu_skill_registry_entries_free(hu_allocator_t *alloc, hu_skill_registry_ent
 hu_error_t hu_skill_registry_install(hu_allocator_t *alloc, const char *source_path);
 
 /**
+ * Install a skill from the remote registry by exact name. Resolves the entry URL,
+ * fetches <name>.skill.json and optional SKILL.md from raw.githubusercontent.com,
+ * and writes ~/.human/skills/<name>/manifest.json (+ SKILL.md when present).
+ * Under HU_IS_TEST, validates arguments and returns HU_OK without network.
+ */
+hu_error_t hu_skill_registry_install_by_name(hu_allocator_t *alloc, const char *name);
+
+/**
  * Uninstall (remove) an installed skill from disk.
  * Removes ~/.human/skills/<name>/ and ~/.human/skills/<name>.skill.json.
  * Under HU_IS_TEST, returns HU_OK without filesystem.

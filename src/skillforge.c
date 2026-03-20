@@ -6,13 +6,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #ifndef _WIN32
 #include <dirent.h>
-#include <sys/stat.h>
 #endif
 
 #define HU_SKILLFORGE_INIT_CAP 8
+#define HU_SKILLFORGE_FILE_MAX 65536
+#define HU_SKILLFORGE_FRONTMATTER_SCAN 4096
 
 static void skill_free(hu_allocator_t *a, hu_skill_t *s) {
     if (!a || !s)
@@ -25,11 +27,17 @@ static void skill_free(hu_allocator_t *a, hu_skill_t *s) {
         a->free(a->ctx, s->command, strlen(s->command) + 1);
     if (s->parameters)
         a->free(a->ctx, s->parameters, strlen(s->parameters) + 1);
-    s->name = s->description = s->command = s->parameters = NULL;
+    if (s->skill_dir)
+        a->free(a->ctx, s->skill_dir, strlen(s->skill_dir) + 1);
+    if (s->instructions_path)
+        a->free(a->ctx, s->instructions_path, strlen(s->instructions_path) + 1);
+    s->name = s->description = s->command = s->parameters = s->skill_dir = s->instructions_path =
+        NULL;
 }
 
 static hu_error_t skill_add(hu_skillforge_t *sf, const char *name, const char *desc,
-                            const char *command, const char *params, bool enabled) {
+                            const char *command, const char *params, bool enabled,
+                            const char *skill_dir, const char *instructions_path) {
     if (sf->skills_len >= sf->skills_cap) {
         size_t new_cap = sf->skills_cap ? sf->skills_cap * 2 : HU_SKILLFORGE_INIT_CAP;
         hu_skill_t *n = (hu_skill_t *)sf->alloc->realloc(sf->alloc->ctx, sf->skills,
@@ -45,8 +53,12 @@ static hu_error_t skill_add(hu_skillforge_t *sf, const char *name, const char *d
     s->description = desc ? hu_strdup(sf->alloc, desc) : hu_strdup(sf->alloc, "");
     s->command = command ? hu_strdup(sf->alloc, command) : NULL;
     s->parameters = params ? hu_strdup(sf->alloc, params) : NULL;
+    s->skill_dir = skill_dir ? hu_strdup(sf->alloc, skill_dir) : NULL;
+    s->instructions_path =
+        instructions_path ? hu_strdup(sf->alloc, instructions_path) : NULL;
     s->enabled = enabled;
-    if (!s->name || !s->description) {
+    if (!s->name || !s->description || (skill_dir && !s->skill_dir) ||
+        (instructions_path && !s->instructions_path)) {
         skill_free(sf->alloc, s);
         return HU_ERR_OUT_OF_MEMORY;
     }
@@ -112,15 +124,163 @@ static hu_error_t parse_skill_json(hu_allocator_t *alloc, const char *json, size
 }
 #endif
 
+static int skillforge_resource_name_ok(const char *name) {
+    if (!name || !name[0])
+        return 0;
+    if (strchr(name, '/') || strchr(name, '\\') || strstr(name, ".."))
+        return 0;
+    return 1;
+}
+
 #if !defined(HU_IS_TEST)
-static hu_error_t load_skill_file(hu_skillforge_t *sf, const char *path) {
+
+static hu_error_t read_file_capped(hu_allocator_t *alloc, const char *path, size_t max_bytes,
+                                   char **out_buf, size_t *out_len) {
     FILE *f = fopen(path, "rb");
     if (!f)
         return HU_ERR_IO;
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
     fseek(f, 0, SEEK_SET);
-    if (sz <= 0 || sz > 65536) {
+    if (sz < 0 || (size_t)sz > max_bytes) {
+        fclose(f);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    char *buf = (char *)alloc->alloc(alloc->ctx, (size_t)sz + 1);
+    if (!buf) {
+        fclose(f);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    size_t nr = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    buf[nr] = '\0';
+    *out_buf = buf;
+    *out_len = nr;
+    return HU_OK;
+}
+
+static char *skill_md_body_after_frontmatter(hu_allocator_t *alloc, const char *data, size_t len,
+                                             size_t *body_len) {
+    if (len < 4 || data[0] != '-' || data[1] != '-' || data[2] != '-')
+        goto whole_file;
+    size_t pos = 3;
+    if (pos < len && data[pos] == '\r')
+        pos++;
+    if (pos < len && data[pos] == '\n')
+        pos++;
+    while (pos < len) {
+        size_t line_start = pos;
+        if (line_start + 2 < len && data[line_start] == '-' && data[line_start + 1] == '-' &&
+            data[line_start + 2] == '-') {
+            size_t after = line_start + 3;
+            if (after >= len || data[after] == '\n' || data[after] == '\r') {
+                if (after < len && data[after] == '\r')
+                    after++;
+                if (after < len && data[after] == '\n')
+                    after++;
+                while (after < len &&
+                       (data[after] == ' ' || data[after] == '\t' || data[after] == '\r' ||
+                        data[after] == '\n'))
+                    after++;
+                *body_len = len - after;
+                return hu_strndup(alloc, data + after, *body_len);
+            }
+        }
+        while (pos < len && data[pos] != '\n')
+            pos++;
+        if (pos < len)
+            pos++;
+    }
+whole_file:
+    *body_len = len;
+    return hu_strndup(alloc, data, len);
+}
+
+static void trim_line_value(const char *start, const char *end, char *dst, size_t dst_cap) {
+    const char *v = start;
+    while (v < end && (*v == ' ' || *v == '\t'))
+        v++;
+    const char *e = end;
+    while (e > v && (e[-1] == '\r' || e[-1] == ' ' || e[-1] == '\t'))
+        e--;
+    size_t n = (size_t)(e - v);
+    if (n >= dst_cap)
+        n = dst_cap - 1;
+    memcpy(dst, v, n);
+    dst[n] = '\0';
+    if (n >= 2 && ((dst[0] == '"' && dst[n - 1] == '"') || (dst[0] == '\'' && dst[n - 1] == '\''))) {
+        dst[n - 1] = '\0';
+        memmove(dst, dst + 1, n - 1);
+    }
+}
+
+static void skill_md_apply_frontmatter(hu_allocator_t *alloc, const char *path, char **name,
+                                       char **desc) {
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return;
+    char buf[HU_SKILLFORGE_FRONTMATTER_SCAN];
+    size_t nr = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    buf[nr] = '\0';
+    if (nr < 4 || buf[0] != '-' || buf[1] != '-' || buf[2] != '-')
+        return;
+
+    char *close = strstr(buf + 3, "\n---");
+    if (!close)
+        close = strstr(buf + 3, "\r\n---");
+    if (!close)
+        return;
+    *close = '\0';
+
+    char *p = buf + 3;
+    while (*p == '\n' || *p == '\r')
+        p++;
+
+    char new_name[256];
+    char new_desc[512];
+    new_name[0] = new_desc[0] = '\0';
+
+    while (*p) {
+        char *nl = strchr(p, '\n');
+        if (!nl)
+            nl = p + strlen(p);
+        if ((size_t)(nl - p) >= 5 && strncmp(p, "name:", 5) == 0)
+            trim_line_value(p + 5, nl, new_name, sizeof(new_name));
+        else if ((size_t)(nl - p) >= 12 && strncmp(p, "description:", 12) == 0)
+            trim_line_value(p + 12, nl, new_desc, sizeof(new_desc));
+        if (*nl)
+            p = nl + 1;
+        else
+            break;
+    }
+
+    if (new_name[0]) {
+        char *dup = hu_strdup(alloc, new_name);
+        if (dup) {
+            alloc->free(alloc->ctx, *name, strlen(*name) + 1);
+            *name = dup;
+        }
+    }
+    if (new_desc[0]) {
+        char *dup = hu_strdup(alloc, new_desc);
+        if (dup) {
+            alloc->free(alloc->ctx, *desc, strlen(*desc) + 1);
+            *desc = dup;
+        }
+    }
+}
+
+static hu_error_t load_skill_file(hu_skillforge_t *sf, const char *json_path,
+                                  const char *skill_dir_for_resources,
+                                  const char *skill_md_path) {
+    FILE *f = fopen(json_path, "rb");
+    if (!f)
+        return HU_ERR_IO;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz <= 0 || (size_t)sz > HU_SKILLFORGE_FILE_MAX) {
         fclose(f);
         return HU_ERR_INVALID_ARGUMENT;
     }
@@ -150,7 +310,17 @@ static hu_error_t load_skill_file(hu_skillforge_t *sf, const char *path) {
         return err;
     }
 
-    hu_error_t add_err = skill_add(sf, name, desc, command, params, enabled);
+    const char *instr_path_arg = NULL;
+    if (skill_md_path && skill_md_path[0]) {
+        struct stat st_md;
+        if (stat(skill_md_path, &st_md) == 0 && S_ISREG(st_md.st_mode)) {
+            skill_md_apply_frontmatter(sf->alloc, skill_md_path, &name, &desc);
+            instr_path_arg = skill_md_path;
+        }
+    }
+
+    hu_error_t add_err =
+        skill_add(sf, name, desc, command, params, enabled, skill_dir_for_resources, instr_path_arg);
     if (add_err != HU_OK)
         fprintf(stderr, "[skillforge] failed to add skill from disk: %d\n", add_err);
     sf->alloc->free(sf->alloc->ctx, name, strlen(name) + 1);
@@ -174,22 +344,43 @@ static hu_error_t discover_from_dir(hu_skillforge_t *sf, const char *dir_path) {
             continue;
         size_t nlen = strlen(e->d_name);
 
-        /* *.skill.json — flat files */
+        /* *.skill.json — flat files; optional stem/SKILL.md */
         if (nlen >= 12 && strcmp(e->d_name + nlen - 11, ".skill.json") == 0) {
             char path[1024];
             int plen = snprintf(path, sizeof(path), "%s/%s", dir_path, e->d_name);
-            if (plen > 0 && (size_t)plen < sizeof(path))
-                load_skill_file(sf, path);
+            if (plen > 0 && (size_t)plen < sizeof(path)) {
+                size_t stem_len = nlen - 11;
+                char skill_md_path[1024];
+                int mdlen = -1;
+                if (stem_len > 0)
+                    mdlen = snprintf(skill_md_path, sizeof(skill_md_path), "%s/%.*s/SKILL.md",
+                                     dir_path, (int)stem_len, e->d_name);
+                if (mdlen > 0 && (size_t)mdlen < sizeof(skill_md_path))
+                    load_skill_file(sf, path, NULL, skill_md_path);
+                else
+                    load_skill_file(sf, path, NULL, NULL);
+            }
             continue;
         }
 
-        /* subdirectory/manifest.json — skill_write format */
+        /* subdirectory/manifest.json — skill_write format + SKILL.md */
         char subpath[1024];
         int n = snprintf(subpath, sizeof(subpath), "%s/%s/manifest.json", dir_path, e->d_name);
         if (n > 0 && (size_t)n < sizeof(subpath)) {
             struct stat st;
-            if (stat(subpath, &st) == 0 && S_ISREG(st.st_mode))
-                load_skill_file(sf, subpath);
+            if (stat(subpath, &st) == 0 && S_ISREG(st.st_mode)) {
+                char skill_dir_buf[1024];
+                int sdlen = snprintf(skill_dir_buf, sizeof(skill_dir_buf), "%s/%s", dir_path,
+                                     e->d_name);
+                char skill_md_path[1024];
+                int mdlen = snprintf(skill_md_path, sizeof(skill_md_path), "%s/%s/SKILL.md",
+                                     dir_path, e->d_name);
+                if (sdlen > 0 && (size_t)sdlen < sizeof(skill_dir_buf) && mdlen > 0 &&
+                    (size_t)mdlen < sizeof(skill_md_path))
+                    load_skill_file(sf, subpath, skill_dir_buf, skill_md_path);
+                else
+                    load_skill_file(sf, subpath, NULL, NULL);
+            }
         }
     }
     closedir(d);
@@ -204,14 +395,20 @@ static hu_error_t discover_from_dir(hu_skillforge_t *sf, const char *dir_path) {
 #ifdef HU_IS_TEST
 static hu_error_t discover_test_data(hu_skillforge_t *sf) {
     hu_error_t err;
-    err = skill_add(sf, "test-skill", "A test skill for unit tests", "echo test", "{}", true);
+    err = skill_add(sf, "test-skill", "A test skill for unit tests", "echo test", "{}", true, NULL,
+                    NULL);
     if (err != HU_OK)
         return err;
-    err = skill_add(sf, "another-skill", "Another test skill", NULL, NULL, false);
+    err = skill_add(sf, "another-skill", "Another test skill", NULL, NULL, false, NULL, NULL);
     if (err != HU_OK)
         return err;
     err = skill_add(sf, "cli-helper", "CLI helper skill", "human help",
-                    "{\"prompt\": \"string\"}", true);
+                    "{\"prompt\": \"string\"}", true, NULL, NULL);
+    if (err != HU_OK)
+        return err;
+    err =
+        skill_add(sf, "skill-md-mock", "Short catalog desc for mock SKILL.md", NULL, NULL, true,
+                  "/mock/skill-dir", HU_SKILLFORGE_TEST_INSTRUCTIONS_PATH);
     if (err != HU_OK)
         return err;
     return HU_OK;
@@ -286,6 +483,113 @@ hu_error_t hu_skillforge_disable(hu_skillforge_t *sf, const char *name) {
     return HU_OK;
 }
 
+hu_error_t hu_skillforge_load_instructions(hu_allocator_t *alloc, const hu_skill_t *skill,
+                                           char **out_instructions, size_t *out_len) {
+    if (!alloc || !skill || !out_instructions)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_instructions = NULL;
+    if (out_len)
+        *out_len = 0;
+
+#ifdef HU_IS_TEST
+    if (skill->instructions_path &&
+        strcmp(skill->instructions_path, HU_SKILLFORGE_TEST_INSTRUCTIONS_PATH) == 0) {
+        static const char k_mock[] =
+            "# Mock SKILL.md\n\nFull instruction body for tests.\n## Step\nDo the thing.\n";
+        *out_instructions = hu_strdup(alloc, k_mock);
+        if (!*out_instructions)
+            return HU_ERR_OUT_OF_MEMORY;
+        if (out_len)
+            *out_len = strlen(*out_instructions);
+        return HU_OK;
+    }
+    const char *fb = skill->description ? skill->description : "";
+    *out_instructions = hu_strdup(alloc, fb);
+    if (!*out_instructions)
+        return HU_ERR_OUT_OF_MEMORY;
+    if (out_len)
+        *out_len = strlen(*out_instructions);
+    return HU_OK;
+#else
+    if (skill->instructions_path && skill->instructions_path[0]) {
+        char *raw = NULL;
+        size_t raw_len = 0;
+        hu_error_t rerr =
+            read_file_capped(alloc, skill->instructions_path, HU_SKILLFORGE_FILE_MAX, &raw, &raw_len);
+        if (rerr == HU_OK && raw) {
+            size_t body_len = 0;
+            char *body = skill_md_body_after_frontmatter(alloc, raw, raw_len, &body_len);
+            alloc->free(alloc->ctx, raw, raw_len + 1);
+            if (!body) {
+                const char *fb = skill->description ? skill->description : "";
+                *out_instructions = hu_strdup(alloc, fb);
+            } else {
+                *out_instructions = body;
+                body_len = strlen(body);
+            }
+            if (!*out_instructions)
+                return HU_ERR_OUT_OF_MEMORY;
+            if (out_len)
+                *out_len = strlen(*out_instructions);
+            return HU_OK;
+        }
+    }
+    const char *fb = skill->description ? skill->description : "";
+    if (!fb[0]) {
+        char *empty = (char *)alloc->alloc(alloc->ctx, 1);
+        if (!empty)
+            return HU_ERR_OUT_OF_MEMORY;
+        empty[0] = '\0';
+        *out_instructions = empty;
+        if (out_len)
+            *out_len = 0;
+        return HU_OK;
+    }
+    *out_instructions = hu_strdup(alloc, fb);
+    if (!*out_instructions)
+        return HU_ERR_OUT_OF_MEMORY;
+    if (out_len)
+        *out_len = strlen(*out_instructions);
+    return HU_OK;
+#endif
+}
+
+hu_error_t hu_skillforge_read_resource(hu_allocator_t *alloc, const hu_skill_t *skill,
+                                       const char *resource_name, char **out_content, size_t *out_len) {
+    if (!alloc || !skill || !resource_name || !out_content)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_content = NULL;
+    size_t len_store = 0;
+    size_t *len_out = out_len ? out_len : &len_store;
+    *len_out = 0;
+    if (!skillforge_resource_name_ok(resource_name))
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!skill->skill_dir || !skill->skill_dir[0])
+        return HU_ERR_INVALID_ARGUMENT;
+
+#ifdef HU_IS_TEST
+    if (strcmp(resource_name, "fixture.txt") == 0) {
+        static const char k_fix[] = "fixture resource body\n";
+        *out_content = hu_strdup(alloc, k_fix);
+        if (!*out_content)
+            return HU_ERR_OUT_OF_MEMORY;
+        *len_out = strlen(*out_content);
+        return HU_OK;
+    }
+    (void)skill;
+    return HU_ERR_NOT_FOUND;
+#else
+    char path[1024];
+    int n = snprintf(path, sizeof(path), "%s/%s", skill->skill_dir, resource_name);
+    if (n <= 0 || (size_t)n >= sizeof(path))
+        return HU_ERR_INVALID_ARGUMENT;
+    struct stat st;
+    if (stat(path, &st) != 0 || !S_ISREG(st.st_mode))
+        return HU_ERR_NOT_FOUND;
+    return read_file_capped(alloc, path, HU_SKILLFORGE_FILE_MAX, out_content, len_out);
+#endif
+}
+
 hu_error_t hu_skillforge_execute(hu_allocator_t *alloc, const hu_skillforge_t *sf, const char *name,
                                  char **out_instructions) {
     if (!alloc || !sf || !name || !out_instructions)
@@ -294,18 +598,8 @@ hu_error_t hu_skillforge_execute(hu_allocator_t *alloc, const hu_skillforge_t *s
     hu_skill_t *s = hu_skillforge_get_skill(sf, name);
     if (!s)
         return HU_ERR_NOT_FOUND;
-    if (!s->description || !s->description[0]) {
-        char *empty = (char *)alloc->alloc(alloc->ctx, 1);
-        if (!empty)
-            return HU_ERR_OUT_OF_MEMORY;
-        empty[0] = '\0';
-        *out_instructions = empty;
-        return HU_OK;
-    }
-    *out_instructions = hu_strdup(alloc, s->description);
-    if (!*out_instructions)
-        return HU_ERR_OUT_OF_MEMORY;
-    return HU_OK;
+    size_t ignore = 0;
+    return hu_skillforge_load_instructions(alloc, s, out_instructions, &ignore);
 }
 
 hu_error_t hu_skillforge_install(const char *name, const char *url) {

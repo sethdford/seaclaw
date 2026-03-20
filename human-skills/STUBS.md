@@ -1,6 +1,6 @@
 # Human — Project Status
 
-Last updated: 2026-03-19
+Last updated: 2026-03-20
 
 ## Summary
 
@@ -8,8 +8,8 @@ Last updated: 2026-03-19
 | ------------------------------ | ------------------------ |
 | Source files (src/ + include/) | **1,054**                |
 | Lines of C/H code              | **~192K**                |
-| Test files                     | 273                      |
-| Tests passing                  | **5,879+/5,879+ (100%)** |
+| Test files                     | 290                      |
+| Tests passing                  | **6006+/6006+ (100%)**   |
 | Binary size (MinSizeRel+LTO)   | **~1696 KB (all flags)** |
 | Cold start (--version)         | **4–27 ms avg**          |
 | Peak RSS (--version)           | **~5.7 MB**              |
@@ -117,15 +117,15 @@ Previously stubbed, now **real**:
 | OpenSSL            | Optional (ON)  | WSS, TLS for WebSocket            |
 | math (-lm)         | Linked         | Vector math, retrieval algorithms |
 
-## Audit (2026-03-09)
+## Audit (2026-03-20)
 
 Source file counts verified against `src/` and `include/`:
 
 | Category         | Files | Notes                                                                                                                                                                                                                                                                                                    |
 | ---------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Providers        | 20    | anthropic, claude_cli, codex_cli, compatible, gemini, ollama, openai, openai_codex, openrouter, reliable, router + factory/helpers                                                                                                                                                                       |
-| Channels         | 35    | cli, web, discord, mattermost, google_chat, google_rcs, dingtalk, irc, email, teams, slack, onebot, matrix, whatsapp, nostr, imessage, instagram, line, signal, telegram, maixcam, qq, lark, twilio, dispatch, thread_binding, facebook, tiktok, twitter, mqtt, voice_channel, gmail, gmail_base64, imap |
-| Tools            | 68    | 58 tool impls + factory + 9 web_search_providers (exa, brave, etc.)                                                                                                                                                                                                                                      |
+| Channels         | 38    | 38 channels (project catalog; README/AGENTS); **39** `.c` files under `src/channels/` (incl. `format.c`, `meta_common.c`, `gmail_base64.c`, `dispatch`, `thread_binding`, `pwa`, `tiktok`, voice split modules)                                                                                         |
+| Tools            | 85    | 85 tools registered in `src/tools/factory.c` (full build); 79 `.c` modules under `src/tools/` + factory + web_search provider bundle                                                                                                                                                                    |
 | Memory engines   | 10    | none, markdown, memory_lru, sqlite, postgres, api, redis, lucid, lancedb, registry                                                                                                                                                                                                                       |
 | Peripherals      | 4     | arduino, stm32, rpi, factory                                                                                                                                                                                                                                                                             |
 | Runtime adapters | 5     | native, docker, cloudflare, wasm_rt, factory                                                                                                                                                                                                                                                             |

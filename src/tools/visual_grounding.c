@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(HU_IS_TEST) && HU_IS_TEST
+static const char k_hu_vg_mock_selector[] = "#mock-grounded-button";
+#endif
+
 hu_error_t hu_visual_ground_action(hu_allocator_t *alloc, hu_provider_t *provider,
                                  const char *model, size_t model_len,
                                  const char *screenshot_path, size_t path_len,
@@ -19,11 +23,15 @@ hu_error_t hu_visual_ground_action(hu_allocator_t *alloc, hu_provider_t *provide
     (void)provider;
     (void)model;
     (void)model_len;
-    *out_x = 512.0;
-    *out_y = 384.0;
-    if (out_selector)
-        *out_selector = NULL;
-    if (out_selector_len)
+    *out_x = 100.0;
+    *out_y = 200.0;
+    if (out_selector) {
+        size_t sl = sizeof(k_hu_vg_mock_selector) - 1;
+        char *dup = hu_strndup(alloc, k_hu_vg_mock_selector, sl);
+        *out_selector = dup;
+        if (out_selector_len)
+            *out_selector_len = dup ? sl : 0;
+    } else if (out_selector_len)
         *out_selector_len = 0;
     return HU_OK;
 #else

@@ -1,12 +1,24 @@
+---
+name: email-digest
+description: Daily email digest with priority sorting and action items
+---
+
 # Email Digest
 
-Summarize and prioritize unread emails into a concise daily digest.
+Turn a noisy inbox into a scannable digest with priorities and next actions. Respect privacy: summarize without leaking full message bodies where inappropriate; honor user redaction rules.
 
-## Usage
+Surface deadlines, questions directed at the user, and threads awaiting reply.
 
-Invoke with `human skills run email-digest` or configure as a cron job.
+## When to Use
+- Daily stand-down, morning planning, or catch-up after time off
 
-## Parameters
+## Workflow
+1. Fetch or accept exported thread list; dedupe by conversation id.
+2. Classify: FYI, needs reply, blocked, calendar-related, newsletters/low priority.
+3. Cap items per section; put **Action** bullets with who/when when known.
+4. Link or reference subjects only; avoid pasting secrets or OTPs.
 
-- `max_emails` — Maximum emails to process (default: 50)
-- `priority_labels` — Labels that indicate high-priority messages
+## Examples
+**Example 1:** “3 threads need reply today: A (budget), B (design review), C (vendor).”
+
+**Example 2:** Newsletters batched under “Read later” with one-line summaries each.

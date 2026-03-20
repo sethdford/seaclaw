@@ -31,8 +31,8 @@
 #define HU_CU_PARAMS                                                                               \
     "{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\",\"enum\":[\"screenshot\"," \
     "\"click\",\"type\",\"scroll\",\"key\"]},\"x\":{\"type\":\"number\"},\"y\":{\"type\":\"number\"}," \
-    "\"target\":{\"type\":\"string\",\"description\":\"Natural-language click target; uses visual " \
-    "grounding when x/y are zero and a provider is bound\"}," \
+    "\"target\":{\"type\":\"string\",\"description\":\"Natural language description of UI element " \
+    "to interact with (uses vision to locate)\"}," \
     "\"text\":{\"type\":\"string\"},\"direction\":{\"type\":\"string\"},\"delta\":{\"type\":\"number\"}," \
     "\"combo\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"}},\"required\":[\"action\"]}"
 
@@ -715,8 +715,44 @@ static hu_error_t computer_use_execute(void *ctx, hu_allocator_t *alloc, const h
         *out = hu_tool_result_ok_owned(copy, mlen);
         return HU_OK;
     }
-    if (strcmp(action, "click") == 0 || strcmp(action, "type") == 0 || strcmp(action, "scroll") == 0 ||
-        strcmp(action, "key") == 0) {
+    if (strcmp(action, "click") == 0) {
+        double x = hu_json_get_number(args, "x", 0);
+        double y = hu_json_get_number(args, "y", 0);
+        const char *target = hu_json_get_string(args, "target");
+        size_t tlen = target ? strlen(target) : 0;
+        if (tlen > 512) {
+            *out = hu_tool_result_fail("target too long", 15);
+            return HU_OK;
+        }
+        if (tlen > 0) {
+            double gx = 0, gy = 0;
+            hu_error_t ge = hu_visual_ground_action(alloc, NULL, NULL, 0, "mock.png", 9, target, tlen,
+                                                    &gx, &gy, NULL, NULL);
+            if (ge == HU_OK && gx >= 0.0 && gy >= 0.0) {
+                x = gx;
+                y = gy;
+            } /* else keep x,y from JSON (fallback when grounding fails) */
+        }
+        if (x == 0.0 && y == 0.0 && tlen > 0) {
+            *out = hu_tool_result_fail("visual grounding failed", 22);
+            return HU_OK;
+        }
+        char *copy = NULL;
+        if (tlen > 0) {
+            copy = hu_sprintf(alloc, "{\"success\":true,\"via_visual_grounding\":true,\"x\":%.0f,"
+                                     "\"y\":%.0f}",
+                              x, y);
+        } else {
+            copy = cu_dup_json(alloc, "{\"success\":true}", 16);
+        }
+        if (!copy) {
+            *out = hu_tool_result_fail("out of memory", 13);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        *out = hu_tool_result_ok_owned(copy, strlen(copy));
+        return HU_OK;
+    }
+    if (strcmp(action, "type") == 0 || strcmp(action, "scroll") == 0 || strcmp(action, "key") == 0) {
         char *copy = cu_dup_json(alloc, "{\"success\":true}", 16);
         if (!copy) {
             *out = hu_tool_result_fail("out of memory", 13);
@@ -759,35 +795,42 @@ static hu_error_t computer_use_execute(void *ctx, hu_allocator_t *alloc, const h
             *out = hu_tool_result_fail("target too long", 15);
             return HU_OK;
         }
-        if (x == 0.0 && y == 0.0 && tlen > 0) {
+        if (tlen > 0) {
             if (!c->ground_provider) {
-                *out = hu_tool_result_fail("visual grounding requires provider binding", 38);
-                return HU_OK;
-            }
-            char tmpl[] = "/tmp/hu_cu_vgXXXXXX.png";
-            int fd = mkstemps(tmpl, 4);
-            if (fd < 0) {
-                *out = hu_tool_result_fail("visual grounding temp file failed", 31);
-                return HU_OK;
-            }
-            (void)close(fd);
-            (void)unlink(tmpl);
-            if (!cu_screencapture_to_path(alloc, c, tmpl)) {
+                if (x == 0.0 && y == 0.0) {
+                    *out = hu_tool_result_fail("visual grounding requires provider binding or explicit "
+                                               "coordinates",
+                                               58);
+                    return HU_OK;
+                }
+            } else {
+                char tmpl[] = "/tmp/hu_cu_vgXXXXXX.png";
+                int fd = mkstemps(tmpl, 4);
+                if (fd < 0) {
+                    *out = hu_tool_result_fail("visual grounding temp file failed", 31);
+                    return HU_OK;
+                }
+                (void)close(fd);
                 (void)unlink(tmpl);
-                *out = hu_tool_result_fail("visual grounding screenshot failed", 33);
-                return HU_OK;
+                if (!cu_screencapture_to_path(alloc, c, tmpl)) {
+                    (void)unlink(tmpl);
+                    *out = hu_tool_result_fail("visual grounding screenshot failed", 33);
+                    return HU_OK;
+                }
+                double gx = -1.0, gy = -1.0;
+                hu_error_t gerr = hu_visual_ground_action(
+                    alloc, c->ground_provider, c->ground_model, c->ground_model_len, tmpl,
+                    strlen(tmpl), target, tlen, &gx, &gy, NULL, NULL);
+                (void)unlink(tmpl);
+                if (gerr == HU_OK && gx >= 0.0 && gy >= 0.0) {
+                    x = gx;
+                    y = gy;
+                }
             }
-            double gx = -1.0, gy = -1.0;
-            hu_error_t gerr = hu_visual_ground_action(
-                alloc, c->ground_provider, c->ground_model, c->ground_model_len, tmpl, strlen(tmpl),
-                target, tlen, &gx, &gy, NULL, NULL);
-            (void)unlink(tmpl);
-            if (gerr != HU_OK || gx < 0.0 || gy < 0.0) {
-                *out = hu_tool_result_fail("visual grounding failed", 22);
-                return HU_OK;
-            }
-            x = gx;
-            y = gy;
+        }
+        if (x == 0.0 && y == 0.0) {
+            *out = hu_tool_result_fail("visual grounding failed", 22);
+            return HU_OK;
         }
         return cu_mac_click(alloc, x, y, out);
     }
@@ -921,35 +964,42 @@ static hu_error_t computer_use_execute(void *ctx, hu_allocator_t *alloc, const h
             *out = hu_tool_result_fail("target too long", 15);
             return HU_OK;
         }
-        if (x == 0.0 && y == 0.0 && tlen > 0) {
+        if (tlen > 0) {
             if (!c->ground_provider) {
-                *out = hu_tool_result_fail("visual grounding requires provider binding", 38);
-                return HU_OK;
-            }
-            char tmpl[] = "/tmp/hu_cu_vgXXXXXX.png";
-            int fd = mkstemps(tmpl, 4);
-            if (fd < 0) {
-                *out = hu_tool_result_fail("visual grounding temp file failed", 31);
-                return HU_OK;
-            }
-            (void)close(fd);
-            (void)unlink(tmpl);
-            if (!cu_linux_try_screenshot_cmd(alloc, c ? c->policy : NULL, tmpl)) {
+                if (x == 0.0 && y == 0.0) {
+                    *out = hu_tool_result_fail("visual grounding requires provider binding or explicit "
+                                               "coordinates",
+                                               58);
+                    return HU_OK;
+                }
+            } else {
+                char tmpl[] = "/tmp/hu_cu_vgXXXXXX.png";
+                int fd = mkstemps(tmpl, 4);
+                if (fd < 0) {
+                    *out = hu_tool_result_fail("visual grounding temp file failed", 31);
+                    return HU_OK;
+                }
+                (void)close(fd);
                 (void)unlink(tmpl);
-                *out = hu_tool_result_fail("visual grounding screenshot failed", 33);
-                return HU_OK;
+                if (!cu_linux_try_screenshot_cmd(alloc, c ? c->policy : NULL, tmpl)) {
+                    (void)unlink(tmpl);
+                    *out = hu_tool_result_fail("visual grounding screenshot failed", 33);
+                    return HU_OK;
+                }
+                double gx = -1.0, gy = -1.0;
+                hu_error_t gerr = hu_visual_ground_action(
+                    alloc, c->ground_provider, c->ground_model, c->ground_model_len, tmpl,
+                    strlen(tmpl), target, tlen, &gx, &gy, NULL, NULL);
+                (void)unlink(tmpl);
+                if (gerr == HU_OK && gx >= 0.0 && gy >= 0.0) {
+                    x = gx;
+                    y = gy;
+                }
             }
-            double gx = -1.0, gy = -1.0;
-            hu_error_t gerr = hu_visual_ground_action(
-                alloc, c->ground_provider, c->ground_model, c->ground_model_len, tmpl, strlen(tmpl),
-                target, tlen, &gx, &gy, NULL, NULL);
-            (void)unlink(tmpl);
-            if (gerr != HU_OK || gx < 0.0 || gy < 0.0) {
-                *out = hu_tool_result_fail("visual grounding failed", 22);
-                return HU_OK;
-            }
-            x = gx;
-            y = gy;
+        }
+        if (x == 0.0 && y == 0.0) {
+            *out = hu_tool_result_fail("visual grounding failed", 22);
+            return HU_OK;
         }
         return cu_linux_click(alloc, x, y, out);
     }

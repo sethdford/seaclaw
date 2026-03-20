@@ -8,14 +8,22 @@
 
 /**
  * Skill — a discovered skill with manifest metadata.
+ * Level-1 (catalog): name + description stay small for system prompts.
+ * Level-2: instructions live in SKILL.md on disk; instructions_path points to that file.
+ * Level-3: bundled files under skill_dir (NULL for flat *.skill.json layouts).
  */
 typedef struct hu_skill {
     char *name;
     char *description;
     char *command;    /* shell command to execute, may be NULL */
     char *parameters; /* JSON string, may be NULL */
+    char *skill_dir;  /* skill bundle directory, or NULL for flat .skill.json */
+    char *instructions_path; /* path to SKILL.md, or NULL */
     bool enabled;
 } hu_skill_t;
+
+/** Sentinel SKILL.md path used with HU_IS_TEST discover data (see tests). */
+#define HU_SKILLFORGE_TEST_INSTRUCTIONS_PATH "__HU_TEST_SKILL_MD__"
 
 /**
  * SkillForge — skill discovery and integration registry.
@@ -52,6 +60,21 @@ hu_error_t hu_skillforge_disable(hu_skillforge_t *sf, const char *name);
 
 hu_error_t hu_skillforge_execute(hu_allocator_t *alloc, const hu_skillforge_t *sf, const char *name,
                                  char **out_instructions);
+
+/**
+ * Load level-2 instructions: SKILL.md body (frontmatter stripped), or description if no path.
+ * In HU_IS_TEST, never reads the filesystem (mock path HU_SKILLFORGE_TEST_INSTRUCTIONS_PATH).
+ */
+hu_error_t hu_skillforge_load_instructions(hu_allocator_t *alloc, const hu_skill_t *skill,
+                                           char **out_instructions, size_t *out_len);
+
+/**
+ * Load a bundled resource file from skill_dir/name (level 3). Validates resource_name.
+ * In HU_IS_TEST, uses mock data only (no filesystem).
+ * @param out_len optional; when non-NULL, set to content length (excluding NUL).
+ */
+hu_error_t hu_skillforge_read_resource(hu_allocator_t *alloc, const hu_skill_t *skill,
+                                       const char *resource_name, char **out_content, size_t *out_len);
 
 hu_error_t hu_skillforge_install(const char *name, const char *url);
 

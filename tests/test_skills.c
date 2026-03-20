@@ -101,6 +101,25 @@ static void test_skill_registry_install_mock(void) {
     HU_ASSERT_EQ(err, HU_OK);
 }
 
+static void test_skill_registry_install_by_name_mock(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_error_t err = hu_skill_registry_install_by_name(&alloc, "code-review");
+    HU_ASSERT_EQ(err, HU_OK);
+}
+
+static void test_skill_registry_install_by_name_null_name_fails(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_error_t err = hu_skill_registry_install_by_name(&alloc, NULL);
+    HU_ASSERT(err != HU_OK);
+    err = hu_skill_registry_install_by_name(&alloc, "");
+    HU_ASSERT(err != HU_OK);
+}
+
+static void test_skill_registry_install_by_name_null_alloc_fails(void) {
+    hu_error_t err = hu_skill_registry_install_by_name(NULL, "x");
+    HU_ASSERT(err != HU_OK);
+}
+
 static void test_skill_registry_uninstall_mock(void) {
     hu_error_t err = hu_skill_registry_uninstall("nonexistent");
     HU_ASSERT_EQ(err, HU_OK);
@@ -222,6 +241,9 @@ void run_skills_tests(void) {
     HU_RUN_TEST(test_skills_list_dot_workspace);
     HU_RUN_TEST(test_skill_registry_search_mock);
     HU_RUN_TEST(test_skill_registry_install_mock);
+    HU_RUN_TEST(test_skill_registry_install_by_name_mock);
+    HU_RUN_TEST(test_skill_registry_install_by_name_null_name_fails);
+    HU_RUN_TEST(test_skill_registry_install_by_name_null_alloc_fails);
     HU_RUN_TEST(test_skill_registry_uninstall_mock);
     HU_RUN_TEST(test_skill_registry_get_installed_dir);
     HU_RUN_TEST(test_skill_registry_publish_mock);

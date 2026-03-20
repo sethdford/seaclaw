@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(HU_IS_TEST) && HU_IS_TEST
+#include "human/tools/visual_grounding.h"
+#endif
+
 typedef struct hu_browser_use_ctx {
     hu_provider_t *ground_provider;
     const char *ground_model;
@@ -110,8 +114,8 @@ static const char k_params[] =
     "\"enum\":[\"navigate\",\"screenshot\",\"click\",\"type\",\"extract_text\",\"execute_js\"]},"
     "\"url\":{\"type\":\"string\",\"description\":\"Target URL (navigate)\"},"
     "\"selector\":{\"type\":\"string\",\"description\":\"CSS selector (click, type, extract_text)\"},"
-    "\"target\":{\"type\":\"string\",\"description\":\"Natural-language click target when selector "
-    "is omitted (requires bound vision provider)\"},"
+    "\"target\":{\"type\":\"string\",\"description\":\"Natural language description of UI element "
+    "to interact with (uses vision to locate)\"},"
     "\"text\":{\"type\":\"string\",\"description\":\"Text to type (type)\"},"
     "\"script\":{\"type\":\"string\",\"description\":\"JavaScript source (execute_js)\"}}}";
 
@@ -280,16 +284,63 @@ static hu_error_t browser_use_execute(void *ctx, hu_allocator_t *alloc, const hu
 
     if (strcmp(action, "click") == 0) {
         const char *sel = hu_json_get_string(args, "selector");
-        if (!sel || !sel[0] || strlen(sel) > HU_BU_MAX_SELECTOR) {
-            *out = hu_tool_result_fail("invalid or missing selector", 27);
+        const char *target = hu_json_get_string(args, "target");
+        size_t sellen = sel ? strlen(sel) : 0;
+        size_t tgtlen = target ? strlen(target) : 0;
+        if (sellen > 0) {
+            if (sellen > HU_BU_MAX_SELECTOR) {
+                *out = hu_tool_result_fail("invalid or missing selector", 27);
+                return HU_OK;
+            }
+            char *msg = hu_sprintf(alloc, "{\"status\":\"ok\",\"selector\":\"%s\"}", sel);
+            if (!msg) {
+                *out = hu_tool_result_fail("out of memory", 13);
+                return HU_OK;
+            }
+            *out = hu_tool_result_ok_owned(msg, strlen(msg));
             return HU_OK;
         }
-        char *msg = hu_sprintf(alloc, "{\"status\":\"ok\",\"selector\":\"%s\"}", sel);
-        if (!msg) {
-            *out = hu_tool_result_fail("out of memory", 13);
+        if (tgtlen > 0) {
+            if (tgtlen > HU_BU_MAX_TEXT) {
+                *out = hu_tool_result_fail("target too long", 15);
+                return HU_OK;
+            }
+            char *gsel = NULL;
+            size_t gsel_len = 0;
+            double gx = 0, gy = 0;
+            hu_error_t ge = hu_visual_ground_action(alloc, NULL, NULL, 0, "mock.png", 9, target, tgtlen,
+                                                    &gx, &gy, &gsel, &gsel_len);
+            if (ge != HU_OK) {
+                if (gsel)
+                    alloc->free(alloc->ctx, gsel, gsel_len + 1);
+                *out = hu_tool_result_fail("visual grounding failed", 22);
+                return HU_OK;
+            }
+            if (gsel && gsel[0]) {
+                char *msg =
+                    hu_sprintf(alloc, "{\"status\":\"ok\",\"click_via\":\"selector\",\"selector\":\"%s\"}",
+                               gsel);
+                alloc->free(alloc->ctx, gsel, gsel_len + 1);
+                if (!msg) {
+                    *out = hu_tool_result_fail("out of memory", 13);
+                    return HU_OK;
+                }
+                *out = hu_tool_result_ok_owned(msg, strlen(msg));
+                return HU_OK;
+            }
+            if (gsel)
+                alloc->free(alloc->ctx, gsel, gsel_len + 1);
+            char *msg = hu_sprintf(alloc,
+                                   "{\"status\":\"ok\",\"click_via\":\"coordinates\",\"x\":%.0f,\"y\":%.0f}",
+                                   gx, gy);
+            if (!msg) {
+                *out = hu_tool_result_fail("out of memory", 13);
+                return HU_OK;
+            }
+            *out = hu_tool_result_ok_owned(msg, strlen(msg));
             return HU_OK;
         }
-        *out = hu_tool_result_ok_owned(msg, strlen(msg));
+        *out = hu_tool_result_fail("invalid or missing selector", 27);
         return HU_OK;
     }
 
@@ -408,7 +459,6 @@ static hu_error_t browser_use_execute(void *ctx, hu_allocator_t *alloc, const hu
             goto done;
         }
         int cx = 0, cy = 0;
-        const char *report_sel = NULL;
 
         if (sellen > 0) {
             if (sellen > HU_BU_MAX_SELECTOR || bu_str_has_disallowed_cdp_chars(sel, sellen)) {
@@ -425,6 +475,19 @@ static hu_error_t browser_use_execute(void *ctx, hu_allocator_t *alloc, const hu
             cx = el.x + (el.width > 0 ? el.width / 2 : 0);
             cy = el.y + (el.height > 0 ? el.height / 2 : 0);
             report_sel = sel;
+            err = hu_cdp_click(&session, cx, cy);
+            if (err != HU_OK) {
+                *out = hu_tool_result_fail("click failed", 12);
+                goto done;
+            }
+            char *msg0 = hu_sprintf(alloc, "{\"status\":\"ok\",\"selector\":\"%s\"}",
+                                    report_sel ? report_sel : "");
+            if (!msg0) {
+                *out = hu_tool_result_fail("out of memory", 13);
+                goto done;
+            }
+            *out = hu_tool_result_ok_owned(msg0, strlen(msg0));
+            goto done;
         } else if (tgtlen > 0 && bctx && bctx->ground_provider) {
             hu_cdp_screenshot_t shot;
             memset(&shot, 0, sizeof(shot));
@@ -451,17 +514,79 @@ static hu_error_t browser_use_execute(void *ctx, hu_allocator_t *alloc, const hu
                 goto done;
             }
             double gx = -1.0, gy = -1.0;
+            char *gsel = NULL;
+            size_t gsel_len = 0;
             err = hu_visual_ground_action(alloc, bctx->ground_provider, bctx->ground_model,
                                           bctx->ground_model_len, tmpl, strlen(tmpl), target, tgtlen,
-                                          &gx, &gy, NULL, NULL);
+                                          &gx, &gy, &gsel, &gsel_len);
             (void)unlink(tmpl);
             if (err != HU_OK || gx < 0.0 || gy < 0.0) {
+                if (gsel)
+                    alloc->free(alloc->ctx, gsel, gsel_len + 1);
                 *out = hu_tool_result_fail("visual grounding failed", 22);
                 goto done;
             }
             cx = (int)gx;
             cy = (int)gy;
             report_sel = "coords";
+
+            int selector_ok = 0;
+            if (gsel && gsel[0] && gsel_len <= HU_BU_MAX_SELECTOR &&
+                !bu_str_has_disallowed_cdp_chars(gsel, gsel_len)) {
+                char *esel = NULL;
+                size_t esel_cap = 0;
+                hu_error_t ee = bu_escape_json_string_body(alloc, gsel, gsel_len, &esel, &esel_cap);
+                if (ee == HU_OK && esel) {
+                    char expr[4096];
+                    int en = snprintf(expr, sizeof(expr),
+                                      "(function(){var e=document.querySelector(\"%s\");if(!e)return "
+                                      "false;e.click();return true;})()",
+                                      esel);
+                    alloc->free(alloc->ctx, esel, esel_cap);
+                    if (en > 0 && (size_t)en < sizeof(expr)) {
+                        hu_json_value_t *vreq = NULL;
+                        hu_error_t ev =
+                            bu_eval_expression(&session, expr, (size_t)en, &vreq);
+                        if (ev == HU_OK && vreq && vreq->type == HU_JSON_BOOL &&
+                            vreq->data.boolean) {
+                            selector_ok = 1;
+                        }
+                        if (vreq)
+                            hu_json_free(alloc, vreq);
+                    }
+                }
+            }
+
+            if (!selector_ok) {
+                err = hu_cdp_click(&session, cx, cy);
+                if (err != HU_OK) {
+                    if (gsel)
+                        alloc->free(alloc->ctx, gsel, gsel_len + 1);
+                    *out = hu_tool_result_fail("click failed", 12);
+                    goto done;
+                }
+            } else {
+                err = HU_OK;
+            }
+
+            char *msg = NULL;
+            if (selector_ok && gsel) {
+                msg = hu_sprintf(alloc,
+                                 "{\"status\":\"ok\",\"click_via\":\"selector\",\"selector\":\"%s\"}",
+                                 gsel);
+            } else {
+                msg = hu_sprintf(alloc,
+                                 "{\"status\":\"ok\",\"click_via\":\"coordinates\",\"x\":%d,\"y\":%d}", cx,
+                                 cy);
+            }
+            if (gsel)
+                alloc->free(alloc->ctx, gsel, gsel_len + 1);
+            if (!msg) {
+                *out = hu_tool_result_fail("out of memory", 13);
+                goto done;
+            }
+            *out = hu_tool_result_ok_owned(msg, strlen(msg));
+            goto done;
         } else if (tgtlen > 0) {
             *out = hu_tool_result_fail("target requires visual grounding provider", 40);
             goto done;
@@ -469,20 +594,6 @@ static hu_error_t browser_use_execute(void *ctx, hu_allocator_t *alloc, const hu
             *out = hu_tool_result_fail("invalid or missing selector", 27);
             goto done;
         }
-
-        err = hu_cdp_click(&session, cx, cy);
-        if (err != HU_OK) {
-            *out = hu_tool_result_fail("click failed", 12);
-            goto done;
-        }
-        char *msg = hu_sprintf(alloc, "{\"status\":\"ok\",\"selector\":\"%s\"}",
-                               report_sel ? report_sel : "");
-        if (!msg) {
-            *out = hu_tool_result_fail("out of memory", 13);
-            goto done;
-        }
-        *out = hu_tool_result_ok_owned(msg, strlen(msg));
-        goto done;
     }
 
     if (strcmp(action, "type") == 0) {

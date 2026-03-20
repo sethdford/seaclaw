@@ -88,6 +88,12 @@ hu_error_t hu_skill_registry_install(hu_allocator_t *alloc, const char *source_p
     return HU_OK;
 }
 
+hu_error_t hu_skill_registry_install_by_name(hu_allocator_t *alloc, const char *name) {
+    if (!alloc || !name || !name[0])
+        return HU_ERR_INVALID_ARGUMENT;
+    return HU_OK;
+}
+
 hu_error_t hu_skill_registry_uninstall(const char *name) {
     if (!name || !name[0])
         return HU_ERR_INVALID_ARGUMENT;
@@ -379,6 +385,37 @@ static hu_error_t remove_dir_recursive(const char *path) {
     return HU_OK;
 }
 
+/* https://github.com/org/repo/tree/branch/path → https://raw.githubusercontent.com/org/repo/branch/path/ */
+static bool github_tree_url_to_raw_base(const char *tree_url, char *out, size_t out_len) {
+    static const char prefix[] = "https://github.com/";
+    if (!tree_url || strncmp(tree_url, prefix, sizeof(prefix) - 1U) != 0)
+        return false;
+    const char *path = tree_url + sizeof(prefix) - 1U;
+    const char *tree = strstr(path, "/tree/");
+    if (!tree)
+        return false;
+    size_t org_repo_len = (size_t)(tree - path);
+    const char *after_tree = tree + 6;
+    if (!after_tree[0])
+        return false;
+    int n = snprintf(out, out_len, "https://raw.githubusercontent.com/%.*s/%s/",
+                     (int)org_repo_len, path, after_tree);
+    return n > 0 && (size_t)n < out_len;
+}
+
+static hu_error_t write_bytes_to_file(const char *path, const void *data, size_t len) {
+    FILE *f = fopen(path, "wb");
+    if (!f)
+        return HU_ERR_IO;
+    if (len > 0 && fwrite(data, 1, len, f) != len) {
+        fclose(f);
+        unlink(path);
+        return HU_ERR_IO;
+    }
+    fclose(f);
+    return HU_OK;
+}
+
 #endif /* HU_GATEWAY_POSIX && !HU_IS_TEST */
 
 hu_error_t hu_skill_registry_install(hu_allocator_t *alloc, const char *source_path) {
@@ -496,6 +533,129 @@ hu_error_t hu_skill_registry_install(hu_allocator_t *alloc, const char *source_p
 #else
     (void)alloc;
     (void)source_path;
+    return HU_OK;
+#endif
+}
+
+hu_error_t hu_skill_registry_install_by_name(hu_allocator_t *alloc, const char *name) {
+    if (!alloc || !name || !name[0])
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
+#ifdef HU_GATEWAY_POSIX
+    hu_skill_registry_entry_t *entries = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_skill_registry_search(alloc, name, &entries, &count);
+    if (err != HU_OK) {
+        if (entries)
+            hu_skill_registry_entries_free(alloc, entries, count);
+        return err;
+    }
+
+    const hu_skill_registry_entry_t *match = NULL;
+    for (size_t i = 0; i < count; i++) {
+        if (entries[i].name && strcmp(entries[i].name, name) == 0) {
+            match = &entries[i];
+            break;
+        }
+    }
+    if (!match || !match->url || !match->url[0]) {
+        hu_skill_registry_entries_free(alloc, entries, count);
+        return HU_ERR_NOT_FOUND;
+    }
+
+    char raw_base[512];
+    if (!github_tree_url_to_raw_base(match->url, raw_base, sizeof(raw_base))) {
+        hu_skill_registry_entries_free(alloc, entries, count);
+        return HU_ERR_PARSE;
+    }
+    hu_skill_registry_entries_free(alloc, entries, count);
+
+    char manifest_url[768];
+    int n = snprintf(manifest_url, sizeof(manifest_url), "%s%s.skill.json", raw_base, name);
+    if (n <= 0 || (size_t)n >= sizeof(manifest_url))
+        return HU_ERR_INVALID_ARGUMENT;
+
+    hu_http_response_t mresp = {0};
+    err = hu_http_get(alloc, manifest_url, NULL, &mresp);
+    if (err != HU_OK || mresp.status_code != 200 || !mresp.body || mresp.body_len == 0) {
+        hu_http_response_free(alloc, &mresp);
+        return err != HU_OK ? err : HU_ERR_PROVIDER_RESPONSE;
+    }
+
+    hu_json_value_t *parsed = NULL;
+    err = hu_json_parse(alloc, mresp.body, mresp.body_len, &parsed);
+    if (err != HU_OK || !parsed || parsed->type != HU_JSON_OBJECT) {
+        if (parsed)
+            hu_json_free(alloc, parsed);
+        hu_http_response_free(alloc, &mresp);
+        return err != HU_OK ? err : HU_ERR_PARSE;
+    }
+    hu_json_free(alloc, parsed);
+
+    const char *home = getenv("HOME");
+    if (!home || !home[0]) {
+        hu_http_response_free(alloc, &mresp);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    char base_dir[512];
+    n = snprintf(base_dir, sizeof(base_dir), "%s/.human/skills", home);
+    if (n <= 0 || (size_t)n >= sizeof(base_dir)) {
+        hu_http_response_free(alloc, &mresp);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    if (mkdir(base_dir, 0755) != 0 && errno != EEXIST) {
+        hu_http_response_free(alloc, &mresp);
+        return HU_ERR_IO;
+    }
+
+    char dest_dir[512];
+    n = snprintf(dest_dir, sizeof(dest_dir), "%s/.human/skills/%.256s", home, name);
+    if (n <= 0 || (size_t)n >= sizeof(dest_dir)) {
+        hu_http_response_free(alloc, &mresp);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    if (mkdir(dest_dir, 0755) != 0 && errno != EEXIST) {
+        hu_http_response_free(alloc, &mresp);
+        return HU_ERR_IO;
+    }
+
+    char dest_manifest[640];
+    n = snprintf(dest_manifest, sizeof(dest_manifest), "%s/manifest.json", dest_dir);
+    if (n <= 0 || (size_t)n >= sizeof(dest_manifest)) {
+        hu_http_response_free(alloc, &mresp);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    err = write_bytes_to_file(dest_manifest, mresp.body, mresp.body_len);
+    hu_http_response_free(alloc, &mresp);
+    if (err != HU_OK)
+        return err;
+
+    char md_url[768];
+    n = snprintf(md_url, sizeof(md_url), "%sSKILL.md", raw_base);
+    if (n > 0 && (size_t)n < sizeof(md_url)) {
+        hu_http_response_t mdresp = {0};
+        hu_error_t merr = hu_http_get(alloc, md_url, NULL, &mdresp);
+        if (merr == HU_OK && mdresp.status_code == 200 && mdresp.body && mdresp.body_len > 0) {
+            char dst_md[640];
+            n = snprintf(dst_md, sizeof(dst_md), "%s/SKILL.md", dest_dir);
+            if (n > 0 && (size_t)n < sizeof(dst_md))
+                (void)write_bytes_to_file(dst_md, mdresp.body, mdresp.body_len);
+        }
+        hu_http_response_free(alloc, &mdresp);
+    }
+
+    return HU_OK;
+#else
+    (void)alloc;
+    (void)name;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+#else
+    (void)alloc;
+    (void)name;
     return HU_OK;
 #endif
 }

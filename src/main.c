@@ -967,10 +967,14 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
 
     if (strcmp(sub, "install") == 0) {
         if (argc < 4 || !argv[3]) {
-            fprintf(stderr, "[%s] skills install <path>\n", HU_CODENAME);
+            fprintf(stderr, "[%s] skills install <name-or-path>\n", HU_CODENAME);
             return HU_ERR_INVALID_ARGUMENT;
         }
-        hu_error_t err = hu_skill_registry_install(alloc, argv[3]);
+        hu_error_t err;
+        if (strchr(argv[3], '/') || strchr(argv[3], '.'))
+            err = hu_skill_registry_install(alloc, argv[3]);
+        else
+            err = hu_skill_registry_install_by_name(alloc, argv[3]);
         if (err != HU_OK) {
             fprintf(stderr, "[%s] skills install: %s\n", HU_CODENAME, hu_error_string(err));
             return err;

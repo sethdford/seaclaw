@@ -1,11 +1,9 @@
 {
   "name": "email-digest",
+  "description": "Daily email digest with priority sorting and action items",
   "version": "1.0.0",
-  "description": "Summarize and prioritize unread emails into a daily digest",
   "author": "human",
-  "tags": ["email", "productivity", "summary"],
-  "parameters": {
-    "max_emails": { "type": "integer", "default": 50 },
-    "priority_labels": { "type": "array", "default": ["urgent", "important"] }
-  }
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
 }
