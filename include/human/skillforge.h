@@ -64,6 +64,7 @@ hu_error_t hu_skillforge_execute(hu_allocator_t *alloc, const hu_skillforge_t *s
 /**
  * Load level-2 instructions: SKILL.md body (frontmatter stripped), or description if no path.
  * In HU_IS_TEST, never reads the filesystem (mock path HU_SKILLFORGE_TEST_INSTRUCTIONS_PATH).
+ * @param out_len optional; when non-NULL, set to strlen(result).
  */
 hu_error_t hu_skillforge_load_instructions(hu_allocator_t *alloc, const hu_skill_t *skill,
                                            char **out_instructions, size_t *out_len);
