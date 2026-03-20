@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define SLACK_API_BASE         "https://slack.com/api"
 #define SLACK_AUTH_TEST        "/auth.test"
@@ -21,7 +22,9 @@
 #define SLACK_ASSISTANT_STATUS "/assistant.threads.setStatus"
 
 #define SLACK_CONVERSATIONS_HISTORY "/conversations.history"
-#define SLACK_MAX_CHANNELS          16
+#define SLACK_REACTIONS_ADD           "/reactions.add"
+#define SLACK_HISTORY_API_MAX         999
+#define SLACK_MAX_CHANNELS            16
 #define SLACK_SESSION_KEY_MAX       127
 #define SLACK_CONTENT_MAX           4095
 #define SLACK_QUEUE_MAX             32
@@ -360,6 +363,66 @@ static hu_error_t build_chat_update_body(hu_allocator_t *alloc, const char *chan
 fail:
     hu_json_buf_free(&jbuf);
     return err;
+}
+
+static hu_error_t build_conversations_history_body(hu_allocator_t *alloc, const char *channel,
+                                                   size_t channel_len, long long limit_val,
+                                                   char **out, size_t *out_len) {
+    hu_json_buf_t jbuf;
+    hu_error_t err = hu_json_buf_init(&jbuf, alloc);
+    if (err)
+        return err;
+    err = hu_json_buf_append_raw(&jbuf, "{\"channel\":", 11);
+    if (err)
+        goto fail;
+    err = hu_json_append_string(&jbuf, channel, channel_len);
+    if (err)
+        goto fail;
+    err = hu_json_buf_append_raw(&jbuf, ",\"limit\":", 9);
+    if (err)
+        goto fail;
+    char nbuf[24];
+    int nn = snprintf(nbuf, sizeof(nbuf), "%lld", limit_val);
+    if (nn < 0 || (size_t)nn >= sizeof(nbuf)) {
+        err = HU_ERR_INTERNAL;
+        goto fail;
+    }
+    err = hu_json_buf_append_raw(&jbuf, nbuf, (size_t)nn);
+    if (err)
+        goto fail;
+    err = hu_json_buf_append_raw(&jbuf, "}", 1);
+    if (err)
+        goto fail;
+    *out_len = jbuf.len;
+    *out = (char *)alloc->alloc(alloc->ctx, jbuf.len + 1);
+    if (!*out) {
+        err = HU_ERR_OUT_OF_MEMORY;
+        goto fail;
+    }
+    memcpy(*out, jbuf.ptr, jbuf.len + 1);
+    hu_json_buf_free(&jbuf);
+    return HU_OK;
+fail:
+    hu_json_buf_free(&jbuf);
+    return err;
+}
+
+/* Slack message ts is fractional Unix time as a string; daemon uses strptime "%Y-%m-%d %H:%M". */
+static void slack_ts_to_history_timestamp(const char *ts, char *dst, size_t dst_sz) {
+    if (!ts || !dst || dst_sz == 0)
+        return;
+    dst[0] = '\0';
+    char *end = NULL;
+    double sec = strtod(ts, &end);
+    if (end == ts)
+        return;
+    time_t t = (time_t)sec;
+    struct tm tm_buf;
+    struct tm *tm = localtime_r(&t, &tm_buf);
+    if (!tm)
+        return;
+    if (strftime(dst, dst_sz, "%Y-%m-%d %H:%M", tm) == 0)
+        dst[0] = '\0';
 }
 #endif /* !HU_IS_TEST */
 
@@ -778,6 +841,214 @@ static hu_error_t slack_send_event(void *ctx, const char *target, size_t target_
 #endif
 }
 
+static hu_error_t slack_get_response_constraints(void *ctx,
+                                                 hu_channel_response_constraints_t *out) {
+    (void)ctx;
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    /* Slack block kit text fields are capped around 40k; practical outbound limit. */
+    out->max_chars = 40000U;
+    return HU_OK;
+}
+
+/*
+ * Slack reactions.add expects channel + message ts (string), not int64_t message_id.
+ * Planned emoji map when extended: HEART→heart, THUMBS_UP→+1, THUMBS_DOWN→-1,
+ * HAHA→laughing, EMPHASIS→exclamation, QUESTION→question (POST …/api/reactions.add).
+ */
+static hu_error_t slack_react(void *ctx, const char *target, size_t target_len, int64_t message_id,
+                              hu_reaction_type_t reaction) {
+    (void)ctx;
+    (void)target;
+    (void)target_len;
+    (void)message_id;
+    (void)reaction;
+#if HU_IS_TEST
+    return HU_OK;
+#else
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
+static hu_error_t slack_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                  const char *contact_id, size_t contact_id_len,
+                                                  size_t limit, hu_channel_history_entry_t **out,
+                                                  size_t *out_count) {
+    hu_slack_ctx_t *c = (hu_slack_ctx_t *)ctx;
+    if (!alloc || !contact_id || contact_id_len == 0 || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+    if (!c)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if HU_IS_TEST
+    (void)limit;
+    return HU_OK;
+#else
+    if (!c->token || c->token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+
+    const char *channel = NULL;
+    size_t channel_len = 0;
+    const char *thread_ts = NULL;
+    size_t thread_ts_len = 0;
+    parse_target(contact_id, contact_id_len, &channel, &channel_len, &thread_ts, &thread_ts_len);
+    (void)thread_ts;
+    (void)thread_ts_len;
+    if (channel_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    long long api_limit = (long long)limit;
+    if (api_limit < 1)
+        api_limit = 1;
+    if (api_limit > (long long)SLACK_HISTORY_API_MAX)
+        api_limit = (long long)SLACK_HISTORY_API_MAX;
+
+    char *body = NULL;
+    size_t body_len = 0;
+    hu_error_t err = build_conversations_history_body(alloc, channel, channel_len, api_limit, &body,
+                                                      &body_len);
+    if (err)
+        return err;
+
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Authorization: Bearer %.*s", (int)c->token_len,
+                      c->token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf)) {
+        alloc->free(alloc->ctx, body, body_len + 1);
+        return HU_ERR_INTERNAL;
+    }
+
+    char url_buf[256];
+    int nu = snprintf(url_buf, sizeof(url_buf), "%s%s", SLACK_API_BASE, SLACK_CONVERSATIONS_HISTORY);
+    if (nu < 0 || (size_t)nu >= sizeof(url_buf)) {
+        alloc->free(alloc->ctx, body, body_len + 1);
+        return HU_ERR_INTERNAL;
+    }
+
+    hu_http_response_t resp = {0};
+    err = hu_http_post_json(alloc, url_buf, auth_buf, body, body_len, &resp);
+    alloc->free(alloc->ctx, body, body_len + 1);
+    if (err != HU_OK) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return HU_ERR_CHANNEL_SEND;
+    }
+    if (resp.status_code < 200 || resp.status_code >= 300 || !resp.body) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return HU_ERR_CHANNEL_SEND;
+    }
+
+    hu_json_value_t *parsed = NULL;
+    err = hu_json_parse(alloc, resp.body, resp.body_len, &parsed);
+    if (resp.owned && resp.body)
+        hu_http_response_free(alloc, &resp);
+    if (err != HU_OK || !parsed)
+        return HU_ERR_CHANNEL_SEND;
+
+    bool api_ok = hu_json_get_bool(parsed, "ok", false);
+    if (!api_ok) {
+        hu_json_free(alloc, parsed);
+        return HU_ERR_CHANNEL_SEND;
+    }
+
+    hu_json_value_t *messages = hu_json_object_get(parsed, "messages");
+    if (!messages || messages->type != HU_JSON_ARRAY) {
+        hu_json_free(alloc, parsed);
+        return HU_OK;
+    }
+
+    size_t arr_len = messages->data.array.len;
+    size_t valid = 0;
+    for (size_t j = arr_len; j > 0; j--) {
+        hu_json_value_t *msg = messages->data.array.items[j - 1];
+        if (!msg || msg->type != HU_JSON_OBJECT)
+            continue;
+        if (hu_json_get_string(msg, "subtype"))
+            continue;
+        const char *user = hu_json_get_string(msg, "user");
+        if (!user)
+            continue;
+        const char *text = hu_json_get_string(msg, "text");
+        if (!text || strlen(text) == 0)
+            continue;
+        valid++;
+    }
+
+    if (valid == 0) {
+        hu_json_free(alloc, parsed);
+        return HU_OK;
+    }
+
+    hu_channel_history_entry_t *entries =
+        (hu_channel_history_entry_t *)alloc->alloc(alloc->ctx, valid * sizeof(*entries));
+    if (!entries) {
+        hu_json_free(alloc, parsed);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    memset(entries, 0, valid * sizeof(*entries));
+
+    size_t w = 0;
+    for (size_t j = arr_len; j > 0; j--) {
+        hu_json_value_t *msg = messages->data.array.items[j - 1];
+        if (!msg || msg->type != HU_JSON_OBJECT)
+            continue;
+        if (hu_json_get_string(msg, "subtype"))
+            continue;
+        const char *user = hu_json_get_string(msg, "user");
+        if (!user)
+            continue;
+        const char *text = hu_json_get_string(msg, "text");
+        if (!text || strlen(text) == 0)
+            continue;
+
+        entries[w].from_me = (c->bot_user_id != NULL && strcmp(user, c->bot_user_id) == 0);
+        size_t tlen = strlen(text);
+        if (tlen >= sizeof(entries[0].text))
+            tlen = sizeof(entries[0].text) - 1;
+        memcpy(entries[w].text, text, tlen);
+        entries[w].text[tlen] = '\0';
+
+        const char *ts = hu_json_get_string(msg, "ts");
+        if (ts) {
+            slack_ts_to_history_timestamp(ts, entries[w].timestamp, sizeof(entries[w].timestamp));
+            if (entries[w].timestamp[0] == '\0') {
+                size_t tsl = strlen(ts);
+                if (tsl >= sizeof(entries[w].timestamp))
+                    tsl = sizeof(entries[w].timestamp) - 1;
+                memcpy(entries[w].timestamp, ts, tsl);
+                entries[w].timestamp[tsl] = '\0';
+            }
+        }
+        w++;
+    }
+
+    hu_json_free(alloc, parsed);
+    *out = entries;
+    *out_count = w;
+    return HU_OK;
+#endif
+}
+
+static char *slack_get_attachment_path(void *ctx, hu_allocator_t *alloc, int64_t message_id) {
+    (void)ctx;
+    (void)alloc;
+    (void)message_id;
+    /* Slack attachments need files.info + different scopes; not resolved here. */
+    return NULL;
+}
+
+static bool slack_human_active_recently(void *ctx, const char *contact, size_t contact_len,
+                                         int window_sec) {
+    (void)ctx;
+    (void)contact;
+    (void)contact_len;
+    (void)window_sec;
+    return false;
+}
+
 static const hu_channel_vtable_t slack_vtable = {
     .start = slack_start,
     .stop = slack_stop,
@@ -787,6 +1058,11 @@ static const hu_channel_vtable_t slack_vtable = {
     .send_event = slack_send_event,
     .start_typing = slack_start_typing,
     .stop_typing = slack_stop_typing,
+    .load_conversation_history = slack_load_conversation_history,
+    .get_response_constraints = slack_get_response_constraints,
+    .react = slack_react,
+    .get_attachment_path = slack_get_attachment_path,
+    .human_active_recently = slack_human_active_recently,
 };
 
 /* ─── Webhook inbound queue ────────────────────────────────────────────── */

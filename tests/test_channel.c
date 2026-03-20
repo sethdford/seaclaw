@@ -4,6 +4,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "test_framework.h"
+#include <stdint.h>
 #include <string.h>
 
 #if HU_HAS_TELEGRAM
@@ -160,6 +161,72 @@ static void test_telegram_start_stop_typing(void) {
         hu_error_t err = ch.vtable->stop_typing(ch.ctx, "123", 3);
         HU_ASSERT_EQ(err, HU_OK);
     }
+    hu_telegram_destroy(&ch);
+}
+
+static void test_telegram_get_response_constraints_max_chars(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_telegram_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->get_response_constraints);
+    hu_channel_response_constraints_t c = {0};
+    hu_error_t err = ch.vtable->get_response_constraints(ch.ctx, &c);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(c.max_chars, 4096u);
+    hu_telegram_destroy(&ch);
+}
+
+static void test_telegram_react_ok_in_test_mode(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_telegram_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->react);
+    hu_error_t err =
+        ch.vtable->react(ch.ctx, "12345", 5, (int64_t)1, HU_REACTION_THUMBS_UP);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_telegram_destroy(&ch);
+}
+
+static void test_telegram_react_rejects_none(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_telegram_create(&alloc, "t", 1, &ch);
+    hu_error_t err = ch.vtable->react(ch.ctx, "1", 1, (int64_t)1, HU_REACTION_NONE);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    hu_telegram_destroy(&ch);
+}
+
+static void test_telegram_load_conversation_history_empty_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_telegram_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->load_conversation_history);
+    hu_channel_history_entry_t *entries = NULL;
+    size_t count = 0;
+    hu_error_t err = ch.vtable->load_conversation_history(ch.ctx, &alloc, "chat1", 5, 10, &entries,
+                                                          &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+    HU_ASSERT_NULL(entries);
+    hu_telegram_destroy(&ch);
+}
+
+static void test_telegram_get_attachment_path_null(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_telegram_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->get_attachment_path);
+    char *p = ch.vtable->get_attachment_path(ch.ctx, &alloc, (int64_t)99);
+    HU_ASSERT_NULL(p);
+    hu_telegram_destroy(&ch);
+}
+
+static void test_telegram_human_active_recently_false(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_telegram_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->human_active_recently);
+    HU_ASSERT_FALSE(ch.vtable->human_active_recently(ch.ctx, "u1", 2, 60));
     hu_telegram_destroy(&ch);
 }
 #endif
@@ -521,6 +588,12 @@ void run_channel_tests(void) {
     HU_RUN_TEST(test_telegram_escape_markdown_v2);
     HU_RUN_TEST(test_telegram_poll_in_test_mode);
     HU_RUN_TEST(test_telegram_start_stop_typing);
+    HU_RUN_TEST(test_telegram_get_response_constraints_max_chars);
+    HU_RUN_TEST(test_telegram_react_ok_in_test_mode);
+    HU_RUN_TEST(test_telegram_react_rejects_none);
+    HU_RUN_TEST(test_telegram_load_conversation_history_empty_in_test);
+    HU_RUN_TEST(test_telegram_get_attachment_path_null);
+    HU_RUN_TEST(test_telegram_human_active_recently_false);
 #endif
 #if HU_HAS_SIGNAL
     HU_RUN_TEST(test_signal_create_succeeds);

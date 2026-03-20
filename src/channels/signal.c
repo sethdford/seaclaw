@@ -412,6 +412,45 @@ static const char *signal_name(void *ctx) {
     return "signal";
 }
 
+static hu_error_t signal_get_response_constraints(void *ctx,
+                                                  hu_channel_response_constraints_t *out) {
+    (void)ctx;
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    out->max_chars = 0;
+    return HU_OK;
+}
+
+static hu_error_t signal_react(void *ctx, const char *target, size_t target_len, int64_t message_id,
+                               hu_reaction_type_t reaction) {
+#if HU_IS_TEST
+    (void)ctx;
+    (void)target;
+    (void)target_len;
+    (void)message_id;
+    (void)reaction;
+    return HU_OK;
+#else
+    /* TODO: Wire reactions via signal-cli (e.g. `signal-cli react` or JSON-RPC) when we have a
+     * supported daemon API path; avoid ad-hoc exec until aligned with existing HTTP RPC patterns. */
+    (void)ctx;
+    (void)target;
+    (void)target_len;
+    (void)message_id;
+    (void)reaction;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
+static bool signal_human_active_recently(void *ctx, const char *contact, size_t contact_len,
+                                         int window_sec) {
+    (void)ctx;
+    (void)contact;
+    (void)contact_len;
+    (void)window_sec;
+    return false;
+}
+
 static bool signal_health_check(void *ctx) {
     hu_signal_ctx_t *c = (hu_signal_ctx_t *)ctx;
     if (!c || !c->running)
@@ -450,6 +489,11 @@ static const hu_channel_vtable_t signal_vtable = {
     .send_event = NULL,
     .start_typing = signal_start_typing,
     .stop_typing = signal_stop_typing,
+    .load_conversation_history = NULL,
+    .get_response_constraints = signal_get_response_constraints,
+    .react = signal_react,
+    .get_attachment_path = NULL,
+    .human_active_recently = signal_human_active_recently,
 };
 
 static void free_group_policy(hu_signal_ctx_t *c) {

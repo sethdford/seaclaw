@@ -308,7 +308,63 @@ static void test_slack_send_captures_last_message(void) {
     HU_ASSERT_STR_EQ(msg, "Test reply");
     hu_slack_destroy(&ch);
 }
+
+static void test_slack_load_history_empty_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_slack_create(&alloc, "token", 5, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->load_conversation_history);
+    hu_channel_history_entry_t *entries = (hu_channel_history_entry_t *)1;
+    size_t count = 99;
+    hu_error_t err =
+        ch.vtable->load_conversation_history(ch.ctx, &alloc, "C0001", 5, 10, &entries, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0);
+    HU_ASSERT(entries == NULL);
+    hu_slack_destroy(&ch);
+}
+
+static void test_slack_react_ok_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_slack_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->react);
+    hu_error_t err = ch.vtable->react(ch.ctx, "C0001", 5, 12345LL, HU_REACTION_HEART);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_slack_destroy(&ch);
+}
 #endif
+
+static void test_slack_get_response_constraints(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_slack_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->get_response_constraints);
+    hu_channel_response_constraints_t cons = {0};
+    hu_error_t err = ch.vtable->get_response_constraints(ch.ctx, &cons);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(cons.max_chars, 40000U);
+    hu_slack_destroy(&ch);
+}
+
+static void test_slack_get_attachment_path_null(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_slack_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->get_attachment_path);
+    char *p = ch.vtable->get_attachment_path(ch.ctx, &alloc, 1);
+    HU_ASSERT(p == NULL);
+    hu_slack_destroy(&ch);
+}
+
+static void test_slack_human_active_recently_false(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_slack_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->human_active_recently);
+    HU_ASSERT(!ch.vtable->human_active_recently(ch.ctx, "C0001", 5, 3600));
+    hu_slack_destroy(&ch);
+}
 #endif
 
 /* ─── WhatsApp ────────────────────────────────────────────────────────────── */
@@ -1875,6 +1931,76 @@ static void test_discord_webhook_malformed(void) {
     hu_discord_destroy(&ch);
 }
 
+static void test_discord_get_response_constraints_max_chars(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_discord_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->get_response_constraints);
+    hu_channel_response_constraints_t cs = {0};
+    HU_ASSERT_EQ(ch.vtable->get_response_constraints(ch.ctx, &cs), HU_OK);
+    HU_ASSERT_EQ(cs.max_chars, 2000u);
+    hu_discord_destroy(&ch);
+}
+
+#if HU_IS_TEST
+static void test_discord_start_stop_typing_test_mode(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_discord_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->start_typing);
+    HU_ASSERT_NOT_NULL(ch.vtable->stop_typing);
+    HU_ASSERT_EQ(ch.vtable->start_typing(ch.ctx, "ch", 2), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->stop_typing(ch.ctx, "ch", 2), HU_OK);
+    hu_discord_destroy(&ch);
+}
+
+static void test_discord_react_ok_in_test_mode(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_discord_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_EQ(ch.vtable->react(ch.ctx, "ch", 2, 12345, HU_REACTION_HEART), HU_OK);
+    hu_discord_destroy(&ch);
+}
+
+static void test_discord_load_conversation_history_empty_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_discord_create(&alloc, "t", 1, &ch);
+    hu_channel_history_entry_t *entries = NULL;
+    size_t n = 99;
+    HU_ASSERT_EQ(
+        ch.vtable->load_conversation_history(ch.ctx, &alloc, "channel-id", 10, 5, &entries, &n),
+        HU_OK);
+    HU_ASSERT_EQ(n, 0u);
+    HU_ASSERT_NULL(entries);
+    hu_discord_destroy(&ch);
+}
+#endif
+
+static void test_discord_react_rejects_none(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_discord_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_EQ(ch.vtable->react(ch.ctx, "ch", 2, 99, HU_REACTION_NONE), HU_ERR_INVALID_ARGUMENT);
+    hu_discord_destroy(&ch);
+}
+
+static void test_discord_get_attachment_path_null_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_discord_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NULL(ch.vtable->get_attachment_path(ch.ctx, &alloc, 42));
+    hu_discord_destroy(&ch);
+}
+
+static void test_discord_human_active_recently_false(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_discord_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_FALSE(ch.vtable->human_active_recently(ch.ctx, "u", 1, 120));
+    hu_discord_destroy(&ch);
+}
+
 #if HU_IS_TEST
 static void test_discord_inject_and_poll(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -2444,7 +2570,14 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_discord_webhook_malformed);
     HU_RUN_TEST(test_discord_webhook_and_poll);
     HU_RUN_TEST(test_discord_webhook_empty_body);
+    HU_RUN_TEST(test_discord_get_response_constraints_max_chars);
+    HU_RUN_TEST(test_discord_react_rejects_none);
+    HU_RUN_TEST(test_discord_get_attachment_path_null_in_test);
+    HU_RUN_TEST(test_discord_human_active_recently_false);
 #if HU_IS_TEST
+    HU_RUN_TEST(test_discord_start_stop_typing_test_mode);
+    HU_RUN_TEST(test_discord_react_ok_in_test_mode);
+    HU_RUN_TEST(test_discord_load_conversation_history_empty_in_test);
     HU_RUN_TEST(test_discord_inject_and_poll);
     HU_RUN_TEST(test_discord_send_captures_last_message);
 #endif
@@ -2463,7 +2596,12 @@ void run_channel_all_tests(void) {
 #if HU_IS_TEST
     HU_RUN_TEST(test_slack_inject_and_poll);
     HU_RUN_TEST(test_slack_send_captures_last_message);
+    HU_RUN_TEST(test_slack_load_history_empty_in_test);
+    HU_RUN_TEST(test_slack_react_ok_in_test);
 #endif
+    HU_RUN_TEST(test_slack_get_response_constraints);
+    HU_RUN_TEST(test_slack_get_attachment_path_null);
+    HU_RUN_TEST(test_slack_human_active_recently_false);
 #endif
 #if HU_HAS_WHATSAPP
     HU_RUN_TEST(test_whatsapp_create);

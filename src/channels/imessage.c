@@ -1221,6 +1221,58 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
 #endif
 }
 
+static char *imessage_vt_get_attachment_path(void *ctx, hu_allocator_t *alloc, int64_t message_id) {
+    (void)ctx;
+#ifndef HU_IS_TEST
+    return hu_imessage_get_attachment_path(alloc, message_id);
+#else
+    (void)alloc;
+    (void)message_id;
+    return NULL;
+#endif
+}
+
+static char *imessage_vt_get_latest_attachment_path(void *ctx, hu_allocator_t *alloc,
+                                                    const char *contact_id, size_t contact_id_len) {
+    (void)ctx;
+#ifndef HU_IS_TEST
+    return hu_imessage_get_latest_attachment_path(alloc, contact_id, contact_id_len);
+#else
+    (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
+    return NULL;
+#endif
+}
+
+static bool imessage_vt_human_active_recently(void *ctx, const char *contact, size_t contact_len,
+                                              int window_sec) {
+#if defined(HU_ENABLE_SQLITE) && !HU_IS_TEST
+    return hu_imessage_user_responded_recently(ctx, contact, contact_len, window_sec);
+#else
+    (void)ctx;
+    (void)contact;
+    (void)contact_len;
+    (void)window_sec;
+    return false;
+#endif
+}
+
+static hu_error_t imessage_vt_build_reaction_context(void *ctx, hu_allocator_t *alloc,
+                                                   const char *contact_id, size_t contact_id_len,
+                                                   char **out, size_t *out_len) {
+    (void)ctx;
+    return hu_imessage_build_tapback_context(alloc, contact_id, contact_id_len, out, out_len);
+}
+
+static hu_error_t imessage_vt_build_read_receipt_context(void *ctx, hu_allocator_t *alloc,
+                                                         const char *contact_id,
+                                                         size_t contact_id_len, char **out,
+                                                         size_t *out_len) {
+    (void)ctx;
+    return hu_imessage_build_read_receipt_context(alloc, contact_id, contact_id_len, out, out_len);
+}
+
 static const hu_channel_vtable_t imessage_vtable = {
     .start = imessage_start,
     .stop = imessage_stop,
@@ -1233,6 +1285,11 @@ static const hu_channel_vtable_t imessage_vtable = {
     .load_conversation_history = imessage_load_conversation_history,
     .get_response_constraints = imessage_get_response_constraints,
     .react = imessage_react,
+    .get_attachment_path = imessage_vt_get_attachment_path,
+    .human_active_recently = imessage_vt_human_active_recently,
+    .get_latest_attachment_path = imessage_vt_get_latest_attachment_path,
+    .build_reaction_context = imessage_vt_build_reaction_context,
+    .build_read_receipt_context = imessage_vt_build_read_receipt_context,
 };
 
 hu_error_t hu_imessage_create(hu_allocator_t *alloc, const char *default_target,

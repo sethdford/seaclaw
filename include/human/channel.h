@@ -126,6 +126,31 @@ typedef struct hu_channel_vtable {
      * NULL = channel does not support reactions. */
     hu_error_t (*react)(void *ctx, const char *target, size_t target_len, int64_t message_id,
                         hu_reaction_type_t reaction);
+
+    /* Optional — resolve attachment path/URL for a message.
+     * Returns allocated string (caller frees) or NULL if unavailable.
+     * NULL vtable entry = channel does not support attachment resolution. */
+    char *(*get_attachment_path)(void *ctx, hu_allocator_t *alloc, int64_t message_id);
+
+    /* Optional — check if real human user responded recently on this channel.
+     * Returns true if the human sent a message to this contact within window_sec.
+     * NULL = channel does not support human-activity detection (assume false). */
+    bool (*human_active_recently)(void *ctx, const char *contact, size_t contact_len,
+                                  int window_sec);
+
+    /* Optional — latest inbound attachment path for a contact (vision / attachment context).
+     * Returns allocated string (caller frees) or NULL. NULL vtable entry = not supported. */
+    char *(*get_latest_attachment_path)(void *ctx, hu_allocator_t *alloc, const char *contact_id,
+                                        size_t contact_id_len);
+
+    /* Optional — inject reaction/tapback awareness into prompt context. NULL = skip. */
+    hu_error_t (*build_reaction_context)(void *ctx, hu_allocator_t *alloc, const char *contact_id,
+                                         size_t contact_id_len, char **out, size_t *out_len);
+
+    /* Optional — inject read/delivered awareness into prompt context. NULL = skip. */
+    hu_error_t (*build_read_receipt_context)(void *ctx, hu_allocator_t *alloc,
+                                             const char *contact_id, size_t contact_id_len,
+                                             char **out, size_t *out_len);
 } hu_channel_vtable_t;
 
 #endif /* HU_CHANNEL_H */

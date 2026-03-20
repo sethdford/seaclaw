@@ -4,6 +4,7 @@
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -291,6 +292,30 @@ static bool whatsapp_health_check(void *ctx) {
     return true;
 }
 
+static hu_error_t whatsapp_get_response_constraints(void *ctx,
+                                                    hu_channel_response_constraints_t *out) {
+    (void)ctx;
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    out->max_chars = 65536;
+    return HU_OK;
+}
+
+static hu_error_t whatsapp_react(void *ctx, const char *target, size_t target_len, int64_t message_id,
+                                 hu_reaction_type_t reaction) {
+    (void)ctx;
+    (void)target;
+    (void)target_len;
+    (void)message_id;
+    (void)reaction;
+#if HU_IS_TEST
+    return HU_OK;
+#else
+    /* Cloud API needs WhatsApp message id (wamid string), not int64 ROWIDs — not wired yet. */
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
 static const hu_channel_vtable_t whatsapp_vtable = {
     .start = whatsapp_start,
     .stop = whatsapp_stop,
@@ -300,6 +325,8 @@ static const hu_channel_vtable_t whatsapp_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
+    .get_response_constraints = whatsapp_get_response_constraints,
+    .react = whatsapp_react,
 };
 
 hu_error_t hu_whatsapp_create(hu_allocator_t *alloc, const char *phone_number_id,

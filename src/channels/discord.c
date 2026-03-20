@@ -5,6 +5,7 @@
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -358,6 +359,355 @@ static hu_error_t discord_send_event(void *ctx, const char *target, size_t targe
 #endif
 }
 
+static hu_error_t discord_stop_typing(void *ctx, const char *recipient, size_t recipient_len) {
+    (void)ctx;
+    (void)recipient;
+    (void)recipient_len;
+    return HU_OK;
+}
+
+static hu_error_t discord_get_response_constraints(void *ctx,
+                                                   hu_channel_response_constraints_t *out) {
+    (void)ctx;
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    out->max_chars = 2000;
+    return HU_OK;
+}
+
+static const char *discord_reaction_emoji_url(hu_reaction_type_t reaction) {
+    switch (reaction) {
+    case HU_REACTION_HEART:
+        return "%E2%9D%A4%EF%B8%8F";
+    case HU_REACTION_THUMBS_UP:
+        return "%F0%9F%91%8D";
+    case HU_REACTION_THUMBS_DOWN:
+        return "%F0%9F%91%8E";
+    case HU_REACTION_HAHA:
+        return "%F0%9F%98%82";
+    case HU_REACTION_EMPHASIS:
+        return "%E2%9D%97";
+    case HU_REACTION_QUESTION:
+        return "%E2%9D%93";
+    default:
+        return NULL;
+    }
+}
+
+static hu_error_t discord_start_typing(void *ctx, const char *recipient, size_t recipient_len) {
+    hu_discord_ctx_t *c = (hu_discord_ctx_t *)ctx;
+    if (!c || !c->alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!c->token || c->token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    if (!recipient || recipient_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if HU_IS_TEST
+    return HU_OK;
+#else
+    char url_buf[512];
+    int n = snprintf(url_buf, sizeof(url_buf), "%s/%.*s/typing", DISCORD_API_BASE,
+                     (int)recipient_len, recipient);
+    if (n < 0 || (size_t)n >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+
+    char auth_buf[256];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Authorization: Bot %.*s", (int)c->token_len,
+                      c->token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+
+    char headers_buf[320];
+    int nh = snprintf(headers_buf, sizeof(headers_buf), "Content-Length: 0\r\n%s", auth_buf);
+    if (nh <= 0 || (size_t)nh >= sizeof(headers_buf))
+        return HU_ERR_INTERNAL;
+
+    hu_http_response_t resp = {0};
+    hu_error_t err = hu_http_request(c->alloc, url_buf, "POST", headers_buf, NULL, 0, &resp);
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    if (err != HU_OK)
+        return HU_ERR_CHANNEL_SEND;
+    if (resp.status_code < 200 || resp.status_code >= 300)
+        return HU_ERR_CHANNEL_SEND;
+    return HU_OK;
+#endif
+}
+
+static hu_error_t discord_react(void *ctx, const char *target, size_t target_len, int64_t message_id,
+                                hu_reaction_type_t reaction) {
+    hu_discord_ctx_t *c = (hu_discord_ctx_t *)ctx;
+    if (!c || !c->alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!c->token || c->token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    if (!target || target_len == 0 || message_id <= 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    const char *emoji_enc = discord_reaction_emoji_url(reaction);
+    if (!emoji_enc)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if HU_IS_TEST
+    return HU_OK;
+#else
+    char auth_buf[256];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Authorization: Bot %.*s", (int)c->token_len,
+                      c->token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+
+    char url_buf[640];
+    int nu = snprintf(url_buf, sizeof(url_buf),
+                      "%s/%.*s/messages/%" PRId64 "/reactions/%s/@me", DISCORD_API_BASE,
+                      (int)target_len, target, message_id, emoji_enc);
+    if (nu < 0 || (size_t)nu >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+
+    char headers_buf[320];
+    int nh = snprintf(headers_buf, sizeof(headers_buf), "Content-Length: 0\r\n%s", auth_buf);
+    if (nh <= 0 || (size_t)nh >= sizeof(headers_buf))
+        return HU_ERR_INTERNAL;
+
+    hu_http_response_t resp = {0};
+    hu_error_t err = hu_http_request(c->alloc, url_buf, "PUT", headers_buf, NULL, 0, &resp);
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    if (err != HU_OK)
+        return HU_ERR_CHANNEL_SEND;
+    if (resp.status_code < 200 || resp.status_code >= 300)
+        return HU_ERR_CHANNEL_SEND;
+    return HU_OK;
+#endif
+}
+
+static hu_error_t discord_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                    const char *contact_id, size_t contact_id_len,
+                                                    size_t limit, hu_channel_history_entry_t **out,
+                                                    size_t *out_count) {
+    hu_discord_ctx_t *c = (hu_discord_ctx_t *)ctx;
+    if (!c || !alloc || !contact_id || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+
+#if HU_IS_TEST
+    (void)contact_id_len;
+    (void)limit;
+    return HU_OK;
+#else
+    if (!c->token || c->token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    if (limit == 0)
+        return HU_OK;
+
+    size_t lim = limit > 100 ? 100 : limit;
+
+    char url_buf[512];
+    int nu = snprintf(url_buf, sizeof(url_buf), "%s/%.*s/messages?limit=%zu", DISCORD_API_BASE,
+                      (int)contact_id_len, contact_id, lim);
+    if (nu < 0 || (size_t)nu >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+
+    char auth_buf[256];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Authorization: Bot %.*s", (int)c->token_len,
+                      c->token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+
+    hu_http_response_t resp = {0};
+    hu_error_t err = hu_http_get(alloc, url_buf, auth_buf, &resp);
+    if (err != HU_OK || resp.status_code != 200 || !resp.body || resp.body_len == 0) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return err != HU_OK ? err : HU_ERR_CHANNEL_SEND;
+    }
+
+    hu_json_value_t *parsed = NULL;
+    err = hu_json_parse(alloc, resp.body, resp.body_len, &parsed);
+    if (resp.owned && resp.body)
+        hu_http_response_free(alloc, &resp);
+    if (err != HU_OK || !parsed || parsed->type != HU_JSON_ARRAY) {
+        if (parsed)
+            hu_json_free(alloc, parsed);
+        return err != HU_OK ? err : HU_ERR_INTERNAL;
+    }
+
+    size_t arr_len = parsed->data.array.len;
+    if (arr_len == 0) {
+        hu_json_free(alloc, parsed);
+        return HU_OK;
+    }
+
+    hu_channel_history_entry_t *entries =
+        (hu_channel_history_entry_t *)alloc->alloc(alloc->ctx, arr_len * sizeof(*entries));
+    if (!entries) {
+        hu_json_free(alloc, parsed);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    memset(entries, 0, arr_len * sizeof(*entries));
+    size_t count = 0;
+
+    /* Discord returns newest first; emit chronological (oldest first). */
+    for (size_t j = arr_len; j > 0; j--) {
+        size_t i = j - 1;
+        hu_json_value_t *msg = parsed->data.array.items[i];
+        if (!msg || msg->type != HU_JSON_OBJECT)
+            continue;
+
+        hu_json_value_t *author = hu_json_object_get(msg, "author");
+        if (!author || author->type != HU_JSON_OBJECT)
+            continue;
+
+        const char *content = hu_json_get_string(msg, "content");
+        if (!content)
+            content = "";
+        size_t content_len = strlen(content);
+        if (content_len == 0)
+            continue;
+
+        const char *author_id = hu_json_get_string(author, "id");
+        bool from_me = false;
+        if (c->bot_id && c->bot_id_len > 0 && author_id)
+            from_me = strcmp(author_id, c->bot_id) == 0;
+        else
+            from_me = hu_json_get_bool(author, "bot", false);
+
+        size_t tlen = content_len;
+        if (tlen > sizeof(entries[0].text) - 1)
+            tlen = sizeof(entries[0].text) - 1;
+        memcpy(entries[count].text, content, tlen);
+        entries[count].text[tlen] = '\0';
+        entries[count].from_me = from_me;
+
+        const char *ts = hu_json_get_string(msg, "timestamp");
+        if (ts) {
+            size_t tslen = strlen(ts);
+            if (tslen > sizeof(entries[0].timestamp) - 1)
+                tslen = sizeof(entries[0].timestamp) - 1;
+            memcpy(entries[count].timestamp, ts, tslen);
+            entries[count].timestamp[tslen] = '\0';
+        }
+
+        count++;
+    }
+
+    hu_json_free(alloc, parsed);
+
+    if (count == 0) {
+        alloc->free(alloc->ctx, entries, arr_len * sizeof(*entries));
+        return HU_OK;
+    }
+
+    /* Callers free with entry_count * sizeof — allocation must match exactly. */
+    if (count < arr_len) {
+        hu_channel_history_entry_t *exact =
+            (hu_channel_history_entry_t *)alloc->alloc(alloc->ctx, count * sizeof(*entries));
+        if (!exact) {
+            alloc->free(alloc->ctx, entries, arr_len * sizeof(*entries));
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        memcpy(exact, entries, count * sizeof(*entries));
+        alloc->free(alloc->ctx, entries, arr_len * sizeof(*entries));
+        entries = exact;
+    }
+
+    *out = entries;
+    *out_count = count;
+    return HU_OK;
+#endif
+}
+
+static char *discord_get_attachment_path(void *ctx, hu_allocator_t *alloc, int64_t message_id) {
+#if HU_IS_TEST
+    (void)ctx;
+    (void)alloc;
+    (void)message_id;
+    return NULL;
+#else
+    hu_discord_ctx_t *c = (hu_discord_ctx_t *)ctx;
+    if (!c || !alloc || !c->token || c->token_len == 0 || message_id <= 0)
+        return NULL;
+    if (!c->channel_ids || c->channel_ids_count == 0)
+        return NULL;
+
+    char auth_buf[256];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Authorization: Bot %.*s", (int)c->token_len,
+                      c->token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return NULL;
+
+    char mid[32];
+    int nm = snprintf(mid, sizeof(mid), "%" PRId64, message_id);
+    if (nm <= 0 || (size_t)nm >= sizeof(mid))
+        return NULL;
+
+    for (size_t ch_idx = 0; ch_idx < c->channel_ids_count; ch_idx++) {
+        const char *ch_id = c->channel_ids[ch_idx];
+        if (!ch_id)
+            continue;
+
+        char url_buf[512];
+        int nu = snprintf(url_buf, sizeof(url_buf), "%s/%s/messages/%s", DISCORD_API_BASE, ch_id,
+                          mid);
+        if (nu < 0 || (size_t)nu >= sizeof(url_buf))
+            continue;
+
+        hu_http_response_t resp = {0};
+        hu_error_t err = hu_http_get(alloc, url_buf, auth_buf, &resp);
+        if (err != HU_OK || resp.status_code != 200 || !resp.body) {
+            if (resp.owned && resp.body)
+                hu_http_response_free(alloc, &resp);
+            continue;
+        }
+
+        hu_json_value_t *parsed = NULL;
+        err = hu_json_parse(alloc, resp.body, resp.body_len, &parsed);
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        if (err != HU_OK || !parsed || parsed->type != HU_JSON_OBJECT) {
+            if (parsed)
+                hu_json_free(alloc, parsed);
+            continue;
+        }
+
+        hu_json_value_t *atts = hu_json_object_get(parsed, "attachments");
+        if (!atts || atts->type != HU_JSON_ARRAY || atts->data.array.len == 0) {
+            hu_json_free(alloc, parsed);
+            continue;
+        }
+
+        hu_json_value_t *a0 = atts->data.array.items[0];
+        const char *url = (a0 && a0->type == HU_JSON_OBJECT) ? hu_json_get_string(a0, "url") : NULL;
+        if (!url) {
+            hu_json_free(alloc, parsed);
+            continue;
+        }
+
+        size_t ulen = strlen(url);
+        char *copy = (char *)alloc->alloc(alloc->ctx, ulen + 1);
+        if (!copy) {
+            hu_json_free(alloc, parsed);
+            return NULL;
+        }
+        memcpy(copy, url, ulen + 1);
+        hu_json_free(alloc, parsed);
+        return copy;
+    }
+
+    return NULL;
+#endif
+}
+
+static bool discord_human_active_recently(void *ctx, const char *contact, size_t contact_len,
+                                          int window_sec) {
+    (void)ctx;
+    (void)contact;
+    (void)contact_len;
+    (void)window_sec;
+    return false;
+}
+
 static const hu_channel_vtable_t discord_vtable = {
     .start = discord_start,
     .stop = discord_stop,
@@ -365,8 +715,13 @@ static const hu_channel_vtable_t discord_vtable = {
     .name = discord_name,
     .health_check = discord_health_check,
     .send_event = discord_send_event,
-    .start_typing = NULL,
-    .stop_typing = NULL,
+    .start_typing = discord_start_typing,
+    .stop_typing = discord_stop_typing,
+    .load_conversation_history = discord_load_conversation_history,
+    .get_response_constraints = discord_get_response_constraints,
+    .react = discord_react,
+    .get_attachment_path = discord_get_attachment_path,
+    .human_active_recently = discord_human_active_recently,
 };
 
 /* ─── Webhook inbound queue ────────────────────────────────────────────── */

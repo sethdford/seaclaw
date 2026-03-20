@@ -262,6 +262,55 @@ fail:
     hu_json_buf_free(&jbuf);
     return err;
 }
+
+static hu_error_t build_set_message_reaction_body(hu_allocator_t *alloc, const char *chat_id,
+                                                  size_t chat_id_len, int64_t message_id,
+                                                  const char *emoji, size_t emoji_len, char **out,
+                                                  size_t *out_len) {
+    hu_json_buf_t jbuf;
+    hu_error_t err = hu_json_buf_init(&jbuf, alloc);
+    if (err)
+        return err;
+    err = hu_json_buf_append_raw(&jbuf, "{", 1);
+    if (err)
+        goto fail;
+    err = hu_json_append_key_value(&jbuf, "chat_id", 8, chat_id, chat_id_len);
+    if (err)
+        goto fail;
+    err = hu_json_buf_append_raw(&jbuf, ",", 1);
+    if (err)
+        goto fail;
+    err = hu_json_append_key_int(&jbuf, "message_id", 10, (long long)message_id);
+    if (err)
+        goto fail;
+    err = hu_json_buf_append_raw(&jbuf, ",\"reaction\":[{", 14);
+    if (err)
+        goto fail;
+    err = hu_json_append_key_value(&jbuf, "type", 4, "emoji", 5);
+    if (err)
+        goto fail;
+    err = hu_json_buf_append_raw(&jbuf, ",", 1);
+    if (err)
+        goto fail;
+    err = hu_json_append_key_value(&jbuf, "emoji", 5, emoji, emoji_len);
+    if (err)
+        goto fail;
+    err = hu_json_buf_append_raw(&jbuf, "}]}", 3);
+    if (err)
+        goto fail;
+    *out_len = jbuf.len;
+    *out = (char *)alloc->alloc(alloc->ctx, jbuf.len + 1);
+    if (!*out) {
+        err = HU_ERR_OUT_OF_MEMORY;
+        goto fail;
+    }
+    memcpy(*out, jbuf.ptr, jbuf.len + 1);
+    hu_json_buf_free(&jbuf);
+    return HU_OK;
+fail:
+    hu_json_buf_free(&jbuf);
+    return err;
+}
 #endif
 
 #if !HU_IS_TEST
@@ -784,6 +833,121 @@ static bool telegram_health_check(void *ctx) {
 #endif
 }
 
+static hu_error_t telegram_get_response_constraints(void *ctx,
+                                                    hu_channel_response_constraints_t *out) {
+    (void)ctx;
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    out->max_chars = TELEGRAM_MAX_MSG;
+    return HU_OK;
+}
+
+static const char *telegram_reaction_emoji_utf8(hu_reaction_type_t reaction, size_t *out_len) {
+    if (!out_len)
+        return NULL;
+    switch (reaction) {
+    case HU_REACTION_HEART:
+        *out_len = 3;
+        return "\xE2\x9D\xA4"; /* U+2764 */
+    case HU_REACTION_THUMBS_UP:
+        *out_len = 4;
+        return "\xF0\x9F\x91\x8D"; /* U+1F44D */
+    case HU_REACTION_THUMBS_DOWN:
+        *out_len = 4;
+        return "\xF0\x9F\x91\x8E"; /* U+1F44E */
+    case HU_REACTION_HAHA:
+        *out_len = 4;
+        return "\xF0\x9F\x98\x82"; /* U+1F602 */
+    case HU_REACTION_EMPHASIS:
+        *out_len = 3;
+        return "\xE2\x9D\x97"; /* U+2757 */
+    case HU_REACTION_QUESTION:
+        *out_len = 3;
+        return "\xE2\x9D\x93"; /* U+2753 */
+    default:
+        return NULL;
+    }
+}
+
+static hu_error_t telegram_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                     const char *contact_id, size_t contact_id_len,
+                                                     size_t limit, hu_channel_history_entry_t **out,
+                                                     size_t *out_count) {
+    (void)ctx;
+    (void)contact_id_len;
+    (void)limit;
+    if (!alloc || !contact_id || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+#if HU_IS_TEST
+    return HU_OK;
+#else
+    (void)contact_id;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
+static hu_error_t telegram_react(void *ctx, const char *target, size_t target_len,
+                                 int64_t message_id, hu_reaction_type_t reaction) {
+    hu_telegram_ctx_t *c = (hu_telegram_ctx_t *)ctx;
+    if (!c || !c->alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!target || target_len == 0 || message_id <= 0 || reaction == HU_REACTION_NONE)
+        return HU_ERR_INVALID_ARGUMENT;
+#if HU_IS_TEST
+    (void)target_len;
+    (void)reaction;
+    return HU_OK;
+#else
+    if (!c->token || c->token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    size_t emoji_len = 0;
+    const char *emoji = telegram_reaction_emoji_utf8(reaction, &emoji_len);
+    if (!emoji || emoji_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    char url_buf[512];
+    int n = build_api_url(url_buf, sizeof(url_buf), c->token, c->token_len, "setMessageReaction");
+    if (n < 0 || (size_t)n >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+    char *body = NULL;
+    size_t body_len = 0;
+    hu_error_t err = build_set_message_reaction_body(c->alloc, target, target_len, message_id, emoji,
+                                                     emoji_len, &body, &body_len);
+    if (err)
+        return err;
+    hu_http_response_t resp = {0};
+    err = hu_http_post_json(c->alloc, url_buf, NULL, body, body_len, &resp);
+    if (body)
+        c->alloc->free(c->alloc->ctx, body, body_len + 1);
+    if (err != HU_OK) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(c->alloc, &resp);
+        return HU_ERR_CHANNEL_SEND;
+    }
+    bool ok = (resp.status_code == 200 && resp.body && strstr(resp.body, "\"ok\":true") != NULL);
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    return ok ? HU_OK : HU_ERR_CHANNEL_SEND;
+#endif
+}
+
+static char *telegram_get_attachment_path(void *ctx, hu_allocator_t *alloc, int64_t message_id) {
+    (void)ctx;
+    (void)alloc;
+    (void)message_id;
+    return NULL;
+}
+
+static bool telegram_human_active_recently(void *ctx, const char *contact, size_t contact_len,
+                                           int window_sec) {
+    (void)ctx;
+    (void)contact;
+    (void)contact_len;
+    (void)window_sec;
+    return false;
+}
+
 static const hu_channel_vtable_t telegram_vtable = {
     .start = telegram_start,
     .stop = telegram_stop,
@@ -793,6 +957,11 @@ static const hu_channel_vtable_t telegram_vtable = {
     .send_event = telegram_send_event,
     .start_typing = telegram_start_typing,
     .stop_typing = telegram_stop_typing,
+    .load_conversation_history = telegram_load_conversation_history,
+    .get_response_constraints = telegram_get_response_constraints,
+    .react = telegram_react,
+    .get_attachment_path = telegram_get_attachment_path,
+    .human_active_recently = telegram_human_active_recently,
 };
 
 /* ─── Public API ─────────────────────────────────────────────────────────── */
