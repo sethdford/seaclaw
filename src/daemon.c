@@ -2742,7 +2742,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 const char *dpo_ch =
                                     (agent->active_channel && agent->active_channel[0])
                                         ? agent->active_channel
-                                        : "imessage";
+                                        : "unknown";
                                 int dpo_plen = snprintf(dpo_path, sizeof(dpo_path),
                                                           "data/%s/dpo_preferences.jsonl", dpo_ch);
                                 size_t exported = 0;
@@ -3647,8 +3647,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     int window = 120;
                     if (dcfg_hu && dcfg_hu->user_response_window_sec > 0)
                         window = dcfg_hu->user_response_window_sec;
-                    else if (config && config->channels.imessage.user_response_window_sec > 0)
-                        window = config->channels.imessage.user_response_window_sec;
                     if (ch->channel->vtable->human_active_recently &&
                         ch->channel->vtable->human_active_recently(ch->channel->ctx, batch_key,
                                                                    key_len, window)) {
@@ -5261,7 +5259,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (style_ctx)
                     alloc->free(alloc->ctx, style_ctx, style_ctx_len + 1);
 
-                /* Tapback / reaction awareness via channel vtable (e.g. iMessage chat.db). */
+                /* Tapback / reaction awareness via channel vtable. */
 #ifndef HU_IS_TEST
                 {
                     if (ch->channel->vtable->build_reaction_context) {
@@ -5741,8 +5739,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                 /* 6. Attachment context: guidance when attachments detected in history.
-                 * When provider supports vision and channel is iMessage, try to get image
-                 * path and describe it for richer context. */
+                 * When provider supports vision and channel exposes attachments, try to
+                 * get image path and describe it for richer context. */
                 if (history_entries && history_count > 0) {
                     size_t attach_ctx_len = 0;
                     char *attach_ctx = hu_conversation_attachment_context(
@@ -7927,8 +7925,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         int window = 120;
                         if (dcfg_ps && dcfg_ps->user_response_window_sec > 0)
                             window = dcfg_ps->user_response_window_sec;
-                        else if (config && config->channels.imessage.user_response_window_sec > 0)
-                            window = config->channels.imessage.user_response_window_sec;
                         if (chn_name && ch->channel->vtable->human_active_recently &&
                             ch->channel->vtable->human_active_recently(ch->channel->ctx, batch_key,
                                                                        key_len, window)) {
@@ -7940,7 +7936,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 #endif
-                    /* ── Voice decision: TTS for iMessage when enabled ───── */
+                    /* ── Voice decision: TTS when channel has voice_enabled ───── */
                     bool sent_voice = false;
 #if defined(HU_ENABLE_CARTESIA) && defined(HU_HAS_PERSONA)
                     {
@@ -7952,9 +7948,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             get_active_daemon_config(config, chn_voice);
                         bool voice_channel_ok =
                             dcfg_voice && dcfg_voice->voice_enabled;
-                        if (!voice_channel_ok && chn_voice &&
-                            strcmp(chn_voice, "imessage") == 0)
-                            voice_channel_ok = true; /* legacy before daemon.voice_enabled */
                         if (voice_channel_ok && agent->persona &&
                             agent->persona->voice.voice_id[0] &&
                             agent->persona->voice_messages.enabled) {
