@@ -1,4 +1,5 @@
 #include "human/memory/vector_math.h"
+#include "human/accel.h"
 #include <math.h>
 #include <string.h>
 
@@ -6,23 +7,37 @@ float hu_vector_cosine_similarity(const float *a, const float *b, size_t len) {
     if (!a || !b || len == 0)
         return 0.0f;
 
+#if !defined(HU_IS_TEST)
+    float dot = hu_dot_f32(a, b, len);
+    float na = hu_sum_sq_f32(a, len);
+    float nb = hu_sum_sq_f32(b, len);
+    double denom = sqrt((double)na) * sqrt((double)nb);
+    if (!isfinite(denom) || denom < 1e-300)
+        return 0.0f;
+    double raw = (double)dot / denom;
+    if (!isfinite(raw))
+        return 0.0f;
+    if (raw < 0.0)
+        raw = 0.0;
+    if (raw > 1.0)
+        raw = 1.0;
+    return (float)raw;
+#else
     double dot = 0.0, norm_a = 0.0, norm_b = 0.0;
     for (size_t i = 0; i < len; i++) {
         double x = (double)a[i];
         double y = (double)b[i];
         if (x != x || y != y)
-            return 0.0f; /* NaN */
+            return 0.0f;
         if (x > 1e38 || x < -1e38 || y > 1e38 || y < -1e38)
-            return 0.0f; /* inf */
+            return 0.0f;
         dot += x * y;
         norm_a += x * x;
         norm_b += y * y;
     }
-
     double denom = sqrt(norm_a) * sqrt(norm_b);
     if (!isfinite(denom) || denom < 1e-300)
         return 0.0f;
-
     double raw = dot / denom;
     if (!isfinite(raw))
         return 0.0f;
@@ -31,6 +46,7 @@ float hu_vector_cosine_similarity(const float *a, const float *b, size_t len) {
     if (raw > 1.0)
         raw = 1.0;
     return (float)raw;
+#endif
 }
 
 unsigned char *hu_vector_to_bytes(hu_allocator_t *alloc, const float *v, size_t len) {

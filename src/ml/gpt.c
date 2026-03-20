@@ -1,7 +1,9 @@
-/* GPT model with full backward pass — CPU reference implementation.
- * Supports activation caching, gradient computation, and parameter registration.
+/* GPT model — hardware-accelerated when available (Accelerate/AMX on Apple Silicon,
+ * NEON on aarch64). Supports activation caching, gradient computation, and
+ * parameter registration.
  * Layout: Q/K/V in [B*S × n_head*hd] (row-major per token). */
 
+#include "human/accel.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/ml/lora.h"
@@ -154,25 +156,19 @@ static void softmax_vec(float *x, int n)
     for (int i = 0; i < n; i++) x[i] /= sum;
 }
 
-/* out[m×n] = A[m×k] @ B[n×k]^T */
+/* out[m×n] = A[m×k] @ B[n×k]^T — delegates to hw-accelerated path when available */
 static void matmul_atb(float *out, const float *a, const float *b, int m, int n, int k)
 {
-    for (int i = 0; i < m; i++)
-        for (int j = 0; j < n; j++) {
-            float s = 0.0f;
-            for (int t = 0; t < k; t++) s += a[i * k + t] * b[j * k + t];
-            out[i * n + j] = s;
-        }
+    hu_matmul_atb(out, a, b, m, n, k);
 }
 
 #define RMS_EPS 1e-6f
 
-static void rms_norm(float *out, const float *x, size_t n)
+static void rms_norm(float * restrict out, const float * restrict x, size_t n)
 {
-    float sq = 0.0f;
-    for (size_t i = 0; i < n; i++) sq += x[i] * x[i];
-    float rms = sqrtf(sq / (float)n + RMS_EPS);
-    for (size_t i = 0; i < n; i++) out[i] = x[i] / rms;
+    float sq = hu_sum_sq_f32(x, n);
+    float inv = 1.0f / sqrtf(sq / (float)n + RMS_EPS);
+    for (size_t i = 0; i < n; i++) out[i] = x[i] * inv;
 }
 
 /* Q/K/V layout: [B*S × n_head*hd] — apply RoPE per token position. */
@@ -202,16 +198,13 @@ static void apply_rope(float *q, float *k, const float *cs, const float *sn,
         }
 }
 
-/* L2-normalize each head vector after RoPE (autoresearch: q, k = norm(q), norm(k)).
- * Stores 1/||x|| per head in inv_out (B*S*nheads) for exact backward pass. */
 static void head_norm(float *buf, float *inv_out, int B, int S, int nheads, int hd)
 {
     for (int b = 0; b < B; b++)
         for (int s = 0; s < S; s++)
             for (int h = 0; h < nheads; h++) {
                 float *v = buf + (b * S + s) * (nheads * hd) + h * hd;
-                float sq = 0.0f;
-                for (int d = 0; d < hd; d++) sq += v[d] * v[d];
+                float sq = hu_sum_sq_f32(v, (size_t)hd);
                 float inv = 1.0f / (sqrtf(sq) + 1e-6f);
                 if (inv_out)
                     inv_out[(b * S + s) * nheads + h] = inv;
@@ -219,8 +212,6 @@ static void head_norm(float *buf, float *inv_out, int B, int S, int nheads, int 
             }
 }
 
-/* Backward for head_norm: for y = x/||x||, dx = (dy - y*(y·dy)) / ||x||.
- * inv_norms[B*S*nheads] has pre-cached 1/||x|| from the forward pass. */
 static void head_norm_bw(float *dbuf, const float *y, const float *inv_norms,
                          int B, int S, int nheads, int hd)
 {
@@ -230,46 +221,32 @@ static void head_norm_bw(float *dbuf, const float *y, const float *inv_norms,
                 float *dv = dbuf + (b * S + s) * (nheads * hd) + h * hd;
                 const float *yv = y + (b * S + s) * (nheads * hd) + h * hd;
                 float inv = inv_norms[(b * S + s) * nheads + h];
-                float dot = 0.0f;
-                for (int d = 0; d < hd; d++) dot += dv[d] * yv[d];
+                float dot = hu_dot_f32(dv, yv, (size_t)hd);
                 for (int d = 0; d < hd; d++) dv[d] = (dv[d] - yv[d] * dot) * inv;
             }
 }
 
 /* ─── Backward helpers ──────────────────────────────────────────────────── */
 
-/* C[m×k] += A[m×n] @ B[n×k] */
+/* C[m×k] += A[m×n] @ B[n×k] — delegates to hw-accelerated path when available */
 static void matmul_add_ab(float *c, const float *a, const float *b, int m, int n, int k)
 {
-    for (int i = 0; i < m; i++)
-        for (int j = 0; j < k; j++) {
-            float s = 0.0f;
-            for (int t = 0; t < n; t++) s += a[i * n + t] * b[t * k + j];
-            c[i * k + j] += s;
-        }
+    hu_matmul_add_ab(c, a, b, m, n, k);
 }
 
-/* C[n×k] += A[m×n]^T @ B[m×k] */
+/* C[n×k] += A[m×n]^T @ B[m×k] — delegates to hw-accelerated path when available */
 static void matmul_add_tab(float *c, const float *a, const float *b, int m, int n, int k)
 {
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < k; j++) {
-            float s = 0.0f;
-            for (int t = 0; t < m; t++) s += a[t * n + i] * b[t * k + j];
-            c[i * k + j] += s;
-        }
+    hu_matmul_add_tab(c, a, b, m, n, k);
 }
 
-/* dx[n] += rms_norm_backward(dy, x, y) per vector */
-static void rms_norm_bw(float *dx, const float *dy, const float *x,
-                         const float *y, size_t n)
+static void rms_norm_bw(float * restrict dx, const float * restrict dy,
+                        const float * restrict x, const float * restrict y,
+                        size_t n)
 {
-    float sq = 0.0f;
-    for (size_t i = 0; i < n; i++) sq += x[i] * x[i];
+    float sq = hu_sum_sq_f32(x, n);
     float inv = 1.0f / sqrtf(sq / (float)n + RMS_EPS);
-    float dot = 0.0f;
-    for (size_t i = 0; i < n; i++) dot += dy[i] * y[i];
-    dot /= (float)n;
+    float dot = hu_dot_f32(dy, y, n) / (float)n;
     for (size_t i = 0; i < n; i++) dx[i] += inv * (dy[i] - y[i] * dot);
 }
 
@@ -475,9 +452,7 @@ static hu_error_t gpt_forward(void *ctx, const hu_ml_tensor_t *input,
                     for (size_t j = 0; j < S; j++) {
                         if (j <= i && j >= j_start) {
                             const float *kj = k_buf + (b * S + j) * (nkv * hd) + kvh * hd;
-                            float dot = 0.0f;
-                            for (size_t d = 0; d < hd; d++) dot += qi[d] * kj[d];
-                            w[j] = dot * scale;
+                            w[j] = hu_dot_f32(qi, kj, hd) * scale;
                         } else {
                             w[j] = -1e9f;
                         }
@@ -714,15 +689,12 @@ static hu_error_t gpt_backward(void *ctx, const hu_ml_tensor_t *grad_output)
 
                     for (size_t j = 0; j < S; j++) {
                         const float *vj = lc->v + (b * S + j) * (nkv * hd) + kvh * hd;
-                        float dw = 0.0f;
-                        for (size_t d = 0; d < hd; d++) dw += doi[d] * vj[d];
-                        d_wbuf[j] = dw;
+                        d_wbuf[j] = hu_dot_f32(doi, vj, hd);
                         float *dvj = d_v + (b * S + j) * (nkv * hd) + kvh * hd;
                         for (size_t d = 0; d < hd; d++) dvj[d] += wi[j] * doi[d];
                     }
 
-                    float dot_wdw = 0.0f;
-                    for (size_t j = 0; j < S; j++) dot_wdw += wi[j] * d_wbuf[j];
+                    float dot_wdw = hu_dot_f32(wi, d_wbuf, S);
                     for (size_t j = 0; j < S; j++)
                         d_sbuf[j] = scale * wi[j] * (d_wbuf[j] - dot_wdw);
 

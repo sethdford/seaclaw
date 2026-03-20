@@ -295,6 +295,7 @@ set(HU_CORE_SOURCES
     src/identity.c
     src/state.c
     src/heartbeat.c
+    src/core/accel.c
     src/core/allocator.c
     src/core/error.c
     src/core/arena.c
@@ -333,6 +334,8 @@ set(HU_CORE_SOURCES
     src/multimodal/calendar.c
     src/multimodal/document.c
     src/multimodal/image.c
+    src/multimodal/audio.c
+    src/multimodal/video.c
     src/multimodal/multimodal.c
     src/rag.c
     src/service.c
@@ -425,7 +428,13 @@ set(HU_CORE_SOURCES
     src/context/intelligence.c
     src/intelligence/skill_system.c
     src/feeds/processor.c
+    src/feeds/awareness.c
     src/context/behavioral.c
+    src/calibration/timing_analyzer.c
+    src/calibration/style_analyzer.c
+    src/calibration/calibrate.c
+    src/calibration/clone.c
+    src/calibration/ab_compare.c
     src/context/context_ext.c
     src/agent/episodic.c
     src/agent/reflection.c
@@ -472,6 +481,7 @@ set(HU_CORE_SOURCES
     src/providers/reliable.c
     src/providers/from_config.c
     src/providers/router.c
+    src/providers/ensemble.c
     src/providers/codex_cli.c
     src/providers/openai_codex.c
     src/providers/runtime_bundle.c
@@ -494,6 +504,7 @@ set(HU_CORE_SOURCES
     src/memory/comfort_patterns.c
     src/memory/emotional_moments.c
     src/memory/superhuman.c
+    src/memory/contact_graph.c
     src/memory/fast_capture.c
     src/memory/promotion.c
     src/memory/consolidation.c
@@ -596,6 +607,7 @@ set(HU_CORE_SOURCES
     src/tools/factory.c
     src/mcp_server.c
     src/channels/thread_binding.c
+    src/channels/format.c
     src/channels/voice_integration.c
     src/security/policy_engine.c
     src/security/replay.c
@@ -703,6 +715,8 @@ list(APPEND HU_CORE_SOURCES
     src/security/moderation.c
     src/tools/code_sandbox.c
     src/tools/computer_use.c
+    src/tools/image_gen.c
+    src/tools/browser_use.c
     src/tools/gui_agent.c
     src/tools/lsp.c
     src/voice/webrtc.c
@@ -973,7 +987,16 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(human_core PUBLIC m dl)
 endif()
 if(APPLE)
-    target_link_libraries(human_core PRIVATE "-framework ApplicationServices")
+    target_link_libraries(human_core PRIVATE "-framework ApplicationServices" "-framework ImageIO" "-framework Accelerate")
+    # New CBLAS headers; avoids -Wdeprecated-declarations on cblas_sgemm (macOS 13.3+).
+    target_compile_definitions(human_core PRIVATE ACCELERATE_NEW_LAPACK=1)
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(X11 QUIET)
+    if(X11_FOUND AND TARGET X11::Xtst)
+        target_link_libraries(human_core PRIVATE X11::X11 X11::Xtst)
+        target_compile_definitions(human_core PRIVATE HU_HAS_X11=1)
+    endif()
 endif()
 target_include_directories(human_core PRIVATE ${HU_ROOT}/asm/generic ${HU_ROOT}/src/agent ${HU_ROOT}/src/gateway)
 ## HU_IS_TEST is intentionally NOT set here — human_core is the production library.
@@ -1746,8 +1769,10 @@ set(HU_TEST_SOURCES
     tests/test_vault.c
     tests/test_provider.c
     tests/test_provider_http.c
+    tests/test_ensemble.c
     tests/test_api_key.c
     tests/test_channel.c
+    tests/test_channel_format.c
     tests/test_tool.c
     tests/test_peripheral.c
     tests/test_peripheral_ctrl.c
@@ -1783,8 +1808,11 @@ set(HU_TEST_SOURCES
     tests/test_multimodal.c
     tests/test_multimodal_pipeline.c
     tests/test_multimodal_memory.c
+    tests/test_multimodal_audio.c
+    tests/test_multimodal_video.c
     tests/test_voice_duplex.c
     tests/test_voice_realtime.c
+    tests/test_voice_rt_openai.c
     tests/test_autonomy.c
     tests/test_retrieval.c
     tests/test_prompt.c
@@ -1874,6 +1902,8 @@ set(HU_TEST_SOURCES
     tests/test_proactive.c
     tests/test_weather_awareness.c
     tests/test_timing.c
+    tests/test_calibration.c
+    tests/test_behavioral_clone.c
     tests/test_governor.c
     tests/test_relationship_dynamics.c
     tests/test_arbitrator.c
@@ -1893,6 +1923,7 @@ set(HU_TEST_SOURCES
     tests/test_memory_degradation.c
     tests/test_self_awareness.c
     tests/test_superhuman.c
+    tests/test_contact_graph.c
     tests/test_tool_call_parser.c
     tests/test_tool_router.c
     tests/test_dag.c
@@ -1910,6 +1941,7 @@ set(HU_TEST_SOURCES
     tests/test_apple_feeds.c
     tests/test_social_feeds.c
     tests/test_feed_processor.c
+    tests/test_feed_awareness.c
     tests/test_forgetting_curve.c
     tests/test_weather_fetch.c
     tests/test_save_for_later.c
@@ -1939,6 +1971,7 @@ set(HU_TEST_SOURCES
     tests/test_distiller.c
     tests/test_model_router.c
     tests/test_plan_executor.c
+    tests/test_planner_mcts_wiring.c
     tests/test_cdp.c
 )
 if(HU_ENABLE_FEEDS)
@@ -1962,6 +1995,7 @@ endif()
 
 list(APPEND HU_TEST_SOURCES tests/test_memory_features.c)
 list(APPEND HU_TEST_SOURCES tests/test_agi_frontiers.c tests/test_world_model_graph.c tests/test_mcts_planner.c)
+list(APPEND HU_TEST_SOURCES tests/test_orchestrator.c)
 list(APPEND HU_TEST_SOURCES tests/test_swarm_execution.c tests/test_dynamic_decomposition.c)
 list(APPEND HU_TEST_SOURCES tests/test_agent_matching.c tests/test_agent_communication.c)
 list(APPEND HU_TEST_SOURCES tests/test_world_simulation.c tests/test_world_context.c)
@@ -1990,7 +2024,10 @@ list(APPEND HU_TEST_SOURCES
     tests/test_cot_audit.c
     tests/test_moderation.c
     tests/test_code_sandbox.c
+    tests/test_compaction_hierarchical.c
     tests/test_computer_use.c
+    tests/test_image_gen.c
+    tests/test_browser_use.c
     tests/test_gui_agent.c
     tests/test_lsp.c
     tests/test_webrtc.c
