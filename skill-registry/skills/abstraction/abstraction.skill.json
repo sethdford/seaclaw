@@ -1,0 +1,9 @@
+{
+  "name": "abstraction",
+  "description": "Navigate between concrete details and abstract principles: know when to zoom in or out",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

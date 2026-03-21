@@ -1,0 +1,9 @@
+{
+  "name": "assumption-mapping",
+  "description": "Surface, categorize, and test hidden assumptions before they cause failure",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

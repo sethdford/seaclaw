@@ -1,0 +1,9 @@
+{
+  "name": "project-retrospective",
+  "description": "Run structured retrospectives to extract lessons learned and improve future performance",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}
