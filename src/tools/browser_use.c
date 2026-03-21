@@ -263,7 +263,11 @@ static hu_error_t browser_use_execute(void *ctx, hu_allocator_t *alloc, const hu
 
     if (strcmp(action, "navigate") == 0) {
         const char *url = hu_json_get_string(args, "url");
-        if (!url || !bu_url_allowed(url, strlen(url))) {
+        if (!url || url[0] == '\0') {
+            *out = hu_tool_result_fail("invalid or missing url", 22);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        if (!bu_url_allowed(url, strlen(url))) {
             *out = hu_tool_result_fail("invalid or missing url", 22);
             return HU_OK;
         }

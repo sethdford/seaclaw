@@ -39,7 +39,8 @@ static int non_empty_cstr(const char *s) {
 }
 
 hu_error_t hu_contact_graph_init(hu_allocator_t *alloc, void *db) {
-    (void)alloc;
+    if (!alloc)
+        return HU_ERR_INVALID_ARGUMENT;
     if (!db)
         return HU_ERR_INVALID_ARGUMENT;
 

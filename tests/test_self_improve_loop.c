@@ -234,6 +234,77 @@ static void test_closed_loop_simulated_improvement_keeps_patch(void) {
     sqlite3_close(db);
 }
 
+static void test_self_improve_parse_patch_valid_key_value(void) {
+    hu_structured_patch_t p = {0};
+    const char *s = "TEMPERATURE:0.75";
+    HU_ASSERT_TRUE(hu_self_improve_parse_patch(s, strlen(s), &p));
+    HU_ASSERT_TRUE(p.parsed);
+    HU_ASSERT_EQ((int)p.type, (int)HU_PATCH_TEMPERATURE);
+    HU_ASSERT_STR_EQ(p.key, "TEMPERATURE");
+    HU_ASSERT_EQ(p.numeric_value, 0.75);
+}
+
+static void test_self_improve_parse_patch_malformed_rejected(void) {
+    hu_structured_patch_t p = {0};
+    HU_ASSERT_FALSE(hu_self_improve_parse_patch("TEMPERATURE", 11, &p));
+    /* JSON-like blobs still contain ':'; use bracket-only text so parse fails (no colon). */
+    HU_ASSERT_FALSE(hu_self_improve_parse_patch("[1,2,3]", 7, &p));
+    HU_ASSERT_FALSE(hu_self_improve_parse_patch("TEMPERATURE:", 12, &p));
+}
+
+static void test_self_improve_parse_patch_null_or_empty_rejected(void) {
+    hu_structured_patch_t p = {0};
+    HU_ASSERT_FALSE(hu_self_improve_parse_patch(NULL, 4, &p));
+    HU_ASSERT_FALSE(hu_self_improve_parse_patch("x", 0, &p));
+    HU_ASSERT_FALSE(hu_self_improve_parse_patch("TEMPERATURE:1", 13, NULL));
+}
+
+static void test_self_improve_apply_structured_patch_under_is_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = open_mem_db();
+    hu_self_improve_t engine = {0};
+    HU_ASSERT_EQ(hu_self_improve_create(&alloc, db, &engine), HU_OK);
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
+    HU_ASSERT_EQ(hu_self_improve_init_tables(&engine), HU_OK);
+#endif
+
+    hu_structured_patch_t patch = {0};
+    patch.parsed = true;
+    patch.type = HU_PATCH_TEMPERATURE;
+    memcpy(patch.key, "TEMPERATURE", sizeof("TEMPERATURE"));
+    memcpy(patch.value, "0.5", sizeof("0.5"));
+    patch.numeric_value = 0.5;
+
+    HU_ASSERT_EQ(hu_self_improve_apply_structured_patch(&engine, &patch), HU_OK);
+
+    patch.parsed = false;
+    HU_ASSERT_EQ(hu_self_improve_apply_structured_patch(&engine, &patch), HU_ERR_INVALID_ARGUMENT);
+
+    hu_self_improve_deinit(&engine);
+    sqlite3_close(db);
+}
+
+static void test_self_improve_get_structured_patches_test_mode_empty(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = open_mem_db();
+    hu_self_improve_t engine = {0};
+    HU_ASSERT_EQ(hu_self_improve_create(&alloc, db, &engine), HU_OK);
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
+    HU_ASSERT_EQ(hu_self_improve_init_tables(&engine), HU_OK);
+#endif
+
+    hu_structured_patch_t *out = NULL;
+    size_t count = 99;
+    HU_ASSERT_EQ(hu_self_improve_get_structured_patches(&engine, &alloc, HU_PATCH_TEMPERATURE, &out,
+                                                        &count),
+                 HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+    HU_ASSERT_NULL(out);
+
+    hu_self_improve_deinit(&engine);
+    sqlite3_close(db);
+}
+
 #endif /* HU_ENABLE_SQLITE */
 
 void run_self_improve_loop_tests(void) {
@@ -250,5 +321,10 @@ void run_self_improve_loop_tests(void) {
     HU_RUN_TEST(test_verify_null_args);
     HU_RUN_TEST(test_closed_loop_null_alloc_returns_error);
     HU_RUN_TEST(test_closed_loop_simulated_improvement_keeps_patch);
+    HU_RUN_TEST(test_self_improve_parse_patch_valid_key_value);
+    HU_RUN_TEST(test_self_improve_parse_patch_malformed_rejected);
+    HU_RUN_TEST(test_self_improve_parse_patch_null_or_empty_rejected);
+    HU_RUN_TEST(test_self_improve_apply_structured_patch_under_is_test);
+    HU_RUN_TEST(test_self_improve_get_structured_patches_test_mode_empty);
 #endif
 }
