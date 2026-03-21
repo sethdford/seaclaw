@@ -1,9 +1,0 @@
-{
-  "name": "data-literacy",
-  "description": "Read, interpret, and communicate data accurately without misleading or being misled",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

@@ -1,9 +1,0 @@
-{
-  "name": "config-validator",
-  "description": "Validate Human and skill configuration files",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

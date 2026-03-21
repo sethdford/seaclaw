@@ -1,9 +1,0 @@
-{
-  "name": "red-team",
-  "description": "Adversarial reasoning and pre-mortem analysis for decisions, plans, and designs",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

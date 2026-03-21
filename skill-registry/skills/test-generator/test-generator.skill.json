@@ -1,9 +1,0 @@
-{
-  "name": "test-generator",
-  "description": "Generate unit tests and integration tests from source code",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

@@ -1,9 +1,0 @@
-{
-  "name": "code-review",
-  "description": "Automated code review with style checks and security scanning",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

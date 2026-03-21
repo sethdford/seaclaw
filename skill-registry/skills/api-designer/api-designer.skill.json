@@ -1,9 +1,0 @@
-{
-  "name": "api-designer",
-  "description": "Design and document REST and GraphQL APIs",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

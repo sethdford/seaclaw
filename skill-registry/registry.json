@@ -36,18 +36,6 @@
     ]
   },
   {
-    "name": "api-designer",
-    "description": "Design and document REST and GraphQL APIs",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/api-designer",
-    "tags": [
-      "development",
-      "api",
-      "design"
-    ]
-  },
-  {
     "name": "assumption-mapping",
     "description": "Surface, categorize, and test hidden assumptions before they cause failure",
     "version": "1.0.0",
@@ -69,18 +57,6 @@
       "cognitive",
       "productivity",
       "wellbeing"
-    ]
-  },
-  {
-    "name": "backup-scheduler",
-    "description": "Schedule and manage backup jobs",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/backup-scheduler",
-    "tags": [
-      "devops",
-      "backup",
-      "recovery"
     ]
   },
   {
@@ -168,17 +144,6 @@
     ]
   },
   {
-    "name": "code-documenter",
-    "description": "Generate docs, READMEs, and API documentation from code",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/code-documenter",
-    "tags": [
-      "development",
-      "documentation"
-    ]
-  },
-  {
     "name": "code-formatter",
     "description": "Format and lint code according to project conventions",
     "version": "1.0.0",
@@ -188,29 +153,6 @@
       "development",
       "formatting",
       "linting"
-    ]
-  },
-  {
-    "name": "code-review",
-    "description": "Automated code review with style checks and security scanning",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/code-review",
-    "tags": [
-      "development",
-      "review"
-    ]
-  },
-  {
-    "name": "code-translator",
-    "description": "Translate code between programming languages and frameworks",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/code-translator",
-    "tags": [
-      "development",
-      "translation",
-      "migration"
     ]
   },
   {
@@ -235,18 +177,6 @@
       "cognitive",
       "strategy",
       "analysis"
-    ]
-  },
-  {
-    "name": "config-validator",
-    "description": "Validate Human and skill configuration files",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/config-validator",
-    "tags": [
-      "migration",
-      "setup",
-      "config"
     ]
   },
   {
@@ -322,18 +252,6 @@
     ]
   },
   {
-    "name": "csv-transformer",
-    "description": "Transform, filter, and reshape CSV data",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/csv-transformer",
-    "tags": [
-      "data",
-      "csv",
-      "etl"
-    ]
-  },
-  {
     "name": "cultural-awareness",
     "description": "Communicate effectively across cultural contexts by recognizing different norms and values",
     "version": "1.0.0",
@@ -366,18 +284,6 @@
     "tags": [
       "data",
       "analytics"
-    ]
-  },
-  {
-    "name": "data-literacy",
-    "description": "Read, interpret, and communicate data accurately without misleading or being misled",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/data-literacy",
-    "tags": [
-      "cognitive",
-      "analysis",
-      "data"
     ]
   },
   {
@@ -653,18 +559,6 @@
     ]
   },
   {
-    "name": "git-workflow",
-    "description": "Git branch strategy, merge workflows, and PR automation",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/git-workflow",
-    "tags": [
-      "development",
-      "git",
-      "version-control"
-    ]
-  },
-  {
     "name": "habit-design",
     "description": "Build and break habits using cue-routine-reward loops, environment design, and implementation intentions",
     "version": "1.0.0",
@@ -757,18 +651,6 @@
       "cognitive",
       "communication",
       "research"
-    ]
-  },
-  {
-    "name": "invoice-generator",
-    "description": "Generate invoices and track billing",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/invoice-generator",
-    "tags": [
-      "productivity",
-      "invoice",
-      "finance"
     ]
   },
   {
@@ -900,18 +782,6 @@
       "social",
       "newsletter",
       "content"
-    ]
-  },
-  {
-    "name": "nostr-bot",
-    "description": "Nostr relay interaction and DMs bot",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/nostr-bot",
-    "tags": [
-      "social",
-      "nostr",
-      "messaging"
     ]
   },
   {
@@ -1106,18 +976,6 @@
     ]
   },
   {
-    "name": "red-team",
-    "description": "Adversarial reasoning and pre-mortem analysis for decisions, plans, and designs",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/red-team",
-    "tags": [
-      "cognitive",
-      "reasoning",
-      "security"
-    ]
-  },
-  {
     "name": "reframing",
     "description": "See problems differently by changing the frame: perspective shifts, inversions, and zoom levels",
     "version": "1.0.0",
@@ -1271,30 +1129,6 @@
     ]
   },
   {
-    "name": "speed-reading",
-    "description": "Extract key information from large documents quickly using structured scanning techniques",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/speed-reading",
-    "tags": [
-      "cognitive",
-      "learning",
-      "productivity"
-    ]
-  },
-  {
-    "name": "sql-query-builder",
-    "description": "Build and optimize SQL queries from natural language",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/sql-query-builder",
-    "tags": [
-      "data",
-      "sql",
-      "database"
-    ]
-  },
-  {
     "name": "ssl-cert-monitor",
     "description": "Monitor SSL/TLS certificate expiration and renewal",
     "version": "1.0.0",
@@ -1411,18 +1245,6 @@
       "cognitive",
       "writing",
       "communication"
-    ]
-  },
-  {
-    "name": "test-generator",
-    "description": "Generate unit tests and integration tests from source code",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/test-generator",
-    "tags": [
-      "development",
-      "testing",
-      "automation"
     ]
   },
   {
