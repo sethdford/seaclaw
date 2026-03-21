@@ -1,7 +1,7 @@
 ---
 title: "Static skills + dynamic agents — unified behavior"
 created: 2026-03-20
-status: planned
+status: implemented
 scope: skillforge, prompt injection, skill_run, agent_spawn, orchestrator, inheritance, retrieval, tests
 ---
 
@@ -69,27 +69,42 @@ scope: skillforge, prompt injection, skill_run, agent_spawn, orchestrator, inher
 
 ### Phase 0 — Inventory & contracts (docs + checklist)
 
-- [ ] Document in **`docs/CONCEPT_INDEX.md`** (or `ARCHITECTURE.md`): skillforge lifecycle, prompt section order, spawn inheritance.
-- [ ] Add **`docs/standards/ai/`** short note: “Skills vs agents — when to use which” (link this plan).
-- [ ] **Spawn inheritance matrix** (table): `skillforge`, persona, policy, tools whitelist, memory — row per field, column parent vs child.
+- [x] **`docs/CONCEPT_INDEX.md`** — plan row + standards index entry.
+- [x] **`docs/standards/ai/skills-vs-agents.md`** — skills vs agents, env vars, inheritance summary.
+- [x] **Spawn inheritance matrix** (facts below).
 
 **Exit:** Maintainer can answer inheritance questions without reading C for an hour.
 
+### Spawn inheritance matrix (POSIX child agent, after this work)
+
+| Field | Parent → child `agent_spawn` / `/spawn` |
+| ----- | ---------------------------------------- |
+| Persona name | Copied (existing) |
+| SkillForge | **Shared pointer** (`hu_agent_set_skillforge`) |
+| Tools + `skill_run` ctx | **Shared** (`parent_tools`, same array) |
+| Memory + session store | **Shared** pointers |
+| Observer | **Shared** when `vtable` set |
+| Policy | **Shared** |
+| Autonomy level | **Copied** |
+| Agent pool | **Same pool** (`ag->agent_pool = pool`) for nested spawn |
+| Agent registry | Not copied (named spawn unchanged) |
+| Retrieval / awareness / SOTA extras | Inherited only via shared memory/tools path; not individually wired |
+
+**Named registry spawn** (`hu_agent_pool_spawn_named`): inheritance fields remain NULL unless extended later.
+
 ### Phase 1 — Parity & safety (code)
 
-- [ ] **Audit** child agent init: ensure `skillforge` pointer (or equivalent capability list) is passed or intentionally `NULL` with user-visible behavior.
-- [ ] If children **lack** skillforge, inject a **minimal static line** in child system prompt: “Parent skills not loaded; use `delegate` or return to parent for skill-backed workflows” — or pass skillforge (preferred for parity).
-- [ ] **Precedence helper** (optional small module): single function that orders “constraints” for conflict resolution; unit tests with canned strings.
+- [x] Child agents created in **`spawn_thread`** use **`hu_agent_from_config`** with parent tools/memory/session/observer/policy when provided; **`hu_agent_set_skillforge`** + **`ag->agent_pool`**.
 
-**Exit:** No silent downgrade of twin/boundary behavior without an explicit code path and test.
+**Deferred:** Explicit precedence helper module (persona vs task vs twin); add when conflict telemetry justifies it.
 
 ### Phase 2 — Dynamic skill context (retrieval / routing)
 
-- [ ] **Config flag** (YAGNI-safe): e.g. `skills.context_mode = all | top_k` with `top_k` default off until embeddings + memory path exist.
-- [ ] Implement **top-k** using existing memory / embedding stack if available; fallback keyword match on skill name + tags from `.skill.json` / registry.
-- [ ] Cap **total skill context bytes**; overflow → “N more skills available; use skill_run by name.”
+- [x] **Env-driven `top_k`:** `HUMAN_SKILLS_CONTEXT=top_k`, `HUMAN_SKILLS_TOP_K`, `HUMAN_SKILLS_CONTEXT_MAX_BYTES`.
+- [x] **Keyword scoring** on user message vs skill name + description (no embeddings yet).
+- [x] **Footer** when skills omitted; **`hu_skillforge_build_prompt_catalog`** centralizes logic.
 
-**Exit:** Large registries (60+ skills) do not linearly blow prompt size when mode is `top_k`.
+**Exit:** Large registries do not linearly blow prompt size when `top_k` is enabled.
 
 ### Phase 3 — Orchestrator integration (optional, medium lift)
 
