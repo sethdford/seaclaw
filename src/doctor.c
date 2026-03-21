@@ -5,6 +5,155 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
+#if defined(HU_ENABLE_PERSONA)
+#include "human/persona.h"
+#endif
+
+#define HU_DOCTOR_LINE_CATEGORY "doctor_line"
+
+static hu_error_t doctor_push_line(hu_allocator_t *alloc, hu_diag_item_t **buf, size_t *n,
+                                   size_t *cap, hu_diag_severity_t sev, const char *line) {
+    if (!line)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (*n >= *cap) {
+        size_t new_cap = *cap * 2;
+        hu_diag_item_t *nb =
+            (hu_diag_item_t *)alloc->alloc(alloc->ctx, sizeof(hu_diag_item_t) * new_cap);
+        if (!nb)
+            return HU_ERR_OUT_OF_MEMORY;
+        memcpy(nb, *buf, sizeof(hu_diag_item_t) * (*n));
+        alloc->free(alloc->ctx, *buf, sizeof(hu_diag_item_t) * (*cap));
+        *buf = nb;
+        *cap = new_cap;
+    }
+    char *cat = hu_strdup(alloc, HU_DOCTOR_LINE_CATEGORY);
+    char *msg = hu_strdup(alloc, line);
+    if (!cat || !msg) {
+        if (cat)
+            alloc->free(alloc->ctx, cat, strlen(cat) + 1);
+        if (msg)
+            alloc->free(alloc->ctx, msg, strlen(msg) + 1);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    (*buf)[*n] = (hu_diag_item_t){sev, cat, msg};
+    (*n)++;
+    return HU_OK;
+}
+
+static bool doctor_config_wants_http(const hu_config_t *cfg) {
+    if (!cfg)
+        return false;
+    if (cfg->gateway.enabled)
+        return true;
+#if defined(HU_ENABLE_FEEDS)
+    if (cfg->feeds.enabled)
+        return true;
+#endif
+    if (cfg->default_provider && hu_config_provider_requires_api_key(cfg->default_provider))
+        return true;
+    if (hu_channel_catalog_has_any_configured(cfg, false))
+        return true;
+    return false;
+}
+
+#if defined(HU_ENABLE_PERSONA)
+static bool doctor_config_wants_persona(const hu_config_t *cfg) {
+    if (!cfg)
+        return false;
+    if (cfg->agent.persona && cfg->agent.persona[0])
+        return true;
+    if (cfg->agent.persona_channels_count > 0)
+        return true;
+    if (cfg->agent.persona_contacts_count > 0)
+        return true;
+    return false;
+}
+#endif
+
+static hu_error_t doctor_check_sqlite_backend(hu_allocator_t *alloc, hu_diag_item_t **buf,
+                                              size_t *n, size_t *cap, const hu_config_t *cfg) {
+    if (!cfg->memory_backend || strcmp(cfg->memory_backend, "sqlite") != 0)
+        return HU_OK;
+#ifdef HU_ENABLE_SQLITE
+    return doctor_push_line(alloc, buf, n, cap, HU_DIAG_OK, "[doctor] SQLite: available");
+#else
+    return doctor_push_line(alloc, buf, n, cap, HU_DIAG_ERR, "[doctor] SQLite: not compiled in");
+#endif
+}
+
+static hu_error_t doctor_check_http_client(hu_allocator_t *alloc, hu_diag_item_t **buf, size_t *n,
+                                           size_t *cap, const hu_config_t *cfg) {
+    if (!doctor_config_wants_http(cfg))
+        return HU_OK;
+#if HU_IS_TEST
+    return doctor_push_line(alloc, buf, n, cap, HU_DIAG_OK, "[doctor] HTTP client: OK");
+#else
+#if !defined(HU_ENABLE_CURL)
+    return doctor_push_line(alloc, buf, n, cap, HU_DIAG_ERR,
+                            "[doctor] HTTP client: not compiled in (HU_ENABLE_CURL=OFF)");
+#elif !defined(HU_HTTP_CURL)
+    return doctor_push_line(
+        alloc, buf, n, cap, HU_DIAG_ERR,
+        "[doctor] HTTP client: libcurl not linked (install libcurl for outbound HTTP)");
+#else
+    return doctor_push_line(alloc, buf, n, cap, HU_DIAG_OK,
+                            "[doctor] HTTP client: libcurl available");
+#endif
+#endif
+}
+
+#if defined(HU_ENABLE_PERSONA)
+static hu_error_t doctor_check_persona_dir(hu_allocator_t *alloc, hu_diag_item_t **buf, size_t *n,
+                                           size_t *cap, const hu_config_t *cfg) {
+    if (!doctor_config_wants_persona(cfg))
+        return HU_OK;
+#if HU_IS_TEST
+    (void)cfg;
+    return doctor_push_line(alloc, buf, n, cap, HU_DIAG_OK, "[doctor] Persona dir: OK");
+#else
+#ifndef _WIN32
+    char pbuf[512];
+    const char *dir = hu_persona_base_dir(pbuf, sizeof(pbuf));
+    if (!dir)
+        return doctor_push_line(alloc, buf, n, cap, HU_DIAG_WARN,
+                                "[doctor] Persona dir: cannot resolve (HOME or HU_PERSONA_DIR)");
+    struct stat st;
+    if (stat(dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        char *line = hu_sprintf(alloc, "[doctor] Persona dir: missing or not a directory (%s)", dir);
+        if (!line)
+            return HU_ERR_OUT_OF_MEMORY;
+        hu_error_t e = doctor_push_line(alloc, buf, n, cap, HU_DIAG_WARN, line);
+        alloc->free(alloc->ctx, line, strlen(line) + 1);
+        return e;
+    }
+    char *line = hu_sprintf(alloc, "[doctor] Persona dir: OK (%s)", dir);
+    if (!line)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_error_t e = doctor_push_line(alloc, buf, n, cap, HU_DIAG_OK, line);
+    alloc->free(alloc->ctx, line, strlen(line) + 1);
+    return e;
+#else
+    (void)cfg;
+    return doctor_push_line(alloc, buf, n, cap, HU_DIAG_OK, "[doctor] Persona dir: OK");
+#endif
+#endif
+}
+#endif /* HU_ENABLE_PERSONA */
+
+static void doctor_free_diag_items(hu_allocator_t *alloc, hu_diag_item_t *buf, size_t n,
+                                   size_t cap_slots) {
+    for (size_t i = 0; i < n; i++) {
+        if (buf[i].category)
+            alloc->free(alloc->ctx, (void *)buf[i].category, strlen(buf[i].category) + 1);
+        if (buf[i].message)
+            alloc->free(alloc->ctx, (void *)buf[i].message, strlen(buf[i].message) + 1);
+    }
+    if (buf)
+        alloc->free(alloc->ctx, buf, sizeof(hu_diag_item_t) * cap_slots);
+}
 
 unsigned long hu_doctor_parse_df_available_mb(const char *df_output, size_t len) {
     if (!df_output || len == 0)
@@ -171,6 +320,24 @@ hu_error_t hu_doctor_check_config_semantics(hu_allocator_t *alloc, const hu_conf
             buf[n++] = it;
         }
     }
+
+    hu_error_t ext_err = doctor_check_sqlite_backend(alloc, &buf, &n, &cap, cfg);
+    if (ext_err != HU_OK) {
+        doctor_free_diag_items(alloc, buf, n, cap);
+        return ext_err;
+    }
+    ext_err = doctor_check_http_client(alloc, &buf, &n, &cap, cfg);
+    if (ext_err != HU_OK) {
+        doctor_free_diag_items(alloc, buf, n, cap);
+        return ext_err;
+    }
+#if defined(HU_ENABLE_PERSONA)
+    ext_err = doctor_check_persona_dir(alloc, &buf, &n, &cap, cfg);
+    if (ext_err != HU_OK) {
+        doctor_free_diag_items(alloc, buf, n, cap);
+        return ext_err;
+    }
+#endif
 
     *items = buf;
     *count = n;

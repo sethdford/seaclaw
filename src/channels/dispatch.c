@@ -3,6 +3,36 @@
 
 #define HU_DISPATCH_INITIAL_CAP 4
 
+/* Routed send: target "hu:ch:<subchannel_name>:<inner_target>" delivers only to the
+ * sub-channel whose vtable name() matches. Omitting the prefix keeps broadcast semantics. */
+static bool dispatch_parse_route_prefix(const char *target, size_t target_len,
+                                        const char **out_chan, size_t *out_chan_len,
+                                        const char **out_inner, size_t *out_inner_len) {
+    static const char pref[] = "hu:ch:";
+    const size_t plen = sizeof(pref) - 1;
+    if (!target || target_len < plen + 2)
+        return false;
+    if (memcmp(target, pref, plen) != 0)
+        return false;
+    const char *p = target + plen;
+    const char *end = target + target_len;
+    const char *colon = NULL;
+    for (const char *q = p; q < end; q++) {
+        if (*q == ':') {
+            colon = q;
+            break;
+        }
+    }
+    if (!colon || colon == p)
+        return false;
+    *out_chan = p;
+    *out_chan_len = (size_t)(colon - p);
+    colon++;
+    *out_inner = colon;
+    *out_inner_len = (size_t)(end - colon);
+    return true;
+}
+
 typedef struct hu_dispatch_ctx {
     hu_allocator_t *alloc;
     hu_channel_t *sub_channels;
@@ -28,19 +58,35 @@ static void dispatch_stop(void *ctx) {
 static hu_error_t dispatch_send(void *ctx, const char *target, size_t target_len,
                                 const char *message, size_t message_len, const char *const *media,
                                 size_t media_count) {
-#if HU_IS_TEST
-    (void)ctx;
-    (void)target;
-    (void)target_len;
-    (void)message;
-    (void)message_len;
-    (void)media;
-    (void)media_count;
-    return HU_OK;
-#else
     hu_dispatch_ctx_t *c = (hu_dispatch_ctx_t *)ctx;
+#if HU_IS_TEST
+    if (!c || c->sub_count == 0)
+        return HU_OK;
+#else
     if (!c || c->sub_count == 0)
         return HU_ERR_NOT_SUPPORTED;
+#endif
+
+    const char *route_name = NULL;
+    size_t route_name_len = 0;
+    const char *inner_target = target;
+    size_t inner_len = target_len;
+    if (dispatch_parse_route_prefix(target, target_len, &route_name, &route_name_len,
+                                    &inner_target, &inner_len)) {
+        for (size_t i = 0; i < c->sub_count; i++) {
+            hu_channel_t *sub = &c->sub_channels[i];
+            if (!sub->vtable || !sub->vtable->send || !sub->vtable->name)
+                continue;
+            const char *n = sub->vtable->name(sub->ctx);
+            if (!n)
+                continue;
+            size_t nlen = strlen(n);
+            if (nlen == route_name_len && memcmp(n, route_name, route_name_len) == 0)
+                return sub->vtable->send(sub->ctx, inner_target, inner_len, message, message_len,
+                                         media, media_count);
+        }
+        return HU_ERR_NOT_FOUND;
+    }
 
     hu_error_t last_err = HU_OK;
     for (size_t i = 0; i < c->sub_count; i++) {
@@ -53,7 +99,6 @@ static hu_error_t dispatch_send(void *ctx, const char *target, size_t target_len
         }
     }
     return last_err;
-#endif
 }
 
 static const char *dispatch_name(void *ctx) {

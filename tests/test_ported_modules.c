@@ -15,6 +15,28 @@
 #include "test_framework.h"
 #include <string.h>
 
+static void doctor_free_semantics_result(hu_allocator_t *alloc, hu_diag_item_t *items,
+                                         size_t count) {
+    if (!items)
+        return;
+    for (size_t i = 0; i < count; i++) {
+        if (items[i].category)
+            alloc->free(alloc->ctx, (void *)items[i].category, strlen(items[i].category) + 1);
+        if (items[i].message)
+            alloc->free(alloc->ctx, (void *)items[i].message, strlen(items[i].message) + 1);
+    }
+    /* hu_doctor may realloc the buffer; system allocator ignores the byte count here. */
+    alloc->free(alloc->ctx, items, sizeof(hu_diag_item_t) * count);
+}
+
+static bool doctor_diag_has_substr(hu_diag_item_t *items, size_t count, const char *needle) {
+    for (size_t i = 0; i < count; i++) {
+        if (items[i].message && strstr(items[i].message, needle))
+            return true;
+    }
+    return false;
+}
+
 static void test_channel_catalog_all(void) {
     size_t n = 0;
     const hu_channel_meta_t *m = hu_channel_catalog_all(&n);
@@ -151,14 +173,74 @@ static void test_doctor_check_config_valid_with_defaults(void) {
     HU_ASSERT_NOT_NULL(items);
     HU_ASSERT_TRUE(count > 0);
 
-    for (size_t i = 0; i < count; i++) {
-        if (items[i].category)
-            alloc.free(alloc.ctx, (void *)items[i].category, strlen(items[i].category) + 1);
-        if (items[i].message)
-            alloc.free(alloc.ctx, (void *)items[i].message, strlen(items[i].message) + 1);
-    }
-    alloc.free(alloc.ctx, items, sizeof(hu_diag_item_t) * 16);
+    doctor_free_semantics_result(&alloc, items, count);
 }
+
+static void test_doctor_semantics_sqlite_backend_line(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_config_t cfg = {0};
+    char prov[] = "ollama";
+    char mem[] = "sqlite";
+    cfg.default_provider = prov;
+    cfg.default_temperature = 0.7;
+    cfg.gateway.port = 3000;
+    cfg.memory_backend = mem;
+
+    hu_diag_item_t *items = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_doctor_check_config_semantics(&alloc, &cfg, &items, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(items);
+    HU_ASSERT_TRUE(doctor_diag_has_substr(items, count, "[doctor] SQLite:"));
+#ifdef HU_ENABLE_SQLITE
+    HU_ASSERT_TRUE(doctor_diag_has_substr(items, count, "available"));
+#else
+    HU_ASSERT_TRUE(doctor_diag_has_substr(items, count, "not compiled in"));
+#endif
+    doctor_free_semantics_result(&alloc, items, count);
+}
+
+static void test_doctor_semantics_http_line_when_gateway_enabled(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_config_t cfg = {0};
+    char prov[] = "ollama";
+    cfg.default_provider = prov;
+    cfg.default_temperature = 0.7;
+    cfg.gateway.port = 3000;
+    cfg.gateway.enabled = true;
+
+    hu_diag_item_t *items = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_doctor_check_config_semantics(&alloc, &cfg, &items, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(items);
+    HU_ASSERT_TRUE(doctor_diag_has_substr(items, count, "[doctor] HTTP client:"));
+#if HU_IS_TEST
+    HU_ASSERT_TRUE(doctor_diag_has_substr(items, count, "OK"));
+#endif
+    doctor_free_semantics_result(&alloc, items, count);
+}
+
+#if defined(HU_ENABLE_PERSONA)
+static void test_doctor_semantics_persona_line_when_configured(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_config_t cfg = {0};
+    char prov[] = "ollama";
+    char persona[] = "assistant";
+    cfg.default_provider = prov;
+    cfg.default_temperature = 0.7;
+    cfg.gateway.port = 3000;
+    cfg.agent.persona = persona;
+
+    hu_diag_item_t *items = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_doctor_check_config_semantics(&alloc, &cfg, &items, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(items);
+    HU_ASSERT_TRUE(doctor_diag_has_substr(items, count, "[doctor] Persona dir:"));
+    doctor_free_semantics_result(&alloc, items, count);
+}
+#endif
 
 static void test_agent_commands_parse(void) {
     const hu_slash_cmd_t *c = hu_agent_commands_parse("/new", 4);
@@ -313,6 +395,11 @@ void run_ported_modules_tests(void) {
     HU_RUN_TEST(test_doctor_check_config_null_cfg);
     HU_RUN_TEST(test_doctor_check_config_null_out);
     HU_RUN_TEST(test_doctor_check_config_valid_with_defaults);
+    HU_RUN_TEST(test_doctor_semantics_sqlite_backend_line);
+    HU_RUN_TEST(test_doctor_semantics_http_line_when_gateway_enabled);
+#if defined(HU_ENABLE_PERSONA)
+    HU_RUN_TEST(test_doctor_semantics_persona_line_when_configured);
+#endif
     HU_RUN_TEST(test_agent_commands_parse);
     HU_RUN_TEST(test_agent_commands_bare_reset_prompt);
     HU_RUN_TEST(test_rate_tracker);

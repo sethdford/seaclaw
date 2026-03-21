@@ -132,6 +132,49 @@ static void test_config_validate_strict_unknown_provider_fails_in_strict(void) {
     hu_arena_destroy(arena);
 }
 
+static void test_config_validate_strict_security_autonomy_level_over_max_fails(void) {
+    /* security.autonomy_level must be 0–4 (JSON key autonomy_level under security). */
+    hu_config_t cfg = {0};
+    cfg.default_provider = "openai";
+    cfg.default_model = "gpt-4";
+    cfg.gateway.port = 3000;
+    cfg.security.autonomy_level = 5;
+    hu_error_t verr = hu_config_validate_strict(&cfg, NULL, true);
+    HU_ASSERT_EQ(verr, HU_ERR_CONFIG_INVALID);
+}
+
+static void test_config_validate_strict_gateway_port_zero_fails(void) {
+    hu_config_t cfg = {0};
+    cfg.default_provider = "openai";
+    cfg.default_model = "gpt-4";
+    cfg.gateway.port = 0;
+    hu_error_t verr = hu_config_validate_strict(&cfg, NULL, true);
+    HU_ASSERT_EQ(verr, HU_ERR_CONFIG_INVALID);
+}
+
+static void test_config_validate_strict_empty_default_provider_fails(void) {
+    char empty[] = "";
+    hu_config_t cfg = {0};
+    cfg.default_provider = empty;
+    cfg.default_model = "gpt-4";
+    cfg.gateway.port = 3000;
+    hu_error_t verr = hu_config_validate_strict(&cfg, NULL, true);
+    HU_ASSERT_EQ(verr, HU_ERR_CONFIG_INVALID);
+}
+
+#if !HU_ENABLE_SQLITE
+static void test_config_validate_strict_memory_sqlite_backend_without_sqlite_build_fails(void) {
+    hu_config_t cfg = {0};
+    cfg.default_provider = "openai";
+    cfg.default_model = "gpt-4";
+    cfg.gateway.port = 3000;
+    char backend[] = "sqlite";
+    cfg.memory.backend = backend;
+    hu_error_t verr = hu_config_validate_strict(&cfg, NULL, true);
+    HU_ASSERT_EQ(verr, HU_ERR_CONFIG_INVALID);
+}
+#endif
+
 static void test_config_validate_strict_unknown_key_fails_with_root(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_config_t cfg;
@@ -162,5 +205,11 @@ void run_config_validation_tests(void) {
     HU_RUN_TEST(test_config_validate_strict_path_traversal_rejected);
     HU_RUN_TEST(test_config_validate_strict_non_strict_warnings_only);
     HU_RUN_TEST(test_config_validate_strict_unknown_provider_fails_in_strict);
+    HU_RUN_TEST(test_config_validate_strict_security_autonomy_level_over_max_fails);
+    HU_RUN_TEST(test_config_validate_strict_gateway_port_zero_fails);
+    HU_RUN_TEST(test_config_validate_strict_empty_default_provider_fails);
+#if !HU_ENABLE_SQLITE
+    HU_RUN_TEST(test_config_validate_strict_memory_sqlite_backend_without_sqlite_build_fails);
+#endif
     HU_RUN_TEST(test_config_validate_strict_unknown_key_fails_with_root);
 }

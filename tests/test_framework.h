@@ -17,6 +17,10 @@ extern const char *hu__suite_filter;
 extern const char *hu__test_filter;
 extern jmp_buf hu__jmp;
 
+static inline void hu_test_fail(void) {
+    longjmp(hu__jmp, 1);
+}
+
 static inline const char *hu__strcasestr(const char *haystack, const char *needle) {
     if (!needle[0])
         return haystack;
@@ -72,6 +76,28 @@ static inline const char *hu__strcasestr(const char *haystack, const char *needl
         const char *_a = (a), *_b = (b);                                                  \
         if (!_a || !_b || strcmp(_a, _b) != 0)                                            \
             HU_FAIL("expected \"%s\" == \"%s\"", _a ? _a : "(null)", _b ? _b : "(null)"); \
+    } while (0)
+
+#define HU_ASSERT_STR_CONTAINS(haystack, needle)                         \
+    do {                                                                 \
+        const char *h_ = (haystack);                                     \
+        const char *n_ = (needle);                                       \
+        if (!h_ || !n_ || !strstr(h_, n_)) {                            \
+            fprintf(stderr, "  FAIL  %s:%d: expected \"%s\" to contain \"%s\"\n", \
+                    __FILE__, __LINE__, h_ ? h_ : "(null)", n_ ? n_ : "(null)");   \
+            hu_test_fail();                                            \
+        }                                                                \
+    } while (0)
+
+#define HU_ASSERT_STR_NOT_CONTAINS(haystack, needle)                         \
+    do {                                                                     \
+        const char *h_ = (haystack);                                         \
+        const char *n_ = (needle);                                           \
+        if (h_ && n_ && strstr(h_, n_)) {                                    \
+            fprintf(stderr, "  FAIL  %s:%d: expected \"%s\" to NOT contain \"%s\"\n", \
+                    __FILE__, __LINE__, h_, n_);                             \
+            hu_test_fail();                                                  \
+        }                                                                    \
     } while (0)
 
 #define HU_ASSERT_NULL(a)                     \

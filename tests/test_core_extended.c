@@ -238,6 +238,13 @@ static void test_arena_large_block(void) {
     hu_arena_destroy(arena);
 }
 
+static void test_assert_str_contains_macros(void) {
+    HU_ASSERT_STR_CONTAINS("hello world", "world");
+    HU_ASSERT_STR_CONTAINS("abc", "a");
+    HU_ASSERT_STR_NOT_CONTAINS("hello", "xyz");
+    HU_ASSERT_STR_NOT_CONTAINS("short", "longer_than_short");
+}
+
 void run_core_extended_tests(void) {
     HU_TEST_SUITE("Core Extended");
     HU_RUN_TEST(test_arena_multiple_allocs);
@@ -268,4 +275,5 @@ void run_core_extended_tests(void) {
     HU_RUN_TEST(test_str_concat_normal);
     HU_RUN_TEST(test_str_join_multiple);
     HU_RUN_TEST(test_arena_large_block);
+    HU_RUN_TEST(test_assert_str_contains_macros);
 }

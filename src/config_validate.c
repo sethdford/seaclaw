@@ -166,6 +166,51 @@ static bool has_path_traversal(const char *path) {
     return path && strstr(path, "..") != NULL;
 }
 
+/* Must stay aligned with src/memory/factory.c backend availability. */
+static bool memory_backend_ok_for_build(const char *backend) {
+    if (!backend || !backend[0])
+        return true;
+    if (strcmp(backend, "lru") == 0 || strcmp(backend, "memory") == 0 ||
+        strcmp(backend, "api") == 0 || strcmp(backend, "markdown") == 0)
+        return true;
+#if HU_ENABLE_SQLITE
+    if (strcmp(backend, "sqlite") == 0)
+        return true;
+#endif
+#if HU_HAS_NONE_ENGINE
+    if (strcmp(backend, "none") == 0)
+        return true;
+#endif
+#if HU_HAS_LANCEDB_ENGINE
+    if (strcmp(backend, "lancedb") == 0)
+        return true;
+#endif
+#if HU_HAS_LUCID_ENGINE
+    if (strcmp(backend, "lucid") == 0)
+        return true;
+#endif
+#if HU_ENABLE_POSTGRES
+    if (strcmp(backend, "postgres") == 0)
+        return true;
+#endif
+#if HU_ENABLE_REDIS_ENGINE
+    if (strcmp(backend, "redis") == 0)
+        return true;
+#endif
+    return false;
+}
+
+static void check_memory_backend_build(const hu_config_t *cfg, bool strict, bool *has_error) {
+    const char *b = cfg->memory.backend;
+    if (!b || !b[0])
+        return;
+    if (memory_backend_ok_for_build(b))
+        return;
+    fprintf(stderr, "[config] memory.backend '%s' is unknown or not available in this build\n", b);
+    if (strict)
+        *has_error = true;
+}
+
 hu_error_t hu_config_validate_strict(const hu_config_t *cfg, const hu_json_value_t *root,
                                      bool strict) {
     if (!cfg)
@@ -289,6 +334,8 @@ hu_error_t hu_config_validate_strict(const hu_config_t *cfg, const hu_json_value
         if (strict)
             has_error = true;
     }
+
+    check_memory_backend_build(cfg, strict, &has_error);
 
     /* Run base validation (provider, model, port) */
     if (has_error)

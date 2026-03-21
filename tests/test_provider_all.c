@@ -2838,6 +2838,134 @@ static void test_ollama_structured_output_json_mode(void) {
         prov.vtable->deinit(prov.ctx, &alloc);
 }
 
+/*
+ * Every string here must stay in sync with src/providers/factory.c:
+ * explicit branches in hu_provider_create plus hu_compat_providers[].name.
+ */
+static void test_provider_all_factory_aliases_create_and_deinit(void) {
+    static const char *const k_factory_provider_names[] = {
+        "openai",
+        "anthropic",
+        "gemini",
+        "google",
+        "google-gemini",
+        "vertex",
+        "ollama",
+        "openrouter",
+        "compatible",
+        "claude_cli",
+        "codex_cli",
+        "openai-codex",
+        "custom:https://example.com/v1",
+        "anthropic-custom:https://example.com/v1",
+        "groq",
+        "mistral",
+        "deepseek",
+        "xai",
+        "grok",
+        "cerebras",
+        "perplexity",
+        "cohere",
+        "venice",
+        "vercel",
+        "vercel-ai",
+        "together",
+        "together-ai",
+        "fireworks",
+        "fireworks-ai",
+        "huggingface",
+        "aihubmix",
+        "siliconflow",
+        "shengsuanyun",
+        "chutes",
+        "synthetic",
+        "opencode",
+        "opencode-zen",
+        "astrai",
+        "poe",
+        "moonshot",
+        "kimi",
+        "glm",
+        "zhipu",
+        "zai",
+        "z.ai",
+        "minimax",
+        "qwen",
+        "dashscope",
+        "qianfan",
+        "baidu",
+        "doubao",
+        "volcengine",
+        "ark",
+        "moonshot-cn",
+        "kimi-cn",
+        "glm-cn",
+        "zhipu-cn",
+        "bigmodel",
+        "zai-cn",
+        "z.ai-cn",
+        "minimax-cn",
+        "minimaxi",
+        "moonshot-intl",
+        "moonshot-global",
+        "kimi-intl",
+        "kimi-global",
+        "glm-global",
+        "zhipu-global",
+        "zai-global",
+        "z.ai-global",
+        "minimax-intl",
+        "minimax-io",
+        "minimax-global",
+        "qwen-intl",
+        "dashscope-intl",
+        "qwen-us",
+        "dashscope-us",
+        "byteplus",
+        "kimi-code",
+        "kimi_coding",
+        "volcengine-plan",
+        "byteplus-plan",
+        "qwen-portal",
+        "bedrock",
+        "aws-bedrock",
+        "cloudflare",
+        "cloudflare-ai",
+        "copilot",
+        "github-copilot",
+        "nvidia",
+        "nvidia-nim",
+        "build.nvidia.com",
+        "ovhcloud",
+        "ovh",
+        "lmstudio",
+        "lm-studio",
+        "vllm",
+        "llamacpp",
+        "llama.cpp",
+        "sglang",
+        "osaurus",
+        "litellm",
+        NULL,
+    };
+
+    hu_allocator_t alloc = hu_system_allocator();
+    for (const char *const *np = k_factory_provider_names; *np; np++) {
+        const char *name = *np;
+        hu_provider_t prov = {0};
+        hu_error_t err =
+            hu_provider_create(&alloc, name, strlen(name), NULL, 0, NULL, 0, &prov);
+        HU_ASSERT_EQ(err, HU_OK);
+        HU_ASSERT_NOT_NULL(prov.vtable);
+        HU_ASSERT_NOT_NULL(prov.vtable->get_name);
+        const char *gn = prov.vtable->get_name(prov.ctx);
+        HU_ASSERT_NOT_NULL(gn);
+        HU_ASSERT_TRUE(gn[0] != '\0');
+        if (prov.vtable->deinit)
+            prov.vtable->deinit(prov.ctx, &alloc);
+    }
+}
+
 void run_provider_all_tests(void) {
     HU_TEST_SUITE("Provider All");
     HU_RUN_TEST(test_openai_create_succeeds);
@@ -2976,6 +3104,7 @@ void run_provider_all_tests(void) {
     HU_RUN_TEST(test_provider_factory_null_name_returns_error);
     HU_RUN_TEST(test_provider_factory_empty_name_returns_error);
     HU_RUN_TEST(test_provider_factory_null_out_returns_error);
+    HU_RUN_TEST(test_provider_all_factory_aliases_create_and_deinit);
     HU_RUN_TEST(test_factory_openai_resolves);
     HU_RUN_TEST(test_factory_anthropic_resolves);
     HU_RUN_TEST(test_factory_gemini_resolves);

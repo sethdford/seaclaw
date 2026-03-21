@@ -5,6 +5,11 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 
+/**
+ * Dispatch channel: send() broadcasts to all registered sub-channels unless the target uses
+ * the routed form "hu:ch:<name>:<inner_target>", which delivers only to the sub whose name()
+ * matches <name>.
+ */
 hu_error_t hu_dispatch_create(hu_allocator_t *alloc, hu_channel_t *out);
 void hu_dispatch_destroy(hu_channel_t *ch);
 

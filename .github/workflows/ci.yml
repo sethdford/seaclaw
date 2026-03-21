@@ -41,7 +41,7 @@ jobs:
         run: |
           COUNT=$(./build/human_tests 2>&1 | grep -oE '[0-9]+/[0-9]+ passed' | head -1 | cut -d/ -f1)
           echo "Test count: $COUNT"
-          BASELINE=6077
+          BASELINE=6089
           if [ "$COUNT" -lt "$BASELINE" ]; then
             echo "::error::Test count regression: $COUNT < $BASELINE baseline"
             exit 1

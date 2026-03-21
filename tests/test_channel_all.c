@@ -447,6 +447,18 @@ static void test_whatsapp_poll_empty(void) {
     HU_ASSERT_EQ(out, 0);
     hu_whatsapp_destroy(&ch);
 }
+
+static void test_whatsapp_typing_hooks(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_whatsapp_create(&alloc, "123", 3, "tok", 3, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->start_typing);
+    HU_ASSERT_NOT_NULL(ch.vtable->stop_typing);
+    HU_ASSERT_EQ(ch.vtable->start_typing(ch.ctx, NULL, 0), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(ch.vtable->start_typing(ch.ctx, "15551234567", 11), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->stop_typing(ch.ctx, "15551234567", 11), HU_OK);
+    hu_whatsapp_destroy(&ch);
+}
 #endif
 
 /* ─── Facebook Messenger ───────────────────────────────────────────────────── */
@@ -2663,6 +2675,7 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_whatsapp_send);
     HU_RUN_TEST(test_whatsapp_webhook_and_poll);
     HU_RUN_TEST(test_whatsapp_poll_empty);
+    HU_RUN_TEST(test_whatsapp_typing_hooks);
 #endif
 #if HU_HAS_FACEBOOK
     HU_RUN_TEST(test_facebook_create);

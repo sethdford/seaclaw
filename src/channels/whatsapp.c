@@ -31,6 +31,11 @@ typedef struct hu_whatsapp_ctx {
     size_t queue_head;
     size_t queue_tail;
     size_t queue_count;
+    /* Last inbound text message (Cloud API typing indicator needs wamid + matching recipient). */
+    char last_inbound_wamid[256];
+    size_t last_inbound_wamid_len;
+    char last_inbound_from[128];
+    size_t last_inbound_from_len;
 #if HU_IS_TEST
     char last_message[4096];
     size_t last_message_len;
@@ -236,6 +241,7 @@ hu_error_t hu_whatsapp_on_webhook(void *channel_ctx, hu_allocator_t *alloc, cons
                 const char *from = hu_json_get_string(msg, "from");
                 if (!from)
                     continue;
+                const char *wamid = hu_json_get_string(msg, "id");
                 hu_json_value_t *text_obj = hu_json_object_get(msg, "text");
                 if (!text_obj || text_obj->type != HU_JSON_OBJECT)
                     continue;
@@ -243,6 +249,18 @@ hu_error_t hu_whatsapp_on_webhook(void *channel_ctx, hu_allocator_t *alloc, cons
                 if (!text_body || strlen(text_body) == 0)
                     continue;
                 whatsapp_queue_push(c, from, strlen(from), text_body, strlen(text_body));
+                if (wamid) {
+                    size_t wl = strlen(wamid);
+                    size_t fl = strlen(from);
+                    if (wl > 0 && wl < sizeof(c->last_inbound_wamid) && fl < sizeof(c->last_inbound_from)) {
+                        memcpy(c->last_inbound_wamid, wamid, wl);
+                        c->last_inbound_wamid[wl] = '\0';
+                        c->last_inbound_wamid_len = wl;
+                        memcpy(c->last_inbound_from, from, fl);
+                        c->last_inbound_from[fl] = '\0';
+                        c->last_inbound_from_len = fl;
+                    }
+                }
             }
         }
     }
@@ -369,6 +387,77 @@ static hu_error_t whatsapp_react(void *ctx, const char *target, size_t target_le
 #endif
 }
 
+static hu_error_t whatsapp_start_typing(void *ctx, const char *recipient, size_t recipient_len) {
+    hu_whatsapp_ctx_t *c = (hu_whatsapp_ctx_t *)ctx;
+    if (!c)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!recipient || recipient_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+#if HU_IS_TEST
+    (void)c;
+    return HU_OK;
+#else
+    if (!c->alloc || !c->phone_number_id || c->phone_number_id_len == 0 || !c->token ||
+        c->token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    /* WhatsApp Cloud API ties typing to the inbound message id (see typing indicators doc). */
+    if (c->last_inbound_wamid_len == 0 || c->last_inbound_from_len != recipient_len ||
+        memcmp(c->last_inbound_from, recipient, recipient_len) != 0)
+        return HU_OK;
+
+    char url_buf[512];
+    int n = snprintf(url_buf, sizeof(url_buf), "%s%.*s/messages", WHATSAPP_API_BASE,
+                     (int)c->phone_number_id_len, c->phone_number_id);
+    if (n < 0 || (size_t)n >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+
+    char auth_buf[512];
+    n = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)c->token_len, c->token);
+    if (n < 0 || (size_t)n >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+
+    hu_json_buf_t jbuf;
+    hu_error_t err = hu_json_buf_init(&jbuf, c->alloc);
+    if (err)
+        return err;
+    err = hu_json_buf_append_raw(&jbuf, "{\"messaging_product\":\"whatsapp\",\"status\":\"read\",",
+                                 58);
+    if (err)
+        goto typing_fail;
+    err = hu_json_append_key_value(&jbuf, "message_id", 10, c->last_inbound_wamid,
+                                   c->last_inbound_wamid_len);
+    if (err)
+        goto typing_fail;
+    err = hu_json_buf_append_raw(&jbuf, ",\"typing_indicator\":{\"type\":\"text\"}}", 39);
+    if (err)
+        goto typing_fail;
+
+    hu_http_response_t resp = {0};
+    err = hu_http_post_json(c->alloc, url_buf, auth_buf, jbuf.ptr, jbuf.len, &resp);
+    hu_json_buf_free(&jbuf);
+    if (err != HU_OK) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(c->alloc, &resp);
+        return HU_ERR_CHANNEL_SEND;
+    }
+    bool ok = (resp.status_code >= 200 && resp.status_code < 300);
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    return ok ? HU_OK : HU_ERR_CHANNEL_SEND;
+typing_fail:
+    hu_json_buf_free(&jbuf);
+    return err;
+#endif
+}
+
+static hu_error_t whatsapp_stop_typing(void *ctx, const char *recipient, size_t recipient_len) {
+    (void)ctx;
+    (void)recipient;
+    (void)recipient_len;
+    /* Typing clears when a message is sent or after ~25s (Cloud API). */
+    return HU_OK;
+}
+
 static const hu_channel_vtable_t whatsapp_vtable = {
     .start = whatsapp_start,
     .stop = whatsapp_stop,
@@ -376,8 +465,8 @@ static const hu_channel_vtable_t whatsapp_vtable = {
     .name = whatsapp_name,
     .health_check = whatsapp_health_check,
     .send_event = NULL,
-    .start_typing = NULL,
-    .stop_typing = NULL,
+    .start_typing = whatsapp_start_typing,
+    .stop_typing = whatsapp_stop_typing,
     .get_response_constraints = whatsapp_get_response_constraints,
     .react = whatsapp_react,
 };

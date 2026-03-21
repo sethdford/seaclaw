@@ -96,7 +96,7 @@ The human runtime tracks test coverage through test count and module coverage ra
 
 | Metric              | Expectation                                              |
 | ------------------- | -------------------------------------------------------- |
-| Total test count    | Growing; currently 6077+                                 |
+| Total test count    | Growing; currently 6089+                                 |
 | Module coverage     | Every `src/` module has a corresponding `tests/test_*.c` |
 | Error path coverage | Every vtable function has at least one error-path test   |
 | ASan clean          | Zero AddressSanitizer errors across the full suite       |
