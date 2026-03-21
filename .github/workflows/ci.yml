@@ -32,6 +32,8 @@ jobs:
           asan-options: ${{ runner.os == 'Linux' && 'detect_leaks=0:detect_stack_use_after_return=0' || '' }}
       - name: Validate eval suites
         run: ./build/human eval validate eval_suites/
+      - name: Check eval regression
+        run: ./build/human eval check-regression eval_suites/
       - name: Persona CLI smoke test
         run: |
           ./build/human persona list
@@ -43,7 +45,7 @@ jobs:
         run: |
           COUNT=$(./build/human_tests 2>&1 | grep -oE '[0-9]+/[0-9]+ passed' | head -1 | cut -d/ -f1)
           echo "Test count: $COUNT"
-          BASELINE=6196
+          BASELINE=6214
           if [ "$COUNT" -lt "$BASELINE" ]; then
             echo "::error::Test count regression: $COUNT < $BASELINE baseline"
             exit 1

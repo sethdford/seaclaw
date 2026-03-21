@@ -2,6 +2,7 @@
 #include "human/core/string.h"
 #include "human/eval.h"
 #include "test_framework.h"
+#include <stdbool.h>
 #include <string.h>
 
 #ifdef HU_ENABLE_SQLITE
@@ -281,6 +282,51 @@ static void test_eval_persist_get_baseline_null_args(void) {
     sqlite3_close(db);
 }
 
+static void test_eval_regression_check_baseline_drop_null_args(void) {
+    bool reg = true;
+    char msg[128];
+    HU_ASSERT_EQ(hu_eval_regression_check_baseline_drop(NULL, NULL, 0.5, 0.1, &reg, msg, sizeof(msg)),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_regression_check_baseline_drop(NULL, "", 0.5, 0.1, &reg, msg, sizeof(msg)),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_regression_check_baseline_drop(NULL, "x", 0.5, 0.1, NULL, msg, sizeof(msg)),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_eval_regression_check_baseline_drop_no_prior_passes(void) {
+    bool reg = true;
+    char msg[256];
+    HU_ASSERT_EQ(
+        hu_eval_regression_check_baseline_drop(NULL, "hu_rdrop_noprior_xyz", 0.55, 0.10, &reg, msg, sizeof(msg)),
+        HU_OK);
+    HU_ASSERT_TRUE(!reg);
+}
+
+static void test_eval_regression_check_baseline_drop_detects_steep_decline(void) {
+    HU_ASSERT_EQ(hu_eval_persist_baseline(NULL, "hu_rdrop_decline_suite", 0.58, 8), HU_OK);
+    bool reg = false;
+    char msg[256];
+    HU_ASSERT_EQ(hu_eval_regression_check_baseline_drop(NULL, "hu_rdrop_decline_suite", 0.45, 0.10, &reg, msg,
+                                                        sizeof(msg)),
+                 HU_OK);
+    HU_ASSERT_TRUE(reg);
+    HU_ASSERT_TRUE(strstr(msg, "FAIL:") != NULL);
+    HU_ASSERT_TRUE(strstr(msg, "hu_rdrop_decline_suite") != NULL);
+    HU_ASSERT_TRUE(strstr(msg, "0.58") != NULL);
+    HU_ASSERT_TRUE(strstr(msg, "0.45") != NULL);
+    HU_ASSERT_TRUE(strstr(msg, "(") != NULL);
+}
+
+static void test_eval_regression_check_baseline_drop_ten_point_boundary_ok(void) {
+    HU_ASSERT_EQ(hu_eval_persist_baseline(NULL, "hu_rdrop_boundary_suite", 0.58, 8), HU_OK);
+    bool reg = true;
+    char msg[256];
+    HU_ASSERT_EQ(hu_eval_regression_check_baseline_drop(NULL, "hu_rdrop_boundary_suite", 0.48, 0.10, &reg, msg,
+                                                        sizeof(msg)),
+                 HU_OK);
+    HU_ASSERT_TRUE(!reg);
+}
+
 void run_eval_history_tests(void) {
     HU_TEST_SUITE("Eval History Storage");
     HU_RUN_TEST(test_eval_init_tables_succeeds);
@@ -297,6 +343,10 @@ void run_eval_history_tests(void) {
     HU_RUN_TEST(test_eval_persist_get_baseline_roundtrip);
     HU_RUN_TEST(test_eval_get_baseline_unknown_returns_not_found);
     HU_RUN_TEST(test_eval_persist_get_baseline_null_args);
+    HU_RUN_TEST(test_eval_regression_check_baseline_drop_null_args);
+    HU_RUN_TEST(test_eval_regression_check_baseline_drop_no_prior_passes);
+    HU_RUN_TEST(test_eval_regression_check_baseline_drop_detects_steep_decline);
+    HU_RUN_TEST(test_eval_regression_check_baseline_drop_ten_point_boundary_ok);
 }
 
 #else

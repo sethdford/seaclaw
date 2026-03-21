@@ -376,3 +376,23 @@ bool hu_ollama_api_tags_reachable(void) {
     return strstr(buf, " 200 ") != NULL || strstr(buf, "200 OK") != NULL;
 #endif
 }
+
+bool hu_mlx_lm_module_available(void) {
+#if HU_IS_TEST
+    return false;
+#elif defined(_WIN32) || !defined(HU_GATEWAY_POSIX)
+    return false;
+#else
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *argv[] = {"python3", "-c", "import mlx_lm", NULL};
+    hu_run_result_t rr = {0};
+    hu_error_t err = hu_process_run(&alloc, argv, NULL, 65536, &rr);
+    if (err != HU_OK) {
+        hu_run_result_free(&alloc, &rr);
+        return false;
+    }
+    bool ok = rr.success && rr.exit_code == 0;
+    hu_run_result_free(&alloc, &rr);
+    return ok;
+#endif
+}

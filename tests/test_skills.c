@@ -334,6 +334,19 @@ static void test_skillforge_read_resource_fixture_ok(void) {
     hu_skillforge_destroy(&sf);
 }
 
+static void test_skillforge_keyword_hits_cli_skill(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_skillforge_t sf;
+    HU_ASSERT_EQ(hu_skillforge_create(&alloc, &sf), HU_OK);
+    HU_ASSERT_EQ(hu_skillforge_discover(&sf, "/tmp"), HU_OK);
+    hu_skill_t *s = hu_skillforge_get_skill(&sf, "cli-helper");
+    HU_ASSERT_NOT_NULL(s);
+    const char *msg = "need help with CLI commands";
+    int h = hu_skillforge_skill_keyword_hits(s, msg, strlen(msg));
+    HU_ASSERT_TRUE(h >= 1);
+    hu_skillforge_destroy(&sf);
+}
+
 static void test_skillforge_execute_prefers_instructions(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_skillforge_t sf;
@@ -406,6 +419,7 @@ void run_skills_tests(void) {
     HU_RUN_TEST(test_skillforge_read_resource_validates_path);
     HU_RUN_TEST(test_skillforge_read_resource_not_found);
     HU_RUN_TEST(test_skillforge_read_resource_fixture_ok);
+    HU_RUN_TEST(test_skillforge_keyword_hits_cli_skill);
     HU_RUN_TEST(test_skillforge_execute_prefers_instructions);
     HU_RUN_TEST(test_skill_run_returns_instructions_content);
 }

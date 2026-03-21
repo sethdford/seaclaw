@@ -18,7 +18,7 @@ final class HumaniOSFleetUITests: XCTestCase {
     func test_launch_shows_tab_bar_with_core_destinations() throws {
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["Overview"].waitForExistence(timeout: 20))
-        for label in ["Overview", "Chat", "Sessions", "Tools", "Settings"] {
+        for label in ["Overview", "Chat", "Memory", "Sessions", "Tools", "Settings"] {
             XCTAssertTrue(
                 app.tabBars.buttons[label].exists,
                 "Expected tab bar item \(label)",
@@ -29,7 +29,7 @@ final class HumaniOSFleetUITests: XCTestCase {
     func test_primary_tabs_are_hittable_award_touch_targets() throws {
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["Overview"].waitForExistence(timeout: 20))
-        for label in ["Overview", "Chat", "Sessions", "Tools", "Settings"] {
+        for label in ["Overview", "Chat", "Memory", "Sessions", "Tools", "Settings"] {
             let tab = app.tabBars.buttons[label]
             XCTAssertTrue(tab.waitForExistence(timeout: 5))
             XCTAssertTrue(tab.isHittable, "Tab \(label) should be hittable (touch target / hit testing)")

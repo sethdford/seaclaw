@@ -486,6 +486,12 @@ void hu_agent_set_retrieval_engine(hu_agent_t *agent, hu_retrieval_engine_t *eng
     agent->retrieval_engine = engine;
 }
 
+void hu_agent_set_skill_route_embedder(hu_agent_t *agent, hu_embedder_t *embedder) {
+    if (!agent)
+        return;
+    agent->skill_route_embedder = embedder;
+}
+
 void hu_agent_set_awareness(hu_agent_t *agent, struct hu_awareness *awareness) {
     if (!agent)
         return;
@@ -623,6 +629,7 @@ void hu_agent_deinit(hu_agent_t *agent) {
                            sizeof(hu_speculative_cache_t));
         agent->speculative_cache = NULL;
     }
+    agent->skill_route_embedder = NULL;
 }
 
 hu_error_t hu_agent_consolidate_memory(hu_agent_t *agent) {

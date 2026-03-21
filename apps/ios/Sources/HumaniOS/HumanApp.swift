@@ -41,6 +41,8 @@ struct HumanApp: App {
             NotificationCenter.default.post(name: .navigateToTab, object: nil, userInfo: ["tab": AppTab.settings])
         case "sessions":
             NotificationCenter.default.post(name: .navigateToTab, object: nil, userInfo: ["tab": AppTab.sessions])
+        case "memory":
+            NotificationCenter.default.post(name: .navigateToTab, object: nil, userInfo: ["tab": AppTab.memory])
         default:
             break
         }

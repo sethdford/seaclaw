@@ -32,6 +32,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -56,6 +58,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
 import ai.human.app.ui.screens.ChatScreen
+import ai.human.app.ui.screens.MemoryScreen
 import ai.human.app.ui.screens.OverviewScreen
 import ai.human.app.ui.screens.SessionsScreen
 import ai.human.app.ui.screens.SettingsScreen
@@ -106,6 +109,7 @@ const val EXTRA_SKIP_ONBOARDING_FOR_TEST: String = "ai.human.SKIP_ONBOARDING_FOR
 private object MainRoutes {
     const val Overview = "overview"
     const val Chat = "chat"
+    const val Memory = "memory"
     const val Sessions = "sessions"
     const val Tools = "tools"
     const val Settings = "settings"
@@ -172,7 +176,7 @@ fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000
     }
 
     DisposableEffect(currentRoute) {
-        if (currentRoute in listOf(MainRoutes.Overview, MainRoutes.Chat, MainRoutes.Sessions, MainRoutes.Tools)) {
+        if (currentRoute in listOf(MainRoutes.Overview, MainRoutes.Chat, MainRoutes.Memory, MainRoutes.Sessions, MainRoutes.Tools)) {
             gateway.connectIfNeeded(initialGatewayUrl)
         }
         if (currentRoute == MainRoutes.Overview && connectionState == ConnectionState.CONNECTED) {
@@ -186,6 +190,7 @@ fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000
         if (uri.scheme == "human") {
             when (uri.host) {
                 "chat" -> navigateTo(MainRoutes.Chat)
+                "memory" -> navigateTo(MainRoutes.Memory)
                 "sessions" -> navigateTo(MainRoutes.Sessions)
                 "tools" -> navigateTo(MainRoutes.Tools)
                 "settings" -> navigateTo(MainRoutes.Settings)
@@ -197,6 +202,9 @@ fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000
     LaunchedEffect(currentRoute) {
         if (connectionState != ConnectionState.CONNECTED) return@LaunchedEffect
         when (currentRoute) {
+            MainRoutes.Memory -> {
+                gateway.prefetchMemory()
+            }
             MainRoutes.Sessions -> {
                 gateway.prefetchSessions()
                 gateway.prefetchTools()
@@ -247,6 +255,19 @@ fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000
                         )
                     },
                     label = { Text("Chat") },
+                )
+                NavigationBarItem(
+                    selected = currentRoute == MainRoutes.Memory,
+                    onClick = { navigateTo(MainRoutes.Memory) },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Psychology,
+                            contentDescription = "Memory",
+                            tint = if (currentRoute == MainRoutes.Memory) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    label = { Text("Memory") },
                 )
                 NavigationBarItem(
                     selected = currentRoute == MainRoutes.Sessions,
@@ -301,6 +322,9 @@ fun HumanApp(intent: Intent?, initialGatewayUrl: String = "http://localhost:3000
                 }
                 composable(MainRoutes.Chat) {
                     ChatScreen(gateway = gateway)
+                }
+                composable(MainRoutes.Memory) {
+                    MemoryScreen(gateway = gateway, connectionState = connectionState)
                 }
                 composable(MainRoutes.Sessions) {
                     SessionsScreen(gateway = gateway, connectionState = connectionState)

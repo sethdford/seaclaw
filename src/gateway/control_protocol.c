@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include "cp_internal.h"
+#include "human/gateway/voice_stream.h"
 
 #ifdef HU_GATEWAY_POSIX
 
@@ -66,6 +67,10 @@ static const hu_rpc_entry_t s_rpc_table[] = {
 #endif
     {"exec.approval.resolve", cp_admin_exec_approval},
     {"voice.transcribe", cp_voice_transcribe},
+    {"voice.session.start", cp_voice_session_start},
+    {"voice.session.stop", cp_voice_session_stop},
+    {"voice.session.interrupt", cp_voice_session_interrupt},
+    {"voice.audio.end", cp_voice_audio_end},
     {"usage.summary", cp_admin_usage_summary},
     {"metrics.snapshot", cp_admin_metrics_snapshot},
     {"activity.recent", cp_admin_activity_recent},
@@ -176,23 +181,15 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
         return;
 
 #ifdef HU_GATEWAY_POSIX
-    /* Simple global RPC rate limit: max 60 calls per second across all connections */
-    uint64_t now_ms = (uint64_t)time(NULL) * 1000;
-    if (now_ms - proto->rpc_window_ms > 1000) {
-        proto->rpc_count = 0;
-        proto->rpc_window_ms = now_ms;
-    }
-    if (++proto->rpc_count > 60) {
-        hu_control_send_response(proto, conn, "0", false, "{\"error\":\"rate limited\"}");
-        return;
-    }
-
     hu_json_value_t *root = NULL;
-    if (hu_json_parse(proto->alloc, data, data_len, &root) != HU_OK)
+    hu_error_t parse_err = hu_json_parse(proto->alloc, data, data_len, &root);
+    if (parse_err != HU_OK || !root) {
+        hu_voice_stream_on_binary(proto, conn, data, data_len);
         return;
-    if (!root || root->type != HU_JSON_OBJECT) {
-        if (root)
-            hu_json_free(proto->alloc, root);
+    }
+    if (root->type != HU_JSON_OBJECT) {
+        hu_json_free(proto->alloc, root);
+        hu_voice_stream_on_binary(proto, conn, data, data_len);
         return;
     }
 
@@ -200,6 +197,20 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
     if (!type_str || strcmp(type_str, "req") != 0) {
         hu_json_free(proto->alloc, root);
         return;
+    }
+
+    /* Rate limit JSON-RPC requests only (not binary audio frames). */
+    {
+        uint64_t now_ms = (uint64_t)time(NULL) * 1000;
+        if (now_ms - proto->rpc_window_ms > 1000) {
+            proto->rpc_count = 0;
+            proto->rpc_window_ms = now_ms;
+        }
+        if (++proto->rpc_count > 60) {
+            hu_control_send_response(proto, conn, "0", false, "{\"error\":\"rate limited\"}");
+            hu_json_free(proto->alloc, root);
+            return;
+        }
     }
 
     const char *id_raw = hu_json_get_string(root, "id");
@@ -258,6 +269,8 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
                 n = (size_t)snprintf(payload, 64, "{\"error\":\"unknown method\"}");
             } else if (err == HU_ERR_GATEWAY_AUTH) {
                 n = (size_t)snprintf(payload, 64, "{\"error\":\"invalid_token\"}");
+            } else if (err == HU_ERR_INVALID_ARGUMENT) {
+                n = (size_t)snprintf(payload, 64, "{\"error\":\"invalid_argument\"}");
             } else {
                 n = (size_t)snprintf(payload, 64, "{\"error\":\"internal\"}");
             }
@@ -322,8 +335,8 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
 }
 
 void hu_control_on_close(hu_ws_conn_t *conn, void *ctx) {
-    (void)conn;
     (void)ctx;
+    hu_voice_stream_on_conn_close(conn);
 }
 
 /* ── Outbound helpers ────────────────────────────────────────────────── */
@@ -349,6 +362,32 @@ void hu_control_send_event(hu_control_protocol_t *proto, const char *event_name,
 
     if (n > 0 && (size_t)n < cap)
         hu_ws_server_broadcast(proto->ws, buf, (size_t)n);
+
+    proto->alloc->free(proto->alloc->ctx, buf, cap);
+#endif
+}
+
+void hu_control_send_event_to_conn(hu_control_protocol_t *proto, hu_ws_conn_t *conn,
+                                   const char *event_name, const char *payload_json) {
+    if (!proto || !proto->ws || !conn || !event_name || !conn->active)
+        return;
+
+#ifdef HU_GATEWAY_POSIX
+    uint64_t seq = proto->event_seq++;
+    const char *payload = payload_json ? payload_json : "{}";
+    size_t payload_len = strlen(payload);
+    size_t event_len = strlen(event_name);
+
+    size_t cap = 128 + event_len + payload_len;
+    char *buf = (char *)proto->alloc->alloc(proto->alloc->ctx, cap);
+    if (!buf)
+        return;
+
+    int n = snprintf(buf, cap, "{\"type\":\"event\",\"event\":\"%s\",\"payload\":%s,\"seq\":%llu}",
+                     event_name, payload, (unsigned long long)seq);
+
+    if (n > 0 && (size_t)n < cap)
+        (void)hu_ws_server_send(proto->ws, conn, buf, (size_t)n);
 
     proto->alloc->free(proto->alloc->ctx, buf, cap);
 #endif

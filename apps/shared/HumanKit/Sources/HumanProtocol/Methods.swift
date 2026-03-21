@@ -59,7 +59,7 @@ public enum Methods {
     public static let authOauthCallback = "auth.oauth.callback"
     public static let authOauthRefresh = "auth.oauth.refresh"
 
-    // Memory
+    // Memory (P0 native parity: list/recall/status for dashboard Memory view)
     public static let memoryStatus = "memory.status"
     public static let memoryList = "memory.list"
     public static let memoryRecall = "memory.recall"

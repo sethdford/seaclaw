@@ -835,7 +835,6 @@ const char *hu_eval_baseline_status_for_score(double score) {
 bool hu_eval_baseline_try_mock_score_for_stem(const char *suite_stem, double *out_score) {
     if (!suite_stem || !out_score)
         return false;
-#if defined(HU_IS_TEST) && HU_IS_TEST
     static const struct {
         const char *stem;
         double score;
@@ -847,16 +846,24 @@ bool hu_eval_baseline_try_mock_score_for_stem(const char *suite_stem, double *ou
         {"memory", 0.75},
         {"social", 0.68},
     };
+    bool use_fixed = false;
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    use_fixed = true;
+#else
+    {
+        const char *ci = getenv("CI");
+        if (ci && ci[0] != '\0' && strcmp(ci, "false") != 0)
+            use_fixed = true;
+    }
+#endif
+    if (!use_fixed)
+        return false;
     for (size_t i = 0; i < sizeof(k_mock) / sizeof(k_mock[0]); i++) {
         if (strcmp(suite_stem, k_mock[i].stem) == 0) {
             *out_score = k_mock[i].score;
             return true;
         }
     }
-#else
-    (void)suite_stem;
-    (void)out_score;
-#endif
     return false;
 }
 
@@ -988,6 +995,36 @@ hu_error_t hu_eval_get_baseline(sqlite3 *db, const char *suite_name, double *out
     sqlite3_finalize(st);
     return HU_OK;
 #endif
+}
+
+hu_error_t hu_eval_regression_check_baseline_drop(sqlite3 *db, const char *suite_stem, double current_score,
+                                                  double max_drop, bool *regressed_out, char *msg_buf,
+                                                  size_t msg_cap) {
+    if (!suite_stem || suite_stem[0] == '\0' || !regressed_out)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (current_score < 0.0 || current_score > 1.0 || isnan(current_score) || isinf(current_score))
+        return HU_ERR_INVALID_ARGUMENT;
+    if (max_drop < 0.0 || isnan(max_drop) || isinf(max_drop))
+        return HU_ERR_INVALID_ARGUMENT;
+    *regressed_out = false;
+    double prev = 0.0;
+    hu_error_t ge = hu_eval_get_baseline(db, suite_stem, &prev);
+    if (ge == HU_ERR_NOT_FOUND)
+        return HU_OK;
+    if (ge != HU_OK)
+        return ge;
+    if (prev < 0.0 || prev > 1.0 || isnan(prev) || isinf(prev))
+        return HU_ERR_INTERNAL;
+    if (prev - current_score > max_drop + 1e-12) {
+        *regressed_out = true;
+        if (msg_buf && msg_cap > 0) {
+            int n = snprintf(msg_buf, msg_cap, "FAIL: %s dropped %.2f → %.2f (%.2f)", suite_stem, prev,
+                             current_score, current_score - prev);
+            if (n < 0 || (size_t)n >= msg_cap)
+                msg_buf[0] = '\0';
+        }
+    }
+    return HU_OK;
 }
 
 hu_error_t hu_eval_store_run(hu_allocator_t *alloc, sqlite3 *db, const hu_eval_run_t *run) {

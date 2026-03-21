@@ -8,12 +8,22 @@
 #   - human eval run on a configurable list of JSON suites (reports under REDTEAM_REPORT_DIR)
 #   - adversarial-eval-harness.py with synthetic probes + suite (needs ADV_EVAL_API_KEY)
 #
+# If .env points ADV_EVAL_* at a Gemini OpenAI-compat base URL but your key is OpenAI, set:
+#   REDTEAM_HARNESS_USE_OPENAI=1   # ADV_EVAL_* -> api.openai.com + gpt-4o-mini (override with REDTEAM_ADV_EVAL_MODEL)
+#
+# Without ~/.human/config.json the binary defaults to Gemini; for live runs use OpenAI keys:
+#   REDTEAM_HARNESS_USE_OPENAI=1   # also sets HUMAN_PROVIDER=openai for eval + harness agent probes (needs OPENAI_API_KEY)
+#   REDTEAM_AGENT_USE_OPENAI=1     # same agent alignment even if harness judge uses another ADV_EVAL_* backend
+#   REDTEAM_AGENT_MODEL=my-model   # optional; else HUMAN_MODEL or gpt-4o-mini
+#
+# Optional: HARNESS_AGENT_CONFIG_PATH=/path/config.json — harness passes HUMAN_CONFIG_PATH to each `human agent` child.
 # Optional: REDTEAM_FLEET_AGENT_SMOKE=1 runs one human agent -m (uses HUMAN_PROVIDER / keys in env).
 # Live harness: REDTEAM_PROBE_PROFILE=safety|capability_honesty for LLM-generated probes (suite tasks use JSON judge_profile).
 #
 # Examples:
 #   bash scripts/redteam-eval-fleet.sh
 #   REDTEAM_FLEET_LIVE=1 set -a && source .env && set +a && bash scripts/redteam-eval-fleet.sh
+#   bash scripts/redteam-live.sh   # sources .env, sets LIVE + OpenAI alignment + runs this script
 #   REDTEAM_FLEET_LIVE=1 REDTEAM_PROBES=5 REDTEAM_EVAL_SUITES="eval_suites/adversarial.json" bash scripts/redteam-eval-fleet.sh
 set -euo pipefail
 
@@ -98,6 +108,22 @@ if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
   echo ""
   echo "=== redteam-eval-fleet: live eval runs -> $LIVE_DIR ==="
 
+  if [ "${REDTEAM_HARNESS_USE_OPENAI:-0}" = 1 ] && [ -n "${OPENAI_API_KEY:-}" ]; then
+    export ADV_EVAL_API_KEY="$OPENAI_API_KEY"
+    export ADV_EVAL_BASE_URL="https://api.openai.com/v1"
+    export ADV_EVAL_MODEL="${REDTEAM_ADV_EVAL_MODEL:-gpt-4o-mini}"
+  fi
+
+  HARNESS_PY_ARGS=()
+  if [ -n "${OPENAI_API_KEY:-}" ]; then
+    if [ "${REDTEAM_AGENT_USE_OPENAI:-0}" = 1 ] || [ "${REDTEAM_HARNESS_USE_OPENAI:-0}" = 1 ]; then
+      export HUMAN_PROVIDER="openai"
+      export HUMAN_MODEL="${REDTEAM_AGENT_MODEL:-${HUMAN_MODEL:-gpt-4o-mini}}"
+      HARNESS_PY_ARGS=(--agent-provider openai --agent-model "${HUMAN_MODEL:-gpt-4o-mini}")
+      echo "redteam-eval-fleet: agent/eval using HUMAN_PROVIDER=openai HUMAN_MODEL=${HUMAN_MODEL:-gpt-4o-mini}"
+    fi
+  fi
+
   SUITES="${REDTEAM_EVAL_SUITES:-$DEFAULT_EVAL_SUITES}"
   local_fail=0
   for suite in $SUITES; do
@@ -121,7 +147,7 @@ if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
     probe_prof="${REDTEAM_PROBE_PROFILE:-safety}"
     echo ""
     echo "=== redteam-eval-fleet: dynamic harness (probes=$probes profile=$probe_prof) -> $LIVE_DIR/harness-report.json ==="
-    if python3 "$HARNESS" --probes "$probes" --probe-profile "$probe_prof" \
+    if python3 "$HARNESS" "${HARNESS_PY_ARGS[@]}" --probes "$probes" --probe-profile "$probe_prof" \
       --include-suite "$ROOT/eval_suites/adversarial.json" \
       --include-suite "$ROOT/eval_suites/capability_edges.json" \
       --timeout "${REDTEAM_AGENT_TIMEOUT:-180}" \

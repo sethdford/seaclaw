@@ -170,6 +170,46 @@ static void test_cmd_eval_baseline_outputs_score_table(void) {
     HU_ASSERT_TRUE(strstr(buf, "0.65") != NULL);
     HU_ASSERT_TRUE(strstr(buf, "PARTIAL") != NULL);
 }
+
+static void test_cmd_eval_check_regression_is_test_emits_pass_line(void) {
+    set_test_home();
+    char tmpl[] = "/tmp/hu_ev_cli_crXXXXXX";
+    int tfd = mkstemp(tmpl);
+    HU_ASSERT(tfd >= 0);
+    if (close(tfd) != 0) {
+        unlink(tmpl);
+        HU_FAIL("close tmp");
+    }
+
+    int save_out = dup(STDOUT_FILENO);
+    HU_ASSERT(save_out >= 0);
+    if (!freopen(tmpl, "w", stdout)) {
+        dup2(save_out, STDOUT_FILENO);
+        close(save_out);
+        unlink(tmpl);
+        HU_FAIL("freopen stdout");
+    }
+
+    hu_allocator_t alloc = hu_system_allocator();
+    char *argv[] = {"human", "eval", "check-regression", HU_EVAL_SUITES_DIR};
+    hu_error_t err = cmd_eval(&alloc, 4, argv);
+
+    fflush(stdout);
+    dup2(save_out, STDOUT_FILENO);
+    close(save_out);
+
+    FILE *rf = fopen(tmpl, "r");
+    HU_ASSERT_NOT_NULL(rf);
+    char buf[4096];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, rf);
+    buf[n] = '\0';
+    fclose(rf);
+    unlink(tmpl);
+
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(strstr(buf, "Regression check: PASS") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "no suite dropped >10%") != NULL);
+}
 #endif
 
 static void test_cmd_setup_local_model_ok(void) {
@@ -196,6 +236,7 @@ static void test_cli_setup_local_model_emit_contains_expected_lines(void) {
     HU_ASSERT_TRUE(strstr(buf, "test mode") != NULL);
     HU_ASSERT_TRUE(strstr(buf, "ollama pull llama3.2:3b") != NULL);
     HU_ASSERT_TRUE(strstr(buf, "huggingface.co") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "mlx_lm") != NULL);
     free(buf);
 }
 #endif
@@ -278,6 +319,7 @@ void run_cli_tests(void) {
     HU_RUN_TEST(test_cmd_init_sc_is_test_returns_ok);
 #if defined(__unix__) || defined(__APPLE__)
     HU_RUN_TEST(test_cmd_eval_baseline_outputs_score_table);
+    HU_RUN_TEST(test_cmd_eval_check_regression_is_test_emits_pass_line);
 #endif
     HU_RUN_TEST(test_cmd_setup_local_model_ok);
     HU_RUN_TEST(test_cmd_setup_unknown_subcommand_fails);

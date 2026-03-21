@@ -4,8 +4,9 @@ Dynamic adversarial evaluation: synthetic probes (LLM) -> human agent -m -> safe
 
 Requires:
   - Built binary: build/human (override with --human-bin or HUMAN_BIN)
-  - Working ~/.human/config.json so `human agent` can reach your provider
-  - API key for OpenAI-compatible generator+judge (not the same as Human's provider unless you want)
+  - A reachable provider for `human agent` (env is enough: HUMAN_PROVIDER / HUMAN_MODEL plus provider API keys;
+    ~/.human/config.json is optional)
+  - API key for OpenAI-compatible generator+judge (ADV_EVAL_*; can match Human's stack via --agent-provider openai)
 
 Environment (OpenAI-compatible):
   ADV_EVAL_API_KEY   — required for generator and judge (unless --no-llm)
@@ -33,6 +34,17 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_HUMAN = REPO_ROOT / "build" / "human"
+
+def _build_agent_env(overrides: dict[str, str] | None) -> dict[str, str]:
+    """Copy os.environ and apply overrides so `human agent` sees the same credentials as the parent shell."""
+    env = os.environ.copy()
+    if overrides:
+        for k, v in overrides.items():
+            if v:
+                env[k] = v
+            elif k in env:
+                del env[k]
+    return env
 
 
 def _strip_json_fence(text: str) -> str:
@@ -186,14 +198,19 @@ def load_suite_prompts(path: Path) -> list[dict[str, Any]]:
     return out
 
 
-def run_human(human_bin: Path, prompt: str, timeout_sec: int) -> tuple[int, str, str]:
+def run_human(
+    human_bin: Path,
+    prompt: str,
+    timeout_sec: int,
+    env_overrides: dict[str, str] | None = None,
+) -> tuple[int, str, str]:
     """Returns (exit_code, stdout, stderr)."""
     r = subprocess.run(
         [str(human_bin), "agent", "-m", prompt],
         capture_output=True,
         text=True,
         timeout=timeout_sec,
-        env=os.environ.copy(),
+        env=_build_agent_env(env_overrides),
         cwd=str(REPO_ROOT),
     )
     return r.returncode, r.stdout or "", r.stderr or ""
@@ -271,7 +288,25 @@ def main() -> int:
         help="Judge profile for LLM-generated probes (suite tasks use per-task judge_profile if set)",
     )
     ap.add_argument("--fail-under", type=float, default=-1.0, help="Exit 2 if mean score < this (0-1)")
+    ap.add_argument(
+        "--agent-provider",
+        metavar="NAME",
+        help="Set HUMAN_PROVIDER only for each `human agent` subprocess (e.g. openai)",
+    )
+    ap.add_argument(
+        "--agent-model",
+        metavar="ID",
+        help="Set HUMAN_MODEL only for each `human agent` subprocess (e.g. gpt-4o-mini)",
+    )
     args = ap.parse_args()
+
+    agent_env_overrides: dict[str, str] = {}
+    if args.agent_provider:
+        agent_env_overrides["HUMAN_PROVIDER"] = args.agent_provider
+    if args.agent_model:
+        agent_env_overrides["HUMAN_MODEL"] = args.agent_model
+    if os.environ.get("HARNESS_AGENT_CONFIG_PATH"):
+        agent_env_overrides["HUMAN_CONFIG_PATH"] = os.environ["HARNESS_AGENT_CONFIG_PATH"]
 
     api_key = os.environ.get("ADV_EVAL_API_KEY", "")
     base_url = os.environ.get("ADV_EVAL_BASE_URL", "https://api.openai.com/v1")
@@ -319,7 +354,12 @@ def main() -> int:
     for p in probes:
         pid = str(p["id"])
         pr = str(p["prompt"])
-        code, out, err = run_human(human_bin, pr, args.timeout)
+        code, out, err = run_human(
+            human_bin,
+            pr,
+            args.timeout,
+            agent_env_overrides if agent_env_overrides else None,
+        )
         combined = (out or "").strip()
         if err.strip():
             combined = (combined + "\n" + err.strip()).strip()

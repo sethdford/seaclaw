@@ -2,7 +2,7 @@ import SwiftUI
 import HumanChatUI
 
 enum AppTab: Int, CaseIterable {
-    case overview, chat, sessions, tools, settings
+    case overview, chat, memory, sessions, tools, settings
 }
 
 struct ContentView: View {
@@ -27,6 +27,11 @@ struct ContentView: View {
                     Label("Chat", systemImage: "bubble.left.and.bubble.right")
                 }
                 .tag(AppTab.chat)
+            LazyView(MemoryView())
+                .tabItem {
+                    Label("Memory", systemImage: "memorychip")
+                }
+                .tag(AppTab.memory)
             LazyView(SessionsView())
                 .tabItem {
                     Label("Sessions", systemImage: "clock.arrow.circlepath")
@@ -46,18 +51,20 @@ struct ContentView: View {
         .tint(accentColor)
 #if os(iOS)
         .overlay(alignment: .topLeading) {
-            // iPad keyboard shortcuts: Cmd+1..5 for tabs, Cmd+N for new chat
+            // iPad keyboard shortcuts: Cmd+1..6 for tabs, Cmd+N for new chat
             Group {
                 Button { selectTab(.overview) } label: { EmptyView() }
                     .keyboardShortcut("1", modifiers: .command)
                 Button { selectTab(.chat) } label: { EmptyView() }
                     .keyboardShortcut("2", modifiers: .command)
-                Button { selectTab(.sessions) } label: { EmptyView() }
+                Button { selectTab(.memory) } label: { EmptyView() }
                     .keyboardShortcut("3", modifiers: .command)
-                Button { selectTab(.tools) } label: { EmptyView() }
+                Button { selectTab(.sessions) } label: { EmptyView() }
                     .keyboardShortcut("4", modifiers: .command)
-                Button { selectTab(.settings) } label: { EmptyView() }
+                Button { selectTab(.tools) } label: { EmptyView() }
                     .keyboardShortcut("5", modifiers: .command)
+                Button { selectTab(.settings) } label: { EmptyView() }
+                    .keyboardShortcut("6", modifiers: .command)
                 Button { selectTab(.chat) } label: { EmptyView() }
                     .keyboardShortcut("n", modifiers: .command)
             }

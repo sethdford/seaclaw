@@ -10,6 +10,7 @@
 #include "human/memory.h"
 #include "human/gateway/control_protocol.h"
 #include "human/gateway/event_bridge.h"
+#include "human/gateway/voice_stream.h"
 #include "human/gateway/oauth.h"
 #include "human/gateway/openai_compat.h"
 #include "human/gateway/rate_limit.h"
@@ -1337,6 +1338,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
     hu_control_protocol_t proto_local;
     hu_event_bridge_t event_bridge;
     bool bridge_active = false;
+    bool voice_bus_stream_attached = false;
 
     memset(&event_bridge, 0, sizeof(event_bridge));
 
@@ -1360,6 +1362,8 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
         if (cfg.app_ctx->bus) {
             hu_event_bridge_init(&event_bridge, ctrl, cfg.app_ctx->bus);
             bridge_active = true;
+            hu_voice_stream_attach_bus(cfg.app_ctx->bus, ctrl);
+            voice_bus_stream_attached = true;
         }
     }
 
@@ -1767,6 +1771,8 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
     }
 
 cleanup:
+    if (voice_bus_stream_attached && cfg.app_ctx && cfg.app_ctx->bus)
+        hu_voice_stream_detach_bus(cfg.app_ctx->bus);
     if (bridge_active)
         hu_event_bridge_deinit(&event_bridge);
     if (gw && gw->pairing_guard) {

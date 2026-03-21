@@ -1,0 +1,468 @@
+/*
+ * Streaming voice session: binary mic chunks, STT, bus → agent, Cartesia TTS → binary PCM.
+ */
+#include "cp_internal.h"
+#include "human/bus.h"
+#include "human/config.h"
+#include "human/gateway/voice_stream.h"
+#include "human/multimodal.h"
+#include "human/platform.h"
+#include "human/tts/cartesia_stream.h"
+#include "human/voice.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#if defined(__unix__) || defined(__APPLE__)
+#include <unistd.h>
+#endif
+
+#ifdef HU_GATEWAY_POSIX
+
+#define VS_MAX_SLOTS 8
+#define VS_MAX_AUDIO (10u * 1024u * 1024u)
+
+typedef struct {
+    bool in_use;
+    uint64_t conn_id;
+    hu_ws_conn_t *conn;
+    uint8_t *pcm_buf;
+    size_t pcm_len;
+    size_t pcm_cap;
+    hu_cartesia_stream_t *tts;
+    char session_key[HU_BUS_ID_LEN];
+    char tts_context[96];
+    bool tts_armed;
+    unsigned turn_counter;
+    char voice_id[128];
+    char model_id[128];
+} vs_slot_t;
+
+static vs_slot_t s_vs[VS_MAX_SLOTS];
+static hu_control_protocol_t *s_proto;
+static hu_bus_t *s_bus;
+static vs_slot_t *s_active_tts_slot;
+
+static hu_allocator_t *vs_alloc_for_close(void) {
+    if (s_proto && s_proto->alloc)
+        return s_proto->alloc;
+    static hu_allocator_t sys;
+    static bool sys_init;
+    if (!sys_init) {
+        sys = hu_system_allocator();
+        sys_init = true;
+    }
+    return &sys;
+}
+
+static const char *vs_mime_ext(const char *mime) {
+    if (!mime)
+        return ".webm";
+    if (strstr(mime, "wav"))
+        return ".wav";
+    if (strstr(mime, "mp3") || strstr(mime, "mpeg"))
+        return ".mp3";
+    if (strstr(mime, "ogg"))
+        return ".ogg";
+    return ".webm";
+}
+
+static vs_slot_t *vs_find_slot_by_conn(const hu_ws_conn_t *c) {
+    if (!c)
+        return NULL;
+    for (int i = 0; i < VS_MAX_SLOTS; i++) {
+        if (s_vs[i].in_use && s_vs[i].conn_id == c->id)
+            return &s_vs[i];
+    }
+    return NULL;
+}
+
+static vs_slot_t *vs_alloc_slot(hu_ws_conn_t *c) {
+    vs_slot_t *ex = vs_find_slot_by_conn(c);
+    if (ex)
+        return ex;
+    for (int i = 0; i < VS_MAX_SLOTS; i++) {
+        if (!s_vs[i].in_use) {
+            memset(&s_vs[i], 0, sizeof(s_vs[i]));
+            s_vs[i].in_use = true;
+            s_vs[i].conn_id = c->id;
+            s_vs[i].conn = c;
+            memcpy(s_vs[i].session_key, "voice", 5);
+            s_vs[i].session_key[5] = '\0';
+            return &s_vs[i];
+        }
+    }
+    return NULL;
+}
+
+static void vs_free_slot(vs_slot_t *sl, hu_allocator_t *alloc) {
+    if (!sl)
+        return;
+    if (s_active_tts_slot == sl)
+        s_active_tts_slot = NULL;
+    if (sl->tts) {
+        hu_cartesia_stream_close(sl->tts, alloc);
+        sl->tts = NULL;
+    }
+    if (sl->pcm_buf) {
+        alloc->free(alloc->ctx, sl->pcm_buf, sl->pcm_cap);
+        sl->pcm_buf = NULL;
+        sl->pcm_len = 0;
+        sl->pcm_cap = 0;
+    }
+    memset(sl, 0, sizeof(*sl));
+}
+
+static void vs_drain_tts_to_conn(vs_slot_t *sl) {
+    if (!sl || !sl->tts || !s_proto || !s_proto->ws || !sl->conn || !sl->conn->active)
+        return;
+    hu_allocator_t *a = s_proto->alloc;
+    for (;;) {
+        void *pcm = NULL;
+        size_t n = 0;
+        bool done = false;
+        hu_error_t err = hu_cartesia_stream_recv_next(sl->tts, a, &pcm, &n, &done);
+        if (err != HU_OK)
+            break;
+        if (pcm && n > 0)
+            (void)hu_ws_server_send_binary(s_proto->ws, sl->conn, (const char *)pcm, n);
+        if (pcm)
+            a->free(a->ctx, pcm, n);
+        if (done)
+            break;
+    }
+}
+
+static bool vs_bus_cb(hu_bus_event_type_t type, const hu_bus_event_t *ev, void *user_ctx) {
+    (void)user_ctx;
+    if (!s_proto || !s_active_tts_slot || !s_active_tts_slot->tts_armed || !s_active_tts_slot->tts)
+        return true;
+    if (!ev || strcmp(ev->id, s_active_tts_slot->session_key) != 0)
+        return true;
+
+    hu_allocator_t *a = s_proto->alloc;
+    vs_slot_t *sl = s_active_tts_slot;
+
+    if (type == HU_BUS_MESSAGE_CHUNK) {
+        const char *tok = ev->message[0] ? ev->message : NULL;
+        if (!tok || !tok[0])
+            return true;
+        if (hu_cartesia_stream_send_generation(sl->tts, a, sl->tts_context, tok, true) == HU_OK)
+            vs_drain_tts_to_conn(sl);
+    } else if (type == HU_BUS_MESSAGE_SENT) {
+        (void)hu_cartesia_stream_flush_context(sl->tts, a, sl->tts_context);
+        vs_drain_tts_to_conn(sl);
+        hu_control_send_event_to_conn(s_proto, sl->conn, "voice.audio.done", "{}");
+        sl->tts_armed = false;
+        s_active_tts_slot = NULL;
+    }
+    return true;
+}
+
+void hu_voice_stream_attach_bus(hu_bus_t *bus, hu_control_protocol_t *proto) {
+    s_bus = bus;
+    s_proto = proto;
+    if (bus)
+        (void)hu_bus_subscribe(bus, vs_bus_cb, NULL, HU_BUS_EVENT_COUNT);
+}
+
+void hu_voice_stream_detach_bus(hu_bus_t *bus) {
+    if (bus && s_bus == bus) {
+        hu_bus_unsubscribe(bus, vs_bus_cb, NULL);
+        s_bus = NULL;
+        s_proto = NULL;
+        s_active_tts_slot = NULL;
+    }
+}
+
+void hu_voice_stream_on_binary(hu_control_protocol_t *proto, hu_ws_conn_t *conn,
+                               const char *data, size_t data_len) {
+    if (!proto || !proto->alloc || !conn || !data || data_len == 0)
+        return;
+    vs_slot_t *sl = vs_find_slot_by_conn(conn);
+    if (!sl)
+        return;
+    hu_allocator_t *alloc = proto->alloc;
+    if (sl->pcm_len + data_len > VS_MAX_AUDIO)
+        return;
+    if (sl->pcm_len + data_len > sl->pcm_cap) {
+        size_t ncap = sl->pcm_cap ? sl->pcm_cap * 2u : 65536u;
+        while (ncap < sl->pcm_len + data_len)
+            ncap *= 2u;
+        if (ncap > VS_MAX_AUDIO)
+            ncap = VS_MAX_AUDIO;
+        uint8_t *nb = (uint8_t *)alloc->alloc(alloc->ctx, ncap);
+        if (!nb)
+            return;
+        if (sl->pcm_buf && sl->pcm_len)
+            memcpy(nb, sl->pcm_buf, sl->pcm_len);
+        if (sl->pcm_buf)
+            alloc->free(alloc->ctx, sl->pcm_buf, sl->pcm_cap);
+        sl->pcm_buf = nb;
+        sl->pcm_cap = ncap;
+    }
+    memcpy(sl->pcm_buf + sl->pcm_len, data, data_len);
+    sl->pcm_len += data_len;
+}
+
+void hu_voice_stream_on_conn_close(hu_ws_conn_t *conn) {
+    vs_slot_t *sl = vs_find_slot_by_conn(conn);
+    if (!sl)
+        return;
+    vs_free_slot(sl, vs_alloc_for_close());
+}
+
+hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                  const hu_control_protocol_t *proto,
+                                  const hu_json_value_t *root, char **out, size_t *out_len) {
+    *out = NULL;
+    *out_len = 0;
+    if (!alloc || !app || !app->config || !conn || !proto || !root)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    vs_slot_t *sl = vs_alloc_slot(conn);
+    if (!sl)
+        return HU_ERR_ALREADY_EXISTS;
+
+    const hu_config_t *cfg = (const hu_config_t *)app->config;
+    const char *key = hu_config_get_provider_key(cfg, "cartesia");
+    if (!key || !key[0])
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const char *voice_id = NULL;
+    const char *model_id = NULL;
+    hu_json_value_t *params = hu_json_object_get((hu_json_value_t *)root, "params");
+    if (params) {
+        const char *v = hu_json_get_string(params, "voiceId");
+        if (v)
+            voice_id = v;
+        const char *m = hu_json_get_string(params, "modelId");
+        if (m)
+            model_id = m;
+    }
+    if (!voice_id || !voice_id[0])
+        voice_id = cfg->voice.tts_voice;
+    if (!model_id || !model_id[0])
+        model_id = cfg->voice.tts_model;
+
+    if (sl->tts) {
+        hu_cartesia_stream_close(sl->tts, alloc);
+        sl->tts = NULL;
+    }
+
+    hu_error_t oerr =
+        hu_cartesia_stream_open(alloc, key, voice_id ? voice_id : "", model_id ? model_id : "",
+                                &sl->tts);
+    if (oerr != HU_OK)
+        return oerr;
+
+    if (voice_id && voice_id[0])
+        (void)snprintf(sl->voice_id, sizeof(sl->voice_id), "%s", voice_id);
+    if (model_id && model_id[0])
+        (void)snprintf(sl->model_id, sizeof(sl->model_id), "%s", model_id);
+
+    hu_json_value_t *res = hu_json_object_new(alloc);
+    if (!res)
+        return HU_ERR_OUT_OF_MEMORY;
+    cp_json_set_str(alloc, res, "encoding", "pcm_f32le");
+    hu_json_object_set(alloc, res, "sampleRate", hu_json_number_new(alloc, 24000));
+    char sid[40];
+    (void)snprintf(sid, sizeof(sid), "%llu", (unsigned long long)conn->id);
+    cp_json_set_str(alloc, res, "sessionId", sid);
+    hu_error_t err = hu_json_stringify(alloc, res, out, out_len);
+    hu_json_free(alloc, res);
+    return err;
+}
+
+hu_error_t cp_voice_session_stop(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                 const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                 char **out, size_t *out_len) {
+    (void)proto;
+    (void)root;
+    *out = NULL;
+    *out_len = 0;
+    if (!alloc || !app || !conn)
+        return HU_ERR_INVALID_ARGUMENT;
+    vs_slot_t *sl = vs_find_slot_by_conn(conn);
+    if (sl)
+        vs_free_slot(sl, alloc);
+    hu_json_value_t *res = hu_json_object_new(alloc);
+    if (!res)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_json_object_set(alloc, res, "ok", hu_json_bool_new(alloc, true));
+    hu_error_t err = hu_json_stringify(alloc, res, out, out_len);
+    hu_json_free(alloc, res);
+    return err;
+}
+
+hu_error_t cp_voice_session_interrupt(hu_allocator_t *alloc, hu_app_context_t *app,
+                                      hu_ws_conn_t *conn, const hu_control_protocol_t *proto,
+                                      const hu_json_value_t *root, char **out, size_t *out_len) {
+    (void)proto;
+    (void)root;
+    *out = NULL;
+    *out_len = 0;
+    if (!alloc || !app || !conn)
+        return HU_ERR_INVALID_ARGUMENT;
+    vs_slot_t *sl = vs_find_slot_by_conn(conn);
+    if (sl && sl->tts && sl->tts_context[0])
+        (void)hu_cartesia_stream_cancel_context(sl->tts, alloc, sl->tts_context);
+    if (sl) {
+        sl->pcm_len = 0;
+        sl->tts_armed = false;
+        if (s_active_tts_slot == sl)
+            s_active_tts_slot = NULL;
+    }
+    if (sl && conn->active)
+        hu_control_send_event_to_conn((hu_control_protocol_t *)proto, conn,
+                                       "voice.audio.interrupted", "{}");
+
+    hu_json_value_t *res = hu_json_object_new(alloc);
+    if (!res)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_json_object_set(alloc, res, "ok", hu_json_bool_new(alloc, true));
+    hu_error_t err = hu_json_stringify(alloc, res, out, out_len);
+    hu_json_free(alloc, res);
+    return err;
+}
+
+hu_error_t cp_voice_audio_end(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                              const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                              char **out, size_t *out_len) {
+    *out = NULL;
+    *out_len = 0;
+    if (!alloc || !app || !app->config || !app->bus || !conn || !proto)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    vs_slot_t *sl = vs_find_slot_by_conn(conn);
+    if (!sl || !sl->tts)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (sl->pcm_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const char *mime_type = "audio/webm";
+    const char *session_key = sl->session_key;
+    hu_json_value_t *params = hu_json_object_get((hu_json_value_t *)root, "params");
+    if (params) {
+        const char *m = hu_json_get_string(params, "mimeType");
+        if (m && m[0])
+            mime_type = m;
+        const char *sk = hu_json_get_string(params, "sessionKey");
+        if (sk && sk[0]) {
+            size_t l = strlen(sk);
+            if (l >= sizeof(sl->session_key))
+                l = sizeof(sl->session_key) - 1;
+            memcpy(sl->session_key, sk, l);
+            sl->session_key[l] = '\0';
+            session_key = sl->session_key;
+        }
+    }
+
+    hu_voice_config_t voice_cfg = {0};
+    (void)hu_voice_config_from_settings((const hu_config_t *)app->config, &voice_cfg);
+    voice_cfg.language = NULL;
+
+    char *tmp_dir = hu_platform_get_temp_dir(alloc);
+    if (!tmp_dir)
+        return HU_ERR_IO;
+    char tmpl[512];
+    (void)snprintf(tmpl, sizeof(tmpl), "%s/human_vs_XXXXXX%s", tmp_dir, vs_mime_ext(mime_type));
+    alloc->free(alloc->ctx, tmp_dir, strlen(tmp_dir) + 1);
+
+    int fd = mkstemps(tmpl, (int)strlen(vs_mime_ext(mime_type)));
+    if (fd < 0) {
+        return HU_ERR_IO;
+    }
+    {
+        const uint8_t *p = sl->pcm_buf;
+        size_t left = sl->pcm_len;
+        while (left > 0) {
+            ssize_t w = write(fd, p, left > 65536 ? 65536 : left);
+            if (w <= 0) {
+                close(fd);
+                unlink(tmpl);
+                return HU_ERR_IO;
+            }
+            p += (size_t)w;
+            left -= (size_t)w;
+        }
+    }
+    close(fd);
+
+    char *text = NULL;
+    size_t text_len = 0;
+    hu_error_t err = hu_voice_stt_file(alloc, &voice_cfg, tmpl, &text, &text_len);
+    unlink(tmpl);
+    sl->pcm_len = 0;
+
+    if (err != HU_OK || !text)
+        return err == HU_OK ? HU_ERR_IO : err;
+
+    /* Targeted transcript event */
+    hu_json_value_t *tev = hu_json_object_new(alloc);
+    if (!tev) {
+        alloc->free(alloc->ctx, text, text_len + 1);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    cp_json_set_str(alloc, tev, "text", text);
+    char *tpayload = NULL;
+    size_t tplen = 0;
+    (void)hu_json_stringify(alloc, tev, &tpayload, &tplen);
+    hu_json_free(alloc, tev);
+    if (tpayload)
+        hu_control_send_event_to_conn((hu_control_protocol_t *)proto, conn, "voice.transcript",
+                                      tpayload);
+    alloc->free(alloc->ctx, tpayload, tplen + 1);
+
+    (void)snprintf(sl->tts_context, sizeof(sl->tts_context), "ctx-%llu-%u",
+                   (unsigned long long)conn->id, ++sl->turn_counter);
+    sl->tts_armed = true;
+    s_active_tts_slot = sl;
+
+    hu_bus_event_t bev;
+    memset(&bev, 0, sizeof(bev));
+    bev.type = HU_BUS_MESSAGE_RECEIVED;
+    (void)snprintf(bev.channel, sizeof(bev.channel), "control-ui");
+    (void)snprintf(bev.id, sizeof(bev.id), "%s", session_key);
+    bev.payload = text;
+    size_t tl = strlen(text);
+    if (tl >= HU_BUS_MSG_LEN)
+        tl = HU_BUS_MSG_LEN - 1;
+    memcpy(bev.message, text, tl);
+    bev.message[tl] = '\0';
+    hu_bus_publish(app->bus, &bev);
+    alloc->free(alloc->ctx, text, text_len + 1);
+
+    hu_json_value_t *res = hu_json_object_new(alloc);
+    if (!res)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_json_object_set(alloc, res, "ok", hu_json_bool_new(alloc, true));
+    err = hu_json_stringify(alloc, res, out, out_len);
+    hu_json_free(alloc, res);
+    return err;
+}
+
+#else /* !HU_GATEWAY_POSIX */
+
+void hu_voice_stream_attach_bus(hu_bus_t *bus, hu_control_protocol_t *proto) {
+    (void)bus;
+    (void)proto;
+}
+
+void hu_voice_stream_detach_bus(hu_bus_t *bus) {
+    (void)bus;
+}
+
+void hu_voice_stream_on_binary(hu_control_protocol_t *proto, hu_ws_conn_t *conn,
+                               const char *data, size_t data_len) {
+    (void)proto;
+    (void)conn;
+    (void)data;
+    (void)data_len;
+}
+
+void hu_voice_stream_on_conn_close(hu_ws_conn_t *conn) {
+    (void)conn;
+}
+
+#endif /* HU_GATEWAY_POSIX */

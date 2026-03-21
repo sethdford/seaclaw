@@ -42,6 +42,7 @@ class NativeFleetAwardTierTest {
             listOf(
                 "Overview",
                 "Chat",
+                "Memory",
                 "Sessions",
                 "Tools",
                 "Settings",
@@ -62,6 +63,7 @@ class NativeFleetAwardTierTest {
             listOf(
                 "Overview",
                 "Chat",
+                "Memory",
                 "Sessions",
                 "Tools",
                 "Settings",

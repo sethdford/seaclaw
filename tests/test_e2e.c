@@ -6,6 +6,11 @@
 #include "human/core/string.h"
 #include "human/health.h"
 #include "human/memory.h"
+#ifdef HU_HAS_SKILLS
+#include "human/memory/vector.h"
+#include "human/observability/bth_metrics.h"
+#include "human/skillforge.h"
+#endif
 #include "human/observability/log_observer.h"
 #include "human/provider.h"
 #include "human/tool.h"
@@ -96,6 +101,64 @@ static hu_provider_t mock_provider_create(hu_allocator_t *alloc, mock_provider_t
     ctx->name = "mock";
     return (hu_provider_t){.ctx = ctx, .vtable = &mock_provider_vtable};
 }
+
+#ifdef HU_HAS_SKILLS
+typedef struct capture_mock_ctx {
+    const char *name;
+    char system_captured[8192];
+} capture_mock_ctx_t;
+
+static hu_error_t mock_chat_capture_system_prompt(void *ctx, hu_allocator_t *alloc,
+                                                  const hu_chat_request_t *request,
+                                                  const char *model, size_t model_len,
+                                                  double temperature,
+                                                  hu_chat_response_t *out) {
+    capture_mock_ctx_t *c = (capture_mock_ctx_t *)ctx;
+    memset(c->system_captured, 0, sizeof(c->system_captured));
+    for (size_t i = 0; i < request->messages_count; i++) {
+        if (request->messages[i].role == HU_ROLE_SYSTEM && request->messages[i].content &&
+            request->messages[i].content_len > 0) {
+            size_t n = request->messages[i].content_len;
+            if (n >= sizeof(c->system_captured))
+                n = sizeof(c->system_captured) - 1;
+            memcpy(c->system_captured, request->messages[i].content, n);
+            c->system_captured[n] = '\0';
+            break;
+        }
+    }
+    (void)model;
+    (void)model_len;
+    (void)temperature;
+    const char *resp = "mock response";
+    out->content = hu_strndup(alloc, resp, strlen(resp));
+    out->content_len = out->content ? strlen(resp) : 0;
+    out->tool_calls = NULL;
+    out->tool_calls_count = 0;
+    out->usage.prompt_tokens = 1;
+    out->usage.completion_tokens = 2;
+    out->usage.total_tokens = 3;
+    out->model = NULL;
+    out->model_len = 0;
+    out->reasoning_content = NULL;
+    out->reasoning_content_len = 0;
+    return out->content ? HU_OK : HU_ERR_OUT_OF_MEMORY;
+}
+
+static const hu_provider_vtable_t capture_mock_provider_vtable = {
+    .chat_with_system = mock_chat_with_system,
+    .chat = mock_chat_capture_system_prompt,
+    .supports_native_tools = mock_supports_native_tools,
+    .get_name = mock_get_name,
+    .deinit = mock_deinit,
+};
+
+static hu_provider_t capture_mock_provider_create(hu_allocator_t *alloc, capture_mock_ctx_t *ctx) {
+    (void)alloc;
+    ctx->name = "mock";
+    memset(ctx->system_captured, 0, sizeof(ctx->system_captured));
+    return (hu_provider_t){.ctx = ctx, .vtable = &capture_mock_provider_vtable};
+}
+#endif /* HU_HAS_SKILLS */
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Mock tool
@@ -716,6 +779,88 @@ static void test_agent_with_observer(void) {
     fclose(f);
 }
 
+#ifdef HU_HAS_SKILLS
+static void test_agent_turn_skill_routing_in_system_prompt_e2e(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    capture_mock_ctx_t cap;
+    hu_provider_t prov = capture_mock_provider_create(&alloc, &cap);
+
+    hu_skillforge_t sf;
+    HU_ASSERT_EQ(hu_skillforge_create(&alloc, &sf), HU_OK);
+    HU_ASSERT_EQ(hu_skillforge_discover(&sf, "/tmp"), HU_OK);
+
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    HU_ASSERT_EQ(hu_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL,
+                                      "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0,
+                                      NULL, 0, NULL, 0, NULL),
+                 HU_OK);
+    hu_agent_set_skillforge(&agent, &sf);
+
+    hu_bth_metrics_t bth;
+    hu_bth_metrics_init(&bth);
+    agent.bth_metrics = &bth;
+
+    char *r = NULL;
+    size_t rlen = 0;
+    const char *user = "help me with the CLI for human commands";
+    HU_ASSERT_EQ(hu_agent_turn(&agent, user, strlen(user), &r, &rlen), HU_OK);
+    if (r)
+        alloc.free(alloc.ctx, r, rlen + 1);
+
+    HU_ASSERT_TRUE(strstr(cap.system_captured, "cli-helper") != NULL);
+    HU_ASSERT_TRUE(strstr(cap.system_captured, "relevance:") != NULL);
+    HU_ASSERT_TRUE(bth.skill_routes_semantic >= 1u);
+
+    hu_agent_deinit(&agent);
+    hu_skillforge_destroy(&sf);
+}
+
+static void test_agent_turn_skill_routing_embedder_increments_bth_e2e(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_embedder_t embedder = hu_embedder_local_create(&alloc);
+    HU_ASSERT_NOT_NULL(embedder.vtable);
+    HU_ASSERT_NOT_NULL(embedder.vtable->embed);
+
+    capture_mock_ctx_t cap;
+    hu_provider_t prov = capture_mock_provider_create(&alloc, &cap);
+
+    hu_skillforge_t sf;
+    HU_ASSERT_EQ(hu_skillforge_create(&alloc, &sf), HU_OK);
+    HU_ASSERT_EQ(hu_skillforge_discover(&sf, "/tmp"), HU_OK);
+
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    HU_ASSERT_EQ(hu_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL,
+                                      "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0,
+                                      NULL, 0, NULL, 0, NULL),
+                 HU_OK);
+    hu_agent_set_skillforge(&agent, &sf);
+    hu_agent_set_skill_route_embedder(&agent, &embedder);
+
+    hu_bth_metrics_t bth;
+    hu_bth_metrics_init(&bth);
+    agent.bth_metrics = &bth;
+
+    char *r = NULL;
+    size_t rlen = 0;
+    const char *user = "help me with the CLI for human commands";
+    HU_ASSERT_EQ(hu_agent_turn(&agent, user, strlen(user), &r, &rlen), HU_OK);
+    if (r)
+        alloc.free(alloc.ctx, r, rlen + 1);
+
+    HU_ASSERT_TRUE(strstr(cap.system_captured, "cli-helper") != NULL);
+    HU_ASSERT_TRUE(strstr(cap.system_captured, "relevance:") != NULL);
+    HU_ASSERT_TRUE(bth.skill_routes_semantic >= 1u);
+    HU_ASSERT_TRUE(bth.skill_routes_embedded >= 1u);
+
+    hu_agent_deinit(&agent);
+    hu_skillforge_destroy(&sf);
+    if (embedder.vtable && embedder.vtable->deinit)
+        embedder.vtable->deinit(embedder.ctx, &alloc);
+}
+#endif /* HU_HAS_SKILLS */
+
 static void test_provider_create_from_config(void) {
     char *old_home = getenv("HOME") ? strdup(getenv("HOME")) : NULL;
     setenv("HOME", "/tmp/human_e2e_provider", 1);
@@ -1107,6 +1252,10 @@ void run_e2e_tests(void) {
     HU_RUN_TEST(test_agent_turn_null_message);
     HU_RUN_TEST(test_agent_turn_null_response);
     HU_RUN_TEST(test_agent_with_observer);
+#ifdef HU_HAS_SKILLS
+    HU_RUN_TEST(test_agent_turn_skill_routing_in_system_prompt_e2e);
+    HU_RUN_TEST(test_agent_turn_skill_routing_embedder_increments_bth_e2e);
+#endif
     HU_RUN_TEST(test_provider_create_from_config);
     HU_RUN_TEST(test_config_validate_after_load);
     HU_RUN_TEST(test_agent_tool_call_round_trip);

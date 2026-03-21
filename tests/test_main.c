@@ -267,6 +267,7 @@ void run_pwa_tests(void);
 void run_paperclip_tests(void);
 #endif
 void run_cartesia_tests(void);
+void run_cartesia_stream_tests(void);
 #ifdef HU_ENABLE_CARTESIA
 void run_audio_pipeline_tests(void);
 void run_voice_decision_tests(void);
@@ -310,6 +311,7 @@ void run_gui_agent_tests(void);
 void run_lsp_tests(void);
 void run_webrtc_tests(void);
 void run_embedded_provider_tests(void);
+void run_coreml_provider_tests(void);
 void run_forgetting_tests(void);
 void run_bootstrap_tests(void);
 void run_thread_pool_tests(void);
@@ -616,6 +618,7 @@ int main(int argc, char **argv) {
     run_paperclip_tests();
 #endif
     run_cartesia_tests();
+    run_cartesia_stream_tests();
 #ifdef HU_ENABLE_CARTESIA
     run_audio_pipeline_tests();
     run_voice_decision_tests();
@@ -658,6 +661,7 @@ int main(int argc, char **argv) {
     run_lsp_tests();
     run_webrtc_tests();
     run_embedded_provider_tests();
+    run_coreml_provider_tests();
     run_forgetting_tests();
     run_bootstrap_tests();
     run_thread_pool_tests();

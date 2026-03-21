@@ -723,6 +723,7 @@ hu_error_t cp_admin_metrics_snapshot(hu_allocator_t *alloc, hu_app_context_t *ap
         BTH_SET(skills_applied);
         BTH_SET(skills_evolved);
         BTH_SET(skills_retired);
+        BTH_SET(skill_routes_embedded);
         BTH_SET(reflections_daily);
 #undef BTH_SET
         hu_json_object_set(alloc, obj, "bth", bth_obj);

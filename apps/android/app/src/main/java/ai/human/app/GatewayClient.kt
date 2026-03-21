@@ -49,6 +49,15 @@ data class ToolInfo(
 )
 
 @Immutable
+data class MemoryEntry(
+    val key: String,
+    val content: String,
+    val category: String,
+    val source: String,
+    val timestamp: String,
+)
+
+@Immutable
 data class HealthStatus(
     val status: String,
     val uptimeSecs: Long = 0,
@@ -78,6 +87,9 @@ class GatewayClient {
 
     private val _tools = MutableStateFlow<List<ToolInfo>>(emptyList())
     val tools: StateFlow<List<ToolInfo>> = _tools.asStateFlow()
+
+    private val _memoryEntries = MutableStateFlow<List<MemoryEntry>>(emptyList())
+    val memoryEntries: StateFlow<List<MemoryEntry>> = _memoryEntries.asStateFlow()
 
     private val _healthStatus = MutableStateFlow<HealthStatus?>(null)
     val healthStatus: StateFlow<HealthStatus?> = _healthStatus.asStateFlow()
@@ -179,6 +191,25 @@ class GatewayClient {
                                 }
                                 _tools.value = list
                             }
+                            val memArr = result.optJSONArray("entries")
+                            if (memArr != null) {
+                                val list = mutableListOf<MemoryEntry>()
+                                for (i in 0 until memArr.length()) {
+                                    val o = memArr.optJSONObject(i) ?: continue
+                                    val key = o.optString("key", "")
+                                    if (key.isBlank()) continue
+                                    list.add(
+                                        MemoryEntry(
+                                            key = key,
+                                            content = o.optString("content", ""),
+                                            category = o.optString("category", ""),
+                                            source = o.optString("source", ""),
+                                            timestamp = o.optString("timestamp", ""),
+                                        ),
+                                    )
+                                }
+                                _memoryEntries.value = list
+                            }
                             if (result.has("status") || result.has("uptime_seconds") || result.has("uptime_secs")) {
                                 val up = when {
                                     result.has("uptime_seconds") -> result.optLong("uptime_seconds", 0L)
@@ -263,6 +294,10 @@ class GatewayClient {
     /** Prefetch tools catalog for adjacent tab navigation. */
     fun prefetchTools() {
         fetchTools()
+    }
+
+    fun prefetchMemory() {
+        fetchMemoryList()
     }
 
     /** Fetch overview data: sessions, activity, and health. Call when connected. */

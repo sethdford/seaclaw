@@ -1,5 +1,23 @@
 /* Core turn execution: hu_agent_turn and turn-local helpers */
 #include "agent_internal.h"
+
+#ifdef HU_HAS_SKILLS
+static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *alloc,
+                                             const char *text, size_t text_len, float **out_vec,
+                                             size_t *out_dims) {
+    hu_embedder_t *emb = (hu_embedder_t *)embed_ctx;
+    if (!emb || !emb->vtable || !emb->vtable->embed || !alloc || !out_vec || !out_dims)
+        return HU_ERR_INVALID_ARGUMENT;
+    hu_embedding_t e;
+    memset(&e, 0, sizeof(e));
+    hu_error_t err = emb->vtable->embed(emb->ctx, alloc, text, text_len, &e);
+    if (err != HU_OK)
+        return err;
+    *out_vec = e.values;
+    *out_dims = e.dim;
+    return HU_OK;
+}
+#endif
 #include "human/agent/ab_response.h"
 #include "human/agent/awareness.h"
 #include "human/agent/commands.h"
@@ -43,6 +61,7 @@
 #include "human/skillforge.h"
 #ifdef HU_HAS_SKILLS
 #include "human/cognition/skill_routing.h"
+#include "human/memory/vector.h"
 #endif
 #include "human/context.h"
 #include "human/context/conversation.h"
@@ -1393,11 +1412,30 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     for (size_t e = 0; e < en; e++)
                         kws[e] /= norm;
 
+                    hu_skill_routing_ctx_t sem_ctx;
+                    hu_skill_routing_init(&sem_ctx);
+                    bool used_skill_embeddings = false;
+                    if (agent->skill_route_embedder && agent->skill_route_embedder->vtable &&
+                        agent->skill_route_embedder->vtable->embed) {
+                        if (hu_skill_routing_embed_catalog(
+                                &sem_ctx, agent->alloc, rskills, en, agent_skill_route_embed_fn,
+                                agent->skill_route_embedder) == HU_OK &&
+                            sem_ctx.initialized)
+                            used_skill_embeddings = true;
+                    }
+
                     hu_skill_blend_t blend;
                     memset(&blend, 0, sizeof(blend));
                     float emo = agent->emotional_cognition.state.intensity;
-                    if (hu_skill_routing_route(NULL, agent->alloc, msg, msg_len, NULL, NULL, rskills,
-                                               en, kws, NULL, emo, &blend) == HU_OK) {
+                    const hu_skill_routing_ctx_t *route_ctx =
+                        sem_ctx.initialized ? &sem_ctx : NULL;
+                    hu_embed_fn msg_embed_fn = sem_ctx.initialized ? agent_skill_route_embed_fn : NULL;
+                    void *msg_embed_ctx =
+                        sem_ctx.initialized ? (void *)agent->skill_route_embedder : NULL;
+
+                    if (hu_skill_routing_route(route_ctx, agent->alloc, msg, msg_len, msg_embed_fn,
+                                               msg_embed_ctx, rskills, en, kws, NULL, emo,
+                                               &blend) == HU_OK) {
                         char *routed = NULL;
                         size_t routed_len = 0;
                         if (hu_skill_routing_build_catalog(agent->alloc, &blend, rskills, en, en,
@@ -1408,6 +1446,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             skills_ctx_len = routed_len;
                             if (agent->bth_metrics) {
                                 agent->bth_metrics->skill_routes_semantic++;
+                                if (used_skill_embeddings)
+                                    agent->bth_metrics->skill_routes_embedded++;
                                 if (blend.count > 1u)
                                     agent->bth_metrics->skill_routes_blended++;
                             }
@@ -1415,6 +1455,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             agent->alloc->free(agent->alloc->ctx, routed, routed_len + 1);
                         }
                     }
+                    hu_skill_routing_deinit(&sem_ctx, agent->alloc);
                     agent->alloc->free(agent->alloc->ctx, kws, en * sizeof(float));
                     agent->alloc->free(agent->alloc->ctx, rskills, en * sizeof(hu_skill_t));
                 } else {

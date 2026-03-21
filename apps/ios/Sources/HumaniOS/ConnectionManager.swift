@@ -27,6 +27,15 @@ public struct ActivityEvent: Identifiable {
     public let timestamp: Date
 }
 
+public struct MemoryEntrySummary: Identifiable {
+    public let id: String
+    public let key: String
+    public let content: String
+    public let category: String
+    public let source: String
+    public let timestamp: String
+}
+
 public enum HealthStatus {
     case unknown, healthy, degraded, unhealthy
 }
@@ -54,6 +63,7 @@ public final class ConnectionManager: ObservableObject {
     @Published public private(set) var uptimeSeconds: UInt64?
     @Published public private(set) var channelCount: Int?
     @Published public private(set) var toolCount: Int?
+    @Published public private(set) var memoryEntries: [MemoryEntrySummary] = []
 
     private var connection: HumanConnection?
     private var eventHandlerStorage: ((String, [String: AnyCodable]?) -> Void)?
@@ -104,6 +114,7 @@ public final class ConnectionManager: ObservableObject {
                 self?.uptimeSeconds = nil
                 self?.channelCount = nil
                 self?.toolCount = nil
+                self?.memoryEntries = []
             }
         }
     }
@@ -206,6 +217,40 @@ public final class ConnectionManager: ObservableObject {
         }
     }
 
+    /// Loads memory entries from `memory.list` (shape: `{ "entries": [ { key, content, category, source, timestamp } ] }`).
+    public func fetchMemoryList(completion: ((Result<Void, Error>) -> Void)? = nil) {
+        Task {
+            do {
+                let resp = try await request(method: Methods.memoryList, params: nil)
+                guard resp.ok else {
+                    await MainActor.run {
+                        memoryEntries = []
+                        completion?(.failure(MemoryListError.requestFailed))
+                    }
+                    return
+                }
+                guard let payload = resp.payload else {
+                    await MainActor.run {
+                        memoryEntries = []
+                        completion?(.success(()))
+                    }
+                    return
+                }
+                let arr = payload["entries"]?.value as? [[String: Any]] ?? []
+                let parsed = arr.compactMap { parseMemoryEntry($0) }
+                await MainActor.run {
+                    memoryEntries = parsed
+                    completion?(.success(()))
+                }
+            } catch {
+                await MainActor.run {
+                    memoryEntries = []
+                    completion?(.failure(error))
+                }
+            }
+        }
+    }
+
     public func fetchHealthStatus() {
         Task {
             do {
@@ -237,6 +282,8 @@ public final class ConnectionManager: ObservableObject {
             if sessions.isEmpty { fetchSessions() }
         case .tools:
             if tools.isEmpty { fetchTools() }
+        case .memory:
+            if memoryEntries.isEmpty { fetchMemoryList() }
         case .chat, .settings:
             break
         }
@@ -288,6 +335,22 @@ public final class ConnectionManager: ObservableObject {
         if lower.contains("fetch") || lower.contains("curl") || lower.contains("http") { return "Network" }
         if lower.contains("grep") || lower.contains("search") || lower.contains("codebase") { return "Search" }
         return "Other"
+    }
+
+    private func parseMemoryEntry(_ dict: [String: Any]) -> MemoryEntrySummary? {
+        guard let key = dict["key"] as? String, !key.isEmpty else { return nil }
+        let content = dict["content"] as? String ?? ""
+        let category = dict["category"] as? String ?? ""
+        let source = dict["source"] as? String ?? ""
+        let timestamp = dict["timestamp"] as? String ?? ""
+        return MemoryEntrySummary(
+            id: key,
+            key: key,
+            content: content,
+            category: category,
+            source: source,
+            timestamp: timestamp
+        )
     }
 
     private func parseActivityEvent(_ dict: [String: Any], index: Int) -> ActivityEvent? {
@@ -363,6 +426,17 @@ public final class ConnectionManager: ObservableObject {
             modelName = m
         } else if let m = payload["default_provider"]?.value as? String, !m.isEmpty {
             modelName = m
+        }
+    }
+}
+
+private enum MemoryListError: LocalizedError {
+    case requestFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .requestFailed:
+            return "Could not load memory from the gateway."
         }
     }
 }

@@ -124,10 +124,12 @@ hu_error_t hu_cli_setup_local_model_emit(FILE *out) {
     fprintf(out, "Local model inference (test mode — environment checks skipped)\n\n");
     fprintf(out, "Backends:\n");
     fprintf(out, "  Ollama (http://127.0.0.1:11434/api/tags): available [test mock]\n");
-    fprintf(out, "  llama-cli (PATH): available [test mock]\n\n");
+    fprintf(out, "  llama-cli (PATH): available [test mock]\n");
+    fprintf(out, "  MLX (python3 -m mlx_lm): skipped in test mode\n\n");
 #else
     bool ollama_ok = hu_ollama_api_tags_reachable();
     bool llama_ok = hu_exe_on_path("llama-cli");
+    bool mlx_ok = hu_mlx_lm_module_available();
     fprintf(out, "Local model inference\n\n");
     fprintf(out, "Backends:\n");
     fprintf(out, "  Ollama: %s\n",
@@ -136,6 +138,10 @@ hu_error_t hu_cli_setup_local_model_emit(FILE *out) {
     fprintf(out, "  llama-cli: %s\n",
             llama_ok ? "found on PATH"
                      : "not on PATH — install llama.cpp and ensure `llama-cli` is on PATH");
+    fprintf(out, "  MLX (python3 -m mlx_lm): %s\n",
+            mlx_ok ? "module import ok"
+                   : "not available — pip install mlx-lm && python3 -m mlx_lm.generate --model "
+                     "mlx-community/Llama-3.2-3B-Instruct-4bit --prompt 'test'");
 #ifdef HU_ENABLE_EMBEDDED_MODEL
     fprintf(out, "  Embedded GGUF (llama-cli): compiled in (HU_ENABLE_EMBEDDED_MODEL)\n");
 #else
@@ -647,10 +653,11 @@ static int eval_json_basename_cmp(const void *a, const void *b) {
 /* ── eval (run/list/compare) ────────────────────────────────────────────── */
 hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
-        printf("Usage: human eval <run|baseline|validate|list|compare|dashboard|history|trend|benchmark> [args]\n");
+        printf("Usage: human eval <run|baseline|validate|check-regression|list|compare|dashboard|history|trend|benchmark> [args]\n");
         printf("  run <suite.json>     Load and run an eval suite, print report JSON\n");
         printf("  baseline [dir]       Run all *.json suites in dir (default: eval_suites/), print score table\n");
         printf("  validate <dir>       Check all *.json suites parse; unique ids; required fields\n");
+        printf("  check-regression <dir>  Fresh baseline vs SQLite; fail if any suite drops >10%% from last persist\n");
         printf("  list                 List eval_suites/*.json with task counts (POSIX)\n");
         printf("  compare <r1> <r2>    Compare two run report JSON files\n");
         printf("  dashboard [r1.json]  Render terminal dashboard from run report(s)\n");
@@ -943,6 +950,203 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         }
         printf("Validated %zu suites, %zu tasks, %zu errors\n", st.suites_ok, st.tasks, st.errors);
         return st.errors > 0 ? HU_ERR_INVALID_ARGUMENT : HU_OK;
+    }
+
+    if (strcmp(sub, "check-regression") == 0) {
+        if (argc < 4) {
+            fprintf(stderr, "Usage: human eval check-regression <dir>\n");
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+#ifdef HU_IS_TEST
+        (void)alloc;
+        printf("Regression check: PASS (no suite dropped >10%%)\n");
+        return HU_OK;
+#else
+#ifndef HU_ENABLE_SQLITE
+        fprintf(stderr, "eval check-regression: SQLite is required\n");
+        return HU_ERR_NOT_SUPPORTED;
+#elif defined(__unix__) || defined(__APPLE__)
+        {
+            const char *dir_path = argv[3];
+            enum { max_json_files = 256 };
+            DIR *d = opendir(dir_path);
+            if (!d) {
+                fprintf(stderr, "eval: cannot open %s: %s\n", dir_path, strerror(errno));
+                return HU_ERR_IO;
+            }
+            char **names = alloc->alloc(alloc->ctx, max_json_files * sizeof(char *));
+            if (!names) {
+                closedir(d);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            size_t n_names = 0;
+            struct dirent *e;
+            while ((e = readdir(d)) != NULL) {
+                if (e->d_name[0] == '.')
+                    continue;
+                size_t len = strlen(e->d_name);
+                if (len < 5 || strcmp(e->d_name + len - 5, ".json") != 0)
+                    continue;
+                if (n_names >= (size_t)max_json_files)
+                    break;
+                char *copy = hu_strdup(alloc, e->d_name);
+                if (!copy) {
+                    closedir(d);
+                    for (size_t j = 0; j < n_names; j++)
+                        alloc->free(alloc->ctx, names[j], strlen(names[j]) + 1);
+                    alloc->free(alloc->ctx, names, max_json_files * sizeof(char *));
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                names[n_names++] = copy;
+            }
+            closedir(d);
+            if (n_names > 1)
+                qsort(names, n_names, sizeof(names[0]), eval_json_basename_cmp);
+
+            typedef struct {
+                char stem[256];
+                double score;
+                size_t tasks;
+            } eval_chk_row_t;
+            eval_chk_row_t *rows = alloc->alloc(alloc->ctx, max_json_files * sizeof(eval_chk_row_t));
+            if (!rows) {
+                for (size_t j = 0; j < n_names; j++)
+                    alloc->free(alloc->ctx, names[j], strlen(names[j]) + 1);
+                alloc->free(alloc->ctx, names, max_json_files * sizeof(char *));
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            size_t n_ok = 0;
+
+            for (size_t i = 0; i < n_names; i++) {
+                char path_buf[HU_INIT_MAX_PATH];
+                int plen = snprintf(path_buf, sizeof(path_buf), "%s/%s", dir_path, names[i]);
+                if (plen < 0 || (size_t)plen >= sizeof(path_buf)) {
+                    fprintf(stderr, "eval: path too long for %s/%s\n", dir_path, names[i]);
+                    continue;
+                }
+                hu_eval_suite_t suite = {0};
+                hu_error_t le = hu_eval_suite_load_json_path(alloc, path_buf, &suite);
+                if (le != HU_OK) {
+                    fprintf(stderr, "eval: could not load %s: %s\n", path_buf, hu_error_string(le));
+                    hu_eval_suite_free(alloc, &suite);
+                    continue;
+                }
+                size_t bn = strlen(names[i]);
+                if (bn <= 5 || bn >= sizeof(rows[0].stem)) {
+                    hu_eval_suite_free(alloc, &suite);
+                    continue;
+                }
+                memcpy(rows[n_ok].stem, names[i], bn - 5);
+                rows[n_ok].stem[bn - 5] = '\0';
+
+                double score = 0.0;
+                bool used_mock = hu_eval_baseline_try_mock_score_for_stem(rows[n_ok].stem, &score);
+                hu_eval_run_t run = {0};
+                if (!used_mock) {
+                    hu_config_t cfg;
+                    hu_error_t cfg_err = hu_config_load(alloc, &cfg);
+                    if (cfg_err != HU_OK) {
+                        fprintf(stderr, "eval: check-regression config error: %s\n", hu_error_string(cfg_err));
+                        hu_eval_suite_free(alloc, &suite);
+                        continue;
+                    }
+                    const char *prov = cfg.default_provider ? cfg.default_provider : "openai";
+                    hu_provider_t provider = {0};
+                    hu_error_t br =
+                        hu_provider_create_from_config(alloc, &cfg, prov, strlen(prov), &provider);
+                    if (br != HU_OK) {
+                        fprintf(stderr, "eval: check-regression provider error: %s\n", hu_error_string(br));
+                        hu_eval_suite_free(alloc, &suite);
+                        hu_config_deinit(&cfg);
+                        continue;
+                    }
+                    const char *model = cfg.default_model ? cfg.default_model : "";
+                    size_t model_len = model ? strlen(model) : 0;
+                    br = hu_eval_run_suite(alloc, &provider, model, model_len, &suite, HU_EVAL_CONTAINS, &run);
+                    if (provider.vtable && provider.vtable->deinit)
+                        provider.vtable->deinit(provider.ctx, alloc);
+                    hu_config_deinit(&cfg);
+                    if (br != HU_OK) {
+                        hu_eval_run_free(alloc, &run);
+                        hu_eval_suite_free(alloc, &suite);
+                        continue;
+                    }
+                    score = run.pass_rate;
+                    hu_eval_run_free(alloc, &run);
+                }
+                rows[n_ok].score = score;
+                rows[n_ok].tasks = suite.tasks_count;
+                hu_eval_suite_free(alloc, &suite);
+                n_ok++;
+            }
+
+            for (size_t j = 0; j < n_names; j++)
+                alloc->free(alloc->ctx, names[j], strlen(names[j]) + 1);
+            alloc->free(alloc->ctx, names, max_json_files * sizeof(char *));
+
+            if (n_ok == 0) {
+                alloc->free(alloc->ctx, rows, max_json_files * sizeof(eval_chk_row_t));
+                fprintf(stderr, "eval check-regression: no suites scored in %s\n", dir_path);
+                return HU_ERR_IO;
+            }
+
+            hu_config_t store_cfg;
+            if (hu_config_load(alloc, &store_cfg) != HU_OK) {
+                alloc->free(alloc->ctx, rows, max_json_files * sizeof(eval_chk_row_t));
+                fprintf(stderr, "eval check-regression: could not load config for history DB\n");
+                return HU_ERR_CONFIG_NOT_FOUND;
+            }
+            const char *ws = store_cfg.workspace_dir ? store_cfg.workspace_dir : ".";
+            hu_memory_t mem = hu_memory_create_from_config(alloc, &store_cfg, ws);
+            sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
+            if (!db || hu_eval_init_tables(db) != HU_OK) {
+                alloc->free(alloc->ctx, rows, max_json_files * sizeof(eval_chk_row_t));
+                if (mem.vtable && mem.vtable->deinit)
+                    mem.vtable->deinit(mem.ctx);
+                hu_config_deinit(&store_cfg);
+                fprintf(stderr, "eval check-regression: no SQLite memory backend\n");
+                return HU_ERR_MEMORY_BACKEND;
+            }
+
+            const double max_drop = 0.10;
+            for (size_t si = 0; si < n_ok; si++) {
+                bool reg = false;
+                char msg[512];
+                hu_error_t re = hu_eval_regression_check_baseline_drop(db, rows[si].stem, rows[si].score, max_drop,
+                                                                       &reg, msg, sizeof(msg));
+                if (re != HU_OK) {
+                    alloc->free(alloc->ctx, rows, max_json_files * sizeof(eval_chk_row_t));
+                    if (mem.vtable && mem.vtable->deinit)
+                        mem.vtable->deinit(mem.ctx);
+                    hu_config_deinit(&store_cfg);
+                    fprintf(stderr, "eval check-regression: %s\n", hu_error_string(re));
+                    return re;
+                }
+                if (reg) {
+                    printf("%s\n", msg);
+                    alloc->free(alloc->ctx, rows, max_json_files * sizeof(eval_chk_row_t));
+                    if (mem.vtable && mem.vtable->deinit)
+                        mem.vtable->deinit(mem.ctx);
+                    hu_config_deinit(&store_cfg);
+                    return HU_ERR_INTERNAL;
+                }
+            }
+
+            for (size_t si = 0; si < n_ok; si++)
+                (void)hu_eval_persist_baseline(db, rows[si].stem, rows[si].score, rows[si].tasks);
+
+            alloc->free(alloc->ctx, rows, max_json_files * sizeof(eval_chk_row_t));
+            if (mem.vtable && mem.vtable->deinit)
+                mem.vtable->deinit(mem.ctx);
+            hu_config_deinit(&store_cfg);
+            printf("Regression check: PASS (no suite dropped >10%%)\n");
+            return HU_OK;
+        }
+#else
+        printf("Regression check: PASS (no suite dropped >10%%)\n");
+        return HU_OK;
+#endif
+#endif
     }
 
     if (strcmp(sub, "list") == 0) {

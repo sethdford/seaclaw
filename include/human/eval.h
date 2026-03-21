@@ -105,6 +105,14 @@ hu_error_t hu_eval_detect_regression(sqlite3 *db, const char *suite_name,
 hu_error_t hu_eval_persist_baseline(sqlite3 *db, const char *suite_name, double score,
                                     size_t task_count);
 hu_error_t hu_eval_get_baseline(sqlite3 *db, const char *suite_name, double *out_score);
+/**
+ * Compare `current_score` to the last persisted baseline for `suite_stem` in `eval_baselines`.
+ * If no prior baseline exists, does not regress. If prior − current > max_drop, sets *regressed_out
+ * and writes FAIL line into msg_buf (when provided). max_drop is on 0–1 scale (e.g. 0.10 = 10 points).
+ */
+hu_error_t hu_eval_regression_check_baseline_drop(sqlite3 *db, const char *suite_stem, double current_score,
+                                                  double max_drop, bool *regressed_out, char *msg_buf,
+                                                  size_t msg_cap);
 #endif
 
 /** Tier label for aggregate baseline score: SOTA / COMPETITIVE / PARTIAL / BASIC. */

@@ -174,6 +174,19 @@ hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_
                                const hu_control_protocol_t *proto, const hu_json_value_t *root,
                                char **out, size_t *out_len);
 
+hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                  const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                  char **out, size_t *out_len);
+hu_error_t cp_voice_session_stop(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                 const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                 char **out, size_t *out_len);
+hu_error_t cp_voice_session_interrupt(hu_allocator_t *alloc, hu_app_context_t *app,
+                                      hu_ws_conn_t *conn, const hu_control_protocol_t *proto,
+                                      const hu_json_value_t *root, char **out, size_t *out_len);
+hu_error_t cp_voice_audio_end(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                              const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                              char **out, size_t *out_len);
+
 /* Memory handlers */
 hu_error_t cp_memory_status(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                             const hu_control_protocol_t *proto, const hu_json_value_t *root,

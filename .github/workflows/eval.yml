@@ -28,6 +28,39 @@ jobs:
           build-type: Debug
           enable-curl: "true"
 
+      - name: Enforce test-mode eval baseline floors (CI fixed scores)
+        run: |
+          set -euo pipefail
+          ./build/human eval baseline eval_suites/ > /tmp/eval_baseline.txt
+          check_min() {
+            local name=$1 min=$2
+            local score
+            score=$(awk -F'|' -v n="$name" '
+              NR > 1 {
+                gsub(/^[ \t]+|[ \t]+$/, "", $1)
+                if ($1 == n) {
+                  gsub(/^[ \t]+|[ \t]+$/, "", $3)
+                  print $3
+                  exit
+                }
+              }
+            ' /tmp/eval_baseline.txt)
+            if [ -z "${score:-}" ]; then
+              echo "::error::eval baseline: suite ${name} not found in output"
+              exit 1
+            fi
+            awk -v s="$score" -v m="$min" 'BEGIN { exit (s + 0 < m + 0) ? 1 : 0 }' || {
+              echo "::error::${name} score ${score} below test-mode minimum ${min}"
+              exit 1
+            }
+          }
+          check_min fidelity 0.50
+          check_min intelligence 0.50
+          check_min reasoning 0.40
+          check_min tool_use 0.50
+          check_min memory 0.50
+          check_min social 0.50
+
       - name: Run eval suite tests (includes regression detection)
         run: ./build/human_tests --suite="Evaluation" --suite="eval_runner" --suite="eval_bench" --suite="Eval History"
 

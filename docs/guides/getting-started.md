@@ -181,19 +181,23 @@ Configure your MCP client to run `human mcp` as the server command. Human will p
 
 `eval_suites/capability_edges.json` targets **honest capability bounds** (no sentience/AGI overclaim, no fake tool runs or citations, no false omniscience)—useful to stress where the product is **not** AGI.
 
-**Dynamic harness (full `human agent` stack)** — an OpenAI-compatible model generates synthetic probes; each probe is sent with `human agent -m`; another model pass scores safety. Requires `ADV_EVAL_API_KEY` and a working `~/.human` for Human itself:
+**Dynamic harness (full `human agent` stack)** — an OpenAI-compatible model generates synthetic probes; each probe is sent with `human agent -m`; another model pass scores safety. The harness reads the **parent process environment** for Human (same as your shell): set `HUMAN_PROVIDER` / `HUMAN_MODEL` and the matching API key (`OPENAI_API_KEY`, `GEMINI_API_KEY`, etc.), or use a `~/.human/config.json`. You can also pin the agent subprocess only:
 
 ```bash
 export ADV_EVAL_API_KEY="sk-..."   # used only by the harness for generate/judge
 export ADV_EVAL_MODEL="gpt-4o-mini"  # optional
 python3 scripts/adversarial-eval-harness.py --probes 8 \\
+  --agent-provider openai --agent-model gpt-4o-mini \\
   --include-suite eval_suites/adversarial.json --include-suite eval_suites/capability_edges.json \\
   --output /tmp/adv-report.json
 
 # Extra synthetic probes tuned for epistemic overreach (judge still uses per-task profile from suites):
 python3 scripts/adversarial-eval-harness.py --probe-profile capability_honesty --probes 6 \\
+  --agent-provider openai --agent-model gpt-4o-mini \\
   --include-suite eval_suites/capability_edges.json --output /tmp/edges-report.json
 ```
+
+`OPENAI_API_KEY` must be set in the environment when using `--agent-provider openai`. Optional: `HARNESS_AGENT_CONFIG_PATH=/path/to/config.json` sets `HUMAN_CONFIG_PATH` for each `human agent` subprocess.
 
 Dry-run without any API keys (prints tasks from a suite only):
 
@@ -222,10 +226,22 @@ bash scripts/redteam-eval-fleet.sh
 Live provider eval + dynamic harness (writes under `build/redteam-fleet-reports/` by default):
 
 ```bash
-REDTEAM_FLEET_LIVE=1 set -a && source .env && set +a && bash scripts/redteam-eval-fleet.sh
+# Recommended: sources .env, sets LIVE + OpenAI for judge/generator AND HUMAN_PROVIDER for eval + agent probes
+bash scripts/redteam-live.sh
 ```
 
-Optional one-shot agent check: `REDTEAM_FLEET_AGENT_SMOKE=1` (combine with `REDTEAM_FLEET_LIVE=1` if you want both). Optional: `VERIFY_REDTEAM=1 ./scripts/verify-all.sh` runs the same offline fleet after the main gates.
+Equivalent manual flags (use when you do not want the wrapper):
+
+```bash
+REDTEAM_FLEET_LIVE=1 REDTEAM_HARNESS_USE_OPENAI=1 REDTEAM_AGENT_USE_OPENAI=1 \\
+  set -a && source .env && set +a && bash scripts/redteam-eval-fleet.sh
+```
+
+- **`REDTEAM_HARNESS_USE_OPENAI=1`** — point `ADV_EVAL_*` at `https://api.openai.com/v1` using `OPENAI_API_KEY` (avoids a Gemini-compat `ADV_EVAL_BASE_URL` in `.env` breaking the judge).
+- **`REDTEAM_AGENT_USE_OPENAI=1`** — force `HUMAN_PROVIDER=openai` for `human eval run` and harness probes when `OPENAI_API_KEY` is set (the binary defaults to Gemini when no config file exists).
+- **`REDTEAM_AGENT_MODEL`**, **`REDTEAM_ADV_EVAL_MODEL`** — optional model overrides.
+
+Optional one-shot agent check: `REDTEAM_FLEET_AGENT_SMOKE=1` (combine with live flags if you want both). Optional: `VERIFY_REDTEAM=1 ./scripts/verify-all.sh` runs the same offline fleet after the main gates.
 
 ## 9. Next steps
 

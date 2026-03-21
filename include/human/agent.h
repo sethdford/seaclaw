@@ -179,6 +179,7 @@ struct hu_agent {
     uint64_t agent_id; /* used for mailbox registration; 0 = use (uintptr_t)agent */
     uint32_t spawn_depth; /* 0 = root session; +1 per nested agent_spawn */
     struct hu_skillforge *skillforge;       /* optional; loaded skills for prompt injection */
+    hu_embedder_t *skill_route_embedder;    /* optional; NOT owned — cosine skill routing when set */
     struct hu_agent_registry *agent_registry; /* optional; named agent definitions */
     hu_worktree_manager_t *worktree_mgr;
     hu_team_t *team;
@@ -291,6 +292,10 @@ void hu_agent_set_task_list(hu_agent_t *agent, hu_task_list_t *task_list);
 
 /* Optional: set retrieval engine for semantic/hybrid recall. Caller owns engine lifecycle. */
 void hu_agent_set_retrieval_engine(hu_agent_t *agent, hu_retrieval_engine_t *engine);
+
+/* Optional embedder for semantic skill routing in hu_agent_turn (same instance as retrieval is typical).
+ * Not owned by the agent — cleared on deinit without calling embedder deinit. */
+void hu_agent_set_skill_route_embedder(hu_agent_t *agent, hu_embedder_t *embedder);
 
 /* Optional: set awareness for situational context injection. Caller owns awareness lifecycle. */
 struct hu_awareness;

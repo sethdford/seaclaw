@@ -8155,8 +8155,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                             }
                         }
-                        if (unified_voice_active)
+                        if (unified_voice_active) {
+                            hu_voice_session_warn_first_byte_latency_if_needed(&unified_voice);
                             (void)hu_voice_session_stop(&unified_voice);
+                        }
                     }
                     if (!sent_voice) {
                     const char *eff_ch = ch->channel->vtable->name

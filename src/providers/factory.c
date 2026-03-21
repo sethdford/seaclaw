@@ -6,6 +6,9 @@
 #include "human/providers/claude_cli.h"
 #include "human/providers/codex_cli.h"
 #include "human/providers/compatible.h"
+#ifdef HU_ENABLE_COREML
+#include "human/providers/coreml.h"
+#endif
 #include "human/providers/gemini.h"
 #include "human/providers/ollama.h"
 #include "human/providers/openai.h"
@@ -162,6 +165,17 @@ hu_error_t hu_provider_create(hu_allocator_t *alloc, const char *name, size_t na
     if (name_len == 12 && memcmp(name, "openai-codex", 12) == 0) {
         return hu_openai_codex_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
     }
+
+#ifdef HU_ENABLE_COREML
+    if (name_len == 7 && memcmp(name, "coreml", 7) == 0) {
+        hu_coreml_config_t cc = {.model_path = base_url, .model_path_len = base_url_len};
+        return hu_coreml_provider_create(alloc, &cc, out);
+    }
+    if (name_len == 3 && memcmp(name, "mlx", 3) == 0) {
+        hu_coreml_config_t cc = {.model_path = base_url, .model_path_len = base_url_len};
+        return hu_coreml_provider_create(alloc, &cc, out);
+    }
+#endif
 
     if (name_len > 7 && memcmp(name, "custom:", 7) == 0) {
         const char *url = name + 7;

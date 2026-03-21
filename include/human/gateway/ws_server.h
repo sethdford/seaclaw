@@ -62,6 +62,10 @@ hu_error_t hu_ws_server_upgrade(hu_ws_server_t *srv, int fd, const char *req, si
 hu_error_t hu_ws_server_send(hu_ws_server_t *srv, hu_ws_conn_t *conn, const char *data,
                             size_t data_len);
 
+/* Send a binary frame to a single connection (e.g. streaming PCM audio). */
+hu_error_t hu_ws_server_send_binary(hu_ws_server_t *srv, hu_ws_conn_t *conn, const char *data,
+                                    size_t data_len);
+
 /* Broadcast a text frame to all active connections. */
 void hu_ws_server_broadcast(hu_ws_server_t *srv, const char *data, size_t data_len);
 

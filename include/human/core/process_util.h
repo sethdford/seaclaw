@@ -68,4 +68,7 @@ bool hu_exe_on_path(const char *name);
 /** True if Ollama HTTP API responds on 127.0.0.1:11434 (best-effort; no network in HU_IS_TEST). */
 bool hu_ollama_api_tags_reachable(void);
 
+/** True if `python3 -c "import mlx_lm"` succeeds (macOS/Linux POSIX builds; false in HU_IS_TEST). */
+bool hu_mlx_lm_module_available(void);
+
 #endif /* HU_PROCESS_UTIL_H */

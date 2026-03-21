@@ -708,6 +708,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         if (bi->cfg.policy.enabled)
             bi->agent.policy_engine = hu_policy_engine_create(alloc);
         hu_agent_set_retrieval_engine(&bi->agent, &bi->retrieval_engine);
+        hu_agent_set_skill_route_embedder(&bi->agent, &bi->embedder);
         if (bi->cfg.security.audit.enabled) {
             hu_audit_config_t acfg = HU_AUDIT_CONFIG_DEFAULT;
             acfg.enabled = true;

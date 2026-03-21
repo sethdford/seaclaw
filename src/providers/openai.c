@@ -269,6 +269,9 @@ static hu_error_t openai_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
         } else if (m->content && m->content_len > 0) {
             hu_json_value_t *content_val = hu_json_string_new(alloc, m->content, m->content_len);
             hu_json_object_set(alloc, obj, "content", content_val);
+        } else if (!(m->role == HU_ROLE_ASSISTANT && m->tool_calls && m->tool_calls_count > 0)) {
+            /* Chat Completions rejects missing/JSON-null content for system/user/tool roles. */
+            hu_json_object_set(alloc, obj, "content", hu_json_string_new(alloc, "", 0));
         }
         if (m->role == HU_ROLE_TOOL && m->tool_call_id) {
             hu_json_value_t *id_val =

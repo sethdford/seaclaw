@@ -45,6 +45,7 @@ typedef struct hu_bth_metrics {
     uint32_t episodic_replays;         /* cognitive replay blocks injected */
     uint32_t skill_routes_semantic;    /* relevance-ranked skill catalog injected (keyword and/or semantic routing) */
     uint32_t skill_routes_blended;     /* turns with multi-skill blends in routed catalog */
+    uint32_t skill_routes_embedded;    /* routed catalog used embedding matrix (hu_embedder_t) for cosine routing */
     uint32_t evolving_outcomes;        /* skill outcome signals collected */
 } hu_bth_metrics_t;
 

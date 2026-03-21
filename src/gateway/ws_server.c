@@ -365,13 +365,13 @@ hu_error_t hu_ws_server_upgrade(hu_ws_server_t *srv, int fd, const char *req, si
 #endif
 }
 
-/* Build an unmasked server→client text frame */
-static size_t build_server_frame(char *buf, size_t buf_size, const char *payload,
-                                 size_t payload_len) {
+/* Build an unmasked server→client frame (opcode = text or binary). */
+static size_t build_server_frame_opcode(char *buf, size_t buf_size, unsigned char opcode,
+                                        const char *payload, size_t payload_len) {
     if (buf_size < 2 || payload_len > HU_WS_SERVER_MAX_MSG)
         return 0;
     size_t pos = 0;
-    buf[pos++] = (char)(0x80 | HU_WS_OP_TEXT);
+    buf[pos++] = (char)(0x80 | (opcode & 0x0F));
     if (payload_len <= 125) {
         buf[pos++] = (char)(payload_len & 0x7F);
     } else if (payload_len <= 65535) {
@@ -389,6 +389,11 @@ static size_t build_server_frame(char *buf, size_t buf_size, const char *payload
     return pos + payload_len;
 }
 
+static size_t build_server_frame(char *buf, size_t buf_size, const char *payload,
+                                 size_t payload_len) {
+    return build_server_frame_opcode(buf, buf_size, HU_WS_OP_TEXT, payload, payload_len);
+}
+
 hu_error_t hu_ws_server_send(hu_ws_server_t *srv, hu_ws_conn_t *conn, const char *data,
                             size_t data_len) {
     if (!srv || !conn || !conn->active || conn->fd < 0 || !data)
@@ -403,6 +408,40 @@ hu_error_t hu_ws_server_send(hu_ws_server_t *srv, hu_ws_conn_t *conn, const char
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
     size_t frame_len = build_server_frame(buf, frame_cap, data, data_len);
+    if (frame_len == 0) {
+        alloc->free(alloc->ctx, buf, frame_cap);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    size_t sent = 0;
+    while (sent < frame_len) {
+        ssize_t w = send(conn->fd, buf + sent, frame_len - sent, MSG_NOSIGNAL);
+        if (w <= 0) {
+            alloc->free(alloc->ctx, buf, frame_cap);
+            return HU_ERR_IO;
+        }
+        sent += (size_t)w;
+    }
+    alloc->free(alloc->ctx, buf, frame_cap);
+    return HU_OK;
+#endif
+}
+
+hu_error_t hu_ws_server_send_binary(hu_ws_server_t *srv, hu_ws_conn_t *conn, const char *data,
+                                    size_t data_len) {
+    if (!srv || !conn || !conn->active || conn->fd < 0 || !data)
+        return HU_ERR_INVALID_ARGUMENT;
+#ifndef HU_GATEWAY_POSIX
+    (void)data_len;
+    return HU_ERR_NOT_SUPPORTED;
+#else
+    size_t frame_cap = data_len + 14;
+    hu_allocator_t *alloc = srv->alloc;
+    char *buf = (char *)alloc->alloc(alloc->ctx, frame_cap);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t frame_len =
+        build_server_frame_opcode(buf, frame_cap, HU_WS_OP_BINARY, data, data_len);
     if (frame_len == 0) {
         alloc->free(alloc->ctx, buf, frame_cap);
         return HU_ERR_INVALID_ARGUMENT;

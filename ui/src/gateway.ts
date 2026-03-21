@@ -32,6 +32,7 @@ type PendingReject = (reason: Error) => void;
 export class GatewayClient extends EventTarget {
   #url = "";
   #ws: WebSocket | null = null;
+  #onBinaryChunk: ((data: ArrayBuffer) => void) | null = null;
   #pending = new Map<
     string,
     {
@@ -66,6 +67,7 @@ export class GatewayClient extends EventTarget {
     this.#setStatus("connecting");
     try {
       this.#ws = new WebSocket(url);
+      this.#ws.binaryType = "arraybuffer";
       this.#ws.onopen = () => {
         this.#reconnectAttempts = 0;
         this.#setStatus("connected");

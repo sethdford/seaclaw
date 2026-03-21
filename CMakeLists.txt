@@ -34,6 +34,7 @@ option(HU_ENABLE_CARTESIA "Enable Cartesia TTS for voice messages" OFF)
 option(HU_ENABLE_ML "Build ML training subsystem (BPE tokenizer, dataloader, experiment loop)" OFF)
 option(HU_ENABLE_FEEDS "Build feed ingestion and research agent" OFF)
 option(HU_ENABLE_EMBEDDED_MODEL "Enable embedded model provider (llama.cpp/llama-cli)" OFF)
+option(HU_ENABLE_COREML "Enable CoreML/MLX provider (macOS only)" OFF)
 
 # WASM build: cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..
 
@@ -379,6 +380,7 @@ set(HU_CORE_SOURCES
     src/gateway/cp_admin.c
     src/gateway/cp_memory.c
     src/gateway/cp_voice.c
+    src/gateway/cp_voice_stream.c
     src/gateway/event_bridge.c
     src/gateway/tenant.c
     src/runtime/native.c
@@ -739,6 +741,10 @@ list(APPEND HU_CORE_SOURCES
     src/providers/embedded.c
 )
 
+if(HU_ENABLE_COREML)
+    list(APPEND HU_CORE_SOURCES src/providers/coreml.c)
+endif()
+
 # Persona system (~138 KB; disable for minimal/embedded builds)
 if(HU_ENABLE_PERSONA)
     list(APPEND HU_CORE_SOURCES
@@ -816,6 +822,7 @@ endif()
 
 # cartesia.c is always compiled (stubs return HU_ERR_NOT_SUPPORTED when disabled)
 list(APPEND HU_CORE_SOURCES src/tts/cartesia.c)
+list(APPEND HU_CORE_SOURCES src/tts/cartesia_stream.c)
 
 # Cartesia full pipeline (requires libcurl for API calls)
 if(HU_ENABLE_CARTESIA)
@@ -1265,6 +1272,13 @@ else()
     message(STATUS "Embedded model provider: disabled")
 endif()
 
+if(HU_ENABLE_COREML)
+    target_compile_definitions(human_core PRIVATE HU_ENABLE_COREML=1)
+    message(STATUS "CoreML/MLX provider: enabled")
+else()
+    message(STATUS "CoreML/MLX provider: disabled")
+endif()
+
 if(HU_ENABLE_CURL)
     find_package(CURL QUIET)
     target_compile_definitions(human_core PRIVATE HU_ENABLE_CURL=1)
@@ -1606,6 +1620,9 @@ add_library(human_core_test STATIC ${HU_CORE_SOURCES} ${HU_TEST_EXTRA_CHANNELS} 
 target_include_directories(human_core_test PUBLIC ${HU_ROOT}/include)
 target_include_directories(human_core_test PRIVATE ${HU_ROOT}/asm/generic)
 target_compile_definitions(human_core_test PRIVATE HU_IS_TEST=1)
+if(HU_ENABLE_COREML)
+    target_compile_definitions(human_core_test PRIVATE HU_ENABLE_COREML=1)
+endif()
 if(HU_ENABLE_FEEDS)
     target_compile_definitions(human_core_test PRIVATE HU_ENABLE_FEEDS=1)
 endif()
@@ -2014,6 +2031,7 @@ if(HU_ENABLE_PERSONA)
     list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c tests/test_persona_feedback.c tests/test_persona_cli.c tests/test_voice_maturity.c tests/test_style_learner.c)
 endif()
 list(APPEND HU_TEST_SOURCES tests/test_cartesia.c)
+list(APPEND HU_TEST_SOURCES tests/test_cartesia_stream.c)
 if(HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_SOURCES tests/test_audio_pipeline.c tests/test_voice_decision.c tests/test_emotion_map.c)
 endif()
@@ -2066,6 +2084,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_lsp.c
     tests/test_webrtc.c
     tests/test_embedded_provider.c
+    tests/test_coreml_provider.c
     tests/test_forgetting.c
     tests/test_bootstrap.c
     tests/test_thread_pool.c
@@ -2077,6 +2096,9 @@ target_include_directories(human_tests PRIVATE ${HU_ROOT}/tests ${HU_ROOT}/src/g
 target_compile_definitions(human_tests PRIVATE "HU_EVAL_SUITES_DIR=\"${HU_ROOT}/eval_suites\"")
 # HU_HAS_PERSONA always set for tests: test lib has persona (main or extra), struct layout must match
 target_compile_definitions(human_tests PRIVATE HU_IS_TEST=1 HU_GATEWAY_TEST_MODE=1 HU_HAS_NONE_ENGINE=1 HU_HAS_CRON=1 HU_HAS_PUSH=1 HU_HAS_UPDATE=1 HU_HAS_SKILLS=1 HU_HAS_PERSONA=1 HU_HAS_RUNTIME_EXOTIC=1)
+if(HU_ENABLE_COREML)
+    target_compile_definitions(human_tests PRIVATE HU_ENABLE_COREML=1)
+endif()
 if(HU_ENABLE_PERSONA)
     target_compile_definitions(human_tests PRIVATE HU_ENABLE_PERSONA=1)
 endif()
