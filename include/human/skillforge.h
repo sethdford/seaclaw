@@ -56,6 +56,13 @@ hu_error_t hu_skillforge_list_skills(const hu_skillforge_t *sf, hu_skill_t **out
                                      size_t *out_count);
 
 /**
+ * Count keyword token overlaps between user_msg and skill name+description (same tokenization
+ * as top_k catalog ranking). Used for dynamic skill routing weights.
+ */
+int hu_skillforge_skill_keyword_hits(const hu_skill_t *skill, const char *user_msg,
+                                     size_t user_msg_len);
+
+/**
  * Build the "## Available Skills" catalog lines (name + description per enabled skill).
  * When getenv("HUMAN_SKILLS_CONTEXT") is "top_k" and there are more than top_k skills,
  * keeps the K best keyword matches against user_msg (HUMAN_SKILLS_TOP_K, default 12).

@@ -2,13 +2,14 @@
 # Red-team + evaluation fleet: offline C tests, eval suite inventory, optional live API runs.
 #
 # Default (no API spend): C tests (Eval* + Adversarial*), human doctor, human eval list,
-#   adversarial-eval-harness dry-run with eval_suites/adversarial.json.
+#   adversarial-eval-harness dry-run with adversarial + capability_edges suites.
 #
 # Live (network + provider keys): set REDTEAM_FLEET_LIVE=1
 #   - human eval run on a configurable list of JSON suites (reports under REDTEAM_REPORT_DIR)
 #   - adversarial-eval-harness.py with synthetic probes + suite (needs ADV_EVAL_API_KEY)
 #
 # Optional: REDTEAM_FLEET_AGENT_SMOKE=1 runs one human agent -m (uses HUMAN_PROVIDER / keys in env).
+# Live harness: REDTEAM_PROBE_PROFILE=safety|capability_honesty for LLM-generated probes (suite tasks use JSON judge_profile).
 #
 # Examples:
 #   bash scripts/redteam-eval-fleet.sh
@@ -26,7 +27,7 @@ REPORT_DIR="${REDTEAM_REPORT_DIR:-$ROOT/build/redteam-fleet-reports}"
 HUMAN_BIN="${HUMAN_BIN:-$ROOT/build/human}"
 HARNESS="$ROOT/scripts/adversarial-eval-harness.py"
 # Space-separated paths, relative to ROOT
-DEFAULT_EVAL_SUITES="eval_suites/reasoning_basic.json eval_suites/tool_use_basic.json eval_suites/adversarial.json eval_suites/coding_basic.json"
+DEFAULT_EVAL_SUITES="eval_suites/reasoning_basic.json eval_suites/tool_use_basic.json eval_suites/adversarial.json eval_suites/capability_edges.json eval_suites/coding_basic.json"
 
 run() {
   local name="$1"
@@ -82,9 +83,11 @@ run "human doctor" "$HUMAN_BIN" doctor
 
 run "human eval list" "$HUMAN_BIN" eval list
 
-# --- Harness dry-run (no API keys) ---
-run "adversarial harness (dry-run, suite tasks)" \
-  python3 "$HARNESS" --dry-run --no-llm --include-suite "$ROOT/eval_suites/adversarial.json"
+# --- Harness dry-run (no API keys): safety + epistemic / anti–AGI-overclaim probes ---
+run "adversarial harness (dry-run, adversarial + capability_edges)" \
+  python3 "$HARNESS" --dry-run --no-llm \
+  --include-suite "$ROOT/eval_suites/adversarial.json" \
+  --include-suite "$ROOT/eval_suites/capability_edges.json"
 
 # --- Live: human eval run ---
 if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
@@ -115,9 +118,12 @@ if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
 
   if [ -n "${ADV_EVAL_API_KEY:-}" ]; then
     probes="${REDTEAM_PROBES:-4}"
+    probe_prof="${REDTEAM_PROBE_PROFILE:-safety}"
     echo ""
-    echo "=== redteam-eval-fleet: dynamic harness (probes=$probes) -> $LIVE_DIR/harness-report.json ==="
-    if python3 "$HARNESS" --probes "$probes" --include-suite "$ROOT/eval_suites/adversarial.json" \
+    echo "=== redteam-eval-fleet: dynamic harness (probes=$probes profile=$probe_prof) -> $LIVE_DIR/harness-report.json ==="
+    if python3 "$HARNESS" --probes "$probes" --probe-profile "$probe_prof" \
+      --include-suite "$ROOT/eval_suites/adversarial.json" \
+      --include-suite "$ROOT/eval_suites/capability_edges.json" \
       --timeout "${REDTEAM_AGENT_TIMEOUT:-180}" \
       --output "$LIVE_DIR/harness-report.json" 2>&1 | tee "$LIVE_DIR/harness-console.log"; then
       echo "--- OK: dynamic harness"

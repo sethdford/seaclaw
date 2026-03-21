@@ -706,9 +706,9 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             size_t model_len = model ? strlen(model) : 0;
             hu_provider_t provider = {0};
             err = hu_provider_create_from_config(alloc, &cfg, prov, prov_len, &provider);
-            hu_config_deinit(&cfg);
             if (err != HU_OK) {
                 hu_eval_suite_free(alloc, &suite);
+                hu_config_deinit(&cfg);
                 fprintf(stderr, "eval: provider error: %s\n", hu_error_string(err));
                 return err;
             }
@@ -716,6 +716,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                                    HU_EVAL_CONTAINS, &run);
             if (provider.vtable && provider.vtable->deinit)
                 provider.vtable->deinit(provider.ctx, alloc);
+            hu_config_deinit(&cfg);
         }
 #endif
         hu_eval_suite_free(alloc, &suite);
@@ -863,16 +864,17 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                         size_t model_len = model ? strlen(model) : 0;
                         hu_provider_t provider = {0};
                         br = hu_provider_create_from_config(alloc, &cfg, prov, prov_len, &provider);
-                        hu_config_deinit(&cfg);
                         if (br != HU_OK) {
                             fprintf(stderr, "eval: baseline provider error: %s\n", hu_error_string(br));
                             hu_eval_suite_free(alloc, &suite);
+                            hu_config_deinit(&cfg);
                             continue;
                         }
                         br = hu_eval_run_suite(alloc, &provider, model, model_len, &suite, HU_EVAL_CONTAINS,
                                                &run);
                         if (provider.vtable && provider.vtable->deinit)
                             provider.vtable->deinit(provider.ctx, alloc);
+                        hu_config_deinit(&cfg);
                     }
 #else
                     br = hu_eval_run_suite(alloc, NULL, "mock", 4, &suite, HU_EVAL_CONTAINS, &run);

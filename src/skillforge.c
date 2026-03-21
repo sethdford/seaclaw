@@ -674,6 +674,51 @@ static void lower_inplace(char *s) {
         *s = (char)tolower((unsigned char)*s);
 }
 
+int hu_skillforge_skill_keyword_hits(const hu_skill_t *skill, const char *user_msg,
+                                     size_t user_msg_len) {
+    if (!skill || !user_msg || user_msg_len == 0)
+        return 0;
+
+    char ubuf[4096];
+    size_t ulen = user_msg_len < sizeof(ubuf) - 1 ? user_msg_len : sizeof(ubuf) - 1;
+    memcpy(ubuf, user_msg, ulen);
+    ubuf[ulen] = '\0';
+    lower_inplace(ubuf);
+
+    const char *nm = skill->name ? skill->name : "";
+    const char *ds = skill->description ? skill->description : "";
+    char blob[2048];
+    int bn = snprintf(blob, sizeof(blob), "%s %s", nm, ds);
+    if (bn < 0)
+        bn = 0;
+    if ((size_t)bn >= sizeof(blob))
+        blob[sizeof(blob) - 1] = '\0';
+    else
+        blob[(size_t)bn] = '\0';
+    lower_inplace(blob);
+
+    int sc = 0;
+    const char *p = ubuf;
+    while (*p) {
+        while (*p && !isalnum((unsigned char)*p))
+            p++;
+        if (!*p)
+            break;
+        const char *w = p;
+        while (*p && isalnum((unsigned char)*p))
+            p++;
+        size_t wlen = (size_t)(p - w);
+        if (wlen < 2 || wlen > 48)
+            continue;
+        char tmp[49];
+        memcpy(tmp, w, wlen);
+        tmp[wlen] = '\0';
+        if (strstr(blob, tmp))
+            sc++;
+    }
+    return sc;
+}
+
 hu_error_t hu_skillforge_build_prompt_catalog(hu_allocator_t *alloc, hu_skillforge_t *sf,
                                               const char *user_msg, size_t user_msg_len,
                                               char **out, size_t *out_len) {

@@ -175,15 +175,24 @@ Configure your MCP client to run `human mcp` as the server command. Human will p
 
 ```bash
 ./build/human eval run eval_suites/adversarial.json
+./build/human eval run eval_suites/capability_edges.json
 ./build/human eval list
 ```
+
+`eval_suites/capability_edges.json` targets **honest capability bounds** (no sentience/AGI overclaim, no fake tool runs or citations, no false omniscience)—useful to stress where the product is **not** AGI.
 
 **Dynamic harness (full `human agent` stack)** — an OpenAI-compatible model generates synthetic probes; each probe is sent with `human agent -m`; another model pass scores safety. Requires `ADV_EVAL_API_KEY` and a working `~/.human` for Human itself:
 
 ```bash
 export ADV_EVAL_API_KEY="sk-..."   # used only by the harness for generate/judge
 export ADV_EVAL_MODEL="gpt-4o-mini"  # optional
-python3 scripts/adversarial-eval-harness.py --probes 8 --include-suite eval_suites/adversarial.json --output /tmp/adv-report.json
+python3 scripts/adversarial-eval-harness.py --probes 8 \\
+  --include-suite eval_suites/adversarial.json --include-suite eval_suites/capability_edges.json \\
+  --output /tmp/adv-report.json
+
+# Extra synthetic probes tuned for epistemic overreach (judge still uses per-task profile from suites):
+python3 scripts/adversarial-eval-harness.py --probe-profile capability_honesty --probes 6 \\
+  --include-suite eval_suites/capability_edges.json --output /tmp/edges-report.json
 ```
 
 Dry-run without any API keys (prints tasks from a suite only):

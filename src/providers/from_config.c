@@ -202,5 +202,13 @@ hu_error_t hu_provider_create_from_config(hu_allocator_t *alloc, const hu_config
         return err;
     }
 
-    return HU_ERR_NOT_SUPPORTED;
+    /* Plain providers (openai, gemini, groq, …): delegate to factory via config keys/URLs. */
+    {
+        char nbuf[160];
+        if (name_len >= sizeof(nbuf))
+            return HU_ERR_INVALID_ARGUMENT;
+        memcpy(nbuf, name, name_len);
+        nbuf[name_len] = '\0';
+        return create_provider_from_name(alloc, cfg, nbuf, out);
+    }
 }

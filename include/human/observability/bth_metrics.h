@@ -43,8 +43,8 @@ typedef struct hu_bth_metrics {
     uint32_t metacog_interventions;    /* metacognitive actions taken (non-NONE) */
     uint32_t episodic_patterns_stored; /* episodic patterns extracted and stored */
     uint32_t episodic_replays;         /* cognitive replay blocks injected */
-    uint32_t skill_routes_semantic;    /* turns using semantic skill routing */
-    uint32_t skill_routes_blended;     /* turns with multi-skill blends */
+    uint32_t skill_routes_semantic;    /* relevance-ranked skill catalog injected (keyword and/or semantic routing) */
+    uint32_t skill_routes_blended;     /* turns with multi-skill blends in routed catalog */
     uint32_t evolving_outcomes;        /* skill outcome signals collected */
 } hu_bth_metrics_t;
 

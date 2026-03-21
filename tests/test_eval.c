@@ -12,6 +12,7 @@ static const struct eval_suite_expect_row {
     size_t expect_tasks;
 } k_eval_suite_expect[] = {
     {"adversarial.json", 10},
+    {"capability_edges.json", 10},
     {"coding_basic.json", 5},
     {"fidelity.json", 10},
     {"intelligence.json", 10},

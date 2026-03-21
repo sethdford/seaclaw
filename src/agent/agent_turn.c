@@ -41,6 +41,9 @@
 #include "human/agent/reflection.h"
 #include "human/agent/swarm.h"
 #include "human/skillforge.h"
+#ifdef HU_HAS_SKILLS
+#include "human/cognition/skill_routing.h"
+#endif
 #include "human/context.h"
 #include "human/context/conversation.h"
 #include "human/context_tokens.h"
@@ -1363,6 +1366,64 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, skills_ctx, skills_ctx_len + 1);
             skills_ctx = NULL;
             skills_ctx_len = 0;
+        } else if (skills_ctx && skills_ctx_len > 0 && msg && msg_len > 0) {
+            /* Dynamic skill routing: replace flat catalog with relevance-ranked lines. */
+            size_t ena[256];
+            size_t en = 0;
+            for (size_t si = 0; si < sf->skills_len && en < 256; si++) {
+                if (!sf->skills[si].enabled)
+                    continue;
+                ena[en++] = si;
+            }
+            if (en > 0) {
+                hu_skill_t *rskills =
+                    (hu_skill_t *)agent->alloc->alloc(agent->alloc->ctx, en * sizeof(hu_skill_t));
+                float *kws =
+                    (float *)agent->alloc->alloc(agent->alloc->ctx, en * sizeof(float));
+                if (rskills && kws) {
+                    int max_hits = 0;
+                    for (size_t e = 0; e < en; e++) {
+                        rskills[e] = sf->skills[ena[e]];
+                        int h = hu_skillforge_skill_keyword_hits(&rskills[e], msg, msg_len);
+                        kws[e] = (float)h;
+                        if (h > max_hits)
+                            max_hits = h;
+                    }
+                    float norm = max_hits > 0 ? (float)max_hits : 1.0f;
+                    for (size_t e = 0; e < en; e++)
+                        kws[e] /= norm;
+
+                    hu_skill_blend_t blend;
+                    memset(&blend, 0, sizeof(blend));
+                    float emo = agent->emotional_cognition.state.intensity;
+                    if (hu_skill_routing_route(NULL, agent->alloc, msg, msg_len, NULL, NULL, rskills,
+                                               en, kws, NULL, emo, &blend) == HU_OK) {
+                        char *routed = NULL;
+                        size_t routed_len = 0;
+                        if (hu_skill_routing_build_catalog(agent->alloc, &blend, rskills, en, en,
+                                                           &routed, &routed_len) == HU_OK &&
+                            routed && routed_len > 0) {
+                            agent->alloc->free(agent->alloc->ctx, skills_ctx, skills_ctx_len + 1);
+                            skills_ctx = routed;
+                            skills_ctx_len = routed_len;
+                            if (agent->bth_metrics) {
+                                agent->bth_metrics->skill_routes_semantic++;
+                                if (blend.count > 1u)
+                                    agent->bth_metrics->skill_routes_blended++;
+                            }
+                        } else if (routed) {
+                            agent->alloc->free(agent->alloc->ctx, routed, routed_len + 1);
+                        }
+                    }
+                    agent->alloc->free(agent->alloc->ctx, kws, en * sizeof(float));
+                    agent->alloc->free(agent->alloc->ctx, rskills, en * sizeof(hu_skill_t));
+                } else {
+                    if (rskills)
+                        agent->alloc->free(agent->alloc->ctx, rskills, en * sizeof(hu_skill_t));
+                    if (kws)
+                        agent->alloc->free(agent->alloc->ctx, kws, en * sizeof(float));
+                }
+            }
         }
     }
 #if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_SKILLS)
