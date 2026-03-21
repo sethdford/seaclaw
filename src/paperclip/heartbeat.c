@@ -78,7 +78,8 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
     if (target_task_id) {
         err = hu_paperclip_get_task(&client, target_task_id, &task);
         if (err != HU_OK) {
-            fprintf(stderr, "[paperclip] Failed to get task %s: %d\n", target_task_id, (int)err);
+            fprintf(stderr, "[paperclip] Failed to get task %s: %s\n", target_task_id,
+                    hu_error_string(err));
             hu_paperclip_client_deinit(&client);
             return err;
         }
@@ -112,7 +113,7 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
         return HU_OK;
     }
     if (err != HU_OK) {
-        fprintf(stderr, "[paperclip] Checkout failed: %d\n", (int)err);
+        fprintf(stderr, "[paperclip] Checkout failed: %s\n", hu_error_string(err));
         hu_paperclip_task_free(alloc, &task);
         hu_paperclip_task_list_free(alloc, &task_list);
         hu_paperclip_client_deinit(&client);
@@ -131,8 +132,8 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
     const char *config_path = getenv("HUMAN_CONFIG_PATH");
     err = hu_app_bootstrap(&app, alloc, config_path, true, false);
     if (err != HU_OK || !app.agent_ok) {
-        fprintf(stderr, "[paperclip] Agent bootstrap failed: %d (agent_ok=%d)\n", (int)err,
-                app.agent_ok);
+        fprintf(stderr, "[paperclip] Agent bootstrap failed: %s (agent_ok=%d)\n",
+                hu_error_string(err), app.agent_ok);
         if (app.agent_ok)
             hu_app_teardown(&app);
         hu_paperclip_comment_list_free(alloc, &comments);
@@ -165,7 +166,7 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
         hu_paperclip_update_task(&client, target_task_id, new_status);
         fprintf(stderr, "[paperclip] Task updated to '%s'\n", new_status);
     } else {
-        fprintf(stderr, "[paperclip] Agent turn failed: %d\n", (int)err);
+        fprintf(stderr, "[paperclip] Agent turn failed: %s\n", hu_error_string(err));
         hu_paperclip_post_comment(&client, target_task_id,
                                   "Agent encountered an error processing this task.",
                                   strlen("Agent encountered an error processing this task."));

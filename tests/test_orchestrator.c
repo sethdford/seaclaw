@@ -88,6 +88,53 @@ static void test_orchestrator_merge_consensus_single_task(void) {
     hu_orchestrator_deinit(&orch);
 }
 
+static void test_orchestrator_merge_consensus_fresh_no_tasks_returns_empty(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_orchestrator_t orch;
+    HU_ASSERT_EQ(hu_orchestrator_create(&alloc, &orch), HU_OK);
+
+    char *merged = NULL;
+    size_t merged_len = 1;
+    HU_ASSERT_EQ(hu_orchestrator_merge_results_consensus(&orch, &alloc, &merged, &merged_len), HU_OK);
+    HU_ASSERT_NULL(merged);
+    HU_ASSERT_EQ(merged_len, 0u);
+    hu_orchestrator_deinit(&orch);
+}
+
+static void test_orchestrator_merge_consensus_all_failed_returns_empty(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_orchestrator_t orch;
+    HU_ASSERT_EQ(hu_orchestrator_create(&alloc, &orch), HU_OK);
+
+    const char *tasks[] = {"a", "b"};
+    size_t lens[] = {1, 1};
+    HU_ASSERT_EQ(hu_orchestrator_propose_split(&orch, "g", 1, tasks, lens, 2), HU_OK);
+    HU_ASSERT_EQ(hu_orchestrator_assign_task(&orch, 1, "x", 1), HU_OK);
+    HU_ASSERT_EQ(hu_orchestrator_assign_task(&orch, 2, "y", 1), HU_OK);
+    HU_ASSERT_EQ(hu_orchestrator_fail_task(&orch, 1, "e1", 2), HU_OK);
+    HU_ASSERT_EQ(hu_orchestrator_fail_task(&orch, 2, "e2", 2), HU_OK);
+
+    char *merged = NULL;
+    size_t merged_len = 1;
+    HU_ASSERT_EQ(hu_orchestrator_merge_results_consensus(&orch, &alloc, &merged, &merged_len), HU_OK);
+    HU_ASSERT_NULL(merged);
+    HU_ASSERT_EQ(merged_len, 0u);
+    hu_orchestrator_deinit(&orch);
+}
+
+static void test_orchestrator_merge_results_empty_completed_returns_ok(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_orchestrator_t orch;
+    HU_ASSERT_EQ(hu_orchestrator_create(&alloc, &orch), HU_OK);
+
+    char *merged = NULL;
+    size_t merged_len = 1;
+    HU_ASSERT_EQ(hu_orchestrator_merge_results(&orch, &alloc, &merged, &merged_len), HU_OK);
+    HU_ASSERT_NULL(merged);
+    HU_ASSERT_EQ(merged_len, 0u);
+    hu_orchestrator_deinit(&orch);
+}
+
 void run_orchestrator_tests(void) {
     HU_TEST_SUITE("Orchestrator");
 
@@ -95,4 +142,7 @@ void run_orchestrator_tests(void) {
     HU_RUN_TEST(test_orchestrator_merge_consensus_picks_longest_when_similar);
     HU_RUN_TEST(test_orchestrator_merge_consensus_divergent_keeps_all);
     HU_RUN_TEST(test_orchestrator_merge_consensus_single_task);
+    HU_RUN_TEST(test_orchestrator_merge_consensus_fresh_no_tasks_returns_empty);
+    HU_RUN_TEST(test_orchestrator_merge_consensus_all_failed_returns_empty);
+    HU_RUN_TEST(test_orchestrator_merge_results_empty_completed_returns_ok);
 }

@@ -28,7 +28,7 @@ Key extension points:
 - `src/peripherals/` (`hu_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **1,093 source + header files, ~233K lines of C, ~98K lines of tests, 6127+ tests, 38 channels**.
+Current scale: **1,093 source + header files, ~233K lines of C, ~98K lines of tests, 6132+ tests, 38 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -76,7 +76,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `HU_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 6127+ tests must pass at zero ASan errors**
+5. **All 6132+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `HU_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -118,7 +118,7 @@ src/
 
 include/human/       public C headers
 
-tests/                 291 test files, 6127+ tests
+tests/                 291 test files, 6132+ tests
 
 apps/                  iOS, macOS, Android, shared (4 app directories)
 
@@ -316,9 +316,10 @@ Standards drift is prevented through recurring ceremonies. Full details in `docs
 Drift detection scripts:
 
 ```bash
-./scripts/verify-all.sh              # Combined verification (build + test + doc index + tokens)
-./scripts/check-doc-index.sh         # Find orphaned docs in docs/standards/
-./scripts/check-standards-drift.sh   # Verify references to standards are current
+./scripts/verify-all.sh              # Combined verification (build + test + doc fleet + tokens)
+./scripts/doc-fleet.sh               # Docs: standards index, drift, terminology, frontmatter, relative links
+./scripts/check-doc-index.sh         # Orphaned standards only (also inside doc-fleet)
+./scripts/check-standards-drift.sh   # Stale paths only (also inside doc-fleet)
 ```
 
 ## 9) Privacy and Sensitive Data (Required)

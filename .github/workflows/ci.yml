@@ -41,7 +41,7 @@ jobs:
         run: |
           COUNT=$(./build/human_tests 2>&1 | grep -oE '[0-9]+/[0-9]+ passed' | head -1 | cut -d/ -f1)
           echo "Test count: $COUNT"
-          BASELINE=6127
+          BASELINE=6132
           if [ "$COUNT" -lt "$BASELINE" ]; then
             echo "::error::Test count regression: $COUNT < $BASELINE baseline"
             exit 1
@@ -551,18 +551,6 @@ jobs:
             echo "Found 'NullClaw' references — update to 'Human'"
             exit 1
           fi
-      - name: Verify docs have frontmatter
-        run: |
-          MISSING=""
-          for f in $(find docs -name '*.md' -not -path '*/plans/*'); do
-            if ! head -1 "$f" | grep -q '^---'; then
-              MISSING="$MISSING $f"
-            fi
-          done
-          if [ -n "$MISSING" ]; then
-            echo "Docs missing frontmatter:$MISSING"
-            exit 1
-          fi
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
@@ -574,12 +562,8 @@ jobs:
           if ! git diff --exit-code docs/icon-inventory.md docs/components.md 2>/dev/null; then
             echo "::warning::Generated docs are stale. Run 'cd ui && npm run docs' to update."
           fi
-      - name: Standards doc index check
-        run: scripts/check-doc-index.sh
-      - name: Standards drift check
-        run: scripts/check-standards-drift.sh
-      - name: Terminology compliance check
-        run: scripts/check-terminology.sh
+      - name: Doc fleet (index, drift, terminology, frontmatter, relative links)
+        run: scripts/doc-fleet.sh
 
   quality-score:
     if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'

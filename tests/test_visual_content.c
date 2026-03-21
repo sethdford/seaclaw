@@ -21,6 +21,22 @@ static void test_visual_create_table_sql_valid(void) {
     HU_ASSERT_TRUE(strstr(buf, "share_count") != NULL);
 }
 
+static void test_visual_create_table_sql_cap_below_512_rejects(void) {
+    char buf[256];
+    size_t len = 0;
+    HU_ASSERT_EQ(hu_visual_create_table_sql(buf, 511, &len), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_visual_create_table_sql(buf, sizeof(buf), &len), HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_visual_create_table_sql_cap_512_succeeds(void) {
+    char buf[512];
+    size_t len = 0;
+    hu_error_t err = hu_visual_create_table_sql(buf, sizeof(buf), &len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "visual_content") != NULL);
+}
+
 static void test_visual_insert_sql_escapes_quotes(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_visual_candidate_t c = {

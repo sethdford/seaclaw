@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Combined verification script: build, test, doc index, standards drift, token lint.
+# Combined verification script: build, test, doc fleet, skill registry, token lint.
 # Run before claiming any work done, and as part of the weekly drift audit.
 set -euo pipefail
 
@@ -63,9 +63,9 @@ else
   skip_check "UI Check" "ui/package.json not found"
 fi
 
-# 4. Standards doc index
-if [ -f "scripts/check-doc-index.sh" ]; then
-  run_check "Doc Index" bash scripts/check-doc-index.sh
+# 4. Doc fleet (standards index, drift, terminology, docs frontmatter, docs relative links)
+if [ -f "scripts/doc-fleet.sh" ]; then
+  run_check "Doc Fleet" bash scripts/doc-fleet.sh
 fi
 
 # 5. Skill registry (in-tree index + skill.json parity)
@@ -73,32 +73,22 @@ if [ -f "scripts/validate-skill-registry.sh" ]; then
   run_check "Skill Registry" bash scripts/validate-skill-registry.sh
 fi
 
-# 6. Standards drift
-if [ -f "scripts/check-standards-drift.sh" ]; then
-  run_check "Standards Drift" bash scripts/check-standards-drift.sh
-fi
-
-# 7. Terminology compliance
-if [ -f "scripts/check-terminology.sh" ]; then
-  run_check "Terminology" bash scripts/check-terminology.sh
-fi
-
-# 8. Token lint (raw colors)
+# 6. Token lint (raw colors)
 if [ -f "scripts/lint-raw-colors.sh" ]; then
   run_check "Token Lint (colors)" bash scripts/lint-raw-colors.sh --all
 fi
 
-# 9. UI token lint
+# 7. UI token lint
 if [ -f "ui/package.json" ] && command -v npm &>/dev/null && [ -d "ui/node_modules" ]; then
   run_check "Token Lint (UI)" npm run lint:tokens --prefix ui 2>/dev/null || true
 fi
 
-# 10. Doc stats (display for manual review)
+# 8. Doc stats (display for manual review)
 if [ -f "scripts/doc-stats.sh" ]; then
   run_check "Doc Stats" bash scripts/doc-stats.sh
 fi
 
-# 11. Native apps (optional — macOS + Xcode + JDK; set VERIFY_NATIVE=1)
+# 9. Native apps (optional — macOS + Xcode + JDK; set VERIFY_NATIVE=1)
 if [ "${VERIFY_NATIVE:-0}" = 1 ] && [ -f "scripts/run-native-fleet-local.sh" ]; then
   if [ "$(uname -s 2>/dev/null)" = Darwin ]; then
     run_check "Native fleet local (full)" bash scripts/run-native-fleet-local.sh full

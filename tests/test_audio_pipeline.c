@@ -60,6 +60,16 @@ static void test_audio_mp3_to_caf_null_out_path_returns_error(void) {
     HU_ASSERT_NEQ(err, HU_OK);
 }
 
+/* Mock path is 26 bytes incl. NUL; cap 10 cannot fit full path → error after file write */
+static void test_audio_mp3_to_caf_mock_path_buffer_too_small(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    static const unsigned char mock_mp3[] = {0xFF, 0xFB, 0x90, 0x00};
+    char out_path[16] = {0};
+    hu_error_t err = hu_audio_mp3_to_caf(&alloc, mock_mp3, sizeof(mock_mp3), out_path, 10);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    hu_audio_cleanup_temp("/tmp/human-voice-test.mp3");
+}
+
 static void test_audio_cleanup_temp_null_safe(void) {
     hu_audio_cleanup_temp(NULL);
 }
@@ -176,6 +186,7 @@ void run_audio_pipeline_tests(void) {
     HU_RUN_TEST(test_audio_mp3_to_caf_null_bytes_returns_error);
     HU_RUN_TEST(test_audio_mp3_to_caf_zero_len_returns_error);
     HU_RUN_TEST(test_audio_mp3_to_caf_null_out_path_returns_error);
+    HU_RUN_TEST(test_audio_mp3_to_caf_mock_path_buffer_too_small);
     HU_RUN_TEST(test_audio_cleanup_temp_null_safe);
     HU_RUN_TEST(test_audio_cleanup_temp_empty_path_safe);
     HU_RUN_TEST(test_audio_tts_bytes_to_temp_writes_mp3);

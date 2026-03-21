@@ -171,7 +171,7 @@ Configure your MCP client to run `human mcp` as the server command. Human will p
 
 ## 8. Next steps
 
-- **Security hardening:** Enable `secrets.encrypt`, set `gateway.require_pairing`, configure `allow_from` per channel. See [security/threat-model.md](security/threat-model.md).
+- **Security hardening:** Enable `secrets.encrypt`, set `gateway.require_pairing`, configure `allow_from` per channel. See [threat model](../standards/security/threat-model.md).
 - **Memory:** Use SQLite with embeddings for richer recall. Configure `memory.backend`, `embedding_provider`, and `vector_weight` in config.
 - **Peripherals:** Flash Arduino, STM32, or Raspberry Pi with `human hardware scan` and `human hardware flash`.
 - **Background service:** `human service install` to run gateway + channels as a system service.

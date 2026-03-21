@@ -930,7 +930,8 @@ hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db_void,
     err = hu_eval_suite_load_json(alloc, json, json_len, &suite);
     alloc->free(alloc->ctx, json, json_len + 1);
     if (err != HU_OK) {
-        fprintf(stderr, "[self_improve] closed_loop: load suite failed (%d)\n", (int)err);
+        fprintf(stderr, "[self_improve] closed_loop: load suite failed (%s)\n",
+                hu_error_string(err));
         return err;
     }
 
@@ -938,7 +939,8 @@ hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db_void,
     err = hu_eval_run_suite(alloc, provider, model, model_len, &suite, HU_EVAL_CONTAINS, &baseline);
     if (err != HU_OK) {
         hu_eval_suite_free(alloc, &suite);
-        fprintf(stderr, "[self_improve] closed_loop: baseline eval failed (%d)\n", (int)err);
+        fprintf(stderr, "[self_improve] closed_loop: baseline eval failed (%s)\n",
+                hu_error_string(err));
         return err;
     }
 
@@ -987,7 +989,8 @@ hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db_void,
         hu_self_improve_rollback_patch(&engine, patch_id);
         hu_eval_run_free(alloc, &baseline);
         hu_eval_suite_free(alloc, &suite);
-        fprintf(stderr, "[self_improve] closed_loop: re-eval failed (%d); rolled back\n", (int)err);
+        fprintf(stderr, "[self_improve] closed_loop: re-eval failed (%s); rolled back\n",
+                hu_error_string(err));
         return err;
     }
 

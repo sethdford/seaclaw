@@ -105,7 +105,7 @@ static hu_error_t refresh_access_token(hu_gmail_ctx_t *c) {
         "Human/1.0",
         body, j, &resp);
     if (err != HU_OK) {
-        fprintf(stderr, "[gmail] token refresh HTTP error: %d\n", (int)err);
+        fprintf(stderr, "[gmail] token refresh HTTP error: %s\n", hu_error_string(err));
         return err;
     }
     if (resp.status_code < 200 || resp.status_code >= 300) {

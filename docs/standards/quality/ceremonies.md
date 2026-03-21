@@ -33,19 +33,15 @@ Recurring checkpoints that prevent standards drift. Each ceremony has a cadence,
    bash scripts/lint-raw-colors.sh --all
    npm run lint:tokens --prefix ui
    ```
-5. Check for orphaned documentation:
+5. Run the documentation fleet (standards index, drift, terminology, `docs/` frontmatter, relative links):
    ```bash
-   ./scripts/check-doc-index.sh
+   ./scripts/doc-fleet.sh
    ```
-6. Verify standards propagation is in sync:
-   ```bash
-   ./scripts/check-standards-drift.sh
-   ```
-7. Verify doc stats (source files, test counts, etc.) match .md files:
+6. Verify doc stats (source files, test counts, etc.) match .md files:
    ```bash
    bash scripts/doc-stats.sh
    ```
-8. Log results as a commit message or in the remediation PR description
+7. Log results as a commit message or in the remediation PR description
 
 ### What "Pass" Looks Like
 

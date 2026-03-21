@@ -1,3 +1,9 @@
+---
+title: "Plan documents audit report"
+created: 2026-03-11
+status: archived
+---
+
 # Plan Documents Audit Report
 
 **Date:** 2026-03-11 (revised)  

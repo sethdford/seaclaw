@@ -53,6 +53,19 @@ static void split_empty_returns_zero(void) {
     HU_ASSERT_EQ(n, 0u);
 }
 
+static void split_null_fragments_returns_zero(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    size_t n = hu_conversation_split_response(&alloc, "hello", 5, NULL, 4, 0);
+    HU_ASSERT_EQ(n, 0u);
+}
+
+static void split_zero_max_fragments_returns_zero(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_message_fragment_t frags[4];
+    size_t n = hu_conversation_split_response(&alloc, "hello", 5, frags, 0, 0);
+    HU_ASSERT_EQ(n, 0u);
+}
+
 static void split_on_newlines(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_message_fragment_t frags[4];
@@ -2815,6 +2828,8 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(split_short_response_stays_single);
     HU_RUN_TEST(split_null_input_returns_zero);
     HU_RUN_TEST(split_empty_returns_zero);
+    HU_RUN_TEST(split_null_fragments_returns_zero);
+    HU_RUN_TEST(split_zero_max_fragments_returns_zero);
     HU_RUN_TEST(split_on_newlines);
     HU_RUN_TEST(split_on_conjunction_starter);
     HU_RUN_TEST(split_respects_max_fragments);
