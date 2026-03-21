@@ -1,0 +1,9 @@
+{
+  "name": "empathy-mapping",
+  "description": "Understand others' perspectives by mapping what they think, feel, say, and do",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

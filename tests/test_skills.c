@@ -222,7 +222,7 @@ static void test_skill_registry_search_mock_returns_entries(void) {
     HU_ASSERT_NOT_NULL(entries);
     HU_ASSERT_EQ(count, 2u);
     HU_ASSERT_STR_EQ(entries[0].name, "code-review");
-    HU_ASSERT_STR_EQ(entries[1].name, "email-digest");
+    HU_ASSERT_STR_EQ(entries[1].name, "code-formatter");
     hu_skill_registry_entries_free(&alloc, entries, count);
 }
 
@@ -230,6 +230,24 @@ static void test_skill_registry_entries_free_null_safe(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_skill_registry_entries_free(&alloc, NULL, 0);
     hu_skill_registry_entries_free(&alloc, NULL, 5);
+}
+
+static void test_skill_registry_tags_array_parses_to_comma_string(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"name\":\"test-skill\",\"description\":\"d\",\"tags\":[\"python\", "
+                       "\"automation\"]}";
+    hu_json_value_t *root = NULL;
+    hu_error_t err = hu_json_parse(&alloc, json, strlen(json), &root);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(root);
+    hu_json_value_t *tags_val = hu_json_object_get(root, "tags");
+    HU_ASSERT_NOT_NULL(tags_val);
+    char tags_buf[256];
+    const char *tags_str = NULL;
+    hu_skill_registry_resolve_tags_string(tags_val, tags_buf, sizeof(tags_buf), &tags_str);
+    HU_ASSERT_NOT_NULL(tags_str);
+    HU_ASSERT_STR_EQ(tags_str, "python, automation");
+    hu_json_free(&alloc, root);
 }
 
 static void test_skillforge_load_instructions_from_path(void) {

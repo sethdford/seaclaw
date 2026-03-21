@@ -1,0 +1,9 @@
+{
+  "name": "triage",
+  "description": "Rapidly categorize and act on incoming items when overwhelmed with volume",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "deliberate-practice",
+  "description": "Design practice sessions that target specific weaknesses with immediate feedback",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

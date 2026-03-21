@@ -1,0 +1,9 @@
+{
+  "name": "risk-assessment",
+  "description": "Evaluate risks using probability-impact analysis, scenario planning, and pre-mortem techniques",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

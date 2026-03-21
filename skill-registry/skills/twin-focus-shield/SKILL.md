@@ -1,3 +1,8 @@
+---
+name: twin-focus-shield
+description: "Deep-work support: batching, interruption scripts, and scope control"
+---
+
 # Digital twin — focus shield
 
 Protect **attention** the way the user would if they were guarding their own calendar.

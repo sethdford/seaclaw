@@ -1,0 +1,9 @@
+{
+  "name": "speed-reading",
+  "description": "Extract key information from large documents quickly using structured scanning techniques",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

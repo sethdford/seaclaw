@@ -1,0 +1,9 @@
+{
+  "name": "storytelling",
+  "description": "Transform information into memorable narratives with tension, stakes, and resolution",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

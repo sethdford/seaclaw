@@ -1,0 +1,9 @@
+{
+  "name": "active-listening",
+  "description": "Paraphrase, confirm understanding, and distinguish stated needs from underlying needs",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

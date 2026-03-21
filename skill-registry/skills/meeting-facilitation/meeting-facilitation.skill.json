@@ -1,0 +1,9 @@
+{
+  "name": "meeting-facilitation",
+  "description": "Run effective meetings with clear purpose, structure, time management, and action items",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

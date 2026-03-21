@@ -1,0 +1,9 @@
+{
+  "name": "hypothesis-testing",
+  "description": "Formulate testable predictions, design validation, and update beliefs on evidence",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

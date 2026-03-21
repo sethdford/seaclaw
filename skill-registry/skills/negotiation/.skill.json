@@ -1,0 +1,9 @@
+{
+  "name": "negotiation",
+  "description": "Navigate negotiations using principled strategies: BATNA, interest mapping, and value creation",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

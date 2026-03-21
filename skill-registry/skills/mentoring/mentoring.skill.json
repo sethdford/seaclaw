@@ -1,0 +1,9 @@
+{
+  "name": "mentoring",
+  "description": "Develop others through experience sharing, guidance, and creating growth opportunities",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

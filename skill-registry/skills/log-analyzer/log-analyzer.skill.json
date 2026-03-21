@@ -1,9 +1,0 @@
-{
-  "name": "log-analyzer",
-  "description": "Parse and analyze application and system logs",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

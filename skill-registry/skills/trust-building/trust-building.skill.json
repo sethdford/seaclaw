@@ -1,0 +1,9 @@
+{
+  "name": "trust-building",
+  "description": "Build and maintain trust through consistency, transparency, competence, and reliability",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

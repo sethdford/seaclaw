@@ -1,0 +1,9 @@
+{
+  "name": "analogy-engine",
+  "description": "Find solutions by mapping structural similarities from unrelated domains",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

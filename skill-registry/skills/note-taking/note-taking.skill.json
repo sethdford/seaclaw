@@ -1,0 +1,9 @@
+{
+  "name": "note-taking",
+  "description": "Capture and organize knowledge using proven methods: Zettelkasten, Cornell, progressive summarization",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

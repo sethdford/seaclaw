@@ -19,6 +19,6 @@ Map registry metadata to disk layout when present.
 4. Output sorted table: name, version, path, enabled, dependencies.
 
 ## Examples
-**Example 1:** Two copies of `email-digest`—show which wins per load order rules.
+**Example 1:** Two copies of `slack-digest`—show which wins per load order rules.
 
 **Example 2:** Orphan skill on disk not referenced in registry—suggest cleanup or registration.

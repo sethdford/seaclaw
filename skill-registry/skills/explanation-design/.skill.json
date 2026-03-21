@@ -1,0 +1,9 @@
+{
+  "name": "explanation-design",
+  "description": "Explain complex ideas clearly by choosing the right abstraction level, analogies, and structure",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

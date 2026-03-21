@@ -1,0 +1,9 @@
+{
+  "name": "coaching",
+  "description": "Guide others toward their own solutions using the GROW model and powerful questions",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

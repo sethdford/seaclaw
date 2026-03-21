@@ -1,9 +1,0 @@
-{
-  "name": "code-translator",
-  "description": "Translate code between programming languages and frameworks",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

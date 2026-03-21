@@ -34,6 +34,36 @@ static void entry_free(hu_allocator_t *a, hu_skill_registry_entry_t *e) {
     memset(e, 0, sizeof(*e));
 }
 
+/* Registry search tag handling; also linked by test_skills.c for array/string coverage. */
+void hu_skill_registry_resolve_tags_string(hu_json_value_t *tags_val, char *tags_buf, size_t tags_buf_len,
+                                         const char **out_tags_str) {
+    *out_tags_str = NULL;
+    if (!tags_val || tags_buf_len == 0)
+        return;
+    if (tags_val->type == HU_JSON_STRING && tags_val->data.string.ptr)
+        *out_tags_str = tags_val->data.string.ptr;
+    else if (tags_val->type == HU_JSON_ARRAY && tags_val->data.array.len > 0) {
+        size_t pos = 0;
+        for (size_t j = 0; j < tags_val->data.array.len && pos < tags_buf_len - 2; j++) {
+            hu_json_value_t *t = tags_val->data.array.items[j];
+            if (t && t->type == HU_JSON_STRING && t->data.string.ptr) {
+                if (j > 0) {
+                    tags_buf[pos++] = ',';
+                    tags_buf[pos++] = ' ';
+                }
+                size_t len = t->data.string.len;
+                if (pos + len >= tags_buf_len)
+                    len = tags_buf_len - pos - 1;
+                memcpy(tags_buf + pos, t->data.string.ptr, len);
+                pos += len;
+            }
+        }
+        tags_buf[pos] = '\0';
+        if (pos > 0)
+            *out_tags_str = tags_buf;
+    }
+}
+
 #ifdef HU_IS_TEST
 /* Mock implementations — no network, no filesystem */
 hu_error_t hu_skill_registry_search(hu_allocator_t *alloc, const char *query,
@@ -57,13 +87,13 @@ hu_error_t hu_skill_registry_search(hu_allocator_t *alloc, const char *query,
     arr[0].url =
         hu_strdup(alloc, "https://github.com/human/skill-registry/tree/main/skills/code-review");
     arr[0].tags = hu_strdup(alloc, "development,review");
-    arr[1].name = hu_strdup(alloc, "email-digest");
-    arr[1].description = hu_strdup(alloc, "Daily email digest");
+    arr[1].name = hu_strdup(alloc, "code-formatter");
+    arr[1].description = hu_strdup(alloc, "Format and lint code");
     arr[1].version = hu_strdup(alloc, "1.0.0");
     arr[1].author = hu_strdup(alloc, "human");
     arr[1].url =
-        hu_strdup(alloc, "https://github.com/human/skill-registry/tree/main/skills/email-digest");
-    arr[1].tags = hu_strdup(alloc, "email,productivity");
+        hu_strdup(alloc, "https://github.com/human/skill-registry/tree/main/skills/code-formatter");
+    arr[1].tags = hu_strdup(alloc, "development,formatting");
 
     *out_entries = arr;
     *out_count = 2;
@@ -178,6 +208,7 @@ hu_error_t hu_skill_registry_search(hu_allocator_t *alloc, const char *query,
     }
     memset(arr, 0, cap * sizeof(hu_skill_registry_entry_t));
 
+    char tags_buf[256];
     size_t count = 0;
     for (size_t i = 0; i < root->data.array.len && count < 256; i++) {
         hu_json_value_t *obj = root->data.array.items[i];
@@ -188,32 +219,7 @@ hu_error_t hu_skill_registry_search(hu_allocator_t *alloc, const char *query,
         const char *desc = hu_json_get_string(obj, "description");
         const char *tags_str = NULL;
         hu_json_value_t *tags_val = hu_json_object_get(obj, "tags");
-        if (tags_val) {
-            if (tags_val->type == HU_JSON_STRING && tags_val->data.string.ptr)
-                tags_str = tags_val->data.string.ptr;
-            else if (tags_val->type == HU_JSON_ARRAY && tags_val->data.array.len > 0) {
-                char tags_buf[256];
-                size_t pos = 0;
-                for (size_t j = 0; j < tags_val->data.array.len && pos < sizeof(tags_buf) - 2;
-                     j++) {
-                    hu_json_value_t *t = tags_val->data.array.items[j];
-                    if (t && t->type == HU_JSON_STRING && t->data.string.ptr) {
-                        if (j > 0) {
-                            tags_buf[pos++] = ',';
-                            tags_buf[pos++] = ' ';
-                        }
-                        size_t len = t->data.string.len;
-                        if (pos + len >= sizeof(tags_buf))
-                            len = sizeof(tags_buf) - pos - 1;
-                        memcpy(tags_buf + pos, t->data.string.ptr, len);
-                        pos += len;
-                    }
-                }
-                tags_buf[pos] = '\0';
-                if (pos > 0)
-                    tags_str = tags_buf; /* only for match, not stored */
-            }
-        }
+        hu_skill_registry_resolve_tags_string(tags_val, tags_buf, sizeof(tags_buf), &tags_str);
         if (!name)
             continue;
         if (query && query[0] && !matches_query(query, name, desc, tags_str))

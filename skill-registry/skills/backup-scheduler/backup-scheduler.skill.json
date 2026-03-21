@@ -1,9 +1,0 @@
-{
-  "name": "backup-scheduler",
-  "description": "Schedule and manage backup jobs",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

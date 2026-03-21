@@ -1,0 +1,9 @@
+{
+  "name": "creative-combination",
+  "description": "Generate novel ideas by combining existing concepts, techniques, or domains in unexpected ways",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

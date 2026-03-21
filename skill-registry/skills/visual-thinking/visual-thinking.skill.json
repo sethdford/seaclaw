@@ -1,0 +1,9 @@
+{
+  "name": "visual-thinking",
+  "description": "Use diagrams, sketches, and spatial reasoning to understand and communicate complex ideas",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

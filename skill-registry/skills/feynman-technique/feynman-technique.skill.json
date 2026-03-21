@@ -1,0 +1,9 @@
+{
+  "name": "feynman-technique",
+  "description": "Explain concepts simply to verify understanding, expose gaps, and teach effectively",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "delegation",
+  "description": "Assign work effectively by matching tasks to people, defining outcomes, and maintaining accountability",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

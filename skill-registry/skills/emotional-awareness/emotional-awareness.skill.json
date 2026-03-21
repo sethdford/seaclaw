@@ -1,0 +1,9 @@
+{
+  "name": "emotional-awareness",
+  "description": "Recognize emotional cues in text, adjust tone appropriately, and validate before problem-solving",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

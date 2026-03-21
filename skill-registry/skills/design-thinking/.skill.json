@@ -1,0 +1,9 @@
+{
+  "name": "design-thinking",
+  "description": "Human-centered problem solving: empathize, define, ideate, prototype, test",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

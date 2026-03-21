@@ -1,0 +1,9 @@
+{
+  "name": "cost-benefit-analysis",
+  "description": "Quantify trade-offs by estimating tangible and intangible costs and benefits",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

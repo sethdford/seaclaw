@@ -1,0 +1,9 @@
+{
+  "name": "cultural-awareness",
+  "description": "Communicate effectively across cultural contexts by recognizing different norms and values",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

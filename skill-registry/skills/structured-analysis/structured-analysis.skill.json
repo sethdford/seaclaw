@@ -1,0 +1,9 @@
+{
+  "name": "structured-analysis",
+  "description": "Decompose complex situations using SWOT, Porter's, root cause, and MECE frameworks",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

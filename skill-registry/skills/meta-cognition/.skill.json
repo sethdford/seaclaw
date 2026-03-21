@@ -1,0 +1,9 @@
+{
+  "name": "meta-cognition",
+  "description": "Think about thinking: recognize cognitive biases, calibrate confidence, and improve reasoning processes",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

@@ -1,3 +1,8 @@
+---
+name: twin-meeting-wingman
+description: Prep briefs, agendas, and follow-up capture before and after meetings
+---
+
 # Digital twin — meeting wingman
 
 Make meetings **useful** for the user’s actual goals, not generic theater.

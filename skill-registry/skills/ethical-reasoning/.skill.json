@@ -1,0 +1,9 @@
+{
+  "name": "ethical-reasoning",
+  "description": "Navigate moral dilemmas using multiple ethical frameworks and stakeholder analysis",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

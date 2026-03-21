@@ -1,0 +1,9 @@
+{
+  "name": "self-regulation",
+  "description": "Manage impulses, delay gratification, and maintain composure under pressure",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

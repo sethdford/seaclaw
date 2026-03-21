@@ -1,0 +1,9 @@
+{
+  "name": "prioritization",
+  "description": "Rank competing demands using structured frameworks: Eisenhower, ICE, MoSCoW, constraint-based triage",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

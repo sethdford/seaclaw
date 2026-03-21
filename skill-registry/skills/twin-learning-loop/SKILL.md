@@ -1,3 +1,8 @@
+---
+name: twin-learning-loop
+description: Turn conversations into durable notes, spaced review prompts, and links to active goals
+---
+
 # Digital twin — learning loop
 
 Make **insights stick** without turning every chat into homework.

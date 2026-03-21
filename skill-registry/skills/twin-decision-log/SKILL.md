@@ -1,3 +1,8 @@
+---
+name: twin-decision-log
+description: Capture decisions with rationale and optional revisit dates for future-you
+---
+
 # Digital twin — decision log
 
 Help the user build a **durable record** of what they decided and why.

@@ -1,0 +1,9 @@
+{
+  "name": "mental-models",
+  "description": "Apply a library of core mental models to frame problems and avoid blind spots",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

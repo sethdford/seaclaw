@@ -1,9 +1,0 @@
-{
-  "name": "garage-door",
-  "description": "Control garage door opener via smart relay",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

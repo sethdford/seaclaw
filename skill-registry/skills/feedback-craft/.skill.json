@@ -1,0 +1,9 @@
+{
+  "name": "feedback-craft",
+  "description": "Deliver constructive feedback that is specific, actionable, and received well",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

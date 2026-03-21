@@ -5,7 +5,10 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/code-review",
-    "tags": ["development", "review"]
+    "tags": [
+      "development",
+      "review"
+    ]
   },
   {
     "name": "git-workflow",
@@ -13,15 +16,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/git-workflow",
-    "tags": ["development", "git", "version-control"]
-  },
-  {
-    "name": "test-generator",
-    "description": "Generate unit tests and integration tests from source code",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/test-generator",
-    "tags": ["development", "testing", "automation"]
+    "tags": [
+      "development",
+      "git",
+      "version-control"
+    ]
   },
   {
     "name": "code-formatter",
@@ -29,31 +28,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/code-formatter",
-    "tags": ["development", "formatting", "linting"]
-  },
-  {
-    "name": "dependency-checker",
-    "description": "Check and update project dependencies for security and compatibility",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/dependency-checker",
-    "tags": ["development", "dependencies", "security"]
-  },
-  {
-    "name": "api-designer",
-    "description": "Design and document REST and GraphQL APIs",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/api-designer",
-    "tags": ["development", "api", "design"]
-  },
-  {
-    "name": "database-migrator",
-    "description": "Generate and run database schema migrations",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/database-migrator",
-    "tags": ["development", "database", "migration"]
+    "tags": [
+      "development",
+      "formatting",
+      "linting"
+    ]
   },
   {
     "name": "code-documenter",
@@ -61,31 +40,10 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/code-documenter",
-    "tags": ["development", "documentation"]
-  },
-  {
-    "name": "ci-cd-helper",
-    "description": "Configure CI/CD pipelines and deployment automation",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/ci-cd-helper",
-    "tags": ["development", "ci", "cd", "automation"]
-  },
-  {
-    "name": "code-translator",
-    "description": "Translate code between programming languages and frameworks",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/code-translator",
-    "tags": ["development", "translation", "migration"]
-  },
-  {
-    "name": "email-digest",
-    "description": "Daily email digest with priority sorting and action items",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/email-digest",
-    "tags": ["email", "productivity"]
+    "tags": [
+      "development",
+      "documentation"
+    ]
   },
   {
     "name": "meeting-notes",
@@ -93,7 +51,10 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/meeting-notes",
-    "tags": ["productivity", "meetings"]
+    "tags": [
+      "productivity",
+      "meetings"
+    ]
   },
   {
     "name": "research-assistant",
@@ -101,7 +62,10 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/research-assistant",
-    "tags": ["productivity", "research"]
+    "tags": [
+      "productivity",
+      "research"
+    ]
   },
   {
     "name": "calendar-sync",
@@ -109,7 +73,10 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/calendar-sync",
-    "tags": ["productivity", "calendar"]
+    "tags": [
+      "productivity",
+      "calendar"
+    ]
   },
   {
     "name": "expense-tracker",
@@ -117,7 +84,10 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/expense-tracker",
-    "tags": ["productivity", "finance"]
+    "tags": [
+      "productivity",
+      "finance"
+    ]
   },
   {
     "name": "todo-manager",
@@ -125,31 +95,10 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/todo-manager",
-    "tags": ["productivity", "tasks"]
-  },
-  {
-    "name": "pomodoro-timer",
-    "description": "Pomodoro technique timer for focused work sessions",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/pomodoro-timer",
-    "tags": ["productivity", "time-management"]
-  },
-  {
-    "name": "daily-standup",
-    "description": "Generate and track daily standup notes",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/daily-standup",
-    "tags": ["productivity", "meetings", "agile"]
-  },
-  {
-    "name": "invoice-generator",
-    "description": "Generate invoices and track billing",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/invoice-generator",
-    "tags": ["productivity", "invoice", "finance"]
+    "tags": [
+      "productivity",
+      "tasks"
+    ]
   },
   {
     "name": "time-tracker",
@@ -157,7 +106,10 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/time-tracker",
-    "tags": ["productivity", "time-management"]
+    "tags": [
+      "productivity",
+      "time-management"
+    ]
   },
   {
     "name": "system-monitor",
@@ -165,39 +117,10 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/system-monitor",
-    "tags": ["devops", "monitoring"]
-  },
-  {
-    "name": "docker-manager",
-    "description": "Manage Docker containers, images, and compose stacks",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/docker-manager",
-    "tags": ["devops", "docker", "containers"]
-  },
-  {
-    "name": "kubernetes-helper",
-    "description": "Kubernetes deployment and cluster management helpers",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/kubernetes-helper",
-    "tags": ["devops", "kubernetes", "orchestration"]
-  },
-  {
-    "name": "log-analyzer",
-    "description": "Parse and analyze application and system logs",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/log-analyzer",
-    "tags": ["devops", "logging", "debugging"]
-  },
-  {
-    "name": "ssl-cert-monitor",
-    "description": "Monitor SSL/TLS certificate expiration and renewal",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/ssl-cert-monitor",
-    "tags": ["devops", "ssl", "security"]
+    "tags": [
+      "devops",
+      "monitoring"
+    ]
   },
   {
     "name": "uptime-checker",
@@ -205,23 +128,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/uptime-checker",
-    "tags": ["devops", "monitoring", "availability"]
-  },
-  {
-    "name": "backup-scheduler",
-    "description": "Schedule and manage backup jobs",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/backup-scheduler",
-    "tags": ["devops", "backup", "recovery"]
-  },
-  {
-    "name": "deployment-manager",
-    "description": "Orchestrate deployments and rollout strategies",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/deployment-manager",
-    "tags": ["devops", "deployment"]
+    "tags": [
+      "devops",
+      "monitoring",
+      "availability"
+    ]
   },
   {
     "name": "home-automation",
@@ -229,7 +140,10 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/home-automation",
-    "tags": ["iot", "smart-home"]
+    "tags": [
+      "iot",
+      "smart-home"
+    ]
   },
   {
     "name": "weather-station",
@@ -237,39 +151,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/weather-station",
-    "tags": ["iot", "weather", "sensors"]
-  },
-  {
-    "name": "plant-monitor",
-    "description": "Monitor soil moisture and plant health",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/plant-monitor",
-    "tags": ["iot", "gardening", "sensors"]
-  },
-  {
-    "name": "energy-tracker",
-    "description": "Track energy consumption from smart meters",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/energy-tracker",
-    "tags": ["iot", "energy", "sensors"]
-  },
-  {
-    "name": "garage-door",
-    "description": "Control garage door opener via smart relay",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/garage-door",
-    "tags": ["iot", "hardware"]
-  },
-  {
-    "name": "nostr-bot",
-    "description": "Nostr relay interaction and DMs bot",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/nostr-bot",
-    "tags": ["social", "nostr", "messaging"]
+    "tags": [
+      "iot",
+      "weather",
+      "sensors"
+    ]
   },
   {
     "name": "rss-monitor",
@@ -277,7 +163,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/rss-monitor",
-    "tags": ["social", "rss", "feeds"]
+    "tags": [
+      "social",
+      "rss",
+      "feeds"
+    ]
   },
   {
     "name": "slack-digest",
@@ -285,15 +175,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/slack-digest",
-    "tags": ["social", "slack", "communication"]
-  },
-  {
-    "name": "discord-moderator",
-    "description": "Discord moderation and auto-moderation rules",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/discord-moderator",
-    "tags": ["social", "discord", "moderation"]
+    "tags": [
+      "social",
+      "slack",
+      "communication"
+    ]
   },
   {
     "name": "twitter-scheduler",
@@ -301,7 +187,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twitter-scheduler",
-    "tags": ["social", "twitter", "scheduling"]
+    "tags": [
+      "social",
+      "twitter",
+      "scheduling"
+    ]
   },
   {
     "name": "newsletter-curator",
@@ -309,7 +199,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/newsletter-curator",
-    "tags": ["social", "newsletter", "content"]
+    "tags": [
+      "social",
+      "newsletter",
+      "content"
+    ]
   },
   {
     "name": "social-analytics",
@@ -317,7 +211,10 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/social-analytics",
-    "tags": ["social", "analytics"]
+    "tags": [
+      "social",
+      "analytics"
+    ]
   },
   {
     "name": "data-analysis",
@@ -325,39 +222,106 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/data-analysis",
-    "tags": ["data", "analytics"]
+    "tags": [
+      "data",
+      "analytics"
+    ]
   },
   {
-    "name": "csv-transformer",
-    "description": "Transform, filter, and reshape CSV data",
+    "name": "analogy-engine",
+    "description": "Find solutions by mapping structural similarities from unrelated domains",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/csv-transformer",
-    "tags": ["data", "csv", "etl"]
+    "url": "https://github.com/human/skill-registry/tree/main/skills/analogy-engine",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "reasoning"
+    ]
   },
   {
-    "name": "json-validator",
-    "description": "Validate JSON against schemas and fix formatting",
+    "name": "constraint-creativity",
+    "description": "Use limitations as creative catalysts: forced constraints, elimination, and reduction",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/json-validator",
-    "tags": ["data", "json", "validation"]
+    "url": "https://github.com/human/skill-registry/tree/main/skills/constraint-creativity",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "innovation"
+    ]
   },
   {
-    "name": "sql-query-builder",
-    "description": "Build and optimize SQL queries from natural language",
+    "name": "creative-combination",
+    "description": "Generate novel ideas by combining existing concepts, techniques, or domains in unexpected ways",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/sql-query-builder",
-    "tags": ["data", "sql", "database"]
+    "url": "https://github.com/human/skill-registry/tree/main/skills/creative-combination",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "innovation"
+    ]
   },
   {
-    "name": "report-generator",
-    "description": "Generate data reports and visualizations",
+    "name": "improvisation",
+    "description": "Apply improv principles to thinking: yes-and, heighten, specificity, and embracing failure",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/report-generator",
-    "tags": ["data", "reporting"]
+    "url": "https://github.com/human/skill-registry/tree/main/skills/improvisation",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "communication"
+    ]
+  },
+  {
+    "name": "lateral-thinking",
+    "description": "Break fixed thinking patterns using provocation, random entry, and concept extraction",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/lateral-thinking",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "reasoning"
+    ]
+  },
+  {
+    "name": "prototyping",
+    "description": "Build quick, cheap, throwaway versions to test ideas before committing to full implementation",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/prototyping",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "innovation"
+    ]
+  },
+  {
+    "name": "reframing",
+    "description": "See problems differently by changing the frame: perspective shifts, inversions, and zoom levels",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/reframing",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "reasoning"
+    ]
+  },
+  {
+    "name": "visual-thinking",
+    "description": "Use diagrams, sketches, and spatial reasoning to understand and communicate complex ideas",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/visual-thinking",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "communication"
+    ]
   },
   {
     "name": "claw-migrator",
@@ -365,15 +329,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/claw-migrator",
-    "tags": ["migration", "setup", "human"]
-  },
-  {
-    "name": "config-validator",
-    "description": "Validate Human and skill configuration files",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/config-validator",
-    "tags": ["migration", "setup", "config"]
+    "tags": [
+      "migration",
+      "setup",
+      "human"
+    ]
   },
   {
     "name": "health-checker",
@@ -381,7 +341,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/health-checker",
-    "tags": ["migration", "setup", "health"]
+    "tags": [
+      "migration",
+      "setup",
+      "health"
+    ]
   },
   {
     "name": "plugin-scanner",
@@ -389,15 +353,107 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/plugin-scanner",
-    "tags": ["migration", "setup", "plugins"]
+    "tags": [
+      "migration",
+      "setup",
+      "plugins"
+    ]
   },
   {
-    "name": "environment-setup",
-    "description": "Setup development and deployment environments",
+    "name": "coaching",
+    "description": "Guide others toward their own solutions using the GROW model and powerful questions",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/environment-setup",
-    "tags": ["migration", "setup", "environment"]
+    "url": "https://github.com/human/skill-registry/tree/main/skills/coaching",
+    "tags": [
+      "cognitive",
+      "emotional-intelligence",
+      "leadership"
+    ]
+  },
+  {
+    "name": "conflict-resolution",
+    "description": "Mediate disagreements using nonviolent communication, reframing, and common ground",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/conflict-resolution",
+    "tags": [
+      "cognitive",
+      "emotional-intelligence",
+      "communication"
+    ]
+  },
+  {
+    "name": "cultural-awareness",
+    "description": "Communicate effectively across cultural contexts by recognizing different norms and values",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/cultural-awareness",
+    "tags": [
+      "cognitive",
+      "emotional-intelligence",
+      "communication"
+    ]
+  },
+  {
+    "name": "emotional-awareness",
+    "description": "Recognize emotional cues in text, adjust tone appropriately, and validate before problem-solving",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/emotional-awareness",
+    "tags": [
+      "cognitive",
+      "emotional-intelligence",
+      "communication"
+    ]
+  },
+  {
+    "name": "empathy-mapping",
+    "description": "Understand others' perspectives by mapping what they think, feel, say, and do",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/empathy-mapping",
+    "tags": [
+      "cognitive",
+      "emotional-intelligence",
+      "design"
+    ]
+  },
+  {
+    "name": "psychological-safety",
+    "description": "Create environments where people can take risks, ask questions, and admit mistakes",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/psychological-safety",
+    "tags": [
+      "cognitive",
+      "emotional-intelligence",
+      "leadership"
+    ]
+  },
+  {
+    "name": "self-regulation",
+    "description": "Manage impulses, delay gratification, and maintain composure under pressure",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/self-regulation",
+    "tags": [
+      "cognitive",
+      "emotional-intelligence",
+      "wellbeing"
+    ]
+  },
+  {
+    "name": "trust-building",
+    "description": "Build and maintain trust through consistency, transparency, competence, and reliability",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/trust-building",
+    "tags": [
+      "cognitive",
+      "emotional-intelligence",
+      "leadership"
+    ]
   },
   {
     "name": "twin-identity-sync",
@@ -405,7 +461,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-identity-sync",
-    "tags": ["digital-twin", "identity", "continuity"]
+    "tags": [
+      "digital-twin",
+      "identity",
+      "continuity"
+    ]
   },
   {
     "name": "twin-boundary-guard",
@@ -413,7 +473,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-boundary-guard",
-    "tags": ["digital-twin", "boundaries", "wellbeing"]
+    "tags": [
+      "digital-twin",
+      "boundaries",
+      "wellbeing"
+    ]
   },
   {
     "name": "twin-relationship-memory",
@@ -421,7 +485,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-relationship-memory",
-    "tags": ["digital-twin", "relationships", "context"]
+    "tags": [
+      "digital-twin",
+      "relationships",
+      "context"
+    ]
   },
   {
     "name": "twin-decision-log",
@@ -429,7 +497,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-decision-log",
-    "tags": ["digital-twin", "decisions", "memory"]
+    "tags": [
+      "digital-twin",
+      "decisions",
+      "memory"
+    ]
   },
   {
     "name": "twin-meeting-wingman",
@@ -437,7 +509,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-meeting-wingman",
-    "tags": ["digital-twin", "meetings", "productivity"]
+    "tags": [
+      "digital-twin",
+      "meetings",
+      "productivity"
+    ]
   },
   {
     "name": "twin-inbox-partner",
@@ -445,7 +521,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-inbox-partner",
-    "tags": ["digital-twin", "email", "communication"]
+    "tags": [
+      "digital-twin",
+      "email",
+      "communication"
+    ]
   },
   {
     "name": "twin-weekly-debrief",
@@ -453,7 +533,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-weekly-debrief",
-    "tags": ["digital-twin", "reflection", "planning"]
+    "tags": [
+      "digital-twin",
+      "reflection",
+      "planning"
+    ]
   },
   {
     "name": "twin-values-check",
@@ -461,7 +545,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-values-check",
-    "tags": ["digital-twin", "values", "ethics"]
+    "tags": [
+      "digital-twin",
+      "values",
+      "ethics"
+    ]
   },
   {
     "name": "twin-focus-shield",
@@ -469,7 +557,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-focus-shield",
-    "tags": ["digital-twin", "focus", "deep-work"]
+    "tags": [
+      "digital-twin",
+      "focus",
+      "deep-work"
+    ]
   },
   {
     "name": "twin-learning-loop",
@@ -477,7 +569,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-learning-loop",
-    "tags": ["digital-twin", "learning", "notes"]
+    "tags": [
+      "digital-twin",
+      "learning",
+      "notes"
+    ]
   },
   {
     "name": "twin-energy-budget",
@@ -485,7 +581,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-energy-budget",
-    "tags": ["digital-twin", "energy", "planning"]
+    "tags": [
+      "digital-twin",
+      "energy",
+      "planning"
+    ]
   },
   {
     "name": "twin-continuity-handoff",
@@ -493,7 +593,11 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-continuity-handoff",
-    "tags": ["digital-twin", "handoff", "continuity"]
+    "tags": [
+      "digital-twin",
+      "handoff",
+      "continuity"
+    ]
   },
   {
     "name": "twin-voice-calibrator",
@@ -501,6 +605,10 @@
     "version": "1.0.0",
     "author": "human",
     "url": "https://github.com/human/skill-registry/tree/main/skills/twin-voice-calibrator",
-    "tags": ["digital-twin", "voice", "writing"]
+    "tags": [
+      "digital-twin",
+      "voice",
+      "writing"
+    ]
   }
 ]

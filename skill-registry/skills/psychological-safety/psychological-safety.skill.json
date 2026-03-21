@@ -1,0 +1,9 @@
+{
+  "name": "psychological-safety",
+  "description": "Create environments where people can take risks, ask questions, and admit mistakes",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

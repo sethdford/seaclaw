@@ -1,9 +1,0 @@
-{
-  "name": "deployment-manager",
-  "description": "Orchestrate deployments and rollout strategies",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

@@ -1,9 +1,0 @@
-{
-  "name": "email-digest",
-  "description": "Daily email digest with priority sorting and action items",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

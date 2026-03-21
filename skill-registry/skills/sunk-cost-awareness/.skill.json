@@ -1,0 +1,9 @@
+{
+  "name": "sunk-cost-awareness",
+  "description": "Recognize and escape sunk cost traps: evaluate decisions on future value, not past investment",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

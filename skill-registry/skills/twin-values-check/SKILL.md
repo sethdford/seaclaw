@@ -1,3 +1,8 @@
+---
+name: twin-values-check
+description: Compare plans and drafts against stated values and surface tensions explicitly
+---
+
 # Digital twin — values check
 
 Help the user **notice misalignment** between what they say they care about and what they are about to do.

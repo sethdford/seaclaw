@@ -1,0 +1,9 @@
+{
+  "name": "trade-off-analysis",
+  "description": "Make explicit trade-offs when no option is clearly best: name what you're giving up",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

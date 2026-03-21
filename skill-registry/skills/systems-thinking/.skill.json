@@ -1,0 +1,9 @@
+{
+  "name": "systems-thinking",
+  "description": "Analyze feedback loops, leverage points, and unintended consequences in complex systems",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

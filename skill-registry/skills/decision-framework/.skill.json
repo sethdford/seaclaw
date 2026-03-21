@@ -1,0 +1,9 @@
+{
+  "name": "decision-framework",
+  "description": "Apply structured decision methods: weighted scoring, second-order thinking, reversibility tests",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

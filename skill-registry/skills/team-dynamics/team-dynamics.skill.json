@@ -1,0 +1,9 @@
+{
+  "name": "team-dynamics",
+  "description": "Understand and improve how groups work together: roles, norms, stages, and dysfunction",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

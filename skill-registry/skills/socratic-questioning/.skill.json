@@ -1,0 +1,9 @@
+{
+  "name": "socratic-questioning",
+  "description": "Guide discovery through progressive question ladders instead of giving direct answers",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

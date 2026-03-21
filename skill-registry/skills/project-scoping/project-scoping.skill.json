@@ -1,0 +1,9 @@
+{
+  "name": "project-scoping",
+  "description": "Define project boundaries, deliverables, and success criteria to prevent scope creep",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

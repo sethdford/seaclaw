@@ -1,0 +1,9 @@
+{
+  "name": "reframing",
+  "description": "See problems differently by changing the frame: perspective shifts, inversions, and zoom levels",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

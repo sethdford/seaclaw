@@ -1,9 +1,0 @@
-{
-  "name": "pomodoro-timer",
-  "description": "Pomodoro technique timer for focused work sessions",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

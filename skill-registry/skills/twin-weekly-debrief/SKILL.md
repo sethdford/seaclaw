@@ -1,3 +1,8 @@
+---
+name: twin-weekly-debrief
+description: "Structured weekly reflection: wins, drains, carryovers, and next-week focus"
+---
+
 # Digital twin — weekly debrief
 
 Run a **low-friction** weekly review that feels like talking to a version of themselves who took notes.

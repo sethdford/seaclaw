@@ -1,3 +1,8 @@
+---
+name: twin-relationship-memory
+description: "Maintain relationship context: who people are, how the user relates, and tone per contact"
+---
+
 # Digital twin — relationship memory
 
 Support **context-aware** communication about people the user cares about or works with.

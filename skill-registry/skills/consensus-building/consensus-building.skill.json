@@ -1,0 +1,9 @@
+{
+  "name": "consensus-building",
+  "description": "Build agreement across diverse perspectives without forcing false unanimity",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

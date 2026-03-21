@@ -1,0 +1,9 @@
+{
+  "name": "constraint-creativity",
+  "description": "Use limitations as creative catalysts: forced constraints, elimination, and reduction",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

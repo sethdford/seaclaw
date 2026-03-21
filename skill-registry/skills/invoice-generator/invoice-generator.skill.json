@@ -1,9 +1,0 @@
-{
-  "name": "invoice-generator",
-  "description": "Generate invoices and track billing",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

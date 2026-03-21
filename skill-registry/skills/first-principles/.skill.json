@@ -1,0 +1,9 @@
+{
+  "name": "first-principles",
+  "description": "Decompose problems to fundamental truths and rebuild solutions from axioms",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

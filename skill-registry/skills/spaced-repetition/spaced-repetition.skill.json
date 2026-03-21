@@ -1,0 +1,9 @@
+{
+  "name": "spaced-repetition",
+  "description": "Schedule review of learned material at optimal intervals to maximize retention",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "persuasive-writing",
+  "description": "Structure arguments that move people to action using rhetorical frameworks",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

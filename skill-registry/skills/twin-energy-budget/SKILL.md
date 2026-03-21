@@ -1,3 +1,8 @@
+---
+name: twin-energy-budget
+description: Track social and cognitive bandwidth; suggest realistic commitments
+---
+
 # Digital twin — energy budget
 
 Treat **bandwidth** as a finite resource the user allocates on purpose.

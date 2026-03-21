@@ -1,3 +1,8 @@
+---
+name: twin-continuity-handoff
+description: "Session handoffs for future-you: state, blockers, and the next concrete action"
+---
+
 # Digital twin — continuity handoff
 
 End sessions with a **clean bridge** to the next context (device, day, or coworker).

@@ -1,0 +1,9 @@
+{
+  "name": "lateral-thinking",
+  "description": "Break fixed thinking patterns using provocation, random entry, and concept extraction",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

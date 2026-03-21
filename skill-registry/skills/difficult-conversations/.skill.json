@@ -1,0 +1,9 @@
+{
+  "name": "difficult-conversations",
+  "description": "Navigate high-stakes or emotionally charged conversations with clarity and care",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

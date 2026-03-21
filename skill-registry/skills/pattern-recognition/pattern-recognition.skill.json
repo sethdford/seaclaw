@@ -1,0 +1,9 @@
+{
+  "name": "pattern-recognition",
+  "description": "Identify recurring patterns, analogies, and structural similarities across different domains",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

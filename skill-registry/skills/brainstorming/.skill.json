@@ -1,0 +1,9 @@
+{
+  "name": "brainstorming",
+  "description": "Divergent ideation techniques for exploring solution spaces before converging",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}
