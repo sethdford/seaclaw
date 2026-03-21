@@ -1,0 +1,9 @@
+{
+  "name": "root-cause-analysis",
+  "description": "Dig beyond symptoms to find the true cause of problems using 5 Whys, fishbone, and fault trees",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}
