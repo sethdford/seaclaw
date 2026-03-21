@@ -93,6 +93,9 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->agent.compaction_max_source_chars = 12000;
     cfg->agent.message_timeout_secs = 600;
     cfg->agent.pool_max_concurrent = 8;
+    cfg->agent.fleet_max_spawn_depth = 8;
+    cfg->agent.fleet_max_total_spawns = 0;
+    cfg->agent.fleet_budget_usd = 0.0;
     cfg->agent.default_profile = NULL;
     cfg->agent.persona = NULL;
     cfg->agent.persona_channels = NULL;

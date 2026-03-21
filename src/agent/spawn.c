@@ -1,5 +1,7 @@
 #include "human/agent/spawn.h"
 #include "human/agent.h"
+#include "human/agent/tool_context.h"
+#include "human/cost.h"
 #include "human/core/error.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/team.h"
@@ -47,6 +49,8 @@ typedef struct hu_pool_slot {
     uint8_t inherit_autonomy;
     int64_t started_at;
     double cost_usd;
+    uint32_t child_spawn_depth;
+    hu_cost_tracker_t *inherit_cost_tracker;
     volatile bool cancelled;
     void *persistent_agent;
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
@@ -61,6 +65,9 @@ struct hu_agent_pool {
     bool used[HU_POOL_MAX_SLOTS];
     uint64_t next_id;
     uint32_t max_concurrent;
+    hu_fleet_limits_t fleet_limits;
+    uint64_t fleet_spawns_started;
+    hu_cost_tracker_t *fleet_cost_tracker;
     hu_worktree_manager_t *worktree_mgr;
     hu_team_config_t *team_config;
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
@@ -173,12 +180,15 @@ static void *spawn_thread(void *arg) {
             goto done;
         }
         ag->agent_id = s->agent_id;
+        ag->spawn_depth = s->child_spawn_depth;
         ag->worktree_mgr = pool->worktree_mgr;
         ag->agent_pool = pool;
 #ifdef HU_HAS_SKILLS
         if (s->inherit_skillforge)
             hu_agent_set_skillforge(ag, (struct hu_skillforge *)s->inherit_skillforge);
 #endif
+        if (s->inherit_cost_tracker)
+            hu_agent_set_cost_tracker(ag, s->inherit_cost_tracker);
         if (s->mailbox)
             hu_agent_set_mailbox(ag, s->mailbox);
         char *resp = NULL;
@@ -218,12 +228,15 @@ static void *spawn_thread(void *arg) {
             goto done;
         }
         ag.agent_id = s->agent_id;
+        ag.spawn_depth = s->child_spawn_depth;
         ag.worktree_mgr = pool->worktree_mgr;
         ag.agent_pool = pool;
 #ifdef HU_HAS_SKILLS
         if (s->inherit_skillforge)
             hu_agent_set_skillforge(&ag, (struct hu_skillforge *)s->inherit_skillforge);
 #endif
+        if (s->inherit_cost_tracker)
+            hu_agent_set_cost_tracker(&ag, s->inherit_cost_tracker);
         if (s->mailbox)
             hu_agent_set_mailbox(&ag, s->mailbox);
         char *resp = NULL;
@@ -282,6 +295,11 @@ hu_agent_pool_t *hu_agent_pool_create(hu_allocator_t *alloc, uint32_t max_concur
     p->alloc = alloc;
     p->next_id = 1;
     p->max_concurrent = max_concurrent > 0 ? max_concurrent : 4;
+    p->fleet_limits.max_spawn_depth = 8;
+    p->fleet_limits.max_total_spawns = 0;
+    p->fleet_limits.budget_limit_usd = 0.0;
+    p->fleet_spawns_started = 0;
+    p->fleet_cost_tracker = NULL;
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
     if (pthread_mutex_init(&p->mu, NULL) != 0) {
         alloc->free(alloc->ctx, p, sizeof(*p));
@@ -302,6 +320,58 @@ void hu_agent_pool_set_team_config(hu_agent_pool_t *pool, hu_team_config_t *team
     if (!pool)
         return;
     pool->team_config = team_config;
+}
+
+void hu_agent_pool_set_fleet_limits(hu_agent_pool_t *pool, const hu_fleet_limits_t *limits) {
+    if (!pool)
+        return;
+#if !defined(HU_IS_TEST) || HU_IS_TEST == 0
+    pthread_mutex_lock(&pool->mu);
+#endif
+    if (!limits) {
+        pool->fleet_limits.max_spawn_depth = 8;
+        pool->fleet_limits.max_total_spawns = 0;
+        pool->fleet_limits.budget_limit_usd = 0.0;
+    } else {
+        pool->fleet_limits = *limits;
+    }
+#if !defined(HU_IS_TEST) || HU_IS_TEST == 0
+    pthread_mutex_unlock(&pool->mu);
+#endif
+}
+
+void hu_agent_pool_bind_fleet_cost_tracker(hu_agent_pool_t *pool, hu_cost_tracker_t *tracker) {
+    if (!pool)
+        return;
+#if !defined(HU_IS_TEST) || HU_IS_TEST == 0
+    pthread_mutex_lock(&pool->mu);
+#endif
+    pool->fleet_cost_tracker = tracker;
+#if !defined(HU_IS_TEST) || HU_IS_TEST == 0
+    pthread_mutex_unlock(&pool->mu);
+#endif
+}
+
+void hu_agent_pool_fleet_status(hu_agent_pool_t *pool, hu_fleet_status_t *out) {
+    if (!out)
+        return;
+    memset(out, 0, sizeof(*out));
+    if (!pool)
+        return;
+#if !defined(HU_IS_TEST) || HU_IS_TEST == 0
+    pthread_mutex_lock(&pool->mu);
+#endif
+    out->limits = pool->fleet_limits;
+    out->spawns_started = pool->fleet_spawns_started;
+    out->running = running_locked(pool);
+    for (uint32_t i = 0; i < HU_POOL_MAX_SLOTS; i++)
+        if (pool->used[i])
+            out->slots_used++;
+    if (pool->fleet_cost_tracker)
+        out->session_spend_usd = hu_cost_session_total(pool->fleet_cost_tracker);
+#if !defined(HU_IS_TEST) || HU_IS_TEST == 0
+    pthread_mutex_unlock(&pool->mu);
+#endif
 }
 
 void hu_agent_pool_destroy(hu_agent_pool_t *pool) {
@@ -353,6 +423,39 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
     pthread_mutex_lock(&pool->mu);
 #endif
+    {
+        uint32_t child_depth = cfg->caller_spawn_depth + 1u;
+        if (pool->fleet_limits.max_spawn_depth > 0u &&
+            child_depth > pool->fleet_limits.max_spawn_depth) {
+#if !defined(HU_IS_TEST) || HU_IS_TEST == 0
+            pthread_mutex_unlock(&pool->mu);
+#endif
+            return HU_ERR_FLEET_DEPTH_EXCEEDED;
+        }
+        if (pool->fleet_limits.max_total_spawns > 0u &&
+            pool->fleet_spawns_started >= pool->fleet_limits.max_total_spawns) {
+#if !defined(HU_IS_TEST) || HU_IS_TEST == 0
+            pthread_mutex_unlock(&pool->mu);
+#endif
+            return HU_ERR_FLEET_SPAWN_CAP;
+        }
+        hu_cost_tracker_t *acct = cfg->shared_cost_tracker ? cfg->shared_cost_tracker
+                                                           : pool->fleet_cost_tracker;
+        if (pool->fleet_limits.budget_limit_usd > 0.0) {
+            if (!acct) {
+#if !defined(HU_IS_TEST) || HU_IS_TEST == 0
+                pthread_mutex_unlock(&pool->mu);
+#endif
+                return HU_ERR_INVALID_ARGUMENT;
+            }
+            if (hu_cost_session_total(acct) >= pool->fleet_limits.budget_limit_usd) {
+#if !defined(HU_IS_TEST) || HU_IS_TEST == 0
+                pthread_mutex_unlock(&pool->mu);
+#endif
+                return HU_ERR_FLEET_BUDGET_EXCEEDED;
+            }
+        }
+    }
     if (running_locked(pool) >= pool->max_concurrent) {
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
         pthread_mutex_unlock(&pool->mu);
@@ -409,7 +512,11 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
     s->inherit_session = cfg->session_store;
     s->inherit_observer = cfg->observer;
     s->inherit_autonomy = cfg->autonomy_level > 0 ? cfg->autonomy_level : 2;
+    s->child_spawn_depth = cfg->caller_spawn_depth + 1u;
+    s->inherit_cost_tracker = cfg->shared_cost_tracker ? cfg->shared_cost_tracker
+                                                       : pool->fleet_cost_tracker;
     pool->used[si] = true;
+    pool->fleet_spawns_started++;
 
 #if defined(HU_IS_TEST) && HU_IS_TEST == 1
     s->result = hu_sprintf(a, "(spawned: %s)", s->label ? s->label : "agent");
@@ -663,5 +770,12 @@ hu_error_t hu_agent_pool_spawn_named(hu_agent_pool_t *pool, const hu_agent_regis
 
     hu_spawn_config_t spawn_cfg;
     hu_spawn_config_from_named(&spawn_cfg, cfg);
+    {
+        hu_agent_t *cur = hu_agent_get_current_for_tools();
+        if (cur) {
+            spawn_cfg.caller_spawn_depth = cur->spawn_depth;
+            spawn_cfg.shared_cost_tracker = cur->cost_tracker;
+        }
+    }
     return hu_agent_pool_spawn(pool, &spawn_cfg, task, task_len, agent_name, out_id);
 }

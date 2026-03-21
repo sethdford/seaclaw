@@ -535,6 +535,67 @@ static void test_pool_result_invalid_id(void) {
     hu_agent_pool_destroy(pool);
 }
 
+static void test_fleet_defaults_status(void) {
+    hu_allocator_t a = hu_system_allocator();
+    hu_agent_pool_t *p = hu_agent_pool_create(&a, 2);
+    hu_fleet_status_t st;
+    hu_agent_pool_fleet_status(p, &st);
+    HU_ASSERT_EQ(st.limits.max_spawn_depth, 8u);
+    HU_ASSERT_EQ(st.limits.max_total_spawns, 0u);
+    HU_ASSERT_EQ(st.limits.budget_limit_usd, 0.0);
+    HU_ASSERT_EQ(st.spawns_started, 0ull);
+    hu_agent_pool_destroy(p);
+}
+
+static void test_fleet_spawn_cap(void) {
+    hu_allocator_t a = hu_system_allocator();
+    hu_agent_pool_t *p = hu_agent_pool_create(&a, 4);
+    hu_fleet_limits_t fl = {0};
+    fl.max_total_spawns = 2;
+    hu_agent_pool_set_fleet_limits(p, &fl);
+    hu_spawn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.provider = "openai";
+    cfg.provider_len = 6;
+    uint64_t id = 0;
+    HU_ASSERT_EQ(hu_agent_pool_spawn(p, &cfg, "a", 1, "t", &id), HU_OK);
+    HU_ASSERT_EQ(hu_agent_pool_spawn(p, &cfg, "b", 1, "t", &id), HU_OK);
+    HU_ASSERT_EQ(hu_agent_pool_spawn(p, &cfg, "c", 1, "t", &id), HU_ERR_FLEET_SPAWN_CAP);
+    hu_agent_pool_destroy(p);
+}
+
+static void test_fleet_depth_limit(void) {
+    hu_allocator_t a = hu_system_allocator();
+    hu_agent_pool_t *p = hu_agent_pool_create(&a, 4);
+    hu_fleet_limits_t fl = {0};
+    fl.max_spawn_depth = 1;
+    hu_agent_pool_set_fleet_limits(p, &fl);
+    hu_spawn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.provider = "openai";
+    cfg.provider_len = 6;
+    uint64_t id = 0;
+    HU_ASSERT_EQ(hu_agent_pool_spawn(p, &cfg, "a", 1, "t", &id), HU_OK);
+    cfg.caller_spawn_depth = 1;
+    HU_ASSERT_EQ(hu_agent_pool_spawn(p, &cfg, "b", 1, "t", &id), HU_ERR_FLEET_DEPTH_EXCEEDED);
+    hu_agent_pool_destroy(p);
+}
+
+static void test_fleet_budget_requires_tracker(void) {
+    hu_allocator_t a = hu_system_allocator();
+    hu_agent_pool_t *p = hu_agent_pool_create(&a, 2);
+    hu_fleet_limits_t fl = {0};
+    fl.budget_limit_usd = 1.0;
+    hu_agent_pool_set_fleet_limits(p, &fl);
+    hu_spawn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.provider = "openai";
+    cfg.provider_len = 6;
+    uint64_t id = 0;
+    HU_ASSERT_EQ(hu_agent_pool_spawn(p, &cfg, "a", 1, "t", &id), HU_ERR_INVALID_ARGUMENT);
+    hu_agent_pool_destroy(p);
+}
+
 static void test_canvas_description(void) {
     hu_allocator_t a = hu_system_allocator();
     hu_tool_t tool = {0};
@@ -630,6 +691,9 @@ static void test_integ_config_defaults(void) {
     hu_error_t err = hu_config_load(&a, &cfg);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(cfg.agent.pool_max_concurrent, 8);
+    HU_ASSERT_EQ(cfg.agent.fleet_max_spawn_depth, 8u);
+    HU_ASSERT_EQ(cfg.agent.fleet_max_total_spawns, 0u);
+    HU_ASSERT_EQ(cfg.agent.fleet_budget_usd, 0.0);
     HU_ASSERT_NULL(cfg.agent.default_profile);
     HU_ASSERT_EQ(cfg.policy.enabled, false);
     HU_ASSERT_EQ(cfg.plugins.enabled, false);
@@ -646,6 +710,22 @@ static void test_integ_config_parse_pool(void) {
     err = hu_config_parse_json(&cfg, json, strlen(json));
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(cfg.agent.pool_max_concurrent, 16);
+    hu_config_deinit(&cfg);
+}
+
+static void test_integ_config_parse_fleet(void) {
+    hu_allocator_t a = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_error_t err = hu_config_load(&a, &cfg);
+    HU_ASSERT_EQ(err, HU_OK);
+    const char *json = "{\"agent\":{\"fleet_max_spawn_depth\":3,\"fleet_max_total_spawns\":10,"
+                       "\"fleet_budget_usd\":2.5}}";
+    err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(cfg.agent.fleet_max_spawn_depth, 3u);
+    HU_ASSERT_EQ(cfg.agent.fleet_max_total_spawns, 10u);
+    HU_ASSERT_TRUE(cfg.agent.fleet_budget_usd > 2.49 && cfg.agent.fleet_budget_usd < 2.51);
     hu_config_deinit(&cfg);
 }
 
@@ -808,6 +888,10 @@ void run_roadmap_tests(void) {
     HU_RUN_TEST(test_pool_status_invalid_id);
     HU_RUN_TEST(test_pool_cancel_invalid_id);
     HU_RUN_TEST(test_pool_result_invalid_id);
+    HU_RUN_TEST(test_fleet_defaults_status);
+    HU_RUN_TEST(test_fleet_spawn_cap);
+    HU_RUN_TEST(test_fleet_depth_limit);
+    HU_RUN_TEST(test_fleet_budget_requires_tracker);
 
     HU_TEST_SUITE("Roadmap: Mailbox (1B)");
     HU_RUN_TEST(test_mailbox_create_destroy);
@@ -881,6 +965,7 @@ void run_roadmap_tests(void) {
     HU_TEST_SUITE("Integration");
     HU_RUN_TEST(test_integ_config_defaults);
     HU_RUN_TEST(test_integ_config_parse_pool);
+    HU_RUN_TEST(test_integ_config_parse_fleet);
     HU_RUN_TEST(test_integ_config_parse_policy);
     HU_RUN_TEST(test_integ_agent_fields);
     HU_RUN_TEST(test_integ_factory_pool);

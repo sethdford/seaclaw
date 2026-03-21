@@ -8,7 +8,8 @@
 
 #define TOOL_NAME "agent_spawn"
 #define TOOL_DESC \
-    "Spawn a sub-agent to work on a task autonomously. Returns an agent ID for querying."
+    "Spawn a sub-agent to work on a task autonomously. Inherits parent tools, memory, SkillForge, " \
+    "and policy when available. Returns an agent ID for querying."
 #define TOOL_PARAMS                                                                          \
     "{\"type\":\"object\",\"properties\":{"                                                  \
     "\"task\":{\"type\":\"string\",\"description\":\"Task description for the sub-agent\"}," \
@@ -82,6 +83,10 @@ static hu_error_t agent_spawn_execute(void *ctx, hu_allocator_t *alloc, const hu
         cfg.policy = parent->policy;
     if (parent)
         cfg.autonomy_level = parent->autonomy_level;
+    if (parent) {
+        cfg.caller_spawn_depth = parent->spawn_depth;
+        cfg.shared_cost_tracker = parent->cost_tracker;
+    }
 
     const char *model = hu_json_get_string(args, "model");
     if (model) {
@@ -92,7 +97,7 @@ static hu_error_t agent_spawn_execute(void *ctx, hu_allocator_t *alloc, const hu
     uint64_t agent_id = 0;
     hu_error_t err = hu_agent_pool_spawn(c->pool, &cfg, task, strlen(task), label, &agent_id);
     if (err != HU_OK) {
-        *out = hu_tool_result_fail("spawn failed", 12);
+        *out = hu_tool_result_fail(hu_error_string(err), strlen(hu_error_string(err)));
         return HU_OK;
     }
     char *msg = hu_sprintf(alloc, "{\"agent_id\":%llu,\"label\":\"%s\",\"status\":\"running\"}",

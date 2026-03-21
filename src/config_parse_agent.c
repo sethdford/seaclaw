@@ -61,6 +61,15 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
     double pmc = hu_json_get_number(obj, "pool_max_concurrent", cfg->agent.pool_max_concurrent);
     if (pmc >= 1 && pmc <= 64)
         cfg->agent.pool_max_concurrent = (uint32_t)pmc;
+    double fmd = hu_json_get_number(obj, "fleet_max_spawn_depth", cfg->agent.fleet_max_spawn_depth);
+    if (fmd >= 0 && fmd <= 256)
+        cfg->agent.fleet_max_spawn_depth = (uint32_t)fmd;
+    double fmt = hu_json_get_number(obj, "fleet_max_total_spawns", cfg->agent.fleet_max_total_spawns);
+    if (fmt >= 0 && fmt <= 100000000)
+        cfg->agent.fleet_max_total_spawns = (uint32_t)fmt;
+    double fbu = hu_json_get_number(obj, "fleet_budget_usd", cfg->agent.fleet_budget_usd);
+    if (fbu >= 0.0 && fbu <= 1.0e9)
+        cfg->agent.fleet_budget_usd = fbu;
     const char *dp = hu_json_get_string(obj, "default_profile");
     if (dp) {
         if (cfg->agent.default_profile)

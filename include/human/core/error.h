@@ -64,6 +64,10 @@ typedef enum hu_error {
     HU_ERR_SUBAGENT_TOO_MANY,
     HU_ERR_CANCELLED,
 
+    HU_ERR_FLEET_DEPTH_EXCEEDED,
+    HU_ERR_FLEET_SPAWN_CAP,
+    HU_ERR_FLEET_BUDGET_EXCEEDED,
+
     HU_ERR_COUNT
 } hu_error_t;
 

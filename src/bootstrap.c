@@ -510,6 +510,13 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
     ctx->cron = bi->cron;
 
     bi->agent_pool = hu_agent_pool_create(alloc, bi->cfg.agent.pool_max_concurrent);
+    {
+        hu_fleet_limits_t fl = {0};
+        fl.max_spawn_depth = bi->cfg.agent.fleet_max_spawn_depth;
+        fl.max_total_spawns = bi->cfg.agent.fleet_max_total_spawns;
+        fl.budget_limit_usd = bi->cfg.agent.fleet_budget_usd;
+        hu_agent_pool_set_fleet_limits(bi->agent_pool, &fl);
+    }
     bi->mailbox = hu_mailbox_create(alloc, 64);
     ctx->agent_pool = bi->agent_pool;
     ctx->mailbox = bi->mailbox;

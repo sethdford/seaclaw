@@ -4,6 +4,7 @@
 #include "human/agent/mailbox.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/cost.h"
 #include "human/security.h"
 
 typedef struct hu_worktree_manager hu_worktree_manager_t;
@@ -49,7 +50,26 @@ typedef struct hu_spawn_config {
     void *session_store;    /* hu_session_store_t * */
     void *observer;         /* hu_observer_t * */
     uint8_t autonomy_level; /* 0 = default 2 when no parent tools; else typical parent copy */
+    /* Fleet: depth of the agent issuing spawn (0 = root). Child depth = this + 1. */
+    uint32_t caller_spawn_depth;
+    /* Optional; shared session accounting for fleet_budget_usd (typically parent's tracker). */
+    hu_cost_tracker_t *shared_cost_tracker;
 } hu_spawn_config_t;
+
+/* Limits for the agent pool ("fleet") — concurrent slots still use max_concurrent. */
+typedef struct hu_fleet_limits {
+    uint32_t max_spawn_depth;   /* 0 = unlimited nested spawns */
+    uint32_t max_total_spawns;  /* 0 = unlimited lifetime spawns started in this pool */
+    double budget_limit_usd;    /* 0 = unlimited; else need shared_cost_tracker or pool bind */
+} hu_fleet_limits_t;
+
+typedef struct hu_fleet_status {
+    hu_fleet_limits_t limits;
+    uint64_t spawns_started;
+    size_t slots_used;
+    size_t running;
+    double session_spend_usd; /* hu_cost_session_total when pool has a bound tracker */
+} hu_fleet_status_t;
 
 typedef enum hu_agent_status {
     HU_AGENT_RUNNING,
@@ -63,6 +83,14 @@ typedef struct hu_agent_pool hu_agent_pool_t;
 
 hu_agent_pool_t *hu_agent_pool_create(hu_allocator_t *alloc, uint32_t max_concurrent);
 void hu_agent_pool_destroy(hu_agent_pool_t *pool);
+
+/* Default fleet limits: max_spawn_depth=8, unlimited spawns/budget. Pass NULL for defaults. */
+void hu_agent_pool_set_fleet_limits(hu_agent_pool_t *pool, const hu_fleet_limits_t *limits);
+
+/* Optional: bind a cost tracker for fleet budget fallback and hu_agent_pool_fleet_status. */
+void hu_agent_pool_bind_fleet_cost_tracker(hu_agent_pool_t *pool, hu_cost_tracker_t *tracker);
+
+void hu_agent_pool_fleet_status(hu_agent_pool_t *pool, hu_fleet_status_t *out);
 
 void hu_agent_pool_set_worktree_manager(hu_agent_pool_t *pool, hu_worktree_manager_t *worktree_mgr);
 

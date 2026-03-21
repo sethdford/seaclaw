@@ -121,6 +121,14 @@ All error codes are defined in `include/human/core/error.h` as `hu_error_t`. Use
 | `HU_ERR_SUBAGENT_TOO_MANY` | 46    | Maximum number of concurrent sub-agents exceeded      |
 | `HU_ERR_CANCELLED`         | 47    | Operation was cancelled by user or system             |
 
+## Fleet (spawn pool)
+
+| Code                            | Value | When to Use                                                    |
+| ------------------------------- | ----- | -------------------------------------------------------------- |
+| `HU_ERR_FLEET_DEPTH_EXCEEDED`   | 48    | Nested spawn would exceed `agent.fleet_max_spawn_depth`        |
+| `HU_ERR_FLEET_SPAWN_CAP`        | 49    | Lifetime spawn count hit `agent.fleet_max_total_spawns`        |
+| `HU_ERR_FLEET_BUDGET_EXCEEDED`  | 50    | Shared session cost is at/above `agent.fleet_budget_usd`       |
+
 ## Usage Guidelines
 
 - Return the most specific error code that applies (e.g., `HU_ERR_TOOL_VALIDATION` over `HU_ERR_INVALID_ARGUMENT` in tool code)

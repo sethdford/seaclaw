@@ -103,6 +103,10 @@ typedef struct hu_agent_config {
     uint32_t compaction_max_source_chars;
     uint64_t message_timeout_secs;
     uint32_t pool_max_concurrent;
+    /* Fleet: pooled sub-agents (spawn) limits — see docs/standards/ai/fleet.md */
+    uint32_t fleet_max_spawn_depth;   /* 0 = unlimited; default from merge */
+    uint32_t fleet_max_total_spawns;  /* 0 = unlimited lifetime spawns per pool */
+    double fleet_budget_usd;          /* 0 = unlimited; requires shared cost tracker */
     char *default_profile;
     char *persona;
     hu_persona_channel_entry_t *persona_channels;

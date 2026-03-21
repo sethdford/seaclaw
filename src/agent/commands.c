@@ -208,6 +208,7 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
                            "  /cost             Show token usage\n"
                            "  /status           Show agent status\n"
                            "  /spawn <task>     Spawn a sub-agent\n"
+                           "  /fleet            Show fleet limits and spawn stats\n"
                            "  /agents           List running agents\n"
                            "  /cancel <id>      Cancel a sub-agent\n"
                            "  /send <id> <msg>  Send message to another agent\n"
@@ -449,12 +450,59 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
         if (agent->policy)
             scfg.policy = agent->policy;
         scfg.autonomy_level = agent->autonomy_level;
+        scfg.caller_spawn_depth = agent->spawn_depth;
+        scfg.shared_cost_tracker = agent->cost_tracker;
         uint64_t new_id = 0;
         hu_error_t err =
             hu_agent_pool_spawn(agent->agent_pool, &scfg, arg_buf, arg_len, "cli-spawn", &new_id);
         if (err != HU_OK)
             return hu_sprintf(agent->alloc, "Spawn failed: %s", hu_error_string(err));
         return hu_sprintf(agent->alloc, "Spawned agent #%llu", (unsigned long long)new_id);
+    }
+
+    if (hu_strncasecmp(cmd_buf, "fleet", 5) == 0) {
+        if (!agent->agent_pool)
+            return hu_strndup(agent->alloc, "Agent pool not configured.", 26);
+        hu_fleet_status_t st;
+        hu_agent_pool_fleet_status(agent->agent_pool, &st);
+        if (st.limits.max_spawn_depth > 0u) {
+            if (st.limits.max_total_spawns > 0u) {
+                return hu_sprintf(agent->alloc,
+                                  "Fleet: %zu running, %zu slots, %llu spawns started\n"
+                                  "  max spawn depth: %u\n"
+                                  "  max lifetime spawns: %llu\n"
+                                  "  budget cap USD: %.4f (session spend: %.4f)\n",
+                                  st.running, st.slots_used,
+                                  (unsigned long long)st.spawns_started, st.limits.max_spawn_depth,
+                                  (unsigned long long)st.limits.max_total_spawns,
+                                  st.limits.budget_limit_usd, st.session_spend_usd);
+            }
+            return hu_sprintf(agent->alloc,
+                              "Fleet: %zu running, %zu slots, %llu spawns started\n"
+                              "  max spawn depth: %u\n"
+                              "  lifetime spawns: unlimited\n"
+                              "  budget cap USD: %.4f (session spend: %.4f)\n",
+                              st.running, st.slots_used, (unsigned long long)st.spawns_started,
+                              st.limits.max_spawn_depth, st.limits.budget_limit_usd,
+                              st.session_spend_usd);
+        }
+        if (st.limits.max_total_spawns > 0u) {
+            return hu_sprintf(agent->alloc,
+                              "Fleet: %zu running, %zu slots, %llu spawns started\n"
+                              "  spawn depth: unlimited\n"
+                              "  max lifetime spawns: %llu\n"
+                              "  budget cap USD: %.4f (session spend: %.4f)\n",
+                              st.running, st.slots_used, (unsigned long long)st.spawns_started,
+                              (unsigned long long)st.limits.max_total_spawns,
+                              st.limits.budget_limit_usd, st.session_spend_usd);
+        }
+        return hu_sprintf(agent->alloc,
+                          "Fleet: %zu running, %zu slots, %llu spawns started\n"
+                          "  spawn depth: unlimited\n"
+                          "  lifetime spawns: unlimited\n"
+                          "  budget cap USD: %.4f (session spend: %.4f)\n",
+                          st.running, st.slots_used, (unsigned long long)st.spawns_started,
+                          st.limits.budget_limit_usd, st.session_spend_usd);
     }
 
     if (hu_strncasecmp(cmd_buf, "agents", 6) == 0) {
