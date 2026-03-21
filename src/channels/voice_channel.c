@@ -42,9 +42,9 @@ static hu_error_t voice_start(void *ctx) {
     if (v->config.mode == HU_VOICE_MODE_REALTIME) {
         hu_voice_rt_config_t rt_cfg = {0};
         rt_cfg.sample_rate = (int)v->config.sample_rate;
-        rt_cfg.api_key = v->config.api_key ? (char *)v->config.api_key : NULL;
-        rt_cfg.model = v->config.model ? (char *)v->config.model : NULL;
-        rt_cfg.voice = v->config.voice ? (char *)v->config.voice : NULL;
+        rt_cfg.api_key = v->config.api_key ? v->config.api_key : NULL;
+        rt_cfg.model = v->config.model ? v->config.model : NULL;
+        rt_cfg.voice = v->config.voice ? v->config.voice : NULL;
         hu_error_t err = hu_voice_rt_session_create(v->alloc, &rt_cfg, &v->rt_session);
         if (err != HU_OK)
             return err;

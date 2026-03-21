@@ -65,6 +65,8 @@ static void test_cartesia_null_config_uses_defaults(void) {
 }
 
 static void test_cartesia_free_bytes_handles_null(void) {
+    /* Crash safety test: verifies NULL bytes does not cause segfault.
+     * hu_cartesia_tts_free_bytes is void — no return code to assert. */
     hu_allocator_t alloc = hu_system_allocator();
     hu_cartesia_tts_free_bytes(&alloc, NULL, 0);
 }

@@ -76,6 +76,7 @@ Types: `feat fix refactor test docs chore perf ci build style`
 | Workflow                    | What it checks                                                                                                                                    |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ci.yml`                    | C build + ~6059 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
+| `native-apps-fleet.yml`     | Multi-simulator iOS XCUITest + multi-API Android instrumented tests + SOTA gate (apps path / schedule / dispatch) |
 | `benchmark.yml`             | Performance regression (binary size, startup time, RSS)                                                                                           |
 | `codeql.yml`                | Static analysis security scanning                                                                                                                 |
 | `security.yml`              | Dependency audit, SBOM generation                                                                                                                 |
@@ -98,7 +99,7 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 
 | Path                              | What                                                                  |
 | --------------------------------- | --------------------------------------------------------------------- |
-| `src/`                            | All C source (~1,054 files, ~192K lines)                              |
+| `src/`                            | All C source (~1,093 files, ~233K lines)                              |
 | `include/human/`                  | Public headers                                                        |
 | `tests/`                          | 291 test files, 6059+ tests                                           |
 | `fuzz/`                           | libFuzzer harnesses                                                   |

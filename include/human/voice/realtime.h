@@ -5,10 +5,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 typedef struct hu_voice_rt_config {
-    char *base_url; /* e.g. wss://api.openai.com/v1/realtime; NULL = default */
-    char *model;
-    char *voice;
-    char *api_key; /* OpenAI API key for Authorization header (Realtime WebSocket) */
+    const char *base_url; /* e.g. wss://api.openai.com/v1/realtime; NULL = default */
+    const char *model;
+    const char *voice;
+    const char *api_key; /* OpenAI API key for Authorization header (Realtime WebSocket) */
     int sample_rate;
     bool vad_enabled;
 } hu_voice_rt_config_t;

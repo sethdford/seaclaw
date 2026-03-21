@@ -6,9 +6,9 @@ Last updated: 2026-03-20
 
 | Metric                         | Value                    |
 | ------------------------------ | ------------------------ |
-| Source files (src/ + include/) | **1,054**                |
-| Lines of C/H code              | **~192K**                |
-| Test files                     | 290                      |
+| Source files (src/ + include/) | **1,093**                |
+| Lines of C/H code              | **~233K**                |
+| Test files                     | 291                      |
 | Tests passing                  | **6059+/6059+ (100%)**   |
 | Binary size (MinSizeRel+LTO)   | **~1696 KB (all flags)** |
 | Cold start (--version)         | **4–27 ms avg**          |

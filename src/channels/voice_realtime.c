@@ -116,9 +116,9 @@ hu_error_t hu_voice_rt_insert_sql(const hu_voice_session_t *session, char *buf, 
     return HU_OK;
 }
 
-hu_voice_config_t hu_voice_rt_default_config(void)
+hu_voice_call_media_config_t hu_voice_rt_default_config(void)
 {
-    hu_voice_config_t c = {0};
+    hu_voice_call_media_config_t c = {0};
     c.sample_rate = 16000;
     c.channels = 1;
     c.codec = HU_VOICE_CODEC_OPUS;
@@ -128,7 +128,7 @@ hu_voice_config_t hu_voice_rt_default_config(void)
     return c;
 }
 
-hu_error_t hu_voice_rt_init_session(const hu_voice_config_t *config, const char *contact_id,
+hu_error_t hu_voice_rt_init_session(const hu_voice_call_media_config_t *config, const char *contact_id,
                                     size_t contact_id_len, hu_voice_session_t *session)
 {
     if (!config || !session)

@@ -1,9 +1,0 @@
-{
-  "name": "todo-manager",
-  "description": "Manage tasks, todos, and project checklists",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

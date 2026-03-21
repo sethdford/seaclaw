@@ -1,9 +1,0 @@
-{
-  "name": "system-monitor",
-  "description": "Monitor system resources, processes, and health metrics",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

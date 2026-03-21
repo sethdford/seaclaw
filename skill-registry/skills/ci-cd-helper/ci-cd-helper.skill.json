@@ -1,9 +1,0 @@
-{
-  "name": "ci-cd-helper",
-  "description": "Configure CI/CD pipelines and deployment automation",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

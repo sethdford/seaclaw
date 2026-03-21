@@ -1,9 +1,0 @@
-{
-  "name": "newsletter-curator",
-  "description": "Curate and compose newsletter content",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

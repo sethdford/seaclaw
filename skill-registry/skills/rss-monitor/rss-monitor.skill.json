@@ -1,9 +1,0 @@
-{
-  "name": "rss-monitor",
-  "description": "Monitor RSS feeds and notify on new posts",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

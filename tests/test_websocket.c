@@ -82,12 +82,28 @@ static void test_ws_connect_stub(void) {
 #if HU_IS_TEST
 static void test_ws_connect_with_headers_test_build(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_ws_client_t *ws = NULL;
-    hu_error_t err = hu_ws_connect_with_headers(&alloc, "wss://example.com/ws",
-                                                "Authorization: Bearer x\r\n", &ws);
-    HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_NOT_NULL(ws);
-    hu_ws_client_free(ws, &alloc);
+
+    /* Note: Under HU_IS_TEST, the mock does not inject extra_headers into the
+     * HTTP upgrade request. This test verifies API contract (non-NULL client on
+     * success) but not wire-level header injection. Integration testing for
+     * real header delivery requires a non-test build with a local WebSocket server. */
+
+    /* NULL extra_headers — should behave like hu_ws_connect for success path */
+    hu_ws_client_t *ws1 = NULL;
+    HU_ASSERT(hu_ws_connect_with_headers(&alloc, "ws://example.com", NULL, &ws1) == HU_OK);
+    HU_ASSERT_NOT_NULL(ws1);
+    hu_ws_client_free(ws1, &alloc);
+
+    hu_ws_client_t *ws2 = NULL;
+    HU_ASSERT(hu_ws_connect_with_headers(&alloc, "ws://example.com",
+                                          "Authorization: Bearer test123\r\n", &ws2) == HU_OK);
+    HU_ASSERT_NOT_NULL(ws2);
+    hu_ws_client_free(ws2, &alloc);
+
+    hu_ws_client_t *ws3 = NULL;
+    HU_ASSERT(hu_ws_connect_with_headers(&alloc, "ws://example.com", "", &ws3) == HU_OK);
+    HU_ASSERT_NOT_NULL(ws3);
+    hu_ws_client_free(ws3, &alloc);
 }
 #endif
 
@@ -240,6 +256,8 @@ static void test_ws_recv_null_client_fails(void) {
 }
 
 static void test_ws_close_null_safe(void) {
+    /* Crash safety test: verifies NULL client does not cause segfault.
+     * hu_ws_close is void — no return code to assert. */
     hu_allocator_t alloc = hu_system_allocator();
     hu_ws_close(NULL, &alloc);
 }

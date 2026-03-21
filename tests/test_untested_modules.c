@@ -52,6 +52,9 @@ static void test_voice_channel_create_with_config_applies_defaults(void) {
     hu_channel_t ch = {0};
     hu_error_t err = hu_channel_voice_create(&alloc, &config, &ch);
     HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(ch.ctx);
+    HU_ASSERT_NOT_NULL(ch.vtable);
+    HU_ASSERT_STR_EQ(ch.vtable->name(ch.ctx), "voice");
     hu_channel_voice_destroy(&ch);
 }
 #endif

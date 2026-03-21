@@ -36,11 +36,14 @@ static void test_skills_list_null_workspace_uses_dot(void) {
 }
 
 static void test_skills_free_null_safe(void) {
+    /* Crash safety test: verifies NULL skills pointer does not cause segfault.
+     * hu_skills_free is void — no return code to assert. */
     hu_allocator_t alloc = hu_system_allocator();
     hu_skills_free(&alloc, NULL, 0);
 }
 
 static void test_skills_free_with_null_skills(void) {
+    /* Crash safety test: NULL skills with nonzero count must not crash. */
     hu_allocator_t alloc = hu_system_allocator();
     hu_skills_free(&alloc, NULL, 5);
 }
@@ -230,6 +233,7 @@ static void test_skill_registry_search_mock_returns_entries(void) {
 }
 
 static void test_skill_registry_entries_free_null_safe(void) {
+    /* Crash safety test: NULL entries must not crash for any count. */
     hu_allocator_t alloc = hu_system_allocator();
     hu_skill_registry_entries_free(&alloc, NULL, 0);
     hu_skill_registry_entries_free(&alloc, NULL, 5);

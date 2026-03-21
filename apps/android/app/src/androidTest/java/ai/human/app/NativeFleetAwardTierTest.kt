@@ -51,6 +51,12 @@ class NativeFleetAwardTierTest {
     }
 
     @Test
+    fun overview_shows_welcome_heading() {
+        composeRule.onNodeWithContentDescription("Overview").performClick()
+        composeRule.onNodeWithContentDescription("Welcome back").assertIsDisplayed()
+    }
+
+    @Test
     fun journey_visits_each_tab_then_opens_gateway_settings() {
         for (label in
             listOf(

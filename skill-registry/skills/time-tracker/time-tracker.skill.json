@@ -1,9 +1,0 @@
-{
-  "name": "time-tracker",
-  "description": "Track time spent on projects and tasks",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

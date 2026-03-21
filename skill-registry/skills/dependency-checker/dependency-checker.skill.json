@@ -1,9 +1,0 @@
-{
-  "name": "dependency-checker",
-  "description": "Check and update project dependencies for security and compatibility",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

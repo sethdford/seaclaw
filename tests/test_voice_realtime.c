@@ -28,7 +28,7 @@ static void create_table_sql_valid(void)
 
 static void insert_sql_valid(void)
 {
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     hu_error_t err = hu_voice_rt_init_session(&config, "user_a", 6, &session);
     HU_ASSERT_EQ(err, HU_OK);
@@ -51,7 +51,7 @@ static void insert_sql_valid(void)
 
 static void default_config_values(void)
 {
-    hu_voice_config_t c = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t c = hu_voice_rt_default_config();
     HU_ASSERT_EQ(c.sample_rate, 16000u);
     HU_ASSERT_EQ(c.channels, (uint8_t)1);
     HU_ASSERT_EQ(c.codec, HU_VOICE_CODEC_OPUS);
@@ -62,7 +62,7 @@ static void default_config_values(void)
 
 static void init_session_sets_idle(void)
 {
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     hu_error_t err = hu_voice_rt_init_session(&config, "user_a", 6, &session);
     HU_ASSERT_EQ(err, HU_OK);
@@ -73,7 +73,7 @@ static void init_session_sets_idle(void)
 
 static void init_session_null_contact_returns_error(void)
 {
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     hu_error_t err = hu_voice_rt_init_session(&config, NULL, 6, &session);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
@@ -83,7 +83,7 @@ static void init_session_null_contact_returns_error(void)
 
 static void transition_idle_to_ringing(void)
 {
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     hu_voice_rt_init_session(&config, "user_a", 6, &session);
     hu_error_t err = hu_voice_rt_transition(&session, HU_VOICE_CALL_RINGING);
@@ -93,7 +93,7 @@ static void transition_idle_to_ringing(void)
 
 static void transition_ringing_to_connected(void)
 {
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     hu_voice_rt_init_session(&config, "user_a", 6, &session);
     hu_voice_rt_transition(&session, HU_VOICE_CALL_RINGING);
@@ -105,7 +105,7 @@ static void transition_ringing_to_connected(void)
 
 static void transition_connected_to_on_hold(void)
 {
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     hu_voice_rt_init_session(&config, "user_a", 6, &session);
     hu_voice_rt_transition(&session, HU_VOICE_CALL_RINGING);
@@ -117,7 +117,7 @@ static void transition_connected_to_on_hold(void)
 
 static void transition_on_hold_to_connected(void)
 {
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     hu_voice_rt_init_session(&config, "user_a", 6, &session);
     hu_voice_rt_transition(&session, HU_VOICE_CALL_RINGING);
@@ -130,7 +130,7 @@ static void transition_on_hold_to_connected(void)
 
 static void transition_connected_to_ended(void)
 {
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     hu_voice_rt_init_session(&config, "user_a", 6, &session);
     hu_voice_rt_transition(&session, HU_VOICE_CALL_RINGING);
@@ -143,7 +143,7 @@ static void transition_connected_to_ended(void)
 
 static void transition_invalid_returns_error(void)
 {
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     hu_voice_rt_init_session(&config, "user_a", 6, &session);
     /* IDLE -> CONNECTED is invalid (must go through RINGING) */
@@ -170,7 +170,7 @@ static void is_valid_transition_checks(void)
 
 static void duration_ms_returns_zero_when_idle(void)
 {
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     hu_voice_rt_init_session(&config, "user_a", 6, &session);
     uint64_t dur = hu_voice_rt_duration_ms(&session);
@@ -180,7 +180,7 @@ static void duration_ms_returns_zero_when_idle(void)
 static void build_prompt_active_call(void)
 {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     hu_voice_rt_init_session(&config, "user_a", 6, &session);
     hu_voice_rt_transition(&session, HU_VOICE_CALL_RINGING);
@@ -201,7 +201,7 @@ static void build_prompt_active_call(void)
 static void build_prompt_idle_session(void)
 {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     hu_voice_rt_init_session(&config, "user_a", 6, &session);
 
@@ -233,7 +233,7 @@ static void codec_str_returns_labels(void)
 
 static void session_init_copies_contact_id(void)
 {
-    hu_voice_config_t config = hu_voice_rt_default_config();
+    hu_voice_call_media_config_t config = hu_voice_rt_default_config();
     hu_voice_session_t session = {0};
     const char *contact = "user_a";
     hu_error_t err = hu_voice_rt_init_session(&config, contact, 6, &session);

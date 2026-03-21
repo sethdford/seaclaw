@@ -1,9 +1,0 @@
-{
-  "name": "plugin-scanner",
-  "description": "Scan and list installed skills and plugins",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

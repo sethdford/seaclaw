@@ -92,10 +92,14 @@ static void voice_rt_openai_send_audio_mock_ok(void) {
 }
 
 static void voice_rt_openai_session_destroy_null_safe(void) {
+    /* Crash safety test: verifies NULL session does not cause segfault.
+     * hu_voice_rt_session_destroy is void — no return code to assert. */
     hu_voice_rt_session_destroy(NULL);
 }
 
 static void voice_rt_openai_event_free_null_event_safe(void) {
+    /* Crash safety test: verifies NULL event does not cause segfault.
+     * hu_voice_rt_event_free is void — no return code to assert. */
     hu_allocator_t alloc = hu_system_allocator();
     hu_voice_rt_event_free(&alloc, NULL);
 }

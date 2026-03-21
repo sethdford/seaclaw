@@ -11,3 +11,8 @@ Jetpack Compose app.
 - Font sizes: `HUTokens.textXs` through `HUTokens.textXl` — never hardcode `14.sp`.
 - Typography: use `AvenirFontFamily` and `AvenirTypography` from `Theme.kt`.
 - Theme: use `MaterialTheme.colorScheme.primary` — not `HumanTheme.Coral` directly.
+
+## Fleet / CI (instrumented)
+
+- Tests: `app/src/androidTest/...` (`connectedDebugAndroidTest`). Intent extra `EXTRA_SKIP_ONBOARDING_FOR_TEST` skips onboarding for automation.
+- Workflow: `.github/workflows/native-apps-fleet.yml` (API-level matrix + SOTA gate).

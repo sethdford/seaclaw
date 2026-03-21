@@ -40,14 +40,15 @@ typedef struct hu_voice_session {
     bool is_muted;
 } hu_voice_session_t;
 
-typedef struct hu_voice_config {
+/* Codec / sample-rate / VAD settings for voice call sessions (not STT/TTS pipeline). */
+typedef struct hu_voice_call_media_config {
     uint32_t sample_rate;       /* default 16000 */
     uint8_t channels;           /* default 1 */
     hu_voice_codec_t codec;
     uint64_t max_duration_ms;
     uint32_t silence_timeout_ms; /* default 5000 */
     bool vad_enabled;           /* default true */
-} hu_voice_config_t;
+} hu_voice_call_media_config_t;
 
 /* SQL schema for voice_sessions table */
 hu_error_t hu_voice_rt_create_table_sql(char *buf, size_t cap, size_t *out_len);
@@ -57,10 +58,10 @@ hu_error_t hu_voice_rt_insert_sql(const hu_voice_session_t *session, char *buf, 
                                   size_t *out_len);
 
 /* Default config: 16kHz, mono, OPUS, 30min max, 5s silence timeout, VAD on */
-hu_voice_config_t hu_voice_rt_default_config(void);
+hu_voice_call_media_config_t hu_voice_rt_default_config(void);
 
 /* Initialize session: generate session_id, copy contact_id, set state to IDLE */
-hu_error_t hu_voice_rt_init_session(const hu_voice_config_t *config, const char *contact_id,
+hu_error_t hu_voice_rt_init_session(const hu_voice_call_media_config_t *config, const char *contact_id,
                                     size_t contact_id_len, hu_voice_session_t *session);
 
 /* Validate and apply state transition */
