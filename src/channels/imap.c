@@ -7,8 +7,15 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/string.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* EXPERIMENTAL: IMAP channel is a development stub. The send() function
+ * stores messages in an in-memory outbox (not actual SMTP/IMAP delivery).
+ * The poll() function returns empty results. This channel is not suitable
+ * for production use. See docs/plans/2026-03-20-digital-twin-master-plan.md
+ * for the roadmap to real IMAP support. */
 
 #define HU_IMAP_OUTBOX_MAX      32
 #define HU_IMAP_MOCK_QUEUE_MAX  16
@@ -93,6 +100,13 @@ static hu_error_t imap_send(void *ctx, const char *target, size_t target_len, co
     return HU_OK;
 #else
     /* Non-test: would send via SMTP; for v1 just store in outbox */
+#if !HU_IS_TEST
+    static bool imap_send_warned;
+    if (!imap_send_warned) {
+        fprintf(stderr, "[imap] WARNING: send() stores to in-memory outbox only (experimental)\n");
+        imap_send_warned = true;
+    }
+#endif
     (void)target_len;
     (void)message_len;
     char *t = hu_strndup(c->alloc, target, target_len);
