@@ -2,6 +2,8 @@
 
 Produce docs that match the reader’s **skill level**, reveal information **progressively**, and favor **working examples** over abstract prose. Clarity beats completeness on page one.
 
+**Tags:** cognitive, writing, communication
+
 ## When to Use
 - READMEs, runbooks, API docs, architecture notes, internal wikis, or any “how does this work?” artifact.
 

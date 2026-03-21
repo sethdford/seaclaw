@@ -1,0 +1,9 @@
+{
+  "name": "change-management",
+  "description": "Guide people and organizations through transitions with communication, empathy, and incremental adoption",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

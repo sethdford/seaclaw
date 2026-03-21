@@ -2,6 +2,8 @@
 
 Make work flow faster and cheaper by seeing **end-to-end value**, cutting **waste**, and attacking the **bottleneck** before polishing side paths.
 
+**Tags:** cognitive, analysis, productivity
+
 ## When to Use
 - Handoffs feel slow, queues grow, rework is high, or “we’ve always done it this way” blocks delivery.
 

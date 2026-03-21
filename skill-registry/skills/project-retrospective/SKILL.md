@@ -2,6 +2,8 @@
 
 Run a **blameless**, time-boxed retrospective that turns experience into **2–3 concrete actions**—not a wish list. The retro fails if nothing changes; systems and processes are the focus, not individuals.
 
+**Tags:** cognitive, leadership, learning
+
 ## When to Use
 - End of phase, release, incident follow-up, or recurring team improvement cadence (e.g. monthly).
 

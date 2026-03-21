@@ -2,7 +2,7 @@
   "name": "interviewing",
   "description": "Conduct effective interviews: research, user, hiring, and journalistic contexts",
   "version": "1.0.0",
- author": "human",
+  "author": "human",
   "dependencies": [],
   "parameters": "{}",
   "enabled": true
