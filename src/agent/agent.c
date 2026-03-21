@@ -33,6 +33,9 @@
 #include "human/agent/team.h"
 #include "human/agent/tool_context.h"
 #include "human/agent/undo.h"
+#ifdef HU_HAS_SKILLS
+#include "human/skillforge.h"
+#endif
 #include "human/context.h"
 #include "human/context_tokens.h"
 #include "human/core/json.h"
@@ -444,6 +447,16 @@ void hu_agent_set_mailbox(hu_agent_t *agent, hu_mailbox_t *mailbox) {
         if (err != HU_OK)
             fprintf(stderr, "warning: mailbox register failed: %s\n", hu_error_string(err));
     }
+}
+
+void hu_agent_set_skillforge(hu_agent_t *agent, struct hu_skillforge *skillforge) {
+    if (!agent)
+        return;
+#ifdef HU_HAS_SKILLS
+    agent->skillforge = skillforge;
+#else
+    (void)skillforge;
+#endif
 }
 
 void hu_agent_set_task_list(hu_agent_t *agent, hu_task_list_t *task_list) {

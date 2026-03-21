@@ -3,8 +3,10 @@
 #include "human/daemon.h"
 #include "human/migration.h"
 #include "human/onboard.h"
+#include "human/agent.h"
 #include "human/skillforge.h"
 #include "test_framework.h"
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -51,6 +53,64 @@ static void test_skillforge_enable_disable(void) {
     HU_ASSERT_FALSE(s->enabled);
     err = hu_skillforge_enable(&sf, "nonexistent");
     HU_ASSERT(err == HU_ERR_NOT_FOUND);
+    hu_skillforge_destroy(&sf);
+}
+
+static void test_skillforge_build_prompt_catalog_default(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_skillforge_t sf;
+    hu_skillforge_create(&alloc, &sf);
+    hu_skillforge_discover(&sf, ".");
+#if !defined(_WIN32)
+    unsetenv("HUMAN_SKILLS_CONTEXT");
+#endif
+    char *out = NULL;
+    size_t out_len = 0;
+    HU_ASSERT_EQ(hu_skillforge_build_prompt_catalog(&alloc, &sf, "cli helper", 10, &out, &out_len),
+                 HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(strstr(out, "cli-helper") != NULL || strstr(out, "test-skill") != NULL);
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_skillforge_destroy(&sf);
+}
+
+static void test_skillforge_build_prompt_catalog_top_k(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_skillforge_t sf;
+    hu_skillforge_create(&alloc, &sf);
+    hu_skillforge_discover(&sf, ".");
+#if !defined(_WIN32)
+    setenv("HUMAN_SKILLS_CONTEXT", "top_k", 1);
+    setenv("HUMAN_SKILLS_TOP_K", "1", 1);
+    char *out = NULL;
+    size_t out_len = 0;
+    const char *msg = "use the cli helper for this task";
+    HU_ASSERT_EQ(
+        hu_skillforge_build_prompt_catalog(&alloc, &sf, msg, strlen(msg), &out, &out_len), HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(strstr(out, "more skills") != NULL);
+    unsetenv("HUMAN_SKILLS_CONTEXT");
+    unsetenv("HUMAN_SKILLS_TOP_K");
+    alloc.free(alloc.ctx, out, out_len + 1);
+#else
+    (void)0;
+#endif
+    hu_skillforge_destroy(&sf);
+}
+
+static void test_hu_agent_set_skillforge_sets_pointer(void) {
+    hu_agent_t ag;
+    memset(&ag, 0, sizeof(ag));
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_skillforge_t sf;
+    hu_skillforge_create(&alloc, &sf);
+    hu_agent_set_skillforge(&ag, &sf);
+#ifdef HU_HAS_SKILLS
+    HU_ASSERT_TRUE((void *)ag.skillforge == (void *)&sf);
+#else
+    (void)ag;
+#endif
+    hu_agent_set_skillforge(&ag, NULL);
     hu_skillforge_destroy(&sf);
 }
 
@@ -418,6 +478,9 @@ void run_subsystems_tests(void) {
     HU_RUN_TEST(test_skillforge_create_destroy);
     HU_RUN_TEST(test_skillforge_discover_list);
     HU_RUN_TEST(test_skillforge_enable_disable);
+    HU_RUN_TEST(test_skillforge_build_prompt_catalog_default);
+    HU_RUN_TEST(test_skillforge_build_prompt_catalog_top_k);
+    HU_RUN_TEST(test_hu_agent_set_skillforge_sets_pointer);
 
     HU_RUN_TEST(test_onboard_check_first_run);
     HU_RUN_TEST(test_onboard_run_test_mode);

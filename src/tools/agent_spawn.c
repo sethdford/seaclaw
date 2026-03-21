@@ -64,6 +64,24 @@ static hu_error_t agent_spawn_execute(void *ctx, hu_allocator_t *alloc, const hu
         cfg.persona_name = parent->persona_name;
         cfg.persona_name_len = parent->persona_name_len;
     }
+#ifdef HU_HAS_SKILLS
+    if (parent && parent->skillforge)
+        cfg.skillforge = parent->skillforge;
+#endif
+    if (parent && parent->tools && parent->tools_count > 0) {
+        cfg.parent_tools = parent->tools;
+        cfg.parent_tools_count = parent->tools_count;
+    }
+    if (parent && parent->memory)
+        cfg.memory = parent->memory;
+    if (parent && parent->session_store)
+        cfg.session_store = parent->session_store;
+    if (parent && parent->observer && parent->observer->vtable)
+        cfg.observer = parent->observer;
+    if (parent && parent->policy)
+        cfg.policy = parent->policy;
+    if (parent)
+        cfg.autonomy_level = parent->autonomy_level;
 
     const char *model = hu_json_get_string(args, "model");
     if (model) {

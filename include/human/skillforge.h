@@ -55,6 +55,16 @@ hu_skill_t *hu_skillforge_get_skill(const hu_skillforge_t *sf, const char *name)
 hu_error_t hu_skillforge_list_skills(const hu_skillforge_t *sf, hu_skill_t **out,
                                      size_t *out_count);
 
+/**
+ * Build the "## Available Skills" catalog lines (name + description per enabled skill).
+ * When getenv("HUMAN_SKILLS_CONTEXT") is "top_k" and there are more than top_k skills,
+ * keeps the K best keyword matches against user_msg (HUMAN_SKILLS_TOP_K, default 12).
+ * Caller frees *out with alloc. Empty registry returns HU_OK with *out NULL.
+ */
+hu_error_t hu_skillforge_build_prompt_catalog(hu_allocator_t *alloc, hu_skillforge_t *sf,
+                                              const char *user_msg, size_t user_msg_len,
+                                              char **out, size_t *out_len);
+
 hu_error_t hu_skillforge_enable(hu_skillforge_t *sf, const char *name);
 hu_error_t hu_skillforge_disable(hu_skillforge_t *sf, const char *name);
 

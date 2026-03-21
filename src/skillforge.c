@@ -3,6 +3,7 @@
 #include "human/core/http.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -651,6 +652,201 @@ hu_error_t hu_skillforge_install(const char *name, const char *url) {
     }
     return HU_OK;
 #endif
+}
+
+typedef struct {
+    size_t idx;
+    int score;
+} hu_skill_rank_t;
+
+static int hu_skill_rank_cmp(const void *a, const void *b) {
+    const hu_skill_rank_t *x = (const hu_skill_rank_t *)a;
+    const hu_skill_rank_t *y = (const hu_skill_rank_t *)b;
+    if (x->score != y->score)
+        return y->score - x->score;
+    return 0; /* name tie-break filled by stable pre-sort */
+}
+
+static void lower_inplace(char *s) {
+    if (!s)
+        return;
+    for (; *s; s++)
+        *s = (char)tolower((unsigned char)*s);
+}
+
+hu_error_t hu_skillforge_build_prompt_catalog(hu_allocator_t *alloc, hu_skillforge_t *sf,
+                                              const char *user_msg, size_t user_msg_len,
+                                              char **out, size_t *out_len) {
+    if (!alloc || !sf || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
+
+    size_t ena[256];
+    size_t en = 0;
+    for (size_t i = 0; i < sf->skills_len && en < 256; i++) {
+        if (!sf->skills[i].enabled)
+            continue;
+        ena[en++] = i;
+    }
+    if (en == 0)
+        return HU_OK;
+
+    const char *mode = getenv("HUMAN_SKILLS_CONTEXT");
+    int use_top_k =
+        mode && strcmp(mode, "top_k") == 0 && user_msg && user_msg_len > 0 && user_msg_len < 65536;
+
+    long k_long = 12;
+    const char *ks = getenv("HUMAN_SKILLS_TOP_K");
+    if (ks && ks[0]) {
+        char *end = NULL;
+        long v = strtol(ks, &end, 10);
+        if (end != ks && v > 0 && v <= 64)
+            k_long = v;
+    }
+    size_t top_k = (size_t)k_long;
+    if (top_k < 1)
+        top_k = 1;
+
+    long max_b_long = 8192;
+    const char *bs = getenv("HUMAN_SKILLS_CONTEXT_MAX_BYTES");
+    if (bs && bs[0]) {
+        char *end = NULL;
+        long v = strtol(bs, &end, 10);
+        if (end != bs && v >= 512 && v <= 65536)
+            max_b_long = v;
+    }
+    size_t max_bytes = (size_t)max_b_long;
+
+    hu_skill_rank_t ranks[256];
+    size_t rn = 0;
+    if (use_top_k && en > top_k) {
+        char ubuf[4096];
+        size_t ulen = user_msg_len < sizeof(ubuf) - 1 ? user_msg_len : sizeof(ubuf) - 1;
+        memcpy(ubuf, user_msg, ulen);
+        ubuf[ulen] = '\0';
+        lower_inplace(ubuf);
+        for (size_t e = 0; e < en; e++) {
+            size_t i = ena[e];
+            const char *nm = sf->skills[i].name ? sf->skills[i].name : "";
+            const char *ds = sf->skills[i].description ? sf->skills[i].description : "";
+            char blob[2048];
+            int bn = snprintf(blob, sizeof(blob), "%s %s", nm, ds);
+            if (bn < 0)
+                bn = 0;
+            if ((size_t)bn >= sizeof(blob))
+                blob[sizeof(blob) - 1] = '\0';
+            lower_inplace(blob);
+            int sc = 0;
+            const char *p = ubuf;
+            while (*p) {
+                while (*p && !isalnum((unsigned char)*p))
+                    p++;
+                if (!*p)
+                    break;
+                const char *w = p;
+                while (*p && isalnum((unsigned char)*p))
+                    p++;
+                size_t wlen = (size_t)(p - w);
+                if (wlen < 2 || wlen > 48)
+                    continue;
+                char tmp[49];
+                memcpy(tmp, w, wlen);
+                tmp[wlen] = '\0';
+                if (strstr(blob, tmp))
+                    sc++;
+            }
+            ranks[rn].idx = i;
+            ranks[rn].score = sc;
+            rn++;
+        }
+        qsort(ranks, rn, sizeof(ranks[0]), hu_skill_rank_cmp);
+        /* Stable tie-break: sort by name among equal scores (insertion on ties) */
+        for (size_t a = 1; a < rn; a++) {
+            size_t b = a;
+            while (b > 0 && ranks[b].score == ranks[b - 1].score) {
+                const char *na = sf->skills[ranks[b].idx].name ? sf->skills[ranks[b].idx].name : "";
+                const char *nb =
+                    sf->skills[ranks[b - 1].idx].name ? sf->skills[ranks[b - 1].idx].name : "";
+                if (strcmp(na, nb) >= 0)
+                    break;
+                hu_skill_rank_t t = ranks[b];
+                ranks[b] = ranks[b - 1];
+                ranks[b - 1] = t;
+                b--;
+            }
+        }
+    } else {
+        for (size_t e = 0; e < en; e++) {
+            ranks[e].idx = ena[e];
+            ranks[e].score = 0;
+        }
+        rn = en;
+        /* Alphabetical by name for non-top_k large lists consistency */
+        for (size_t a = 1; a < rn; a++) {
+            size_t b = a;
+            while (b > 0) {
+                const char *na = sf->skills[ranks[b].idx].name ? sf->skills[ranks[b].idx].name : "";
+                const char *nb =
+                    sf->skills[ranks[b - 1].idx].name ? sf->skills[ranks[b - 1].idx].name : "";
+                if (strcmp(na, nb) >= 0)
+                    break;
+                hu_skill_rank_t t = ranks[b];
+                ranks[b] = ranks[b - 1];
+                ranks[b - 1] = t;
+                b--;
+            }
+        }
+    }
+
+    size_t pick = use_top_k && en > top_k ? top_k : en;
+    size_t total = 0;
+    for (size_t p = 0; p < pick; p++) {
+        size_t i = ranks[p].idx;
+        total += 4 + strlen(sf->skills[i].name ? sf->skills[i].name : "") + 3 +
+                 strlen(sf->skills[i].description ? sf->skills[i].description : "") + 1;
+    }
+    size_t omitted = en > pick ? en - pick : 0;
+    if (omitted > 0)
+        total += 80 + (omitted > 99 ? 3 : omitted > 9 ? 2 : 1);
+
+    if (total > max_bytes) {
+        while (pick > 1 && total > max_bytes) {
+            size_t i = ranks[pick - 1].idx;
+            size_t line = 4 + strlen(sf->skills[i].name ? sf->skills[i].name : "") + 3 +
+                          strlen(sf->skills[i].description ? sf->skills[i].description : "") + 1;
+            total -= line;
+            pick--;
+        }
+        omitted = en > pick ? en - pick : 0;
+    }
+
+    /* +256 slop: per-line snprintf can exceed the strlen sum slightly */
+    char *buf = (char *)alloc->alloc(alloc->ctx, total + 256);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t cap = total + 256;
+    size_t pos = 0;
+    for (size_t p = 0; p < pick; p++) {
+        size_t i = ranks[p].idx;
+        int n = snprintf(buf + pos, cap - pos, "- %s: %s\n",
+                         sf->skills[i].name ? sf->skills[i].name : "",
+                         sf->skills[i].description ? sf->skills[i].description : "");
+        if (n > 0)
+            pos += (size_t)n;
+    }
+    if (omitted > 0) {
+        int n = snprintf(buf + pos, cap - pos,
+                         "\n(%zu more skills installed; use skill_run with a skill name for full "
+                         "instructions.)\n",
+                         omitted);
+        if (n > 0)
+            pos += (size_t)n;
+    }
+    buf[pos] = '\0';
+    *out = buf;
+    *out_len = pos;
+    return HU_OK;
 }
 
 hu_error_t hu_skillforge_uninstall(hu_skillforge_t *sf, const char *name) {

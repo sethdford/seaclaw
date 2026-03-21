@@ -26,6 +26,12 @@ This is also run as part of **`./scripts/verify-all.sh`** (“Skill Registry” 
 
 Skills whose names start with **`twin-`** are oriented toward **personal continuity**: mirroring the user’s voice, boundaries, relationships, decisions, and energy. In `registry.json` they are tagged with **`digital-twin`** (plus specific tags). Install the ones that match how you want your runtime to behave.
 
+## Static skills vs dynamic agents (runtime)
+
+The C runtime combines **installed skills** (prompt catalog + `skill_run` for full `SKILL.md`) with **dynamic agents** (`agent_spawn`, orchestrator, `delegate`). For a phased plan to keep them aligned (inheritance, retrieval, tests), see:
+
+- [`docs/plans/2026-03-20-static-skills-dynamic-agents-unification.md`](../docs/plans/2026-03-20-static-skills-dynamic-agents-unification.md)
+
 ## registry.json Format
 
 Array of skill entries:

@@ -267,6 +267,10 @@ void hu_agent_deinit(hu_agent_t *agent);
 /* Optional: set mailbox and register agent for multi-agent messaging. Caller owns mailbox. */
 void hu_agent_set_mailbox(hu_agent_t *agent, hu_mailbox_t *mailbox);
 
+/* Optional: share parent's SkillForge for prompt catalog + skill_run. Caller owns skillforge.
+ * Pass NULL to clear. */
+void hu_agent_set_skillforge(hu_agent_t *agent, struct hu_skillforge *skillforge);
+
 /* Optional: set shared task list for multi-agent collaboration. Caller owns task_list. */
 void hu_agent_set_task_list(hu_agent_t *agent, hu_task_list_t *task_list);
 

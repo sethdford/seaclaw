@@ -1268,33 +1268,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 #ifdef HU_HAS_SKILLS
     if (agent->skillforge) {
         hu_skillforge_t *sf = (hu_skillforge_t *)agent->skillforge;
-        hu_skill_t *all_skills = NULL;
-        size_t all_count = 0;
-        if (hu_skillforge_list_skills(sf, &all_skills, &all_count) == HU_OK && all_count > 0) {
-            size_t total = 0;
-            for (size_t i = 0; i < all_count; i++) {
-                if (!all_skills[i].enabled)
-                    continue;
-                total += 4 + (all_skills[i].name ? strlen(all_skills[i].name) : 0) + 3 +
-                         (all_skills[i].description ? strlen(all_skills[i].description) : 0) + 1;
-            }
-            if (total > 0) {
-                skills_ctx = (char *)agent->alloc->alloc(agent->alloc->ctx, total + 1);
-                if (skills_ctx) {
-                    size_t pos = 0;
-                    for (size_t i = 0; i < all_count; i++) {
-                        if (!all_skills[i].enabled)
-                            continue;
-                        int n = snprintf(skills_ctx + pos, total + 1 - pos, "- %s: %s\n",
-                                         all_skills[i].name ? all_skills[i].name : "",
-                                         all_skills[i].description ? all_skills[i].description : "");
-                        if (n > 0)
-                            pos += (size_t)n;
-                    }
-                    skills_ctx[pos] = '\0';
-                    skills_ctx_len = pos;
-                }
-            }
+        hu_error_t sc_err = hu_skillforge_build_prompt_catalog(agent->alloc, sf, msg, msg_len,
+                                                               &skills_ctx, &skills_ctx_len);
+        if (sc_err != HU_OK) {
+            if (skills_ctx)
+                agent->alloc->free(agent->alloc->ctx, skills_ctx, skills_ctx_len + 1);
+            skills_ctx = NULL;
+            skills_ctx_len = 0;
         }
     }
 #if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_SKILLS)

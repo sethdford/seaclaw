@@ -673,7 +673,10 @@ jobs:
             "fuzz_fast_capture" \
             "fuzz_sse" \
             "fuzz_http_parse" \
-            "fuzz_prompt_injection"; do
+            "fuzz_prompt_injection" \
+            "fuzz_visual_grounding" \
+            "fuzz_ensemble_rerank" \
+            "fuzz_contact_phone"; do
             NAME=$(echo "$harness" | cut -d' ' -f1)
             echo "--- Running $NAME ---"
             if ! ./build-fuzz/$harness -max_total_time=30 -print_final_stats=1; then

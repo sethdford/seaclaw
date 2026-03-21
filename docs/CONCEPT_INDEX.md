@@ -171,6 +171,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Strategy learner**        | `src/memory/retrieval/strategy_learner.c`                                                                | `test_agi_frontiers.c`   |
 | **Peripheral control tool** | `src/tools/peripheral_ctrl.c`                                                                            | `test_peripheral_ctrl.c` |
 | **Skill runner tool**       | `src/tools/skill_run.c`                                                                                  | `test_agent_registry.c`  |
+| **Skills ↔ agents plan**    | `docs/plans/2026-03-20-static-skills-dynamic-agents-unification.md`                                     | —                        |
 | **PWA bridge**              | `src/pwa/bridge.c`, `context.c`, `drivers.c`, `learner.c`                                                | `test_pwa.c`             |
 | **ML subsystem**            | `src/ml/gpt.c`, `train.c`, `prepare.c`, `tokenizer_bpe.c`, `dataloader.c`, `evaluator.c`, `experiment.c` | `test_ml.c`              |
 | **Research feeds**          | `src/feeds/research.c`, `file_ingest.c`, `gmail.c`, `imessage.c`, `twitter.c`                            | `test_research_feeds.c`  |

@@ -432,6 +432,23 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
             scfg.persona_name = agent->persona_name;
             scfg.persona_name_len = agent->persona_name_len;
         }
+#ifdef HU_HAS_SKILLS
+        if (agent->skillforge)
+            scfg.skillforge = agent->skillforge;
+#endif
+        if (agent->tools && agent->tools_count > 0) {
+            scfg.parent_tools = agent->tools;
+            scfg.parent_tools_count = agent->tools_count;
+        }
+        if (agent->memory)
+            scfg.memory = agent->memory;
+        if (agent->session_store)
+            scfg.session_store = agent->session_store;
+        if (agent->observer && agent->observer->vtable)
+            scfg.observer = agent->observer;
+        if (agent->policy)
+            scfg.policy = agent->policy;
+        scfg.autonomy_level = agent->autonomy_level;
         uint64_t new_id = 0;
         hu_error_t err =
             hu_agent_pool_spawn(agent->agent_pool, &scfg, arg_buf, arg_len, "cli-spawn", &new_id);

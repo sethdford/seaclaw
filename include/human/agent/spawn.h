@@ -40,6 +40,15 @@ typedef struct hu_spawn_config {
     uint32_t max_iterations;
     hu_spawn_mode_t mode;
     hu_mailbox_t *mailbox; /* optional; when set, child agents share this mailbox */
+    /* Optional parity with parent agent (pointers alias parent; not copied). When set with
+     * tools_count > 0, child gets same tool surface + memory + skill catalog as parent. */
+    void *skillforge; /* hu_skillforge_t * when HU_HAS_SKILLS */
+    const void *parent_tools; /* const hu_tool_t * */
+    size_t parent_tools_count;
+    void *memory;           /* hu_memory_t * */
+    void *session_store;    /* hu_session_store_t * */
+    void *observer;         /* hu_observer_t * */
+    uint8_t autonomy_level; /* 0 = default 2 when no parent tools; else typical parent copy */
 } hu_spawn_config_t;
 
 typedef enum hu_agent_status {

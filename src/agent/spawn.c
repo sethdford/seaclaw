@@ -37,6 +37,14 @@ typedef struct hu_pool_slot {
     uint32_t max_iterations;
     hu_security_policy_t *policy;
     hu_mailbox_t *mailbox;
+    /* Optional parent parity (not freed by slot; aliases caller-owned objects). */
+    void *inherit_skillforge;
+    const hu_tool_t *inherit_tools;
+    size_t inherit_tools_count;
+    void *inherit_memory;
+    void *inherit_session;
+    void *inherit_observer;
+    uint8_t inherit_autonomy;
     int64_t started_at;
     double cost_usd;
     volatile bool cancelled;
@@ -153,9 +161,12 @@ static void *spawn_thread(void *arg) {
             goto done;
         }
         memset(ag, 0, sizeof(*ag));
-        if (hu_agent_from_config(ag, a, prov, NULL, 0, NULL, NULL, NULL, s->policy, mdl,
+        if (hu_agent_from_config(ag, a, prov, s->inherit_tools, s->inherit_tools_count,
+                                 (hu_memory_t *)s->inherit_memory,
+                                 (hu_session_store_t *)s->inherit_session,
+                                 (hu_observer_t *)s->inherit_observer, s->policy, mdl,
                                  strlen(mdl), pn, strlen(pn), temp, ws, strlen(ws), mi, 50, false,
-                                 2, sys, strlen(sys), s->persona_name,
+                                 s->inherit_autonomy, sys, strlen(sys), s->persona_name,
                                  s->persona_name ? strlen(s->persona_name) : 0, NULL) != HU_OK) {
             a->free(a->ctx, ag, sizeof(*ag));
             result = hu_strndup(a, "(agent create failed)", 21);
@@ -163,6 +174,11 @@ static void *spawn_thread(void *arg) {
         }
         ag->agent_id = s->agent_id;
         ag->worktree_mgr = pool->worktree_mgr;
+        ag->agent_pool = pool;
+#ifdef HU_HAS_SKILLS
+        if (s->inherit_skillforge)
+            hu_agent_set_skillforge(ag, (struct hu_skillforge *)s->inherit_skillforge);
+#endif
         if (s->mailbox)
             hu_agent_set_mailbox(ag, s->mailbox);
         char *resp = NULL;
@@ -191,15 +207,23 @@ static void *spawn_thread(void *arg) {
         pthread_mutex_unlock(&pool->mu);
     } else {
         hu_agent_t ag = {0};
-        if (hu_agent_from_config(&ag, a, prov, NULL, 0, NULL, NULL, NULL, s->policy, mdl,
+        if (hu_agent_from_config(&ag, a, prov, s->inherit_tools, s->inherit_tools_count,
+                                 (hu_memory_t *)s->inherit_memory,
+                                 (hu_session_store_t *)s->inherit_session,
+                                 (hu_observer_t *)s->inherit_observer, s->policy, mdl,
                                  strlen(mdl), pn, strlen(pn), temp, ws, strlen(ws), mi, 50, false,
-                                 2, sys, strlen(sys), s->persona_name,
+                                 s->inherit_autonomy, sys, strlen(sys), s->persona_name,
                                  s->persona_name ? strlen(s->persona_name) : 0, NULL) != HU_OK) {
             result = hu_strndup(a, "(agent create failed)", 21);
             goto done;
         }
         ag.agent_id = s->agent_id;
         ag.worktree_mgr = pool->worktree_mgr;
+        ag.agent_pool = pool;
+#ifdef HU_HAS_SKILLS
+        if (s->inherit_skillforge)
+            hu_agent_set_skillforge(&ag, (struct hu_skillforge *)s->inherit_skillforge);
+#endif
         if (s->mailbox)
             hu_agent_set_mailbox(&ag, s->mailbox);
         char *resp = NULL;
@@ -378,6 +402,13 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
     s->task = task ? hu_strndup(a, task, task_len) : NULL;
     s->label = label ? hu_strndup(a, label, strlen(label)) : NULL;
     s->mailbox = cfg->mailbox;
+    s->inherit_skillforge = cfg->skillforge;
+    s->inherit_tools = (const hu_tool_t *)cfg->parent_tools;
+    s->inherit_tools_count = cfg->parent_tools_count;
+    s->inherit_memory = cfg->memory;
+    s->inherit_session = cfg->session_store;
+    s->inherit_observer = cfg->observer;
+    s->inherit_autonomy = cfg->autonomy_level > 0 ? cfg->autonomy_level : 2;
     pool->used[si] = true;
 
 #if defined(HU_IS_TEST) && HU_IS_TEST == 1
