@@ -331,6 +331,20 @@ static void test_slack_react_ok_in_test(void) {
     HU_ASSERT_NOT_NULL(ch.vtable->react);
     hu_error_t err = ch.vtable->react(ch.ctx, "C0001", 5, 12345LL, HU_REACTION_HEART);
     HU_ASSERT_EQ(err, HU_OK);
+    err = ch.vtable->react(ch.ctx, "C0001:1732067890.000100", 23, 999LL, HU_REACTION_THUMBS_UP);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_slack_destroy(&ch);
+}
+
+static void test_slack_react_rejects_invalid_args_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_slack_create(&alloc, "t", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->react);
+    HU_ASSERT_EQ(ch.vtable->react(ch.ctx, "C0001", 5, 0LL, HU_REACTION_HEART), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(ch.vtable->react(ch.ctx, "C0001", 5, 1LL, HU_REACTION_NONE), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(ch.vtable->react(ch.ctx, "C0001", 5, 1LL, (hu_reaction_type_t)99), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(ch.vtable->react(ch.ctx, NULL, 0, 1LL, HU_REACTION_HEART), HU_ERR_INVALID_ARGUMENT);
     hu_slack_destroy(&ch);
 }
 #endif
@@ -2598,6 +2612,7 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_slack_send_captures_last_message);
     HU_RUN_TEST(test_slack_load_history_empty_in_test);
     HU_RUN_TEST(test_slack_react_ok_in_test);
+    HU_RUN_TEST(test_slack_react_rejects_invalid_args_in_test);
 #endif
     HU_RUN_TEST(test_slack_get_response_constraints);
     HU_RUN_TEST(test_slack_get_attachment_path_null);

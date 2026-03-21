@@ -1,0 +1,9 @@
+{
+  "name": "nostr-bot",
+  "description": "Nostr relay interaction and DMs bot",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

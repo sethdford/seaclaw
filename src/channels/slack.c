@@ -9,6 +9,7 @@
 #include "human/core/http.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -851,21 +852,113 @@ static hu_error_t slack_get_response_constraints(void *ctx,
     return HU_OK;
 }
 
+/* Map hu_reaction_type_t to Slack reactions.add emoji `name` (short name, not :colon: form). */
+static const char *slack_reaction_emoji_name(hu_reaction_type_t reaction) {
+    switch (reaction) {
+    case HU_REACTION_HEART:
+        return "heart";
+    case HU_REACTION_THUMBS_UP:
+        return "+1";
+    case HU_REACTION_THUMBS_DOWN:
+        return "-1";
+    case HU_REACTION_HAHA:
+        return "laughing";
+    case HU_REACTION_EMPHASIS:
+        return "exclamation";
+    case HU_REACTION_QUESTION:
+        return "question";
+    default:
+        return NULL;
+    }
+}
+
 /*
- * Slack reactions.add expects channel + message ts (string), not int64_t message_id.
- * Planned emoji map when extended: HEART→heart, THUMBS_UP→+1, THUMBS_DOWN→-1,
- * HAHA→laughing, EMPHASIS→exclamation, QUESTION→question (POST …/api/reactions.add).
+ * Slack reactions.add: channel id from target (via parse_target), message ts as decimal string
+ * derived from message_id (callers store the platform id in int64_t).
  */
 static hu_error_t slack_react(void *ctx, const char *target, size_t target_len, int64_t message_id,
                               hu_reaction_type_t reaction) {
-    (void)ctx;
-    (void)target;
-    (void)target_len;
-    (void)message_id;
-    (void)reaction;
+    hu_slack_ctx_t *c = (hu_slack_ctx_t *)ctx;
+    if (!c || !c->alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!target || target_len == 0 || message_id <= 0 || reaction == HU_REACTION_NONE)
+        return HU_ERR_INVALID_ARGUMENT;
+    const char *emoji_name = slack_reaction_emoji_name(reaction);
+    if (!emoji_name)
+        return HU_ERR_INVALID_ARGUMENT;
+
 #if HU_IS_TEST
+    (void)emoji_name;
     return HU_OK;
+#elif defined(HU_HTTP_CURL)
+    if (!c->token || c->token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+
+    const char *channel = NULL;
+    size_t channel_len = 0;
+    const char *thread_ts = NULL;
+    size_t thread_ts_len = 0;
+    parse_target(target, target_len, &channel, &channel_len, &thread_ts, &thread_ts_len);
+    (void)thread_ts;
+    (void)thread_ts_len;
+    if (channel_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char ts_buf[48];
+    int nt = snprintf(ts_buf, sizeof(ts_buf), "%" PRId64, message_id);
+    if (nt <= 0 || (size_t)nt >= sizeof(ts_buf))
+        return HU_ERR_INTERNAL;
+
+    hu_json_buf_t jbuf;
+    if (hu_json_buf_init(&jbuf, c->alloc) != HU_OK)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_error_t jerr = hu_json_buf_append_raw(&jbuf, "{\"channel\":", 11);
+    if (jerr == HU_OK)
+        jerr = hu_json_append_string(&jbuf, channel, channel_len);
+    if (jerr == HU_OK)
+        jerr = hu_json_buf_append_raw(&jbuf, ",\"name\":", 8);
+    if (jerr == HU_OK)
+        jerr = hu_json_append_string(&jbuf, emoji_name, strlen(emoji_name));
+    if (jerr == HU_OK)
+        jerr = hu_json_buf_append_raw(&jbuf, ",\"timestamp\":", 13);
+    if (jerr == HU_OK)
+        jerr = hu_json_append_string(&jbuf, ts_buf, (size_t)nt);
+    if (jerr == HU_OK)
+        jerr = hu_json_buf_append_raw(&jbuf, "}", 1);
+    if (jerr != HU_OK) {
+        hu_json_buf_free(&jbuf);
+        return jerr;
+    }
+
+    char url_buf[256];
+    int nu = snprintf(url_buf, sizeof(url_buf), "%s%s", SLACK_API_BASE, SLACK_REACTIONS_ADD);
+    if (nu < 0 || (size_t)nu >= sizeof(url_buf)) {
+        hu_json_buf_free(&jbuf);
+        return HU_ERR_INTERNAL;
+    }
+
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Authorization: Bearer %.*s", (int)c->token_len,
+                      c->token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf)) {
+        hu_json_buf_free(&jbuf);
+        return HU_ERR_INTERNAL;
+    }
+
+    hu_http_response_t resp = {0};
+    hu_error_t err = hu_http_post_json(c->alloc, url_buf, auth_buf, jbuf.ptr, jbuf.len, &resp);
+    hu_json_buf_free(&jbuf);
+    if (err != HU_OK) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(c->alloc, &resp);
+        return HU_ERR_CHANNEL_SEND;
+    }
+    bool ok = (resp.status_code == 200 && resp.body && strstr(resp.body, "\"ok\":true") != NULL);
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    return ok ? HU_OK : HU_ERR_CHANNEL_SEND;
 #else
+    (void)emoji_name;
     return HU_ERR_NOT_SUPPORTED;
 #endif
 }

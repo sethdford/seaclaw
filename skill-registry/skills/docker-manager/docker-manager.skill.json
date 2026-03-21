@@ -1,0 +1,9 @@
+{
+  "name": "docker-manager",
+  "description": "Manage Docker containers, images, and compose stacks",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

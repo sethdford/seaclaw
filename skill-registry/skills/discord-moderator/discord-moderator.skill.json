@@ -1,0 +1,9 @@
+{
+  "name": "discord-moderator",
+  "description": "Discord moderation and auto-moderation rules",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

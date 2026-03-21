@@ -1,0 +1,9 @@
+{
+  "name": "energy-tracker",
+  "description": "Track energy consumption from smart meters",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

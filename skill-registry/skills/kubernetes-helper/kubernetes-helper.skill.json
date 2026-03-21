@@ -1,0 +1,9 @@
+{
+  "name": "kubernetes-helper",
+  "description": "Kubernetes deployment and cluster management helpers",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

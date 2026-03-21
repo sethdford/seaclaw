@@ -1,0 +1,9 @@
+{
+  "name": "environment-setup",
+  "description": "Setup development and deployment environments",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

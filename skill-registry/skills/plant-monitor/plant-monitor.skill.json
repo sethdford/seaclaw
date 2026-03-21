@@ -1,0 +1,9 @@
+{
+  "name": "plant-monitor",
+  "description": "Monitor soil moisture and plant health",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}
