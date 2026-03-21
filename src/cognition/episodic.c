@@ -34,6 +34,10 @@ hu_error_t hu_episodic_init_schema(sqlite3 *db) {
 
 /* Generate a simple pseudo-UUID for pattern IDs. Not crypto-safe. */
 static void generate_id(char *buf, size_t buf_size) {
+#ifdef HU_IS_TEST
+    static unsigned int test_counter = 0;
+    (void)snprintf(buf, buf_size, "ep-test-%08u", test_counter++);
+#else
     static unsigned int seed = 0;
     if (seed == 0) seed = (unsigned int)time(NULL);
 
@@ -41,6 +45,7 @@ static void generate_id(char *buf, size_t buf_size) {
              (unsigned int)(rand_r(&seed)),
              (unsigned int)(rand_r(&seed) & 0xFFFF),
              (unsigned int)(rand_r(&seed) & 0xFFFF));
+#endif
 }
 
 hu_error_t hu_episodic_store_pattern(sqlite3 *db, hu_allocator_t *alloc,
@@ -218,6 +223,13 @@ hu_error_t hu_episodic_retrieve(sqlite3 *db, hu_allocator_t *alloc,
         count++;
     }
     sqlite3_finalize(stmt);
+
+    if (count == 0) {
+        alloc->free(alloc->ctx, arr, cap * sizeof(hu_episodic_pattern_t));
+        *out = NULL;
+        *out_count = 0;
+        return HU_OK;
+    }
 
     *out = arr;
     *out_count = count;

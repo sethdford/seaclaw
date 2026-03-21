@@ -218,13 +218,15 @@ hu_error_t hu_emotional_cognition_build_prompt(hu_allocator_t *alloc,
     if (ec->source_mask == 0 || ec->state.intensity < 0.1f)
         return HU_OK;
 
+    const char *dominant = ec->state.dominant_emotion ? ec->state.dominant_emotion : "neutral";
+
     char buf[2048];
     int pos = 0;
     pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
                     "## Emotional Context\n\n");
     pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
                     "- Dominant emotion: **%s** (valence: %.2f, intensity: %.2f)\n",
-                    ec->state.dominant_emotion, (double)ec->state.valence,
+                    dominant, (double)ec->state.valence,
                     (double)ec->state.intensity);
 
     if (ec->secondary_emotion != HU_EMOTION_NEUTRAL) {

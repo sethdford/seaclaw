@@ -292,6 +292,7 @@ void hu_decomposition_free(hu_allocator_t *alloc, hu_decomposition_t *result) {
     }
 }
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
 static void decomposition_result_from_orchestrator(const hu_decomposition_t *decomp,
                                                    hu_decomposition_strategy_t strategy,
                                                    hu_decomposition_result_t *result) {
@@ -310,6 +311,7 @@ static void decomposition_result_from_orchestrator(const hu_decomposition_t *dec
         result->tasks[i].depends_on = decomp->tasks[i].depends_on;
     }
 }
+#endif
 
 hu_error_t hu_decompose_task(hu_allocator_t *alloc, hu_provider_t *provider,
                              const char *model, size_t model_len,

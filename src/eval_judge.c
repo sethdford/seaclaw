@@ -96,6 +96,7 @@ void hu_eval_judge_cache_destroy(hu_eval_judge_cache_t *cache) {
     memset(cache->slots, 0, sizeof(cache->slots));
 }
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
 static int parse_score_1to5(const char *start, const char *end) {
     const char *key = "\"score\"";
     const char *k = strstr(start, key);
@@ -150,6 +151,7 @@ static char *parse_reasoning(hu_allocator_t *alloc, const char *start, const cha
     *out_len = len;
     return s;
 }
+#endif /* !HU_IS_TEST */
 
 static bool str_case_contains_judge(const char *haystack, size_t hlen,
                                      const char *needle, size_t nlen) {

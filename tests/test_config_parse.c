@@ -432,6 +432,50 @@ static void test_config_parse_email_channel_daemon_block(void) {
     hu_arena_destroy(arena);
 }
 
+static void test_daemon_active_config_null_config_returns_null(void) {
+    HU_ASSERT_NULL(hu_daemon_test_get_active_daemon_config(NULL, "discord"));
+}
+
+static void test_daemon_active_config_known_channels_match_structs(void) {
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "discord") ==
+              &cfg.channels.discord.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "email") ==
+              &cfg.channels.email.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "gmail") ==
+              &cfg.channels.gmail.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "imessage") ==
+              &cfg.channels.imessage.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "irc") == &cfg.channels.irc.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "matrix") ==
+              &cfg.channels.matrix.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "nostr") ==
+              &cfg.channels.nostr.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "signal") ==
+              &cfg.channels.signal.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "slack") ==
+              &cfg.channels.slack.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "telegram") ==
+              &cfg.channels.telegram.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "whatsapp") ==
+              &cfg.channels.whatsapp.daemon);
+}
+
+static void test_daemon_active_config_unknown_channel_returns_default_daemon(void) {
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "not_a_real_channel_key") ==
+              &cfg.channels.default_daemon);
+}
+
+static void test_daemon_active_config_null_channel_name_returns_default_daemon(void) {
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, NULL) ==
+              &cfg.channels.default_daemon);
+}
+
 static void test_config_parse_mcp_servers(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_config_t cfg;
@@ -780,6 +824,54 @@ static void test_config_parse_voice_section(void) {
     hu_arena_destroy(arena);
 }
 
+static void test_config_parse_voice_realtime_mode_fields(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg_local;
+    memset(&cfg_local, 0, sizeof(cfg_local));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg_local.arena = arena;
+    cfg_local.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"voice\": {\"mode\": \"realtime\", "
+                       "\"realtime_model\": \"gpt-4o-realtime-preview\", "
+                       "\"realtime_voice\": \"alloy\", "
+                       "\"stt_provider\": \"cartesia\"}}";
+    hu_error_t err = hu_config_parse_json(&cfg_local, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(cfg_local.voice.mode);
+    HU_ASSERT_STR_EQ(cfg_local.voice.mode, "realtime");
+    HU_ASSERT_NOT_NULL(cfg_local.voice.realtime_model);
+    HU_ASSERT_STR_EQ(cfg_local.voice.realtime_model, "gpt-4o-realtime-preview");
+    HU_ASSERT_NOT_NULL(cfg_local.voice.realtime_voice);
+    HU_ASSERT_STR_EQ(cfg_local.voice.realtime_voice, "alloy");
+    HU_ASSERT_NOT_NULL(cfg_local.voice.stt_provider);
+    HU_ASSERT_STR_EQ(cfg_local.voice.stt_provider, "cartesia");
+    hu_arena_destroy(arena);
+}
+
+static void test_config_parse_voice_stt_tts_providers(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg_local;
+    memset(&cfg_local, 0, sizeof(cfg_local));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg_local.arena = arena;
+    cfg_local.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"voice\":{\"stt_provider\":\"cartesia\",\"tts_provider\":\"cartesia\","
+                       "\"tts_voice\":\"professional-en\",\"stt_model\":\"ink-whisper\"}}";
+    hu_error_t err = hu_config_parse_json(&cfg_local, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(cfg_local.voice.stt_provider);
+    HU_ASSERT_STR_EQ(cfg_local.voice.stt_provider, "cartesia");
+    HU_ASSERT_NOT_NULL(cfg_local.voice.tts_provider);
+    HU_ASSERT_STR_EQ(cfg_local.voice.tts_provider, "cartesia");
+    HU_ASSERT_NOT_NULL(cfg_local.voice.tts_voice);
+    HU_ASSERT_STR_EQ(cfg_local.voice.tts_voice, "professional-en");
+    HU_ASSERT_NOT_NULL(cfg_local.voice.stt_model);
+    HU_ASSERT_STR_EQ(cfg_local.voice.stt_model, "ink-whisper");
+    hu_arena_destroy(arena);
+}
+
 static void test_config_parse_feeds_section(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_config_t cfg_local; memset(&cfg_local, 0, sizeof(cfg_local));
@@ -823,6 +915,10 @@ void run_config_parse_tests(void) {
     HU_RUN_TEST(test_config_parse_response_mode_normal);
     HU_RUN_TEST(test_config_parse_channels_default_daemon_response_mode);
     HU_RUN_TEST(test_config_parse_email_channel_daemon_block);
+    HU_RUN_TEST(test_daemon_active_config_null_config_returns_null);
+    HU_RUN_TEST(test_daemon_active_config_known_channels_match_structs);
+    HU_RUN_TEST(test_daemon_active_config_unknown_channel_returns_default_daemon);
+    HU_RUN_TEST(test_daemon_active_config_null_channel_name_returns_default_daemon);
     HU_RUN_TEST(test_config_parse_mcp_servers);
     HU_RUN_TEST(test_config_parse_mcp_servers_empty);
     HU_RUN_TEST(test_config_parse_nodes_array);
@@ -850,4 +946,6 @@ void run_config_parse_tests(void) {
     HU_RUN_TEST(test_config_parse_feeds_section);
     HU_TEST_SUITE("Voice config");
     HU_RUN_TEST(test_config_parse_voice_section);
+    HU_RUN_TEST(test_config_parse_voice_realtime_mode_fields);
+    HU_RUN_TEST(test_config_parse_voice_stt_tts_providers);
 }

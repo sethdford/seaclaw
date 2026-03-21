@@ -28,7 +28,7 @@
 #if HU_HAS_IMAP
 #include "human/channels/imap.h"
 #endif
-#if HU_HAS_SONATA
+#if defined(HU_ENABLE_VOICE) && HU_ENABLE_VOICE
 #include "human/channels/voice_channel.h"
 #endif
 
@@ -513,8 +513,8 @@ static void test_imap_poll_returns_mock(void) {
 #endif
 #endif
 
-/* ── Voice channel vtable tests ──────────────────────────────── */
-#if HU_HAS_SONATA
+/* ── Voice channel vtable tests (Realtime uses HU_IS_TEST mocks; not Sonata-specific) ─ */
+#if defined(HU_ENABLE_VOICE) && HU_ENABLE_VOICE
 static void test_voice_channel_vtable_name(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch = {0};
@@ -566,6 +566,61 @@ static void test_voice_poll_returns_zero_messages_in_test(void) {
     err = hu_voice_poll(ch.ctx, &alloc, msgs, 4, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(count, 0u);
+    ch.vtable->stop(ch.ctx);
+    hu_channel_voice_destroy(&ch);
+}
+
+static void test_voice_channel_realtime_mode_start_stop(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_voice_config_t cfg = {0};
+    cfg.mode = HU_VOICE_MODE_REALTIME;
+    cfg.api_key = "test-key";
+    cfg.model = "gpt-4o-realtime-preview";
+    cfg.voice = "alloy";
+    hu_channel_t ch = {0};
+    HU_ASSERT_EQ(hu_channel_voice_create(&alloc, &cfg, &ch), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->start(ch.ctx), HU_OK);
+    HU_ASSERT_TRUE(ch.vtable->health_check(ch.ctx));
+    ch.vtable->stop(ch.ctx);
+    HU_ASSERT_FALSE(ch.vtable->health_check(ch.ctx));
+    hu_channel_voice_destroy(&ch);
+}
+
+static void test_voice_channel_realtime_poll_returns_transcript(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_voice_config_t cfg = {0};
+    cfg.mode = HU_VOICE_MODE_REALTIME;
+    cfg.api_key = "test-key";
+    hu_channel_t ch = {0};
+    HU_ASSERT_EQ(hu_channel_voice_create(&alloc, &cfg, &ch), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->start(ch.ctx), HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_voice_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_TRUE(strstr(msgs[0].content, "Hello from realtime") != NULL);
+    HU_ASSERT_STR_EQ(msgs[0].session_key, "voice-rt");
+
+    ch.vtable->stop(ch.ctx);
+    hu_channel_voice_destroy(&ch);
+}
+
+static void test_voice_channel_realtime_send_audio(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_voice_config_t cfg = {0};
+    cfg.mode = HU_VOICE_MODE_REALTIME;
+    cfg.api_key = "test-key";
+    hu_channel_t ch = {0};
+    HU_ASSERT_EQ(hu_channel_voice_create(&alloc, &cfg, &ch), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->start(ch.ctx), HU_OK);
+
+    static const unsigned char audio[] = {0, 1, 2, 3};
+    HU_ASSERT_EQ(ch.vtable->send(ch.ctx, NULL, 0, (const char *)audio, sizeof(audio), NULL, 0),
+                 HU_OK);
+
+    ch.vtable->stop(ch.ctx);
     hu_channel_voice_destroy(&ch);
 }
 #endif
@@ -628,11 +683,14 @@ void run_channel_tests(void) {
     HU_RUN_TEST(test_imap_poll_returns_mock);
 #endif
 #endif
-#if HU_HAS_SONATA
+#if defined(HU_ENABLE_VOICE) && HU_ENABLE_VOICE
     HU_RUN_TEST(test_voice_channel_vtable_name);
     HU_RUN_TEST(test_voice_channel_start_stop);
     HU_RUN_TEST(test_voice_channel_send);
     HU_RUN_TEST(test_voice_channel_health_check_before_start);
     HU_RUN_TEST(test_voice_poll_returns_zero_messages_in_test);
+    HU_RUN_TEST(test_voice_channel_realtime_mode_start_stop);
+    HU_RUN_TEST(test_voice_channel_realtime_poll_returns_transcript);
+    HU_RUN_TEST(test_voice_channel_realtime_send_audio);
 #endif
 }

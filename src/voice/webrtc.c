@@ -24,12 +24,15 @@ hu_error_t hu_webrtc_sdp_format_fingerprint(const uint8_t sha256[32], char finge
     static const char *hex = "0123456789ABCDEF";
     size_t o = 0;
     for (int i = 0; i < 32; i++) {
-        if (o + 3 > 95)
+        if (o + 2 > 95)
             return HU_ERR_IO;
         fingerprint[o++] = hex[(sha256[i] >> 4) & 0x0F];
         fingerprint[o++] = hex[sha256[i] & 0x0F];
-        if (i < 31)
+        if (i < 31) {
+            if (o + 1 > 95)
+                return HU_ERR_IO;
             fingerprint[o++] = ':';
+        }
     }
     fingerprint[o] = '\0';
     return HU_OK;
@@ -90,6 +93,7 @@ static void hu_webrtc_random_bytes(uint8_t *out, size_t n) {
 #endif
 }
 
+#ifndef HU_IS_TEST
 static hu_error_t hu_webrtc_build_sdp_offer(hu_allocator_t *alloc, const hu_webrtc_config_t *config,
                                             const char *fingerprint_sha256, const char *ice_attr_block,
                                             char **out) {
@@ -160,6 +164,7 @@ static void hu_webrtc_close_sock(int fd) {
     close(fd);
 #endif
 }
+#endif /* !HU_IS_TEST */
 
 hu_error_t hu_webrtc_session_create(hu_allocator_t *alloc, const hu_webrtc_config_t *config,
                                     hu_webrtc_session_t **out) {
@@ -219,6 +224,7 @@ hu_error_t hu_webrtc_session_create(hu_allocator_t *alloc, const hu_webrtc_confi
 #endif
 }
 
+#ifndef HU_IS_TEST
 static hu_error_t hu_webrtc_fetch_remote_sdp_http(hu_webrtc_session_t *session, char **remote_out) {
 #if defined(HU_HTTP_CURL) && !defined(HU_IS_TEST)
     const char *url = session->config.signaling_endpoint;
@@ -269,6 +275,7 @@ static hu_error_t hu_webrtc_fetch_remote_sdp_http(hu_webrtc_session_t *session, 
     return HU_ERR_NOT_SUPPORTED;
 #endif
 }
+#endif /* !HU_IS_TEST */
 
 hu_error_t hu_webrtc_connect(hu_webrtc_session_t *session, const char *remote_sdp_in) {
     if (!session)
@@ -364,6 +371,7 @@ hu_error_t hu_webrtc_connect(hu_webrtc_session_t *session, const char *remote_sd
 #endif
 }
 
+#ifndef HU_IS_TEST
 static hu_error_t hu_webrtc_build_rtp_opus(uint8_t *rtp, size_t cap, uint16_t seq, uint32_t ts, uint32_t ssrc,
                                            const void *opus, size_t opus_len) {
     size_t need = 12 + opus_len;
@@ -384,6 +392,7 @@ static hu_error_t hu_webrtc_build_rtp_opus(uint8_t *rtp, size_t cap, uint16_t se
     memcpy(rtp + 12, opus, opus_len);
     return HU_OK;
 }
+#endif /* !HU_IS_TEST */
 
 hu_error_t hu_webrtc_send_audio(hu_webrtc_session_t *session, const void *data, size_t data_len) {
     if (!session || !data)

@@ -3,6 +3,7 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include <stdio.h>
 
 hu_error_t cmd_channel(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_hardware(hu_allocator_t *alloc, int argc, char **argv);
@@ -15,6 +16,9 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_sandbox(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_init(hu_allocator_t *alloc, int argc, char **argv);
+hu_error_t cmd_setup(hu_allocator_t *alloc, int argc, char **argv);
+/* Emits `human setup local-model` report to `out` (stdout from cmd_setup); used by tests. */
+hu_error_t hu_cli_setup_local_model_emit(FILE *out);
 #ifdef HU_ENABLE_FEEDS
 hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv);
 #endif

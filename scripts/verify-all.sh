@@ -97,6 +97,11 @@ if [ "${VERIFY_NATIVE:-0}" = 1 ] && [ -f "scripts/run-native-fleet-local.sh" ]; 
   fi
 fi
 
+# 10. Red-team / eval fleet (offline by default; set VERIFY_REDTEAM=1 — does not enable live API unless REDTEAM_FLEET_LIVE=1)
+if [ "${VERIFY_REDTEAM:-0}" = 1 ] && [ -f "scripts/redteam-eval-fleet.sh" ]; then
+  run_check "Red-team eval fleet" bash scripts/redteam-eval-fleet.sh
+fi
+
 # Summary
 echo ""
 echo "=============================="

@@ -26,6 +26,9 @@
 #include "human/tool.h"
 #include "human/tools/factory.h"
 #include "human/voice.h"
+#ifdef HU_HAS_VOICE_CHANNEL
+#include "human/channels/voice_channel.h"
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -303,6 +306,12 @@ static void destroy_qq_wrap(hu_channel_t *ch, hu_allocator_t *a) {
     (void)a;
     hu_qq_destroy(ch);
     (void)ch;
+}
+#endif
+#ifdef HU_HAS_VOICE_CHANNEL
+static void destroy_voice_wrap(hu_channel_t *ch, hu_allocator_t *a) {
+    (void)a;
+    hu_channel_voice_destroy(ch);
 }
 #endif
 
@@ -681,7 +690,8 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         memset(&bi->voice_cfg, 0, sizeof(bi->voice_cfg));
         (void)hu_voice_config_from_settings(&bi->cfg, &bi->voice_cfg);
         if (bi->voice_cfg.tts_provider || bi->voice_cfg.local_tts_endpoint || bi->voice_cfg.api_key ||
-            bi->voice_cfg.cartesia_api_key) {
+            bi->voice_cfg.cartesia_api_key || bi->voice_cfg.openai_api_key ||
+            (bi->cfg.voice.mode && bi->cfg.voice.mode[0])) {
             hu_agent_set_voice_config(&bi->agent, &bi->voice_cfg);
         }
         bi->agent.chain_of_thought = true;
@@ -1298,6 +1308,40 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             }
         }
 #endif
+
+#ifdef HU_HAS_VOICE_CHANNEL
+        if (cfg->voice.mode && cfg->voice.mode[0] && ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
+            hu_channel_voice_config_t vcfg = {0};
+            bool want = false;
+            if (strcmp(cfg->voice.mode, "realtime") == 0) {
+                vcfg.mode = HU_VOICE_MODE_REALTIME;
+                vcfg.api_key = hu_config_get_provider_key(cfg, "openai");
+                vcfg.model = cfg->voice.realtime_model;
+                vcfg.voice = cfg->voice.realtime_voice;
+                want = true;
+            } else if (strcmp(cfg->voice.mode, "webrtc") == 0) {
+                vcfg.mode = HU_VOICE_MODE_WEBRTC;
+                want = true;
+            } else if (strcmp(cfg->voice.mode, "sonata") == 0) {
+                vcfg.mode = HU_VOICE_MODE_SONATA;
+                want = true;
+            }
+            if (want) {
+                err = hu_channel_voice_create(alloc, &vcfg, &bi->channel_slots[ch_count]);
+                if (err == HU_OK) {
+                    bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;
+                    bi->channels[ch_count].channel = &bi->channel_slots[ch_count];
+                    bi->channels[ch_count].poll_fn = hu_voice_poll;
+                    bi->channels[ch_count].webhook_fn = NULL;
+                    bi->channels[ch_count].interval_ms =
+                        vcfg.mode == HU_VOICE_MODE_REALTIME ? 200u : 1000u;
+                    bi->channels[ch_count].last_poll_ms = 0;
+                    bi->channel_destroys[ch_count] = destroy_voice_wrap;
+                    ch_count++;
+                }
+            }
+        }
+#endif /* HU_HAS_VOICE_CHANNEL */
 
         bi->channel_count = ch_count;
         ctx->channels = bi->channels;

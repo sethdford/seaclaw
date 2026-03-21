@@ -248,6 +248,7 @@ static hu_error_t cmd_paperclip(hu_allocator_t *alloc, int argc, char **argv) {
 static const hu_command_t commands[] = {
     {"agent", "Start interactive agent (--demo: use local Ollama)", cmd_agent},
     {"init", "Initialize config file", cmd_init},
+    {"setup", "Local / on-device model setup", cmd_setup},
     {"gateway", "Start webhook gateway server", cmd_gateway},
     {"mcp", "Run as MCP server (stdin/stdout JSON-RPC)", cmd_mcp},
     {"service", "Run as background service (daemonize)", cmd_service},

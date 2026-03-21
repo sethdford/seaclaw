@@ -371,6 +371,11 @@ hu_error_t hu_mcts_plan(hu_allocator_t *alloc, const char *goal, size_t goal_len
     memset(result, 0, sizeof(*result));
 
 #ifdef HU_IS_TEST
+    (void)max_llm_calls;
+    (void)provider;
+    (void)model;
+    (void)model_len;
+
     hu_mcts_node_t nodes[HU_MCTS_MAX_NODES];
     memset(nodes, 0, sizeof(nodes));
     int node_count = 0;

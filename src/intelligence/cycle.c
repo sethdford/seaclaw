@@ -147,7 +147,73 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
             hu_error_t tbl_err = hu_self_improve_init_tables(&si);
             if (tbl_err != HU_OK)
                 fprintf(stderr, "[cycle] self_improve table init failed: %d\n", tbl_err);
+
+            /* MAX(id) over all rows — a new insert always gets a new rowid even if older active
+             * rows have larger ids than some inactive rows (uncommon); monotonic ids detect inserts. */
+            int64_t max_patch_id_before = 0;
+            sqlite3_stmt *mx = NULL;
+            if (sqlite3_prepare_v2(db, "SELECT COALESCE(MAX(id),0) FROM prompt_patches", -1, &mx,
+                                   NULL) == SQLITE_OK) {
+                if (sqlite3_step(mx) == SQLITE_ROW)
+                    max_patch_id_before = sqlite3_column_int64(mx, 0);
+                sqlite3_finalize(mx);
+            }
+
             (void)hu_self_improve_apply_reflections(&si, now_ts);
+
+            int64_t max_patch_id_after = 0;
+            mx = NULL;
+            if (sqlite3_prepare_v2(db, "SELECT COALESCE(MAX(id),0) FROM prompt_patches", -1, &mx,
+                                   NULL) == SQLITE_OK) {
+                if (sqlite3_step(mx) == SQLITE_ROW)
+                    max_patch_id_after = sqlite3_column_int64(mx, 0);
+                sqlite3_finalize(mx);
+            }
+
+            if (max_patch_id_after > max_patch_id_before) {
+                sqlite3_stmt *ps = NULL;
+                char patch_copy[2048];
+                patch_copy[0] = '\0';
+                if (sqlite3_prepare_v2(db, "SELECT patch_text FROM prompt_patches WHERE id = ?1", -1, &ps,
+                                       NULL) == SQLITE_OK) {
+                    sqlite3_bind_int64(ps, 1, max_patch_id_after);
+                    if (sqlite3_step(ps) == SQLITE_ROW) {
+                        const char *ptxt = (const char *)sqlite3_column_text(ps, 0);
+                        int nbytes = sqlite3_column_bytes(ps, 0);
+                        if (ptxt && nbytes > 0) {
+                            size_t copy_len = (size_t)nbytes < sizeof(patch_copy) - 1 ? (size_t)nbytes
+                                                                                      : sizeof(patch_copy) - 1;
+                            memcpy(patch_copy, ptxt, copy_len);
+                            patch_copy[copy_len] = '\0';
+                        }
+                    }
+                    sqlite3_finalize(ps);
+                }
+
+                if (patch_copy[0]) {
+                    hu_structured_patch_t sp = {0};
+                    if (hu_self_improve_parse_patch(patch_copy, strlen(patch_copy), &sp) &&
+                        sp.type != HU_PATCH_TEXT_HINT) {
+                        sqlite3_stmt *deact = NULL;
+                        if (sqlite3_prepare_v2(db, "UPDATE prompt_patches SET active = 0 WHERE id = ?1", -1,
+                                               &deact, NULL) == SQLITE_OK) {
+                            sqlite3_bind_int64(deact, 1, max_patch_id_after);
+                            (void)sqlite3_step(deact);
+                            sqlite3_finalize(deact);
+                        }
+
+                        hu_self_improve_delta_t delta = {0};
+                        hu_error_t eval_err = hu_self_improve_eval_and_apply(alloc, db, &sp, &delta);
+                        if (eval_err == HU_OK) {
+                            const char *rb = delta.should_rollback ? " [rolled back]" : "";
+                            fprintf(stderr,
+                                    "[self-improve] patch %s: %.2f → %.2f (delta: %+.2f)%s\n",
+                                    delta.patch_id, delta.score_before, delta.score_after, delta.delta, rb);
+                            (void)hu_self_improve_rollback_if_negative(alloc, db, &delta);
+                        }
+                    }
+                }
+            }
 
             (void)hu_self_improve_record_tool_outcome(&si, "feed_digest", 11, true, now_ts);
             (void)hu_self_improve_record_tool_outcome(&si, "trend_detect", 12, true, now_ts);

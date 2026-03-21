@@ -735,6 +735,7 @@ list(APPEND HU_CORE_SOURCES
     src/voice/webrtc_srtp.c
     src/voice/realtime.c
     src/voice/duplex.c
+    src/voice/session.c
     src/providers/embedded.c
 )
 
@@ -1162,7 +1163,8 @@ if(HU_ENABLE_GMAIL)
     target_compile_definitions(human_core PRIVATE HU_HAS_GMAIL=1)
 endif()
 if(HU_ENABLE_VOICE)
-    target_compile_definitions(human_core PRIVATE HU_HAS_SONATA=1)
+    # Voice channel (realtime/webrtc); Sonata Rust FFI only when HU_ENABLE_SONATA.
+    target_compile_definitions(human_core PRIVATE HU_HAS_VOICE_CHANNEL=1 HU_ENABLE_VOICE=1)
 endif()
 if(HU_ENABLE_MQTT)
     target_compile_definitions(human_core PRIVATE HU_HAS_MQTT=1)
@@ -1207,6 +1209,7 @@ if(HU_ENABLE_SQLITE)
         endif()
     endif()
     target_compile_definitions(human_core PRIVATE HU_ENABLE_SQLITE=1)
+    target_compile_definitions(human_core PRIVATE "HU_EVAL_SUITES_DIR=\"${HU_ROOT}/eval_suites\"")
 endif()
 
 if(HU_ENABLE_POSTGRES)
@@ -1695,6 +1698,9 @@ endif()
 if(HU_ENABLE_SONATA)
     target_compile_definitions(human_core_test PRIVATE HU_HAS_SONATA=1)
 endif()
+if(HU_ENABLE_VOICE)
+    target_compile_definitions(human_core_test PRIVATE HU_HAS_VOICE_CHANNEL=1 HU_ENABLE_VOICE=1)
+endif()
 target_compile_definitions(human_core_test PRIVATE HU_HAS_SIGNAL=1 HU_HAS_NOSTR=1 HU_HAS_QQ=1 HU_HAS_MAIXCAM=1 HU_HAS_DISPATCH=1 HU_HAS_GMAIL=1 HU_HAS_MQTT=1 HU_HAS_THREAD_BINDING=1 HU_HAS_FACEBOOK=1 HU_HAS_INSTAGRAM=1 HU_HAS_TWITTER=1 HU_HAS_TIKTOK=1 HU_HAS_GOOGLE_RCS=1)
 target_compile_definitions(human_core_test PRIVATE HU_HAS_NONE_ENGINE=1 HU_HAS_MARKDOWN_ENGINE=1)
 if(HU_ENABLE_MEMORY_LRU_ENGINE)
@@ -1831,6 +1837,7 @@ set(HU_TEST_SOURCES
     tests/test_multimodal_video.c
     tests/test_voice_duplex.c
     tests/test_voice_rt_openai.c
+    tests/test_voice_session.c
     tests/test_autonomy.c
     tests/test_retrieval.c
     tests/test_prompt.c
@@ -1858,6 +1865,7 @@ set(HU_TEST_SOURCES
     tests/test_security_pipeline.c
     tests/test_core_extended.c
     tests/test_gateway_extended.c
+    tests/test_gateway_voice.c
     tests/test_gateway_auth.c
     tests/test_pairing.c
     tests/test_agent_extended.c
@@ -2065,7 +2073,7 @@ list(APPEND HU_TEST_SOURCES
 
 add_executable(human_tests ${HU_TEST_SOURCES} wasm/wasm_alloc.c src/bootstrap.c)
 target_link_libraries(human_tests human_core_test)
-target_include_directories(human_tests PRIVATE ${HU_ROOT}/tests)
+target_include_directories(human_tests PRIVATE ${HU_ROOT}/tests ${HU_ROOT}/src/gateway)
 target_compile_definitions(human_tests PRIVATE "HU_EVAL_SUITES_DIR=\"${HU_ROOT}/eval_suites\"")
 # HU_HAS_PERSONA always set for tests: test lib has persona (main or extra), struct layout must match
 target_compile_definitions(human_tests PRIVATE HU_IS_TEST=1 HU_GATEWAY_TEST_MODE=1 HU_HAS_NONE_ENGINE=1 HU_HAS_CRON=1 HU_HAS_PUSH=1 HU_HAS_UPDATE=1 HU_HAS_SKILLS=1 HU_HAS_PERSONA=1 HU_HAS_RUNTIME_EXOTIC=1)
@@ -2184,7 +2192,7 @@ if(HU_ENABLE_DISPATCH)
     target_compile_definitions(human_tests PRIVATE HU_HAS_DISPATCH=1)
 endif()
 if(HU_ENABLE_VOICE)
-    target_compile_definitions(human_tests PRIVATE HU_HAS_SONATA=1)
+    target_compile_definitions(human_tests PRIVATE HU_ENABLE_VOICE=1 HU_HAS_VOICE_CHANNEL=1)
 endif()
 if(HU_ENABLE_LUCID_ENGINE)
     target_compile_definitions(human_tests PRIVATE HU_HAS_LUCID_ENGINE=1)

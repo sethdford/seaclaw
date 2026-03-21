@@ -5,6 +5,33 @@
 #include "human/core/error.h"
 #include "human/provider.h"
 
+/*
+ * Hybrid local + cloud routing (config.json)
+ * ------------------------------------------
+ * Use the ensemble composite as `default_provider` (or per-agent provider) to combine a local
+ * backend with a cloud API. Example:
+ *
+ *   {
+ *     "default_provider": "ensemble",
+ *     "ensemble": {
+ *       "providers": ["ollama", "anthropic"],
+ *       "strategy": "best_for_task",
+ *       "routing": {
+ *         "simple": "ollama",
+ *         "complex": "anthropic"
+ *       }
+ *     }
+ *   }
+ *
+ * Strategies map to hu_ensemble_strategy_t: "round_robin", "best_for_task", "consensus".
+ * `best_for_task` uses keyword heuristics on the user message to pick among `providers`
+ * (e.g. code-ish prompts bias toward names containing "openai" / "anthropic").
+ *
+ * The `routing` object is reserved for explicit simple/complex overrides; it is accepted in
+ * JSON (see config schema `ensemble.routing`) for forward-compatible configs but is not yet
+ * applied by the runtime — keep your preferred default first in `providers` until then.
+ */
+
 #define HU_ENSEMBLE_MAX_PROVIDERS 8
 
 typedef enum {

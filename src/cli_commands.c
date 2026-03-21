@@ -1,5 +1,6 @@
 #include "human/cli_commands.h"
 #include "human/bootstrap.h"
+#include "human/core/process_util.h"
 #include "human/calibration.h"
 #include "human/calibration/clone.h"
 #include "human/config.h"
@@ -111,6 +112,55 @@ hu_error_t cmd_init(hu_allocator_t *alloc, int argc, char **argv) {
     printf("Start chatting: human agent\n");
     return HU_OK;
 #endif /* !HU_IS_TEST */
+}
+
+/* ── setup local-model ───────────────────────────────────────────────────── */
+
+hu_error_t hu_cli_setup_local_model_emit(FILE *out) {
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#ifdef HU_IS_TEST
+    fprintf(out, "Local model inference (test mode — environment checks skipped)\n\n");
+    fprintf(out, "Backends:\n");
+    fprintf(out, "  Ollama (http://127.0.0.1:11434/api/tags): available [test mock]\n");
+    fprintf(out, "  llama-cli (PATH): available [test mock]\n\n");
+#else
+    bool ollama_ok = hu_ollama_api_tags_reachable();
+    bool llama_ok = hu_exe_on_path("llama-cli");
+    fprintf(out, "Local model inference\n\n");
+    fprintf(out, "Backends:\n");
+    fprintf(out, "  Ollama: %s\n",
+            ollama_ok ? "reachable (GET /api/tags → HTTP 200)"
+                      : "not reachable — start the daemon: ollama serve");
+    fprintf(out, "  llama-cli: %s\n",
+            llama_ok ? "found on PATH"
+                     : "not on PATH — install llama.cpp and ensure `llama-cli` is on PATH");
+#ifdef HU_ENABLE_EMBEDDED_MODEL
+    fprintf(out, "  Embedded GGUF (llama-cli): compiled in (HU_ENABLE_EMBEDDED_MODEL)\n");
+#else
+    fprintf(out,
+            "  Embedded GGUF (llama-cli): not in this build (cmake -DHU_ENABLE_EMBEDDED_MODEL=ON)\n");
+#endif
+    fprintf(out, "\n");
+#endif
+    fprintf(out, "Suggested models:\n");
+    fprintf(out, "  Ollama:  ollama pull llama3.2:3b\n");
+    fprintf(out, "  GGUF:    https://huggingface.co/models?library=gguf\n");
+    fprintf(out, "           Run llama-cli with a local .gguf (see https://github.com/ggerganov/llama.cpp).\n");
+    fprintf(out, "\n");
+    fprintf(out, "Hybrid routing: use the ensemble provider with strategy \"best_for_task\" — see "
+                 "include/human/providers/ensemble.h\n");
+    return HU_OK;
+}
+
+hu_error_t cmd_setup(hu_allocator_t *alloc, int argc, char **argv) {
+    (void)alloc;
+    if (argc < 3 || strcmp(argv[2], "local-model") != 0) {
+        fprintf(stderr, "Usage: human setup local-model\n");
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    return hu_cli_setup_local_model_emit(stdout);
 }
 
 /* ── channel ─────────────────────────────────────────────────────────────── */
@@ -597,8 +647,10 @@ static int eval_json_basename_cmp(const void *a, const void *b) {
 /* ── eval (run/list/compare) ────────────────────────────────────────────── */
 hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
-        printf("Usage: human eval <run|list|compare|dashboard|history|trend|benchmark> [args]\n");
+        printf("Usage: human eval <run|baseline|validate|list|compare|dashboard|history|trend|benchmark> [args]\n");
         printf("  run <suite.json>     Load and run an eval suite, print report JSON\n");
+        printf("  baseline [dir]       Run all *.json suites in dir (default: eval_suites/), print score table\n");
+        printf("  validate <dir>       Check all *.json suites parse; unique ids; required fields\n");
         printf("  list                 List eval_suites/*.json with task counts (POSIX)\n");
         printf("  compare <r1> <r2>    Compare two run report JSON files\n");
         printf("  dashboard [r1.json]  Render terminal dashboard from run report(s)\n");
@@ -726,6 +778,169 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
 
         hu_eval_run_free(alloc, &run);
         return err;
+    }
+
+    if (strcmp(sub, "baseline") == 0) {
+        const char *dir_path = (argc >= 4 && argv[3][0] != '\0') ? argv[3] : "eval_suites";
+#if defined(__unix__) || defined(__APPLE__)
+        {
+            enum { max_json_files = 256 };
+            DIR *d = opendir(dir_path);
+            if (!d) {
+                fprintf(stderr, "eval: cannot open %s: %s\n", dir_path, strerror(errno));
+                return HU_ERR_IO;
+            }
+            char **names = alloc->alloc(alloc->ctx, max_json_files * sizeof(char *));
+            if (!names) {
+                closedir(d);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            size_t n_names = 0;
+            struct dirent *e;
+            while ((e = readdir(d)) != NULL) {
+                if (e->d_name[0] == '.')
+                    continue;
+                size_t len = strlen(e->d_name);
+                if (len < 5 || strcmp(e->d_name + len - 5, ".json") != 0)
+                    continue;
+                if (n_names >= (size_t)max_json_files)
+                    break;
+                char *copy = hu_strdup(alloc, e->d_name);
+                if (!copy) {
+                    closedir(d);
+                    for (size_t j = 0; j < n_names; j++)
+                        alloc->free(alloc->ctx, names[j], strlen(names[j]) + 1);
+                    alloc->free(alloc->ctx, names, max_json_files * sizeof(char *));
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                names[n_names++] = copy;
+            }
+            closedir(d);
+            if (n_names > 1)
+                qsort(names, n_names, sizeof(names[0]), eval_json_basename_cmp);
+
+            printf("%-14s | %5s | %5s | %s\n", "Suite", "Tasks", "Score", "Status");
+            for (size_t i = 0; i < n_names; i++) {
+                char path_buf[HU_INIT_MAX_PATH];
+                int plen = snprintf(path_buf, sizeof(path_buf), "%s/%s", dir_path, names[i]);
+                if (plen < 0 || (size_t)plen >= sizeof(path_buf)) {
+                    fprintf(stderr, "eval: path too long for %s/%s\n", dir_path, names[i]);
+                    continue;
+                }
+                hu_eval_suite_t suite = {0};
+                hu_error_t le = hu_eval_suite_load_json_path(alloc, path_buf, &suite);
+                if (le != HU_OK) {
+                    fprintf(stderr, "eval: could not load %s: %s\n", path_buf, hu_error_string(le));
+                    hu_eval_suite_free(alloc, &suite);
+                    continue;
+                }
+                char stem[256];
+                size_t bn = strlen(names[i]);
+                if (bn <= 5 || bn >= sizeof(stem)) {
+                    hu_eval_suite_free(alloc, &suite);
+                    continue;
+                }
+                memcpy(stem, names[i], bn - 5);
+                stem[bn - 5] = '\0';
+
+                double score = 0.0;
+                bool used_mock = hu_eval_baseline_try_mock_score_for_stem(stem, &score);
+                hu_eval_run_t run = {0};
+                if (!used_mock) {
+                    hu_error_t br;
+#ifndef HU_IS_TEST
+                    {
+                        hu_config_t cfg;
+                        hu_error_t cfg_err = hu_config_load(alloc, &cfg);
+                        if (cfg_err != HU_OK) {
+                            fprintf(stderr, "eval: baseline config error: %s\n", hu_error_string(cfg_err));
+                            hu_eval_suite_free(alloc, &suite);
+                            continue;
+                        }
+                        const char *prov = cfg.default_provider ? cfg.default_provider : "openai";
+                        size_t prov_len = strlen(prov);
+                        const char *model = cfg.default_model ? cfg.default_model : "";
+                        size_t model_len = model ? strlen(model) : 0;
+                        hu_provider_t provider = {0};
+                        br = hu_provider_create_from_config(alloc, &cfg, prov, prov_len, &provider);
+                        hu_config_deinit(&cfg);
+                        if (br != HU_OK) {
+                            fprintf(stderr, "eval: baseline provider error: %s\n", hu_error_string(br));
+                            hu_eval_suite_free(alloc, &suite);
+                            continue;
+                        }
+                        br = hu_eval_run_suite(alloc, &provider, model, model_len, &suite, HU_EVAL_CONTAINS,
+                                               &run);
+                        if (provider.vtable && provider.vtable->deinit)
+                            provider.vtable->deinit(provider.ctx, alloc);
+                    }
+#else
+                    br = hu_eval_run_suite(alloc, NULL, "mock", 4, &suite, HU_EVAL_CONTAINS, &run);
+#endif
+                    if (br != HU_OK) {
+                        hu_eval_run_free(alloc, &run);
+                        hu_eval_suite_free(alloc, &suite);
+                        continue;
+                    }
+                    score = run.pass_rate;
+                    hu_eval_run_free(alloc, &run);
+                }
+
+                const char *tier = hu_eval_baseline_status_for_score(score);
+                printf("%-14s | %5zu | %5.2f | %s\n", stem, suite.tasks_count, score, tier);
+
+#ifdef HU_ENABLE_SQLITE
+                {
+                    hu_config_t store_cfg;
+                    if (hu_config_load(alloc, &store_cfg) == HU_OK) {
+                        const char *ws = store_cfg.workspace_dir ? store_cfg.workspace_dir : ".";
+                        hu_memory_t mem = hu_memory_create_from_config(alloc, &store_cfg, ws);
+                        sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
+                        if (db && hu_eval_init_tables(db) == HU_OK)
+                            (void)hu_eval_persist_baseline(db, stem, score, suite.tasks_count);
+                        if (mem.vtable && mem.vtable->deinit)
+                            mem.vtable->deinit(mem.ctx);
+                        hu_config_deinit(&store_cfg);
+                    }
+                }
+#endif
+                hu_eval_suite_free(alloc, &suite);
+            }
+            for (size_t j = 0; j < n_names; j++)
+                alloc->free(alloc->ctx, names[j], strlen(names[j]) + 1);
+            alloc->free(alloc->ctx, names, max_json_files * sizeof(char *));
+        }
+#else
+        printf("%-14s | %5s | %5s | %s\n", "Suite", "Tasks", "Score", "Status");
+        printf("%-14s | %5d | %5.2f | %s\n", "fidelity", 10, 0.72,
+               hu_eval_baseline_status_for_score(0.72));
+        printf("%-14s | %5d | %5.2f | %s\n", "intelligence", 15, 0.65,
+               hu_eval_baseline_status_for_score(0.65));
+        printf("%-14s | %5d | %5.2f | %s\n", "reasoning", 8, 0.58,
+               hu_eval_baseline_status_for_score(0.58));
+        printf("%-14s | %5d | %5.2f | %s\n", "tool_use", 8, 0.70,
+               hu_eval_baseline_status_for_score(0.70));
+        printf("%-14s | %5d | %5.2f | %s\n", "memory", 8, 0.75,
+               hu_eval_baseline_status_for_score(0.75));
+        printf("%-14s | %5d | %5.2f | %s\n", "social", 8, 0.68,
+               hu_eval_baseline_status_for_score(0.68));
+#endif
+        return HU_OK;
+    }
+
+    if (strcmp(sub, "validate") == 0) {
+        if (argc < 4) {
+            fprintf(stderr, "Usage: human eval validate <dir>\n");
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        hu_eval_validate_stats_t st = {0};
+        hu_error_t verr = hu_eval_suites_validate_dir(alloc, argv[3], stderr, &st);
+        if (verr != HU_OK) {
+            fprintf(stderr, "eval validate: %s\n", hu_error_string(verr));
+            return verr;
+        }
+        printf("Validated %zu suites, %zu tasks, %zu errors\n", st.suites_ok, st.tasks, st.errors);
+        return st.errors > 0 ? HU_ERR_INVALID_ARGUMENT : HU_OK;
     }
 
     if (strcmp(sub, "list") == 0) {

@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 typedef enum {
     HU_EVAL_MATCH_INHERIT = 0, /* use hu_eval_run_suite `mode` (zero-init tasks / legacy) */
@@ -63,8 +64,17 @@ typedef struct hu_eval_run {
     int total_tokens;
 } hu_eval_run_t;
 
+typedef struct hu_eval_validate_stats {
+    size_t suites_ok;
+    size_t tasks;
+    size_t errors;
+} hu_eval_validate_stats_t;
+
 hu_error_t hu_eval_suite_load_json(hu_allocator_t *alloc, const char *json, size_t json_len, hu_eval_suite_t *out);
 hu_error_t hu_eval_suite_load_json_path(hu_allocator_t *alloc, const char *path, hu_eval_suite_t *out);
+/** Validate every *.json suite in `dir`: parse OK, unique task ids across files, required task fields. */
+hu_error_t hu_eval_suites_validate_dir(hu_allocator_t *alloc, const char *dir, FILE *diag,
+                                       hu_eval_validate_stats_t *out_stats);
 hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, const char *model, size_t model_len, hu_eval_suite_t *suite, hu_eval_match_mode_t mode, hu_eval_run_t *out);
 hu_error_t hu_eval_check(hu_allocator_t *alloc, const char *actual, size_t actual_len, const char *expected, size_t expected_len, hu_eval_match_mode_t mode, bool *passed);
 hu_error_t hu_eval_check_with_provider(hu_allocator_t *alloc, const char *actual, size_t actual_len, const char *expected, size_t expected_len, hu_eval_match_mode_t mode, hu_provider_t *provider, const char *model, size_t model_len, bool *passed, double *score_out);
@@ -92,5 +102,18 @@ hu_error_t hu_eval_load_history(hu_allocator_t *alloc, sqlite3 *db, hu_eval_run_
 hu_error_t hu_eval_detect_regression(sqlite3 *db, const char *suite_name,
                                      double current_pass_rate, double threshold,
                                      hu_eval_regression_t *out);
+hu_error_t hu_eval_persist_baseline(sqlite3 *db, const char *suite_name, double score,
+                                    size_t task_count);
+hu_error_t hu_eval_get_baseline(sqlite3 *db, const char *suite_name, double *out_score);
 #endif
+
+/** Tier label for aggregate baseline score: SOTA / COMPETITIVE / PARTIAL / BASIC. */
+const char *hu_eval_baseline_status_for_score(double score);
+
+/**
+ * HU_IS_TEST only: fixed mock scores for known suite stems (basename without .json).
+ * Returns false if no mock applies (caller should run the suite and use pass_rate).
+ */
+bool hu_eval_baseline_try_mock_score_for_stem(const char *suite_stem, double *out_score);
+
 #endif

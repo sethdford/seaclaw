@@ -21,6 +21,10 @@
 #include "human/agent/weather_awareness.h"
 #include "human/agent/weather_fetch.h"
 #include "human/config.h"
+#include "human/voice.h"
+#include "human/voice/session.h"
+#include "human/tts/audio_pipeline.h"
+#include "human/tts/cartesia.h"
 #include "human/context/conversation.h"
 #include "human/context/event_extract.h"
 #include "human/context/style_tracker.h"
@@ -136,6 +140,7 @@ hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc,
 #endif
 #include <ctype.h>
 #include <limits.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -176,25 +181,58 @@ static hu_emotional_state_t hu_daemon_detect_emotion(hu_allocator_t *alloc, hu_a
 #endif
 }
 
-#ifndef HU_IS_TEST
-/* Per-channel daemon.* config for the active messaging channel (NULL if unknown). */
+/* Per-channel daemon.* config for the active messaging channel.
+ *
+ * To add a channel: ensure hu_<channel>_channel_config_t in config.h has a `daemon` field,
+ * then add one row to k_daemon_configs[] with the vtable `name()` string and the combined
+ * offset (offsetof(hu_channels_config_t, <member>) + offsetof(hu_*_channel_config_t, daemon)).
+ */
+typedef struct {
+    const char *name;
+    size_t daemon_offset; /* bytes from &config->channels to that channel's daemon struct */
+} hu_daemon_config_entry_t;
+
+static const hu_daemon_config_entry_t k_daemon_configs[] = {
+    {"discord", offsetof(hu_channels_config_t, discord) + offsetof(hu_discord_channel_config_t,
+                                                                   daemon)},
+    {"email", offsetof(hu_channels_config_t, email) + offsetof(hu_email_channel_config_t, daemon)},
+    {"gmail", offsetof(hu_channels_config_t, gmail) + offsetof(hu_gmail_channel_config_t, daemon)},
+    {"imessage",
+     offsetof(hu_channels_config_t, imessage) + offsetof(hu_imessage_channel_config_t, daemon)},
+    {"irc", offsetof(hu_channels_config_t, irc) + offsetof(hu_irc_channel_config_t, daemon)},
+    {"matrix", offsetof(hu_channels_config_t, matrix) + offsetof(hu_matrix_channel_config_t,
+                                                                   daemon)},
+    {"nostr", offsetof(hu_channels_config_t, nostr) + offsetof(hu_nostr_channel_config_t, daemon)},
+    {"signal", offsetof(hu_channels_config_t, signal) + offsetof(hu_signal_channel_config_t,
+                                                                  daemon)},
+    {"slack", offsetof(hu_channels_config_t, slack) + offsetof(hu_slack_channel_config_t, daemon)},
+    {"telegram",
+     offsetof(hu_channels_config_t, telegram) + offsetof(hu_telegram_channel_config_t, daemon)},
+    {"whatsapp",
+     offsetof(hu_channels_config_t, whatsapp) + offsetof(hu_whatsapp_channel_config_t, daemon)},
+};
+
 static const hu_channel_daemon_config_t *get_active_daemon_config(const hu_config_t *config,
                                                                   const char *ch_name) {
-    if (!config || !ch_name)
+    if (!config)
         return NULL;
-    if (strcmp(ch_name, "imessage") == 0)
-        return &config->channels.imessage.daemon;
-    if (strcmp(ch_name, "discord") == 0)
-        return &config->channels.discord.daemon;
-    if (strcmp(ch_name, "telegram") == 0)
-        return &config->channels.telegram.daemon;
-    if (strcmp(ch_name, "slack") == 0)
-        return &config->channels.slack.daemon;
-    if (strcmp(ch_name, "whatsapp") == 0)
-        return &config->channels.whatsapp.daemon;
-    return NULL;
+    if (!ch_name)
+        return &config->channels.default_daemon;
+    for (size_t i = 0; i < sizeof(k_daemon_configs) / sizeof(k_daemon_configs[0]); i++) {
+        if (strcmp(ch_name, k_daemon_configs[i].name) == 0) {
+            const char *base = (const char *)&config->channels;
+            return (const hu_channel_daemon_config_t *)(void *)(base + k_daemon_configs[i].daemon_offset);
+        }
+    }
+    return &config->channels.default_daemon;
 }
-#endif /* !HU_IS_TEST */
+
+#ifdef HU_IS_TEST
+const hu_channel_daemon_config_t *hu_daemon_test_get_active_daemon_config(const hu_config_t *config,
+                                                                          const char *ch_name) {
+    return get_active_daemon_config(config, ch_name);
+}
+#endif
 
 #ifndef HU_IS_TEST
 /* Proactive-style budget for outbound visual attachments (separate from check-in governor). */
@@ -7938,7 +7976,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
                     /* ── Voice decision: TTS when channel has voice_enabled ───── */
                     bool sent_voice = false;
-#if defined(HU_ENABLE_CARTESIA) && defined(HU_HAS_PERSONA)
                     {
                         const char *chn_voice =
                             ch->channel->vtable->name
@@ -7948,6 +7985,23 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             get_active_daemon_config(config, chn_voice);
                         bool voice_channel_ok =
                             dcfg_voice && dcfg_voice->voice_enabled;
+
+                        /* Unified duplex + Realtime (`voice.mode`: "realtime" or legacy
+                         * `voice.tts_provider`: "realtime"). */
+                        hu_voice_session_t unified_voice = {0};
+                        bool unified_voice_active = false;
+                        bool cfg_realtime =
+                            (config->voice.mode && strcmp(config->voice.mode, "realtime") == 0) ||
+                            (config->voice.tts_provider &&
+                             strcmp(config->voice.tts_provider, "realtime") == 0);
+                        if (voice_channel_ok && config && chn_voice && cfg_realtime) {
+                            size_t chn_len = strlen(chn_voice);
+                            if (hu_voice_session_start(alloc, &unified_voice, chn_voice, chn_len,
+                                                       config) == HU_OK)
+                                unified_voice_active = true;
+                        }
+
+#if defined(HU_ENABLE_CARTESIA) && defined(HU_HAS_PERSONA)
                         if (voice_channel_ok && agent->persona &&
                             agent->persona->voice.voice_id[0] &&
                             agent->persona->voice_messages.enabled) {
@@ -7958,8 +8012,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (vdec == HU_VOICE_SEND_VOICE) {
                                 const char *cartesia_key =
                                     hu_config_get_provider_key(config, "cartesia");
-                                if (!cartesia_key || !cartesia_key[0])
-                                    cartesia_key = getenv("CARTESIA_API_KEY");
                                 if (cartesia_key && cartesia_key[0]) {
                                     char voice_transcript[4096];
                                     size_t vt_len = response_len < sizeof(voice_transcript) - 64
@@ -8029,8 +8081,83 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                             }
                         }
-                    }
 #endif
+                        /* Fallback: unified voice pipeline when persona Cartesia path did not send. */
+                        if (!sent_voice && voice_channel_ok && !unified_voice_active && config) {
+                            hu_voice_config_t voice_cfg = {0};
+                            if (hu_voice_config_from_settings(config, &voice_cfg) == HU_OK &&
+                                voice_cfg.tts_provider && voice_cfg.tts_provider[0]) {
+                                void *audio = NULL;
+                                size_t audio_len = 0;
+                                hu_error_t tts_err = hu_voice_tts(alloc, &voice_cfg, response,
+                                                                 response_len, &audio, &audio_len);
+                                if (tts_err == HU_OK && audio && audio_len > 0) {
+                                    unsigned char *audio_bytes = (unsigned char *)audio;
+                                    char audio_path[512];
+                                    hu_error_t pipe_err = HU_ERR_IO;
+#if defined(HU_ENABLE_CARTESIA)
+                                    {
+                                        const char *voice_fmt = hu_tts_format_for_channel(chn_voice);
+                                        if (strcmp(voice_fmt, "caf") == 0) {
+                                            pipe_err = hu_audio_mp3_to_caf(
+                                                alloc, audio_bytes, audio_len, audio_path,
+                                                sizeof(audio_path));
+                                        } else {
+                                            const char *temp_ext = "mp3";
+                                            if (strcmp(voice_fmt, "wav") == 0)
+                                                temp_ext = "wav";
+                                            else if (strcmp(voice_fmt, "ogg") == 0)
+                                                temp_ext = "wav";
+                                            pipe_err = hu_audio_tts_bytes_to_temp(
+                                                alloc, audio_bytes, audio_len, temp_ext, audio_path,
+                                                sizeof(audio_path));
+                                        }
+                                    }
+#else
+                                    {
+                                        char *tmp_dir = hu_platform_get_temp_dir(alloc);
+                                        if (tmp_dir) {
+                                            int np = snprintf(audio_path, sizeof(audio_path),
+                                                              "%s/human_dtts_%lld.mp3", tmp_dir,
+                                                              (long long)time(NULL));
+                                            size_t tdl = strlen(tmp_dir);
+                                            alloc->free(alloc->ctx, tmp_dir, tdl + 1);
+                                            if (np > 0 && (size_t)np < sizeof(audio_path)) {
+                                                FILE *tf = fopen(audio_path, "wb");
+                                                if (tf) {
+                                                    if (fwrite(audio_bytes, 1, audio_len, tf) ==
+                                                        audio_len)
+                                                        pipe_err = HU_OK;
+                                                    fclose(tf);
+                                                    if (pipe_err != HU_OK)
+                                                        (void)unlink(audio_path);
+                                                }
+                                            }
+                                        }
+                                    }
+#endif
+                                    alloc->free(alloc->ctx, audio, audio_len);
+                                    if (pipe_err == HU_OK) {
+                                        const char *media_paths[] = {audio_path};
+                                        hu_error_t send_err = ch->channel->vtable->send(
+                                            ch->channel->ctx, batch_key, key_len, "", 0,
+                                            media_paths, 1);
+#if defined(HU_ENABLE_CARTESIA)
+                                        hu_audio_cleanup_temp(audio_path);
+#else
+                                        (void)unlink(audio_path);
+#endif
+                                        if (send_err == HU_OK)
+                                            sent_voice = true;
+                                    }
+                                } else if (audio) {
+                                    alloc->free(alloc->ctx, audio, audio_len);
+                                }
+                            }
+                        }
+                        if (unified_voice_active)
+                            (void)hu_voice_session_stop(&unified_voice);
+                    }
                     if (!sent_voice) {
                     const char *eff_ch = ch->channel->vtable->name
                                              ? ch->channel->vtable->name(ch->channel->ctx)

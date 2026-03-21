@@ -15,6 +15,9 @@ hu_error_t hu_voice_rt_session_create(hu_allocator_t *alloc, const hu_voice_rt_c
         return HU_ERR_OUT_OF_MEMORY;
     memset(s, 0, sizeof(*s));
     s->alloc = alloc;
+#if HU_IS_TEST
+    s->test_recv_seq = 0;
+#endif
     if (config)
         s->config = *config;
     *out = s;
@@ -121,6 +124,21 @@ hu_error_t hu_voice_rt_send_audio(hu_voice_rt_session_t *session, const void *da
 #endif
 }
 
+hu_error_t hu_voice_rt_response_cancel(hu_voice_rt_session_t *session) {
+    if (!session)
+        return HU_ERR_INVALID_ARGUMENT;
+#if HU_IS_TEST
+    return HU_OK;
+#elif defined(HU_HTTP_CURL)
+    if (!session->connected || !session->ws_client)
+        return HU_ERR_IO;
+    static const char k_cancel[] = "{\"type\":\"response.cancel\"}";
+    return hu_ws_send((hu_ws_client_t *)session->ws_client, k_cancel, sizeof(k_cancel) - 1);
+#else
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
 static void copy_event_type(const char *type, hu_voice_rt_event_t *out) {
     if (type) {
         strncpy(out->type, type, sizeof(out->type) - 1);
@@ -136,12 +154,23 @@ hu_error_t hu_voice_rt_recv_event(hu_voice_rt_session_t *session, hu_allocator_t
 #if HU_IS_TEST
     if (!alloc)
         return HU_ERR_INVALID_ARGUMENT;
-    (void)alloc;
     (void)timeout_ms;
     if (!session->connected)
         return HU_ERR_IO;
-    copy_event_type("response.audio.done", out);
-    out->done = true;
+    unsigned call = session->test_recv_seq++;
+    if ((call % 2u) == 0u) {
+        copy_event_type("conversation.item.input_audio_transcription.completed", out);
+        static const char k_mock_text[] = "Hello from realtime";
+        size_t tlen = sizeof(k_mock_text) - 1u;
+        out->transcript = hu_strndup(alloc, k_mock_text, tlen);
+        if (!out->transcript)
+            return HU_ERR_OUT_OF_MEMORY;
+        out->transcript_len = tlen;
+        out->done = false;
+    } else {
+        copy_event_type("response.audio.done", out);
+        out->done = true;
+    }
     return HU_OK;
 #elif defined(HU_HTTP_CURL)
     if (!alloc)

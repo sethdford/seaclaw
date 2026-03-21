@@ -128,5 +128,24 @@ hu_error_t hu_self_improve_get_structured_patches(hu_self_improve_t *engine,
                                                   hu_allocator_t *alloc, hu_patch_type_t type,
                                                   hu_structured_patch_t **out, size_t *out_count);
 
+/* --- Eval delta gate (fast subset before/after structured patch) --- */
+
+typedef struct hu_self_improve_delta {
+    double score_before;
+    double score_after;
+    double delta;         /* score_after - score_before */
+    bool should_rollback; /* delta < -threshold (see implementation) */
+    char patch_id[64];    /* prompt_patches row id as decimal string after apply (non-test) */
+} hu_self_improve_delta_t;
+
+/* Run a fast eval subset, apply patch, re-eval, compare. Persists row to self_improve_deltas. */
+hu_error_t hu_self_improve_eval_and_apply(hu_allocator_t *alloc, sqlite3 *db,
+                                          const hu_structured_patch_t *patch,
+                                          hu_self_improve_delta_t *out_delta);
+
+/* Deactivate the structured patch row if delta.should_rollback; marks self_improve_deltas.rolled_back. */
+hu_error_t hu_self_improve_rollback_if_negative(hu_allocator_t *alloc, sqlite3 *db,
+                                                const hu_self_improve_delta_t *delta);
+
 #endif /* HU_ENABLE_SQLITE */
 #endif /* HU_INTELLIGENCE_SELF_IMPROVE_H */

@@ -28,7 +28,7 @@ Key extension points:
 - `src/peripherals/` (`hu_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **1,093 source + header files, ~233K lines of C, ~98K lines of tests, 6132+ tests, 38 channels**.
+Current scale: **1,093 source + header files, ~233K lines of C, ~98K lines of tests, 6196+ tests, 38 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -76,7 +76,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `HU_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 6132+ tests must pass at zero ASan errors**
+5. **All 6196+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `HU_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -118,7 +118,7 @@ src/
 
 include/human/       public C headers
 
-tests/                 291 test files, 6132+ tests
+tests/                 291 test files, 6196+ tests
 
 apps/                  iOS, macOS, Android, shared (4 app directories)
 
@@ -167,7 +167,7 @@ When uncertain, classify as higher risk.
 4. **Validate** — `cmake --build build && ./build/human_tests` must show 0 failures and 0 ASan errors.
    - During iteration, use `./build/human_tests --suite=<name>` to run targeted tests.
    - Use `scripts/what-to-test.sh <changed-files>` to find relevant suites.
-   - Use `scripts/agent-preflight.sh` for change-aware validation before committing.
+   - Use `scripts/agent-preflight.sh` for change-aware validation before committing (runs `doc-fleet` when `docs/`, `human-skills/`, `skill-registry/`, or any `.md` changes).
    - Run full suite (`./build/human_tests` with no args) before final commit.
 5. **Document impact** — update comments/docs for behavior changes, risk, and side effects.
 
@@ -245,7 +245,7 @@ scripts/agent-preflight.sh                 # change-aware validation (auto-detec
 scripts/run-native-fleet-local.sh quick    # native apps: HumanKit + iOS/macOS SPM + Android unit (no Simulator)
 ```
 
-CI runs **XCUITest** and **Android instrumented** in `.github/workflows/native-apps-fleet.yml` (matrix + SOTA gate) and a single iOS simulator in `ci.yml` via `.github/actions/ios-uitest`. Optional full local parity on macOS: `scripts/run-native-fleet-local.sh full` or `VERIFY_NATIVE=1 ./scripts/verify-all.sh`.
+CI runs **XCUITest** and **Android instrumented** in `.github/workflows/native-apps-fleet.yml` (matrix + SOTA gate) and a single iOS simulator in `ci.yml` via `.github/actions/ios-uitest`. Optional full local parity on macOS: `scripts/run-native-fleet-local.sh full` or `VERIFY_NATIVE=1 ./scripts/verify-all.sh`. Optional red-team / eval aggregation (offline): `VERIFY_REDTEAM=1 ./scripts/verify-all.sh` or `bash scripts/redteam-eval-fleet.sh`.
 
 For release changes:
 
@@ -318,6 +318,7 @@ Drift detection scripts:
 ```bash
 ./scripts/verify-all.sh              # Combined verification (build + test + doc fleet + tokens)
 ./scripts/doc-fleet.sh               # Docs + human-skills frontmatter; repo-wide Markdown relative links
+./scripts/redteam-eval-fleet.sh      # Eval + adversarial C suites, doctor, eval list, harness dry-run; set REDTEAM_FLEET_LIVE=1 for API
 ./scripts/check-doc-index.sh         # Orphaned standards only (also inside doc-fleet)
 ./scripts/check-standards-drift.sh   # Stale paths only (also inside doc-fleet)
 ```

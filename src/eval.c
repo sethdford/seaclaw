@@ -7,6 +7,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__unix__) || defined(__APPLE__)
+#include <dirent.h>
+#include <errno.h>
+#endif
 #ifdef HU_ENABLE_SQLITE
 #include <sqlite3.h>
 #include <time.h>
@@ -299,6 +303,191 @@ hu_error_t hu_eval_suite_load_json_path(hu_allocator_t *alloc, const char *path,
     alloc->free(alloc->ctx, json, json_len + 1);
     return err;
 }
+
+#if defined(__unix__) || defined(__APPLE__)
+static int eval_validate_json_basename_cmp(const void *a, const void *b) {
+    const char *const *sa = (const char *const *)a;
+    const char *const *sb = (const char *const *)b;
+    return strcmp(*sa, *sb);
+}
+
+hu_error_t hu_eval_suites_validate_dir(hu_allocator_t *alloc, const char *dir, FILE *diag,
+                                       hu_eval_validate_stats_t *out_stats) {
+    if (!alloc || !dir || !out_stats)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out_stats, 0, sizeof(*out_stats));
+
+    enum { max_json_files = 256, path_max = 1024 };
+    DIR *d = opendir(dir);
+    if (!d) {
+        if (diag)
+            fprintf(diag, "eval validate: cannot open %s: %s\n", dir, strerror(errno));
+        return HU_ERR_IO;
+    }
+
+    char **names = alloc->alloc(alloc->ctx, max_json_files * sizeof(char *));
+    if (!names) {
+        closedir(d);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    size_t n_names = 0;
+    struct dirent *ent;
+    while ((ent = readdir(d)) != NULL) {
+        if (ent->d_name[0] == '.')
+            continue;
+        size_t len = strlen(ent->d_name);
+        if (len < 5 || strcmp(ent->d_name + len - 5, ".json") != 0)
+            continue;
+        if (n_names >= (size_t)max_json_files)
+            break;
+        char *copy = hu_strdup(alloc, ent->d_name);
+        if (!copy) {
+            closedir(d);
+            for (size_t i = 0; i < n_names; i++)
+                alloc->free(alloc->ctx, names[i], strlen(names[i]) + 1);
+            alloc->free(alloc->ctx, names, max_json_files * sizeof(char *));
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        names[n_names++] = copy;
+    }
+    closedir(d);
+
+    if (n_names == 0) {
+        if (diag)
+            fprintf(diag, "eval validate: no .json suites in %s\n", dir);
+        out_stats->errors++;
+        alloc->free(alloc->ctx, names, max_json_files * sizeof(char *));
+        return HU_OK;
+    }
+
+    if (n_names > 1)
+        qsort(names, n_names, sizeof(names[0]), eval_validate_json_basename_cmp);
+
+    char **seen_ids = NULL;
+    size_t n_seen = 0;
+    size_t cap_seen = 0;
+    hu_error_t ret = HU_OK;
+
+    for (size_t fi = 0; fi < n_names; fi++) {
+        char path[path_max];
+        int plen = snprintf(path, sizeof(path), "%s/%s", dir, names[fi]);
+        if (plen < 0 || (size_t)plen >= sizeof(path)) {
+            if (diag)
+                fprintf(diag, "eval validate: path too long for %s/%s\n", dir, names[fi]);
+            out_stats->errors++;
+            continue;
+        }
+
+        hu_eval_suite_t suite = {0};
+        hu_error_t le = hu_eval_suite_load_json_path(alloc, path, &suite);
+        if (le != HU_OK) {
+            if (diag)
+                fprintf(diag, "eval validate: %s: load failed (%s)\n", path, hu_error_string(le));
+            out_stats->errors++;
+            hu_eval_suite_free(alloc, &suite);
+            continue;
+        }
+
+        if (suite.tasks_count == 0) {
+            if (diag)
+                fprintf(diag, "eval validate: %s: suite has no tasks\n", path);
+            out_stats->errors++;
+            hu_eval_suite_free(alloc, &suite);
+            continue;
+        }
+
+        out_stats->suites_ok++;
+
+        for (size_t ti = 0; ti < suite.tasks_count; ti++) {
+            hu_eval_task_t *t = &suite.tasks[ti];
+            out_stats->tasks++;
+
+            const char *tid = t->id ? t->id : "";
+            if (!t->id || tid[0] == '\0') {
+                if (diag)
+                    fprintf(diag, "eval validate: %s: task[%zu]: missing non-empty id\n", path, ti);
+                out_stats->errors++;
+                continue;
+            }
+
+            if (!t->prompt || t->prompt[0] == '\0') {
+                if (diag)
+                    fprintf(diag, "eval validate: %s: task %s: missing non-empty prompt\n", path, tid);
+                out_stats->errors++;
+                continue;
+            }
+
+            bool has_expected = t->expected && t->expected[0] != '\0';
+            bool has_rubric = t->rubric && t->rubric[0] != '\0';
+            if (!has_expected && !has_rubric) {
+                if (diag)
+                    fprintf(diag, "eval validate: %s: task %s: need expected or rubric\n", path, tid);
+                out_stats->errors++;
+                continue;
+            }
+
+            bool is_dup = false;
+            for (size_t si = 0; si < n_seen; si++) {
+                if (strcmp(seen_ids[si], tid) == 0) {
+                    is_dup = true;
+                    break;
+                }
+            }
+            if (is_dup) {
+                if (diag)
+                    fprintf(diag, "eval validate: duplicate task id %s (in %s)\n", tid, path);
+                out_stats->errors++;
+                continue;
+            }
+
+            if (n_seen >= cap_seen) {
+                size_t ncap = cap_seen ? cap_seen * 2u : 32u;
+                size_t old_b = cap_seen * sizeof(char *);
+                size_t new_b = ncap * sizeof(char *);
+                char **next = alloc->realloc(alloc->ctx, seen_ids, old_b, new_b);
+                if (!next) {
+                    hu_eval_suite_free(alloc, &suite);
+                    ret = HU_ERR_OUT_OF_MEMORY;
+                    goto validate_cleanup;
+                }
+                seen_ids = next;
+                cap_seen = ncap;
+            }
+
+            char *id_copy = hu_strdup(alloc, tid);
+            if (!id_copy) {
+                hu_eval_suite_free(alloc, &suite);
+                ret = HU_ERR_OUT_OF_MEMORY;
+                goto validate_cleanup;
+            }
+            seen_ids[n_seen++] = id_copy;
+        }
+
+        hu_eval_suite_free(alloc, &suite);
+    }
+
+validate_cleanup:
+    for (size_t i = 0; i < n_seen; i++)
+        alloc->free(alloc->ctx, seen_ids[i], strlen(seen_ids[i]) + 1);
+    if (seen_ids)
+        alloc->free(alloc->ctx, seen_ids, cap_seen * sizeof(char *));
+    for (size_t i = 0; i < n_names; i++)
+        alloc->free(alloc->ctx, names[i], strlen(names[i]) + 1);
+    alloc->free(alloc->ctx, names, max_json_files * sizeof(char *));
+    return ret;
+}
+#else
+hu_error_t hu_eval_suites_validate_dir(hu_allocator_t *alloc, const char *dir, FILE *diag,
+                                       hu_eval_validate_stats_t *out_stats) {
+    (void)dir;
+    if (!alloc || !out_stats)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out_stats, 0, sizeof(*out_stats));
+    if (diag)
+        fprintf(diag, "eval validate: not supported on this platform\n");
+    return HU_ERR_NOT_SUPPORTED;
+}
+#endif
 
 hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, const char *model, size_t model_len, hu_eval_suite_t *suite, hu_eval_match_mode_t mode, hu_eval_run_t *out) {
     if (!alloc || !suite || !out)
@@ -633,7 +822,61 @@ hu_error_t hu_eval_compare(hu_allocator_t *alloc, const hu_eval_run_t *baseline,
     return HU_OK;
 }
 
+const char *hu_eval_baseline_status_for_score(double score) {
+    if (score >= 0.85)
+        return "SOTA";
+    if (score >= 0.70)
+        return "COMPETITIVE";
+    if (score >= 0.50)
+        return "PARTIAL";
+    return "BASIC";
+}
+
+bool hu_eval_baseline_try_mock_score_for_stem(const char *suite_stem, double *out_score) {
+    if (!suite_stem || !out_score)
+        return false;
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    static const struct {
+        const char *stem;
+        double score;
+    } k_mock[] = {
+        {"fidelity", 0.72},
+        {"intelligence", 0.65},
+        {"reasoning", 0.58},
+        {"tool_use", 0.70},
+        {"memory", 0.75},
+        {"social", 0.68},
+    };
+    for (size_t i = 0; i < sizeof(k_mock) / sizeof(k_mock[0]); i++) {
+        if (strcmp(suite_stem, k_mock[i].stem) == 0) {
+            *out_score = k_mock[i].score;
+            return true;
+        }
+    }
+#else
+    (void)suite_stem;
+    (void)out_score;
+#endif
+    return false;
+}
+
 #ifdef HU_ENABLE_SQLITE
+#if defined(HU_IS_TEST) && HU_IS_TEST
+enum { hu_eval_baseline_test_cap = 64 };
+static char hu_eval_baseline_test_names[hu_eval_baseline_test_cap][128];
+static double hu_eval_baseline_test_scores[hu_eval_baseline_test_cap];
+static size_t hu_eval_baseline_test_tasks[hu_eval_baseline_test_cap];
+static size_t hu_eval_baseline_test_n;
+
+static int hu_eval_baseline_test_find(const char *name) {
+    for (size_t i = 0; i < hu_eval_baseline_test_n; i++) {
+        if (strcmp(hu_eval_baseline_test_names[i], name) == 0)
+            return (int)i;
+    }
+    return -1;
+}
+#endif
+
 hu_error_t hu_eval_init_tables(sqlite3 *db) {
     if (!db) return HU_ERR_INVALID_ARGUMENT;
     const char *runs_sql =
@@ -663,7 +906,88 @@ hu_error_t hu_eval_init_tables(sqlite3 *db) {
         "elapsed_ms INTEGER)";
     if (sqlite3_exec(db, results_sql, NULL, NULL, NULL) != SQLITE_OK)
         return HU_ERR_MEMORY_BACKEND;
+    const char *baselines_sql = "CREATE TABLE IF NOT EXISTS eval_baselines ("
+                                "suite_name TEXT PRIMARY KEY,"
+                                "score REAL NOT NULL,"
+                                "task_count INTEGER NOT NULL,"
+                                "measured_at TEXT DEFAULT (datetime('now'))"
+                                ")";
+    if (sqlite3_exec(db, baselines_sql, NULL, NULL, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
     return HU_OK;
+}
+
+hu_error_t hu_eval_persist_baseline(sqlite3 *db, const char *suite_name, double score, size_t task_count) {
+    if (!suite_name || suite_name[0] == '\0')
+        return HU_ERR_INVALID_ARGUMENT;
+    if (score < 0.0 || score > 1.0 || isnan(score) || isinf(score))
+        return HU_ERR_INVALID_ARGUMENT;
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)db;
+    int ix = hu_eval_baseline_test_find(suite_name);
+    if (ix >= 0) {
+        hu_eval_baseline_test_scores[(size_t)ix] = score;
+        hu_eval_baseline_test_tasks[(size_t)ix] = task_count;
+        return HU_OK;
+    }
+    if (hu_eval_baseline_test_n >= hu_eval_baseline_test_cap)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t nl = strlen(suite_name);
+    if (nl >= sizeof(hu_eval_baseline_test_names[0]))
+        return HU_ERR_INVALID_ARGUMENT;
+    memcpy(hu_eval_baseline_test_names[hu_eval_baseline_test_n], suite_name, nl + 1);
+    hu_eval_baseline_test_scores[hu_eval_baseline_test_n] = score;
+    hu_eval_baseline_test_tasks[hu_eval_baseline_test_n] = task_count;
+    hu_eval_baseline_test_n++;
+    return HU_OK;
+#else
+    if (!db)
+        return HU_ERR_INVALID_ARGUMENT;
+    sqlite3_stmt *st = NULL;
+    const char *sql = "INSERT INTO eval_baselines(suite_name,score,task_count,measured_at) "
+                      "VALUES(?,?,?,datetime('now')) "
+                      "ON CONFLICT(suite_name) DO UPDATE SET "
+                      "score=excluded.score,task_count=excluded.task_count,measured_at=datetime('now')";
+    if (sqlite3_prepare_v2(db, sql, -1, &st, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
+    sqlite3_bind_text(st, 1, suite_name, -1, SQLITE_STATIC);
+    sqlite3_bind_double(st, 2, score);
+    sqlite3_bind_int64(st, 3, (sqlite3_int64)task_count);
+    hu_error_t ret = HU_OK;
+    if (sqlite3_step(st) != SQLITE_DONE)
+        ret = HU_ERR_MEMORY_BACKEND;
+    sqlite3_finalize(st);
+    return ret;
+#endif
+}
+
+hu_error_t hu_eval_get_baseline(sqlite3 *db, const char *suite_name, double *out_score) {
+    if (!suite_name || !out_score)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_score = 0.0;
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)db;
+    int ix = hu_eval_baseline_test_find(suite_name);
+    if (ix < 0)
+        return HU_ERR_NOT_FOUND;
+    *out_score = hu_eval_baseline_test_scores[(size_t)ix];
+    return HU_OK;
+#else
+    if (!db)
+        return HU_ERR_INVALID_ARGUMENT;
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(db, "SELECT score FROM eval_baselines WHERE suite_name=?", -1, &st, NULL) !=
+        SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
+    sqlite3_bind_text(st, 1, suite_name, -1, SQLITE_STATIC);
+    if (sqlite3_step(st) != SQLITE_ROW) {
+        sqlite3_finalize(st);
+        return HU_ERR_NOT_FOUND;
+    }
+    *out_score = sqlite3_column_double(st, 0);
+    sqlite3_finalize(st);
+    return HU_OK;
+#endif
 }
 
 hu_error_t hu_eval_store_run(hu_allocator_t *alloc, sqlite3 *db, const hu_eval_run_t *run) {

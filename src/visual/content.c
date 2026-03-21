@@ -21,6 +21,7 @@
 #define HU_VISUAL_GOV_DAILY_MAX    3u
 #define HU_VISUAL_GOV_WEEKLY_MAX   10u
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
 static uint64_t s_vis_gov_day;
 static uint64_t s_vis_gov_week;
 static uint8_t s_vis_gov_daily;
@@ -39,6 +40,7 @@ static void visual_gov_apply_resets(uint64_t now_ms) {
         s_vis_gov_weekly = 0;
     }
 }
+#endif /* !HU_IS_TEST */
 
 bool hu_visual_proactive_media_governor_allow(uint64_t now_ms) {
 #if defined(HU_IS_TEST) && HU_IS_TEST

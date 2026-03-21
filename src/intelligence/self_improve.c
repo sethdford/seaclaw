@@ -20,8 +20,19 @@
 
 #include "human/eval.h"
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
+#include "human/config.h"
+#include "human/providers/factory.h"
+#include <stdint.h>
+#endif
+
 #define PATCH_TEXT_MAX 2048
 #define TOOL_NAME_MAX  128
+
+/* Average judge score delta threshold: rollback structured patch if worse by more than this. */
+#define HU_SELF_IMPROVE_EVAL_REGRESSION_THRESHOLD 0.05
+
+#define HU_SELF_IMPROVE_FAST_EVAL_TASKS 3
 
 hu_error_t hu_self_improve_create(hu_allocator_t *alloc, sqlite3 *db,
                                   hu_self_improve_t *out) {
@@ -54,6 +65,19 @@ hu_error_t hu_self_improve_init_tables(hu_self_improve_t *engine) {
         "tool_name TEXT PRIMARY KEY, weight REAL DEFAULT 1.0, "
         "successes INTEGER DEFAULT 0, failures INTEGER DEFAULT 0, updated_at INTEGER)";
     rc = sqlite3_exec(engine->db, sql_prefs, NULL, NULL, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+
+    const char *sql_deltas =
+        "CREATE TABLE IF NOT EXISTS self_improve_deltas("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "patch_id TEXT NOT NULL,"
+        "score_before REAL,"
+        "score_after REAL,"
+        "delta REAL,"
+        "rolled_back INTEGER DEFAULT 0,"
+        "created_at TEXT DEFAULT (datetime('now')))";
+    rc = sqlite3_exec(engine->db, sql_deltas, NULL, NULL, NULL);
     if (rc != SQLITE_OK)
         return HU_ERR_MEMORY_STORE;
 
@@ -1213,6 +1237,271 @@ hu_error_t hu_self_improve_get_structured_patches(hu_self_improve_t *engine,
     *out_count = count;
     return HU_OK;
 #endif
+}
+
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
+static void self_improve_pick_task_indices(size_t n_tasks, unsigned seed,
+                                           size_t out_pick[HU_SELF_IMPROVE_FAST_EVAL_TASKS],
+                                           size_t *out_n) {
+    *out_n = 0;
+    if (n_tasks == 0)
+        return;
+    size_t want = HU_SELF_IMPROVE_FAST_EVAL_TASKS;
+    if (n_tasks < want)
+        want = n_tasks;
+    for (size_t k = 0; k < want; k++) {
+        size_t idx = ((size_t)seed + k * 7919u) % n_tasks;
+        size_t offset = 0;
+        bool placed = false;
+        while (offset < n_tasks) {
+            size_t cand = (idx + offset) % n_tasks;
+            bool dup = false;
+            for (size_t j = 0; j < k; j++) {
+                if (out_pick[j] == cand) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (!dup) {
+                out_pick[k] = cand;
+                placed = true;
+                break;
+            }
+            offset++;
+        }
+        if (!placed)
+            out_pick[k] = k % n_tasks;
+    }
+    *out_n = want;
+}
+
+static double self_improve_avg_judge_score(const hu_eval_run_t *run) {
+    if (!run || run->results_count == 0)
+        return 0.0;
+    double sum = 0.0;
+    for (size_t i = 0; i < run->results_count; i++)
+        sum += run->results[i].score;
+    return sum / (double)run->results_count;
+}
+
+static hu_error_t self_improve_insert_delta(sqlite3 *db, const char *patch_id_str, double sb, double sa,
+                                            double d) {
+    const char *ins =
+        "INSERT INTO self_improve_deltas (patch_id, score_before, score_after, delta, rolled_back) "
+        "VALUES (?1, ?2, ?3, ?4, 0)";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, ins, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+    sqlite3_bind_text(stmt, 1, patch_id_str, -1, SQLITE_STATIC);
+    sqlite3_bind_double(stmt, 2, sb);
+    sqlite3_bind_double(stmt, 3, sa);
+    sqlite3_bind_double(stmt, 4, d);
+    int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return rc == SQLITE_DONE ? HU_OK : HU_ERR_MEMORY_STORE;
+}
+
+static hu_error_t self_improve_deactivate_structured_row(sqlite3 *db, sqlite3_int64 rowid) {
+    const char *sql =
+        "UPDATE prompt_patches SET active = 0 WHERE id = ?1 AND source = 'structured'";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+    sqlite3_bind_int64(stmt, 1, rowid);
+    int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return rc == SQLITE_DONE ? HU_OK : HU_ERR_MEMORY_STORE;
+}
+
+static hu_error_t self_improve_open_fidelity_suite(hu_allocator_t *alloc, hu_eval_suite_t *suite) {
+    static const char *paths[] = {
+#ifdef HU_EVAL_SUITES_DIR
+        HU_EVAL_SUITES_DIR "/fidelity.json",
+#endif
+        "eval_suites/fidelity.json",
+        NULL,
+    };
+    for (size_t pi = 0; paths[pi]; pi++) {
+        hu_error_t e = hu_eval_suite_load_json_path(alloc, paths[pi], suite);
+        if (e == HU_OK)
+            return HU_OK;
+    }
+    return HU_ERR_IO;
+}
+
+static hu_error_t self_improve_run_fast_eval(hu_allocator_t *alloc, hu_eval_suite_t *full,
+                                             const size_t pick[HU_SELF_IMPROVE_FAST_EVAL_TASKS],
+                                             size_t n_pick, hu_provider_t *provider, const char *model,
+                                             size_t model_len, double *out_score) {
+    if (!alloc || !full || !pick || !provider || !out_score)
+        return HU_ERR_INVALID_ARGUMENT;
+    hu_eval_task_t stack_tasks[HU_SELF_IMPROVE_FAST_EVAL_TASKS];
+    for (size_t i = 0; i < n_pick; i++) {
+        if (pick[i] >= full->tasks_count)
+            return HU_ERR_INVALID_ARGUMENT;
+        stack_tasks[i] = full->tasks[pick[i]];
+    }
+    hu_eval_suite_t sub = *full;
+    sub.tasks = stack_tasks;
+    sub.tasks_count = n_pick;
+    hu_eval_run_t run = {0};
+    hu_error_t err =
+        hu_eval_run_suite(alloc, provider, model, model_len, &sub, full->default_match_mode, &run);
+    if (err != HU_OK) {
+        hu_eval_run_free(alloc, &run);
+        return err;
+    }
+    *out_score = self_improve_avg_judge_score(&run);
+    hu_eval_run_free(alloc, &run);
+    return HU_OK;
+}
+#endif /* !HU_IS_TEST */
+
+hu_error_t hu_self_improve_eval_and_apply(hu_allocator_t *alloc, sqlite3 *db,
+                                          const hu_structured_patch_t *patch,
+                                          hu_self_improve_delta_t *out_delta) {
+    if (!alloc || !db || !patch || !out_delta)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!patch->parsed)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out_delta, 0, sizeof(*out_delta));
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    out_delta->score_before = 0.7;
+    out_delta->score_after = 0.72;
+    out_delta->delta = out_delta->score_after - out_delta->score_before;
+    out_delta->should_rollback = false;
+    snprintf(out_delta->patch_id, sizeof(out_delta->patch_id), "test");
+    return HU_OK;
+#else
+    hu_self_improve_t engine = {0};
+    hu_error_t err = hu_self_improve_create(alloc, db, &engine);
+    if (err != HU_OK)
+        return err;
+    err = hu_self_improve_init_tables(&engine);
+    if (err != HU_OK)
+        return err;
+
+    hu_eval_suite_t suite = {0};
+    err = self_improve_open_fidelity_suite(alloc, &suite);
+    if (err != HU_OK) {
+        hu_eval_suite_free(alloc, &suite);
+        return err;
+    }
+
+    size_t work_n = suite.tasks_count;
+    if (work_n > 128)
+        work_n = 128;
+
+    size_t picks[HU_SELF_IMPROVE_FAST_EVAL_TASKS];
+    size_t n_pick = 0;
+    unsigned seed = (unsigned)time(NULL) ^ (unsigned)patch->type ^
+                    (unsigned)(unsigned char)patch->value[0];
+    self_improve_pick_task_indices(work_n, seed, picks, &n_pick);
+    if (n_pick == 0) {
+        hu_eval_suite_free(alloc, &suite);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    hu_config_t cfg = {0};
+    err = hu_config_load(alloc, &cfg);
+    if (err != HU_OK) {
+        hu_eval_suite_free(alloc, &suite);
+        return err;
+    }
+    const char *prov = cfg.default_provider ? cfg.default_provider : "openai";
+    size_t prov_len = strlen(prov);
+    const char *model = cfg.default_model ? cfg.default_model : "";
+    size_t model_len = model ? strlen(model) : 0;
+    hu_provider_t provider = {0};
+    err = hu_provider_create_from_config(alloc, &cfg, prov, prov_len, &provider);
+    hu_config_deinit(&cfg);
+    if (err != HU_OK) {
+        hu_eval_suite_free(alloc, &suite);
+        return err;
+    }
+
+    double before = 0.0;
+    err = self_improve_run_fast_eval(alloc, &suite, picks, n_pick, &provider, model, model_len, &before);
+    if (err != HU_OK) {
+        if (provider.vtable && provider.vtable->deinit)
+            provider.vtable->deinit(provider.ctx, alloc);
+        hu_eval_suite_free(alloc, &suite);
+        return err;
+    }
+
+    err = hu_self_improve_apply_structured_patch(&engine, patch);
+    if (err != HU_OK) {
+        if (provider.vtable && provider.vtable->deinit)
+            provider.vtable->deinit(provider.ctx, alloc);
+        hu_eval_suite_free(alloc, &suite);
+        return err;
+    }
+
+    sqlite3_int64 rowid = sqlite3_last_insert_rowid(db);
+    if (rowid <= 0) {
+        if (provider.vtable && provider.vtable->deinit)
+            provider.vtable->deinit(provider.ctx, alloc);
+        hu_eval_suite_free(alloc, &suite);
+        return HU_ERR_INTERNAL;
+    }
+    snprintf(out_delta->patch_id, sizeof(out_delta->patch_id), "%lld", (long long)rowid);
+
+    double after = 0.0;
+    err = self_improve_run_fast_eval(alloc, &suite, picks, n_pick, &provider, model, model_len, &after);
+    if (provider.vtable && provider.vtable->deinit)
+        provider.vtable->deinit(provider.ctx, alloc);
+    hu_eval_suite_free(alloc, &suite);
+    if (err != HU_OK) {
+        (void)self_improve_deactivate_structured_row(db, rowid);
+        return err;
+    }
+
+    out_delta->score_before = before;
+    out_delta->score_after = after;
+    out_delta->delta = after - before;
+    out_delta->should_rollback = (out_delta->delta < -HU_SELF_IMPROVE_EVAL_REGRESSION_THRESHOLD);
+
+    err = self_improve_insert_delta(db, out_delta->patch_id, before, after, out_delta->delta);
+    if (err != HU_OK)
+        return err;
+
+    return HU_OK;
+#endif /* !HU_IS_TEST */
+}
+
+hu_error_t hu_self_improve_rollback_if_negative(hu_allocator_t *alloc, sqlite3 *db,
+                                                const hu_self_improve_delta_t *delta) {
+    (void)alloc;
+    if (!db || !delta)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)delta;
+    return HU_OK;
+#else
+    if (!delta->should_rollback)
+        return HU_OK;
+
+    char *end = NULL;
+    sqlite3_int64 rowid = (sqlite3_int64)strtoll(delta->patch_id, &end, 10);
+    if (!end || end == delta->patch_id || rowid <= 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    hu_error_t err = self_improve_deactivate_structured_row(db, rowid);
+    if (err != HU_OK)
+        return err;
+
+    const char *upd = "UPDATE self_improve_deltas SET rolled_back = 1 WHERE id = ("
+                       "SELECT id FROM self_improve_deltas WHERE patch_id = ?1 ORDER BY id DESC LIMIT 1)";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, upd, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+    sqlite3_bind_text(stmt, 1, delta->patch_id, -1, SQLITE_STATIC);
+    (void)sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return HU_OK;
+#endif /* !HU_IS_TEST */
 }
 
 #endif /* HU_ENABLE_SQLITE */

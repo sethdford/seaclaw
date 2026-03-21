@@ -232,6 +232,55 @@ static void test_eval_improvement_exceeds_10_percent(void) {
     sqlite3_close(db);
 }
 
+static void test_eval_baselines_table_created(void) {
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    HU_ASSERT_EQ(hu_eval_init_tables(db), HU_OK);
+    sqlite3_stmt *st = NULL;
+    HU_ASSERT_EQ(sqlite3_prepare_v2(db,
+                                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='eval_baselines'",
+                                    -1, &st, NULL),
+                 SQLITE_OK);
+    HU_ASSERT_EQ(sqlite3_step(st), SQLITE_ROW);
+    HU_ASSERT_EQ(sqlite3_column_int(st, 0), 1);
+    sqlite3_finalize(st);
+    sqlite3_close(db);
+}
+
+static void test_eval_persist_get_baseline_roundtrip(void) {
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    HU_ASSERT_EQ(hu_eval_init_tables(db), HU_OK);
+    HU_ASSERT_EQ(hu_eval_persist_baseline(db, "eval_baseline_rt_suite", 0.81, 7), HU_OK);
+    double got = 0.0;
+    HU_ASSERT_EQ(hu_eval_get_baseline(db, "eval_baseline_rt_suite", &got), HU_OK);
+    HU_ASSERT_FLOAT_EQ(got, 0.81, 0.001);
+    sqlite3_close(db);
+}
+
+static void test_eval_get_baseline_unknown_returns_not_found(void) {
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    HU_ASSERT_EQ(hu_eval_init_tables(db), HU_OK);
+    double x = 99.0;
+    HU_ASSERT_EQ(hu_eval_get_baseline(db, "eval_baseline_missing_suite_key", &x), HU_ERR_NOT_FOUND);
+    HU_ASSERT_FLOAT_EQ(x, 0.0, 0.001);
+    sqlite3_close(db);
+}
+
+static void test_eval_persist_get_baseline_null_args(void) {
+    sqlite3 *db = NULL;
+    HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    double s = 0.0;
+    HU_ASSERT_EQ(hu_eval_get_baseline(db, "x", NULL), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_get_baseline(db, NULL, &s), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_persist_baseline(db, NULL, 0.5, 1), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_persist_baseline(db, "", 0.5, 1), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_persist_baseline(db, "badscore", -0.1, 1), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_persist_baseline(db, "badscore2", 1.5, 1), HU_ERR_INVALID_ARGUMENT);
+    sqlite3_close(db);
+}
+
 void run_eval_history_tests(void) {
     HU_TEST_SUITE("Eval History Storage");
     HU_RUN_TEST(test_eval_init_tables_succeeds);
@@ -244,6 +293,10 @@ void run_eval_history_tests(void) {
     HU_RUN_TEST(test_eval_detect_regression_passes_when_stable);
     HU_RUN_TEST(test_eval_detect_regression_triggers_on_drop);
     HU_RUN_TEST(test_eval_improvement_exceeds_10_percent);
+    HU_RUN_TEST(test_eval_baselines_table_created);
+    HU_RUN_TEST(test_eval_persist_get_baseline_roundtrip);
+    HU_RUN_TEST(test_eval_get_baseline_unknown_returns_not_found);
+    HU_RUN_TEST(test_eval_persist_get_baseline_null_args);
 }
 
 #else

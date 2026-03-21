@@ -242,6 +242,27 @@ static void test_doctor_semantics_persona_line_when_configured(void) {
 }
 #endif
 
+#if HU_IS_TEST
+static void test_doctor_semantics_local_inference_ok_in_test_mode(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_config_t cfg = {0};
+    char prov[] = "ollama";
+    cfg.default_provider = prov;
+    cfg.default_temperature = 0.7;
+    cfg.gateway.port = 3000;
+
+    hu_diag_item_t *items = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_doctor_check_config_semantics(&alloc, &cfg, &items, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(items);
+    HU_ASSERT_TRUE(doctor_diag_has_substr(items, count, "[doctor] Ollama (localhost:11434): OK"));
+    HU_ASSERT_TRUE(doctor_diag_has_substr(items, count, "[doctor] llama-cli (PATH): OK"));
+    HU_ASSERT_TRUE(doctor_diag_has_substr(items, count, "[doctor] Embedded model provider:"));
+    doctor_free_semantics_result(&alloc, items, count);
+}
+#endif
+
 static void test_agent_commands_parse(void) {
     const hu_slash_cmd_t *c = hu_agent_commands_parse("/new", 4);
     HU_ASSERT_NOT_NULL(c);
@@ -399,6 +420,9 @@ void run_ported_modules_tests(void) {
     HU_RUN_TEST(test_doctor_semantics_http_line_when_gateway_enabled);
 #if defined(HU_ENABLE_PERSONA)
     HU_RUN_TEST(test_doctor_semantics_persona_line_when_configured);
+#endif
+#if HU_IS_TEST
+    HU_RUN_TEST(test_doctor_semantics_local_inference_ok_in_test_mode);
 #endif
     HU_RUN_TEST(test_agent_commands_parse);
     HU_RUN_TEST(test_agent_commands_bare_reset_prompt);

@@ -18,6 +18,10 @@ typedef struct hu_voice_rt_session {
     bool connected;
     char *session_id;
     void *ws_client; /* hu_ws_client_t * when connected; opaque */
+#if HU_IS_TEST
+    /** Mock recv_event sequence per session (alternates transcript / done). */
+    unsigned test_recv_seq;
+#endif
 } hu_voice_rt_session_t;
 
 typedef struct hu_voice_rt_event {
@@ -33,6 +37,8 @@ hu_error_t hu_voice_rt_session_create(hu_allocator_t *alloc, const hu_voice_rt_c
                                       hu_voice_rt_session_t **out);
 hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session);
 hu_error_t hu_voice_rt_send_audio(hu_voice_rt_session_t *session, const void *data, size_t data_len);
+/** Cancel the in-flight model response (OpenAI Realtime `response.cancel`). */
+hu_error_t hu_voice_rt_response_cancel(hu_voice_rt_session_t *session);
 hu_error_t hu_voice_rt_recv_event(hu_voice_rt_session_t *session, hu_allocator_t *alloc,
                                   hu_voice_rt_event_t *out, int timeout_ms);
 void hu_voice_rt_event_free(hu_allocator_t *alloc, hu_voice_rt_event_t *event);

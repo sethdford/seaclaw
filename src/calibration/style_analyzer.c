@@ -26,6 +26,7 @@ typedef struct {
     uint32_t count;
 } hu_calib_phrase_slot_t;
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
 static size_t hu_calib_count_emoji_utf8(const char *s) {
     size_t count = 0;
     const unsigned char *p = (const unsigned char *)s;
@@ -151,6 +152,7 @@ static int hu_calib_cmp_slot_desc(const void *a, const void *b) {
 static int hu_calib_cmp_str(const void *a, const void *b) {
     return strcmp(*(const char *const *)a, *(const char *const *)b);
 }
+#endif /* !HU_IS_TEST */
 
 void hu_style_report_deinit(hu_allocator_t *alloc, hu_style_report_t *report) {
     if (!alloc || !report)

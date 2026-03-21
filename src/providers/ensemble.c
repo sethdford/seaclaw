@@ -1,3 +1,4 @@
+/* Config notes: hybrid local + cloud via ensemble — see comment block in ensemble.h. */
 #include "human/providers/ensemble.h"
 #include <stdio.h>
 #include <string.h>

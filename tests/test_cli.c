@@ -4,9 +4,24 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "test_framework.h"
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+#ifndef HU_EVAL_SUITES_DIR
+#error "HU_EVAL_SUITES_DIR must be defined when building human_tests"
+#endif
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200809L
+#include <stddef.h>
+#elif defined(__linux__) || defined(__APPLE__)
+/* open_memstream */
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#include <stdio.h>
+#endif
 
 /* Use a temp HOME with no config so hu_config_load uses defaults and validates. */
 static void set_test_home(void) {
@@ -107,6 +122,84 @@ static void test_cmd_init_sc_is_test_returns_ok(void) {
     HU_ASSERT_EQ(err, HU_OK);
 }
 
+#if defined(__unix__) || defined(__APPLE__)
+static void test_cmd_eval_baseline_outputs_score_table(void) {
+    set_test_home();
+    char tmpl[] = "/tmp/hu_ev_cli_blXXXXXX";
+    int tfd = mkstemp(tmpl);
+    HU_ASSERT(tfd >= 0);
+    if (close(tfd) != 0) {
+        unlink(tmpl);
+        HU_FAIL("close tmp");
+    }
+
+    int save_out = dup(STDOUT_FILENO);
+    HU_ASSERT(save_out >= 0);
+    if (!freopen(tmpl, "w", stdout)) {
+        dup2(save_out, STDOUT_FILENO);
+        close(save_out);
+        unlink(tmpl);
+        HU_FAIL("freopen stdout");
+    }
+
+    hu_allocator_t alloc = hu_system_allocator();
+    char *argv[] = {"human", "eval", "baseline", HU_EVAL_SUITES_DIR};
+    hu_error_t err = cmd_eval(&alloc, 4, argv);
+
+    fflush(stdout);
+    dup2(save_out, STDOUT_FILENO);
+    close(save_out);
+
+    FILE *rf = fopen(tmpl, "r");
+    HU_ASSERT_NOT_NULL(rf);
+    char buf[65536];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, rf);
+    buf[n] = '\0';
+    fclose(rf);
+    unlink(tmpl);
+
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(strstr(buf, "Suite") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "Tasks") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "Score") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "Status") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "fidelity") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "0.72") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "COMPETITIVE") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "intelligence") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "0.65") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "PARTIAL") != NULL);
+}
+#endif
+
+static void test_cmd_setup_local_model_ok(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char *argv[] = {"human", "setup", "local-model"};
+    HU_ASSERT_EQ(cmd_setup(&alloc, 3, argv), HU_OK);
+}
+
+static void test_cmd_setup_unknown_subcommand_fails(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char *argv[] = {"human", "setup", "typo"};
+    HU_ASSERT_NEQ(cmd_setup(&alloc, 3, argv), HU_OK);
+}
+
+#if defined(__linux__) || defined(__APPLE__)
+static void test_cli_setup_local_model_emit_contains_expected_lines(void) {
+    char *buf = NULL;
+    size_t len = 0;
+    FILE *fp = open_memstream(&buf, &len);
+    HU_ASSERT_NOT_NULL(fp);
+    HU_ASSERT_EQ(hu_cli_setup_local_model_emit(fp), HU_OK);
+    fclose(fp);
+    HU_ASSERT_NOT_NULL(buf);
+    HU_ASSERT_TRUE(strstr(buf, "test mode") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "ollama pull llama3.2:3b") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "huggingface.co") != NULL);
+    free(buf);
+}
+#endif
+
 /* Demo mode: --demo flag sets demo_mode in parsed args */
 static void test_agent_cli_demo_flag_parsing(void) {
     const char *argv[] = {"human", "agent", "--demo"};
@@ -183,6 +276,14 @@ void run_cli_tests(void) {
     HU_RUN_TEST(test_cmd_update_check);
     HU_RUN_TEST(test_cmd_sandbox_default);
     HU_RUN_TEST(test_cmd_init_sc_is_test_returns_ok);
+#if defined(__unix__) || defined(__APPLE__)
+    HU_RUN_TEST(test_cmd_eval_baseline_outputs_score_table);
+#endif
+    HU_RUN_TEST(test_cmd_setup_local_model_ok);
+    HU_RUN_TEST(test_cmd_setup_unknown_subcommand_fails);
+#if defined(__linux__) || defined(__APPLE__)
+    HU_RUN_TEST(test_cli_setup_local_model_emit_contains_expected_lines);
+#endif
     HU_RUN_TEST(test_agent_cli_demo_flag_parsing);
     HU_RUN_TEST(test_agent_cli_no_demo_flag);
     HU_RUN_TEST(test_agent_cli_config_flag_parsing);

@@ -6,6 +6,9 @@
 #include "human/agent/profile.h"
 #include "human/agent/tui.h"
 #include "human/channels/cli.h"
+#ifdef HU_HAS_VOICE_CHANNEL
+#include "human/channels/voice_channel.h"
+#endif
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/core/string.h"
@@ -45,8 +48,10 @@
 #include "human/tool.h"
 #include "human/tools/factory.h"
 #include "human/version.h"
+#include <ctype.h>
 #include <errno.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -67,6 +72,21 @@
 
 #define HU_CODENAME     "Human"
 #define HU_CLI_MAX_PATH 1024
+
+#ifndef HU_IS_TEST
+/* Gemini-tier router IDs are only valid for Google providers; OpenAI et al. need cfg model names. */
+static bool cli_provider_uses_gemini_slot_models(const char *prov, size_t prov_len) {
+    if (!prov || prov_len == 0)
+        return false;
+    char buf[12];
+    if (prov_len >= sizeof(buf))
+        return false;
+    for (size_t i = 0; i < prov_len; i++)
+        buf[i] = (char)tolower((unsigned char)prov[i]);
+    buf[prov_len] = '\0';
+    return strcmp(buf, "gemini") == 0 || strcmp(buf, "google") == 0 || strcmp(buf, "vertex") == 0;
+}
+#endif
 
 /* ── ANSI escape helpers (from design_tokens.h) ─────────────────────── */
 #define HU_ANSI_HIDE_CURSOR "\033[?25l"
@@ -255,6 +275,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     const char *config_path = parsed_args.config_path ? parsed_args.config_path
                                                       : getenv("HUMAN_CONFIG_PATH");
     hu_config_t cfg;
+#ifdef HU_HAS_VOICE_CHANNEL
+    hu_channel_t cli_voice_ch = {0};
+#endif
     hu_error_t err =
         (config_path && config_path[0]) ? hu_config_load_from(alloc, config_path, &cfg)
                                          : hu_config_load(alloc, &cfg);
@@ -285,6 +308,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     if (err != HU_OK) {
         fprintf(stderr, "[%s] Provider '%s' init failed: %s\n", HU_CODENAME, prov_name,
                 hu_error_string(err));
+#ifdef HU_HAS_VOICE_CHANNEL
+        hu_channel_voice_destroy(&cli_voice_ch);
+#endif
         hu_config_deinit(&cfg);
         return err;
     }
@@ -300,6 +326,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     if (err != HU_OK) {
         fprintf(stderr, "[%s] Runtime '%s' not supported: %s\n", HU_CODENAME,
                 cfg.runtime.kind ? cfg.runtime.kind : "(null)", hu_error_string(err));
+#ifdef HU_HAS_VOICE_CHANNEL
+        hu_channel_voice_destroy(&cli_voice_ch);
+#endif
         hu_config_deinit(&cfg);
         return err;
     }
@@ -430,6 +459,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         if (sb_storage)
             hu_sandbox_storage_destroy(sb_storage, &sb_alloc);
         hu_awareness_deinit(&cli_awareness);
+#ifdef HU_HAS_VOICE_CHANNEL
+        hu_channel_voice_destroy(&cli_voice_ch);
+#endif
         hu_config_deinit(&cfg);
         return err;
     }
@@ -477,15 +509,40 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             hu_sandbox_storage_destroy(sb_storage, &sb_alloc);
         hu_awareness_deinit(&cli_awareness);
         hu_bus_deinit(&cli_bus);
+#ifdef HU_HAS_VOICE_CHANNEL
+        hu_channel_voice_destroy(&cli_voice_ch);
+#endif
         hu_config_deinit(&cfg);
         return err;
     }
     hu_voice_config_t voice_cfg = {0};
     (void)hu_voice_config_from_settings(&cfg, &voice_cfg);
     if (voice_cfg.tts_provider || voice_cfg.local_tts_endpoint || voice_cfg.api_key ||
-        voice_cfg.cartesia_api_key) {
+        voice_cfg.cartesia_api_key || voice_cfg.openai_api_key ||
+        (cfg.voice.mode && cfg.voice.mode[0])) {
         hu_agent_set_voice_config(&agent, &voice_cfg);
     }
+#ifdef HU_HAS_VOICE_CHANNEL
+    if (cfg.voice.mode && cfg.voice.mode[0]) {
+        hu_channel_voice_config_t vcfg = {0};
+        bool want_voice = false;
+        if (strcmp(cfg.voice.mode, "realtime") == 0) {
+            vcfg.mode = HU_VOICE_MODE_REALTIME;
+            vcfg.api_key = hu_config_get_provider_key(&cfg, "openai");
+            vcfg.model = cfg.voice.realtime_model;
+            vcfg.voice = cfg.voice.realtime_voice;
+            want_voice = true;
+        } else if (strcmp(cfg.voice.mode, "webrtc") == 0) {
+            vcfg.mode = HU_VOICE_MODE_WEBRTC;
+            want_voice = true;
+        } else if (strcmp(cfg.voice.mode, "sonata") == 0) {
+            vcfg.mode = HU_VOICE_MODE_SONATA;
+            want_voice = true;
+        }
+        if (want_voice)
+            (void)hu_channel_voice_create(alloc, &vcfg, &cli_voice_ch);
+    }
+#endif
     agent.agent_pool = cli_agent_pool;
     hu_agent_set_mailbox(&agent, cli_mailbox);
     agent.policy_engine = NULL;
@@ -609,6 +666,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         if (sb_storage)
             hu_sandbox_storage_destroy(sb_storage, &sb_alloc);
         hu_awareness_deinit(&cli_awareness);
+#ifdef HU_HAS_VOICE_CHANNEL
+        hu_channel_voice_destroy(&cli_voice_ch);
+#endif
         hu_config_deinit(&cfg);
         return err;
     }
@@ -772,6 +832,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             hu_sandbox_storage_destroy(sb_storage, &sb_alloc);
         hu_awareness_deinit(&cli_awareness);
         hu_bus_deinit(&cli_bus);
+#ifdef HU_HAS_VOICE_CHANNEL
+        hu_channel_voice_destroy(&cli_voice_ch);
+#endif
         hu_config_deinit(&cfg);
         return err;
     }
@@ -833,9 +896,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         agent.cancel_requested = 0;
         cli_stream_started = 0;
 
-        /* Adaptive model routing for CLI */
+        /* Adaptive model routing for CLI (Gemini slot names only for Google family providers) */
 #ifndef HU_IS_TEST
-        {
+        if (cli_provider_uses_gemini_slot_models(prov_name, prov_name_len)) {
             hu_model_router_config_t mr_cfg = hu_model_router_default_config();
             time_t now_rt = time(NULL);
             struct tm *lt = localtime(&now_rt);
@@ -846,6 +909,11 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             agent.turn_model_len = sel.model_len;
             agent.turn_temperature = sel.temperature;
             agent.turn_thinking_budget = sel.thinking_budget;
+        } else {
+            agent.turn_model = agent.model_name;
+            agent.turn_model_len = agent.model_name_len;
+            agent.turn_temperature = agent.temperature;
+            agent.turn_thinking_budget = 0;
         }
 #endif
 
@@ -962,6 +1030,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         hu_sandbox_storage_destroy(sb_storage, &sb_alloc);
     hu_awareness_deinit(&cli_awareness);
     hu_bus_deinit(&cli_bus);
+#ifdef HU_HAS_VOICE_CHANNEL
+    hu_channel_voice_destroy(&cli_voice_ch);
+#endif
     hu_config_deinit(&cfg);
     return HU_OK;
 }

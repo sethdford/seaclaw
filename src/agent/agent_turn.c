@@ -24,6 +24,14 @@
 #include "human/agent/tool_call_parser.h"
 #include "human/agent/tool_router.h"
 #include "human/observability/bth_metrics.h"
+#include "human/cognition/dual_process.h"
+#include "human/cognition/emotional.h"
+#include "human/cognition/metacognition.h"
+#include <math.h>
+#ifdef HU_ENABLE_SQLITE
+#include "human/cognition/episodic.h"
+#include "human/cognition/evolving.h"
+#endif
 #ifdef HU_HAS_PERSONA
 #include "human/persona/circadian.h"
 #include "human/persona/relationship.h"
@@ -69,6 +77,7 @@
 #if HU_HAS_PWA
 #include "human/pwa_context.h"
 #endif
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -318,6 +327,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         return err;
     }
 
+    hu_cognition_budget_t cognition_budget =
+        hu_cognition_get_budget(HU_COGNITION_FAST, agent->max_tool_iterations);
+    char *emotional_ctx = NULL;
+    size_t emotional_ctx_len = 0;
+    char *episodic_replay = NULL;
+    size_t episodic_replay_len = 0;
+    bool cognition_skills_shown = false;
+
     /* Superhuman: observe user message (emotional, silence services) */
     (void)hu_superhuman_observe_all(&agent->superhuman, agent->alloc, msg, msg_len, "user", 4);
 
@@ -376,6 +393,76 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
         }
         hu_fc_result_deinit(&fc_result, agent->alloc);
+    }
+
+    /* Cognition: emotional fusion + dual-process dispatch (memory loader budgets, prompt hints) */
+    {
+        hu_emotional_perception_t percep;
+        memset(&percep, 0, sizeof(percep));
+        percep.voice_valence = NAN;
+        percep.egraph_dominant = HU_EMOTION_NEUTRAL;
+        percep.egraph_intensity = 0.0f;
+
+        size_t stm_n = hu_stm_count(&agent->stm);
+        const hu_stm_emotion_t *stm_emo = NULL;
+        size_t stm_emo_count = 0;
+        if (stm_n > 0) {
+            const hu_stm_turn_t *lt = hu_stm_get(&agent->stm, stm_n - 1);
+            if (lt && lt->emotion_count > 0) {
+                stm_emo = lt->emotions;
+                stm_emo_count = lt->emotion_count;
+            }
+        }
+        percep.stm_emotions = stm_emo;
+        percep.stm_emotion_count = stm_emo_count;
+        percep.fast_capture = NULL;
+        percep.conversation = NULL;
+
+        hu_emotional_cognition_perceive(&agent->emotional_cognition, &percep);
+
+        size_t recent_tools = 0;
+        if (agent->history_count > 1) {
+            for (size_t hi = agent->history_count - 1; hi > 0; hi--) {
+                if (agent->history[hi - 1].role == HU_ROLE_TOOL) {
+                    recent_tools++;
+                    if (recent_tools >= 8)
+                        break;
+                }
+            }
+        }
+
+        hu_cognition_dispatch_input_t d_in = {
+            .message = msg,
+            .message_len = msg_len,
+            .emotional = &agent->emotional_cognition,
+            .tools_count = agent->tools_count,
+            .recent_tool_calls = recent_tools,
+            .agent_max_tool_iterations = agent->max_tool_iterations,
+        };
+        agent->current_cognition_mode = hu_cognition_dispatch(&d_in);
+        cognition_budget =
+            hu_cognition_get_budget(agent->current_cognition_mode, agent->max_tool_iterations);
+
+        if (agent->observer) {
+            hu_observer_event_t ev = {.tag = HU_OBSERVER_EVENT_COGNITION_MODE};
+            ev.data.cognition_mode.mode = hu_cognition_mode_name(agent->current_cognition_mode);
+            HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
+        }
+        if (agent->bth_metrics) {
+            switch (agent->current_cognition_mode) {
+            case HU_COGNITION_FAST:
+                agent->bth_metrics->cognition_fast_turns++;
+                break;
+            case HU_COGNITION_SLOW:
+                agent->bth_metrics->cognition_slow_turns++;
+                break;
+            case HU_COGNITION_EMOTIONAL:
+                agent->bth_metrics->cognition_emotional_turns++;
+                break;
+            default:
+                break;
+            }
+        }
     }
 
     /* Commitment detection: extract promises, intentions, reminders, goals from user message */
@@ -497,8 +584,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     size_t memory_ctx_len = 0;
     if (agent->memory && agent->memory->vtable && !srag_skip_retrieval) {
         hu_memory_loader_t loader;
-        hu_memory_loader_init(&loader, agent->alloc, agent->memory, agent->retrieval_engine, 10,
-                              4000);
+        hu_memory_loader_init(&loader, agent->alloc, agent->memory, agent->retrieval_engine,
+                              cognition_budget.max_memory_entries,
+                              cognition_budget.max_memory_chars);
         hu_error_t load_err = hu_memory_loader_load(&loader, msg, msg_len,
                                     agent->memory_session_id ? agent->memory_session_id : "",
                                     agent->memory_session_id ? agent->memory_session_id_len : 0,
@@ -1344,12 +1432,36 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
+    /* Cognition: episodic replay + emotional context strings for prompt */
+#ifdef HU_ENABLE_SQLITE
+    if (agent->cognition_db &&
+        (agent->current_cognition_mode == HU_COGNITION_SLOW ||
+         agent->current_cognition_mode == HU_COGNITION_EMOTIONAL)) {
+        hu_episodic_pattern_t *ep_patterns = NULL;
+        size_t ep_cnt = 0;
+        if (hu_episodic_retrieve(agent->cognition_db, agent->alloc, msg, msg_len, 3, &ep_patterns,
+                                 &ep_cnt) == HU_OK &&
+            ep_cnt > 0) {
+            if (hu_episodic_build_replay(agent->alloc, ep_patterns, ep_cnt, &episodic_replay,
+                                         &episodic_replay_len) == HU_OK &&
+                episodic_replay && agent->bth_metrics)
+                agent->bth_metrics->episodic_replays++;
+            hu_episodic_free_patterns(agent->alloc, ep_patterns, ep_cnt);
+        }
+    }
+#endif
+    if (hu_emotional_cognition_build_prompt(agent->alloc, &agent->emotional_cognition,
+                                            &emotional_ctx, &emotional_ctx_len) != HU_OK) {
+        emotional_ctx = NULL;
+        emotional_ctx_len = 0;
+    }
+
     /* Build system prompt using cached static portion when available */
     char *system_prompt = NULL;
     size_t system_prompt_len = 0;
     if (agent->cached_static_prompt && !pref_ctx && !tone_hint && !persona_prompt &&
         !awareness_ctx && !stm_ctx && !commitment_ctx && !pattern_ctx && !adaptive_ctx &&
-        !proactive_ctx && !superhuman_ctx && !skills_ctx) {
+        !proactive_ctx && !superhuman_ctx && !skills_ctx && !emotional_ctx && !episodic_replay) {
         err = hu_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
                                          agent->cached_static_prompt_len, memory_ctx,
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
@@ -1376,12 +1488,18 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
             if (intelligence_ctx)
                 agent->alloc->free(agent->alloc->ctx, intelligence_ctx, intelligence_ctx_len + 1);
+            if (emotional_ctx)
+                agent->alloc->free(agent->alloc->ctx, emotional_ctx, emotional_ctx_len + 1);
+            if (episodic_replay)
+                agent->alloc->free(agent->alloc->ctx, episodic_replay, episodic_replay_len + 1);
             if (plan_ctx)
                 agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
             hu_agent_clear_current_for_tools();
             return err;
         }
     } else {
+        const char *cognition_mode_str = hu_cognition_mode_name(agent->current_cognition_mode);
+        size_t cognition_mode_str_len = strlen(cognition_mode_str);
         hu_prompt_config_t cfg = {
             .provider_name = agent->provider.vtable->get_name(agent->provider.ctx),
             .provider_name_len = 0,
@@ -1438,6 +1556,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             .skills_context_len = skills_ctx_len,
             .native_tools = (agent->provider.vtable->supports_native_tools &&
                              agent->provider.vtable->supports_native_tools(agent->provider.ctx)),
+            .emotional_context = emotional_ctx,
+            .emotional_context_len = emotional_ctx_len,
+            .cognition_mode = cognition_mode_str,
+            .cognition_mode_len = cognition_mode_str_len,
+            .episodic_replay = episodic_replay,
+            .episodic_replay_len = episodic_replay_len,
         };
         err = hu_prompt_build_system(agent->alloc, &cfg, &system_prompt, &system_prompt_len);
         if (persona_prompt)
@@ -1455,6 +1579,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
         if (intelligence_ctx)
             agent->alloc->free(agent->alloc->ctx, intelligence_ctx, intelligence_ctx_len + 1);
+        if (emotional_ctx)
+            agent->alloc->free(agent->alloc->ctx, emotional_ctx, emotional_ctx_len + 1);
+        emotional_ctx = NULL;
+        if (episodic_replay)
+            agent->alloc->free(agent->alloc->ctx, episodic_replay, episodic_replay_len + 1);
+        episodic_replay = NULL;
+        cognition_skills_shown = (skills_ctx != NULL && skills_ctx_len > 0);
         if (skills_ctx)
             agent->alloc->free(agent->alloc->ctx, skills_ctx, skills_ctx_len + 1);
         skills_ctx = NULL;
@@ -1473,6 +1604,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
             if (plan_ctx)
                 agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
+            if (emotional_ctx)
+                agent->alloc->free(agent->alloc->ctx, emotional_ctx, emotional_ctx_len + 1);
+            if (episodic_replay)
+                agent->alloc->free(agent->alloc->ctx, episodic_replay, episodic_replay_len + 1);
             hu_agent_clear_current_for_tools();
             return err;
         }
@@ -2137,8 +2272,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         hu_arena_reset(agent->turn_arena);
                     return HU_ERR_OUT_OF_MEMORY;
                 }
+                /* hu_strndup stops at first '\0' within final_len — length must match allocation. */
+                const size_t response_effective_len = strlen(*response_out);
                 if (response_len_out)
-                    *response_len_out = final_len;
+                    *response_len_out = response_effective_len;
 
                 /* Speculative: predict follow-ups and cache them */
                 if (agent->speculative_cache && *response_out) {
@@ -2148,7 +2285,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     size_t pred_count = 0;
                     memset(preds, 0, sizeof(preds));
                     if (hu_speculative_predict(agent->alloc, msg, msg_len,
-                                               *response_out, final_len,
+                                               *response_out, response_effective_len,
                                                preds, pred_lens, confs,
                                                HU_SPEC_MAX_PREDICTIONS, &pred_count) == HU_OK) {
                         for (size_t pi = 0; pi < pred_count; pi++) {
@@ -2158,7 +2295,43 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     }
                 }
 
-                hu_agent_internal_maybe_tts(agent, *response_out, final_len);
+                {
+                    hu_agent_internal_maybe_tts(agent, *response_out, response_effective_len);
+                }
+            }
+            /* Metacognition: monitor final response (observational; does not re-loop) */
+            if (response_out && *response_out && response_len_out && *response_len_out > 0) {
+                const char *prev_resp = NULL;
+                size_t prev_resp_len = 0;
+                if (agent->history_count > 1) {
+                    for (size_t hi = agent->history_count - 1; hi > 0; hi--) {
+                        if (hi == agent->history_count - 1)
+                            continue; /* skip assistant message from this turn */
+                        if (agent->history[hi].role == HU_ROLE_ASSISTANT &&
+                            agent->history[hi].content && agent->history[hi].content_len > 0) {
+                            prev_resp = agent->history[hi].content;
+                            prev_resp_len = agent->history[hi].content_len;
+                            break;
+                        }
+                    }
+                }
+                hu_metacognition_signal_t mc_sig = hu_metacognition_monitor(
+                    msg, msg_len, *response_out, *response_len_out, prev_resp, prev_resp_len,
+                    agent->emotional_cognition.confidence,
+                    (uint64_t)resp.usage.prompt_tokens, (uint64_t)resp.usage.completion_tokens);
+                hu_metacog_action_t mc_act =
+                    hu_metacognition_plan_action(&agent->metacognition, &mc_sig);
+                if (mc_act != HU_METACOG_ACTION_NONE) {
+                    if (agent->observer) {
+                        hu_observer_event_t mev = {.tag = HU_OBSERVER_EVENT_METACOG_ACTION};
+                        mev.data.metacog_action.action = hu_metacog_action_name(mc_act);
+                        mev.data.metacog_action.confidence = mc_sig.confidence;
+                        mev.data.metacog_action.coherence = mc_sig.coherence;
+                        HU_OBS_SAFE_RECORD_EVENT(agent, &mev);
+                    }
+                    if (agent->bth_metrics)
+                        agent->bth_metrics->metacog_interventions++;
+                }
             }
             hu_chat_response_free(agent->alloc, &resp);
             hu_agent_clear_current_for_tools();
@@ -2433,6 +2606,90 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     (void)hu_superhuman_style_record(agent->memory,
                         agent->memory_session_id, agent->memory_session_id_len,
                         resp_len, formality, has_emoji, has_question);
+                }
+            }
+
+            /* Cognition DB: evolving skill exposure/outcomes + episodic pattern extraction */
+            if (agent->cognition_db && agent->history_count > 0 &&
+                agent->history[agent->history_count - 1].role == HU_ROLE_ASSISTANT) {
+                const char *resp_txt = agent->history[agent->history_count - 1].content;
+                size_t resp_txt_len = agent->history[agent->history_count - 1].content_len;
+                if (resp_txt && resp_txt_len > 0) {
+                    hu_reflection_quality_t cq = hu_reflection_evaluate(
+                        msg, msg_len, resp_txt, resp_txt_len, &agent->reflection);
+                    int sk_outcome = HU_SKILL_OUTCOME_NEUTRAL;
+                    if (cq == HU_QUALITY_GOOD)
+                        sk_outcome = HU_SKILL_OUTCOME_POSITIVE;
+                    else if (cq == HU_QUALITY_NEEDS_RETRY)
+                        sk_outcome = HU_SKILL_OUTCOME_NEGATIVE;
+                    if (msg && msg_len >= 6) {
+                        static const char *neg_phrases[] = {"that's wrong", "incorrect",
+                                                              "not what i meant",
+                                                              "you misunderstood",
+                                                              "that's not right", NULL};
+                        char low[512];
+                        size_t cap = msg_len < sizeof(low) - 1 ? msg_len : sizeof(low) - 1;
+                        for (size_t i = 0; i < cap; i++)
+                            low[i] = (char)tolower((unsigned char)msg[i]);
+                        low[cap] = '\0';
+                        for (size_t pi = 0; neg_phrases[pi]; pi++) {
+                            if (strstr(low, neg_phrases[pi])) {
+                                sk_outcome = HU_SKILL_OUTCOME_NEGATIVE;
+                                break;
+                            }
+                        }
+                    }
+                    const char *cid = agent->memory_session_id;
+                    size_t cid_len = agent->memory_session_id ? agent->memory_session_id_len : 0;
+                    const char *sid = cid;
+                    size_t sid_len = cid_len;
+                    static const char cat_name[] = "skillforge_catalog";
+                    if (cognition_skills_shown) {
+                        hu_skill_invocation_t inv = {
+                            .skill_name = cat_name,
+                            .skill_name_len = sizeof(cat_name) - 1,
+                            .contact_id = cid,
+                            .contact_id_len = cid_len,
+                            .session_id = sid,
+                            .session_id_len = sid_len,
+                            .explicit_run = false,
+                            .outcome = HU_SKILL_OUTCOME_NEUTRAL,
+                        };
+                        (void)hu_evolving_record_invocation(agent->cognition_db, &inv);
+                    }
+                    (void)hu_evolving_collect_outcome(agent->cognition_db, cid, cid_len, sid,
+                                                      sid_len, sk_outcome);
+                    if (agent->bth_metrics)
+                        agent->bth_metrics->evolving_outcomes++;
+
+                    const char *tool_row[1];
+                    size_t ep_tool_n = 0;
+                    if (turn_tool_results_count > 0) {
+                        static const char tt[] = "tool_execution";
+                        tool_row[0] = tt;
+                        ep_tool_n = 1;
+                    } else if (cognition_skills_shown) {
+                        tool_row[0] = cat_name;
+                        ep_tool_n = 1;
+                    }
+                    if (ep_tool_n > 0) {
+                        hu_episodic_session_summary_t esum = {
+                            .session_id = sid,
+                            .session_id_len = sid_len,
+                            .tool_names = tool_row,
+                            .tool_count = ep_tool_n,
+                            .skill_names = NULL,
+                            .skill_count = 0,
+                            .had_positive_feedback = (cq == HU_QUALITY_GOOD),
+                            .had_correction = (sk_outcome == HU_SKILL_OUTCOME_NEGATIVE),
+                            .topic = msg,
+                            .topic_len = msg_len > 256 ? 256 : msg_len,
+                        };
+                        if (hu_episodic_extract_and_store(agent->cognition_db, agent->alloc,
+                                                          &esum) == HU_OK &&
+                            agent->bth_metrics)
+                            agent->bth_metrics->episodic_patterns_stored++;
+                    }
                 }
             }
 #endif

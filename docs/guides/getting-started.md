@@ -204,6 +204,20 @@ Suite-only with judge (no synthetic generator):
 python3 scripts/adversarial-eval-harness.py --no-llm --include-suite eval_suites/adversarial.json --output /tmp/adv-report.json
 ```
 
+**Fleet (aggregate)** — offline checks plus optional live API runs:
+
+```bash
+bash scripts/redteam-eval-fleet.sh
+```
+
+Live provider eval + dynamic harness (writes under `build/redteam-fleet-reports/` by default):
+
+```bash
+REDTEAM_FLEET_LIVE=1 set -a && source .env && set +a && bash scripts/redteam-eval-fleet.sh
+```
+
+Optional one-shot agent check: `REDTEAM_FLEET_AGENT_SMOKE=1` (combine with `REDTEAM_FLEET_LIVE=1` if you want both). Optional: `VERIFY_REDTEAM=1 ./scripts/verify-all.sh` runs the same offline fleet after the main gates.
+
 ## 9. Next steps
 
 - **Security hardening:** Enable `secrets.encrypt`, set `gateway.require_pairing`, configure `allow_from` per channel. See [threat model](../standards/security/threat-model.md).

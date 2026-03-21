@@ -492,6 +492,9 @@ typedef struct hu_voice_settings {
     char *tts_voice;          /* voice name, NULL = default */
     char *tts_model;          /* model name, NULL = default */
     char *stt_model;          /* model name, NULL = default */
+    char *mode;               /* "sonata", "realtime", "webrtc" — NULL = sonata (default pipeline) */
+    char *realtime_model;     /* OpenAI Realtime model, e.g. "gpt-4o-realtime-preview" */
+    char *realtime_voice;     /* Voice for Realtime, e.g. "alloy" */
 } hu_voice_settings_t;
 
 typedef struct hu_identity_config {

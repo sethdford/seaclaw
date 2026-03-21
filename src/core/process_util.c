@@ -3,6 +3,7 @@
 #include "human/core/error.h"
 #include "human/security.h"
 #include "human/security/sandbox.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -10,6 +11,12 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <unistd.h>
+#endif
+#if (defined(__unix__) || defined(__APPLE__)) && !defined(_WIN32)
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #endif
 
@@ -293,3 +300,79 @@ hu_error_t hu_process_run_with_policy(hu_allocator_t *alloc, const char *const *
     return hu_process_run(alloc, argv, cwd, max_output_bytes, out);
 }
 #endif
+
+bool hu_exe_on_path(const char *name) {
+#if defined(_WIN32)
+    (void)name;
+    return false;
+#elif defined(__unix__) || defined(__APPLE__)
+    if (!name || !name[0])
+        return false;
+    if (strchr(name, '/'))
+        return access(name, X_OK) == 0;
+    const char *path_env = getenv("PATH");
+    if (!path_env || !path_env[0])
+        return false;
+    char dir[4096];
+    char cand[4096];
+    const char *p = path_env;
+    for (;;) {
+        const char *colon = strchr(p, ':');
+        size_t plen = colon ? (size_t)(colon - p) : strlen(p);
+        if (plen >= sizeof(dir)) {
+            if (!colon)
+                break;
+            p = colon + 1;
+            continue;
+        }
+        memcpy(dir, p, plen);
+        dir[plen] = '\0';
+        while (plen > 1 && dir[plen - 1] == '/')
+            dir[--plen] = '\0';
+        const char *d = plen ? dir : ".";
+        int n = snprintf(cand, sizeof cand, "%s/%s", d, name);
+        if (n > 0 && (size_t)n < sizeof(cand) && access(cand, X_OK) == 0)
+            return true;
+        if (!colon)
+            break;
+        p = colon + 1;
+    }
+    return false;
+#else
+    (void)name;
+    return false;
+#endif
+}
+
+bool hu_ollama_api_tags_reachable(void) {
+#if defined(_WIN32) || !(defined(__unix__) || defined(__APPLE__))
+    return false;
+#else
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0)
+        return false;
+    struct timeval tv = {.tv_sec = 2, .tv_usec = 0};
+    (void)setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, (socklen_t)sizeof(tv));
+    (void)setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, (socklen_t)sizeof(tv));
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(11434);
+    addr.sin_addr.s_addr = htonl(0x7f000001);
+    if (connect(fd, (struct sockaddr *)&addr, (socklen_t)sizeof(addr)) != 0) {
+        close(fd);
+        return false;
+    }
+    static const char req[] = "GET /api/tags HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    if (send(fd, req, sizeof(req) - 1, 0) < 0) {
+        close(fd);
+        return false;
+    }
+    char buf[256];
+    ssize_t n = recv(fd, buf, sizeof(buf) - 1, 0);
+    close(fd);
+    if (n <= 0)
+        return false;
+    buf[n] = '\0';
+    return strstr(buf, " 200 ") != NULL || strstr(buf, "200 OK") != NULL;
+#endif
+}

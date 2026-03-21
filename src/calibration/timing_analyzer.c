@@ -31,6 +31,7 @@ typedef struct {
     uint32_t n;
 } hu_calib_contact_buf_t;
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
 static int hu_calib_cmp_i64(const void *a, const void *b) {
     int64_t x = *(const int64_t *)a;
     int64_t y = *(const int64_t *)b;
@@ -151,6 +152,7 @@ static hu_calib_contact_buf_t *hu_calib_find_contact(hu_calib_contact_buf_t *cts
     (*n_ct)++;
     return &cts[i];
 }
+#endif /* !HU_IS_TEST */
 
 void hu_timing_report_deinit(hu_allocator_t *alloc, hu_timing_report_t *report) {
     if (!alloc || !report)

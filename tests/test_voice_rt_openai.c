@@ -28,8 +28,17 @@ static void voice_rt_openai_recv_event_mock(void) {
     hu_voice_rt_session_create(&alloc, &cfg, &session);
     HU_ASSERT_NOT_NULL(session);
     hu_voice_rt_connect(session);
+    /* Test mock alternates events: even seq → transcription, odd → response.audio.done */
     hu_voice_rt_event_t event = {0};
     hu_error_t err = hu_voice_rt_recv_event(session, &alloc, &event, 1000);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(event.type, "conversation.item.input_audio_transcription.completed");
+    HU_ASSERT_FALSE(event.done);
+    HU_ASSERT_NOT_NULL(event.transcript);
+    HU_ASSERT_STR_EQ(event.transcript, "Hello from realtime");
+    hu_voice_rt_event_free(&alloc, &event);
+    memset(&event, 0, sizeof(event));
+    err = hu_voice_rt_recv_event(session, &alloc, &event, 1000);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(event.done);
     HU_ASSERT_STR_EQ(event.type, "response.audio.done");
@@ -167,6 +176,19 @@ static void voice_rt_openai_session_create_null_alloc_fails(void) {
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
 
+static void voice_rt_openai_response_cancel_mock_ok(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_voice_rt_session_t *session = NULL;
+    hu_voice_rt_session_create(&alloc, NULL, &session);
+    hu_voice_rt_connect(session);
+    HU_ASSERT_EQ(hu_voice_rt_response_cancel(session), HU_OK);
+    hu_voice_rt_session_destroy(session);
+}
+
+static void voice_rt_openai_response_cancel_null_session_fails(void) {
+    HU_ASSERT_EQ(hu_voice_rt_response_cancel(NULL), HU_ERR_INVALID_ARGUMENT);
+}
+
 void run_voice_rt_openai_tests(void) {
     HU_TEST_SUITE("voice_rt_openai");
     HU_RUN_TEST(voice_rt_openai_session_create_connect_destroy);
@@ -185,4 +207,6 @@ void run_voice_rt_openai_tests(void) {
     HU_RUN_TEST(voice_rt_openai_recv_null_alloc_fails);
     HU_RUN_TEST(voice_rt_openai_event_free_clears_owned_fields);
     HU_RUN_TEST(voice_rt_openai_session_create_null_alloc_fails);
+    HU_RUN_TEST(voice_rt_openai_response_cancel_mock_ok);
+    HU_RUN_TEST(voice_rt_openai_response_cancel_null_session_fails);
 }

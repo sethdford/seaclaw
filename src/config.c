@@ -23,7 +23,8 @@ void hu_config_deinit(hu_config_t *cfg) {
         cfg->ensemble.strategy = NULL;
     }
     if (cfg->arena) {
-        /* Arena holds most config strings (e.g. cfg->voice.*); bulk-freed here. */
+        /* Arena holds most config strings (e.g. cfg->voice.* including mode, realtime_model,
+         * realtime_voice); bulk-freed here. */
         hu_arena_destroy(cfg->arena);
         cfg->arena = NULL;
     }

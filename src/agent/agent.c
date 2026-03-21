@@ -10,6 +10,7 @@
 #include "human/memory/consolidation.h"
 #include "human/memory/promotion.h"
 #ifdef HU_ENABLE_SQLITE
+#include "human/cognition/db.h"
 #include "human/intelligence/meta_learning.h"
 #endif
 #ifdef HU_HAS_PERSONA
@@ -376,6 +377,14 @@ hu_error_t hu_agent_from_config(
     }
     out->sota_initialized = true;
 
+    hu_emotional_cognition_init(&out->emotional_cognition);
+    hu_metacognition_init(&out->metacognition);
+    out->current_cognition_mode = HU_COGNITION_FAST;
+#ifdef HU_ENABLE_SQLITE
+    if (hu_cognition_db_open(&out->cognition_db) != HU_OK)
+        out->cognition_db = NULL;
+#endif
+
     return HU_OK;
 }
 
@@ -581,6 +590,12 @@ void hu_agent_deinit(hu_agent_t *agent) {
         hu_commitment_store_destroy(agent->commitment_store);
         agent->commitment_store = NULL;
     }
+#ifdef HU_ENABLE_SQLITE
+    if (agent->cognition_db) {
+        hu_cognition_db_close(agent->cognition_db);
+        agent->cognition_db = NULL;
+    }
+#endif
     if (agent->provider.vtable && agent->provider.vtable->deinit) {
         agent->provider.vtable->deinit(agent->provider.ctx, agent->alloc);
         agent->provider.vtable = NULL;
@@ -645,23 +660,28 @@ hu_error_t hu_agent_internal_append_history(hu_agent_t *agent, hu_role_t role, c
     char *dup = hu_strndup(agent->alloc, content, content_len);
     if (!dup)
         return HU_ERR_OUT_OF_MEMORY;
+    /* hu_strndup stops at first '\0' within content_len — stored length must match allocation. */
+    const size_t stored_content_len = strlen(dup);
     agent->history[agent->history_count].role = role;
     agent->history[agent->history_count].content = dup;
-    agent->history[agent->history_count].content_len = content_len;
-    agent->history[agent->history_count].name =
-        name_len ? hu_strndup(agent->alloc, name, name_len) : NULL;
-    agent->history[agent->history_count].name_len = name_len;
-    if (name_len && !agent->history[agent->history_count].name) {
-        agent->alloc->free(agent->alloc->ctx, dup, content_len + 1);
+    agent->history[agent->history_count].content_len = stored_content_len;
+    char *name_dup = name_len ? hu_strndup(agent->alloc, name, name_len) : NULL;
+    agent->history[agent->history_count].name = name_dup;
+    agent->history[agent->history_count].name_len =
+        name_dup ? strlen(name_dup) : 0;
+    if (name_len && !name_dup) {
+        agent->alloc->free(agent->alloc->ctx, dup, stored_content_len + 1);
         return HU_ERR_OUT_OF_MEMORY;
     }
-    agent->history[agent->history_count].tool_call_id =
+    char *tc_dup =
         tool_call_id_len ? hu_strndup(agent->alloc, tool_call_id, tool_call_id_len) : NULL;
-    agent->history[agent->history_count].tool_call_id_len = tool_call_id_len;
-    if (tool_call_id_len && !agent->history[agent->history_count].tool_call_id) {
-        agent->alloc->free(agent->alloc->ctx, dup, content_len + 1);
-        if (agent->history[agent->history_count].name)
-            agent->alloc->free(agent->alloc->ctx, agent->history[agent->history_count].name,
+    agent->history[agent->history_count].tool_call_id = tc_dup;
+    agent->history[agent->history_count].tool_call_id_len =
+        tc_dup ? strlen(tc_dup) : 0;
+    if (tool_call_id_len && !tc_dup) {
+        agent->alloc->free(agent->alloc->ctx, dup, stored_content_len + 1);
+        if (name_dup)
+            agent->alloc->free(agent->alloc->ctx, name_dup,
                                agent->history[agent->history_count].name_len + 1);
         return HU_ERR_OUT_OF_MEMORY;
     }
@@ -685,9 +705,10 @@ hu_error_t hu_agent_internal_append_history_with_tool_calls(hu_agent_t *agent, c
                                            : hu_strndup(agent->alloc, "", 0);
     if (!dup)
         return HU_ERR_OUT_OF_MEMORY;
+    const size_t stored_content_len = strlen(dup);
     agent->history[agent->history_count].role = HU_ROLE_ASSISTANT;
     agent->history[agent->history_count].content = dup;
-    agent->history[agent->history_count].content_len = content_len;
+    agent->history[agent->history_count].content_len = stored_content_len;
     agent->history[agent->history_count].name = NULL;
     agent->history[agent->history_count].name_len = 0;
     agent->history[agent->history_count].tool_call_id = NULL;
@@ -700,7 +721,7 @@ hu_error_t hu_agent_internal_append_history_with_tool_calls(hu_agent_t *agent, c
         hu_tool_call_t *owned = (hu_tool_call_t *)agent->alloc->alloc(
             agent->alloc->ctx, tool_calls_count * sizeof(hu_tool_call_t));
         if (!owned) {
-            agent->alloc->free(agent->alloc->ctx, dup, content_len + 1);
+            agent->alloc->free(agent->alloc->ctx, dup, stored_content_len + 1);
             return HU_ERR_OUT_OF_MEMORY;
         }
         memset(owned, 0, tool_calls_count * sizeof(hu_tool_call_t));
@@ -710,7 +731,7 @@ hu_error_t hu_agent_internal_append_history_with_tool_calls(hu_agent_t *agent, c
                 owned[i].id = hu_strndup(agent->alloc, src->id, src->id_len);
                 if (!owned[i].id) {
                     hu_agent_commands_free_owned_tool_calls(agent->alloc, owned, tool_calls_count);
-                    agent->alloc->free(agent->alloc->ctx, dup, content_len ? content_len + 1 : 1);
+                    agent->alloc->free(agent->alloc->ctx, dup, stored_content_len + 1);
                     return HU_ERR_OUT_OF_MEMORY;
                 }
                 owned[i].id_len = src->id_len;
@@ -719,7 +740,7 @@ hu_error_t hu_agent_internal_append_history_with_tool_calls(hu_agent_t *agent, c
                 owned[i].name = hu_strndup(agent->alloc, src->name, src->name_len);
                 if (!owned[i].name) {
                     hu_agent_commands_free_owned_tool_calls(agent->alloc, owned, tool_calls_count);
-                    agent->alloc->free(agent->alloc->ctx, dup, content_len ? content_len + 1 : 1);
+                    agent->alloc->free(agent->alloc->ctx, dup, stored_content_len + 1);
                     return HU_ERR_OUT_OF_MEMORY;
                 }
                 owned[i].name_len = src->name_len;
@@ -728,7 +749,7 @@ hu_error_t hu_agent_internal_append_history_with_tool_calls(hu_agent_t *agent, c
                 owned[i].arguments = hu_strndup(agent->alloc, src->arguments, src->arguments_len);
                 if (!owned[i].arguments) {
                     hu_agent_commands_free_owned_tool_calls(agent->alloc, owned, tool_calls_count);
-                    agent->alloc->free(agent->alloc->ctx, dup, content_len ? content_len + 1 : 1);
+                    agent->alloc->free(agent->alloc->ctx, dup, stored_content_len + 1);
                     return HU_ERR_OUT_OF_MEMORY;
                 }
                 owned[i].arguments_len = src->arguments_len;

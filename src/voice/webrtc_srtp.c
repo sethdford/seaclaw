@@ -242,13 +242,6 @@ static void hu_srtp_aes128_encrypt_block(const uint8_t key[16], const uint8_t in
 
 /* ── SRTP AES-CM PRF / packet IV (RFC 3711 §4.1.1, §4.3.3, Appendix B.3) ─── */
 
-static void hu_srtp_kdf_xor_key_id(uint8_t x[14], const uint8_t master_salt[14], const uint8_t key_id[7]) {
-    memset(x, 0, 14);
-    memcpy(x + (14 - 7), key_id, 7);
-    for (int i = 0; i < 14; i++)
-        x[i] ^= master_salt[i];
-}
-
 static void hu_srtp_aes_cm_prf(const uint8_t master_key[16], const uint8_t x14[14], uint8_t *out, size_t out_len) {
     uint8_t counter[16];
     memset(counter, 0, 16);
@@ -270,9 +263,10 @@ static void hu_srtp_aes_cm_prf(const uint8_t master_key[16], const uint8_t x14[1
 
 static void hu_srtp_kdf_derive(const uint8_t mkey[16], const uint8_t msalt[14], uint8_t label,
                                uint8_t *out, size_t out_len) {
-    uint8_t key_id[7] = {0, 0, 0, 0, 0, 0, label};
+    /* RFC 3711 Appendix B.3: initial derivation (index 0) XOR label into octet 7 of master salt. */
     uint8_t x[14];
-    hu_srtp_kdf_xor_key_id(x, msalt, key_id);
+    memcpy(x, msalt, 14);
+    x[7] ^= label;
     hu_srtp_aes_cm_prf(mkey, x, out, out_len);
 }
 

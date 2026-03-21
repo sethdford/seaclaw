@@ -20,6 +20,8 @@ typedef struct hu_voice_config {
     const char *tts_provider; /* NULL = auto; "cartesia", "openai", "local" */
     const char *cartesia_api_key; /* NULL = use CARTESIA_API_KEY env; for Cartesia STT/TTS */
     size_t cartesia_api_key_len;
+    const char *openai_api_key; /* OpenAI key when voice.mode is "realtime" (secondary to api_key) */
+    size_t openai_api_key_len;
 } hu_voice_config_t;
 
 struct hu_config;

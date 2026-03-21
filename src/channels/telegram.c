@@ -842,6 +842,7 @@ static hu_error_t telegram_get_response_constraints(void *ctx,
     return HU_OK;
 }
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
 static const char *telegram_reaction_emoji_utf8(hu_reaction_type_t reaction, size_t *out_len) {
     if (!out_len)
         return NULL;
@@ -868,6 +869,7 @@ static const char *telegram_reaction_emoji_utf8(hu_reaction_type_t reaction, siz
         return NULL;
     }
 }
+#endif /* !HU_IS_TEST */
 
 static hu_error_t telegram_load_conversation_history(void *ctx, hu_allocator_t *alloc,
                                                      const char *contact_id, size_t contact_id_len,

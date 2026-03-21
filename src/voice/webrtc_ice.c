@@ -73,8 +73,9 @@ hu_error_t hu_webrtc_stun_parse_binding_response(const uint8_t *pkt, size_t pkt_
             const uint8_t *v = pkt + off;
             if (v[1] != 0x01)
                 return HU_ERR_PARSE;
-            uint16_t xp = ((uint16_t)v[2] << 8) | v[3];
-            *mapped_port_be = (uint16_t)(xp ^ (uint16_t)(HU_STUN_MAGIC_COOKIE >> 16));
+            uint16_t xp_be = ((uint16_t)v[2] << 8) | v[3];
+            uint16_t port_host = (uint16_t)(xp_be ^ (uint16_t)(HU_STUN_MAGIC_COOKIE >> 16));
+            *mapped_port_be = htons(port_host);
             uint32_t xa = ((uint32_t)v[4] << 24) | ((uint32_t)v[5] << 16) | ((uint32_t)v[6] << 8) | v[7];
             *mapped_ipv4_be = xa ^ HU_STUN_MAGIC_COOKIE;
             return HU_OK;
@@ -384,6 +385,7 @@ static hu_error_t hu_ice_pick_remote_peer(const char *remote_sdp, struct sockadd
     }
     return HU_ERR_NOT_FOUND;
 }
+#endif /* !HU_IS_TEST */
 
 hu_error_t hu_webrtc_ice_connect(hu_webrtc_ice_state_t *ice, const hu_webrtc_config_t *cfg,
                                  const char *remote_sdp, int *udp_fd, struct sockaddr_storage *peer,

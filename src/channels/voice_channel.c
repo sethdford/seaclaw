@@ -61,7 +61,7 @@ static hu_error_t voice_start(void *ctx) {
     if (v->config.mode == HU_VOICE_MODE_WEBRTC) {
 #if !HU_IS_TEST
         fprintf(stderr,
-                "voice_channel: WebRTC mode is experimental (HTTP signaling only, no ICE/DTLS)\n");
+                "voice_channel: WebRTC uses native ICE/DTLS/SRTP; configure STUN/TURN and signaling_endpoint\n");
 #endif
 #if HU_IS_TEST
         v->running = true;

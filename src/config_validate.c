@@ -63,6 +63,7 @@ static const size_t hu_memory_keys_len = sizeof(hu_memory_keys) / sizeof(hu_memo
 static const char *const hu_ensemble_keys[] = {
     "providers",
     "strategy",
+    "routing",
 };
 static const size_t hu_ensemble_keys_len = sizeof(hu_ensemble_keys) / sizeof(hu_ensemble_keys[0]);
 
@@ -74,6 +75,9 @@ static const char *const hu_voice_keys[] = {
     "tts_voice",
     "tts_model",
     "stt_model",
+    "mode",
+    "realtime_model",
+    "realtime_voice",
 };
 static const size_t hu_voice_keys_len = sizeof(hu_voice_keys) / sizeof(hu_voice_keys[0]);
 

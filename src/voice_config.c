@@ -38,5 +38,13 @@ hu_error_t hu_voice_config_from_settings(const hu_config_t *config, hu_voice_con
         }
     }
 
+    if (vs->mode && strcmp(vs->mode, "realtime") == 0) {
+        const char *oai_key = hu_config_get_provider_key(config, "openai");
+        if (oai_key && oai_key[0]) {
+            out->openai_api_key = oai_key;
+            out->openai_api_key_len = strlen(oai_key);
+        }
+    }
+
     return HU_OK;
 }

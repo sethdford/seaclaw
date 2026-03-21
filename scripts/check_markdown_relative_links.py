@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 Scan Markdown under configured repo roots for relative links and verify targets exist.
-Skips http(s)://, mailto:, javascript:, and pure #anchors.
+Checks: inline [text](url), reference-style [id]: url definitions, and HTML <a href="...">.
+
+Skips http(s)://, mailto:, javascript:, data:, vscode:, and pure #anchors.
 
 Environment:
   MARKDOWN_LINK_ROOTS — space-separated top-level dirs under repo root (default below).
@@ -15,7 +17,11 @@ import sys
 from pathlib import Path
 
 # [text](url) or [text](url "title")
-LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)(?:\s+[\"'][^\"']*[\"'])?\)")
+INLINE_LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)(?:\s+[\"'][^\"']*[\"'])?\)")
+# Link reference definition: [label]: url — same line only ([ \t]+ avoids crossing newlines into fenced blocks)
+REF_DEF_RE = re.compile(r"^\s{0,3}\[[^\]]+\]:[ \t]+<?([^>\s]+)>?", re.MULTILINE)
+HTML_HREF_RE = re.compile(r'(?i)\bhref\s*=\s*["\']([^"\']+)["\']')
+EXT_IN_PATH = re.compile(r"\.(md|markdown|html?|svg|png|jpe?g|gif|webp|json|ya?ml|txt|pdf)\b", re.I)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -47,7 +53,6 @@ def junk_path(path: Path) -> bool:
     for i, part in enumerate(parts):
         if part in JUNK_DIR_NAMES:
             return True
-        # Claude plugin vendor trees (huge; not maintained as repo docs)
         if i >= 2 and parts[i - 2] == "plugins" and parts[i - 1] == "cache":
             return True
     return False
@@ -80,6 +85,67 @@ def collect_md_files() -> list[Path]:
     return sorted(files)
 
 
+def ref_def_destination_plausible(url: str) -> bool:
+    """Avoid false positives on prose like '[Source: …]: User said …'."""
+    u = url.strip()
+    if not u or skip_href(u):
+        return False
+    if u.startswith((".", "/", "\\")):
+        return True
+    if "/" in u or "\\" in u:
+        return True
+    if EXT_IN_PATH.search(u):
+        return True
+    if u.startswith("#"):
+        return False
+    return False
+
+
+def skip_href(raw: str) -> bool:
+    s = raw.strip()
+    if not s or s.startswith("#"):
+        return True
+    lowered = s.lower()
+    if lowered.startswith(
+        ("http://", "https://", "mailto:", "javascript:", "data:", "vscode:", "file:")
+    ):
+        return True
+    return False
+
+
+def check_path(raw: str, parent: Path) -> str | None:
+    """Return failure reason, or None if OK / skipped."""
+    raw = raw.strip()
+    if skip_href(raw):
+        return None
+    if raw.startswith("<") and raw.endswith(">"):
+        raw = raw[1:-1]
+    path_part = raw.split("#", 1)[0]
+    if not path_part:
+        return None
+    target = (parent / path_part).resolve()
+    try:
+        target.relative_to(ROOT)
+    except ValueError:
+        return "escapes repo root"
+    if not target.exists():
+        return "missing"
+    return None
+
+
+def extract_urls_from_file(text: str) -> list[str]:
+    urls: list[str] = []
+    for m in INLINE_LINK_RE.finditer(text):
+        urls.append(m.group(1).strip())
+    for m in REF_DEF_RE.finditer(text):
+        u = m.group(1).strip()
+        if ref_def_destination_plausible(u):
+            urls.append(u)
+    for m in HTML_HREF_RE.finditer(text):
+        urls.append(m.group(1).strip())
+    return urls
+
+
 def main() -> int:
     md_files = collect_md_files()
     if not md_files:
@@ -96,26 +162,13 @@ def main() -> int:
             continue
         parent = md_path.parent
         rel_src = str(md_path.relative_to(ROOT))
-        for m in LINK_RE.finditer(text):
-            raw = m.group(1).strip()
-            if not raw or raw.startswith(("#", "http://", "https://", "mailto:", "javascript:")):
-                continue
-            if raw.startswith("<") and raw.endswith(">"):
-                raw = raw[1:-1]
-            path_part = raw.split("#", 1)[0]
-            if not path_part:
-                continue
-            target = (parent / path_part).resolve()
-            try:
-                target.relative_to(ROOT)
-            except ValueError:
-                broken.append((rel_src, raw, "escapes repo root"))
-                continue
-            if not target.exists():
-                broken.append((rel_src, raw, "missing"))
+        for raw in extract_urls_from_file(text):
+            reason = check_path(raw, parent)
+            if reason:
+                broken.append((rel_src, raw, reason))
 
     if broken:
-        print("Broken or invalid relative Markdown links:\n")
+        print("Broken or invalid relative Markdown / HTML links:\n")
         for src, href, reason in broken:
             print(f"  {src}")
             print(f"    -> {href} ({reason})")

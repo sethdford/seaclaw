@@ -71,12 +71,16 @@ hu_error_t hu_daemon_uninstall(void);
 hu_error_t hu_daemon_logs(void);
 
 #ifdef HU_IS_TEST
+struct hu_channel_daemon_config;
 /* Test hook: compute photo viewing delay for batch (3–8 s when has_attachment). */
 uint32_t hu_daemon_photo_viewing_delay_ms(const hu_channel_loop_msg_t *msgs, size_t batch_start,
                                           size_t batch_end, uint32_t seed);
 /* Test hook: compute video viewing delay for batch (2–10 s when has_video). */
 uint32_t hu_daemon_video_viewing_delay_ms(const hu_channel_loop_msg_t *msgs, size_t batch_start,
                                           size_t batch_end, uint32_t seed);
+/* Test hook: per-channel daemon config lookup (see k_daemon_configs in daemon.c). */
+const struct hu_channel_daemon_config *hu_daemon_test_get_active_daemon_config(
+    const struct hu_config *config, const char *ch_name);
 #endif
 
 /* Set the missed-message acknowledgment threshold in seconds (minimum 60s). Default: 1800 (30min) */

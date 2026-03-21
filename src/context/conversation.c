@@ -1883,6 +1883,7 @@ hu_emotional_state_t hu_conversation_detect_emotion(const hu_channel_history_ent
     return state;
 }
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
 /* Parse outermost JSON object span (handles ```json fences or leading prose). */
 static bool conversation_json_object_span(const char *s, size_t n, size_t *start_out, size_t *len_out) {
     size_t start = SIZE_MAX;
@@ -1931,6 +1932,7 @@ static void conversation_map_llm_emotion_label(const char *emotion, hu_emotional
     else
         base->dominant_emotion = "neutral";
 }
+#endif
 
 hu_emotional_state_t hu_conversation_detect_emotion_llm(
     hu_allocator_t *alloc, hu_provider_t *provider, const char *model, size_t model_len,

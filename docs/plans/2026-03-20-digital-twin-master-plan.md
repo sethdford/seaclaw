@@ -268,7 +268,7 @@ Measure how "human" the responses feel.
 **Files:**
 
 - `eval_suites/fidelity.json` — tasks with real conversation snippets, expected timing distributions, expected response styles
-- `eval_suites/fidelity_rubric.json` — LLM judge rubric for naturalness, appropriate length, emotional resonance
+- `docs/eval/fidelity_rubric.json` — LLM judge rubric for naturalness, appropriate length, emotional resonance
 
 **Dimensions:**
 

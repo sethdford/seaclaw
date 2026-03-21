@@ -4,6 +4,7 @@
 #include "human/intelligence/weakness.h"
 #include "human/eval.h"
 #include <sqlite3.h>
+#include <stdio.h>
 #include <string.h>
 
 static sqlite3 *open_mem_db(void) {
@@ -284,6 +285,40 @@ static void test_self_improve_apply_structured_patch_under_is_test(void) {
     sqlite3_close(db);
 }
 
+static void test_self_improve_eval_and_apply_returns_positive_delta_in_test_mode(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = open_mem_db();
+    hu_structured_patch_t p = {0};
+    p.parsed = true;
+    p.type = HU_PATCH_TEMPERATURE;
+    hu_self_improve_delta_t d = {0};
+    HU_ASSERT_EQ(hu_self_improve_eval_and_apply(&alloc, db, &p, &d), HU_OK);
+    HU_ASSERT_FLOAT_EQ(d.score_before, 0.7, 1e-9);
+    HU_ASSERT_FLOAT_EQ(d.score_after, 0.72, 1e-9);
+    HU_ASSERT_FLOAT_EQ(d.delta, 0.02, 1e-9);
+    HU_ASSERT_FALSE(d.should_rollback);
+    sqlite3_close(db);
+}
+
+static void test_self_improve_rollback_if_negative_should_rollback_does_not_crash(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = open_mem_db();
+    hu_self_improve_delta_t d = {0};
+    d.should_rollback = true;
+    snprintf(d.patch_id, sizeof(d.patch_id), "1");
+    HU_ASSERT_EQ(hu_self_improve_rollback_if_negative(&alloc, db, &d), HU_OK);
+    sqlite3_close(db);
+}
+
+static void test_self_improve_rollback_if_negative_false_is_noop(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    sqlite3 *db = open_mem_db();
+    hu_self_improve_delta_t d = {0};
+    d.should_rollback = false;
+    HU_ASSERT_EQ(hu_self_improve_rollback_if_negative(&alloc, db, &d), HU_OK);
+    sqlite3_close(db);
+}
+
 static void test_self_improve_get_structured_patches_test_mode_empty(void) {
     hu_allocator_t alloc = hu_system_allocator();
     sqlite3 *db = open_mem_db();
@@ -325,6 +360,9 @@ void run_self_improve_loop_tests(void) {
     HU_RUN_TEST(test_self_improve_parse_patch_malformed_rejected);
     HU_RUN_TEST(test_self_improve_parse_patch_null_or_empty_rejected);
     HU_RUN_TEST(test_self_improve_apply_structured_patch_under_is_test);
+    HU_RUN_TEST(test_self_improve_eval_and_apply_returns_positive_delta_in_test_mode);
+    HU_RUN_TEST(test_self_improve_rollback_if_negative_should_rollback_does_not_crash);
+    HU_RUN_TEST(test_self_improve_rollback_if_negative_false_is_noop);
     HU_RUN_TEST(test_self_improve_get_structured_patches_test_mode_empty);
 #endif
 }

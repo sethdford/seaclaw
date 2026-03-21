@@ -59,4 +59,13 @@ hu_error_t hu_process_run_with_policy(hu_allocator_t *alloc, const char *const *
                                       const char *cwd, size_t max_output_bytes,
                                       hu_security_policy_t *policy, hu_run_result_t *out);
 
+/**
+ * True if `name` is an executable found on PATH, or an absolute/relative path with execute bit.
+ * On Windows always returns false (not implemented).
+ */
+bool hu_exe_on_path(const char *name);
+
+/** True if Ollama HTTP API responds on 127.0.0.1:11434 (best-effort; no network in HU_IS_TEST). */
+bool hu_ollama_api_tags_reachable(void);
+
 #endif /* HU_PROCESS_UTIL_H */

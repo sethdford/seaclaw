@@ -35,6 +35,12 @@ static void test_run_result_free_null_safe(void) {
     hu_run_result_free(&alloc, NULL);
 }
 
+#if !defined(_WIN32) && (defined(__unix__) || defined(__APPLE__))
+static void test_exe_on_path_finds_sh(void) {
+    HU_ASSERT_TRUE(hu_exe_on_path("sh"));
+}
+#endif
+
 static void test_run_result_free_clears_buffers(void) {
     hu_allocator_t alloc = hu_system_allocator();
     const char *argv[] = {"true", NULL};
@@ -52,6 +58,9 @@ static void test_run_result_free_clears_buffers(void) {
 
 void run_process_util_tests(void) {
     HU_TEST_SUITE("Process util");
+#if !defined(_WIN32) && (defined(__unix__) || defined(__APPLE__))
+    HU_RUN_TEST(test_exe_on_path_finds_sh);
+#endif
     HU_RUN_TEST(test_process_run_stub_success);
     HU_RUN_TEST(test_process_run_null_args_fail);
     HU_RUN_TEST(test_process_run_empty_argv0_fail);

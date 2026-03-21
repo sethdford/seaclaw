@@ -7,6 +7,22 @@
 #error "HU_EVAL_SUITES_DIR must be defined when building human_tests"
 #endif
 
+static const struct eval_suite_expect_row {
+    const char *file;
+    size_t expect_tasks;
+} k_eval_suite_expect[] = {
+    {"adversarial.json", 10},
+    {"coding_basic.json", 5},
+    {"fidelity.json", 10},
+    {"intelligence.json", 10},
+    {"memory.json", 8},
+    {"reasoning.json", 10},
+    {"reasoning_basic.json", 10},
+    {"social.json", 8},
+    {"tool_use.json", 8},
+    {"tool_use_basic.json", 5},
+};
+
 static void test_eval_load(void) {
     hu_allocator_t alloc = hu_system_allocator();
     const char *json = "{\"name\":\"test-suite\",\"tasks\":[]}";
@@ -318,33 +334,22 @@ static void test_eval_suite_load_json_path_missing_returns_io(void) {
 }
 
 static void test_eval_expanded_suite_json_files_parse_unique_ids_expected_counts(void) {
-    static const struct {
-        const char *file;
-        size_t expect_tasks;
-    } k_exp[] = {
-        {"fidelity.json", 10},
-        {"intelligence.json", 10},
-        {"reasoning.json", 10},
-        {"tool_use.json", 8},
-        {"memory.json", 8},
-        {"social.json", 8},
-    };
     hu_allocator_t alloc = hu_system_allocator();
-    hu_eval_suite_t suites[sizeof(k_exp) / sizeof(k_exp[0])];
+    hu_eval_suite_t suites[sizeof(k_eval_suite_expect) / sizeof(k_eval_suite_expect[0])];
     memset(suites, 0, sizeof(suites));
 
-    for (size_t si = 0; si < sizeof(k_exp) / sizeof(k_exp[0]); si++) {
+    for (size_t si = 0; si < sizeof(k_eval_suite_expect) / sizeof(k_eval_suite_expect[0]); si++) {
         char path[768];
-        int n = snprintf(path, sizeof(path), "%s/%s", HU_EVAL_SUITES_DIR, k_exp[si].file);
+        int n = snprintf(path, sizeof(path), "%s/%s", HU_EVAL_SUITES_DIR, k_eval_suite_expect[si].file);
         HU_ASSERT(n > 0 && (size_t)n < sizeof(path));
         HU_ASSERT_EQ(hu_eval_suite_load_json_path(&alloc, path, &suites[si]), HU_OK);
-        HU_ASSERT_EQ(suites[si].tasks_count, k_exp[si].expect_tasks);
+        HU_ASSERT_EQ(suites[si].tasks_count, k_eval_suite_expect[si].expect_tasks);
     }
 
-    for (size_t i = 0; i < sizeof(k_exp) / sizeof(k_exp[0]); i++) {
+    for (size_t i = 0; i < sizeof(k_eval_suite_expect) / sizeof(k_eval_suite_expect[0]); i++) {
         for (size_t ti = 0; ti < suites[i].tasks_count; ti++) {
             HU_ASSERT_NOT_NULL(suites[i].tasks[ti].id);
-            for (size_t j = i; j < sizeof(k_exp) / sizeof(k_exp[0]); j++) {
+            for (size_t j = i; j < sizeof(k_eval_suite_expect) / sizeof(k_eval_suite_expect[0]); j++) {
                 size_t tj_start = (j == i) ? (ti + 1) : 0;
                 for (size_t tj = tj_start; tj < suites[j].tasks_count; tj++) {
                     if (strcmp(suites[i].tasks[ti].id, suites[j].tasks[tj].id) == 0)
@@ -354,8 +359,48 @@ static void test_eval_expanded_suite_json_files_parse_unique_ids_expected_counts
         }
     }
 
-    for (size_t si = 0; si < sizeof(k_exp) / sizeof(k_exp[0]); si++)
+    for (size_t si = 0; si < sizeof(k_eval_suite_expect) / sizeof(k_eval_suite_expect[0]); si++)
         hu_eval_suite_free(&alloc, &suites[si]);
+}
+
+#if defined(__unix__) || defined(__APPLE__)
+static void test_eval_smoke_validate_eval_suites_directory(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_eval_validate_stats_t st = {0};
+    HU_ASSERT_EQ(hu_eval_suites_validate_dir(&alloc, HU_EVAL_SUITES_DIR, NULL, &st), HU_OK);
+    HU_ASSERT_EQ(st.errors, 0u);
+    HU_ASSERT_EQ(st.suites_ok, sizeof(k_eval_suite_expect) / sizeof(k_eval_suite_expect[0]));
+    size_t expect_tasks = 0;
+    for (size_t i = 0; i < sizeof(k_eval_suite_expect) / sizeof(k_eval_suite_expect[0]); i++)
+        expect_tasks += k_eval_suite_expect[i].expect_tasks;
+    HU_ASSERT_EQ(st.tasks, expect_tasks);
+}
+#endif
+
+static void test_eval_baseline_status_for_score_thresholds(void) {
+    HU_ASSERT_STR_EQ(hu_eval_baseline_status_for_score(0.90), "SOTA");
+    HU_ASSERT_STR_EQ(hu_eval_baseline_status_for_score(0.85), "SOTA");
+    HU_ASSERT_STR_EQ(hu_eval_baseline_status_for_score(0.75), "COMPETITIVE");
+    HU_ASSERT_STR_EQ(hu_eval_baseline_status_for_score(0.70), "COMPETITIVE");
+    HU_ASSERT_STR_EQ(hu_eval_baseline_status_for_score(0.65), "PARTIAL");
+    HU_ASSERT_STR_EQ(hu_eval_baseline_status_for_score(0.50), "PARTIAL");
+    HU_ASSERT_STR_EQ(hu_eval_baseline_status_for_score(0.49), "BASIC");
+    HU_ASSERT_STR_EQ(hu_eval_baseline_status_for_score(0.0), "BASIC");
+}
+
+static void test_eval_baseline_try_mock_scores_for_known_stems(void) {
+    double s = 0.0;
+    HU_ASSERT_FALSE(hu_eval_baseline_try_mock_score_for_stem(NULL, &s));
+    HU_ASSERT_FALSE(hu_eval_baseline_try_mock_score_for_stem("fidelity", NULL));
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    HU_ASSERT_TRUE(hu_eval_baseline_try_mock_score_for_stem("fidelity", &s));
+    HU_ASSERT_FLOAT_EQ(s, 0.72, 0.001);
+    HU_ASSERT_TRUE(hu_eval_baseline_try_mock_score_for_stem("intelligence", &s));
+    HU_ASSERT_FLOAT_EQ(s, 0.65, 0.001);
+    HU_ASSERT_FALSE(hu_eval_baseline_try_mock_score_for_stem("coding_basic", &s));
+#else
+    HU_ASSERT_FALSE(hu_eval_baseline_try_mock_score_for_stem("fidelity", &s));
+#endif
 }
 
 static void test_eval_run_free(void) {
@@ -406,7 +451,12 @@ void run_eval_tests(void) {
     HU_RUN_TEST(test_eval_run_load_json_partial);
     HU_RUN_TEST(test_eval_report);
     HU_RUN_TEST(test_eval_compare);
+    HU_RUN_TEST(test_eval_baseline_status_for_score_thresholds);
+    HU_RUN_TEST(test_eval_baseline_try_mock_scores_for_known_stems);
     HU_RUN_TEST(test_eval_suite_load_json_path_missing_returns_io);
     HU_RUN_TEST(test_eval_expanded_suite_json_files_parse_unique_ids_expected_counts);
+#if defined(__unix__) || defined(__APPLE__)
+    HU_RUN_TEST(test_eval_smoke_validate_eval_suites_directory);
+#endif
     HU_RUN_TEST(test_eval_run_free);
 }

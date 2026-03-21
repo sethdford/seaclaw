@@ -9,7 +9,7 @@
 #include "test_framework.h"
 #include <string.h>
 
-#if defined(HU_HAS_SONATA)
+#if defined(HU_ENABLE_VOICE) && HU_ENABLE_VOICE
 #include "human/channel.h"
 #include "human/channels/voice_channel.h"
 #endif
@@ -20,8 +20,8 @@
 #include "human/skill_registry.h"
 #include "human/update.h"
 
-/* ─── voice_channel (only when built with HU_HAS_SONATA) ──────────────────── */
-#if defined(HU_HAS_SONATA)
+/* ─── voice_channel (HU_ENABLE_VOICE) ─────────────────────────────────────── */
+#if defined(HU_ENABLE_VOICE) && HU_ENABLE_VOICE
 static void test_voice_channel_create_destroy(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch = {0};
@@ -168,7 +168,7 @@ static void test_api_memory_store_recall_mock(void) {
 void run_untested_modules_tests(void) {
     HU_TEST_SUITE("Untested modules");
 
-#if defined(HU_HAS_SONATA)
+#if defined(HU_ENABLE_VOICE) && HU_ENABLE_VOICE
     HU_RUN_TEST(test_voice_channel_create_destroy);
     HU_RUN_TEST(test_voice_channel_create_null_alloc_fails);
     HU_RUN_TEST(test_voice_channel_create_null_out_fails);

@@ -1,6 +1,7 @@
 #include "human/doctor.h"
 #include "human/channel_catalog.h"
 #include "human/config.h"
+#include "human/core/process_util.h"
 #include "human/core/string.h"
 #include <stdint.h>
 #include <stdlib.h>
@@ -218,6 +219,47 @@ hu_error_t hu_doctor_truncate_for_display(hu_allocator_t *alloc, const char *s, 
     return *out ? HU_OK : HU_ERR_OUT_OF_MEMORY;
 }
 
+static hu_error_t doctor_check_local_inference(hu_allocator_t *alloc, hu_diag_item_t **buf,
+                                               size_t *n, size_t *cap) {
+#if HU_IS_TEST
+    hu_error_t e = doctor_push_line(alloc, buf, n, cap, HU_DIAG_OK,
+                                    "[doctor] Ollama (localhost:11434): OK (test mode)");
+    if (e != HU_OK)
+        return e;
+    e = doctor_push_line(alloc, buf, n, cap, HU_DIAG_OK,
+                         "[doctor] llama-cli (PATH): OK (test mode)");
+    if (e != HU_OK)
+        return e;
+#else
+    bool ollama_ok = hu_ollama_api_tags_reachable();
+    hu_error_t e;
+    if (ollama_ok)
+        e = doctor_push_line(alloc, buf, n, cap, HU_DIAG_OK,
+                             "[doctor] Ollama (localhost:11434): reachable (GET /api/tags)");
+    else
+        e = doctor_push_line(
+            alloc, buf, n, cap, HU_DIAG_WARN,
+            "[doctor] Ollama (localhost:11434): not reachable (run `ollama serve`)");
+    if (e != HU_OK)
+        return e;
+    if (hu_exe_on_path("llama-cli"))
+        e = doctor_push_line(alloc, buf, n, cap, HU_DIAG_OK, "[doctor] llama-cli: on PATH");
+    else
+        e = doctor_push_line(alloc, buf, n, cap, HU_DIAG_WARN,
+                             "[doctor] llama-cli: not on PATH (install llama.cpp)");
+    if (e != HU_OK)
+        return e;
+#endif
+#ifdef HU_ENABLE_EMBEDDED_MODEL
+    return doctor_push_line(alloc, buf, n, cap, HU_DIAG_OK,
+                            "[doctor] Embedded model provider: compiled in");
+#else
+    return doctor_push_line(
+        alloc, buf, n, cap, HU_DIAG_WARN,
+        "[doctor] Embedded model provider: not compiled in (HU_ENABLE_EMBEDDED_MODEL=OFF)");
+#endif
+}
+
 hu_error_t hu_doctor_check_config_semantics(hu_allocator_t *alloc, const hu_config_t *cfg,
                                             hu_diag_item_t **items, size_t *count) {
     if (!alloc || !cfg || !items || !count)
@@ -338,6 +380,11 @@ hu_error_t hu_doctor_check_config_semantics(hu_allocator_t *alloc, const hu_conf
         return ext_err;
     }
 #endif
+    ext_err = doctor_check_local_inference(alloc, &buf, &n, &cap);
+    if (ext_err != HU_OK) {
+        doctor_free_diag_items(alloc, buf, n, cap);
+        return ext_err;
+    }
 
     *items = buf;
     *count = n;
