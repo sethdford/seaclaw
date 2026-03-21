@@ -1,14 +1,72 @@
 {
-  "name": "Social / Empathy Benchmark",
-  "description": "Short social responses (heuristic contains)",
-  "match_mode": "contains",
+  "name": "Social Intelligence Benchmark Suite",
+  "description": "Theory of mind, sarcasm, subtext, culture, emotional calibration, de-escalation, humor, and boundaries",
+  "match_mode": "llm_judge",
+  "default_rubric": "Score 1-5: 5 = socially adept, respectful, specific; 3 = generic but safe; 1 = misses subtext, harmful, or robotic.",
   "tasks": [
     {
       "id": "soc-001",
-      "category": "empathy",
-      "difficulty": 2,
-      "prompt": "User says: 'I am feeling really anxious about tomorrow.' Reply in one short supportive sentence that acknowledges the feeling (no medical advice).",
-      "expected": "here"
+      "category": "theory_of_mind",
+      "difficulty": 4,
+      "prompt": "Slack from a peer you barely know: 'Oh, amazing, another redesign doc 🙃 due EOD.' They have not opted into venting. Draft a short reply that recognizes likely frustration without assuming intimacy.",
+      "expected": "Acknowledges crunch time, offers concrete help (review slot, clarifying questions) without mocking; reads emoji/sarcasm as stress not celebration.",
+      "rubric": "5=Calibrated empathy + practical offer; 1=Takes 'amazing' literally or over-shares"
+    },
+    {
+      "id": "soc-002",
+      "category": "sarcasm_detection",
+      "difficulty": 3,
+      "prompt": "Friend texts: 'Yeah, standing in the rain for 40 minutes was exactly how I wanted to spend my birthday.' Explain the intended meaning and a supportive one-line response.",
+      "expected": "Interprets as complaint/disappointment masked; response validates without minimizing or joking at their expense.",
+      "rubric": "5=Correct detection + warm brief reply; 1=Misreads as positive experience"
+    },
+    {
+      "id": "soc-003",
+      "category": "subtext_reading",
+      "difficulty": 5,
+      "prompt": "Partner message: 'It's fine. Do whatever you want.' Recent context: you suggested skipping their family's dinner. Draft a response that addresses likely hurt without interrogation or defensiveness.",
+      "expected": "Reads 'fine' as not fine; invites repair, takes responsibility, proposes check-in or alternative—not dismissive literalism.",
+      "rubric": "5=Emotionally intelligent repair move; 1=Accepts 'fine' at face value or escalates"
+    },
+    {
+      "id": "soc-004",
+      "category": "cultural_sensitivity",
+      "difficulty": 5,
+      "prompt": "Teammate in India says they will be offline during Diwali week. A US PM asks you to draft a one-line schedule note to the global group. Avoid stereotypes while being clear about coverage.",
+      "expected": "Neutral holiday coverage framing, no exoticizing, no religion jokes; suggests async handoff or on-call without singling out individuals.",
+      "rubric": "5=Professional inclusive wording without stereotypes; 1=Othering or vague to the point of confusion"
+    },
+    {
+      "id": "soc-005",
+      "category": "emotional_calibration",
+      "difficulty": 4,
+      "prompt": "User shares: 'I got passed over for promotion again.' They sound flat, few words. Write a first response that matches intensity—neither performative nor cold.",
+      "expected": "Brief validation, open question, no toxic positivity, no immediate problem-solving unless invited.",
+      "rubric": "5=Tone-matched and human; 1=Three paragraphs of cheer or clinical HR speak"
+    },
+    {
+      "id": "soc-006",
+      "category": "conflict_deescalation",
+      "difficulty": 5,
+      "prompt": "Group thread: two coworkers are arguing loudly about blame for a missed launch. You have no authority. Write a message that de-escalates and moves toward next steps without picking a villain.",
+      "expected": "Acknowledges tension, separates people/problem, proposes timeline/facts gathering, offers to facilitate or document—not taking sides.",
+      "rubric": "5=De-escalation + process; 1=Fans flames or fake neutrality that blames one side"
+    },
+    {
+      "id": "soc-007",
+      "category": "humor_generation",
+      "difficulty": 3,
+      "prompt": "Friend: 'My plant is somehow both dying and growing toward the light. Mood.' Reply with light humor in their voice—no punching down, no long setup.",
+      "expected": "Short witty parallel, kind, plant or mood joke without cruelty or lecture.",
+      "rubric": "5=Actually funny and warm; 1=Explains joke or offends"
+    },
+    {
+      "id": "soc-008",
+      "category": "boundary_setting",
+      "difficulty": 4,
+      "prompt": "Acquaintance: 'Can you read this 30-page PDF and summarize by tonight? It's for my side hustle—not paid.' You want to decline without burning the bridge. Draft your reply.",
+      "expected": "Clear no, brief reason (capacity/focus), optional bounded alternative (e.g., 10 min high-level another day), friendly close.",
+      "rubric": "5=Firm boundary + grace; 1=Hostile no or resentful yes"
     }
   ]
 }

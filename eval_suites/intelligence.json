@@ -46,6 +46,51 @@
       "expected": "Should decompose into subtasks, use multiple tools, maintain coherent plan across steps.",
       "match_mode": "llm_judge",
       "rubric": "5=Comprehensive multi-step plan with tool use, 1=Shallow single-step response"
+    },
+    {
+      "id": "intel-006",
+      "category": "metacognition",
+      "difficulty": 5,
+      "prompt": "A founder asks for the exact equity dilution they'll face after three future priced rounds, including liquidation preferences, based only on a two-sentence description of their cap table. How should you answer?",
+      "expected": "Refuses false precision; lists missing inputs (SAFEs/notes, pre/post, option pool, MFN, seniority); offers ranges or scenarios or requests documents; distinguishes what you can reason about vs what requires counsel/finance models.",
+      "match_mode": "llm_judge",
+      "rubric": "5=Clear epistemic limits + what would be needed, 1=Fabricates percentages or legal outcomes"
+    },
+    {
+      "id": "intel-007",
+      "category": "long_horizon_planning",
+      "difficulty": 5,
+      "prompt": "Coordinate a 4-day work trip Thu–Sun: two customer meetings (Fri AM, Sat PM cities 200 km apart), one internal workshop Thu PM, and a 90-minute live demo slot Sat late morning that cannot move. Outline a multi-day plan with travel buffers, contingency if Friday flight cancels, and what you would track daily—not a single packed paragraph.",
+      "expected": "Day-bucketed schedule, realistic transit, buffer before demo, explicit dependency chain, cancel/rebook branch for Friday travel, checklist of moving parts (gear, slides, time zones, local contacts).",
+      "match_mode": "llm_judge",
+      "rubric": "5=Coherent cross-day coordination with contingencies, 1=Impossible timing or hand-wavy travel"
+    },
+    {
+      "id": "intel-008",
+      "category": "learning_from_correction",
+      "difficulty": 4,
+      "prompt": "Turn 1 you summarized a policy as 'employees must use VPN always.' Turn 2 the user corrects: 'Only for prod data; internal staging is split-tunnel OK.' Turn 3 they ask: 'So how should I access the staging DB from home?' Answer using the correction—no re-litigating unless you flag residual ambiguity.",
+      "expected": "Applies split-tunnel/staging exception; does not repeat the wrong 'always VPN' rule; states any remaining unknowns (e.g., which networks count as staging) as questions—not guesses.",
+      "match_mode": "llm_judge",
+      "rubric": "5=Integrates correction cleanly, 1=Ignores correction or contradicts user"
+    },
+    {
+      "id": "intel-009",
+      "category": "ambiguity_resolution",
+      "difficulty": 4,
+      "prompt": "Message from ops: 'Ship the fix to the usual channel after the window.' You don't know which service, which channel (deploy ring vs comms Slack), or which maintenance window. List the minimal clarifying questions grouped by assumption, and what safe default you would refuse to guess.",
+      "expected": "Disambiguates service/artifact, deployment target, window time source of truth, approval owner; refuses to silently push or announce without confirmation.",
+      "match_mode": "llm_judge",
+      "rubric": "5=Tight structured clarification + explicit refusal to guess destructive actions, 1=Pretends context is obvious"
+    },
+    {
+      "id": "intel-010",
+      "category": "creative_problem_solving",
+      "difficulty": 5,
+      "prompt": "A small nonprofit has no budget for paid ads but must fill 200 seats for a free climate workshop in 10 days. Traditional flyer drops underperformed. Propose three unconventional outreach tactics that use partnerships and existing networks, with a quick feasibility note for each—not generic 'post on social media' only.",
+      "expected": "Concrete partner types (libraries, schools, faith groups, employers, community orgs), mutual benefit, low-cost mechanics (calendar swaps, speaker cross-promo, SMS tree with consent), and a sense of which is fastest to stand up.",
+      "match_mode": "llm_judge",
+      "rubric": "5=Specific, plausible, differentiated ideas with feasibility, 1=Generic platitudes or unrealistic spend"
     }
   ]
 }
