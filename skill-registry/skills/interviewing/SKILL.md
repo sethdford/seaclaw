@@ -2,6 +2,8 @@
 
 Run interviews that surface **truthful, specific signal**—whether for **users**, **candidates**, **sources**, or **exits**—through prep, open questions, and disciplined listening.
 
+**Tags:** cognitive, communication, research
+
 ## When to Use
 - User research, hiring loops, stakeholder discovery, journalistic Q&A, or exit conversations.
 

@@ -2,6 +2,8 @@
 
 Help people adopt new ways of working by pairing **clear “why”** with **small, reinforced steps**. Resistance is information—reduce fear and friction before pushing scale.
 
+**Tags:** cognitive, leadership, strategy
+
 ## When to Use
 - Tool rollouts, org redesigns, process changes, migrations, or any initiative where behavior must shift.
 
