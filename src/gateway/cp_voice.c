@@ -70,11 +70,7 @@ hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     const char *stt_provider = cfg->voice.stt_provider;
 
     hu_voice_config_t voice_cfg = {0};
-    if (cfg->voice.stt_model && cfg->voice.stt_model[0])
-        voice_cfg.stt_model = cfg->voice.stt_model;
-    if (cfg->voice.local_stt_endpoint && cfg->voice.local_stt_endpoint[0])
-        voice_cfg.local_stt_endpoint = cfg->voice.local_stt_endpoint;
-    voice_cfg.stt_provider = stt_provider;
+    (void)hu_voice_config_from_settings(cfg, &voice_cfg);
     voice_cfg.language = NULL;
 
     char *text = NULL;
@@ -87,21 +83,6 @@ hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_
                                       strcmp(stt_provider, "local") == 0));
 
     if (use_file) {
-        /* Populate API key for the chosen provider */
-        if (strcmp(stt_provider, "cartesia") == 0) {
-            const char *ckey = hu_config_get_provider_key(cfg, "cartesia");
-            if (ckey && ckey[0]) {
-                voice_cfg.cartesia_api_key = ckey;
-                voice_cfg.cartesia_api_key_len = strlen(ckey);
-            }
-        } else if (strcmp(stt_provider, "groq") == 0) {
-            const char *gkey = hu_config_get_provider_key(cfg, "groq");
-            if (gkey && gkey[0]) {
-                voice_cfg.api_key = gkey;
-                voice_cfg.api_key_len = strlen(gkey);
-            }
-        }
-
 #if HU_IS_TEST
         err = hu_voice_stt_file(alloc, &voice_cfg, "/tmp/test.webm", &text, &text_len);
 #else

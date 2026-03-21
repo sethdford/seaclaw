@@ -7956,8 +7956,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 &agent->persona->voice_messages, true, bth_hour,
                                 (uint32_t)(time(NULL) ^ (uintptr_t)combined));
                             if (vdec == HU_VOICE_SEND_VOICE) {
-                                const char *cartesia_key = getenv("CARTESIA_API_KEY");
-                                if (cartesia_key) {
+                                const char *cartesia_key =
+                                    hu_config_get_provider_key(config, "cartesia");
+                                if (!cartesia_key || !cartesia_key[0])
+                                    cartesia_key = getenv("CARTESIA_API_KEY");
+                                if (cartesia_key && cartesia_key[0]) {
                                     char voice_transcript[4096];
                                     size_t vt_len = response_len < sizeof(voice_transcript) - 64
                                                         ? response_len

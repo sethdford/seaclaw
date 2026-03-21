@@ -40,12 +40,11 @@ static hu_error_t voice_start(void *ctx) {
         return HU_ERR_INVALID_ARGUMENT;
 
     if (v->config.mode == HU_VOICE_MODE_REALTIME) {
-#if HU_IS_TEST
-        v->running = true;
-        return HU_OK;
-#else
         hu_voice_rt_config_t rt_cfg = {0};
         rt_cfg.sample_rate = (int)v->config.sample_rate;
+        rt_cfg.api_key = v->config.api_key ? (char *)v->config.api_key : NULL;
+        rt_cfg.model = v->config.model ? (char *)v->config.model : NULL;
+        rt_cfg.voice = v->config.voice ? (char *)v->config.voice : NULL;
         hu_error_t err = hu_voice_rt_session_create(v->alloc, &rt_cfg, &v->rt_session);
         if (err != HU_OK)
             return err;
@@ -57,7 +56,6 @@ static hu_error_t voice_start(void *ctx) {
         }
         v->running = true;
         return HU_OK;
-#endif
     }
 
     if (v->config.mode == HU_VOICE_MODE_WEBRTC) {
@@ -198,6 +196,26 @@ hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc,
 
     if (!v->running)
         return HU_OK;
+
+    if (v->config.mode == HU_VOICE_MODE_REALTIME && v->rt_session) {
+        hu_voice_rt_event_t event = {0};
+        hu_error_t err = hu_voice_rt_recv_event(v->rt_session, alloc, &event, 100);
+        if (err == HU_OK && event.transcript && event.transcript_len > 0 && max_msgs > 0) {
+            memset(&msgs[0], 0, sizeof(msgs[0]));
+            size_t copy_len = event.transcript_len;
+            if (copy_len >= sizeof(msgs[0].content))
+                copy_len = sizeof(msgs[0].content) - 1;
+            memcpy(msgs[0].content, event.transcript, copy_len);
+            msgs[0].content[copy_len] = '\0';
+            memcpy(msgs[0].session_key, "voice-rt", 8);
+            msgs[0].session_key[8] = '\0';
+            msgs[0].is_group = false;
+            msgs[0].message_id = -1;
+            *out_count = 1;
+        }
+        hu_voice_rt_event_free(alloc, &event);
+        return HU_OK;
+    }
 
 #if HU_IS_TEST
     (void)max_msgs;

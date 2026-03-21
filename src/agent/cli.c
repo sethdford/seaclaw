@@ -1,5 +1,6 @@
 #include "human/agent/cli.h"
 #include "human/agent.h"
+#include "human/agent/spawn.h"
 #include "human/agent/awareness.h"
 #include "human/agent/outcomes.h"
 #include "human/agent/profile.h"
@@ -395,6 +396,13 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
 #endif
 
     hu_agent_pool_t *cli_agent_pool = hu_agent_pool_create(alloc, cfg.agent.pool_max_concurrent);
+    {
+        hu_fleet_limits_t fl = {0};
+        fl.max_spawn_depth = cfg.agent.fleet_max_spawn_depth;
+        fl.max_total_spawns = cfg.agent.fleet_max_total_spawns;
+        fl.budget_limit_usd = cfg.agent.fleet_budget_usd;
+        hu_agent_pool_set_fleet_limits(cli_agent_pool, &fl);
+    }
     hu_mailbox_t *cli_mailbox = hu_mailbox_create(alloc, 64);
 
     hu_tool_t *tools = NULL;
@@ -471,6 +479,12 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         hu_bus_deinit(&cli_bus);
         hu_config_deinit(&cfg);
         return err;
+    }
+    hu_voice_config_t voice_cfg = {0};
+    (void)hu_voice_config_from_settings(&cfg, &voice_cfg);
+    if (voice_cfg.tts_provider || voice_cfg.local_tts_endpoint || voice_cfg.api_key ||
+        voice_cfg.cartesia_api_key) {
+        hu_agent_set_voice_config(&agent, &voice_cfg);
     }
     agent.agent_pool = cli_agent_pool;
     hu_agent_set_mailbox(&agent, cli_mailbox);

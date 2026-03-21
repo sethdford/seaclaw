@@ -342,6 +342,7 @@ set(HU_CORE_SOURCES
     src/skill_registry.c
     src/subagent.c
     src/voice.c
+    src/voice_config.c
     src/voice/local_stt.c
     src/voice/local_tts.c
     src/portable_atomic.c

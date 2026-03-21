@@ -174,6 +174,7 @@ struct hu_agent {
     hu_agent_pool_t *agent_pool;
     hu_mailbox_t *mailbox;
     uint64_t agent_id; /* used for mailbox registration; 0 = use (uintptr_t)agent */
+    uint32_t spawn_depth; /* 0 = root session; +1 per nested agent_spawn */
     struct hu_skillforge *skillforge;       /* optional; loaded skills for prompt injection */
     struct hu_agent_registry *agent_registry; /* optional; named agent definitions */
     hu_worktree_manager_t *worktree_mgr;
@@ -271,6 +272,9 @@ void hu_agent_set_mailbox(hu_agent_t *agent, hu_mailbox_t *mailbox);
  * Pass NULL to clear. */
 void hu_agent_set_skillforge(hu_agent_t *agent, struct hu_skillforge *skillforge);
 
+/* Optional: share session cost accounting with spawned workers (borrowed pointer). */
+void hu_agent_set_cost_tracker(hu_agent_t *agent, hu_cost_tracker_t *tracker);
+
 /* Optional: set shared task list for multi-agent collaboration. Caller owns task_list. */
 void hu_agent_set_task_list(hu_agent_t *agent, hu_task_list_t *task_list);
 
@@ -287,6 +291,10 @@ const struct hu_awareness *hu_agent_get_awareness(const hu_agent_t *agent);
 /* Optional: set outcome tracker for continuous learning. Caller owns tracker lifecycle. */
 struct hu_outcome_tracker;
 void hu_agent_set_outcomes(hu_agent_t *agent, struct hu_outcome_tracker *tracker);
+
+/* Point the agent at a hu_voice_config_t (e.g. from hu_voice_config_from_settings).
+ * Borrowed pointers inside that struct must outlive the agent. Pass NULL to disable TTS. */
+void hu_agent_set_voice_config(hu_agent_t *agent, hu_voice_config_t *voice_cfg);
 
 /* Run one conversation turn: send to provider, process tool calls, iterate. */
 hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, char **response_out,

@@ -22,6 +22,12 @@ typedef struct hu_voice_config {
     size_t cartesia_api_key_len;
 } hu_voice_config_t;
 
+struct hu_config;
+/* Build hu_voice_config_t from config settings + provider keys.
+ * Does not allocate — all pointers reference config-owned strings.
+ * config may be NULL (returns zeroed struct). */
+hu_error_t hu_voice_config_from_settings(const struct hu_config *config, hu_voice_config_t *out);
+
 hu_error_t hu_voice_stt_file(hu_allocator_t *alloc, const hu_voice_config_t *config,
                              const char *file_path, char **out_text, size_t *out_len);
 

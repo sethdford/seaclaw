@@ -41,6 +41,9 @@ typedef struct hu_channel_voice_config {
     float emotion_exaggeration;               /* 0.0 - 2.0, default 1.0 */
     bool emotion_exaggeration_set;            /* true if explicitly configured */
     uint32_t sample_rate;                     /* Default: 24000 */
+    const char *api_key; /* OpenAI API key for Realtime mode */
+    const char *model;   /* Model name, e.g. "gpt-4o-realtime-preview" */
+    const char *voice;   /* Voice name, e.g. "alloy" */
     bool enable_full_duplex;                  /* Enable overlapping speech */
     bool enable_backchanneling;               /* Enable hmm/right/oh responses */
     hu_voice_audio_callback_t on_audio_ready; /* Callback for generated audio */

@@ -459,6 +459,12 @@ void hu_agent_set_skillforge(hu_agent_t *agent, struct hu_skillforge *skillforge
 #endif
 }
 
+void hu_agent_set_cost_tracker(hu_agent_t *agent, hu_cost_tracker_t *tracker) {
+    if (!agent)
+        return;
+    agent->cost_tracker = tracker;
+}
+
 void hu_agent_set_task_list(hu_agent_t *agent, hu_task_list_t *task_list) {
     if (!agent)
         return;
@@ -485,6 +491,13 @@ void hu_agent_set_outcomes(hu_agent_t *agent, struct hu_outcome_tracker *tracker
     if (!agent)
         return;
     agent->outcomes = tracker;
+}
+
+void hu_agent_set_voice_config(hu_agent_t *agent, hu_voice_config_t *voice_cfg) {
+    if (!agent)
+        return;
+    agent->voice_config = voice_cfg;
+    agent->tts_enabled = (voice_cfg != NULL);
 }
 
 void hu_agent_deinit(hu_agent_t *agent) {
