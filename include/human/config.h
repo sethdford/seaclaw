@@ -171,6 +171,7 @@ typedef struct hu_email_channel_config {
     char *smtp_pass;
     char *imap_host;
     uint16_t imap_port;
+    hu_channel_daemon_config_t daemon;
 } hu_email_channel_config_t;
 
 typedef struct hu_imap_channel_config {
@@ -197,6 +198,7 @@ typedef struct hu_gmail_channel_config {
     char *client_secret;
     char *refresh_token;
     int poll_interval_sec;
+    hu_channel_daemon_config_t daemon;
 } hu_gmail_channel_config_t;
 
 #define HU_DISCORD_CHANNEL_IDS_MAX 16
@@ -248,6 +250,10 @@ typedef struct hu_whatsapp_channel_config {
     char *verify_token;
     hu_channel_daemon_config_t daemon;
 } hu_whatsapp_channel_config_t;
+
+typedef struct hu_signal_channel_config {
+    hu_channel_daemon_config_t daemon;
+} hu_signal_channel_config_t;
 
 typedef struct hu_line_channel_config {
     char *channel_token;
@@ -305,11 +311,13 @@ typedef struct hu_mqtt_channel_config {
 typedef struct hu_matrix_channel_config {
     char *homeserver;
     char *access_token;
+    hu_channel_daemon_config_t daemon;
 } hu_matrix_channel_config_t;
 
 typedef struct hu_irc_channel_config {
     char *server;
     uint16_t port;
+    hu_channel_daemon_config_t daemon;
 } hu_irc_channel_config_t;
 
 typedef struct hu_nostr_channel_config {
@@ -317,6 +325,7 @@ typedef struct hu_nostr_channel_config {
     char *bot_pubkey;
     char *relay_url;
     char *seckey_hex;
+    hu_channel_daemon_config_t daemon;
 } hu_nostr_channel_config_t;
 
 typedef struct hu_lark_channel_config {
@@ -369,6 +378,7 @@ typedef struct hu_channels_config {
     hu_discord_channel_config_t discord;
     hu_telegram_channel_config_t telegram;
     hu_slack_channel_config_t slack;
+    hu_signal_channel_config_t signal;
     hu_whatsapp_channel_config_t whatsapp;
     hu_line_channel_config_t line;
     hu_google_chat_channel_config_t google_chat;
@@ -387,6 +397,7 @@ typedef struct hu_channels_config {
     hu_twilio_channel_config_t twilio;
     hu_onebot_channel_config_t onebot;
     hu_qq_channel_config_t qq;
+    hu_channel_daemon_config_t default_daemon;
     struct {
         char **apps;         /* app names to monitor, NULL = all */
         size_t apps_count;

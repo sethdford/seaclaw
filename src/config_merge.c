@@ -143,6 +143,9 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->heartbeat.interval_minutes = 30;
     cfg->channels.cli = true;
     cfg->channels.default_channel = NULL;
+    /* channels.default_daemon and per-channel .daemon: zeroed here; successive
+     * hu_config_parse_json (global then workspace in config_load_impl) overlays
+     * only keys present in each file — no separate merge pass. */
     cfg->tunnel.provider = hu_strdup(a, "none");
     if (!cfg->tunnel.provider)
         return;

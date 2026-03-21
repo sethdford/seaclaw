@@ -4,11 +4,9 @@
 #include "human/core/string.h"
 #include <string.h>
 
-static void parse_daemon_config(hu_allocator_t *a, hu_channel_daemon_config_t *dcfg,
-                                const hu_json_value_t *obj) {
-    if (!obj || obj->type != HU_JSON_OBJECT)
-        return;
-    hu_json_value_t *daemon_obj = hu_json_object_get(obj, "daemon");
+/* Apply fields from a JSON object that is the daemon block itself (not a parent with "daemon"). */
+static void parse_daemon_object(hu_allocator_t *a, hu_channel_daemon_config_t *dcfg,
+                                const hu_json_value_t *daemon_obj) {
     if (!daemon_obj || daemon_obj->type != HU_JSON_OBJECT)
         return;
 
@@ -24,6 +22,14 @@ static void parse_daemon_config(hu_allocator_t *a, hu_channel_daemon_config_t *d
     dcfg->poll_interval_sec =
         (int)hu_json_get_number(daemon_obj, "poll_interval_sec", (double)dcfg->poll_interval_sec);
     dcfg->voice_enabled = hu_json_get_bool(daemon_obj, "voice_enabled", dcfg->voice_enabled);
+}
+
+static void parse_daemon_config(hu_allocator_t *a, hu_channel_daemon_config_t *dcfg,
+                                const hu_json_value_t *parent_obj) {
+    if (!parent_obj || parent_obj->type != HU_JSON_OBJECT)
+        return;
+    hu_json_value_t *daemon_obj = hu_json_object_get(parent_obj, "daemon");
+    parse_daemon_object(a, dcfg, daemon_obj);
 }
 
 static void parse_email_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -67,6 +73,7 @@ static void parse_email_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_js
     port = hu_json_get_number(obj, "imap_port", e->imap_port);
     if (port >= 1 && port <= 65535)
         e->imap_port = (uint16_t)port;
+    parse_daemon_config(a, &e->daemon, obj);
 }
 
 static void parse_imap_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -179,6 +186,10 @@ static void parse_gmail_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_js
         cfg->channels.gmail.refresh_token = hu_strndup(a, rtok, strlen(rtok));
     }
     cfg->channels.gmail.poll_interval_sec = (int)hu_json_get_number(obj, "poll_interval_sec", 30.0);
+    parse_daemon_config(a, &cfg->channels.gmail.daemon, obj);
+    if (cfg->channels.gmail.daemon.poll_interval_sec == 0 &&
+        cfg->channels.gmail.poll_interval_sec > 0)
+        cfg->channels.gmail.daemon.poll_interval_sec = cfg->channels.gmail.poll_interval_sec;
 }
 
 static void parse_telegram_channel(hu_allocator_t *a, hu_config_t *cfg,
@@ -618,6 +629,7 @@ static void parse_matrix_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_j
                     strlen(cfg->channels.matrix.access_token) + 1);
         cfg->channels.matrix.access_token = hu_strdup(a, tok);
     }
+    parse_daemon_config(a, &cfg->channels.matrix.daemon, obj);
 }
 
 static void parse_irc_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -632,6 +644,7 @@ static void parse_irc_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_json
     double port = hu_json_get_number(obj, "port", 6667);
     if (port >= 1 && port <= 65535)
         cfg->channels.irc.port = (uint16_t)port;
+    parse_daemon_config(a, &cfg->channels.irc.daemon, obj);
 }
 
 static void parse_lark_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -840,6 +853,19 @@ static void parse_nostr_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_js
                     strlen(cfg->channels.nostr.seckey_hex) + 1);
         cfg->channels.nostr.seckey_hex = hu_strdup(a, sk);
     }
+    parse_daemon_config(a, &cfg->channels.nostr.daemon, obj);
+}
+
+static void parse_signal_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
+    if (!obj)
+        return;
+    const hu_json_value_t *val = obj;
+    if (obj->type == HU_JSON_ARRAY && obj->data.array.len > 0 && obj->data.array.items &&
+        obj->data.array.items[0])
+        val = obj->data.array.items[0];
+    if (!val || val->type != HU_JSON_OBJECT)
+        return;
+    parse_daemon_config(a, &cfg->channels.signal.daemon, val);
 }
 
 hu_error_t parse_channels(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -855,6 +881,10 @@ hu_error_t parse_channels(hu_allocator_t *a, hu_config_t *cfg, const hu_json_val
                     strlen(cfg->channels.default_channel) + 1);
         cfg->channels.default_channel = hu_strdup(a, def_ch);
     }
+
+    hu_json_value_t *default_daemon_obj = hu_json_object_get(obj, "daemon");
+    if (default_daemon_obj)
+        parse_daemon_object(a, &cfg->channels.default_daemon, default_daemon_obj);
 
     hu_json_value_t *email_obj = hu_json_object_get(obj, "email");
     if (email_obj)
@@ -883,6 +913,10 @@ hu_error_t parse_channels(hu_allocator_t *a, hu_config_t *cfg, const hu_json_val
     hu_json_value_t *slack_obj = hu_json_object_get(obj, "slack");
     if (slack_obj)
         parse_slack_channel(a, cfg, slack_obj);
+
+    hu_json_value_t *signal_obj = hu_json_object_get(obj, "signal");
+    if (signal_obj)
+        parse_signal_channel(a, cfg, signal_obj);
 
     hu_json_value_t *whatsapp_obj = hu_json_object_get(obj, "whatsapp");
     if (whatsapp_obj)
@@ -981,7 +1015,8 @@ hu_error_t parse_channels(hu_allocator_t *a, hu_config_t *cfg, const hu_json_val
             hu_json_pair_t *p = &obj->data.object.pairs[i];
             if (!p->key || !p->value)
                 continue;
-            if (strcmp(p->key, "cli") == 0 || strcmp(p->key, "default_channel") == 0)
+            if (strcmp(p->key, "cli") == 0 || strcmp(p->key, "default_channel") == 0 ||
+                strcmp(p->key, "daemon") == 0)
                 continue;
             size_t cnt = 0;
             if (p->value->type == HU_JSON_ARRAY && p->value->data.array.items)
