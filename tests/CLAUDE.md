@@ -1,6 +1,6 @@
 # tests/ — Test Suite
 
-6051+ C tests using a lightweight custom framework (`test_framework.h`).
+6059+ C tests using a lightweight custom framework (`test_framework.h`).
 
 ## Framework
 
