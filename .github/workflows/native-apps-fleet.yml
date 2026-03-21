@@ -1,0 +1,87 @@
+# Parallel native E2E / instrumented smoke across iOS simulators and Android API levels.
+# Heavier than default CI — runs on apps changes, main, schedule, and manual dispatch.
+name: Native apps E2E fleet
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 11 * * 1"
+  pull_request:
+    paths:
+      - "apps/**"
+      - ".github/workflows/native-apps-fleet.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/**"
+      - ".github/workflows/native-apps-fleet.yml"
+
+concurrency:
+  group: native-apps-fleet-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  human-kit-swift:
+    name: HumanKit (Swift PM)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: swift test
+        run: cd apps/shared/HumanKit && swift test
+
+  ios-simulator-fleet:
+    name: iOS ${{ matrix.destination }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        destination:
+          - "platform=iOS Simulator,name=iPhone 16,OS=latest"
+          - "platform=iOS Simulator,name=iPhone SE (3rd generation),OS=latest"
+          - "platform=iOS Simulator,name=iPad (10th generation),OS=latest"
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: cd apps/ios && xcodegen generate
+      - name: XCUITest (HumaniOSUITests)
+        run: |
+          xcodebuild test \
+            -project apps/ios/HumaniOS.xcodeproj \
+            -scheme HumaniOS \
+            -destination "${{ matrix.destination }}" \
+            -only-testing:HumaniOSUITests \
+            CODE_SIGNING_ALLOWED=NO
+
+  android-emulator-fleet:
+    name: Android API ${{ matrix.api-level }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [29, 33, 34]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: google_apis
+          profile: Nexus 6
+          force-avd-creation: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-bootanim -camera-back none
+          disable-animations: true
+          script: cd apps/android && chmod +x gradlew && ./gradlew connectedDebugAndroidTest
+
+  macos-app-build:
+    name: macOS app (swift build)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: cd apps/macos && swift build

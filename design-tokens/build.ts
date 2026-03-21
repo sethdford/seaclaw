@@ -225,47 +225,6 @@ function writeOutput(
   console.log("Wrote", dest);
 }
 
-function generateDart(tokens: TokenMap): string {
-  const lines: string[] = [
-    "// Auto-generated from design-tokens/ — do not edit manually",
-    "import 'package:flutter/material.dart';",
-    "",
-    "abstract final class HUTokens {",
-  ];
-
-  for (const [key, val] of Object.entries(tokens).sort()) {
-    const dartName = key
-      .replace(/\./g, "_")
-      .replace(/-/g, "_")
-      .replace(/([A-Z])/g, "_$1")
-      .toLowerCase()
-      .replace(/^_/, "");
-
-    if (typeof val === "string" && val.startsWith("#") && val.length === 7) {
-      const hex = val.replace("#", "").toUpperCase();
-      lines.push(`  static const ${dartName} = Color(0xFF${hex});`);
-    } else if (typeof val === "number") {
-      lines.push(`  static const ${dartName} = ${val};`);
-    } else if (typeof val === "string" && val.endsWith("px")) {
-      const num = parseFloat(val);
-      if (!isNaN(num)) lines.push(`  static const ${dartName} = ${num};`);
-    } else if (typeof val === "string" && val.endsWith("rem")) {
-      const num = parseFloat(val) * 16;
-      if (!isNaN(num)) lines.push(`  static const ${dartName} = ${num};`);
-    } else if (typeof val === "string" && val.endsWith("ms")) {
-      const num = parseInt(val);
-      if (!isNaN(num))
-        lines.push(
-          `  static const ${dartName} = Duration(milliseconds: ${num});`,
-        );
-    }
-  }
-
-  lines.push("}");
-  lines.push("");
-  return lines.join("\n");
-}
-
 function generateRuntimeJSON(tokens: TokenMap): string {
   const organized: Record<string, Record<string, unknown>> = {};
   for (const [key, val] of Object.entries(tokens)) {
@@ -455,16 +414,6 @@ function main() {
   const refDir = path.dirname(refPath);
   if (!fs.existsSync(refDir)) fs.mkdirSync(refDir, { recursive: true });
   writeOutput(outdir, refPath, "design-tokens-reference.json", refJson);
-
-  const dart = generateDart(tokens);
-  const dartDir = outdir || path.join(ROOT, "apps", "flutter", "lib");
-  if (!fs.existsSync(dartDir)) fs.mkdirSync(dartDir, { recursive: true });
-  writeOutput(
-    outdir,
-    path.join(dartDir, "design_tokens.dart"),
-    "design_tokens.dart",
-    dart,
-  );
 
   const runtimeJson = generateRuntimeJSON(tokens);
   writeOutput(

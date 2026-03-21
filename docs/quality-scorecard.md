@@ -153,7 +153,7 @@ Sprint 12 changes (SOTA UX push): **Foundation** — Anticipatory UX engine (idl
 - [x] **Native Visual Craft**: 7→8. Typography hierarchy, tonal surfaces, accent restraint, dark/light polish.
 - [x] **Native Motion**: iOS 8→9, macOS/Android 7→8. springInteractive, stagger lists, predictive back.
 - [x] **Android Brand**: 7→8. Phosphor vector drawables, Avenir typography throughout.
-- [x] **Flutter**: Lazy loading, deferred gateway, Material 3 typography, overview density.
+- [x] **Flutter** (removed): superseded by native iOS, macOS, and Android apps.
 - [x] **Cross-surface audit**: All checks passing. Raw hex/duration violations fixed.
 - [x] **C Runtime**: 8+ compile errors fixed. 5,048 tests pass, 0 ASan errors.
 - [x] **Native Density**: 8→9. Animated numbers (`.contentTransition(.numericText())` iOS, `AnimatedContent` Android), message count badges, preview text, relative timestamps, collapsible Advanced sections (`DisclosureGroup`/`AnimatedVisibility`/`ExpansionTile`), sparklines on macOS.

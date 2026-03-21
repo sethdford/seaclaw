@@ -52,3 +52,17 @@ targets:
         SWIFT_VERSION: "5.9"
         INFOPLIST_FILE: Sources/HumanWidgetExtension/Info.plist
         GENERATE_INFOPLIST_FILE: false
+
+  HumaniOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: HumaniOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.human.ios.uitests
+        SWIFT_VERSION: "5.9"
+        TEST_TARGET_NAME: HumaniOS
+        CODE_SIGNING_ALLOWED: NO

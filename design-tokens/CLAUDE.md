@@ -14,7 +14,7 @@ npm run docs           # generate token reference docs
 - Edit `.tokens.json` files only — never hand-edit generated outputs
 - Token format: `$value`, `$type`, `$description` (W3C standard)
 - Token names map to `--hu-*` CSS custom properties
-- After editing, run `npm run build` to regenerate: CSS, Kotlin, Swift, C, Dart
+- After editing, run `npm run build` to regenerate: CSS, Kotlin, Swift, C
 - `check-drift.sh` verifies generated outputs match source — runs in pre-commit and CI
 
 ## Token Files

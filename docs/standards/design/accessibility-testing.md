@@ -116,13 +116,6 @@ Every view must be fully operable without a mouse:
 - Support `ANIMATOR_DURATION_SCALE = 0` (reduced motion)
 - Test with TalkBack + Switch Access
 
-### 4.3 Flutter
-
-- All icon-only buttons wrapped in `Semantics(label:, button: true)`
-- Screen titles use `Semantics(header: true)`
-- Decorative elements wrapped in `ExcludeSemantics`
-- Test with platform screen readers (VoiceOver iOS, TalkBack Android)
-
 ## 5. Acceptance Criteria
 
 A surface passes accessibility review when:

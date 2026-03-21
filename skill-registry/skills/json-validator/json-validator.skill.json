@@ -1,9 +1,0 @@
-{
-  "name": "json-validator",
-  "description": "Validate JSON against schemas and fix formatting",
-  "version": "1.0.0",
-  "author": "human",
-  "dependencies": [],
-  "parameters": "{}",
-  "enabled": true
-}

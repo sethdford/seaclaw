@@ -66,14 +66,6 @@ if [ -f "$TMPDIR/DesignTokens.kt" ] && [ -f "$REPO_ROOT/apps/android/app/src/mai
   fi
 fi
 
-# Check Flutter/Dart output
-if [ -f "$TMPDIR/design_tokens.dart" ] && [ -f "$REPO_ROOT/apps/flutter/lib/design_tokens.dart" ]; then
-  if ! diff -q "$TMPDIR/design_tokens.dart" "$REPO_ROOT/apps/flutter/lib/design_tokens.dart" >/dev/null 2>&1; then
-    echo "DRIFT: apps/flutter/lib/design_tokens.dart differs from generated output"
-    DRIFT=1
-  fi
-fi
-
 # Check runtime JSON output
 if [ -f "$TMPDIR/tokens.json" ] && [ -f "$REPO_ROOT/docs/tokens.json" ]; then
   if ! diff -q "$TMPDIR/tokens.json" "$REPO_ROOT/docs/tokens.json" >/dev/null 2>&1; then

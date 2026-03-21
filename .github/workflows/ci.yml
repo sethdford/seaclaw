@@ -135,18 +135,19 @@ jobs:
       - uses: actions/checkout@v6
       - run: cd apps/shared/HumanKit && swift test
       - run: cd apps/ios && swift build
-      - name: iOS simulator test
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate iOS Xcode project
+        run: cd apps/ios && xcodegen generate
+      - name: iOS simulator test (HumaniOS + XCUITest)
         run: |
-          cd apps/ios
-          if [ -f Package.swift ] || [ -d Human.xcodeproj ]; then
-            xcodebuild test \
-              -scheme Human \
-              -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
-              -resultBundlePath TestResults \
-              CODE_SIGNING_ALLOWED=NO 2>&1
-          else
-            echo "::notice::No Xcode project found — skipping simulator tests"
-          fi
+          xcodebuild test \
+            -project apps/ios/HumaniOS.xcodeproj \
+            -scheme HumaniOS \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -only-testing:HumaniOSUITests \
+            -resultBundlePath apps/ios/TestResults \
+            CODE_SIGNING_ALLOWED=NO 2>&1
 
   build-android:
     runs-on: ubuntu-latest

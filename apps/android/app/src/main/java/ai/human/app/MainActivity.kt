@@ -79,7 +79,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             HumanTheme {
-                HumanRoot(intent = intent)
+                HumanRoot(
+                    intent = intent,
+                    initialSkipOnboarding = intent.getBooleanExtra(EXTRA_SKIP_ONBOARDING_FOR_TEST, false),
+                )
             }
         }
     }
@@ -97,6 +100,9 @@ private fun isValidGatewayUrl(url: String): Boolean {
         trimmed.startsWith("http://") || trimmed.startsWith("https://")
 }
 
+/** Instrumented tests pass this extra to reach main nav without onboarding. */
+const val EXTRA_SKIP_ONBOARDING_FOR_TEST: String = "ai.human.SKIP_ONBOARDING_FOR_TEST"
+
 private object MainRoutes {
     const val Overview = "overview"
     const val Chat = "chat"
@@ -107,12 +113,12 @@ private object MainRoutes {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HumanRoot(intent: Intent?) {
+fun HumanRoot(intent: Intent?, initialSkipOnboarding: Boolean = false) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var prefsLoaded by remember { mutableStateOf(false) }
     var gatewayUrl by rememberSaveable { mutableStateOf("http://localhost:3000") }
-    var hasOnboarded by rememberSaveable { mutableStateOf(false) }
+    var hasOnboarded by rememberSaveable { mutableStateOf(initialSkipOnboarding) }
 
     LaunchedEffect(Unit) {
         gatewayUrl = ctx.readGatewayUrl()

@@ -120,7 +120,7 @@ include/human/       public C headers
 
 tests/                 291 test files, 6059+ tests
 
-apps/                  iOS, macOS, Android, Flutter, shared (5 app directories)
+apps/                  iOS, macOS, Android, shared (4 app directories)
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 

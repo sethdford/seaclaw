@@ -95,18 +95,6 @@
     ]
   },
   {
-    "name": "change-management",
-    "description": "Guide people and organizations through transitions with communication, empathy, and incremental adoption",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/change-management",
-    "tags": [
-      "cognitive",
-      "leadership",
-      "strategy"
-    ]
-  },
-  {
     "name": "ci-cd-helper",
     "description": "Configure CI/CD pipelines and deployment automation",
     "version": "1.0.0",
@@ -120,18 +108,6 @@
     ]
   },
   {
-    "name": "claw-migrator",
-    "description": "Migrate configs and skills between Human instances",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/claw-migrator",
-    "tags": [
-      "migration",
-      "setup",
-      "human"
-    ]
-  },
-  {
     "name": "coaching",
     "description": "Guide others toward their own solutions using the GROW model and powerful questions",
     "version": "1.0.0",
@@ -141,18 +117,6 @@
       "cognitive",
       "emotional-intelligence",
       "leadership"
-    ]
-  },
-  {
-    "name": "code-formatter",
-    "description": "Format and lint code according to project conventions",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/code-formatter",
-    "tags": [
-      "development",
-      "formatting",
-      "linting"
     ]
   },
   {
@@ -548,17 +512,6 @@
     ]
   },
   {
-    "name": "garage-door",
-    "description": "Control garage door opener via smart relay",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/garage-door",
-    "tags": [
-      "iot",
-      "hardware"
-    ]
-  },
-  {
     "name": "habit-design",
     "description": "Build and break habits using cue-routine-reward loops, environment design, and implementation intentions",
     "version": "1.0.0",
@@ -654,18 +607,6 @@
     ]
   },
   {
-    "name": "json-validator",
-    "description": "Validate JSON against schemas and fix formatting",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/json-validator",
-    "tags": [
-      "data",
-      "json",
-      "validation"
-    ]
-  },
-  {
     "name": "kubernetes-helper",
     "description": "Kubernetes deployment and cluster management helpers",
     "version": "1.0.0",
@@ -687,18 +628,6 @@
       "cognitive",
       "creativity",
       "reasoning"
-    ]
-  },
-  {
-    "name": "log-analyzer",
-    "description": "Parse and analyze application and system logs",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/log-analyzer",
-    "tags": [
-      "devops",
-      "logging",
-      "debugging"
     ]
   },
   {
@@ -1126,18 +1055,6 @@
       "cognitive",
       "learning",
       "memory"
-    ]
-  },
-  {
-    "name": "ssl-cert-monitor",
-    "description": "Monitor SSL/TLS certificate expiration and renewal",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/ssl-cert-monitor",
-    "tags": [
-      "devops",
-      "ssl",
-      "security"
     ]
   },
   {

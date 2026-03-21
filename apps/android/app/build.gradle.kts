@@ -13,6 +13,7 @@ android {
         targetSdk = 36
         versionCode = 2
         versionName = "1.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -62,4 +63,10 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+
+    androidTestImplementation(platform("androidx.compose:compose-bom:2026.02.01"))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

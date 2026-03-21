@@ -214,7 +214,7 @@ tests/          291 test files, 6059+ tests
 fuzz/           libFuzzer harnesses
 ui/             LitElement web dashboard
 website/        Astro marketing site
-apps/           iOS, macOS, Android, Flutter native apps
+apps/           iOS, macOS, Android native apps + shared HumanKit
 ```
 
 ## Build Targets

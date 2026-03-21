@@ -104,7 +104,7 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 | `fuzz/`                           | libFuzzer harnesses                                                   |
 | `ui/`                             | LitElement web dashboard                                              |
 | `website/`                        | Astro marketing site                                                  |
-| `apps/`                           | iOS, macOS, Android, Flutter native apps                              |
+| `apps/`                           | iOS, macOS, Android native apps + shared HumanKit                     |
 | `design-tokens/`                  | W3C design tokens (source of truth for all UI)                        |
 | `docs/`                           | Guides, plans, design docs                                            |
 | `docs/standards/`                 | Canonical standards (AI, design, engineering, ops, quality, security) |

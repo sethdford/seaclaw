@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Comprehensive design token audit across ALL consumers
-# ui, website, docs, design-tokens, apps (Flutter/Swift/Kotlin use different names)
+# ui, website, docs, design-tokens, apps (Swift/Kotlin use different names)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -73,4 +73,4 @@ echo "Total tokens: $TOTAL"
 echo "Truly unused (no refs in ui, website, docs, design-tokens): $UNUSED_COUNT"
 echo ""
 echo "Note: Tokens used as values in other tokens (e.g. var(--hu-x) in --hu-y) are excluded."
-echo "Note: C (design_tokens.h) and apps (Flutter/Swift/Kotlin) use generated outputs, not CSS var names."
+echo "Note: C (design_tokens.h) and apps (Swift/Kotlin) use generated outputs, not CSS var names."

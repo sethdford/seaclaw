@@ -64,11 +64,3 @@ updates:
     groups:
       android-deps:
         patterns: ["*"]
-
-  - package-ecosystem: pub
-    directory: /apps/flutter
-    schedule:
-      interval: weekly
-    groups:
-      flutter-deps:
-        patterns: ["*"]

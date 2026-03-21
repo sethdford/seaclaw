@@ -26,7 +26,7 @@ Human's design system references SOTA sources (Apple HIG, Material Design 3, Dis
 - **Quantified deltas** — no data on where we stand vs. leaders
 - **Category-defining ambition** — current bars are "match industry good" not "redefine the ceiling"
 - **Automated competitive measurement** — Lighthouse runs on us but not on competitors
-- **Cross-surface quality scoring** — no unified scorecard across website, dashboard, iOS, Android, Flutter
+- **Cross-surface quality scoring** — no unified scorecard across website, dashboard, iOS, Android, macOS
 
 ### Vision
 

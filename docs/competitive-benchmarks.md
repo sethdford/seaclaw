@@ -197,7 +197,7 @@ See `docs/standards/quality/award-criteria.md` for complete submission checklist
 - Website LCP optimization for production (WebGL hero and scroll-driven narrative shipped)
 - Website scroll-driven narrative sections with parallax
 - Dashboard Lighthouse audit — target 99+ performance
-- Flutter app: build Compose-equivalent screens or sunset decision
+- Flutter app: removed; native iOS, macOS, and Android are the mobile/desktop app surfaces
 - Schedule Q2 2026 quarterly review with updated scores
 
 ## Related

@@ -5,9 +5,14 @@ struct HumanApp: App {
     @StateObject private var connectionManager = ConnectionManager()
     @AppStorage("hu-onboarded") private var hasOnboarded = false
 
+    /// XCUITest fleet passes `-uitestSkipOnboarding` (must not rely on `UserDefaults` in `init()` — @AppStorage reads first).
+    private var showMainChrome: Bool {
+        hasOnboarded || ProcessInfo.processInfo.arguments.contains("-uitestSkipOnboarding")
+    }
+
     var body: some Scene {
         WindowGroup {
-            if hasOnboarded {
+            if showMainChrome {
                 ContentView()
                     .environmentObject(connectionManager)
                     .onOpenURL { url in

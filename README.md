@@ -695,7 +695,6 @@ apps/ios/ Native iOS app (SwiftUI)
 apps/android/ Native Android app (Kotlin + Jetpack Compose)
 apps/shared/ Shared packages (HumanKit for iOS)
 apps/macos/   Native macOS app (SwiftUI)
-apps/flutter/ Flutter cross-platform app
 
 ```
 

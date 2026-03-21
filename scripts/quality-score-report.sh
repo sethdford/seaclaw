@@ -106,13 +106,12 @@ PLATFORMS=0
 [ -f "apps/ios/Sources/HumaniOS/ContentView.swift" ] && grep -q "HUTokens" "apps/ios/Sources/HumaniOS/ContentView.swift" 2>/dev/null && PLATFORMS=$((PLATFORMS + 1))
 [ -f "apps/macos/Sources/HumanApp/SettingsView.swift" ] && grep -q "HUTokens" "apps/macos/Sources/HumanApp/SettingsView.swift" 2>/dev/null && PLATFORMS=$((PLATFORMS + 1))
 [ -f "apps/android/app/src/main/java/ai/human/app/ui/theme/Theme.kt" ] && PLATFORMS=$((PLATFORMS + 1))
-[ -f "apps/flutter/lib/design_tokens.dart" ] && PLATFORMS=$((PLATFORMS + 1))
-if [ "$PLATFORMS" -ge 4 ]; then
-  pass 10 "All 4 native platforms use design tokens"
+if [ "$PLATFORMS" -ge 3 ]; then
+  pass 10 "All 3 native platforms use design tokens"
 elif [ "$PLATFORMS" -ge 2 ]; then
-  warn 10 "$PLATFORMS/4 native platforms use design tokens"
+  warn 10 "$PLATFORMS/3 native platforms use design tokens"
 else
-  fail 10 "Only $PLATFORMS/4 native platforms use design tokens"
+  fail 10 "Only $PLATFORMS/3 native platforms use design tokens"
 fi
 
 # --- Accessibility ---
