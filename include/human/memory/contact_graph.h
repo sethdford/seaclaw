@@ -34,4 +34,16 @@ hu_error_t hu_contact_graph_list(hu_allocator_t *alloc, void *db, const char *co
  * All identities under old_id are reassigned to new_id. */
 hu_error_t hu_contact_graph_merge(void *db, const char *old_id, const char *new_id);
 
+/* Fuzzy auto-resolve: find candidate contact_ids that might match a new identity.
+ * Matches by: (1) exact platform_handle on any platform, (2) normalized phone number,
+ * (3) display_name similarity (case-insensitive substring). Returns candidates sorted
+ * by confidence descending. Caller owns allocated array. */
+hu_error_t hu_contact_graph_auto_resolve(hu_allocator_t *alloc, void *db,
+    const char *display_name, const char *platform_handle,
+    hu_contact_identity_t **out_candidates, size_t *out_count);
+
+/* Normalize a phone number by stripping non-digit characters (except leading +).
+ * Writes into out_buf, returns length. */
+size_t hu_contact_normalize_phone(const char *input, char *out_buf, size_t out_cap);
+
 #endif

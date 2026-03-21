@@ -9,6 +9,7 @@
 #include "human/core/string.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -431,14 +432,39 @@ static hu_error_t signal_react(void *ctx, const char *target, size_t target_len,
     (void)reaction;
     return HU_OK;
 #else
-    /* TODO: Wire reactions via signal-cli (e.g. `signal-cli react` or JSON-RPC) when we have a
-     * supported daemon API path; avoid ad-hoc exec until aligned with existing HTTP RPC patterns. */
-    (void)ctx;
-    (void)target;
-    (void)target_len;
-    (void)message_id;
-    (void)reaction;
-    return HU_ERR_NOT_SUPPORTED;
+    hu_signal_ctx_t *c = (hu_signal_ctx_t *)ctx;
+    if (!c || !c->alloc || !c->http_url || c->http_url_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    if (!target || target_len == 0 || reaction == HU_REACTION_NONE)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const char *emoji = NULL;
+    switch (reaction) {
+    case HU_REACTION_HEART:       emoji = "\xe2\x9d\xa4\xef\xb8\x8f"; break;
+    case HU_REACTION_THUMBS_UP:   emoji = "\xf0\x9f\x91\x8d"; break;
+    case HU_REACTION_THUMBS_DOWN: emoji = "\xf0\x9f\x91\x8e"; break;
+    case HU_REACTION_HAHA:        emoji = "\xf0\x9f\x98\x82"; break;
+    case HU_REACTION_EMPHASIS:    emoji = "\xe2\x9d\x97"; break;
+    case HU_REACTION_QUESTION:    emoji = "\xe2\x9d\x93"; break;
+    default: return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    char body[1024];
+    int n = snprintf(body, sizeof(body),
+                     "{\"jsonrpc\":\"2.0\",\"method\":\"sendReaction\","
+                     "\"params\":{\"account\":\"%.*s\","
+                     "\"recipient\":[\"%.*s\"],"
+                     "\"targetAuthor\":\"%.*s\","
+                     "\"targetTimestamp\":%" PRId64 ","
+                     "\"emoji\":\"%s\"},\"id\":\"1\"}",
+                     (int)c->account_len, c->account,
+                     (int)target_len, target,
+                     (int)target_len, target,
+                     message_id, emoji);
+    if (n < 0 || (size_t)n >= sizeof(body))
+        return HU_ERR_INTERNAL;
+
+    return send_rpc(c, body, (size_t)n);
 #endif
 }
 

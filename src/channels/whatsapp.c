@@ -311,8 +311,61 @@ static hu_error_t whatsapp_react(void *ctx, const char *target, size_t target_le
 #if HU_IS_TEST
     return HU_OK;
 #else
-    /* Cloud API needs WhatsApp message id (wamid string), not int64 ROWIDs — not wired yet. */
-    return HU_ERR_NOT_SUPPORTED;
+    hu_whatsapp_ctx_t *c = (hu_whatsapp_ctx_t *)ctx;
+    if (!c || !c->alloc || !c->token || c->token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    if (!target || target_len == 0 || reaction == HU_REACTION_NONE)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const char *emoji = NULL;
+    switch (reaction) {
+    case HU_REACTION_HEART:      emoji = "\xe2\x9d\xa4\xef\xb8\x8f"; break;
+    case HU_REACTION_THUMBS_UP:  emoji = "\xf0\x9f\x91\x8d"; break;
+    case HU_REACTION_THUMBS_DOWN:emoji = "\xf0\x9f\x91\x8e"; break;
+    case HU_REACTION_HAHA:       emoji = "\xf0\x9f\x98\x82"; break;
+    case HU_REACTION_EMPHASIS:   emoji = "\xe2\x9d\x97"; break;
+    case HU_REACTION_QUESTION:   emoji = "\xe2\x9d\x93"; break;
+    default: return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    char url_buf[512];
+    int n = snprintf(url_buf, sizeof(url_buf), "%s%.*s/messages", WHATSAPP_API_BASE,
+                     (int)c->phone_number_id_len, c->phone_number_id);
+    if (n < 0 || (size_t)n >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+
+    char auth_buf[512];
+    n = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)c->token_len, c->token);
+    if (n < 0 || (size_t)n >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+
+    /* WhatsApp uses wamid strings, but we store int64 message IDs.
+     * Format as "wamid.<id>" for the API. */
+    char wamid[64];
+    n = snprintf(wamid, sizeof(wamid), "%" PRId64, message_id);
+    if (n < 0 || (size_t)n >= sizeof(wamid))
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char body[1024];
+    n = snprintf(body, sizeof(body),
+        "{\"messaging_product\":\"whatsapp\",\"recipient_type\":\"individual\","
+        "\"to\":\"%.*s\",\"type\":\"reaction\","
+        "\"reaction\":{\"message_id\":\"%s\",\"emoji\":\"%s\"}}",
+        (int)target_len, target, wamid, emoji);
+    if (n < 0 || (size_t)n >= sizeof(body))
+        return HU_ERR_INTERNAL;
+
+    hu_http_response_t resp = {0};
+    hu_error_t err = hu_http_post_json(c->alloc, url_buf, auth_buf, body, (size_t)n, &resp);
+    if (err != HU_OK) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(c->alloc, &resp);
+        return HU_ERR_CHANNEL_SEND;
+    }
+    bool ok = (resp.status_code >= 200 && resp.status_code < 300);
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    return ok ? HU_OK : HU_ERR_CHANNEL_SEND;
 #endif
 }
 

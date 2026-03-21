@@ -2,9 +2,25 @@
 #include "human/core/error.h"
 #include <string.h>
 
+size_t hu_contact_normalize_phone(const char *input, char *out_buf, size_t out_cap) {
+    if (!input || !out_buf || out_cap == 0)
+        return 0;
+    size_t pos = 0;
+    for (size_t i = 0; input[i] && pos < out_cap - 1; i++) {
+        if (input[i] >= '0' && input[i] <= '9') {
+            out_buf[pos++] = input[i];
+        } else if (input[i] == '+' && pos == 0) {
+            out_buf[pos++] = '+';
+        }
+    }
+    out_buf[pos] = '\0';
+    return pos;
+}
+
 #ifdef HU_ENABLE_SQLITE
 
 #include <sqlite3.h>
+#include <stdio.h>
 
 #define HU_CONTACT_GRAPH_COPY_COL(dst, dst_size, text, nbytes) \
     do { \
@@ -191,6 +207,176 @@ hu_error_t hu_contact_graph_merge(void *db, const char *old_id, const char *new_
     return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_BACKEND;
 }
 
+hu_error_t hu_contact_graph_auto_resolve(hu_allocator_t *alloc, void *db,
+    const char *display_name, const char *platform_handle,
+    hu_contact_identity_t **out_candidates, size_t *out_count) {
+    if (!alloc || !out_candidates || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_candidates = NULL;
+    *out_count = 0;
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)db;
+    (void)display_name;
+    (void)platform_handle;
+    return HU_OK;
+#else
+    if (!db)
+        return HU_ERR_NOT_SUPPORTED;
+
+    sqlite3 *sdb = (sqlite3 *)db;
+
+    /* Collect candidates from multiple matching strategies */
+    hu_contact_identity_t candidates[32];
+    size_t count = 0;
+
+    /* Strategy 1: exact platform_handle match on any platform */
+    if (platform_handle && platform_handle[0]) {
+        sqlite3_stmt *stmt = NULL;
+        if (sqlite3_prepare_v2(sdb,
+                "SELECT contact_id, display_name, platform, platform_handle, confidence "
+                "FROM contact_identities WHERE platform_handle = ? LIMIT 10",
+                -1, &stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_text(stmt, 1, platform_handle, -1, SQLITE_STATIC);
+            while (sqlite3_step(stmt) == SQLITE_ROW && count < 32) {
+                hu_contact_identity_t *c = &candidates[count];
+                const char *cid = (const char *)sqlite3_column_text(stmt, 0);
+                const char *dn = (const char *)sqlite3_column_text(stmt, 1);
+                const char *pl = (const char *)sqlite3_column_text(stmt, 2);
+                const char *ph = (const char *)sqlite3_column_text(stmt, 3);
+                c->confidence = sqlite3_column_double(stmt, 4);
+                size_t n0 = cid ? (size_t)sqlite3_column_bytes(stmt, 0) : 0;
+                HU_CONTACT_GRAPH_COPY_COL(c->contact_id, sizeof(c->contact_id), cid, n0);
+                size_t n1 = dn ? (size_t)sqlite3_column_bytes(stmt, 1) : 0;
+                HU_CONTACT_GRAPH_COPY_COL(c->display_name, sizeof(c->display_name), dn, n1);
+                size_t n2 = pl ? (size_t)sqlite3_column_bytes(stmt, 2) : 0;
+                HU_CONTACT_GRAPH_COPY_COL(c->platform, sizeof(c->platform), pl, n2);
+                size_t n3 = ph ? (size_t)sqlite3_column_bytes(stmt, 3) : 0;
+                HU_CONTACT_GRAPH_COPY_COL(c->platform_handle, sizeof(c->platform_handle), ph, n3);
+                count++;
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    /* Strategy 2: normalized phone match */
+    if (platform_handle && platform_handle[0] && count < 32) {
+        char norm[32];
+        size_t nlen = hu_contact_normalize_phone(platform_handle, norm, sizeof(norm));
+        if (nlen >= 7) {
+            sqlite3_stmt *stmt = NULL;
+            if (sqlite3_prepare_v2(sdb,
+                    "SELECT contact_id, display_name, platform, platform_handle, confidence "
+                    "FROM contact_identities LIMIT 200",
+                    -1, &stmt, NULL) == SQLITE_OK) {
+                while (sqlite3_step(stmt) == SQLITE_ROW && count < 32) {
+                    const char *ph = (const char *)sqlite3_column_text(stmt, 3);
+                    if (!ph)
+                        continue;
+                    char other_norm[32];
+                    size_t olen = hu_contact_normalize_phone(ph, other_norm, sizeof(other_norm));
+                    if (olen < 7 || olen != nlen || memcmp(norm, other_norm, nlen) != 0)
+                        continue;
+                    /* Check for duplicate */
+                    const char *cid = (const char *)sqlite3_column_text(stmt, 0);
+                    int dup = 0;
+                    for (size_t d = 0; d < count; d++) {
+                        if (cid && strcmp(candidates[d].contact_id, cid) == 0 &&
+                            strcmp(candidates[d].platform_handle, ph) == 0) {
+                            dup = 1;
+                            break;
+                        }
+                    }
+                    if (dup)
+                        continue;
+                    hu_contact_identity_t *c = &candidates[count];
+                    const char *dn = (const char *)sqlite3_column_text(stmt, 1);
+                    const char *pl = (const char *)sqlite3_column_text(stmt, 2);
+                    c->confidence = sqlite3_column_double(stmt, 4) * 0.8;
+                    size_t nc0 = cid ? (size_t)sqlite3_column_bytes(stmt, 0) : 0;
+                    HU_CONTACT_GRAPH_COPY_COL(c->contact_id, sizeof(c->contact_id), cid, nc0);
+                    size_t nc1 = dn ? (size_t)sqlite3_column_bytes(stmt, 1) : 0;
+                    HU_CONTACT_GRAPH_COPY_COL(c->display_name, sizeof(c->display_name), dn, nc1);
+                    size_t nc2 = pl ? (size_t)sqlite3_column_bytes(stmt, 2) : 0;
+                    HU_CONTACT_GRAPH_COPY_COL(c->platform, sizeof(c->platform), pl, nc2);
+                    size_t nc3 = ph ? (size_t)sqlite3_column_bytes(stmt, 3) : 0;
+                    HU_CONTACT_GRAPH_COPY_COL(c->platform_handle, sizeof(c->platform_handle), ph, nc3);
+                    count++;
+                }
+                sqlite3_finalize(stmt);
+            }
+        }
+    }
+
+    /* Strategy 3: display_name case-insensitive match */
+    if (display_name && display_name[0] && count < 32) {
+        sqlite3_stmt *stmt = NULL;
+        if (sqlite3_prepare_v2(sdb,
+                "SELECT contact_id, display_name, platform, platform_handle, confidence "
+                "FROM contact_identities WHERE display_name LIKE ? COLLATE NOCASE LIMIT 10",
+                -1, &stmt, NULL) == SQLITE_OK) {
+            char pattern[260];
+            int pn = snprintf(pattern, sizeof(pattern), "%%%s%%", display_name);
+            if (pn > 0 && (size_t)pn < sizeof(pattern))
+                sqlite3_bind_text(stmt, 1, pattern, pn, SQLITE_STATIC);
+            else
+                sqlite3_bind_text(stmt, 1, display_name, -1, SQLITE_STATIC);
+            while (sqlite3_step(stmt) == SQLITE_ROW && count < 32) {
+                const char *cid = (const char *)sqlite3_column_text(stmt, 0);
+                const char *ph = (const char *)sqlite3_column_text(stmt, 3);
+                int dup = 0;
+                for (size_t d = 0; d < count; d++) {
+                    if (cid && strcmp(candidates[d].contact_id, cid) == 0 && ph &&
+                        strcmp(candidates[d].platform_handle, ph) == 0) {
+                        dup = 1;
+                        break;
+                    }
+                }
+                if (dup)
+                    continue;
+                hu_contact_identity_t *c = &candidates[count];
+                const char *dn = (const char *)sqlite3_column_text(stmt, 1);
+                const char *pl = (const char *)sqlite3_column_text(stmt, 2);
+                c->confidence = sqlite3_column_double(stmt, 4) * 0.5;
+                size_t nc0 = cid ? (size_t)sqlite3_column_bytes(stmt, 0) : 0;
+                HU_CONTACT_GRAPH_COPY_COL(c->contact_id, sizeof(c->contact_id), cid, nc0);
+                size_t nc1 = dn ? (size_t)sqlite3_column_bytes(stmt, 1) : 0;
+                HU_CONTACT_GRAPH_COPY_COL(c->display_name, sizeof(c->display_name), dn, nc1);
+                size_t nc2 = pl ? (size_t)sqlite3_column_bytes(stmt, 2) : 0;
+                HU_CONTACT_GRAPH_COPY_COL(c->platform, sizeof(c->platform), pl, nc2);
+                size_t nc3 = ph ? (size_t)sqlite3_column_bytes(stmt, 3) : 0;
+                HU_CONTACT_GRAPH_COPY_COL(c->platform_handle, sizeof(c->platform_handle), ph, nc3);
+                count++;
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    if (count == 0)
+        return HU_OK;
+
+    /* Sort by confidence descending (simple insertion sort) */
+    for (size_t i = 1; i < count; i++) {
+        hu_contact_identity_t tmp = candidates[i];
+        size_t j = i;
+        while (j > 0 && candidates[j - 1].confidence < tmp.confidence) {
+            candidates[j] = candidates[j - 1];
+            j--;
+        }
+        candidates[j] = tmp;
+    }
+
+    hu_contact_identity_t *out = (hu_contact_identity_t *)alloc->alloc(
+        alloc->ctx, count * sizeof(hu_contact_identity_t));
+    if (!out)
+        return HU_ERR_OUT_OF_MEMORY;
+    memcpy(out, candidates, count * sizeof(hu_contact_identity_t));
+    *out_candidates = out;
+    *out_count = count;
+    return HU_OK;
+#endif
+}
+
 #elif defined(HU_IS_TEST)
 
 enum { hu_contact_graph_test_cap = 64 };
@@ -237,6 +423,39 @@ static int test_find_empty(void) {
             return i;
     }
     return -1;
+}
+
+static unsigned char test_ascii_tolower(unsigned char c) {
+    if (c >= 'A' && c <= 'Z')
+        return (unsigned char)(c - 'A' + 'a');
+    return c;
+}
+
+static int test_substring_ci(const char *haystack, const char *needle) {
+    if (!haystack || !needle || !needle[0])
+        return 0;
+    for (size_t i = 0; haystack[i]; i++) {
+        size_t j = 0;
+        while (needle[j] && haystack[i + j]) {
+            if (test_ascii_tolower((unsigned char)needle[j]) !=
+                test_ascii_tolower((unsigned char)haystack[i + j]))
+                break;
+            j++;
+        }
+        if (needle[j] == '\0')
+            return 1;
+    }
+    return 0;
+}
+
+static int test_candidate_dup(const hu_contact_identity_t *candidates, size_t count,
+    const char *cid, const char *ph) {
+    for (size_t d = 0; d < count; d++) {
+        if (cid && strcmp(candidates[d].contact_id, cid) == 0 && ph &&
+            strcmp(candidates[d].platform_handle, ph) == 0)
+            return 1;
+    }
+    return 0;
 }
 
 hu_error_t hu_contact_graph_init(hu_allocator_t *alloc, void *db) {
@@ -347,6 +566,89 @@ hu_error_t hu_contact_graph_merge(void *db, const char *old_id, const char *new_
     return HU_OK;
 }
 
+hu_error_t hu_contact_graph_auto_resolve(hu_allocator_t *alloc, void *db,
+    const char *display_name, const char *platform_handle,
+    hu_contact_identity_t **out_candidates, size_t *out_count) {
+    (void)db;
+    if (!alloc || !out_candidates || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_candidates = NULL;
+    *out_count = 0;
+
+    hu_contact_identity_t candidates[32];
+    size_t count = 0;
+
+    if (platform_handle && platform_handle[0]) {
+        for (int i = 0; i < hu_contact_graph_test_cap && count < 32; i++) {
+            if (!g_contact_graph_test_rows[i].used)
+                continue;
+            if (strcmp(g_contact_graph_test_rows[i].row.platform_handle, platform_handle) != 0)
+                continue;
+            candidates[count++] = g_contact_graph_test_rows[i].row;
+        }
+    }
+
+    if (platform_handle && platform_handle[0] && count < 32) {
+        char norm[32];
+        size_t nlen = hu_contact_normalize_phone(platform_handle, norm, sizeof(norm));
+        if (nlen >= 7) {
+            for (int i = 0; i < hu_contact_graph_test_cap && count < 32; i++) {
+                if (!g_contact_graph_test_rows[i].used)
+                    continue;
+                const char *ph = g_contact_graph_test_rows[i].row.platform_handle;
+                char other_norm[32];
+                size_t olen = hu_contact_normalize_phone(ph, other_norm, sizeof(other_norm));
+                if (olen < 7 || olen != nlen || memcmp(norm, other_norm, nlen) != 0)
+                    continue;
+                const char *cid = g_contact_graph_test_rows[i].row.contact_id;
+                if (test_candidate_dup(candidates, count, cid, ph))
+                    continue;
+                candidates[count] = g_contact_graph_test_rows[i].row;
+                candidates[count].confidence *= 0.8;
+                count++;
+            }
+        }
+    }
+
+    if (display_name && display_name[0] && count < 32) {
+        for (int i = 0; i < hu_contact_graph_test_cap && count < 32; i++) {
+            if (!g_contact_graph_test_rows[i].used)
+                continue;
+            if (!test_substring_ci(g_contact_graph_test_rows[i].row.display_name, display_name))
+                continue;
+            const char *cid = g_contact_graph_test_rows[i].row.contact_id;
+            const char *ph = g_contact_graph_test_rows[i].row.platform_handle;
+            if (test_candidate_dup(candidates, count, cid, ph))
+                continue;
+            candidates[count] = g_contact_graph_test_rows[i].row;
+            candidates[count].confidence *= 0.5;
+            count++;
+        }
+    }
+
+    if (count == 0)
+        return HU_OK;
+
+    for (size_t i = 1; i < count; i++) {
+        hu_contact_identity_t tmp = candidates[i];
+        size_t j = i;
+        while (j > 0 && candidates[j - 1].confidence < tmp.confidence) {
+            candidates[j] = candidates[j - 1];
+            j--;
+        }
+        candidates[j] = tmp;
+    }
+
+    hu_contact_identity_t *out = (hu_contact_identity_t *)alloc->alloc(
+        alloc->ctx, count * sizeof(hu_contact_identity_t));
+    if (!out)
+        return HU_ERR_OUT_OF_MEMORY;
+    memcpy(out, candidates, count * sizeof(hu_contact_identity_t));
+    *out_candidates = out;
+    *out_count = count;
+    return HU_OK;
+}
+
 #else /* !HU_ENABLE_SQLITE && !HU_IS_TEST */
 
 hu_error_t hu_contact_graph_init(hu_allocator_t *alloc, void *db) {
@@ -392,6 +694,19 @@ hu_error_t hu_contact_graph_merge(void *db, const char *old_id, const char *new_
     (void)db;
     (void)old_id;
     (void)new_id;
+    return HU_ERR_NOT_SUPPORTED;
+}
+
+hu_error_t hu_contact_graph_auto_resolve(hu_allocator_t *alloc, void *db,
+    const char *display_name, const char *platform_handle,
+    hu_contact_identity_t **out_candidates, size_t *out_count) {
+    if (!alloc || !out_candidates || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_candidates = NULL;
+    *out_count = 0;
+    (void)db;
+    (void)display_name;
+    (void)platform_handle;
     return HU_ERR_NOT_SUPPORTED;
 }
 

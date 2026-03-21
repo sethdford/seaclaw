@@ -95,5 +95,38 @@ hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db,
                                        hu_provider_t *provider, const char *model, size_t model_len,
                                        const char *eval_suite_path);
 
+/* Structured patch types for real config/persona mutations. */
+typedef enum hu_patch_type {
+    HU_PATCH_TEMPERATURE = 0,
+    HU_PATCH_MAX_TOKENS,
+    HU_PATCH_PERSONA_TRAIT_ADD,
+    HU_PATCH_PERSONA_TRAIT_REMOVE,
+    HU_PATCH_STYLE_RULE,
+    HU_PATCH_TOOL_PREF,
+    HU_PATCH_TEXT_HINT,
+} hu_patch_type_t;
+
+typedef struct hu_structured_patch {
+    hu_patch_type_t type;
+    char key[128];
+    char value[512];
+    double numeric_value;
+    bool parsed;
+} hu_structured_patch_t;
+
+/* Parse a patch_text string into a structured patch. Returns true if parseable. */
+bool hu_self_improve_parse_patch(const char *patch_text, size_t patch_text_len,
+                                 hu_structured_patch_t *out);
+
+/* Apply a structured patch to the self-improve engine's patch store.
+ * Records in prompt_patches with a structured prefix for later retrieval. */
+hu_error_t hu_self_improve_apply_structured_patch(hu_self_improve_t *engine,
+                                                  const hu_structured_patch_t *patch);
+
+/* Get all active structured patches of a given type. Caller frees *out with alloc->free(ctx, ptr, count * sizeof(hu_structured_patch_t)). */
+hu_error_t hu_self_improve_get_structured_patches(hu_self_improve_t *engine,
+                                                  hu_allocator_t *alloc, hu_patch_type_t type,
+                                                  hu_structured_patch_t **out, size_t *out_count);
+
 #endif /* HU_ENABLE_SQLITE */
 #endif /* HU_INTELLIGENCE_SELF_IMPROVE_H */

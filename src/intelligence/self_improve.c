@@ -1024,4 +1024,192 @@ hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db_void,
 #endif /* !HU_IS_TEST */
 }
 
+/* --- Structured patches (config/persona-oriented commands) --- */
+
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
+static const char *self_improve_structured_type_label(hu_patch_type_t ty) {
+    static const char *labels[] = {
+        "TEMPERATURE",          "MAX_TOKENS",         "PERSONA_TRAIT_ADD",
+        "PERSONA_TRAIT_REMOVE", "STYLE_RULE",         "TOOL_PREF",
+        "TEXT_HINT",
+    };
+    if ((int)ty < 0 || (size_t)ty >= sizeof(labels) / sizeof(labels[0]))
+        return "UNKNOWN";
+    return labels[ty];
+}
+#endif
+
+bool hu_self_improve_parse_patch(const char *patch_text, size_t patch_text_len,
+                                 hu_structured_patch_t *out) {
+    if (!patch_text || patch_text_len == 0 || !out)
+        return false;
+    memset(out, 0, sizeof(*out));
+
+    size_t colon = 0;
+    bool found = false;
+    for (size_t i = 0; i < patch_text_len; i++) {
+        if (patch_text[i] == ':') {
+            colon = i;
+            found = true;
+            break;
+        }
+    }
+    if (!found || colon == 0 || colon >= patch_text_len - 1)
+        return false;
+
+    size_t klen = colon < sizeof(out->key) - 1 ? colon : sizeof(out->key) - 1;
+    memcpy(out->key, patch_text, klen);
+    out->key[klen] = '\0';
+
+    const char *val = patch_text + colon + 1;
+    size_t vlen = patch_text_len - colon - 1;
+    if (vlen >= sizeof(out->value))
+        vlen = sizeof(out->value) - 1;
+    memcpy(out->value, val, vlen);
+    out->value[vlen] = '\0';
+
+    if (strcmp(out->key, "TEMPERATURE") == 0) {
+        out->type = HU_PATCH_TEMPERATURE;
+        out->numeric_value = strtod(out->value, NULL);
+    } else if (strcmp(out->key, "MAX_TOKENS") == 0) {
+        out->type = HU_PATCH_MAX_TOKENS;
+        out->numeric_value = strtod(out->value, NULL);
+    } else if (strcmp(out->key, "PERSONA_TRAIT") == 0) {
+        out->type = (out->value[0] == '-') ? HU_PATCH_PERSONA_TRAIT_REMOVE : HU_PATCH_PERSONA_TRAIT_ADD;
+    } else if (strcmp(out->key, "STYLE_RULE") == 0) {
+        out->type = HU_PATCH_STYLE_RULE;
+    } else if (strcmp(out->key, "TOOL_PREF") == 0) {
+        out->type = HU_PATCH_TOOL_PREF;
+        const char *sep = strchr(out->value, ':');
+        if (sep)
+            out->numeric_value = strtod(sep + 1, NULL);
+    } else {
+        out->type = HU_PATCH_TEXT_HINT;
+    }
+    out->parsed = true;
+    return true;
+}
+
+hu_error_t hu_self_improve_apply_structured_patch(hu_self_improve_t *engine,
+                                                  const hu_structured_patch_t *patch) {
+    if (!engine || !patch)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!patch->parsed)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)engine;
+    return HU_OK;
+#else
+    if (!engine->db)
+        return HU_ERR_NOT_SUPPORTED;
+
+    const char *tname = self_improve_structured_type_label(patch->type);
+
+    char patch_text[2048];
+    int n = snprintf(patch_text, sizeof(patch_text), "[STRUCTURED:%s] %s", tname, patch->value);
+    if (n < 0 || (size_t)n >= sizeof(patch_text))
+        return HU_ERR_INTERNAL;
+
+    sqlite3_stmt *deact = NULL;
+    if (sqlite3_prepare_v2(engine->db,
+                           "UPDATE prompt_patches SET active = 0 WHERE patch_text LIKE ?1 AND active = 1",
+                           -1, &deact, NULL) == SQLITE_OK) {
+        char like_pat[256];
+        int ln = snprintf(like_pat, sizeof(like_pat), "[STRUCTURED:%s]%%", tname);
+        if (ln > 0 && (size_t)ln < sizeof(like_pat)) {
+            sqlite3_bind_text(deact, 1, like_pat, ln, SQLITE_STATIC);
+            (void)sqlite3_step(deact);
+        }
+        sqlite3_finalize(deact);
+    }
+
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(engine->db,
+                           "INSERT INTO prompt_patches(source, patch_text, active, applied_at) "
+                           "VALUES('structured', ?1, 1, strftime('%s','now'))",
+                           -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+    sqlite3_bind_text(stmt, 1, patch_text, n, SQLITE_STATIC);
+    int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_STORE;
+#endif
+}
+
+hu_error_t hu_self_improve_get_structured_patches(hu_self_improve_t *engine,
+                                                  hu_allocator_t *alloc, hu_patch_type_t type,
+                                                  hu_structured_patch_t **out, size_t *out_count) {
+    if (!engine || !alloc || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)engine;
+    (void)type;
+    return HU_OK;
+#else
+    if (!engine->db)
+        return HU_ERR_NOT_SUPPORTED;
+
+    const char *tname = self_improve_structured_type_label(type);
+    char like_pat[256];
+    int ln = snprintf(like_pat, sizeof(like_pat), "[STRUCTURED:%s]%%", tname);
+    if (ln <= 0 || (size_t)ln >= sizeof(like_pat))
+        return HU_ERR_INTERNAL;
+
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(engine->db,
+                           "SELECT patch_text FROM prompt_patches WHERE patch_text LIKE ?1 AND active = 1 "
+                           "ORDER BY applied_at DESC LIMIT 20",
+                           -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_STORE;
+    sqlite3_bind_text(stmt, 1, like_pat, ln, SQLITE_STATIC);
+
+    hu_structured_patch_t results[20];
+    size_t count = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW && count < 20) {
+        const char *text = (const char *)sqlite3_column_text(stmt, 0);
+        if (!text)
+            continue;
+        const char *val_start = strchr(text, ']');
+        if (val_start && val_start[1] == ' ')
+            val_start += 2;
+        else
+            val_start = text;
+        hu_structured_patch_t *p = &results[count];
+        memset(p, 0, sizeof(*p));
+        p->type = type;
+        size_t vlen = strlen(val_start);
+        if (vlen >= sizeof(p->value))
+            vlen = sizeof(p->value) - 1;
+        memcpy(p->value, val_start, vlen);
+        p->value[vlen] = '\0';
+        p->parsed = true;
+        if (type == HU_PATCH_TEMPERATURE || type == HU_PATCH_MAX_TOKENS)
+            p->numeric_value = strtod(p->value, NULL);
+        else if (type == HU_PATCH_TOOL_PREF) {
+            const char *sep = strchr(p->value, ':');
+            if (sep)
+                p->numeric_value = strtod(sep + 1, NULL);
+        }
+        count++;
+    }
+    sqlite3_finalize(stmt);
+
+    if (count == 0)
+        return HU_OK;
+
+    hu_structured_patch_t *arr =
+        (hu_structured_patch_t *)alloc->alloc(alloc->ctx, count * sizeof(hu_structured_patch_t));
+    if (!arr)
+        return HU_ERR_OUT_OF_MEMORY;
+    memcpy(arr, results, count * sizeof(hu_structured_patch_t));
+    *out = arr;
+    *out_count = count;
+    return HU_OK;
+#endif
+}
+
 #endif /* HU_ENABLE_SQLITE */
