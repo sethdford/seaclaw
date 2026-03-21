@@ -75,7 +75,7 @@ Types: `feat fix refactor test docs chore perf ci build style`
 
 | Workflow                    | What it checks                                                                                                                                    |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ci.yml`                    | C build + ~6032 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
+| `ci.yml`                    | C build + ~6051 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
 | `benchmark.yml`             | Performance regression (binary size, startup time, RSS)                                                                                           |
 | `codeql.yml`                | Static analysis security scanning                                                                                                                 |
 | `security.yml`              | Dependency audit, SBOM generation                                                                                                                 |
