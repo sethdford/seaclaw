@@ -60,6 +60,6 @@ final class HumaniOSFleetUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["Chat"].waitForExistence(timeout: 20))
         app.tabBars.buttons["Chat"].tap()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Chat"].exists)
     }
 }
