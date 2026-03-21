@@ -1,0 +1,9 @@
+{
+  "name": "attention-management",
+  "description": "Protect and direct attention in a distraction-rich environment",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

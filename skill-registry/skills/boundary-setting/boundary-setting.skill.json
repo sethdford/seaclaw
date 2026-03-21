@@ -1,0 +1,9 @@
+{
+  "name": "boundary-setting",
+  "description": "Establish and communicate personal and professional boundaries clearly and kindly",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

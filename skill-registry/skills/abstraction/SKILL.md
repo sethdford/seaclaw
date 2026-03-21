@@ -4,6 +4,7 @@ Move fluidly on the **ladder of abstraction**: **concrete** facts and examples a
 
 ## When to Use
 - Complex explanations, architecture discussions, debugging, teaching, or when feedback is “too hand-wavy” or “lost in the weeds.”
+- When you need both a **portable rule** and **grounding evidence** in the same answer.
 
 ## Behaviors
 **Zoom out** to name patterns, invariants, trade-offs, and analogies that transfer. **Zoom in** to verify with **specific evidence**, steps, and edge cases. **Too abstract:** vague advice, jargon without examples, no next action. **Too concrete:** endless detail without a takeaway, can’t generalize or prioritize. For agents: **start** at the user’s stated level; **escalate** abstraction to unify confusion; **descend** to steps when execution is blocked. Explicitly label moves: “at the principle level…,” “concretely, that means….”

@@ -4,6 +4,7 @@ Reason under uncertainty with **explicit degrees of belief**, **ranges**, and **
 
 ## When to Use
 - Forecasting, prioritization, risk reviews, investment or roadmap choices, or when stakeholders demand single-point answers.
+- When a decision hinges on rare events (“black swans”) that averages and dashboards hide.
 
 ## Behaviors
 Prefer **ranges** and **confidence language** (“roughly 60–80% likely”) over absolutes. **Expected value** ≈ **probability × payoff** (a 10% shot at $1M has ~$100K expectation—compare to alternatives). Look at the **distribution**: means hide **tail risks** and ruin scenarios. Run a **pre-mortem**: list failure modes, assign **rough probabilities**, and design mitigations for the heavy tails. **Update** as evidence arrives (**Bayesian** intuition: shift beliefs proportionally to how surprising the data is). Separate **risk** (known-ish probabilities) from **uncertainty** (opaque odds)—choose learning, buffers, or options accordingly.
