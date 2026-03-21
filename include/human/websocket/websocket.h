@@ -16,6 +16,10 @@ typedef struct hu_ws_client hu_ws_client_t;
 
 hu_error_t hu_ws_connect(hu_allocator_t *alloc, const char *url, hu_ws_client_t **out);
 
+/* extra_headers: "Header: value\r\n..." or NULL — appended after Sec-WebSocket-Version before final blank line */
+hu_error_t hu_ws_connect_with_headers(hu_allocator_t *alloc, const char *url,
+                                      const char *extra_headers, hu_ws_client_t **out);
+
 hu_error_t hu_ws_send(hu_ws_client_t *ws, const char *data, size_t data_len);
 
 /* timeout_ms: -1 = block until a data frame arrives; 0 = poll once; >0 = wait up to N ms per frame */

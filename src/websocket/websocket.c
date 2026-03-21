@@ -204,14 +204,21 @@ static int ws_parse_url(const char *url, char *host, size_t host_size, uint16_t 
 }
 #endif
 
-hu_error_t hu_ws_connect(hu_allocator_t *alloc, const char *url, hu_ws_client_t **out) {
+hu_error_t hu_ws_connect_with_headers(hu_allocator_t *alloc, const char *url,
+                                      const char *extra_headers, hu_ws_client_t **out) {
     if (!alloc || !url || !out)
         return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
 
 #if HU_IS_TEST
-    (void)alloc;
-    return HU_ERR_NOT_SUPPORTED;
+    (void)extra_headers;
+    hu_ws_client_t *mock = (hu_ws_client_t *)alloc->alloc(alloc->ctx, sizeof(hu_ws_client_t));
+    if (!mock)
+        return HU_ERR_OUT_OF_MEMORY;
+    memset(mock, 0, sizeof(*mock));
+    mock->alloc = alloc;
+    *out = mock;
+    return HU_OK;
 #elif defined(HU_GATEWAY_POSIX)
     int use_tls = 0;
 #if !defined(HU_HAS_TLS)
@@ -299,6 +306,8 @@ hu_error_t hu_ws_connect(hu_allocator_t *alloc, const char *url, hu_ws_client_t 
     ws_b64_encode_16(key_raw, key_b64);
     key_b64[24] = '\0';
 
+    const char *xh = (extra_headers && extra_headers[0]) ? extra_headers : "";
+
     size_t req_len = 0;
     req_len += (size_t)snprintf(NULL, 0,
                                 "GET %s HTTP/1.1\r\n"
@@ -307,8 +316,9 @@ hu_error_t hu_ws_connect(hu_allocator_t *alloc, const char *url, hu_ws_client_t 
                                 "Connection: Upgrade\r\n"
                                 "Sec-WebSocket-Key: %s\r\n"
                                 "Sec-WebSocket-Version: 13\r\n"
+                                "%s"
                                 "\r\n",
-                                path, host, key_b64) +
+                                path, host, key_b64, xh) +
                1;
     char *req = (char *)alloc->alloc(alloc->ctx, req_len);
     if (!req) {
@@ -328,8 +338,9 @@ hu_error_t hu_ws_connect(hu_allocator_t *alloc, const char *url, hu_ws_client_t 
                    "Connection: Upgrade\r\n"
                    "Sec-WebSocket-Key: %s\r\n"
                    "Sec-WebSocket-Version: 13\r\n"
+                   "%s"
                    "\r\n",
-                   path, host, key_b64);
+                   path, host, key_b64, xh);
     size_t sent = 0;
     size_t to_send = strlen(req);
     while (sent < to_send) {
@@ -434,8 +445,13 @@ hu_error_t hu_ws_connect(hu_allocator_t *alloc, const char *url, hu_ws_client_t 
 #else
     (void)alloc;
     (void)url;
+    (void)extra_headers;
     return HU_ERR_NOT_SUPPORTED;
 #endif
+}
+
+hu_error_t hu_ws_connect(hu_allocator_t *alloc, const char *url, hu_ws_client_t **out) {
+    return hu_ws_connect_with_headers(alloc, url, NULL, out);
 }
 
 hu_error_t hu_ws_send(hu_ws_client_t *ws, const char *data, size_t data_len) {

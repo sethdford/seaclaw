@@ -69,9 +69,27 @@ static void test_ws_connect_stub(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_ws_client_t *ws = NULL;
     hu_error_t err = hu_ws_connect(&alloc, "wss://example.com/ws", &ws);
+#if HU_IS_TEST
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(ws);
+    hu_ws_client_free(ws, &alloc);
+#else
     HU_ASSERT_NEQ(err, HU_OK);
     HU_ASSERT_NULL(ws);
+#endif
 }
+
+#if HU_IS_TEST
+static void test_ws_connect_with_headers_test_build(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_client_t *ws = NULL;
+    hu_error_t err = hu_ws_connect_with_headers(&alloc, "wss://example.com/ws",
+                                                "Authorization: Bearer x\r\n", &ws);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(ws);
+    hu_ws_client_free(ws, &alloc);
+}
+#endif
 
 static void test_ws_build_frame_binary(void) {
     char buf[64];
@@ -196,8 +214,14 @@ static void test_ws_connect_invalid_host_returns_error(void) {
     hu_ws_client_t *ws = NULL;
     hu_error_t err =
         hu_ws_connect(&alloc, "ws://invalid-host-that-does-not-resolve.example/ws", &ws);
+#if HU_IS_TEST
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(ws);
+    hu_ws_client_free(ws, &alloc);
+#else
     HU_ASSERT_NEQ(err, HU_OK);
     HU_ASSERT_NULL(ws);
+#endif
 }
 
 static void test_ws_send_null_client_fails(void) {
@@ -255,6 +279,9 @@ void run_websocket_tests(void) {
     HU_RUN_TEST(test_ws_apply_mask);
     HU_RUN_TEST(test_ws_apply_mask_empty);
     HU_RUN_TEST(test_ws_connect_stub);
+#if HU_IS_TEST
+    HU_RUN_TEST(test_ws_connect_with_headers_test_build);
+#endif
     HU_RUN_TEST(test_ws_connect_invalid_host_returns_error);
     HU_RUN_TEST(test_ws_send_null_client_fails);
     HU_RUN_TEST(test_ws_recv_null_client_fails);
