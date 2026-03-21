@@ -30,6 +30,8 @@ export class AudioRecorder {
   #chunks: Blob[] = [];
   #mimeType = "";
   #recording = false;
+  #streaming = false;
+  #onStreamChunk: ((data: ArrayBuffer) => void) | null = null;
 
   get isRecording(): boolean {
     return this.#recording;
@@ -42,6 +44,71 @@ export class AudioRecorder {
       typeof MediaRecorder !== "undefined" &&
       selectMimeType() !== ""
     );
+  }
+
+  /**
+   * Stream encoded media chunks (~250 ms) to the callback while recording.
+   * Stops the mic only when {@link stopStreaming} is called.
+   */
+  async startStreaming(onChunk: (data: ArrayBuffer) => void): Promise<void> {
+    if (this.#recording) return;
+
+    const mimeType = selectMimeType();
+    if (!mimeType) throw new Error("No supported audio MIME type found");
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    this.#stream = stream;
+    this.#mimeType = mimeType;
+    this.#streaming = true;
+    this.#onStreamChunk = onChunk;
+
+    const recorder = new MediaRecorder(stream, { mimeType });
+    recorder.ondataavailable = (e: BlobEvent) => {
+      if (e.data.size === 0 || !this.#onStreamChunk) return;
+      void e.data.arrayBuffer().then((ab) => this.#onStreamChunk?.(ab));
+    };
+    recorder.start(250);
+    this.#recorder = recorder;
+    this.#recording = true;
+  }
+
+  async stopStreaming(): Promise<void> {
+    if (!this.#recorder || !this.#recording || !this.#streaming) {
+      throw new Error("Not streaming");
+    }
+    return new Promise((resolve, reject) => {
+      const recorder = this.#recorder!;
+      recorder.onstop = () => {
+        this.#streaming = false;
+        this.#onStreamChunk = null;
+        this.#recording = false;
+        this.#releaseStream();
+        this.#recorder = null;
+        resolve();
+      };
+      recorder.onerror = () => {
+        this.#streaming = false;
+        this.#onStreamChunk = null;
+        this.#recording = false;
+        this.#releaseStream();
+        this.#recorder = null;
+        reject(new Error("Streaming recording failed"));
+      };
+      try {
+        recorder.stop();
+      } catch {
+        this.#streaming = false;
+        this.#onStreamChunk = null;
+        this.#recording = false;
+        this.#releaseStream();
+        this.#recorder = null;
+        reject(new Error("Failed to stop recorder"));
+      }
+    });
+  }
+
+  get streamMimeType(): string {
+    return this.#mimeType;
   }
 
   async start(): Promise<void> {
@@ -100,6 +167,8 @@ export class AudioRecorder {
       }
     }
     this.#recording = false;
+    this.#streaming = false;
+    this.#onStreamChunk = null;
     this.#releaseStream();
     this.#recorder = null;
     this.#chunks = [];

@@ -124,10 +124,54 @@ export class GatewayClient extends EventTarget {
     }, delay);
   }
 
+  setOnBinaryChunk(handler: ((data: ArrayBuffer) => void) | null): void {
+    this.#onBinaryChunk = handler;
+  }
+
+  sendBinary(data: ArrayBuffer | ArrayBufferView): void {
+    if (this.#ws?.readyState !== WebSocket.OPEN) {
+      throw new Error("WebSocket not connected");
+    }
+    const payload =
+      data instanceof ArrayBuffer
+        ? data
+        : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    this.#ws.send(payload);
+  }
+
+  voiceSessionStart(
+    params?: Record<string, unknown>,
+  ): Promise<{ sessionId?: string; sampleRate?: number; encoding?: string }> {
+    return this.request("voice.session.start", params);
+  }
+
+  voiceSessionStop(): Promise<unknown> {
+    return this.request("voice.session.stop", {});
+  }
+
+  voiceSessionInterrupt(): Promise<unknown> {
+    return this.request("voice.session.interrupt", {});
+  }
+
+  voiceAudioEnd(params?: Record<string, unknown>): Promise<unknown> {
+    return this.request("voice.audio.end", params);
+  }
+
   #onMessage(ev: MessageEvent): void {
+    if (ev.data instanceof ArrayBuffer) {
+      this.#onBinaryChunk?.(ev.data);
+      return;
+    }
+    if (ev.data instanceof Blob) {
+      void ev.data.arrayBuffer().then((ab) => this.#onBinaryChunk?.(ab));
+      return;
+    }
+    if (typeof ev.data !== "string") {
+      return;
+    }
     let data: Record<string, unknown>;
     try {
-      data = JSON.parse(ev.data as string) as Record<string, unknown>;
+      data = JSON.parse(ev.data) as Record<string, unknown>;
     } catch {
       log.warn("[gateway] failed to parse message:", ev.data);
       return;
@@ -212,6 +256,7 @@ export class GatewayClient extends EventTarget {
       p.reject(new Error("Disconnected"));
     }
     this.#pending.clear();
+    this.#onBinaryChunk = null;
     if (this.#ws) {
       this.#ws.close();
       this.#ws = null;
