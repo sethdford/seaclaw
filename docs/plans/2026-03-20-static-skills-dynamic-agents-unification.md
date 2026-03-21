@@ -108,23 +108,17 @@ scope: skillforge, prompt injection, skill_run, agent_spawn, orchestrator, inher
 
 ### Phase 3 — Orchestrator integration (optional, medium lift)
 
-- [ ] Extend decomposition output (or follow-up prompt) to attach **suggested_skill** per task (string name, optional).
-- [ ] Telemetry: log suggested vs actually invoked `skill_run`.
-
-**Exit:** Multi-step goals can be traced to skill usage per sub-task.
+- [ ] Deferred: **`suggested_skill`** on decomposition tasks + telemetry.
 
 ### Phase 4 — Evaluation & CI
 
-- [ ] **Scenario tests** (deterministic, `HU_IS_TEST`): e.g. mock provider asserts system prompt contains `## Available Skills` and contains `twin-boundary-guard` when enabled.
-- [ ] **Spawn + skill** test: parent enables a skill; spawn child; assert child prompt or tool surface matches contract from Phase 0 matrix.
-- [ ] Add **`scripts/validate-skill-registry.sh`** already in `verify-all`; extend with optional **“skill names referenced in docs match registry”** grep (low priority).
-
-**Exit:** Regressions in integration are caught in CI, not in production.
+- [x] **`hu_skillforge_build_prompt_catalog`** tests (default + `top_k`) and **`hu_agent_set_skillforge`** pointer test in **`tests/test_subsystems.c`**.
+- [ ] Full prompt integration test with mock provider (optional follow-up).
 
 ### Phase 5 — Product UX
 
-- [ ] CLI / gateway: **`human skills list --active`** and **`human agent spawn --help`** cross-link to “Skills vs agents” doc.
-- [ ] Dashboard (optional): show active skills count + last `skill_run` / spawn (from metrics).
+- [x] **`human skills`** / **`human agents`** usage footers → **`docs/standards/ai/skills-vs-agents.md`**.
+- [ ] Dashboard metrics (deferred).
 
 ---
 
