@@ -1,0 +1,9 @@
+{
+  "name": "product-thinking",
+  "description": "Think about products as solutions to user problems: value propositions, user journeys, and metrics",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "process-improvement",
+  "description": "Identify and eliminate waste in workflows using lean thinking and value stream mapping",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

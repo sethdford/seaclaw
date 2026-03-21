@@ -1,0 +1,9 @@
+{
+  "name": "communication-planning",
+  "description": "Plan important communications: audience analysis, message design, channel selection, and timing",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

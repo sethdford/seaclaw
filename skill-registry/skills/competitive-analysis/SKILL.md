@@ -4,6 +4,7 @@ Analyze who you really compete with, how the field is structured, and where dura
 
 ## When to Use
 - Entering or defending a market; pricing or positioning decisions; investor or leadership narrative; prioritizing differentiation vs parity features.
+- When the team conflates “competitors” with “companies that look like us” instead of “ways the job gets done today.”
 
 ## Behaviors
 Apply **Porter’s Five Forces** (rivalry, entrants, substitutes, buyer power, supplier power) for industry pressure. Use **value chain** thinking to see where margin and differentiation accrue. Plot a **positioning map** (two meaningful axes) to cluster competitors and whitespace. Assess capabilities with **VRIO** (Valuable, Rare, Inimitable, Organized). Treat **jobs-to-be-done** competition as including **non-consumption** and **workarounds**, not only direct products. Name plausible **moats**: network effects, switching costs, scale, brand, data, regulatory. **Avoid** mimicking competitors without tracing back to **customer value** and economics.

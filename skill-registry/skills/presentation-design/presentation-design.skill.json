@@ -1,0 +1,9 @@
+{
+  "name": "presentation-design",
+  "description": "Design and deliver presentations that are clear, memorable, and action-oriented",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

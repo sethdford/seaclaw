@@ -1,0 +1,9 @@
+{
+  "name": "problem-decomposition",
+  "description": "Break large, overwhelming problems into small, tractable sub-problems",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

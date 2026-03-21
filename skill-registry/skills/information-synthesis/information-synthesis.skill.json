@@ -1,0 +1,9 @@
+{
+  "name": "information-synthesis",
+  "description": "Combine information from multiple sources into coherent, actionable insight",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

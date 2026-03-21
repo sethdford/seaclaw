@@ -1,0 +1,9 @@
+{
+  "name": "habit-design",
+  "description": "Build and break habits using cue-routine-reward loops, environment design, and implementation intentions",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

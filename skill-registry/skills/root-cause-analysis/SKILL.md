@@ -4,6 +4,7 @@ Move from observable failure to **fixable systemic causes** using structured inq
 
 ## When to Use
 - Incidents, quality defects, recurring bugs, customer churn spikes, or process breakdowns where quick fixes keep failing.
+- Post-mortems where the group agrees on a “root cause” in minutes—pressure-test that depth.
 
 ## Behaviors
 **5 Whys:** iterate “why” until you reach a **mechanism or missing control**, not a person’s mood. **Fishbone (Ishikawa):** branch causes under categories such as **people, process, tools, environment, materials, measurement**—force completeness before picking a fix. **Fault tree:** top-down logic (AND/OR) from the undesired event to contributing failures. **Traps:** stopping at symptoms, **blame-seeking** instead of system design, assuming a **single** root when several interact. After each candidate cause, ask: **“If we fix this, would recurrence plausibly stop?”** If not, keep digging or broaden the diagram.

@@ -1,0 +1,9 @@
+{
+  "name": "resilience",
+  "description": "Recover from setbacks using reframing, incremental action, and support-seeking strategies",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}
