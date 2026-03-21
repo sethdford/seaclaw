@@ -1,6 +1,6 @@
 # Human — Project Status
 
-Last updated: 2026-03-19
+Last updated: 2026-03-21
 
 ## Summary
 
@@ -8,7 +8,7 @@ Last updated: 2026-03-19
 | ------------------------------ | ---------------------- |
 | Source files (src/ + include/) | **1,054**              |
 | Lines of C/H/ASM code          | **~192K**              |
-| Test files                     | 273                    |
+| Test files                     | ~308                   |
 | Tests passing                  | **6059+/6059+ (100%)** |
 | Binary size (MinSizeRel+LTO)   | **~1696 KB**           |
 | Peak RSS (test suite)          | **~6.0 MB**            |
@@ -39,12 +39,7 @@ Last updated: 2026-03-19
 | Teams       | HTTP API       | Webhook + poll queue       | `app_id`, `app_secret`                |
 | Twilio SMS  | HTTP API       | Webhook + poll queue       | `account_sid`, `auth_token`           |
 | Google Chat | HTTP API       | Webhook + poll queue       | `bearer_token`, `space_id`            |
-
-### Receive only (1 channel)
-
-| Channel | send()        | listen()       | Config Required                               |
-| ------- | ------------- | -------------- | --------------------------------------------- |
-| Gmail   | Not supported | Gmail API poll | `client_id`, `client_secret`, `refresh_token` |
+| Gmail       | Gmail API POST | Gmail API poll (messages)  | `client_id`, `client_secret`, `refresh_token` (send requires `HU_HTTP_CURL`) |
 
 ### Send only (2 channels)
 
@@ -185,9 +180,19 @@ cron._, skills._, models.list, usage.summary, push.\*, update.check/run, exec.
 | LanceDB    | `HU_ENABLE_LANCEDB_ENGINE` (ON) | Real   | SQLite-backed text search engine      |
 | pgvector   | `HU_ENABLE_POSTGRES`            | Real   | Vector store via libpq + pgvector ext |
 
-## What Remains Stubbed
+## Known gaps and partial surfaces
 
-Nothing. All subsystems have real implementations, gated by build flags where external dependencies are required.
+These are **intentional or environmental limits**, not “missing vtables”:
+
+| Area | Status |
+| ---- | ------ |
+| **Gmail / HTTP channels** | Outbound Gmail and other REST paths need **`HU_HTTP_CURL`** (or return `HU_ERR_NOT_SUPPORTED` when curl is disabled). |
+| **Generic email IMAP receive** | Implemented via **spawned `curl`** IMAP commands (not in-process libcurl). Treat as **dev / best-effort** for receive; SMTP send uses the normal HTTP/curl stack where enabled. |
+| **WebRTC** | **HTTP signaling** (POST SDP to a configured endpoint) and optional audio POST; **no full in-process peer media stack** (no native RTP/ICE beyond scaffolding). |
+| **Voice playback (`hu_voice_play`)** | **macOS** (`afplay`) and **Linux** (`paplay` / `aplay`) only; **Windows** returns `HU_ERR_NOT_SUPPORTED`. |
+| **Edge runtimes** | **`wasm`** / **`cloudflare`**: `wrap_command` returns **`HU_ERR_NOT_SUPPORTED`** unless **`HU_HAS_RUNTIME_EXOTIC`** is on (optional wasmtime / wrangler wiring). **`gce`**: wraps `gcloud compute ssh` when instance config is present; returns **`HU_ERR_NOT_SUPPORTED`** if the VM target is unset. **Native** and **docker** are the default production runtimes. |
+
+Everything else in-tree is implemented behind the documented **CMake / feature flags** (optional engines, channels, tools, etc.).
 
 ## Web UI Dashboard
 

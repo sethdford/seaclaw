@@ -30,14 +30,19 @@ A single persona — Seth's digital twin — that operates across iMessage, Disc
 - **Daemon orchestration**: timing, delays, jitter, late-night stretching, leave-on-read, backchannels, proactive outbound — the "human feel" engine
 - **Security**: policy engine, sandboxing (landlock/firejail/bwrap/docker/firecracker), input guards, audit, autonomy levels
 - **85 tools**, 38 channels, 50+ providers, ToT/beam search, eval framework
+- **Planner + cognition wiring**: MCTS path in `planner.c` / `agent_turn.c`, LLMCompiler + DAG executor in the hot path, `browser_use` + macOS `computer_use`, hierarchical compaction, multimodal **audio** + **video** pipelines (POSIX video uses ffmpeg)
+- **Channel parity (in progress)**: Discord, Telegram, Slack, WhatsApp, and Signal expose **`react`**; cross-channel context and **`contact_graph`** resolution are wired in the daemon; per-channel daemon config + voice gating generalized beyond iMessage
+- **Evaluation + calibration**: JSON suites under `eval_suites/` (fidelity, reasoning, tool_use, memory, social, etc.), calibration module (`human calibrate`), A/B compare, eval dashboard trend API
+- **Scale-out**: Swarm parallel execution + aggregation strategies, ensemble provider, fleet limits / spawn governance in the agent pool
+- **Realtime transport**: WebSocket client supports **custom headers** (e.g. OpenAI Realtime `Authorization` + beta headers via `hu_ws_connect_with_headers`)
 
 ### What's weak
 
-- **Channel parity**: iMessage is the only channel with reactions, conversation history, response constraints, vision/attachments, human-takeover detection, voice, and read receipts. The daemon has **17 iMessage hard-forks**.
-- **AGI cognition**: MCTS exists but isn't wired to planner. Computer-use is a stub. No browser automation. Multimodal lacks audio/video.
-- **Evaluation**: Framework exists but no real benchmark suites running. Can't measure intelligence improvements.
-- **Behavioral calibration**: No measurement against Seth's actual patterns. Success criteria defined but not enforced.
-- **Cross-channel identity**: Contact IDs are per-platform. No "this Discord user is the same person as this iMessage contact" mapping.
+- **Channel parity**: Major chat platforms gained reactions, history hooks, and constraints, but **iMessage still leads** on attachment paths, tapback/read-receipt context, and some daemon affordances. Remaining work is **narrowing capability gaps**, not greenfield vtable work.
+- **AGI cognition**: **Computer use** is production-grade on **macOS** only (CoreGraphics); other desktops are limited or unsupported. **WebRTC** remains **signaling-first**, not a full managed media stack.
+- **Evaluation**: Suites and harness exist, but **pass rates are not yet a enforced product gate**; continuous benchmarking and “regression as CI” are still maturing.
+- **Behavioral calibration**: Pipelines exist; **ground truth linkage** (Seth-specific distributions, automated enforcement of rubrics) still needs operational discipline.
+- **Cross-channel identity**: **`contact_graph`** and resolution exist; **coverage and confidence** (manual vs inferred links, drift) remain the hard part.
 
 ---
 
@@ -50,6 +55,8 @@ A single persona — Seth's digital twin — that operates across iMessage, Disc
 **Dependencies**: None — unblocks everything else
 
 ### 1.1 Daemon De-iMessageification
+
+**Status — mostly done; polish remains.** Many former iMessage-only paths now use shared helpers, `hu_channel_daemon_config_t`, and vtable hooks; a small number of channel-specific branches may still exist for Apple-only features.
 
 Eliminate all 17 hard-coded `strcmp(chn, "imessage")` forks in `src/daemon.c`. Replace with vtable capabilities and per-channel config.
 
@@ -80,6 +87,8 @@ Eliminate all 17 hard-coded `strcmp(chn, "imessage")` forks in `src/daemon.c`. R
 
 ### 1.2 Channel Vtable Enrichment
 
+**Status — done** for Discord, Telegram, Slack, WhatsApp, and Signal (including `react`, history, and constraints where the platform allows).
+
 Fill the gaps in the top 5 non-iMessage channels:
 
 | Vtable member | Discord | Telegram | Slack | WhatsApp | Signal |
@@ -99,6 +108,8 @@ Fill the gaps in the top 5 non-iMessage channels:
 - `src/channels/signal.c` — add `get_response_constraints`
 
 ### 1.3 Per-Channel Config Generalization
+
+**Status — done** (`hu_channel_daemon_config_t` embedded per channel; daemon reads active channel config).
 
 **Files:**
 
@@ -120,6 +131,8 @@ Embed in `hu_imessage_channel_config_t`, `hu_discord_channel_config_t`, etc. Dae
 
 ### 1.4 Message Splitting Respects Constraints
 
+**Status — done** (splitter consumes `get_response_constraints()` / channel limits).
+
 **Files:**
 
 - Modify: `src/context/conversation.c` — `hu_conversation_split_response` accepts `max_chars` parameter
@@ -128,6 +141,8 @@ Embed in `hu_imessage_channel_config_t`, `hu_discord_channel_config_t`, etc. Dae
 Currently `hu_conversation_split_response` uses a fixed ~300-char algorithm. After this change, Discord splits at 2000, Telegram at 4096, iMessage at ~300, Slack rarely splits.
 
 ### 1.5 Per-Channel Outbound Formatting
+
+**Status — partial** (verify coverage for every outbound path and channel-specific markdown/HTML rules).
 
 **Files:**
 
@@ -155,7 +170,9 @@ Currently `hu_conversation_split_response` uses a fixed ~300-char algorithm. Aft
 
 ### 2.1 Wire MCTS into Planner
 
-`src/agent/mcts_planner.c` exists with UCB1 logic and beam search. `src/agent/planner.c` does not call it.
+**Status — done** (`hu_planner_plan_mcts` + routing from `agent_turn.c` when plans merit MCTS).
+
+`src/agent/mcts_planner.c` provides UCB1 / beam search; the planner exposes `hu_planner_plan_mcts` and the agent loop invokes it when appropriate.
 
 **Files:**
 
@@ -167,7 +184,9 @@ Currently `hu_conversation_split_response` uses a fixed ~300-char algorithm. Aft
 
 ### 2.2 Wire LLMCompiler into Agent Loop
 
-`src/agent/llm_compiler.c` compiles natural language to DAGs. `src/agent/dag_executor.c` executes them. Neither is called from `agent_turn.c` in the hot path.
+**Status — done** (enabled path when `llm_compiler_enabled` and tool-call volume crosses threshold).
+
+`src/agent/llm_compiler.c` compiles natural language to DAGs; `src/agent/dag_executor.c` executes them from `agent_turn.c` when the compiler path wins.
 
 **Files:**
 
@@ -175,7 +194,7 @@ Currently `hu_conversation_split_response` uses a fixed ~300-char algorithm. Aft
 
 ### 2.3 Computer Use Tool (Real Implementation)
 
-`src/tools/computer_use.c` currently returns "not supported." Build a real implementation.
+**Status — partial** — **macOS**: CoreGraphics screenshot + input (see `src/tools/computer_use.c`). **Other OSes**: not production-complete; tests use `HU_IS_TEST` mocks.
 
 **Files:**
 
@@ -186,47 +205,47 @@ Currently `hu_conversation_split_response` uses a fixed ~300-char algorithm. Aft
 
 ### 2.4 Browser Use Tool (New)
 
-No browser automation tool exists.
+**Status — done** (`src/tools/browser_use.c`, CDP over WebSocket to Chrome; registered in `factory.c`; tests behind `HU_IS_TEST`).
 
 **Files:**
 
-- Create: `src/tools/browser_use.c` — navigate, click, type, extract via CDP (Chrome DevTools Protocol)
-- Create: `include/human/tools/browser_use.h`
-- Create: `tests/test_browser_use.c`
-- Modify: `src/tools/factory.c` — register
+- `src/tools/browser_use.c` — navigate, click, type, extract via CDP (Chrome DevTools Protocol)
+- `include/human/tools/browser_use.h`
+- `tests/test_browser_use.c`
+- `src/tools/factory.c` — registration
 
 CDP over WebSocket to a local Chrome instance. Actions: navigate, screenshot, click (by selector), type, extract text, execute JS. All behind `HU_IS_TEST` guards.
 
 ### 2.5 Multimodal Audio & Video
 
-`src/multimodal/image.c` and `document.c` exist. Audio and video are missing.
+**Status — done** (`src/multimodal/audio.c`, `src/multimodal/video.c`, routing in `multimodal.c` / daemon; video path uses **ffmpeg** on POSIX).
 
 **Files:**
 
-- Create: `src/multimodal/audio.c` — transcription pipeline (Whisper API or provider STT)
-- Create: `src/multimodal/video.c` — frame extraction + description pipeline
-- Modify: `src/multimodal/multimodal.c` — route audio/video to new handlers
-- Modify: `src/daemon.c` — process audio/video attachments like images
+- `src/multimodal/audio.c` — transcription pipeline (provider STT)
+- `src/multimodal/video.c` — frame extraction + description pipeline
+- `src/multimodal/multimodal.c` — route audio/video to handlers
+- `src/daemon.c` — attachment handling aligned with multimodal ingress
 
 ### 2.6 Hierarchical Memory Summarization
 
-Compaction is single-level today. Add multi-level.
+**Status — done** (`hu_compact_hierarchical` in `src/agent/compaction.c`; life-chapters integration as implemented in-tree).
 
 **Files:**
 
-- Modify: `src/agent/compaction.c` — add `hu_compact_hierarchical` that produces session → chapter → summary tiers
-- Modify: `src/memory/life_chapters.c` — integrate with compaction output
-- Add chapter-level storage in SQLite memory tables
+- `src/agent/compaction.c` — `hu_compact_hierarchical` (session → chapter → summary tiers)
+- `src/memory/life_chapters.c` — integration with compaction output where wired
+- Chapter-level persistence — follow SQLite memory schema in-tree
 
 ### 2.7 Constitutional AI Principles
 
-No explicit principles in system prompt today.
+**Status — done** — `core.principles[]` in persona JSON is parsed and emitted under `## Principles` in composed prompts (`src/persona/persona.c`).
 
-**Files:**
+**Files (as implemented):**
 
-- Modify: `src/persona/prompt.c` — inject constitutional principles section from persona config
-- Modify: `include/human/persona.h` — add `principles` array to `hu_persona_t`
-- Modify: `src/persona/persona.c` — parse `principles` from persona JSON
+- `include/human/persona.h` — `principles` / `principles_count` on `hu_persona_t`
+- `src/persona/persona.c` — parse `principles` from persona JSON and append to composed prompt
+- (Optional follow-up) `src/persona/prompt.c` — only if prompt assembly is split further later
 
 Principles like: "Be helpful but never harmful," "Admit uncertainty," "Protect privacy," "Defer to the real Seth on irreversible decisions."
 
@@ -242,12 +261,14 @@ Principles like: "Be helpful but never harmful," "Admit uncertainty," "Protect p
 
 ### 3.1 Fidelity Benchmark Suite
 
+**Status — done** (suite + rubric files exist under `eval_suites/`).
+
 Measure how "human" the responses feel.
 
 **Files:**
 
-- Create: `eval_suites/fidelity.json` — tasks with real conversation snippets, expected timing distributions, expected response styles
-- Create: `eval_suites/fidelity_rubric.json` — LLM judge rubric for naturalness, appropriate length, emotional resonance
+- `eval_suites/fidelity.json` — tasks with real conversation snippets, expected timing distributions, expected response styles
+- `eval_suites/fidelity_rubric.json` — LLM judge rubric for naturalness, appropriate length, emotional resonance
 
 **Dimensions:**
 
@@ -259,45 +280,52 @@ Measure how "human" the responses feel.
 
 ### 3.2 Intelligence Benchmark Suite
 
+**Status — done** (reasoning, tool_use, memory, social, plus `intelligence.json` / `*_basic.json` variants in `eval_suites/`).
+
 Measure AGI capabilities.
 
 **Files:**
 
-- Create: `eval_suites/reasoning.json` — multi-step reasoning tasks
-- Create: `eval_suites/tool_use.json` — complex tool chains
-- Create: `eval_suites/memory.json` — recall accuracy over long conversations
-- Create: `eval_suites/social.json` — theory of mind, empathy, humor
+- `eval_suites/reasoning.json` — multi-step reasoning tasks
+- `eval_suites/tool_use.json` — complex tool chains
+- `eval_suites/memory.json` — recall accuracy over long conversations
+- `eval_suites/social.json` — theory of mind, empathy, humor
 
 ### 3.3 Behavioral Calibration Pipeline
+
+**Status — done** (`src/calibration/*`, `human calibrate`; **channel-agnostic** entry via `channel_name` / `"auto"` — not iMessage-only).
 
 Capture Seth's real messaging patterns and use them to tune parameters.
 
 **Files:**
 
-- Create: `src/calibration/` — new module
-- Create: `src/calibration/timing_analyzer.c` — analyze real chat.db for response time distributions per contact, time of day, message type
-- Create: `src/calibration/style_analyzer.c` — analyze real messages for length distributions, emoji usage, reaction frequency, vocabulary
-- Create: `src/calibration/calibrate.c` — CLI command `human calibrate` that reads chat.db, produces persona parameter recommendations
-- Modify: `src/cli_commands.c` — add `calibrate` subcommand
+- `src/calibration/timing_analyzer.c` — analyze real chat.db for response time distributions per contact, time of day, message type
+- `src/calibration/style_analyzer.c` — analyze real messages for length distributions, emoji usage, reaction frequency, vocabulary
+- `src/calibration/calibrate.c` — CLI command `human calibrate` that reads chat.db, produces persona parameter recommendations
+- `src/cli_commands.c` — `calibrate` subcommand
 
 **Output**: JSON file with measured distributions that the daemon can read to set timing parameters, filler probabilities, reaction frequencies, etc.
 
 ### 3.4 Live A/B Comparison
 
+**Status — done** (`src/calibration/ab_compare.c`).
+
 Compare digital twin output to what Seth actually said.
 
 **Files:**
 
-- Create: `src/calibration/ab_compare.c` — given a conversation history, generate what the twin would say, compare to what Seth actually said
+- `src/calibration/ab_compare.c` — given a conversation history, generate what the twin would say, compare to what Seth actually said
 - Use LLM judge to score: "Which response is more Seth-like?"
 
 ### 3.5 Regression Dashboard
+
+**Status — partial** — `hu_eval_dashboard_render_trend` exists in `src/eval_dashboard.c`; end-to-end “always-on” trend UX + SQLite history may still need product wiring.
 
 Track improvements over time.
 
 **Files:**
 
-- Modify: `src/eval_dashboard.c` — add fidelity + intelligence trend visualization
+- `src/eval_dashboard.c` — fidelity + intelligence trend rendering
 - Store eval runs in SQLite for historical comparison
 - CLI: `human eval trend` shows score changes over time
 
@@ -313,13 +341,15 @@ Track improvements over time.
 
 ### 4.1 Unified Contact Graph
 
+**Status — done** (`src/memory/contact_graph.c`, `hu_contact_identity_t`, SQLite-backed link/resolve APIs; used from agent/daemon paths).
+
 Map identities across platforms.
 
 **Files:**
 
-- Create: `src/memory/contact_graph.c` — cross-platform identity resolution
-- Modify: `include/human/memory.h` — add `hu_contact_identity_t` with platform handles
-- Modify: `src/memory/superhuman.c` — use unified contact ID for inside jokes, commitments, patterns
+- `src/memory/contact_graph.c` — cross-platform identity resolution
+- `include/human/memory.h` — `hu_contact_identity_t` with platform handles
+- `src/memory/superhuman.c` — unified contact ID for inside jokes, commitments, patterns (as wired)
 
 **Schema:**
 
@@ -338,40 +368,48 @@ CREATE TABLE contact_identities (
 
 ### 4.2 Cross-Channel Context Awareness
 
+**Status — done** (`cross_channel_ctx` in `src/daemon.c` via other channels' `load_conversation_history` and contact graph handles).
+
 When texting on iMessage, know what was discussed on Discord yesterday.
 
 **Files:**
 
-- Modify: `src/daemon.c` — the cross-channel history loading path (already commented at line 3535) actually loads from other channels
-- Use `load_conversation_history` vtable (enriched in Phase 1) to pull recent exchanges from other platforms for the same contact
+- `src/daemon.c` — cross-channel history loading pulls from other registered channels for the same contact
+- `load_conversation_history` vtable (Phase 1 enrichment) supplies recent exchanges per platform
 
 ### 4.3 Proactive Cross-Channel Routing
+
+**Status — partial** — infrastructure exists (multi-channel contact awareness, proactive governor); **verify** all proactive outbound paths rank channels from real activity signals end-to-end.
 
 Know which channel to reach someone on based on their activity patterns.
 
 **Files:**
 
-- Modify: `src/daemon.c` — proactive outbound considers all channels the contact is reachable on
+- `src/daemon.c` — proactive outbound considers all channels the contact is reachable on
 - Track last-active-per-channel in contact profiles
 - Route proactive messages to the channel where the contact was most recently active
 
 ### 4.4 Multi-Agent Task Swarm (Production)
 
+**Status — mostly done** — `hu_swarm_execute` uses **pthread** worker pool; **`hu_swarm_aggregate`** implements merge strategies; ensemble provider covers **multi-model consensus** at the provider layer. Remaining: richer LLM-driven decomposition in `orchestrator_llm.c` vs static task lists.
+
 Wire the orchestrator for real parallel work.
 
 **Files:**
 
-- Modify: `src/agent/orchestrator_llm.c` — LLM-driven goal decomposition (not pre-split subtasks)
-- Modify: `src/agent/swarm.c` — true parallel execution with result merging
-- Add consensus protocol: when sub-agents disagree, escalate to a "judge" agent or pick highest confidence
+- `src/agent/orchestrator_llm.c` — LLM-driven goal decomposition (not pre-split subtasks)
+- `src/agent/swarm.c` — parallel execution with result merging + aggregation
+- Ensemble / judge-style flows — see `src/providers/ensemble.c` and spawn policy in `src/agent/spawn.c`
 
 ### 4.5 Self-Improvement Loop (Closed)
+
+**Status — partial** — `self_improve.c` consumes eval outputs and persists patch metadata; a **fully automated nightly closed loop** (schedule + safe apply + rollback policy) is not yet a default product path.
 
 Full closed loop: eval → weakness analysis → generate fix → apply → re-eval → keep or rollback.
 
 **Files:**
 
-- Modify: `src/intelligence/self_improve.c` — wire eval framework as the quality signal
+- `src/intelligence/self_improve.c` — eval framework as quality signal (SQLite-backed patch tracking)
 - Add: nightly self-improvement daemon job that runs eval suite, identifies weakest area, generates improvement, measures delta
 
 ---
@@ -386,13 +424,15 @@ Full closed loop: eval → weakness analysis → generate fix → apply → re-e
 
 ### 5.1 Voice Across Channels
 
+**Status — mostly done** — daemon gates TTS on **`hu_channel_daemon_config_t.voice_enabled`** for the active channel (not iMessage-only); per-channel audio packaging still varies by platform APIs.
+
 Generalize Cartesia TTS beyond iMessage.
 
 **Files:**
 
-- Modify: `src/daemon.c` — voice path works for any channel supporting audio media
-- Modify: `src/tts/cartesia.c` — output format per channel (CAF for iMessage, OGG for Telegram, MP3 for Discord)
-- Add per-channel voice config in `hu_channel_daemon_config_t`
+- `src/daemon.c` — voice path for channels with `voice_enabled`
+- `src/tts/cartesia.c` — output format per channel (CAF for iMessage, OGG for Telegram, MP3 for Discord)
+- `hu_channel_daemon_config_t` — per-channel voice enablement
 
 ### 5.2 Full-Duplex Voice Sessions
 
