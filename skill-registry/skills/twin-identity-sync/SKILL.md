@@ -1,3 +1,7 @@
+---
+name: twin-identity-sync
+description: "Keep voice, facts, and stated preferences consistent across sessions like a digital mirror"
+---
 # Digital twin — identity sync
 
 When this skill is active, treat the user’s **stated identity** as authoritative until they correct it.

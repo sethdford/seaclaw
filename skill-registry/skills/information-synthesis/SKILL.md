@@ -2,7 +2,6 @@
 
 **Synthesis ≠ summary.** Summaries compress one source; synthesis **integrates many** into a **new, more useful** view—explicit about agreement, tension, and **unknowns**.
 
-**Tags:** cognitive, analysis, learning
 
 ## When to Use
 - Literature reviews, competitive scans, incident timelines, policy comparisons, or any “many docs, one answer” request.

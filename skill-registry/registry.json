@@ -1,230 +1,26 @@
 [
   {
-    "name": "code-review",
-    "description": "Automated code review with style checks and security scanning",
+    "name": "abstraction",
+    "description": "Navigate between concrete details and abstract principles: know when to zoom in or out",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/code-review",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/abstraction",
     "tags": [
-      "development",
-      "review"
+      "cognitive",
+      "analysis",
+      "reasoning"
     ]
   },
   {
-    "name": "git-workflow",
-    "description": "Git branch strategy, merge workflows, and PR automation",
+    "name": "active-listening",
+    "description": "Paraphrase, confirm understanding, and distinguish stated needs from underlying needs",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/git-workflow",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/active-listening",
     "tags": [
-      "development",
-      "git",
-      "version-control"
-    ]
-  },
-  {
-    "name": "code-formatter",
-    "description": "Format and lint code according to project conventions",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/code-formatter",
-    "tags": [
-      "development",
-      "formatting",
-      "linting"
-    ]
-  },
-  {
-    "name": "code-documenter",
-    "description": "Generate docs, READMEs, and API documentation from code",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/code-documenter",
-    "tags": [
-      "development",
-      "documentation"
-    ]
-  },
-  {
-    "name": "meeting-notes",
-    "description": "Summarize meetings and extract action items",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/meeting-notes",
-    "tags": [
-      "productivity",
-      "meetings"
-    ]
-  },
-  {
-    "name": "research-assistant",
-    "description": "Research topics and compile summaries from multiple sources",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/research-assistant",
-    "tags": [
-      "productivity",
-      "research"
-    ]
-  },
-  {
-    "name": "calendar-sync",
-    "description": "Sync and manage calendar events across providers",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/calendar-sync",
-    "tags": [
-      "productivity",
-      "calendar"
-    ]
-  },
-  {
-    "name": "expense-tracker",
-    "description": "Track expenses and categorize spending",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/expense-tracker",
-    "tags": [
-      "productivity",
-      "finance"
-    ]
-  },
-  {
-    "name": "todo-manager",
-    "description": "Manage tasks, todos, and project checklists",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/todo-manager",
-    "tags": [
-      "productivity",
-      "tasks"
-    ]
-  },
-  {
-    "name": "time-tracker",
-    "description": "Track time spent on projects and tasks",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/time-tracker",
-    "tags": [
-      "productivity",
-      "time-management"
-    ]
-  },
-  {
-    "name": "system-monitor",
-    "description": "Monitor system resources, processes, and health metrics",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/system-monitor",
-    "tags": [
-      "devops",
-      "monitoring"
-    ]
-  },
-  {
-    "name": "uptime-checker",
-    "description": "Monitor endpoint uptime and availability",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/uptime-checker",
-    "tags": [
-      "devops",
-      "monitoring",
-      "availability"
-    ]
-  },
-  {
-    "name": "home-automation",
-    "description": "Control smart home devices and automation rules",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/home-automation",
-    "tags": [
-      "iot",
-      "smart-home"
-    ]
-  },
-  {
-    "name": "weather-station",
-    "description": "Aggregate and display weather data from sensors",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/weather-station",
-    "tags": [
-      "iot",
-      "weather",
-      "sensors"
-    ]
-  },
-  {
-    "name": "rss-monitor",
-    "description": "Monitor RSS feeds and notify on new posts",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/rss-monitor",
-    "tags": [
-      "social",
-      "rss",
-      "feeds"
-    ]
-  },
-  {
-    "name": "slack-digest",
-    "description": "Daily Slack channel digest and highlights",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/slack-digest",
-    "tags": [
-      "social",
-      "slack",
-      "communication"
-    ]
-  },
-  {
-    "name": "twitter-scheduler",
-    "description": "Schedule and publish tweets",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/twitter-scheduler",
-    "tags": [
-      "social",
-      "twitter",
-      "scheduling"
-    ]
-  },
-  {
-    "name": "newsletter-curator",
-    "description": "Curate and compose newsletter content",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/newsletter-curator",
-    "tags": [
-      "social",
-      "newsletter",
-      "content"
-    ]
-  },
-  {
-    "name": "social-analytics",
-    "description": "Analyze social media engagement metrics",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/social-analytics",
-    "tags": [
-      "social",
-      "analytics"
-    ]
-  },
-  {
-    "name": "data-analysis",
-    "description": "Analyze datasets and generate insights",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/data-analysis",
-    "tags": [
-      "data",
-      "analytics"
+      "cognitive",
+      "communication",
+      "empathy"
     ]
   },
   {
@@ -240,87 +36,111 @@
     ]
   },
   {
-    "name": "constraint-creativity",
-    "description": "Use limitations as creative catalysts: forced constraints, elimination, and reduction",
+    "name": "api-designer",
+    "description": "Design and document REST and GraphQL APIs",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/constraint-creativity",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/api-designer",
     "tags": [
-      "cognitive",
-      "creativity",
-      "innovation"
+      "development",
+      "api",
+      "design"
     ]
   },
   {
-    "name": "creative-combination",
-    "description": "Generate novel ideas by combining existing concepts, techniques, or domains in unexpected ways",
+    "name": "assumption-mapping",
+    "description": "Surface, categorize, and test hidden assumptions before they cause failure",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/creative-combination",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/assumption-mapping",
     "tags": [
       "cognitive",
-      "creativity",
-      "innovation"
+      "analysis",
+      "planning"
     ]
   },
   {
-    "name": "improvisation",
-    "description": "Apply improv principles to thinking: yes-and, heighten, specificity, and embracing failure",
+    "name": "attention-management",
+    "description": "Protect and direct attention in a distraction-rich environment",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/improvisation",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/attention-management",
     "tags": [
       "cognitive",
-      "creativity",
+      "productivity",
+      "wellbeing"
+    ]
+  },
+  {
+    "name": "backup-scheduler",
+    "description": "Schedule and manage backup jobs",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/backup-scheduler",
+    "tags": [
+      "devops",
+      "backup",
+      "recovery"
+    ]
+  },
+  {
+    "name": "boundary-setting",
+    "description": "Establish and communicate personal and professional boundaries clearly and kindly",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/boundary-setting",
+    "tags": [
+      "cognitive",
+      "wellbeing",
       "communication"
     ]
   },
   {
-    "name": "lateral-thinking",
-    "description": "Break fixed thinking patterns using provocation, random entry, and concept extraction",
+    "name": "brainstorming",
+    "description": "Divergent ideation techniques for exploring solution spaces before converging",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/lateral-thinking",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/brainstorming",
     "tags": [
       "cognitive",
-      "creativity",
-      "reasoning"
+      "reasoning",
+      "creativity"
     ]
   },
   {
-    "name": "prototyping",
-    "description": "Build quick, cheap, throwaway versions to test ideas before committing to full implementation",
+    "name": "calendar-sync",
+    "description": "Sync and manage calendar events across providers",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/prototyping",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/calendar-sync",
     "tags": [
-      "cognitive",
-      "creativity",
-      "innovation"
+      "productivity",
+      "calendar"
     ]
   },
   {
-    "name": "reframing",
-    "description": "See problems differently by changing the frame: perspective shifts, inversions, and zoom levels",
+    "name": "change-management",
+    "description": "Guide people and organizations through transitions with communication, empathy, and incremental adoption",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/reframing",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/change-management",
     "tags": [
       "cognitive",
-      "creativity",
-      "reasoning"
+      "leadership",
+      "strategy"
     ]
   },
   {
-    "name": "visual-thinking",
-    "description": "Use diagrams, sketches, and spatial reasoning to understand and communicate complex ideas",
+    "name": "ci-cd-helper",
+    "description": "Configure CI/CD pipelines and deployment automation",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/visual-thinking",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/ci-cd-helper",
     "tags": [
-      "cognitive",
-      "creativity",
-      "communication"
+      "development",
+      "ci",
+      "cd",
+      "automation"
     ]
   },
   {
@@ -336,30 +156,6 @@
     ]
   },
   {
-    "name": "health-checker",
-    "description": "Run health checks on gateway and provider connectivity",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/health-checker",
-    "tags": [
-      "migration",
-      "setup",
-      "health"
-    ]
-  },
-  {
-    "name": "plugin-scanner",
-    "description": "Scan and list installed skills and plugins",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/plugin-scanner",
-    "tags": [
-      "migration",
-      "setup",
-      "plugins"
-    ]
-  },
-  {
     "name": "coaching",
     "description": "Guide others toward their own solutions using the GROW model and powerful questions",
     "version": "1.0.0",
@@ -369,6 +165,88 @@
       "cognitive",
       "emotional-intelligence",
       "leadership"
+    ]
+  },
+  {
+    "name": "code-documenter",
+    "description": "Generate docs, READMEs, and API documentation from code",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/code-documenter",
+    "tags": [
+      "development",
+      "documentation"
+    ]
+  },
+  {
+    "name": "code-formatter",
+    "description": "Format and lint code according to project conventions",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/code-formatter",
+    "tags": [
+      "development",
+      "formatting",
+      "linting"
+    ]
+  },
+  {
+    "name": "code-review",
+    "description": "Automated code review with style checks and security scanning",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/code-review",
+    "tags": [
+      "development",
+      "review"
+    ]
+  },
+  {
+    "name": "code-translator",
+    "description": "Translate code between programming languages and frameworks",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/code-translator",
+    "tags": [
+      "development",
+      "translation",
+      "migration"
+    ]
+  },
+  {
+    "name": "communication-planning",
+    "description": "Plan important communications: audience analysis, message design, channel selection, and timing",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/communication-planning",
+    "tags": [
+      "cognitive",
+      "communication",
+      "planning"
+    ]
+  },
+  {
+    "name": "competitive-analysis",
+    "description": "Analyze competitive landscapes, positioning, and sustainable advantages",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/competitive-analysis",
+    "tags": [
+      "cognitive",
+      "strategy",
+      "analysis"
+    ]
+  },
+  {
+    "name": "config-validator",
+    "description": "Validate Human and skill configuration files",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/config-validator",
+    "tags": [
+      "migration",
+      "setup",
+      "config"
     ]
   },
   {
@@ -384,6 +262,78 @@
     ]
   },
   {
+    "name": "consensus-building",
+    "description": "Build agreement across diverse perspectives without forcing false unanimity",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/consensus-building",
+    "tags": [
+      "cognitive",
+      "leadership",
+      "communication"
+    ]
+  },
+  {
+    "name": "constraint-creativity",
+    "description": "Use limitations as creative catalysts: forced constraints, elimination, and reduction",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/constraint-creativity",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "innovation"
+    ]
+  },
+  {
+    "name": "cost-benefit-analysis",
+    "description": "Quantify trade-offs by estimating tangible and intangible costs and benefits",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/cost-benefit-analysis",
+    "tags": [
+      "cognitive",
+      "decision-making",
+      "analysis"
+    ]
+  },
+  {
+    "name": "creative-combination",
+    "description": "Generate novel ideas by combining existing concepts, techniques, or domains in unexpected ways",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/creative-combination",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "innovation"
+    ]
+  },
+  {
+    "name": "critical-thinking",
+    "description": "Evaluate arguments, identify assumptions, weigh evidence, and detect reasoning flaws",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/critical-thinking",
+    "tags": [
+      "cognitive",
+      "reasoning",
+      "analysis"
+    ]
+  },
+  {
+    "name": "csv-transformer",
+    "description": "Transform, filter, and reshape CSV data",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/csv-transformer",
+    "tags": [
+      "data",
+      "csv",
+      "etl"
+    ]
+  },
+  {
     "name": "cultural-awareness",
     "description": "Communicate effectively across cultural contexts by recognizing different norms and values",
     "version": "1.0.0",
@@ -393,6 +343,171 @@
       "cognitive",
       "emotional-intelligence",
       "communication"
+    ]
+  },
+  {
+    "name": "daily-standup",
+    "description": "Generate and track daily standup notes",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/daily-standup",
+    "tags": [
+      "productivity",
+      "meetings",
+      "agile"
+    ]
+  },
+  {
+    "name": "data-analysis",
+    "description": "Analyze datasets and generate insights",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/data-analysis",
+    "tags": [
+      "data",
+      "analytics"
+    ]
+  },
+  {
+    "name": "data-literacy",
+    "description": "Read, interpret, and communicate data accurately without misleading or being misled",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/data-literacy",
+    "tags": [
+      "cognitive",
+      "analysis",
+      "data"
+    ]
+  },
+  {
+    "name": "database-migrator",
+    "description": "Generate and run database schema migrations",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/database-migrator",
+    "tags": [
+      "development",
+      "database",
+      "migration"
+    ]
+  },
+  {
+    "name": "decision-framework",
+    "description": "Apply structured decision methods: weighted scoring, second-order thinking, reversibility tests",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/decision-framework",
+    "tags": [
+      "cognitive",
+      "decision-making",
+      "analysis"
+    ]
+  },
+  {
+    "name": "delegation",
+    "description": "Assign work effectively by matching tasks to people, defining outcomes, and maintaining accountability",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/delegation",
+    "tags": [
+      "cognitive",
+      "leadership",
+      "productivity"
+    ]
+  },
+  {
+    "name": "deliberate-practice",
+    "description": "Design practice sessions that target specific weaknesses with immediate feedback",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/deliberate-practice",
+    "tags": [
+      "cognitive",
+      "learning",
+      "growth"
+    ]
+  },
+  {
+    "name": "dependency-checker",
+    "description": "Check and update project dependencies for security and compatibility",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/dependency-checker",
+    "tags": [
+      "development",
+      "dependencies",
+      "security"
+    ]
+  },
+  {
+    "name": "deployment-manager",
+    "description": "Orchestrate deployments and rollout strategies",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/deployment-manager",
+    "tags": [
+      "devops",
+      "deployment"
+    ]
+  },
+  {
+    "name": "design-thinking",
+    "description": "Human-centered problem solving: empathize, define, ideate, prototype, test",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/design-thinking",
+    "tags": [
+      "cognitive",
+      "reasoning",
+      "design"
+    ]
+  },
+  {
+    "name": "difficult-conversations",
+    "description": "Navigate high-stakes or emotionally charged conversations with clarity and care",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/difficult-conversations",
+    "tags": [
+      "cognitive",
+      "communication",
+      "emotional-intelligence"
+    ]
+  },
+  {
+    "name": "discord-moderator",
+    "description": "Discord moderation and auto-moderation rules",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/discord-moderator",
+    "tags": [
+      "social",
+      "discord",
+      "moderation"
+    ]
+  },
+  {
+    "name": "docker-manager",
+    "description": "Manage Docker containers, images, and compose stacks",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/docker-manager",
+    "tags": [
+      "devops",
+      "docker",
+      "containers"
+    ]
+  },
+  {
+    "name": "email-digest",
+    "description": "Daily email digest with priority sorting and action items",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/email-digest",
+    "tags": [
+      "email",
+      "productivity"
     ]
   },
   {
@@ -420,6 +535,565 @@
     ]
   },
   {
+    "name": "energy-tracker",
+    "description": "Track energy consumption from smart meters",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/energy-tracker",
+    "tags": [
+      "iot",
+      "energy",
+      "sensors"
+    ]
+  },
+  {
+    "name": "environment-setup",
+    "description": "Setup development and deployment environments",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/environment-setup",
+    "tags": [
+      "migration",
+      "setup",
+      "environment"
+    ]
+  },
+  {
+    "name": "ethical-reasoning",
+    "description": "Navigate moral dilemmas using multiple ethical frameworks and stakeholder analysis",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/ethical-reasoning",
+    "tags": [
+      "cognitive",
+      "decision-making",
+      "ethics"
+    ]
+  },
+  {
+    "name": "expense-tracker",
+    "description": "Track expenses and categorize spending",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/expense-tracker",
+    "tags": [
+      "productivity",
+      "finance"
+    ]
+  },
+  {
+    "name": "explanation-design",
+    "description": "Explain complex ideas clearly by choosing the right abstraction level, analogies, and structure",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/explanation-design",
+    "tags": [
+      "cognitive",
+      "communication",
+      "teaching"
+    ]
+  },
+  {
+    "name": "feedback-craft",
+    "description": "Deliver constructive feedback that is specific, actionable, and received well",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/feedback-craft",
+    "tags": [
+      "cognitive",
+      "communication",
+      "leadership"
+    ]
+  },
+  {
+    "name": "feynman-technique",
+    "description": "Explain concepts simply to verify understanding, expose gaps, and teach effectively",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/feynman-technique",
+    "tags": [
+      "cognitive",
+      "learning",
+      "teaching"
+    ]
+  },
+  {
+    "name": "financial-literacy",
+    "description": "Understand and apply basic financial concepts: budgeting, compounding, opportunity cost, and risk",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/financial-literacy",
+    "tags": [
+      "cognitive",
+      "life-skills",
+      "finance"
+    ]
+  },
+  {
+    "name": "first-principles",
+    "description": "Decompose problems to fundamental truths and rebuild solutions from axioms",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/first-principles",
+    "tags": [
+      "cognitive",
+      "reasoning",
+      "analysis"
+    ]
+  },
+  {
+    "name": "garage-door",
+    "description": "Control garage door opener via smart relay",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/garage-door",
+    "tags": [
+      "iot",
+      "hardware"
+    ]
+  },
+  {
+    "name": "git-workflow",
+    "description": "Git branch strategy, merge workflows, and PR automation",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/git-workflow",
+    "tags": [
+      "development",
+      "git",
+      "version-control"
+    ]
+  },
+  {
+    "name": "habit-design",
+    "description": "Build and break habits using cue-routine-reward loops, environment design, and implementation intentions",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/habit-design",
+    "tags": [
+      "cognitive",
+      "life-skills",
+      "wellbeing"
+    ]
+  },
+  {
+    "name": "health-checker",
+    "description": "Run health checks on gateway and provider connectivity",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/health-checker",
+    "tags": [
+      "migration",
+      "setup",
+      "health"
+    ]
+  },
+  {
+    "name": "home-automation",
+    "description": "Control smart home devices and automation rules",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/home-automation",
+    "tags": [
+      "iot",
+      "smart-home"
+    ]
+  },
+  {
+    "name": "hypothesis-testing",
+    "description": "Formulate testable predictions, design validation, and update beliefs on evidence",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/hypothesis-testing",
+    "tags": [
+      "cognitive",
+      "reasoning",
+      "scientific-method"
+    ]
+  },
+  {
+    "name": "improvisation",
+    "description": "Apply improv principles to thinking: yes-and, heighten, specificity, and embracing failure",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/improvisation",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "communication"
+    ]
+  },
+  {
+    "name": "influence-without-authority",
+    "description": "Lead change and drive alignment when you don't have formal power",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/influence-without-authority",
+    "tags": [
+      "cognitive",
+      "leadership",
+      "communication"
+    ]
+  },
+  {
+    "name": "information-synthesis",
+    "description": "Combine information from multiple sources into coherent, actionable insight",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/information-synthesis",
+    "tags": [
+      "cognitive",
+      "analysis",
+      "learning"
+    ]
+  },
+  {
+    "name": "interviewing",
+    "description": "Conduct effective interviews: research, user, hiring, and journalistic contexts",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/interviewing",
+    "tags": [
+      "cognitive",
+      "communication",
+      "research"
+    ]
+  },
+  {
+    "name": "invoice-generator",
+    "description": "Generate invoices and track billing",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/invoice-generator",
+    "tags": [
+      "productivity",
+      "invoice",
+      "finance"
+    ]
+  },
+  {
+    "name": "json-validator",
+    "description": "Validate JSON against schemas and fix formatting",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/json-validator",
+    "tags": [
+      "data",
+      "json",
+      "validation"
+    ]
+  },
+  {
+    "name": "kubernetes-helper",
+    "description": "Kubernetes deployment and cluster management helpers",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/kubernetes-helper",
+    "tags": [
+      "devops",
+      "kubernetes",
+      "orchestration"
+    ]
+  },
+  {
+    "name": "lateral-thinking",
+    "description": "Break fixed thinking patterns using provocation, random entry, and concept extraction",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/lateral-thinking",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "reasoning"
+    ]
+  },
+  {
+    "name": "log-analyzer",
+    "description": "Parse and analyze application and system logs",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/log-analyzer",
+    "tags": [
+      "devops",
+      "logging",
+      "debugging"
+    ]
+  },
+  {
+    "name": "meeting-facilitation",
+    "description": "Run effective meetings with clear purpose, structure, time management, and action items",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/meeting-facilitation",
+    "tags": [
+      "cognitive",
+      "leadership",
+      "communication"
+    ]
+  },
+  {
+    "name": "meeting-notes",
+    "description": "Summarize meetings and extract action items",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/meeting-notes",
+    "tags": [
+      "productivity",
+      "meetings"
+    ]
+  },
+  {
+    "name": "mental-models",
+    "description": "Apply a library of core mental models to frame problems and avoid blind spots",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/mental-models",
+    "tags": [
+      "cognitive",
+      "learning",
+      "reasoning"
+    ]
+  },
+  {
+    "name": "mentoring",
+    "description": "Develop others through experience sharing, guidance, and creating growth opportunities",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/mentoring",
+    "tags": [
+      "cognitive",
+      "leadership",
+      "growth"
+    ]
+  },
+  {
+    "name": "meta-cognition",
+    "description": "Think about thinking: recognize cognitive biases, calibrate confidence, and improve reasoning processes",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/meta-cognition",
+    "tags": [
+      "cognitive",
+      "reasoning",
+      "self-awareness"
+    ]
+  },
+  {
+    "name": "negotiation",
+    "description": "Navigate negotiations using principled strategies: BATNA, interest mapping, and value creation",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/negotiation",
+    "tags": [
+      "cognitive",
+      "communication",
+      "strategy"
+    ]
+  },
+  {
+    "name": "newsletter-curator",
+    "description": "Curate and compose newsletter content",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/newsletter-curator",
+    "tags": [
+      "social",
+      "newsletter",
+      "content"
+    ]
+  },
+  {
+    "name": "nostr-bot",
+    "description": "Nostr relay interaction and DMs bot",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/nostr-bot",
+    "tags": [
+      "social",
+      "nostr",
+      "messaging"
+    ]
+  },
+  {
+    "name": "note-taking",
+    "description": "Capture and organize knowledge using proven methods: Zettelkasten, Cornell, progressive summarization",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/note-taking",
+    "tags": [
+      "cognitive",
+      "learning",
+      "knowledge-management"
+    ]
+  },
+  {
+    "name": "pattern-recognition",
+    "description": "Identify recurring patterns, analogies, and structural similarities across different domains",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/pattern-recognition",
+    "tags": [
+      "cognitive",
+      "learning",
+      "reasoning"
+    ]
+  },
+  {
+    "name": "persuasive-writing",
+    "description": "Structure arguments that move people to action using rhetorical frameworks",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/persuasive-writing",
+    "tags": [
+      "cognitive",
+      "communication",
+      "writing"
+    ]
+  },
+  {
+    "name": "plant-monitor",
+    "description": "Monitor soil moisture and plant health",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/plant-monitor",
+    "tags": [
+      "iot",
+      "gardening",
+      "sensors"
+    ]
+  },
+  {
+    "name": "plugin-scanner",
+    "description": "Scan and list installed skills and plugins",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/plugin-scanner",
+    "tags": [
+      "migration",
+      "setup",
+      "plugins"
+    ]
+  },
+  {
+    "name": "pomodoro-timer",
+    "description": "Pomodoro technique timer for focused work sessions",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/pomodoro-timer",
+    "tags": [
+      "productivity",
+      "time-management"
+    ]
+  },
+  {
+    "name": "presentation-design",
+    "description": "Design and deliver presentations that are clear, memorable, and action-oriented",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/presentation-design",
+    "tags": [
+      "cognitive",
+      "communication",
+      "design"
+    ]
+  },
+  {
+    "name": "prioritization",
+    "description": "Rank competing demands using structured frameworks: Eisenhower, ICE, MoSCoW, constraint-based triage",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/prioritization",
+    "tags": [
+      "cognitive",
+      "decision-making",
+      "productivity"
+    ]
+  },
+  {
+    "name": "probabilistic-thinking",
+    "description": "Reason about uncertainty using ranges, confidence levels, and expected value calculations",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/probabilistic-thinking",
+    "tags": [
+      "cognitive",
+      "analysis",
+      "reasoning"
+    ]
+  },
+  {
+    "name": "problem-decomposition",
+    "description": "Break large, overwhelming problems into small, tractable sub-problems",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/problem-decomposition",
+    "tags": [
+      "cognitive",
+      "analysis",
+      "productivity"
+    ]
+  },
+  {
+    "name": "process-improvement",
+    "description": "Identify and eliminate waste in workflows using lean thinking and value stream mapping",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/process-improvement",
+    "tags": [
+      "cognitive",
+      "analysis",
+      "productivity"
+    ]
+  },
+  {
+    "name": "product-thinking",
+    "description": "Think about products as solutions to user problems: value propositions, user journeys, and metrics",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/product-thinking",
+    "tags": [
+      "cognitive",
+      "strategy",
+      "design"
+    ]
+  },
+  {
+    "name": "project-retrospective",
+    "description": "Run structured retrospectives to extract lessons learned and improve future performance",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/project-retrospective",
+    "tags": [
+      "cognitive",
+      "leadership",
+      "learning"
+    ]
+  },
+  {
+    "name": "project-scoping",
+    "description": "Define project boundaries, deliverables, and success criteria to prevent scope creep",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/project-scoping",
+    "tags": [
+      "cognitive",
+      "leadership",
+      "planning"
+    ]
+  },
+  {
+    "name": "prototyping",
+    "description": "Build quick, cheap, throwaway versions to test ideas before committing to full implementation",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/prototyping",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "innovation"
+    ]
+  },
+  {
     "name": "psychological-safety",
     "description": "Create environments where people can take risks, ask questions, and admit mistakes",
     "version": "1.0.0",
@@ -429,6 +1103,112 @@
       "cognitive",
       "emotional-intelligence",
       "leadership"
+    ]
+  },
+  {
+    "name": "red-team",
+    "description": "Adversarial reasoning and pre-mortem analysis for decisions, plans, and designs",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/red-team",
+    "tags": [
+      "cognitive",
+      "reasoning",
+      "security"
+    ]
+  },
+  {
+    "name": "reframing",
+    "description": "See problems differently by changing the frame: perspective shifts, inversions, and zoom levels",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/reframing",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "reasoning"
+    ]
+  },
+  {
+    "name": "report-generator",
+    "description": "Generate data reports and visualizations",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/report-generator",
+    "tags": [
+      "data",
+      "reporting"
+    ]
+  },
+  {
+    "name": "research-assistant",
+    "description": "Research topics and compile summaries from multiple sources",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/research-assistant",
+    "tags": [
+      "productivity",
+      "research"
+    ]
+  },
+  {
+    "name": "resilience",
+    "description": "Recover from setbacks using reframing, incremental action, and support-seeking strategies",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/resilience",
+    "tags": [
+      "cognitive",
+      "wellbeing",
+      "emotional-intelligence"
+    ]
+  },
+  {
+    "name": "risk-assessment",
+    "description": "Evaluate risks using probability-impact analysis, scenario planning, and pre-mortem techniques",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/risk-assessment",
+    "tags": [
+      "cognitive",
+      "decision-making",
+      "analysis"
+    ]
+  },
+  {
+    "name": "root-cause-analysis",
+    "description": "Dig beyond symptoms to find the true cause of problems using 5 Whys, fishbone, and fault trees",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/root-cause-analysis",
+    "tags": [
+      "cognitive",
+      "analysis",
+      "debugging"
+    ]
+  },
+  {
+    "name": "rss-monitor",
+    "description": "Monitor RSS feeds and notify on new posts",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/rss-monitor",
+    "tags": [
+      "social",
+      "rss",
+      "feeds"
+    ]
+  },
+  {
+    "name": "scenario-planning",
+    "description": "Prepare for multiple futures by building and stress-testing plausible scenarios",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/scenario-planning",
+    "tags": [
+      "cognitive",
+      "strategy",
+      "planning"
     ]
   },
   {
@@ -444,6 +1224,266 @@
     ]
   },
   {
+    "name": "slack-digest",
+    "description": "Daily Slack channel digest and highlights",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/slack-digest",
+    "tags": [
+      "social",
+      "slack",
+      "communication"
+    ]
+  },
+  {
+    "name": "social-analytics",
+    "description": "Analyze social media engagement metrics",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/social-analytics",
+    "tags": [
+      "social",
+      "analytics"
+    ]
+  },
+  {
+    "name": "socratic-questioning",
+    "description": "Guide discovery through progressive question ladders instead of giving direct answers",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/socratic-questioning",
+    "tags": [
+      "cognitive",
+      "communication",
+      "coaching"
+    ]
+  },
+  {
+    "name": "spaced-repetition",
+    "description": "Schedule review of learned material at optimal intervals to maximize retention",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/spaced-repetition",
+    "tags": [
+      "cognitive",
+      "learning",
+      "memory"
+    ]
+  },
+  {
+    "name": "speed-reading",
+    "description": "Extract key information from large documents quickly using structured scanning techniques",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/speed-reading",
+    "tags": [
+      "cognitive",
+      "learning",
+      "productivity"
+    ]
+  },
+  {
+    "name": "sql-query-builder",
+    "description": "Build and optimize SQL queries from natural language",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/sql-query-builder",
+    "tags": [
+      "data",
+      "sql",
+      "database"
+    ]
+  },
+  {
+    "name": "ssl-cert-monitor",
+    "description": "Monitor SSL/TLS certificate expiration and renewal",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/ssl-cert-monitor",
+    "tags": [
+      "devops",
+      "ssl",
+      "security"
+    ]
+  },
+  {
+    "name": "stakeholder-management",
+    "description": "Map, engage, and communicate with stakeholders based on their influence and interests",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/stakeholder-management",
+    "tags": [
+      "cognitive",
+      "leadership",
+      "strategy"
+    ]
+  },
+  {
+    "name": "storytelling",
+    "description": "Transform information into memorable narratives with tension, stakes, and resolution",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/storytelling",
+    "tags": [
+      "cognitive",
+      "communication",
+      "creativity"
+    ]
+  },
+  {
+    "name": "strategic-planning",
+    "description": "Define long-term direction with vision, objectives, key results, and execution roadmaps",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/strategic-planning",
+    "tags": [
+      "cognitive",
+      "strategy",
+      "planning"
+    ]
+  },
+  {
+    "name": "structured-analysis",
+    "description": "Decompose complex situations using SWOT, Porter's, root cause, and MECE frameworks",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/structured-analysis",
+    "tags": [
+      "cognitive",
+      "learning",
+      "analysis"
+    ]
+  },
+  {
+    "name": "sunk-cost-awareness",
+    "description": "Recognize and escape sunk cost traps: evaluate decisions on future value, not past investment",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/sunk-cost-awareness",
+    "tags": [
+      "cognitive",
+      "decision-making",
+      "biases"
+    ]
+  },
+  {
+    "name": "system-monitor",
+    "description": "Monitor system resources, processes, and health metrics",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/system-monitor",
+    "tags": [
+      "devops",
+      "monitoring"
+    ]
+  },
+  {
+    "name": "systems-thinking",
+    "description": "Analyze feedback loops, leverage points, and unintended consequences in complex systems",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/systems-thinking",
+    "tags": [
+      "cognitive",
+      "reasoning",
+      "analysis"
+    ]
+  },
+  {
+    "name": "team-dynamics",
+    "description": "Understand and improve how groups work together: roles, norms, stages, and dysfunction",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/team-dynamics",
+    "tags": [
+      "cognitive",
+      "leadership",
+      "collaboration"
+    ]
+  },
+  {
+    "name": "technical-writing",
+    "description": "Write clear technical documentation: structure, audience awareness, and progressive disclosure",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/technical-writing",
+    "tags": [
+      "cognitive",
+      "writing",
+      "communication"
+    ]
+  },
+  {
+    "name": "test-generator",
+    "description": "Generate unit tests and integration tests from source code",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/test-generator",
+    "tags": [
+      "development",
+      "testing",
+      "automation"
+    ]
+  },
+  {
+    "name": "time-management",
+    "description": "Plan and protect time using time-blocking, batching, energy mapping, and buffer allocation",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/time-management",
+    "tags": [
+      "cognitive",
+      "productivity",
+      "wellbeing"
+    ]
+  },
+  {
+    "name": "time-tracker",
+    "description": "Track time spent on projects and tasks",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/time-tracker",
+    "tags": [
+      "productivity",
+      "time-management"
+    ]
+  },
+  {
+    "name": "todo-manager",
+    "description": "Manage tasks, todos, and project checklists",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/todo-manager",
+    "tags": [
+      "productivity",
+      "tasks"
+    ]
+  },
+  {
+    "name": "trade-off-analysis",
+    "description": "Make explicit trade-offs when no option is clearly best: name what you're giving up",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/trade-off-analysis",
+    "tags": [
+      "cognitive",
+      "decision-making",
+      "analysis"
+    ]
+  },
+  {
+    "name": "triage",
+    "description": "Rapidly categorize and act on incoming items when overwhelmed with volume",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/triage",
+    "tags": [
+      "cognitive",
+      "decision-making",
+      "productivity"
+    ]
+  },
+  {
     "name": "trust-building",
     "description": "Build and maintain trust through consistency, transparency, competence, and reliability",
     "version": "1.0.0",
@@ -453,18 +1493,6 @@
       "cognitive",
       "emotional-intelligence",
       "leadership"
-    ]
-  },
-  {
-    "name": "twin-identity-sync",
-    "description": "Keep voice, facts, and stated preferences consistent across sessions like a digital mirror",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-identity-sync",
-    "tags": [
-      "digital-twin",
-      "identity",
-      "continuity"
     ]
   },
   {
@@ -480,15 +1508,15 @@
     ]
   },
   {
-    "name": "twin-relationship-memory",
-    "description": "Maintain relationship context: who people are, how the user relates, and tone per contact",
+    "name": "twin-continuity-handoff",
+    "description": "Session handoffs for future-you: state, blockers, and the next concrete action",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-relationship-memory",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-continuity-handoff",
     "tags": [
       "digital-twin",
-      "relationships",
-      "context"
+      "handoff",
+      "continuity"
     ]
   },
   {
@@ -504,51 +1532,15 @@
     ]
   },
   {
-    "name": "twin-meeting-wingman",
-    "description": "Prep briefs, agendas, and follow-up capture before and after meetings",
+    "name": "twin-energy-budget",
+    "description": "Track social and cognitive bandwidth; suggest realistic commitments",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-meeting-wingman",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-energy-budget",
     "tags": [
       "digital-twin",
-      "meetings",
-      "productivity"
-    ]
-  },
-  {
-    "name": "twin-inbox-partner",
-    "description": "Triage messages, draft replies in the user's voice, and flag risk or urgency",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-inbox-partner",
-    "tags": [
-      "digital-twin",
-      "email",
-      "communication"
-    ]
-  },
-  {
-    "name": "twin-weekly-debrief",
-    "description": "Structured weekly reflection: wins, drains, carryovers, and next-week focus",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-weekly-debrief",
-    "tags": [
-      "digital-twin",
-      "reflection",
+      "energy",
       "planning"
-    ]
-  },
-  {
-    "name": "twin-values-check",
-    "description": "Compare plans and drafts against stated values and surface tensions explicitly",
-    "version": "1.0.0",
-    "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-values-check",
-    "tags": [
-      "digital-twin",
-      "values",
-      "ethics"
     ]
   },
   {
@@ -564,6 +1556,30 @@
     ]
   },
   {
+    "name": "twin-identity-sync",
+    "description": "Keep voice, facts, and stated preferences consistent across sessions like a digital mirror",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-identity-sync",
+    "tags": [
+      "digital-twin",
+      "identity",
+      "continuity"
+    ]
+  },
+  {
+    "name": "twin-inbox-partner",
+    "description": "Triage messages, draft replies in the user's voice, and flag risk or urgency",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-inbox-partner",
+    "tags": [
+      "digital-twin",
+      "email",
+      "communication"
+    ]
+  },
+  {
     "name": "twin-learning-loop",
     "description": "Turn conversations into durable notes, spaced review prompts, and links to active goals",
     "version": "1.0.0",
@@ -576,27 +1592,39 @@
     ]
   },
   {
-    "name": "twin-energy-budget",
-    "description": "Track social and cognitive bandwidth; suggest realistic commitments",
+    "name": "twin-meeting-wingman",
+    "description": "Prep briefs, agendas, and follow-up capture before and after meetings",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-energy-budget",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-meeting-wingman",
     "tags": [
       "digital-twin",
-      "energy",
-      "planning"
+      "meetings",
+      "productivity"
     ]
   },
   {
-    "name": "twin-continuity-handoff",
-    "description": "Session handoffs for future-you: state, blockers, and the next concrete action",
+    "name": "twin-relationship-memory",
+    "description": "Maintain relationship context: who people are, how the user relates, and tone per contact",
     "version": "1.0.0",
     "author": "human",
-    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-continuity-handoff",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-relationship-memory",
     "tags": [
       "digital-twin",
-      "handoff",
-      "continuity"
+      "relationships",
+      "context"
+    ]
+  },
+  {
+    "name": "twin-values-check",
+    "description": "Compare plans and drafts against stated values and surface tensions explicitly",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-values-check",
+    "tags": [
+      "digital-twin",
+      "values",
+      "ethics"
     ]
   },
   {
@@ -609,6 +1637,66 @@
       "digital-twin",
       "voice",
       "writing"
+    ]
+  },
+  {
+    "name": "twin-weekly-debrief",
+    "description": "Structured weekly reflection: wins, drains, carryovers, and next-week focus",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twin-weekly-debrief",
+    "tags": [
+      "digital-twin",
+      "reflection",
+      "planning"
+    ]
+  },
+  {
+    "name": "twitter-scheduler",
+    "description": "Schedule and publish tweets",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/twitter-scheduler",
+    "tags": [
+      "social",
+      "twitter",
+      "scheduling"
+    ]
+  },
+  {
+    "name": "uptime-checker",
+    "description": "Monitor endpoint uptime and availability",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/uptime-checker",
+    "tags": [
+      "devops",
+      "monitoring",
+      "availability"
+    ]
+  },
+  {
+    "name": "visual-thinking",
+    "description": "Use diagrams, sketches, and spatial reasoning to understand and communicate complex ideas",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/visual-thinking",
+    "tags": [
+      "cognitive",
+      "creativity",
+      "communication"
+    ]
+  },
+  {
+    "name": "weather-station",
+    "description": "Aggregate and display weather data from sensors",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/weather-station",
+    "tags": [
+      "iot",
+      "weather",
+      "sensors"
     ]
   }
 ]

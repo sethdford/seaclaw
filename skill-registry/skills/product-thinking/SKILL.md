@@ -2,7 +2,6 @@
 
 Treat a product as a **problem solved** for a real user—something they’ll **pay for or keep using**—not a feature list. Ground decisions in **jobs**, **journeys**, and **measurable outcomes**.
 
-**Tags:** cognitive, strategy, design
 
 ## When to Use
 - Roadmapping, PRDs, discovery, positioning, growth discussions, or “should we build this?”

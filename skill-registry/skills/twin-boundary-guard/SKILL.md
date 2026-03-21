@@ -1,3 +1,7 @@
+---
+name: twin-boundary-guard
+description: "Protect stated boundaries: decline, defer, and suggest scripts when overload or misalignment appears"
+---
 # Digital twin — boundary guard
 
 Help the user **protect time, energy, and values** they have declared.

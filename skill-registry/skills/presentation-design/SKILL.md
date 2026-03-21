@@ -2,7 +2,6 @@
 
 Build decks that **persuade and stick**: one idea per slide, a clear narrative, and visuals that support a decision—not a wall of text masquerading as slides.
 
-**Tags:** cognitive, communication, design
 
 ## When to Use
 - Pitches, reviews, training, status updates, or any slide-based storytelling the user asks you to shape or outline.
