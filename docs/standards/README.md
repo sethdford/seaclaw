@@ -32,6 +32,7 @@ AGENTS.md                <- Full engineering protocol
 | Doc                                                           | Covers                                                                                     | Used When                                  |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------ |
 | [agent-architecture.md](ai/agent-architecture.md)             | Pipeline design, vtable component responsibilities, orchestration patterns, retry/fallback | Modifying agent loop, adding components    |
+| [skills-vs-agents.md](ai/skills-vs-agents.md)                 | Static SkillForge vs spawned agents; top_k catalog env; inheritance                         | Skills, `agent_spawn`, prompt sizing       |
 | [conversation-design.md](ai/conversation-design.md)           | Response patterns, channel-aware behavior, intent routing, persona integration             | Building conversational features           |
 | [hallucination-prevention.md](ai/hallucination-prevention.md) | Grounding hierarchy, tool output integrity, memory attribution, capability honesty         | Any AI response generation                 |
 | [prompt-engineering.md](ai/prompt-engineering.md)             | System prompt structure, persona composition, RAG patterns, context window management      | Modifying prompts, adding providers        |
