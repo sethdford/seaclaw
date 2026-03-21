@@ -675,7 +675,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         hu_agent_set_mailbox(&bi->agent, bi->mailbox);
 #ifdef HU_HAS_SKILLS
         if (bi->skillforge_ok)
-            bi->agent.skillforge = (struct hu_skillforge *)&bi->skillforge;
+            hu_agent_set_skillforge(&bi->agent, (struct hu_skillforge *)&bi->skillforge);
 #endif
         if (bi->agent_registry_ok)
             bi->agent.agent_registry = (struct hu_agent_registry *)&bi->agent_registry;
