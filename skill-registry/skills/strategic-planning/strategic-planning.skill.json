@@ -1,0 +1,9 @@
+{
+  "name": "strategic-planning",
+  "description": "Define long-term direction with vision, objectives, key results, and execution roadmaps",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "scenario-planning",
+  "description": "Prepare for multiple futures by building and stress-testing plausible scenarios",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}
