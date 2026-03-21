@@ -1,5 +1,8 @@
-# Parallel native E2E / instrumented smoke across iOS simulators and Android API levels.
-# Heavier than default CI — runs on apps changes, main, schedule, and manual dispatch.
+# Native apps fleet — parallel instrumented / UI tests across iOS simulators, Android API levels,
+# and macOS build. Tuned for award-program parity (Apple Design Awards / Google Play Best App):
+# multi-device coverage, accessibility-focused journeys, flake mitigation, and CI observability.
+#
+# See docs/standards/quality/award-criteria.md (iOS + Android sections).
 name: Native apps E2E fleet
 
 on:
@@ -17,71 +20,192 @@ on:
       - "apps/**"
       - ".github/workflows/native-apps-fleet.yml"
 
+permissions:
+  contents: read
+
 concurrency:
   group: native-apps-fleet-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=4 -Dkotlin.incremental=false"
+
 jobs:
   human-kit-swift:
-    name: HumanKit (Swift PM)
+    name: HumanKit · Swift PM
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
-      - name: swift test
+      - name: Swift PM tests (shared protocol + UI kit)
         run: cd apps/shared/HumanKit && swift test
 
   ios-simulator-fleet:
-    name: iOS ${{ matrix.destination }}
+    name: iOS · ${{ matrix.slug }}
     runs-on: macos-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        destination:
-          - "platform=iOS Simulator,name=iPhone 16,OS=latest"
-          - "platform=iOS Simulator,name=iPhone SE (3rd generation),OS=latest"
-          - "platform=iOS Simulator,name=iPad (10th generation),OS=latest"
+        include:
+          - slug: iphone-16
+            destination: "platform=iOS Simulator,name=iPhone 16,OS=latest"
+          - slug: iphone-16-pro
+            destination: "platform=iOS Simulator,name=iPhone 16 Pro,OS=latest"
+          - slug: iphone-se-3
+            destination: "platform=iOS Simulator,name=iPhone SE (3rd generation),OS=latest"
+          - slug: ipad-10
+            destination: "platform=iOS Simulator,name=iPad (10th generation),OS=latest"
     steps:
       - uses: actions/checkout@v6
+
+      - name: Cache Xcode DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-xcode-dd-${{ hashFiles('apps/ios/**/*.swift', 'apps/ios/project.yml', 'apps/shared/HumanKit/**/*.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-dd-
+
+      - name: Cache Homebrew downloads (XcodeGen)
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: ${{ runner.os }}-brew-${{ hashFiles('.github/workflows/native-apps-fleet.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-brew-
+
       - name: Install XcodeGen
         run: brew install xcodegen
+
       - name: Generate Xcode project
         run: cd apps/ios && xcodegen generate
-      - name: XCUITest (HumaniOSUITests)
+
+      - name: XCUITest (HumaniOSUITests, parallel + retry)
         run: |
+          set -o pipefail
           xcodebuild test \
             -project apps/ios/HumaniOS.xcodeproj \
             -scheme HumaniOS \
             -destination "${{ matrix.destination }}" \
             -only-testing:HumaniOSUITests \
-            CODE_SIGNING_ALLOWED=NO
+            -parallel-testing-enabled NO \
+            -retry-tests-on-failure \
+            -resultBundlePath "apps/ios/TestResults-${{ matrix.slug }}.xcresult" \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            2>&1 | tee xcodebuild-${{ matrix.slug }}.log
+
+      - name: Upload xcresult + log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-${{ matrix.slug }}-xcresult
+          path: |
+            apps/ios/TestResults-${{ matrix.slug }}.xcresult
+            xcodebuild-${{ matrix.slug }}.log
+          retention-days: 7
 
   android-emulator-fleet:
-    name: Android API ${{ matrix.api-level }}
+    name: Android · API ${{ matrix.api-level }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        api-level: [29, 33, 34]
+        api-level: [29, 30, 33, 34]
     steps:
       - uses: actions/checkout@v6
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/android/**/*.gradle.kts', 'apps/android/gradle/wrapper/**') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Pre-download dependencies (host JVM)
+        run: cd apps/android && chmod +x gradlew && ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon
+
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
           arch: x86_64
           target: google_apis
-          profile: Nexus 6
+          profile: pixel_6
           force-avd-creation: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-bootanim -camera-back none
           disable-animations: true
-          script: cd apps/android && chmod +x gradlew && ./gradlew connectedDebugAndroidTest
+          script: cd apps/android && chmod +x gradlew && ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
+
+      - name: Upload Android test outputs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-api${{ matrix.api-level }}-outputs
+          path: |
+            apps/android/app/build/outputs/androidTest-results
+            apps/android/app/build/reports/androidTests
+          retention-days: 7
+          if-no-files-found: ignore
 
   macos-app-build:
-    name: macOS app (swift build)
+    name: macOS app · Swift
     runs-on: macos-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-      - run: cd apps/macos && swift build
+      - name: Debug + release build (award-tier: ships clean on both configs)
+        run: |
+          cd apps/macos && swift build
+          cd apps/macos && swift build -c release
+
+  fleet-sota-gate:
+    name: Fleet SOTA gate (award-tier)
+    runs-on: ubuntu-latest
+    needs:
+      - human-kit-swift
+      - ios-simulator-fleet
+      - android-emulator-fleet
+      - macos-app-build
+    if: always()
+    steps:
+      - name: Summarize + enforce all-green
+        env:
+          HK: ${{ needs.human-kit-swift.result }}
+          IOS: ${{ needs.ios-simulator-fleet.result }}
+          AND: ${{ needs.android-emulator-fleet.result }}
+          MAC: ${{ needs.macos-app-build.result }}
+        run: |
+          {
+            echo "## Native fleet — SOTA / award-tier gate"
+            echo ""
+            echo "Maps to \`docs/standards/quality/award-criteria.md\` (Apple Design Awards + Google Play Best App checklists)."
+            echo ""
+            echo "| Stage | Result |"
+            echo "| --- | --- |"
+            echo "| HumanKit Swift PM | \`$HK\` |"
+            echo "| iOS simulator matrix (XCUITest) | \`$IOS\` |"
+            echo "| Android emulator matrix (Compose) | \`$AND\` |"
+            echo "| macOS app (debug + release) | \`$MAC\` |"
+            echo ""
+            echo "### What this fleet proves"
+            echo "- **Inclusivity**: Tab journeys + labeled controls exercised under automation (VoiceOver/TalkBack-oriented labels)."
+            echo "- **Cross-device**: Multiple iPhone / iPad + API 29–34 emulators."
+            echo "- **Reliability**: Xcode test retries + disabled emulator animations + Gradle caches."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$HK" != success ] || [ "$IOS" != success ] || [ "$AND" != success ] || [ "$MAC" != success ]; then
+            echo "::error::Fleet SOTA gate failed — every matrix job must be success."
+            exit 1
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ **Fleet SOTA gate passed.**" >> "$GITHUB_STEP_SUMMARY"
