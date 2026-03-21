@@ -1164,7 +1164,8 @@ hu_error_t cmd_research(hu_allocator_t *alloc, int argc, char **argv) {
 hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
         printf("Usage: human calibrate <run|clone> [args]\n");
-        printf("  run [db_path] [contact]  - Analyze messaging patterns and produce recommendations\n");
+        printf("  run [db_path] [contact] [channel]  - Analyze messaging patterns and produce "
+               "recommendations (channel defaults to auto)\n");
         printf("  clone [db_path] [contact] [persona_path] - Extract behavioral patterns and update persona\n");
         return HU_OK;
     }
@@ -1173,8 +1174,9 @@ hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv) {
     if (strcmp(sub, "run") == 0) {
         const char *db_path = argc >= 4 ? argv[3] : NULL;
         const char *contact = argc >= 5 ? argv[4] : NULL;
+        const char *channel = argc >= 6 ? argv[5] : NULL;
         char *recommendations = NULL;
-        hu_error_t err = hu_calibrate(alloc, db_path, contact, &recommendations);
+        hu_error_t err = hu_calibrate(alloc, db_path, contact, channel, &recommendations);
         if (err != HU_OK) {
             fprintf(stderr, "Calibration failed: %d\n", (int)err);
             return err;

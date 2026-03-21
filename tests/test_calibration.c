@@ -33,12 +33,22 @@ static void test_calibration_style_mock_populates_metrics(void) {
 static void test_calibration_hu_calibrate_mock_returns_persona_json(void) {
     hu_allocator_t alloc = hu_system_allocator();
     char *json = NULL;
-    HU_ASSERT_EQ(hu_calibrate(&alloc, NULL, NULL, &json), HU_OK);
+    HU_ASSERT_EQ(hu_calibrate(&alloc, NULL, NULL, NULL, &json), HU_OK);
     HU_ASSERT_NOT_NULL(json);
     HU_ASSERT_TRUE(strstr(json, "\"recommended_overlay\"") != NULL);
+    HU_ASSERT_TRUE(strstr(json, "\"channel\":\"auto\"") != NULL);
     HU_ASSERT_TRUE(strstr(json, "\"avg_length\":\"42\"") != NULL);
     HU_ASSERT_TRUE(strstr(json, "\"response_tempo\":\"within_minutes\"") != NULL);
     HU_ASSERT_TRUE(strstr(json, "\"vocabulary_richness\":\"0.620\"") != NULL);
+    hu_str_free(&alloc, json);
+}
+
+static void test_calibration_hu_calibrate_mock_embeds_explicit_channel(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char *json = NULL;
+    HU_ASSERT_EQ(hu_calibrate(&alloc, NULL, NULL, "telegram", &json), HU_OK);
+    HU_ASSERT_NOT_NULL(json);
+    HU_ASSERT_TRUE(strstr(json, "\"channel\":\"telegram\"") != NULL);
     hu_str_free(&alloc, json);
 }
 
@@ -58,5 +68,6 @@ void run_calibration_tests(void) {
     HU_RUN_TEST(test_calibration_timing_mock_populates_buckets);
     HU_RUN_TEST(test_calibration_style_mock_populates_metrics);
     HU_RUN_TEST(test_calibration_hu_calibrate_mock_returns_persona_json);
+    HU_RUN_TEST(test_calibration_hu_calibrate_mock_embeds_explicit_channel);
     HU_RUN_TEST(test_ab_compare_prefers_shorter_reply_in_test_mode);
 }

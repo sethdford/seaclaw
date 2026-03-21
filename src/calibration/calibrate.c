@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static void hu_calib_weighted_median_reply(const hu_timing_report_t *t, double *out_med,
                                            uint32_t *out_samples) {
     double sum = 0.0;
@@ -54,10 +55,11 @@ static const char *hu_calib_formality_label(const hu_style_report_t *s) {
 static hu_error_t hu_calib_build_recommendations_json(hu_allocator_t *alloc,
                                                       const hu_timing_report_t *timing,
                                                       const hu_style_report_t *style,
-                                                      char **out_json) {
+                                                      const char *channel_name, char **out_json) {
     if (!alloc || !timing || !style || !out_json)
         return HU_ERR_INVALID_ARGUMENT;
     *out_json = NULL;
+    const char *ch = channel_name ? channel_name : "auto";
 
     double wmed = 0.0;
     uint32_t tsamp = 0;
@@ -83,7 +85,7 @@ static hu_error_t hu_calib_build_recommendations_json(hu_allocator_t *alloc,
     err = hu_json_buf_append_raw(&buf, "\"recommended_overlay\":{", 23);
     if (err != HU_OK)
         goto fail;
-    err = hu_json_util_append_key_value(&buf, "channel", "imessage");
+    err = hu_json_util_append_key_value(&buf, "channel", ch);
     if (err != HU_OK)
         goto fail;
     err = hu_json_buf_append_raw(&buf, ",", 1);
@@ -205,23 +207,30 @@ fail:
         *out_json = NULL;
     return err;
 }
+#endif /* !(defined(HU_IS_TEST) && HU_IS_TEST) */
 
 hu_error_t hu_calibrate(hu_allocator_t *alloc, const char *db_path, const char *contact_filter,
-                        char **out_recommendations) {
+                        const char *channel_name, char **out_recommendations) {
     if (!alloc || !out_recommendations)
         return HU_ERR_INVALID_ARGUMENT;
     *out_recommendations = NULL;
+    const char *ch = channel_name ? channel_name : "auto";
 
 #if defined(HU_IS_TEST) && HU_IS_TEST
     (void)db_path;
     (void)contact_filter;
-    static const char k_mock[] =
-        "{\"recommended_overlay\":{\"channel\":\"imessage\",\"formality\":\"casual\","
+    char mock_buf[1024];
+    int n = snprintf(
+        mock_buf, sizeof(mock_buf),
+        "{\"recommended_overlay\":{\"channel\":\"%s\",\"formality\":\"casual\","
         "\"avg_length\":\"42\",\"emoji_usage\":\"moderate\"},"
         "\"recommended_voice_rhythm\":{\"response_tempo\":\"within_minutes\"},"
         "\"calibration_meta\":{\"timing_weighted_median_reply_sec\":180,"
-        "\"timing_samples\":40,\"style_messages_analyzed\":120,\"vocabulary_richness\":\"0.620\"}}";
-    *out_recommendations = hu_strdup(alloc, k_mock);
+        "\"timing_samples\":40,\"style_messages_analyzed\":120,\"vocabulary_richness\":\"0.620\"}}",
+        ch);
+    if (n < 0 || (size_t)n >= sizeof(mock_buf))
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_recommendations = hu_strdup(alloc, mock_buf);
     return *out_recommendations ? HU_OK : HU_ERR_OUT_OF_MEMORY;
 #else
 
@@ -240,7 +249,7 @@ hu_error_t hu_calibrate(hu_allocator_t *alloc, const char *db_path, const char *
         return err;
     }
 
-    err = hu_calib_build_recommendations_json(alloc, &timing, &style, out_recommendations);
+    err = hu_calib_build_recommendations_json(alloc, &timing, &style, ch, out_recommendations);
     hu_timing_report_deinit(alloc, &timing);
     hu_style_report_deinit(alloc, &style);
     return err;

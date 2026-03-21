@@ -66,8 +66,10 @@ hu_error_t hu_calibration_analyze_timing(hu_allocator_t *alloc, const char *db_p
 hu_error_t hu_calibration_analyze_style(hu_allocator_t *alloc, const char *db_path,
                                         const char *contact_filter, hu_style_report_t *out_report);
 
-/* Caller frees *out_recommendations with hu_str_free(alloc, *out_recommendations). */
+/* Caller frees *out_recommendations with hu_str_free(alloc, *out_recommendations).
+ * channel_name: overlay channel key for recommendations (e.g. "imessage", "telegram").
+ * NULL means auto-detected / unspecified ("auto" in JSON). */
 hu_error_t hu_calibrate(hu_allocator_t *alloc, const char *db_path, const char *contact_filter,
-                        char **out_recommendations);
+                        const char *channel_name, char **out_recommendations);
 
 #endif /* HU_CALIBRATION_H */
