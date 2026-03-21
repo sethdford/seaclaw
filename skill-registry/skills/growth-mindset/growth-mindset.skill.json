@@ -1,0 +1,9 @@
+{
+  "name": "growth-mindset",
+  "description": "Foster belief in development through effort: reframe failures as learning and challenges as growth opportunities",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

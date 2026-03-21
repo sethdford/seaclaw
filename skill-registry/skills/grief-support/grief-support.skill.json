@@ -1,0 +1,9 @@
+{
+  "name": "grief-support",
+  "description": "Be present for loss and pain: validate, witness, and resist the urge to fix",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

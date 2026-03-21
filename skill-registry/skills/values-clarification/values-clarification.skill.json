@@ -1,0 +1,9 @@
+{
+  "name": "values-clarification",
+  "description": "Help users discover what they actually value, not what they think they should value",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

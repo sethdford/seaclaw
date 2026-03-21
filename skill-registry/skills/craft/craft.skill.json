@@ -1,0 +1,9 @@
+{
+  "name": "craft",
+  "description": "Pursue excellence in the work: attention to detail, pride in quality, and the ethic of doing things well",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

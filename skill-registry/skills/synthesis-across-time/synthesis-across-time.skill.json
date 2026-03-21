@@ -1,0 +1,9 @@
+{
+  "name": "synthesis-across-time",
+  "description": "Connect ideas across sessions and weeks: long-term pattern recognition and threading the arc",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

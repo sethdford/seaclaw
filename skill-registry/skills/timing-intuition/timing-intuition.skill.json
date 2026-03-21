@@ -1,0 +1,9 @@
+{
+  "name": "timing-intuition",
+  "description": "Read the moment: match depth and directness to signals for when to push, pause, pivot, or go deeper",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

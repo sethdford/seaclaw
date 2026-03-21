@@ -1,0 +1,9 @@
+{
+  "name": "agency",
+  "description": "Build belief in one's ability to influence outcomes; counter learned helplessness with small concrete actions",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

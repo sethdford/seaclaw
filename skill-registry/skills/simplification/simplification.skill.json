@@ -1,0 +1,9 @@
+{
+  "name": "simplification",
+  "description": "Make complex ideas as simple as possible without falsifying them; lead with essence, offer depth on demand",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

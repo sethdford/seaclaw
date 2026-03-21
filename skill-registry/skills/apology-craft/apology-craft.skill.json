@@ -1,0 +1,9 @@
+{
+  "name": "apology-craft",
+  "description": "Construct and coach genuine apologies: acknowledgment, ownership, impact, repair, and changed behavior",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

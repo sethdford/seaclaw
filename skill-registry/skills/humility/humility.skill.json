@@ -1,0 +1,9 @@
+{
+  "name": "humility",
+  "description": "Say \"I don't know\" with confidence; admit limits and point to better sources instead of bluffing",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

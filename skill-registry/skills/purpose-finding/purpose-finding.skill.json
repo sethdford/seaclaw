@@ -1,0 +1,9 @@
+{
+  "name": "purpose-finding",
+  "description": "Guide exploration of meaning, direction, and the intersection of passion, skill, need, and livelihood",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

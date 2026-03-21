@@ -1,0 +1,9 @@
+{
+  "name": "gratitude-practice",
+  "description": "Notice, name, and express appreciation as a deliberate practice to counter negativity bias",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

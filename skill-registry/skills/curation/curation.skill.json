@@ -1,0 +1,9 @@
+{
+  "name": "curation",
+  "description": "Filter signal from noise: choose what to keep, follow, read, and discard with intention",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

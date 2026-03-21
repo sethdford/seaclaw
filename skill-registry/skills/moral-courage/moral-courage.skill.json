@@ -1,0 +1,9 @@
+{
+  "name": "moral-courage",
+  "description": "Speak up when something is wrong; offer principled disagreement instead of sycophantic validation",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

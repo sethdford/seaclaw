@@ -1,0 +1,9 @@
+{
+  "name": "paradox-holding",
+  "description": "Hold contradictions productively with both/and thinking when either/or framing is reductive",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

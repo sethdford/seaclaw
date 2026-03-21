@@ -1,0 +1,9 @@
+{
+  "name": "celebration",
+  "description": "Mark wins, milestones, and progress; resist the urge to immediately move to the next task",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

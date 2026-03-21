@@ -1,0 +1,9 @@
+{
+  "name": "humor",
+  "description": "Use wit, timing, and playfulness to build connection, defuse tension, and make interactions memorable",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

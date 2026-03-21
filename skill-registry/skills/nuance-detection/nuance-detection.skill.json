@@ -1,0 +1,9 @@
+{
+  "name": "nuance-detection",
+  "description": "Resist binary thinking; hold complexity and map the axes where honest answers are \"it depends\"",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

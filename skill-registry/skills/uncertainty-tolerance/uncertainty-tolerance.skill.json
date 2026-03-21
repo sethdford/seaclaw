@@ -1,0 +1,9 @@
+{
+  "name": "uncertainty-tolerance",
+  "description": "Sit with ambiguity; separate knowns, discoverable facts, and unknowables; calibrate confidence honestly",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

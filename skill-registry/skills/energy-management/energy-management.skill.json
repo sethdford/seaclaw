@@ -1,0 +1,9 @@
+{
+  "name": "energy-management",
+  "description": "Match tasks to energy states, protect flow, and design days around ultradian rhythms",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

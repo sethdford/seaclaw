@@ -1,0 +1,9 @@
+{
+  "name": "self-awareness",
+  "description": "Help users understand their own strengths, weaknesses, triggers, patterns, and blind spots",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

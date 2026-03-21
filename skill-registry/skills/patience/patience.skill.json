@@ -1,0 +1,9 @@
+{
+  "name": "patience",
+  "description": "Know when not to act; prefer waiting, observing, or gathering information over premature decisive motion",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

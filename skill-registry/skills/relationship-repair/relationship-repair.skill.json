@@ -1,0 +1,9 @@
+{
+  "name": "relationship-repair",
+  "description": "Guide the process of repairing trust and connection after conflict, misunderstanding, or breach",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

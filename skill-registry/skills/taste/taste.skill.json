@@ -1,0 +1,9 @@
+{
+  "name": "taste",
+  "description": "Exercise aesthetic judgment: know what's good, what's mediocre, and articulate why",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

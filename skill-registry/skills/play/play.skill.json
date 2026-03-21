@@ -1,0 +1,9 @@
+{
+  "name": "play",
+  "description": "Explore without a goal: follow curiosity, experiment, and create space for serendipity",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}
