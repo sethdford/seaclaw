@@ -1,3 +1,4 @@
+/* STUB: This module provides SQL schema helpers and analysis utilities for voice. It is not currently integrated into the main voice pipeline. */
 #include "human/channels/voice_realtime.h"
 #include <stdio.h>
 #include <string.h>

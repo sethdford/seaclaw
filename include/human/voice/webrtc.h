@@ -1,5 +1,6 @@
 #ifndef HU_WEBRTC_H
 #define HU_WEBRTC_H
+/* NOTE: This is an HTTP-based signaling stub, not a full WebRTC implementation. Real ICE/DTLS/SRTP is not yet implemented. */
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include <stdbool.h>

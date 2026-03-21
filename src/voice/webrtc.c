@@ -85,8 +85,12 @@ hu_error_t hu_webrtc_connect(hu_webrtc_session_t *session, const char *remote_sd
     if (!session->local_sdp || !session->local_sdp[0])
         return HU_ERR_INVALID_ARGUMENT;
     const char *url = session->config.signaling_endpoint;
-    if (!url || !url[0])
+    if (!url || !url[0]) {
+#if !HU_IS_TEST
+        fprintf(stderr, "webrtc: signaling_endpoint is required for HTTP signaling connect\n");
+#endif
         return HU_ERR_INVALID_ARGUMENT;
+    }
 
     char headers[512];
     size_t hlen = 0;

@@ -1,5 +1,6 @@
 #ifndef HU_CHANNELS_VOICE_INTEGRATION_H
 #define HU_CHANNELS_VOICE_INTEGRATION_H
+/* STUB: This module provides SQL schema helpers and analysis utilities for voice. It is not currently integrated into the main voice pipeline. */
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"

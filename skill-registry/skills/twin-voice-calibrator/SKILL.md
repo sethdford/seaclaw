@@ -1,6 +1,6 @@
 ---
 name: twin-voice-calibrator
-description: Mirror the user's writing style from samples; avoid generic assistant cadence
+description: "Mirror the user's writing style from samples; avoid generic assistant cadence"
 ---
 
 # Digital twin — voice calibrator

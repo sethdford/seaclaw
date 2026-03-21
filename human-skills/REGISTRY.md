@@ -88,8 +88,9 @@ https://raw.githubusercontent.com/human/skill-registry/main/skills/code-review/c
 
 The registry repo CI must:
 
-1. **Validate** all `*.skill.json` files have required fields: `name`, `description`, `version`, `author`, `url`.
-2. **Validate** `registry.json` is valid JSON.
-3. **Validate** every entry in `registry.json` references an existing skill directory under `skills/<name>/` with a matching `<name>.skill.json`.
+1. **Validate** each `registry.json` entry has required fields: `name`, `description`, `version`, `author`, `url` (the install source URL lives in the index, not in per-skill manifests).
+2. **Validate** each referenced `skills/<name>/<name>.skill.json` has at least `name` and `description` (manifests do not carry `url`; that field belongs only on `registry.json` entries).
+3. **Validate** `registry.json` is valid JSON.
+4. **Validate** every entry in `registry.json` references an existing skill directory under `skills/<name>/` with a matching `<name>.skill.json`.
 
 See `.github/workflows/validate.yml` in the skill-registry repo.

@@ -25,6 +25,7 @@
 #include "human/security/sandbox_internal.h"
 #include "human/tool.h"
 #include "human/tools/factory.h"
+#include "human/voice.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -322,6 +323,7 @@ typedef struct hu_bootstrap_internal {
     hu_provider_t provider;
     hu_memory_t memory;
     hu_agent_t agent;
+    hu_voice_config_t voice_cfg;
     hu_embedder_t embedder;
     hu_vector_store_t vector_store;
     hu_retrieval_engine_t retrieval_engine;
@@ -676,6 +678,12 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             bi->cfg.agent.persona ? strlen(bi->cfg.agent.persona) : 0, &ctx_cfg);
         if (err != HU_OK)
             goto fail;
+        memset(&bi->voice_cfg, 0, sizeof(bi->voice_cfg));
+        (void)hu_voice_config_from_settings(&bi->cfg, &bi->voice_cfg);
+        if (bi->voice_cfg.tts_provider || bi->voice_cfg.local_tts_endpoint || bi->voice_cfg.api_key ||
+            bi->voice_cfg.cartesia_api_key) {
+            hu_agent_set_voice_config(&bi->agent, &bi->voice_cfg);
+        }
         bi->agent.chain_of_thought = true;
         bi->agent.agent_pool = bi->agent_pool;
         bi->agent.scheduler = (struct hu_cron_scheduler *)bi->cron;

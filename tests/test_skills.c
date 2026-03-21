@@ -9,6 +9,9 @@
 #include "test_framework.h"
 #include <string.h>
 
+extern void hu_skill_registry_resolve_tags_string(hu_json_value_t *tags_val, char *tags_buf,
+                                                  size_t tags_buf_len, const char **out_tags_str);
+
 static void test_skills_list_delegates_to_skillforge(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_skill_t *skills = NULL;
@@ -393,6 +396,7 @@ void run_skills_tests(void) {
     HU_RUN_TEST(test_skill_registry_get_installed_dir_small_buffer);
     HU_RUN_TEST(test_skill_registry_search_mock_returns_entries);
     HU_RUN_TEST(test_skill_registry_entries_free_null_safe);
+    HU_RUN_TEST(test_skill_registry_tags_array_parses_to_comma_string);
     HU_RUN_TEST(test_skillforge_load_instructions_from_path);
     HU_RUN_TEST(test_skillforge_load_instructions_fallback_to_description);
     HU_RUN_TEST(test_skillforge_read_resource_validates_path);

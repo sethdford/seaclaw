@@ -46,11 +46,39 @@ Skills extend the agent with instructions injected into the system prompt. Each 
 
 ## SKILL.md Format
 
-Plain markdown instructions injected into the agent system prompt when the skill is enabled. No special frontmatter required. Content is appended to the system context.
+Plain markdown instructions injected into the agent system prompt when the skill is enabled. The body (everything after optional frontmatter) is what gets injected; SkillForge strips the frontmatter block from the loaded text.
 
-Example:
+### Optional YAML frontmatter
+
+Frontmatter is **not required**, but **recommended for discoverability**: when present, SkillForge (`src/skillforge.c`) reads the opening `---` … `---` block and applies `name:` and `description:` lines to override the values from `.skill.json` for that skill’s catalog metadata. If you omit frontmatter, `name` and `description` come only from the manifest.
+
+Use this shape at the very top of `SKILL.md`:
 
 ```markdown
+---
+name: skill-name
+description: Brief description of what this skill does
+---
+
+# Human-readable title
+
+…markdown body…
+```
+
+Rules that match the parser:
+
+- Start the file with `---` on its own line; end the block with a line `---` (after `name` / `description` lines).
+- Supported keys: `name:` and `description:` (other lines in the block are ignored).
+- Values can be quoted if they contain characters that would break YAML (e.g. a colon followed by a space in the description).
+
+Example (with optional frontmatter):
+
+```markdown
+---
+name: code-review
+description: Automated code review with style checks and security scanning
+---
+
 # Code Review Skill
 
 When performing code review:
@@ -79,6 +107,11 @@ When performing code review:
 **SKILL.md**
 
 ```markdown
+---
+name: code-review
+description: Automated code review with style checks and security scanning
+---
+
 # Code Review
 
 Use this skill when the user requests code review. Apply:

@@ -1,6 +1,6 @@
 ---
 name: twin-inbox-partner
-description: Triage messages, draft replies in the user's voice, and flag risk or urgency
+description: "Triage messages, draft replies in the user's voice, and flag risk or urgency"
 ---
 
 # Digital twin — inbox partner
