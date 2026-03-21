@@ -1087,6 +1087,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
     fprintf(stderr, "  human skills update <path>\n");
     fprintf(stderr, "  human skills info <name>\n");
     fprintf(stderr, "  human skills publish [directory]\n");
+    fprintf(stderr, "See docs/standards/ai/skills-vs-agents.md (skills vs spawned agents).\n");
     return HU_ERR_INVALID_ARGUMENT;
 }
 #else
@@ -1195,6 +1196,7 @@ static hu_error_t cmd_agents(hu_allocator_t *alloc, int argc, char **argv) {
 
     hu_agent_registry_destroy(&reg);
     fprintf(stderr, "Usage: human agents [list|show <name>]\n");
+    fprintf(stderr, "Runtime spawn: /spawn or agent_spawn tool; see docs/standards/ai/skills-vs-agents.md\n");
     return HU_ERR_INVALID_ARGUMENT;
 }
 
