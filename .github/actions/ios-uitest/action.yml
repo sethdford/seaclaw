@@ -1,0 +1,68 @@
+# Generate apps/ios/HumaniOS.xcodeproj via XcodeGen and run HumaniOSUITests.
+# Used by ci.yml (single simulator) and native-apps-fleet.yml (matrix).
+name: iOS UI tests (XcodeGen + XCUITest)
+description: Run HumaniOS XCUITest target on a Simulator destination
+
+inputs:
+  destination:
+    description: xcodebuild -destination (quoted Simulator spec)
+    required: true
+  result-bundle-path:
+    description: Optional path for -resultBundlePath (.xcresult bundle)
+    required: false
+    default: ""
+  log-file:
+    description: If set, pipe xcodebuild through tee to this path (repo-relative or absolute)
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install XcodeGen
+      run: brew install xcodegen
+      shell: bash
+
+    - name: Generate Xcode project
+      run: cd apps/ios && xcodegen generate
+      shell: bash
+
+    - name: XCUITest (HumaniOSUITests)
+      env:
+        DEST: ${{ inputs.destination }}
+        BUNDLE: ${{ inputs.result-bundle-path }}
+        LOG_FILE: ${{ inputs.log-file }}
+      run: |
+        set -euo pipefail
+        ROOT="$(pwd)"
+        bundle_args=()
+        if [ -n "$BUNDLE" ]; then
+          bundle_args=( -resultBundlePath "$ROOT/$BUNDLE" )
+        fi
+        if [ -n "$LOG_FILE" ]; then
+          mkdir -p "$(dirname "$ROOT/$LOG_FILE")"
+          set -o pipefail
+          xcodebuild test \
+            -project apps/ios/HumaniOS.xcodeproj \
+            -scheme HumaniOS \
+            -destination "$DEST" \
+            -only-testing:HumaniOSUITests \
+            -parallel-testing-enabled NO \
+            -retry-tests-on-failure \
+            "${bundle_args[@]}" \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            2>&1 | tee "$ROOT/$LOG_FILE"
+        else
+          xcodebuild test \
+            -project apps/ios/HumaniOS.xcodeproj \
+            -scheme HumaniOS \
+            -destination "$DEST" \
+            -only-testing:HumaniOSUITests \
+            -parallel-testing-enabled NO \
+            -retry-tests-on-failure \
+            "${bundle_args[@]}" \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO
+        fi
+      shell: bash

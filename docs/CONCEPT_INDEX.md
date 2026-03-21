@@ -176,3 +176,13 @@ Use this to find the right files for a given task without searching the full cod
 | **PWA bridge**              | `src/pwa/bridge.c`, `context.c`, `drivers.c`, `learner.c`                                                | `test_pwa.c`             |
 | **ML subsystem**            | `src/ml/gpt.c`, `train.c`, `prepare.c`, `tokenizer_bpe.c`, `dataloader.c`, `evaluator.c`, `experiment.c` | `test_ml.c`              |
 | **Research feeds**          | `src/feeds/research.c`, `file_ingest.c`, `gmail.c`, `imessage.c`, `twitter.c`                            | `test_research_feeds.c`  |
+
+## Native client apps (`apps/`)
+
+| Concept | Primary | Tests / CI |
+| --- | --- | --- |
+| **Shared Swift (HumanKit)** | `apps/shared/HumanKit/` | `swift test`; `HumaniOSUITests` depends on HumanChatUI |
+| **iOS app** | `apps/ios/Sources/HumaniOS/` | `apps/ios/UITests/` (XCUITest); `.github/actions/ios-uitest`; `native-apps-fleet.yml` |
+| **macOS app** | `apps/macos/Sources/HumanApp/` | `swift build` in CI / fleet |
+| **Android app** | `apps/android/app/src/main/` | `app/src/androidTest/` (`connectedDebugAndroidTest` in fleet) |
+| **Local runner** | — | `scripts/run-native-fleet-local.sh` |

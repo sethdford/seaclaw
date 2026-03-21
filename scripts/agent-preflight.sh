@@ -36,17 +36,18 @@ TOKENS_CHANGED=0
 WEBSITE_CHANGED=0
 
 if [ "$FULL" -eq 1 ]; then
-    C_CHANGED=1; UI_CHANGED=1; TOKENS_CHANGED=1; WEBSITE_CHANGED=1
+    C_CHANGED=1; UI_CHANGED=1; TOKENS_CHANGED=1; WEBSITE_CHANGED=1; APPS_CHANGED=1
 else
     has_changes_in '\.c$|\.h$|CMakeLists' && C_CHANGED=1 || true
     has_changes_in '^ui/' && UI_CHANGED=1 || true
     has_changes_in '^design-tokens/' && TOKENS_CHANGED=1 || true
     has_changes_in '^website/' && WEBSITE_CHANGED=1 || true
+    has_changes_in '^apps/' && APPS_CHANGED=1 || true
 fi
 
 printf "\n=== Agent Pre-Flight Check ===\n"
-printf "C=%d  UI=%d  Tokens=%d  Website=%d  Full=%d\n\n" \
-    "$C_CHANGED" "$UI_CHANGED" "$TOKENS_CHANGED" "$WEBSITE_CHANGED" "$FULL"
+printf "C=%d  UI=%d  Tokens=%d  Website=%d  Apps=%d  Full=%d\n\n" \
+    "$C_CHANGED" "$UI_CHANGED" "$TOKENS_CHANGED" "$WEBSITE_CHANGED" "${APPS_CHANGED:-0}" "$FULL"
 
 if [ "$C_CHANGED" -eq 1 ]; then
     printf "--- C Backend ---\n"
@@ -134,6 +135,37 @@ if [ "$WEBSITE_CHANGED" -eq 1 ]; then
     else
         fail "Website build"
     fi
+    printf "\n"
+fi
+
+if [ "${APPS_CHANGED:-0}" -eq 1 ]; then
+    printf "--- Native apps (apps/) ---\n"
+    if (cd apps/shared/HumanKit && swift test 2>&1 | tail -5); then
+        pass "HumanKit swift test"
+    else
+        fail "HumanKit swift test"
+    fi
+    if (cd apps/ios && swift build 2>&1 | tail -3); then
+        pass "iOS swift build"
+    else
+        fail "iOS swift build"
+    fi
+    if (cd apps/macos && swift build 2>&1 | tail -3); then
+        pass "macOS swift build"
+    else
+        fail "macOS swift build"
+    fi
+    if command -v java &>/dev/null; then
+        if (cd apps/android && chmod +x gradlew && ./gradlew assembleDebug lint test --no-daemon 2>&1 | tail -8); then
+            pass "Android assemble + lint + unit tests"
+        else
+            fail "Android assemble + lint + unit tests"
+        fi
+    else
+        skip "Android Gradle (no java on PATH)"
+    fi
+    info "For XCUITest + emulator matrix see .github/workflows/native-apps-fleet.yml"
+    info "Local: scripts/run-native-fleet-local.sh quick | full"
     printf "\n"
 fi
 

@@ -23,6 +23,7 @@ static const hu_tool_vtable_t lsp_vtable = {
 };
 
 hu_tool_t hu_lsp_tool_create(hu_allocator_t *alloc) {
-    (void)alloc;
+    if (!alloc)
+        return (hu_tool_t){ .ctx = NULL, .vtable = NULL };
     return (hu_tool_t){ .ctx = NULL, .vtable = &lsp_vtable };
 }

@@ -155,7 +155,11 @@ typedef struct hu_heartbeat_config {
 #define HU_CHANNEL_CONFIG_MAX 24
 
 /* Shared daemon behavior config — embedded in per-channel config structs.
- * Daemon reads from the active channel's config, falling back to defaults. */
+ * Daemon reads from the active channel's config, falling back to defaults.
+ *
+ * All string fields (e.g. response_mode) are arena-allocated by hu_config_load.
+ * hu_config_deinit destroys the arena, freeing all strings at once.
+ * Do not call free() on individual fields. */
 typedef struct hu_channel_daemon_config {
     char *response_mode;          /* "selective" (default), "normal", "eager" */
     int user_response_window_sec; /* 0 = use default (120s) */

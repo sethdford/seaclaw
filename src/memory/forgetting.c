@@ -34,7 +34,8 @@ hu_error_t hu_memory_decay(hu_allocator_t *alloc, hu_memory_t *memory, double de
         return HU_ERR_INVALID_ARGUMENT;
     memset(out, 0, sizeof(*out));
 #ifdef HU_IS_TEST
-    (void)memory;
+    if (!memory)
+        return HU_ERR_INVALID_ARGUMENT;
     out->total_memories = 100;
     out->decayed = 10;
     return HU_OK;
@@ -104,12 +105,15 @@ hu_error_t hu_memory_decay(hu_allocator_t *alloc, hu_memory_t *memory, double de
 
 hu_error_t hu_memory_boost(hu_allocator_t *alloc, hu_memory_t *memory, const char *memory_id,
                            double boost_amount) {
-    if (!alloc || !memory_id)
+    if (!alloc || !memory_id || memory_id[0] == '\0')
         return HU_ERR_INVALID_ARGUMENT;
     if (boost_amount < 0.0)
         return HU_ERR_INVALID_ARGUMENT;
+    if (!memory)
+        return HU_ERR_INVALID_ARGUMENT;
 #ifdef HU_IS_TEST
-    (void)memory;
+    if (strcmp(memory_id, "__hu_test_absent_memory__") == 0)
+        return HU_ERR_NOT_FOUND;
     return HU_OK;
 #else
     if (!memory || !memory->vtable || !memory->vtable->get)
@@ -161,7 +165,8 @@ hu_error_t hu_memory_prune(hu_allocator_t *alloc, hu_memory_t *memory, double th
         return HU_ERR_INVALID_ARGUMENT;
     memset(out, 0, sizeof(*out));
 #ifdef HU_IS_TEST
-    (void)memory;
+    if (!memory)
+        return HU_ERR_INVALID_ARGUMENT;
     out->total_memories = 100;
     out->pruned = 5;
     return HU_OK;

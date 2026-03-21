@@ -19,6 +19,92 @@ Optional methods (may be NULL):
 - `load_conversation_history` — retrieve past messages
 - `get_response_constraints` — platform-specific limits (e.g., max chars)
 - `react` — add reactions to messages
+- `human_active_recently` — detect if the real user messaged this contact recently (daemon uses this to suppress assistant sends when the human is active)
+
+## Channel capability matrix
+
+Generated from designated initializers in each `src/channels/*.c` vtable. **history** = `load_conversation_history`, **human_active** = `human_active_recently`, **typing** = both `start_typing` and `stop_typing` non-NULL, **constraints** = `get_response_constraints`. Omitted optional fields are NULL.
+
+Only **discord**, **imessage**, **signal**, **slack**, and **telegram** implement `human_active_recently`. On all other channels the daemon cannot suppress outbound messages based on recent human activity.
+
+```c
+/*
+ * Channel capability matrix (vtable hooks):
+ * Channel        | send | history | react | human_active | typing | constraints
+ * cli            |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * dingtalk       |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * discord        |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ✓
+ * dispatch       |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * email          |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * facebook       |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * gmail          |  ✓   |    ✓    |   ·   |      ·       |   ·    |     ·
+ * google_chat    |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * google_rcs     |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * imap           |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * imessage       |  ✓   |    ✓    |   ✓   |      ✓       |   ·    |     ✓
+ * instagram      |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * irc            |  ✓   |    ✓    |   ·   |      ·       |   ·    |     ·
+ * lark           |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * line           |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * maixcam        |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * matrix         |  ✓   |    ✓    |   ·   |      ·       |   ·    |     ·
+ * mattermost     |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * mqtt           |  ✓   |    ✓    |   ·   |      ·       |   ·    |     ·
+ * nostr          |  ✓   |    ✓    |   ·   |      ·       |   ·    |     ·
+ * onebot         |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * pwa            |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * qq             |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * signal         |  ✓   |    ·    |   ✓   |      ✓       |   ✓    |     ✓
+ * slack          |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ✓
+ * teams          |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * telegram       |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ✓
+ * tiktok         |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * twilio         |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * twitter        |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * voice_channel  |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * web            |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * whatsapp       |  ✓   |    ·    |   ✓   |      ·       |   ·    |     ✓
+ *
+ * Channels without human_active_recently: daemon cannot suppress messages
+ * when the real user is active on those channels.
+ */
+```
+
+| Channel | `load_conversation_history` | `react` | `human_active_recently` | typing | `get_response_constraints` |
+| --- | --- | --- | --- | --- | --- |
+| cli | · | · | · | · | · |
+| dingtalk | · | · | · | · | · |
+| discord | ✓ | ✓ | ✓ | ✓ | ✓ |
+| dispatch | · | · | · | · | · |
+| email | · | · | · | · | · |
+| facebook | · | · | · | · | · |
+| gmail | ✓ | · | · | · | · |
+| google_chat | · | · | · | · | · |
+| google_rcs | · | · | · | · | · |
+| imap | · | · | · | · | · |
+| imessage | ✓ | ✓ | ✓ | · | ✓ |
+| instagram | · | · | · | · | · |
+| irc | ✓ | · | · | · | · |
+| lark | · | · | · | · | · |
+| line | · | · | · | · | · |
+| maixcam | · | · | · | · | · |
+| matrix | ✓ | · | · | · | · |
+| mattermost | · | · | · | · | · |
+| mqtt | ✓ | · | · | · | · |
+| nostr | ✓ | · | · | · | · |
+| onebot | · | · | · | · | · |
+| pwa | · | · | · | · | · |
+| qq | · | · | · | · | · |
+| signal | · (`NULL`) | ✓ | ✓ | ✓ | ✓ |
+| slack | ✓ | ✓ | ✓ | ✓ | ✓ |
+| teams | · | · | · | · | · |
+| telegram | ✓ | ✓ | ✓ | ✓ | ✓ |
+| tiktok | · | · | · | · | · |
+| twilio | · | · | · | · | · |
+| twitter | · | · | · | · | · |
+| voice_channel | · | · | · | · | · |
+| web | · | · | · | · | · |
+| whatsapp | · | ✓ | · | · | ✓ |
 
 ## Channel Implementations
 

@@ -98,6 +98,15 @@ if [ -f "scripts/doc-stats.sh" ]; then
   run_check "Doc Stats" bash scripts/doc-stats.sh
 fi
 
+# 11. Native apps (optional — macOS + Xcode + JDK; set VERIFY_NATIVE=1)
+if [ "${VERIFY_NATIVE:-0}" = 1 ] && [ -f "scripts/run-native-fleet-local.sh" ]; then
+  if [ "$(uname -s 2>/dev/null)" = Darwin ]; then
+    run_check "Native fleet local (full)" bash scripts/run-native-fleet-local.sh full
+  else
+    run_check "Native fleet local (quick, no XCUITest)" bash scripts/run-native-fleet-local.sh quick
+  fi
+fi
+
 # Summary
 echo ""
 echo "=============================="

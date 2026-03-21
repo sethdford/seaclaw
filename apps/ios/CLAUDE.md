@@ -16,4 +16,4 @@ SwiftUI app using HumanKit shared library.
 
 - Xcode project is generated: `brew install xcodegen && cd apps/ios && xcodegen generate` → `HumaniOS.xcodeproj`.
 - UI tests live in `UITests/` (scheme `HumaniOS`, target `HumaniOSUITests`). Launch argument `-uitestSkipOnboarding` skips onboarding for deterministic automation.
-- Workflow: `.github/workflows/native-apps-fleet.yml` (matrix + award-tier gate). Default `ci.yml` runs the same suite on one simulator.
+- CI: reusable `.github/actions/ios-uitest` (XcodeGen + `xcodebuild test` for `HumaniOSUITests`). Wired from `ci.yml` (one simulator) and `.github/workflows/native-apps-fleet.yml` (matrix + SOTA gate).

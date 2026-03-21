@@ -28,7 +28,7 @@ Key extension points:
 - `src/peripherals/` (`hu_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 
-Current scale: **1,093 source + header files, ~233K lines of C, ~98K lines of tests, 6059+ tests, 38 channels**.
+Current scale: **1,093 source + header files, ~233K lines of C, ~98K lines of tests, 6075+ tests, 38 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -76,7 +76,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `HU_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 6059+ tests must pass at zero ASan errors**
+5. **All 6075+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `HU_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -118,7 +118,7 @@ src/
 
 include/human/       public C headers
 
-tests/                 291 test files, 6059+ tests
+tests/                 291 test files, 6075+ tests
 
 apps/                  iOS, macOS, Android, shared (4 app directories)
 
@@ -242,7 +242,10 @@ For faster iteration, use targeted tests:
 ./build/human_tests --suite=JSON           # run suites matching "JSON"
 ./build/human_tests --filter=config_parse  # run tests matching "config_parse"
 scripts/agent-preflight.sh                 # change-aware validation (auto-detects what changed)
+scripts/run-native-fleet-local.sh quick    # native apps: HumanKit + iOS/macOS SPM + Android unit (no Simulator)
 ```
+
+CI runs **XCUITest** and **Android instrumented** in `.github/workflows/native-apps-fleet.yml` (matrix + SOTA gate) and a single iOS simulator in `ci.yml` via `.github/actions/ios-uitest`. Optional full local parity on macOS: `scripts/run-native-fleet-local.sh full` or `VERIFY_NATIVE=1 ./scripts/verify-all.sh`.
 
 For release changes:
 
@@ -262,6 +265,7 @@ Additional expectations by change type:
 - **Docs/comments only**: no build required, but verify no broken code references.
 - **Security/runtime/gateway/tools**: include at least one boundary/failure-mode test.
 - **Provider additions**: test vtable wiring + graceful failure without credentials.
+- **Native apps (`apps/`)**: `scripts/run-native-fleet-local.sh quick` (or rely on `scripts/agent-preflight.sh` when `apps/` changed).
 
 If full validation is impractical, document what was run and what was skipped.
 

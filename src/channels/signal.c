@@ -477,6 +477,26 @@ static bool signal_human_active_recently(void *ctx, const char *contact, size_t 
     return false;
 }
 
+static hu_error_t signal_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                   const char *contact_id, size_t contact_id_len,
+                                                   size_t limit, hu_channel_history_entry_t **out,
+                                                   size_t *out_count) {
+    (void)ctx;
+    (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
+    (void)limit;
+    if (!out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+#if HU_IS_TEST
+    return HU_OK;
+#else
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
 static bool signal_health_check(void *ctx) {
     hu_signal_ctx_t *c = (hu_signal_ctx_t *)ctx;
     if (!c || !c->running)
@@ -515,7 +535,7 @@ static const hu_channel_vtable_t signal_vtable = {
     .send_event = NULL,
     .start_typing = signal_start_typing,
     .stop_typing = signal_stop_typing,
-    .load_conversation_history = NULL,
+    .load_conversation_history = signal_load_conversation_history,
     .get_response_constraints = signal_get_response_constraints,
     .react = signal_react,
     .get_attachment_path = NULL,

@@ -247,7 +247,7 @@ static const hu_channel_vtable_t pwa_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
-    .load_conversation_history = NULL,
+    .load_conversation_history = NULL, /* PWA receives messages via gateway push; no server-side history API */
     .get_response_constraints = NULL,
     .react = NULL,
 };

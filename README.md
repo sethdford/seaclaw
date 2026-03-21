@@ -22,7 +22,7 @@
 The smallest fully autonomous AI assistant infrastructure — a static C binary that fits on any $5 board, boots in milliseconds, and requires nothing but libc.
 
 ```
-~1696 KB binary · <30 ms startup · 6059+ tests · 97 providers · 38 channels · 85 tools · Pluggable everything
+~1696 KB binary · <30 ms startup · 6075+ tests · 97 providers · 38 channels · 85 tools · Pluggable everything
 ```
 
 ### Features
@@ -61,7 +61,7 @@ Human's verified numbers (measured on macOS arm64, March 2026):
 Binary size:   ~1696 KB (MinSizeRel + LTO, all channels)
 Peak RSS:      ~5.7 MB (--version), ~5.9 MB (test suite)
 Startup:       6–27 ms avg (Apple Silicon M4 Max)
-Tests:         6059+ passing, 0 ASan errors
+Tests:         6075+ passing, 0 ASan errors
 ```
 
 ### Why Switch from OpenClaw?
@@ -615,7 +615,7 @@ Build and tests require a C11 compiler and CMake 3.16+. One-time setup:
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Debug -DHU_ENABLE_ALL_CHANNELS=ON
 cmake --build .                            # Dev build
-./human_tests                             # 6059+ tests
+./human_tests                             # 6075+ tests
 cd ..
 ```
 
@@ -653,7 +653,7 @@ Language: C11 + ASM (aarch64, x86_64)
 Source files: 1,093
 Lines of code: ~233K
 Test files: 291
-Tests: 6059+
+Tests: 6075+
 Binary: ~1696 KB (MinSizeRel + LTO, all channels)
 Peak RSS: ~5.7 MB
 Startup: 6–27 ms avg (Apple Silicon)
@@ -687,7 +687,7 @@ config.c Config loading/merging (~/.human/config.json)
 ...
 
 include/human/ Public C headers
-tests/ 291 test files, 6059+ tests
+tests/ 291 test files, 6075+ tests
 asm/ Platform-specific assembly (aarch64, x86_64, generic C)
 
 ui/ Web UI (LitElement + Vite)
@@ -697,6 +697,8 @@ apps/shared/ Shared packages (HumanKit for iOS)
 apps/macos/   Native macOS app (SwiftUI)
 
 ```
+
+**Native CI:** `ci.yml` runs iOS XCUITest on one simulator (via `.github/actions/ios-uitest`). The **native apps fleet** workflow (`.github/workflows/native-apps-fleet.yml`) runs a multi-simulator iOS matrix, multi-API Android emulators (`connectedDebugAndroidTest`), and an all-green SOTA gate. **Local:** `scripts/run-native-fleet-local.sh quick` (no Simulator UI tests) or `full` on macOS (includes XCUITest).
 
 ### Web UI
 

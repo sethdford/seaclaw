@@ -1489,6 +1489,21 @@ static void test_signal_send_captures_last_message(void) {
     HU_ASSERT_STR_EQ(msg, "Test reply");
     hu_signal_destroy(&ch);
 }
+
+static void test_signal_load_conversation_history_empty_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_signal_create(&alloc, "http://localhost", 16, "a", 1, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->load_conversation_history);
+    hu_channel_history_entry_t *entries = NULL;
+    size_t n = 99;
+    HU_ASSERT_EQ(
+        ch.vtable->load_conversation_history(ch.ctx, &alloc, "+15551234567", 12, 5, &entries, &n),
+        HU_OK);
+    HU_ASSERT_EQ(n, 0u);
+    HU_ASSERT_NULL(entries);
+    hu_signal_destroy(&ch);
+}
 #endif
 #endif
 
@@ -2519,6 +2534,7 @@ void run_channel_all_tests(void) {
 #if HU_IS_TEST
     HU_RUN_TEST(test_signal_inject_and_poll);
     HU_RUN_TEST(test_signal_send_captures_last_message);
+    HU_RUN_TEST(test_signal_load_conversation_history_empty_in_test);
 #endif
 #endif
 #if HU_HAS_NOSTR

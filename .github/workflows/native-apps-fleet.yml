@@ -71,30 +71,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/Library/Caches/Homebrew
-          key: ${{ runner.os }}-brew-${{ hashFiles('.github/workflows/native-apps-fleet.yml') }}
+          key: ${{ runner.os }}-brew-${{ hashFiles('.github/workflows/native-apps-fleet.yml', '.github/actions/ios-uitest/**') }}
           restore-keys: |
             ${{ runner.os }}-brew-
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate Xcode project
-        run: cd apps/ios && xcodegen generate
-
-      - name: XCUITest (HumaniOSUITests, parallel + retry)
-        run: |
-          set -o pipefail
-          xcodebuild test \
-            -project apps/ios/HumaniOS.xcodeproj \
-            -scheme HumaniOS \
-            -destination "${{ matrix.destination }}" \
-            -only-testing:HumaniOSUITests \
-            -parallel-testing-enabled NO \
-            -retry-tests-on-failure \
-            -resultBundlePath "apps/ios/TestResults-${{ matrix.slug }}.xcresult" \
-            CODE_SIGNING_ALLOWED=NO \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            2>&1 | tee xcodebuild-${{ matrix.slug }}.log
+      - uses: ./.github/actions/ios-uitest
+        with:
+          destination: ${{ matrix.destination }}
+          result-bundle-path: apps/ios/TestResults-${{ matrix.slug }}.xcresult
+          log-file: xcodebuild-${{ matrix.slug }}.log
 
       - name: Upload xcresult + log on failure
         if: failure()
