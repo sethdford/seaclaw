@@ -323,13 +323,12 @@ static hu_error_t gmail_send(void *ctx, const char *target, size_t target_len, c
         return HU_ERR_INVALID_ARGUMENT;
 
 #if HU_IS_TEST
-    /* Test mode: store to mock buffer, return NOT_SUPPORTED (unchanged) */
     size_t len = message_len > 4095 ? 4095 : message_len;
     if (len > 0)
         memcpy(c->last_message, message, len);
     c->last_message[len] = '\0';
     c->last_message_len = len;
-    return HU_ERR_NOT_SUPPORTED;
+    return HU_OK;
 #elif defined(HU_HTTP_CURL)
     hu_error_t err = ensure_access_token(c);
     if (err != HU_OK)
@@ -438,7 +437,13 @@ static hu_error_t gmail_load_conversation_history(void *ctx, hu_allocator_t *all
     *out = NULL;
     *out_count = 0;
 
-#if HU_IS_TEST || !defined(HU_HTTP_CURL)
+#if HU_IS_TEST
+    (void)ctx;
+    (void)contact_id_len;
+    (void)limit;
+    return HU_OK;
+#elif !defined(HU_HTTP_CURL)
+    (void)ctx;
     (void)contact_id_len;
     (void)limit;
     return HU_ERR_NOT_SUPPORTED;

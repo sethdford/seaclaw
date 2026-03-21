@@ -90,7 +90,7 @@ static void test_gmail_send_test_mode_stores_message(void) {
     HU_ASSERT_NOT_NULL(ch.vtable->send);
     hu_error_t err =
         ch.vtable->send(ch.ctx, "recipient@example.com", 21, "Hello from test", 15, NULL, 0);
-    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED); /* test mode returns NOT_SUPPORTED */
+    HU_ASSERT_EQ(err, HU_OK);
     size_t len = 0;
     const char *last = hu_gmail_test_get_last_message(&ch, &len);
     HU_ASSERT_NOT_NULL(last);
