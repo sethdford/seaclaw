@@ -64,6 +64,7 @@ typedef struct hu_eval_run {
 } hu_eval_run_t;
 
 hu_error_t hu_eval_suite_load_json(hu_allocator_t *alloc, const char *json, size_t json_len, hu_eval_suite_t *out);
+hu_error_t hu_eval_suite_load_json_path(hu_allocator_t *alloc, const char *path, hu_eval_suite_t *out);
 hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, const char *model, size_t model_len, hu_eval_suite_t *suite, hu_eval_match_mode_t mode, hu_eval_run_t *out);
 hu_error_t hu_eval_check(hu_allocator_t *alloc, const char *actual, size_t actual_len, const char *expected, size_t expected_len, hu_eval_match_mode_t mode, bool *passed);
 hu_error_t hu_eval_check_with_provider(hu_allocator_t *alloc, const char *actual, size_t actual_len, const char *expected, size_t expected_len, hu_eval_match_mode_t mode, hu_provider_t *provider, const char *model, size_t model_len, bool *passed, double *score_out);

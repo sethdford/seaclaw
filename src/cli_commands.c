@@ -4,6 +4,7 @@
 #include "human/calibration/clone.h"
 #include "human/config.h"
 #include "human/core/error.h"
+#include "human/core/string.h"
 #include "human/eval.h"
 #include "human/eval_benchmarks.h"
 #include "human/eval_dashboard.h"
@@ -585,12 +586,20 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv) {
 #endif
 }
 
+#if defined(__unix__) || defined(__APPLE__)
+static int eval_json_basename_cmp(const void *a, const void *b) {
+    const char *const *sa = (const char *const *)a;
+    const char *const *sb = (const char *const *)b;
+    return strcmp(*sa, *sb);
+}
+#endif
+
 /* ── eval (run/list/compare) ────────────────────────────────────────────── */
 hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
         printf("Usage: human eval <run|list|compare|dashboard|history|trend|benchmark> [args]\n");
         printf("  run <suite.json>     Load and run an eval suite, print report JSON\n");
-        printf("  list                 List available eval suites in eval_suites/\n");
+        printf("  list                 List eval_suites/*.json with task counts (POSIX)\n");
         printf("  compare <r1> <r2>    Compare two run report JSON files\n");
         printf("  dashboard [r1.json]  Render terminal dashboard from run report(s)\n");
         printf("  history [--last N] [--benchmark X]  Show eval history from SQLite\n");
@@ -606,66 +615,26 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             return HU_ERR_INVALID_ARGUMENT;
         }
         const char *path = argv[3];
-        char *json = NULL;
-        size_t json_len = 0;
-
+        hu_eval_suite_t suite = {0};
+        hu_error_t err;
 #ifdef HU_IS_TEST
         (void)path;
         static const char MOCK_SUITE[] =
             "{\"name\":\"mock-eval\",\"tasks\":["
             "{\"id\":\"m1\",\"prompt\":\"2+2?\",\"expected\":\"4\",\"category\":\"math\",\"difficulty\":1,\"timeout_ms\":5000}"
             "]}\n";
-        json_len = sizeof(MOCK_SUITE) - 1;
-        json = alloc->alloc(alloc->ctx, json_len + 1);
-        if (!json)
-            return HU_ERR_OUT_OF_MEMORY;
-        memcpy(json, MOCK_SUITE, json_len + 1);
+        err = hu_eval_suite_load_json(alloc, MOCK_SUITE, sizeof(MOCK_SUITE) - 1, &suite);
 #else
-        {
-            FILE *f = fopen(path, "rb");
-            if (!f) {
-                fprintf(stderr, "eval: cannot open %s: %s\n", path, strerror(errno));
-                return HU_ERR_IO;
-            }
-            fseek(f, 0, SEEK_END);
-            long sz = ftell(f);
-            fseek(f, 0, SEEK_SET);
-            if (sz <= 0 || sz > 1024 * 1024) {
-                fclose(f);
-                fprintf(stderr, "eval: invalid file size\n");
-                return HU_ERR_INVALID_ARGUMENT;
-            }
-            json_len = (size_t)sz;
-            json = alloc->alloc(alloc->ctx, json_len + 1);
-            if (!json) {
-                fclose(f);
-                return HU_ERR_OUT_OF_MEMORY;
-            }
-            size_t n = fread(json, 1, json_len, f);
-            fclose(f);
-            if (n != json_len) {
-                alloc->free(alloc->ctx, json, json_len + 1);
-                return HU_ERR_IO;
-            }
-            json[json_len] = '\0';
-        }
-#endif
-
-        hu_eval_suite_t suite = {0};
-        hu_error_t err = hu_eval_suite_load_json(alloc, json, json_len, &suite);
-#ifndef HU_IS_TEST
-        alloc->free(alloc->ctx, json, json_len + 1);
+        err = hu_eval_suite_load_json_path(alloc, path, &suite);
 #endif
         if (err != HU_OK) {
-#ifdef HU_IS_TEST
-            alloc->free(alloc->ctx, json, json_len + 1);
-#endif
+#ifndef HU_IS_TEST
+            fprintf(stderr, "eval: failed to load %s: %s\n", path, hu_error_string(err));
+#else
             fprintf(stderr, "eval: failed to load suite: %s\n", hu_error_string(err));
+#endif
             return err;
         }
-#ifdef HU_IS_TEST
-        alloc->free(alloc->ctx, json, json_len + 1);
-#endif
 
         hu_eval_run_t run = {0};
 #ifdef HU_IS_TEST
@@ -760,31 +729,73 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     }
 
     if (strcmp(sub, "list") == 0) {
-#if defined(HU_IS_TEST) || !(defined(__unix__) || defined(__APPLE__))
-        printf("eval_suites/reasoning_basic.json\n");
-        printf("eval_suites/tool_use_basic.json\n");
-        printf("eval_suites/coding_basic.json\n");
-        printf("eval_suites/fidelity.json\n");
-        printf("eval_suites/intelligence.json\n");
-        return HU_OK;
-#else
+#if defined(__unix__) || defined(__APPLE__)
         {
             const char *dir_path = "eval_suites";
+            enum { max_json_files = 256 };
             DIR *d = opendir(dir_path);
             if (!d) {
                 fprintf(stderr, "eval: cannot open %s: %s\n", dir_path, strerror(errno));
                 return HU_ERR_IO;
             }
+            char **names = alloc->alloc(alloc->ctx, max_json_files * sizeof(char *));
+            if (!names) {
+                closedir(d);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            size_t n_names = 0;
             struct dirent *e;
             while ((e = readdir(d)) != NULL) {
                 if (e->d_name[0] == '.')
                     continue;
                 size_t len = strlen(e->d_name);
-                if (len >= 5 && strcmp(e->d_name + len - 5, ".json") == 0)
-                    printf("%s/%s\n", dir_path, e->d_name);
+                if (len < 5 || strcmp(e->d_name + len - 5, ".json") != 0)
+                    continue;
+                if (n_names >= (size_t)max_json_files)
+                    break;
+                char *copy = hu_strdup(alloc, e->d_name);
+                if (!copy) {
+                    closedir(d);
+                    for (size_t i = 0; i < n_names; i++)
+                        alloc->free(alloc->ctx, names[i], strlen(names[i]) + 1);
+                    alloc->free(alloc->ctx, names, max_json_files * sizeof(char *));
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                names[n_names++] = copy;
             }
             closedir(d);
+            if (n_names > 1)
+                qsort(names, n_names, sizeof(names[0]), eval_json_basename_cmp);
+            for (size_t i = 0; i < n_names; i++) {
+                char path_buf[HU_INIT_MAX_PATH];
+                int plen = snprintf(path_buf, sizeof(path_buf), "%s/%s", dir_path, names[i]);
+                if (plen < 0 || (size_t)plen >= sizeof(path_buf)) {
+                    fprintf(stderr, "eval: path too long for %s/%s\n", dir_path, names[i]);
+                    continue;
+                }
+                hu_eval_suite_t suite = {0};
+                hu_error_t le = hu_eval_suite_load_json_path(alloc, path_buf, &suite);
+                if (le != HU_OK) {
+                    fprintf(stderr, "eval: could not load %s: %s\n", path_buf, hu_error_string(le));
+                    hu_eval_suite_free(alloc, &suite);
+                    continue;
+                }
+                const char *sn = suite.name ? suite.name : names[i];
+                printf("%s\t%zu tasks\t(%s)\n", path_buf, suite.tasks_count, sn);
+                hu_eval_suite_free(alloc, &suite);
+            }
+            for (size_t i = 0; i < n_names; i++)
+                alloc->free(alloc->ctx, names[i], strlen(names[i]) + 1);
+            alloc->free(alloc->ctx, names, max_json_files * sizeof(char *));
         }
+        return HU_OK;
+#else
+        printf("eval_suites/fidelity.json\t10 tasks\t(fidelity)\n");
+        printf("eval_suites/intelligence.json\t10 tasks\t(intelligence)\n");
+        printf("eval_suites/reasoning.json\t10 tasks\t(reasoning)\n");
+        printf("eval_suites/tool_use.json\t8 tasks\t(tool_use)\n");
+        printf("eval_suites/memory.json\t8 tasks\t(memory)\n");
+        printf("eval_suites/social.json\t8 tasks\t(social)\n");
         return HU_OK;
 #endif
     }

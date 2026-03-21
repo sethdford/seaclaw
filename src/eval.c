@@ -13,6 +13,7 @@
 #endif
 
 #define EVAL_MAX_TASKS 256
+#define HU_EVAL_SUITE_JSON_MAX_BYTES (1024u * 1024u)
 
 static hu_eval_match_mode_t eval_match_mode_from_cstr(const char *mm) {
     if (!mm)
@@ -260,6 +261,43 @@ hu_error_t hu_eval_suite_load_json(hu_allocator_t *alloc, const char *json, size
 
     hu_json_free(alloc, root);
     return HU_OK;
+}
+
+hu_error_t hu_eval_suite_load_json_path(hu_allocator_t *alloc, const char *path, hu_eval_suite_t *out) {
+    if (!alloc || !path || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return HU_ERR_IO;
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return HU_ERR_IO;
+    }
+    long sz = ftell(f);
+    if (sz <= 0 || (unsigned long)sz > (unsigned long)HU_EVAL_SUITE_JSON_MAX_BYTES) {
+        fclose(f);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return HU_ERR_IO;
+    }
+    size_t json_len = (size_t)sz;
+    char *json = alloc->alloc(alloc->ctx, json_len + 1);
+    if (!json) {
+        fclose(f);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    size_t n = fread(json, 1, json_len, f);
+    fclose(f);
+    if (n != json_len) {
+        alloc->free(alloc->ctx, json, json_len + 1);
+        return HU_ERR_IO;
+    }
+    json[json_len] = '\0';
+    hu_error_t err = hu_eval_suite_load_json(alloc, json, json_len, out);
+    alloc->free(alloc->ctx, json, json_len + 1);
+    return err;
 }
 
 hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, const char *model, size_t model_len, hu_eval_suite_t *suite, hu_eval_match_mode_t mode, hu_eval_run_t *out) {

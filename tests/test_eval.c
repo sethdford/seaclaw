@@ -1,6 +1,11 @@
 #include "test_framework.h"
 #include "human/eval.h"
+#include <stdio.h>
 #include <string.h>
+
+#ifndef HU_EVAL_SUITES_DIR
+#error "HU_EVAL_SUITES_DIR must be defined when building human_tests"
+#endif
 
 static void test_eval_load(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -305,6 +310,54 @@ static void test_eval_judge_heuristic_still_works(void) {
     HU_ASSERT(!passed);
 }
 
+static void test_eval_suite_load_json_path_missing_returns_io(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_eval_suite_t suite = {0};
+    HU_ASSERT_EQ(hu_eval_suite_load_json_path(&alloc, "/nonexistent/human_eval_suite_xyz.json", &suite),
+                 HU_ERR_IO);
+}
+
+static void test_eval_expanded_suite_json_files_parse_unique_ids_expected_counts(void) {
+    static const struct {
+        const char *file;
+        size_t expect_tasks;
+    } k_exp[] = {
+        {"fidelity.json", 10},
+        {"intelligence.json", 10},
+        {"reasoning.json", 10},
+        {"tool_use.json", 8},
+        {"memory.json", 8},
+        {"social.json", 8},
+    };
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_eval_suite_t suites[sizeof(k_exp) / sizeof(k_exp[0])];
+    memset(suites, 0, sizeof(suites));
+
+    for (size_t si = 0; si < sizeof(k_exp) / sizeof(k_exp[0]); si++) {
+        char path[768];
+        int n = snprintf(path, sizeof(path), "%s/%s", HU_EVAL_SUITES_DIR, k_exp[si].file);
+        HU_ASSERT(n > 0 && (size_t)n < sizeof(path));
+        HU_ASSERT_EQ(hu_eval_suite_load_json_path(&alloc, path, &suites[si]), HU_OK);
+        HU_ASSERT_EQ(suites[si].tasks_count, k_exp[si].expect_tasks);
+    }
+
+    for (size_t i = 0; i < sizeof(k_exp) / sizeof(k_exp[0]); i++) {
+        for (size_t ti = 0; ti < suites[i].tasks_count; ti++) {
+            HU_ASSERT_NOT_NULL(suites[i].tasks[ti].id);
+            for (size_t j = i; j < sizeof(k_exp) / sizeof(k_exp[0]); j++) {
+                size_t tj_start = (j == i) ? (ti + 1) : 0;
+                for (size_t tj = tj_start; tj < suites[j].tasks_count; tj++) {
+                    if (strcmp(suites[i].tasks[ti].id, suites[j].tasks[tj].id) == 0)
+                        HU_FAIL("duplicate eval task id across suites: %s", suites[i].tasks[ti].id);
+                }
+            }
+        }
+    }
+
+    for (size_t si = 0; si < sizeof(k_exp) / sizeof(k_exp[0]); si++)
+        hu_eval_suite_free(&alloc, &suites[si]);
+}
+
 static void test_eval_run_free(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_eval_run_t run = {0};
@@ -353,5 +406,7 @@ void run_eval_tests(void) {
     HU_RUN_TEST(test_eval_run_load_json_partial);
     HU_RUN_TEST(test_eval_report);
     HU_RUN_TEST(test_eval_compare);
+    HU_RUN_TEST(test_eval_suite_load_json_path_missing_returns_io);
+    HU_RUN_TEST(test_eval_expanded_suite_json_files_parse_unique_ids_expected_counts);
     HU_RUN_TEST(test_eval_run_free);
 }
