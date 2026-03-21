@@ -54,6 +54,9 @@ static void metrics_record_event(void *ctx, const hu_observer_event_t *event) {
     case HU_OBSERVER_EVENT_ERR:
         c->total_errors++;
         break;
+    case HU_OBSERVER_EVENT_COGNITION_MODE:
+    case HU_OBSERVER_EVENT_METACOG_ACTION:
+        break;
     }
 }
 

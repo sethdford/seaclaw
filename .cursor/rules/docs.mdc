@@ -13,4 +13,4 @@ globs:
 - Generated docs (`icon-inventory.md`, `components.md`) via `cd ui && npm run docs`
 - Update AGENTS.md or cursor rules when adding a new standard doc
 - Never include real credentials in examples
-- Run `./scripts/doc-fleet.sh` before large doc changes (CI `docs` job uses the same bundle)
+- Run `./scripts/doc-fleet.sh` before large doc changes (CI `docs` job uses the same bundle). `human-skills/*.md` index files require line-1 `---` like `docs/`.

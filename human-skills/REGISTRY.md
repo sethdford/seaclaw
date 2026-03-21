@@ -1,3 +1,8 @@
+---
+title: "Human skill registry"
+status: active
+---
+
 # Human Skill Registry
 
 The skill registry is a JSON index of publishable skills. Users run `human skills search`, `install`, and `update` against this index.

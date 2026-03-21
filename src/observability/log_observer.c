@@ -169,6 +169,18 @@ static void log_record_event(void *ctx, const hu_observer_event_t *event) {
         json_escape_fp(f, event->data.err.message);
         fprintf(f, "}\n");
         break;
+    case HU_OBSERVER_EVENT_COGNITION_MODE:
+        fprintf(f, "cognition_mode\",\"mode\":");
+        json_escape_fp(f, event->data.cognition_mode.mode);
+        fprintf(f, "}\n");
+        break;
+    case HU_OBSERVER_EVENT_METACOG_ACTION:
+        fprintf(f, "metacog_action\",\"action\":");
+        json_escape_fp(f, event->data.metacog_action.action);
+        fprintf(f, ",\"confidence\":%.2f,\"coherence\":%.2f}\n",
+                (double)event->data.metacog_action.confidence,
+                (double)event->data.metacog_action.coherence);
+        break;
     }
 }
 

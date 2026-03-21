@@ -55,7 +55,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Telegram / Discord / Slack** | `src/channels/telegram.c`, `discord.c`, `slack.c`              | `test_channel_all.c`                                              |
 | **iMessage**                   | `src/channels/imessage.c`                                      | `test_imessage_extended.c`                                        |
 | **Gmail**                      | `src/channels/gmail.c`                                         | `test_gmail.c`                                                    |
-| **Voice**                      | `src/channels/voice_channel.c`, `voice_realtime.c`             | `test_voice.c`, `test_voice_integration.c`                        |
+| **Voice**                      | `src/channels/voice_channel.c`, `src/voice.c`                  | `test_voice.c`, `test_cartesia.c`, `test_local_voice.c`           |
 
 ## Tools
 
@@ -146,11 +146,11 @@ Use this to find the right files for a given task without searching the full cod
 | **Observability**                                      | `src/observability/log_observer.c`, `metrics_observer.c`, `bth_metrics.c`                                                       | `test_observer.c`, `test_bth_metrics.c`                                            |
 | **Subagent / MCP**                                     | `src/subagent.c`, `src/mcp.c`, `src/mcp_server.c`                                                                               | `test_subagent.c`, `test_mcp.c`                                                    |
 | **Session**                                            | `src/session.c`                                                                                                                 | `test_session.c`                                                                   |
-| **WebSocket client**                                   | `src/websocket/websocket.c`                                                                                                     | `test_websocket.c`                                                                 |
+| **WebSocket client**                                   | `src/websocket/websocket.c`                                                                                                     | `test_websocket.c`, `test_ws_integration.c`                                        |
 | **Tunnel**                                             | `src/tunnel/ngrok.c`, `cloudflare.c`, `tailscale.c`                                                                             | `test_tunnel.c`                                                                    |
 | **Voice / TTS / WebRTC**                               | `src/voice.c`, `src/voice_config.c`, `src/voice/realtime.c`, `src/voice/webrtc.c`, `src/tts/audio_pipeline.c`, `emotion_map.c`                        | `test_voice.c`, `test_webrtc.c`, `test_audio_pipeline.c`, `test_emotion_map.c`     |
 | **Paperclip**                                          | `src/paperclip/client.c`, `heartbeat.c`                                                                                         | `test_paperclip.c`                                                                 |
-| **Eval**                                               | `src/eval.c`                                                                                                                    | `test_eval.c`                                                                      |
+| **Eval**                                               | `src/eval.c`, `eval_suites/*.json`, `scripts/adversarial-eval-harness.py`                                                      | `test_eval.c`, `test_adversarial_detect.c`                                         |
 | **A2A**                                                | `src/a2a.c`                                                                                                                     | `test_a2a.c`                                                                       |
 
 ## AGI Frontiers / Intelligence

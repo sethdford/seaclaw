@@ -69,6 +69,12 @@ typedef struct hu_prompt_config {
     const char *skills_context;         /* available SkillForge skills for this agent */
     size_t skills_context_len;
     bool native_tools;                  /* provider supports structured tool calls */
+    const char *emotional_context;      /* from hu_emotional_cognition_build_prompt */
+    size_t emotional_context_len;
+    const char *cognition_mode;         /* "fast", "slow", "emotional"; NULL = unset */
+    size_t cognition_mode_len;
+    const char *episodic_replay;        /* cognitive replay from episodic patterns */
+    size_t episodic_replay_len;
 } hu_prompt_config_t;
 
 /* Build the full system prompt. Caller owns returned string; free with alloc. */

@@ -1,7 +1,7 @@
 ---
 title: Getting Started with Human
 description: Quick setup guide from zero to first AI chat in under 5 minutes
-updated: 2026-03-02
+updated: 2026-03-21
 ---
 
 # Getting Started with Human
@@ -169,7 +169,42 @@ Configure your MCP client to run `human mcp` as the server command. Human will p
 }
 ```
 
-## 8. Next steps
+## 8. Evaluation and adversarial testing
+
+**Static suite (provider + LLM judge)** — exercises prompts through `human eval` against your configured default provider (not the full agent tool loop):
+
+```bash
+./build/human eval run eval_suites/adversarial.json
+./build/human eval list
+```
+
+**Dynamic harness (full `human agent` stack)** — an OpenAI-compatible model generates synthetic probes; each probe is sent with `human agent -m`; another model pass scores safety. Requires `ADV_EVAL_API_KEY` and a working `~/.human` for Human itself:
+
+```bash
+export ADV_EVAL_API_KEY="sk-..."   # used only by the harness for generate/judge
+export ADV_EVAL_MODEL="gpt-4o-mini"  # optional
+python3 scripts/adversarial-eval-harness.py --probes 8 --include-suite eval_suites/adversarial.json --output /tmp/adv-report.json
+```
+
+Dry-run without any API keys (prints tasks from a suite only):
+
+```bash
+python3 scripts/adversarial-eval-harness.py --dry-run --no-llm --include-suite eval_suites/adversarial.json
+```
+
+Dry-run with synthetic probes (requires `ADV_EVAL_API_KEY` for generation only):
+
+```bash
+python3 scripts/adversarial-eval-harness.py --probes 5 --dry-run
+```
+
+Suite-only with judge (no synthetic generator):
+
+```bash
+python3 scripts/adversarial-eval-harness.py --no-llm --include-suite eval_suites/adversarial.json --output /tmp/adv-report.json
+```
+
+## 9. Next steps
 
 - **Security hardening:** Enable `secrets.encrypt`, set `gateway.require_pairing`, configure `allow_from` per channel. See [threat model](../standards/security/threat-model.md).
 - **Memory:** Use SQLite with embeddings for richer recall. Configure `memory.backend`, `embedding_provider`, and `vector_weight` in config.

@@ -1,3 +1,9 @@
+---
+title: "Human — project status (stubs)"
+created: 2026-03-20
+status: active
+---
+
 # Human — Project Status
 
 Last updated: 2026-03-20

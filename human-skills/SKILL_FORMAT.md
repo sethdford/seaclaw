@@ -1,3 +1,8 @@
+---
+title: "Human skill format"
+status: active
+---
+
 # Human Skill Format
 
 Skills extend the agent with instructions injected into the system prompt. Each skill is a directory with metadata and markdown content.

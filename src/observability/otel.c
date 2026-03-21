@@ -103,6 +103,10 @@ static const char *event_tag_str(hu_observer_event_tag_t tag) {
         return "heartbeat";
     case HU_OBSERVER_EVENT_ERR:
         return "error";
+    case HU_OBSERVER_EVENT_COGNITION_MODE:
+        return "cognition.mode";
+    case HU_OBSERVER_EVENT_METACOG_ACTION:
+        return "metacog.action";
     default:
         return "unknown";
     }

@@ -47,4 +47,11 @@ typedef struct {
 
 int hu_ws_parse_header(const char *bytes, size_t bytes_len, hu_ws_parsed_header_t *out);
 
+/* Build RFC 6455 HTTP upgrade request into buf. extra_headers: "Header: value\r\n..." or NULL.
+ * If buf is NULL or buf_cap is 0, returns the length that would be written (excluding '\0').
+ * On success with buf != NULL, returns written length (excluding '\0'); buf is null-terminated.
+ * Returns 0 if host/path/ws_key are missing or buffer too small. */
+size_t hu_ws_build_upgrade_request(char *buf, size_t buf_cap, const char *host, const char *path,
+                                   const char *ws_key, const char *extra_headers);
+
 #endif

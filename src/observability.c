@@ -116,6 +116,15 @@ static void log_record_event(void *ctx, const hu_observer_event_t *event) {
         fprintf(f, "error component=%s message=%s\n", HU_STR(event->data.err.component),
                 HU_STR(event->data.err.message));
         break;
+    case HU_OBSERVER_EVENT_COGNITION_MODE:
+        fprintf(f, "cognition.mode mode=%s\n", HU_STR(event->data.cognition_mode.mode));
+        break;
+    case HU_OBSERVER_EVENT_METACOG_ACTION:
+        fprintf(f, "metacog.action action=%s confidence=%.2f coherence=%.2f\n",
+                HU_STR(event->data.metacog_action.action),
+                (double)event->data.metacog_action.confidence,
+                (double)event->data.metacog_action.coherence);
+        break;
     }
 }
 

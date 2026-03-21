@@ -33,7 +33,7 @@ Recurring checkpoints that prevent standards drift. Each ceremony has a cadence,
    bash scripts/lint-raw-colors.sh --all
    npm run lint:tokens --prefix ui
    ```
-5. Run the documentation fleet (standards index, drift, terminology, `docs/` frontmatter, relative links):
+5. Run the documentation fleet (standards index, drift, terminology, `docs/` + `human-skills/` frontmatter, repo-wide Markdown links):
    ```bash
    ./scripts/doc-fleet.sh
    ```

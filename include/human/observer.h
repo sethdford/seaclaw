@@ -19,6 +19,8 @@ typedef enum hu_observer_event_tag {
     HU_OBSERVER_EVENT_CHANNEL_MESSAGE,
     HU_OBSERVER_EVENT_HEARTBEAT_TICK,
     HU_OBSERVER_EVENT_ERR,
+    HU_OBSERVER_EVENT_COGNITION_MODE,
+    HU_OBSERVER_EVENT_METACOG_ACTION,
 } hu_observer_event_tag_t;
 
 typedef struct hu_observer_event {
@@ -65,6 +67,14 @@ typedef struct hu_observer_event {
             const char *component;
             const char *message;
         } err;
+        struct {
+            const char *mode; /* "fast", "slow", "emotional" */
+        } cognition_mode;
+        struct {
+            const char *action; /* from hu_metacog_action_name */
+            float confidence;
+            float coherence;
+        } metacog_action;
     } data;
 } hu_observer_event_t;
 

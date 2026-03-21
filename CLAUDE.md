@@ -114,7 +114,7 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 | `docs/error-codes.md`             | All `HU_ERR_*` codes with usage guidelines                            |
 | `scripts/`                        | Build, release, benchmark, check scripts                              |
 | `scripts/agent-preflight.sh`      | Change-aware validation for agents                                    |
-| `scripts/doc-fleet.sh`            | Docs gate: standards index, drift, terminology, frontmatter, links  |
+| `scripts/doc-fleet.sh`            | Docs gate: standards, terminology, frontmatter, repo-wide MD links |
 | `scripts/what-to-test.sh`         | Maps changed files to relevant test suites                            |
 | `scripts/gen-include-graph.sh`    | Module dependency graph (Mermaid or JSON)                             |
 | `ARCHITECTURE.md`                 | System topology, request flow, module dependency diagrams             |

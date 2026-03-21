@@ -1,6 +1,7 @@
 #include "human/core/allocator.h"
 #include "human/voice.h"
 #include "test_framework.h"
+#include <string.h>
 
 static void test_voice_stt_file_mock(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -317,6 +318,57 @@ static void test_voice_stt_gemini_null_mime_defaults_webm(void) {
     alloc.free(alloc.ctx, text, len + 1);
 }
 
+/* Provider routing in hu_voice_stt_file / hu_voice_tts (Cartesia covered in test_cartesia.c). */
+
+static void test_voice_stt_file_groq_provider_routes_to_default_stt(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_voice_config_t cfg = {0};
+    cfg.stt_provider = "groq";
+    cfg.api_key = "sk-test";
+    cfg.api_key_len = 7;
+    char *text = NULL;
+    size_t len = 0;
+    hu_error_t err = hu_voice_stt_file(&alloc, &cfg, "/tmp/foo.wav", &text, &len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(text);
+    HU_ASSERT_TRUE(strstr(text, "This is a mock transcription of ") == text);
+    HU_ASSERT_TRUE(strstr(text, "/tmp/foo.wav") != NULL);
+    HU_ASSERT_NULL(strstr(text, "Cartesia"));
+    alloc.free(alloc.ctx, text, len + 1);
+}
+
+static void test_voice_stt_file_local_endpoint_routes_before_cloud(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_voice_config_t cfg = {0};
+    cfg.stt_provider = "local";
+    cfg.local_stt_endpoint = "http://127.0.0.1:9/stt";
+    cfg.api_key = NULL;
+    cfg.api_key_len = 0;
+    char *text = NULL;
+    size_t len = 0;
+    hu_error_t err = hu_voice_stt_file(&alloc, &cfg, "/tmp/local.wav", &text, &len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(text);
+    HU_ASSERT_STR_EQ(text, "Hello world");
+    alloc.free(alloc.ctx, text, len + 1);
+}
+
+static void test_voice_tts_local_endpoint_null_tts_provider_routes_local(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_voice_config_t cfg = {0};
+    cfg.local_tts_endpoint = "http://127.0.0.1:9/tts";
+    cfg.tts_provider = NULL;
+    cfg.api_key = NULL;
+    cfg.api_key_len = 0;
+    void *audio = NULL;
+    size_t audio_len = 0;
+    hu_error_t err = hu_voice_tts(&alloc, &cfg, "Hi", 2, &audio, &audio_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(audio);
+    HU_ASSERT_EQ(audio_len, 0u);
+    alloc.free(alloc.ctx, audio, 1);
+}
+
 void run_voice_tests(void) {
     HU_TEST_SUITE("Voice");
     HU_RUN_TEST(test_voice_stt_file_mock);
@@ -351,4 +403,7 @@ void run_voice_tests(void) {
     HU_RUN_TEST(test_voice_stt_gemini_null_alloc_fails);
     HU_RUN_TEST(test_voice_stt_gemini_null_output_ptrs_fails);
     HU_RUN_TEST(test_voice_stt_gemini_null_mime_defaults_webm);
+    HU_RUN_TEST(test_voice_stt_file_groq_provider_routes_to_default_stt);
+    HU_RUN_TEST(test_voice_stt_file_local_endpoint_routes_before_cloud);
+    HU_RUN_TEST(test_voice_tts_local_endpoint_null_tts_provider_routes_local);
 }

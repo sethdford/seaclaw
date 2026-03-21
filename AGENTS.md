@@ -317,7 +317,7 @@ Drift detection scripts:
 
 ```bash
 ./scripts/verify-all.sh              # Combined verification (build + test + doc fleet + tokens)
-./scripts/doc-fleet.sh               # Docs: standards index, drift, terminology, frontmatter, relative links
+./scripts/doc-fleet.sh               # Docs + human-skills frontmatter; repo-wide Markdown relative links
 ./scripts/check-doc-index.sh         # Orphaned standards only (also inside doc-fleet)
 ./scripts/check-standards-drift.sh   # Stale paths only (also inside doc-fleet)
 ```

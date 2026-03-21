@@ -54,7 +54,6 @@ void run_multimodal_memory_tests(void);
 void run_multimodal_audio_tests(void);
 void run_multimodal_video_tests(void);
 void run_voice_duplex_tests(void);
-void run_voice_realtime_tests(void);
 void run_voice_rt_openai_tests(void);
 void run_autonomy_tests(void);
 void run_retrieval_tests(void);
@@ -66,6 +65,7 @@ void run_http_tests(void);
 void run_sse_tests(void);
 void run_streaming_tests(void);
 void run_websocket_tests(void);
+void run_ws_integration_tests(void);
 void run_net_security_tests(void);
 void run_path_security_tests(void);
 void run_process_util_tests(void);
@@ -139,7 +139,6 @@ void run_humor_tests(void);
 void run_authentic_tests(void);
 void run_rag_pipeline_tests(void);
 void run_persona_training_tests(void);
-void run_voice_integration_tests(void);
 void run_behavioral_tests(void);
 void run_context_ext_tests(void);
 void run_untested_modules_tests(void);
@@ -317,6 +316,12 @@ void run_distiller_tests(void);
 void run_plan_executor_tests(void);
 void run_planner_mcts_wiring_tests(void);
 void run_cdp_tests(void);
+void run_emotional_cognition_tests(void);
+void run_evolving_cognition_tests(void);
+void run_metacognition_tests(void);
+void run_skill_routing_tests(void);
+void run_dual_process_tests(void);
+void run_episodic_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -400,7 +405,6 @@ int main(int argc, char **argv) {
     run_multimodal_audio_tests();
     run_multimodal_video_tests();
     run_voice_duplex_tests();
-    run_voice_realtime_tests();
     run_voice_rt_openai_tests();
     run_autonomy_tests();
     run_retrieval_tests();
@@ -414,6 +418,7 @@ int main(int argc, char **argv) {
     run_sse_tests();
     run_streaming_tests();
     run_websocket_tests();
+    run_ws_integration_tests();
     run_net_security_tests();
     run_path_security_tests();
     run_process_util_tests();
@@ -487,7 +492,6 @@ int main(int argc, char **argv) {
     run_authentic_tests();
     run_rag_pipeline_tests();
     run_persona_training_tests();
-    run_voice_integration_tests();
     run_behavioral_tests();
     run_context_ext_tests();
     run_untested_modules_tests();
@@ -658,6 +662,12 @@ int main(int argc, char **argv) {
     run_plan_executor_tests();
     run_planner_mcts_wiring_tests();
     run_cdp_tests();
+    run_emotional_cognition_tests();
+    run_evolving_cognition_tests();
+    run_metacognition_tests();
+    run_skill_routing_tests();
+    run_dual_process_tests();
+    run_episodic_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

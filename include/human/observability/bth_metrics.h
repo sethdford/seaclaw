@@ -36,6 +36,16 @@ typedef struct hu_bth_metrics {
     uint32_t reflections_daily;        /* Phase 8: daily reflections run */
     uint32_t reflections_weekly;       /* Phase 8: weekly reflections run */
     uint32_t total_turns;              /* total agent turns */
+    /* Cognition subsystem counters */
+    uint32_t cognition_fast_turns;     /* turns dispatched as System 1 (fast) */
+    uint32_t cognition_slow_turns;     /* turns dispatched as System 2 (slow) */
+    uint32_t cognition_emotional_turns; /* turns dispatched as emotional mode */
+    uint32_t metacog_interventions;    /* metacognitive actions taken (non-NONE) */
+    uint32_t episodic_patterns_stored; /* episodic patterns extracted and stored */
+    uint32_t episodic_replays;         /* cognitive replay blocks injected */
+    uint32_t skill_routes_semantic;    /* turns using semantic skill routing */
+    uint32_t skill_routes_blended;     /* turns with multi-skill blends */
+    uint32_t evolving_outcomes;        /* skill outcome signals collected */
 } hu_bth_metrics_t;
 
 void hu_bth_metrics_init(hu_bth_metrics_t *m);

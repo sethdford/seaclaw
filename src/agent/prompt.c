@@ -457,6 +457,36 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
             goto fail;
     }
 
+    /* Emotional context (from emotional cognition fusion) */
+    if (config->emotional_context && config->emotional_context_len > 0) {
+        err = append(alloc, &buf, &len, &cap, config->emotional_context,
+                     config->emotional_context_len);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    /* Cognition mode hint */
+    if (config->cognition_mode && config->cognition_mode_len > 0) {
+        err = append(alloc, &buf, &len, &cap, "\n## Cognition Mode: ", 20);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->cognition_mode,
+                     config->cognition_mode_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n\n", 2);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    /* Episodic replay (cognitive patterns from past sessions) */
+    if (config->episodic_replay && config->episodic_replay_len > 0) {
+        err = append(alloc, &buf, &len, &cap, config->episodic_replay,
+                     config->episodic_replay_len);
+        if (err != HU_OK)
+            goto fail;
+    }
+
     /* Memory context */
     err = append(alloc, &buf, &len, &cap, "## Memory Context\n\n", 19);
     if (err != HU_OK)

@@ -234,7 +234,7 @@ if(HU_ENABLE_GMAIL)
     list(APPEND CHANNEL_SOURCES src/channels/gmail_base64.c src/channels/gmail.c)
 endif()
 if(HU_ENABLE_VOICE)
-    list(APPEND CHANNEL_SOURCES src/channels/voice_channel.c src/channels/voice_realtime.c)
+    list(APPEND CHANNEL_SOURCES src/channels/voice_channel.c)
 endif()
 if(HU_ENABLE_MQTT)
     list(APPEND CHANNEL_SOURCES src/channels/mqtt.c)
@@ -545,6 +545,13 @@ set(HU_CORE_SOURCES
     src/memory/ingest.c
     src/memory/inbox.c
     src/memory/vector/circuit_breaker.c
+    src/cognition/db.c
+    src/cognition/emotional.c
+    src/cognition/evolving.c
+    src/cognition/metacognition.c
+    src/cognition/skill_routing.c
+    src/cognition/dual_process.c
+    src/cognition/episodic.c
     src/tools/validation.c
     src/tools/path_security.c
     src/tools/shell.c
@@ -611,7 +618,6 @@ set(HU_CORE_SOURCES
     src/mcp_server.c
     src/channels/thread_binding.c
     src/channels/format.c
-    src/channels/voice_integration.c
     src/security/policy_engine.c
     src/security/replay.c
     src/plugins/registry.c
@@ -724,6 +730,9 @@ list(APPEND HU_CORE_SOURCES
     src/tools/gui_agent.c
     src/tools/lsp.c
     src/voice/webrtc.c
+    src/voice/webrtc_ice.c
+    src/voice/webrtc_dtls.c
+    src/voice/webrtc_srtp.c
     src/voice/realtime.c
     src/voice/duplex.c
     src/providers/embedded.c
@@ -1567,7 +1576,7 @@ if(NOT HU_ENABLE_PERSONA)
         src/context/protective.c src/context/humor.c src/context/social_graph.c
         src/context/authentic.c
         src/memory/degradation.c src/memory/opinions.c src/memory/life_chapters.c
-        src/memory/rag_pipeline.c src/persona/training.c src/channels/voice_integration.c)
+        src/memory/rag_pipeline.c src/persona/training.c)
 endif()
 if(NOT HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_EXTRA_MODULES
@@ -1808,6 +1817,7 @@ set(HU_TEST_SOURCES
     tests/test_sse.c
     tests/test_streaming.c
     tests/test_websocket.c
+    tests/test_ws_integration.c
     tests/test_net_security.c
     tests/test_path_security.c
     tests/test_process_util.c
@@ -1820,7 +1830,6 @@ set(HU_TEST_SOURCES
     tests/test_multimodal_audio.c
     tests/test_multimodal_video.c
     tests/test_voice_duplex.c
-    tests/test_voice_realtime.c
     tests/test_voice_rt_openai.c
     tests/test_autonomy.c
     tests/test_retrieval.c
@@ -1887,7 +1896,6 @@ set(HU_TEST_SOURCES
     tests/test_authentic.c
     tests/test_rag_pipeline.c
     tests/test_persona_training.c
-    tests/test_voice_integration.c
     tests/test_behavioral.c
     tests/test_context_ext.c
     tests/test_entropy_gate.c
@@ -1983,6 +1991,12 @@ set(HU_TEST_SOURCES
     tests/test_plan_executor.c
     tests/test_planner_mcts_wiring.c
     tests/test_cdp.c
+    tests/test_emotional_cognition.c
+    tests/test_evolving_cognition.c
+    tests/test_metacognition.c
+    tests/test_skill_routing.c
+    tests/test_dual_process.c
+    tests/test_episodic.c
 )
 if(HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_SOURCES tests/test_google_feeds.c tests/test_music_feeds.c

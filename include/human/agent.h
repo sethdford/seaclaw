@@ -39,6 +39,9 @@
 #include "human/persona/relationship.h"
 #endif
 #include "human/agent/reflection.h"
+#include "human/cognition/dual_process.h"
+#include "human/cognition/emotional.h"
+#include "human/cognition/metacognition.h"
 #include "human/provider.h"
 #include "human/security.h"
 #include "human/security/audit.h"
@@ -249,6 +252,14 @@ struct hu_agent {
     hu_prm_config_t prm_config;
     hu_dpo_collector_t dpo_collector;
     bool sota_initialized;
+
+    /* Cognition subsystems */
+    hu_emotional_cognition_t emotional_cognition;
+    hu_metacognition_t metacognition;
+    hu_cognition_mode_t current_cognition_mode;
+#ifdef HU_ENABLE_SQLITE
+    struct sqlite3 *cognition_db;  /* shared DB for evolving + episodic */
+#endif
 };
 
 /* Create agent from minimal config (no full config loader yet).

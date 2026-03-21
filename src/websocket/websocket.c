@@ -131,6 +131,44 @@ int hu_ws_parse_header(const char *bytes, size_t bytes_len, hu_ws_parsed_header_
     return 0;
 }
 
+size_t hu_ws_build_upgrade_request(char *buf, size_t buf_cap, const char *host, const char *path,
+                                   const char *ws_key, const char *extra_headers) {
+    if (!host || !host[0] || !path || !path[0] || !ws_key || !ws_key[0])
+        return 0;
+    const char *xh = (extra_headers && extra_headers[0]) ? extra_headers : "";
+    int n;
+    if (!buf || buf_cap == 0) {
+        n = snprintf(NULL, 0,
+                       "GET %s HTTP/1.1\r\n"
+                       "Host: %s\r\n"
+                       "Upgrade: websocket\r\n"
+                       "Connection: Upgrade\r\n"
+                       "Sec-WebSocket-Key: %s\r\n"
+                       "Sec-WebSocket-Version: 13\r\n"
+                       "%s"
+                       "\r\n",
+                       path, host, ws_key, xh);
+    } else {
+        n = snprintf(buf, buf_cap,
+                       "GET %s HTTP/1.1\r\n"
+                       "Host: %s\r\n"
+                       "Upgrade: websocket\r\n"
+                       "Connection: Upgrade\r\n"
+                       "Sec-WebSocket-Key: %s\r\n"
+                       "Sec-WebSocket-Version: 13\r\n"
+                       "%s"
+                       "\r\n",
+                       path, host, ws_key, xh);
+    }
+    if (n < 0)
+        return 0;
+    if (!buf || buf_cap == 0)
+        return (size_t)n;
+    if ((size_t)n >= buf_cap)
+        return 0;
+    return (size_t)n;
+}
+
 #if defined(HU_GATEWAY_POSIX) && !HU_IS_TEST
 /* Base64 encode 16 bytes into 24 chars. RFC 6455 accepts padding. */
 static void ws_b64_encode_16(const unsigned char *in, char *out) {
@@ -308,18 +346,18 @@ hu_error_t hu_ws_connect_with_headers(hu_allocator_t *alloc, const char *url,
 
     const char *xh = (extra_headers && extra_headers[0]) ? extra_headers : "";
 
-    size_t req_len = 0;
-    req_len += (size_t)snprintf(NULL, 0,
-                                "GET %s HTTP/1.1\r\n"
-                                "Host: %s\r\n"
-                                "Upgrade: websocket\r\n"
-                                "Connection: Upgrade\r\n"
-                                "Sec-WebSocket-Key: %s\r\n"
-                                "Sec-WebSocket-Version: 13\r\n"
-                                "%s"
-                                "\r\n",
-                                path, host, key_b64, xh) +
-               1;
+    size_t need = hu_ws_build_upgrade_request(NULL, 0, host, path, key_b64, xh);
+    if (need == 0) {
+#ifdef HU_HAS_TLS
+        if (ssl) {
+            SSL_free(ssl);
+            SSL_CTX_free(ssl_ctx);
+        }
+#endif
+        close(sockfd);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    size_t req_len = need + 1;
     char *req = (char *)alloc->alloc(alloc->ctx, req_len);
     if (!req) {
 #ifdef HU_HAS_TLS
@@ -331,16 +369,17 @@ hu_error_t hu_ws_connect_with_headers(hu_allocator_t *alloc, const char *url,
         close(sockfd);
         return HU_ERR_OUT_OF_MEMORY;
     }
-    (void)snprintf(req, req_len,
-                   "GET %s HTTP/1.1\r\n"
-                   "Host: %s\r\n"
-                   "Upgrade: websocket\r\n"
-                   "Connection: Upgrade\r\n"
-                   "Sec-WebSocket-Key: %s\r\n"
-                   "Sec-WebSocket-Version: 13\r\n"
-                   "%s"
-                   "\r\n",
-                   path, host, key_b64, xh);
+    if (hu_ws_build_upgrade_request(req, req_len, host, path, key_b64, xh) == 0) {
+        alloc->free(alloc->ctx, req, req_len);
+#ifdef HU_HAS_TLS
+        if (ssl) {
+            SSL_free(ssl);
+            SSL_CTX_free(ssl_ctx);
+        }
+#endif
+        close(sockfd);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
     size_t sent = 0;
     size_t to_send = strlen(req);
     while (sent < to_send) {
