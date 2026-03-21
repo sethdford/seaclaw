@@ -1,0 +1,9 @@
+{
+  "name": "financial-literacy",
+  "description": "Understand and apply basic financial concepts: budgeting, compounding, opportunity cost, and risk",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

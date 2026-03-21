@@ -1,0 +1,9 @@
+{
+  "name": "technical-writing",
+  "description": "Write clear technical documentation: structure, audience awareness, and progressive disclosure",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}

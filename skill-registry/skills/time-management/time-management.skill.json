@@ -1,0 +1,9 @@
+{
+  "name": "time-management",
+  "description": "Plan and protect time using time-blocking, batching, energy mapping, and buffer allocation",
+  "version": "1.0.0",
+  "author": "human",
+  "dependencies": [],
+  "parameters": "{}",
+  "enabled": true
+}
