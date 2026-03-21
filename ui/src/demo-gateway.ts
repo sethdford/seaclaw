@@ -211,8 +211,8 @@ function makeSkills() {
       parameters: '{"source": "string"}',
     },
     {
-      name: "email-digest",
-      description: "Summarize and prioritize inbox messages across providers",
+      name: "slack-digest",
+      description: "Daily Slack channel digest and highlights",
       enabled: false,
     },
     {
@@ -239,12 +239,12 @@ const DEMO_REGISTRY = [
     tags: "development, review",
   },
   {
-    name: "email-digest",
-    description: "Daily email digest and inbox summarization",
+    name: "slack-digest",
+    description: "Daily Slack channel digest and highlights",
     version: "1.0.0",
     author: "h-uman",
-    url: "https://github.com/human/skill-registry/tree/main/skills/email-digest",
-    tags: "email, productivity",
+    url: "https://github.com/human/skill-registry/tree/main/skills/slack-digest",
+    tags: "social, slack, communication",
   },
   {
     name: "web-research",
