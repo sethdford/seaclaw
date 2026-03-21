@@ -36,6 +36,18 @@
     ]
   },
   {
+    "name": "apology-craft",
+    "description": "Construct and coach genuine apologies: acknowledgment, ownership, impact, repair, and changed behavior",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/apology-craft",
+    "tags": [
+      "communication",
+      "emotional-intelligence",
+      "relationships"
+    ]
+  },
+  {
     "name": "assumption-mapping",
     "description": "Surface, categorize, and test hidden assumptions before they cause failure",
     "version": "1.0.0",
@@ -509,6 +521,30 @@
       "cognitive",
       "reasoning",
       "analysis"
+    ]
+  },
+  {
+    "name": "gratitude-practice",
+    "description": "Notice, name, and express appreciation as a deliberate practice to counter negativity bias",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/gratitude-practice",
+    "tags": [
+      "wellbeing",
+      "emotional-intelligence",
+      "mindfulness"
+    ]
+  },
+  {
+    "name": "grief-support",
+    "description": "Be present for loss and pain: validate, witness, and resist the urge to fix",
+    "version": "1.0.0",
+    "author": "human",
+    "url": "https://github.com/human/skill-registry/tree/main/skills/grief-support",
+    "tags": [
+      "wellbeing",
+      "empathy",
+      "communication"
     ]
   },
   {
