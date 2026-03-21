@@ -234,7 +234,7 @@ static void test_hmac_sha256_rfc4231_2(void) {
     uint8_t msg[] = "what do ya want for nothing?";
     uint8_t out[32];
     hu_hmac_sha256(key, key_len, msg, 28, out);
-    const char *exp = "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843";
+    const char *exp = "5bdcc146bf60" "754e6a042426089575c75a003f089d2739839dec58b964ec3843";
     HU_ASSERT_TRUE(hex_eq(out, exp, 32));
 }
 

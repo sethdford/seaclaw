@@ -54,7 +54,7 @@ Only **discord**, **imessage**, **signal**, **slack**, and **telegram** implemen
  * onebot         |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * pwa            |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * qq             |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
- * signal         |  ✓   |    ·    |   ✓   |      ✓       |   ✓    |     ✓
+ * signal         |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ✓
  * slack          |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ✓
  * teams          |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * telegram       |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ✓
@@ -95,7 +95,7 @@ Only **discord**, **imessage**, **signal**, **slack**, and **telegram** implemen
 | onebot | · | · | · | · | · |
 | pwa | · | · | · | · | · |
 | qq | · | · | · | · | · |
-| signal | · (`NULL`) | ✓ | ✓ | ✓ | ✓ |
+| signal | ✓ | ✓ | ✓ | ✓ | ✓ |
 | slack | ✓ | ✓ | ✓ | ✓ | ✓ |
 | teams | · | · | · | · | · |
 | telegram | ✓ | ✓ | ✓ | ✓ | ✓ |

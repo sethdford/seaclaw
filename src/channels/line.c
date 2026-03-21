@@ -169,6 +169,14 @@ static bool line_health_check(void *ctx) {
     return true;
 }
 
+static hu_error_t line_get_response_constraints(void *ctx, hu_channel_response_constraints_t *out) {
+    (void)ctx;
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    out->max_chars = 5000;
+    return HU_OK;
+}
+
 static const hu_channel_vtable_t line_vtable = {
     .start = line_start,
     .stop = line_stop,
@@ -178,6 +186,7 @@ static const hu_channel_vtable_t line_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
+    .get_response_constraints = line_get_response_constraints,
 };
 
 hu_error_t hu_line_on_webhook(void *channel_ctx, hu_allocator_t *alloc, const char *body,

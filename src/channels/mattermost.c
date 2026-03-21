@@ -133,6 +133,15 @@ static bool mattermost_health_check(void *ctx) {
     return true;
 }
 
+static hu_error_t mattermost_get_response_constraints(void *ctx, hu_channel_response_constraints_t *out) {
+    (void)ctx;
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    /* Default server max post length (configurable on server; this matches common default). */
+    out->max_chars = 16383;
+    return HU_OK;
+}
+
 static const hu_channel_vtable_t mattermost_vtable = {
     .start = mattermost_start,
     .stop = mattermost_stop,
@@ -142,6 +151,7 @@ static const hu_channel_vtable_t mattermost_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
+    .get_response_constraints = mattermost_get_response_constraints,
 };
 
 hu_error_t hu_mattermost_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_loop_msg_t *msgs,

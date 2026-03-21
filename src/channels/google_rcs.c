@@ -224,6 +224,14 @@ static bool google_rcs_health_check(void *ctx) {
     return true;
 }
 
+static hu_error_t google_rcs_get_response_constraints(void *ctx, hu_channel_response_constraints_t *out) {
+    (void)ctx;
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    out->max_chars = 8000;
+    return HU_OK;
+}
+
 static const hu_channel_vtable_t google_rcs_vtable = {
     .start = google_rcs_start,
     .stop = google_rcs_stop,
@@ -233,6 +241,7 @@ static const hu_channel_vtable_t google_rcs_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
+    .get_response_constraints = google_rcs_get_response_constraints,
 };
 
 hu_error_t hu_google_rcs_create(hu_allocator_t *alloc, const char *agent_id, size_t agent_id_len,

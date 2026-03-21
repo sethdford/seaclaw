@@ -7,7 +7,7 @@ not quite human. C11 autonomous AI assistant runtime. See `AGENTS.md` for the fu
 - **Language**: C11 (`-Wall -Wextra -Wpedantic -Werror`)
 - **Dependencies**: libc only (optional SQLite, libcurl)
 - **Build**: CMake 3.20+, presets in `CMakePresets.json`
-- **Test**: Custom framework in `tests/test_framework.h`, 6075+ tests
+- **Test**: Custom framework in `tests/test_framework.h`, 6077+ tests
 
 ## Architecture
 

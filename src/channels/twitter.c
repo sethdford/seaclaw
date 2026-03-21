@@ -224,6 +224,14 @@ static bool twitter_health_check(void *ctx) {
     return true;
 }
 
+static hu_error_t twitter_get_response_constraints(void *ctx, hu_channel_response_constraints_t *out) {
+    (void)ctx;
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    out->max_chars = 10000;
+    return HU_OK;
+}
+
 static const hu_channel_vtable_t twitter_vtable = {
     .start = twitter_start,
     .stop = twitter_stop,
@@ -233,6 +241,7 @@ static const hu_channel_vtable_t twitter_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
+    .get_response_constraints = twitter_get_response_constraints,
 };
 
 hu_error_t hu_twitter_create(hu_allocator_t *alloc, const char *bearer_token,

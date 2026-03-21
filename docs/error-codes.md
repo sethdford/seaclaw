@@ -136,3 +136,9 @@ All error codes are defined in `include/human/core/error.h` as `hu_error_t`. Use
 - Use `HU_ERR_NOT_SUPPORTED` for platform-specific features on unsupported platforms (never silent 0)
 - Security errors should be specific — `COMMAND_NOT_ALLOWED` vs `HIGH_RISK_BLOCKED` vs `LOCKOUT` convey different user actions
 - `HU_ERR_INTERNAL` indicates a bug — investigate rather than handling gracefully
+
+### Sentinel Value
+
+`HU_ERR_COUNT` is a sentinel marking the end of the enum. It is **not** a valid error code
+and must never be returned from any function. Use `0 .. HU_ERR_COUNT - 1` for valid error codes.
+`hu_error_string()` returns a non-empty string for any value including invalid ones.

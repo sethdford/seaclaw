@@ -238,6 +238,14 @@ static bool pwa_health_check(void *ctx) {
 #endif
 }
 
+static hu_error_t pwa_get_response_constraints(void *ctx, hu_channel_response_constraints_t *out) {
+    (void)ctx;
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    out->max_chars = 0;
+    return HU_OK;
+}
+
 static const hu_channel_vtable_t pwa_vtable = {
     .start = pwa_start,
     .stop = pwa_stop,
@@ -248,7 +256,7 @@ static const hu_channel_vtable_t pwa_vtable = {
     .start_typing = NULL,
     .stop_typing = NULL,
     .load_conversation_history = NULL, /* PWA receives messages via gateway push; no server-side history API */
-    .get_response_constraints = NULL,
+    .get_response_constraints = pwa_get_response_constraints,
     .react = NULL,
 };
 

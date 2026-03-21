@@ -211,6 +211,15 @@ static bool twilio_health_check(void *ctx) {
     return true;
 }
 
+static hu_error_t twilio_get_response_constraints(void *ctx, hu_channel_response_constraints_t *out) {
+    (void)ctx;
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    /* Concatenated SMS; conservative cap vs carrier-specific limits. */
+    out->max_chars = 1600;
+    return HU_OK;
+}
+
 static const hu_channel_vtable_t twilio_vtable = {
     .start = twilio_start,
     .stop = twilio_stop,
@@ -220,6 +229,7 @@ static const hu_channel_vtable_t twilio_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
+    .get_response_constraints = twilio_get_response_constraints,
 };
 
 hu_error_t hu_twilio_on_webhook(void *channel_ctx, hu_allocator_t *alloc, const char *body,

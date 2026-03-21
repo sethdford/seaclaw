@@ -41,7 +41,7 @@ jobs:
         run: |
           COUNT=$(./build/human_tests 2>&1 | grep -oE '[0-9]+/[0-9]+ passed' | head -1 | cut -d/ -f1)
           echo "Test count: $COUNT"
-          BASELINE=6075
+          BASELINE=6077
           if [ "$COUNT" -lt "$BASELINE" ]; then
             echo "::error::Test count regression: $COUNT < $BASELINE baseline"
             exit 1
@@ -675,7 +675,8 @@ jobs:
             "fuzz_prompt_injection" \
             "fuzz_visual_grounding" \
             "fuzz_ensemble_rerank" \
-            "fuzz_contact_phone"; do
+            "fuzz_contact_phone" \
+            "fuzz_twilio_webhook"; do
             NAME=$(echo "$harness" | cut -d' ' -f1)
             echo "--- Running $NAME ---"
             if ! ./build-fuzz/$harness -max_total_time=30 -print_final_stats=1; then

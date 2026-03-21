@@ -1189,7 +1189,7 @@ hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv) {
         char *recommendations = NULL;
         hu_error_t err = hu_calibrate(alloc, db_path, contact, channel, &recommendations);
         if (err != HU_OK) {
-            fprintf(stderr, "Calibration failed: %d\n", (int)err);
+            fprintf(stderr, "Calibration failed: %s\n", hu_error_string(err));
             return err;
         }
         if (recommendations) {
@@ -1208,7 +1208,7 @@ hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv) {
         memset(&patterns, 0, sizeof(patterns));
         hu_error_t err = hu_behavioral_clone_extract(alloc, db_path, contact, &patterns);
         if (err != HU_OK) {
-            fprintf(stderr, "Clone extraction failed: %d\n", (int)err);
+            fprintf(stderr, "Clone extraction failed: %s\n", hu_error_string(err));
             return err;
         }
 
@@ -1221,7 +1221,7 @@ hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv) {
         if (persona_path) {
             err = hu_behavioral_clone_update_persona(alloc, &patterns, persona_path);
             if (err != HU_OK) {
-                fprintf(stderr, "Persona update failed: %d\n", (int)err);
+                fprintf(stderr, "Persona update failed: %s\n", hu_error_string(err));
                 return err;
             }
             printf("Persona recommendations written to: %s\n", persona_path);

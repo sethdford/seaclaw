@@ -141,6 +141,14 @@ static bool teams_health_check(void *ctx) {
     return true;
 }
 
+static hu_error_t teams_get_response_constraints(void *ctx, hu_channel_response_constraints_t *out) {
+    (void)ctx;
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    out->max_chars = 28000;
+    return HU_OK;
+}
+
 static const hu_channel_vtable_t teams_vtable = {
     .start = teams_start,
     .stop = teams_stop,
@@ -150,6 +158,7 @@ static const hu_channel_vtable_t teams_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
+    .get_response_constraints = teams_get_response_constraints,
 };
 
 hu_error_t hu_teams_on_webhook(void *channel_ctx, hu_allocator_t *alloc, const char *body,

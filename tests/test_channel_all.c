@@ -688,6 +688,17 @@ static void test_twitter_send_empty_message(void) {
     HU_ASSERT_EQ(err, HU_OK);
     hu_twitter_destroy(&ch);
 }
+
+static void test_twitter_get_response_constraints_max_chars(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_twitter_create(&alloc, "bearer", 6, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->get_response_constraints);
+    hu_channel_response_constraints_t cs = {0};
+    HU_ASSERT_EQ(ch.vtable->get_response_constraints(ch.ctx, &cs), HU_OK);
+    HU_ASSERT_EQ(cs.max_chars, 10000u);
+    hu_twitter_destroy(&ch);
+}
 #endif
 
 /* ─── Google RCS ───────────────────────────────────────────────────────────── */
@@ -2444,6 +2455,17 @@ static void test_twilio_poll_null_args(void) {
     hu_error_t err = hu_twilio_poll(NULL, NULL, NULL, 0, NULL);
     HU_ASSERT(err == HU_ERR_INVALID_ARGUMENT);
 }
+
+static void test_twilio_get_response_constraints_max_chars(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_twilio_create(&alloc, "ACXXXX", 6, "token", 5, "+15551234567", 12, "+15559876543", 12, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->get_response_constraints);
+    hu_channel_response_constraints_t cs = {0};
+    HU_ASSERT_EQ(ch.vtable->get_response_constraints(ch.ctx, &cs), HU_OK);
+    HU_ASSERT_EQ(cs.max_chars, 1600u);
+    hu_twilio_destroy(&ch);
+}
 #endif
 
 /* ─── Google Chat ───────────────────────────────────────────────────────── */
@@ -2682,6 +2704,7 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_twitter_poll_empty);
     HU_RUN_TEST(test_twitter_webhook_malformed);
     HU_RUN_TEST(test_twitter_send_empty_message);
+    HU_RUN_TEST(test_twitter_get_response_constraints_max_chars);
 #endif
 #if HU_HAS_GOOGLE_RCS
     HU_RUN_TEST(test_google_rcs_create);
@@ -2796,6 +2819,7 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_twilio_health_check);
     HU_RUN_TEST(test_twilio_webhook_and_poll);
     HU_RUN_TEST(test_twilio_poll_null_args);
+    HU_RUN_TEST(test_twilio_get_response_constraints_max_chars);
 #endif
 #if HU_HAS_GOOGLE_CHAT
     HU_RUN_TEST(test_google_chat_create);

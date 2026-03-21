@@ -95,13 +95,14 @@ static void test_tracking_allocator_reports_leak_count(void) {
 }
 
 static void test_error_string_all_codes(void) {
-    const char *s0 = hu_error_string(HU_OK);
-    const char *s1 = hu_error_string(HU_ERR_OUT_OF_MEMORY);
-    const char *s2 = hu_error_string(HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_NOT_NULL(s0);
-    HU_ASSERT_NOT_NULL(s1);
-    HU_ASSERT_NOT_NULL(s2);
-    HU_ASSERT(strlen(s0) > 0);
+    for (int e = 0; e < (int)HU_ERR_COUNT; e++) {
+        const char *s = hu_error_string((hu_error_t)e);
+        HU_ASSERT(s != NULL);
+        HU_ASSERT(s[0] != '\0');
+    }
+    const char *unknown = hu_error_string((hu_error_t)9999);
+    HU_ASSERT(unknown != NULL);
+    HU_ASSERT(unknown[0] != '\0');
 }
 
 static void test_strndup_zero_len(void) {

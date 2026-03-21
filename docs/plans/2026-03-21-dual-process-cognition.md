@@ -24,7 +24,7 @@ Non-goals (for this proposal):
 
 ---
 
-## Background / Research
+## Background/Research
 
 ### Dual-process theory (product metaphor)
 
@@ -82,7 +82,7 @@ The runtime already contains partial analogues:
 - `float confidence` in **[0.0, 1.0]**
 - Optional `hu_cognition_flags_t` bitset (e.g. “force retrieval”, “suppress chain-of-thought”)
 
-**Performance target**: **&lt; 50 ms** CPU time on native for the default **heuristic** backend on typical messages (no network, no provider call). Embedding or micro-LLM backends may exceed that; they must be opt-in and budgeted separately in config.
+**Performance target**: **under 50 ms** CPU time on native for the default **heuristic** backend on typical messages (no network, no provider call). Embedding or micro-LLM backends may exceed that; they must be opt-in and budgeted separately in config.
 
 **Backend options** (vtable-driven):
 
@@ -90,7 +90,7 @@ The runtime already contains partial analogues:
 2. **Embedding classifier**: compare message embedding to centroid prototypes (requires optional embedding path; guarded by build flags and `HU_IS_TEST` stubs).
 3. **Cheap LLM call**: ultra-small model / secondary provider — **off by default**, only when explicitly configured; must use `HU_IS_TEST` short-circuit to a fixed mode in tests.
 
-**Safety**: If `confidence &lt; threshold` or classifier errors, **default to `HU_COGNITION_MODE_SLOW`**. Injection-high-risk path remains unchanged (already returns before the main pipeline).
+**Safety**: If confidence is below the configured threshold or the classifier errors, **default to `HU_COGNITION_MODE_SLOW`**. Injection-high-risk path remains unchanged (already returns before the main pipeline).
 
 ### System 1 prompt budget (~2K tokens target)
 
@@ -344,7 +344,7 @@ All classifier tests run **without** provider network: use `HU_IS_TEST` paths; e
 
 ### Performance smoke (optional)
 
-- Micro-benchmark heuristic dispatch-only on a corpus of strings; assert p99 &lt; 50 ms on CI hardware class (loose gate, informational first).
+- Micro-benchmark heuristic dispatch-only on a corpus of strings; assert p99 is under 50 ms on CI hardware class (loose gate, informational first).
 
 ---
 

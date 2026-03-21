@@ -33,6 +33,7 @@ AGENTS.md                <- Full engineering protocol
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------ |
 | [agent-architecture.md](ai/agent-architecture.md)             | Pipeline design, vtable component responsibilities, orchestration patterns, retry/fallback | Modifying agent loop, adding components    |
 | [skills-vs-agents.md](ai/skills-vs-agents.md)                 | Static SkillForge vs spawned agents; top_k catalog env; inheritance                         | Skills, `agent_spawn`, prompt sizing       |
+| [fleet.md](ai/fleet.md)                                       | `hu_agent_pool_t` limits: depth, lifetime spawns, session budget; `/fleet`, spawn errors    | Sub-agents, `agent_spawn`, `/spawn`, cost caps |
 | [conversation-design.md](ai/conversation-design.md)           | Response patterns, channel-aware behavior, intent routing, persona integration             | Building conversational features           |
 | [hallucination-prevention.md](ai/hallucination-prevention.md) | Grounding hierarchy, tool output integrity, memory attribution, capability honesty         | Any AI response generation                 |
 | [prompt-engineering.md](ai/prompt-engineering.md)             | System prompt structure, persona composition, RAG patterns, context window management      | Modifying prompts, adding providers        |
