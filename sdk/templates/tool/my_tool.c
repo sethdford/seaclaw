@@ -2,12 +2,10 @@
  * Template: Custom Tool
  *
  * Implements hu_tool_t vtable. Required methods:
- *   - execute: run with JSON args, write result to out
- *   - name: return tool name (static string)
- *   - description: return description for LLM (static string)
- *   - parameters_json: JSON Schema for args (static string)
+ *   - execute, name, description, parameters_json
  *
- * Optional: deinit for heap-allocated context cleanup
+ * Optional (may be NULL; see include/human/tool.h):
+ *   - deinit, execute_streaming
  */
 #include "my_tool.h"
 #include "human/tool.h"
@@ -20,7 +18,7 @@
 #define HU_MY_TOOL_PARAMS "{\"type\":\"object\",\"properties\":{\"input\":{\"type\":\"string\"}},\"required\":[\"input\"]}"
 
 typedef struct hu_my_tool_ctx {
-    /* Add per-instance state if needed */
+    char reserved; /* replace with real fields when you add per-instance state */
 } hu_my_tool_ctx_t;
 
 static hu_error_t my_tool_execute(void *ctx, hu_allocator_t *alloc,
@@ -49,10 +47,13 @@ static hu_error_t my_tool_execute(void *ctx, hu_allocator_t *alloc,
     *out = hu_tool_result_ok_owned(msg, 14);
     return HU_OK;
 #else
-    /* TODO: Implement real logic. Validate inputs, perform action.
-     * Use hu_tool_result_ok / hu_tool_result_ok_owned for success.
-     * Use hu_tool_result_fail / hu_tool_result_fail_owned for errors.
-     * Caller must hu_tool_result_free if output_owned or error_msg_owned. */
+    /* Implementation checklist (AGENTS.md §7.3 — Adding a Tool):
+     * [ ] Validate and sanitize all inputs from args; return hu_tool_result_fail* on errors.
+     * [ ] Use hu_tool_result_ok / hu_tool_result_ok_owned for success; fail* for tool errors.
+     * [ ] HU_IS_TEST-guard any network, process spawn, or filesystem side effects.
+     * [ ] Register in src/tools/factory.c; add execute/schema tests.
+     * [ ] Caller frees owned fields via hu_tool_result_free when needed.
+     */
     (void)alloc;
     (void)input;
     *out = hu_tool_result_fail("Not implemented", 14);
@@ -76,8 +77,8 @@ static const char *my_tool_parameters_json(void *ctx) {
 }
 
 static void my_tool_deinit(void *ctx, hu_allocator_t *alloc) {
-    (void)alloc;
-    if (ctx) free(ctx);
+    if (!ctx || !alloc) return;
+    alloc->free(alloc->ctx, ctx, sizeof(hu_my_tool_ctx_t));
 }
 
 static const hu_tool_vtable_t my_tool_vtable = {
@@ -86,6 +87,7 @@ static const hu_tool_vtable_t my_tool_vtable = {
     .description = my_tool_description,
     .parameters_json = my_tool_parameters_json,
     .deinit = my_tool_deinit,
+    .execute_streaming = NULL,
 };
 
 hu_error_t hu_my_tool_create(hu_allocator_t *alloc, hu_tool_t *out) {

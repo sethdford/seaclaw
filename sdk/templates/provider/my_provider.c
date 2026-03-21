@@ -2,22 +2,16 @@
  * Template: Custom AI Provider
  *
  * Implements hu_provider_t vtable. Required methods:
- *   - chat_with_system: simple system+user -> text
- *   - chat: full multi-message chat with optional tool calls
- *   - supports_native_tools
- *   - get_name
- *   - deinit
+ *   - chat_with_system, chat, supports_native_tools, get_name, deinit
  *
- * Optional (may be NULL): warmup, chat_with_tools, supports_streaming,
- *   supports_vision, stream_chat
+ * Optional (may be NULL; see include/human/provider.h):
+ *   - warmup, chat_with_tools, supports_streaming, supports_vision,
+ *     supports_vision_for_model, stream_chat
  */
 #include "my_provider.h"
 #include "human/provider.h"
-#include "human/core/json.h"
-#include "human/core/http.h"
 #include "human/core/string.h"
 #include <string.h>
-#include <stdlib.h>
 
 typedef struct hu_my_provider_ctx {
     char *api_key;
@@ -34,7 +28,6 @@ static hu_error_t my_provider_chat_with_system(void *ctx, hu_allocator_t *alloc,
     double temperature,
     char **out, size_t *out_len)
 {
-    (void)alloc;
     (void)system_prompt;
     (void)system_prompt_len;
     (void)message;
@@ -44,6 +37,8 @@ static hu_error_t my_provider_chat_with_system(void *ctx, hu_allocator_t *alloc,
     (void)temperature;
 
 #if HU_IS_TEST
+    (void)ctx;
+    if (!out || !out_len || !alloc) return HU_ERR_INVALID_ARGUMENT;
     *out = hu_strndup(alloc, "(my_provider stub)", 18);
     if (!*out) return HU_ERR_OUT_OF_MEMORY;
     *out_len = 18;
@@ -51,10 +46,15 @@ static hu_error_t my_provider_chat_with_system(void *ctx, hu_allocator_t *alloc,
 #else
     hu_my_provider_ctx_t *c = (hu_my_provider_ctx_t *)ctx;
     if (!c || !out || !out_len) return HU_ERR_INVALID_ARGUMENT;
+    (void)alloc;
 
-    /* TODO: Build JSON request, call HTTP API, parse response.
-     * Use hu_http_post_json or hu_http_post_json_ex. */
-    (void)c;
+    /* Implementation checklist (AGENTS.md §7.1 — Adding a Provider):
+     * [ ] Build request JSON from system_prompt, message, model, temperature.
+     * [ ] POST to your API (e.g. human/core/http.h); parse assistant text into *out.
+     * [ ] Allocate *out with alloc (hu_strndup or alloc->alloc); set *out_len.
+     * [ ] HU_IS_TEST: no real HTTP; return deterministic stub text.
+     * [ ] Register in src/providers/factory.c; add vtable and failure-path tests.
+     */
     *out = NULL;
     *out_len = 0;
     return HU_ERR_NOT_SUPPORTED;
@@ -68,20 +68,25 @@ static hu_error_t my_provider_chat(void *ctx, hu_allocator_t *alloc,
     double temperature,
     hu_chat_response_t *out)
 {
+#if HU_IS_TEST
+    (void)ctx;
+    (void)model;
+    (void)model_len;
+    (void)temperature;
+    if (!alloc || !request || !out) return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+    out->content = hu_strndup(alloc, "(my_provider chat stub)", 24);
+    if (!out->content) return HU_ERR_OUT_OF_MEMORY;
+    out->content_len = 24;
+    return HU_OK;
+#else
+    if (!out) return HU_ERR_INVALID_ARGUMENT;
     (void)ctx;
     (void)alloc;
     (void)request;
     (void)model;
     (void)model_len;
     (void)temperature;
-    (void)out;
-
-#if HU_IS_TEST
-    memset(out, 0, sizeof(*out));
-    out->content = hu_strndup(alloc, "(my_provider chat stub)", 24);
-    if (out->content) out->content_len = 24;
-    return HU_OK;
-#else
     return HU_ERR_NOT_SUPPORTED;
 #endif
 }
@@ -98,7 +103,7 @@ static const char *my_provider_get_name(void *ctx) {
 
 static void my_provider_deinit(void *ctx, hu_allocator_t *alloc) {
     hu_my_provider_ctx_t *c = (hu_my_provider_ctx_t *)ctx;
-    if (!c) return;
+    if (!c || !alloc) return;
     if (c->api_key) alloc->free(alloc->ctx, c->api_key, c->api_key_len + 1);
     if (c->base_url) alloc->free(alloc->ctx, c->base_url, c->base_url_len + 1);
     alloc->free(alloc->ctx, c, sizeof(*c));

@@ -2,13 +2,13 @@
  * Template: Custom Channel
  *
  * Implements hu_channel_t vtable. Required methods:
- *   - start: initialize / start listening
- *   - stop: stop listening
- *   - send: send message to target
- *   - name: return channel name (static string)
- *   - health_check: return true if healthy
+ *   - start, stop, send, name, health_check
  *
- * Optional (may be NULL): send_event, start_typing, stop_typing
+ * Optional (may be NULL; see include/human/channel.h):
+ *   - send_event, start_typing, stop_typing
+ *   - load_conversation_history, get_response_constraints, react
+ *   - get_attachment_path, human_active_recently, get_latest_attachment_path
+ *   - build_reaction_context, build_read_receipt_context
  */
 #include "my_channel.h"
 #include "human/channel.h"
@@ -49,8 +49,12 @@ static hu_error_t my_channel_send(void *ctx,
     hu_my_channel_ctx_t *c = (hu_my_channel_ctx_t *)ctx;
     if (!c || !c->running) return HU_ERR_CHANNEL_SEND;
 
-    /* TODO: Send message to target via your transport (HTTP, WebSocket, etc.).
-     * media is optional array of URLs; media_count 0 if none. */
+    /* Implementation checklist (AGENTS.md §7.2 — Adding a Channel):
+     * [ ] Validate target and message pointers; respect platform length limits.
+     * [ ] Deliver via your transport (HTTP, WebSocket, etc.); guard with HU_IS_TEST.
+     * [ ] If media_count > 0, attach URLs from media[] per platform API.
+     * [ ] Register in src/channels/factory.c; add config/auth/health tests.
+     */
     (void)target;
     (void)target_len;
     (void)message;
@@ -80,6 +84,14 @@ static const hu_channel_vtable_t my_channel_vtable = {
     .send_event = NULL,
     .start_typing = NULL,
     .stop_typing = NULL,
+    .load_conversation_history = NULL,
+    .get_response_constraints = NULL,
+    .react = NULL,
+    .get_attachment_path = NULL,
+    .human_active_recently = NULL,
+    .get_latest_attachment_path = NULL,
+    .build_reaction_context = NULL,
+    .build_read_receipt_context = NULL,
 };
 
 hu_error_t hu_my_channel_create(hu_allocator_t *alloc, hu_channel_t *out) {
