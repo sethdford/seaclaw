@@ -883,8 +883,163 @@ static hu_error_t telegram_load_conversation_history(void *ctx, hu_allocator_t *
 #if HU_IS_TEST
     return HU_OK;
 #else
+#if defined(HU_HTTP_CURL)
+    hu_telegram_ctx_t *c = (hu_telegram_ctx_t *)ctx;
+    if (!c || !c->token || c->token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    if (contact_id_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (limit == 0)
+        return HU_OK;
+
+    size_t api_lim = limit > 100 ? 100 : limit;
+    char url_buf[512];
+    int nu = build_api_url(url_buf, sizeof(url_buf), c->token, c->token_len, "getUpdates");
+    if (nu < 0 || (size_t)nu >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+
+    char body_buf[192];
+    int nb =
+        snprintf(body_buf, sizeof(body_buf),
+                 "{\"offset\":%lld,\"limit\":%zu,\"timeout\":0,"
+                 "\"allowed_updates\":[\"message\",\"channel_post\"]}",
+                 (long long)c->last_update_id, api_lim);
+    if (nb < 0 || (size_t)nb >= sizeof(body_buf))
+        return HU_ERR_INTERNAL;
+
+    hu_http_response_t resp = {0};
+    hu_error_t err = hu_http_post_json(alloc, url_buf, NULL, body_buf, (size_t)nb, &resp);
+    if (err != HU_OK) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return err;
+    }
+    if (resp.status_code != 200 || !resp.body || resp.body_len == 0) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return HU_ERR_CHANNEL_SEND;
+    }
+    if (strstr(resp.body, "\"ok\":true") == NULL) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return HU_ERR_CHANNEL_SEND;
+    }
+
+    hu_json_value_t *parsed = NULL;
+    err = hu_json_parse(alloc, resp.body, resp.body_len, &parsed);
+    if (resp.owned && resp.body)
+        hu_http_response_free(alloc, &resp);
+    if (err != HU_OK || !parsed || parsed->type != HU_JSON_OBJECT) {
+        if (parsed)
+            hu_json_free(alloc, parsed);
+        return err != HU_OK ? err : HU_ERR_INTERNAL;
+    }
+
+    hu_json_value_t *result = hu_json_object_get(parsed, "result");
+    if (!result || result->type != HU_JSON_ARRAY) {
+        hu_json_free(alloc, parsed);
+        return HU_OK;
+    }
+
+    hu_channel_history_entry_t *scratch =
+        (hu_channel_history_entry_t *)alloc->alloc(alloc->ctx, 100 * sizeof(*scratch));
+    if (!scratch) {
+        hu_json_free(alloc, parsed);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    memset(scratch, 0, 100 * sizeof(*scratch));
+    size_t n_match = 0;
+
+    for (size_t i = 0; i < result->data.array.len; i++) {
+        hu_json_value_t *up = result->data.array.items[i];
+        if (!up || up->type != HU_JSON_OBJECT)
+            continue;
+
+        hu_json_value_t *msg_obj = hu_json_object_get(up, "message");
+        if (!msg_obj || msg_obj->type != HU_JSON_OBJECT) {
+            msg_obj = hu_json_object_get(up, "channel_post");
+            if (!msg_obj || msg_obj->type != HU_JSON_OBJECT)
+                continue;
+        }
+
+        hu_json_value_t *chat = hu_json_object_get(msg_obj, "chat");
+        if (!chat || chat->type != HU_JSON_OBJECT)
+            continue;
+        double chat_id_num = hu_json_get_number(chat, "id", 0);
+        char chat_id_buf[32];
+        int cn = snprintf(chat_id_buf, sizeof(chat_id_buf), "%.0f", chat_id_num);
+        if (cn < 0 || (size_t)cn >= sizeof(chat_id_buf))
+            continue;
+        if ((size_t)cn != contact_id_len || memcmp(chat_id_buf, contact_id, contact_id_len) != 0)
+            continue;
+
+        const char *text = hu_json_get_string(msg_obj, "text");
+        if (!text)
+            text = hu_json_get_string(msg_obj, "caption");
+        if (!text)
+            text = "";
+        size_t text_len = strlen(text);
+        if (text_len == 0)
+            continue;
+
+        hu_channel_history_entry_t entry;
+        memset(&entry, 0, sizeof(entry));
+
+        hu_json_value_t *from = hu_json_object_get(msg_obj, "from");
+        if (from && from->type == HU_JSON_OBJECT)
+            entry.from_me = hu_json_get_bool(from, "is_bot", false);
+
+        size_t tcopy = text_len;
+        if (tcopy > sizeof(entry.text) - 1)
+            tcopy = sizeof(entry.text) - 1;
+        memcpy(entry.text, text, tcopy);
+        entry.text[tcopy] = '\0';
+
+        double date_num = hu_json_get_number(msg_obj, "date", 0);
+        time_t tsec = (time_t)date_num;
+        struct tm tm_utc;
+        if (gmtime_r(&tsec, &tm_utc) != NULL)
+            strftime(entry.timestamp, sizeof(entry.timestamp), "%Y-%m-%dT%H:%M:%SZ", &tm_utc);
+
+        if (n_match < 100) {
+            scratch[n_match++] = entry;
+        } else {
+            memmove(scratch, scratch + 1, (100 - 1) * sizeof(*scratch));
+            scratch[99] = entry;
+        }
+    }
+
+    hu_json_free(alloc, parsed);
+
+    if (n_match == 0) {
+        alloc->free(alloc->ctx, scratch, 100 * sizeof(*scratch));
+        return HU_OK;
+    }
+
+    size_t start = 0;
+    if (n_match > limit)
+        start = n_match - limit;
+    size_t out_n = n_match - start;
+
+    hu_channel_history_entry_t *entries =
+        (hu_channel_history_entry_t *)alloc->alloc(alloc->ctx, out_n * sizeof(*entries));
+    if (!entries) {
+        alloc->free(alloc->ctx, scratch, 100 * sizeof(*scratch));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    memcpy(entries, scratch + start, out_n * sizeof(*entries));
+    alloc->free(alloc->ctx, scratch, 100 * sizeof(*scratch));
+
+    *out = entries;
+    *out_count = out_n;
+    return HU_OK;
+#else
+    (void)ctx;
     (void)contact_id;
+    (void)contact_id_len;
+    (void)limit;
     return HU_ERR_NOT_SUPPORTED;
+#endif
 #endif
 }
 

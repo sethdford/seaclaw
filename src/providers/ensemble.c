@@ -1,4 +1,5 @@
 #include "human/providers/ensemble.h"
+#include <stdio.h>
 #include <string.h>
 
 typedef struct {
@@ -85,18 +86,88 @@ static hu_error_t ensemble_chat_with_system(void *ctx, hu_allocator_t *alloc,
         if (valid == 0)
             return HU_ERR_IO;
 
-        size_t best = 0;
-        size_t best_len = 0;
-        for (size_t p = 0; p < ectx->config.provider_count; p++) {
-            if (responses[p] && resp_lens[p] > best_len) {
-                best = p;
-                best_len = resp_lens[p];
+        if (valid == 1) {
+            /* Only one response — use it directly */
+            for (size_t p = 0; p < ectx->config.provider_count; p++) {
+                if (responses[p]) {
+                    *out = responses[p];
+                    *out_len = resp_lens[p];
+                    responses[p] = NULL;
+                    break;
+                }
             }
-        }
+        } else {
+            /* LLM rerank: ask an LLM to pick the best response */
+            size_t fallback_best = 0;
+            size_t fallback_len = 0;
+            for (size_t p = 0; p < ectx->config.provider_count; p++) {
+                if (responses[p] && resp_lens[p] > fallback_len) {
+                    fallback_best = p;
+                    fallback_len = resp_lens[p];
+                }
+            }
+            size_t best = fallback_best;
 
-        *out = responses[best];
-        *out_len = resp_lens[best];
-        responses[best] = NULL;
+            char rerank_prompt[8192];
+            int rp_len = snprintf(rerank_prompt, sizeof(rerank_prompt),
+                                  "Given this user message: \"%.*s\"\n\n"
+                                  "Choose the BEST response from these candidates:\n",
+                                  (int)(message_len < 500 ? message_len : 500), message);
+
+            size_t candidate_idx[HU_ENSEMBLE_MAX_PROVIDERS];
+            size_t num_candidates = 0;
+            for (size_t p = 0; p < ectx->config.provider_count && rp_len < (int)sizeof(rerank_prompt) - 256;
+                 p++) {
+                if (!responses[p])
+                    continue;
+                candidate_idx[num_candidates] = p;
+                num_candidates++;
+                int added = snprintf(rerank_prompt + rp_len, sizeof(rerank_prompt) - (size_t)rp_len,
+                                     "\n--- Response %zu ---\n%.*s\n", num_candidates,
+                                     (int)(resp_lens[p] < 1000 ? resp_lens[p] : 1000), responses[p]);
+                if (added > 0)
+                    rp_len += added;
+            }
+            int added = snprintf(rerank_prompt + rp_len, sizeof(rerank_prompt) - (size_t)rp_len,
+                                 "\nReply with ONLY the number (1-%zu) of the best response.",
+                                 num_candidates);
+            if (added > 0)
+                rp_len += added;
+
+            /* Use first available provider for reranking */
+            for (size_t p = 0; p < ectx->config.provider_count; p++) {
+                hu_provider_t *rprov = &ectx->config.providers[p];
+                if (!rprov->vtable || !rprov->vtable->chat_with_system)
+                    continue;
+                static const char rank_sys[] =
+                    "You are a response quality judge. Output ONLY a single number.";
+                char *rank_out = NULL;
+                size_t rank_out_len = 0;
+                hu_error_t rerr = rprov->vtable->chat_with_system(
+                    rprov->ctx, alloc, rank_sys, sizeof(rank_sys) - 1, rerank_prompt, (size_t)rp_len,
+                    model, model_len, 0.0, &rank_out, &rank_out_len);
+                if (rerr == HU_OK && rank_out && rank_out_len > 0) {
+                    /* Parse the number from the response */
+                    size_t choice = 0;
+                    for (size_t ci = 0; ci < rank_out_len; ci++) {
+                        if (rank_out[ci] >= '1' && rank_out[ci] <= '9') {
+                            choice = (size_t)(rank_out[ci] - '0');
+                            break;
+                        }
+                    }
+                    if (choice >= 1 && choice <= num_candidates)
+                        best = candidate_idx[choice - 1];
+                    alloc->free(alloc->ctx, rank_out, rank_out_len + 1);
+                } else if (rank_out) {
+                    alloc->free(alloc->ctx, rank_out, rank_out_len + 1);
+                }
+                break; /* only use one provider for reranking */
+            }
+
+            *out = responses[best];
+            *out_len = resp_lens[best];
+            responses[best] = NULL;
+        }
 
         for (size_t p = 0; p < ectx->config.provider_count; p++) {
             if (responses[p])
@@ -141,9 +212,7 @@ static hu_error_t ensemble_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_
     if (ectx->config.strategy == HU_ENSEMBLE_CONSENSUS) {
         hu_chat_response_t responses[HU_ENSEMBLE_MAX_PROVIDERS];
         memset(responses, 0, sizeof(responses));
-        size_t best = 0;
-        size_t best_len = 0;
-        bool any = false;
+        size_t valid = 0;
 
         for (size_t p = 0; p < ectx->config.provider_count; p++) {
             hu_provider_t *prov = &ectx->config.providers[p];
@@ -155,17 +224,95 @@ static hu_error_t ensemble_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_
                 hu_chat_response_free(alloc, &responses[p]);
                 continue;
             }
-            if (responses[p].content && responses[p].content_len > best_len) {
-                best_len = responses[p].content_len;
-                best = p;
-                any = true;
-            }
+            if (responses[p].content)
+                valid++;
         }
 
-        if (!any) {
+        if (valid == 0) {
             for (size_t p = 0; p < ectx->config.provider_count; p++)
                 hu_chat_response_free(alloc, &responses[p]);
             return HU_ERR_IO;
+        }
+
+        const char *umsg = NULL;
+        size_t ulen = 0;
+        last_user_message(request, &umsg, &ulen);
+
+        size_t best = 0;
+        if (valid == 1) {
+            for (size_t p = 0; p < ectx->config.provider_count; p++) {
+                if (responses[p].content) {
+                    best = p;
+                    break;
+                }
+            }
+        } else {
+            size_t fallback_best = 0;
+            size_t fallback_len = 0;
+            for (size_t p = 0; p < ectx->config.provider_count; p++) {
+                if (!responses[p].content)
+                    continue;
+                if (responses[p].content_len > fallback_len) {
+                    fallback_len = responses[p].content_len;
+                    fallback_best = p;
+                }
+            }
+            best = fallback_best;
+
+            char rerank_prompt[8192];
+            int rp_len = snprintf(rerank_prompt, sizeof(rerank_prompt),
+                                  "Given this user message: \"%.*s\"\n\n"
+                                  "Choose the BEST response from these candidates:\n",
+                                  (int)(ulen < 500 ? ulen : 500), umsg);
+
+            size_t candidate_idx[HU_ENSEMBLE_MAX_PROVIDERS];
+            size_t num_candidates = 0;
+            for (size_t p = 0; p < ectx->config.provider_count && rp_len < (int)sizeof(rerank_prompt) - 256;
+                 p++) {
+                if (!responses[p].content)
+                    continue;
+                candidate_idx[num_candidates] = p;
+                num_candidates++;
+                size_t clen = responses[p].content_len;
+                int added = snprintf(rerank_prompt + rp_len, sizeof(rerank_prompt) - (size_t)rp_len,
+                                     "\n--- Response %zu ---\n%.*s\n", num_candidates,
+                                     (int)(clen < 1000 ? clen : 1000), responses[p].content);
+                if (added > 0)
+                    rp_len += added;
+            }
+            int added = snprintf(rerank_prompt + rp_len, sizeof(rerank_prompt) - (size_t)rp_len,
+                                 "\nReply with ONLY the number (1-%zu) of the best response.",
+                                 num_candidates);
+            if (added > 0)
+                rp_len += added;
+
+            for (size_t p = 0; p < ectx->config.provider_count; p++) {
+                hu_provider_t *rprov = &ectx->config.providers[p];
+                if (!rprov->vtable || !rprov->vtable->chat_with_system)
+                    continue;
+                static const char rank_sys[] =
+                    "You are a response quality judge. Output ONLY a single number.";
+                char *rank_out = NULL;
+                size_t rank_out_len = 0;
+                hu_error_t rerr = rprov->vtable->chat_with_system(
+                    rprov->ctx, alloc, rank_sys, sizeof(rank_sys) - 1, rerank_prompt, (size_t)rp_len,
+                    model, model_len, 0.0, &rank_out, &rank_out_len);
+                if (rerr == HU_OK && rank_out && rank_out_len > 0) {
+                    size_t choice = 0;
+                    for (size_t ci = 0; ci < rank_out_len; ci++) {
+                        if (rank_out[ci] >= '1' && rank_out[ci] <= '9') {
+                            choice = (size_t)(rank_out[ci] - '0');
+                            break;
+                        }
+                    }
+                    if (choice >= 1 && choice <= num_candidates)
+                        best = candidate_idx[choice - 1];
+                    alloc->free(alloc->ctx, rank_out, rank_out_len + 1);
+                } else if (rank_out) {
+                    alloc->free(alloc->ctx, rank_out, rank_out_len + 1);
+                }
+                break;
+            }
         }
 
         for (size_t p = 0; p < ectx->config.provider_count; p++) {

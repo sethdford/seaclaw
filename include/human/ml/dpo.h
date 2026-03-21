@@ -3,6 +3,7 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/provider.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -75,5 +76,21 @@ void hu_dpo_export_free(hu_allocator_t *alloc, hu_dpo_export_t *export_data);
 hu_error_t hu_dpo_get_best_examples(hu_dpo_collector_t *collector, hu_allocator_t *alloc,
                                     size_t max_examples, char **out_prompt_fragment,
                                     size_t *out_len);
+
+/* DPO training result from a single optimization step. */
+typedef struct hu_dpo_train_result {
+    double loss;              /* Average DPO loss across the batch */
+    double alignment_score;   /* Fraction of pairs where chosen > rejected (0.0-1.0) */
+    size_t pairs_evaluated;   /* Number of pairs processed */
+    size_t pairs_aligned;     /* Number correctly aligned */
+} hu_dpo_train_result_t;
+
+/* Run one DPO training step: evaluate preference pairs via provider log-probabilities.
+ * beta: DPO temperature (typically 0.1-0.5). batch_size: max pairs per step (0 = all).
+ * Requires HU_ENABLE_SQLITE. Without it, returns HU_ERR_NOT_SUPPORTED. */
+hu_error_t hu_dpo_train_step(hu_dpo_collector_t *collector, hu_allocator_t *alloc,
+                             hu_provider_t *provider, const char *model, size_t model_len,
+                             double beta, size_t batch_size,
+                             hu_dpo_train_result_t *out);
 
 #endif /* HU_ML_DPO_H */

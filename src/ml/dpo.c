@@ -1,8 +1,10 @@
 #include "human/ml/dpo.h"
+#include "human/provider.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/core/json.h"
 #include "human/core/string.h"
 #endif
+#include <math.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
@@ -371,4 +373,151 @@ void hu_dpo_export_free(hu_allocator_t *alloc, hu_dpo_export_t *export_data) {
         export_data->pairs = NULL;
     }
     export_data->count = 0;
+}
+
+hu_error_t hu_dpo_train_step(hu_dpo_collector_t *collector, hu_allocator_t *alloc,
+                             hu_provider_t *provider, const char *model, size_t model_len,
+                             double beta, size_t batch_size,
+                             hu_dpo_train_result_t *out) {
+    if (!collector || !alloc || !provider || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    memset(out, 0, sizeof(*out));
+    if (beta <= 0.0)
+        beta = 0.1;
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    /* Deterministic mock: simulate training on 3 pairs */
+    out->pairs_evaluated = 3;
+    out->pairs_aligned = 2;
+    out->alignment_score = 2.0 / 3.0;
+    out->loss = 0.45;
+    (void)collector;
+    (void)alloc;
+    (void)provider;
+    (void)model;
+    (void)model_len;
+    (void)batch_size;
+    return HU_OK;
+#else
+#ifdef HU_ENABLE_SQLITE
+    if (!collector->db)
+        return HU_ERR_NOT_SUPPORTED;
+    if (!provider->vtable || !provider->vtable->chat_with_system)
+        return HU_ERR_NOT_SUPPORTED;
+
+    int lim = (batch_size > 0 && batch_size < 100) ? (int)batch_size : 20;
+    sqlite3_stmt *stmt = NULL;
+    const char *sql = "SELECT prompt, chosen, rejected, margin FROM dpo_pairs "
+                      "WHERE chosen != '' AND rejected != '' "
+                      "ORDER BY margin DESC LIMIT ?";
+    if (sqlite3_prepare_v2(collector->db, sql, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_IO;
+    sqlite3_bind_int(stmt, 1, lim);
+
+    double total_loss = 0.0;
+    size_t evaluated = 0;
+    size_t aligned = 0;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *prompt = (const char *)sqlite3_column_text(stmt, 0);
+        const char *chosen = (const char *)sqlite3_column_text(stmt, 1);
+        const char *rejected = (const char *)sqlite3_column_text(stmt, 2);
+        if (!prompt || !chosen || !rejected)
+            continue;
+
+        /* Get log-probability proxy for chosen response via LLM scoring */
+        static const char score_sys[] =
+            "Rate how well this response answers the prompt on a scale of 0-100. "
+            "Output ONLY a number.";
+
+        char chosen_prompt[4096];
+        int cn = snprintf(chosen_prompt, sizeof(chosen_prompt),
+                          "Prompt: \"%.*s\"\nResponse: \"%.*s\"",
+                          (int)(strlen(prompt) < 500 ? strlen(prompt) : 500), prompt,
+                          (int)(strlen(chosen) < 1500 ? strlen(chosen) : 1500), chosen);
+
+        char rejected_prompt[4096];
+        int rn = snprintf(rejected_prompt, sizeof(rejected_prompt),
+                          "Prompt: \"%.*s\"\nResponse: \"%.*s\"",
+                          (int)(strlen(prompt) < 500 ? strlen(prompt) : 500), prompt,
+                          (int)(strlen(rejected) < 1500 ? strlen(rejected) : 1500), rejected);
+
+        char *chosen_out = NULL;
+        size_t chosen_out_len = 0;
+        char *rejected_out = NULL;
+        size_t rejected_out_len = 0;
+
+        hu_error_t e1 = provider->vtable->chat_with_system(
+            provider->ctx, alloc, score_sys, sizeof(score_sys) - 1u,
+            chosen_prompt, cn > 0 ? (size_t)cn : 0u,
+            model ? model : "", model_len, 0.0,
+            &chosen_out, &chosen_out_len);
+
+        hu_error_t e2 = provider->vtable->chat_with_system(
+            provider->ctx, alloc, score_sys, sizeof(score_sys) - 1u,
+            rejected_prompt, rn > 0 ? (size_t)rn : 0u,
+            model ? model : "", model_len, 0.0,
+            &rejected_out, &rejected_out_len);
+
+        double chosen_score = 50.0;
+        double rejected_score = 50.0;
+
+        if (e1 == HU_OK && chosen_out) {
+            for (size_t ci = 0; ci < chosen_out_len; ci++) {
+                if (chosen_out[ci] >= '0' && chosen_out[ci] <= '9') {
+                    chosen_score = 0;
+                    while (ci < chosen_out_len && chosen_out[ci] >= '0' && chosen_out[ci] <= '9') {
+                        chosen_score = chosen_score * 10.0 + (double)(chosen_out[ci] - '0');
+                        ci++;
+                    }
+                    break;
+                }
+            }
+            alloc->free(alloc->ctx, chosen_out, chosen_out_len + 1u);
+        }
+        if (e2 == HU_OK && rejected_out) {
+            for (size_t ci = 0; ci < rejected_out_len; ci++) {
+                if (rejected_out[ci] >= '0' && rejected_out[ci] <= '9') {
+                    rejected_score = 0;
+                    while (ci < rejected_out_len && rejected_out[ci] >= '0' && rejected_out[ci] <= '9') {
+                        rejected_score = rejected_score * 10.0 + (double)(rejected_out[ci] - '0');
+                        ci++;
+                    }
+                    break;
+                }
+            }
+            alloc->free(alloc->ctx, rejected_out, rejected_out_len + 1u);
+        }
+
+        /* Normalize scores to log-probability proxy */
+        double log_ratio = (chosen_score - rejected_score) / 100.0;
+
+        /* DPO loss: -log(sigmoid(beta * log_ratio)) */
+        double sigmoid_val = 1.0 / (1.0 + exp(-beta * log_ratio));
+        if (sigmoid_val < 1e-10)
+            sigmoid_val = 1e-10;
+        double pair_loss = -log(sigmoid_val);
+        total_loss += pair_loss;
+
+        if (chosen_score > rejected_score)
+            aligned++;
+        evaluated++;
+    }
+    sqlite3_finalize(stmt);
+
+    out->pairs_evaluated = evaluated;
+    out->pairs_aligned = aligned;
+    out->alignment_score = evaluated > 0 ? (double)aligned / (double)evaluated : 0.0;
+    out->loss = evaluated > 0 ? total_loss / (double)evaluated : 0.0;
+    return HU_OK;
+#else
+    (void)provider;
+    (void)model;
+    (void)model_len;
+    (void)beta;
+    (void)batch_size;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+#endif
 }
