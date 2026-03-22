@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 void hu_skill_routing_init(hu_skill_routing_ctx_t *ctx) {

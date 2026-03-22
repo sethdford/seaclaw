@@ -16,9 +16,9 @@
 
 #define HU_MEETING_NAME "meeting_transcribe"
 #define HU_MEETING_DESC                                                                      \
-    "Transcribe audio (WAV/FLAC/raw) with Google Speech-to-Text v1, then store text in BFF " \
-    "memory. Requires access_token (OAuth2 from gcloud auth print-access-token or SA). "     \
-    "Env: BFF_BASE_URL, BFF_AUTH_TOKEN, optional BFF_TENANT_ID."
+    "Transcribe audio (WAV/FLAC/raw) with Google Speech-to-Text v1 (sync, max ~8MB). Set "   \
+    "model to chirp_2 or chirp_telephony in supported projects; default latest_long. "     \
+    "Requires access_token (OAuth). Env: BFF_BASE_URL, BFF_AUTH_TOKEN, optional BFF_TENANT_ID."
 #define HU_MEETING_PARAMS                                                                       \
     "{\"type\":\"object\",\"properties\":{\"audio_path\":{\"type\":\"string\"},\"access_token\":" \
     "{\"type\":\"string\",\"description\":\"GCP OAuth2 access token\"},\"client_id\":{\"type\":"   \
