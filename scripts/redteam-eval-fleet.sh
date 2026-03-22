@@ -11,10 +11,14 @@
 # If .env points ADV_EVAL_* at a Gemini OpenAI-compat base URL but your key is OpenAI, set:
 #   REDTEAM_HARNESS_USE_OPENAI=1   # ADV_EVAL_* -> api.openai.com + gpt-4o-mini (override with REDTEAM_ADV_EVAL_MODEL)
 #
-# Without ~/.human/config.json the binary defaults to Gemini; for live runs use OpenAI keys:
-#   REDTEAM_HARNESS_USE_OPENAI=1   # also sets HUMAN_PROVIDER=openai for eval + harness agent probes (needs OPENAI_API_KEY)
-#   REDTEAM_AGENT_USE_OPENAI=1     # same agent alignment even if harness judge uses another ADV_EVAL_* backend
-#   REDTEAM_AGENT_MODEL=my-model   # optional; else HUMAN_MODEL or gpt-4o-mini
+# Agent vs judge (decoupled):
+#   REDTEAM_HARNESS_USE_OPENAI=1   # judge only: sets ADV_EVAL_* to OpenAI (needs OPENAI_API_KEY). Does NOT change HUMAN_*.
+#   REDTEAM_AGENT_USE_OPENAI=1     # agent + eval: sets HUMAN_PROVIDER=openai and harness --agent-* (needs OPENAI_API_KEY)
+#   REDTEAM_AGENT_USE_GEMINI=1     # agent + eval: sets HUMAN_PROVIDER=gemini (needs GEMINI_API_KEY); optional explicit pin
+#   REDTEAM_AGENT_MODEL=my-model   # optional when using *_AGENT_USE_*; else HUMAN_MODEL or provider default
+#
+# Typical Gemini-vs-OpenAI comparison: keep HUMAN_PROVIDER/HUMAN_MODEL for the agent in .env, set
+# REDTEAM_HARNESS_USE_OPENAI=1 for a comparable OpenAI judge, and do not set REDTEAM_AGENT_USE_OPENAI.
 #
 # Optional: HARNESS_AGENT_CONFIG_PATH=/path/config.json — harness passes HUMAN_CONFIG_PATH to each `human agent` child.
 # Optional: REDTEAM_FLEET_AGENT_SMOKE=1 runs one human agent -m (uses HUMAN_PROVIDER / keys in env).
@@ -119,13 +123,18 @@ if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
   fi
 
   HARNESS_PY_ARGS=()
-  if [ -n "${OPENAI_API_KEY:-}" ]; then
-    if [ "${REDTEAM_AGENT_USE_OPENAI:-0}" = 1 ] || [ "${REDTEAM_HARNESS_USE_OPENAI:-0}" = 1 ]; then
-      export HUMAN_PROVIDER="openai"
-      export HUMAN_MODEL="${REDTEAM_AGENT_MODEL:-${HUMAN_MODEL:-gpt-4o-mini}}"
-      HARNESS_PY_ARGS=(--agent-provider openai --agent-model "${HUMAN_MODEL:-gpt-4o-mini}")
-      echo "redteam-eval-fleet: agent/eval using HUMAN_PROVIDER=openai HUMAN_MODEL=${HUMAN_MODEL:-gpt-4o-mini}"
-    fi
+  if [ "${REDTEAM_AGENT_USE_OPENAI:-0}" = 1 ] && [ -n "${OPENAI_API_KEY:-}" ]; then
+    export HUMAN_PROVIDER="openai"
+    export HUMAN_MODEL="${REDTEAM_AGENT_MODEL:-${HUMAN_MODEL:-gpt-4o-mini}}"
+    HARNESS_PY_ARGS=(--agent-provider openai --agent-model "${HUMAN_MODEL}")
+    echo "redteam-eval-fleet: agent/eval forced HUMAN_PROVIDER=openai HUMAN_MODEL=${HUMAN_MODEL}"
+  elif [ "${REDTEAM_AGENT_USE_GEMINI:-0}" = 1 ] && [ -n "${GEMINI_API_KEY:-}" ]; then
+    export HUMAN_PROVIDER="gemini"
+    export HUMAN_MODEL="${REDTEAM_AGENT_MODEL:-${HUMAN_MODEL:-gemini-2.0-flash}}"
+    HARNESS_PY_ARGS=(--agent-provider gemini --agent-model "${HUMAN_MODEL}")
+    echo "redteam-eval-fleet: agent/eval forced HUMAN_PROVIDER=gemini HUMAN_MODEL=${HUMAN_MODEL}"
+  else
+    echo "redteam-eval-fleet: agent/eval using HUMAN_PROVIDER=${HUMAN_PROVIDER:-unset} HUMAN_MODEL=${HUMAN_MODEL:-unset} (from environment; harness inherits)"
   fi
 
   # Isolated HOME so eval runs don't load stale ~/.human/ memory/preferences

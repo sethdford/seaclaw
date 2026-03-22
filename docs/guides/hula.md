@@ -82,7 +82,7 @@ Quick smoke test (requires built binary):
 | `delegate` | Spawn a sub-agent with a `goal` (POSIX, non-test, requires agent pool; inherits parent tools/policy when configured). |
 | `emit` | Produce a string value; `emit_value` can reference prior nodes as `$node_id`. |
 
-**Note:** `$node_id` substitution applies to **`emit_value`**, not to arbitrary `call` argument strings.
+**Note:** `$node_id` substitution applies to **`emit_value`** and to **JSON string values inside `call` `args`** (after parse, before the tool runs). The executor picks the **longest** matching node id at each `$`; the referenced node must already be **done**. Unknown ids or nodes that are not done make the `call` fail. Expansion per string value is capped (256 KiB). After a match, the next character must **not** continue an id (`[A-Za-z0-9_]`); use a delimiter such as `.` before literal suffix text (so `$first_suf` does **not** substitute `first`—it looks for a node id `first_suf`).
 
 ## Emergence from traces
 

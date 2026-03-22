@@ -11,6 +11,7 @@ updated: 2026-03-22
 | File | Use with |
 | ---- | -------- |
 | [`hula_minimal.json`](hula_minimal.json) | `human hula validate` / `human hula run` — single `echo` demo call. |
+| [`hula_arg_refs.json`](hula_arg_refs.json) | `human hula validate` / `human hula run` — second `echo` uses `$first` inside `args.text`. |
 | [`hula_research_pipeline.json`](hula_research_pipeline.json) | `human hula run` — illustrates `seq`, `par`, `branch`, `emit` using demo tools **`search`**, **`analyze`**, **`write`** (these names match the CLI demo stubs, not every production build). |
 | [`hula_parallel_fetch.json`](hula_parallel_fetch.json) | **Live agent** (when `web_fetch` is enabled) — two parallel fetches; adjust URLs for your policy. |
 

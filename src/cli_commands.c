@@ -1,5 +1,6 @@
 #include "human/cli_commands.h"
 #include "human/agent/hula.h"
+#include "human/agent/hula_emergence.h"
 #include "human/bootstrap.h"
 #include "human/core/process_util.h"
 #include "human/calibration.h"
@@ -2208,6 +2209,7 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         printf("  validate <program>  Parse and validate only\n\n");
         printf("The program can be a file path or inline JSON.\n");
         printf("Demo tools available: echo, search, write, analyze\n");
+        printf("Optional: HU_HULA_TRACE_DIR=/path/dir persists trace JSON (POSIX; see hu_hula_trace_persist).\n");
         return HU_OK;
     }
 
@@ -2319,6 +2321,8 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         return err;
     }
 
+    const hu_hula_result_t *root_r = prog.root ? hu_hula_exec_result(&exec, prog.root->id) : NULL;
+
     /* Print per-node results */
     printf("  Results:\n");
     for (size_t i = 0; i < prog.node_count; i++) {
@@ -2346,8 +2350,22 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         printf("  (empty)\n");
     }
 
+    const char *trace_dir_env = getenv("HU_HULA_TRACE_DIR");
+    if (trace && trace_len > 0 && trace_dir_env && trace_dir_env[0]) {
+        const char *pn = prog.name;
+        size_t pnl = pn ? strlen(pn) : 0;
+        bool trace_ok = root_r && root_r->status == HU_HULA_DONE;
+        hu_error_t tr_err =
+            hu_hula_trace_persist(alloc, trace_dir_env, trace, trace_len, pn, pnl, trace_ok);
+        if (tr_err != HU_OK) {
+            fprintf(stderr, "hula: HU_HULA_TRACE_DIR persist failed: %s\n", hu_error_string(tr_err));
+        } else {
+            printf("\n── Trace persist ─────────────────────────────────────\n");
+            printf("  wrote JSON under %s\n", trace_dir_env);
+        }
+    }
+
     /* Summary */
-    const hu_hula_result_t *root_r = prog.root ? hu_hula_exec_result(&exec, prog.root->id) : NULL;
     printf("\n── Summary ──────────────────────────────────────────\n");
     printf("  Program: %s\n", prog.name ? prog.name : "?");
     printf("  Nodes:   %zu\n", prog.node_count);

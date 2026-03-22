@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="https://github.com/sethdford/h-uman/actions/workflows/ci.yml"><img src="https://github.com/sethdford/h-uman/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://sethdford.github.io/human"><img src="https://img.shields.io/badge/docs-sethdford.github.io/human-informational" alt="Documentation" /></a>
+  <a href="https://h-uman.ai"><img src="https://img.shields.io/badge/docs-h--uman.ai-informational" alt="Documentation" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
 </p>
 

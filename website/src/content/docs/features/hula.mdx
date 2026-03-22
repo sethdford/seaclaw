@@ -71,7 +71,7 @@ Human can build a minimal program (`par` or a single `call`) from the model’s 
 | `delegate` | Spawn a sub-agent with a `goal` (POSIX, non-test, pool + inheritance when configured). |
 | `emit` | Produce a string; `emit_value` can use `$node_id` for prior outputs. |
 
-`$node_id` applies to **`emit_value`**, not to arbitrary `call` argument strings.
+`$node_id` applies to **`emit_value`** and to **string values in `call` `args`** (longest id match; referenced node must be done). Expansion per string is capped at 256 KiB.
 
 ## Emergence from traces
 

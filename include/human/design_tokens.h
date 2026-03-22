@@ -34,7 +34,7 @@
 #define HU_COLOR_SUCCESS                         "\033[38;5;43m"
 #define HU_COLOR_WARNING                         "\033[38;5;220m"
 #define HU_COLOR_ERROR                           "\033[38;5;210m"
-#define HU_COLOR_INFO                            "\033[38;5;67m"
+#define HU_COLOR_INFO                            "\033[38;5;75m"
 #define HU_COLOR_FOCUS_RING                      "\033[38;5;113m"
 #define HU_COLOR_LINK                            "\033[38;5;149m"
 
@@ -59,7 +59,7 @@
 #define HU_COLOR_SUCCESS_TC                      "\033[38;2;16;185;129m"
 #define HU_COLOR_WARNING_TC                      "\033[38;2;234;179;8m"
 #define HU_COLOR_ERROR_TC                        "\033[38;2;249;112;102m"
-#define HU_COLOR_INFO_TC                         "\033[38;2;74;111;165m"
+#define HU_COLOR_INFO_TC                         "\033[38;2;59;130;246m"
 #define HU_COLOR_FOCUS_RING_TC                   "\033[38;2;122;182;72m"
 #define HU_COLOR_LINK_TC                         "\033[38;2;141;198;63m"
 
@@ -84,7 +84,7 @@
 #define HU_COLOR_BG_SUCCESS_TC                   "\033[48;2;16;185;129m"
 #define HU_COLOR_BG_WARNING_TC                   "\033[48;2;234;179;8m"
 #define HU_COLOR_BG_ERROR_TC                     "\033[48;2;249;112;102m"
-#define HU_COLOR_BG_INFO_TC                      "\033[48;2;74;111;165m"
+#define HU_COLOR_BG_INFO_TC                      "\033[48;2;59;130;246m"
 #define HU_COLOR_BG_FOCUS_RING_TC                "\033[48;2;122;182;72m"
 #define HU_COLOR_BG_LINK_TC                      "\033[48;2;141;198;63m"
 
@@ -109,7 +109,7 @@
 #define HU_COLOR_BG_SUCCESS                      "\033[48;5;43m"
 #define HU_COLOR_BG_WARNING                      "\033[48;5;220m"
 #define HU_COLOR_BG_ERROR                        "\033[48;5;210m"
-#define HU_COLOR_BG_INFO                         "\033[48;5;67m"
+#define HU_COLOR_BG_INFO                         "\033[48;5;75m"
 #define HU_COLOR_BG_FOCUS_RING                   "\033[48;5;113m"
 #define HU_COLOR_BG_LINK                         "\033[48;5;149m"
 
@@ -134,7 +134,7 @@
 #define HU_COLOR_LIGHT_SUCCESS                   "\033[38;5;34m"
 #define HU_COLOR_LIGHT_WARNING                   "\033[38;5;178m"
 #define HU_COLOR_LIGHT_ERROR                     "\033[38;5;160m"
-#define HU_COLOR_LIGHT_INFO                      "\033[38;5;67m"
+#define HU_COLOR_LIGHT_INFO                      "\033[38;5;69m"
 #define HU_COLOR_LIGHT_FOCUS_RING                "\033[38;5;107m"
 #define HU_COLOR_LIGHT_LINK                      "\033[38;5;107m"
 
@@ -159,7 +159,7 @@
 #define HU_COLOR_LIGHT_SUCCESS_TC                "\033[38;2;0;128;0m"
 #define HU_COLOR_LIGHT_WARNING_TC                "\033[38;2;202;138;4m"
 #define HU_COLOR_LIGHT_ERROR_TC                  "\033[38;2;204;0;0m"
-#define HU_COLOR_LIGHT_INFO_TC                   "\033[38;2;61;93;140m"
+#define HU_COLOR_LIGHT_INFO_TC                   "\033[38;2;37;99;235m"
 #define HU_COLOR_LIGHT_FOCUS_RING_TC             "\033[38;2;90;154;48m"
 #define HU_COLOR_LIGHT_LINK_TC                   "\033[38;2;90;154;48m"
 
@@ -184,7 +184,7 @@
 #define HU_COLOR_LIGHT_BG_SUCCESS_TC             "\033[48;2;0;128;0m"
 #define HU_COLOR_LIGHT_BG_WARNING_TC             "\033[48;2;202;138;4m"
 #define HU_COLOR_LIGHT_BG_ERROR_TC               "\033[48;2;204;0;0m"
-#define HU_COLOR_LIGHT_BG_INFO_TC                "\033[48;2;61;93;140m"
+#define HU_COLOR_LIGHT_BG_INFO_TC                "\033[48;2;37;99;235m"
 #define HU_COLOR_LIGHT_BG_FOCUS_RING_TC          "\033[48;2;90;154;48m"
 #define HU_COLOR_LIGHT_BG_LINK_TC                "\033[48;2;90;154;48m"
 
@@ -209,7 +209,7 @@
 #define HU_COLOR_LIGHT_BG_SUCCESS                "\033[48;5;34m"
 #define HU_COLOR_LIGHT_BG_WARNING                "\033[48;5;178m"
 #define HU_COLOR_LIGHT_BG_ERROR                  "\033[48;5;160m"
-#define HU_COLOR_LIGHT_BG_INFO                   "\033[48;5;67m"
+#define HU_COLOR_LIGHT_BG_INFO                   "\033[48;5;69m"
 #define HU_COLOR_LIGHT_BG_FOCUS_RING             "\033[48;5;107m"
 #define HU_COLOR_LIGHT_BG_LINK                   "\033[48;5;107m"
 

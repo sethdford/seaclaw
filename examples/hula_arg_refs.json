@@ -1,0 +1,22 @@
+{
+  "name": "arg_refs_demo",
+  "version": 1,
+  "root": {
+    "op": "seq",
+    "id": "pipe",
+    "children": [
+      {
+        "op": "call",
+        "id": "first",
+        "tool": "echo",
+        "args": { "text": "hello" }
+      },
+      {
+        "op": "call",
+        "id": "second",
+        "tool": "echo",
+        "args": { "text": "prefix.$first.suffix" }
+      }
+    ]
+  }
+}

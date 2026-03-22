@@ -435,6 +435,54 @@ static void hula_exec_seq_propagates_output(void) {
     hu_hula_program_deinit(&prog);
 }
 
+static void hula_exec_call_substitutes_dollar_node_id_in_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json =
+        "{\"name\":\"refs\",\"root\":{\"op\":\"seq\",\"id\":\"s1\","
+        "\"children\":["
+        "{\"op\":\"call\",\"id\":\"first\",\"tool\":\"echo\",\"args\":{\"text\":\"alpha\"}},"
+        "{\"op\":\"call\",\"id\":\"second\",\"tool\":\"echo\",\"args\":{\"text\":\"pre.$first.suf\"}}"
+        "]}}";
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
+
+    hu_tool_t tools[2];
+    make_tools(tools);
+    hu_hula_exec_t exec;
+    HU_ASSERT_EQ(hu_hula_exec_init(&exec, alloc, &prog, tools, 2), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
+
+    const hu_hula_result_t *r2 = hu_hula_exec_result(&exec, "second");
+    HU_ASSERT_NOT_NULL(r2);
+    HU_ASSERT_EQ(r2->status, HU_HULA_DONE);
+    HU_ASSERT_STR_EQ(r2->output, "pre.alpha.suf");
+
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+}
+
+static void hula_exec_call_dollar_ref_unknown_id_fails(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json =
+        "{\"name\":\"badref\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
+        "\"tool\":\"echo\",\"args\":{\"text\":\"$noSuchId\"}}}";
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
+
+    hu_tool_t tools[2];
+    make_tools(tools);
+    hu_hula_exec_t exec;
+    HU_ASSERT_EQ(hu_hula_exec_init(&exec, alloc, &prog, tools, 2), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
+
+    const hu_hula_result_t *r = hu_hula_exec_result(&exec, "c1");
+    HU_ASSERT_NOT_NULL(r);
+    HU_ASSERT_EQ(r->status, HU_HULA_FAILED);
+
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+}
+
 static void hula_exec_seq_short_circuits_on_failure(void) {
     hu_allocator_t alloc = hu_system_allocator();
     const char *json =
@@ -1304,6 +1352,8 @@ void run_hula_tests(void) {
 
     HU_RUN_TEST(hula_exec_simple_call);
     HU_RUN_TEST(hula_exec_seq_propagates_output);
+    HU_RUN_TEST(hula_exec_call_substitutes_dollar_node_id_in_args);
+    HU_RUN_TEST(hula_exec_call_dollar_ref_unknown_id_fails);
     HU_RUN_TEST(hula_exec_seq_short_circuits_on_failure);
     HU_RUN_TEST(hula_exec_par_runs_all);
     HU_RUN_TEST(hula_exec_branch_takes_then_on_success);

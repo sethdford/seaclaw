@@ -345,8 +345,8 @@
   --hu-focus-ring-width: 2px;
   --hu-hero-gradient: linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(74,111,165,0.03) 80%, transparent 100%);
   --hu-hover-overlay: rgba(122, 182, 72, 0.08);
-  --hu-info: #4a6fa5;
-  --hu-info-dim: {color.blue.dim};
+  --hu-info: #3b82f6;
+  --hu-info-dim: rgba(59, 130, 246, 0.15);
   --hu-link: #8DC63F;
   --hu-link-active: #7AB648;
   --hu-link-hover: #a3d46a;
@@ -601,8 +601,8 @@
     --hu-focus-ring-width: 2px;
     --hu-hero-gradient: linear-gradient(135deg, rgba(122,182,72,0.07) 0%, rgba(122,182,72,0.03) 50%, transparent 100%);
     --hu-hover-overlay: rgba(90, 154, 48, 0.06);
-    --hu-info: #3d5d8c;
-    --hu-info-dim: {color.blue.light-dim};
+    --hu-info: #2563eb;
+    --hu-info-dim: rgba(37, 99, 235, 0.1);
     --hu-link: #5A9A30;
     --hu-link-active: #7AB648;
     --hu-link-hover: #3a6a24;
@@ -676,8 +676,8 @@
   --hu-focus-ring-width: 2px;
   --hu-hero-gradient: linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(74,111,165,0.03) 80%, transparent 100%);
   --hu-hover-overlay: rgba(122, 182, 72, 0.08);
-  --hu-info: #4a6fa5;
-  --hu-info-dim: {color.blue.dim};
+  --hu-info: #3b82f6;
+  --hu-info-dim: rgba(59, 130, 246, 0.15);
   --hu-link: #8DC63F;
   --hu-link-active: #7AB648;
   --hu-link-hover: #a3d46a;
@@ -754,8 +754,8 @@
   --hu-focus-ring-width: 2px;
   --hu-hero-gradient: linear-gradient(135deg, rgba(122,182,72,0.07) 0%, rgba(122,182,72,0.03) 50%, transparent 100%);
   --hu-hover-overlay: rgba(90, 154, 48, 0.06);
-  --hu-info: #3d5d8c;
-  --hu-info-dim: {color.blue.light-dim};
+  --hu-info: #2563eb;
+  --hu-info-dim: rgba(37, 99, 235, 0.1);
   --hu-link: #5A9A30;
   --hu-link-active: #7AB648;
   --hu-link-hover: #3a6a24;

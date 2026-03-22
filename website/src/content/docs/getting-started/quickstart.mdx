@@ -147,6 +147,22 @@ human gateway
 
 By default it listens on `127.0.0.1:3000`. Pair with a 6-digit code to get a bearer token for authenticated requests.
 
+## 6. Try HuLa (optional)
+
+HuLa is Human’s JSON program format for multi-step tool plans (`seq`, `par`, `branch`, and more). Validate a sample program from the repo:
+
+```bash
+human hula validate examples/hula_minimal.json
+```
+
+Run the demo executor (fixed stub tools):
+
+```bash
+human hula run examples/hula_arg_refs.json
+```
+
+Learn more on the [HuLa feature page](/features/hula/) and in the repo guide at [`docs/guides/hula.md`](https://github.com/sethdford/h-uman/blob/main/docs/guides/hula.md).
+
 ## CLI reference
 
 | Command                                        | Description              |

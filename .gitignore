@@ -23,6 +23,10 @@ benchmark-results.json
 *.db
 *.db-journal
 
+# Python
+__pycache__/
+*.pyc
+
 # Editor / OS
 .DS_Store
 *.swp

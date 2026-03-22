@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Human — 2026 Brand Color Architecture</title>
+<style>
+  /* System fonts only — Avenir is the brand face but not loadable from CDN. */
+
+  :root {
+    --human-900: #264A17; --human-700: #3a6a24; --human-600: #5A9A30;
+    --human-500: #7AB648; --human-400: #8DC63F; --human-300: #a3d46a;
+    --human-200: #c5e59a; --human-100: #e2f2c8;
+    --black: #0c0a08; --white: #faf8f6;
+    --blue-800: #2a3d5f; --blue-700: #324a73; --blue-600: #3d5d8c;
+    --blue-500: #4a6fa5; --blue-400: #7496c4; --blue-300: #9fb8d9;
+    --blue-200: #c5d5e8;
+    --amber-700: #b45309; --amber-600: #d97706; --amber-500: #f59e0b;
+    --amber-400: #fbbf24; --amber-300: #fcd34d;
+    --teal-500: #14b8a6; --teal-300: #5eead4;
+    --coral-500: #f97066; --coral-300: #ffa099;
+    --chartreuse: #C2CD23;
+    --forest: #00703C; --cyan: #009BDE; --violet: #9D61CC;
+    --gold: #F0D202; --orange: #FF6800; --crimson: #CC0000; --azure: #2B89CB;
+    --n900: #141210; --n800: #1e1a16; --n700: #28231e; --n600: #332d26;
+    --n500: #3e372f; --n400: #56504a; --n300: #8a847e; --n200: #9e9892;
+    --n100: #c8c2bc; --n50: #ddd8d3; --cream: #ebe7e3; --offwhite: #f4f1ee;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #faf8f6;
+    color: #1e1a16;
+    font-family: system-ui, -apple-system, "Segoe UI", Helvetica, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 24px 64px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 {
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    font-weight: 400;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    letter-spacing: -0.03em;
+    margin-bottom: 6px;
+    color: #0c0a08;
+  }
+  h1 em { color: var(--human-500); font-style: italic; }
+
+  .subtitle {
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--n300);
+    margin-bottom: 56px;
+  }
+
+  .wheel-wrap {
+    position: relative;
+    width: min(660px, 88vw);
+    height: min(660px, 88vw);
+    margin-bottom: 64px;
+  }
+  .wheel-wrap canvas { width: 100%; height: 100%; cursor: crosshair; }
+
+  /* Tooltip */
+  .tip {
+    position: fixed; pointer-events: none;
+    background: #0c0a08; color: #faf8f6;
+    padding: 10px 16px; border-radius: 10px;
+    font-size: 0.7rem; line-height: 1.5;
+    opacity: 0; transition: opacity 0.15s;
+    z-index: 100; box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    max-width: 220px;
+  }
+  .tip.on { opacity: 1; }
+  .tip .dot {
+    display: inline-block; width: 13px; height: 13px;
+    border-radius: 4px; vertical-align: middle; margin-right: 6px;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .tip .hex { opacity: 0.55; font-size: 0.62rem; }
+
+  /* Legend */
+  .legend {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 48px; max-width: 800px; width: 100%;
+  }
+  @media (max-width: 520px) { .legend { grid-template-columns: 1fr; gap: 32px; } }
+
+  .leg h3 {
+    font-family: Georgia, "Iowan Old Style", serif;
+    font-weight: 400; font-size: 1.25rem;
+    margin-bottom: 4px; color: #0c0a08;
+  }
+  .leg p {
+    font-size: 0.65rem; line-height: 1.55;
+    color: var(--n300); margin-bottom: 14px;
+  }
+  .leg canvas { display: block; margin: 0 auto 14px; }
+
+  .row { display: flex; gap: 3px; margin-bottom: 3px; }
+  .chip {
+    flex: 1; height: 26px; border-radius: 5px;
+    cursor: pointer; transition: transform 0.15s cubic-bezier(0.2,0,0,1);
+  }
+  .chip:hover { transform: scaleY(1.45); z-index: 2; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #0c0a08; color: var(--human-400);
+    padding: 10px 20px; border-radius: 999px;
+    font-size: 0.7rem; opacity: 0;
+    transition: all 0.25s cubic-bezier(0.2,0,0,1); z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<h1>Human <em>2026</em></h1>
+<p class="subtitle">Brand Color Architecture</p>
+
+<div class="wheel-wrap">
+  <canvas id="W" width="1320" height="1320"></canvas>
+</div>
+
+<div class="legend">
+  <div class="leg">
+    <canvas id="mc" width="220" height="220"></canvas>
+    <h3>Core colors</h3>
+    <p>Human green is the primary brand color, anchored by black and warm white. Core colors pair with any secondary or tertiary.</p>
+    <div class="row">
+      <div class="chip" style="background:#0c0a08" data-c="#0C0A08"></div>
+      <div class="chip" style="background:#264A17" data-c="#264A17"></div>
+      <div class="chip" style="background:#5A9A30" data-c="#5A9A30"></div>
+      <div class="chip" style="background:#7AB648" data-c="#7AB648"></div>
+      <div class="chip" style="background:#a3d46a" data-c="#A3D46A"></div>
+      <div class="chip" style="background:#faf8f6;border:1px solid #ddd8d3" data-c="#FAF8F6"></div>
+    </div>
+  </div>
+  <div class="leg">
+    <canvas id="ms" width="220" height="220"></canvas>
+    <h3>Secondary colors</h3>
+    <p>Steel blue, amber, teal, coral, and extended viz hues. Used as accents, highlights, data series, and bold color fields.</p>
+    <div class="row">
+      <div class="chip" style="background:#4a6fa5" data-c="#4A6FA5"></div>
+      <div class="chip" style="background:#9fb8d9" data-c="#9FB8D9"></div>
+      <div class="chip" style="background:#f59e0b" data-c="#F59E0B"></div>
+      <div class="chip" style="background:#14b8a6" data-c="#14B8A6"></div>
+      <div class="chip" style="background:#f97066" data-c="#F97066"></div>
+      <div class="chip" style="background:#C2CD23" data-c="#C2CD23"></div>
+    </div>
+  </div>
+  <div class="leg">
+    <canvas id="mt" width="220" height="220"></canvas>
+    <h3>Tertiary colors</h3>
+    <p>Warm charcoal neutrals support backgrounds, borders, and text. Cream and off-white round out the light end.</p>
+    <div class="row">
+      <div class="chip" style="background:#3e372f" data-c="#3E372F"></div>
+      <div class="chip" style="background:#8a847e" data-c="#8A847E"></div>
+      <div class="chip" style="background:#c8c2bc" data-c="#C8C2BC"></div>
+      <div class="chip" style="background:#ddd8d3" data-c="#DDD8D3"></div>
+      <div class="chip" style="background:#ebe7e3;border:1px solid #ddd8d3" data-c="#EBE7E3"></div>
+      <div class="chip" style="background:#f4f1ee;border:1px solid #ddd8d3" data-c="#F4F1EE"></div>
+    </div>
+  </div>
+</div>
+
+<div class="tip" id="tip"><span class="dot"></span><strong></strong><br><span class="hex"></span></div>
+<div class="toast" id="toast">Copied!</div>
+
+<script>
+const CORE = [
+  {h:'#0c0a08',n:'Black',w:1.2},{h:'#264A17',n:'Human 900',w:0.8},
+  {h:'#3a6a24',n:'Human 700',w:0.7},{h:'#5A9A30',n:'Human 600',w:1.0},
+  {h:'#7AB648',n:'Human 500',w:2.8},{h:'#8DC63F',n:'Human 400',w:1.0},
+  {h:'#a3d46a',n:'Human 300',w:0.8},{h:'#c5e59a',n:'Human 200',w:0.6},
+  {h:'#e2f2c8',n:'Human 100',w:0.5},{h:'#faf8f6',n:'Warm White',w:1.2}
+];
+const SEC = [
+  {h:'#2a3d5f',n:'Steel 800',w:0.6},{h:'#324a73',n:'Steel 700',w:0.6},
+  {h:'#4a6fa5',n:'Steel 500',w:1.8},{h:'#7496c4',n:'Steel 400',w:0.8},
+  {h:'#9fb8d9',n:'Steel 300',w:0.7},{h:'#c5d5e8',n:'Steel 200',w:0.5},
+  {h:'#009BDE',n:'Cyan',w:0.7},{h:'#14b8a6',n:'Teal 500',w:1.0},
+  {h:'#00703C',n:'Forest',w:0.7},{h:'#C2CD23',n:'Chartreuse',w:0.7},
+  {h:'#f59e0b',n:'Amber 500',w:1.2},{h:'#fbbf24',n:'Amber 400',w:0.6},
+  {h:'#fcd34d',n:'Amber 300',w:0.5},{h:'#FF6800',n:'Orange',w:0.8},
+  {h:'#f97066',n:'Coral 500',w:1.0},{h:'#CC0000',n:'Crimson',w:0.7}
+];
+const TER = [
+  {h:'#141210',n:'Neutral 900',w:0.7},{h:'#1e1a16',n:'Neutral 800',w:0.7},
+  {h:'#28231e',n:'Neutral 700',w:0.7},{h:'#332d26',n:'Neutral 600',w:0.7},
+  {h:'#3e372f',n:'Neutral 500',w:0.8},{h:'#56504a',n:'Neutral 400',w:0.7},
+  {h:'#8a847e',n:'Neutral 300',w:1.0},{h:'#9e9892',n:'Neutral 200',w:0.7},
+  {h:'#c8c2bc',n:'Neutral 100',w:0.8},{h:'#ddd8d3',n:'Neutral 50',w:0.7},
+  {h:'#ebe7e3',n:'Cream',w:0.8},{h:'#f4f1ee',n:'Off White',w:0.7},
+  {h:'#faf8f6',n:'Canvas',w:0.5}
+];
+
+function draw(cv, rings, centerFill) {
+  const ctx = cv.getContext('2d');
+  const w = cv.width, cx = w/2, cy = w/2;
+  ctx.clearRect(0,0,w,w);
+  const gaps = rings.length === 3
+    ? [[0.92,1.0],[0.64,0.88],[0.0,0.58]]
+    : [[0.72,1.0],[0.0,0.62]];
+  rings.forEach((ring,ri) => {
+    const [iR,oR] = gaps[ri];
+    const inner = iR*cx, outer = oR*cx;
+    const tw = ring.reduce((s,c)=>s+c.w,0);
+    let a = -Math.PI/2;
+    ring.forEach(c => {
+      const sw = (c.w/tw)*Math.PI*2;
+      ctx.beginPath();
+      ctx.arc(cx,cy,outer,a,a+sw);
+      ctx.arc(cx,cy,inner,a+sw,a,true);
+      ctx.closePath();
+      ctx.fillStyle = c.h;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(cx+Math.cos(a)*inner, cy+Math.sin(a)*inner);
+      ctx.lineTo(cx+Math.cos(a)*outer, cy+Math.sin(a)*outer);
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      c._sa = a; c._ea = a+sw; c._ir = inner; c._or = outer;
+      a += sw;
+    });
+    if (ri < rings.length-1) {
+      ctx.beginPath();
+      ctx.arc(cx,cy,inner+1.5,0,Math.PI*2);
+      ctx.strokeStyle = '#faf8f6';
+      ctx.lineWidth = rings.length===3 ? 5 : 4;
+      ctx.stroke();
+    }
+  });
+  if (centerFill && rings.length===3) {
+    ctx.beginPath();
+    ctx.arc(cx,cy,gaps[2][1]*cx*0.65,0,Math.PI*2);
+    ctx.fillStyle = centerFill;
+    ctx.fill();
+  }
+}
+
+const mainCv = document.getElementById('W');
+draw(mainCv,[TER,SEC,CORE],'#7AB648');
+
+draw(document.getElementById('mc'), [
+  [{h:'#faf8f6',w:1.2,n:'White'},{h:'#0c0a08',w:1.2,n:'Black'}],
+  CORE.filter(c=>['#7AB648','#5A9A30','#a3d46a','#264A17'].includes(c.h))
+], '#7AB648');
+
+draw(document.getElementById('ms'), [
+  [{h:'#faf8f6',w:1,n:'W'},{h:'#c5d5e8',w:0.8,n:'S200'}],
+  [{h:'#4a6fa5',w:1.2,n:'Steel'},{h:'#009BDE',w:0.8,n:'Cyan'},
+   {h:'#14b8a6',w:0.8,n:'Teal'},{h:'#00703C',w:0.8,n:'Forest'},
+   {h:'#C2CD23',w:0.7,n:'Chart'},{h:'#f59e0b',w:1.0,n:'Amber'},
+   {h:'#FF6800',w:0.7,n:'Orange'},{h:'#f97066',w:0.8,n:'Coral'}]
+], null);
+
+draw(document.getElementById('mt'), [
+  [{h:'#f4f1ee',w:1,n:'O'},{h:'#faf8f6',w:0.5,n:'C'},{h:'#ebe7e3',w:0.8,n:'Cr'}],
+  [{h:'#3e372f',w:1,n:'N500'},{h:'#8a847e',w:1,n:'N300'},
+   {h:'#c8c2bc',w:1,n:'N100'},{h:'#ddd8d3',w:0.8,n:'N50'}]
+], null);
+
+const tip = document.getElementById('tip');
+const allR = [TER,SEC,CORE];
+
+function hitTest(cv, e) {
+  const r = cv.getBoundingClientRect();
+  const sx = cv.width/r.width, sy = cv.height/r.height;
+  const px = (e.clientX-r.left)*sx, py = (e.clientY-r.top)*sy;
+  const cx = cv.width/2, cy = cv.height/2;
+  const dx = px-cx, dy = py-cy, dist = Math.sqrt(dx*dx+dy*dy);
+  let ang = Math.atan2(dy,dx);
+  for (const ring of allR) {
+    for (const c of ring) {
+      if (dist >= c._ir && dist <= c._or) {
+        let a = ang;
+        while (a < c._sa) a += Math.PI*2;
+        while (a > c._ea+Math.PI*2) a -= Math.PI*2;
+        if (a >= c._sa && a <= c._ea) return c;
+      }
+    }
+  }
+  return null;
+}
+
+mainCv.addEventListener('mousemove', e => {
+  const c = hitTest(mainCv, e);
+  if (c) {
+    tip.classList.add('on');
+    tip.querySelector('.dot').style.background = c.h;
+    tip.querySelector('strong').textContent = c.n;
+    tip.querySelector('.hex').textContent = c.h.toUpperCase();
+    tip.style.left = (e.clientX+16)+'px';
+    tip.style.top = (e.clientY-40)+'px';
+    mainCv.style.cursor = 'pointer';
+  } else {
+    tip.classList.remove('on');
+    mainCv.style.cursor = 'crosshair';
+  }
+});
+mainCv.addEventListener('mouseleave', () => tip.classList.remove('on'));
+
+function flash(hex) {
+  const t = document.getElementById('toast');
+  t.textContent = 'Copied '+hex;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1400);
+}
+
+mainCv.addEventListener('click', e => {
+  const c = hitTest(mainCv, e);
+  if (c) { navigator.clipboard.writeText(c.h.toUpperCase()); flash(c.h.toUpperCase()); }
+});
+
+document.querySelectorAll('.chip').forEach(el => {
+  el.addEventListener('click', () => {
+    navigator.clipboard.writeText(el.dataset.c);
+    flash(el.dataset.c);
+  });
+});
+</script>
+</body>
+</html>

@@ -6,11 +6,173 @@
 #include "human/core/string.h"
 #include "human/observer.h"
 #include "human/security.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #if (defined(__unix__) || defined(__APPLE__)) && !defined(HU_IS_TEST)
 #include <time.h>
 #endif
+
+#define HU_HULA_REF_EXPAND_CAP (256u * 1024u)
+
+static bool hula_id_char_start(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
+
+static bool hula_id_char_cont(char c) {
+    return hula_id_char_start(c) || (c >= '0' && c <= '9');
+}
+
+/* Longest program node id matching s[0..) with boundary at end or non-continuing char. */
+static size_t hula_ref_longest_match(const char *s, size_t s_rem, const hu_hula_program_t *prog) {
+    size_t best = 0;
+    if (!s || s_rem == 0 || !prog)
+        return 0;
+    for (size_t ni = 0; ni < prog->node_count; ni++) {
+        const hu_hula_node_t *nd = &prog->nodes[ni];
+        if (!nd->id)
+            continue;
+        size_t idl = strlen(nd->id);
+        if (idl == 0 || idl > s_rem)
+            continue;
+        if (memcmp(s, nd->id, idl) != 0)
+            continue;
+        if (s_rem > idl && hula_id_char_cont(s[idl]))
+            continue;
+        if (idl > best)
+            best = idl;
+    }
+    return best;
+}
+
+/* Expand $node_id in JSON string values to prior node outputs (HU_HULA_DONE). */
+static hu_error_t hula_expand_dollar_refs(hu_hula_exec_t *exec, const char *in, size_t in_len,
+                                          char **out, size_t *out_len) {
+    if (!exec || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
+    if (!in && in_len > 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    hu_allocator_t *a = &exec->alloc;
+    size_t cap = in_len + 128;
+    if (cap < 64)
+        cap = 64;
+    char *buf = (char *)a->alloc(a->ctx, cap);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t pos = 0;
+    for (size_t i = 0; i < in_len;) {
+        if (in[i] == '$' && i + 1 < in_len && hula_id_char_start(in[i + 1])) {
+            size_t rem = in_len - (i + 1);
+            size_t idl = hula_ref_longest_match(in + i + 1, rem, exec->program);
+            if (idl > 0) {
+                char idbuf[160];
+                if (idl >= sizeof(idbuf)) {
+                    a->free(a->ctx, buf, cap);
+                    return HU_ERR_INVALID_ARGUMENT;
+                }
+                memcpy(idbuf, in + i + 1, idl);
+                idbuf[idl] = '\0';
+                const hu_hula_result_t *hr = hu_hula_exec_result(exec, idbuf);
+                if (!hr || hr->status != HU_HULA_DONE || !hr->output) {
+                    a->free(a->ctx, buf, cap);
+                    return HU_ERR_INVALID_ARGUMENT;
+                }
+                if (hr->output_len > HU_HULA_REF_EXPAND_CAP) {
+                    a->free(a->ctx, buf, cap);
+                    return HU_ERR_INVALID_ARGUMENT;
+                }
+                size_t need = pos + hr->output_len + 1;
+                while (cap < need) {
+                    size_t oldc = cap;
+                    if (cap > SIZE_MAX / 2) {
+                        a->free(a->ctx, buf, oldc);
+                        return HU_ERR_OUT_OF_MEMORY;
+                    }
+                    cap *= 2;
+                    if (cap < need)
+                        cap = need;
+                    void *nb = a->realloc(a->ctx, buf, oldc, cap);
+                    if (!nb) {
+                        a->free(a->ctx, buf, oldc);
+                        return HU_ERR_OUT_OF_MEMORY;
+                    }
+                    buf = (char *)nb;
+                }
+                memcpy(buf + pos, hr->output, hr->output_len);
+                pos += hr->output_len;
+                if (pos > HU_HULA_REF_EXPAND_CAP) {
+                    a->free(a->ctx, buf, cap);
+                    return HU_ERR_INVALID_ARGUMENT;
+                }
+                i += 1 + idl;
+                continue;
+            }
+            /* `$` + id-like prefix but no matching node id */
+            a->free(a->ctx, buf, cap);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        size_t need = pos + 2;
+        while (cap < need) {
+            size_t oldc = cap;
+            if (cap > SIZE_MAX / 2) {
+                a->free(a->ctx, buf, oldc);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            cap *= 2;
+            void *nb = a->realloc(a->ctx, buf, oldc, cap);
+            if (!nb) {
+                a->free(a->ctx, buf, oldc);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            buf = (char *)nb;
+        }
+        buf[pos++] = in[i++];
+    }
+    buf[pos] = '\0';
+    *out = buf;
+    *out_len = pos;
+    return HU_OK;
+}
+
+static hu_error_t hula_substitute_json_strings(hu_hula_exec_t *exec, hu_json_value_t *v) {
+    if (!exec || !v)
+        return HU_ERR_INVALID_ARGUMENT;
+    switch (v->type) {
+    case HU_JSON_STRING: {
+        char *s = v->data.string.ptr;
+        size_t L = v->data.string.len;
+        if (!s || !memchr(s, '$', L))
+            return HU_OK;
+        char *new_s = NULL;
+        size_t new_len = 0;
+        hu_error_t e = hula_expand_dollar_refs(exec, s, L, &new_s, &new_len);
+        if (e != HU_OK)
+            return e;
+        exec->alloc.free(exec->alloc.ctx, s, L + 1);
+        v->data.string.ptr = new_s;
+        v->data.string.len = new_len;
+        return HU_OK;
+    }
+    case HU_JSON_ARRAY:
+        for (size_t j = 0; j < v->data.array.len; j++) {
+            hu_error_t e = hula_substitute_json_strings(exec, v->data.array.items[j]);
+            if (e != HU_OK)
+                return e;
+        }
+        return HU_OK;
+    case HU_JSON_OBJECT:
+        for (size_t j = 0; j < v->data.object.len; j++) {
+            hu_error_t e = hula_substitute_json_strings(exec, v->data.object.pairs[j].value);
+            if (e != HU_OK)
+                return e;
+        }
+        return HU_OK;
+    default:
+        return HU_OK;
+    }
+}
 
 /* ── Name tables ────────────────────────────────────────────────────────── */
 
@@ -687,6 +849,16 @@ static hu_error_t exec_call(hu_hula_exec_t *exec, hu_hula_node_t *n) {
         return HU_OK;
     }
 
+    if (strchr(args_src, '$') != NULL) {
+        err = hula_substitute_json_strings(exec, args);
+        if (err != HU_OK) {
+            hu_json_free(&exec->alloc, args);
+            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "hula $ref in args failed",
+                       strlen("hula $ref in args failed"));
+            return HU_OK;
+        }
+    }
+
     hu_tool_result_t tr;
     memset(&tr, 0, sizeof(tr));
 
@@ -809,6 +981,7 @@ static hu_error_t exec_loop(hu_hula_exec_t *exec, hu_hula_node_t *n) {
     return HU_OK;
 }
 
+#if (defined(__unix__) || defined(__APPLE__)) && !defined(HU_IS_TEST)
 static hu_error_t delegate_embed_children_json(hu_allocator_t *alloc, hu_hula_node_t *n,
                                                 char **out_json, size_t *out_len) {
     if (!alloc || !n || !out_json || !out_len)
@@ -867,6 +1040,7 @@ static hu_error_t delegate_embed_children_json(hu_allocator_t *alloc, hu_hula_no
     hu_json_free(alloc, prog);
     return err;
 }
+#endif
 
 static hu_error_t exec_delegate(hu_hula_exec_t *exec, hu_hula_node_t *n) {
 #if (defined(__unix__) || defined(__APPLE__)) && !defined(HU_IS_TEST)

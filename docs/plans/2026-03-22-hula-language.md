@@ -27,7 +27,7 @@ Every node:
 | `op`         | string | yes      | `call`, `seq`, `par`, `branch`, `loop`, `delegate`, `emit` |
 | `id`         | string | yes      | Unique within program; used for results and `$refs` |
 | `tool`       | string | for `call` | Must match a registered tool name                |
-| `args`       | object | for `call` | Serialized as JSON string internally               |
+| `args`       | object | for `call` | Serialized as JSON string internally; **string values** may include `$node_id`, expanded from prior **done** outputs (longest id match; capped per value, currently 256 KiB) |
 | `children`   | array  | for `seq`/`par` | Ordered for `seq`; concurrent for `par`      |
 | `goal`       | string | for `delegate` | Sub-agent goal text                          |
 | `model`      | string | no       | Optional delegate model override                   |
@@ -46,6 +46,7 @@ Every node:
 - **`loop`**: bounded iterations over `body`; uses `max_iter` when set.
 - **`delegate`**: with `hu_agent_pool_t` + `hu_spawn_config_t` (non-test Unix), spawns a child agent; optional **child program** is embedded from `children` as JSON in an extended system prompt. The main turn wires pool + `hu_spawn_config_apply_parent_agent` into `hu_hula_exec_set_spawn` for native HuLa, the trivial IR path, and `hu_hula_compiler_chat_compile_execute` (stack `hu_spawn_config_t` must remain valid until `hu_hula_exec_run` returns). Without pool/config, returns the goal string as a stub success result (`HU_IS_TEST` always stubs delegate execution).
 - **`emit`**: produces a string value, resolving `$id` placeholders from prior node outputs.
+- **`call` args**: after JSON parse, the executor walks string values and expands `$node_id` the same way as `emit_value` (referenced node must be **done** before the `call` runs, for example under `seq`).
 
 Policy (`hu_security_policy_t`) is applied before each tool `call`. Risk is combined into `hu_hula_estimate_cost` (`max_tool_risk`).
 

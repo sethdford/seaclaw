@@ -125,9 +125,9 @@ static void agent_turn_hula_append_histories(hu_agent_t *agent, const hu_hula_pr
     if (!agent || !prog || !exec)
         return;
     for (size_t i = 0; i < prog->node_count; i++) {
-        if (prog->nodes[i].op != HU_HULA_CALL)
-            continue;
         const hu_hula_node_t *cn = &prog->nodes[i];
+        if (cn->op != HU_HULA_CALL && cn->op != HU_HULA_DELEGATE && cn->op != HU_HULA_EMIT)
+            continue;
         const hu_hula_result_t *hr =
             cn->id ? hu_hula_exec_result(exec, cn->id) : NULL;
         const char *out_text = "";
@@ -147,8 +147,18 @@ static void agent_turn_hula_append_histories(hu_agent_t *agent, const hu_hula_pr
             out_text = hr->error;
             out_len = hr->error_len;
         }
-        const char *nm = cn->tool_name ? cn->tool_name : "hula";
-        size_t nm_len = cn->tool_name ? strlen(cn->tool_name) : 4;
+        const char *nm;
+        size_t nm_len;
+        if (cn->op == HU_HULA_CALL) {
+            nm = cn->tool_name ? cn->tool_name : "hula";
+            nm_len = cn->tool_name ? strlen(cn->tool_name) : 4;
+        } else if (cn->op == HU_HULA_DELEGATE) {
+            nm = "hula_delegate";
+            nm_len = 13;
+        } else {
+            nm = "hula_emit";
+            nm_len = 9;
+        }
         (void)hu_agent_internal_append_history(agent, HU_ROLE_TOOL, out_text, out_len, nm, nm_len,
                                                tcid, tcid_len);
     }
