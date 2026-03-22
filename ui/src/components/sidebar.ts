@@ -617,10 +617,21 @@ export class ScSidebar extends LitElement {
 
   private _applyTheme() {
     const root = document.documentElement;
-    if (this.theme === "system") {
-      root.removeAttribute("data-theme");
+    const apply = () => {
+      if (this.theme === "system") {
+        root.removeAttribute("data-theme");
+      } else {
+        root.setAttribute("data-theme", this.theme);
+      }
+    };
+
+    if (
+      typeof document.startViewTransition === "function" &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      document.startViewTransition(apply);
     } else {
-      root.setAttribute("data-theme", this.theme);
+      apply();
     }
   }
 

@@ -1,0 +1,5 @@
+# Minimal HuLa lite program (demo tools: echo)
+program hello
+seq root
+  call hi echo
+    text Hello from HuLa lite

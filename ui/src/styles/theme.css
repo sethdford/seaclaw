@@ -117,6 +117,46 @@ body {
   --hu-focus-ring: var(--hu-accent);
 }
 
+/* ─── Theme switch crossfade (View Transitions API) ──────────── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--hu-duration-normal, 250ms);
+  animation-timing-function: var(--hu-ease-out);
+}
+
+::view-transition-old(root) {
+  animation-name: hu-theme-fade-out;
+}
+
+::view-transition-new(root) {
+  animation-name: hu-theme-fade-in;
+}
+
+@keyframes hu-theme-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes hu-theme-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0ms;
+  }
+}
+
 :focus-visible {
   outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
   outline-offset: var(--hu-focus-ring-offset, 2px);
@@ -173,37 +213,22 @@ hu-card.hu-entrance.hu-visible {
   animation-delay: 0ms;
 }
 .hu-stagger > *:nth-child(2) {
-  animation-delay: 40ms;
+  animation-delay: calc(1 * var(--hu-stagger-delay, 50ms));
 }
 .hu-stagger > *:nth-child(3) {
-  animation-delay: 80ms;
+  animation-delay: calc(2 * var(--hu-stagger-delay, 50ms));
 }
 .hu-stagger > *:nth-child(4) {
-  animation-delay: 120ms;
+  animation-delay: calc(3 * var(--hu-stagger-delay, 50ms));
 }
 .hu-stagger > *:nth-child(5) {
-  animation-delay: 160ms;
+  animation-delay: calc(4 * var(--hu-stagger-delay, 50ms));
 }
 .hu-stagger > *:nth-child(6) {
-  animation-delay: 200ms;
+  animation-delay: calc(5 * var(--hu-stagger-delay, 50ms));
 }
-.hu-stagger > *:nth-child(7) {
-  animation-delay: 240ms;
-}
-.hu-stagger > *:nth-child(8) {
-  animation-delay: 280ms;
-}
-.hu-stagger > *:nth-child(9) {
-  animation-delay: 320ms;
-}
-.hu-stagger > *:nth-child(10) {
-  animation-delay: 360ms;
-}
-.hu-stagger > *:nth-child(11) {
-  animation-delay: 400ms;
-}
-.hu-stagger > *:nth-child(12) {
-  animation-delay: 440ms;
+.hu-stagger > *:nth-child(n + 7) {
+  animation-delay: var(--hu-stagger-max, 300ms);
 }
 
 /* Hover lift — subtle card elevation on hover */
@@ -241,25 +266,22 @@ hu-card.hu-entrance.hu-visible {
   animation-delay: 0ms;
 }
 .hu-cascade > :nth-child(2) {
-  animation-delay: 50ms;
+  animation-delay: calc(1 * var(--hu-cascade-delay, 30ms));
 }
 .hu-cascade > :nth-child(3) {
-  animation-delay: 100ms;
+  animation-delay: calc(2 * var(--hu-cascade-delay, 30ms));
 }
 .hu-cascade > :nth-child(4) {
-  animation-delay: 150ms;
+  animation-delay: calc(3 * var(--hu-cascade-delay, 30ms));
 }
 .hu-cascade > :nth-child(5) {
-  animation-delay: 200ms;
+  animation-delay: calc(4 * var(--hu-cascade-delay, 30ms));
 }
 .hu-cascade > :nth-child(6) {
-  animation-delay: 250ms;
+  animation-delay: calc(5 * var(--hu-cascade-delay, 30ms));
 }
-.hu-cascade > :nth-child(7) {
-  animation-delay: 300ms;
-}
-.hu-cascade > :nth-child(8) {
-  animation-delay: 350ms;
+.hu-cascade > :nth-child(n + 7) {
+  animation-delay: var(--hu-cascade-max, 200ms);
 }
 
 @media (prefers-reduced-motion: reduce) {

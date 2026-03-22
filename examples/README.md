@@ -1,10 +1,18 @@
 ---
 title: Example HuLa programs and fixtures
 description: Which JSON files match the CLI demo tools vs a real agent catalog
-updated: 2026-03-22
+updated: 2026-03-23
 ---
 
 # Examples
+
+## HuLa bundle (`hula/`)
+
+| File | Use with |
+| ---- | -------- |
+| [`hula/hello.lite`](hula/hello.lite) | `human hula validate --lite` / `human hula run --lite` / `human hula compile --lite` (demo `echo`). |
+| [`hula/workflow.template.json`](hula/workflow.template.json) | `human hula expand hula/workflow.template.json hula/workflow.vars.example.json` → filled JSON on stdout. |
+| [`hula/workflow.vars.example.json`](hula/workflow.vars.example.json) | Vars for `expand` (copy and edit for your run). |
 
 ## HuLa programs (`hula_*.json`)
 

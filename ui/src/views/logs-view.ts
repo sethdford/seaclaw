@@ -570,8 +570,8 @@ export class ScLogsView extends GatewayAwareLitElement {
         </div>
       </div>
       <hu-card class="log-card" glass>
-        <div class="log-area-wrapper log-area-min">
-          <div class="log-area">
+          <div class="log-area-wrapper log-area-min">
+          <div class="log-area hu-stagger-motion9">
             <hu-skeleton variant="line" class="skeleton-line"></hu-skeleton>
             <hu-skeleton variant="line" class="skeleton-line-90"></hu-skeleton>
             <hu-skeleton variant="line" class="skeleton-line-95"></hu-skeleton>
@@ -651,7 +651,7 @@ export class ScLogsView extends GatewayAwareLitElement {
       return html`
         <hu-card class="log-card" glass>
           <div class="log-area-wrapper">
-            <div class="log-area" role="log" aria-live="polite">
+            <div class="log-area hu-stagger-motion9" role="log" aria-live="polite">
               <hu-empty-state
                 .icon=${icons["file-text"]}
                 heading="Waiting for events..."
@@ -674,7 +674,7 @@ export class ScLogsView extends GatewayAwareLitElement {
       <hu-card class="log-card" glass>
         <div class="log-area-wrapper">
           <div
-            class="log-area"
+            class="log-area hu-stagger-motion9"
             role="log"
             aria-live="polite"
             aria-label="${total} log entries"

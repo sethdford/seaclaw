@@ -18,6 +18,8 @@ export class ScCard extends LitElement {
   @property({ type: Boolean }) mesh = false;
   /** Enable chromatic prismatic border. */
   @property({ type: Boolean }) chromatic = false;
+  /** Animate card into view when it intersects the viewport (IntersectionObserver). */
+  @property({ type: Boolean, reflect: true }) animate = false;
   /** Tonal surface: default (container), high (interactive/elevated), highest (emphasis). */
   @property({ type: String }) surface: CardSurface = "default";
 
@@ -242,6 +244,28 @@ export class ScCard extends LitElement {
       padding: 1px;
     }
 
+    :host([animate]) .card {
+      opacity: 0;
+      transform: translateY(var(--hu-space-sm, 8px));
+      transition:
+        opacity var(--hu-duration-normal, 250ms) var(--hu-ease-out),
+        transform var(--hu-duration-normal, 250ms) var(--hu-ease-out);
+      transition-delay: var(--hu-stagger-delay, 0ms);
+    }
+
+    :host([animate].entered) .card {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :host([animate]) .card {
+        opacity: 1;
+        transform: none;
+        transition: none;
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       :host([hoverable]),
       :host([clickable]),
@@ -267,16 +291,53 @@ export class ScCard extends LitElement {
     }
   `;
 
+  private _entranceObserver: IntersectionObserver | null = null;
+
+  private _teardownEntranceObserver(): void {
+    if (this._entranceObserver) {
+      this._entranceObserver.disconnect();
+      this._entranceObserver = null;
+    }
+  }
+
+  private _setupEntranceObserver(): void {
+    this._teardownEntranceObserver();
+    if (!this.animate) {
+      return;
+    }
+    if (typeof IntersectionObserver === "undefined") {
+      this.classList.add("entered");
+      return;
+    }
+    this._entranceObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            this.classList.add("entered");
+            this._teardownEntranceObserver();
+            break;
+          }
+        }
+      },
+      { threshold: 0.1 },
+    );
+    this._entranceObserver.observe(this);
+  }
+
   override connectedCallback(): void {
     super.connectedCallback();
     if (this.tilt) {
       pointerProximity.observe(this);
+    }
+    if (this.animate) {
+      this._setupEntranceObserver();
     }
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     pointerProximity.unobserve(this);
+    this._teardownEntranceObserver();
   }
 
   override updated(changed: Map<string, unknown>): void {
@@ -285,6 +346,14 @@ export class ScCard extends LitElement {
         pointerProximity.observe(this);
       } else {
         pointerProximity.unobserve(this);
+      }
+    }
+    if (changed.has("animate")) {
+      if (this.animate) {
+        this._setupEntranceObserver();
+      } else {
+        this._teardownEntranceObserver();
+        this.classList.remove("entered");
       }
     }
   }

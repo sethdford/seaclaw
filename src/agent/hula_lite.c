@@ -1,6 +1,5 @@
 #include "human/agent/hula_lite.h"
 #include "human/core/string.h"
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -122,19 +121,27 @@ static hu_error_t collect_lines(const char *src, size_t src_len, hula_lite_line_
 
         while (line_len > 0 && (unsigned char)src[start + line_len - 1] <= 32)
             line_len--;
-        while (line_len > 0 && (unsigned char)src[start] <= 32) {
-            start++;
-            line_len--;
-        }
         if (line_len == 0)
             continue;
-        if (src[start] == '#')
+
+        bool any_non_ws = false;
+        for (size_t z = 0; z < line_len; z++) {
+            if (!((unsigned char)src[start + z] <= 32)) {
+                any_non_ws = true;
+                break;
+            }
+        }
+        if (!any_non_ws)
             continue;
 
         size_t skip = 0;
         int ind = line_indent(src + start, line_len, &skip);
         if (ind < 0)
             return HU_ERR_PARSE;
+        if (skip >= line_len)
+            continue;
+        if (src[start + skip] == '#')
+            continue;
         if (*out_count >= HU_HULA_LITE_MAX_LINES)
             return HU_ERR_INVALID_ARGUMENT;
 
@@ -151,15 +158,18 @@ static hu_error_t collect_lines(const char *src, size_t src_len, hula_lite_line_
 
 static hu_error_t emit_call(hula_bb_t *bb, const hula_lite_line_t *lines, size_t nlines, size_t *idx,
                             int my_ind, const char *id, const char *tool) {
-    if (bb_append(bb, "{\"op\":\"call\",\"id\":\"", 22) != HU_OK)
+    const char *call_head = "{\"op\":\"call\",\"id\":\"";
+    if (bb_append(bb, call_head, strlen(call_head)) != HU_OK)
         return HU_ERR_OUT_OF_MEMORY;
     if (bb_append_esc(bb, id, strlen(id)) != HU_OK)
         return HU_ERR_OUT_OF_MEMORY;
-    if (bb_append(bb, "\",\"tool\":\"", 10) != HU_OK)
+    const char *tool_mid = "\",\"tool\":\"";
+    if (bb_append(bb, tool_mid, strlen(tool_mid)) != HU_OK)
         return HU_ERR_OUT_OF_MEMORY;
     if (bb_append_esc(bb, tool, strlen(tool)) != HU_OK)
         return HU_ERR_OUT_OF_MEMORY;
-    if (bb_append(bb, "\",\"args\":{", 9) != HU_OK)
+    const char *args_open = "\",\"args\":{";
+    if (bb_append(bb, args_open, strlen(args_open)) != HU_OK)
         return HU_ERR_OUT_OF_MEMORY;
 
     (*idx)++;
@@ -181,22 +191,22 @@ static hu_error_t emit_call(hula_bb_t *bb, const hula_lite_line_t *lines, size_t
         const char *val = ln + kend;
         size_t vl = rl - kend;
 
-        if (!first && bb_append(bb, ",", 1) != HU_OK)
+        if (!first && bb_append(bb, ",", strlen(",")) != HU_OK)
             return HU_ERR_OUT_OF_MEMORY;
         first = false;
-        if (bb_append(bb, "\"", 1) != HU_OK)
+        if (bb_append(bb, "\"", strlen("\"")) != HU_OK)
             return HU_ERR_OUT_OF_MEMORY;
         if (bb_append_esc(bb, k, strlen(k)) != HU_OK)
             return HU_ERR_OUT_OF_MEMORY;
-        if (bb_append(bb, "\":\"", 3) != HU_OK)
+        if (bb_append(bb, "\":\"", strlen("\":\"")) != HU_OK)
             return HU_ERR_OUT_OF_MEMORY;
         if (bb_append_esc(bb, val, vl) != HU_OK)
             return HU_ERR_OUT_OF_MEMORY;
-        if (bb_append(bb, "\"", 1) != HU_OK)
+        if (bb_append(bb, "\"", strlen("\"")) != HU_OK)
             return HU_ERR_OUT_OF_MEMORY;
         (*idx)++;
     }
-    if (bb_append(bb, "}}", 2) != HU_OK)
+    if (bb_append(bb, "}}", strlen("}}")) != HU_OK)
         return HU_ERR_OUT_OF_MEMORY;
     return HU_OK;
 }
@@ -229,27 +239,30 @@ static hu_error_t emit_node(hula_bb_t *bb, const hula_lite_line_t *lines, size_t
 
 static hu_error_t emit_seq_par(hula_bb_t *bb, const hula_lite_line_t *lines, size_t nlines, size_t *idx,
                                int my_ind, const char *op, const char *id) {
-    if (bb_append(bb, "{\"op\":\"", 7) != HU_OK)
+    const char *op_head = "{\"op\":\"";
+    if (bb_append(bb, op_head, strlen(op_head)) != HU_OK)
         return HU_ERR_OUT_OF_MEMORY;
     if (bb_append(bb, op, strlen(op)) != HU_OK)
         return HU_ERR_OUT_OF_MEMORY;
-    if (bb_append(bb, "\",\"id\":\"", 8) != HU_OK)
+    const char *id_mid = "\",\"id\":\"";
+    if (bb_append(bb, id_mid, strlen(id_mid)) != HU_OK)
         return HU_ERR_OUT_OF_MEMORY;
     if (bb_append_esc(bb, id, strlen(id)) != HU_OK)
         return HU_ERR_OUT_OF_MEMORY;
-    if (bb_append(bb, "\",\"children\":[", 13) != HU_OK)
+    const char *kids = "\",\"children\":[";
+    if (bb_append(bb, kids, strlen(kids)) != HU_OK)
         return HU_ERR_OUT_OF_MEMORY;
     (*idx)++;
     bool first = true;
     while (*idx < nlines && lines[*idx].ind == my_ind + 1) {
-        if (!first && bb_append(bb, ",", 1) != HU_OK)
+        if (!first && bb_append(bb, ",", strlen(",")) != HU_OK)
             return HU_ERR_OUT_OF_MEMORY;
         first = false;
         hu_error_t e = emit_node(bb, lines, nlines, idx, my_ind + 1);
         if (e != HU_OK)
             return e;
     }
-    if (bb_append(bb, "]}", 2) != HU_OK)
+    if (bb_append(bb, "]}", strlen("]}")) != HU_OK)
         return HU_ERR_OUT_OF_MEMORY;
     return HU_OK;
 }
@@ -277,11 +290,13 @@ hu_error_t hu_hula_lite_to_json(hu_allocator_t *alloc, const char *src, size_t s
         return HU_ERR_PARSE;
 
     hula_bb_t bb = {.alloc = alloc};
-    err = bb_append(&bb, "{\"name\":\"", 10);
+    const char *prog_name = "{\"name\":\"";
+    err = bb_append(&bb, prog_name, strlen(prog_name));
     if (err == HU_OK)
         err = bb_append_esc(&bb, w1, strlen(w1));
+    const char *prog_tail = "\",\"version\":1,\"root\":";
     if (err == HU_OK)
-        err = bb_append(&bb, "\",\"version\":1,\"root\":", 22);
+        err = bb_append(&bb, prog_tail, strlen(prog_tail));
     if (err != HU_OK) {
         bb_free(&bb);
         return err;
@@ -290,7 +305,6 @@ hu_error_t hu_hula_lite_to_json(hu_allocator_t *alloc, const char *src, size_t s
     size_t idx = 1;
     err = emit_node(&bb, lines, nlines, &idx, lines[1].ind);
     if (err != HU_OK || idx != nlines) {
-        fprintf(stderr, "hula_lite debug: err=%d idx=%zu nlines=%zu\n", (int)err, idx, nlines);
         bb_free(&bb);
         return err != HU_OK ? err : HU_ERR_PARSE;
     }

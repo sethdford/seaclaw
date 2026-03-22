@@ -160,7 +160,7 @@ static hu_error_t bff_memory_execute(void *ctx, hu_allocator_t *alloc, const hu_
         if (sid && sid[0])
             n += snprintf(jb + n, qcap - (size_t)n, ",\"session_id\":\"%s\"", sid);
         n += snprintf(jb + n, qcap - (size_t)n, "}");
-        char url[256];
+        char url[768];
         snprintf(url, sizeof(url), "%s/v1/memory/recall", base_buf);
         hu_http_response_t resp = {0};
         hu_error_t err =

@@ -1,5 +1,5 @@
 /*
- * Transcribe meeting audio via Google Cloud Speech-to-Text v1, then store transcript in BFF.
+ * Transcribe meeting audio via Google Cloud Speech-to-Text v2 (Chirp) or v1, then store in BFF.
  */
 #include "human/core/allocator.h"
 #include "human/core/error.h"
@@ -16,19 +16,24 @@
 
 #define HU_MEETING_NAME "meeting_transcribe"
 #define HU_MEETING_DESC                                                                      \
-    "Transcribe audio (WAV/FLAC/raw) with Google Speech-to-Text v1 (sync, max ~8MB). Set "   \
-    "model to chirp_2 or chirp_telephony in supported projects; default latest_long. "     \
-    "Requires access_token (OAuth). Env: BFF_BASE_URL, BFF_AUTH_TOKEN, optional BFF_TENANT_ID."
+    "Transcribe audio (sync, max ~8MB). Uses Speech-to-Text v2 with model chirp_2 when "    \
+    "gcp_project is set (arg or GOOGLE_CLOUD_PROJECT/GCP_PROJECT env) and speech_api is not " \
+    "v1; otherwise v1. v2 URL: .../locations/{speech_location}/recognizers/_:recognize. "   \
+    "OAuth access_token. Env: BFF_*, optional SPEECH_LOCATION."
 #define HU_MEETING_PARAMS                                                                       \
     "{\"type\":\"object\",\"properties\":{\"audio_path\":{\"type\":\"string\"},\"access_token\":" \
     "{\"type\":\"string\",\"description\":\"GCP OAuth2 access token\"},\"client_id\":{\"type\":"   \
-    "\"string\"},\"encoding\":{\"type\":\"string\",\"description\":\"LINEAR16, FLAC, "           \
-    "OGG_OPUS, MP3, WEBM_OPUS (default LINEAR16)\"},\"sample_rate_hertz\":{\"type\":\"number\","  \
+    "\"string\"},\"gcp_project\":{\"type\":\"string\",\"description\":\"GCP project id for "      \
+    "Speech v2\"},\"speech_location\":{\"type\":\"string\",\"default\":\"us\"},\"speech_api\":"   \
+    "{\"type\":\"string\",\"description\":\"v2 (default when project set) or v1\"},"              \
+    "\"encoding\":{\"type\":\"string\",\"description\":\"LINEAR16, FLAC, MP3, OGG_OPUS, "         \
+    "WEBM_OPUS (default LINEAR16)\"},\"sample_rate_hertz\":{\"type\":\"number\","                 \
     "\"default\":16000},\"language_code\":{\"type\":\"string\",\"default\":\"en-US\"},"          \
-    "\"model\":{\"type\":\"string\",\"default\":\"latest_long\"},\"session_id\":{\"type\":"       \
-    "\"string\"}},\"required\":[\"audio_path\",\"access_token\",\"client_id\"]}"
+    "\"model\":{\"type\":\"string\",\"description\":\"v2 default chirp_2; v1 default "           \
+    "latest_long\"},\"session_id\":{\"type\":\"string\"}},\"required\":[\"audio_path\","         \
+    "\"access_token\",\"client_id\"]}"
 
-#define SPEECH_URL "https://speech.googleapis.com/v1/speech:recognize"
+#define SPEECH_V1_URL "https://speech.googleapis.com/v1/speech:recognize"
 #define AUDIO_CAP  (8 * 1024 * 1024)
 
 typedef struct {
@@ -38,6 +43,36 @@ typedef struct {
 } meeting_ctx_t;
 
 #if !HU_IS_TEST
+/* v1 and v2 JSON both include "transcript":"..." under alternatives. */
+static char *meeting_extract_transcript(hu_allocator_t *alloc, const char *body, size_t bl) {
+    const char *needle = "\"transcript\"";
+    const char *found = NULL;
+    for (size_t i = 0; i + 12 < bl; i++) {
+        if (memcmp(body + i, needle, 12) == 0) {
+            found = body + i;
+            break;
+        }
+    }
+    char *transcript = hu_strndup(alloc, "(no transcript in response)", 27);
+    if (found) {
+        const char *q = strchr(found, ':');
+        if (q) {
+            q++;
+            while (*q == ' ' || *q == '\t')
+                q++;
+            if (*q == '"') {
+                q++;
+                const char *end = strchr(q, '"');
+                if (end && end > q) {
+                    alloc->free(alloc->ctx, transcript, 28);
+                    transcript = hu_strndup(alloc, q, (size_t)(end - q));
+                }
+            }
+        }
+    }
+    return transcript;
+}
+
 static void strip_slash(char *s) {
     size_t n = strlen(s);
     while (n > 0 && s[n - 1] == '/')
@@ -103,9 +138,23 @@ static hu_error_t meeting_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
     const char *lang = hu_json_get_string(args, "language_code");
     if (!lang || !lang[0])
         lang = "en-US";
+    const char *gcp_proj = hu_json_get_string(args, "gcp_project");
+    if (!gcp_proj || !gcp_proj[0])
+        gcp_proj = getenv("GOOGLE_CLOUD_PROJECT");
+    if (!gcp_proj || !gcp_proj[0])
+        gcp_proj = getenv("GCP_PROJECT");
+    const char *speech_api = hu_json_get_string(args, "speech_api");
+    bool force_v1 = speech_api && strcmp(speech_api, "v1") == 0;
+    bool use_v2 = !force_v1 && gcp_proj && gcp_proj[0];
+    const char *sloc = hu_json_get_string(args, "speech_location");
+    if (!sloc || !sloc[0])
+        sloc = getenv("SPEECH_LOCATION");
+    if (!sloc || !sloc[0])
+        sloc = "us";
+
     const char *model = hu_json_get_string(args, "model");
     if (!model || !model[0])
-        model = "latest_long";
+        model = use_v2 ? "chirp_2" : "latest_long";
     const char *sid = hu_json_get_string(args, "session_id");
 
     hu_error_t perr =
@@ -181,24 +230,43 @@ static hu_error_t meeting_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
     char gauth[256];
     snprintf(gauth, sizeof(gauth), "Bearer %s", tok);
 
-    size_t req_cap = b64_len + 512;
+    char speech_url[384];
+    if (use_v2) {
+        snprintf(speech_url, sizeof(speech_url),
+                 "https://speech.googleapis.com/v2/projects/%s/locations/%s/recognizers/_:recognize",
+                 gcp_proj, sloc);
+    } else {
+        strncpy(speech_url, SPEECH_V1_URL, sizeof(speech_url) - 1);
+        speech_url[sizeof(speech_url) - 1] = '\0';
+    }
+
+    size_t req_cap = b64_len + 1536;
     char *req = (char *)alloc->alloc(alloc->ctx, req_cap);
     if (!req) {
         alloc->free(alloc->ctx, b64, b64_len + 1);
         *out = hu_tool_result_fail("out of memory", 12);
         return HU_ERR_OUT_OF_MEMORY;
     }
-    int rn = snprintf(req, req_cap,
+    int rn;
+    if (use_v2) {
+        rn = snprintf(req, req_cap,
+                      "{\"config\":{\"explicitDecodingConfig\":{\"encoding\":\"%s\","
+                      "\"sampleRateHertz\":%d,\"audioChannelCount\":1},\"languageCodes\":[\"%s\"],"
+                      "\"model\":\"%s\"},\"content\":\"",
+                      enc, sr, lang, model);
+    } else {
+        rn = snprintf(req, req_cap,
                       "{\"config\":{\"encoding\":\"%s\",\"sampleRateHertz\":%d,\"languageCode\":"
                       "\"%s\",\"model\":\"%s\"},\"audio\":{\"content\":\"",
                       enc, sr, lang, model);
+    }
     if (rn < 0 || (size_t)rn >= req_cap) {
         alloc->free(alloc->ctx, req, req_cap);
         alloc->free(alloc->ctx, b64, b64_len + 1);
         *out = hu_tool_result_fail("request too large", 15);
         return HU_OK;
     }
-    if ((size_t)rn + b64_len + 8 >= req_cap) {
+    if ((size_t)rn + b64_len + 16 >= req_cap) {
         alloc->free(alloc->ctx, req, req_cap);
         alloc->free(alloc->ctx, b64, b64_len + 1);
         *out = hu_tool_result_fail("request too large", 15);
@@ -206,11 +274,14 @@ static hu_error_t meeting_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
     }
     memcpy(req + rn, b64, b64_len);
     rn += (int)b64_len;
-    rn += snprintf(req + rn, req_cap - (size_t)rn, "\"}}");
+    if (use_v2)
+        rn += snprintf(req + rn, req_cap - (size_t)rn, "\"}");
+    else
+        rn += snprintf(req + rn, req_cap - (size_t)rn, "\"}}");
     alloc->free(alloc->ctx, b64, b64_len + 1);
 
     hu_http_response_t resp = {0};
-    hu_error_t herr = hu_http_post_json_ex(alloc, SPEECH_URL, gauth, NULL, req, (size_t)rn, &resp);
+    hu_error_t herr = hu_http_post_json_ex(alloc, speech_url, gauth, NULL, req, (size_t)rn, &resp);
     alloc->free(alloc->ctx, req, req_cap);
     if (herr != HU_OK || resp.status_code < 200 || resp.status_code >= 300) {
         if (resp.owned && resp.body) {
@@ -223,35 +294,12 @@ static hu_error_t meeting_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
         return HU_OK;
     }
 
-    /* Minimal parse: look for "transcript":" in body */
-    const char *body = resp.body;
-    size_t bl = resp.body_len;
-    const char *needle = "\"transcript\"";
-    const char *found = NULL;
-    for (size_t i = 0; i + 12 < bl; i++) {
-        if (memcmp(body + i, needle, 12) == 0) {
-            found = body + i;
-            break;
-        }
-    }
-    char *transcript = hu_strndup(alloc, "(no transcript in response)", 27);
-    if (found) {
-        const char *q = strchr(found, ':');
-        if (q) {
-            q++;
-            while (*q == ' ' || *q == '\t')
-                q++;
-            if (*q == '"') {
-                q++;
-                const char *end = strchr(q, '"');
-                if (end && end > q) {
-                    alloc->free(alloc->ctx, transcript, 28);
-                    transcript = hu_strndup(alloc, q, (size_t)(end - q));
-                }
-            }
-        }
-    }
+    char *transcript = meeting_extract_transcript(alloc, resp.body, resp.body_len);
     hu_http_response_free(alloc, &resp);
+    if (!transcript) {
+        *out = hu_tool_result_fail("out of memory", 12);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
 
     const char *eb = getenv("BFF_BASE_URL");
     const char *bff_auth = bff_bearer();

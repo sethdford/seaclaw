@@ -45,7 +45,8 @@ export class HuHulaTree extends LitElement {
           (s) => html`
             <li role="treeitem">
               <span class="id">${String(s.id ?? "?")}</span>
-              <span class="meta">${String(s.op ?? "")}${s.tool ? ` · ${String(s.tool)}` : ""} ·
+              <span class="meta"
+                >${String(s.op ?? "")}${s.tool ? ` · ${String(s.tool)}` : ""} ·
                 ${String(s.status ?? "")}</span
               >
             </li>

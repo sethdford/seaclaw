@@ -81,7 +81,8 @@ export class ScHulaView extends GatewayAwareLitElement {
         width: 100%;
         font-family: var(--hu-font);
         color: var(--hu-text);
-        transition: border-color var(--hu-duration-fast) var(--hu-ease-out),
+        transition:
+          border-color var(--hu-duration-fast) var(--hu-ease-out),
           background var(--hu-duration-fast) var(--hu-ease-out);
       }
       .trace-row:hover {
@@ -118,6 +119,14 @@ export class ScHulaView extends GatewayAwareLitElement {
         color: var(--hu-text);
         margin-bottom: var(--hu-space-lg);
       }
+      .detail-error {
+        padding: var(--hu-space-md);
+        border-radius: var(--hu-radius);
+        background: color-mix(in srgb, var(--hu-error) 10%, transparent);
+        color: var(--hu-text);
+        font-size: var(--hu-text-sm);
+        margin-bottom: var(--hu-space-md);
+      }
       .stats {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
@@ -144,13 +153,18 @@ export class ScHulaView extends GatewayAwareLitElement {
   @state() private detail: HulaTraceRecord | null = null;
   @state() private analytics: HulaAnalyticsSummary | null = null;
   @state() private loading = true;
-  @state() private error = "";
+  @state() private listError = "";
+  @state() private detailLoading = false;
+  @state() private detailError = "";
 
   protected override async load(): Promise<void> {
     const gw = this.gateway;
-    if (!gw) return;
+    if (!gw) {
+      this.loading = false;
+      return;
+    }
     this.loading = true;
-    this.error = "";
+    this.listError = "";
     try {
       const [listRes, anRes] = await Promise.all([
         gw.request<{ traces?: HulaTraceListItem[]; directory?: string }>("hula.traces.list", {}),
@@ -166,7 +180,7 @@ export class ScHulaView extends GatewayAwareLitElement {
         await this._loadDetail(this.selected.id);
       }
     } catch (e) {
-      this.error = friendlyError(e);
+      this.listError = friendlyError(e);
     } finally {
       this.loading = false;
     }
@@ -175,17 +189,22 @@ export class ScHulaView extends GatewayAwareLitElement {
   private async _loadDetail(id: string): Promise<void> {
     const gw = this.gateway;
     if (!gw) return;
+    this.detailLoading = true;
+    this.detailError = "";
     try {
       const res = await gw.request<HulaTraceRecord>("hula.traces.get", { id });
       this.detail = res;
     } catch (e) {
-      this.error = friendlyError(e);
+      this.detailError = friendlyError(e);
       this.detail = null;
+    } finally {
+      this.detailLoading = false;
     }
   }
 
   private async _onSelect(t: HulaTraceListItem): Promise<void> {
     this.selected = t;
+    this.detailError = "";
     if (t.id) await this._loadDetail(t.id);
   }
 
@@ -197,9 +216,10 @@ export class ScHulaView extends GatewayAwareLitElement {
       await gw.request("hula.traces.delete", { id: this.selected.id });
       this.detail = null;
       this.selected = null;
+      this.detailError = "";
       await this.load();
     } catch (e) {
-      this.error = friendlyError(e);
+      this.listError = friendlyError(e);
     }
   }
 
@@ -214,14 +234,12 @@ export class ScHulaView extends GatewayAwareLitElement {
         </hu-section-header>
       </hu-page-hero>
 
-      ${this.error
-        ? html`<div class="error-banner" role="alert">${this.error}</div>`
+      ${this.listError
+        ? html`<div class="error-banner" role="alert">${this.listError}</div>`
         : nothing}
-
       ${this.loading
         ? html`<hu-skeleton style="height:6rem;border-radius:var(--hu-radius)"></hu-skeleton>`
         : nothing}
-
       ${!this.loading && this.analytics
         ? html`
             <div class="stats">
@@ -254,7 +272,7 @@ export class ScHulaView extends GatewayAwareLitElement {
                 description="Run a HuLa program with HU_HULA_TRACE_DIR set (or use the default ~/.human/hula_traces on POSIX)."
               ></hu-empty-state>`
             : nothing}
-          <div class="trace-list" role="list">
+          <div class="trace-list hu-stagger-motion9" role="list">
             ${this.traces.map(
               (t) => html`
                 <button
@@ -288,23 +306,33 @@ export class ScHulaView extends GatewayAwareLitElement {
             <hu-section-header heading="Trace detail"></hu-section-header>
             <hu-button
               variant="secondary"
-              ?disabled=${!this.selected?.id}
+              ?disabled=${!this.selected?.id || this.detailLoading}
               @click=${() => this._onDelete()}
               >Delete</hu-button
             >
           </div>
-          ${this.detail?.record
-            ? html`
-                <p style="font-size:var(--hu-text-sm);margin-bottom:var(--hu-space-md);">
-                  <strong>${this.detail.record.program_name ?? "program"}</strong>
-                  · ${this.detail.record.success ? "success" : "failed"}
-                </p>
-                <hu-hula-tree .steps=${this.detail.record.trace ?? []}></hu-hula-tree>
-              `
-            : html`<hu-empty-state
-                headline="Select a trace"
-                description="Choose a file on the left to inspect its execution tree."
-              ></hu-empty-state>`}
+          ${this.detailError
+            ? html`<div class="detail-error" role="alert">${this.detailError}</div>`
+            : nothing}
+          ${this.detailLoading
+            ? html`<hu-skeleton style="height:12rem;border-radius:var(--hu-radius)"></hu-skeleton>`
+            : this.detail?.record
+              ? html`
+                  <p style="font-size:var(--hu-text-sm);margin-bottom:var(--hu-space-md);">
+                    <strong>${this.detail.record.program_name ?? "program"}</strong>
+                    · ${this.detail.record.success ? "success" : "failed"}
+                  </p>
+                  <hu-hula-tree .steps=${this.detail.record.trace ?? []}></hu-hula-tree>
+                `
+              : this.selected?.id
+                ? html`<hu-empty-state
+                    headline="Could not load trace"
+                    description="The list entry is selected but no record was returned. Try another file or refresh."
+                  ></hu-empty-state>`
+                : html`<hu-empty-state
+                    headline="Select a trace"
+                    description="Choose a file on the left to inspect its execution tree."
+                  ></hu-empty-state>`}
         </hu-card>
       </div>
     `;

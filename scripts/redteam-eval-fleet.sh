@@ -164,7 +164,8 @@ if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
     probe_prof="${REDTEAM_PROBE_PROFILE:-safety}"
     echo ""
     echo "=== redteam-eval-fleet: dynamic harness (probes=$probes profile=$probe_prof) -> $LIVE_DIR/harness-report.json ==="
-    if python3 "$HARNESS" "${HARNESS_PY_ARGS[@]}" --probes "$probes" --probe-profile "$probe_prof" \
+    # Empty HARNESS_PY_ARGS + set -u: "${arr[@]}" is unbound on some Bash versions; use ${arr[@]+"${arr[@]}"}
+    if python3 "$HARNESS" ${HARNESS_PY_ARGS[@]+"${HARNESS_PY_ARGS[@]}"} --probes "$probes" --probe-profile "$probe_prof" \
       --include-suite "$ROOT/eval_suites/adversarial.json" \
       --include-suite "$ROOT/eval_suites/capability_edges.json" \
       --include-suite "$ROOT/eval_suites/human_likeness.json" \

@@ -1,7 +1,7 @@
 ---
 title: HuLa — structured plans for the Human agent
 description: How HuLa makes multi-step tool use clearer, safer, and easier to improve over time
-updated: 2026-03-22
+updated: 2026-03-23
 ---
 
 # HuLa — structured plans for the Human agent
@@ -70,6 +70,47 @@ Quick smoke test (requires built binary):
 
 **Important:** `human hula run` uses **fixed demo tool names** (`echo`, `search`, `write`, `analyze`) for the CLI. Your **live agent** only accepts tools that are actually registered for that session (e.g. `web_fetch`, `memory_store`). See [`examples/README.md`](../../examples/README.md).
 
+## HuLa in practice (schema, lite, templates, traces UI)
+
+### JSON Schema
+
+The canonical machine-readable shape lives at [`schemas/hula-program.schema.json`](../../schemas/hula-program.schema.json). From a built binary, run:
+
+```bash
+./build/human hula schema
+```
+
+This prints the resolved path (repo root, parent paths, or `HUMAN_SOURCE_ROOT`) and the schema file contents when found—use it to wire editors, CI checks, or LLM JSON-mode prompts.
+
+### HuLa lite (indentation syntax)
+
+For hand-authored plans without raw JSON, use **lite**: two spaces per indent level, op lines such as `program <name>`, `seq <id>`, `par <id>`, `call <id> <tool>`, and child lines for `call` args (`key value ...`). Comments start with `#` after indentation.
+
+```bash
+# Compile lite → JSON on stdout
+./build/human hula compile --lite examples/hula/hello.lite
+
+# Validate or run lite sources directly
+./build/human hula validate --lite examples/hula/hello.lite
+./build/human hula run --lite examples/hula/hello.lite
+```
+
+### Template expansion
+
+To fill `{{placeholders}}` in a program template (JSON text) from a small vars JSON object:
+
+```bash
+./build/human hula expand examples/hula/workflow.template.json examples/hula/workflow.vars.example.json
+```
+
+Example files live under [`examples/hula/`](../../examples/hula/).
+
+### Persisted traces and dashboard
+
+- **Filesystem:** Traces are written under `~/.human/hula_traces/` when `HU_HULA_TRACE_DIR` is unset (POSIX), or to the directory you set.
+- **Gateway RPC** (control protocol): `hula.traces.list`, `hula.traces.get`, `hula.traces.delete`, `hula.traces.analytics` power the **HuLa traces** view in the web dashboard.
+- **Provider JSON mode:** For compiler reliability, see [`docs/providers/hula-json-mode-matrix.md`](../providers/hula-json-mode-matrix.md).
+
 ## Opcodes at a glance
 
 | Opcode | Meaning |
@@ -122,6 +163,8 @@ For LLM fine-tuning or distillation, align training targets with the same JSON s
 | -------- | ------- |
 | **Published docs** | [HuLa Programs](https://h-uman.ai/features/hula/) on h-uman.ai (Starlight; mirrors this guide) |
 | [`docs/plans/2026-03-22-hula-language.md`](../plans/2026-03-22-hula-language.md) | Authoritative field-level spec |
-| [`examples/README.md`](../../examples/README.md) | Example JSON files (CLI vs agent) |
+| [`examples/README.md`](../../examples/README.md) | Example JSON and lite files (CLI vs agent) |
+| [`examples/hula/`](../../examples/hula/) | Template + lite samples for `expand` / `--lite` |
+| [`schemas/hula-program.schema.json`](../../schemas/hula-program.schema.json) | JSON Schema for programs |
 | [`docs/CONCEPT_INDEX.md`](../CONCEPT_INDEX.md) | Source file map |
 | [`docs/api/config.md`](../api/config.md) | `agent.hula` and related config |

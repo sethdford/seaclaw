@@ -572,6 +572,31 @@
     }
   }
 
+  /* ── Main nav: defer entrance until after LCP (matches #site-nav in Nav.astro) ── */
+  .site-nav,
+  #site-nav {
+    opacity: 0;
+    transform: translateY(-8px);
+    transition:
+      opacity var(--hu-duration-slower, 400ms) var(--hu-ease-out, ease-out),
+      transform var(--hu-duration-slower, 400ms) var(--hu-ease-out, ease-out);
+  }
+
+  .hu-lcp-done .site-nav,
+  .hu-lcp-done #site-nav {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .site-nav,
+    #site-nav {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+
   /* ── Scroll reveal system (replaces GSAP ScrollTrigger) ── */
   [data-reveal] {
     opacity: 0;
@@ -1392,6 +1417,7 @@
   .arch-title,
   .arch-sub,
   .arch-node,
+  #site-nav,
   #arch-core,
   .providers-title,
   .providers-sub,
