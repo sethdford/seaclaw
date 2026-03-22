@@ -1264,7 +1264,8 @@ static void hula_emergence_persist_scan_promote(void) {
     fclose(f2);
 
     const char *tr_json = "[{\"op\":\"call\",\"tool\":\"z\"}]";
-    HU_ASSERT_EQ(hu_hula_trace_persist(&alloc, tr, tr_json, strlen(tr_json), "unitprog", 8, true),
+    HU_ASSERT_EQ(hu_hula_trace_persist(&alloc, tr, tr_json, strlen(tr_json), "unitprog", 8, true,
+                                       NULL, 0),
                  HU_OK);
 
     char **patterns = NULL;
@@ -1310,6 +1311,49 @@ static void hula_emergence_persist_scan_promote(void) {
     (void)unlink(skill_json_path);
     (void)unlink(skill_md_path);
     (void)rmdir(sk);
+    (void)rmdir(td);
+}
+
+static void hula_trace_persist_embeds_program_field(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char td[] = "/tmp/hu_hula_progemb_XXXXXX";
+    HU_ASSERT_NOT_NULL(mkdtemp(td));
+    const char *trace_a = "[{\"op\":\"call\",\"id\":\"z\",\"tool\":\"echo\"}]";
+    const char *prog =
+        "{\"name\":\"emb\",\"version\":1,\"root\":{\"op\":\"call\",\"id\":\"c\",\"tool\":\"echo\","
+        "\"args\":{\"text\":\"x\"}}}";
+    HU_ASSERT_EQ(hu_hula_trace_persist(&alloc, td, trace_a, strlen(trace_a), "emb", 3, true, prog,
+                                       strlen(prog)),
+                 HU_OK);
+    DIR *d = opendir(td);
+    HU_ASSERT_NOT_NULL(d);
+    char path[640];
+    path[0] = '\0';
+    struct dirent *de;
+    while ((de = readdir(d)) != NULL) {
+        if (de->d_name[0] == '.')
+            continue;
+        (void)snprintf(path, sizeof(path), "%s/%s", td, de->d_name);
+        break;
+    }
+    closedir(d);
+    HU_ASSERT_TRUE(path[0] != '\0');
+    FILE *fp = fopen(path, "rb");
+    HU_ASSERT_NOT_NULL(fp);
+    char buf[4096];
+    size_t nr = fread(buf, 1, sizeof(buf) - 1, fp);
+    fclose(fp);
+    buf[nr] = '\0';
+    hu_json_value_t *root = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc, buf, nr, &root), HU_OK);
+    HU_ASSERT_NOT_NULL(root);
+    hu_json_value_t *po = hu_json_object_get(root, "program");
+    HU_ASSERT_NOT_NULL(po);
+    HU_ASSERT_TRUE(po->type == HU_JSON_OBJECT);
+    const char *nm = hu_json_get_string(po, "name");
+    HU_ASSERT_TRUE(nm && strcmp(nm, "emb") == 0);
+    hu_json_free(&alloc, root);
+    (void)unlink(path);
     (void)rmdir(td);
 }
 #endif
@@ -1546,9 +1590,24 @@ static void hula_expand_template_substitutes(void) {
 }
 
 static void hula_lite_produces_valid_program(void) {
-    /* TODO: collect_lines strips leading whitespace before computing indent,
-       so all lines have indent 0 — lite parser needs a fix. Skipping for now. */
-    (void)0;
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *src = "program hello\nseq root\n  call hi echo\n    text Hello from HuLa lite\n";
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_hula_lite_to_json(&alloc, src, strlen(src), &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(out != NULL);
+    HU_ASSERT_TRUE(out_len > 0);
+    HU_ASSERT_TRUE(strstr(out, "\"name\":\"hello\"") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "\"op\":\"seq\"") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "\"op\":\"call\"") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "\"tool\":\"echo\"") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "\"text\":\"Hello from HuLa lite\"") != NULL);
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, out, out_len, &prog), HU_OK);
+    HU_ASSERT_STR_EQ(prog.name, "hello");
+    hu_hula_program_deinit(&prog);
+    alloc.free(alloc.ctx, out, out_len + 1);
 }
 
 static void hula_compiler_prompt_includes_finance_domain_example(void) {
@@ -1713,5 +1772,6 @@ void run_hula_tests(void) {
 #if defined(__unix__) || defined(__APPLE__)
     HU_RUN_TEST(hula_analytics_summarize_empty_dir);
     HU_RUN_TEST(hula_emergence_persist_scan_promote);
+    HU_RUN_TEST(hula_trace_persist_embeds_program_field);
 #endif
 }

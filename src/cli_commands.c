@@ -10,6 +10,7 @@
 #include "human/calibration/clone.h"
 #include "human/config.h"
 #include "human/core/error.h"
+#include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/eval.h"
 #include "human/eval_benchmarks.h"
@@ -2239,16 +2240,152 @@ static hu_error_t hula_try_open_schema(FILE **out, char *path_buf, size_t path_c
     return HU_ERR_NOT_FOUND;
 }
 
+/* Parse, validate, optionally execute; embed program_snapshot in persisted traces when set. */
+static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *json, size_t json_len,
+                                            bool json_owned, bool run_after_validate,
+                                            const char *program_snapshot_json,
+                                            size_t program_snapshot_len) {
+    printf("── Parse ────────────────────────────────────────────\n");
+    hu_hula_program_t prog;
+    hu_error_t err = hu_hula_parse_json(alloc, json, json_len, &prog);
+    if (err != HU_OK) {
+        fprintf(stderr, "  FAIL: parse error: %s\n", hu_error_string(err));
+        if (json_owned) hu_str_free(alloc, (char *)json);
+        return err;
+    }
+    printf("  OK: program \"%s\" v%u, %zu nodes, root=%s (%s)\n",
+           prog.name ? prog.name : "(unnamed)", prog.version,
+           prog.node_count,
+           prog.root ? (prog.root->id ? prog.root->id : "?") : "(none)",
+           prog.root ? hu_hula_op_name(prog.root->op) : "?");
+
+    printf("\n── Validate ─────────────────────────────────────────\n");
+    const char *tool_names[] = {"echo", "search", "write", "analyze"};
+    hu_hula_validation_t v;
+    err = hu_hula_validate(&prog, alloc, tool_names, 4, &v);
+    if (err != HU_OK) {
+        fprintf(stderr, "  FAIL: validation error: %s\n", hu_error_string(err));
+        hu_hula_program_deinit(&prog);
+        if (json_owned) hu_str_free(alloc, (char *)json);
+        return err;
+    }
+    if (v.valid) {
+        printf("  OK: program is valid\n");
+    } else {
+        printf("  WARN: %zu diagnostics:\n", v.diag_count);
+        for (size_t i = 0; i < v.diag_count; i++)
+            printf("    - %s\n", v.diags[i].message ? v.diags[i].message : "?");
+    }
+    hu_hula_validation_deinit(alloc, &v);
+
+    if (!run_after_validate) {
+        hu_hula_program_deinit(&prog);
+        if (json_owned) hu_str_free(alloc, (char *)json);
+        return HU_OK;
+    }
+
+    printf("\n── Execute ──────────────────────────────────────────\n");
+
+    hula_demo_tool_ctx_t demo_ctxs[] = {
+        {.name = "echo"}, {.name = "search"}, {.name = "write"}, {.name = "analyze"},
+    };
+    hu_tool_t tools[4];
+    for (size_t i = 0; i < 4; i++) {
+        tools[i].ctx = &demo_ctxs[i];
+        tools[i].vtable = &hula_demo_vtable;
+    }
+
+    hu_security_policy_t policy;
+    memset(&policy, 0, sizeof(policy));
+    policy.autonomy = HU_AUTONOMY_AUTONOMOUS;
+
+    hu_observer_t obs = hu_observer_log_stderr();
+
+    hu_hula_exec_t exec;
+    err = hu_hula_exec_init_full(&exec, *alloc, &prog, tools, 4, &policy, &obs);
+    if (err != HU_OK) {
+        fprintf(stderr, "  FAIL: exec init: %s\n", hu_error_string(err));
+        hu_hula_program_deinit(&prog);
+        if (json_owned) hu_str_free(alloc, (char *)json);
+        return err;
+    }
+
+    err = hu_hula_exec_run(&exec);
+    if (err != HU_OK) {
+        fprintf(stderr, "  FAIL: exec run: %s\n", hu_error_string(err));
+        hu_hula_exec_deinit(&exec);
+        hu_hula_program_deinit(&prog);
+        if (json_owned) hu_str_free(alloc, (char *)json);
+        return err;
+    }
+
+    const hu_hula_result_t *root_r = prog.root ? hu_hula_exec_result(&exec, prog.root->id) : NULL;
+
+    printf("  Results:\n");
+    for (size_t i = 0; i < prog.node_count; i++) {
+        const hu_hula_node_t *n = &prog.nodes[i];
+        const hu_hula_result_t *r = hu_hula_exec_result(&exec, n->id);
+        if (!r) continue;
+        printf("    %-10s %-8s %-7s", n->id ? n->id : "?",
+               hu_hula_op_name(n->op), hu_hula_status_name(r->status));
+        if (r->output && r->output_len > 0) {
+            size_t show = r->output_len > 60 ? 60 : r->output_len;
+            printf("  \"%.*s%s\"", (int)show, r->output, r->output_len > 60 ? "..." : "");
+        }
+        if (r->error && r->error_len > 0)
+            printf("  err=\"%.*s\"", (int)r->error_len, r->error);
+        printf("\n");
+    }
+
+    printf("\n── Trace ────────────────────────────────────────────\n");
+    size_t trace_len = 0;
+    const char *trace = hu_hula_exec_trace(&exec, &trace_len);
+    if (trace && trace_len > 0) {
+        printf("  %.*s\n", (int)trace_len, trace);
+    } else {
+        printf("  (empty)\n");
+    }
+
+    const char *trace_dir_env = getenv("HU_HULA_TRACE_DIR");
+    const char *snap = program_snapshot_json ? program_snapshot_json : json;
+    size_t snap_len = program_snapshot_json ? program_snapshot_len : json_len;
+    if (trace && trace_len > 0 && trace_dir_env && trace_dir_env[0]) {
+        const char *pn = prog.name;
+        size_t pnl = pn ? strlen(pn) : 0;
+        bool trace_ok = root_r && root_r->status == HU_HULA_DONE;
+        hu_error_t tr_err = hu_hula_trace_persist(alloc, trace_dir_env, trace, trace_len, pn, pnl,
+                                                  trace_ok, snap, snap_len);
+        if (tr_err != HU_OK) {
+            fprintf(stderr, "hula: HU_HULA_TRACE_DIR persist failed: %s\n", hu_error_string(tr_err));
+        } else {
+            printf("\n── Trace persist ─────────────────────────────────────\n");
+            printf("  wrote JSON under %s\n", trace_dir_env);
+        }
+    }
+
+    printf("\n── Summary ──────────────────────────────────────────\n");
+    printf("  Program: %s\n", prog.name ? prog.name : "?");
+    printf("  Nodes:   %zu\n", prog.node_count);
+    printf("  Root:    %s\n", root_r ? hu_hula_status_name(root_r->status) : "?");
+    printf("  Result:  %s\n", (root_r && root_r->status == HU_HULA_DONE) ? "SUCCESS" : "FAILED");
+
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+    if (json_owned) hu_str_free(alloc, (char *)json);
+    return HU_OK;
+}
+
 hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
-        printf("Usage: human hula <schema|expand|compile|run|validate> ...\n\n");
+        printf("Usage: human hula <schema|expand|compile|replay|run|validate> ...\n\n");
         printf("  schema              Print JSON Schema path and contents (if found)\n");
         printf("  expand <tmpl> <vars.json>   Expand {{keys}} using JSON object vars\n");
         printf("  compile [--lite] <file>     Print HuLa JSON (lite syntax or JSON file passthrough)\n");
+        printf("  replay <trace.json>         Re-run program embedded in a persisted trace file\n");
         printf("  run [--lite] <file|'{...}'>  Execute program\n");
         printf("  validate [--lite] <file|'{...}'>\n\n");
         printf("Demo tools for run: echo, search, write, analyze\n");
-        printf("Optional: HU_HULA_TRACE_DIR=/path/dir persists trace JSON (POSIX).\n");
+        printf("Optional: HU_HULA_TRACE_DIR=/path/dir persists trace JSON + program (POSIX).\n");
         return HU_OK;
     }
 
@@ -2342,6 +2479,51 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         return HU_OK;
     }
 
+    if (strcmp(sub, "replay") == 0) {
+        if (argc < 4) {
+            fprintf(stderr, "Usage: human hula replay <trace.json>\n");
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        char *raw = NULL;
+        size_t rl = 0;
+        hu_error_t err = hula_read_file(alloc, argv[3], &raw, &rl);
+        if (err != HU_OK) {
+            fprintf(stderr, "hula: cannot read %s: %s\n", argv[3], hu_error_string(err));
+            return err;
+        }
+        hu_json_value_t *wrap = NULL;
+        err = hu_json_parse(alloc, raw, rl, &wrap);
+        hu_str_free(alloc, raw);
+        if (err != HU_OK || !wrap) {
+            fprintf(stderr, "hula: replay: invalid JSON (%s)\n",
+                    err != HU_OK ? hu_error_string(err) : "parse");
+            if (wrap)
+                hu_json_free(alloc, wrap);
+            return err != HU_OK ? err : HU_ERR_PARSE;
+        }
+        hu_json_value_t *prog_obj = hu_json_object_get(wrap, "program");
+        if (!prog_obj || prog_obj->type != HU_JSON_OBJECT) {
+            fprintf(stderr,
+                    "hula: replay: missing \"program\" object (only traces written after this change "
+                    "embed it; use hula run on your source JSON).\n");
+            hu_json_free(alloc, wrap);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        char *pj = NULL;
+        size_t pjl = 0;
+        err = hu_json_stringify(alloc, prog_obj, &pj, &pjl);
+        hu_json_free(alloc, wrap);
+        if (err != HU_OK || !pj) {
+            fprintf(stderr, "hula: replay: program serialize failed: %s\n", hu_error_string(err));
+            if (pj)
+                hu_str_free(alloc, pj);
+            return err != HU_OK ? err : HU_ERR_OUT_OF_MEMORY;
+        }
+        printf("── Replay ───────────────────────────────────────────\n");
+        printf("  trace file: %s\n\n", argv[3]);
+        return hula_cli_run_program_json(alloc, pj, pjl, true, true, pj, pjl);
+    }
+
     bool run_mode = (strcmp(sub, "run") == 0);
     bool validate_mode = (strcmp(sub, "validate") == 0);
     if (!run_mode && !validate_mode) {
@@ -2360,7 +2542,6 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         return HU_ERR_INVALID_ARGUMENT;
     }
 
-    /* Load program JSON */
     const char *input = argv[argi];
     char *json = NULL;
     size_t json_len = 0;
@@ -2392,136 +2573,5 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         }
     }
 
-    /* 1. Parse */
-    printf("── Parse ────────────────────────────────────────────\n");
-    hu_hula_program_t prog;
-    hu_error_t err = hu_hula_parse_json(alloc, json, json_len, &prog);
-    if (err != HU_OK) {
-        fprintf(stderr, "  FAIL: parse error: %s\n", hu_error_string(err));
-        if (json_owned) hu_str_free(alloc, json);
-        return err;
-    }
-    printf("  OK: program \"%s\" v%u, %zu nodes, root=%s (%s)\n",
-           prog.name ? prog.name : "(unnamed)", prog.version,
-           prog.node_count,
-           prog.root ? (prog.root->id ? prog.root->id : "?") : "(none)",
-           prog.root ? hu_hula_op_name(prog.root->op) : "?");
-
-    /* 2. Validate */
-    printf("\n── Validate ─────────────────────────────────────────\n");
-    const char *tool_names[] = {"echo", "search", "write", "analyze"};
-    hu_hula_validation_t v;
-    err = hu_hula_validate(&prog, alloc, tool_names, 4, &v);
-    if (err != HU_OK) {
-        fprintf(stderr, "  FAIL: validation error: %s\n", hu_error_string(err));
-        hu_hula_program_deinit(&prog);
-        if (json_owned) hu_str_free(alloc, json);
-        return err;
-    }
-    if (v.valid) {
-        printf("  OK: program is valid\n");
-    } else {
-        printf("  WARN: %zu diagnostics:\n", v.diag_count);
-        for (size_t i = 0; i < v.diag_count; i++)
-            printf("    - %s\n", v.diags[i].message ? v.diags[i].message : "?");
-    }
-    hu_hula_validation_deinit(alloc, &v);
-
-    if (validate_mode) {
-        hu_hula_program_deinit(&prog);
-        if (json_owned) hu_str_free(alloc, json);
-        return HU_OK;
-    }
-
-    /* 3. Execute with trace + observer */
-    printf("\n── Execute ──────────────────────────────────────────\n");
-
-    hula_demo_tool_ctx_t demo_ctxs[] = {
-        {.name = "echo"}, {.name = "search"}, {.name = "write"}, {.name = "analyze"},
-    };
-    hu_tool_t tools[4];
-    for (size_t i = 0; i < 4; i++) {
-        tools[i].ctx = &demo_ctxs[i];
-        tools[i].vtable = &hula_demo_vtable;
-    }
-
-    hu_security_policy_t policy;
-    memset(&policy, 0, sizeof(policy));
-    policy.autonomy = HU_AUTONOMY_AUTONOMOUS;
-
-    hu_observer_t obs = hu_observer_log_stderr();
-
-    hu_hula_exec_t exec;
-    err = hu_hula_exec_init_full(&exec, *alloc, &prog, tools, 4, &policy, &obs);
-    if (err != HU_OK) {
-        fprintf(stderr, "  FAIL: exec init: %s\n", hu_error_string(err));
-        hu_hula_program_deinit(&prog);
-        if (json_owned) hu_str_free(alloc, json);
-        return err;
-    }
-
-    err = hu_hula_exec_run(&exec);
-    if (err != HU_OK) {
-        fprintf(stderr, "  FAIL: exec run: %s\n", hu_error_string(err));
-        hu_hula_exec_deinit(&exec);
-        hu_hula_program_deinit(&prog);
-        if (json_owned) hu_str_free(alloc, json);
-        return err;
-    }
-
-    const hu_hula_result_t *root_r = prog.root ? hu_hula_exec_result(&exec, prog.root->id) : NULL;
-
-    /* Print per-node results */
-    printf("  Results:\n");
-    for (size_t i = 0; i < prog.node_count; i++) {
-        const hu_hula_node_t *n = &prog.nodes[i];
-        const hu_hula_result_t *r = hu_hula_exec_result(&exec, n->id);
-        if (!r) continue;
-        printf("    %-10s %-8s %-7s", n->id ? n->id : "?",
-               hu_hula_op_name(n->op), hu_hula_status_name(r->status));
-        if (r->output && r->output_len > 0) {
-            size_t show = r->output_len > 60 ? 60 : r->output_len;
-            printf("  \"%.*s%s\"", (int)show, r->output, r->output_len > 60 ? "..." : "");
-        }
-        if (r->error && r->error_len > 0)
-            printf("  err=\"%.*s\"", (int)r->error_len, r->error);
-        printf("\n");
-    }
-
-    /* 4. Trace log */
-    printf("\n── Trace ────────────────────────────────────────────\n");
-    size_t trace_len = 0;
-    const char *trace = hu_hula_exec_trace(&exec, &trace_len);
-    if (trace && trace_len > 0) {
-        printf("  %.*s\n", (int)trace_len, trace);
-    } else {
-        printf("  (empty)\n");
-    }
-
-    const char *trace_dir_env = getenv("HU_HULA_TRACE_DIR");
-    if (trace && trace_len > 0 && trace_dir_env && trace_dir_env[0]) {
-        const char *pn = prog.name;
-        size_t pnl = pn ? strlen(pn) : 0;
-        bool trace_ok = root_r && root_r->status == HU_HULA_DONE;
-        hu_error_t tr_err =
-            hu_hula_trace_persist(alloc, trace_dir_env, trace, trace_len, pn, pnl, trace_ok);
-        if (tr_err != HU_OK) {
-            fprintf(stderr, "hula: HU_HULA_TRACE_DIR persist failed: %s\n", hu_error_string(tr_err));
-        } else {
-            printf("\n── Trace persist ─────────────────────────────────────\n");
-            printf("  wrote JSON under %s\n", trace_dir_env);
-        }
-    }
-
-    /* Summary */
-    printf("\n── Summary ──────────────────────────────────────────\n");
-    printf("  Program: %s\n", prog.name ? prog.name : "?");
-    printf("  Nodes:   %zu\n", prog.node_count);
-    printf("  Root:    %s\n", root_r ? hu_hula_status_name(root_r->status) : "?");
-    printf("  Result:  %s\n", (root_r && root_r->status == HU_HULA_DONE) ? "SUCCESS" : "FAILED");
-
-    hu_hula_exec_deinit(&exec);
-    hu_hula_program_deinit(&prog);
-    if (json_owned) hu_str_free(alloc, json);
-    return HU_OK;
+    return hula_cli_run_program_json(alloc, json, json_len, json_owned, run_mode, NULL, 0);
 }

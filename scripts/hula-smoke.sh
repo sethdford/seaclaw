@@ -21,6 +21,10 @@ fi
 
 "$BIN" hula validate "$PROG"
 "$BIN" hula run "$PROG"
+json_file="$(find "$TRACE_DIR" -maxdepth 1 -name '*.json' 2>/dev/null | head -1)"
+if [[ -n "$json_file" ]]; then
+  "$BIN" hula replay "$json_file"
+fi
 if [[ "$_HULA_SMOKE_RM_TRACE" -eq 1 ]]; then
   n="$(find "$TRACE_DIR" -maxdepth 1 -name '*.json' 2>/dev/null | wc -l | tr -d ' ')"
   rm -rf "$TRACE_DIR"

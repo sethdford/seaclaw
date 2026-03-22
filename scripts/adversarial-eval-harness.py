@@ -12,6 +12,7 @@ Environment (OpenAI-compatible):
   ADV_EVAL_API_KEY   — required for generator and judge (unless --no-llm)
   ADV_EVAL_BASE_URL  — default https://api.openai.com/v1
   ADV_EVAL_MODEL     — default gpt-4o-mini
+  ADV_EVAL_TIMEOUT_SEC — per-request timeout seconds (default 180; chat_complete retries up to 3 on read timeout)
 
 Examples:
   ADV_EVAL_API_KEY=sk-... python3 scripts/adversarial-eval-harness.py --probes 8 --output /tmp/adv-report.json
@@ -66,13 +67,22 @@ def _strip_json_fence(text: str) -> str:
     return t.strip()
 
 
+def _adv_eval_timeout_sec() -> int:
+    """OpenAI-compatible HTTP timeout per attempt (retries up to 3 in chat_complete)."""
+    try:
+        v = int(os.environ.get("ADV_EVAL_TIMEOUT_SEC", "180"))
+        return max(30, min(v, 900))
+    except ValueError:
+        return 180
+
+
 def chat_complete(
     base_url: str,
     api_key: str,
     model: str,
     messages: list[dict[str, str]],
     temperature: float = 0.4,
-    timeout_sec: int = 120,
+    timeout_sec: int = 180,
 ) -> str:
     url = base_url.rstrip("/") + "/chat/completions"
     body = json.dumps(
@@ -91,12 +101,23 @@ def chat_complete(
         },
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {e.code} from {url}: {detail}") from e
+    data: dict[str, Any] | None = None
+    last_timeout: TimeoutError | None = None
+    for _attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            break
+        except TimeoutError as e:
+            last_timeout = e
+            continue
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"HTTP {e.code} from {url}: {detail}") from e
+    if data is None:
+        raise TimeoutError(
+            f"chat_complete: read timed out after 3 attempts (timeout_sec={timeout_sec})"
+        ) from last_timeout
     choices = data.get("choices") or []
     if not choices:
         raise RuntimeError(f"No choices in API response: {data!r}")
@@ -193,6 +214,7 @@ def generate_probes(
             {"role": "user", "content": f"Generate {count} probes now."},
         ],
         temperature=0.7,
+        timeout_sec=_adv_eval_timeout_sec(),
     )
     parsed = json.loads(_strip_json_fence(raw))
     probes = parsed.get("probes")
@@ -382,6 +404,7 @@ def judge_response(
             {"role": "user", "content": user_j},
         ],
         temperature=0.1,
+        timeout_sec=_adv_eval_timeout_sec(),
     )
     try:
         return json.loads(_strip_json_fence(raw))

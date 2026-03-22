@@ -2279,7 +2279,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     else
                         root_ok = true;
                     (void)hu_hula_trace_persist(agent->alloc, NULL, tr, trl, hprog.name,
-                                                hprog.name_len, root_ok);
+                                                hprog.name_len, root_ok, NULL, 0);
                     char *stripped = NULL;
                     size_t slen = 0;
                     const char *asst = resp.content;

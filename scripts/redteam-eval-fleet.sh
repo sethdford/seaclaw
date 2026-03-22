@@ -20,6 +20,7 @@
 # Typical Gemini-vs-OpenAI comparison: keep HUMAN_PROVIDER/HUMAN_MODEL for the agent in .env, set
 # REDTEAM_HARNESS_USE_OPENAI=1 for a comparable OpenAI judge, and do not set REDTEAM_AGENT_USE_OPENAI.
 #
+# Optional: ADV_EVAL_TIMEOUT_SEC=240 — longer OpenAI-compat HTTP timeout for harness judge/generator (default 180; retries 3×).
 # Optional: HARNESS_AGENT_CONFIG_PATH=/path/config.json — harness passes HUMAN_CONFIG_PATH to each `human agent` child.
 # Optional: REDTEAM_FLEET_AGENT_SMOKE=1 runs one human agent -m (uses HUMAN_PROVIDER / keys in env).
 # Live harness: REDTEAM_PROBE_PROFILE=safety|capability_honesty|human_likeness|tool_capability for generated probes.

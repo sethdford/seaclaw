@@ -43,7 +43,8 @@ static void default_trace_dir(char *buf, size_t cap) {
 
 hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
                                  const char *trace_json, size_t trace_json_len,
-                                 const char *program_name, size_t program_name_len, bool success) {
+                                 const char *program_name, size_t program_name_len, bool success,
+                                 const char *program_json, size_t program_json_len) {
 #if !(defined(__unix__) || defined(__APPLE__))
     (void)alloc;
     (void)trace_dir;
@@ -52,6 +53,8 @@ hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
     (void)program_name;
     (void)program_name_len;
     (void)success;
+    (void)program_json;
+    (void)program_json_len;
     return HU_ERR_NOT_SUPPORTED;
 #else
 #if defined(HU_IS_TEST)
@@ -97,6 +100,12 @@ hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
     if (!trace_arr)
         trace_arr = hu_json_array_new(alloc);
     hu_json_object_set(alloc, root, "trace", trace_arr);
+
+    if (program_json && program_json_len > 0) {
+        hu_json_value_t *prog_val = NULL;
+        if (hu_json_parse(alloc, program_json, program_json_len, &prog_val) == HU_OK && prog_val)
+            hu_json_object_set(alloc, root, "program", prog_val);
+    }
 
     char *file_body = NULL;
     size_t file_len = 0;

@@ -1,7 +1,7 @@
 ---
 title: HuLa — structured plans for the Human agent
 description: How HuLa makes multi-step tool use clearer, safer, and easier to improve over time
-updated: 2026-03-23
+updated: 2026-03-24
 ---
 
 # HuLa — structured plans for the Human agent
@@ -60,6 +60,9 @@ You do **not** need a running agent to check JSON.
 
 # Inline JSON
 ./build/human hula validate '{"name":"x","version":1,"root":{"op":"call","id":"c","tool":"echo","args":{"text":"ok"}}}'
+
+# Re-run a program from a persisted trace file (must contain a "program" object; see HU_HULA_TRACE_DIR)
+./build/human hula replay ~/.human/hula_traces/some_file.json
 ```
 
 Quick smoke test (requires built binary):
@@ -107,7 +110,7 @@ Example files live under [`examples/hula/`](../../examples/hula/).
 
 ### Persisted traces and dashboard
 
-- **Filesystem:** Traces are written under `~/.human/hula_traces/` when `HU_HULA_TRACE_DIR` is unset (POSIX), or to the directory you set.
+- **Filesystem:** Traces are written under `~/.human/hula_traces/` when `HU_HULA_TRACE_DIR` is unset (POSIX), or to the directory you set. New writes include a **`program`** field (source JSON) so **`human hula replay <file.json>`** can execute the same plan again with demo tools.
 - **Gateway RPC** (control protocol): `hula.traces.list`, `hula.traces.get`, `hula.traces.delete`, `hula.traces.analytics` power the **HuLa traces** view in the web dashboard.
 - **Provider JSON mode:** For compiler reliability, see [`docs/providers/hula-json-mode-matrix.md`](../providers/hula-json-mode-matrix.md).
 
