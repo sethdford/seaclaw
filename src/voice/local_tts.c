@@ -1,9 +1,14 @@
+#if !defined(_POSIX_C_SOURCE) || _POSIX_C_SOURCE < 200112L
+#undef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200112L
+#endif
 #include "human/voice/local_tts.h"
 #include "human/core/json.h"
 #include "human/core/process_util.h"
 #include "human/core/string.h"
 #include "human/platform.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #if defined(__unix__) || defined(__APPLE__)
@@ -19,8 +24,8 @@ hu_error_t hu_local_tts_synthesize(hu_allocator_t *alloc, const hu_local_tts_con
         return HU_ERR_INVALID_ARGUMENT;
 
 #if HU_IS_TEST
-    char tmpl[] = "/tmp/hu_lttsXXXXXX.raw";
-    int fd = mkstemps(tmpl, 4);
+    char tmpl[] = "/tmp/hu_lttsXXXXXX";
+    int fd = mkstemp(tmpl);
     if (fd < 0)
         return HU_ERR_IO;
     (void)close(fd);

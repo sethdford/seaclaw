@@ -66,6 +66,9 @@
 #include "human/tools/memory_list.h"
 #include "human/tools/memory_recall.h"
 #include "human/tools/memory_store.h"
+#include "human/tools/bff_memory.h"
+#include "human/tools/doc_ingest.h"
+#include "human/tools/meeting_transcribe.h"
 #include "human/tools/save_for_later.h"
 #include "human/tools/message.h"
 #include "human/tools/pdf.h"
@@ -111,8 +114,8 @@
 #define HU_TOOLS_PERSONA_COUNT 0
 #endif
 #define HU_TOOLS_COUNT_BASE         \
-    (51 + HU_TOOLS_CRON_COUNT - 1 + \
-     HU_TOOLS_PERSONA_COUNT) /* base tools + computer_use + image_generate + browser_use + ... */
+    (54 + HU_TOOLS_CRON_COUNT - 1 + \
+     HU_TOOLS_PERSONA_COUNT) /* +bff_memory +doc_ingest +meeting_transcribe */
 #ifdef HU_HAS_TOOLS_BROWSER
 #define HU_TOOLS_BROWSER_COUNT 3
 #else
@@ -258,6 +261,20 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     if (err != HU_OK)
         goto fail;
     idx++;
+
+    err = hu_bff_memory_create(alloc, &tools[idx]);
+    if (err != HU_OK)
+        goto fail;
+    idx++;
+
+    err = add_tool_ws(alloc, tools, &idx, workspace_dir, workspace_dir_len, policy, hu_doc_ingest_create);
+    if (err != HU_OK)
+        goto fail;
+
+    err = add_tool_ws(alloc, tools, &idx, workspace_dir, workspace_dir_len, policy,
+                      hu_meeting_transcribe_create);
+    if (err != HU_OK)
+        goto fail;
 
     err = hu_message_create(alloc, NULL, &tools[idx]);
     if (err != HU_OK)

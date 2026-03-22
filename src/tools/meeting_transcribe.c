@@ -7,6 +7,7 @@
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/multimodal.h"
+#include "human/security.h"
 #include "human/tool.h"
 #include "human/tools/validation.h"
 #include <stdio.h>
@@ -36,6 +37,7 @@ typedef struct {
     hu_security_policy_t *policy;
 } meeting_ctx_t;
 
+#if !HU_IS_TEST
 static void strip_slash(char *s) {
     size_t n = strlen(s);
     while (n > 0 && s[n - 1] == '/')
@@ -73,6 +75,7 @@ static int bff_store(hu_allocator_t *alloc, const char *base, const char *bff_au
         hu_http_response_free(alloc, &resp);
     return (sc >= 200 && sc < 300) ? 0 : -1;
 }
+#endif
 
 static hu_error_t meeting_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
                                   hu_tool_result_t *out) {
@@ -82,6 +85,7 @@ static hu_error_t meeting_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
         return HU_ERR_INVALID_ARGUMENT;
     }
 #if HU_IS_TEST
+    (void)alloc;
     *out = hu_tool_result_ok("{\"transcript\":\"(test)\",\"stored\":true}", 38);
     return HU_OK;
 #else
@@ -252,8 +256,11 @@ static hu_error_t meeting_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
     const char *eb = getenv("BFF_BASE_URL");
     const char *bff_auth = bff_bearer();
     if (!eb || !bff_auth) {
-        char *wrap = hu_sprintf(alloc, "{\"transcript\":\"%s\",\"bff_store\":false}", transcript);
-        alloc->free(alloc->ctx, transcript, strlen(transcript) + 1);
+        size_t tlen_early = strlen(transcript);
+        char *wrap =
+            hu_sprintf(alloc, "{\"transcript_chars\":%zu,\"bff_store\":false,\"note\":\"set BFF_*\"}",
+                       tlen_early);
+        alloc->free(alloc->ctx, transcript, tlen_early + 1);
         *out = hu_tool_result_ok_owned(wrap, wrap ? strlen(wrap) : 0);
         return HU_OK;
     }
@@ -296,8 +303,9 @@ static hu_error_t meeting_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
     const char *tenant = getenv("BFF_TENANT_ID");
     int ok = bff_store(alloc, base, bff_auth, tenant, jb, j);
     alloc->free(alloc->ctx, jb, jb_cap);
-    char *fin = hu_sprintf(alloc, "{\"transcript_stored\":%s,\"bff_ok\":%s}", ok == 0 ? "true" : "false",
-                           ok == 0 ? "true" : "false");
+    char *fin = hu_sprintf(alloc,
+                           "{\"transcript_chars\":%zu,\"transcript_stored\":%s,\"bff_ok\":%s}", tlen,
+                           ok == 0 ? "true" : "false", ok == 0 ? "true" : "false");
     *out = hu_tool_result_ok_owned(fin, fin ? strlen(fin) : 0);
     return HU_OK;
 #endif

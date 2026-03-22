@@ -583,6 +583,9 @@ set(HU_CORE_SOURCES
     src/tools/memory_recall.c
     src/tools/memory_list.c
     src/tools/memory_forget.c
+    src/tools/bff_memory.c
+    src/tools/doc_ingest.c
+    src/tools/meeting_transcribe.c
     src/tools/message.c
     src/tools/delegate.c
     src/tools/spawn.c
