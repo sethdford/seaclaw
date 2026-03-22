@@ -400,6 +400,8 @@ static void test_visual_proactive_media_governor_test_always_allows(void) {
 void run_visual_content_tests(void) {
     HU_TEST_SUITE("visual_content");
     HU_RUN_TEST(test_visual_create_table_sql_valid);
+    HU_RUN_TEST(test_visual_create_table_sql_cap_below_512_rejects);
+    HU_RUN_TEST(test_visual_create_table_sql_cap_512_succeeds);
     HU_RUN_TEST(test_visual_insert_sql_escapes_quotes);
     HU_RUN_TEST(test_visual_query_recent_sql_valid);
     HU_RUN_TEST(test_visual_record_share_sql_valid);

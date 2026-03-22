@@ -171,6 +171,8 @@ static void plan_executor_streaming_vtable_field(void) {
 
 static size_t stream_chunk_count;
 static size_t stream_total_bytes;
+static void test_on_chunk(void *ctx, const char *data, size_t len)
+    __attribute__((unused));
 static void test_on_chunk(void *ctx, const char *data, size_t len) {
     (void)ctx; (void)data;
     stream_chunk_count++;

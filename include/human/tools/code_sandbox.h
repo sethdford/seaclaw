@@ -3,6 +3,7 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/security.h"
 #include "human/tool.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -35,6 +36,7 @@ typedef struct hu_code_sandbox_result {
 hu_code_sandbox_config_t hu_code_sandbox_config_default(void);
 hu_error_t hu_code_sandbox_execute(hu_allocator_t *alloc,
                                    const hu_code_sandbox_config_t *config,
+                                   hu_security_policy_t *policy,
                                    const char *code, size_t code_len,
                                    hu_code_sandbox_result_t *result);
 const char *hu_sandbox_language_name(hu_sandbox_language_t lang);
@@ -52,6 +54,7 @@ hu_error_t hu_code_sandbox_save_checkpoint(const hu_code_sandbox_result_t *resul
 hu_error_t hu_code_sandbox_restore_checkpoint(const hu_code_sandbox_checkpoint_t *ckpt,
                                                hu_code_sandbox_config_t *config);
 
-hu_error_t hu_code_sandbox_create(hu_allocator_t *alloc, hu_tool_t *out);
+hu_error_t hu_code_sandbox_create(hu_allocator_t *alloc, hu_security_policy_t *policy,
+                                  hu_tool_t *out);
 
 #endif

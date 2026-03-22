@@ -80,6 +80,7 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->agent.context_pressure_warn = 0.85f;
     cfg->agent.context_pressure_compact = 0.95f;
     cfg->agent.context_compact_target = 0.70f;
+    hu_metacog_settings_default(&cfg->agent.metacognition);
     cfg->agent.max_tool_iterations = 1000;
     cfg->agent.max_history_messages = 100;
     cfg->agent.parallel_tools = false;
@@ -504,5 +505,19 @@ void hu_config_apply_env_overrides(hu_config_t *cfg) {
         if (al <= 4)
             cfg->security.autonomy_level = (uint8_t)al;
         sync_autonomy_string_from_level(cfg, a);
+    }
+
+    v = getenv("HUMAN_METACOGNITION");
+    if (v) {
+        if (strcmp(v, "0") == 0 || strcmp(v, "false") == 0 || strcmp(v, "off") == 0)
+            cfg->agent.metacognition.enabled = false;
+        else if (strcmp(v, "1") == 0 || strcmp(v, "true") == 0 || strcmp(v, "on") == 0)
+            cfg->agent.metacognition.enabled = true;
+    }
+    v = getenv("HUMAN_METACOG_MAX_REGEN");
+    if (v) {
+        unsigned long mr = strtoul(v, NULL, 10);
+        if (mr <= 32u)
+            cfg->agent.metacognition.max_regen = (uint32_t)mr;
     }
 }

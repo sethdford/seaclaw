@@ -1,5 +1,8 @@
 // Auto-generated from design-tokens/ — do not edit manually
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 public enum HUTokens {
     // MARK: - Colors (Dark)
@@ -216,6 +219,28 @@ public enum HUTokens {
     public static let springExpressive = Animation.spring(response: 0.574, dampingFraction: 0.639)
     public static let springDramatic = Animation.spring(response: 0.702, dampingFraction: 0.559)
     public static let springInteractive = Animation.spring(response: 0.35, dampingFraction: 0.864)
+
+    // MARK: - Spatial Depth (Quiet Mastery)
+
+    /// Default perspective distance for card containers
+    public static let perspective: CGFloat = 1200
+    /// Maximum card tilt angle in degrees
+    public static let cardTiltMax: Double = 8
+    /// Pointer proximity detection radius
+    public static let proximityRadius: CGFloat = 200
+
+    // MARK: - Haptic Vocabulary (Extended)
+    #if canImport(UIKit)
+
+    /// Selection haptic — tab switch, picker scroll, settings toggle
+    public static let hapticSelection = UIImpactFeedbackGenerator(style: .light)
+    /// Impact haptic — button press, significant state changes
+    public static let hapticImpact = UIImpactFeedbackGenerator(style: .medium)
+    /// Heavy impact — destructive actions, major transitions
+    public static let hapticHeavy = UIImpactFeedbackGenerator(style: .heavy)
+    /// Notification success — task complete, connection established
+    public static let hapticSuccess = UINotificationFeedbackGenerator()
+    #endif
 
     // MARK: - Haptic Feedback
     public enum Haptic {

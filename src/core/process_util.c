@@ -187,6 +187,8 @@ hu_error_t hu_process_run(hu_allocator_t *alloc, const char *const *argv, const 
 
 typedef struct hu_policy_child_ctx {
     hu_security_policy_t *policy;
+    const char *const *argv;
+    size_t argc;
 } hu_policy_child_ctx_t;
 
 static hu_error_t policy_child_setup(void *raw) {
@@ -239,6 +241,18 @@ static hu_error_t policy_child_setup(void *raw) {
             return err;
     }
 
+    if (p->sandbox && hu_sandbox_is_available(p->sandbox) && pc->argv && pc->argc > 0) {
+        const char *wrapped[16];
+        size_t wrapped_count = 0;
+        if (hu_sandbox_wrap_command(p->sandbox, pc->argv, pc->argc, wrapped, 15, &wrapped_count) ==
+                HU_OK &&
+            wrapped_count > 0) {
+            wrapped[wrapped_count] = NULL;
+            execvp(wrapped[0], (char *const *)wrapped);
+            _exit(127);
+        }
+    }
+
     return HU_OK;
 }
 
@@ -250,7 +264,10 @@ hu_error_t hu_process_run_with_policy(hu_allocator_t *alloc, const char *const *
     if (!policy) {
         return hu_process_run(alloc, argv, cwd, max_output_bytes, out);
     }
-    hu_policy_child_ctx_t ctx = {.policy = policy};
+    size_t argc = 0;
+    while (argv[argc])
+        argc++;
+    hu_policy_child_ctx_t ctx = {.policy = policy, .argv = argv, .argc = argc};
     return hu_process_run_sandboxed(alloc, argv, cwd, max_output_bytes, policy_child_setup, &ctx,
                                     out);
 }

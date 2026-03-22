@@ -79,6 +79,12 @@ hu_error_t hu_cognition_db_ensure_schema(sqlite3 *db) {
         "  coherence REAL DEFAULT 0.0,"
         "  repetition REAL DEFAULT 0.0,"
         "  action TEXT DEFAULT 'none',"
+        "  difficulty TEXT DEFAULT 'unknown',"
+        "  stuck_score REAL DEFAULT 0.0,"
+        "  satisfaction_proxy REAL DEFAULT 0.0,"
+        "  trajectory_confidence REAL DEFAULT 0.0,"
+        "  outcome_proxy REAL DEFAULT 0.0,"
+        "  regen_applied INTEGER DEFAULT 0,"
         "  timestamp TEXT NOT NULL DEFAULT (datetime('now'))"
         ")",
 
@@ -100,7 +106,89 @@ hu_error_t hu_cognition_db_ensure_schema(sqlite3 *db) {
         }
     }
 
+    /* Idempotent migrations for existing metacog_history rows */
+    static const char *metacog_alters[] = {
+        "ALTER TABLE metacog_history ADD COLUMN difficulty TEXT DEFAULT 'unknown'",
+        "ALTER TABLE metacog_history ADD COLUMN stuck_score REAL DEFAULT 0.0",
+        "ALTER TABLE metacog_history ADD COLUMN satisfaction_proxy REAL DEFAULT 0.0",
+        "ALTER TABLE metacog_history ADD COLUMN trajectory_confidence REAL DEFAULT 0.0",
+        "ALTER TABLE metacog_history ADD COLUMN outcome_proxy REAL DEFAULT 0.0",
+        "ALTER TABLE metacog_history ADD COLUMN regen_applied INTEGER DEFAULT 0",
+        "ALTER TABLE metacog_history ADD COLUMN prompt_tokens INTEGER DEFAULT 0",
+        "ALTER TABLE metacog_history ADD COLUMN completion_tokens INTEGER DEFAULT 0",
+        "ALTER TABLE metacog_history ADD COLUMN logprob_mean REAL DEFAULT -1.0",
+        "ALTER TABLE metacog_history ADD COLUMN risk_score REAL DEFAULT 0.0",
+        NULL,
+    };
+    for (size_t a = 0; metacog_alters[a]; a++)
+        (void)sqlite3_exec(db, metacog_alters[a], NULL, NULL, NULL);
+
     return HU_OK;
+}
+
+hu_error_t hu_metacog_history_insert(
+    sqlite3 *db, const char *trace_id, int iteration, float confidence, float coherence,
+    float repetition, float stuck_score, float satisfaction_proxy, float trajectory_confidence,
+    const char *action, const char *difficulty, int regen_applied,
+    const hu_metacog_history_extra_t *extra_opt) {
+    if (!db) return HU_ERR_INVALID_ARGUMENT;
+
+    static const char sql[] =
+        "INSERT INTO metacog_history (trace_id, iteration, confidence, coherence, repetition, "
+        "action, difficulty, stuck_score, satisfaction_proxy, trajectory_confidence, "
+        "outcome_proxy, regen_applied, prompt_tokens, completion_tokens, logprob_mean, risk_score) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,0.0,?,?,?,?,?)";
+
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &st, NULL) != SQLITE_OK)
+        return HU_ERR_IO;
+
+    sqlite3_bind_text(st, 1, trace_id ? trace_id : "", -1, SQLITE_STATIC);
+    sqlite3_bind_int(st, 2, iteration);
+    sqlite3_bind_double(st, 3, (double)confidence);
+    sqlite3_bind_double(st, 4, (double)coherence);
+    sqlite3_bind_double(st, 5, (double)repetition);
+    sqlite3_bind_text(st, 6, action ? action : "none", -1, SQLITE_STATIC);
+    sqlite3_bind_text(st, 7, difficulty ? difficulty : "unknown", -1, SQLITE_STATIC);
+    sqlite3_bind_double(st, 8, (double)stuck_score);
+    sqlite3_bind_double(st, 9, (double)satisfaction_proxy);
+    sqlite3_bind_double(st, 10, (double)trajectory_confidence);
+    sqlite3_bind_int(st, 11, regen_applied);
+    if (extra_opt) {
+        sqlite3_bind_int64(st, 12, (sqlite3_int64)extra_opt->prompt_tokens);
+        sqlite3_bind_int64(st, 13, (sqlite3_int64)extra_opt->completion_tokens);
+        sqlite3_bind_double(st, 14, (double)extra_opt->logprob_mean);
+        sqlite3_bind_double(st, 15, (double)extra_opt->risk_score);
+    } else {
+        sqlite3_bind_int64(st, 12, 0);
+        sqlite3_bind_int64(st, 13, 0);
+        sqlite3_bind_double(st, 14, -1.0);
+        sqlite3_bind_double(st, 15, 0.0);
+    }
+
+    int rc = sqlite3_step(st);
+    sqlite3_finalize(st);
+    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_IO;
+}
+
+hu_error_t hu_metacog_history_update_outcome(sqlite3 *db, const char *trace_id,
+                                              float outcome_proxy) {
+    if (!db || !trace_id || trace_id[0] == '\0') return HU_ERR_INVALID_ARGUMENT;
+
+    static const char sql[] = "UPDATE metacog_history SET outcome_proxy = ? WHERE id = ("
+                              "SELECT id FROM metacog_history WHERE trace_id = ? "
+                              "ORDER BY id DESC LIMIT 1)";
+
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &st, NULL) != SQLITE_OK)
+        return HU_ERR_IO;
+
+    sqlite3_bind_double(st, 1, (double)outcome_proxy);
+    sqlite3_bind_text(st, 2, trace_id, -1, SQLITE_STATIC);
+
+    int rc = sqlite3_step(st);
+    sqlite3_finalize(st);
+    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_IO;
 }
 
 void hu_cognition_db_close(sqlite3 *db) {

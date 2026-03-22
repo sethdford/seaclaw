@@ -432,6 +432,52 @@ All buttons:
 | Connecting   | `--hu-warning` | Dot (10px) | `hu-status-pulse` (2s ease-in-out) |
 | Active       | `--hu-accent`  | Ring       | Spring pulse ring                  |
 
+### 8.5 3D Integration
+
+Three-dimensional elements add spatial depth beyond glass blur. Use sparingly — depth serves
+communication, not decoration.
+
+#### Perspective Cards
+
+Dashboard and marketing cards gain subtle 3D perspective on pointer interaction:
+
+| Token | Value | Purpose |
+|-------|-------|---------|
+| `--hu-3d-perspective` | `1200px` | Default perspective distance |
+| `--hu-3d-card-tilt-max` | `8deg` | Maximum card tilt angle |
+| `--hu-3d-depth-scale` | `0.95 – 1.0` | Scale range for z-depth perception |
+
+Rules:
+
+- Maximum tilt: 8 degrees — text must remain readable at all angles
+- Perspective origin follows pointer position for natural parallax
+- Tilt transitions use `--hu-spring-standard` (not duration-based)
+- Disabled under `prefers-reduced-motion: reduce` (cards render flat)
+- Never apply 3D tilt to text-heavy content areas (settings, logs, conversation)
+
+#### WebGL Integration (Website)
+
+For marketing pages, Three.js particle environments provide cinematic depth:
+
+Rules:
+
+- Maximum 5000 particles per scene (performance budget)
+- WebGL loads AFTER first contentful paint (never in critical render path)
+- Graceful degradation: CSS gradient mesh when WebGL unavailable
+- Canvas has explicit dimensions (no CLS impact)
+- Film grain overlay: `--hu-3d-grain-opacity` (0.5% — texture, not noise)
+- Depth-of-field blur on distant particles creates natural focus hierarchy
+- requestAnimationFrame budget: terminate animation loop when tab is hidden
+
+#### Depth-of-Field
+
+Simulated depth-of-field brings photographic quality to data visualization and hero sections:
+
+- Near-field content: sharp, full opacity
+- Mid-field: slight blur (2px), 90% opacity
+- Far-field: stronger blur (6px), 60% opacity
+- Applied via CSS `filter: blur()` on layered elements, or Three.js post-processing
+
 ---
 
 ## 9. Data Visualization (Tufte Principles)
@@ -458,6 +504,43 @@ rather than one complex chart with many overlapping series.
 Inline mini-charts (`hu-sparkline`) for showing trends without full chart infrastructure.
 Use in stat cards, table cells, and dashboard tiles.
 
+### 9.4 Narrative Data Visualization
+
+Data that tells stories. Inspired by Spotify Wrapped and Pixar's staging principle — present
+one idea at a time, build understanding incrementally.
+
+#### Data Cascade
+
+Chart data points appear sequentially, building the picture over 500ms:
+
+- Stagger: 50ms between data points (same as `--hu-stagger-delay`)
+- Easing: `--hu-ease-out` per point, overall deceleration
+- Trigger: viewport entry via `animation-timeline: view()`
+- Skip: click anywhere to show final state immediately
+
+#### Metric Counter
+
+Hero numbers count up from 0 to value with spring deceleration:
+
+- Duration: `--hu-duration-slower` (500ms) total count
+- Easing: spring deceleration (fast start, gentle landing at final value)
+- Format: `font-variant-numeric: tabular-nums` to prevent layout shift during count
+- Trigger: viewport entry (IntersectionObserver with `threshold: 0.3`)
+
+#### Connection Drawing
+
+Lines between related elements draw on progressively:
+
+- Stroke uses `stroke-dasharray` + `stroke-dashoffset` animation
+- Duration: `--hu-duration-slow` (350ms) per segment
+- Direction: follows reading order (left-to-right, top-to-bottom)
+- Color: `--hu-accent` at 40% opacity
+
+All narrative animations must be:
+- Skippable (click to complete)
+- Maximum 2 seconds total sequence length
+- Disabled under `prefers-reduced-motion: reduce` (show final state)
+
 ---
 
 ## 10. Quality Checklist
@@ -478,6 +561,11 @@ Before shipping any visual change, verify:
 - [ ] **Perceptual speed**: Does the transition from loading to loaded feel instantaneous?
 - [ ] **Monochrome test**: Does the screen pass the grayscale squint test?
 - [ ] **Competitive ceiling**: Would this screen hold up next to Linear, Stripe, or Vercel?
+- [ ] **3D depth**: Perspective tilt stays under 8deg? Text readable at all angles?
+- [ ] **Pointer response**: Elements respond to proximity, not just hover? Graceful without pointer?
+- [ ] **Ambient**: Background effects use < 2% CPU combined? Disabled on mobile?
+- [ ] **Narrative data**: Data animations are skippable? Total sequence < 2 seconds?
+- [ ] **WebGL**: Loads after FCP? Fallback for no-WebGL? Canvas has explicit dimensions?
 
 ---
 
@@ -526,6 +614,33 @@ Before shipping any visual change, verify:
 | **Haptic vocabulary**                  | On iOS: selection (tab switch), impact (button press), notification (status change). Each haptic type maps to exactly one interaction category.     |
 | **0ms perceived latency**              | Optimistic UI on all primary actions. The UI should respond to the user's intent before the server confirms.                                        |
 
+### Exceeding Pixar (Emotional Craft)
+
+**Principle**: Every interaction should evoke emotion. Not "impressive effects" — "I forgot I
+was using software." The UI should have the warmth and intentionality of a Pixar frame.
+
+| Rule | Enforcement |
+|------|------------|
+| **Staging for every state change** | Before content appears, the container establishes context (background, border). Content enters second. Ambient effects last. Pixar Principle 3. |
+| **Timing carries meaning** | Fast = urgent. Slow = deliberate. Spring overshoot = playful. Duration is not arbitrary — it communicates. Pixar Principle 9. |
+| **Appeal in every frame** | Ambient motion (gradient drift, particle float, status breathing) makes static screens feel alive. A frozen UI is a dead UI. Pixar Principle 12. |
+| **Weight and material** | Elements squash on press and stretch on release. Cards have mass (spring physics). Glass has optical properties (refraction, blur). Nothing is flat paper. |
+| **One idea per screen** | Each viewport presents one clear concept. Competing ideas are sequenced (scroll chapters), never simultaneous. Apple + Pixar: staging + clarity. |
+| **Magic that doesn't demand attention** | The best effects are discovered, not announced. Pointer proximity glow, ambient gradient shift, subtle particle drift — noticed subconsciously. |
+
+### Exceeding Immersive Garden (Technical Innovation)
+
+**Principle**: The most technically ambitious studio on Awwwards proves that WebGL, shaders,
+and scroll-driven narratives can be accessible and performant, not just impressive.
+
+| Rule | Enforcement |
+|------|------------|
+| **WebGL as storytelling** | 3D elements serve the narrative, not decorate it. Particles represent data, not confetti. |
+| **Scroll as instrument** | Every scroll-driven animation maps to content understanding. Scroll position = story position. |
+| **Pointer as paint** | Cursor movements create visible effects (glow, tilt, gradient shift) making the user a co-creator. |
+| **Graceful degradation** | Every 3D/WebGL feature has a CSS fallback. Every scroll animation has a static fallback. No broken experiences. |
+| **Performance as respect** | 60fps is non-negotiable. If an effect can't run at 60fps on mid-range hardware, it doesn't ship. |
+
 ### Exceeding Google Material Design (Systematic Design)
 
 **Principle**: The design system should be so complete that a component built from tokens alone, without seeing any reference, looks correct.
@@ -542,10 +657,12 @@ Before shipping any visual change, verify:
 
 ### The Human Standard
 
-When all three are met, the result is:
+When all five are met, the result is:
 
 - **Data that speaks** (Tufte) — users understand before they decide to look
 - **Interactions that feel** (Apple) — users feel the interface, not just see it
 - **Systems that scale** (Google) — contributors produce quality by default, not by effort
+- **Emotion in every frame** (Pixar) — warmth and intentionality that makes software feel alive
+- **Technical craft as art** (Immersive Garden) — WebGL, scroll, and pointer create co-authored experiences
 
 This is the standard. Ship nothing less.

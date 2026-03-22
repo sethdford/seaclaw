@@ -1,0 +1,192 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$extensions": {
+    "com.human.platform": "all",
+    "com.human.version": "0.5.0"
+  },
+  "$description": "Spatial depth tokens — 3D perspective, pointer proximity, particle systems, and depth-of-field",
+  "perspective": {
+    "default": {
+      "$value": "1200px",
+      "$type": "dimension",
+      "$description": "Default perspective distance for card containers"
+    },
+    "shallow": {
+      "$value": "800px",
+      "$type": "dimension",
+      "$description": "Shallower perspective for dramatic tilt effects"
+    },
+    "deep": {
+      "$value": "2000px",
+      "$type": "dimension",
+      "$description": "Deep perspective for subtle, distant effects"
+    }
+  },
+  "card-tilt": {
+    "max-angle": {
+      "$value": "8deg",
+      "$type": "string",
+      "$description": "Maximum card tilt — text must remain readable"
+    },
+    "factor": {
+      "$value": 0.02,
+      "$type": "number",
+      "$description": "Tilt degrees per pixel of pointer offset from center"
+    },
+    "return-spring": {
+      "$value": "standard",
+      "$type": "string",
+      "$description": "Spring preset for tilt return to rest (references motion.spring.standard)"
+    }
+  },
+  "depth-scale": {
+    "near": {
+      "$value": 1.0,
+      "$type": "number",
+      "$description": "Foreground elements — full scale"
+    },
+    "mid": {
+      "$value": 0.975,
+      "$type": "number",
+      "$description": "Mid-ground elements — slightly smaller"
+    },
+    "far": {
+      "$value": 0.95,
+      "$type": "number",
+      "$description": "Background elements — noticeably smaller"
+    }
+  },
+  "depth-of-field": {
+    "near-blur": {
+      "$value": "0px",
+      "$type": "dimension",
+      "$description": "No blur for foreground content"
+    },
+    "mid-blur": {
+      "$value": "2px",
+      "$type": "dimension",
+      "$description": "Slight blur for mid-ground"
+    },
+    "far-blur": {
+      "$value": "6px",
+      "$type": "dimension",
+      "$description": "Stronger blur for background"
+    },
+    "near-opacity": {
+      "$value": 1.0,
+      "$type": "number",
+      "$description": "Full opacity foreground"
+    },
+    "mid-opacity": {
+      "$value": 0.9,
+      "$type": "number",
+      "$description": "Slightly faded mid-ground"
+    },
+    "far-opacity": {
+      "$value": 0.6,
+      "$type": "number",
+      "$description": "Faded background"
+    }
+  },
+  "film-grain": {
+    "opacity": {
+      "$value": 0.005,
+      "$type": "number",
+      "$description": "Film grain overlay — texture, not noise (0.5%)"
+    },
+    "size": {
+      "$value": "200px",
+      "$type": "dimension",
+      "$description": "Grain texture tile size"
+    }
+  },
+  "pointer": {
+    "$description": "Pointer proximity detection and response tokens",
+    "proximity-radius": {
+      "$value": "200px",
+      "$type": "dimension",
+      "$description": "Detection radius around element center"
+    },
+    "glow-radius": {
+      "$value": "200px",
+      "$type": "dimension",
+      "$description": "Glow spread following cursor position"
+    },
+    "glow-intensity": {
+      "$value": 0.06,
+      "$type": "number",
+      "$description": "Glow opacity at peak proximity (6%)"
+    },
+    "magnetic-strength": {
+      "$value": "8px",
+      "$type": "dimension",
+      "$description": "Maximum magnetic pull for small targets (≤48px)"
+    },
+    "magnetic-threshold": {
+      "$value": "48px",
+      "$type": "dimension",
+      "$description": "Maximum element size for magnetic effect"
+    },
+    "max-tracked-elements": {
+      "$value": 20,
+      "$type": "number",
+      "$description": "Performance cap on simultaneous proximity-tracked elements"
+    }
+  },
+  "particle": {
+    "$description": "WebGL particle system tokens (marketing site)",
+    "primary-color": {
+      "$value": "rgba(122,182,72,0.15)",
+      "$type": "color",
+      "$description": "Particle dot color — fidelity green at 15%"
+    },
+    "secondary-color": {
+      "$value": "rgba(122,182,72,0.08)",
+      "$type": "color",
+      "$description": "Distant particle color — fidelity green at 8%"
+    },
+    "max-count": {
+      "$value": 5000,
+      "$type": "number",
+      "$description": "Maximum particles per scene (performance budget)"
+    },
+    "drift-speed": {
+      "$value": 0.0005,
+      "$type": "number",
+      "$description": "Brownian motion speed multiplier for idle drift"
+    },
+    "scroll-depth-factor": {
+      "$value": 0.002,
+      "$type": "number",
+      "$description": "Depth shift per pixel of scroll"
+    },
+    "pointer-wave-radius": {
+      "$value": "150px",
+      "$type": "dimension",
+      "$description": "Wave deformation radius around pointer in particle field"
+    },
+    "pointer-wave-strength": {
+      "$value": 0.3,
+      "$type": "number",
+      "$description": "Wave deformation strength (0 = none, 1 = strong)"
+    }
+  },
+  "webgl": {
+    "$description": "WebGL scene performance and quality tokens",
+    "target-fps": {
+      "$value": 60,
+      "$type": "number",
+      "$description": "Target frame rate"
+    },
+    "max-bundle-kb": {
+      "$value": 50,
+      "$type": "number",
+      "$description": "Maximum Three.js bundle size (gzipped KB)"
+    },
+    "load-strategy": {
+      "$value": "after-fcp",
+      "$type": "string",
+      "$description": "WebGL loads after First Contentful Paint"
+    }
+  }
+}

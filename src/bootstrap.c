@@ -7,6 +7,7 @@
 #include "human/bootstrap.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/spawn.h"
+#include "human/cognition/metacognition.h"
 #include "human/config.h"
 #include "human/memory.h"
 #include "human/memory/engines.h"
@@ -687,6 +688,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             bi->cfg.agent.persona ? strlen(bi->cfg.agent.persona) : 0, &ctx_cfg);
         if (err != HU_OK)
             goto fail;
+        hu_metacognition_apply_config(&bi->agent.metacognition, &bi->cfg.agent.metacognition);
         memset(&bi->voice_cfg, 0, sizeof(bi->voice_cfg));
         (void)hu_voice_config_from_settings(&bi->cfg, &bi->voice_cfg);
         if (bi->voice_cfg.tts_provider || bi->voice_cfg.local_tts_endpoint || bi->voice_cfg.api_key ||

@@ -179,6 +179,15 @@ static void compress_merges_similar_patterns(void) {
     teardown();
 }
 
+static void metacog_history_insert_and_outcome_update(void) {
+    setup();
+    HU_ASSERT_EQ(hu_metacog_history_insert(db, "trace-metacog-1", 1, 0.7f, 0.6f, 0.1f, 0.2f, 0.8f,
+                                           0.55f, "reflect", "medium", 0, NULL),
+                 HU_OK);
+    HU_ASSERT_EQ(hu_metacog_history_update_outcome(db, "trace-metacog-1", 0.9f), HU_OK);
+    teardown();
+}
+
 static void null_db_returns_error(void) {
     hu_error_t err = hu_episodic_init_schema(NULL);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
@@ -196,6 +205,7 @@ void run_episodic_tests(void) {
     HU_RUN_TEST(build_replay_formats_patterns);
     HU_RUN_TEST(build_replay_empty_returns_null);
     HU_RUN_TEST(compress_merges_similar_patterns);
+    HU_RUN_TEST(metacog_history_insert_and_outcome_update);
     HU_RUN_TEST(null_db_returns_error);
 #endif
 }

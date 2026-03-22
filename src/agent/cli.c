@@ -9,6 +9,7 @@
 #ifdef HU_HAS_VOICE_CHANNEL
 #include "human/channels/voice_channel.h"
 #endif
+#include "human/cognition/metacognition.h"
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/core/string.h"
@@ -515,6 +516,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         hu_config_deinit(&cfg);
         return err;
     }
+    hu_metacognition_apply_config(&agent.metacognition, &cfg.agent.metacognition);
     hu_voice_config_t voice_cfg = {0};
     (void)hu_voice_config_from_settings(&cfg, &voice_cfg);
     if (voice_cfg.tts_provider || voice_cfg.local_tts_endpoint || voice_cfg.api_key ||

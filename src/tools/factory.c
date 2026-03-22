@@ -362,7 +362,7 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
         goto fail;
     idx++;
 
-    err = hu_code_sandbox_create(alloc, &tools[idx]);
+    err = hu_code_sandbox_create(alloc, policy, &tools[idx]);
     if (err != HU_OK)
         goto fail;
     idx++;

@@ -75,6 +75,23 @@ const BTH_GROUPS: Record<string, string[]> = {
     "events_extracted",
   ],
   Polish: ["typos_applied", "corrections_sent"],
+  Cognition: [
+    "cognition_fast_turns",
+    "cognition_slow_turns",
+    "cognition_emotional_turns",
+    "metacog_interventions",
+    "metacog_regens",
+    "metacog_difficulty_easy",
+    "metacog_difficulty_medium",
+    "metacog_difficulty_hard",
+    "metacog_hysteresis_suppressed",
+    "episodic_patterns_stored",
+    "episodic_replays",
+    "skill_routes_semantic",
+    "skill_routes_blended",
+    "skill_routes_embedded",
+    "evolving_outcomes",
+  ],
 };
 
 function labelFromKey(key: string): string {

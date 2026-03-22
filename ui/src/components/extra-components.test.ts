@@ -7,6 +7,7 @@ import type { ScDataTableV2 } from "./hu-data-table-v2.js";
 import type { ScCheckbox } from "./hu-checkbox.js";
 import type { ScCombobox } from "./hu-combobox.js";
 import type { ScFormGroup } from "./hu-form-group.js";
+import type { ScVoiceOrb, VoiceOrbState } from "./hu-voice-orb.js";
 
 import "./floating-mic.js";
 import "./sidebar.js";
@@ -2313,6 +2314,106 @@ describe("hu-voice-orb", () => {
     const btn = el.shadowRoot?.querySelector(".mic-btn") as HTMLButtonElement;
     btn?.click();
     expect(fired).toBe(true);
+    el.remove();
+  });
+
+  async function createOrb(state: VoiceOrbState, level = 0) {
+    const el = document.createElement("hu-voice-orb") as ScVoiceOrb;
+    el.state = state;
+    el.audioLevel = level;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    return el;
+  }
+
+  it("applies .active class to glow, rings, and button when listening", async () => {
+    const el = await createOrb("listening");
+    expect(el.shadowRoot?.querySelector(".mic-orb-glow.active")).toBeTruthy();
+    expect(el.shadowRoot?.querySelector(".mic-ring.active")).toBeTruthy();
+    expect(el.shadowRoot?.querySelector(".mic-btn.active")).toBeTruthy();
+    el.remove();
+  });
+
+  it("applies .speaking class to glow and button when speaking", async () => {
+    const el = await createOrb("speaking");
+    expect(el.shadowRoot?.querySelector(".mic-orb-glow.speaking")).toBeTruthy();
+    expect(el.shadowRoot?.querySelector(".mic-btn.speaking")).toBeTruthy();
+    expect(el.shadowRoot?.querySelector(".mic-ring.active")).toBeFalsy();
+    el.remove();
+  });
+
+  it("applies .processing class to glow, rings, and button when processing", async () => {
+    const el = await createOrb("processing");
+    expect(el.shadowRoot?.querySelector(".mic-orb-glow.processing")).toBeTruthy();
+    expect(el.shadowRoot?.querySelector(".mic-ring.processing")).toBeTruthy();
+    expect(el.shadowRoot?.querySelector(".mic-btn.processing")).toBeTruthy();
+    el.remove();
+  });
+
+  it("idle state has no active/speaking/processing classes", async () => {
+    const el = await createOrb("idle");
+    const glow = el.shadowRoot?.querySelector(".mic-orb-glow") as HTMLElement;
+    expect(glow?.classList.contains("active")).toBe(false);
+    expect(glow?.classList.contains("speaking")).toBe(false);
+    expect(glow?.classList.contains("processing")).toBe(false);
+    el.remove();
+  });
+
+  it("sets --_level from audioLevel property", async () => {
+    const el = await createOrb("listening", 0.7);
+    const glow = el.shadowRoot?.querySelector(".mic-orb-glow") as HTMLElement;
+    expect(glow?.style.getPropertyValue("--_level")).toContain("0.7");
+    el.remove();
+  });
+
+  it("clamps audioLevel between 0 and 1", async () => {
+    const el = await createOrb("listening", 2.5);
+    const glow = el.shadowRoot?.querySelector(".mic-orb-glow") as HTMLElement;
+    expect(glow?.style.getPropertyValue("--_level")).toContain("1");
+    el.remove();
+  });
+
+  it("sets correct aria-label per state", async () => {
+    const labels: Record<VoiceOrbState, string> = {
+      idle: "Start listening",
+      listening: "Stop listening",
+      speaking: "Interrupt and speak",
+      processing: "Processing voice",
+      unsupported: "Start listening",
+    };
+    for (const [state, expected] of Object.entries(labels)) {
+      const el = await createOrb(state as VoiceOrbState);
+      const btn = el.shadowRoot?.querySelector(".mic-btn") as HTMLButtonElement;
+      expect(btn?.getAttribute("aria-label")).toBe(expected);
+      el.remove();
+    }
+  });
+
+  it("sets aria-busy on button during processing", async () => {
+    const el = await createOrb("processing");
+    const btn = el.shadowRoot?.querySelector(".mic-btn") as HTMLButtonElement;
+    expect(btn?.getAttribute("aria-busy")).toBe("true");
+    el.remove();
+  });
+
+  it("status text matches state", async () => {
+    const texts: Partial<Record<VoiceOrbState, string>> = {
+      listening: "Listening…",
+      speaking: "Speaking…",
+      processing: "Processing…",
+    };
+    for (const [state, expected] of Object.entries(texts)) {
+      const el = await createOrb(state as VoiceOrbState);
+      const status = el.shadowRoot?.querySelector(".voice-status");
+      expect(status?.textContent).toBe(expected);
+      el.remove();
+    }
+  });
+
+  it("status div has aria-live=polite", async () => {
+    const el = await createOrb("idle");
+    const status = el.shadowRoot?.querySelector(".voice-status");
+    expect(status?.getAttribute("aria-live")).toBe("polite");
     el.remove();
   });
 });

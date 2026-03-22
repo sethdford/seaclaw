@@ -1,0 +1,241 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$extensions": {
+    "com.human.platform": "all",
+    "com.human.version": "0.5.0"
+  },
+  "$description": "Ambient intelligence tokens — environmental responsiveness, time-aware theming, and optional audio design",
+  "ambient": {
+    "$description": "Ambient visual effects that make the UI feel alive",
+    "glow": {
+      "$value": "radial-gradient(ellipse at 50% 50%, rgba(122,182,72,0.03), transparent 70%)",
+      "$type": "string",
+      "$description": "Subtle background radial glow — fidelity green at 3%"
+    },
+    "glow-warm": {
+      "$value": "radial-gradient(ellipse at 50% 50%, rgba(182,156,72,0.02), transparent 70%)",
+      "$type": "string",
+      "$description": "Secondary warm ambient glow — amber at 2%"
+    },
+    "glow-cool": {
+      "$value": "radial-gradient(ellipse at 50% 50%, rgba(72,122,182,0.02), transparent 70%)",
+      "$type": "string",
+      "$description": "Cool ambient glow — indigo at 2% (morning/night)"
+    },
+    "warmth-default": {
+      "$value": 0.5,
+      "$type": "number",
+      "$description": "Default ambient warmth (0=cool, 0.5=neutral, 1=warm)"
+    },
+    "warmth-mix-max": {
+      "$value": 0.03,
+      "$type": "number",
+      "$description": "Maximum color mix percentage for time-aware warmth (3%)"
+    }
+  },
+  "time-aware": {
+    "$description": "Time-of-day color temperature — subliminal, not visible as individual changes",
+    "morning": {
+      "warmth": {
+        "$value": 0.0,
+        "$type": "number",
+        "$description": "Cool tone (6:00–10:00)"
+      },
+      "tint": {
+        "$value": "rgba(72,122,182,0.02)",
+        "$type": "color",
+        "$description": "Cool blue morning tint"
+      }
+    },
+    "day": {
+      "warmth": {
+        "$value": 0.5,
+        "$type": "number",
+        "$description": "Neutral tone (10:00–16:00)"
+      },
+      "tint": {
+        "$value": "rgba(122,182,72,0.01)",
+        "$type": "color",
+        "$description": "Neutral green day tint"
+      }
+    },
+    "evening": {
+      "warmth": {
+        "$value": 1.0,
+        "$type": "number",
+        "$description": "Warm tone (16:00–22:00)"
+      },
+      "tint": {
+        "$value": "rgba(182,156,72,0.02)",
+        "$type": "color",
+        "$description": "Warm amber evening tint"
+      }
+    },
+    "night": {
+      "warmth": {
+        "$value": 0.3,
+        "$type": "number",
+        "$description": "Slightly cool (22:00–6:00)"
+      },
+      "tint": {
+        "$value": "rgba(72,82,122,0.02)",
+        "$type": "color",
+        "$description": "Deep blue night tint"
+      }
+    },
+    "update-interval": {
+      "$value": "300000",
+      "$type": "string",
+      "$description": "Warmth update interval in ms (5 minutes)"
+    }
+  },
+  "status-breathing": {
+    "$description": "Status indicator pulse rates correlated with system health",
+    "healthy": {
+      "period": {
+        "$value": "3s",
+        "$type": "duration",
+        "$description": "Slow, calm breathing — system healthy"
+      },
+      "intensity": {
+        "$value": 0.3,
+        "$type": "number",
+        "$description": "Subtle glow pulse (30%)"
+      }
+    },
+    "warning": {
+      "period": {
+        "$value": "1.5s",
+        "$type": "duration",
+        "$description": "Faster breathing — system under load"
+      },
+      "intensity": {
+        "$value": 0.5,
+        "$type": "number",
+        "$description": "Moderate glow pulse (50%)"
+      }
+    },
+    "error": {
+      "period": {
+        "$value": "0.75s",
+        "$type": "duration",
+        "$description": "Rapid breathing — system in error state"
+      },
+      "intensity": {
+        "$value": 0.8,
+        "$type": "number",
+        "$description": "Strong glow pulse (80%)"
+      }
+    }
+  },
+  "idle": {
+    "$description": "Idle state behavior — subtle life when user is not interacting",
+    "threshold": {
+      "$value": "30000",
+      "$type": "string",
+      "$description": "Milliseconds of no interaction before idle mode (30s)"
+    },
+    "drift-speed": {
+      "$value": 0.001,
+      "$type": "number",
+      "$description": "Particle drift speed in idle mode"
+    },
+    "glow-pulse-period": {
+      "$value": "8s",
+      "$type": "duration",
+      "$description": "Ambient glow pulse period in idle mode"
+    }
+  },
+  "scroll-depth": {
+    "$description": "Glass blur density increases with scroll depth",
+    "blur-per-100vh": {
+      "$value": "1px",
+      "$type": "dimension",
+      "$description": "Additional blur per 100vh of scroll"
+    },
+    "max-additional-blur": {
+      "$value": "4px",
+      "$type": "dimension",
+      "$description": "Cap on scroll-driven blur increase"
+    }
+  },
+  "gradient-response": {
+    "$description": "Background gradient shifts based on pointer proximity",
+    "hue-shift-max": {
+      "$value": 5,
+      "$type": "number",
+      "$description": "Maximum hue rotation in degrees (±5°)"
+    },
+    "response-speed": {
+      "$value": "500ms",
+      "$type": "duration",
+      "$description": "Gradient response transition duration"
+    },
+    "easing": {
+      "$value": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "$type": "cubicBezier",
+      "$description": "Ease-out for smooth gradient follow"
+    }
+  },
+  "cpu-budget": {
+    "$description": "CPU budget constraints for ambient effects",
+    "gradient-response": {
+      "$value": 0.5,
+      "$type": "number",
+      "$description": "Max CPU% for pointer gradient response"
+    },
+    "status-breathing": {
+      "$value": 0.1,
+      "$type": "number",
+      "$description": "Max CPU% for status pulse animation"
+    },
+    "idle-drift": {
+      "$value": 0.3,
+      "$type": "number",
+      "$description": "Max CPU% for idle particle drift"
+    },
+    "particle-float": {
+      "$value": 0.5,
+      "$type": "number",
+      "$description": "Max CPU% for WebGL particle animation"
+    },
+    "combined-max": {
+      "$value": 2.0,
+      "$type": "number",
+      "$description": "Maximum combined CPU% for ALL ambient effects"
+    }
+  },
+  "audio": {
+    "$description": "Optional audio design — always muted by default, opt-in only",
+    "enabled": {
+      "$value": false,
+      "$type": "boolean",
+      "$description": "Global audio toggle — false by default, always"
+    },
+    "volume": {
+      "$value": 0.3,
+      "$type": "number",
+      "$description": "Default volume when enabled (30%)"
+    },
+    "fade-duration": {
+      "$value": "500ms",
+      "$type": "duration",
+      "$description": "Crossfade between audio states"
+    },
+    "ambient-loop-duration": {
+      "$value": "30s",
+      "$type": "duration",
+      "$description": "Ambient pad loop length"
+    },
+    "max-file-size-kb": {
+      "$value": 50,
+      "$type": "number",
+      "$description": "Maximum audio file size in KB"
+    },
+    "scope": {
+      "$value": "website-only",
+      "$type": "string",
+      "$description": "Audio is website-only — no audio in dashboard (productivity = silence)"
+    }
+  }
+}

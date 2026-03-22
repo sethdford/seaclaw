@@ -1,8 +1,18 @@
 #include "human/core/error.h"
 #include "human/security/sandbox.h"
 #include "human/security/sandbox_internal.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static void hu_sandbox_warn_no_backend_resolved_noop_once(void) {
+    static int warned;
+    if (warned)
+        return;
+    warned = 1;
+    fprintf(stderr, "[human] warning: sandbox auto-detection found no backend; "
+                    "code execution is NOT sandboxed\n");
+}
 
 struct hu_sandbox_storage {
     hu_noop_sandbox_ctx_t noop;
@@ -196,10 +206,12 @@ hu_sandbox_t hu_sandbox_create(hu_sandbox_backend_t backend, const char *workspa
         if (result.vtable->is_available(result.ctx))
             break;
 
+        hu_sandbox_warn_no_backend_resolved_noop_once();
         result = hu_noop_sandbox_get(&st->noop);
         break;
     }
     default:
+        hu_sandbox_warn_no_backend_resolved_noop_once();
         result = hu_noop_sandbox_get(&st->noop);
         break;
     }

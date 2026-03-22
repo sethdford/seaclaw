@@ -2,7 +2,40 @@
 #include "human/agent/mcts_planner.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/json.h"
+#include "human/tool.h"
 #include <string.h>
+
+static hu_error_t mock_mcts_tool_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
+                                         hu_tool_result_t *out) {
+    (void)ctx;
+    (void)alloc;
+    (void)args;
+    (void)out;
+    return HU_OK;
+}
+
+static const char *mock_mcts_tool_name(void *ctx) {
+    (void)ctx;
+    return "weather_lookup";
+}
+
+static const char *mock_mcts_tool_description(void *ctx) {
+    (void)ctx;
+    return "look up weather";
+}
+
+static const char *mock_mcts_tool_parameters_json(void *ctx) {
+    (void)ctx;
+    return "{}";
+}
+
+static const hu_tool_vtable_t mock_mcts_expand_tool_vtable = {
+    .execute = mock_mcts_tool_execute,
+    .name = mock_mcts_tool_name,
+    .description = mock_mcts_tool_description,
+    .parameters_json = mock_mcts_tool_parameters_json,
+};
 
 static void mcts_config_default_values(void) {
     hu_mcts_config_t c = hu_mcts_config_default();
@@ -93,6 +126,29 @@ static void mcts_plan_explores_multiple_nodes(void) {
     hu_mcts_result_free_path(&alloc, &result);
 }
 
+static void mcts_expand_prompt_lists_configured_tools(void) {
+    hu_mcts_node_t nodes[2];
+    memset(nodes, 0, sizeof(nodes));
+    hu_tool_t tools[1] = {{.ctx = NULL, .vtable = &mock_mcts_expand_tool_vtable}};
+    hu_mcts_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.tools = tools;
+    cfg.tools_count = 1;
+
+    char system[512];
+    char prompt[4096];
+    size_t sys_len = 0;
+    size_t prompt_len = 0;
+    HU_ASSERT_EQ(hu_mcts_test_format_expand_prompts("book a flight", 13, 1, 0, nodes, &cfg, system,
+                                                     sizeof(system), &sys_len, prompt, sizeof(prompt),
+                                                     &prompt_len),
+                 HU_OK);
+    HU_ASSERT_TRUE(sys_len > 0);
+    HU_ASSERT_TRUE(prompt_len > 0);
+    HU_ASSERT_TRUE(strstr(prompt, "Available tools:") != NULL);
+    HU_ASSERT_TRUE(strstr(prompt, "weather_lookup") != NULL);
+}
+
 static void mcts_backpropagation_updates_values(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_mcts_config_t config = hu_mcts_config_default();
@@ -118,4 +174,5 @@ void run_mcts_planner_tests(void) {
     HU_RUN_TEST(mcts_plan_respects_max_depth);
     HU_RUN_TEST(mcts_plan_explores_multiple_nodes);
     HU_RUN_TEST(mcts_backpropagation_updates_values);
+    HU_RUN_TEST(mcts_expand_prompt_lists_configured_tools);
 }

@@ -81,6 +81,7 @@ hu_error_t hu_webrtc_sdp_extract_setup_active(const char *sdp, bool *remote_is_a
     return HU_OK;
 }
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
 static void hu_webrtc_random_bytes(uint8_t *out, size_t n) {
 #if defined(HU_HAS_TLS) && !defined(HU_IS_TEST)
     if (RAND_bytes(out, (int)n) != 1) {
@@ -92,6 +93,7 @@ static void hu_webrtc_random_bytes(uint8_t *out, size_t n) {
         out[i] = (uint8_t)(rand() & 0xff);
 #endif
 }
+#endif
 
 #ifndef HU_IS_TEST
 static hu_error_t hu_webrtc_build_sdp_offer(hu_allocator_t *alloc, const hu_webrtc_config_t *config,

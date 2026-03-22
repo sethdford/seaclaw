@@ -2250,3 +2250,74 @@ h3 {
 .bench-fill.on .val {
   opacity: 1;
 }
+
+/* ─── Quiet Mastery: Scroll Narrative ──────────────────────────── */
+
+@supports (animation-timeline: view()) {
+  .hu-chapter-reveal {
+    animation: hu-chapter-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+
+  @keyframes hu-chapter-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(40px) scale(0.98);
+      filter: blur(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+}
+
+.hu-chapter-label {
+  font-size: clamp(3rem, 8vw, 6rem);
+  font-weight: 800;
+  opacity: 0.06;
+  letter-spacing: 0.04em;
+  font-family: var(--hu-font, "Avenir", "Avenir Next", system-ui);
+  pointer-events: none;
+  user-select: none;
+  position: absolute;
+  top: var(--hu-space-xl);
+  left: var(--hu-space-xl);
+  line-height: 1;
+}
+
+/* Pointer proximity glow for interactive elements */
+.hu-proximity-glow {
+  position: relative;
+}
+.hu-proximity-glow::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: var(--hu-proximity, 0);
+  background: radial-gradient(
+    200px at calc(50% + var(--hu-pointer-x, 0px)) calc(50% + var(--hu-pointer-y, 0px)),
+    color-mix(in srgb, var(--color-accent) 8%, transparent),
+    transparent
+  );
+  transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
+  z-index: 1;
+}
+
+/* Metric counter animation */
+.hu-metric-counter {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hu-chapter-reveal {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}

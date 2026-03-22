@@ -94,12 +94,13 @@ run "human doctor" "$HUMAN_BIN" doctor
 run "human eval list" "$HUMAN_BIN" eval list
 
 # --- Harness dry-run (no API keys): safety + epistemic / anti–AGI-overclaim probes ---
-run "adversarial harness (dry-run, adversarial + capability + human + tool)" \
+run "adversarial harness (dry-run, adversarial + capability + human + tool + multi-turn)" \
   python3 "$HARNESS" --dry-run --no-llm \
   --include-suite "$ROOT/eval_suites/adversarial.json" \
   --include-suite "$ROOT/eval_suites/capability_edges.json" \
   --include-suite "$ROOT/eval_suites/human_likeness.json" \
-  --include-suite "$ROOT/eval_suites/tool_capability.json"
+  --include-suite "$ROOT/eval_suites/tool_capability.json" \
+  --include-suite "$ROOT/eval_suites/multi_turn.json"
 
 # --- Live: human eval run ---
 if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
@@ -154,6 +155,7 @@ if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
       --include-suite "$ROOT/eval_suites/capability_edges.json" \
       --include-suite "$ROOT/eval_suites/human_likeness.json" \
       --include-suite "$ROOT/eval_suites/tool_capability.json" \
+      --include-suite "$ROOT/eval_suites/multi_turn.json" \
       --timeout "${REDTEAM_AGENT_TIMEOUT:-180}" \
       --output "$LIVE_DIR/harness-report.json" 2>&1 | tee "$LIVE_DIR/harness-console.log"; then
       echo "--- OK: dynamic harness"

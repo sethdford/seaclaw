@@ -41,6 +41,11 @@ typedef struct hu_bth_metrics {
     uint32_t cognition_slow_turns;     /* turns dispatched as System 2 (slow) */
     uint32_t cognition_emotional_turns; /* turns dispatched as emotional mode */
     uint32_t metacog_interventions;    /* metacognitive actions taken (non-NONE) */
+    uint32_t metacog_regens;           /* metacognitive provider re-entries in a turn */
+    uint32_t metacog_difficulty_easy;  /* turns with easy heuristic difficulty */
+    uint32_t metacog_difficulty_medium;
+    uint32_t metacog_difficulty_hard;
+    uint32_t metacog_hysteresis_suppressed; /* plan_action returned NONE due to hysteresis */
     uint32_t episodic_patterns_stored; /* episodic patterns extracted and stored */
     uint32_t episodic_replays;         /* cognitive replay blocks injected */
     uint32_t skill_routes_semantic;    /* relevance-ranked skill catalog injected (keyword and/or semantic routing) */

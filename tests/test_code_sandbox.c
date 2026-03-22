@@ -16,7 +16,7 @@ static void sandbox_execute_python(void) {
     hu_code_sandbox_result_t result;
     memset(&result, 0, sizeof(result));
     const char *code = "print('hello')";
-    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, code, strlen(code), &result), HU_OK);
+    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, NULL, code, strlen(code), &result), HU_OK);
     HU_ASSERT(strstr(result.stdout_buf, "Hello") != NULL);
     HU_ASSERT_EQ(result.exit_code, 0);
 }
@@ -28,7 +28,7 @@ static void sandbox_execute_javascript(void) {
     hu_code_sandbox_result_t result;
     memset(&result, 0, sizeof(result));
     const char *code = "console.log(42)";
-    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, code, strlen(code), &result), HU_OK);
+    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, NULL, code, strlen(code), &result), HU_OK);
     HU_ASSERT(strstr(result.stdout_buf, "42") != NULL);
     HU_ASSERT_EQ(result.exit_code, 0);
 }
@@ -40,7 +40,7 @@ static void sandbox_execute_shell(void) {
     hu_code_sandbox_result_t result;
     memset(&result, 0, sizeof(result));
     const char *code = "ls";
-    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, code, strlen(code), &result), HU_OK);
+    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, NULL, code, strlen(code), &result), HU_OK);
     HU_ASSERT(result.stdout_len > 0);
     HU_ASSERT_EQ(result.exit_code, 0);
 }
@@ -57,10 +57,10 @@ static void sandbox_null_args_returns_error(void) {
     hu_code_sandbox_result_t result;
     memset(&result, 0, sizeof(result));
     const char *code = "1+1";
-    HU_ASSERT_NEQ(hu_code_sandbox_execute(NULL, &config, code, 3, &result), HU_OK);
-    HU_ASSERT_NEQ(hu_code_sandbox_execute(&alloc, NULL, code, 3, &result), HU_OK);
-    HU_ASSERT_NEQ(hu_code_sandbox_execute(&alloc, &config, NULL, 0, &result), HU_OK);
-    HU_ASSERT_NEQ(hu_code_sandbox_execute(&alloc, &config, code, 3, NULL), HU_OK);
+    HU_ASSERT_NEQ(hu_code_sandbox_execute(NULL, &config, NULL, code, 3, &result), HU_OK);
+    HU_ASSERT_NEQ(hu_code_sandbox_execute(&alloc, NULL, NULL, code, 3, &result), HU_OK);
+    HU_ASSERT_NEQ(hu_code_sandbox_execute(&alloc, &config, NULL, NULL, 0, &result), HU_OK);
+    HU_ASSERT_NEQ(hu_code_sandbox_execute(&alloc, &config, NULL, code, 3, NULL), HU_OK);
 }
 
 static void sandbox_checkpoint_save_restore(void) {
@@ -113,16 +113,16 @@ static void sandbox_cold_start_under_500ms(void) {
     hu_code_sandbox_result_t result;
 
     config.language = HU_SANDBOX_PYTHON;
-    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, "print(1)", 8, &result), HU_OK);
+    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, NULL, "print(1)", 8, &result), HU_OK);
     HU_ASSERT_TRUE(result.elapsed_ms < 500);
     HU_ASSERT_TRUE(result.elapsed_ms >= 0);
 
     config.language = HU_SANDBOX_JAVASCRIPT;
-    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, "1+1", 3, &result), HU_OK);
+    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, NULL, "1+1", 3, &result), HU_OK);
     HU_ASSERT_TRUE(result.elapsed_ms < 500);
 
     config.language = HU_SANDBOX_SHELL;
-    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, "ls", 2, &result), HU_OK);
+    HU_ASSERT_EQ(hu_code_sandbox_execute(&alloc, &config, NULL, "ls", 2, &result), HU_OK);
     HU_ASSERT_TRUE(result.elapsed_ms < 500);
 }
 

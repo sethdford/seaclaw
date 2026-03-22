@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include <string.h>
 
+typedef struct hu_code_sandbox_ctx {
+    hu_security_policy_t *policy;
+} hu_code_sandbox_ctx_t;
+
 #define SANDBOX_PARAMS                                                                             \
     "{\"type\":\"object\",\"properties\":{\"language\":{\"type\":\"string\",\"enum\":["           \
     "\"python\",\"javascript\",\"shell\"]},\"code\":{\"type\":\"string\"}},\"required\":["         \
@@ -24,6 +28,7 @@ hu_code_sandbox_config_t hu_code_sandbox_config_default(void) {
 
 hu_error_t hu_code_sandbox_execute(hu_allocator_t *alloc,
                                    const hu_code_sandbox_config_t *config,
+                                   hu_security_policy_t *policy,
                                    const char *code, size_t code_len,
                                    hu_code_sandbox_result_t *result) {
     if (!alloc || !config || !result)
@@ -36,6 +41,7 @@ hu_error_t hu_code_sandbox_execute(hu_allocator_t *alloc,
 #ifdef HU_IS_TEST
     /* Mock results: no real process spawning */
     (void)code_len;
+    (void)policy;
     switch (config->language) {
     case HU_SANDBOX_PYTHON:
         memcpy(result->stdout_buf, "Hello World\n", 12);
@@ -97,7 +103,8 @@ hu_error_t hu_code_sandbox_execute(hu_allocator_t *alloc,
         max_out = 1048576;
 
     hu_run_result_t run;
-    hu_error_t err = hu_process_run(alloc, argv, NULL, max_out, &run);
+    hu_error_t err =
+        hu_process_run_with_policy(alloc, (const char *const *)argv, NULL, max_out, policy, &run);
 
     alloc->free(alloc->ctx, code_copy, code_cap);
 
@@ -177,8 +184,8 @@ hu_error_t hu_code_sandbox_restore_checkpoint(const hu_code_sandbox_checkpoint_t
 
 static hu_error_t code_sandbox_execute(void *ctx, hu_allocator_t *alloc,
                                        const hu_json_value_t *args, hu_tool_result_t *out) {
-    (void)ctx;
-    if (!alloc || !args || !out)
+    hu_code_sandbox_ctx_t *cs = (hu_code_sandbox_ctx_t *)ctx;
+    if (!cs || !alloc || !args || !out)
         return HU_ERR_INVALID_ARGUMENT;
 
     const char *lang_str = hu_json_get_string(args, "language");
@@ -202,7 +209,8 @@ static hu_error_t code_sandbox_execute(void *ctx, hu_allocator_t *alloc,
     config.language = lang;
 
     hu_code_sandbox_result_t result;
-    hu_error_t err = hu_code_sandbox_execute(alloc, &config, code, strlen(code), &result);
+    hu_error_t err =
+        hu_code_sandbox_execute(alloc, &config, cs->policy, code, strlen(code), &result);
     if (err != HU_OK) {
         *out = hu_tool_result_fail("sandbox execute failed", 22);
         return HU_OK;
@@ -233,18 +241,30 @@ static const char *code_sandbox_parameters_json(void *ctx) {
     return SANDBOX_PARAMS;
 }
 
+static void code_sandbox_deinit(void *ctx, hu_allocator_t *alloc) {
+    if (!ctx || !alloc)
+        return;
+    alloc->free(alloc->ctx, ctx, sizeof(hu_code_sandbox_ctx_t));
+}
+
 static const hu_tool_vtable_t code_sandbox_vtable = {
     .execute = code_sandbox_execute,
     .name = code_sandbox_name,
     .description = code_sandbox_description,
     .parameters_json = code_sandbox_parameters_json,
-    .deinit = NULL,
+    .deinit = code_sandbox_deinit,
 };
 
-hu_error_t hu_code_sandbox_create(hu_allocator_t *alloc, hu_tool_t *out) {
+hu_error_t hu_code_sandbox_create(hu_allocator_t *alloc, hu_security_policy_t *policy,
+                                  hu_tool_t *out) {
     if (!alloc || !out)
         return HU_ERR_INVALID_ARGUMENT;
-    out->ctx = NULL;
+    hu_code_sandbox_ctx_t *c =
+        (hu_code_sandbox_ctx_t *)alloc->alloc(alloc->ctx, sizeof(hu_code_sandbox_ctx_t));
+    if (!c)
+        return HU_ERR_OUT_OF_MEMORY;
+    c->policy = policy;
+    out->ctx = c;
     out->vtable = &code_sandbox_vtable;
     return HU_OK;
 }

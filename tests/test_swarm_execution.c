@@ -146,6 +146,35 @@ static void swarm_aggregate_null_args(void) {
                  HU_ERR_INVALID_ARGUMENT);
 }
 
+static void swarm_aggregate_vote_clusters_similar_phrasings(void) {
+    hu_swarm_task_t tasks[3];
+    memset(tasks, 0, sizeof(tasks));
+
+    const char *r0 = "The answer is 42";
+    const char *r1 = "42 is the answer";
+    const char *r2 = "completely different";
+
+    strncpy(tasks[0].result, r0, sizeof(tasks[0].result) - 1);
+    tasks[0].result_len = strlen(r0);
+    tasks[0].completed = true;
+
+    strncpy(tasks[1].result, r1, sizeof(tasks[1].result) - 1);
+    tasks[1].result_len = strlen(r1);
+    tasks[1].completed = true;
+
+    strncpy(tasks[2].result, r2, sizeof(tasks[2].result) - 1);
+    tasks[2].result_len = strlen(r2);
+    tasks[2].completed = true;
+
+    hu_swarm_result_t result = {.tasks = tasks, .task_count = 3};
+    char agg[256];
+    size_t agg_len = 0;
+    HU_ASSERT_EQ(hu_swarm_aggregate(&result, HU_SWARM_AGG_VOTE, agg, sizeof(agg), &agg_len), HU_OK);
+    HU_ASSERT_TRUE(agg_len > 0);
+    HU_ASSERT_TRUE(strstr(agg, "42") != NULL);
+    HU_ASSERT_TRUE(strstr(agg, "different") == NULL);
+}
+
 void run_swarm_execution_tests(void) {
     HU_TEST_SUITE("swarm_execution");
     HU_RUN_TEST(swarm_config_default_values);
@@ -157,4 +186,5 @@ void run_swarm_execution_tests(void) {
     HU_RUN_TEST(swarm_aggregate_concatenate);
     HU_RUN_TEST(swarm_aggregate_first_success);
     HU_RUN_TEST(swarm_aggregate_null_args);
+    HU_RUN_TEST(swarm_aggregate_vote_clusters_similar_phrasings);
 }

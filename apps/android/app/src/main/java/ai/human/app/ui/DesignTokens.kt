@@ -211,6 +211,18 @@ object HUTokens {
     val springInteractiveDamping = 31f
     val springInteractiveMass = 1f
 
+    // Spatial Depth (Quiet Mastery)
+
+    /** Default perspective distance for card containers */
+    const val PERSPECTIVE = 1200f
+    /** Maximum card tilt angle in degrees */
+    const val CARD_TILT_MAX = 8f
+    /** Pointer proximity detection radius */
+    const val PROXIMITY_RADIUS = 200f
+
+    // Haptic Vocabulary (Extended)
+    // Use with HapticFeedbackConstants in Compose
+
     // Opacity
     val opacityDisabled = 0.38f
     val opacityDragged = 0.16f

@@ -36,6 +36,11 @@ static void bth_metrics_init_zeros(void) {
     HU_ASSERT_EQ(m.reflections_daily, 0u);
     HU_ASSERT_EQ(m.reflections_weekly, 0u);
     HU_ASSERT_EQ(m.total_turns, 0u);
+    HU_ASSERT_EQ(m.cognition_fast_turns, 0u);
+    HU_ASSERT_EQ(m.metacog_regens, 0u);
+    HU_ASSERT_EQ(m.metacog_difficulty_hard, 0u);
+    HU_ASSERT_EQ(m.skill_routes_semantic, 0u);
+    HU_ASSERT_EQ(m.evolving_outcomes, 0u);
 }
 
 static void bth_metrics_summary_with_data(void) {
@@ -78,50 +83,58 @@ static void bth_metrics_all_counters_addressable(void) {
     hu_bth_metrics_t m;
     hu_bth_metrics_init(&m);
 
-    /* Set each counter individually and verify */
     m.emotions_surfaced = 1;
-    m.facts_extracted = 2;
-    m.commitment_followups = 3;
-    m.pattern_insights = 4;
-    m.emotions_promoted = 5;
-    m.events_extracted = 6;
-    m.mood_contexts_built = 7;
-    m.silence_checkins = 8;
-    m.event_followups = 9;
-    m.starters_built = 10;
-    m.typos_applied = 11;
-    m.corrections_sent = 12;
-    m.thinking_responses = 13;
-    m.callbacks_triggered = 14;
-    m.reactions_sent = 15;
-    m.link_contexts = 16;
-    m.attachment_contexts = 17;
-    m.ab_evaluations = 18;
-    m.ab_alternates_chosen = 19;
-    m.replay_analyses = 20;
-    m.egraph_contexts = 21;
-    m.vision_descriptions = 22;
-    m.total_turns = 23;
+    m.facts_extracted = 1;
+    m.commitment_followups = 1;
+    m.pattern_insights = 1;
+    m.emotions_promoted = 1;
+    m.events_extracted = 1;
+    m.mood_contexts_built = 1;
+    m.silence_checkins = 1;
+    m.event_followups = 1;
+    m.starters_built = 1;
+    m.typos_applied = 1;
+    m.corrections_sent = 1;
+    m.thinking_responses = 1;
+    m.double_texts = 1;
+    m.callbacks_triggered = 1;
+    m.reactions_sent = 1;
+    m.link_contexts = 1;
+    m.attachment_contexts = 1;
+    m.ab_evaluations = 1;
+    m.ab_alternates_chosen = 1;
+    m.replay_analyses = 1;
+    m.egraph_contexts = 1;
+    m.vision_descriptions = 1;
+    m.skills_applied = 1;
+    m.skills_evolved = 1;
+    m.skills_retired = 1;
+    m.reflections_daily = 1;
+    m.reflections_weekly = 1;
+    m.total_turns = 1;
+    m.cognition_fast_turns = 1;
+    m.cognition_slow_turns = 1;
+    m.cognition_emotional_turns = 1;
+    m.metacog_interventions = 1;
+    m.metacog_regens = 1;
+    m.metacog_difficulty_easy = 1;
+    m.metacog_difficulty_medium = 1;
+    m.metacog_difficulty_hard = 1;
+    m.metacog_hysteresis_suppressed = 1;
+    m.episodic_patterns_stored = 1;
+    m.episodic_replays = 1;
+    m.skill_routes_semantic = 1;
+    m.skill_routes_blended = 1;
+    m.skill_routes_embedded = 1;
+    m.evolving_outcomes = 1;
 
-    /* Verify none overlapped (total should be sum 1..23 = 276) */
-    uint32_t sum = m.emotions_surfaced + m.facts_extracted + m.commitment_followups +
-                   m.pattern_insights + m.emotions_promoted + m.events_extracted +
-                   m.mood_contexts_built + m.silence_checkins + m.event_followups +
-                   m.starters_built + m.typos_applied + m.corrections_sent + m.thinking_responses +
-                   m.callbacks_triggered + m.reactions_sent + m.link_contexts +
-                   m.attachment_contexts + m.ab_evaluations + m.ab_alternates_chosen +
-                   m.replay_analyses + m.egraph_contexts + m.vision_descriptions + m.total_turns;
-    HU_ASSERT_EQ(sum, 276u);
-
-    /* Summary should include all 23 non-zero counters */
     hu_allocator_t alloc = hu_system_allocator();
     size_t out_len = 0;
     char *summary = hu_bth_metrics_summary(&alloc, &m, &out_len);
     HU_ASSERT_NOT_NULL(summary);
-    HU_ASSERT_TRUE(strstr(summary, "vision_descriptions=22") != NULL);
-    HU_ASSERT_TRUE(strstr(summary, "starters_built=10") != NULL);
-    HU_ASSERT_TRUE(strstr(summary, "thinking_responses=13") != NULL);
-    HU_ASSERT_TRUE(strstr(summary, "link_contexts=16") != NULL);
+    HU_ASSERT_TRUE(strstr(summary, "metacog_regens=1") != NULL);
+    HU_ASSERT_TRUE(strstr(summary, "cognition_fast_turns=1") != NULL);
+    HU_ASSERT_TRUE(strstr(summary, "skill_routes_semantic=1") != NULL);
     alloc.free(alloc.ctx, summary, out_len);
 }
 

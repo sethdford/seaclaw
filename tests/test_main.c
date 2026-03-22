@@ -33,6 +33,7 @@ void run_ensemble_tests(void);
 void run_api_key_tests(void);
 void run_channel_tests(void);
 void run_channel_format_tests(void);
+void run_channel_rate_limit_tests(void);
 void run_tool_tests(void);
 void test_vtables_run(void);
 void run_peripheral_tests(void);
@@ -382,6 +383,7 @@ int main(int argc, char **argv) {
     run_api_key_tests();
     run_channel_tests();
     run_channel_format_tests();
+    run_channel_rate_limit_tests();
     run_tool_tests();
     test_vtables_run();
     run_peripheral_tests();

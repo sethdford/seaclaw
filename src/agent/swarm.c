@@ -1,6 +1,8 @@
 #include "human/agent/swarm.h"
+#include "human/core/error.h"
 #include "human/core/json.h"
 #include "human/provider.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -106,7 +108,8 @@ static void swarm_run_one_task(hu_allocator_t *alloc, const hu_swarm_config_t *c
             if (err != HU_OK) {
                 t->failed = true;
                 t->completed = false;
-                int n = snprintf(t->result, sizeof(t->result), "sub-agent failed: %d", (int)err);
+                int n = snprintf(t->result, sizeof(t->result), "sub-agent failed: %s",
+                                 hu_error_string(err));
                 t->result_len = n > 0 ? (size_t)n : 0;
                 hu_chat_response_free(alloc, &resp);
                 goto done;
@@ -196,7 +199,8 @@ static void swarm_run_one_task(hu_allocator_t *alloc, const hu_swarm_config_t *c
             } else {
                 t->completed = false;
                 t->failed = true;
-                int n = snprintf(t->result, sizeof(t->result), "sub-agent failed: %d", (int)err);
+                int n = snprintf(t->result, sizeof(t->result), "sub-agent failed: %s",
+                                 hu_error_string(err));
                 t->result_len = n > 0 ? (size_t)n : 0;
                 if (llm_out)
                     alloc->free(alloc->ctx, llm_out, llm_out_len + 1u);
@@ -427,6 +431,89 @@ hu_error_t hu_swarm_execute(hu_allocator_t *alloc, const hu_swarm_config_t *conf
     return HU_OK;
 }
 
+#define HU_SWARM_JACCARD_MAX_WORDS 64
+#define HU_SWARM_JACCARD_WORD_LEN 48
+#define HU_SWARM_VOTE_MAX_INDICES 128
+
+static int swarm_vote_extract_words(const char *s, size_t s_len,
+                                    char words[][HU_SWARM_JACCARD_WORD_LEN]) {
+    int n = 0;
+    size_t i = 0;
+    while (i < s_len && n < HU_SWARM_JACCARD_MAX_WORDS) {
+        while (i < s_len && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r'))
+            i++;
+        if (i >= s_len)
+            break;
+        size_t start = i;
+        while (i < s_len && !(s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r'))
+            i++;
+        size_t wlen = i - start;
+        if (wlen == 0)
+            continue;
+        if (wlen >= HU_SWARM_JACCARD_WORD_LEN)
+            wlen = HU_SWARM_JACCARD_WORD_LEN - 1u;
+        bool dup = false;
+        for (int k = 0; k < n; k++) {
+            if (strncmp(words[k], s + start, wlen) == 0 && words[k][wlen] == '\0') {
+                dup = true;
+                break;
+            }
+        }
+        if (dup)
+            continue;
+        memcpy(words[n], s + start, wlen);
+        words[n][wlen] = '\0';
+        n++;
+    }
+    return n;
+}
+
+static double swarm_jaccard_similarity(const char *a, size_t a_len, const char *b, size_t b_len) {
+    char wa[HU_SWARM_JACCARD_MAX_WORDS][HU_SWARM_JACCARD_WORD_LEN];
+    char wb[HU_SWARM_JACCARD_MAX_WORDS][HU_SWARM_JACCARD_WORD_LEN];
+    int na = swarm_vote_extract_words(a, a_len, wa);
+    int nb = swarm_vote_extract_words(b, b_len, wb);
+    if (na == 0 && nb == 0)
+        return 1.0;
+    if (na == 0 || nb == 0)
+        return 0.0;
+    int inter = 0;
+    for (int i = 0; i < na; i++) {
+        for (int j = 0; j < nb; j++) {
+            if (strcmp(wa[i], wb[j]) == 0) {
+                inter++;
+                break;
+            }
+        }
+    }
+    int uni = na + nb - inter;
+    if (uni <= 0)
+        return 0.0;
+    return (double)inter / (double)uni;
+}
+
+static int swarm_vote_find_root(int *parent, int i) {
+    while (parent[i] != i) {
+        parent[i] = parent[parent[i]];
+        i = parent[i];
+    }
+    return i;
+}
+
+static void swarm_vote_union(int *parent, int a, int b) {
+    int ra = swarm_vote_find_root(parent, a);
+    int rb = swarm_vote_find_root(parent, b);
+    if (ra != rb)
+        parent[rb] = ra;
+}
+
+static double swarm_vote_pair_similarity(const hu_swarm_task_t *x, const hu_swarm_task_t *y) {
+    if (x->result_len == y->result_len &&
+        memcmp(x->result, y->result, x->result_len) == 0)
+        return 1.0;
+    return swarm_jaccard_similarity(x->result, x->result_len, y->result, y->result_len);
+}
+
 hu_error_t hu_swarm_aggregate(const hu_swarm_result_t *result, hu_swarm_aggregation_t strategy,
                                char *out, size_t out_size, size_t *out_len) {
     if (!result || !out || !out_len || out_size == 0)
@@ -473,31 +560,82 @@ hu_error_t hu_swarm_aggregate(const hu_swarm_result_t *result, hu_swarm_aggregat
         break;
     }
     case HU_SWARM_AGG_VOTE: {
-        /* Simple vote: find most common result */
-        size_t best_idx = 0;
-        int best_count = 0;
-        for (size_t i = 0; i < result->task_count; i++) {
+        /* Similarity-threshold clustering (Jaccard on word sets) + exact-match fast path;
+         * largest cluster wins; centroid = highest mean pairwise similarity within cluster. */
+        size_t idxs[HU_SWARM_VOTE_MAX_INDICES];
+        size_t nv = 0;
+        for (size_t i = 0; i < result->task_count && nv < HU_SWARM_VOTE_MAX_INDICES; i++) {
             if (!result->tasks[i].completed || result->tasks[i].result_len == 0)
                 continue;
-            int count = 0;
-            for (size_t j = 0; j < result->task_count; j++) {
-                if (result->tasks[j].completed && result->tasks[j].result_len > 0 &&
-                    result->tasks[i].result_len == result->tasks[j].result_len &&
-                    memcmp(result->tasks[i].result, result->tasks[j].result,
-                           result->tasks[i].result_len) == 0) {
-                    count++;
-                }
-            }
-            if (count > best_count) {
-                best_count = count;
-                best_idx = i;
+            idxs[nv++] = i;
+        }
+        if (nv == 0)
+            break;
+        if (nv == 1) {
+            const hu_swarm_task_t *t = &result->tasks[idxs[0]];
+            size_t to_copy = t->result_len < out_size - 1 ? t->result_len : out_size - 1;
+            memcpy(out, t->result, to_copy);
+            out[to_copy] = '\0';
+            *out_len = to_copy;
+            break;
+        }
+
+        int parent[HU_SWARM_VOTE_MAX_INDICES];
+        for (size_t i = 0; i < nv; i++)
+            parent[i] = (int)i;
+
+        for (size_t ii = 0; ii < nv; ii++) {
+            for (size_t jj = ii + 1; jj < nv; jj++) {
+                double sim = swarm_vote_pair_similarity(&result->tasks[idxs[ii]],
+                                                        &result->tasks[idxs[jj]]);
+                if (sim >= 1.0 || sim > 0.5)
+                    swarm_vote_union(parent, (int)ii, (int)jj);
             }
         }
-        if (best_count > 0 && result->tasks[best_idx].result_len > 0) {
-            size_t to_copy = result->tasks[best_idx].result_len;
-            if (to_copy > out_size - 1)
-                to_copy = out_size - 1;
-            memcpy(out, result->tasks[best_idx].result, to_copy);
+
+        int best_sz = 0;
+        int wr_best = -1;
+        for (size_t i = 0; i < nv; i++) {
+            int ri = swarm_vote_find_root(parent, (int)i);
+            int sz = 0;
+            for (size_t j = 0; j < nv; j++) {
+                if (swarm_vote_find_root(parent, (int)j) == ri)
+                    sz++;
+            }
+            if (sz > best_sz || (sz == best_sz && (wr_best < 0 || ri < wr_best))) {
+                best_sz = sz;
+                wr_best = ri;
+            }
+        }
+
+        if (wr_best < 0)
+            break;
+
+        double best_avg = -1.0;
+        size_t pick_orig = idxs[0];
+        for (size_t ii = 0; ii < nv; ii++) {
+            if (swarm_vote_find_root(parent, (int)ii) != wr_best)
+                continue;
+            double sum = 0.0;
+            int cnt = 0;
+            for (size_t jj = 0; jj < nv; jj++) {
+                if (swarm_vote_find_root(parent, (int)jj) != wr_best || jj == ii)
+                    continue;
+                sum += swarm_vote_pair_similarity(&result->tasks[idxs[ii]],
+                                                  &result->tasks[idxs[jj]]);
+                cnt++;
+            }
+            double avg = cnt > 0 ? sum / (double)cnt : 1.0;
+            if (avg > best_avg || (avg == best_avg && idxs[ii] < pick_orig)) {
+                best_avg = avg;
+                pick_orig = idxs[ii];
+            }
+        }
+
+        const hu_swarm_task_t *win = &result->tasks[pick_orig];
+        if (win->result_len > 0) {
+            size_t to_copy = win->result_len < out_size - 1 ? win->result_len : out_size - 1;
+            memcpy(out, win->result, to_copy);
             out[to_copy] = '\0';
             *out_len = to_copy;
         }

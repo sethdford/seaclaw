@@ -266,7 +266,12 @@ export class ScFloatingMic extends LitElement {
             ? "Start voice input (Cmd+Shift+M)"
             : "Audio recording not supported"}
           @click=${this.toggleRecording}
-          aria-label="Toggle voice input"
+          aria-label=${this.isListening
+            ? "Stop recording"
+            : this.isTranscribing
+              ? "Transcribing audio"
+              : "Start voice input"}
+          aria-busy=${this.isTranscribing}
         >
           ${icons.mic}
         </button>

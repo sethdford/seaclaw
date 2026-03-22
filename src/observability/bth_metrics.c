@@ -8,72 +8,63 @@ void hu_bth_metrics_init(hu_bth_metrics_t *m) {
     memset(m, 0, sizeof(*m));
 }
 
+#define HU_BTH_LOG_FIELD(field) \
+    do { \
+        if (m->field) \
+            fprintf(stderr, "[bth] " #field "=%u\n", m->field); \
+    } while (0)
+
 void hu_bth_metrics_log(const hu_bth_metrics_t *m) {
     if (!m)
         return;
 
-    /* Only log non-zero counters */
-    if (m->emotions_surfaced)
-        fprintf(stderr, "[bth] emotions_surfaced=%u\n", m->emotions_surfaced);
-    if (m->facts_extracted)
-        fprintf(stderr, "[bth] facts_extracted=%u\n", m->facts_extracted);
-    if (m->commitment_followups)
-        fprintf(stderr, "[bth] commitment_followups=%u\n", m->commitment_followups);
-    if (m->pattern_insights)
-        fprintf(stderr, "[bth] pattern_insights=%u\n", m->pattern_insights);
-    if (m->emotions_promoted)
-        fprintf(stderr, "[bth] emotions_promoted=%u\n", m->emotions_promoted);
-    if (m->events_extracted)
-        fprintf(stderr, "[bth] events_extracted=%u\n", m->events_extracted);
-    if (m->mood_contexts_built)
-        fprintf(stderr, "[bth] mood_contexts_built=%u\n", m->mood_contexts_built);
-    if (m->silence_checkins)
-        fprintf(stderr, "[bth] silence_checkins=%u\n", m->silence_checkins);
-    if (m->event_followups)
-        fprintf(stderr, "[bth] event_followups=%u\n", m->event_followups);
-    if (m->starters_built)
-        fprintf(stderr, "[bth] starters_built=%u\n", m->starters_built);
-    if (m->typos_applied)
-        fprintf(stderr, "[bth] typos_applied=%u\n", m->typos_applied);
-    if (m->corrections_sent)
-        fprintf(stderr, "[bth] corrections_sent=%u\n", m->corrections_sent);
-    if (m->thinking_responses)
-        fprintf(stderr, "[bth] thinking_responses=%u\n", m->thinking_responses);
-    if (m->double_texts)
-        fprintf(stderr, "[bth] double_texts=%u\n", m->double_texts);
-    if (m->callbacks_triggered)
-        fprintf(stderr, "[bth] callbacks_triggered=%u\n", m->callbacks_triggered);
-    if (m->reactions_sent)
-        fprintf(stderr, "[bth] reactions_sent=%u\n", m->reactions_sent);
-    if (m->link_contexts)
-        fprintf(stderr, "[bth] link_contexts=%u\n", m->link_contexts);
-    if (m->attachment_contexts)
-        fprintf(stderr, "[bth] attachment_contexts=%u\n", m->attachment_contexts);
-    if (m->ab_evaluations)
-        fprintf(stderr, "[bth] ab_evaluations=%u\n", m->ab_evaluations);
-    if (m->ab_alternates_chosen)
-        fprintf(stderr, "[bth] ab_alternates_chosen=%u\n", m->ab_alternates_chosen);
-    if (m->replay_analyses)
-        fprintf(stderr, "[bth] replay_analyses=%u\n", m->replay_analyses);
-    if (m->egraph_contexts)
-        fprintf(stderr, "[bth] egraph_contexts=%u\n", m->egraph_contexts);
-    if (m->vision_descriptions)
-        fprintf(stderr, "[bth] vision_descriptions=%u\n", m->vision_descriptions);
-    if (m->skills_applied)
-        fprintf(stderr, "[bth] skills_applied=%u\n", m->skills_applied);
-    if (m->skills_evolved)
-        fprintf(stderr, "[bth] skills_evolved=%u\n", m->skills_evolved);
-    if (m->skills_retired)
-        fprintf(stderr, "[bth] skills_retired=%u\n", m->skills_retired);
-    if (m->skill_routes_embedded)
-        fprintf(stderr, "[bth] skill_routes_embedded=%u\n", m->skill_routes_embedded);
-    if (m->reflections_daily)
-        fprintf(stderr, "[bth] reflections_daily=%u\n", m->reflections_daily);
-    if (m->reflections_weekly)
-        fprintf(stderr, "[bth] reflections_weekly=%u\n", m->reflections_weekly);
-    if (m->total_turns)
-        fprintf(stderr, "[bth] total_turns=%u\n", m->total_turns);
+    HU_BTH_LOG_FIELD(emotions_surfaced);
+    HU_BTH_LOG_FIELD(facts_extracted);
+    HU_BTH_LOG_FIELD(commitment_followups);
+    HU_BTH_LOG_FIELD(pattern_insights);
+    HU_BTH_LOG_FIELD(emotions_promoted);
+    HU_BTH_LOG_FIELD(events_extracted);
+    HU_BTH_LOG_FIELD(mood_contexts_built);
+    HU_BTH_LOG_FIELD(silence_checkins);
+    HU_BTH_LOG_FIELD(event_followups);
+    HU_BTH_LOG_FIELD(starters_built);
+    HU_BTH_LOG_FIELD(typos_applied);
+    HU_BTH_LOG_FIELD(corrections_sent);
+    HU_BTH_LOG_FIELD(thinking_responses);
+    HU_BTH_LOG_FIELD(double_texts);
+    HU_BTH_LOG_FIELD(callbacks_triggered);
+    HU_BTH_LOG_FIELD(reactions_sent);
+    HU_BTH_LOG_FIELD(link_contexts);
+    HU_BTH_LOG_FIELD(attachment_contexts);
+    HU_BTH_LOG_FIELD(ab_evaluations);
+    HU_BTH_LOG_FIELD(ab_alternates_chosen);
+    HU_BTH_LOG_FIELD(replay_analyses);
+    HU_BTH_LOG_FIELD(egraph_contexts);
+    HU_BTH_LOG_FIELD(vision_descriptions);
+    HU_BTH_LOG_FIELD(skills_applied);
+    HU_BTH_LOG_FIELD(skills_evolved);
+    HU_BTH_LOG_FIELD(skills_retired);
+    HU_BTH_LOG_FIELD(reflections_daily);
+    HU_BTH_LOG_FIELD(reflections_weekly);
+    HU_BTH_LOG_FIELD(total_turns);
+    HU_BTH_LOG_FIELD(cognition_fast_turns);
+    HU_BTH_LOG_FIELD(cognition_slow_turns);
+    HU_BTH_LOG_FIELD(cognition_emotional_turns);
+    HU_BTH_LOG_FIELD(metacog_interventions);
+    HU_BTH_LOG_FIELD(metacog_regens);
+    HU_BTH_LOG_FIELD(metacog_difficulty_easy);
+    HU_BTH_LOG_FIELD(metacog_difficulty_medium);
+    HU_BTH_LOG_FIELD(metacog_difficulty_hard);
+    HU_BTH_LOG_FIELD(metacog_hysteresis_suppressed);
+    HU_BTH_LOG_FIELD(episodic_patterns_stored);
+    HU_BTH_LOG_FIELD(episodic_replays);
+    HU_BTH_LOG_FIELD(skill_routes_semantic);
+    HU_BTH_LOG_FIELD(skill_routes_blended);
+    HU_BTH_LOG_FIELD(skill_routes_embedded);
+    HU_BTH_LOG_FIELD(evolving_outcomes);
 }
+
+#undef HU_BTH_LOG_FIELD
 
 #define HU_BTH_SUMMARY_LINE(field, name) \
     do { \
@@ -86,8 +77,7 @@ char *hu_bth_metrics_summary(hu_allocator_t *alloc, const hu_bth_metrics_t *m, s
     if (!alloc || !alloc->alloc || !m || !out_len)
         return NULL;
 
-    /* Estimate size: ~25 fields * ~30 chars = 750, round to 1024 */
-    size_t cap = 1024;
+    size_t cap = 3072;
     char *buf = (char *)alloc->alloc(alloc->ctx, cap);
     if (!buf)
         return NULL;
@@ -119,11 +109,25 @@ char *hu_bth_metrics_summary(hu_allocator_t *alloc, const hu_bth_metrics_t *m, s
     HU_BTH_SUMMARY_LINE(skills_applied, "skills_applied");
     HU_BTH_SUMMARY_LINE(skills_evolved, "skills_evolved");
     HU_BTH_SUMMARY_LINE(skills_retired, "skills_retired");
-    HU_BTH_SUMMARY_LINE(skill_routes_embedded, "skill_routes_embedded");
     HU_BTH_SUMMARY_LINE(reflections_daily, "reflections_daily");
     HU_BTH_SUMMARY_LINE(reflections_weekly, "reflections_weekly");
     HU_BTH_SUMMARY_LINE(total_turns, "total_turns");
+    HU_BTH_SUMMARY_LINE(cognition_fast_turns, "cognition_fast_turns");
+    HU_BTH_SUMMARY_LINE(cognition_slow_turns, "cognition_slow_turns");
+    HU_BTH_SUMMARY_LINE(cognition_emotional_turns, "cognition_emotional_turns");
+    HU_BTH_SUMMARY_LINE(metacog_interventions, "metacog_interventions");
+    HU_BTH_SUMMARY_LINE(metacog_regens, "metacog_regens");
+    HU_BTH_SUMMARY_LINE(metacog_difficulty_easy, "metacog_difficulty_easy");
+    HU_BTH_SUMMARY_LINE(metacog_difficulty_medium, "metacog_difficulty_medium");
+    HU_BTH_SUMMARY_LINE(metacog_difficulty_hard, "metacog_difficulty_hard");
+    HU_BTH_SUMMARY_LINE(metacog_hysteresis_suppressed, "metacog_hysteresis_suppressed");
+    HU_BTH_SUMMARY_LINE(episodic_patterns_stored, "episodic_patterns_stored");
+    HU_BTH_SUMMARY_LINE(episodic_replays, "episodic_replays");
+    HU_BTH_SUMMARY_LINE(skill_routes_semantic, "skill_routes_semantic");
+    HU_BTH_SUMMARY_LINE(skill_routes_blended, "skill_routes_blended");
+    HU_BTH_SUMMARY_LINE(skill_routes_embedded, "skill_routes_embedded");
+    HU_BTH_SUMMARY_LINE(evolving_outcomes, "evolving_outcomes");
 
-    *out_len = cap; /* must match allocation size for free() */
+    *out_len = cap;
     return buf;
 }

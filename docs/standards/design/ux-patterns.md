@@ -221,6 +221,58 @@ Rules:
 - Controls anchored at top
 - Color-coded log levels using semantic tokens
 
+### 2.7 Scroll Narrative (Cinematic)
+
+**Used by**: Marketing site homepage, feature pages, about page
+
+```
+┌─────────────────────────────────────┐
+│  Floating Nav (glass, persistent)   │  ← position: fixed, --hu-glass-subtle
+├─────────────────────────────────────┤
+│                                     │
+│  Chapter 1.0 — [Title]             │  ← min-height: 100vh
+│  Scroll-scrubbed content reveal     │
+│                                     │
+├─────────────────────────────────────┤
+│                                     │
+│  Chapter 2.0 — [Title]             │  ← min-height: 100vh
+│  Data cascade / product scrub       │
+│                                     │
+├─────────────────────────────────────┤
+│  ...chapters continue...            │
+└─────────────────────────────────────┘
+```
+
+Rules:
+
+- Each chapter occupies minimum 100vh (one full viewport)
+- Chapters are self-contained: one idea per chapter (Apple principle)
+- Chapter numbers are large, muted editorial labels (`--hu-text-hero` at 8% opacity)
+- Content within chapters is scroll-position-driven (blur → sharp, scale, translate)
+- Navigation: floating glass pill with chapter dots (like iOS page indicators)
+- Skip navigation link at top for screen readers (`Skip to chapter N`)
+- Chapters load lazily (`content-visibility: auto` for off-screen chapters)
+- Reduced motion: all chapters visible immediately, no scroll-driven animation
+- Maximum 7 chapters per page (cognitive load limit)
+
+Scroll-driven patterns within chapters:
+
+| Pattern           | Description                            | Trigger                         |
+| ----------------- | -------------------------------------- | ------------------------------- |
+| Chapter Reveal    | Blur-to-sharp + scale + translate      | `animation-timeline: view()`      |
+| Product Scrub     | Screenshot transitions between states  | Scroll position within chapter  |
+| Data Cascade      | Chart data builds progressively        | Viewport entry                  |
+| Metric Counter    | Numbers count up from 0                | IntersectionObserver            |
+| Connection Draw   | Lines draw between related elements    | Scroll position                 |
+| Parallax Depth    | Background layers at different rates   | `scroll-timeline`               |
+
+Anti-patterns:
+
+- Never hijack scroll behavior (wheel events must scroll naturally)
+- Never prevent scrolling past a chapter (no scroll-lock gates)
+- Never auto-scroll to chapter boundaries (user controls pace)
+- Never use horizontal scroll within chapters
+
 ---
 
 ## 3. Component Interaction Patterns
@@ -345,6 +397,42 @@ Every interaction type has an explicit latency budget, measured and enforced.
 | View transition complete     | < 200ms          | View Transitions API timing     |
 | Search results populated     | < 100ms          | Playwright + performance.mark() |
 | Command palette response     | < 80ms           | Playwright + performance.mark() |
+
+### 3.8 Pointer Proximity Interactions
+
+Beyond hover states — elements respond to cursor proximity, creating an environment where
+the cursor is an instrument, not just a selector.
+
+#### Proximity Response Tiers
+
+| Distance      | Response   | Visual                                                |
+| ------------- | ---------- | ----------------------------------------------------- |
+| > 200px       | None       | Default state                                         |
+| 100–200px     | Awareness  | Subtle glow appears, border brightens                 |
+| 50–100px      | Attention  | Card tilts slightly toward cursor, glow intensifies   |
+| < 50px        | Engagement | Full hover state + 3D tilt + proximity glow at peak   |
+| Direct hover  | Active     | Standard hover treatment + spring animation         |
+
+#### Implementation Pattern
+
+Proximity detection via JavaScript sets CSS custom properties:
+
+- `--hu-proximity`: 0 (far) to 1 (touching)
+- `--hu-pointer-x`: horizontal offset from element center
+- `--hu-pointer-y`: vertical offset from element center
+
+CSS consumes these properties for visual response (no JS animation loop needed for the visual
+treatment — only the property calculation runs in JS).
+
+#### Rules
+
+- Detection radius: `--hu-pointer-proximity-radius` (200px default)
+- Maximum simultaneous tracked elements: 20 (performance)
+- Use IntersectionObserver to only track visible elements
+- Touch devices: proximity detection disabled (no pointer position)
+- Keyboard navigation: proximity effects do not apply; standard focus styles used
+- Reduced motion: proximity detection disabled entirely
+- Performance: use `requestAnimationFrame` for pointer tracking, throttle to 60fps
 
 ---
 

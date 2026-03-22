@@ -87,6 +87,55 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
         hu_json_get_number(obj, "context_compact_target", cfg->agent.context_compact_target);
     if (cct > 0.0 && cct <= 1.0)
         cfg->agent.context_compact_target = (float)cct;
+
+    hu_json_value_t *mc_obj = hu_json_object_get(obj, "metacognition");
+    if (mc_obj && mc_obj->type == HU_JSON_OBJECT) {
+        hu_metacog_settings_t *m = &cfg->agent.metacognition;
+        m->enabled = hu_json_get_bool(mc_obj, "enabled", m->enabled);
+        double x;
+        x = hu_json_get_number(mc_obj, "confidence_threshold", m->confidence_threshold);
+        if (x >= 0.0 && x <= 1.0)
+            m->confidence_threshold = (float)x;
+        x = hu_json_get_number(mc_obj, "coherence_threshold", m->coherence_threshold);
+        if (x >= 0.0 && x <= 1.0)
+            m->coherence_threshold = (float)x;
+        x = hu_json_get_number(mc_obj, "repetition_threshold", m->repetition_threshold);
+        if (x >= 0.0 && x <= 1.0)
+            m->repetition_threshold = (float)x;
+        double mr = hu_json_get_number(mc_obj, "max_reflects", m->max_reflects);
+        if (mr >= 0.0 && mr <= 100.0)
+            m->max_reflects = (uint32_t)mr;
+        double mg = hu_json_get_number(mc_obj, "max_regen", m->max_regen);
+        if (mg >= 0.0 && mg <= 32.0)
+            m->max_regen = (uint32_t)mg;
+        double hm = hu_json_get_number(mc_obj, "hysteresis_min", m->hysteresis_min);
+        if (hm >= 1.0 && hm <= 20.0)
+            m->hysteresis_min = (uint32_t)hm;
+        m->use_calibrated_risk =
+            hu_json_get_bool(mc_obj, "use_calibrated_risk", m->use_calibrated_risk);
+        x = hu_json_get_number(mc_obj, "risk_high_threshold", m->risk_high_threshold);
+        if (x >= 0.0 && x <= 1.0)
+            m->risk_high_threshold = (float)x;
+        x = hu_json_get_number(mc_obj, "w_low_confidence", m->w_low_confidence);
+        if (x >= 0.0 && x <= 10.0)
+            m->w_low_confidence = (float)x;
+        x = hu_json_get_number(mc_obj, "w_low_coherence", m->w_low_coherence);
+        if (x >= 0.0 && x <= 10.0)
+            m->w_low_coherence = (float)x;
+        x = hu_json_get_number(mc_obj, "w_repetition", m->w_repetition);
+        if (x >= 0.0 && x <= 10.0)
+            m->w_repetition = (float)x;
+        x = hu_json_get_number(mc_obj, "w_stuck", m->w_stuck);
+        if (x >= 0.0 && x <= 10.0)
+            m->w_stuck = (float)x;
+        x = hu_json_get_number(mc_obj, "w_low_satisfaction", m->w_low_satisfaction);
+        if (x >= 0.0 && x <= 10.0)
+            m->w_low_satisfaction = (float)x;
+        x = hu_json_get_number(mc_obj, "w_low_trajectory", m->w_low_trajectory);
+        if (x >= 0.0 && x <= 10.0)
+            m->w_low_trajectory = (float)x;
+    }
+
     const char *persona = hu_json_get_string(obj, "persona");
     if (persona) {
         if (cfg->agent.persona)

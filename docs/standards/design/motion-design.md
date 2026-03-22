@@ -673,6 +673,7 @@ Rules:
 ## 8. Platform Innovation Patterns
 
 CSS features for competitive advantage. Adopt when browser support reaches ~90%+.
+Subsections 8.4–8.6 define the **Quiet Mastery** maximum motion design system: pointer-responsive motion, optional audio-reactive motion, and ambient intelligence motion.
 
 ### 8.1 `@starting-style`
 
@@ -706,6 +707,139 @@ Replace custom JS popover logic when browser support permits.
 
 CSS-native element positioning relative to trigger elements.
 Eliminates JS positioning logic for tooltips, dropdowns, and context menus.
+
+### 8.4 Pointer-Responsive Motion
+
+Elements respond to cursor proximity, not just hover state. This creates an environment
+where the user's cursor is an instrument, not just a selector.
+
+#### Proximity Detection
+
+```css
+/* Applied via JavaScript; consumed by CSS custom properties */
+/* --hu-proximity: 0 (far) to 1 (touching) */
+/* --hu-pointer-x: offset from element center */
+/* --hu-pointer-y: offset from element center */
+```
+
+| Token | Value | Purpose |
+|-------|-------|---------|
+| `--hu-pointer-proximity-radius` | `200px` | Detection radius around element |
+| `--hu-pointer-tilt-factor` | `0.02` | Perspective tilt multiplier (deg per px) |
+| `--hu-pointer-glow-radius` | `200px` | Glow spread following cursor |
+| `--hu-pointer-glow-intensity` | `0.06` | Glow opacity at peak proximity |
+| `--hu-pointer-magnetic-strength` | `8px` | Magnetic pull for small targets |
+
+#### Magnetic Elements
+
+Small interactive targets (icon buttons, toggles) subtly pull toward the cursor when within
+magnetic range. This increases effective target size without visual growth.
+
+Rules:
+
+- Magnetic effect only on elements ≤ 48px
+- Maximum displacement: `--hu-pointer-magnetic-strength` (8px)
+- Spring-based return to rest: `--hu-spring-micro`
+- Disabled on touch devices (no pointer position available)
+- Disabled under `prefers-reduced-motion: reduce`
+
+#### Perspective Tilt
+
+Cards and panels tilt subtly toward the cursor, creating 3D depth perception:
+
+```css
+.hu-proximity-card {
+  transform: perspective(var(--hu-3d-perspective, 1200px))
+    rotateY(calc(var(--hu-pointer-x, 0px) * var(--hu-pointer-tilt-factor)))
+    rotateX(calc(var(--hu-pointer-y, 0px) * calc(-1 * var(--hu-pointer-tilt-factor))));
+  transition: transform var(--hu-duration-fast) var(--hu-spring-standard);
+}
+```
+
+Rules:
+
+- Maximum tilt: 8 degrees in any direction (text readability constraint)
+- Perspective origin follows pointer position
+- Tilt uses spring physics for natural settle
+- Disabled under `prefers-reduced-motion: reduce`
+- Never apply to text-heavy content (settings, logs, conversation views)
+
+### 8.5 Audio-Reactive Motion
+
+Optional audio layer that connects sound to visual motion. Always opt-in, never autoplay.
+
+#### Audio Tokens
+
+| Token | Value | Purpose |
+|-------|-------|---------|
+| `--hu-audio-enabled` | `false` | Global audio toggle (CSS custom property) |
+| `--hu-audio-volume` | `0.3` | Default volume (30%) |
+| `--hu-audio-fade-duration` | `500ms` | Crossfade between audio states |
+
+#### Audio-Visual Connections
+
+| Sound Event | Visual Response | Trigger |
+|------------|----------------|---------|
+| Ambient pad | Subtle gradient drift | Background loop (when enabled) |
+| Click tone | Button press squash | Primary CTA activation |
+| Success chime | Status dot glow pulse | Operation completion |
+| Error tone | Error border flash | Validation failure |
+| Transition whoosh | View slide direction | Route change |
+
+Rules:
+
+- Audio is ALWAYS muted by default. User must explicitly enable.
+- Use Web Audio API for spatial positioning and real-time processing
+- Audio toggle: floating speaker icon, bottom-right, website only
+- All audio disabled under `prefers-reduced-motion: reduce`
+- Audio files: ≤ 50KB each, MP3 format, lazy-loaded
+- No audio in the dashboard (productivity context — silence is respect)
+- Mobile: audio disabled by default (battery, context)
+
+### 8.6 Ambient Intelligence Motion
+
+Subtle environmental motion that makes the UI feel alive without demanding attention. The
+goal: noticed subconsciously, never consciously.
+
+#### Ambient Patterns
+
+| Pattern | Trigger | Response | CPU Budget |
+|---------|---------|----------|------------|
+| Gradient Response | Pointer position | Background gradient shifts hue ±5° | < 0.5% |
+| Status Breathing | System health | Dot pulse rate: healthy=3s, warning=1.5s, error=0.75s | < 0.1% |
+| Time-Aware Warmth | Time of day | Color temperature: cool blue morning → warm amber evening | 0% (CSS) |
+| Scroll Depth Blur | Scroll position | Glass blur density increases 1px per 200px scrolled | Compositor |
+| Idle Drift | No interaction 30s | Particles drift, ambient glow pulses gently | < 0.3% |
+| Particle Float | Always (when enabled) | WebGL particles drift slowly in Brownian motion | < 0.5% |
+
+#### Time-Aware Theming
+
+```css
+/* Implemented via JavaScript setting --hu-time-warmth at intervals */
+/* Morning (6-10): cool (0.0), Day (10-16): neutral (0.5), Evening (16-22): warm (1.0), Night: neutral */
+
+:root {
+  --hu-ambient-warmth: 0.5; /* Set by JS based on time */
+}
+
+.hu-ambient-bg {
+  background-color: color-mix(
+    in oklch,
+    var(--hu-bg) calc(100% - var(--hu-ambient-warmth) * 3%),
+    var(--hu-ambient-glow-warm) calc(var(--hu-ambient-warmth) * 3%)
+  );
+}
+```
+
+#### Rules
+
+- ALL ambient effects disabled under `prefers-reduced-motion: reduce`
+- ALL ambient effects disabled on mobile devices (battery preservation)
+- Combined CPU budget: < 2% across all ambient effects
+- Individual effect changes must be imperceptible — only cumulative effect is felt
+- Time-aware theming shift: maximum 3% color mix (subliminal, not visible)
+- Ambient effects never interfere with content readability or interaction
+- Idle drift resets on any user interaction (touch, key, pointer)
 
 ---
 

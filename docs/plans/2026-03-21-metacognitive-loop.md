@@ -1,7 +1,18 @@
 ---
 title: "Metacognitive control loop: self-monitoring and adaptive strategy switching"
 created: 2026-03-21
-status: proposed
+status: in-progress
+---
+
+## V2 (2026-03-21) — shipped in tree
+
+- **Pre-turn difficulty** via `hu_metacog_estimate_difficulty()` (heuristic; bumps `turn_thinking_budget` on HARD when already non-zero).
+- **Extended signals**: `stuck_score`, `satisfaction_proxy`, `trajectory_confidence` (decay-weighted ring composite).
+- **Trend + hysteresis**: `hu_metacog_compute_trend()`; costly actions require `hysteresis_min` consecutive breaches (immediate `SIMPLIFY` for repetition / token_efficiency).
+- **Bounded re-entry**: up to `max_regen` extra `provider.chat` calls with `[METACOGNITION]` system suffix (`hu_metacognition_apply`).
+- **SQLite flywheel**: `metacog_history` rows + `hu_metacog_label_from_followup()` updates `outcome_proxy` on the next user message (`pending_outcome_trace_id`).
+- **BTH**: `metacog_regens`, `metacog_difficulty_*`, `metacog_hysteresis_suppressed`.
+
 ---
 
 # Metacognitive control loop: self-monitoring and adaptive strategy switching

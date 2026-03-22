@@ -63,14 +63,40 @@ class PcmPullProcessor extends AudioWorkletProcessor {
 registerProcessor("pcm-pull", PcmPullProcessor);
 `;
 
+const IDLE_DISPOSE_MS = 60_000;
+
 export class AudioPlaybackEngine {
   readonly sampleRate: number;
   #ctx: AudioContext | null = null;
   #node: AudioWorkletNode | null = null;
   #onPlaybackEnd: (() => void) | null = null;
+  #idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(sampleRate = 24000) {
     this.sampleRate = sampleRate;
+  }
+
+  #resetIdleTimer(): void {
+    if (this.#idleTimer) clearTimeout(this.#idleTimer);
+    this.#idleTimer = null;
+  }
+
+  #scheduleIdleDispose(): void {
+    this.#resetIdleTimer();
+    this.#idleTimer = setTimeout(() => {
+      this.#teardownAudio();
+    }, IDLE_DISPOSE_MS);
+  }
+
+  #teardownAudio(): void {
+    this.#resetIdleTimer();
+    this.#node?.port.postMessage({ type: "clear" });
+    this.#node?.disconnect();
+    this.#node = null;
+    if (this.#ctx && this.#ctx.state !== "closed") {
+      void this.#ctx.close();
+    }
+    this.#ctx = null;
   }
 
   setOnPlaybackEnd(cb: (() => void) | null): void {
@@ -100,6 +126,7 @@ export class AudioPlaybackEngine {
 
   /** Queue one PCM chunk (mono f32). Copies internally before posting to the worklet. */
   async pushChunk(pcm: Float32Array): Promise<void> {
+    this.#resetIdleTimer();
     await this.#ensureAudio();
     if (!this.#node) return;
     const copy = pcm.slice();
@@ -110,12 +137,14 @@ export class AudioPlaybackEngine {
   /** Signal that no further chunks will arrive; fires onPlaybackEnd once the buffer drains. */
   markEndOfStream(): void {
     this.#node?.port.postMessage({ type: "end" });
+    this.#scheduleIdleDispose();
   }
 
   /** Drop queued audio and suspend the context. */
   interrupt(): void {
     this.#node?.port.postMessage({ type: "clear" });
     void this.#ctx?.suspend();
+    this.#scheduleIdleDispose();
   }
 
   get isPlaying(): boolean {
@@ -123,13 +152,7 @@ export class AudioPlaybackEngine {
   }
 
   dispose(): void {
-    this.#node?.port.postMessage({ type: "clear" });
-    this.#node?.disconnect();
-    this.#node = null;
-    if (this.#ctx && this.#ctx.state !== "closed") {
-      void this.#ctx.close();
-    }
-    this.#ctx = null;
+    this.#teardownAudio();
     this.#onPlaybackEnd = null;
   }
 }

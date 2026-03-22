@@ -4,6 +4,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/provider.h"
+#include "human/tool.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -16,11 +17,14 @@ typedef struct hu_mcts_config {
     hu_provider_t *provider;  /* optional: NULL = use heuristics */
     const char *model;
     size_t model_len;
+    hu_tool_t *tools;       /* optional: names included in expansion prompt */
+    size_t tools_count;
 } hu_mcts_config_t;
 
 typedef struct hu_mcts_node {
     char action[512];
     size_t action_len;
+    char state_summary[256]; /* cumulative path context after this action */
     double total_value;
     int visit_count;
     int parent_idx;       /* index into nodes array, -1 for root */
@@ -50,5 +54,15 @@ void hu_mcts_result_free_path(hu_allocator_t *alloc, hu_mcts_result_t *result);
 hu_error_t hu_mcts_plan(hu_allocator_t *alloc, const char *goal, size_t goal_len,
                        const char *context, size_t context_len,
                        const hu_mcts_config_t *config, hu_mcts_result_t *result);
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+/* Build expansion system + user prompts as production would (no provider call). */
+hu_error_t hu_mcts_test_format_expand_prompts(const char *goal, size_t goal_len, int depth,
+                                              int parent_idx, const hu_mcts_node_t *nodes,
+                                              const hu_mcts_config_t *config, char *system_out,
+                                              size_t system_cap, size_t *system_len_out,
+                                              char *prompt_out, size_t prompt_cap,
+                                              size_t *prompt_len_out);
+#endif
 
 #endif

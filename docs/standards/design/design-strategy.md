@@ -208,6 +208,111 @@ CSS classes: `.hu-glass-enter` (reveal), `.hu-glass-exit` (dismiss).
 - Token source: `design-tokens/glass.tokens.json`
 - Visual demo: `docs/design-system-demo.html`
 
+## 3D & Spatial Depth
+
+Human's 3D system adds physical depth beyond glass blur. Three.js for marketing WebGL;
+CSS `perspective` and `transform` for dashboard card interactions.
+
+### 3D Tokens
+
+| Token | Value | Purpose |
+|-------|-------|---------|
+| `--hu-3d-perspective` | `1200px` | Default perspective distance for card containers |
+| `--hu-3d-card-tilt-max` | `8deg` | Maximum card tilt on pointer interaction |
+| `--hu-3d-depth-scale-near` | `1.0` | Scale for foreground elements |
+| `--hu-3d-depth-scale-far` | `0.95` | Scale for background elements |
+| `--hu-3d-dof-near-blur` | `0px` | Depth-of-field: no blur for near content |
+| `--hu-3d-dof-mid-blur` | `2px` | Depth-of-field: slight blur for mid-ground |
+| `--hu-3d-dof-far-blur` | `6px` | Depth-of-field: stronger blur for background |
+| `--hu-3d-grain-opacity` | `0.005` | Film grain overlay strength (texture, not noise) |
+
+### WebGL Performance Budget
+
+| Metric | Budget |
+|--------|--------|
+| Particle count | ≤ 5000 |
+| Frame rate | 60fps steady-state |
+| Load timing | After first contentful paint |
+| Bundle impact | < 50KB gzipped (tree-shaken Three.js) |
+| Canvas CLS | 0.00 (explicit dimensions) |
+| Tab-hidden | Animation loop suspended |
+
+### Rules
+
+- WebGL is marketing-site only; dashboard uses CSS-only 3D
+- Always provide CSS gradient mesh fallback for no-WebGL browsers
+- Film grain via CSS pseudo-element, not WebGL (simpler, compositable)
+- 3D tilt disabled under `prefers-reduced-motion: reduce`
+- Maximum tilt 8deg — text must remain readable at all angles
+
+## Ambient Intelligence
+
+Subtle environmental responsiveness that makes the UI feel alive without demanding attention.
+Changes are imperceptible individually; the cumulative effect is "the interface breathes."
+
+### Ambient Color Tokens
+
+| Token | Value | Purpose |
+|-------|-------|---------|
+| `--hu-ambient-glow` | `radial-gradient(ellipse, rgba(122,182,72,0.03), transparent)` | Subtle background life |
+| `--hu-ambient-glow-warm` | `radial-gradient(ellipse, rgba(182,156,72,0.02), transparent)` | Secondary warm ambient glow |
+| `--hu-ambient-warmth` | `0.5` | Time-aware warmth (0=cool, 1=warm) — set by JS |
+
+### Pointer Proximity Tokens
+
+| Token | Value | Purpose |
+|-------|-------|---------|
+| `--hu-pointer-proximity-radius` | `200px` | Detection radius around element |
+| `--hu-pointer-tilt-factor` | `0.02` | Perspective tilt deg per px offset |
+| `--hu-pointer-glow-radius` | `200px` | Glow spread following cursor |
+| `--hu-pointer-glow-intensity` | `0.06` | Glow opacity at peak proximity |
+| `--hu-pointer-magnetic-strength` | `8px` | Magnetic pull for small targets |
+| `--hu-particle-primary` | `rgba(122,182,72,0.15)` | Particle/mesh dot color |
+| `--hu-particle-secondary` | `rgba(122,182,72,0.08)` | Distant particle color |
+| `--hu-pointer-glow` | `radial-gradient(200px, rgba(122,182,72,0.06), transparent)` | Pointer proximity glow |
+
+### Ambient Motion Budget
+
+| Effect | CPU Budget | Scope |
+|--------|-----------|-------|
+| Gradient response | < 0.5% | Pointer proximity |
+| Status breathing | < 0.1% | Status indicators |
+| Time-aware warmth | 0% (CSS only) | Background tint |
+| Scroll depth blur | Compositor thread | Glass blur |
+| Idle drift | < 0.3% | Particles |
+| Particle float | < 0.5% | WebGL particles |
+| **Combined** | **< 2.0%** | **All ambient** |
+
+### Rules
+
+- ALL ambient effects disabled under `prefers-reduced-motion: reduce`
+- ALL ambient effects disabled on mobile (battery preservation)
+- Time-aware theming: maximum 3% color mix (subliminal)
+- Idle drift resets on any user interaction
+- Pointer effects disabled on touch devices
+
+## Audio Design
+
+Optional multi-sensory layer. Muted by default. Always opt-in.
+
+### Audio Tokens
+
+| Token | Value | Purpose |
+|-------|-------|---------|
+| `--hu-audio-enabled` | `false` | Global audio toggle |
+| `--hu-audio-volume` | `0.3` | Default volume (30%) |
+| `--hu-audio-fade-duration` | `500ms` | Crossfade between states |
+
+### Rules
+
+- Audio is ALWAYS muted by default. No autoplay. No exceptions.
+- Toggle: floating speaker icon, bottom-right, website only
+- No audio in dashboard (productivity context = silence is respect)
+- Use Web Audio API for spatial positioning
+- Audio files: ≤ 50KB each, lazy-loaded
+- Disabled under `prefers-reduced-motion: reduce`
+- Disabled on mobile by default (battery, context)
+
 ## Data Visualization
 
 Chart colors use the `chart.*` token series from `data-viz.tokens.json`.
@@ -288,6 +393,9 @@ against. See `docs/competitive-benchmarks.md` for named competitors and scores.
 | C runtime binary       | N/A (Electron: 100MB+) | **< 1.5MB**    | C11 + LTO (competitors can't match)             |
 | C runtime startup      | N/A (Electron: 2-5s)   | **< 30ms**     | No VM, no GC, pure native (100x faster)         |
 | C runtime RSS          | N/A (Electron: 100MB+) | **< 6MB**      | Zero-allocation hot paths                       |
+| Motion quality score | 8–9 (Linear/Apple)     | **10**         | WebGL + scroll narrative + spring-everything     |
+| Visual craft score   | 8–9 (Linear/Stripe)    | **10**         | Pointer-responsive + ambient + cinematic depth   |
+| Innovation score     | 8–9 (Immersive Garden) | **10**         | Audio-reactive + 3D + pointer proximity          |
 
 ### Competitive Advantages Nobody Can Match
 
@@ -313,6 +421,10 @@ Every quarter, evaluate and adopt one emerging web platform feature before compe
 
 - Anchor Positioning API for contextual UI (Chrome 125+)
 - `scrollbar-color` and `scrollbar-width` for branded scrollbars
+- WebGL particle hero for marketing site (Three.js, lazy-loaded)
+- Pointer-responsive 3D cards across dashboard
+- Ambient intelligence layer (gradient response, time-aware warmth)
+- Audio-reactive optional layer for website
 
 ### Q3 2026
 

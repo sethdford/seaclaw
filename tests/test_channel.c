@@ -675,6 +675,10 @@ void run_channel_tests(void) {
     HU_RUN_TEST(test_maixcam_create_succeeds);
     HU_RUN_TEST(test_maixcam_send_in_test_mode);
 #endif
+#if HU_HAS_DISPATCH
+    HU_RUN_TEST(test_dispatch_create_succeeds);
+    HU_RUN_TEST(test_dispatch_send_in_test_mode);
+#endif
 #if HU_HAS_IMAP
     HU_RUN_TEST(test_imap_create_with_mock_config);
     HU_RUN_TEST(test_imap_send_stores_in_outbox);

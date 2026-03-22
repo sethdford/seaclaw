@@ -33,10 +33,12 @@ export class ScVoiceOrb extends LitElement {
       background: radial-gradient(circle, var(--hu-accent-subtle) 0%, transparent 70%);
       opacity: 0.4;
       pointer-events: none;
-      transition: opacity var(--hu-duration-normal) var(--hu-ease-out);
+      transition:
+        opacity var(--hu-duration-normal) var(--hu-ease-out),
+        transform var(--hu-duration-fast) var(--hu-ease-spring, ease-out);
       &.active {
-        opacity: 0.8;
-        animation: hu-glow-breathe 3s ease-in-out infinite; /* hu-lint-ok: ambient */
+        opacity: calc(0.6 + var(--_level, 0) * 0.4);
+        transform: translate(-50%, -60%) scale(calc(1 + var(--_level, 0) * 0.15));
       }
       &.speaking {
         background: radial-gradient(
@@ -47,17 +49,14 @@ export class ScVoiceOrb extends LitElement {
         opacity: 0.85;
         animation: hu-glow-speak 1.1s ease-in-out infinite; /* hu-lint-ok: ambient */
       }
-    }
-
-    @keyframes hu-glow-breathe {
-      0%,
-      100% {
-        opacity: 0.6;
-        transform: translate(-50%, -60%) scale(1);
-      }
-      50% {
-        opacity: 1;
-        transform: translate(-50%, -60%) scale(1.1);
+      &.processing {
+        background: radial-gradient(
+          circle,
+          color-mix(in srgb, var(--hu-accent-tertiary, var(--hu-accent)) 35%, transparent) 0%,
+          transparent 70%
+        );
+        opacity: 0.7;
+        animation: hu-glow-think 2.4s ease-in-out infinite; /* hu-lint-ok: ambient */
       }
     }
 
@@ -70,6 +69,18 @@ export class ScVoiceOrb extends LitElement {
       50% {
         opacity: 1;
         transform: translate(-50%, -60%) scale(1.06);
+      }
+    }
+
+    @keyframes hu-glow-think {
+      0%,
+      100% {
+        opacity: 0.5;
+        transform: translate(-50%, -60%) scale(0.97);
+      }
+      50% {
+        opacity: 0.8;
+        transform: translate(-50%, -60%) scale(1.03);
       }
     }
 
@@ -128,6 +139,26 @@ export class ScVoiceOrb extends LitElement {
         box-shadow: var(--hu-shadow-glow-accent);
         transform: translateY(-1px);
       }
+      &.speaking {
+        border-color: var(--hu-accent-secondary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--hu-accent-secondary) 20%, transparent);
+      }
+      &.processing {
+        border-color: var(--hu-accent-tertiary, var(--hu-accent));
+        box-shadow: 0 0 0 3px
+          color-mix(in srgb, var(--hu-accent-tertiary, var(--hu-accent)) 20%, transparent);
+        animation: hu-btn-think-pulse 2.4s ease-in-out infinite; /* hu-lint-ok: ambient */
+      }
+    }
+
+    @keyframes hu-btn-think-pulse {
+      0%,
+      100% {
+        opacity: 0.7;
+      }
+      50% {
+        opacity: 1;
+      }
     }
 
     .mic-ring {
@@ -144,15 +175,28 @@ export class ScVoiceOrb extends LitElement {
     }
 
     .mic-ring.active {
-      animation: hu-ring-expand 2s ease-out infinite; /* hu-lint-ok: ambient */
+      animation: hu-ring-expand calc(1.4s + var(--_level, 0) * -0.6s) ease-out infinite; /* hu-lint-ok: ambient */
     }
 
     .mic-ring.ring-2.active {
-      animation-delay: 0.6s;
+      animation-delay: 0.5s;
     }
 
     .mic-ring.ring-3.active {
-      animation-delay: 1.2s;
+      animation-delay: 1s;
+    }
+
+    .mic-ring.processing {
+      border-color: var(--hu-accent-tertiary, var(--hu-accent));
+      animation: hu-ring-think 2.4s ease-in-out infinite; /* hu-lint-ok: ambient */
+    }
+
+    .mic-ring.ring-2.processing {
+      animation-delay: 0.8s;
+    }
+
+    .mic-ring.ring-3.processing {
+      animation-delay: 1.6s;
     }
 
     @keyframes hu-ring-expand {
@@ -161,8 +205,20 @@ export class ScVoiceOrb extends LitElement {
         opacity: 0.6;
       }
       100% {
-        transform: translate(-50%, -50%) scale(2.2);
+        transform: translate(-50%, -50%) scale(calc(1.8 + var(--_level, 0) * 0.8));
         opacity: 0;
+      }
+    }
+
+    @keyframes hu-ring-think {
+      0%,
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0;
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.35);
+        opacity: 0.3;
       }
     }
 
@@ -180,6 +236,11 @@ export class ScVoiceOrb extends LitElement {
       font-weight: var(--hu-weight-medium);
     }
 
+    .voice-status.speaking {
+      color: var(--hu-accent-secondary);
+      font-weight: var(--hu-weight-medium);
+    }
+
     @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
       .mic-btn {
         width: 4.5rem;
@@ -192,8 +253,15 @@ export class ScVoiceOrb extends LitElement {
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .mic-btn.active {
+      .mic-orb-glow,
+      .mic-ring,
+      .mic-btn {
         animation: none !important;
+        transition: none !important;
+      }
+      .mic-orb-glow.active {
+        opacity: 0.8;
+        transform: translate(-50%, -60%) scale(1);
       }
       .mic-btn.active {
         box-shadow: var(--hu-shadow-glow-accent);
@@ -226,20 +294,51 @@ export class ScVoiceOrb extends LitElement {
     }
   }
 
+  private get _buttonLabel(): string {
+    switch (this.state) {
+      case "listening":
+        return "Stop listening";
+      case "speaking":
+        return "Interrupt and speak";
+      case "processing":
+        return "Processing voice";
+      default:
+        return "Start listening";
+    }
+  }
+
   override render() {
     const isActive = this.state === "listening";
     const isSpeaking = this.state === "speaking";
+    const isProcessing = this.state === "processing";
+    const glowClass = isProcessing
+      ? "processing"
+      : isSpeaking
+        ? "speaking"
+        : isActive
+          ? "active"
+          : "";
+    const ringClass = isProcessing ? "processing" : isActive ? "active" : "";
+    const btnClass = isProcessing
+      ? "processing"
+      : isSpeaking
+        ? "speaking"
+        : isActive
+          ? "active"
+          : "";
+    const level = Math.min(1, Math.max(0, this.audioLevel));
     return html`
-      <div class="mic-orb-glow ${isSpeaking ? "speaking" : isActive ? "active" : ""}"></div>
+      <div class="mic-orb-glow ${glowClass}" style="--_level: ${level}"></div>
       <div class="mic-btn-wrap">
-        <div class="mic-ring ${isActive ? "active" : ""}"></div>
-        <div class="mic-ring ring-2 ${isActive ? "active" : ""}"></div>
-        <div class="mic-ring ring-3 ${isActive ? "active" : ""}"></div>
+        <div class="mic-ring ${ringClass}" style="--_level: ${level}"></div>
+        <div class="mic-ring ring-2 ${ringClass}" style="--_level: ${level}"></div>
+        <div class="mic-ring ring-3 ${ringClass}" style="--_level: ${level}"></div>
         <button
-          class="mic-btn ${isActive ? "active" : ""}"
+          class="mic-btn ${btnClass}"
           ?disabled=${this.disabled}
           @click=${this._handleClick}
-          aria-label=${isActive ? "Stop listening" : "Start listening"}
+          aria-label=${this._buttonLabel}
+          aria-busy=${isProcessing}
         >
           ${icons.mic}
         </button>

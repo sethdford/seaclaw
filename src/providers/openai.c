@@ -387,6 +387,11 @@ static hu_error_t openai_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
     if (err != HU_OK)
         return err;
 
+#ifndef HU_IS_TEST
+    if (getenv("HU_DEBUG_OPENAI_BODY"))
+        fprintf(stderr, "[openai_debug] body (%zu bytes): %.4096s\n", body_len, body);
+#endif
+
     const char *url = oc->base_url ? oc->base_url : HU_OPENAI_URL;
     size_t url_len = oc->base_url_len ? oc->base_url_len : HU_OPENAI_URL_LEN;
 

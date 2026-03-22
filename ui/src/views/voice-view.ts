@@ -205,6 +205,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   @state() private _sessionStartTs: number | null = null;
   @state() private _sessionDurationSec = 0;
   @state() private _speaking = false;
+  @state() private _audioLevel = 0;
   private _durationTimer: ReturnType<typeof setInterval> | null = null;
   private _recorder = new AudioRecorder();
   readonly #playback = new AudioPlaybackEngine(24000);
@@ -618,7 +619,12 @@ export class ScVoiceView extends GatewayAwareLitElement {
               /* socket closed */
             }
           },
-          { onLevel: (rms) => this.#silence.onLevel(rms) },
+          {
+            onLevel: (rms) => {
+              this._audioLevel = rms;
+              this.#silence.onLevel(rms);
+            },
+          },
         );
         this.#voiceStreaming = true;
         this.voiceStatus = "listening";
@@ -654,6 +660,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
   private async _stopRecording(): Promise<void> {
     if (this.voiceStatus !== "listening") return;
+    this._audioLevel = 0;
     const gw = this.gateway;
     if (!gw) {
       this._recorder.dispose();
@@ -844,6 +851,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
       <div class="controls-zone hu-scroll-reveal-stagger">
         <hu-voice-orb
           .state=${this._orbVisualState}
+          .audioLevel=${this._audioLevel}
           ?disabled=${micDisabled}
           @hu-voice-mic-toggle=${this.toggleMic}
         ></hu-voice-orb>

@@ -1,5 +1,6 @@
 import { LitElement, html, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { pointerProximity } from "../lib/pointer-proximity.js";
 
 export type CardSurface = "default" | "high" | "highest";
 
@@ -11,6 +12,8 @@ export class ScCard extends LitElement {
   @property({ type: Boolean }) elevated = false;
   @property({ type: Boolean }) glass = true;
   @property({ type: Boolean }) solid = false;
+  /** Enable 3D perspective tilt on pointer proximity. */
+  @property({ type: Boolean }) tilt = false;
   /** Tonal surface: default (container), high (interactive/elevated), highest (emphasis). */
   @property({ type: String }) surface: CardSurface = "default";
 
@@ -168,11 +171,40 @@ export class ScCard extends LitElement {
       outline-offset: var(--hu-focus-ring-offset);
     }
 
+    /* 3D perspective tilt — pointer proximity driven */
+    :host([tilt]) {
+      perspective: 1200px;
+    }
+    :host([tilt]) .card {
+      transform-style: preserve-3d;
+      transform:
+        rotateY(calc(var(--hu-pointer-x, 0px) * 0.02deg))
+        rotateX(calc(var(--hu-pointer-y, 0px) * -0.02deg));
+      transition: transform var(--hu-duration-fast) var(--hu-spring-out);
+    }
+    /* Pointer proximity glow overlay */
+    :host([tilt]) .card .proximity-glow {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      z-index: 1;
+      opacity: var(--hu-proximity, 0);
+      background: radial-gradient(
+        200px at calc(50% + var(--hu-pointer-x, 0px)) calc(50% + var(--hu-pointer-y, 0px)),
+        color-mix(in srgb, var(--hu-accent) 6%, transparent),
+        transparent
+      );
+      transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
+    }
+
     @media (prefers-reduced-motion: reduce) {
       :host([hoverable]),
-      :host([clickable]) {
+      :host([clickable]),
+      :host([tilt]) .card {
         transition: none !important;
         animation: none !important;
+        transform: none !important;
       }
     }
 
@@ -190,6 +222,28 @@ export class ScCard extends LitElement {
       }
     }
   `;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    if (this.tilt) {
+      pointerProximity.observe(this);
+    }
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    pointerProximity.unobserve(this);
+  }
+
+  override updated(changed: Map<string, unknown>): void {
+    if (changed.has("tilt")) {
+      if (this.tilt) {
+        pointerProximity.observe(this);
+      } else {
+        pointerProximity.unobserve(this);
+      }
+    }
+  }
 
   private _onKeyDown(e: KeyboardEvent): void {
     if (!this.clickable || (e.key !== "Enter" && e.key !== " ")) return;
@@ -224,6 +278,7 @@ export class ScCard extends LitElement {
         tabindex=${this.clickable ? 0 : undefined}
         @keydown=${this._onKeyDown}
       >
+        ${this.tilt ? html`<div class="proximity-glow"></div>` : ""}
         <slot></slot>
       </div>
     `;

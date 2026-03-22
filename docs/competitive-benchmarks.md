@@ -114,6 +114,13 @@ Human's targets vs industry best:
 | LCP                    | 0.8s (Linear)      | < 0.5s       |
 | CLS                    | ~0.02 (Stripe)     | 0.00         |
 | INP                    | ~80ms (Superhuman) | < 50ms       |
+| Motion quality          | 9 (Apple/Linear)   | 10           |
+| Visual craft            | 9 (Linear/Stripe)  | 10           |
+| Innovation              | 10 (Immersive)     | 10           |
+| Ambient intelligence    | 0 (none exist)     | 10           |
+| 3D/WebGL integration    | 8 (Immersive)      | 10           |
+| Pointer responsiveness  | 6 (basic hover)    | 10           |
+| Audio design            | 0 (none exist)     | 8            |
 | Accessibility          | 98 (Vercel)        | 100          |
 
 Human's lightweight C runtime and minimal UI stack (Lit, design tokens) position it to exceed these targets. The dashboard and marketing site are optimized for sub-500ms LCP and zero layout shift.
@@ -198,7 +205,26 @@ See `docs/standards/quality/award-criteria.md` for complete submission checklist
 - Website scroll-driven narrative sections with parallax
 - Dashboard Lighthouse audit — target 99+ performance
 - Flutter app: removed; native iOS, macOS, and Android are the mobile/desktop app surfaces
+- Quiet Mastery design system: standards updated, new spatial + ambient tokens shipped
+- WebGL particle hero implementation for marketing site (Three.js, lazy-loaded)
+- Pointer-responsive 3D cards across all dashboard views
+- Ambient intelligence layer: gradient response, time-aware warmth, status breathing
+- Audio-reactive optional layer for website (muted by default)
+- Scroll-driven chapter narrative for homepage
 - Schedule Q2 2026 quarterly review with updated scores
+
+## Q1 2026 Sprint 4: Quiet Mastery
+
+Design philosophy: Apple's editorial discipline + Pixar's emotional motion craft + Immersive Garden's technical ambition.
+
+- **Standards updated**: visual-standards.md, motion-design.md, ux-patterns.md, design-strategy.md all extended with 3D integration, pointer-responsive motion, ambient intelligence, audio-reactive patterns, scroll narrative archetype
+- **New token files**: `spatial.tokens.json` (3D perspective, pointer proximity, particle systems), `ambient.tokens.json` (ambient intelligence, time-aware theming, audio design)
+- **New design paradigms**: Cinematic scroll narratives (chapter-based), pointer proximity interactions (4-tier response), ambient intelligence (6 patterns with CPU budgets)
+- **"Better than Pixar" framework**: Emotional craft + software-native superpowers (responsiveness, personalization, accessibility)
+- **Quality target**: 70/70 scorecard (from 66/70)
+- **Award target**: Awwwards ≥ 8.5 average
+
+See `docs/plans/2026-03-22-sota-quiet-mastery-design.md` for the full design document.
 
 ## Related
 

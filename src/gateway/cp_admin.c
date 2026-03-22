@@ -601,6 +601,7 @@ hu_error_t cp_admin_nodes_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     return err;
 }
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
 static const char *cp_agent_status_wire(hu_agent_status_t st) {
     switch (st) {
     case HU_AGENT_RUNNING:
@@ -617,6 +618,7 @@ static const char *cp_agent_status_wire(hu_agent_status_t st) {
         return "unknown";
     }
 }
+#endif
 
 /* ── nodes.action (stub) ─────────────────────────────────────────────── */
 
@@ -645,6 +647,7 @@ hu_error_t cp_admin_agents_list(hu_allocator_t *alloc, hu_app_context_t *app, hu
     *out_len = 0;
 
 #if HU_IS_TEST
+    (void)app;
     static const char mock[] =
         "{\"agents\":[{\"name\":\"main\",\"status\":\"idle\",\"model\":\"claude-sonnet-4-20250514\","
         "\"turns\":0,\"uptime\":0}]}";
@@ -794,7 +797,7 @@ hu_error_t cp_admin_metrics_snapshot(hu_allocator_t *alloc, hu_app_context_t *ap
         hu_json_object_set(alloc, obj, "metrics", metrics_obj);
     }
 
-    /* bth: all 22 BTH counters */
+    /* bth: all hu_bth_metrics_t counters (struct order) */
     hu_json_value_t *bth_obj = hu_json_object_new(alloc);
     if (bth_obj) {
         const hu_bth_metrics_t *m =
@@ -816,6 +819,7 @@ hu_error_t cp_admin_metrics_snapshot(hu_allocator_t *alloc, hu_app_context_t *ap
         BTH_SET(typos_applied);
         BTH_SET(corrections_sent);
         BTH_SET(thinking_responses);
+        BTH_SET(double_texts);
         BTH_SET(callbacks_triggered);
         BTH_SET(reactions_sent);
         BTH_SET(link_contexts);
@@ -825,12 +829,27 @@ hu_error_t cp_admin_metrics_snapshot(hu_allocator_t *alloc, hu_app_context_t *ap
         BTH_SET(replay_analyses);
         BTH_SET(egraph_contexts);
         BTH_SET(vision_descriptions);
-        BTH_SET(total_turns);
         BTH_SET(skills_applied);
         BTH_SET(skills_evolved);
         BTH_SET(skills_retired);
-        BTH_SET(skill_routes_embedded);
         BTH_SET(reflections_daily);
+        BTH_SET(reflections_weekly);
+        BTH_SET(total_turns);
+        BTH_SET(cognition_fast_turns);
+        BTH_SET(cognition_slow_turns);
+        BTH_SET(cognition_emotional_turns);
+        BTH_SET(metacog_interventions);
+        BTH_SET(metacog_regens);
+        BTH_SET(metacog_difficulty_easy);
+        BTH_SET(metacog_difficulty_medium);
+        BTH_SET(metacog_difficulty_hard);
+        BTH_SET(metacog_hysteresis_suppressed);
+        BTH_SET(episodic_patterns_stored);
+        BTH_SET(episodic_replays);
+        BTH_SET(skill_routes_semantic);
+        BTH_SET(skill_routes_blended);
+        BTH_SET(skill_routes_embedded);
+        BTH_SET(evolving_outcomes);
 #undef BTH_SET
         hu_json_object_set(alloc, obj, "bth", bth_obj);
     }

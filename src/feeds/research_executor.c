@@ -82,6 +82,7 @@ hu_error_t hu_research_execute_safe(hu_allocator_t *alloc, sqlite3 *db,
         return HU_ERR_SECURITY_APPROVAL_REQUIRED;
 
 #ifdef HU_IS_TEST
+    (void)db;
     /* In test mode, just mark as executed. */
     ((hu_research_action_t *)action)->executed = true;
     ((hu_research_action_t *)action)->executed_at = (int64_t)time(NULL);

@@ -2,6 +2,7 @@
 #define HU_CONFIG_H
 
 #include "human/config_types.h"
+#include "human/cognition/metacognition.h"
 #include "human/core/allocator.h"
 #include "human/core/arena.h"
 #include "human/core/error.h"
@@ -116,6 +117,7 @@ typedef struct hu_agent_config {
     float context_pressure_warn;    /* warn at this ratio (default 0.85) */
     float context_pressure_compact; /* auto-compact at this ratio (default 0.95) */
     float context_compact_target;   /* compact until below this ratio (default 0.70) */
+    hu_metacog_settings_t metacognition; /* agent.metacognition in config.json */
 } hu_agent_config_t;
 
 typedef struct hu_policy_config {

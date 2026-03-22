@@ -620,6 +620,7 @@ set(HU_CORE_SOURCES
     src/mcp_server.c
     src/channels/thread_binding.c
     src/channels/format.c
+    src/channels/rate_limit.c
     src/security/policy_engine.c
     src/security/replay.c
     src/plugins/registry.c
@@ -1814,6 +1815,7 @@ set(HU_TEST_SOURCES
     tests/test_api_key.c
     tests/test_channel.c
     tests/test_channel_format.c
+    tests/test_channel_rate_limit.c
     tests/test_tool.c
     tests/test_peripheral.c
     tests/test_peripheral_ctrl.c

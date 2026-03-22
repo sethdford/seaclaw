@@ -76,14 +76,107 @@
   }
 }
 
+/* ─── Chapter reveal (Quiet Mastery) ─────────────────────────────
+   Cinematic blur-to-sharp + scale + translate for scroll narrative
+   chapters. Used on website marketing pages.
+─────────────────────────────────────────────────────────────────── */
+@supports (animation-timeline: view()) {
+  .hu-chapter-reveal {
+    animation: hu-chapter-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+
+  @keyframes hu-chapter-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(40px) scale(0.98);
+      filter: blur(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+}
+
+/* ─── Data cascade entrance ──────────────────────────────────────
+   Sequential data point reveal for chart/metric elements.
+─────────────────────────────────────────────────────────────────── */
+@supports (animation-timeline: view()) {
+  .hu-data-cascade > * {
+    animation: hu-data-point-enter linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 30%;
+  }
+
+  @keyframes hu-data-point-enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}
+
+/* ─── Connection draw (SVG stroke reveal) ────────────────────────
+   Lines between related elements draw on progressively.
+─────────────────────────────────────────────────────────────────── */
+@supports (animation-timeline: view()) {
+  .hu-connection-draw {
+    animation: hu-stroke-draw linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 50%;
+  }
+
+  @keyframes hu-stroke-draw {
+    from {
+      stroke-dashoffset: var(--hu-stroke-length, 1000);
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+}
+
+/* ─── Deep parallax (stronger than subtle) ───────────────────────
+   For WebGL backgrounds and hero imagery on marketing pages.
+─────────────────────────────────────────────────────────────────── */
+@supports (animation-timeline: scroll()) {
+  .hu-parallax-deep {
+    animation: hu-parallax-deep-shift linear both;
+    animation-timeline: scroll(nearest block);
+    animation-range: cover 0% cover 100%;
+  }
+
+  @keyframes hu-parallax-deep-shift {
+    from {
+      transform: translateY(-60px) scale(1.02);
+    }
+    to {
+      transform: translateY(60px) scale(0.98);
+    }
+  }
+}
+
 /* ─── Reduced motion: disable all scroll-driven animations ─────── */
 @media (prefers-reduced-motion: reduce) {
   .hu-scroll-reveal,
   .hu-scroll-reveal-stagger > *,
   .hu-scroll-progress,
-  .hu-parallax-subtle {
+  .hu-parallax-subtle,
+  .hu-chapter-reveal,
+  .hu-data-cascade > *,
+  .hu-connection-draw,
+  .hu-parallax-deep {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+    filter: none !important;
+    stroke-dashoffset: 0 !important;
   }
 }

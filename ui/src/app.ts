@@ -7,6 +7,8 @@ import { DemoGatewayClient } from "./demo-gateway.js";
 import { setGateway } from "./gateway-provider.js";
 import { AUTH_FAILED } from "./gateway-aware.js";
 import { dynamicLight } from "./lib/dynamic-light.js";
+import { pointerProximity } from "./lib/pointer-proximity.js";
+import { ambientIntelligence } from "./lib/ambient-intelligence.js";
 import { icons } from "./icons.js";
 import "./components/floating-mic.js";
 import "./components/sidebar.js";
@@ -543,7 +545,8 @@ export class ScApp extends LitElement {
     window.addEventListener("hashchange", this._hashHandler);
     this._onHashChange();
     dynamicLight.start();
-    this._initAmbientIntelligence();
+    pointerProximity.start();
+    ambientIntelligence.start();
 
     const wsUrl =
       typeof window !== "undefined" &&
@@ -647,6 +650,8 @@ export class ScApp extends LitElement {
     document.removeEventListener(AUTH_FAILED, this._authFailedHandler);
     window.removeEventListener("hashchange", this._hashHandler);
     dynamicLight.stop();
+    pointerProximity.stop();
+    ambientIntelligence.stop();
     if (this._fallbackTimer) {
       clearTimeout(this._fallbackTimer);
       this._fallbackTimer = null;
@@ -860,15 +865,9 @@ export class ScApp extends LitElement {
     localStorage.setItem(SIDEBAR_KEY, String(this.sidebarCollapsed));
   }
 
+  /** @deprecated Replaced by AmbientIntelligence module */
   private _initAmbientIntelligence(): void {
-    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReduced) return;
-    const hour = new Date().getHours();
-    let warmth = 0;
-    if (hour < 7 || hour > 19) warmth = 0.08;
-    else if (hour < 10 || hour > 17) warmth = 0.04;
-    document.documentElement.style.setProperty("--hu-ambient-warmth", `${warmth}`);
-    document.documentElement.style.setProperty("--hu-ambient-hour", `${hour}`);
+    ambientIntelligence.start();
   }
 
   private _switchToDemo(): void {

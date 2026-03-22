@@ -47,6 +47,7 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/cognition/metacognition.h"
 #include <math.h>
 #ifdef HU_ENABLE_SQLITE
+#include "human/cognition/db.h"
 #include "human/cognition/episodic.h"
 #include "human/cognition/evolving.h"
 #endif
@@ -817,19 +818,20 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     &memory_sh_ctx, &memory_sh_len) == HU_OK &&
                 memory_sh_ctx && memory_sh_len > 0) {
                 if (superhuman_ctx && superhuman_ctx_len > 0) {
-                    size_t merged_len = superhuman_ctx_len + 2 + strlen(memory_sh_ctx) + 1;
-                    char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, merged_len);
+                    size_t mem_sh_slen = strlen(memory_sh_ctx);
+                    size_t content_len = superhuman_ctx_len + 2 + mem_sh_slen;
+                    char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, content_len + 1);
                     if (merged) {
                         memcpy(merged, superhuman_ctx, superhuman_ctx_len);
                         merged[superhuman_ctx_len] = '\n';
                         merged[superhuman_ctx_len + 1] = '\n';
-                        memcpy(merged + superhuman_ctx_len + 2, memory_sh_ctx,
-                            strlen(memory_sh_ctx) + 1);
+                        memcpy(merged + superhuman_ctx_len + 2, memory_sh_ctx, mem_sh_slen);
+                        merged[content_len] = '\0';
                         agent->alloc->free(agent->alloc->ctx, superhuman_ctx,
-                            superhuman_ctx_len);
+                            superhuman_ctx_len + 1);
                         agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len);
                         superhuman_ctx = merged;
-                        superhuman_ctx_len = merged_len;
+                        superhuman_ctx_len = content_len;
                     } else {
                         agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len);
                     }
@@ -850,17 +852,17 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     &style_guidance, &style_guidance_len) == HU_OK &&
                 style_guidance && style_guidance_len > 0) {
                 if (superhuman_ctx && superhuman_ctx_len > 0) {
-                    size_t merged_len = superhuman_ctx_len + 1 + style_guidance_len + 1;
-                    char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, merged_len);
+                    size_t content_len = superhuman_ctx_len + 1 + style_guidance_len;
+                    char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, content_len + 1);
                     if (merged) {
                         memcpy(merged, superhuman_ctx, superhuman_ctx_len);
                         merged[superhuman_ctx_len] = '\n';
                         memcpy(merged + superhuman_ctx_len + 1, style_guidance, style_guidance_len);
-                        merged[merged_len - 1] = '\0';
-                        agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+                        merged[content_len] = '\0';
+                        agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
                         agent->alloc->free(agent->alloc->ctx, style_guidance, style_guidance_len + 1);
                         superhuman_ctx = merged;
-                        superhuman_ctx_len = merged_len;
+                        superhuman_ctx_len = content_len;
                     } else {
                         agent->alloc->free(agent->alloc->ctx, style_guidance, style_guidance_len + 1);
                     }
@@ -895,16 +897,16 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     if (nw > 0 && (size_t)nw < sizeof(line)) {
                         size_t line_len = (size_t)nw;
                         if (superhuman_ctx && superhuman_ctx_len > 0) {
-                            size_t merged_len = superhuman_ctx_len + 1 + line_len + 1;
-                            char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, merged_len);
+                            size_t content_len = superhuman_ctx_len + 1 + line_len;
+                            char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, content_len + 1);
                             if (merged) {
                                 memcpy(merged, superhuman_ctx, superhuman_ctx_len);
                                 merged[superhuman_ctx_len] = '\n';
                                 memcpy(merged + superhuman_ctx_len + 1, line, line_len);
-                                merged[merged_len - 1] = '\0';
-                                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+                                merged[content_len] = '\0';
+                                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
                                 superhuman_ctx = merged;
-                                superhuman_ctx_len = merged_len;
+                                superhuman_ctx_len = content_len;
                             }
                         } else {
                             char *dup = (char *)agent->alloc->alloc(agent->alloc->ctx, line_len + 1);
@@ -912,7 +914,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 memcpy(dup, line, line_len);
                                 dup[line_len] = '\0';
                                 superhuman_ctx = dup;
-                                superhuman_ctx_len = line_len + 1;
+                                superhuman_ctx_len = line_len;
                             }
                         }
                     }
@@ -1806,7 +1808,48 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     compact_cfg.max_history_messages = agent->max_history_messages;
     compact_cfg.token_limit = max_tokens;
 
+#ifdef HU_ENABLE_SQLITE
+    if (agent->metacognition.cfg.enabled && agent->cognition_db &&
+        agent->metacognition.pending_outcome_trace_id[0] != '\0') {
+        float ox = hu_metacog_label_from_followup(msg, msg_len);
+        (void)hu_metacog_history_update_outcome(agent->cognition_db,
+                                                 agent->metacognition.pending_outcome_trace_id, ox);
+        agent->metacognition.pending_outcome_trace_id[0] = '\0';
+    } else if (!agent->metacognition.cfg.enabled) {
+        agent->metacognition.pending_outcome_trace_id[0] = '\0';
+    }
+#endif
+
     hu_agent_internal_generate_trace_id(agent->trace_id);
+
+    agent->metacognition.regen_count = 0;
+    agent->metacognition.consecutive_bad_count = 0;
+    if (agent->metacognition.cfg.enabled) {
+        agent->metacognition.difficulty = hu_metacog_estimate_difficulty(msg, msg_len);
+        if (agent->bth_metrics) {
+            switch (agent->metacognition.difficulty) {
+            case HU_METACOG_DIFFICULTY_EASY:
+                agent->bth_metrics->metacog_difficulty_easy++;
+                break;
+            case HU_METACOG_DIFFICULTY_MEDIUM:
+                agent->bth_metrics->metacog_difficulty_medium++;
+                break;
+            case HU_METACOG_DIFFICULTY_HARD:
+                agent->bth_metrics->metacog_difficulty_hard++;
+                break;
+            default:
+                break;
+            }
+        }
+        if (agent->metacognition.difficulty == HU_METACOG_DIFFICULTY_HARD &&
+            agent->turn_thinking_budget > 0) {
+            int nb = (int)((double)agent->turn_thinking_budget * 1.25);
+            if (nb > agent->turn_thinking_budget) agent->turn_thinking_budget = nb;
+        }
+    } else {
+        agent->metacognition.difficulty = HU_METACOG_DIFFICULTY_EASY;
+    }
+
     clock_t turn_start = clock();
     uint64_t turn_tokens = 0;
     const char *prov_name = agent->provider.vtable->get_name
@@ -2355,6 +2398,155 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
 #endif
 
+                /* Metacognition: bounded re-entry (same provider) + SQLite history */
+                if (agent->metacognition.cfg.enabled) {
+                    const char *work_content = final_content;
+                    size_t work_len = final_len;
+                    uint64_t work_in = (uint64_t)resp.usage.prompt_tokens;
+                    uint64_t work_out = (uint64_t)resp.usage.completion_tokens;
+                    hu_metacog_action_t last_mc_act = HU_METACOG_ACTION_NONE;
+                    hu_metacognition_signal_t last_mc_sig;
+                    memset(&last_mc_sig, 0, sizeof(last_mc_sig));
+
+                    for (;;) {
+                        const char *prev_resp = NULL;
+                        size_t prev_resp_len = 0;
+                        if (agent->history_count > 0) {
+                            for (size_t hi = agent->history_count; hi > 0; hi--) {
+                                size_t idx = hi - 1;
+                                if (agent->history[idx].role == HU_ROLE_ASSISTANT &&
+                                    agent->history[idx].content && agent->history[idx].content_len > 0) {
+                                    prev_resp = agent->history[idx].content;
+                                    prev_resp_len = agent->history[idx].content_len;
+                                    break;
+                                }
+                            }
+                        }
+
+                        hu_metacognition_signal_t mc_sig = hu_metacognition_monitor(
+                            msg, msg_len, work_content, work_len, prev_resp, prev_resp_len,
+                            agent->emotional_cognition.confidence, work_in, work_out,
+                            &agent->metacognition);
+                        hu_metacog_action_t mc_act =
+                            hu_metacognition_plan_action(&agent->metacognition, &mc_sig);
+                        last_mc_sig = mc_sig;
+                        last_mc_act = mc_act;
+
+                        if (agent->bth_metrics && agent->metacognition.last_suppressed_hysteresis)
+                            agent->bth_metrics->metacog_hysteresis_suppressed++;
+
+                        if (mc_act == HU_METACOG_ACTION_NONE) break;
+
+                        if (agent->observer) {
+                            hu_observer_event_t mev = {.tag = HU_OBSERVER_EVENT_METACOG_ACTION};
+                            mev.data.metacog_action.action = hu_metacog_action_name(mc_act);
+                            mev.data.metacog_action.confidence = mc_sig.confidence;
+                            mev.data.metacog_action.coherence = mc_sig.coherence;
+                            HU_OBS_SAFE_RECORD_EVENT(agent, &mev);
+                        }
+                        if (agent->bth_metrics)
+                            agent->bth_metrics->metacog_interventions++;
+
+                        if (agent->metacognition.regen_count >= agent->metacognition.cfg.max_regen)
+                            break;
+
+                        char mod[512];
+                        size_t mod_len = 0;
+                        if (hu_metacognition_apply(mc_act, mod, sizeof(mod), &mod_len) != HU_OK)
+                            break;
+
+                        static const char sep[] = "\n\n[METACOGNITION]\n";
+                        size_t sep_len = sizeof(sep) - 1;
+                        size_t new_sl = system_prompt_len + sep_len + mod_len;
+                        char *new_sp = (char *)agent->alloc->alloc(agent->alloc->ctx, new_sl + 1);
+                        if (!new_sp) break;
+                        memcpy(new_sp, system_prompt, system_prompt_len);
+                        memcpy(new_sp + system_prompt_len, sep, sep_len);
+                        memcpy(new_sp + system_prompt_len + sep_len, mod, mod_len);
+                        new_sp[new_sl] = '\0';
+
+                        size_t total = msgs_count;
+                        hu_chat_message_t *mc_msgs = (hu_chat_message_t *)agent->alloc->alloc(
+                            agent->alloc->ctx, total * sizeof(hu_chat_message_t));
+                        if (!mc_msgs) {
+                            agent->alloc->free(agent->alloc->ctx, new_sp, new_sl + 1);
+                            break;
+                        }
+                        mc_msgs[0].role = HU_ROLE_SYSTEM;
+                        mc_msgs[0].content = new_sp;
+                        mc_msgs[0].content_len = new_sl;
+                        mc_msgs[0].name = NULL;
+                        mc_msgs[0].name_len = 0;
+                        mc_msgs[0].tool_call_id = NULL;
+                        mc_msgs[0].tool_call_id_len = 0;
+                        mc_msgs[0].content_parts = NULL;
+                        mc_msgs[0].content_parts_count = 0;
+                        for (size_t mi = 1; mi < total; mi++) mc_msgs[mi] = msgs[mi];
+
+                        hu_chat_request_t mc_req = req;
+                        mc_req.messages = mc_msgs;
+                        mc_req.messages_count = total;
+
+                        hu_chat_response_t mc_resp;
+                        memset(&mc_resp, 0, sizeof(mc_resp));
+                        hu_error_t mc_err = agent->provider.vtable->chat(
+                            agent->provider.ctx, agent->alloc, &mc_req, turn_model, turn_model_len,
+                            turn_temp, &mc_resp);
+
+                        agent->alloc->free(agent->alloc->ctx, new_sp, new_sl + 1);
+                        agent->alloc->free(agent->alloc->ctx, mc_msgs,
+                                            total * sizeof(hu_chat_message_t));
+
+                        if (mc_err != HU_OK || !mc_resp.content || mc_resp.content_len == 0) {
+                            hu_chat_response_free(agent->alloc, &mc_resp);
+                            break;
+                        }
+
+                        agent->total_tokens += mc_resp.usage.total_tokens;
+                        hu_agent_internal_record_cost(agent, &mc_resp.usage);
+                        turn_tokens += mc_resp.usage.total_tokens;
+                        work_in = (uint64_t)mc_resp.usage.prompt_tokens;
+                        work_out = (uint64_t)mc_resp.usage.completion_tokens;
+
+                        char *new_final =
+                            hu_strndup(agent->alloc, mc_resp.content, mc_resp.content_len);
+                        hu_chat_response_free(agent->alloc, &mc_resp);
+                        if (!new_final) break;
+
+                        if (ab_owned)
+                            agent->alloc->free(agent->alloc->ctx, (void *)final_content, final_len + 1);
+                        final_content = new_final;
+                        final_len = strlen(new_final);
+                        ab_owned = true;
+                        work_content = final_content;
+                        work_len = final_len;
+                        agent->metacognition.regen_count++;
+                        if (agent->bth_metrics) agent->bth_metrics->metacog_regens++;
+                    }
+
+#ifdef HU_ENABLE_SQLITE
+                    if (agent->cognition_db) {
+                        float risk = hu_metacog_calibrated_risk(&agent->metacognition, &last_mc_sig);
+                        hu_metacog_history_extra_t mc_ex = {
+                            .prompt_tokens = work_in,
+                            .completion_tokens = work_out,
+                            .logprob_mean = -1.0f,
+                            .risk_score = risk,
+                        };
+                        (void)hu_metacog_history_insert(
+                            agent->cognition_db, agent->trace_id, (int)iter, last_mc_sig.confidence,
+                            last_mc_sig.coherence, last_mc_sig.repetition, last_mc_sig.stuck_score,
+                            last_mc_sig.satisfaction_proxy, last_mc_sig.trajectory_confidence,
+                            hu_metacog_action_name(last_mc_act),
+                            hu_metacog_difficulty_name(agent->metacognition.difficulty),
+                            agent->metacognition.regen_count > 0 ? 1 : 0, &mc_ex);
+                        /* Next user turn labels outcome_proxy for this trace_id */
+                        memcpy(agent->metacognition.pending_outcome_trace_id, agent->trace_id,
+                               sizeof(agent->trace_id));
+                    }
+#endif
+                }
+
                 hu_error_t hist_err = hu_agent_internal_append_history(agent, HU_ROLE_ASSISTANT, final_content,
                                                        final_len, NULL, 0, NULL, 0);
                 if (hist_err != HU_OK)
@@ -2399,40 +2591,6 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
                 {
                     hu_agent_internal_maybe_tts(agent, *response_out, response_effective_len);
-                }
-            }
-            /* Metacognition: monitor final response (observational; does not re-loop) */
-            if (response_out && *response_out && response_len_out && *response_len_out > 0) {
-                const char *prev_resp = NULL;
-                size_t prev_resp_len = 0;
-                if (agent->history_count > 1) {
-                    for (size_t hi = agent->history_count - 1; hi > 0; hi--) {
-                        if (hi == agent->history_count - 1)
-                            continue; /* skip assistant message from this turn */
-                        if (agent->history[hi].role == HU_ROLE_ASSISTANT &&
-                            agent->history[hi].content && agent->history[hi].content_len > 0) {
-                            prev_resp = agent->history[hi].content;
-                            prev_resp_len = agent->history[hi].content_len;
-                            break;
-                        }
-                    }
-                }
-                hu_metacognition_signal_t mc_sig = hu_metacognition_monitor(
-                    msg, msg_len, *response_out, *response_len_out, prev_resp, prev_resp_len,
-                    agent->emotional_cognition.confidence,
-                    (uint64_t)resp.usage.prompt_tokens, (uint64_t)resp.usage.completion_tokens);
-                hu_metacog_action_t mc_act =
-                    hu_metacognition_plan_action(&agent->metacognition, &mc_sig);
-                if (mc_act != HU_METACOG_ACTION_NONE) {
-                    if (agent->observer) {
-                        hu_observer_event_t mev = {.tag = HU_OBSERVER_EVENT_METACOG_ACTION};
-                        mev.data.metacog_action.action = hu_metacog_action_name(mc_act);
-                        mev.data.metacog_action.confidence = mc_sig.confidence;
-                        mev.data.metacog_action.coherence = mc_sig.coherence;
-                        HU_OBS_SAFE_RECORD_EVENT(agent, &mev);
-                    }
-                    if (agent->bth_metrics)
-                        agent->bth_metrics->metacog_interventions++;
                 }
             }
             hu_chat_response_free(agent->alloc, &resp);

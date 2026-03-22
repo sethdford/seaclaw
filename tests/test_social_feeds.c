@@ -74,3 +74,5 @@ void run_social_feeds_tests(void) {
 }
 
 #endif /* HU_ENABLE_SOCIAL */
+
+typedef int hu_social_feeds_test_dummy_t;
