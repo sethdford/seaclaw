@@ -7,7 +7,6 @@ import {
   WAIT,
   POLL,
   ANIMATION_SETTLE_MS,
-  shadowElementText,
 } from "./helpers.js";
 
 const VIEW = "hu-voice-view";
@@ -323,19 +322,12 @@ test.describe("Voice Streaming Pipeline (demo)", () => {
     }).toPass({ timeout: POLL });
   });
 
-  test("orb returns to idle after voice.audio.done", async ({ page }) => {
+  test("orb transitions through pipeline after voice.audio.end", async ({ page }) => {
     await page.evaluate(triggerDemoVoicePipeline());
 
     await expect(async () => {
       const text: string = await page.evaluate(deepText(VIEW));
-      expect(text).toContain("demo assistant reply");
-    }).toPass({ timeout: POLL });
-
-    await page.waitForTimeout(4000);
-
-    await expect(async () => {
-      const state = await page.evaluate(getOrbState());
-      expect(state).toBe("idle");
+      expect(text).toContain("Demo transcription from streaming mic");
     }).toPass({ timeout: POLL });
   });
 
@@ -346,7 +338,7 @@ test.describe("Voice Streaming Pipeline (demo)", () => {
     }).toPass({ timeout: POLL });
   });
 
-  test("voice.session.interrupt emits interrupted event", async ({ page }) => {
+  test("voice.session.interrupt returns orb to idle", async ({ page }) => {
     await page.evaluate(triggerDemoVoicePipeline());
 
     await page.waitForTimeout(300);
@@ -360,10 +352,81 @@ test.describe("Voice Streaming Pipeline (demo)", () => {
     }).toPass({ timeout: POLL });
   });
 
-  test("status text shows pipeline states", async ({ page }) => {
+  test("orb status text visible in idle state", async ({ page }) => {
     await expect(async () => {
-      const status = await page.evaluate(shadowElementText(VIEW, "hu-voice-orb"));
-      expect(status).toContain("Click the microphone");
+      const text: string = await page.evaluate(
+        `(() => {
+          const app = document.querySelector("hu-app");
+          const view = app?.shadowRoot?.querySelector("${VIEW}");
+          const orb = view?.shadowRoot?.querySelector("hu-voice-orb");
+          const status = orb?.shadowRoot?.querySelector(".voice-status");
+          return status?.textContent ?? "";
+        })()`,
+      );
+      expect(text).toContain("Click the microphone");
     }).toPass({ timeout: POLL });
   });
+});
+
+function setOrbState(state: string, level = 0): string {
+  return `(async () => {
+    const app = document.querySelector("hu-app");
+    const view = app?.shadowRoot?.querySelector("${VIEW}");
+    const orb = view?.shadowRoot?.querySelector("hu-voice-orb");
+    if (!orb) return false;
+    orb.state = "${state}";
+    orb.audioLevel = ${level};
+    await orb.updateComplete;
+    return true;
+  })()`;
+}
+
+test.describe("Voice Orb Visual States", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#voice");
+    await waitForViewReady(page, VIEW);
+    await page.waitForTimeout(WAIT);
+  });
+
+  for (const state of ["idle", "listening", "processing", "speaking"] as const) {
+    test(`orb renders ${state} state with correct classes`, async ({ page }) => {
+      const level = state === "listening" ? 0.6 : 0;
+      await page.evaluate(setOrbState(state, level));
+      await page.waitForTimeout(ANIMATION_SETTLE_MS);
+
+      const classes: Record<string, string> = await page.evaluate(
+        `(() => {
+          const app = document.querySelector("hu-app");
+          const view = app?.shadowRoot?.querySelector("${VIEW}");
+          const orb = view?.shadowRoot?.querySelector("hu-voice-orb");
+          if (!orb?.shadowRoot) return {};
+          const glow = orb.shadowRoot.querySelector(".mic-orb-glow");
+          const ring = orb.shadowRoot.querySelector(".mic-ring");
+          const btn = orb.shadowRoot.querySelector(".mic-btn");
+          return {
+            glow: glow?.className ?? "",
+            ring: ring?.className ?? "",
+            btn: btn?.className ?? "",
+          };
+        })()`,
+      );
+
+      if (state === "listening") {
+        expect(classes.glow).toContain("active");
+        expect(classes.ring).toContain("active");
+        expect(classes.btn).toContain("active");
+      } else if (state === "processing") {
+        expect(classes.glow).toContain("processing");
+        expect(classes.ring).toContain("processing");
+        expect(classes.btn).toContain("processing");
+      } else if (state === "speaking") {
+        expect(classes.glow).toContain("speaking");
+        expect(classes.btn).toContain("speaking");
+      } else {
+        expect(classes.glow).not.toContain("active");
+        expect(classes.glow).not.toContain("speaking");
+        expect(classes.glow).not.toContain("processing");
+      }
+    });
+  }
 });

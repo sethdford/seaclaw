@@ -14,6 +14,10 @@ export class ScCard extends LitElement {
   @property({ type: Boolean }) solid = false;
   /** Enable 3D perspective tilt on pointer proximity. */
   @property({ type: Boolean }) tilt = false;
+  /** Enable mesh gradient background overlay. */
+  @property({ type: Boolean }) mesh = false;
+  /** Enable chromatic prismatic border. */
+  @property({ type: Boolean }) chromatic = false;
   /** Tonal surface: default (container), high (interactive/elevated), highest (emphasis). */
   @property({ type: String }) surface: CardSurface = "default";
 
@@ -197,6 +201,47 @@ export class ScCard extends LitElement {
       transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
     }
 
+    /* Mesh gradient background */
+    .card.mesh {
+      background-image:
+        radial-gradient(
+          ellipse at 20% 50%,
+          color-mix(in srgb, var(--hu-accent) 6%, transparent) 0%,
+          transparent 50%
+        ),
+        radial-gradient(
+          ellipse at 80% 20%,
+          color-mix(in srgb, var(--hu-accent-tertiary) 4%, transparent) 0%,
+          transparent 50%
+        ),
+        radial-gradient(
+          ellipse at 50% 80%,
+          color-mix(in srgb, var(--hu-accent-secondary) 3%, transparent) 0%,
+          transparent 50%
+        ),
+        var(--hu-surface-gradient);
+    }
+
+    /* Chromatic prismatic border */
+    .card.chromatic::before {
+      background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--hu-accent) 15%, transparent),
+        color-mix(in srgb, var(--hu-accent-tertiary) 12%, transparent),
+        color-mix(in srgb, var(--hu-accent-secondary) 10%, transparent),
+        color-mix(in srgb, var(--hu-accent) 15%, transparent)
+      );
+      mask:
+        linear-gradient(var(--hu-color-white) 0 0) content-box,
+        linear-gradient(var(--hu-color-white) 0 0);
+      mask-composite: exclude;
+      -webkit-mask:
+        linear-gradient(var(--hu-color-white) 0 0) content-box,
+        linear-gradient(var(--hu-color-white) 0 0);
+      -webkit-mask-composite: xor;
+      padding: 1px;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       :host([hoverable]),
       :host([clickable]),
@@ -265,6 +310,8 @@ export class ScCard extends LitElement {
       this.accent ? "accent" : "",
       this.elevated ? "elevated" : "",
       !this.solid ? "glass" : "",
+      this.mesh ? "mesh" : "",
+      this.chromatic ? "chromatic" : "",
     ]
       .filter(Boolean)
       .join(" ");

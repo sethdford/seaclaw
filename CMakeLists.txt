@@ -973,6 +973,7 @@ list(APPEND HU_CORE_SOURCES
     src/data/data_memory_emotion_prefixes_json.c
     src/data/data_prompts_tone_hints_json.c
     src/data/data_channels_telegram_commands_txt.c
+    src/data/data_eval_golden_set_jsonl.c
 )
 
 # Crypto sources (generic C fallbacks + dispatch)

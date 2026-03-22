@@ -28,6 +28,7 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/agent/dag_executor.h"
 #include "human/agent/dispatcher.h"
 #include "human/agent/input_guard.h"
+#include "human/agent/hula.h"
 #include "human/agent/llm_compiler.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/memory_loader.h"
@@ -3362,7 +3363,90 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     }
                 }
 
-                if (!used_llm_compiler) {
+                /* HuLa: compile tool calls into a HuLa program and execute via the IR.
+                 * This path provides unified policy checking, tracing, and structured
+                 * execution. Falls through to the dispatcher if disabled or on failure. */
+                bool used_hula = false;
+#ifndef HU_IS_TEST
+                if (!used_llm_compiler && agent->hula_enabled && tc_count >= 1) {
+                    hu_hula_program_t hula_prog;
+                    hu_error_t herr = hu_hula_program_init(&hula_prog, *agent->alloc,
+                                                            "turn", 4);
+                    if (herr == HU_OK) {
+                        hu_hula_node_t *hula_root;
+                        if (tc_count == 1) {
+                            hula_root = hu_hula_program_alloc_node(&hula_prog, HU_HULA_CALL, "t0");
+                        } else {
+                            hula_root = hu_hula_program_alloc_node(&hula_prog, HU_HULA_PAR, "root");
+                        }
+                        if (hula_root) {
+                            bool hula_build_ok = true;
+                            for (size_t hti = 0; hti < tc_count && hula_build_ok; hti++) {
+                                hu_hula_node_t *cn;
+                                if (tc_count == 1) {
+                                    cn = hula_root;
+                                } else {
+                                    char cid[16];
+                                    (void)snprintf(cid, sizeof(cid), "t%zu", hti);
+                                    cn = hu_hula_program_alloc_node(&hula_prog, HU_HULA_CALL, cid);
+                                    if (cn)
+                                        hula_root->children[hula_root->children_count++] = cn;
+                                }
+                                if (cn) {
+                                    cn->tool_name = hu_strndup(agent->alloc, calls[hti].name,
+                                                                calls[hti].name_len);
+                                    cn->args_json = hu_strndup(agent->alloc, calls[hti].arguments,
+                                                                calls[hti].arguments_len);
+                                } else {
+                                    hula_build_ok = false;
+                                }
+                            }
+                            if (hula_build_ok) {
+                                hula_prog.root = hula_root;
+                                hu_hula_exec_t hula_exec;
+                                hu_security_policy_t *hula_policy = agent->policy;
+                                hu_observer_t *hula_obs = agent->observer;
+                                herr = hu_hula_exec_init_full(&hula_exec, *agent->alloc,
+                                                               &hula_prog, agent->tools,
+                                                               agent->tools_count,
+                                                               hula_policy, hula_obs);
+                                if (herr == HU_OK) {
+                                    herr = hu_hula_exec_run(&hula_exec);
+                                    if (herr == HU_OK) {
+                                        used_hula = true;
+                                        for (size_t hti = 0; hti < tc_count; hti++) {
+                                            char cid[16];
+                                            if (tc_count == 1)
+                                                (void)snprintf(cid, sizeof(cid), "t0");
+                                            else
+                                                (void)snprintf(cid, sizeof(cid), "t%zu", hti);
+                                            const hu_hula_result_t *hr =
+                                                hu_hula_exec_result(&hula_exec, cid);
+                                            const char *out_text = "";
+                                            size_t out_len = 0;
+                                            if (hr && hr->status == HU_HULA_DONE && hr->output) {
+                                                out_text = hr->output;
+                                                out_len = hr->output_len;
+                                            } else if (hr && hr->error) {
+                                                out_text = hr->error;
+                                                out_len = hr->error_len;
+                                            }
+                                            hu_agent_internal_append_history(
+                                                agent, HU_ROLE_TOOL, out_text, out_len,
+                                                calls[hti].name, calls[hti].name_len,
+                                                calls[hti].id, calls[hti].id_len);
+                                        }
+                                    }
+                                    hu_hula_exec_deinit(&hula_exec);
+                                }
+                            }
+                        }
+                        hu_hula_program_deinit(&hula_prog);
+                    }
+                }
+#endif /* HU_IS_TEST */
+
+                if (!used_llm_compiler && !used_hula) {
                 /* Use dispatcher for parallel execution when enabled (Tier 1.3) */
                 hu_dispatcher_t dispatcher;
                 hu_dispatcher_default(&dispatcher);

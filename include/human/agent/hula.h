@@ -130,6 +130,9 @@ typedef struct hu_hula_result {
     size_t error_len;
 } hu_hula_result_t;
 
+typedef struct hu_agent_pool hu_agent_pool_t;
+typedef struct hu_spawn_config hu_spawn_config_t;
+
 /* Execution state for a running program */
 typedef struct hu_hula_exec {
     hu_allocator_t alloc;
@@ -140,6 +143,8 @@ typedef struct hu_hula_exec {
     size_t tools_count;
     hu_security_policy_t *policy;   /* borrowed; optional — NULL skips policy */
     hu_observer_t *observer;        /* borrowed; optional — NULL skips tracing */
+    hu_agent_pool_t *pool;          /* borrowed; optional — NULL stubs delegate */
+    hu_spawn_config_t *spawn_cfg;   /* borrowed; optional — template for delegate spawns */
     /* Trace log for emergence analysis */
     char *trace_log;                /* owned; accumulated JSON array of executed nodes */
     size_t trace_log_len;

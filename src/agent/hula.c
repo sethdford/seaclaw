@@ -626,6 +626,25 @@ static void trace_append(hu_hula_exec_t *exec, const hu_hula_node_t *n) {
 }
 
 static hu_error_t exec_call(hu_hula_exec_t *exec, hu_hula_node_t *n) {
+    /* Policy check runs first — before tool lookup or arg parsing */
+    if (exec->policy) {
+        hu_command_risk_level_t risk = hu_tool_risk_level(n->tool_name);
+        if (exec->policy->autonomy == HU_AUTONOMY_LOCKED) {
+            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "blocked by policy: locked",
+                       strlen("blocked by policy: locked"));
+            return HU_OK;
+        }
+        if (risk == HU_RISK_HIGH && exec->policy->block_high_risk_commands) {
+            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "blocked by policy: high risk",
+                       strlen("blocked by policy: high risk"));
+            return HU_OK;
+        }
+        if (exec->policy->tracker && hu_policy_is_rate_limited(exec->policy)) {
+            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "rate limited", 12);
+            return HU_OK;
+        }
+    }
+
     hu_tool_t *tool = find_tool(exec->tools, exec->tools_count, n->tool_name);
     if (!tool) {
         set_result(exec, n, HU_HULA_FAILED, NULL, 0, "tool not found", 14);
@@ -638,27 +657,6 @@ static hu_error_t exec_call(hu_hula_exec_t *exec, hu_hula_node_t *n) {
     if (err != HU_OK) {
         set_result(exec, n, HU_HULA_FAILED, NULL, 0, "args parse error", 16);
         return HU_OK;
-    }
-
-    if (exec->policy) {
-        hu_command_risk_level_t risk = hu_tool_risk_level(n->tool_name);
-        if (exec->policy->autonomy == HU_AUTONOMY_LOCKED) {
-            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "blocked by policy: locked",
-                       strlen("blocked by policy: locked"));
-            hu_json_free(&exec->alloc, args);
-            return HU_OK;
-        }
-        if (risk == HU_RISK_HIGH && exec->policy->block_high_risk_commands) {
-            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "blocked by policy: high risk",
-                       strlen("blocked by policy: high risk"));
-            hu_json_free(&exec->alloc, args);
-            return HU_OK;
-        }
-        if (exec->policy->tracker && hu_policy_is_rate_limited(exec->policy)) {
-            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "rate limited", 12);
-            hu_json_free(&exec->alloc, args);
-            return HU_OK;
-        }
     }
 
     hu_tool_result_t tr;
@@ -785,7 +783,7 @@ static hu_error_t exec_loop(hu_hula_exec_t *exec, hu_hula_node_t *n) {
 
 static hu_error_t exec_delegate(hu_hula_exec_t *exec, hu_hula_node_t *n) {
     (void)exec;
-    /* Delegation requires the spawn system; stub in test/basic mode. */
+    /* Stub: return goal as output (test mode or no pool configured) */
     set_result(exec, n, HU_HULA_DONE, n->goal, n->goal_len, NULL, 0);
     return HU_OK;
 }

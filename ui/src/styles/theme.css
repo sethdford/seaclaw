@@ -1461,19 +1461,33 @@ dd {
 /* ── Mesh Gradient System ── */
 .hu-mesh-gradient {
   background:
-    radial-gradient(ellipse at 20% 50%, color-mix(in srgb, var(--hu-accent) 6%, transparent) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, color-mix(in srgb, var(--hu-accent-tertiary) 4%, transparent) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 80%, color-mix(in srgb, var(--hu-accent-secondary) 3%, transparent) 0%, transparent 50%),
+    radial-gradient(
+      ellipse at 20% 50%,
+      color-mix(in srgb, var(--hu-accent) 6%, transparent) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 80% 20%,
+      color-mix(in srgb, var(--hu-accent-tertiary) 4%, transparent) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 50% 80%,
+      color-mix(in srgb, var(--hu-accent-secondary) 3%, transparent) 0%,
+      transparent 50%
+    ),
     var(--hu-bg);
 }
 
 .hu-aurora-gradient {
   background:
-    conic-gradient(from var(--hu-gradient-angle, 135deg) at 50% 50%,
+    conic-gradient(
+      from var(--hu-gradient-angle, 135deg) at 50% 50%,
       color-mix(in srgb, var(--hu-accent) 8%, transparent),
       color-mix(in srgb, var(--hu-accent-tertiary) 6%, transparent),
       color-mix(in srgb, var(--hu-accent-secondary) 4%, transparent),
-      color-mix(in srgb, var(--hu-accent) 8%, transparent)),
+      color-mix(in srgb, var(--hu-accent) 8%, transparent)
+    ),
     var(--hu-bg);
 }
 
@@ -1484,8 +1498,12 @@ dd {
 }
 
 @keyframes hu-aurora-rotate {
-  from { --hu-gradient-angle: 0deg; }
-  to { --hu-gradient-angle: 360deg; }
+  from {
+    --hu-gradient-angle: 0deg;
+  }
+  to {
+    --hu-gradient-angle: 360deg;
+  }
 }
 
 /* ── Gradient Text ── */
@@ -1504,7 +1522,12 @@ dd {
 }
 
 .hu-text-gradient-aurora {
-  background: linear-gradient(135deg, var(--hu-accent), var(--hu-accent-tertiary), var(--hu-accent-secondary));
+  background: linear-gradient(
+    135deg,
+    var(--hu-accent),
+    var(--hu-accent-tertiary),
+    var(--hu-accent-secondary)
+  );
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -1547,8 +1570,13 @@ dd {
     color-mix(in srgb, var(--hu-accent-secondary) 10%, transparent),
     color-mix(in srgb, var(--hu-accent) 15%, transparent)
   );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask:
+    linear-gradient(var(--hu-color-white) 0 0) content-box,
+    linear-gradient(var(--hu-color-white) 0 0);
   -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(var(--hu-color-white) 0 0) content-box,
+    linear-gradient(var(--hu-color-white) 0 0);
   mask-composite: exclude;
   pointer-events: none;
   z-index: 1;
@@ -1556,13 +1584,15 @@ dd {
 
 /* ── Colored Shadows ── */
 .hu-shadow-accent {
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--hu-accent) 12%, transparent),
+  box-shadow:
+    0 4px 16px color-mix(in srgb, var(--hu-accent) 12%, transparent),
     0 8px 32px color-mix(in srgb, var(--hu-accent) 8%, transparent);
 }
 
 .hu-shadow-warm {
-  box-shadow: 0 4px 16px rgba(200,160,80,0.10),
-    0 8px 32px rgba(200,160,80,0.06);
+  box-shadow:
+    0 4px 16px rgba(200, 160, 80, 0.1),
+    0 8px 32px rgba(200, 160, 80, 0.06);
 }
 
 .hu-shadow-glass {

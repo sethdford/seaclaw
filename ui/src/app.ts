@@ -983,7 +983,8 @@ export class ScApp extends LitElement {
           </div>`
         : nothing}
       <div
-        class="layout ${this._effectiveSidebarCollapsed ? "collapsed" : ""} ${this._hasDetail
+        class="layout hu-film-grain ${this._effectiveSidebarCollapsed ? "collapsed" : ""} ${this
+          ._hasDetail
           ? "has-detail"
           : ""}"
       >

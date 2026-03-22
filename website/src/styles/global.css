@@ -108,17 +108,17 @@
   :root {
     /* Website-specific warm neutrals — accent colors come from _tokens.css.
      * NEVER set accent hex values here — edit design-tokens/*.json instead. */
-    --hu-web-bg: #fafaf9;
-    --hu-web-surface: #ffffff;
-    --hu-web-surface-elevated: rgba(255, 255, 255, 0.6);
-    --hu-web-border: rgba(0, 0, 0, 0.06);
-    --hu-web-border-strong: rgba(0, 0, 0, 0.12);
-    --hu-web-text: #1d1d1f;
-    --hu-web-text-secondary: #6e6e73;
-    --hu-web-text-tertiary: #86868b;
-    --hu-web-code-bg: #f5f5f4;
-    --hu-web-terminal-bg: #1d1d1f;
-    --hu-web-terminal-chrome: #2c2c2e;
+    --hu-web-bg: #f4f1ee;
+    --hu-web-surface: #fffefa;
+    --hu-web-surface-elevated: rgba(255, 254, 250, 0.6);
+    --hu-web-border: rgba(45, 36, 24, 0.06);
+    --hu-web-border-strong: rgba(45, 36, 24, 0.12);
+    --hu-web-text: #2d2a26;
+    --hu-web-text-secondary: #6b655e;
+    --hu-web-text-tertiary: #9a9490;
+    --hu-web-code-bg: #f0ede9;
+    --hu-web-terminal-bg: #141210;
+    --hu-web-terminal-chrome: #1e1a16;
 
     /* ── Pill tokens ── */
     --hu-web-pill-provider: #3b72c4;
@@ -150,17 +150,17 @@
 
   @media (prefers-color-scheme: dark) {
     :root {
-      --hu-web-bg: #0a0a0a;
-      --hu-web-surface: #1c1c1e;
-      --hu-web-surface-elevated: rgba(28, 28, 30, 0.7);
-      --hu-web-border: rgba(255, 255, 255, 0.08);
-      --hu-web-border-strong: rgba(255, 255, 255, 0.15);
-      --hu-web-text: #f5f5f7;
-      --hu-web-text-secondary: #a1a1a6;
-      --hu-web-text-tertiary: #86868b;
-      --hu-web-code-bg: #1c1c1e;
-      --hu-web-terminal-bg: #0f0f0f;
-      --hu-web-terminal-chrome: #1c1c1e;
+      --hu-web-bg: #0c0a08;
+      --hu-web-surface: #141210;
+      --hu-web-surface-elevated: rgba(20, 18, 16, 0.7);
+      --hu-web-border: rgba(252, 248, 242, 0.08);
+      --hu-web-border-strong: rgba(252, 248, 242, 0.15);
+      --hu-web-text: #ddd8d3;
+      --hu-web-text-secondary: #9e9892;
+      --hu-web-text-tertiary: #8a847e;
+      --hu-web-code-bg: #1e1a16;
+      --hu-web-terminal-bg: #0c0a08;
+      --hu-web-terminal-chrome: #1e1a16;
 
       --hu-web-pill-provider: #93bbfd;
       --hu-web-pill-provider-bg: rgba(59, 130, 246, 0.1);
@@ -208,17 +208,17 @@
   }
 
   [data-theme="light"] {
-    --hu-web-bg: #fafaf9;
-    --hu-web-surface: #ffffff;
-    --hu-web-surface-elevated: rgba(255, 255, 255, 0.6);
-    --hu-web-border: rgba(0, 0, 0, 0.06);
-    --hu-web-border-strong: rgba(0, 0, 0, 0.12);
-    --hu-web-text: #1d1d1f;
-    --hu-web-text-secondary: #6e6e73;
-    --hu-web-text-tertiary: #86868b;
-    --hu-web-code-bg: #f5f5f4;
-    --hu-web-terminal-bg: #1d1d1f;
-    --hu-web-terminal-chrome: #2c2c2e;
+    --hu-web-bg: #f4f1ee;
+    --hu-web-surface: #fffefa;
+    --hu-web-surface-elevated: rgba(255, 254, 250, 0.6);
+    --hu-web-border: rgba(45, 36, 24, 0.06);
+    --hu-web-border-strong: rgba(45, 36, 24, 0.12);
+    --hu-web-text: #2d2a26;
+    --hu-web-text-secondary: #6b655e;
+    --hu-web-text-tertiary: #9a9490;
+    --hu-web-code-bg: #f0ede9;
+    --hu-web-terminal-bg: #141210;
+    --hu-web-terminal-chrome: #1e1a16;
 
     --hu-web-pill-provider: #3b72c4;
     --hu-web-pill-provider-bg: rgba(59, 130, 246, 0.06);
@@ -2313,11 +2313,50 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
+/* Gradient text utilities */
+.hu-text-gradient {
+  background: linear-gradient(135deg, var(--hu-accent, #7AB648), var(--hu-accent-tertiary, #6366f1));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hu-text-gradient-warm {
+  background: linear-gradient(135deg, var(--hu-accent, #7AB648), var(--hu-accent-secondary, #f59e0b));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Mesh gradient background */
+.hu-mesh-gradient {
+  background:
+    radial-gradient(ellipse at 20% 50%, color-mix(in srgb, var(--hu-accent, #7AB648) 6%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, color-mix(in srgb, var(--hu-accent-tertiary, #6366f1) 4%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, color-mix(in srgb, var(--hu-accent-secondary, #f59e0b) 3%, transparent) 0%, transparent 50%),
+    var(--hu-web-bg);
+}
+
+/* Film grain overlay */
+.hu-film-grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hu-chapter-reveal {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
+  }
+  .hu-film-grain::before {
+    display: none;
   }
 }

@@ -835,6 +835,56 @@ function generateCSS(
     }
   }
 
+  // Spatial tokens (perspective, card-tilt, depth-scale, depth-of-field, film-grain, pointer, particle, webgl)
+  lines.push("  /* Spatial depth */");
+  const spatialPrefixes = [
+    "perspective",
+    "card-tilt",
+    "depth-scale",
+    "depth-of-field",
+    "film-grain",
+    "pointer",
+    "particle",
+    "webgl",
+  ];
+  for (const prefix of spatialPrefixes) {
+    const spatialKeys = Object.keys(tokens)
+      .filter((k) => k.startsWith(`${prefix}.`))
+      .sort();
+    for (const k of spatialKeys) {
+      const val = tokens[k];
+      if (val != null) {
+        const suffix = k.replace(`${prefix}.`, "").replace(/\./g, "-");
+        lines.push(`  --hu-${prefix}-${suffix}: ${val};`);
+      }
+    }
+  }
+
+  // Ambient tokens (ambient, time-aware, status-breathing, idle, scroll-depth, gradient-response, cpu-budget, audio)
+  lines.push("  /* Ambient intelligence */");
+  const ambientPrefixes = [
+    "ambient",
+    "time-aware",
+    "status-breathing",
+    "idle",
+    "scroll-depth",
+    "gradient-response",
+    "cpu-budget",
+    "audio",
+  ];
+  for (const prefix of ambientPrefixes) {
+    const ambientKeys = Object.keys(tokens)
+      .filter((k) => k.startsWith(`${prefix}.`))
+      .sort();
+    for (const k of ambientKeys) {
+      const val = tokens[k];
+      if (val != null) {
+        const suffix = k.replace(`${prefix}.`, "").replace(/\./g, "-");
+        lines.push(`  --hu-${prefix}-${suffix}: ${val};`);
+      }
+    }
+  }
+
   lines.push("}");
   lines.push("");
   lines.push("@media (prefers-color-scheme: light) {");

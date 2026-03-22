@@ -24,14 +24,14 @@ object HUTokens {
         val accentTertiaryText = Color(0xFF818CF8)
         val accentText = Color(0xFF8DC63F)
         val backdropOverlay = Color(0x99000000)
-        val bg = Color(0xFF060B12)
-        val bgElevated = Color(0xFF1E3044)
-        val bgInset = Color(0xFF0D1520)
-        val bgOverlay = Color(0xFF273D55)
-        val bgSurface = Color(0xFF152333)
-        val border = Color(0xFF2F4A64)
-        val borderSubtle = Color(0xFF1E3044)
-        val disabledOverlay = Color(0x0AFFFFFF)
+        val bg = Color(0xFF0C0A08)
+        val bgElevated = Color(0xFF28231E)
+        val bgInset = Color(0xFF141210)
+        val bgOverlay = Color(0xFF332D26)
+        val bgSurface = Color(0xFF1E1A16)
+        val border = Color(0xFF3E372F)
+        val borderSubtle = Color(0xFF28231E)
+        val disabledOverlay = Color(0x0AFCF8F2)
         val draggedOverlay = Color(0x297AB648)
         val error = Color(0xFFF97066)
         val errorDim = Color(0x1FF97066)
@@ -45,20 +45,20 @@ object HUTokens {
         val linkHover = Color(0xFFA3D46A)
         val linkVisited = Color(0xFF5A9A30)
         val onAccent = Color(0xFFFFFFFF)
-        val onAccentSecondary = Color(0xFF060B12)
+        val onAccentSecondary = Color(0xFF0C0A08)
         val onAccentTertiary = Color(0xFFFFFFFF)
         val pressedOverlay = Color(0x1F7AB648)
         val success = Color(0xFF10B981)
         val successDim = Color(0x2610B981)
-        val surfaceBright = Color(0xFF34506A)
-        val surfaceContainer = Color(0xFF172631)
-        val surfaceContainerHigh = Color(0xFF223540)
-        val surfaceContainerHighest = Color(0xFF2C4451)
-        val surfaceDim = Color(0xFF030710)
-        val text = Color(0xFFD8E4F0)
-        val textFaint = Color(0xFF3D5468)
-        val textMuted = Color(0xFF7A96B0)
-        val textSecondary = Color(0xFF8AA0B8)
+        val surfaceBright = Color(0xFF42392E)
+        val surfaceContainer = Color(0xFF1F1C19)
+        val surfaceContainerHigh = Color(0xFF2A2621)
+        val surfaceContainerHighest = Color(0xFF35302A)
+        val surfaceDim = Color(0xFF080604)
+        val text = Color(0xFFDDD8D3)
+        val textFaint = Color(0xFF56504A)
+        val textMuted = Color(0xFF8A847E)
+        val textSecondary = Color(0xFF9E9892)
         val warning = Color(0xFFEAB308)
         val warningDim = Color(0x26EAB308)
     }
@@ -82,14 +82,14 @@ object HUTokens {
         val accentTertiaryText = Color(0xFF4338CA)
         val accentText = Color(0xFF3A6A24)
         val backdropOverlay = Color(0x4D000000)
-        val bg = Color(0xFFF5F5F5)
-        val bgElevated = Color(0xFFF8F8F8)
-        val bgInset = Color(0xFFEFEFEF)
-        val bgOverlay = Color(0xFFFFFFFF)
-        val bgSurface = Color(0xFFFFFFFF)
-        val bgWarm = Color(0xFFFAFAFA)
-        val border = Color(0xFFD9D9D9)
-        val borderSubtle = Color(0xFFE8E8E8)
+        val bg = Color(0xFFF4F1EE)
+        val bgElevated = Color(0xFFF9F7F4)
+        val bgInset = Color(0xFFEBE7E3)
+        val bgOverlay = Color(0xFFFFFEFA)
+        val bgSurface = Color(0xFFFFFEFA)
+        val bgWarm = Color(0xFFFAF8F6)
+        val border = Color(0xFFD8D2CC)
+        val borderSubtle = Color(0xFFE6E1DB)
         val disabledOverlay = Color(0x0A000000)
         val draggedOverlay = Color(0x245A9A30)
         val error = Color(0xFFCC0000)
@@ -109,15 +109,15 @@ object HUTokens {
         val pressedOverlay = Color(0x1A5A9A30)
         val success = Color(0xFF008000)
         val successDim = Color(0x14008000)
-        val surfaceBright = Color(0xFFFFFFFF)
-        val surfaceContainer = Color(0xFFF7F8F5)
-        val surfaceContainerHigh = Color(0xFFEEEFEC)
-        val surfaceContainerHighest = Color(0xFFE7E9E5)
-        val surfaceDim = Color(0xFFE8E8E8)
-        val text = Color(0xFF333333)
-        val textFaint = Color(0xFF999999)
-        val textMuted = Color(0xFF666666)
-        val textSecondary = Color(0xFF4A4A4A)
+        val surfaceBright = Color(0xFFFFFEFA)
+        val surfaceContainer = Color(0xFFF9F7F4)
+        val surfaceContainerHigh = Color(0xFFF0EDE9)
+        val surfaceContainerHighest = Color(0xFFE9E5E0)
+        val surfaceDim = Color(0xFFE6E2DE)
+        val text = Color(0xFF2D2A26)
+        val textFaint = Color(0xFF9A9490)
+        val textMuted = Color(0xFF6B655E)
+        val textSecondary = Color(0xFF4A4540)
         val warning = Color(0xFFCA8A04)
         val warningDim = Color(0x1ACA8A04)
     }
@@ -211,18 +211,6 @@ object HUTokens {
     val springInteractiveDamping = 31f
     val springInteractiveMass = 1f
 
-    // Spatial Depth (Quiet Mastery)
-
-    /** Default perspective distance for card containers */
-    const val PERSPECTIVE = 1200f
-    /** Maximum card tilt angle in degrees */
-    const val CARD_TILT_MAX = 8f
-    /** Pointer proximity detection radius */
-    const val PROXIMITY_RADIUS = 200f
-
-    // Haptic Vocabulary (Extended)
-    // Use with HapticFeedbackConstants in Compose
-
     // Opacity
     val opacityDisabled = 0.38f
     val opacityDragged = 0.16f
@@ -239,6 +227,7 @@ object HUTokens {
     val glassChatActionsBgOpacity = 0.9f
     val glassChatBgOpacity = 0.85f
     val glassChatBorderOpacity = 0.08f
+    val glassChromaticOpacity = 0.15f
     val glassProminentBgOpacity = 0.08f
     val glassProminentBorderOpacity = 0.12f
     val glassProminentInsetOpacity = 0.1f
@@ -261,6 +250,7 @@ object HUTokens {
     val glassTextBoost = 1.15f
     val glassChatActionsBlur = 16.dp
     val glassChatBlur = 24.dp
+    val glassChromaticSpread = 2.dp
     val glassProminentBlur = 32.dp
     val glassStandardBlur = 24.dp
     val glassSubtleBlur = 12.dp

@@ -683,6 +683,318 @@ static void hula_exec_nested_seq_par(void) {
     hu_hula_program_deinit(&prog);
 }
 
+/* ── Bridge: plan → HuLa ────────────────────────────────────────────────── */
+
+static void hula_from_plan_flat_seq(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_plan_step_t steps[2] = {
+        {.tool_name = "echo", .args_json = "{\"text\":\"a\"}", .description = "first"},
+        {.tool_name = "echo", .args_json = "{\"text\":\"b\"}", .description = "second"},
+    };
+    hu_plan_t plan = {.steps = steps, .steps_count = 2, .steps_cap = 2};
+
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_from_plan(&alloc, &plan, "flat", 4, &prog), HU_OK);
+    HU_ASSERT_NOT_NULL(prog.root);
+    HU_ASSERT_EQ(prog.root->op, HU_HULA_SEQ);
+    HU_ASSERT_EQ(prog.root->children_count, 2u);
+    HU_ASSERT_STR_EQ(prog.root->children[0]->tool_name, "echo");
+    HU_ASSERT_STR_EQ(prog.root->children[1]->tool_name, "echo");
+
+    hu_tool_t tools[2];
+    make_tools(tools);
+    hu_hula_exec_t exec;
+    HU_ASSERT_EQ(hu_hula_exec_init(&exec, alloc, &prog, tools, 2), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_result(&exec, "s0")->status, HU_HULA_DONE);
+    HU_ASSERT_EQ(hu_hula_exec_result(&exec, "s1")->status, HU_HULA_DONE);
+
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+}
+
+static void hula_from_plan_with_deps(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_plan_step_t steps[3] = {
+        {.tool_name = "echo", .args_json = "{\"text\":\"a\"}"},
+        {.tool_name = "echo", .args_json = "{\"text\":\"b\"}"},
+        {.tool_name = "echo", .args_json = "{\"text\":\"c\"}",
+         .depends_count = 2, .depends_on = {0, 1}},
+    };
+    hu_plan_t plan = {.steps = steps, .steps_count = 3, .steps_cap = 3};
+
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_from_plan(&alloc, &plan, "deps", 4, &prog), HU_OK);
+    HU_ASSERT_NOT_NULL(prog.root);
+    HU_ASSERT_EQ(prog.root->op, HU_HULA_SEQ);
+    /* Wave 0: s0 + s1 (parallel), Wave 1: s2 */
+    HU_ASSERT_EQ(prog.root->children_count, 2u);
+    HU_ASSERT_EQ(prog.root->children[0]->op, HU_HULA_PAR);
+    HU_ASSERT_EQ(prog.root->children[0]->children_count, 2u);
+    HU_ASSERT_EQ(prog.root->children[1]->op, HU_HULA_CALL);
+
+    hu_tool_t tools[2];
+    make_tools(tools);
+    hu_hula_exec_t exec;
+    HU_ASSERT_EQ(hu_hula_exec_init(&exec, alloc, &prog, tools, 2), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_result(&exec, "s2")->status, HU_HULA_DONE);
+
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+}
+
+/* ── Bridge: DAG → HuLa ────────────────────────────────────────────────── */
+
+static void hula_from_dag_parallel_roots(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_dag_t dag;
+    hu_dag_init(&dag, alloc);
+    hu_dag_add_node(&dag, "t0", "echo", "{\"text\":\"x\"}", NULL, 0);
+    hu_dag_add_node(&dag, "t1", "echo", "{\"text\":\"y\"}", NULL, 0);
+    hu_dag_add_node(&dag, "t2", "echo", "{\"text\":\"z\"}", (const char *[]){"t0", "t1"}, 2);
+
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_from_dag(&alloc, &dag, "dagp", 4, &prog), HU_OK);
+    HU_ASSERT_NOT_NULL(prog.root);
+    HU_ASSERT_EQ(prog.root->op, HU_HULA_SEQ);
+    /* Wave 0: t0 + t1 (par), Wave 1: t2 */
+    HU_ASSERT_EQ(prog.root->children_count, 2u);
+    HU_ASSERT_EQ(prog.root->children[0]->op, HU_HULA_PAR);
+
+    hu_tool_t tools[2];
+    make_tools(tools);
+    hu_hula_exec_t exec;
+    HU_ASSERT_EQ(hu_hula_exec_init(&exec, alloc, &prog, tools, 2), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_result(&exec, "t2")->status, HU_HULA_DONE);
+
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+    hu_dag_deinit(&dag);
+}
+
+/* ── Policy: locked blocks execution ────────────────────────────────────── */
+
+static void hula_policy_locked_blocks_call(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json =
+        "{\"name\":\"blocked\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
+        "\"tool\":\"echo\",\"args\":{\"text\":\"nope\"}}}";
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
+
+    hu_security_policy_t policy;
+    memset(&policy, 0, sizeof(policy));
+    policy.autonomy = HU_AUTONOMY_LOCKED;
+
+    hu_tool_t tools[2];
+    make_tools(tools);
+    hu_hula_exec_t exec;
+    HU_ASSERT_EQ(hu_hula_exec_init_full(&exec, alloc, &prog, tools, 2, &policy, NULL), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
+
+    const hu_hula_result_t *r = hu_hula_exec_result(&exec, "c1");
+    HU_ASSERT_NOT_NULL(r);
+    HU_ASSERT_EQ(r->status, HU_HULA_FAILED);
+    HU_ASSERT_STR_CONTAINS(r->error, "locked");
+
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+}
+
+static void hula_policy_high_risk_blocked(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json =
+        "{\"name\":\"risky\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
+        "\"tool\":\"shell\",\"args\":{}}}";
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
+
+    hu_security_policy_t policy;
+    memset(&policy, 0, sizeof(policy));
+    policy.autonomy = HU_AUTONOMY_AUTONOMOUS;
+    policy.block_high_risk_commands = true;
+
+    hu_tool_t tools[2];
+    make_tools(tools);
+    hu_hula_exec_t exec;
+    HU_ASSERT_EQ(hu_hula_exec_init_full(&exec, alloc, &prog, tools, 2, &policy, NULL), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
+
+    const hu_hula_result_t *r = hu_hula_exec_result(&exec, "c1");
+    HU_ASSERT_NOT_NULL(r);
+    HU_ASSERT_EQ(r->status, HU_HULA_FAILED);
+    HU_ASSERT_STR_CONTAINS(r->error, "high risk");
+
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+}
+
+/* ── Trace: produces valid JSON array ───────────────────────────────────── */
+
+static void hula_trace_records_execution(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json =
+        "{\"name\":\"traced\",\"root\":{\"op\":\"seq\",\"id\":\"s1\","
+        "\"children\":["
+        "{\"op\":\"call\",\"id\":\"c1\",\"tool\":\"echo\",\"args\":{\"text\":\"hi\"}},"
+        "{\"op\":\"call\",\"id\":\"c2\",\"tool\":\"echo\",\"args\":{\"text\":\"bye\"}}"
+        "]}}";
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
+
+    hu_tool_t tools[2];
+    make_tools(tools);
+    hu_hula_exec_t exec;
+    HU_ASSERT_EQ(hu_hula_exec_init_full(&exec, alloc, &prog, tools, 2, NULL, NULL), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
+
+    size_t trace_len = 0;
+    const char *trace = hu_hula_exec_trace(&exec, &trace_len);
+    HU_ASSERT_NOT_NULL(trace);
+    HU_ASSERT_GT(trace_len, 2u);
+    HU_ASSERT_TRUE(trace[0] == '[');
+    HU_ASSERT_TRUE(trace[trace_len - 1] == ']');
+    HU_ASSERT_STR_CONTAINS(trace, "\"c1\"");
+    HU_ASSERT_STR_CONTAINS(trace, "\"c2\"");
+    HU_ASSERT_STR_CONTAINS(trace, "\"done\"");
+
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+}
+
+/* ── Observer: events are emitted ───────────────────────────────────────── */
+
+typedef struct {
+    int start_count;
+    int call_count;
+    bool last_success;
+} test_obs_ctx_t;
+
+static void test_obs_record(void *ctx, const hu_observer_event_t *ev) {
+    test_obs_ctx_t *t = (test_obs_ctx_t *)ctx;
+    if (ev->tag == HU_OBSERVER_EVENT_TOOL_CALL_START) t->start_count++;
+    if (ev->tag == HU_OBSERVER_EVENT_TOOL_CALL) {
+        t->call_count++;
+        t->last_success = ev->data.tool_call.success;
+    }
+}
+
+static const hu_observer_vtable_t test_obs_vtable = {
+    .record_event = test_obs_record, .name = NULL, .flush = NULL, .deinit = NULL,
+};
+
+static void hula_observer_receives_events(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json =
+        "{\"name\":\"obs\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
+        "\"tool\":\"echo\",\"args\":{\"text\":\"hey\"}}}";
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
+
+    test_obs_ctx_t obs_ctx = {0};
+    hu_observer_t obs = {.ctx = &obs_ctx, .vtable = &test_obs_vtable};
+
+    hu_tool_t tools[2];
+    make_tools(tools);
+    hu_hula_exec_t exec;
+    HU_ASSERT_EQ(hu_hula_exec_init_full(&exec, alloc, &prog, tools, 2, NULL, &obs), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
+
+    HU_ASSERT_EQ(obs_ctx.start_count, 1);
+    HU_ASSERT_EQ(obs_ctx.call_count, 1);
+    HU_ASSERT_TRUE(obs_ctx.last_success);
+
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+}
+
+/* ── E2E: full pipeline parse → validate → policy → execute → trace ─── */
+
+static void hula_e2e_full_pipeline(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+
+    /* 1. Parse a multi-step program from JSON */
+    const char *json =
+        "{\"name\":\"e2e_pipeline\",\"version\":1,"
+        "\"root\":{\"op\":\"seq\",\"id\":\"main\","
+        "\"children\":["
+        "{\"op\":\"par\",\"id\":\"gather\",\"children\":["
+        "{\"op\":\"call\",\"id\":\"fetch1\",\"tool\":\"echo\",\"args\":{\"text\":\"data_a\"}},"
+        "{\"op\":\"call\",\"id\":\"fetch2\",\"tool\":\"echo\",\"args\":{\"text\":\"data_b\"}}"
+        "]},"
+        "{\"op\":\"branch\",\"id\":\"check\",\"pred\":\"success\","
+        "\"then\":{\"op\":\"call\",\"id\":\"process\",\"tool\":\"echo\",\"args\":{\"text\":\"processed\"}},"
+        "\"else\":{\"op\":\"emit\",\"id\":\"err_out\",\"emit_key\":\"error\",\"emit_value\":\"failed\"}"
+        "},"
+        "{\"op\":\"emit\",\"id\":\"result\",\"emit_key\":\"output\",\"emit_value\":\"$process\"}"
+        "]}}";
+
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
+    HU_ASSERT_STR_EQ(prog.name, "e2e_pipeline");
+
+    /* 2. Validate against known tools */
+    const char *tool_names[] = {"echo", "fail_tool"};
+    hu_hula_validation_t v;
+    HU_ASSERT_EQ(hu_hula_validate(&prog, &alloc, tool_names, 2, &v), HU_OK);
+    HU_ASSERT_TRUE(v.valid);
+    hu_hula_validation_deinit(&alloc, &v);
+
+    /* 3. Serialize → re-parse (round-trip) */
+    char *serialized = NULL;
+    size_t serialized_len = 0;
+    HU_ASSERT_EQ(hu_hula_to_json(&alloc, &prog, &serialized, &serialized_len), HU_OK);
+    HU_ASSERT_STR_CONTAINS(serialized, "e2e_pipeline");
+    hu_str_free(&alloc, serialized);
+
+    /* 4. Execute with policy (autonomous, no blocking) + observer + trace */
+    hu_security_policy_t policy;
+    memset(&policy, 0, sizeof(policy));
+    policy.autonomy = HU_AUTONOMY_AUTONOMOUS;
+
+    test_obs_ctx_t obs_ctx = {0};
+    hu_observer_t obs = {.ctx = &obs_ctx, .vtable = &test_obs_vtable};
+
+    hu_tool_t tools[2];
+    make_tools(tools);
+    hu_hula_exec_t exec;
+    HU_ASSERT_EQ(hu_hula_exec_init_full(&exec, alloc, &prog, tools, 2, &policy, &obs), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
+
+    /* 5. Verify results across the entire tree */
+    HU_ASSERT_EQ(hu_hula_exec_result(&exec, "fetch1")->status, HU_HULA_DONE);
+    HU_ASSERT_STR_EQ(hu_hula_exec_result(&exec, "fetch1")->output, "data_a");
+    HU_ASSERT_EQ(hu_hula_exec_result(&exec, "fetch2")->status, HU_HULA_DONE);
+    HU_ASSERT_STR_EQ(hu_hula_exec_result(&exec, "fetch2")->output, "data_b");
+    HU_ASSERT_EQ(hu_hula_exec_result(&exec, "gather")->status, HU_HULA_DONE);
+    HU_ASSERT_EQ(hu_hula_exec_result(&exec, "process")->status, HU_HULA_DONE);
+    HU_ASSERT_STR_EQ(hu_hula_exec_result(&exec, "process")->output, "processed");
+    HU_ASSERT_EQ(hu_hula_exec_result(&exec, "result")->status, HU_HULA_DONE);
+    HU_ASSERT_STR_EQ(hu_hula_exec_result(&exec, "result")->output, "processed");
+    HU_ASSERT_EQ(hu_hula_exec_result(&exec, "main")->status, HU_HULA_DONE);
+
+    /* 6. Verify observer captured all tool calls */
+    HU_ASSERT_EQ(obs_ctx.start_count, 3);  /* fetch1, fetch2, process */
+    HU_ASSERT_EQ(obs_ctx.call_count, 3);
+
+    /* 7. Verify trace log is valid JSON with all nodes */
+    size_t trace_len = 0;
+    const char *trace = hu_hula_exec_trace(&exec, &trace_len);
+    HU_ASSERT_NOT_NULL(trace);
+    HU_ASSERT_TRUE(trace[0] == '[');
+    HU_ASSERT_TRUE(trace[trace_len - 1] == ']');
+    HU_ASSERT_STR_CONTAINS(trace, "\"fetch1\"");
+    HU_ASSERT_STR_CONTAINS(trace, "\"fetch2\"");
+    HU_ASSERT_STR_CONTAINS(trace, "\"process\"");
+    HU_ASSERT_STR_CONTAINS(trace, "\"result\"");
+    HU_ASSERT_STR_CONTAINS(trace, "\"main\"");
+
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+}
+
 void run_hula_tests(void) {
     HU_TEST_SUITE("hula");
 
@@ -724,4 +1036,16 @@ void run_hula_tests(void) {
     HU_RUN_TEST(hula_roundtrip_preserves_structure);
     HU_RUN_TEST(hula_exec_emit_resolves_ref);
     HU_RUN_TEST(hula_exec_nested_seq_par);
+
+    HU_RUN_TEST(hula_from_plan_flat_seq);
+    HU_RUN_TEST(hula_from_plan_with_deps);
+    HU_RUN_TEST(hula_from_dag_parallel_roots);
+
+    HU_RUN_TEST(hula_policy_locked_blocks_call);
+    HU_RUN_TEST(hula_policy_high_risk_blocked);
+
+    HU_RUN_TEST(hula_trace_records_execution);
+    HU_RUN_TEST(hula_observer_receives_events);
+
+    HU_RUN_TEST(hula_e2e_full_pipeline);
 }

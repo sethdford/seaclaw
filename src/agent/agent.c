@@ -195,6 +195,7 @@ hu_error_t hu_agent_from_config(
         out->tree_of_thought_enabled = ctx_cfg->tree_of_thought;
         out->constitutional_enabled = ctx_cfg->constitutional_ai;
         out->multi_agent_enabled = ctx_cfg->multi_agent;
+        out->hula_enabled = ctx_cfg->hula_enabled;
         if (ctx_cfg->speculative_cache) {
             hu_speculative_cache_t *cache =
                 (hu_speculative_cache_t *)alloc->alloc(alloc->ctx, sizeof(hu_speculative_cache_t));

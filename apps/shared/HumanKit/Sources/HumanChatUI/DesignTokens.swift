@@ -1,8 +1,5 @@
 // Auto-generated from design-tokens/ — do not edit manually
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
 
 public enum HUTokens {
     // MARK: - Colors (Dark)
@@ -23,14 +20,14 @@ public enum HUTokens {
         public static let accentTertiaryText = Color(hex: 0x818CF8)
         public static let accentText = Color(hex: 0x8DC63F)
         public static let backdropOverlay = Color(red: 0, green: 0, blue: 0, opacity: 0.6)
-        public static let bg = Color(hex: 0x060B12)
-        public static let bgElevated = Color(hex: 0x1E3044)
-        public static let bgInset = Color(hex: 0x0D1520)
-        public static let bgOverlay = Color(hex: 0x273D55)
-        public static let bgSurface = Color(hex: 0x152333)
-        public static let border = Color(hex: 0x2F4A64)
-        public static let borderSubtle = Color(hex: 0x1E3044)
-        public static let disabledOverlay = Color(red: 1, green: 1, blue: 1, opacity: 0.04)
+        public static let bg = Color(hex: 0x0C0A08)
+        public static let bgElevated = Color(hex: 0x28231E)
+        public static let bgInset = Color(hex: 0x141210)
+        public static let bgOverlay = Color(hex: 0x332D26)
+        public static let bgSurface = Color(hex: 0x1E1A16)
+        public static let border = Color(hex: 0x3E372F)
+        public static let borderSubtle = Color(hex: 0x28231E)
+        public static let disabledOverlay = Color(red: 0.9882, green: 0.9725, blue: 0.949, opacity: 0.04)
         public static let draggedOverlay = Color(red: 0.4784, green: 0.7137, blue: 0.2824, opacity: 0.16)
         public static let error = Color(hex: 0xF97066)
         public static let errorDim = Color(red: 0.9765, green: 0.4392, blue: 0.4, opacity: 0.12)
@@ -44,20 +41,20 @@ public enum HUTokens {
         public static let linkHover = Color(hex: 0xA3D46A)
         public static let linkVisited = Color(hex: 0x5A9A30)
         public static let onAccent = Color(hex: 0xFFFFFF)
-        public static let onAccentSecondary = Color(hex: 0x060B12)
+        public static let onAccentSecondary = Color(hex: 0x0C0A08)
         public static let onAccentTertiary = Color(hex: 0xFFFFFF)
         public static let pressedOverlay = Color(red: 0.4784, green: 0.7137, blue: 0.2824, opacity: 0.12)
         public static let success = Color(hex: 0x10B981)
         public static let successDim = Color(red: 0.0627, green: 0.7255, blue: 0.5059, opacity: 0.15)
-        public static let surfaceBright = Color(hex: 0x34506A)
-        public static let surfaceContainer = Color(hex: 0x172631)
-        public static let surfaceContainerHigh = Color(hex: 0x223540)
-        public static let surfaceContainerHighest = Color(hex: 0x2C4451)
-        public static let surfaceDim = Color(hex: 0x030710)
-        public static let text = Color(hex: 0xD8E4F0)
-        public static let textFaint = Color(hex: 0x3D5468)
-        public static let textMuted = Color(hex: 0x7A96B0)
-        public static let textSecondary = Color(hex: 0x8AA0B8)
+        public static let surfaceBright = Color(hex: 0x42392E)
+        public static let surfaceContainer = Color(hex: 0x1F1C19)
+        public static let surfaceContainerHigh = Color(hex: 0x2A2621)
+        public static let surfaceContainerHighest = Color(hex: 0x35302A)
+        public static let surfaceDim = Color(hex: 0x080604)
+        public static let text = Color(hex: 0xDDD8D3)
+        public static let textFaint = Color(hex: 0x56504A)
+        public static let textMuted = Color(hex: 0x8A847E)
+        public static let textSecondary = Color(hex: 0x9E9892)
         public static let warning = Color(hex: 0xEAB308)
         public static let warningDim = Color(red: 0.9176, green: 0.702, blue: 0.0314, opacity: 0.15)
     }
@@ -81,14 +78,14 @@ public enum HUTokens {
         public static let accentTertiaryText = Color(hex: 0x4338CA)
         public static let accentText = Color(hex: 0x3A6A24)
         public static let backdropOverlay = Color(red: 0, green: 0, blue: 0, opacity: 0.3)
-        public static let bg = Color(hex: 0xF5F5F5)
-        public static let bgElevated = Color(hex: 0xF8F8F8)
-        public static let bgInset = Color(hex: 0xEFEFEF)
-        public static let bgOverlay = Color(hex: 0xFFFFFF)
-        public static let bgSurface = Color(hex: 0xFFFFFF)
-        public static let bgWarm = Color(hex: 0xFAFAFA)
-        public static let border = Color(hex: 0xD9D9D9)
-        public static let borderSubtle = Color(hex: 0xE8E8E8)
+        public static let bg = Color(hex: 0xF4F1EE)
+        public static let bgElevated = Color(hex: 0xF9F7F4)
+        public static let bgInset = Color(hex: 0xEBE7E3)
+        public static let bgOverlay = Color(hex: 0xFFFEFA)
+        public static let bgSurface = Color(hex: 0xFFFEFA)
+        public static let bgWarm = Color(hex: 0xFAF8F6)
+        public static let border = Color(hex: 0xD8D2CC)
+        public static let borderSubtle = Color(hex: 0xE6E1DB)
         public static let disabledOverlay = Color(red: 0, green: 0, blue: 0, opacity: 0.04)
         public static let draggedOverlay = Color(red: 0.3529, green: 0.6039, blue: 0.1882, opacity: 0.14)
         public static let error = Color(hex: 0xCC0000)
@@ -108,15 +105,15 @@ public enum HUTokens {
         public static let pressedOverlay = Color(red: 0.3529, green: 0.6039, blue: 0.1882, opacity: 0.1)
         public static let success = Color(hex: 0x008000)
         public static let successDim = Color(red: 0, green: 0.502, blue: 0, opacity: 0.08)
-        public static let surfaceBright = Color(hex: 0xFFFFFF)
-        public static let surfaceContainer = Color(hex: 0xF7F8F5)
-        public static let surfaceContainerHigh = Color(hex: 0xEEEFEC)
-        public static let surfaceContainerHighest = Color(hex: 0xE7E9E5)
-        public static let surfaceDim = Color(hex: 0xE8E8E8)
-        public static let text = Color(hex: 0x333333)
-        public static let textFaint = Color(hex: 0x999999)
-        public static let textMuted = Color(hex: 0x666666)
-        public static let textSecondary = Color(hex: 0x4A4A4A)
+        public static let surfaceBright = Color(hex: 0xFFFEFA)
+        public static let surfaceContainer = Color(hex: 0xF9F7F4)
+        public static let surfaceContainerHigh = Color(hex: 0xF0EDE9)
+        public static let surfaceContainerHighest = Color(hex: 0xE9E5E0)
+        public static let surfaceDim = Color(hex: 0xE6E2DE)
+        public static let text = Color(hex: 0x2D2A26)
+        public static let textFaint = Color(hex: 0x9A9490)
+        public static let textMuted = Color(hex: 0x6B655E)
+        public static let textSecondary = Color(hex: 0x4A4540)
         public static let warning = Color(hex: 0xCA8A04)
         public static let warningDim = Color(red: 0.7922, green: 0.5412, blue: 0.0157, opacity: 0.1)
     }
@@ -185,6 +182,7 @@ public enum HUTokens {
     public static let glassChatActionsBgOpacity: Double = 0.9
     public static let glassChatBgOpacity: Double = 0.85
     public static let glassChatBorderOpacity: Double = 0.08
+    public static let glassChromaticOpacity: Double = 0.15
     public static let glassProminentBgOpacity: Double = 0.08
     public static let glassProminentBorderOpacity: Double = 0.12
     public static let glassProminentInsetOpacity: Double = 0.1
@@ -207,6 +205,7 @@ public enum HUTokens {
     public static let glassTextBoost: Double = 1.15
     public static let glassChatActionsBlur: CGFloat = 16
     public static let glassChatBlur: CGFloat = 24
+    public static let glassChromaticSpread: CGFloat = 2
     public static let glassProminentBlur: CGFloat = 32
     public static let glassStandardBlur: CGFloat = 24
     public static let glassSubtleBlur: CGFloat = 12
@@ -219,28 +218,6 @@ public enum HUTokens {
     public static let springExpressive = Animation.spring(response: 0.574, dampingFraction: 0.639)
     public static let springDramatic = Animation.spring(response: 0.702, dampingFraction: 0.559)
     public static let springInteractive = Animation.spring(response: 0.35, dampingFraction: 0.864)
-
-    // MARK: - Spatial Depth (Quiet Mastery)
-
-    /// Default perspective distance for card containers
-    public static let perspective: CGFloat = 1200
-    /// Maximum card tilt angle in degrees
-    public static let cardTiltMax: Double = 8
-    /// Pointer proximity detection radius
-    public static let proximityRadius: CGFloat = 200
-
-    // MARK: - Haptic Vocabulary (Extended)
-    #if canImport(UIKit)
-
-    /// Selection haptic — tab switch, picker scroll, settings toggle
-    public static let hapticSelection = UIImpactFeedbackGenerator(style: .light)
-    /// Impact haptic — button press, significant state changes
-    public static let hapticImpact = UIImpactFeedbackGenerator(style: .medium)
-    /// Heavy impact — destructive actions, major transitions
-    public static let hapticHeavy = UIImpactFeedbackGenerator(style: .heavy)
-    /// Notification success — task complete, connection established
-    public static let hapticSuccess = UINotificationFeedbackGenerator()
-    #endif
 
     // MARK: - Haptic Feedback
     public enum Haptic {
