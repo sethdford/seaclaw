@@ -1704,9 +1704,13 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         bench_json_len = (size_t)bsz;
         bench_json = alloc->alloc(alloc->ctx, bench_json_len + 1);
         if (!bench_json) { fclose(bf); return HU_ERR_OUT_OF_MEMORY; }
-        fread(bench_json, 1, bench_json_len, bf);
-        bench_json[bench_json_len] = '\0';
+        size_t nread = fread(bench_json, 1, bench_json_len, bf);
         fclose(bf);
+        if (nread != bench_json_len) {
+            alloc->free(alloc->ctx, bench_json, bench_json_len + 1);
+            return HU_ERR_IO;
+        }
+        bench_json[bench_json_len] = '\0';
 #endif
 
         hu_eval_suite_t bench_suite;
