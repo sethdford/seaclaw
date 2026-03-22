@@ -305,8 +305,9 @@
       "$type": "shadow"
     },
     "surface-gradient": {
-      "$value": "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.12) 100%)",
-      "$type": "string"
+      "$value": "linear-gradient(180deg, rgba(252,248,242,0.04) 0%, rgba(12,8,4,0.12) 100%)",
+      "$type": "string",
+      "$description": "Warm cream-to-dark gradient — warm inset highlight"
     },
     "surface-glow": {
       "$value": "radial-gradient(ellipse at 50% 0%, rgba(122,182,72,0.08) 0%, transparent 70%)",
@@ -314,13 +315,33 @@
       "$description": "Ambient Fidelity green glow at the top of cards — creates atmospheric depth"
     },
     "button-gradient-primary": {
-      "$value": "linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(0,0,0,0.18) 100%)",
+      "$value": "linear-gradient(180deg, rgba(252,248,242,0.12) 0%, rgba(12,8,4,0.18) 100%)",
       "$type": "string"
     },
     "hero-gradient": {
       "$value": "linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(99,102,241,0.03) 80%, transparent 100%)",
       "$type": "string",
       "$description": "Atmospheric gradient — Fidelity green to forest with a hint of deep indigo"
+    },
+    "mesh-gradient": {
+      "$value": "radial-gradient(ellipse at 20% 50%, rgba(122,182,72,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(99,102,241,0.04) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.03) 0%, transparent 50%)",
+      "$type": "string",
+      "$description": "Multi-point mesh gradient — fidelity green, indigo, amber for cinematic depth"
+    },
+    "aurora-gradient": {
+      "$value": "conic-gradient(from 135deg at 50% 50%, rgba(122,182,72,0.08), rgba(99,102,241,0.06), rgba(245,158,11,0.04), rgba(122,182,72,0.08))",
+      "$type": "string",
+      "$description": "Slow-rotating aurora for hero sections — ambient color wash"
+    },
+    "shadow-colored-accent": {
+      "$value": "0 4px 16px rgba(122,182,72,0.12), 0 8px 32px rgba(122,182,72,0.08)",
+      "$type": "shadow",
+      "$description": "Fidelity green tinted shadow for accent-heavy elements"
+    },
+    "shadow-colored-warm": {
+      "$value": "0 4px 16px rgba(200,160,80,0.10), 0 8px 32px rgba(200,160,80,0.06)",
+      "$type": "shadow",
+      "$description": "Warm amber tinted shadow for elevated surfaces"
     }
   },
   "light": {

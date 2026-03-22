@@ -27,6 +27,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -35,9 +36,19 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_HUMAN = REPO_ROOT / "build" / "human"
 
+_EVAL_HOME: str | None = None
+
+def _get_eval_home() -> str:
+    """Lazily create a clean temp HOME so agent subprocesses don't load stale ~/.human/ state."""
+    global _EVAL_HOME
+    if _EVAL_HOME is None:
+        _EVAL_HOME = tempfile.mkdtemp(prefix="hu_eval_home_")
+    return _EVAL_HOME
+
 def _build_agent_env(overrides: dict[str, str] | None) -> dict[str, str]:
     """Copy os.environ and apply overrides so `human agent` sees the same credentials as the parent shell."""
     env = os.environ.copy()
+    env["HOME"] = _get_eval_home()
     if overrides:
         for k, v in overrides.items():
             if v:
@@ -509,6 +520,7 @@ def main() -> int:
             "agent_provider": args.agent_provider or os.environ.get("HUMAN_PROVIDER", ""),
             "agent_model": args.agent_model or os.environ.get("HUMAN_MODEL", ""),
             "autonomy_level": os.environ.get("HUMAN_AUTONOMY", "default"),
+            "isolated_home": _EVAL_HOME or "",
         },
         "results": results,
     }
@@ -516,6 +528,11 @@ def main() -> int:
     print(text)
     if args.output:
         args.output.write_text(text, encoding="utf-8")
+
+    # Clean up isolated eval HOME
+    import shutil
+    if _EVAL_HOME and os.path.isdir(_EVAL_HOME):
+        shutil.rmtree(_EVAL_HOME, ignore_errors=True)
 
     if args.fail_under >= 0.0 and mean_score < args.fail_under:
         return 2

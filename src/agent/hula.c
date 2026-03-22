@@ -752,3 +752,296 @@ void hu_hula_exec_deinit(hu_hula_exec_t *exec) {
         exec->alloc.free(exec->alloc.ctx, exec->halt_reason, exec->halt_reason_len + 1);
     memset(exec, 0, sizeof(*exec));
 }
+
+/* ── Bridges (plan / DAG → HuLa) ───────────────────────────────────────── */
+
+static hu_hula_node_t *hula_bridge_alloc_call(hu_hula_program_t *prog, const char *id,
+                                              const char *tool_name, const char *args_json,
+                                              const char *description) {
+    hu_hula_node_t *n = hu_hula_program_alloc_node(prog, HU_HULA_CALL, id);
+    if (!n) return NULL;
+    if (tool_name) {
+        n->tool_name = hu_strdup(&prog->alloc, tool_name);
+        if (!n->tool_name) return NULL;
+    }
+    if (args_json) {
+        n->args_json = hu_strdup(&prog->alloc, args_json);
+        if (!n->args_json) return NULL;
+    }
+    if (description) {
+        n->description = hu_strdup(&prog->alloc, description);
+        if (!n->description) return NULL;
+    }
+    return n;
+}
+
+static bool plan_step_ready(const hu_plan_t *plan, size_t idx, const unsigned char *placed) {
+    const hu_plan_step_t *st = &plan->steps[idx];
+    for (size_t d = 0; d < st->depends_count; d++) {
+        int di = st->depends_on[d];
+        if (di < 0 || (size_t)di >= plan->steps_count) return false;
+        if (!placed[(size_t)di]) return false;
+    }
+    return true;
+}
+
+static int dag_index_by_id(const hu_dag_t *dag, const char *id) {
+    if (!id) return -1;
+    for (size_t i = 0; i < dag->node_count; i++) {
+        if (dag->nodes[i].id && strcmp(dag->nodes[i].id, id) == 0) return (int)i;
+    }
+    return -1;
+}
+
+static bool dag_node_ready(const hu_dag_t *dag, size_t idx, const unsigned char *placed) {
+    const hu_dag_node_t *n = &dag->nodes[idx];
+    for (size_t d = 0; d < n->dep_count; d++) {
+        int di = dag_index_by_id(dag, n->deps[d]);
+        if (di < 0) return false;
+        if (!placed[(size_t)di]) return false;
+    }
+    return true;
+}
+
+hu_error_t hu_hula_from_plan(hu_allocator_t *alloc, const hu_plan_t *plan, const char *name,
+                             size_t name_len, hu_hula_program_t *out) {
+    if (!alloc || !plan || !out) return HU_ERR_INVALID_ARGUMENT;
+    if (plan->steps_count > 0 && !plan->steps) return HU_ERR_INVALID_ARGUMENT;
+
+    hu_error_t err = hu_hula_program_init(out, *alloc, name, name_len);
+    if (err != HU_OK) return err;
+
+    if (plan->steps_count == 0) {
+        out->root = NULL;
+        return HU_OK;
+    }
+
+    unsigned char *placed = alloc->alloc(alloc->ctx, plan->steps_count);
+    if (!placed) {
+        hu_hula_program_deinit(out);
+        memset(out, 0, sizeof(*out));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    memset(placed, 0, plan->steps_count);
+
+    size_t *wave_idx = alloc->alloc(alloc->ctx, plan->steps_count * sizeof(size_t));
+    if (!wave_idx) {
+        alloc->free(alloc->ctx, placed, plan->steps_count);
+        hu_hula_program_deinit(out);
+        memset(out, 0, sizeof(*out));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+
+    hu_hula_node_t *outer = hu_hula_program_alloc_node(out, HU_HULA_SEQ, "plan");
+    if (!outer) {
+        err = HU_ERR_OUT_OF_MEMORY;
+        goto fail;
+    }
+
+    size_t placed_count = 0;
+    size_t wave_num = 0;
+    while (placed_count < plan->steps_count) {
+        size_t wn = 0;
+        for (size_t i = 0; i < plan->steps_count; i++) {
+            if (placed[i]) continue;
+            if (!plan_step_ready(plan, i, placed)) continue;
+            wave_idx[wn++] = i;
+        }
+        if (wn == 0) {
+            err = HU_ERR_INVALID_ARGUMENT;
+            goto fail;
+        }
+        if (wn > HU_HULA_MAX_CHILDREN) {
+            err = HU_ERR_INVALID_ARGUMENT;
+            goto fail;
+        }
+
+        if (wn == 1) {
+            size_t si = wave_idx[0];
+            char sid[32];
+            (void)snprintf(sid, sizeof(sid), "s%zu", si);
+            const hu_plan_step_t *st = &plan->steps[si];
+            hu_hula_node_t *call = hula_bridge_alloc_call(out, sid, st->tool_name, st->args_json,
+                                                           st->description);
+            if (!call) {
+                err = HU_ERR_OUT_OF_MEMORY;
+                goto fail;
+            }
+            if (outer->children_count >= HU_HULA_MAX_CHILDREN) {
+                err = HU_ERR_INVALID_ARGUMENT;
+                goto fail;
+            }
+            outer->children[outer->children_count++] = call;
+            placed[si] = 1;
+        } else {
+            char wid[40];
+            (void)snprintf(wid, sizeof(wid), "w%zu", wave_num);
+            hu_hula_node_t *par = hu_hula_program_alloc_node(out, HU_HULA_PAR, wid);
+            if (!par) {
+                err = HU_ERR_OUT_OF_MEMORY;
+                goto fail;
+            }
+            for (size_t k = 0; k < wn; k++) {
+                size_t si = wave_idx[k];
+                char sid[32];
+                (void)snprintf(sid, sizeof(sid), "s%zu", si);
+                const hu_plan_step_t *st = &plan->steps[si];
+                hu_hula_node_t *call = hula_bridge_alloc_call(out, sid, st->tool_name, st->args_json,
+                                                               st->description);
+                if (!call) {
+                    err = HU_ERR_OUT_OF_MEMORY;
+                    goto fail;
+                }
+                if (par->children_count >= HU_HULA_MAX_CHILDREN) {
+                    err = HU_ERR_INVALID_ARGUMENT;
+                    goto fail;
+                }
+                par->children[par->children_count++] = call;
+            }
+            if (outer->children_count >= HU_HULA_MAX_CHILDREN) {
+                err = HU_ERR_INVALID_ARGUMENT;
+                goto fail;
+            }
+            outer->children[outer->children_count++] = par;
+            for (size_t k = 0; k < wn; k++) placed[wave_idx[k]] = 1;
+        }
+
+        placed_count += wn;
+        wave_num++;
+    }
+
+    out->root = outer;
+    alloc->free(alloc->ctx, wave_idx, plan->steps_count * sizeof(size_t));
+    alloc->free(alloc->ctx, placed, plan->steps_count);
+    return HU_OK;
+
+fail:
+    alloc->free(alloc->ctx, wave_idx, plan->steps_count * sizeof(size_t));
+    alloc->free(alloc->ctx, placed, plan->steps_count);
+    hu_hula_program_deinit(out);
+    memset(out, 0, sizeof(*out));
+    return err;
+}
+
+hu_error_t hu_hula_from_dag(hu_allocator_t *alloc, const hu_dag_t *dag, const char *name,
+                            size_t name_len, hu_hula_program_t *out) {
+    if (!alloc || !dag || !out) return HU_ERR_INVALID_ARGUMENT;
+
+    hu_error_t err = hu_hula_program_init(out, *alloc, name, name_len);
+    if (err != HU_OK) return err;
+
+    if (dag->node_count == 0) {
+        out->root = NULL;
+        return HU_OK;
+    }
+
+    unsigned char *placed = alloc->alloc(alloc->ctx, dag->node_count);
+    if (!placed) {
+        hu_hula_program_deinit(out);
+        memset(out, 0, sizeof(*out));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    memset(placed, 0, dag->node_count);
+
+    size_t *wave_idx = alloc->alloc(alloc->ctx, dag->node_count * sizeof(size_t));
+    if (!wave_idx) {
+        alloc->free(alloc->ctx, placed, dag->node_count);
+        hu_hula_program_deinit(out);
+        memset(out, 0, sizeof(*out));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+
+    hu_hula_node_t *outer = hu_hula_program_alloc_node(out, HU_HULA_SEQ, "dag");
+    if (!outer) {
+        err = HU_ERR_OUT_OF_MEMORY;
+        goto fail_dag;
+    }
+
+    size_t placed_count = 0;
+    size_t wave_num = 0;
+    while (placed_count < dag->node_count) {
+        size_t wn = 0;
+        for (size_t i = 0; i < dag->node_count; i++) {
+            if (placed[i]) continue;
+            if (!dag_node_ready(dag, i, placed)) continue;
+            wave_idx[wn++] = i;
+        }
+        if (wn == 0) {
+            err = HU_ERR_INVALID_ARGUMENT;
+            goto fail_dag;
+        }
+        if (wn > HU_HULA_MAX_CHILDREN) {
+            err = HU_ERR_INVALID_ARGUMENT;
+            goto fail_dag;
+        }
+
+        if (wn == 1) {
+            size_t ni = wave_idx[0];
+            const hu_dag_node_t *dn = &dag->nodes[ni];
+            char nid[40];
+            if (dn->id)
+                (void)snprintf(nid, sizeof(nid), "%s", dn->id);
+            else
+                (void)snprintf(nid, sizeof(nid), "n%zu", ni);
+            hu_hula_node_t *call = hula_bridge_alloc_call(out, nid, dn->tool_name, dn->args_json, NULL);
+            if (!call) {
+                err = HU_ERR_OUT_OF_MEMORY;
+                goto fail_dag;
+            }
+            if (outer->children_count >= HU_HULA_MAX_CHILDREN) {
+                err = HU_ERR_INVALID_ARGUMENT;
+                goto fail_dag;
+            }
+            outer->children[outer->children_count++] = call;
+            placed[ni] = 1;
+        } else {
+            char wid[40];
+            (void)snprintf(wid, sizeof(wid), "w%zu", wave_num);
+            hu_hula_node_t *par = hu_hula_program_alloc_node(out, HU_HULA_PAR, wid);
+            if (!par) {
+                err = HU_ERR_OUT_OF_MEMORY;
+                goto fail_dag;
+            }
+            for (size_t k = 0; k < wn; k++) {
+                size_t ni = wave_idx[k];
+                const hu_dag_node_t *dn = &dag->nodes[ni];
+                char nid[40];
+                if (dn->id)
+                    (void)snprintf(nid, sizeof(nid), "%s", dn->id);
+                else
+                    (void)snprintf(nid, sizeof(nid), "n%zu", ni);
+                hu_hula_node_t *call = hula_bridge_alloc_call(out, nid, dn->tool_name, dn->args_json, NULL);
+                if (!call) {
+                    err = HU_ERR_OUT_OF_MEMORY;
+                    goto fail_dag;
+                }
+                if (par->children_count >= HU_HULA_MAX_CHILDREN) {
+                    err = HU_ERR_INVALID_ARGUMENT;
+                    goto fail_dag;
+                }
+                par->children[par->children_count++] = call;
+            }
+            if (outer->children_count >= HU_HULA_MAX_CHILDREN) {
+                err = HU_ERR_INVALID_ARGUMENT;
+                goto fail_dag;
+            }
+            outer->children[outer->children_count++] = par;
+            for (size_t k = 0; k < wn; k++) placed[wave_idx[k]] = 1;
+        }
+
+        placed_count += wn;
+        wave_num++;
+    }
+
+    out->root = outer;
+    alloc->free(alloc->ctx, wave_idx, dag->node_count * sizeof(size_t));
+    alloc->free(alloc->ctx, placed, dag->node_count);
+    return HU_OK;
+
+fail_dag:
+    alloc->free(alloc->ctx, wave_idx, dag->node_count * sizeof(size_t));
+    alloc->free(alloc->ctx, placed, dag->node_count);
+    hu_hula_program_deinit(out);
+    memset(out, 0, sizeof(*out));
+    return err;
+}
