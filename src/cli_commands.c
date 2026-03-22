@@ -2174,9 +2174,8 @@ static hu_error_t hula_demo_execute(void *ctx, hu_allocator_t *alloc,
     hula_demo_tool_ctx_t *t = ctx;
     const char *text = "ok";
     if (args) {
-        const hu_json_value_t *v = hu_json_get(args, "text");
-        if (v && v->type == HU_JSON_STRING)
-            text = v->str;
+        const char *s = hu_json_get_string(args, "text");
+        if (s) text = s;
     }
     char buf[256];
     int n = snprintf(buf, sizeof(buf), "[%s] %s", t->name, text);
