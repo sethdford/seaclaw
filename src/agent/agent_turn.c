@@ -29,6 +29,8 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/agent/dispatcher.h"
 #include "human/agent/input_guard.h"
 #include "human/agent/hula.h"
+#include "human/agent/hula_compiler.h"
+#include "human/agent/hula_emergence.h"
 #include "human/agent/llm_compiler.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/memory_loader.h"
@@ -115,6 +117,40 @@ typedef struct dag_parallel_work {
     hu_dag_node_t *node;
     hu_dag_t *dag;
 } dag_parallel_work_t;
+
+static void agent_turn_hula_append_histories(hu_agent_t *agent, const hu_hula_program_t *prog,
+                                             const hu_hula_exec_t *exec) {
+    if (!agent || !prog || !exec)
+        return;
+    for (size_t i = 0; i < prog->node_count; i++) {
+        if (prog->nodes[i].op != HU_HULA_CALL)
+            continue;
+        const hu_hula_node_t *cn = &prog->nodes[i];
+        const hu_hula_result_t *hr =
+            cn->id ? hu_hula_exec_result(exec, cn->id) : NULL;
+        const char *out_text = "";
+        size_t out_len = 0;
+        char idbuf[64];
+        const char *tcid = cn->id;
+        size_t tcid_len = tcid ? strlen(tcid) : 0;
+        if (!tcid) {
+            (void)snprintf(idbuf, sizeof(idbuf), "hula_%zu", i);
+            tcid = idbuf;
+            tcid_len = strlen(idbuf);
+        }
+        if (hr && hr->status == HU_HULA_DONE && hr->output) {
+            out_text = hr->output;
+            out_len = hr->output_len;
+        } else if (hr && hr->error) {
+            out_text = hr->error;
+            out_len = hr->error_len;
+        }
+        const char *nm = cn->tool_name ? cn->tool_name : "hula";
+        size_t nm_len = cn->tool_name ? strlen(cn->tool_name) : 4;
+        (void)hu_agent_internal_append_history(agent, HU_ROLE_TOOL, out_text, out_len, nm, nm_len,
+                                               tcid, tcid_len);
+    }
+}
 
 static void *dag_parallel_worker(void *arg) {
     dag_parallel_work_t *w = (dag_parallel_work_t *)arg;
@@ -1667,6 +1703,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             .cognition_mode_len = cognition_mode_str_len,
             .episodic_replay = episodic_replay,
             .episodic_replay_len = episodic_replay_len,
+            .hula_program_protocol = agent->hula_enabled,
         };
         err = hu_prompt_build_system(agent->alloc, &cfg, &system_prompt, &system_prompt_len);
         if (persona_prompt)
@@ -2138,6 +2175,63 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 resp.tool_calls_count = text_calls_count;
             }
         }
+
+#ifndef HU_IS_TEST
+        /* Native HuLa: model embeds <hula_program>...</hula_program> with no tool_calls */
+        if (agent->hula_enabled && resp.tool_calls_count == 0 && resp.content && resp.content_len > 0) {
+            hu_hula_program_t hprog;
+            memset(&hprog, 0, sizeof(hprog));
+            if (hu_hula_extract_program_from_text(agent->alloc, resp.content, resp.content_len,
+                                                  &hprog) == HU_OK &&
+                hprog.root) {
+                hu_hula_exec_t hx;
+                memset(&hx, 0, sizeof(hx));
+                hu_error_t hxe = hu_hula_exec_init_full(&hx, *agent->alloc, &hprog, agent->tools,
+                                                        agent->tools_count, agent->policy,
+                                                        agent->observer);
+                if (hxe == HU_OK)
+                    hxe = hu_hula_exec_run(&hx);
+                if (hxe == HU_OK) {
+                    size_t trl = 0;
+                    const char *tr = hu_hula_exec_trace(&hx, &trl);
+                    bool root_ok = false;
+                    if (hprog.root && hprog.root->id)
+                        root_ok = hu_hula_exec_result(&hx, hprog.root->id)->status == HU_HULA_DONE;
+                    else
+                        root_ok = true;
+                    (void)hu_hula_trace_persist(agent->alloc, NULL, tr, trl, hprog.name,
+                                                hprog.name_len, root_ok);
+                    char *stripped = NULL;
+                    size_t slen = 0;
+                    const char *asst = resp.content;
+                    size_t asst_len = resp.content_len;
+                    if (hu_hula_strip_program_tags(agent->alloc, resp.content, resp.content_len,
+                                                   &stripped, &slen) == HU_OK &&
+                        stripped) {
+                        asst = stripped;
+                        asst_len = slen;
+                    }
+                    if (asst_len > 0)
+                        (void)hu_agent_internal_append_history(agent, HU_ROLE_ASSISTANT, asst, asst_len,
+                                                               NULL, 0, NULL, 0);
+                    if (stripped)
+                        agent->alloc->free(agent->alloc->ctx, stripped, slen + 1);
+                    agent_turn_hula_append_histories(agent, &hprog, &hx);
+                    if (agent->bth_metrics)
+                        agent->bth_metrics->hula_tool_turns++;
+                    hu_hula_exec_deinit(&hx);
+                    hu_hula_program_deinit(&hprog);
+                    hu_chat_response_free(agent->alloc, &resp);
+                    iter++;
+                    continue;
+                }
+                hu_hula_exec_deinit(&hx);
+                hu_hula_program_deinit(&hprog);
+            } else {
+                hu_hula_program_deinit(&hprog);
+            }
+        }
+#endif
 
         if (resp.tool_calls_count == 0) {
             uint64_t turn_duration_ms = hu_agent_internal_clock_diff_ms(turn_start, clock());
@@ -3031,12 +3125,103 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
             } else {
                 bool used_llm_compiler = false;
+                bool used_hula_ir = false;
                 /* LLMCompiler: when enabled, compile tool calls into a DAG for parallel execution.
                  * Note: LLMCompiler is opt-in via config; the existing dispatcher handles
                  * parallelism. */
 #ifndef HU_IS_TEST
+                /* HuLa compiler: LLM emits full HuLa JSON (preferred over DAG when enabled). */
+                if (agent->hula_enabled && tc_count >= 3 && agent->provider.vtable &&
+                    agent->provider.vtable->chat) {
+                    char *hprompt = NULL;
+                    size_t hprompt_len = 0;
+                    if (hu_hula_compiler_build_prompt(agent->alloc, msg, msg_len, agent->tools,
+                                                      agent->tools_count, &hprompt,
+                                                      &hprompt_len) == HU_OK && hprompt) {
+                        hu_chat_message_t hm[1] = {{.role = HU_ROLE_USER,
+                                                    .content = hprompt,
+                                                    .content_len = hprompt_len}};
+                        hu_chat_request_t hreq = {.messages = hm,
+                                                .messages_count = 1,
+                                                .tools = NULL,
+                                                .tools_count = 0,
+                                                .response_format = "json_object",
+                                                .response_format_len = 11};
+                        hu_chat_response_t hresp;
+                        memset(&hresp, 0, sizeof(hresp));
+                        hu_error_t her = agent->provider.vtable->chat(
+                            agent->provider.ctx, agent->alloc, &hreq, agent->model_name,
+                            agent->model_name_len, agent->temperature, &hresp);
+                        hu_str_free(agent->alloc, hprompt);
+                        if (her == HU_OK && hresp.content && hresp.content_len > 0) {
+                            hu_hula_program_t hcp;
+                            memset(&hcp, 0, sizeof(hcp));
+                            if (hu_hula_compiler_parse_response(agent->alloc, hresp.content,
+                                                                hresp.content_len, &hcp) == HU_OK &&
+                                hcp.root) {
+                                const char **tnames = NULL;
+                                size_t tnc = 0;
+                                if (agent->tools_count > 0) {
+                                    tnames = (const char **)agent->alloc->alloc(
+                                        agent->alloc->ctx,
+                                        agent->tools_count * sizeof(const char *));
+                                    if (tnames) {
+                                        for (size_t ui = 0; ui < agent->tools_count; ui++) {
+                                            tnames[ui] =
+                                                (agent->tools[ui].vtable &&
+                                                 agent->tools[ui].vtable->name)
+                                                    ? agent->tools[ui].vtable->name(
+                                                          agent->tools[ui].ctx)
+                                                    : "";
+                                        }
+                                        tnc = agent->tools_count;
+                                    }
+                                }
+                                hu_hula_validation_t hv;
+                                memset(&hv, 0, sizeof(hv));
+                                bool vok = (hu_hula_validate(&hcp, agent->alloc, tnames, tnc, &hv) ==
+                                            HU_OK &&
+                                            hv.valid);
+                                hu_hula_validation_deinit(agent->alloc, &hv);
+                                if (tnames)
+                                    agent->alloc->free(agent->alloc->ctx, (void *)tnames,
+                                                       agent->tools_count * sizeof(const char *));
+                                if (vok) {
+                                    hu_hula_exec_t hcx;
+                                    memset(&hcx, 0, sizeof(hcx));
+                                    if (hu_hula_exec_init_full(&hcx, *agent->alloc, &hcp,
+                                                               agent->tools, agent->tools_count,
+                                                               agent->policy,
+                                                               agent->observer) == HU_OK &&
+                                        hu_hula_exec_run(&hcx) == HU_OK) {
+                                        size_t trl = 0;
+                                        const char *tr = hu_hula_exec_trace(&hcx, &trl);
+                                        bool hok = false;
+                                        if (hcp.root && hcp.root->id)
+                                            hok = hu_hula_exec_result(&hcx, hcp.root->id)->status ==
+                                                  HU_HULA_DONE;
+                                        else
+                                            hok = true;
+                                        (void)hu_hula_trace_persist(agent->alloc, NULL, tr, trl,
+                                                                    hcp.name, hcp.name_len, hok);
+                                        agent_turn_hula_append_histories(agent, &hcp, &hcx);
+                                        if (agent->bth_metrics)
+                                            agent->bth_metrics->hula_tool_turns++;
+                                        used_llm_compiler = true;
+                                        used_hula_ir = true;
+                                        hu_hula_exec_deinit(&hcx);
+                                    } else
+                                        hu_hula_exec_deinit(&hcx);
+                                }
+                                hu_hula_program_deinit(&hcp);
+                            } else
+                                hu_hula_program_deinit(&hcp);
+                        }
+                        hu_chat_response_free(agent->alloc, &hresp);
+                    }
+                }
                 /* LLMCompiler: if enabled and 3+ tool calls, use DAG-based execution */
-                if (agent->llm_compiler_enabled && tc_count >= 3) {
+                if (!used_llm_compiler && agent->llm_compiler_enabled && tc_count >= 3) {
                     const char *tool_names[32];
                     size_t tn_count = 0;
                     for (size_t ti = 0; ti < agent->tools_count && tn_count < 32; ti++) {
@@ -3368,7 +3553,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                  * execution. Falls through to the dispatcher if disabled or on failure. */
                 bool used_hula = false;
 #ifndef HU_IS_TEST
-                if (!used_llm_compiler && agent->hula_enabled && tc_count >= 1) {
+                if (!used_llm_compiler && !used_hula_ir && agent->hula_enabled && tc_count >= 1) {
                     hu_hula_program_t hula_prog;
                     hu_error_t herr = hu_hula_program_init(&hula_prog, *agent->alloc,
                                                             "turn", 4);
@@ -3414,8 +3599,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     herr = hu_hula_exec_run(&hula_exec);
                                     if (herr == HU_OK) {
                                         used_hula = true;
-                                        if (agent->bth_metrics)
-                                            agent->bth_metrics->hula_tool_turns++;
+                                        hu_bth_metrics_record_hula_tool_turn(agent->bth_metrics);
                                         for (size_t hti = 0; hti < tc_count; hti++) {
                                             char cid[16];
                                             if (tc_count == 1)
@@ -3448,7 +3632,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
 #endif /* HU_IS_TEST */
 
-                if (!used_llm_compiler && !used_hula) {
+                if (!used_llm_compiler && !used_hula_ir && !used_hula) {
                 /* Use dispatcher for parallel execution when enabled (Tier 1.3) */
                 hu_dispatcher_t dispatcher;
                 hu_dispatcher_default(&dispatcher);

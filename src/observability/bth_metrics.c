@@ -8,6 +8,11 @@ void hu_bth_metrics_init(hu_bth_metrics_t *m) {
     memset(m, 0, sizeof(*m));
 }
 
+void hu_bth_metrics_record_hula_tool_turn(hu_bth_metrics_t *m) {
+    if (m)
+        m->hula_tool_turns++;
+}
+
 #define HU_BTH_LOG_FIELD(field) \
     do { \
         if (m->field) \

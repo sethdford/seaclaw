@@ -57,6 +57,9 @@ typedef struct hu_bth_metrics {
 
 void hu_bth_metrics_init(hu_bth_metrics_t *m);
 
+/* Increment hula_tool_turns when non-NULL. Used from agent_turn (HuLa path) and tests. */
+void hu_bth_metrics_record_hula_tool_turn(hu_bth_metrics_t *m);
+
 /* Log a summary of metrics to stderr. */
 void hu_bth_metrics_log(const hu_bth_metrics_t *m);
 

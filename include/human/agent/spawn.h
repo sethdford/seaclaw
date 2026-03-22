@@ -141,4 +141,9 @@ struct hu_named_agent_config;
 void hu_spawn_config_from_named(hu_spawn_config_t *out,
                                 const struct hu_named_agent_config *cfg);
 
+/* If hu_agent_get_current_for_tools() is set, copy caller_spawn_depth,
+ * shared_cost_tracker, and metacognition_policy from that agent into *cfg.
+ * Used by hu_agent_pool_spawn_named; callable from tests without spawning. */
+void hu_spawn_config_apply_current_tool_agent(hu_spawn_config_t *cfg);
+
 #endif /* HU_AGENT_SPAWN_H */

@@ -764,6 +764,17 @@ void hu_spawn_config_from_named(hu_spawn_config_t *out, const hu_named_agent_con
     out->mode = HU_SPAWN_ONE_SHOT;
 }
 
+void hu_spawn_config_apply_current_tool_agent(hu_spawn_config_t *cfg) {
+    if (!cfg)
+        return;
+    hu_agent_t *cur = hu_agent_get_current_for_tools();
+    if (!cur)
+        return;
+    cfg->caller_spawn_depth = cur->spawn_depth;
+    cfg->shared_cost_tracker = cur->cost_tracker;
+    cfg->metacognition_policy = &cur->metacognition.cfg;
+}
+
 hu_error_t hu_agent_pool_spawn_named(hu_agent_pool_t *pool, const hu_agent_registry_t *registry,
                                      const char *agent_name, const char *task, size_t task_len,
                                      uint64_t *out_id) {
@@ -776,13 +787,6 @@ hu_error_t hu_agent_pool_spawn_named(hu_agent_pool_t *pool, const hu_agent_regis
 
     hu_spawn_config_t spawn_cfg;
     hu_spawn_config_from_named(&spawn_cfg, cfg);
-    {
-        hu_agent_t *cur = hu_agent_get_current_for_tools();
-        if (cur) {
-            spawn_cfg.caller_spawn_depth = cur->spawn_depth;
-            spawn_cfg.shared_cost_tracker = cur->cost_tracker;
-            spawn_cfg.metacognition_policy = &cur->metacognition.cfg;
-        }
-    }
+    hu_spawn_config_apply_current_tool_agent(&spawn_cfg);
     return hu_agent_pool_spawn(pool, &spawn_cfg, task, task_len, agent_name, out_id);
 }

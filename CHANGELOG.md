@@ -8,7 +8,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 
 - **BTH**: `hula_tool_turns` counter when the HuLa IR path executes a tool batch
+- **`hu_bth_metrics_record_hula_tool_turn()`**: shared hook for HuLa success path and unit tests
+- **`hu_spawn_config_apply_current_tool_agent()`**: merges thread-local tool agent into spawn cfg (used by named spawn; covered by `agent_registry` tests)
+- **Docs**: `docs/operations/metacog-hula-production.md` (tuning, telemetry, CI parity)
 - **Delegate / named spawn**: inherit parent metacognition policy via `hu_agent_pool_spawn_named`
+
+### Fixed
+
+- **Docs**: YAML frontmatter on `docs/eval-runs/README.md` (doc-fleet / CI)
 
 ## [0.5.0] - 2026-03-15
 

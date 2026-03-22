@@ -147,6 +147,17 @@ static void bth_metrics_log_does_not_crash_with_zeros(void) {
     hu_bth_metrics_log(&m);
 }
 
+static void bth_metrics_record_hula_hook(void) {
+    hu_bth_metrics_t m;
+    hu_bth_metrics_init(&m);
+    hu_bth_metrics_record_hula_tool_turn(NULL);
+    HU_ASSERT_EQ(m.hula_tool_turns, 0u);
+    hu_bth_metrics_record_hula_tool_turn(&m);
+    HU_ASSERT_EQ(m.hula_tool_turns, 1u);
+    hu_bth_metrics_record_hula_tool_turn(&m);
+    HU_ASSERT_EQ(m.hula_tool_turns, 2u);
+}
+
 static void bth_metrics_summary_contains_counter_names(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_bth_metrics_t m;
@@ -186,6 +197,7 @@ void run_bth_metrics_tests(void) {
     HU_RUN_TEST(bth_metrics_summary_empty);
     HU_RUN_TEST(bth_metrics_all_counters_addressable);
     HU_RUN_TEST(bth_metrics_log_does_not_crash_with_zeros);
+    HU_RUN_TEST(bth_metrics_record_hula_hook);
     HU_RUN_TEST(bth_metrics_summary_contains_counter_names);
     HU_RUN_TEST(bth_metrics_summary_null_alloc);
     HU_RUN_TEST(bth_metrics_summary_null_metrics);

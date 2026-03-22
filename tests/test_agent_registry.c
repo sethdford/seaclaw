@@ -2,6 +2,8 @@
 #include "human/agent.h"
 #include "human/agent/registry.h"
 #include "human/agent/spawn.h"
+#include "human/agent/tool_context.h"
+#include "human/cognition/metacognition.h"
 #include "human/config_types.h"
 #include "human/config.h"
 #include "human/core/allocator.h"
@@ -290,6 +292,35 @@ static void test_spawn_config_from_named_null_safe(void) {
     hu_spawn_config_from_named(NULL, NULL);
 }
 
+static void test_spawn_config_apply_current_tool_agent_null_safe(void) {
+    hu_spawn_config_apply_current_tool_agent(NULL);
+}
+
+static void test_spawn_config_apply_current_tool_agent_metacog_pointer(void) {
+    hu_agent_t parent;
+    memset(&parent, 0, sizeof(parent));
+    hu_metacognition_init(&parent.metacognition);
+    parent.metacognition.cfg.max_regen = 77u;
+    parent.spawn_depth = 4u;
+
+    hu_named_agent_config_t named = {
+        .name = "sub",
+        .provider = "openai",
+        .model = "gpt-4",
+    };
+    hu_spawn_config_t spawn = {0};
+    hu_spawn_config_from_named(&spawn, &named);
+    HU_ASSERT_NULL(spawn.metacognition_policy);
+
+    hu_agent_set_current_for_tools(&parent);
+    hu_spawn_config_apply_current_tool_agent(&spawn);
+    HU_ASSERT_TRUE(spawn.metacognition_policy == &parent.metacognition.cfg);
+    HU_ASSERT_EQ(spawn.caller_spawn_depth, 4u);
+    HU_ASSERT_EQ(spawn.metacognition_policy->max_regen, 77u);
+
+    hu_agent_clear_current_for_tools();
+}
+
 /* ─── discover (test mode: no-op) ────────────────────────────────────────── */
 
 static void test_registry_discover_test_mode(void) {
@@ -554,6 +585,8 @@ void run_agent_registry_tests(void) {
     HU_RUN_TEST(test_named_agent_config_free_null_safe);
     HU_RUN_TEST(test_spawn_config_from_named);
     HU_RUN_TEST(test_spawn_config_from_named_null_safe);
+    HU_RUN_TEST(test_spawn_config_apply_current_tool_agent_null_safe);
+    HU_RUN_TEST(test_spawn_config_apply_current_tool_agent_metacog_pointer);
     HU_RUN_TEST(test_registry_discover_test_mode);
     HU_RUN_TEST(test_registry_reload_empty);
     HU_RUN_TEST(test_skill_run_finds_skill);
