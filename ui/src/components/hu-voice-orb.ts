@@ -38,6 +38,15 @@ export class ScVoiceOrb extends LitElement {
         opacity: 0.8;
         animation: hu-glow-breathe 3s ease-in-out infinite; /* hu-lint-ok: ambient */
       }
+      &.speaking {
+        background: radial-gradient(
+          circle,
+          color-mix(in srgb, var(--hu-accent-secondary) 45%, transparent) 0%,
+          transparent 72%
+        );
+        opacity: 0.85;
+        animation: hu-glow-speak 1.1s ease-in-out infinite; /* hu-lint-ok: ambient */
+      }
     }
 
     @keyframes hu-glow-breathe {
@@ -49,6 +58,18 @@ export class ScVoiceOrb extends LitElement {
       50% {
         opacity: 1;
         transform: translate(-50%, -60%) scale(1.1);
+      }
+    }
+
+    @keyframes hu-glow-speak {
+      0%,
+      100% {
+        opacity: 0.75;
+        transform: translate(-50%, -60%) scale(1);
+      }
+      50% {
+        opacity: 1;
+        transform: translate(-50%, -60%) scale(1.06);
       }
     }
 
@@ -194,6 +215,8 @@ export class ScVoiceOrb extends LitElement {
     switch (this.state) {
       case "listening":
         return "Listening…";
+      case "speaking":
+        return "Speaking…";
       case "processing":
         return "Processing…";
       case "unsupported":
@@ -205,8 +228,9 @@ export class ScVoiceOrb extends LitElement {
 
   override render() {
     const isActive = this.state === "listening";
+    const isSpeaking = this.state === "speaking";
     return html`
-      <div class="mic-orb-glow ${isActive ? "active" : ""}"></div>
+      <div class="mic-orb-glow ${isSpeaking ? "speaking" : isActive ? "active" : ""}"></div>
       <div class="mic-btn-wrap">
         <div class="mic-ring ${isActive ? "active" : ""}"></div>
         <div class="mic-ring ring-2 ${isActive ? "active" : ""}"></div>

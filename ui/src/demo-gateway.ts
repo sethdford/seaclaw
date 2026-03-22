@@ -1,4 +1,5 @@
 import type { GatewayStatus, ServerFeatures } from "./gateway.js";
+import { SESSION_KEY_VOICE } from "./utils.js";
 
 const DEMO_CHANNELS = [
   { key: "telegram", label: "Telegram", configured: true, healthy: true, status: "Connected" },
@@ -1038,6 +1039,7 @@ export class DemoGatewayClient extends EventTarget {
   #features: ServerFeatures = {};
   #interval: ReturnType<typeof setInterval> | null = null;
   #nextId = 100;
+  #onBinary: ((data: ArrayBuffer) => void) | null = null;
 
   private state = {
     sessions: makeSessions(),
@@ -1604,6 +1606,28 @@ export class DemoGatewayClient extends EventTarget {
       case "voice.transcribe":
         return { text: "Demo transcription of your audio" };
 
+      case "voice.session.start":
+        return {
+          sessionId: `demo-${Date.now()}`,
+          sampleRate: 24000,
+          encoding: "pcm_f32le",
+        };
+
+      case "voice.session.stop":
+        return { ok: true };
+
+      case "voice.session.interrupt":
+        this.dispatchEvent(
+          new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
+            detail: { event: "voice.audio.interrupted", payload: {} },
+          }),
+        );
+        return { ok: true };
+
+      case "voice.audio.end":
+        this.#scheduleDemoVoicePipeline("Demo transcription from streaming mic");
+        return { ok: true };
+
       case "voice.config":
         return {
           local_stt_endpoint: "http://localhost:8000/v1/audio/transcriptions",
@@ -1826,6 +1850,72 @@ export class DemoGatewayClient extends EventTarget {
 
   disconnect(): void {
     if (this.#interval) clearInterval(this.#interval);
+    this.#onBinary = null;
     this.#setStatus("disconnected");
+  }
+
+  setOnBinaryChunk(handler: ((data: ArrayBuffer) => void) | null): void {
+    this.#onBinary = handler;
+  }
+
+  sendBinary(_data: ArrayBuffer | ArrayBufferView): void {
+    /* Demo mode has no server-side binary sink */
+  }
+
+  voiceSessionStart(params?: Record<string, unknown>): Promise<Record<string, unknown>> {
+    return this.request("voice.session.start", params);
+  }
+
+  voiceSessionStop(): Promise<unknown> {
+    return this.request("voice.session.stop", {});
+  }
+
+  voiceSessionInterrupt(): Promise<unknown> {
+    return this.request("voice.session.interrupt", {});
+  }
+
+  voiceAudioEnd(params?: Record<string, unknown>): Promise<unknown> {
+    return this.request("voice.audio.end", params);
+  }
+
+  #emitDemoVoicePcmChunks(): void {
+    let pcmCount = 0;
+    const sendPcm = (): void => {
+      if (!this.#onBinary) return;
+      const sr = 24000;
+      const n = 2048;
+      const f32 = new Float32Array(n);
+      const base = pcmCount * n;
+      for (let i = 0; i < n; i++) {
+        f32[i] = 0.1 * Math.sin((2 * Math.PI * 330 * (base + i)) / sr);
+      }
+      pcmCount++;
+      this.#onBinary(f32.buffer.slice(f32.byteOffset, f32.byteOffset + f32.byteLength));
+    };
+    sendPcm();
+    setTimeout(sendPcm, 90);
+    setTimeout(sendPcm, 180);
+  }
+
+  #scheduleDemoVoicePipeline(userText: string): void {
+    this.dispatchEvent(
+      new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
+        detail: { event: "voice.transcript", payload: { text: userText } },
+      }),
+    );
+    setTimeout(() => this.#emitDemoVoicePcmChunks(), 120);
+    setTimeout(() => {
+      this.#emitChatResponse(
+        `I heard you say: “${userText}”. This is the demo assistant reply.`,
+        SESSION_KEY_VOICE,
+      );
+    }, 200);
+    setTimeout(() => {
+      this.dispatchEvent(
+        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
+          detail: { event: "voice.audio.done", payload: {} },
+        }),
+      );
+    }, 3400);
   }
 }

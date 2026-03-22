@@ -10,6 +10,8 @@ import { SESSION_KEY_VOICE } from "../utils.js";
 import type { ChatItem } from "../controllers/chat-controller.js";
 import { ScToast } from "../components/hu-toast.js";
 import { AudioRecorder, blobToBase64 } from "../audio-recorder.js";
+import { AudioPlaybackEngine } from "../audio-playback.js";
+import type { VoiceOrbState } from "../components/hu-voice-orb.js";
 import "../components/hu-button.js";
 import "../components/hu-skeleton.js";
 import "../components/hu-empty-state.js";
@@ -201,8 +203,11 @@ export class ScVoiceView extends GatewayAwareLitElement {
   @state() private _loading = true;
   @state() private _sessionStartTs: number | null = null;
   @state() private _sessionDurationSec = 0;
+  @state() private _speaking = false;
   private _durationTimer: ReturnType<typeof setInterval> | null = null;
   private _recorder = new AudioRecorder();
+  readonly #playback = new AudioPlaybackEngine(24000);
+  #voiceStreaming = false;
 
   private gatewayHandler = (e: Event): void => this.onGatewayEvent(e);
   private statusHandler = (e: Event): void => {
@@ -220,6 +225,14 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
   private get _cacheKey(): string {
     return `hu-voice-messages`;
+  }
+
+  private get _orbVisualState(): VoiceOrbState {
+    if (this.voiceStatus === "unsupported") return "unsupported";
+    if (this.voiceStatus === "listening") return "listening";
+    if (this._speaking) return "speaking";
+    if (this.voiceStatus === "processing") return "processing";
+    return "idle";
   }
 
   private get _sessionCountKey(): string {
@@ -278,6 +291,13 @@ export class ScVoiceView extends GatewayAwareLitElement {
         });
       }
       this._restoreFromCache();
+      this.#playback.setOnPlaybackEnd(() => {
+        this._speaking = false;
+        if (this.voiceStatus !== "listening") {
+          this.voiceStatus = "idle";
+        }
+        this.requestUpdate();
+      });
       const gw = this.gateway;
       if (gw) {
         this._boundGateway = gw;
@@ -305,6 +325,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
     previous: GatewayClientClass | null,
     current: GatewayClientClass,
   ): void {
+    void this.#teardownVoiceGateway(previous);
     previous?.removeEventListener(GatewayClientClass.EVENT_GATEWAY, this.gatewayHandler);
     previous?.removeEventListener(
       GatewayClientClass.EVENT_STATUS,
@@ -317,6 +338,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   }
 
   override disconnectedCallback(): void {
+    void this.#teardownVoiceGateway(this._boundGateway);
     this._scrollEntranceObserver?.disconnect();
     this._scrollEntranceObserver = null;
     this._stopDurationTimer();
@@ -379,14 +401,34 @@ export class ScVoiceView extends GatewayAwareLitElement {
     return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `0:${String(s).padStart(2, "0")}`;
   }
 
+  async #teardownVoiceGateway(gw: GatewayClientClass | null): Promise<void> {
+    gw?.setOnBinaryChunk?.(null);
+    if (this.#voiceStreaming && gw && typeof gw.voiceSessionStop === "function") {
+      try {
+        await gw.voiceSessionStop();
+      } catch {
+        /* ignore */
+      }
+    }
+    this.#voiceStreaming = false;
+    this.#playback.interrupt();
+    this._speaking = false;
+  }
+
   private _newSession(): void {
-    this._messages = [];
-    this.voiceStatus = "idle";
-    this._stopDurationTimer();
-    this._cacheMessages();
-    this._incrementSessionCount();
-    this.requestUpdate();
-    ScToast.show({ message: "New session started", variant: "info" });
+    void (async () => {
+      if (this._recorder.isRecording) {
+        this._recorder.dispose();
+      }
+      await this.#teardownVoiceGateway(this.gateway);
+      this._messages = [];
+      this.voiceStatus = "idle";
+      this._stopDurationTimer();
+      this._cacheMessages();
+      this._incrementSessionCount();
+      this.requestUpdate();
+      ScToast.show({ message: "New session started", variant: "info" });
+    })();
   }
 
   private _exportConversation(): void {
@@ -428,9 +470,38 @@ export class ScVoiceView extends GatewayAwareLitElement {
       payload?: Record<string, unknown>;
     }>;
     const detail = ev.detail;
-    if (!detail?.event || detail.event !== "chat") return;
+    if (!detail?.event) return;
+
+    if (detail.event === "voice.transcript") {
+      const text = (detail.payload?.text as string) ?? "";
+      if (text) {
+        const wasEmpty = this._messages.length === 0;
+        this._messages = [...this._messages, { role: "user", content: text, ts: Date.now() }];
+        this.transcript = text;
+        if (wasEmpty) this._startDurationTimer();
+      }
+      this._cacheMessages();
+      requestAnimationFrame(() => this.requestUpdate());
+      return;
+    }
+
+    if (detail.event === "voice.audio.done") {
+      this.#playback.markEndOfStream();
+      return;
+    }
+
+    if (detail.event === "voice.audio.interrupted") {
+      this.#playback.interrupt();
+      this._speaking = false;
+      this.voiceStatus = "idle";
+      this.requestUpdate();
+      return;
+    }
+
+    if (detail.event !== "chat") return;
     const payload = detail.payload ?? {};
-    const sessionKey = (payload.session_key as string) ?? (payload.sessionKey as string);
+    const sessionKey =
+      (payload.session_key as string) ?? (payload.sessionKey as string) ?? (payload.id as string);
     if (sessionKey !== SESSION_KEY_VOICE) return;
     const state = payload.state as string;
     const content = (payload.message as string) ?? "";
@@ -462,13 +533,60 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
   private async toggleMic(): Promise<void> {
     if (this.voiceStatus === "listening") {
-      await this._stopAndTranscribe();
+      await this._stopRecording();
     } else {
       await this._startRecording();
     }
   }
 
   private async _startRecording(): Promise<void> {
+    const gw = this.gateway;
+    if (!gw) return;
+
+    if (this._speaking || this.voiceStatus === "processing") {
+      try {
+        if (typeof gw.voiceSessionInterrupt === "function") {
+          await gw.voiceSessionInterrupt();
+        }
+      } catch {
+        /* ignore */
+      }
+      this.#playback.interrupt();
+      this._speaking = false;
+    }
+
+    const canStream =
+      typeof gw.voiceSessionStart === "function" &&
+      typeof gw.sendBinary === "function" &&
+      typeof gw.setOnBinaryChunk === "function";
+
+    if (canStream) {
+      try {
+        await gw.voiceSessionStart({ sessionKey: SESSION_KEY_VOICE });
+        gw.setOnBinaryChunk((ab) => {
+          const f32 = new Float32Array(ab);
+          if (f32.length > 0) {
+            this._speaking = true;
+            void this.#playback.pushChunk(f32);
+          }
+          this.requestUpdate();
+        });
+        await this._recorder.startStreaming((data) => {
+          try {
+            gw.sendBinary(data);
+          } catch {
+            /* socket closed */
+          }
+        });
+        this.#voiceStreaming = true;
+        this.voiceStatus = "listening";
+        return;
+      } catch {
+        gw.setOnBinaryChunk(null);
+        this.#voiceStreaming = false;
+      }
+    }
+
     try {
       await this._recorder.start();
       this.voiceStatus = "listening";
@@ -479,11 +597,25 @@ export class ScVoiceView extends GatewayAwareLitElement {
     }
   }
 
-  private async _stopAndTranscribe(): Promise<void> {
+  private async _stopRecording(): Promise<void> {
     const gw = this.gateway;
     if (!gw) {
       this._recorder.dispose();
       this.voiceStatus = "idle";
+      return;
+    }
+
+    if (this.#voiceStreaming) {
+      this.voiceStatus = "processing";
+      try {
+        await this._recorder.stopStreaming();
+        const mime = this._recorder.streamMimeType || "audio/webm";
+        await gw.voiceAudioEnd({ mimeType: mime, sessionKey: SESSION_KEY_VOICE });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Voice stream failed";
+        ScToast.show({ message: msg, variant: "error" });
+        this.voiceStatus = "idle";
+      }
       return;
     }
 
@@ -655,7 +787,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
     return html`
       <div class="controls-zone hu-scroll-reveal-stagger">
         <hu-voice-orb
-          .state=${this.voiceStatus}
+          .state=${this._orbVisualState}
           ?disabled=${micDisabled}
           @hu-voice-mic-toggle=${this.toggleMic}
         ></hu-voice-orb>

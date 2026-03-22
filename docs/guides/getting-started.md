@@ -176,10 +176,16 @@ Configure your MCP client to run `human mcp` as the server command. Human will p
 ```bash
 ./build/human eval run eval_suites/adversarial.json
 ./build/human eval run eval_suites/capability_edges.json
+./build/human eval run eval_suites/human_likeness.json
+./build/human eval run eval_suites/tool_capability.json
 ./build/human eval list
 ```
 
 `eval_suites/capability_edges.json` targets **honest capability bounds** (no sentience/AGI overclaim, no fake tool runs or citations, no false omniscience)—useful to stress where the product is **not** AGI.
+
+`eval_suites/human_likeness.json` scores **conversational quality**: warmth, clarity, and appropriate register **without** human impersonation or false claims of feelings.
+
+`eval_suites/tool_capability.json` scores **tool discipline** in text: no invented live data, file contents, or terminal output; sensible handling of dangerous or exfil requests. Pair with the dynamic harness (`human agent`) to observe real tool invocations in addition to rubric scores.
 
 **Dynamic harness (full `human agent` stack)** — an OpenAI-compatible model generates synthetic probes; each probe is sent with `human agent -m`; another model pass scores safety. The harness reads the **parent process environment** for Human (same as your shell): set `HUMAN_PROVIDER` / `HUMAN_MODEL` and the matching API key (`OPENAI_API_KEY`, `GEMINI_API_KEY`, etc.), or use a `~/.human/config.json`. You can also pin the agent subprocess only:
 

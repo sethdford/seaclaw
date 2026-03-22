@@ -18,7 +18,7 @@
 #
 # Optional: HARNESS_AGENT_CONFIG_PATH=/path/config.json — harness passes HUMAN_CONFIG_PATH to each `human agent` child.
 # Optional: REDTEAM_FLEET_AGENT_SMOKE=1 runs one human agent -m (uses HUMAN_PROVIDER / keys in env).
-# Live harness: REDTEAM_PROBE_PROFILE=safety|capability_honesty for LLM-generated probes (suite tasks use JSON judge_profile).
+# Live harness: REDTEAM_PROBE_PROFILE=safety|capability_honesty|human_likeness|tool_capability for generated probes.
 #
 # Examples:
 #   bash scripts/redteam-eval-fleet.sh
@@ -37,7 +37,7 @@ REPORT_DIR="${REDTEAM_REPORT_DIR:-$ROOT/build/redteam-fleet-reports}"
 HUMAN_BIN="${HUMAN_BIN:-$ROOT/build/human}"
 HARNESS="$ROOT/scripts/adversarial-eval-harness.py"
 # Space-separated paths, relative to ROOT
-DEFAULT_EVAL_SUITES="eval_suites/reasoning_basic.json eval_suites/tool_use_basic.json eval_suites/adversarial.json eval_suites/capability_edges.json eval_suites/coding_basic.json"
+DEFAULT_EVAL_SUITES="eval_suites/reasoning_basic.json eval_suites/tool_use_basic.json eval_suites/adversarial.json eval_suites/capability_edges.json eval_suites/human_likeness.json eval_suites/tool_capability.json eval_suites/coding_basic.json"
 
 run() {
   local name="$1"
@@ -94,10 +94,12 @@ run "human doctor" "$HUMAN_BIN" doctor
 run "human eval list" "$HUMAN_BIN" eval list
 
 # --- Harness dry-run (no API keys): safety + epistemic / anti–AGI-overclaim probes ---
-run "adversarial harness (dry-run, adversarial + capability_edges)" \
+run "adversarial harness (dry-run, adversarial + capability + human + tool)" \
   python3 "$HARNESS" --dry-run --no-llm \
   --include-suite "$ROOT/eval_suites/adversarial.json" \
-  --include-suite "$ROOT/eval_suites/capability_edges.json"
+  --include-suite "$ROOT/eval_suites/capability_edges.json" \
+  --include-suite "$ROOT/eval_suites/human_likeness.json" \
+  --include-suite "$ROOT/eval_suites/tool_capability.json"
 
 # --- Live: human eval run ---
 if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
@@ -150,6 +152,8 @@ if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
     if python3 "$HARNESS" "${HARNESS_PY_ARGS[@]}" --probes "$probes" --probe-profile "$probe_prof" \
       --include-suite "$ROOT/eval_suites/adversarial.json" \
       --include-suite "$ROOT/eval_suites/capability_edges.json" \
+      --include-suite "$ROOT/eval_suites/human_likeness.json" \
+      --include-suite "$ROOT/eval_suites/tool_capability.json" \
       --timeout "${REDTEAM_AGENT_TIMEOUT:-180}" \
       --output "$LIVE_DIR/harness-report.json" 2>&1 | tee "$LIVE_DIR/harness-console.log"; then
       echo "--- OK: dynamic harness"

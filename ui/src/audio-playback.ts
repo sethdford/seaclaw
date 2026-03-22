@@ -68,7 +68,6 @@ export class AudioPlaybackEngine {
   #ctx: AudioContext | null = null;
   #node: AudioWorkletNode | null = null;
   #onPlaybackEnd: (() => void) | null = null;
-  #moduleLoaded = false;
 
   constructor(sampleRate = 24000) {
     this.sampleRate = sampleRate;
@@ -81,13 +80,10 @@ export class AudioPlaybackEngine {
   async #ensureAudio(): Promise<void> {
     if (this.#ctx && this.#node) return;
     const ctx = new AudioContext({ sampleRate: this.sampleRate });
-    if (!this.#moduleLoaded) {
-      const blob = new Blob([PCM_PULL_WORKLET_SRC], { type: "application/javascript" });
-      const url = URL.createObjectURL(blob);
-      await ctx.audioWorklet.addModule(url);
-      URL.revokeObjectURL(url);
-      this.#moduleLoaded = true;
-    }
+    const blob = new Blob([PCM_PULL_WORKLET_SRC], { type: "application/javascript" });
+    const url = URL.createObjectURL(blob);
+    await ctx.audioWorklet.addModule(url);
+    URL.revokeObjectURL(url);
     const node = new AudioWorkletNode(ctx, "pcm-pull", {
       numberOfOutputs: 1,
       outputChannelCount: [1],

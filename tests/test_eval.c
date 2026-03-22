@@ -15,11 +15,13 @@ static const struct eval_suite_expect_row {
     {"capability_edges.json", 10},
     {"coding_basic.json", 5},
     {"fidelity.json", 10},
+    {"human_likeness.json", 8},
     {"intelligence.json", 10},
     {"memory.json", 8},
     {"reasoning.json", 10},
     {"reasoning_basic.json", 10},
     {"social.json", 8},
+    {"tool_capability.json", 8},
     {"tool_use.json", 8},
     {"tool_use_basic.json", 5},
 };
