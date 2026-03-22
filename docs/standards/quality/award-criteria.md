@@ -137,7 +137,7 @@ updated: 2026-03-14
 - axe-core accessibility E2E tests (all 14 dashboard views)
 - Container queries for responsive layouts (overview-view, website)
 - View transitions and scroll-driven animations
-- C test suite: 6264+ tests passing
+- C test suite: 6322+ tests passing
 
 ## Measurement Automation
 

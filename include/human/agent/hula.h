@@ -1,0 +1,218 @@
+#ifndef HU_AGENT_HULA_H
+#define HU_AGENT_HULA_H
+
+#include "human/core/allocator.h"
+#include "human/core/error.h"
+#include "human/agent/dag.h"
+#include "human/agent/planner.h"
+#include "human/tool.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * HuLa — Human Language: a minimal typed IR for agent programs.
+ *
+ * HuLa unifies the planner, DAG/LLM-compiler, and skill systems into a
+ * single serializable intermediate representation that sits between LLM
+ * output and vtable dispatch.
+ *
+ * Design principles:
+ *   - 7 opcodes, no more. Small grammar, growing vocabulary.
+ *   - Machine-checkable: parse → validate → policy → execute.
+ *   - Compiles from natural language (or traces) into the IR.
+ *   - Maps 1:1 to existing vtable dispatch (tools, channels, memory).
+ *   - Emergence: hot paths from logs become named programs (skills).
+ *
+ * Opcode set:
+ *   CALL      — invoke a registered tool with JSON args
+ *   SEQ       — execute children in order (short-circuits on failure)
+ *   PAR       — execute children concurrently (join-all)
+ *   BRANCH    — conditional: if tool result matches predicate, then/else
+ *   LOOP      — repeat body while predicate holds (bounded)
+ *   DELEGATE  — spawn a sub-agent with a goal string
+ *   EMIT      — produce a named output (return value, side-channel message)
+ *
+ * Wire format: JSON (parse/serialize), with a compact text notation for
+ * human-readable debugging.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+#define HU_HULA_MAX_CHILDREN   32
+#define HU_HULA_MAX_DEPTH      16
+#define HU_HULA_MAX_NODES      128
+#define HU_HULA_VERSION        1
+
+typedef enum hu_hula_op {
+    HU_HULA_CALL = 0,
+    HU_HULA_SEQ,
+    HU_HULA_PAR,
+    HU_HULA_BRANCH,
+    HU_HULA_LOOP,
+    HU_HULA_DELEGATE,
+    HU_HULA_EMIT,
+    HU_HULA_OP_COUNT,
+} hu_hula_op_t;
+
+/* Predicate for BRANCH/LOOP conditions */
+typedef enum hu_hula_pred {
+    HU_HULA_PRED_SUCCESS = 0,   /* last result was success */
+    HU_HULA_PRED_FAILURE,       /* last result was failure */
+    HU_HULA_PRED_CONTAINS,      /* output contains match_str */
+    HU_HULA_PRED_NOT_CONTAINS,
+    HU_HULA_PRED_ALWAYS,        /* unconditional (for loops with explicit max) */
+} hu_hula_pred_t;
+
+typedef struct hu_hula_node hu_hula_node_t;
+
+struct hu_hula_node {
+    hu_hula_op_t op;
+    char *id;               /* unique node identifier; owned */
+
+    /* CALL: tool invocation */
+    char *tool_name;        /* owned */
+    char *args_json;        /* owned; JSON object string */
+
+    /* BRANCH / LOOP: condition */
+    hu_hula_pred_t pred;
+    char *match_str;        /* owned; for CONTAINS predicates */
+    size_t match_str_len;
+    uint32_t max_iter;      /* LOOP bound; 0 = use default (10) */
+
+    /* DELEGATE: sub-agent goal */
+    char *goal;             /* owned */
+    size_t goal_len;
+    char *delegate_model;   /* owned; optional model override */
+    size_t delegate_model_len;
+
+    /* EMIT: output channel */
+    char *emit_key;         /* owned; output name/channel */
+    size_t emit_key_len;
+    char *emit_value;       /* owned; template, may reference $node_id */
+    size_t emit_value_len;
+
+    /* Tree structure */
+    hu_hula_node_t *children[HU_HULA_MAX_CHILDREN];
+    size_t children_count;
+
+    /* For BRANCH: then_branch = children[0], else_branch = children[1],
+       condition_node = the CALL preceding the branch (resolved at validate) */
+    char *description;      /* owned; optional human-readable annotation */
+};
+
+/* A complete HuLa program */
+typedef struct hu_hula_program {
+    hu_allocator_t alloc;
+    char *name;             /* owned; program/skill name */
+    size_t name_len;
+    uint32_t version;
+    hu_hula_node_t *nodes;  /* flat owned array of all nodes */
+    size_t node_count;
+    size_t node_cap;
+    hu_hula_node_t *root;   /* entry point (points into nodes array) */
+} hu_hula_program_t;
+
+/* Execution result per node */
+typedef enum hu_hula_status {
+    HU_HULA_PENDING = 0,
+    HU_HULA_RUNNING,
+    HU_HULA_DONE,
+    HU_HULA_FAILED,
+    HU_HULA_SKIPPED,
+} hu_hula_status_t;
+
+typedef struct hu_hula_result {
+    hu_hula_status_t status;
+    char *output;           /* owned */
+    size_t output_len;
+    char *error;            /* owned */
+    size_t error_len;
+} hu_hula_result_t;
+
+/* Execution state for a running program */
+typedef struct hu_hula_exec {
+    hu_allocator_t alloc;
+    hu_hula_program_t *program;     /* borrowed */
+    hu_hula_result_t *results;      /* owned; indexed by node position */
+    size_t results_count;
+    hu_tool_t *tools;               /* borrowed */
+    size_t tools_count;
+    bool halted;
+    char *halt_reason;              /* owned */
+    size_t halt_reason_len;
+} hu_hula_exec_t;
+
+/* Validation diagnostics */
+typedef struct hu_hula_diag {
+    char *message;      /* owned */
+    size_t message_len;
+    const hu_hula_node_t *node;     /* borrowed; may be NULL */
+} hu_hula_diag_t;
+
+#define HU_HULA_MAX_DIAGS 32
+
+typedef struct hu_hula_validation {
+    hu_hula_diag_t diags[HU_HULA_MAX_DIAGS];
+    size_t diag_count;
+    bool valid;
+} hu_hula_validation_t;
+
+/* ── Lifecycle ──────────────────────────────────────────────────────────── */
+
+hu_error_t hu_hula_program_init(hu_hula_program_t *prog, hu_allocator_t alloc,
+                                const char *name, size_t name_len);
+void hu_hula_program_deinit(hu_hula_program_t *prog);
+
+/* Allocate a new node within the program. Returns pointer into the arena. */
+hu_hula_node_t *hu_hula_program_alloc_node(hu_hula_program_t *prog, hu_hula_op_t op,
+                                            const char *id);
+
+/* ── Parse ──────────────────────────────────────────────────────────────── */
+
+/* Parse a HuLa program from JSON. */
+hu_error_t hu_hula_parse_json(hu_allocator_t *alloc, const char *json, size_t json_len,
+                              hu_hula_program_t *out);
+
+/* Serialize a HuLa program to JSON. Caller frees output. */
+hu_error_t hu_hula_to_json(hu_allocator_t *alloc, const hu_hula_program_t *prog,
+                           char **out, size_t *out_len);
+
+/* ── Validate ───────────────────────────────────────────────────────────── */
+
+/* Validate program structure, tool references, depth, cycles, etc.
+ * tool_names: available tool names for reference checking (may be NULL to skip). */
+hu_error_t hu_hula_validate(const hu_hula_program_t *prog, hu_allocator_t *alloc,
+                            const char *const *tool_names, size_t tool_count,
+                            hu_hula_validation_t *out);
+
+void hu_hula_validation_deinit(hu_allocator_t *alloc, hu_hula_validation_t *v);
+
+/* ── Execute ────────────────────────────────────────────────────────────── */
+
+hu_error_t hu_hula_exec_init(hu_hula_exec_t *exec, hu_allocator_t alloc,
+                             hu_hula_program_t *prog, hu_tool_t *tools, size_t tools_count);
+
+/* Run the program to completion. */
+hu_error_t hu_hula_exec_run(hu_hula_exec_t *exec);
+
+/* Get result for a specific node by id. Returns NULL if not found. */
+const hu_hula_result_t *hu_hula_exec_result(const hu_hula_exec_t *exec, const char *node_id);
+
+void hu_hula_exec_deinit(hu_hula_exec_t *exec);
+
+/* ── Utilities ──────────────────────────────────────────────────────────── */
+
+const char *hu_hula_op_name(hu_hula_op_t op);
+const char *hu_hula_pred_name(hu_hula_pred_t pred);
+const char *hu_hula_status_name(hu_hula_status_t status);
+
+/* ── Bridges (convert existing structures to HuLa) ──────────────────── */
+
+hu_error_t hu_hula_from_plan(hu_allocator_t *alloc, const hu_plan_t *plan,
+                             const char *name, size_t name_len,
+                             hu_hula_program_t *out);
+
+hu_error_t hu_hula_from_dag(hu_allocator_t *alloc, const hu_dag_t *dag,
+                            const char *name, size_t name_len,
+                            hu_hula_program_t *out);
+
+#endif /* HU_AGENT_HULA_H */

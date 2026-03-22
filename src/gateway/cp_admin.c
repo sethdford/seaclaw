@@ -521,31 +521,26 @@ hu_error_t cp_admin_models_list(hu_allocator_t *alloc, hu_app_context_t *app, hu
     return err;
 }
 
-/* ── nodes.list ──────────────────────────────────────────────────────── */
+/* One nodes.list element; NULL if node_id is unknown or allocation fails. */
+static hu_json_value_t *cp_admin_node_object_for_id(hu_allocator_t *alloc, hu_app_context_t *app,
+                                                    const char *node_id) {
+    if (!alloc || !node_id || !node_id[0])
+        return NULL;
 
-hu_error_t cp_admin_nodes_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
-                               const hu_control_protocol_t *proto, const hu_json_value_t *root,
-                               char **out, size_t *out_len) {
-    (void)conn;
-    (void)proto;
-    (void)root;
-    hu_json_value_t *obj = hu_json_object_new(alloc);
-    if (!obj)
-        return HU_ERR_OUT_OF_MEMORY;
-
-    hu_json_value_t *arr = hu_json_array_new(alloc);
-
-    size_t node_count = 0;
     const char *default_id = "local";
     const char *default_status = "online";
+    const hu_config_t *cfg = (app && app->config) ? app->config : NULL;
 
-    if (app && app->config && app->config->nodes_len > 0) {
-        node_count = app->config->nodes_len;
-        for (size_t i = 0; i < node_count; i++) {
+    if (cfg && cfg->nodes_len > 0) {
+        for (size_t i = 0; i < cfg->nodes_len; i++) {
+            const char *name = cfg->nodes[i].name ? cfg->nodes[i].name : default_id;
+            if (strcmp(node_id, name) != 0)
+                continue;
+
             hu_json_value_t *n = hu_json_object_new(alloc);
-            const char *name = app->config->nodes[i].name ? app->config->nodes[i].name : default_id;
-            const char *status =
-                app->config->nodes[i].status ? app->config->nodes[i].status : default_status;
+            if (!n)
+                return NULL;
+            const char *status = cfg->nodes[i].status ? cfg->nodes[i].status : default_status;
             cp_json_set_str(alloc, n, "id", name);
             cp_json_set_str(alloc, n, "type", "gateway");
             cp_json_set_str(alloc, n, "status", status);
@@ -568,30 +563,71 @@ hu_error_t cp_admin_nodes_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_
             } else {
                 hu_json_object_set(alloc, n, "ws_connections", hu_json_number_new(alloc, 0.0));
             }
+            return n;
+        }
+        return NULL;
+    }
+
+    if (strcmp(node_id, default_id) != 0)
+        return NULL;
+
+    hu_json_value_t *local = hu_json_object_new(alloc);
+    if (!local)
+        return NULL;
+    cp_json_set_str(alloc, local, "id", default_id);
+    cp_json_set_str(alloc, local, "type", "gateway");
+    cp_json_set_str(alloc, local, "status", default_status);
+    cp_json_set_str(alloc, local, "version", hu_version_string());
+#if !defined(HU_IS_TEST)
+    {
+        char hostname[256] = {0};
+        if (gethostname(hostname, sizeof(hostname) - 1) == 0)
+            cp_json_set_str(alloc, local, "hostname", hostname);
+#if defined(__APPLE__) || defined(__linux__)
+        struct timespec ts;
+        if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+            hu_json_object_set(alloc, local, "uptime_secs",
+                               hu_json_number_new(alloc, (double)ts.tv_sec));
+#endif
+    }
+#endif
+    hu_json_object_set(alloc, local, "ws_connections",
+                       hu_json_number_new(alloc, (app && app->config) ? 1.0 : 0.0));
+    return local;
+}
+
+/* ── nodes.list ──────────────────────────────────────────────────────── */
+
+hu_error_t cp_admin_nodes_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                               const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                               char **out, size_t *out_len) {
+    (void)conn;
+    (void)proto;
+    (void)root;
+    hu_json_value_t *obj = hu_json_object_new(alloc);
+    if (!obj)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    hu_json_value_t *arr = hu_json_array_new(alloc);
+
+    const char *default_id = "local";
+
+    if (app && app->config && app->config->nodes_len > 0) {
+        for (size_t i = 0; i < app->config->nodes_len; i++) {
+            const char *name = app->config->nodes[i].name ? app->config->nodes[i].name : default_id;
+            hu_json_value_t *n = cp_admin_node_object_for_id(alloc, app, name);
+            if (!n) {
+                hu_json_free(alloc, obj);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
             hu_json_array_push(alloc, arr, n);
         }
     } else {
-        /* Backward compatibility: no config or no nodes configured → default local node */
-        hu_json_value_t *local = hu_json_object_new(alloc);
-        cp_json_set_str(alloc, local, "id", default_id);
-        cp_json_set_str(alloc, local, "type", "gateway");
-        cp_json_set_str(alloc, local, "status", default_status);
-        cp_json_set_str(alloc, local, "version", hu_version_string());
-#if !defined(HU_IS_TEST)
-        {
-            char hostname[256] = {0};
-            if (gethostname(hostname, sizeof(hostname) - 1) == 0)
-                cp_json_set_str(alloc, local, "hostname", hostname);
-#if defined(__APPLE__) || defined(__linux__)
-            struct timespec ts;
-            if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
-                hu_json_object_set(alloc, local, "uptime_secs",
-                                   hu_json_number_new(alloc, (double)ts.tv_sec));
-#endif
+        hu_json_value_t *local = cp_admin_node_object_for_id(alloc, app, default_id);
+        if (!local) {
+            hu_json_free(alloc, obj);
+            return HU_ERR_OUT_OF_MEMORY;
         }
-#endif
-        hu_json_object_set(alloc, local, "ws_connections",
-                           hu_json_number_new(alloc, (app && app->config) ? 1.0 : 0.0));
         hu_json_array_push(alloc, arr, local);
     }
 
@@ -620,19 +656,84 @@ static const char *cp_agent_status_wire(hu_agent_status_t st) {
 }
 #endif
 
-/* ── nodes.action (stub) ─────────────────────────────────────────────── */
+/* ── nodes.action ────────────────────────────────────────────────────── */
 
 hu_error_t cp_admin_nodes_action(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                                  const hu_control_protocol_t *proto, const hu_json_value_t *root,
                                  char **out, size_t *out_len) {
-    (void)alloc;
-    (void)app;
     (void)conn;
     (void)proto;
-    (void)root;
-    (void)out;
-    (void)out_len;
-    return HU_ERR_NOT_SUPPORTED;
+    *out = NULL;
+    *out_len = 0;
+    if (!alloc || !root)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    hu_json_value_t *params = hu_json_object_get(root, "params");
+    const char *node_id = hu_json_get_string(root, "node_id");
+    if (!node_id && params)
+        node_id = hu_json_get_string(params, "node_id");
+    const char *action = hu_json_get_string(root, "action");
+    if (!action && params)
+        action = hu_json_get_string(params, "action");
+
+    if (!node_id || !node_id[0] || !action || !action[0])
+        return HU_ERR_INVALID_ARGUMENT;
+
+    if (strcmp(action, "restart") != 0 && strcmp(action, "stop") != 0 && strcmp(action, "status") != 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    if (!cp_admin_node_object_for_id(alloc, app, node_id))
+        return HU_ERR_INVALID_ARGUMENT;
+
+    if (strcmp(action, "status") == 0) {
+        hu_json_value_t *obj = hu_json_object_new(alloc);
+        if (!obj)
+            return HU_ERR_OUT_OF_MEMORY;
+        hu_json_object_set(alloc, obj, "ok", hu_json_bool_new(alloc, true));
+        cp_json_set_str(alloc, obj, "action", "status");
+        hu_json_value_t *node = cp_admin_node_object_for_id(alloc, app, node_id);
+        if (!node) {
+            hu_json_free(alloc, obj);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        hu_json_object_set(alloc, obj, "node", node);
+        hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+        hu_json_free(alloc, obj);
+        return err;
+    }
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    {
+        char buf[160];
+        int n = snprintf(buf, sizeof(buf), "{\"ok\":true,\"action\":\"%s\"}", action);
+        if (n <= 0 || (size_t)n >= sizeof(buf))
+            return HU_ERR_INVALID_ARGUMENT;
+        size_t mlen = (size_t)n;
+        char *copy = (char *)alloc->alloc(alloc->ctx, mlen + 1);
+        if (!copy)
+            return HU_ERR_OUT_OF_MEMORY;
+        memcpy(copy, buf, mlen + 1);
+        *out = copy;
+        *out_len = mlen;
+        return HU_OK;
+    }
+#else
+    {
+        char buf[224];
+        int n = snprintf(buf, sizeof(buf),
+                         "{\"ok\":true,\"action\":\"%s\",\"note\":\"single-node mode\"}", action);
+        if (n <= 0 || (size_t)n >= sizeof(buf))
+            return HU_ERR_INVALID_ARGUMENT;
+        size_t mlen = (size_t)n;
+        char *copy = (char *)alloc->alloc(alloc->ctx, mlen + 1);
+        if (!copy)
+            return HU_ERR_OUT_OF_MEMORY;
+        memcpy(copy, buf, mlen + 1);
+        *out = copy;
+        *out_len = mlen;
+        return HU_OK;
+    }
+#endif
 }
 
 /* ── agents.list ─────────────────────────────────────────────────────── */

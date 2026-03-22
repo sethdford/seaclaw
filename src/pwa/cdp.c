@@ -1,5 +1,6 @@
 #include "human/pwa/cdp.h"
 #include "human/core/string.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -213,10 +214,16 @@ static hu_error_t cdp_send_and_recv(hu_cdp_session_t *s, const char *method,
 
 #else /* !HU_ENABLE_CURL */
 
+static void cdp_warn_no_curl_once(void);
+
 hu_error_t hu_cdp_connect(hu_allocator_t *alloc, const char *host, uint16_t port,
                           hu_cdp_session_t *out) {
-    (void)alloc; (void)host; (void)port;
-    if (out) memset(out, 0, sizeof(*out));
+    cdp_warn_no_curl_once();
+    (void)alloc;
+    (void)host;
+    (void)port;
+    if (out)
+        memset(out, 0, sizeof(*out));
     return HU_ERR_NOT_SUPPORTED;
 }
 
@@ -399,28 +406,68 @@ hu_error_t hu_cdp_query_elements(hu_cdp_session_t *s, const char *selector,
 
 #else /* !HU_ENABLE_CURL stubs */
 
-hu_error_t hu_cdp_navigate(hu_cdp_session_t *s, const char *u, size_t l) {
-    (void)s; (void)u; (void)l; return HU_ERR_NOT_SUPPORTED;
+static void cdp_warn_no_curl_once(void) {
+    static bool warned = false;
+    if (!warned) {
+        fprintf(stderr, "[human] warning: CDP browser automation requires libcurl "
+                        "(build with HU_ENABLE_CURL=ON)\n");
+        warned = true;
+    }
 }
-hu_error_t hu_cdp_evaluate(hu_cdp_session_t *s, const char *e, size_t l,
-                           char **o, size_t *ol) {
-    (void)s; (void)e; (void)l; (void)o; (void)ol; return HU_ERR_NOT_SUPPORTED;
+
+hu_error_t hu_cdp_navigate(hu_cdp_session_t *s, const char *u, size_t l) {
+    cdp_warn_no_curl_once();
+    (void)s;
+    (void)u;
+    (void)l;
+    return HU_ERR_NOT_SUPPORTED;
+}
+hu_error_t hu_cdp_evaluate(hu_cdp_session_t *s, const char *e, size_t l, char **o, size_t *ol) {
+    cdp_warn_no_curl_once();
+    (void)s;
+    (void)e;
+    (void)l;
+    (void)o;
+    (void)ol;
+    return HU_ERR_NOT_SUPPORTED;
 }
 hu_error_t hu_cdp_screenshot(hu_cdp_session_t *s, hu_cdp_screenshot_t *o) {
-    (void)s; (void)o; return HU_ERR_NOT_SUPPORTED;
+    cdp_warn_no_curl_once();
+    (void)s;
+    (void)o;
+    return HU_ERR_NOT_SUPPORTED;
 }
 hu_error_t hu_cdp_click(hu_cdp_session_t *s, int x, int y) {
-    (void)s; (void)x; (void)y; return HU_ERR_NOT_SUPPORTED;
+    cdp_warn_no_curl_once();
+    (void)s;
+    (void)x;
+    (void)y;
+    return HU_ERR_NOT_SUPPORTED;
 }
 hu_error_t hu_cdp_type(hu_cdp_session_t *s, const char *t, size_t l) {
-    (void)s; (void)t; (void)l; return HU_ERR_NOT_SUPPORTED;
+    cdp_warn_no_curl_once();
+    (void)s;
+    (void)t;
+    (void)l;
+    return HU_ERR_NOT_SUPPORTED;
 }
 hu_error_t hu_cdp_get_title(hu_cdp_session_t *s, char **o, size_t *ol) {
-    (void)s; (void)o; (void)ol; return HU_ERR_NOT_SUPPORTED;
+    cdp_warn_no_curl_once();
+    (void)s;
+    (void)o;
+    (void)ol;
+    return HU_ERR_NOT_SUPPORTED;
 }
-hu_error_t hu_cdp_query_elements(hu_cdp_session_t *s, const char *sel, size_t sl,
-                                 hu_cdp_element_t *o, size_t m, size_t *c) {
-    (void)s; (void)sel; (void)sl; (void)o; (void)m; (void)c; return HU_ERR_NOT_SUPPORTED;
+hu_error_t hu_cdp_query_elements(hu_cdp_session_t *s, const char *sel, size_t sl, hu_cdp_element_t *o,
+                                 size_t m, size_t *c) {
+    cdp_warn_no_curl_once();
+    (void)s;
+    (void)sel;
+    (void)sl;
+    (void)o;
+    (void)m;
+    (void)c;
+    return HU_ERR_NOT_SUPPORTED;
 }
 
 #endif /* HU_ENABLE_CURL */

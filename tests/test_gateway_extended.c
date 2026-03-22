@@ -11,6 +11,7 @@
 #include "human/gateway/ws_server.h"
 #include "human/health.h"
 #include "test_framework.h"
+#include "cp_internal.h"
 #include <string.h>
 #include <time.h>
 
@@ -914,7 +915,7 @@ static void test_rpc_voice_config_no_crash(void) {
     teardown_proto(&ws, &proto);
 }
 
-static void test_rpc_nodes_action_not_supported_no_crash(void) {
+static void test_rpc_nodes_action_missing_fields_no_crash(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_ws_server_t ws;
     hu_control_protocol_t proto;
@@ -927,6 +928,37 @@ static void test_rpc_nodes_action_not_supported_no_crash(void) {
     const char *msg = "{\"type\":\"req\",\"id\":\"na\",\"method\":\"nodes.action\"}";
     hu_control_on_message(&conn, msg, strlen(msg), &proto);
     teardown_proto(&ws, &proto);
+}
+
+static void test_cp_admin_nodes_action_restart_returns_mock_json(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_app_context_t app;
+    hu_config_t cfg;
+    hu_bus_t bus;
+    memset(&app, 0, sizeof(app));
+    memset(&cfg, 0, sizeof(cfg));
+    hu_bus_init(&bus);
+    app.config = &cfg;
+    app.alloc = &alloc;
+    app.bus = &bus;
+
+    hu_json_value_t *root = NULL;
+    const char *json = "{\"type\":\"req\",\"id\":\"r1\",\"method\":\"nodes.action\",\"params\":{"
+                       "\"node_id\":\"local\",\"action\":\"restart\"}}";
+    HU_ASSERT_EQ(hu_json_parse(&alloc, json, strlen(json), &root), HU_OK);
+    HU_ASSERT_NOT_NULL(root);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_admin_nodes_action(&alloc, &app, NULL, NULL, root, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(strstr(out, "\"ok\":true") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "\"action\":\"restart\"") != NULL);
+
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, root);
+    hu_bus_deinit(&bus);
 }
 
 static void test_event_bridge_payload_propagation(void) {
@@ -1222,7 +1254,8 @@ void run_gateway_extended_tests(void) {
     HU_RUN_TEST(test_rpc_nodes_list_returns_at_least_one_node);
     HU_RUN_TEST(test_rpc_agents_list_no_crash);
     HU_RUN_TEST(test_rpc_voice_config_no_crash);
-    HU_RUN_TEST(test_rpc_nodes_action_not_supported_no_crash);
+    HU_RUN_TEST(test_rpc_nodes_action_missing_fields_no_crash);
+    HU_RUN_TEST(test_cp_admin_nodes_action_restart_returns_mock_json);
     HU_RUN_TEST(test_event_bridge_payload_propagation);
 
     HU_TEST_SUITE("WS Server Extended");

@@ -1,0 +1,21 @@
+{
+  "agent": {
+    "metacognition": {
+      "enabled": true,
+      "confidence_threshold": 0.3,
+      "coherence_threshold": 0.2,
+      "repetition_threshold": 0.6,
+      "max_reflects": 2,
+      "max_regen": 3,
+      "hysteresis_min": 2,
+      "use_calibrated_risk": true,
+      "risk_high_threshold": 0.62,
+      "w_low_confidence": 0.2,
+      "w_low_coherence": 0.22,
+      "w_repetition": 0.18,
+      "w_stuck": 0.15,
+      "w_low_satisfaction": 0.12,
+      "w_low_trajectory": 0.13
+    }
+  }
+}

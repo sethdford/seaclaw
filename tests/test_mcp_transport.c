@@ -122,7 +122,7 @@ static void http_recv_without_send(void) {
 }
 
 void run_mcp_transport_tests(void) {
-    HU_TEST_SUITE("MCP Transport");
+    HU_TEST_SUITE("MCP Transport IO");
     HU_RUN_TEST(stdio_roundtrip);
     HU_RUN_TEST(null_safety);
     HU_RUN_TEST(invalid_fd);

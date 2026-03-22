@@ -1,3 +1,9 @@
+---
+title: Eval release notes template
+description: Template for publishing evaluation results in release notes or PRs
+updated: 2026-03-21
+---
+
 # Eval Release Notes Template
 
 Copy this into your release notes or PR description when publishing evaluation results.

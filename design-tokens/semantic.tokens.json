@@ -1,6 +1,6 @@
 {
   "$schema": "https://design-tokens.github.io/community-group/format/",
-  "$description": "Semantic tokens — ocean-aligned theme",
+  "$description": "Semantic tokens — warm charcoal theme (Quiet Mastery)",
   "$extensions": {
     "com.human.platform": "all",
     "com.human.version": "0.5.0",
@@ -137,7 +137,7 @@
       "$type": "color"
     },
     "on-accent-secondary": {
-      "$value": "#060b12",
+      "$value": "#0c0a08",
       "$type": "color"
     },
     "accent-tertiary": {
@@ -254,7 +254,7 @@
       "$description": "M3 tinted state layer — primary green tint while dragging"
     },
     "disabled-overlay": {
-      "$value": "rgba(255, 255, 255, 0.04)",
+      "$value": "rgba(252, 248, 242, 0.04)",
       "$type": "color"
     },
     "backdrop-overlay": {
@@ -262,27 +262,28 @@
       "$type": "color"
     },
     "shadow-xs": {
-      "$value": "0 1px 2px rgba(3,8,16,0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
-      "$type": "shadow"
+      "$value": "0 1px 2px rgba(12,8,4,0.50), inset 0 1px 0 rgba(255,252,248,0.05)",
+      "$type": "shadow",
+      "$description": "Warm charcoal shadow — amber-tinted darks"
     },
     "shadow-sm": {
-      "$value": "0 1px 3px rgba(3,8,16,0.4), 0 2px 8px rgba(3,8,16,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
+      "$value": "0 1px 3px rgba(12,8,4,0.45), 0 2px 8px rgba(12,8,4,0.30), inset 0 1px 0 rgba(255,252,248,0.05)",
       "$type": "shadow"
     },
     "shadow-md": {
-      "$value": "0 2px 4px rgba(3,8,16,0.35), 0 8px 24px rgba(3,8,16,0.35), inset 0 1px 0 rgba(255,255,255,0.04)",
+      "$value": "0 2px 4px rgba(12,8,4,0.40), 0 8px 24px rgba(12,8,4,0.35), inset 0 1px 0 rgba(255,252,248,0.04)",
       "$type": "shadow"
     },
     "shadow-lg": {
-      "$value": "0 4px 8px rgba(3,8,16,0.4), 0 16px 48px rgba(3,8,16,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+      "$value": "0 4px 8px rgba(12,8,4,0.45), 0 16px 48px rgba(12,8,4,0.40), inset 0 1px 0 rgba(255,252,248,0.04)",
       "$type": "shadow"
     },
     "shadow-xl": {
-      "$value": "0 8px 16px rgba(3,8,16,0.45), 0 32px 72px rgba(3,8,16,0.5), inset 0 1px 0 rgba(255,255,255,0.03)",
+      "$value": "0 8px 16px rgba(12,8,4,0.50), 0 32px 72px rgba(12,8,4,0.50), inset 0 1px 0 rgba(255,252,248,0.03)",
       "$type": "shadow"
     },
     "shadow-card": {
-      "$value": "0 1px 3px rgba(3,8,16,0.3), 0 8px 24px rgba(3,8,16,0.25), inset 0 1px 0 rgba(255,255,255,0.05)",
+      "$value": "0 1px 3px rgba(12,8,4,0.35), 0 8px 24px rgba(12,8,4,0.25), inset 0 1px 0 rgba(255,252,248,0.05)",
       "$type": "shadow"
     },
     "shadow-glow-accent": {

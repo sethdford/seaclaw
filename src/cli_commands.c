@@ -1477,8 +1477,103 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     }
 
     if (strcmp(sub, "trend") == 0) {
-        printf("Eval trend: use 'human eval run' to generate runs, then 'human eval trend' to compare.\n");
-        return HU_OK;
+#ifdef HU_ENABLE_SQLITE
+        enum { eval_trend_max_runs = 200, eval_trend_max_suites = 64 };
+        hu_config_t cfg;
+        hu_error_t cfg_err = hu_config_load(alloc, &cfg);
+        if (cfg_err != HU_OK) {
+            fprintf(stderr, "eval trend: config error\n");
+            return cfg_err;
+        }
+        const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
+        hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
+        sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
+        if (!db) {
+            printf("No eval history found. Run 'human eval baseline' first.\n");
+            if (mem.vtable && mem.vtable->deinit)
+                mem.vtable->deinit(mem.ctx);
+            hu_config_deinit(&cfg);
+            return HU_OK;
+        }
+        (void)hu_eval_init_tables(db);
+        hu_eval_run_t *runs = alloc->alloc(alloc->ctx, eval_trend_max_runs * sizeof(hu_eval_run_t));
+        if (!runs) {
+            if (mem.vtable && mem.vtable->deinit)
+                mem.vtable->deinit(mem.ctx);
+            hu_config_deinit(&cfg);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        memset(runs, 0, eval_trend_max_runs * sizeof(hu_eval_run_t));
+        size_t count = 0;
+        hu_error_t err = hu_eval_load_history(alloc, db, runs, eval_trend_max_runs, &count);
+        char suite_names[eval_trend_max_suites][128];
+        double curr[eval_trend_max_suites];
+        double prev[eval_trend_max_suites];
+        bool have_curr[eval_trend_max_suites];
+        bool have_prev[eval_trend_max_suites];
+        memset(have_curr, 0, sizeof(have_curr));
+        memset(have_prev, 0, sizeof(have_prev));
+        size_t nslots = 0;
+
+        if (err == HU_OK && count > 0) {
+            for (size_t i = 0; i < count; i++) {
+                const char *sn = runs[i].suite_name && runs[i].suite_name[0] ? runs[i].suite_name : "-";
+                int slot = -1;
+                for (size_t s = 0; s < nslots; s++) {
+                    if (strcmp(suite_names[s], sn) == 0) {
+                        slot = (int)s;
+                        break;
+                    }
+                }
+                if (slot < 0) {
+                    if (nslots >= eval_trend_max_suites)
+                        continue;
+                    slot = (int)nslots;
+                    nslots++;
+                    strncpy(suite_names[slot], sn, sizeof(suite_names[0]) - 1);
+                    suite_names[slot][sizeof(suite_names[0]) - 1] = '\0';
+                }
+                if (!have_curr[slot]) {
+                    curr[slot] = runs[i].pass_rate;
+                    have_curr[slot] = true;
+                } else if (!have_prev[slot]) {
+                    prev[slot] = runs[i].pass_rate;
+                    have_prev[slot] = true;
+                }
+            }
+        }
+
+        size_t printed = 0;
+        if (err == HU_OK && nslots > 0) {
+            printf("%-28s %12s %12s %10s\n", "Suite", "Previous", "Current", "Delta");
+            printf("%-28s %12s %12s %10s\n", "----------------------------", "------------", "------------",
+                   "----------");
+            for (size_t s = 0; s < nslots; s++) {
+                if (!have_curr[s] || !have_prev[s])
+                    continue;
+                double delta = curr[s] - prev[s];
+                printf("%-28.28s %11.1f%% %11.1f%% %+9.1f%%\n", suite_names[s], prev[s] * 100.0,
+                       curr[s] * 100.0, delta * 100.0);
+                printed++;
+            }
+        }
+
+        for (size_t i = 0; i < count; i++)
+            hu_eval_run_free(alloc, &runs[i]);
+        alloc->free(alloc->ctx, runs, eval_trend_max_runs * sizeof(hu_eval_run_t));
+        if (mem.vtable && mem.vtable->deinit)
+            mem.vtable->deinit(mem.ctx);
+        hu_config_deinit(&cfg);
+
+        if (printed == 0) {
+            printf("No eval history found. Run 'human eval baseline' first.\n");
+            return HU_OK;
+        }
+        return err;
+#else
+        printf("Eval trend requires SQLite support (build with HU_ENABLE_SQLITE).\n");
+        return HU_ERR_NOT_SUPPORTED;
+#endif
     }
 
     if (strcmp(sub, "benchmark") == 0) {

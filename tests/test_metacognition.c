@@ -2,6 +2,20 @@
 #include "test_framework.h"
 #include <string.h>
 
+static void apply_config_copies_settings(void) {
+    hu_metacognition_t mc;
+    hu_metacognition_init(&mc);
+    hu_metacog_settings_t s;
+    hu_metacog_settings_default(&s);
+    s.enabled = false;
+    s.max_regen = 5;
+    s.hysteresis_min = 7;
+    hu_metacognition_apply_config(&mc, &s);
+    HU_ASSERT_FALSE(mc.cfg.enabled);
+    HU_ASSERT_EQ(mc.cfg.max_regen, 5u);
+    HU_ASSERT_EQ(mc.cfg.hysteresis_min, 7u);
+}
+
 static void init_sets_defaults(void) {
     hu_metacognition_t mc;
     hu_metacognition_init(&mc);
@@ -289,6 +303,7 @@ static void hard_difficulty_relaxes_confidence_threshold(void) {
 
 void run_metacognition_tests(void) {
     HU_TEST_SUITE("Metacognition");
+    HU_RUN_TEST(apply_config_copies_settings);
     HU_RUN_TEST(init_sets_defaults);
     HU_RUN_TEST(monitor_confident_response);
     HU_RUN_TEST(monitor_hedging_response_low_confidence);

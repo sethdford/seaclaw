@@ -36,6 +36,7 @@ AGENTS.md                <- Full engineering protocol
 | [fleet.md](ai/fleet.md)                                       | `hu_agent_pool_t` limits: depth, lifetime spawns, session budget; `/fleet`, spawn errors    | Sub-agents, `agent_spawn`, `/spawn`, cost caps |
 | [conversation-design.md](ai/conversation-design.md)           | Response patterns, channel-aware behavior, intent routing, persona integration             | Building conversational features           |
 | [hallucination-prevention.md](ai/hallucination-prevention.md) | Grounding hierarchy, tool output integrity, memory attribution, capability honesty         | Any AI response generation                 |
+| [capability-claims.md](ai/capability-claims.md)               | Verifiable capability claims, evidence bars, avoiding overstated product language           | Marketing, docs, release notes             |
 | [prompt-engineering.md](ai/prompt-engineering.md)             | System prompt structure, persona composition, RAG patterns, context window management      | Modifying prompts, adding providers        |
 | [evaluation.md](ai/evaluation.md)                             | Quality dimensions, golden-set testing, scoring rubrics, per-provider metrics              | Prompt changes, model upgrades             |
 | [citation-and-sourcing.md](ai/citation-and-sourcing.md)       | Source tiers, attribution patterns, freshness rules, confidence mapping                    | Agent responses that reference data        |

@@ -1,3 +1,9 @@
+---
+title: Metacognition analytics
+description: SQLite queries and script for metacog_history in cognition.db
+updated: 2026-03-21
+---
+
 # Metacognition analytics (`metacog_history`)
 
 The cognition database (`~/.human/cognition.db`, table `metacog_history`) stores one row per assistant completion when metacognition is enabled. Useful columns:
@@ -33,3 +39,14 @@ WHERE logprob_mean IS NOT NULL AND logprob_mean > -0.5;
 ```
 
 Run with `sqlite3 ~/.human/cognition.db`. Under tests, cognition DB may be `:memory:` only.
+
+## Script
+
+From the repo root:
+
+```bash
+./scripts/metacog-analytics.sh
+./scripts/metacog-analytics.sh /path/to/cognition.db
+```
+
+If the DB file is missing, the script exits `0` and prints a short notice (safe for CI-less laptops).

@@ -1,6 +1,7 @@
 #include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/arena.h"
+#include "human/core/json.h"
 #include "human/core/error.h"
 #include "human/provider.h"
 #include "human/providers/anthropic.h"
@@ -783,6 +784,21 @@ static void test_chat_response_free_null_safe(void) {
     hu_chat_response_free(&alloc, NULL);
 }
 
+static void test_helpers_openai_choice_logprob_mean(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"logprobs\":{\"content\":["
+                       "{\"logprob\":-0.1},{\"logprob\":-0.3}]}}";
+    hu_json_value_t *root = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc, json, strlen(json), &root), HU_OK);
+    HU_ASSERT_NOT_NULL(root);
+    hu_chat_response_t out;
+    memset(&out, 0, sizeof(out));
+    hu_helpers_openai_choice_apply_logprobs(root, &out);
+    HU_ASSERT_TRUE(out.logprob_mean_valid);
+    HU_ASSERT_TRUE(out.logprob_mean > -0.21f && out.logprob_mean < -0.19f);
+    hu_json_free(&alloc, root);
+}
+
 void run_provider_tests(void) {
     HU_TEST_SUITE("Provider");
     HU_RUN_TEST(test_openai_create_succeeds);
@@ -833,5 +849,6 @@ void run_provider_tests(void) {
     HU_RUN_TEST(test_helpers_extract_anthropic_content_succeeds);
     HU_RUN_TEST(test_helpers_extract_anthropic_content_invalid_json_returns_null);
     HU_RUN_TEST(test_helpers_extract_anthropic_content_empty_array_returns_null);
+    HU_RUN_TEST(test_helpers_openai_choice_logprob_mean);
     HU_RUN_TEST(test_chat_response_free_null_safe);
 }

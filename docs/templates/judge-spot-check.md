@@ -1,3 +1,9 @@
+---
+title: Judge spot-check template
+description: Human calibration template for LLM-judged eval verdicts
+updated: 2026-03-21
+---
+
 # Judge Spot-Check Template
 
 When publishing eval claims, a human reviewer should spot-check at least 10% of LLM-judged verdicts. This template records the calibration.

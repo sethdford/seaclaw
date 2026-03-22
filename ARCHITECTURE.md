@@ -210,7 +210,7 @@ src/
   core/        Allocator, arena, JSON, string, HTTP, error
 
 include/human/  Public C headers (vtable definitions)
-tests/          291 test files, 6264+ tests
+tests/          291 test files, 6322+ tests
 fuzz/           libFuzzer harnesses
 ui/             LitElement web dashboard
 website/        Astro marketing site

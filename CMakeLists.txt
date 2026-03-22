@@ -408,6 +408,7 @@ set(HU_CORE_SOURCES
     src/agent/mcts_planner.c
     src/agent/dag.c
     src/agent/dag_executor.c
+    src/agent/hula.c
     src/agent/llm_compiler.c
     src/agent/orchestrator.c
     src/agent/orchestrator_llm.c
@@ -1972,6 +1973,7 @@ set(HU_TEST_SOURCES
     tests/test_tool_call_parser.c
     tests/test_tool_router.c
     tests/test_dag.c
+    tests/test_hula.c
     tests/test_mood.c
     tests/test_bth_e2e.c
     tests/test_style_tracker.c

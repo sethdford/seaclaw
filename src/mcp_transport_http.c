@@ -75,9 +75,9 @@ static void http_close(void *ctx, hu_allocator_t *alloc) {
 
 hu_error_t hu_mcp_transport_http_create(hu_allocator_t *alloc, const char *url, size_t url_len,
                                         hu_mcp_transport_t *out) {
-#ifdef HU_HTTP_CURL
-    if (!alloc || !out || !url)
+    if (!alloc || !out || !url || url_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
+#ifdef HU_HTTP_CURL
     http_ctx_t *c = (http_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
     if (!c)
         return HU_ERR_OUT_OF_MEMORY;
@@ -94,10 +94,8 @@ hu_error_t hu_mcp_transport_http_create(hu_allocator_t *alloc, const char *url, 
     out->close = http_close;
     return HU_OK;
 #else
-    (void)alloc;
     (void)url;
     (void)url_len;
-    (void)out;
     return HU_ERR_NOT_SUPPORTED;
 #endif
 }

@@ -1,4 +1,5 @@
 /* Config edge cases (~30 tests). No real I/O - uses parse_json and env overrides. */
+#include "human/cognition/metacognition.h"
 #include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/arena.h"
@@ -531,6 +532,54 @@ static void test_config_parse_agent_context_pressure(void) {
                    cfg->agent.context_pressure_compact < 0.99f);
     HU_ASSERT_TRUE(cfg->agent.context_compact_target > 0.64f &&
                    cfg->agent.context_compact_target < 0.66f);
+    free_config(cfg);
+}
+
+static void test_config_parse_agent_metacognition(void) {
+    hu_config_t *cfg = make_config_with_arena();
+    const char *j = "{\"agent\":{\"metacognition\":{"
+                    "\"enabled\":true,\"confidence_threshold\":0.25,\"coherence_threshold\":0.15,"
+                    "\"repetition_threshold\":0.55,\"max_reflects\":3,\"max_regen\":2,"
+                    "\"hysteresis_min\":4,\"use_calibrated_risk\":false,\"risk_high_threshold\":0.71,"
+                    "\"w_low_confidence\":0.11,\"w_low_coherence\":0.12,\"w_repetition\":0.13,"
+                    "\"w_stuck\":0.14,\"w_low_satisfaction\":0.15,\"w_low_trajectory\":0.16}}}";
+    hu_error_t err = hu_config_parse_json(cfg, j, strlen(j));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(cfg->agent.metacognition.enabled);
+    HU_ASSERT_TRUE(cfg->agent.metacognition.confidence_threshold > 0.24f &&
+                   cfg->agent.metacognition.confidence_threshold < 0.26f);
+    HU_ASSERT_TRUE(cfg->agent.metacognition.coherence_threshold > 0.14f &&
+                   cfg->agent.metacognition.coherence_threshold < 0.16f);
+    HU_ASSERT_TRUE(cfg->agent.metacognition.repetition_threshold > 0.54f &&
+                   cfg->agent.metacognition.repetition_threshold < 0.56f);
+    HU_ASSERT_EQ(cfg->agent.metacognition.max_reflects, 3u);
+    HU_ASSERT_EQ(cfg->agent.metacognition.max_regen, 2u);
+    HU_ASSERT_EQ(cfg->agent.metacognition.hysteresis_min, 4u);
+    HU_ASSERT_FALSE(cfg->agent.metacognition.use_calibrated_risk);
+    HU_ASSERT_TRUE(cfg->agent.metacognition.risk_high_threshold > 0.70f &&
+                   cfg->agent.metacognition.risk_high_threshold < 0.72f);
+    HU_ASSERT_TRUE(cfg->agent.metacognition.w_low_confidence > 0.10f &&
+                   cfg->agent.metacognition.w_low_confidence < 0.12f);
+    HU_ASSERT_TRUE(cfg->agent.metacognition.w_low_trajectory > 0.15f &&
+                   cfg->agent.metacognition.w_low_trajectory < 0.17f);
+    free_config(cfg);
+}
+
+static void test_config_env_override_metacognition(void) {
+    hu_config_t *cfg = make_config_with_arena();
+    hu_metacog_settings_default(&cfg->agent.metacognition);
+    HU_ASSERT_TRUE(cfg->agent.metacognition.enabled);
+    setenv("HUMAN_METACOGNITION", "0", 1);
+    hu_config_apply_env_overrides(cfg);
+    HU_ASSERT_FALSE(cfg->agent.metacognition.enabled);
+    unsetenv("HUMAN_METACOGNITION");
+
+    hu_metacog_settings_default(&cfg->agent.metacognition);
+    setenv("HUMAN_METACOG_MAX_REGEN", "7", 1);
+    hu_config_apply_env_overrides(cfg);
+    HU_ASSERT_EQ(cfg->agent.metacognition.max_regen, 7u);
+    unsetenv("HUMAN_METACOG_MAX_REGEN");
+
     free_config(cfg);
 }
 
@@ -1263,6 +1312,8 @@ void run_config_extended_tests(void) {
     HU_RUN_TEST(test_config_parse_agent_llm_compiler);
     HU_RUN_TEST(test_config_parse_agent_tool_routing);
     HU_RUN_TEST(test_config_parse_agent_context_pressure);
+    HU_RUN_TEST(test_config_parse_agent_metacognition);
+    HU_RUN_TEST(test_config_env_override_metacognition);
     HU_RUN_TEST(test_config_persona_per_channel);
     HU_RUN_TEST(test_config_parse_runtime_docker);
     HU_RUN_TEST(test_config_parse_tools_enabled_list);

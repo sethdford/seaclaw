@@ -1610,8 +1610,20 @@ export class DemoGatewayClient extends EventTarget {
 
       case "nodes.list":
         return { nodes: this.state.nodes };
-      case "nodes.action":
-        return { ok: true };
+      case "nodes.action": {
+        const act = (params?.action as string) ?? "restart";
+        const nid = (params?.nodeId as string) ?? (params?.node_id as string) ?? "local";
+        if (act === "status") {
+          const node = this.state.nodes.find((n) => n.id === nid) ??
+            this.state.nodes[0] ?? {
+              id: "local",
+              type: "gateway",
+              status: "online",
+            };
+          return { ok: true, action: "status", node };
+        }
+        return { ok: true, action: act, note: "single-node mode" };
+      }
 
       // --- Chat (emits mock response) ---
       case "chat.send": {

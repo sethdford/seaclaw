@@ -130,8 +130,9 @@ export function generatePalette(sourceHex: string): ColorPalette {
     steps,
   );
 
+  const warmNeutralHue = 55;
   const neutral = generateScale(
-    { l: oklch.l, c: oklch.c * 0.05, h: oklch.h },
+    { l: oklch.l, c: oklch.c * 0.07, h: warmNeutralHue },
     steps,
   );
 

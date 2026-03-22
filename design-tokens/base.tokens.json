@@ -12,126 +12,126 @@
         "$type": "color"
       },
       "50": {
-        "$value": "#060b12",
+        "$value": "#0c0a08",
         "$type": "color"
       },
       "100": {
-        "$value": "#0d1520",
+        "$value": "#141210",
         "$type": "color"
       },
       "150": {
-        "$value": "#152333",
+        "$value": "#1e1a16",
         "$type": "color"
       },
       "200": {
-        "$value": "#1e3044",
+        "$value": "#28231e",
         "$type": "color"
       },
       "250": {
-        "$value": "#273d55",
+        "$value": "#332d26",
         "$type": "color"
       },
       "300": {
-        "$value": "#2f4a64",
+        "$value": "#3e372f",
         "$type": "color"
       },
       "400": {
-        "$value": "#3d5468",
+        "$value": "#56504a",
         "$type": "color"
       },
       "500": {
-        "$value": "#7a96b0",
+        "$value": "#8a847e",
         "$type": "color"
       },
       "600": {
-        "$value": "#8aa0b8",
+        "$value": "#9e9892",
         "$type": "color"
       },
       "700": {
-        "$value": "#c0d0e0",
+        "$value": "#c8c2bc",
         "$type": "color"
       },
       "750": {
-        "$value": "#d8e4f0",
+        "$value": "#ddd8d3",
         "$type": "color"
       },
       "800": {
-        "$value": "#e6edf4",
+        "$value": "#ebe7e3",
         "$type": "color"
       },
       "825": {
-        "$value": "#ecf2f8",
+        "$value": "#f0ece9",
         "$type": "color"
       },
       "850": {
-        "$value": "#f0f5fa",
+        "$value": "#f4f1ee",
         "$type": "color"
       },
       "900": {
-        "$value": "#f7f9fc",
+        "$value": "#faf8f6",
         "$type": "color"
       },
       "925": {
-        "$value": "#fafcfe",
+        "$value": "#fcfbf9",
         "$type": "color"
       },
       "1000": {
         "$value": "#ffffff",
         "$type": "color"
       },
-      "$description": "Tonal ocean scale — deep midnight blues to coastal whites. Dark surface steps widened for M3-level contrast between elevation levels."
+      "$description": "Warm charcoal scale — cinematic amber-tinted darks to cream whites. Warm neutral tones for premium feel, OKLCH hue ~55deg."
     },
     "tonal": {
-      "$description": "M3-style tonal surface primitives — neutrals tinted with fidelity green for surface-container hierarchy",
+      "$description": "M3-style tonal surface primitives — warm neutrals tinted with fidelity green for surface-container hierarchy",
       "dark-container": {
-        "$value": "#172631",
+        "$value": "#1f1c19",
         "$type": "color",
-        "$description": "neutral.150 + 4% fidelity.500 — default card/panel surface"
+        "$description": "warm neutral.150 + 4% fidelity.500 — default card/panel surface"
       },
       "dark-container-high": {
-        "$value": "#223540",
+        "$value": "#2a2621",
         "$type": "color",
-        "$description": "neutral.200 + 6% fidelity.500 — elevated interactive surfaces"
+        "$description": "warm neutral.200 + 6% fidelity.500 — elevated interactive surfaces"
       },
       "dark-container-highest": {
-        "$value": "#2c4451",
+        "$value": "#35302a",
         "$type": "color",
-        "$description": "neutral.250 + 8% fidelity.500 — highest emphasis surfaces, active states"
+        "$description": "warm neutral.250 + 8% fidelity.500 — highest emphasis surfaces, active states"
       },
       "dark-dim": {
-        "$value": "#030710",
+        "$value": "#080604",
         "$type": "color",
         "$description": "Recessed surface — darker than bg for inset/well areas"
       },
       "dark-bright": {
-        "$value": "#34506a",
+        "$value": "#42392e",
         "$type": "color",
         "$description": "Prominent surface — lighter than elevated for hero/featured areas"
       },
       "light-container": {
-        "$value": "#f7f8f5",
+        "$value": "#f9f7f4",
         "$type": "color",
-        "$description": "white + 6% fidelity.100 — default card/panel surface"
+        "$description": "warm cream + 6% fidelity.100 — default card/panel surface"
       },
       "light-container-high": {
-        "$value": "#eeefec",
+        "$value": "#f0ede9",
         "$type": "color",
-        "$description": "gray + 8% fidelity.100 — elevated interactive surfaces"
+        "$description": "warm gray + 8% fidelity.100 — elevated interactive surfaces"
       },
       "light-container-highest": {
-        "$value": "#e7e9e5",
+        "$value": "#e9e5e0",
         "$type": "color",
-        "$description": "gray + 10% fidelity.100 — highest emphasis surfaces"
+        "$description": "warm gray + 10% fidelity.100 — highest emphasis surfaces"
       },
       "light-dim": {
-        "$value": "#e8e8e8",
+        "$value": "#e6e2de",
         "$type": "color",
-        "$description": "Recessed surface — light theme inset/well areas"
+        "$description": "Recessed surface — warm light theme inset/well areas"
       },
       "light-bright": {
-        "$value": "#ffffff",
+        "$value": "#fffefa",
         "$type": "color",
-        "$description": "Prominent surface — brightest level for hero/featured areas"
+        "$description": "Prominent surface — warm cream brightest level for hero/featured areas"
       }
     },
     "teal": {

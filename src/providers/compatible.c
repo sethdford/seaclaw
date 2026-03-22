@@ -350,6 +350,7 @@ static hu_error_t compatible_chat(void *ctx, hu_allocator_t *alloc,
                 }
             }
         }
+        hu_helpers_openai_choice_apply_logprobs(first, out);
     }
     hu_json_value_t *usage = hu_json_object_get(parsed, "usage");
     if (usage && usage->type == HU_JSON_OBJECT) {

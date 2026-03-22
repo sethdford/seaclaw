@@ -1,3 +1,9 @@
+---
+title: Streaming voice
+description: Control UI and gateway flow for voice streaming (STT, TTS, WebSocket)
+updated: 2026-03-21
+---
+
 # Streaming voice (control UI + gateway)
 
 End-to-end flow: the **Voice** tab streams microphone audio over the control WebSocket, the gateway runs STT, publishes the user turn on the bus for the agent, streams **Cartesia** TTS back as **binary** `pcm_f32le` @ 24 kHz, and the dashboard plays it via an `AudioWorklet`.

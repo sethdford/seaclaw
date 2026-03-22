@@ -151,7 +151,7 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
                              (const uint8_t *)v->config.speaker_id, exag, audio_buf, &audio_len);
     if (err != 0) {
 #if !HU_IS_TEST
-        fprintf(stderr, "voice_channel: sonata_tts failed (err=%d)\n", err);
+        fprintf(stderr, "voice_channel: sonata_tts failed (err=%d [sonata])\n", (int)err);
 #endif
         v->alloc->free(v->alloc->ctx, audio_buf, buf_bytes);
         return HU_ERR_CHANNEL_SEND;

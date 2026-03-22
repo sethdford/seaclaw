@@ -22,6 +22,11 @@ hu_error_t hu_moderation_check_local(hu_allocator_t *alloc, const char *text, si
     memset(out, 0, sizeof(*out));
     if (mod_contains(text, text_len, "kill") || mod_contains(text, text_len, "murder") || mod_contains(text, text_len, "violence")) { out->violence = true; out->violence_score = 0.9; out->flagged = true; }
     if (mod_contains(text, text_len, "hate") && mod_contains(text, text_len, "group")) { out->hate = true; out->hate_score = 0.8; out->flagged = true; }
+    if (mod_contains(text, text_len, "suicide") || mod_contains(text, text_len, "self harm") || mod_contains(text, text_len, "self-harm")) {
+        out->self_harm = true;
+        out->self_harm_score = 0.85;
+        out->flagged = true;
+    }
     return HU_OK;
 }
 
