@@ -7,6 +7,7 @@ import {
   WAIT,
   POLL,
   ANIMATION_SETTLE_MS,
+  shadowElementText,
 } from "./helpers.js";
 
 const VIEW = "hu-voice-view";
@@ -243,6 +244,128 @@ test.describe("Voice Interactions", () => {
         })()`,
       );
       expect(barText).toMatch(/2 message/i);
+    }).toPass({ timeout: POLL });
+  });
+});
+
+/**
+ * Drive the demo voice pipeline through voiceAudioEnd (skipping real mic)
+ * and assert the full transcript → response → audio.done flow.
+ */
+function triggerDemoVoicePipeline(): string {
+  return `(async () => {
+    const app = document.querySelector("hu-app");
+    const view = app?.shadowRoot?.querySelector("${VIEW}");
+    if (!view || !view.gateway) return "no-view";
+    const gw = view.gateway;
+    if (typeof gw.voiceSessionStart !== "function") return "no-streaming";
+    await gw.voiceSessionStart({ sessionKey: "voice" });
+    gw.setOnBinaryChunk?.((ab) => {
+      const f32 = new Float32Array(ab);
+      if (f32.length > 0) view._speaking = true;
+      view.requestUpdate();
+    });
+    await gw.voiceAudioEnd({ mimeType: "audio/webm", sessionKey: "voice" });
+    return "triggered";
+  })()`;
+}
+
+function getOrbState(): string {
+  return `(() => {
+    const app = document.querySelector("hu-app");
+    const view = app?.shadowRoot?.querySelector("${VIEW}");
+    const orb = view?.shadowRoot?.querySelector("hu-voice-orb");
+    return orb?.state ?? "unknown";
+  })()`;
+}
+
+function getOrbAriaLabel(): string {
+  return `(() => {
+    const app = document.querySelector("hu-app");
+    const view = app?.shadowRoot?.querySelector("${VIEW}");
+    const orb = view?.shadowRoot?.querySelector("hu-voice-orb");
+    const btn = orb?.shadowRoot?.querySelector(".mic-btn");
+    return btn?.getAttribute("aria-label") ?? "";
+  })()`;
+}
+
+function triggerInterrupt(): string {
+  return `(async () => {
+    const app = document.querySelector("hu-app");
+    const view = app?.shadowRoot?.querySelector("${VIEW}");
+    if (!view || !view.gateway) return "no-view";
+    const gw = view.gateway;
+    if (typeof gw.voiceSessionInterrupt !== "function") return "no-streaming";
+    await gw.voiceSessionInterrupt();
+    return "interrupted";
+  })()`;
+}
+
+test.describe("Voice Streaming Pipeline (demo)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/?demo#voice");
+    await waitForViewReady(page, VIEW);
+    await page.waitForTimeout(WAIT);
+  });
+
+  test("voice.audio.end triggers transcript + assistant reply", async ({ page }) => {
+    const result = await page.evaluate(triggerDemoVoicePipeline());
+    expect(result).toBe("triggered");
+
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText(VIEW));
+      expect(text).toContain("Demo transcription from streaming mic");
+    }).toPass({ timeout: POLL });
+
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText(VIEW));
+      expect(text).toContain("demo assistant reply");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("orb returns to idle after voice.audio.done", async ({ page }) => {
+    await page.evaluate(triggerDemoVoicePipeline());
+
+    await expect(async () => {
+      const text: string = await page.evaluate(deepText(VIEW));
+      expect(text).toContain("demo assistant reply");
+    }).toPass({ timeout: POLL });
+
+    await page.waitForTimeout(4000);
+
+    await expect(async () => {
+      const state = await page.evaluate(getOrbState());
+      expect(state).toBe("idle");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("orb aria-label reflects idle state", async ({ page }) => {
+    await expect(async () => {
+      const label = await page.evaluate(getOrbAriaLabel());
+      expect(label).toBe("Start listening");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("voice.session.interrupt emits interrupted event", async ({ page }) => {
+    await page.evaluate(triggerDemoVoicePipeline());
+
+    await page.waitForTimeout(300);
+
+    const interruptResult = await page.evaluate(triggerInterrupt());
+    expect(interruptResult).toBe("interrupted");
+
+    await expect(async () => {
+      const state = await page.evaluate(getOrbState());
+      expect(state).toBe("idle");
+    }).toPass({ timeout: POLL });
+  });
+
+  test("status text shows pipeline states", async ({ page }) => {
+    await expect(async () => {
+      const status = await page.evaluate(
+        shadowElementText(VIEW, "hu-voice-orb"),
+      );
+      expect(status).toContain("Click the microphone");
     }).toPass({ timeout: POLL });
   });
 });

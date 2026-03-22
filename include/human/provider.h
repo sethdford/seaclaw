@@ -115,6 +115,9 @@ typedef struct hu_chat_response {
     size_t model_len;
     const char *reasoning_content; /* optional, NULL if none */
     size_t reasoning_content_len;  /* 0 if reasoning_content is NULL */
+    /* Mean logprob over completion tokens when provider returned logprobs (e.g. OpenAI). */
+    bool logprob_mean_valid;
+    float logprob_mean;
 } hu_chat_response_t;
 
 typedef struct hu_stream_chunk {
@@ -159,6 +162,7 @@ typedef struct hu_chat_request {
     size_t response_format_len;
     double budget_remaining_usd;  /* 0.0 = unlimited; router may downgrade model when low */
     int thinking_budget;          /* 0 = no thinking; >0 = token budget for model reasoning */
+    bool include_completion_logprobs; /* OpenAI-compatible: logprobs + top_logprobs in request */
 } hu_chat_request_t;
 
 /* ──────────────────────────────────────────────────────────────────────────

@@ -100,7 +100,7 @@ hu_error_t hu_superhuman_build_context(hu_superhuman_registry_t *reg, hu_allocat
         return HU_OK;
     }
     *out = buf;
-    *out_len = cap; /* allocated size for caller to free */
+    *out_len = len;
     return HU_OK;
 }
 

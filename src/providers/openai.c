@@ -24,6 +24,36 @@ typedef struct hu_openai_ctx {
     bool ws_streaming; /* prefer WebSocket over SSE for streaming */
 } hu_openai_ctx_t;
 
+/* choices[0].logprobs.content[].logprob — OpenAI chat completions */
+static void openai_extract_logprob_mean(hu_json_value_t *choice, hu_chat_response_t *out) {
+    if (!choice || !out)
+        return;
+    out->logprob_mean_valid = false;
+    out->logprob_mean = 0.0f;
+    hu_json_value_t *lp = hu_json_object_get(choice, "logprobs");
+    if (!lp || lp->type != HU_JSON_OBJECT)
+        return;
+    hu_json_value_t *content = hu_json_object_get(lp, "content");
+    if (!content || content->type != HU_JSON_ARRAY || content->data.array.len == 0)
+        return;
+    double sum = 0.0;
+    size_t n = 0;
+    for (size_t i = 0; i < content->data.array.len; i++) {
+        hu_json_value_t *tok = content->data.array.items[i];
+        if (!tok || tok->type != HU_JSON_OBJECT)
+            continue;
+        double v = hu_json_get_number(tok, "logprob", -999.0);
+        if (v > -900.0) {
+            sum += v;
+            n++;
+        }
+    }
+    if (n > 0) {
+        out->logprob_mean_valid = true;
+        out->logprob_mean = (float)(sum / (double)n);
+    }
+}
+
 #if HU_IS_TEST
 /* Mock HTTP POST for tests. When body contains "tools" but NOT "tool_call_id", return tool_calls.
    When "tool_call_id" is present, return text. */
@@ -477,6 +507,7 @@ static hu_error_t openai_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
                 }
             }
         }
+        openai_extract_logprob_mean(first, out);
     }
     hu_json_value_t *usage = hu_json_object_get(parsed, "usage");
     if (usage && usage->type == HU_JSON_OBJECT) {
