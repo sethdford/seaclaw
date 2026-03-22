@@ -121,4 +121,15 @@ export class AudioPlaybackEngine {
   get isPlaying(): boolean {
     return this.#ctx?.state === "running";
   }
+
+  dispose(): void {
+    this.#node?.port.postMessage({ type: "clear" });
+    this.#node?.disconnect();
+    this.#node = null;
+    if (this.#ctx && this.#ctx.state !== "closed") {
+      void this.#ctx.close();
+    }
+    this.#ctx = null;
+    this.#onPlaybackEnd = null;
+  }
 }

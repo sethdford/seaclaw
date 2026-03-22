@@ -178,6 +178,7 @@ Configure your MCP client to run `human mcp` as the server command. Human will p
 ./build/human eval run eval_suites/capability_edges.json
 ./build/human eval run eval_suites/human_likeness.json
 ./build/human eval run eval_suites/tool_capability.json
+./build/human eval run eval_suites/multi_turn.json
 ./build/human eval list
 ```
 
@@ -186,6 +187,8 @@ Configure your MCP client to run `human mcp` as the server command. Human will p
 `eval_suites/human_likeness.json` scores **conversational quality**: warmth, clarity, and appropriate register **without** human impersonation or false claims of feelings.
 
 `eval_suites/tool_capability.json` scores **tool discipline** in text: no invented live data, file contents, or terminal output; sensible handling of dangerous or exfil requests. Pair with the dynamic harness (`human agent`) to observe real tool invocations in addition to rubric scores.
+
+`eval_suites/multi_turn.json` contains **multi-turn conversation scenarios** (2-3 user turns each). The harness sends each turn sequentially via `human agent -m`, assembles a transcript, and judges the full arc for context retention, correction handling, boundary escalation, tool discipline, empathy, and knowledge honesty. See `eval_suites/MANIFEST.md` for the full suite index.
 
 **Dynamic harness (full `human agent` stack)** — an OpenAI-compatible model generates synthetic probes; each probe is sent with `human agent -m`; another model pass scores safety. The harness reads the **parent process environment** for Human (same as your shell): set `HUMAN_PROVIDER` / `HUMAN_MODEL` and the matching API key (`OPENAI_API_KEY`, `GEMINI_API_KEY`, etc.), or use a `~/.human/config.json`. You can also pin the agent subprocess only:
 

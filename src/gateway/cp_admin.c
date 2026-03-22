@@ -601,6 +601,112 @@ hu_error_t cp_admin_nodes_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     return err;
 }
 
+static const char *cp_agent_status_wire(hu_agent_status_t st) {
+    switch (st) {
+    case HU_AGENT_RUNNING:
+        return "running";
+    case HU_AGENT_IDLE:
+        return "idle";
+    case HU_AGENT_COMPLETED:
+        return "completed";
+    case HU_AGENT_FAILED:
+        return "failed";
+    case HU_AGENT_CANCELLED:
+        return "cancelled";
+    default:
+        return "unknown";
+    }
+}
+
+/* ── nodes.action (stub) ─────────────────────────────────────────────── */
+
+hu_error_t cp_admin_nodes_action(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                 const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                 char **out, size_t *out_len) {
+    (void)alloc;
+    (void)app;
+    (void)conn;
+    (void)proto;
+    (void)root;
+    (void)out;
+    (void)out_len;
+    return HU_ERR_NOT_SUPPORTED;
+}
+
+/* ── agents.list ─────────────────────────────────────────────────────── */
+
+hu_error_t cp_admin_agents_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                char **out, size_t *out_len) {
+    (void)conn;
+    (void)proto;
+    (void)root;
+    *out = NULL;
+    *out_len = 0;
+
+#if HU_IS_TEST
+    static const char mock[] =
+        "{\"agents\":[{\"name\":\"main\",\"status\":\"idle\",\"model\":\"claude-sonnet-4-20250514\","
+        "\"turns\":0,\"uptime\":0}]}";
+    size_t mlen = strlen(mock);
+    char *copy = (char *)alloc->alloc(alloc->ctx, mlen + 1);
+    if (!copy)
+        return HU_ERR_OUT_OF_MEMORY;
+    memcpy(copy, mock, mlen + 1);
+    *out = copy;
+    *out_len = mlen;
+    return HU_OK;
+#else
+    hu_json_value_t *obj = hu_json_object_new(alloc);
+    if (!obj)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_json_value_t *arr = hu_json_array_new(alloc);
+    if (!arr) {
+        hu_json_free(alloc, obj);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+
+    hu_agent_pool_t *pool = (app && app->agent) ? app->agent->agent_pool : NULL;
+    hu_agent_pool_info_t *infos = NULL;
+    size_t n = 0;
+    if (pool) {
+        hu_error_t le = hu_agent_pool_list(pool, alloc, &infos, &n);
+        if (le != HU_OK) {
+            hu_json_free(alloc, obj);
+            return le;
+        }
+    }
+
+    time_t now = time(NULL);
+    for (size_t i = 0; i < n; i++) {
+        hu_json_value_t *a = hu_json_object_new(alloc);
+        if (!a) {
+            if (infos)
+                alloc->free(alloc->ctx, infos, n * sizeof(*infos));
+            hu_json_free(alloc, obj);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        const char *nm = (infos[i].label && infos[i].label[0]) ? infos[i].label : "agent";
+        cp_json_set_str(alloc, a, "name", nm);
+        cp_json_set_str(alloc, a, "status", cp_agent_status_wire(infos[i].status));
+        cp_json_set_str(alloc, a, "model", infos[i].model ? infos[i].model : "");
+        hu_json_object_set(alloc, a, "turns", hu_json_number_new(alloc, 0));
+        double uptime = 0;
+        if (infos[i].started_at > 0 && (int64_t)now >= infos[i].started_at)
+            uptime = (double)((int64_t)now - infos[i].started_at);
+        hu_json_object_set(alloc, a, "uptime", hu_json_number_new(alloc, uptime));
+        hu_json_array_push(alloc, arr, a);
+    }
+    if (infos)
+        alloc->free(alloc->ctx, infos, n * sizeof(*infos));
+
+    hu_json_object_set(alloc, obj, "agents", arr);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
+#endif
+}
+
 /* ── usage.summary ───────────────────────────────────────────────────── */
 
 hu_error_t cp_admin_usage_summary(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,

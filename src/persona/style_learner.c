@@ -146,7 +146,7 @@ hu_error_t hu_persona_style_reanalyze(hu_allocator_t *alloc, hu_provider_t *prov
                                              persona_name, persona_name_len, &merged) == HU_OK) {
                 hu_error_t write_err = hu_persona_creator_write(alloc, &merged);
                 if (write_err != HU_OK)
-                    fprintf(stderr, "[style_learner] persona write failed: %d\n", write_err);
+                    fprintf(stderr, "[style_learner] persona write failed: %s\n", hu_error_string(write_err));
                 hu_persona_deinit(alloc, &merged);
             }
             hu_persona_deinit(alloc, &current);

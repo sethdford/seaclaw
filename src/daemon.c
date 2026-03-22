@@ -657,8 +657,8 @@ static void store_conversation_summary(hu_allocator_t *alloc, hu_memory_t *memor
                     hu_error_t rel_err = hu_graph_upsert_relation(graph, src_id, tgt_id, rel_type,
                                                                   1.0f, f->object, obj_len);
                     if (rel_err != HU_OK)
-                        fprintf(stderr, "[daemon] graph: relation upsert failed: %d\n",
-                                (int)rel_err);
+                        fprintf(stderr, "[daemon] graph: relation upsert failed: %s\n",
+                                hu_error_string(rel_err));
                 }
             }
 #endif
@@ -683,7 +683,8 @@ static void store_conversation_summary(hu_allocator_t *alloc, hu_memory_t *memor
                 hu_error_t rel_err = hu_graph_upsert_relation(graph, src_id, tgt_id, rel_type, 1.0f,
                                                               r->entity_b, b_len);
                 if (rel_err != HU_OK)
-                    fprintf(stderr, "[daemon] graph: relation upsert failed: %d\n", (int)rel_err);
+                    fprintf(stderr, "[daemon] graph: relation upsert failed: %s\n",
+                            hu_error_string(rel_err));
             }
         }
     }
@@ -858,8 +859,8 @@ static void run_cron_tick(hu_allocator_t *alloc) {
         hu_run_result_t result = {0};
         hu_error_t run_err = hu_process_run(alloc, argv, NULL, 65536, &result);
         if (run_err != HU_OK)
-            fprintf(stderr, "[human] cron job failed: %s (err=%d)\n", entries[i].command,
-                    (int)run_err);
+            fprintf(stderr, "[human] cron job failed: %s (err=%s)\n", entries[i].command,
+                    hu_error_string(run_err));
         hu_run_result_free(alloc, &result);
 #endif
     }
@@ -1589,8 +1590,8 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 channels[c].channel->ctx, alloc, target_part, target_len, 15, &entries,
                 &entry_count);
             if (hist_err != HU_OK)
-                fprintf(stderr, "[daemon] proactive: history load failed for %s: %d\n",
-                        cp->contact_id, (int)hist_err);
+                fprintf(stderr, "[daemon] proactive: history load failed for %s: %s\n",
+                        cp->contact_id, hu_error_string(hist_err));
 
             uint64_t last_contact_ms = 0;
             bool should_checkin = true;
@@ -2376,7 +2377,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     if (agent && agent->memory) {
         hu_error_t inbox_err = hu_inbox_init(&inbox_watcher, alloc, agent->memory, NULL, 0);
         if (inbox_err != HU_OK)
-            fprintf(stderr, "[daemon] inbox init failed: %d\n", inbox_err);
+            fprintf(stderr, "[daemon] inbox init failed: %s\n", hu_error_string(inbox_err));
         inbox_watcher.provider = &agent->provider;
         inbox_watcher.model = agent->model_name;
         inbox_watcher.model_len = agent->model_name_len;
@@ -2886,7 +2887,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 poll_receive_time = time(NULL);
             }
             if (poll_err != HU_OK && poll_err != HU_ERR_NOT_SUPPORTED && getenv("HU_DEBUG"))
-                fprintf(stderr, "[human] poll error on channel %zu: %d\n", i, (int)poll_err);
+                fprintf(stderr, "[human] poll error on channel %zu: %s\n", i,
+                        hu_error_string(poll_err));
 
             if (!agent || !ch->channel || !ch->channel->vtable || !ch->channel->vtable->send ||
                 count == 0) {
@@ -7141,11 +7143,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         response_len = 0;
                     }
                     err = hu_agent_turn(agent, combined, combined_len, &response, &response_len);
-                    fprintf(stderr, "[human] agent turn result: err=%d response_len=%zu for %.*s\n",
-                            (int)err, response_len, (int)(key_len > 20 ? 20 : key_len), batch_key);
+                    fprintf(stderr, "[human] agent turn result: err=%s response_len=%zu for %.*s\n",
+                            hu_error_string(err), response_len, (int)(key_len > 20 ? 20 : key_len),
+                            batch_key);
                     if (err != HU_OK)
-                        fprintf(stderr, "[human] agent turn failed for %.*s: %d\n", (int)key_len,
-                                batch_key, (int)err);
+                        fprintf(stderr, "[human] agent turn failed for %.*s: %s\n", (int)key_len,
+                                batch_key, hu_error_string(err));
 
 #ifndef HU_IS_TEST
                     /* Stop typing indicator after LLM call */
@@ -8464,7 +8467,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 size_t ingested = 0;
                 hu_error_t poll_err = hu_inbox_poll(&inbox_watcher, &ingested);
                 if (poll_err != HU_OK)
-                    fprintf(stderr, "[human] inbox: poll error %d\n", (int)poll_err);
+                    fprintf(stderr, "[human] inbox: poll error %s\n", hu_error_string(poll_err));
                 else if (ingested > 0)
                     fprintf(stderr, "[human] inbox: ingested %zu file(s)\n", ingested);
                 last_inbox_poll_ms = inbox_now;

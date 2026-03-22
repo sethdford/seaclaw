@@ -2,7 +2,13 @@ import { LitElement, html, css } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { icons } from "../icons.js";
 import { AudioRecorder, blobToBase64 } from "../audio-recorder.js";
+import { createVoiceSilenceController } from "../voice-stream-silence.js";
 
+/**
+ * Global dictation: records a clip, then `hu-voice-transcribe` → `voice.transcribe` RPC.
+ * Uses streaming recorder + silence auto-stop but sends the full blob via `voice.transcribe`
+ * (batch STT, no agent turn / TTS). See `docs/streaming-voice.md`.
+ */
 @customElement("hu-floating-mic")
 export class ScFloatingMic extends LitElement {
   static override styles = css`
@@ -83,6 +89,13 @@ export class ScFloatingMic extends LitElement {
   @state() private isTranscribing = false;
   @state() private overlayText = "";
   private _recorder = new AudioRecorder();
+  #streamChunks: Blob[] = [];
+  readonly #silence = createVoiceSilenceController({
+    isActive: () => this.isListening,
+    onSilenceEnd: () => {
+      void this._stopAndTranscribe();
+    },
+  });
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -121,22 +134,36 @@ export class ScFloatingMic extends LitElement {
 
   private async _startRecording(): Promise<void> {
     try {
-      await this._recorder.start();
+      this.#streamChunks = [];
+      this.#silence.reset();
+      await this._recorder.startStreaming(
+        (data) => {
+          this.#streamChunks.push(new Blob([data]));
+        },
+        {
+          onLevel: (rms) => this.#silence.onLevel(rms),
+        },
+      );
       this.isListening = true;
-      this.overlayText = "Recording\u2026";
+      this.overlayText = "Listening\u2026 stay quiet to send";
     } catch {
+      this.#streamChunks = [];
       this.isListening = false;
       this.overlayText = "";
     }
   }
 
   private async _stopAndTranscribe(): Promise<void> {
+    if (!this.isListening) return;
     this.isListening = false;
     this.isTranscribing = true;
     this.overlayText = "Transcribing\u2026";
 
     try {
-      const { blob, mimeType } = await this._recorder.stop();
+      await this._recorder.stopStreaming();
+      const mimeType = this._recorder.streamMimeType.split(";")[0] || "audio/webm";
+      const blob = new Blob(this.#streamChunks, { type: mimeType });
+      this.#streamChunks = [];
       const audio = await blobToBase64(blob);
 
       const detail = { audio, mimeType };

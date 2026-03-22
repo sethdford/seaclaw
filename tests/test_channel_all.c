@@ -60,6 +60,9 @@
 #if HU_HAS_EMAIL
 #include "human/channels/email.h"
 #endif
+#if HU_HAS_GMAIL
+#include "human/channels/gmail.h"
+#endif
 #if HU_HAS_IMESSAGE
 #include "human/channels/imessage.h"
 #endif
@@ -459,6 +462,27 @@ static void test_whatsapp_typing_hooks(void) {
     HU_ASSERT_EQ(ch.vtable->stop_typing(ch.ctx, "15551234567", 11), HU_OK);
     hu_whatsapp_destroy(&ch);
 }
+
+static void test_whatsapp_get_attachment_path_returns_test_file(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_whatsapp_create(&alloc, "123", 3, "tok", 3, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->get_attachment_path);
+    char *p = ch.vtable->get_attachment_path(ch.ctx, &alloc, (int64_t)12345);
+    HU_ASSERT_NOT_NULL(p);
+    HU_ASSERT_STR_EQ(p, "/tmp/test-attachment.jpg");
+    alloc.free(alloc.ctx, p, strlen(p) + 1);
+    hu_whatsapp_destroy(&ch);
+}
+
+static void test_whatsapp_human_active_recently_false_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_whatsapp_create(&alloc, "123", 3, "tok", 3, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->human_active_recently);
+    HU_ASSERT_FALSE(ch.vtable->human_active_recently(ch.ctx, "15551234567", 11, 90));
+    hu_whatsapp_destroy(&ch);
+}
 #endif
 
 /* ─── Facebook Messenger ───────────────────────────────────────────────────── */
@@ -856,6 +880,50 @@ static void test_matrix_load_history_not_supported_in_test(void) {
     HU_ASSERT(count == 0);
     hu_matrix_destroy(&ch);
 }
+
+static void test_matrix_get_attachment_path_returns_test_file(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_matrix_create(&alloc, "https://matrix.org", 17, "tok", 3, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->get_attachment_path);
+    char *p = ch.vtable->get_attachment_path(ch.ctx, &alloc, (int64_t)1);
+    HU_ASSERT_NOT_NULL(p);
+    HU_ASSERT_STR_EQ(p, "/tmp/test-attachment.jpg");
+    alloc.free(alloc.ctx, p, strlen(p) + 1);
+    hu_matrix_destroy(&ch);
+}
+
+static void test_matrix_start_stop_typing(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_matrix_create(&alloc, "https://matrix.org", 17, "tok", 3, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->start_typing);
+    HU_ASSERT_NOT_NULL(ch.vtable->stop_typing);
+    HU_ASSERT_EQ(ch.vtable->start_typing(ch.ctx, "!room:matrix.org", 16), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->stop_typing(ch.ctx, "!room:matrix.org", 16), HU_OK);
+    hu_matrix_destroy(&ch);
+}
+
+static void test_matrix_react_ok_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_matrix_create(&alloc, "https://matrix.org", 17, "tok", 3, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->react);
+    static const char tgt[] = "!room:matrix.org|$event:matrix.org";
+    hu_error_t err =
+        ch.vtable->react(ch.ctx, tgt, sizeof(tgt) - 1, 1LL, HU_REACTION_THUMBS_UP);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_matrix_destroy(&ch);
+}
+
+static void test_matrix_human_active_recently_false_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_matrix_create(&alloc, "https://matrix.org", 17, "tok", 3, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->human_active_recently);
+    HU_ASSERT_FALSE(ch.vtable->human_active_recently(ch.ctx, "!room:matrix.org", 16, 90));
+    hu_matrix_destroy(&ch);
+}
 #endif
 
 /* ─── IRC ──────────────────────────────────────────────────────────────────── */
@@ -1156,6 +1224,17 @@ static void test_email_set_auth_null_channel(void) {
 static void test_email_set_imap_null_channel(void) {
     hu_error_t err = hu_email_set_imap(NULL, "x", 1, 993);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+#endif
+
+#if HU_HAS_GMAIL
+static void test_gmail_human_active_recently_false_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_gmail_create(&alloc, "cid", 3, "csec", 4, "rtok", 4, 60, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->human_active_recently);
+    HU_ASSERT_FALSE(ch.vtable->human_active_recently(ch.ctx, "user@example.com", 16, 90));
+    hu_gmail_destroy(&ch);
 }
 #endif
 
@@ -1536,7 +1615,8 @@ static void test_signal_load_conversation_history_empty_in_test(void) {
 static void test_nostr_create(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
-    hu_error_t err = hu_nostr_create(&alloc, "/tmp/nak", 8, "npub1abc", 8, NULL, 0, NULL, 0, &ch);
+    hu_error_t err =
+        hu_nostr_create(&alloc, "/tmp/nak", 8, "npub1abc", 8, NULL, 0, NULL, 0, &ch);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(ch.ctx);
     HU_ASSERT_STR_EQ(ch.vtable->name(ch.ctx), "nostr");
@@ -2336,6 +2416,52 @@ static void test_mattermost_poll_null_args(void) {
     hu_error_t err = hu_mattermost_poll(NULL, NULL, NULL, 0, NULL);
     HU_ASSERT(err == HU_ERR_INVALID_ARGUMENT);
 }
+
+static void test_mattermost_load_conversation_history_empty_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_mattermost_create(&alloc, "https://chat.example.com", 24, "token", 5, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->load_conversation_history);
+    hu_channel_history_entry_t *entries = NULL;
+    size_t n = 99;
+    hu_error_t err = ch.vtable->load_conversation_history(ch.ctx, &alloc, "chan123", 7, 10, &entries,
+                                                          &n);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(n, 0u);
+    HU_ASSERT_NULL(entries);
+    hu_mattermost_destroy(&ch);
+}
+
+static void test_mattermost_start_stop_typing(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_mattermost_create(&alloc, "https://chat.example.com", 24, "token", 5, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->start_typing);
+    HU_ASSERT_NOT_NULL(ch.vtable->stop_typing);
+    HU_ASSERT_EQ(ch.vtable->start_typing(ch.ctx, "channel_xyz", 11), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->stop_typing(ch.ctx, "channel_xyz", 11), HU_OK);
+    hu_mattermost_destroy(&ch);
+}
+
+static void test_mattermost_react_ok_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_mattermost_create(&alloc, "https://chat.example.com", 24, "token", 5, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->react);
+    static const char tgt[] = "channel_xyz|post_abc123";
+    hu_error_t err = ch.vtable->react(ch.ctx, tgt, sizeof(tgt) - 1, 1LL, HU_REACTION_HEART);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_mattermost_destroy(&ch);
+}
+
+static void test_mattermost_human_active_recently_false_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_mattermost_create(&alloc, "https://chat.example.com", 24, "token", 5, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->human_active_recently);
+    HU_ASSERT_FALSE(ch.vtable->human_active_recently(ch.ctx, "channel_xyz", 11, 90));
+    hu_mattermost_destroy(&ch);
+}
 #endif
 
 #if HU_HAS_ONEBOT
@@ -2387,7 +2513,7 @@ static void test_dingtalk_poll_null_args(void) {
 static void test_teams_create(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
-    hu_error_t err = hu_teams_create(&alloc, "https://example.com", 19, &ch);
+    hu_error_t err = hu_teams_create(&alloc, "https://example.com", 19, NULL, 0, NULL, 0, &ch);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_STR_EQ(ch.vtable->name(ch.ctx), "teams");
     HU_ASSERT(hu_teams_is_configured(&ch) == true);
@@ -2397,7 +2523,7 @@ static void test_teams_create(void) {
 static void test_teams_health_check(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
-    hu_error_t err = hu_teams_create(&alloc, "https://example.com", 19, &ch);
+    hu_error_t err = hu_teams_create(&alloc, "https://example.com", 19, NULL, 0, NULL, 0, &ch);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT(ch.vtable->health_check(ch.ctx) == true);
     hu_teams_destroy(&ch);
@@ -2406,7 +2532,7 @@ static void test_teams_health_check(void) {
 static void test_teams_webhook_and_poll(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch = {0};
-    hu_error_t err = hu_teams_create(&alloc, "https://example.com", 19, &ch);
+    hu_error_t err = hu_teams_create(&alloc, "https://example.com", 19, NULL, 0, NULL, 0, &ch);
     HU_ASSERT(err == HU_OK);
     err = hu_teams_on_webhook(ch.ctx, &alloc, "hello from teams", 16);
     HU_ASSERT(err == HU_OK);
@@ -2421,6 +2547,52 @@ static void test_teams_webhook_and_poll(void) {
 static void test_teams_poll_null_args(void) {
     hu_error_t err = hu_teams_poll(NULL, NULL, NULL, 0, NULL);
     HU_ASSERT(err == HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_teams_load_conversation_history_empty_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_teams_create(&alloc, "https://example.com", 19, NULL, 0, NULL, 0, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->load_conversation_history);
+    hu_channel_history_entry_t *entries = NULL;
+    size_t n = 99;
+    hu_error_t err = ch.vtable->load_conversation_history(ch.ctx, &alloc, "channel-id", 10, 5,
+                                                          &entries, &n);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(n, 0u);
+    HU_ASSERT_NULL(entries);
+    hu_teams_destroy(&ch);
+}
+
+static void test_teams_start_stop_typing(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_teams_create(&alloc, "https://example.com", 19, NULL, 0, NULL, 0, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->start_typing);
+    HU_ASSERT_NOT_NULL(ch.vtable->stop_typing);
+    HU_ASSERT_EQ(ch.vtable->start_typing(ch.ctx, "19:chat@thread.v2", 17), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->stop_typing(ch.ctx, "19:chat@thread.v2", 17), HU_OK);
+    hu_teams_destroy(&ch);
+}
+
+static void test_teams_react_ok_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_teams_create(&alloc, "https://example.com", 19, NULL, 0, NULL, 0, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->react);
+    static const char tgt[] = "19:chat@thread.v2|AQQkADIwMDJw";
+    hu_error_t err = ch.vtable->react(ch.ctx, tgt, sizeof(tgt) - 1, 1LL, HU_REACTION_HAHA);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_teams_destroy(&ch);
+}
+
+static void test_teams_human_active_recently_false_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_teams_create(&alloc, "https://example.com", 19, NULL, 0, NULL, 0, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->human_active_recently);
+    HU_ASSERT_FALSE(ch.vtable->human_active_recently(ch.ctx, "user-1", 6, 90));
+    hu_teams_destroy(&ch);
 }
 #endif
 
@@ -2676,6 +2848,8 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_whatsapp_webhook_and_poll);
     HU_RUN_TEST(test_whatsapp_poll_empty);
     HU_RUN_TEST(test_whatsapp_typing_hooks);
+    HU_RUN_TEST(test_whatsapp_get_attachment_path_returns_test_file);
+    HU_RUN_TEST(test_whatsapp_human_active_recently_false_in_test);
 #endif
 #if HU_HAS_FACEBOOK
     HU_RUN_TEST(test_facebook_create);
@@ -2736,6 +2910,10 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_matrix_poll_test_mode);
     HU_RUN_TEST(test_matrix_poll_null_args);
     HU_RUN_TEST(test_matrix_load_history_not_supported_in_test);
+    HU_RUN_TEST(test_matrix_get_attachment_path_returns_test_file);
+    HU_RUN_TEST(test_matrix_start_stop_typing);
+    HU_RUN_TEST(test_matrix_react_ok_in_test);
+    HU_RUN_TEST(test_matrix_human_active_recently_false_in_test);
 #endif
 #if HU_HAS_IRC
     HU_RUN_TEST(test_irc_create);
@@ -2784,6 +2962,9 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_email_set_auth_null_channel);
     HU_RUN_TEST(test_email_set_imap_null_channel);
 #endif
+#if HU_HAS_GMAIL
+    HU_RUN_TEST(test_gmail_human_active_recently_false_in_test);
+#endif
 #if HU_HAS_IMESSAGE
     HU_RUN_TEST(test_imessage_create);
     HU_RUN_TEST(test_imessage_name);
@@ -2806,6 +2987,10 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_mattermost_send);
     HU_RUN_TEST(test_mattermost_poll_test_mode);
     HU_RUN_TEST(test_mattermost_poll_null_args);
+    HU_RUN_TEST(test_mattermost_load_conversation_history_empty_in_test);
+    HU_RUN_TEST(test_mattermost_start_stop_typing);
+    HU_RUN_TEST(test_mattermost_react_ok_in_test);
+    HU_RUN_TEST(test_mattermost_human_active_recently_false_in_test);
 #endif
 #if HU_HAS_ONEBOT
     HU_RUN_TEST(test_onebot_create);
@@ -2826,6 +3011,10 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_teams_health_check);
     HU_RUN_TEST(test_teams_webhook_and_poll);
     HU_RUN_TEST(test_teams_poll_null_args);
+    HU_RUN_TEST(test_teams_load_conversation_history_empty_in_test);
+    HU_RUN_TEST(test_teams_start_stop_typing);
+    HU_RUN_TEST(test_teams_react_ok_in_test);
+    HU_RUN_TEST(test_teams_human_active_recently_false_in_test);
 #endif
 #if HU_HAS_TWILIO
     HU_RUN_TEST(test_twilio_create);

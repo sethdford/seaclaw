@@ -884,6 +884,51 @@ static void test_rpc_nodes_list_returns_at_least_one_node(void) {
     teardown_proto(&ws, &proto);
 }
 
+static void test_rpc_agents_list_no_crash(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_server_t ws;
+    hu_control_protocol_t proto;
+    hu_app_context_t app;
+    hu_bus_t bus;
+    hu_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    hu_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"al\",\"method\":\"agents.list\"}";
+    hu_control_on_message(&conn, msg, strlen(msg), &proto);
+    teardown_proto(&ws, &proto);
+}
+
+static void test_rpc_voice_config_no_crash(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_server_t ws;
+    hu_control_protocol_t proto;
+    hu_app_context_t app;
+    hu_bus_t bus;
+    hu_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    hu_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"vc\",\"method\":\"voice.config\"}";
+    hu_control_on_message(&conn, msg, strlen(msg), &proto);
+    teardown_proto(&ws, &proto);
+}
+
+static void test_rpc_nodes_action_not_supported_no_crash(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_server_t ws;
+    hu_control_protocol_t proto;
+    hu_app_context_t app;
+    hu_bus_t bus;
+    hu_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    hu_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    const char *msg = "{\"type\":\"req\",\"id\":\"na\",\"method\":\"nodes.action\"}";
+    hu_control_on_message(&conn, msg, strlen(msg), &proto);
+    teardown_proto(&ws, &proto);
+}
+
 static void test_event_bridge_payload_propagation(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_ws_server_t ws;
@@ -1175,6 +1220,9 @@ void run_gateway_extended_tests(void) {
     HU_RUN_TEST(test_rpc_update_check_returns_valid_structure);
     HU_RUN_TEST(test_rpc_update_run_returns_valid_structure);
     HU_RUN_TEST(test_rpc_nodes_list_returns_at_least_one_node);
+    HU_RUN_TEST(test_rpc_agents_list_no_crash);
+    HU_RUN_TEST(test_rpc_voice_config_no_crash);
+    HU_RUN_TEST(test_rpc_nodes_action_not_supported_no_crash);
     HU_RUN_TEST(test_event_bridge_payload_propagation);
 
     HU_TEST_SUITE("WS Server Extended");

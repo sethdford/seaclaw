@@ -211,12 +211,33 @@ def load_suite_prompts(path: Path) -> list[dict[str, Any]]:
     for i, t in enumerate(tasks):
         if not isinstance(t, dict):
             continue
-        pr = t.get("prompt")
-        if not isinstance(pr, str) or not pr.strip():
-            continue
         jp = t.get("judge_profile")
         if not isinstance(jp, str) or jp not in JUDGE_PROFILES:
             jp = "safety"
+        turns = t.get("turns")
+        if isinstance(turns, list) and len(turns) >= 2:
+            user_turns = [
+                tr["content"]
+                for tr in turns
+                if isinstance(tr, dict) and tr.get("role") == "user" and tr.get("content")
+            ]
+            if user_turns:
+                out.append(
+                    {
+                        "id": t.get("id", f"suite-{i}"),
+                        "category": t.get("category", "suite"),
+                        "turns": user_turns,
+                        "prompt": " ||| ".join(user_turns),
+                        "expected": t.get("expected", ""),
+                        "intent": "from eval suite (multi-turn)",
+                        "judge_profile": jp,
+                        "multi_turn": True,
+                    }
+                )
+                continue
+        pr = t.get("prompt")
+        if not isinstance(pr, str) or not pr.strip():
+            continue
         out.append(
             {
                 "id": t.get("id", f"suite-{i}"),
@@ -408,21 +429,47 @@ def main() -> int:
     scores = []
     for p in probes:
         pid = str(p["id"])
-        pr = str(p["prompt"])
-        code, out, err = run_human(
-            human_bin,
-            pr,
-            args.timeout,
-            agent_env_overrides if agent_env_overrides else None,
-        )
-        combined = (out or "").strip()
-        if err.strip():
-            combined = (combined + "\n" + err.strip()).strip()
         jp = p.get("judge_profile")
         if not isinstance(jp, str) or jp not in JUDGE_PROFILES:
             jp = "safety"
+
+        turns = p.get("turns") if p.get("multi_turn") else None
+        if turns and len(turns) >= 2:
+            turn_outputs: list[str] = []
+            last_code = 0
+            for turn_msg in turns:
+                tc, tout, terr = run_human(
+                    human_bin,
+                    turn_msg,
+                    args.timeout,
+                    agent_env_overrides if agent_env_overrides else None,
+                )
+                combined_t = (tout or "").strip()
+                if terr.strip():
+                    combined_t = (combined_t + "\n" + terr.strip()).strip()
+                turn_outputs.append(combined_t)
+                last_code = tc
+            transcript = "\n---\n".join(
+                f"[Turn {i+1}] User: {turns[i]}\nAssistant: {turn_outputs[i]}"
+                for i in range(len(turns))
+            )
+            combined = transcript
+            code = last_code
+            pr = p.get("prompt", " ||| ".join(turns))
+        else:
+            pr = str(p["prompt"])
+            code, out, err = run_human(
+                human_bin,
+                pr,
+                args.timeout,
+                agent_env_overrides if agent_env_overrides else None,
+            )
+            combined = (out or "").strip()
+            if err.strip():
+                combined = (combined + "\n" + err.strip()).strip()
+
         verdict: dict[str, Any]
-        if code != 0:
+        if code != 0 and not p.get("multi_turn"):
             verdict = {
                 "pass": False,
                 "score": 0.0,
@@ -438,6 +485,8 @@ def main() -> int:
                 "id": pid,
                 "category": p.get("category"),
                 "prompt": pr,
+                "multi_turn": bool(p.get("multi_turn")),
+                "turns_count": len(turns) if turns else 1,
                 "human_exit": code,
                 "judge_profile": jp,
                 "assistant_output": combined[:8000],
@@ -450,11 +499,16 @@ def main() -> int:
     report = {
         "summary": {
             "probes": len(results),
+            "multi_turn_scenarios": sum(1 for r in results if r.get("multi_turn")),
             "judge_passed": passed_n,
             "mean_score": mean_score,
             "human_bin": str(human_bin),
             "judge_model": model,
+            "judge_model_version": model,
             "probe_profile_default": args.probe_profile,
+            "agent_provider": args.agent_provider or os.environ.get("HUMAN_PROVIDER", ""),
+            "agent_model": args.agent_model or os.environ.get("HUMAN_MODEL", ""),
+            "autonomy_level": os.environ.get("HUMAN_AUTONOMY", "default"),
         },
         "results": results,
     }

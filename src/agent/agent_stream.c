@@ -125,7 +125,7 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
                               4000);
         hu_error_t mem_err = hu_memory_loader_load(&loader, msg, msg_len, "", 0, &memory_ctx, &memory_ctx_len);
         if (mem_err != HU_OK && mem_err != HU_ERR_NOT_SUPPORTED)
-            fprintf(stderr, "[agent_stream] memory_loader_load failed: %d\n", mem_err);
+            fprintf(stderr, "[agent_stream] memory_loader_load failed: %s\n", hu_error_string(mem_err));
     }
 
     /* Build situational awareness context */
@@ -293,7 +293,7 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
                 hu_error_t hist_err = hu_agent_internal_append_history(
                     agent, HU_ROLE_ASSISTANT, sresp.content, sresp.content_len, NULL, 0, NULL, 0);
                 if (hist_err != HU_OK)
-                    fprintf(stderr, "[agent_stream] append_history failed: %d\n", hist_err);
+                    fprintf(stderr, "[agent_stream] append_history failed: %s\n", hu_error_string(hist_err));
             }
             *response_out = hu_strndup(agent->alloc, sresp.content, sresp.content_len);
             hu_agent_internal_maybe_tts(agent, sresp.content, sresp.content_len);

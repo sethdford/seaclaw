@@ -25,7 +25,7 @@ Optional methods (may be NULL):
 
 Generated from designated initializers in each `src/channels/*.c` vtable. **history** = `load_conversation_history`, **human_active** = `human_active_recently`, **typing** = both `start_typing` and `stop_typing` non-NULL, **constraints** = `get_response_constraints`. Omitted optional fields are NULL.
 
-Only **discord**, **imessage**, **signal**, **slack**, and **telegram** implement `human_active_recently`. On all other channels the daemon cannot suppress outbound messages based on recent human activity.
+**discord**, **imessage**, **signal**, **slack**, and **telegram** use channel-specific activity buffers. **whatsapp** and **teams** use the inbound webhook/poll queue timestamps. **matrix** records the bot user’s own sends and `/sync` self-events per room. **gmail** tracks the last successful outbound send per recipient. **mattermost** tracks the last successful post per channel. Under `HU_IS_TEST`, all of these hooks return false. Other channels omit the hook (daemon treats as no recent human activity).
 
 ```c
 /*
@@ -37,7 +37,7 @@ Only **discord**, **imessage**, **signal**, **slack**, and **telegram** implemen
  * dispatch       |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * email          |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * facebook       |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
- * gmail          |  ✓   |    ✓    |   ·   |      ·       |   ·    |     ·
+ * gmail          |  ✓   |    ✓    |   ·   |      ✓       |   ·    |     ·
  * google_chat    |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * google_rcs     |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * imap           |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
@@ -47,8 +47,8 @@ Only **discord**, **imessage**, **signal**, **slack**, and **telegram** implemen
  * lark           |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * line           |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * maixcam        |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
- * matrix         |  ✓   |    ✓    |   ·   |      ·       |   ·    |     ·
- * mattermost     |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * matrix         |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ·
+ * mattermost     |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ·
  * mqtt           |  ✓   |    ✓    |   ·   |      ·       |   ·    |     ·
  * nostr          |  ✓   |    ✓    |   ·   |      ·       |   ·    |     ·
  * onebot         |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
@@ -56,15 +56,16 @@ Only **discord**, **imessage**, **signal**, **slack**, and **telegram** implemen
  * qq             |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * signal         |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ✓
  * slack          |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ✓
- * teams          |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
+ * teams          |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ·
  * telegram       |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ✓
  * tiktok         |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * twilio         |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * twitter        |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * voice_channel  |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * web            |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
- * whatsapp       |  ✓   |    ·    |   ✓   |      ·       |   ·    |     ✓
+ * whatsapp       |  ✓   |    ·    |   ✓   |      ✓       |   ✓    |     ✓
  *
+ * Teams typing/react/history stubs are test-mode no-ops unless Microsoft Graph is wired.
  * Channels without human_active_recently: daemon cannot suppress messages
  * when the real user is active on those channels.
  */
@@ -78,7 +79,7 @@ Only **discord**, **imessage**, **signal**, **slack**, and **telegram** implemen
 | dispatch | · | · | · | · | · |
 | email | · | · | · | · | · |
 | facebook | · | · | · | · | · |
-| gmail | ✓ | · | · | · | · |
+| gmail | ✓ | · | ✓ | · | · |
 | google_chat | · | · | · | · | · |
 | google_rcs | · | · | · | · | · |
 | imap | · | · | · | · | · |
@@ -88,8 +89,8 @@ Only **discord**, **imessage**, **signal**, **slack**, and **telegram** implemen
 | lark | · | · | · | · | · |
 | line | · | · | · | · | · |
 | maixcam | · | · | · | · | · |
-| matrix | ✓ | · | · | · | · |
-| mattermost | · | · | · | · | · |
+| matrix | ✓ | ✓ | ✓ | ✓ | · |
+| mattermost | ✓ | ✓ | ✓ | ✓ | · |
 | mqtt | ✓ | · | · | · | · |
 | nostr | ✓ | · | · | · | · |
 | onebot | · | · | · | · | · |
@@ -97,14 +98,14 @@ Only **discord**, **imessage**, **signal**, **slack**, and **telegram** implemen
 | qq | · | · | · | · | · |
 | signal | ✓ | ✓ | ✓ | ✓ | ✓ |
 | slack | ✓ | ✓ | ✓ | ✓ | ✓ |
-| teams | · | · | · | · | · |
+| teams | ✓ | ✓ | ✓ | ✓ | · |
 | telegram | ✓ | ✓ | ✓ | ✓ | ✓ |
 | tiktok | · | · | · | · | · |
 | twilio | · | · | · | · | · |
 | twitter | · | · | · | · | · |
 | voice_channel | · | · | · | · | · |
 | web | · | · | · | · | · |
-| whatsapp | · | ✓ | · | · | ✓ |
+| whatsapp | · | ✓ | ✓ | ✓ | ✓ |
 
 ## Channel Implementations
 

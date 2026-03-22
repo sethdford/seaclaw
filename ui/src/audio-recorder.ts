@@ -9,6 +9,10 @@ export interface AudioCaptureResult {
   mimeType: string;
 }
 
+export interface StreamingOptions {
+  onLevel?: (rms: number) => void;
+}
+
 const PREFERRED_MIME_TYPES = [
   "audio/webm;codecs=opus",
   "audio/webm",
@@ -32,6 +36,10 @@ export class AudioRecorder {
   #recording = false;
   #streaming = false;
   #onStreamChunk: ((data: ArrayBuffer) => void) | null = null;
+  #levelContext: AudioContext | null = null;
+  #levelAnalyser: AnalyserNode | null = null;
+  #levelRaf: number | null = null;
+  #onLevel: ((rms: number) => void) | null = null;
 
   get isRecording(): boolean {
     return this.#recording;
@@ -50,7 +58,10 @@ export class AudioRecorder {
    * Stream encoded media chunks (~250 ms) to the callback while recording.
    * Stops the mic only when {@link stopStreaming} is called.
    */
-  async startStreaming(onChunk: (data: ArrayBuffer) => void): Promise<void> {
+  async startStreaming(
+    onChunk: (data: ArrayBuffer) => void,
+    options?: StreamingOptions,
+  ): Promise<void> {
     if (this.#recording) return;
 
     const mimeType = selectMimeType();
@@ -61,6 +72,31 @@ export class AudioRecorder {
     this.#mimeType = mimeType;
     this.#streaming = true;
     this.#onStreamChunk = onChunk;
+    this.#onLevel = options?.onLevel ?? null;
+
+    if (this.#onLevel && typeof AudioContext !== "undefined") {
+      const ctx = new AudioContext();
+      this.#levelContext = ctx;
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      this.#levelAnalyser = analyser;
+      void ctx.resume();
+      const samples = new Uint8Array(analyser.fftSize);
+      const tick = (): void => {
+        if (!this.#levelAnalyser || !this.#onLevel) return;
+        this.#levelAnalyser.getByteTimeDomainData(samples);
+        let sum = 0;
+        for (let i = 0; i < samples.length; i++) {
+          const v = (samples[i]! - 128) / 128;
+          sum += v * v;
+        }
+        this.#onLevel(Math.sqrt(sum / samples.length));
+        this.#levelRaf = requestAnimationFrame(tick);
+      };
+      this.#levelRaf = requestAnimationFrame(tick);
+    }
 
     const recorder = new MediaRecorder(stream, { mimeType });
     recorder.ondataavailable = (e: BlobEvent) => {
@@ -79,16 +115,20 @@ export class AudioRecorder {
     return new Promise((resolve, reject) => {
       const recorder = this.#recorder!;
       recorder.onstop = () => {
+        this.#stopLevelMonitor();
         this.#streaming = false;
         this.#onStreamChunk = null;
+        this.#onLevel = null;
         this.#recording = false;
         this.#releaseStream();
         this.#recorder = null;
         resolve();
       };
       recorder.onerror = () => {
+        this.#stopLevelMonitor();
         this.#streaming = false;
         this.#onStreamChunk = null;
+        this.#onLevel = null;
         this.#recording = false;
         this.#releaseStream();
         this.#recorder = null;
@@ -97,8 +137,10 @@ export class AudioRecorder {
       try {
         recorder.stop();
       } catch {
+        this.#stopLevelMonitor();
         this.#streaming = false;
         this.#onStreamChunk = null;
+        this.#onLevel = null;
         this.#recording = false;
         this.#releaseStream();
         this.#recorder = null;
@@ -169,9 +211,24 @@ export class AudioRecorder {
     this.#recording = false;
     this.#streaming = false;
     this.#onStreamChunk = null;
+    this.#onLevel = null;
+    this.#stopLevelMonitor();
     this.#releaseStream();
     this.#recorder = null;
     this.#chunks = [];
+  }
+
+  #stopLevelMonitor(): void {
+    if (this.#levelRaf != null) {
+      cancelAnimationFrame(this.#levelRaf);
+      this.#levelRaf = null;
+    }
+    this.#levelAnalyser = null;
+    this.#onLevel = null;
+    if (this.#levelContext && this.#levelContext.state !== "closed") {
+      void this.#levelContext.close();
+    }
+    this.#levelContext = null;
   }
 
   #releaseStream(): void {

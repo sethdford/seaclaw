@@ -18,6 +18,7 @@ static const struct eval_suite_expect_row {
     {"human_likeness.json", 8},
     {"intelligence.json", 10},
     {"memory.json", 8},
+    {"multi_turn.json", 6},
     {"reasoning.json", 10},
     {"reasoning_basic.json", 10},
     {"social.json", 8},

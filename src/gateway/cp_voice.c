@@ -151,4 +151,47 @@ hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     return err;
 }
 
+hu_error_t cp_voice_config(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                           const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                           char **out, size_t *out_len) {
+    (void)conn;
+    (void)proto;
+    (void)root;
+    *out = NULL;
+    *out_len = 0;
+    if (!app || !app->config)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    hu_json_value_t *obj = hu_json_object_new(alloc);
+    if (!obj)
+        return HU_ERR_OUT_OF_MEMORY;
+
+#if HU_IS_TEST
+    cp_json_set_str(alloc, obj, "local_stt_endpoint",
+                    "http://localhost:8000/v1/audio/transcriptions");
+    cp_json_set_str(alloc, obj, "local_tts_endpoint", "http://localhost:8880/v1/audio/speech");
+    cp_json_set_str(alloc, obj, "stt_provider", "local");
+    cp_json_set_str(alloc, obj, "tts_provider", "local");
+    cp_json_set_str(alloc, obj, "tts_voice", "af_heart");
+    cp_json_set_str(alloc, obj, "tts_model", "kokoro");
+    cp_json_set_str(alloc, obj, "stt_model", "whisper-large-v3");
+    cp_json_set_str(alloc, obj, "realtime_voice", "alloy");
+#else
+    const hu_voice_settings_t *v = &app->config->voice;
+    cp_json_set_str(alloc, obj, "local_stt_endpoint",
+                    v->local_stt_endpoint ? v->local_stt_endpoint : "");
+    cp_json_set_str(alloc, obj, "local_tts_endpoint",
+                    v->local_tts_endpoint ? v->local_tts_endpoint : "");
+    cp_json_set_str(alloc, obj, "stt_provider", v->stt_provider ? v->stt_provider : "");
+    cp_json_set_str(alloc, obj, "tts_provider", v->tts_provider ? v->tts_provider : "");
+    cp_json_set_str(alloc, obj, "tts_voice", v->tts_voice ? v->tts_voice : "");
+    cp_json_set_str(alloc, obj, "tts_model", v->tts_model ? v->tts_model : "");
+    cp_json_set_str(alloc, obj, "stt_model", v->stt_model ? v->stt_model : "");
+    cp_json_set_str(alloc, obj, "realtime_voice", v->realtime_voice ? v->realtime_voice : "");
+#endif
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
+}
+
 #endif /* HU_GATEWAY_POSIX */

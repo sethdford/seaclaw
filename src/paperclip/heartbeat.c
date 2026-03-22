@@ -86,7 +86,7 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
     } else {
         err = hu_paperclip_list_tasks(&client, &task_list);
         if (err != HU_OK) {
-            fprintf(stderr, "[paperclip] Failed to list tasks: %d\n", (int)err);
+            fprintf(stderr, "[paperclip] Failed to list tasks: %s\n", hu_error_string(err));
             hu_paperclip_client_deinit(&client);
             return err;
         }

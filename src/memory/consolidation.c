@@ -216,8 +216,8 @@ hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,
             hu_error_t ferr =
                 memory->vtable->forget(memory->ctx, entries[i].key, entries[i].key_len, &deleted);
             if (ferr != HU_OK)
-                fprintf(stderr, "[consolidation] forget key '%.*s' failed: %d\n",
-                        (int)entries[i].key_len, entries[i].key, (int)ferr);
+                fprintf(stderr, "[consolidation] forget key '%.*s' failed: %s\n",
+                        (int)entries[i].key_len, entries[i].key, hu_error_string(ferr));
         }
     }
 
@@ -258,8 +258,8 @@ hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,
             hu_error_t ferr =
                 memory->vtable->forget(memory->ctx, entries[i].key, entries[i].key_len, &deleted);
             if (ferr != HU_OK)
-                fprintf(stderr, "[consolidation] evict key '%.*s' failed: %d\n",
-                        (int)entries[i].key_len, entries[i].key, (int)ferr);
+                fprintf(stderr, "[consolidation] evict key '%.*s' failed: %s\n",
+                        (int)entries[i].key_len, entries[i].key, hu_error_string(ferr));
         }
     }
 

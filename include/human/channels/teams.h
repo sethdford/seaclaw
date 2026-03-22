@@ -8,8 +8,11 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+/* graph_access_token / team_id: optional Microsoft Graph credentials for channel message history;
+ * both may be NULL / zero length. */
 hu_error_t hu_teams_create(hu_allocator_t *alloc, const char *webhook_url, size_t webhook_url_len,
-                           hu_channel_t *out);
+                           const char *graph_access_token, size_t graph_access_token_len,
+                           const char *team_id, size_t team_id_len, hu_channel_t *out);
 
 hu_error_t hu_teams_on_webhook(void *channel_ctx, hu_allocator_t *alloc, const char *body,
                                size_t body_len);

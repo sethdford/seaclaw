@@ -94,7 +94,7 @@ void hu_agent_internal_record_cost(hu_agent_t *agent, const hu_token_usage_t *us
     entry.timestamp_secs = (int64_t)time(NULL);
     hu_error_t cost_err = hu_cost_record_usage(agent->cost_tracker, &entry, agent->active_job_id);
     if (cost_err != HU_OK)
-        fprintf(stderr, "[agent] cost tracking failed: %d\n", cost_err);
+        fprintf(stderr, "[agent] cost tracking failed: %s\n", hu_error_string(cost_err));
 }
 
 #define HU_AGENT_HISTORY_INIT_CAP 16
@@ -582,7 +582,7 @@ void hu_agent_deinit(hu_agent_t *agent) {
         hu_promotion_config_t promo_config = HU_PROMOTION_DEFAULTS;
         hu_error_t promo_err = hu_promotion_run(agent->alloc, &agent->stm, agent->memory, &promo_config);
         if (promo_err != HU_OK)
-            fprintf(stderr, "[agent] STM promotion failed: %d\n", promo_err);
+            fprintf(stderr, "[agent] STM promotion failed: %s\n", hu_error_string(promo_err));
     }
     hu_stm_deinit(&agent->stm);
     if (agent->sota_initialized) {
@@ -996,7 +996,7 @@ void hu_agent_internal_process_mailbox_messages(hu_agent_t *agent) {
             hu_error_t hist_err = hu_agent_internal_append_history(
                 agent, HU_ROLE_USER, buf, (size_t)n, NULL, 0, NULL, 0);
             if (hist_err != HU_OK)
-                fprintf(stderr, "[agent] mailbox message history append failed: %d\n", hist_err);
+                fprintf(stderr, "[agent] mailbox message history append failed: %s\n", hu_error_string(hist_err));
         }
         hu_message_free(agent->alloc, &msg);
     }

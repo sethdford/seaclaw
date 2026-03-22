@@ -501,7 +501,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                               &commit_result.commitments[i],
                                                               sess, sess_len);
                 if (cs_err != HU_OK)
-                    fprintf(stderr, "[agent] commitment save failed: %d\n", (int)cs_err);
+                    fprintf(stderr, "[agent] commitment save failed: %s\n", hu_error_string(cs_err));
             }
         }
         hu_commitment_detect_result_deinit(&commit_result, agent->alloc);
@@ -587,7 +587,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     if (agent->memory) {
         hu_error_t pref_err = hu_preferences_load(agent->memory, agent->alloc, &pref_ctx, &pref_ctx_len);
         if (pref_err != HU_OK)
-            fprintf(stderr, "[agent_turn] preferences load failed: %d\n", pref_err);
+            fprintf(stderr, "[agent_turn] preferences load failed: %s\n", hu_error_string(pref_err));
     }
 
     /* Self-RAG gate: decide whether retrieval is needed before loading memory */
@@ -614,7 +614,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     agent->memory_session_id ? agent->memory_session_id_len : 0,
                                     &memory_ctx, &memory_ctx_len);
         if (load_err != HU_OK)
-            fprintf(stderr, "[agent_turn] memory loader failed: %d\n", load_err);
+            fprintf(stderr, "[agent_turn] memory loader failed: %s\n", hu_error_string(load_err));
 
         /* Self-RAG: verify relevance of retrieved content */
         if (srag_assessment.decision == HU_SRAG_RETRIEVE_AND_VERIFY && memory_ctx && memory_ctx_len > 0) {
@@ -691,7 +691,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     size_t stm_ctx_len = 0;
     hu_error_t stm_err = hu_stm_build_context(&agent->stm, agent->alloc, &stm_ctx, &stm_ctx_len);
     if (stm_err != HU_OK)
-        fprintf(stderr, "[agent_turn] STM context build failed: %d\n", stm_err);
+        fprintf(stderr, "[agent_turn] STM context build failed: %s\n", hu_error_string(stm_err));
     if (stm_ctx_len > 0 && agent->bth_metrics)
         agent->bth_metrics->emotions_surfaced++;
 
@@ -743,7 +743,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->commitment_store, agent->alloc, agent->memory_session_id,
                 agent->memory_session_id_len, &commitments, &commitment_count);
             if (commit_err != HU_OK)
-                fprintf(stderr, "[agent_turn] commitment list failed: %d\n", commit_err);
+                fprintf(stderr, "[agent_turn] commitment list failed: %s\n", hu_error_string(commit_err));
         }
         hu_error_t proactive_err =
             hu_proactive_check_extended(agent->alloc, session_count, hour, commitments,
@@ -2137,11 +2137,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                                resp.content, resp.content_len, NULL,
                                                                0, NULL, 0);
                         if (hist_err != HU_OK)
-                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                            fprintf(stderr, "[agent_turn] history append failed: %s\n", hu_error_string(hist_err));
                         hist_err = hu_agent_internal_append_history(agent, HU_ROLE_USER, critique,
                                                                critique_len, NULL, 0, NULL, 0);
                         if (hist_err != HU_OK)
-                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                            fprintf(stderr, "[agent_turn] history append failed: %s\n", hu_error_string(hist_err));
                         agent->alloc->free(agent->alloc->ctx, critique, critique_len + 1);
 
                         /* DPO: save the rejected response for pairing with the
@@ -2358,7 +2358,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 hu_error_t hist_err = hu_agent_internal_append_history(agent, HU_ROLE_ASSISTANT, final_content,
                                                        final_len, NULL, 0, NULL, 0);
                 if (hist_err != HU_OK)
-                    fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                    fprintf(stderr, "[agent_turn] history append failed: %s\n", hu_error_string(hist_err));
                 *response_out = hu_strndup(agent->alloc, final_content, final_len);
                 if (ab_owned)
                     agent->alloc->free(agent->alloc->ctx, (void *)final_content, final_len + 1);
@@ -2468,8 +2468,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     agent->memory->ctx, key_buf, (size_t)n, f->object,
                                     strlen(f->object), &cat, sid ? sid : "", sid_len);
                                 if (store_err != HU_OK && store_err != HU_ERR_NOT_SUPPORTED)
-                                    fprintf(stderr, "[agent] memory store failed: %d\n",
-                                            (int)store_err);
+                                    fprintf(stderr, "[agent] memory store failed: %s\n",
+                                            hu_error_string(store_err));
                                 if (agent->sota_initialized) {
                                     hu_memory_tier_t assigned;
                                     hu_tier_manager_auto_tier(&agent->tier_manager,
@@ -2496,8 +2496,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                                       &cr.commitments[ci],
                                                                       sess, sess_len);
                         if (cs_err != HU_OK)
-                            fprintf(stderr, "[agent] commitment save failed: %d\n",
-                                    (int)cs_err);
+                            fprintf(stderr, "[agent] commitment save failed: %s\n",
+                                    hu_error_string(cs_err));
                     }
                 }
                 hu_commitment_detect_result_deinit(&cr, agent->alloc);
@@ -2517,8 +2517,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                                    "agent_turn", 10,
                                                                    resp_text, resp_len, 1.0);
                         if (exp_err != HU_OK)
-                            fprintf(stderr, "[agent] experience record failed: %d\n",
-                                    (int)exp_err);
+                            fprintf(stderr, "[agent] experience record failed: %s\n",
+                                    hu_error_string(exp_err));
                     }
                     hu_experience_store_deinit(&exp_store);
                 }
@@ -2853,7 +2853,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         agent, HU_ROLE_TOOL, "Action blocked: agent is in locked mode", 38,
                         call->name, call->name_len, call->id, call->id_len);
                     if (hist_err != HU_OK)
-                        fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                        fprintf(stderr, "[agent_turn] history append failed: %s\n", hu_error_string(hist_err));
                     if (agent->cancel_requested)
                         break;
                 }
@@ -3010,7 +3010,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                             node->tool_name, node->tool_name ? strlen(node->tool_name) : 0,
                                             node->id, node->id ? strlen(node->id) : 0);
                                         if (hist_err != HU_OK)
-                                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                                            fprintf(stderr, "[agent_turn] history append failed: %s\n", hu_error_string(hist_err));
                                     }
                                 }
                             }
@@ -3105,7 +3105,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                 agent, HU_ROLE_TOOL, swarm_merged, swarm_merged_len,
                                                 "swarm", 5, "swarm_parallel", 14);
                                             if (hist_err != HU_OK)
-                                                fprintf(stderr, "[agent_turn] swarm history append failed: %d\n", hist_err);
+                                                fprintf(stderr, "[agent_turn] swarm history append failed: %s\n", hu_error_string(hist_err));
                                         }
                                         for (size_t s = 0; s < swarm_n; s++) {
                                             size_t task_idx = 0;
@@ -3176,7 +3176,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     agent, HU_ROLE_TOOL, merged, merged_len,
                                     "orchestrator", 12, "orch_merge", 10);
                                 if (hist_err != HU_OK)
-                                    fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                                    fprintf(stderr, "[agent_turn] history append failed: %s\n", hu_error_string(hist_err));
                                 agent->alloc->free(agent->alloc->ctx, merged, merged_len + 1);
                             }
                             hu_observer_event_t ev = {
@@ -3412,7 +3412,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                                res_len, call->name, call->name_len,
                                                                call->id, call->id_len);
                         if (hist_err != HU_OK)
-                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                            fprintf(stderr, "[agent_turn] history append failed: %s\n", hu_error_string(hist_err));
 
                         if (agent->audit_logger) {
                             hu_audit_event_t aev;
@@ -3441,7 +3441,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 agent, HU_ROLE_TOOL, "tool not found", 14, call->name,
                                 call->name_len, call->id, call->id_len);
                             if (hist_err != HU_OK)
-                                fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                                fprintf(stderr, "[agent_turn] history append failed: %s\n", hu_error_string(hist_err));
                             continue;
                         }
                         char pol_tn[64];
@@ -3530,7 +3530,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                                res_len, call->name, call->name_len,
                                                                call->id, call->id_len);
                         if (hist_err != HU_OK)
-                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                            fprintf(stderr, "[agent_turn] history append failed: %s\n", hu_error_string(hist_err));
 
                         if (agent->audit_logger) {
                             hu_audit_event_t aev;
@@ -3630,7 +3630,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         hu_error_t hist_err = hu_agent_internal_append_history(
                             agent, HU_ROLE_SYSTEM, note, strlen(note), NULL, 0, NULL, 0);
                         if (hist_err != HU_OK)
-                            fprintf(stderr, "[agent_turn] history append failed: %d\n", hist_err);
+                            fprintf(stderr, "[agent_turn] history append failed: %s\n", hu_error_string(hist_err));
                         agent->alloc->free(agent->alloc->ctx, note, strlen(note) + 1);
                     }
                     agent->alloc->free(agent->alloc->ctx, mid_ctx, mid_ctx_len + 1);

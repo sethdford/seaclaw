@@ -23,7 +23,8 @@
 static void test_teams_integration_full_lifecycle(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch = {0};
-    hu_error_t err = hu_teams_create(&alloc, "https://example.com/incoming", 27, &ch);
+    hu_error_t err = hu_teams_create(&alloc, "https://example.com/incoming", 27, NULL, 0, NULL, 0,
+                                     &ch);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(hu_teams_is_configured(&ch));
     HU_ASSERT_STR_EQ(ch.vtable->name(ch.ctx), "teams");
@@ -35,7 +36,7 @@ static void test_teams_integration_full_lifecycle(void) {
 static void test_teams_integration_empty_config_not_configured(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch = {0};
-    hu_error_t err = hu_teams_create(&alloc, NULL, 0, &ch);
+    hu_error_t err = hu_teams_create(&alloc, NULL, 0, NULL, 0, NULL, 0, &ch);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_FALSE(hu_teams_is_configured(&ch));
     err = ch.vtable->send(ch.ctx, NULL, 0, "test", 4, NULL, 0);

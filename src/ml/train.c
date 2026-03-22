@@ -201,7 +201,7 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
     if (config->checkpoint_path && config->checkpoint_path[0]) {
         hu_error_t ck_err = hu_ml_checkpoint_save(alloc, config->checkpoint_path, model, optimizer);
         if (ck_err != HU_OK)
-            fprintf(stderr, "[train] checkpoint save failed: %d\n", ck_err);
+            fprintf(stderr, "[train] checkpoint save failed: %s\n", hu_error_string(ck_err));
     }
 
     result->training_seconds = wall_seconds() - t_start;

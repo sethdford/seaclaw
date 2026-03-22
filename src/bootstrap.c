@@ -1229,7 +1229,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
 #if HU_HAS_TEAMS
         if (cfg->channels.teams.webhook_url && ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
             err = hu_teams_create(alloc, cfg->channels.teams.webhook_url,
-                                  strlen(cfg->channels.teams.webhook_url),
+                                  strlen(cfg->channels.teams.webhook_url), NULL, 0, NULL, 0,
                                   &bi->channel_slots[ch_count]);
             if (err == HU_OK) {
                 bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define WHATSAPP_API_BASE "https://graph.facebook.com/v18.0/"
 
@@ -18,6 +19,7 @@
 typedef struct hu_whatsapp_queued_msg {
     char session_key[128];
     char content[4096];
+    time_t received_at;
 } hu_whatsapp_queued_msg_t;
 
 typedef struct hu_whatsapp_ctx {
@@ -191,6 +193,7 @@ static void whatsapp_queue_push(hu_whatsapp_ctx_t *c, const char *from, size_t f
     size_t ct = body_len < WHATSAPP_CONTENT_MAX ? body_len : WHATSAPP_CONTENT_MAX;
     memcpy(slot->content, body, ct);
     slot->content[ct] = '\0';
+    slot->received_at = time(NULL);
     c->queue_tail = (c->queue_tail + 1) % WHATSAPP_QUEUE_MAX;
     c->queue_count++;
 }
@@ -458,6 +461,102 @@ static hu_error_t whatsapp_stop_typing(void *ctx, const char *recipient, size_t 
     return HU_OK;
 }
 
+static char *whatsapp_get_attachment_path(void *ctx, hu_allocator_t *alloc, int64_t message_id) {
+#if HU_IS_TEST
+    (void)ctx;
+    (void)message_id;
+    if (!alloc)
+        return NULL;
+    static const char k[] = "/tmp/test-attachment.jpg";
+    size_t ln = strlen(k);
+    char *copy = (char *)alloc->alloc(alloc->ctx, ln + 1);
+    if (!copy)
+        return NULL;
+    memcpy(copy, k, ln + 1);
+    return copy;
+#elif defined(HU_HTTP_CURL)
+    hu_whatsapp_ctx_t *c = (hu_whatsapp_ctx_t *)ctx;
+    if (!c || !alloc || !c->token || c->token_len == 0 || message_id <= 0)
+        return NULL;
+    char mid[32];
+    int nm = snprintf(mid, sizeof(mid), "%" PRId64, message_id);
+    if (nm <= 0 || (size_t)nm >= sizeof(mid))
+        return NULL;
+    char url_buf[256];
+    int nu = snprintf(url_buf, sizeof(url_buf), "%s%s?fields=url", WHATSAPP_API_BASE, mid);
+    if (nu < 0 || (size_t)nu >= sizeof(url_buf))
+        return NULL;
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)c->token_len, c->token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return NULL;
+    hu_http_response_t resp = {0};
+    hu_error_t herr = hu_http_get(alloc, url_buf, auth_buf, &resp);
+    if (herr != HU_OK || resp.status_code != 200 || !resp.body) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return NULL;
+    }
+    hu_json_value_t *parsed = NULL;
+    herr = hu_json_parse(alloc, resp.body, resp.body_len, &parsed);
+    if (resp.owned && resp.body)
+        hu_http_response_free(alloc, &resp);
+    if (herr != HU_OK || !parsed) {
+        if (parsed)
+            hu_json_free(alloc, parsed);
+        return NULL;
+    }
+    const char *url = hu_json_get_string(parsed, "url");
+    if (!url || strlen(url) == 0) {
+        hu_json_free(alloc, parsed);
+        return NULL;
+    }
+    size_t ulen = strlen(url);
+    char *copy = (char *)alloc->alloc(alloc->ctx, ulen + 1);
+    if (!copy) {
+        hu_json_free(alloc, parsed);
+        return NULL;
+    }
+    memcpy(copy, url, ulen + 1);
+    hu_json_free(alloc, parsed);
+    return copy;
+#else
+    (void)ctx;
+    (void)alloc;
+    (void)message_id;
+    return NULL;
+#endif
+}
+
+static bool whatsapp_human_active_recently(void *ctx, const char *contact, size_t contact_len,
+                                             int window_sec) {
+#if HU_IS_TEST
+    (void)ctx;
+    (void)contact;
+    (void)contact_len;
+    (void)window_sec;
+    return false;
+#else
+    hu_whatsapp_ctx_t *c = (hu_whatsapp_ctx_t *)ctx;
+    if (!c || !contact || contact_len == 0 || window_sec <= 0)
+        return false;
+    time_t newest = 0;
+    for (size_t i = 0; i < c->queue_count; i++) {
+        size_t idx = (c->queue_head + i) % WHATSAPP_QUEUE_MAX;
+        const hu_whatsapp_queued_msg_t *slot = &c->queue[idx];
+        size_t skl = strlen(slot->session_key);
+        if (skl == contact_len && memcmp(slot->session_key, contact, contact_len) == 0) {
+            if (slot->received_at > newest)
+                newest = slot->received_at;
+        }
+    }
+    if (newest == 0)
+        return false;
+    time_t now = time(NULL);
+    return (now - newest) <= (time_t)window_sec;
+#endif
+}
+
 static const hu_channel_vtable_t whatsapp_vtable = {
     .start = whatsapp_start,
     .stop = whatsapp_stop,
@@ -469,6 +568,8 @@ static const hu_channel_vtable_t whatsapp_vtable = {
     .stop_typing = whatsapp_stop_typing,
     .get_response_constraints = whatsapp_get_response_constraints,
     .react = whatsapp_react,
+    .get_attachment_path = whatsapp_get_attachment_path,
+    .human_active_recently = whatsapp_human_active_recently,
 };
 
 hu_error_t hu_whatsapp_create(hu_allocator_t *alloc, const char *phone_number_id,

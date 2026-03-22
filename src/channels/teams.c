@@ -6,24 +6,32 @@
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define TEAMS_QUEUE_MAX       32
 #define TEAMS_SESSION_KEY_MAX 127
 #define TEAMS_CONTENT_MAX     4095
+#define TEAMS_GRAPH_API_BASE  "https://graph.microsoft.com/v1.0"
 
 typedef struct hu_teams_queued_msg {
     char session_key[128];
     char content[4096];
+    time_t received_at;
 } hu_teams_queued_msg_t;
 
 typedef struct hu_teams_ctx {
     hu_allocator_t *alloc;
     char *webhook_url;
     size_t webhook_url_len;
+    char *graph_access_token;
+    size_t graph_access_token_len;
+    char *team_id;
+    size_t team_id_len;
     bool running;
     hu_teams_queued_msg_t queue[TEAMS_QUEUE_MAX];
     size_t queue_head;
@@ -65,6 +73,7 @@ static void teams_queue_push(hu_teams_ctx_t *c, const char *from, size_t from_le
     size_t ct = body_len < TEAMS_CONTENT_MAX ? body_len : TEAMS_CONTENT_MAX;
     memcpy(slot->content, body, ct);
     slot->content[ct] = '\0';
+    slot->received_at = time(NULL);
     c->queue_tail = (c->queue_tail + 1) % TEAMS_QUEUE_MAX;
     c->queue_count++;
 }
@@ -149,6 +158,401 @@ static hu_error_t teams_get_response_constraints(void *ctx, hu_channel_response_
     return HU_OK;
 }
 
+/* React target: "chatId|graphMessageId". */
+static bool teams_split_chat_message(const char *target, size_t target_len, const char **chat_id,
+                                     size_t *chat_len, const char **msg_id, size_t *msg_len) {
+    for (size_t i = 0; i < target_len; i++) {
+        if (target[i] == '|') {
+            *chat_id = target;
+            *chat_len = i;
+            *msg_id = target + i + 1;
+            *msg_len = target_len - i - 1;
+            return *chat_len > 0 && *msg_len > 0;
+        }
+    }
+    return false;
+}
+
+static const char *teams_graph_reaction_type(hu_reaction_type_t reaction) {
+    switch (reaction) {
+    case HU_REACTION_HEART:
+        return "heart";
+    case HU_REACTION_THUMBS_UP:
+        return "like";
+    case HU_REACTION_THUMBS_DOWN:
+        return "sad";
+    case HU_REACTION_HAHA:
+        return "laugh";
+    case HU_REACTION_EMPHASIS:
+        return "surprised";
+    case HU_REACTION_QUESTION:
+        return "surprised";
+    default:
+        return NULL;
+    }
+}
+
+static hu_error_t teams_start_typing(void *ctx, const char *recipient, size_t recipient_len) {
+    hu_teams_ctx_t *c = (hu_teams_ctx_t *)ctx;
+    if (!c || !recipient || recipient_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+#if HU_IS_TEST
+    return HU_OK;
+#elif defined(HU_HTTP_CURL)
+    if (!c->graph_access_token || c->graph_access_token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    if (!c->alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    char url_buf[2048];
+    int n = snprintf(url_buf, sizeof(url_buf), TEAMS_GRAPH_API_BASE "/chats/%.*s/sendTypingIndicator",
+                     (int)recipient_len, recipient);
+    if (n < 0 || (size_t)n >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)c->graph_access_token_len,
+                      c->graph_access_token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+    static const char body[] = "{\"isTyping\":true}";
+    hu_http_response_t resp = {0};
+    hu_error_t err =
+        hu_http_post_json(c->alloc, url_buf, auth_buf, body, sizeof(body) - 1, &resp);
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    if (err != HU_OK)
+        return HU_ERR_CHANNEL_SEND;
+    if (resp.status_code < 200 || resp.status_code >= 300)
+        return HU_ERR_CHANNEL_SEND;
+    return HU_OK;
+#else
+    (void)recipient_len;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
+static hu_error_t teams_stop_typing(void *ctx, const char *recipient, size_t recipient_len) {
+    hu_teams_ctx_t *c = (hu_teams_ctx_t *)ctx;
+    if (!c || !recipient || recipient_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+#if HU_IS_TEST
+    return HU_OK;
+#elif defined(HU_HTTP_CURL)
+    if (!c->graph_access_token || c->graph_access_token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    if (!c->alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    char url_buf[2048];
+    int n = snprintf(url_buf, sizeof(url_buf), TEAMS_GRAPH_API_BASE "/chats/%.*s/sendTypingIndicator",
+                     (int)recipient_len, recipient);
+    if (n < 0 || (size_t)n >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)c->graph_access_token_len,
+                      c->graph_access_token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+    static const char body[] = "{\"isTyping\":false}";
+    hu_http_response_t resp = {0};
+    hu_error_t err =
+        hu_http_post_json(c->alloc, url_buf, auth_buf, body, sizeof(body) - 1, &resp);
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    if (err != HU_OK)
+        return HU_ERR_CHANNEL_SEND;
+    if (resp.status_code < 200 || resp.status_code >= 300)
+        return HU_ERR_CHANNEL_SEND;
+    return HU_OK;
+#else
+    (void)recipient_len;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
+#if HU_IS_TEST
+static hu_error_t teams_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                  const char *contact_id, size_t contact_id_len,
+                                                  size_t limit, hu_channel_history_entry_t **out,
+                                                  size_t *out_count) {
+    (void)ctx;
+    (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
+    (void)limit;
+    if (!out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+    return HU_OK;
+}
+#elif defined(HU_HTTP_CURL)
+static size_t teams_pct_encode_path_seg(const char *in, size_t in_len, char *out, size_t out_cap) {
+    size_t j = 0;
+    for (size_t i = 0; i < in_len && j + 4 < out_cap; i++) {
+        unsigned char c = (unsigned char)in[i];
+        if (isalnum(c) || c == '-' || c == '.' || c == '_' || c == '~') {
+            out[j++] = (char)c;
+        } else {
+            int w = snprintf(out + j, out_cap - j, "%%%02X", (unsigned)c);
+            if (w < 0 || (size_t)w >= out_cap - j)
+                return 0;
+            j += (size_t)w;
+        }
+    }
+    if (j >= out_cap)
+        return 0;
+    out[j] = '\0';
+    return j;
+}
+
+static hu_error_t teams_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                  const char *contact_id, size_t contact_id_len,
+                                                  size_t limit, hu_channel_history_entry_t **out,
+                                                  size_t *out_count) {
+    if (!ctx || !alloc || !contact_id || contact_id_len == 0 || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+
+    hu_teams_ctx_t *c = (hu_teams_ctx_t *)ctx;
+    if (!c->graph_access_token || c->graph_access_token_len == 0 || !c->team_id ||
+        c->team_id_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+
+    if (limit > 50)
+        limit = 50;
+    if (limit == 0)
+        limit = 20;
+
+    char enc_team[512];
+    char enc_chan[768];
+    if (teams_pct_encode_path_seg(c->team_id, c->team_id_len, enc_team, sizeof(enc_team)) == 0 ||
+        teams_pct_encode_path_seg(contact_id, contact_id_len, enc_chan, sizeof(enc_chan)) == 0)
+        return HU_ERR_INTERNAL;
+
+    char url_buf[2048];
+    int nu = snprintf(url_buf, sizeof(url_buf),
+                      TEAMS_GRAPH_API_BASE "/teams/%s/channels/%s/messages?$top=%zu", enc_team,
+                      enc_chan, limit);
+    if (nu < 0 || (size_t)nu >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)c->graph_access_token_len,
+                      c->graph_access_token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+
+    hu_http_response_t resp = {0};
+    hu_error_t err = hu_http_get(alloc, url_buf, auth_buf, &resp);
+    if (err != HU_OK || !resp.body || resp.status_code != 200) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return err != HU_OK ? err : HU_ERR_INTERNAL;
+    }
+
+    hu_json_value_t *parsed = NULL;
+    err = hu_json_parse(alloc, resp.body, resp.body_len, &parsed);
+    if (resp.owned && resp.body)
+        hu_http_response_free(alloc, &resp);
+    if (err != HU_OK || !parsed)
+        return HU_OK;
+
+    hu_json_value_t *values = hu_json_object_get(parsed, "value");
+    if (!values || values->type != HU_JSON_ARRAY) {
+        hu_json_free(alloc, parsed);
+        return HU_OK;
+    }
+
+    size_t arr_len = values->data.array.len;
+    if (arr_len > limit)
+        arr_len = limit;
+    if (arr_len == 0) {
+        hu_json_free(alloc, parsed);
+        return HU_OK;
+    }
+
+    hu_channel_history_entry_t *entries =
+        (hu_channel_history_entry_t *)alloc->alloc(alloc->ctx, arr_len * sizeof(*entries));
+    if (!entries) {
+        hu_json_free(alloc, parsed);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    memset(entries, 0, arr_len * sizeof(*entries));
+    size_t count = 0;
+
+    for (size_t i = 0; i < values->data.array.len && count < arr_len; i++) {
+        hu_json_value_t *msg = values->data.array.items[i];
+        if (!msg || msg->type != HU_JSON_OBJECT)
+            continue;
+        hu_json_value_t *body_o = hu_json_object_get(msg, "body");
+        const char *content = body_o ? hu_json_get_string(body_o, "content") : NULL;
+        if (!content || strlen(content) == 0)
+            continue;
+
+        entries[count].from_me = false;
+        size_t text_len = strlen(content);
+        if (text_len > 511)
+            text_len = 511;
+        memcpy(entries[count].text, content, text_len);
+        entries[count].text[text_len] = '\0';
+
+        const char *cdt = hu_json_get_string(msg, "createdDateTime");
+        if (cdt && strlen(cdt) >= 16) {
+            memcpy(entries[count].timestamp, cdt, 10);
+            entries[count].timestamp[10] = ' ';
+            memcpy(entries[count].timestamp + 11, cdt + 11, 5);
+            entries[count].timestamp[16] = '\0';
+        } else {
+            entries[count].timestamp[0] = '\0';
+        }
+
+        count++;
+    }
+
+    hu_json_free(alloc, parsed);
+
+    for (size_t i = 0; i < count / 2; i++) {
+        hu_channel_history_entry_t tmp = entries[i];
+        entries[i] = entries[count - 1 - i];
+        entries[count - 1 - i] = tmp;
+    }
+
+    if (count < arr_len) {
+        hu_channel_history_entry_t *exact =
+            (hu_channel_history_entry_t *)alloc->alloc(alloc->ctx, count * sizeof(*entries));
+        if (!exact) {
+            alloc->free(alloc->ctx, entries, arr_len * sizeof(*entries));
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        memcpy(exact, entries, count * sizeof(*entries));
+        alloc->free(alloc->ctx, entries, arr_len * sizeof(*entries));
+        entries = exact;
+    }
+
+    *out = entries;
+    *out_count = count;
+    return HU_OK;
+}
+#else
+static hu_error_t teams_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                  const char *contact_id, size_t contact_id_len,
+                                                  size_t limit, hu_channel_history_entry_t **out,
+                                                  size_t *out_count) {
+    (void)ctx;
+    (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
+    (void)limit;
+    (void)out;
+    (void)out_count;
+    return HU_ERR_NOT_SUPPORTED;
+}
+#endif
+
+static hu_error_t teams_react(void *ctx, const char *target, size_t target_len, int64_t message_id,
+                              hu_reaction_type_t reaction) {
+    hu_teams_ctx_t *c = (hu_teams_ctx_t *)ctx;
+    (void)message_id;
+    if (!c || !c->alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!target || target_len == 0 || reaction == HU_REACTION_NONE)
+        return HU_ERR_INVALID_ARGUMENT;
+    const char *rtype = teams_graph_reaction_type(reaction);
+    if (!rtype)
+        return HU_ERR_INVALID_ARGUMENT;
+    const char *chat_id = NULL;
+    size_t chat_len = 0;
+    const char *msg_id = NULL;
+    size_t msg_len = 0;
+    if (!teams_split_chat_message(target, target_len, &chat_id, &chat_len, &msg_id, &msg_len))
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if HU_IS_TEST
+    (void)rtype;
+    (void)chat_id;
+    (void)chat_len;
+    (void)msg_id;
+    (void)msg_len;
+    return HU_OK;
+#elif defined(HU_HTTP_CURL)
+    if (!c->graph_access_token || c->graph_access_token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    char url_buf[4096];
+    int n = snprintf(url_buf, sizeof(url_buf),
+                     TEAMS_GRAPH_API_BASE "/chats/%.*s/messages/%.*s/reactions", (int)chat_len,
+                     chat_id, (int)msg_len, msg_id);
+    if (n < 0 || (size_t)n >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)c->graph_access_token_len,
+                      c->graph_access_token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+    hu_json_buf_t jbuf;
+    hu_error_t err = hu_json_buf_init(&jbuf, c->alloc);
+    if (err)
+        return err;
+    err = hu_json_buf_append_raw(&jbuf, "{\"reactionType\":", 16);
+    if (err)
+        goto teams_re_fail;
+    err = hu_json_append_string(&jbuf, rtype, strlen(rtype));
+    if (err)
+        goto teams_re_fail;
+    err = hu_json_buf_append_raw(&jbuf, "}", 1);
+    if (err)
+        goto teams_re_fail;
+    hu_http_response_t resp = {0};
+    err = hu_http_post_json(c->alloc, url_buf, auth_buf, jbuf.ptr, jbuf.len, &resp);
+    hu_json_buf_free(&jbuf);
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    if (err != HU_OK)
+        return HU_ERR_CHANNEL_SEND;
+    if (resp.status_code < 200 || resp.status_code >= 300)
+        return HU_ERR_CHANNEL_SEND;
+    return HU_OK;
+teams_re_fail:
+    hu_json_buf_free(&jbuf);
+    return err;
+#else
+    (void)chat_id;
+    (void)chat_len;
+    (void)msg_id;
+    (void)msg_len;
+    (void)rtype;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
+static bool teams_human_active_recently(void *ctx, const char *contact, size_t contact_len,
+                                        int window_sec) {
+#if HU_IS_TEST
+    (void)ctx;
+    (void)contact;
+    (void)contact_len;
+    (void)window_sec;
+    return false;
+#else
+    hu_teams_ctx_t *c = (hu_teams_ctx_t *)ctx;
+    if (!c || !contact || contact_len == 0 || window_sec <= 0)
+        return false;
+    time_t newest = 0;
+    for (size_t i = 0; i < c->queue_count; i++) {
+        size_t idx = (c->queue_head + i) % TEAMS_QUEUE_MAX;
+        const hu_teams_queued_msg_t *slot = &c->queue[idx];
+        size_t skl = strlen(slot->session_key);
+        if (skl == contact_len && memcmp(slot->session_key, contact, contact_len) == 0) {
+            if (slot->received_at > newest)
+                newest = slot->received_at;
+        }
+    }
+    if (newest == 0)
+        return false;
+    time_t now = time(NULL);
+    return (now - newest) <= (time_t)window_sec;
+#endif
+}
+
 static const hu_channel_vtable_t teams_vtable = {
     .start = teams_start,
     .stop = teams_stop,
@@ -156,9 +560,12 @@ static const hu_channel_vtable_t teams_vtable = {
     .name = teams_name,
     .health_check = teams_health_check,
     .send_event = NULL,
-    .start_typing = NULL,
-    .stop_typing = NULL,
+    .start_typing = teams_start_typing,
+    .stop_typing = teams_stop_typing,
+    .load_conversation_history = teams_load_conversation_history,
     .get_response_constraints = teams_get_response_constraints,
+    .react = teams_react,
+    .human_active_recently = teams_human_active_recently,
 };
 
 hu_error_t hu_teams_on_webhook(void *channel_ctx, hu_allocator_t *alloc, const char *body,
@@ -228,7 +635,8 @@ bool hu_teams_is_configured(hu_channel_t *ch) {
 }
 
 hu_error_t hu_teams_create(hu_allocator_t *alloc, const char *webhook_url, size_t webhook_url_len,
-                           hu_channel_t *out) {
+                           const char *graph_access_token, size_t graph_access_token_len,
+                           const char *team_id, size_t team_id_len, hu_channel_t *out) {
     if (!alloc || !out)
         return HU_ERR_INVALID_ARGUMENT;
     hu_teams_ctx_t *c = (hu_teams_ctx_t *)alloc->alloc(alloc->ctx, sizeof(*c));
@@ -244,6 +652,28 @@ hu_error_t hu_teams_create(hu_allocator_t *alloc, const char *webhook_url, size_
         }
         c->webhook_url_len = webhook_url_len;
     }
+    if (graph_access_token && graph_access_token_len > 0) {
+        c->graph_access_token = hu_strndup(alloc, graph_access_token, graph_access_token_len);
+        if (!c->graph_access_token) {
+            if (c->webhook_url)
+                hu_str_free(alloc, c->webhook_url);
+            alloc->free(alloc->ctx, c, sizeof(*c));
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        c->graph_access_token_len = graph_access_token_len;
+    }
+    if (team_id && team_id_len > 0) {
+        c->team_id = hu_strndup(alloc, team_id, team_id_len);
+        if (!c->team_id) {
+            if (c->webhook_url)
+                hu_str_free(alloc, c->webhook_url);
+            if (c->graph_access_token)
+                hu_str_free(alloc, c->graph_access_token);
+            alloc->free(alloc->ctx, c, sizeof(*c));
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        c->team_id_len = team_id_len;
+    }
     out->ctx = c;
     out->vtable = &teams_vtable;
     return HU_OK;
@@ -255,6 +685,10 @@ void hu_teams_destroy(hu_channel_t *ch) {
         hu_allocator_t *a = c->alloc;
         if (c->webhook_url)
             hu_str_free(a, c->webhook_url);
+        if (c->graph_access_token)
+            hu_str_free(a, c->graph_access_token);
+        if (c->team_id)
+            hu_str_free(a, c->team_id);
         a->free(a->ctx, c, sizeof(*c));
         ch->ctx = NULL;
         ch->vtable = NULL;

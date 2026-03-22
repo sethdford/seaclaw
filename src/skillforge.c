@@ -1,5 +1,6 @@
 #include "human/skillforge.h"
 #include "human/core/allocator.h"
+#include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
@@ -323,7 +324,7 @@ static hu_error_t load_skill_file(hu_skillforge_t *sf, const char *json_path,
     hu_error_t add_err =
         skill_add(sf, name, desc, command, params, enabled, skill_dir_for_resources, instr_path_arg);
     if (add_err != HU_OK)
-        fprintf(stderr, "[skillforge] failed to add skill from disk: %d\n", add_err);
+        fprintf(stderr, "[skillforge] failed to add skill from disk: %s\n", hu_error_string(add_err));
     sf->alloc->free(sf->alloc->ctx, name, strlen(name) + 1);
     sf->alloc->free(sf->alloc->ctx, desc, strlen(desc) + 1);
     if (command)

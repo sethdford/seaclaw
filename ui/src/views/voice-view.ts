@@ -11,6 +11,7 @@ import type { ChatItem } from "../controllers/chat-controller.js";
 import { ScToast } from "../components/hu-toast.js";
 import { AudioRecorder, blobToBase64 } from "../audio-recorder.js";
 import { AudioPlaybackEngine } from "../audio-playback.js";
+import { createVoiceSilenceController } from "../voice-stream-silence.js";
 import type { VoiceOrbState } from "../components/hu-voice-orb.js";
 import "../components/hu-button.js";
 import "../components/hu-skeleton.js";
@@ -208,10 +209,20 @@ export class ScVoiceView extends GatewayAwareLitElement {
   private _recorder = new AudioRecorder();
   readonly #playback = new AudioPlaybackEngine(24000);
   #voiceStreaming = false;
+  readonly #silence = createVoiceSilenceController({
+    isActive: () => this.voiceStatus === "listening" && this.#voiceStreaming,
+    onSilenceEnd: () => {
+      void this._stopRecording();
+    },
+  });
 
   private gatewayHandler = (e: Event): void => this.onGatewayEvent(e);
   private statusHandler = (e: Event): void => {
+    const prev = this._connectionStatus;
     this._connectionStatus = (e as CustomEvent<GatewayStatus>).detail;
+    if (prev !== "disconnected" && this._connectionStatus === "disconnected") {
+      void this.#onGatewayDisconnectedDuringVoice();
+    }
   };
   private _boundGateway: GatewayClient | null = null;
 
@@ -339,6 +350,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
   override disconnectedCallback(): void {
     void this.#teardownVoiceGateway(this._boundGateway);
+    this.#playback.dispose();
     this._scrollEntranceObserver?.disconnect();
     this._scrollEntranceObserver = null;
     this._stopDurationTimer();
@@ -413,6 +425,32 @@ export class ScVoiceView extends GatewayAwareLitElement {
     this.#voiceStreaming = false;
     this.#playback.interrupt();
     this._speaking = false;
+  }
+
+  async #onGatewayDisconnectedDuringVoice(): Promise<void> {
+    const gw = this.gateway ?? this._boundGateway;
+    gw?.setOnBinaryChunk?.(null);
+    if (this._recorder.isRecording) {
+      this._recorder.dispose();
+    }
+    const wasActive =
+      this.voiceStatus === "listening" ||
+      this.voiceStatus === "processing" ||
+      this.#voiceStreaming ||
+      this._speaking;
+    this.#voiceStreaming = false;
+    this.#playback.interrupt();
+    this._speaking = false;
+    if (this.voiceStatus === "listening" || this.voiceStatus === "processing") {
+      this.voiceStatus = "idle";
+    }
+    if (wasActive) {
+      ScToast.show({
+        message: "Connection lost — voice stopped. Reconnect when ready.",
+        variant: "info",
+      });
+    }
+    this.requestUpdate();
   }
 
   private _newSession(): void {
@@ -571,17 +609,34 @@ export class ScVoiceView extends GatewayAwareLitElement {
           }
           this.requestUpdate();
         });
-        await this._recorder.startStreaming((data) => {
-          try {
-            gw.sendBinary(data);
-          } catch {
-            /* socket closed */
-          }
-        });
+        this.#silence.reset();
+        await this._recorder.startStreaming(
+          (data) => {
+            try {
+              gw.sendBinary(data);
+            } catch {
+              /* socket closed */
+            }
+          },
+          { onLevel: (rms) => this.#silence.onLevel(rms) },
+        );
         this.#voiceStreaming = true;
         this.voiceStatus = "listening";
         return;
-      } catch {
+      } catch (err) {
+        const raw = err instanceof Error ? err.message : String(err);
+        let detail = raw;
+        const low = raw.toLowerCase();
+        if (low.includes("cartesia") || low.includes("api_key") || low.includes("api key")) {
+          detail = "Voice session failed: check Cartesia API key in gateway config.";
+        } else if (low.includes("timeout")) {
+          detail = "Voice session timed out. Check network and gateway.";
+        } else if (low.includes("not connected")) {
+          detail = "Reconnect to the gateway, then try again.";
+        } else if (low.includes("invalid") || low.includes("argument")) {
+          detail = "Voice streaming unavailable (gateway or provider configuration).";
+        }
+        ScToast.show({ message: detail, variant: "error" });
         gw.setOnBinaryChunk(null);
         this.#voiceStreaming = false;
       }
@@ -598,6 +653,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   }
 
   private async _stopRecording(): Promise<void> {
+    if (this.voiceStatus !== "listening") return;
     const gw = this.gateway;
     if (!gw) {
       this._recorder.dispose();

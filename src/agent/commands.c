@@ -311,8 +311,8 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
                 agent->cached_static_prompt = NULL;
                 agent->cached_static_prompt_len = 0;
                 agent->cached_static_prompt_cap = 0;
-                fprintf(stderr, "[agent] prompt rebuild after model switch failed: %d\n",
-                        prompt_err);
+                fprintf(stderr, "[agent] prompt rebuild after model switch failed: %s\n",
+                        hu_error_string(prompt_err));
             } else {
                 agent->cached_static_prompt_cap = agent->cached_static_prompt_len;
             }

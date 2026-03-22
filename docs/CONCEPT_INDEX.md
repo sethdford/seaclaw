@@ -44,7 +44,14 @@ Use this to find the right files for a given task without searching the full cod
 | **Provider factory / router**   | `src/providers/factory.c`, `router.c`               | `test_provider.c`, `test_provider_all.c` |
 | **OpenAI / Anthropic / Gemini** | `src/providers/openai.c`, `anthropic.c`, `gemini.c` | `test_provider_all.c`                    |
 | **Ollama / local**              | `src/providers/ollama.c`                            | `test_ollama_integration.c`              |
+| **CoreML / MLX (on-device)**    | `src/providers/coreml.c`, `include/human/providers/coreml.h` | `test_coreml_provider.c`            |
 | **SSE streaming**               | `src/providers/sse.c`, `src/sse/sse_client.c`       | `test_sse.c`, `test_streaming.c`         |
+
+### Voice session (unified)
+
+| Concept | Primary Source Files | Test Files |
+| --- | --- | --- |
+| **Voice session API** | `src/voice/session.c`, `include/human/voice/session.h` | `test_voice_session.c` |
 
 ## Channels
 
@@ -105,11 +112,12 @@ Use this to find the right files for a given task without searching the full cod
 | Concept              | Primary Source Files                                                                      | Test Files                              |
 | -------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------- |
 | **HTTP gateway**     | `src/gateway/gateway.c`                                                                   | `test_gateway.c`, `test_gateway_http.c` |
-| **Control protocol** | `src/gateway/control_protocol.c`, `cp_chat.c`, `cp_config.c`, `cp_admin.c`, `cp_memory.c` | `test_gateway_extended.c`               |
+| **Control protocol** | `src/gateway/control_protocol.c`, `cp_chat.c`, `cp_config.c`, `cp_admin.c`, `cp_voice.c`, `cp_memory.c` | `test_gateway_extended.c`               |
 | **WebSocket server** | `src/gateway/ws_server.c`                                                                 | `test_gateway_extended.c`               |
 | **OAuth**            | `src/gateway/oauth.c`                                                                     | `test_oauth.c`, `test_gateway_auth.c`   |
 | **OpenAI compat**    | `src/gateway/openai_compat.c`                                                             | `test_gateway_extended.c`               |
 | **Event bridge**     | `src/gateway/event_bridge.c`                                                              | `test_gateway_extended.c`               |
+| **Streaming voice**  | `src/gateway/cp_voice_stream.c`, `src/tts/cartesia_stream.c`, `docs/streaming-voice.md`   | `test_cartesia_stream.c`, `test_gateway_voice.c` |
 | **Tenancy**          | `src/gateway/tenant.c`                                                                    | `test_tenant.c`                         |
 
 ## Persona
@@ -186,3 +194,4 @@ Use this to find the right files for a given task without searching the full cod
 | **macOS app** | `apps/macos/Sources/HumanApp/` | `swift build` in CI / fleet |
 | **Android app** | `apps/android/app/src/main/` | `app/src/androidTest/` (`connectedDebugAndroidTest` in fleet) |
 | **Local runner** | — | `scripts/run-native-fleet-local.sh` |
+| **Parity matrix (UI vs native vs gateway)** | `apps/shared/PARITY.md` | Reference for feature parity across surfaces |

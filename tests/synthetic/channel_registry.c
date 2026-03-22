@@ -167,7 +167,7 @@ static void mattermost_test_destroy(hu_channel_t *ch) {
 #include "human/channels/teams.h"
 
 static hu_error_t teams_test_create(hu_allocator_t *alloc, hu_channel_t *out) {
-    return hu_teams_create(alloc, "https://example.com/webhook", 26, out);
+    return hu_teams_create(alloc, "https://example.com/webhook", 26, NULL, 0, NULL, 0, out);
 }
 static void teams_test_destroy(hu_channel_t *ch) {
     hu_teams_destroy(ch);

@@ -61,6 +61,8 @@ static const hu_rpc_entry_t s_rpc_table[] = {
 #endif
     {"models.list", cp_admin_models_list},
     {"nodes.list", cp_admin_nodes_list},
+    {"nodes.action", cp_admin_nodes_action},
+    {"agents.list", cp_admin_agents_list},
 #ifdef HU_HAS_UPDATE
     {"update.check", cp_admin_update_check},
     {"update.run", cp_admin_update_run},
@@ -71,6 +73,7 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"voice.session.stop", cp_voice_session_stop},
     {"voice.session.interrupt", cp_voice_session_interrupt},
     {"voice.audio.end", cp_voice_audio_end},
+    {"voice.config", cp_voice_config},
     {"usage.summary", cp_admin_usage_summary},
     {"metrics.snapshot", cp_admin_metrics_snapshot},
     {"activity.recent", cp_admin_activity_recent},
@@ -271,6 +274,8 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
                 n = (size_t)snprintf(payload, 64, "{\"error\":\"invalid_token\"}");
             } else if (err == HU_ERR_INVALID_ARGUMENT) {
                 n = (size_t)snprintf(payload, 64, "{\"error\":\"invalid_argument\"}");
+            } else if (err == HU_ERR_NOT_SUPPORTED) {
+                n = (size_t)snprintf(payload, 64, "{\"error\":\"not_supported\"}");
             } else {
                 n = (size_t)snprintf(payload, 64, "{\"error\":\"internal\"}");
             }

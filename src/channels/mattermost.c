@@ -4,9 +4,11 @@
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
+#include "human/core/string.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define MM_SESSION_KEY_MAX 127
 #define MM_CONTENT_MAX     4095
@@ -20,6 +22,10 @@ typedef struct hu_mattermost_ctx {
     bool running;
     char *channel_id;
     char *last_post_id;
+    char *self_user_id;
+    time_t last_user_post_unix;
+    char last_user_post_channel[128];
+    size_t last_user_post_channel_len;
 #if HU_IS_TEST
     char last_message[4096];
     size_t last_message_len;
@@ -117,10 +123,41 @@ static hu_error_t mattermost_send(void *ctx, const char *target, size_t target_l
         hu_http_response_free(c->alloc, &resp);
     if (resp.status_code < 200 || resp.status_code >= 300)
         return HU_ERR_CHANNEL_SEND;
+    {
+        size_t cl = target_len < sizeof(c->last_user_post_channel) - 1 ? target_len
+                                                                       : sizeof(c->last_user_post_channel) - 1;
+        memcpy(c->last_user_post_channel, target, cl);
+        c->last_user_post_channel[cl] = '\0';
+        c->last_user_post_channel_len = cl;
+        c->last_user_post_unix = time(NULL);
+    }
     return HU_OK;
 jfail:
     hu_json_buf_free(&jbuf);
     return err;
+#endif
+}
+
+static bool mattermost_human_active_recently(void *ctx, const char *contact, size_t contact_len,
+                                             int window_sec) {
+#if HU_IS_TEST
+    (void)ctx;
+    (void)contact;
+    (void)contact_len;
+    (void)window_sec;
+    return false;
+#else
+    hu_mattermost_ctx_t *c = (hu_mattermost_ctx_t *)ctx;
+    if (!c || !contact || contact_len == 0 || window_sec <= 0)
+        return false;
+    if (c->last_user_post_channel_len != contact_len)
+        return false;
+    if (memcmp(c->last_user_post_channel, contact, contact_len) != 0)
+        return false;
+    if (c->last_user_post_unix == 0)
+        return false;
+    time_t now = time(NULL);
+    return (now - c->last_user_post_unix) <= (time_t)window_sec;
 #endif
 }
 
@@ -142,6 +179,373 @@ static hu_error_t mattermost_get_response_constraints(void *ctx, hu_channel_resp
     return HU_OK;
 }
 
+static bool mattermost_split_channel_post(const char *target, size_t target_len, const char **channel_id,
+                                          size_t *channel_len, const char **post_id, size_t *post_len) {
+    for (size_t i = 0; i < target_len; i++) {
+        if (target[i] == '|') {
+            *channel_id = target;
+            *channel_len = i;
+            *post_id = target + i + 1;
+            *post_len = target_len - i - 1;
+            return *channel_len > 0 && *post_len > 0;
+        }
+    }
+    return false;
+}
+
+static const char *mattermost_reaction_emoji_name(hu_reaction_type_t reaction) {
+    switch (reaction) {
+    case HU_REACTION_HEART:
+        return "heart";
+    case HU_REACTION_THUMBS_UP:
+        return "+1";
+    case HU_REACTION_THUMBS_DOWN:
+        return "thumbsdown";
+    case HU_REACTION_HAHA:
+        return "joy";
+    case HU_REACTION_EMPHASIS:
+        return "exclamation";
+    case HU_REACTION_QUESTION:
+        return "question";
+    default:
+        return NULL;
+    }
+}
+
+#if !HU_IS_TEST
+static hu_error_t mattermost_ensure_self_user(hu_mattermost_ctx_t *c) {
+    if (!c || !c->alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (c->self_user_id)
+        return HU_OK;
+    if (!c->url || c->url_len == 0 || !c->token || c->token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    char url_buf[1024];
+    int n = snprintf(url_buf, sizeof(url_buf), "%.*s/api/v4/users/me", (int)c->url_len, c->url);
+    if (n < 0 || (size_t)n >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+    char auth_buf[512];
+    n = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)c->token_len, c->token);
+    if (n <= 0 || (size_t)n >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+    hu_http_response_t resp = {0};
+    hu_error_t err = hu_http_get(c->alloc, url_buf, auth_buf, &resp);
+    if (err != HU_OK || !resp.body || resp.status_code != 200) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(c->alloc, &resp);
+        return err != HU_OK ? err : HU_ERR_CHANNEL_SEND;
+    }
+    hu_json_value_t *parsed = NULL;
+    err = hu_json_parse(c->alloc, resp.body, resp.body_len, &parsed);
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    if (err != HU_OK || !parsed)
+        return HU_ERR_CHANNEL_SEND;
+    const char *uid = hu_json_get_string(parsed, "id");
+    if (!uid || uid[0] == '\0') {
+        hu_json_free(c->alloc, parsed);
+        return HU_ERR_CHANNEL_SEND;
+    }
+    c->self_user_id = hu_strndup(c->alloc, uid, strlen(uid));
+    hu_json_free(c->alloc, parsed);
+    if (!c->self_user_id)
+        return HU_ERR_OUT_OF_MEMORY;
+    return HU_OK;
+}
+#endif
+
+static hu_error_t mattermost_start_typing(void *ctx, const char *recipient, size_t recipient_len) {
+    hu_mattermost_ctx_t *c = (hu_mattermost_ctx_t *)ctx;
+    if (!c || !recipient || recipient_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+#if HU_IS_TEST
+    return HU_OK;
+#else
+    if (!c->url || c->url_len == 0 || !c->token || c->token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+    char url_buf[1024];
+    int n = snprintf(url_buf, sizeof(url_buf), "%.*s/api/v4/users/me/typing", (int)c->url_len, c->url);
+    if (n < 0 || (size_t)n >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+    char auth_buf[512];
+    n = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)c->token_len, c->token);
+    if (n <= 0 || (size_t)n >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+    hu_json_buf_t jbuf;
+    hu_error_t err = hu_json_buf_init(&jbuf, c->alloc);
+    if (err)
+        return err;
+    err = hu_json_buf_append_raw(&jbuf, "{", 1);
+    if (err)
+        goto mm_type_fail;
+    err = hu_json_append_key_value(&jbuf, "channel_id", 10, recipient, recipient_len);
+    if (err)
+        goto mm_type_fail;
+    err = hu_json_buf_append_raw(&jbuf, "}", 1);
+    if (err)
+        goto mm_type_fail;
+    hu_http_response_t resp = {0};
+    err = hu_http_post_json(c->alloc, url_buf, auth_buf, jbuf.ptr, jbuf.len, &resp);
+    hu_json_buf_free(&jbuf);
+    if (resp.owned && resp.body)
+        hu_http_response_free(c->alloc, &resp);
+    if (err != HU_OK)
+        return HU_ERR_CHANNEL_SEND;
+    if (resp.status_code < 200 || resp.status_code >= 300)
+        return HU_ERR_CHANNEL_SEND;
+    return HU_OK;
+mm_type_fail:
+    hu_json_buf_free(&jbuf);
+    return err;
+#endif
+}
+
+static hu_error_t mattermost_stop_typing(void *ctx, const char *recipient, size_t recipient_len) {
+    (void)ctx;
+    (void)recipient;
+    (void)recipient_len;
+#if HU_IS_TEST
+    return HU_OK;
+#else
+    return HU_OK;
+#endif
+}
+
+static hu_error_t mattermost_react(void *ctx, const char *target, size_t target_len, int64_t message_id,
+                                   hu_reaction_type_t reaction) {
+    hu_mattermost_ctx_t *c = (hu_mattermost_ctx_t *)ctx;
+    (void)message_id;
+    if (!c || !c->alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!target || target_len == 0 || reaction == HU_REACTION_NONE)
+        return HU_ERR_INVALID_ARGUMENT;
+    const char *emoji = mattermost_reaction_emoji_name(reaction);
+    if (!emoji)
+        return HU_ERR_INVALID_ARGUMENT;
+    const char *ch_id = NULL;
+    size_t ch_len = 0;
+    const char *post_id = NULL;
+    size_t post_len = 0;
+    if (!mattermost_split_channel_post(target, target_len, &ch_id, &ch_len, &post_id, &post_len))
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if HU_IS_TEST
+    (void)emoji;
+    (void)ch_id;
+    (void)ch_len;
+    (void)post_id;
+    (void)post_len;
+    return HU_OK;
+#else
+    {
+        hu_error_t e = mattermost_ensure_self_user(c);
+        if (e != HU_OK)
+            return e;
+        char url_buf[1024];
+        int n = snprintf(url_buf, sizeof(url_buf), "%.*s/api/v4/reactions", (int)c->url_len, c->url);
+        if (n < 0 || (size_t)n >= sizeof(url_buf))
+            return HU_ERR_INTERNAL;
+        char auth_buf[512];
+        n = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)c->token_len, c->token);
+        if (n <= 0 || (size_t)n >= sizeof(auth_buf))
+            return HU_ERR_INTERNAL;
+        hu_json_buf_t jbuf;
+        hu_error_t err = hu_json_buf_init(&jbuf, c->alloc);
+        if (err)
+            return err;
+        err = hu_json_buf_append_raw(&jbuf, "{", 1);
+        if (err)
+            goto mm_re_fail;
+        err = hu_json_append_key_value(&jbuf, "user_id", 7, c->self_user_id, strlen(c->self_user_id));
+        if (err)
+            goto mm_re_fail;
+        err = hu_json_buf_append_raw(&jbuf, ",", 1);
+        if (err)
+            goto mm_re_fail;
+        err = hu_json_append_key_value(&jbuf, "post_id", 7, post_id, post_len);
+        if (err)
+            goto mm_re_fail;
+        err = hu_json_buf_append_raw(&jbuf, ",", 1);
+        if (err)
+            goto mm_re_fail;
+        err = hu_json_append_key_value(&jbuf, "emoji_name", 10, emoji, strlen(emoji));
+        if (err)
+            goto mm_re_fail;
+        err = hu_json_buf_append_raw(&jbuf, "}", 1);
+        if (err)
+            goto mm_re_fail;
+        hu_http_response_t resp = {0};
+        err = hu_http_post_json(c->alloc, url_buf, auth_buf, jbuf.ptr, jbuf.len, &resp);
+        hu_json_buf_free(&jbuf);
+        if (resp.owned && resp.body)
+            hu_http_response_free(c->alloc, &resp);
+        if (err != HU_OK)
+            return HU_ERR_CHANNEL_SEND;
+        if (resp.status_code < 200 || resp.status_code >= 300)
+            return HU_ERR_CHANNEL_SEND;
+        return HU_OK;
+    mm_re_fail:
+        hu_json_buf_free(&jbuf);
+        return err;
+    }
+#endif
+}
+
+#if HU_IS_TEST
+static hu_error_t mattermost_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                       const char *contact_id, size_t contact_id_len,
+                                                       size_t limit, hu_channel_history_entry_t **out,
+                                                       size_t *out_count) {
+    (void)ctx;
+    (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
+    (void)limit;
+    if (!out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+    return HU_OK;
+}
+#elif defined(HU_HTTP_CURL)
+static hu_error_t mattermost_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                       const char *contact_id, size_t contact_id_len,
+                                                       size_t limit, hu_channel_history_entry_t **out,
+                                                       size_t *out_count) {
+    if (!ctx || !alloc || !contact_id || contact_id_len == 0 || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+
+    hu_mattermost_ctx_t *c = (hu_mattermost_ctx_t *)ctx;
+    if (!c->url || c->url_len == 0 || !c->token || c->token_len == 0)
+        return HU_ERR_CHANNEL_NOT_CONFIGURED;
+
+    if (limit > 200)
+        limit = 200;
+    if (limit == 0)
+        limit = 60;
+
+    char url_buf[1024];
+    int nu = snprintf(url_buf, sizeof(url_buf),
+                       "%.*s/api/v4/channels/%.*s/posts?per_page=%zu", (int)c->url_len, c->url,
+                       (int)contact_id_len, contact_id, limit);
+    if (nu < 0 || (size_t)nu >= sizeof(url_buf))
+        return HU_ERR_INTERNAL;
+
+    char auth_buf[512];
+    int na = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)c->token_len, c->token);
+    if (na <= 0 || (size_t)na >= sizeof(auth_buf))
+        return HU_ERR_INTERNAL;
+
+    hu_http_response_t resp = {0};
+    hu_error_t err = hu_http_get(alloc, url_buf, auth_buf, &resp);
+    if (err != HU_OK || !resp.body || resp.status_code != 200) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return err != HU_OK ? err : HU_ERR_INTERNAL;
+    }
+
+    hu_json_value_t *parsed = NULL;
+    err = hu_json_parse(alloc, resp.body, resp.body_len, &parsed);
+    if (resp.owned && resp.body)
+        hu_http_response_free(alloc, &resp);
+    if (err != HU_OK || !parsed)
+        return HU_OK;
+
+    hu_json_value_t *order = hu_json_object_get(parsed, "order");
+    hu_json_value_t *posts = hu_json_object_get(parsed, "posts");
+    if (!order || order->type != HU_JSON_ARRAY || !posts || posts->type != HU_JSON_OBJECT) {
+        hu_json_free(alloc, parsed);
+        return HU_OK;
+    }
+
+    size_t arr_len = order->data.array.len;
+    if (arr_len > limit)
+        arr_len = limit;
+    if (arr_len == 0) {
+        hu_json_free(alloc, parsed);
+        return HU_OK;
+    }
+
+    hu_channel_history_entry_t *entries =
+        (hu_channel_history_entry_t *)alloc->alloc(alloc->ctx, arr_len * sizeof(*entries));
+    if (!entries) {
+        hu_json_free(alloc, parsed);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    memset(entries, 0, arr_len * sizeof(*entries));
+    size_t count = 0;
+
+    for (size_t i = 0; i < order->data.array.len && count < arr_len; i++) {
+        hu_json_value_t *pid_val = order->data.array.items[i];
+        if (!pid_val || pid_val->type != HU_JSON_STRING)
+            continue;
+        const char *pid = pid_val->data.string.ptr;
+        hu_json_value_t *post = hu_json_object_get(posts, pid);
+        if (!post || post->type != HU_JSON_OBJECT)
+            continue;
+        const char *msg = hu_json_get_string(post, "message");
+        if (!msg || strlen(msg) == 0)
+            continue;
+
+        entries[count].from_me = false;
+        size_t text_len = strlen(msg);
+        if (text_len > 511)
+            text_len = 511;
+        memcpy(entries[count].text, msg, text_len);
+        entries[count].text[text_len] = '\0';
+
+        double ca = hu_json_get_number(post, "create_at", 0.0);
+        time_t sec = (time_t)((int64_t)(ca / 1000.0));
+        struct tm *tm = gmtime(&sec);
+        if (tm)
+            strftime(entries[count].timestamp, sizeof(entries[count].timestamp), "%Y-%m-%d %H:%M",
+                     tm);
+
+        count++;
+    }
+
+    hu_json_free(alloc, parsed);
+
+    for (size_t i = 0; i < count / 2; i++) {
+        hu_channel_history_entry_t tmp = entries[i];
+        entries[i] = entries[count - 1 - i];
+        entries[count - 1 - i] = tmp;
+    }
+
+    if (count < arr_len) {
+        hu_channel_history_entry_t *exact =
+            (hu_channel_history_entry_t *)alloc->alloc(alloc->ctx, count * sizeof(*entries));
+        if (!exact) {
+            alloc->free(alloc->ctx, entries, arr_len * sizeof(*entries));
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        memcpy(exact, entries, count * sizeof(*entries));
+        alloc->free(alloc->ctx, entries, arr_len * sizeof(*entries));
+        entries = exact;
+    }
+
+    *out = entries;
+    *out_count = count;
+    return HU_OK;
+}
+#else
+static hu_error_t mattermost_load_conversation_history(void *ctx, hu_allocator_t *alloc,
+                                                       const char *contact_id, size_t contact_id_len,
+                                                       size_t limit, hu_channel_history_entry_t **out,
+                                                       size_t *out_count) {
+    (void)ctx;
+    (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
+    (void)limit;
+    (void)out;
+    (void)out_count;
+    return HU_ERR_NOT_SUPPORTED;
+}
+#endif
+
 static const hu_channel_vtable_t mattermost_vtable = {
     .start = mattermost_start,
     .stop = mattermost_stop,
@@ -149,9 +553,12 @@ static const hu_channel_vtable_t mattermost_vtable = {
     .name = mattermost_name,
     .health_check = mattermost_health_check,
     .send_event = NULL,
-    .start_typing = NULL,
-    .stop_typing = NULL,
+    .start_typing = mattermost_start_typing,
+    .stop_typing = mattermost_stop_typing,
+    .load_conversation_history = mattermost_load_conversation_history,
     .get_response_constraints = mattermost_get_response_constraints,
+    .react = mattermost_react,
+    .human_active_recently = mattermost_human_active_recently,
 };
 
 hu_error_t hu_mattermost_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_loop_msg_t *msgs,
@@ -307,6 +714,8 @@ void hu_mattermost_destroy(hu_channel_t *ch) {
                 a->free(a->ctx, c->channel_id, strlen(c->channel_id) + 1);
             if (c->last_post_id)
                 a->free(a->ctx, c->last_post_id, strlen(c->last_post_id) + 1);
+            if (c->self_user_id)
+                hu_str_free(a, c->self_user_id);
             a->free(a->ctx, c, sizeof(*c));
         }
         ch->ctx = NULL;

@@ -1,6 +1,7 @@
 #include "human/channels/imessage.h"
 #include "human/channel_loop.h"
 #include "human/core/process_util.h"
+#include "human/core/error.h"
 #include "human/core/string.h"
 #ifndef HU_CODENAME
 #define HU_CODENAME "human"
@@ -1201,8 +1202,8 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
     c->alloc->free(c->alloc->ctx, script, script_cap);
     if (err != HU_OK) {
         if (getenv("HU_DEBUG"))
-            fprintf(stderr, "[imessage] tapback osascript failed: hu_process_run err=%d\n",
-                    (int)err);
+            fprintf(stderr, "[imessage] tapback osascript failed: hu_process_run err=%s\n",
+                    hu_error_string(err));
         hu_run_result_free(c->alloc, &result);
         return HU_ERR_NOT_SUPPORTED;
     }

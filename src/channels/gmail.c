@@ -32,6 +32,9 @@ typedef struct hu_gmail_ctx {
     char *user_email; /* cached from profile, for From header */
     int poll_interval_sec;
     bool running;
+    time_t last_user_send_unix;
+    char last_user_send_to[256];
+    size_t last_user_send_to_len;
 #if HU_IS_TEST
     char last_message[4096];
     size_t last_message_len;
@@ -328,6 +331,15 @@ static hu_error_t gmail_send(void *ctx, const char *target, size_t target_len, c
         memcpy(c->last_message, message, len);
     c->last_message[len] = '\0';
     c->last_message_len = len;
+    {
+        size_t tl = target_len < sizeof(c->last_user_send_to) - 1 ? target_len
+                                                                  : sizeof(c->last_user_send_to) - 1;
+        if (target && tl > 0)
+            memcpy(c->last_user_send_to, target, tl);
+        c->last_user_send_to[tl] = '\0';
+        c->last_user_send_to_len = tl;
+        c->last_user_send_unix = time(NULL);
+    }
     return HU_OK;
 #elif defined(HU_HTTP_CURL)
     hu_error_t err = ensure_access_token(c);
@@ -407,11 +419,42 @@ static hu_error_t gmail_send(void *ctx, const char *target, size_t target_len, c
     }
     if (resp.owned && resp.body)
         hu_http_response_free(c->alloc, &resp);
+    {
+        size_t tl = to_len < sizeof(c->last_user_send_to) - 1 ? to_len
+                                                                : sizeof(c->last_user_send_to) - 1;
+        memcpy(c->last_user_send_to, target, tl);
+        c->last_user_send_to[tl] = '\0';
+        c->last_user_send_to_len = tl;
+        c->last_user_send_unix = time(NULL);
+    }
     return HU_OK;
 #else
     (void)target_len;
     (void)message_len;
     return HU_ERR_NOT_SUPPORTED;
+#endif
+}
+
+static bool gmail_human_active_recently(void *ctx, const char *contact, size_t contact_len,
+                                        int window_sec) {
+#if HU_IS_TEST
+    (void)ctx;
+    (void)contact;
+    (void)contact_len;
+    (void)window_sec;
+    return false;
+#else
+    hu_gmail_ctx_t *c = (hu_gmail_ctx_t *)ctx;
+    if (!c || !contact || contact_len == 0 || window_sec <= 0)
+        return false;
+    if (c->last_user_send_to_len != contact_len)
+        return false;
+    if (strncasecmp(c->last_user_send_to, contact, contact_len) != 0)
+        return false;
+    if (c->last_user_send_unix == 0)
+        return false;
+    time_t now = time(NULL);
+    return (now - c->last_user_send_unix) <= (time_t)window_sec;
 #endif
 }
 
@@ -611,6 +654,7 @@ static const hu_channel_vtable_t gmail_vtable = {
     .start_typing = NULL,
     .stop_typing = NULL,
     .load_conversation_history = gmail_load_conversation_history,
+    .human_active_recently = gmail_human_active_recently,
 };
 
 /* ─── Public API ─────────────────────────────────────────────────────────── */
