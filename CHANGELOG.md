@@ -3,6 +3,13 @@
 All notable changes to human are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+
+- **BTH**: `hula_tool_turns` counter when the HuLa IR path executes a tool batch
+- **Delegate / named spawn**: inherit parent metacognition policy via `hu_agent_pool_spawn_named`
+
 ## [0.5.0] - 2026-03-15
 
 ### Added

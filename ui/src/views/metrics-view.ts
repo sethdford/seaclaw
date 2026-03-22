@@ -85,6 +85,7 @@ const BTH_GROUPS: Record<string, string[]> = {
     "metacog_difficulty_medium",
     "metacog_difficulty_hard",
     "metacog_hysteresis_suppressed",
+    "hula_tool_turns",
     "episodic_patterns_stored",
     "episodic_replays",
     "skill_routes_semantic",

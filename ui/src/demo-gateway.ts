@@ -1564,6 +1564,7 @@ export class DemoGatewayClient extends EventTarget {
             metacog_difficulty_medium: 300,
             metacog_difficulty_hard: 147,
             metacog_hysteresis_suppressed: 5,
+            hula_tool_turns: 14,
             episodic_patterns_stored: 28,
             episodic_replays: 9,
             skill_routes_semantic: 200,

@@ -11,7 +11,7 @@ status: in-progress
 - **Trend + hysteresis**: `hu_metacog_compute_trend()`; costly actions require `hysteresis_min` consecutive breaches (immediate `SIMPLIFY` for repetition / token_efficiency).
 - **Bounded re-entry**: up to `max_regen` extra `provider.chat` calls with `[METACOGNITION]` system suffix (`hu_metacognition_apply`).
 - **SQLite flywheel**: `metacog_history` rows + `hu_metacog_label_from_followup()` updates `outcome_proxy` on the next user message (`pending_outcome_trace_id`).
-- **BTH**: `metacog_regens`, `metacog_difficulty_*`, `metacog_hysteresis_suppressed`.
+- **BTH**: `metacog_regens`, `metacog_difficulty_*`, `metacog_hysteresis_suppressed`, `hula_tool_turns`.
 
 ---
 

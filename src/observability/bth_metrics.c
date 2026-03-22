@@ -56,6 +56,7 @@ void hu_bth_metrics_log(const hu_bth_metrics_t *m) {
     HU_BTH_LOG_FIELD(metacog_difficulty_medium);
     HU_BTH_LOG_FIELD(metacog_difficulty_hard);
     HU_BTH_LOG_FIELD(metacog_hysteresis_suppressed);
+    HU_BTH_LOG_FIELD(hula_tool_turns);
     HU_BTH_LOG_FIELD(episodic_patterns_stored);
     HU_BTH_LOG_FIELD(episodic_replays);
     HU_BTH_LOG_FIELD(skill_routes_semantic);
@@ -121,6 +122,7 @@ char *hu_bth_metrics_summary(hu_allocator_t *alloc, const hu_bth_metrics_t *m, s
     HU_BTH_SUMMARY_LINE(metacog_difficulty_medium, "metacog_difficulty_medium");
     HU_BTH_SUMMARY_LINE(metacog_difficulty_hard, "metacog_difficulty_hard");
     HU_BTH_SUMMARY_LINE(metacog_hysteresis_suppressed, "metacog_hysteresis_suppressed");
+    HU_BTH_SUMMARY_LINE(hula_tool_turns, "hula_tool_turns");
     HU_BTH_SUMMARY_LINE(episodic_patterns_stored, "episodic_patterns_stored");
     HU_BTH_SUMMARY_LINE(episodic_replays, "episodic_replays");
     HU_BTH_SUMMARY_LINE(skill_routes_semantic, "skill_routes_semantic");

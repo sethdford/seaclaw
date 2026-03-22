@@ -144,6 +144,8 @@ sudo cp human /usr/local/bin/
 ```bash
 git clone https://github.com/sethdford/h-uman.git
 cd h-uman
+# Optional first-time: git config user.name "You" && git config user.email "you@example.com"
+# After hooks pass: git push -u origin <your-branch>
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON
 cmake --build .

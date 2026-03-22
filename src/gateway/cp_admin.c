@@ -945,6 +945,7 @@ hu_error_t cp_admin_metrics_snapshot(hu_allocator_t *alloc, hu_app_context_t *ap
         BTH_SET(metacog_difficulty_medium);
         BTH_SET(metacog_difficulty_hard);
         BTH_SET(metacog_hysteresis_suppressed);
+        BTH_SET(hula_tool_turns);
         BTH_SET(episodic_patterns_stored);
         BTH_SET(episodic_replays);
         BTH_SET(skill_routes_semantic);

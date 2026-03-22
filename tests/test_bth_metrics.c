@@ -38,6 +38,7 @@ static void bth_metrics_init_zeros(void) {
     HU_ASSERT_EQ(m.total_turns, 0u);
     HU_ASSERT_EQ(m.cognition_fast_turns, 0u);
     HU_ASSERT_EQ(m.metacog_regens, 0u);
+    HU_ASSERT_EQ(m.hula_tool_turns, 0u);
     HU_ASSERT_EQ(m.metacog_difficulty_hard, 0u);
     HU_ASSERT_EQ(m.skill_routes_semantic, 0u);
     HU_ASSERT_EQ(m.evolving_outcomes, 0u);
@@ -121,6 +122,7 @@ static void bth_metrics_all_counters_addressable(void) {
     m.metacog_difficulty_medium = 1;
     m.metacog_difficulty_hard = 1;
     m.metacog_hysteresis_suppressed = 1;
+    m.hula_tool_turns = 1;
     m.episodic_patterns_stored = 1;
     m.episodic_replays = 1;
     m.skill_routes_semantic = 1;
@@ -133,6 +135,7 @@ static void bth_metrics_all_counters_addressable(void) {
     char *summary = hu_bth_metrics_summary(&alloc, &m, &out_len);
     HU_ASSERT_NOT_NULL(summary);
     HU_ASSERT_TRUE(strstr(summary, "metacog_regens=1") != NULL);
+    HU_ASSERT_TRUE(strstr(summary, "hula_tool_turns=1") != NULL);
     HU_ASSERT_TRUE(strstr(summary, "cognition_fast_turns=1") != NULL);
     HU_ASSERT_TRUE(strstr(summary, "skill_routes_semantic=1") != NULL);
     alloc.free(alloc.ctx, summary, out_len);

@@ -3414,6 +3414,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     herr = hu_hula_exec_run(&hula_exec);
                                     if (herr == HU_OK) {
                                         used_hula = true;
+                                        if (agent->bth_metrics)
+                                            agent->bth_metrics->hula_tool_turns++;
                                         for (size_t hti = 0; hti < tc_count; hti++) {
                                             char cid[16];
                                             if (tc_count == 1)
