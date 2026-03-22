@@ -193,6 +193,10 @@ Location: `src/ml/`, `include/human/ml/`. Gated behind `HU_ENABLE_ML`.
 
 Components: BPE tokenizer, GPT model, MuonAdamW optimizer, data loader, training loop, experiment loop. Config-driven: `hu_experiment_config_t` parameterizes model architecture and optimizer. Same vtable-driven approach as the rest of the project (`hu_model_t`, `hu_ml_optimizer_t`).
 
+## HuLa (agent program IR)
+
+HuLa is a JSON program tree for tool orchestration (`call`, `seq`, `par`, `branch`, `loop`, `delegate`, `emit`) executed by `src/agent/hula.c` with policy checks and trace logging. **Compiler mode** (`hu_hula_compiler_chat_compile_execute` in `hula_compiler.c`), **native mode** (`<hula_program>` in assistant text), and a **direct IR** path from tool calls integrate in `agent_turn.c` when `agent.hula_enabled` is set (default **on** after config merge). **`delegate`** uses `hu_hula_exec_set_spawn` with the session `agent_pool` and `hu_spawn_config_apply_parent_agent` when a pool exists (POSIX non-test). Traces can persist under `~/.human/hula_traces/`; `hula_emergence.c` scans n-grams and can promote hot paths to SkillForge-style manifests. Operator guide: `docs/guides/hula.md`. Full spec: `docs/plans/2026-03-22-hula-language.md`.
+
 ## Key Directories
 
 ```
@@ -210,7 +214,7 @@ src/
   core/        Allocator, arena, JSON, string, HTTP, error
 
 include/human/  Public C headers (vtable definitions)
-tests/          291 test files, 6359+ tests
+tests/          291 test files, 6374+ tests
 fuzz/           libFuzzer harnesses
 ui/             LitElement web dashboard
 website/        Astro marketing site

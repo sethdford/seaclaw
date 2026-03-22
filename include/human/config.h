@@ -86,6 +86,7 @@ typedef struct hu_persona_channel_entry {
 
 typedef struct hu_agent_config {
     bool llm_compiler_enabled;
+    bool hula_enabled;
     bool mcts_planner_enabled;
     bool tool_routing_enabled;
     bool tree_of_thought;
@@ -192,6 +193,9 @@ typedef struct hu_imap_channel_config {
     char *imap_password;
     char *imap_folder;
     bool imap_use_tls;
+    char *smtp_host;
+    uint16_t smtp_port;
+    char *from_address;
 } hu_imap_channel_config_t;
 
 typedef struct hu_imessage_channel_config {

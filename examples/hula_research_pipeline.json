@@ -1,0 +1,44 @@
+{
+  "name": "research_pipeline",
+  "version": 1,
+  "root": {
+    "op": "seq",
+    "id": "main",
+    "children": [
+      {
+        "op": "par",
+        "id": "gather",
+        "children": [
+          {"op": "call", "id": "search_web", "tool": "search", "args": {"text": "quantum computing 2026"}},
+          {"op": "call", "id": "search_papers", "tool": "search", "args": {"text": "arxiv recent papers"}},
+          {"op": "call", "id": "search_news", "tool": "search", "args": {"text": "tech news today"}}
+        ]
+      },
+      {
+        "op": "branch",
+        "id": "quality_check",
+        "pred": "success",
+        "then": {
+          "op": "seq",
+          "id": "process",
+          "children": [
+            {"op": "call", "id": "analyze_results", "tool": "analyze", "args": {"text": "synthesize findings"}},
+            {"op": "call", "id": "write_summary", "tool": "write", "args": {"text": "research report"}}
+          ]
+        },
+        "else": {
+          "op": "emit",
+          "id": "error_out",
+          "emit_key": "error",
+          "emit_value": "search failed"
+        }
+      },
+      {
+        "op": "emit",
+        "id": "final_report",
+        "emit_key": "report",
+        "emit_value": "$write_summary"
+      }
+    ]
+  }
+}

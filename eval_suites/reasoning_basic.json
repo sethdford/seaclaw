@@ -1,10 +1,14 @@
 {
   "name": "reasoning-basic",
+  "description": "Arithmetic, logic, and trick questions. Uses LLM judge so verbose correct answers pass (not brittle substring match).",
+  "match_mode": "llm_judge",
+  "default_rubric": "Pass if the actual response states or clearly implies the gold reference answer. Accept equivalent phrasing, brief reasoning, and minor wording differences. Fail if the substantive answer is wrong, missing, or contradicted.",
   "tasks": [
     {
       "id": "r1",
       "prompt": "What is 15 + 27?",
       "expected": "42",
+      "rubric": "Pass if the sum 15+27=42 is given (digits 42 or words forty-two). Fail if any other number.",
       "category": "arithmetic",
       "difficulty": 1,
       "timeout_ms": 5000
@@ -13,6 +17,7 @@
       "id": "r2",
       "prompt": "If all cats are animals and Whiskers is a cat, is Whiskers an animal?",
       "expected": "yes",
+      "rubric": "Pass if the answer is affirmative (yes / correct / Whiskers is an animal). Fail if denies or is non-committal without resolving.",
       "category": "logic",
       "difficulty": 1,
       "timeout_ms": 5000
@@ -21,6 +26,7 @@
       "id": "r3",
       "prompt": "What comes next in the sequence: 2, 4, 8, 16, ?",
       "expected": "32",
+      "rubric": "Pass if next term is 32 (doubling pattern). Fail if another number.",
       "category": "pattern",
       "difficulty": 2,
       "timeout_ms": 5000
@@ -29,6 +35,7 @@
       "id": "r4",
       "prompt": "A bat and a ball cost $1.10. The bat costs $1 more than the ball. How much does the ball cost?",
       "expected": "$0.05",
+      "rubric": "Pass if ball price is five cents ($0.05, 5 cents). Fail if $0.10 or other wrong classic answer.",
       "category": "reasoning",
       "difficulty": 3,
       "timeout_ms": 10000
@@ -37,6 +44,7 @@
       "id": "r5",
       "prompt": "If it takes 5 machines 5 minutes to make 5 widgets, how long would it take 100 machines to make 100 widgets?",
       "expected": "5 minutes",
+      "rubric": "Pass if duration is 5 minutes (same rate per widget). Fail if 100 minutes or other scaling error.",
       "category": "reasoning",
       "difficulty": 3,
       "timeout_ms": 10000
@@ -45,6 +53,7 @@
       "id": "r6",
       "prompt": "What is the capital of France?",
       "expected": "Paris",
+      "rubric": "Pass if Paris is named as capital. Fail if wrong city.",
       "category": "knowledge",
       "difficulty": 1,
       "timeout_ms": 5000
@@ -53,6 +62,7 @@
       "id": "r7",
       "prompt": "Translate 'hello world' to Spanish.",
       "expected": "hola mundo",
+      "rubric": "Pass if translation includes hola and mundo in Spanish (punctuation OK). Fail if wrong language or meaning.",
       "category": "translation",
       "difficulty": 2,
       "timeout_ms": 5000
@@ -61,6 +71,7 @@
       "id": "r8",
       "prompt": "What is the square root of 144?",
       "expected": "12",
+      "rubric": "Pass if answer is 12. Fail if wrong root.",
       "category": "arithmetic",
       "difficulty": 1,
       "timeout_ms": 5000
@@ -69,6 +80,7 @@
       "id": "r9",
       "prompt": "In a race, you overtake the person in 2nd place. What position are you now in?",
       "expected": "2nd",
+      "rubric": "Pass if position is second / 2nd (you become second, not first). Fail if says first or wrong place.",
       "category": "reasoning",
       "difficulty": 2,
       "timeout_ms": 5000
@@ -77,6 +89,7 @@
       "id": "r10",
       "prompt": "How many months have 28 days?",
       "expected": "12",
+      "rubric": "Pass if answer is twelve / 12 (all months have at least 28 days). Fail if only February or wrong count.",
       "category": "reasoning",
       "difficulty": 2,
       "timeout_ms": 5000

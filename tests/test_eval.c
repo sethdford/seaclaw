@@ -15,6 +15,7 @@ static const struct eval_suite_expect_row {
     {"capability_edges.json", 10},
     {"coding_basic.json", 5},
     {"fidelity.json", 10},
+    {"hula_orchestration.json", 2},
     {"human_likeness.json", 8},
     {"intelligence.json", 10},
     {"memory.json", 8},

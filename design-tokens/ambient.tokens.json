@@ -10,7 +10,7 @@
     "glow": {
       "$value": "radial-gradient(ellipse at 50% 50%, rgba(122,182,72,0.03), transparent 70%)",
       "$type": "string",
-      "$description": "Subtle background radial glow — Human green at 3%"
+      "$description": "Subtle background radial glow — human green at 3%"
     },
     "glow-warm": {
       "$value": "radial-gradient(ellipse at 50% 50%, rgba(182,156,72,0.02), transparent 70%)",

@@ -50,7 +50,7 @@
       "9": {
         "$value": "{color.viz-extended.forest}",
         "$type": "color",
-        "$description": "Extended — deep forest"
+        "$description": "Extended — deep forest (Web Color)"
       },
       "10": {
         "$value": "{color.viz-extended.cyan}",
@@ -87,7 +87,7 @@
         "$type": "color",
         "$description": "Extended — azure blue"
       },
-      "$description": "Ordered categorical series — 16 colors: core 1–8 plus viz-extended for dense charts"
+      "$description": "Ordered categorical series — 16 colors: core 1–8 plus Web Color–derived extended hues for dense multi-series charts"
     },
     "sequential": {
       "100": {

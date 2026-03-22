@@ -20,7 +20,7 @@ Human's design system prioritizes:
 
 ## Color System
 
-### Primary Accent — Ocean Teal
+### Primary Accent — Human Green
 
 The primary accent is Human green (`--hu-accent`), a nature-inspired color that anchors the Human brand identity.
 
@@ -41,15 +41,15 @@ Amber (`--hu-accent-secondary`) provides warm counterpoint for featured content,
 | `--hu-accent-secondary-hover`  | #fbbf24               | #b45309              |
 | `--hu-accent-secondary-subtle` | rgba(245,158,11,0.14) | rgba(217,119,6,0.10) |
 
-### Tertiary Accent — Indigo
+### Tertiary Accent — Steel Blue
 
-Indigo (`--hu-accent-tertiary`) adds depth for info states, data visualization, and provider-related UI.
+Steel blue (`--hu-accent-tertiary`) adds depth for info states, data visualization, and provider-related UI (institutional steel blue, anchor `#4A6FA5` at 500).
 
 | Token                         | Dark                  | Light                |
 | ----------------------------- | --------------------- | -------------------- |
-| `--hu-accent-tertiary`        | #6366f1               | #4f46e5              |
-| `--hu-accent-tertiary-hover`  | #818cf8               | #4338ca              |
-| `--hu-accent-tertiary-subtle` | rgba(99,102,241,0.14) | rgba(79,70,229,0.10) |
+| `--hu-accent-tertiary`        | #4a6fa5               | #3d5d8c              |
+| `--hu-accent-tertiary-hover`  | #7496c4               | #324a73              |
+| `--hu-accent-tertiary-subtle` | rgba(74,111,165,0.14) | rgba(61,93,140,0.10) |
 
 ### Coral (Error/Destructive Only)
 

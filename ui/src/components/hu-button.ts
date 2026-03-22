@@ -47,7 +47,7 @@ export class ScButton extends LitElement {
       outline-offset: var(--hu-focus-ring-offset);
     }
 
-    /* Primary — brand green convex pillow with specular highlights */
+    /* Primary — Human-style convex pillow with specular highlights */
     button.variant-primary {
       background: var(--hu-accent);
       background-image: var(--hu-button-gradient-primary);

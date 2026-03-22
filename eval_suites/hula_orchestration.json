@@ -1,0 +1,28 @@
+{
+  "name": "hula-orchestration",
+  "description": "Can the assistant emit a short HuLa IR plan: parallel gather (par + calls) then conditional (branch with then/else)? Scored by LLM judge in static eval and harness.",
+  "match_mode": "llm_judge",
+  "default_rubric": "Pass if the reply contains a coherent HuLa-shaped JSON tree: top-level name/version/root; root uses seq; includes par with at least three call children; includes branch with pred and both then and else subtrees (then often seq+call, else emit or call). Accept minor field order or extra harmless fields. Fail if only prose, wrong op vocabulary, missing parallel or missing branch, or invalid JSON.",
+  "tasks": [
+    {
+      "id": "hula-001",
+      "category": "hula_from_scratch",
+      "difficulty": 3,
+      "timeout_ms": 90000,
+      "judge_profile": "hula_structure",
+      "prompt": "Design a minimal HuLa program (JSON only) for Human's agent IR. Requirements: top-level object with keys \"name\" (string), \"version\" (number), \"root\" (node). Root node: op \"seq\", id \"main\", \"children\" array with exactly two elements in order: (1) op \"par\" with at least three children each op \"call\" with id, tool (string), and args (object)—use placeholder tools like search_web, search_news, search_papers; (2) op \"branch\" with id, \"pred\" string (e.g. \"success\"), \"then\" object that is op \"seq\" containing at least one op \"call\", and \"else\" object that is either op \"emit\" (with emit_key and emit_value) or op \"call\". Output raw JSON only—no markdown code fences, no commentary.",
+      "expected": "Valid JSON with name, version, root.seq containing par>=3 calls then branch with then and else subtrees as specified.",
+      "rubric": "5=Valid JSON + par with 3+ calls + branch with then seq+call and else emit/call; 3=Right shape but one structural gap; 1=Prose only or missing par/branch"
+    },
+    {
+      "id": "hula-002",
+      "category": "hula_extend_incomplete",
+      "difficulty": 3,
+      "timeout_ms": 90000,
+      "judge_profile": "hula_structure",
+      "prompt": "This HuLa program is incomplete: it has a seq with only a par of two calls. Extend it to full JSON: keep existing nodes, then add as the second child of the root seq a branch node with pred \"success\", then: seq with one call id \"summarize\" tool \"summarize\" args {\"text\":\"combined\"}, else: emit with emit_key \"error\" and emit_value \"gather failed\". Return the complete program JSON only (no markdown).\n\n{\"name\":\"gather_then_decide\",\"version\":1,\"root\":{\"op\":\"seq\",\"id\":\"main\",\"children\":[{\"op\":\"par\",\"id\":\"gather\",\"children\":[{\"op\":\"call\",\"id\":\"a\",\"tool\":\"fetch\",\"args\":{}},{\"op\":\"call\",\"id\":\"b\",\"tool\":\"fetch\",\"args\":{}}]}]}}",
+      "expected": "Same program extended: root seq has two children: original par, then branch with then/else as specified.",
+      "rubric": "5=Preserves par + adds branch with summarize seq and error emit; 3=Branch present but wrong wiring; 1=No branch or broken JSON"
+    }
+  ]
+}

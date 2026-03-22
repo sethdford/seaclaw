@@ -1,5 +1,7 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import brandLogoSvg from "../assets/logo.svg?raw";
 import { icons } from "../icons.js";
 import "./hu-status-dot.js";
 
@@ -498,35 +500,7 @@ export class ScSidebar extends LitElement {
     return html`
       <aside class="sidebar">
         <header class="header" role="banner">
-          <div class="logo" aria-hidden="true">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-              <path
-                d="M8 24C8 24 6 20 6 16C6 12 8 8 12 6"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-              />
-              <path
-                d="M14 24C14 24 12 21 12 18C12 15 13 12 16 10"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-              />
-              <path
-                d="M20 24C20 24 18 21 18 18C18 15 19 12 22 10"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-              />
-              <path
-                d="M24 24C24 24 26 20 26 16C26 12 24 8 20 6"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-              />
-              <circle cx="16" cy="27" r="2" fill="currentColor" />
-            </svg>
-          </div>
+          <div class="logo" aria-hidden="true">${unsafeHTML(brandLogoSvg)}</div>
           <div class="brand-wrap">
             ${this.connectionStatus === "connected"
               ? html`<span

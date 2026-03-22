@@ -1,7 +1,7 @@
 ---
 title: Getting Started with Human
 description: Quick setup guide from zero to first AI chat in under 5 minutes
-updated: 2026-03-21
+updated: 2026-03-22
 ---
 
 # Getting Started with Human
@@ -179,6 +179,7 @@ Configure your MCP client to run `human mcp` as the server command. Human will p
 ./build/human eval run eval_suites/human_likeness.json
 ./build/human eval run eval_suites/tool_capability.json
 ./build/human eval run eval_suites/multi_turn.json
+./build/human eval run eval_suites/hula_orchestration.json
 ./build/human eval list
 ```
 
@@ -190,7 +191,20 @@ Configure your MCP client to run `human mcp` as the server command. Human will p
 
 `eval_suites/multi_turn.json` contains **multi-turn conversation scenarios** (2-3 user turns each). The harness sends each turn sequentially via `human agent -m`, assembles a transcript, and judges the full arc for context retention, correction handling, boundary escalation, tool discipline, empathy, and knowledge honesty. See `eval_suites/MANIFEST.md` for the full suite index.
 
-**Dynamic harness (full `human agent` stack)** — an OpenAI-compatible model generates synthetic probes; each probe is sent with `human agent -m`; another model pass scores safety. The harness reads the **parent process environment** for Human (same as your shell): set `HUMAN_PROVIDER` / `HUMAN_MODEL` and the matching API key (`OPENAI_API_KEY`, `GEMINI_API_KEY`, etc.), or use a `~/.human/config.json`. You can also pin the agent subprocess only:
+`eval_suites/hula_orchestration.json` checks whether the model can output **HuLa-shaped JSON**: a `par` of multiple `call` nodes (parallel gather) followed by a `branch` with `then` / `else` subtrees. Static `human eval run` uses `llm_judge`; the adversarial harness uses judge profile `hula_structure` when this suite is included.
+
+## 9. HuLa (structured multi-step plans)
+
+Human can execute **HuLa** programs: JSON trees of tool calls (`seq`, `par`, `branch`, `loop`, `delegate`, `emit`) with policy checks and optional trace files under `~/.human/hula_traces/`. This makes multi-step automation easier to **read, validate, and audit**.
+
+- **User guide:** [HuLa — structured plans for the Human agent](hula.md) (config, CLI, ethics, emergence).
+- **Quick CLI check:** `./scripts/hula-smoke.sh` or `./build/human hula validate` / `hula run` on a JSON file (see `examples/README.md` for which tool names apply).
+
+`agent.hula` is **on by default**; set `"hula": false` under `agent` in config to disable.
+
+## 10. Dynamic harness (full `human agent` stack)
+
+An OpenAI-compatible model generates synthetic probes; each probe is sent with `human agent -m`; another model pass scores safety. The harness reads the **parent process environment** for Human (same as your shell): set `HUMAN_PROVIDER` / `HUMAN_MODEL` and the matching API key (`OPENAI_API_KEY`, `GEMINI_API_KEY`, etc.), or use a `~/.human/config.json`. You can also pin the agent subprocess only:
 
 ```bash
 export ADV_EVAL_API_KEY="sk-..."   # used only by the harness for generate/judge
@@ -252,7 +266,7 @@ REDTEAM_FLEET_LIVE=1 REDTEAM_HARNESS_USE_OPENAI=1 REDTEAM_AGENT_USE_OPENAI=1 \\
 
 Optional one-shot agent check: `REDTEAM_FLEET_AGENT_SMOKE=1` (combine with live flags if you want both). Optional: `VERIFY_REDTEAM=1 ./scripts/verify-all.sh` runs the same offline fleet after the main gates.
 
-## 9. Next steps
+## 11. Next steps
 
 - **Security hardening:** Enable `secrets.encrypt`, set `gateway.require_pairing`, configure `allow_from` per channel. See [threat model](../standards/security/threat-model.md).
 - **Memory:** Use SQLite with embeddings for richer recall. Configure `memory.backend`, `embedding_provider`, and `vector_weight` in config.

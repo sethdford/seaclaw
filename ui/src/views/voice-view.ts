@@ -58,6 +58,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
         position: relative;
         width: 100%;
         min-height: 0;
+        border-radius: var(--hu-radius-lg);
+        overflow: hidden;
       }
 
       /* ── Status bar ─────────────────────────────────── */
@@ -185,6 +187,15 @@ export class ScVoiceView extends GatewayAwareLitElement {
         * {
           animation-duration: 0s !important;
           transition-duration: 0s !important;
+        }
+      }
+
+      @media (prefers-reduced-transparency: reduce) {
+        .status-bar,
+        .input-row {
+          backdrop-filter: none;
+          -webkit-backdrop-filter: none;
+          background: var(--hu-bg-surface);
         }
       }
     `,
@@ -748,7 +759,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   override render() {
     if (this._loading) return this._renderSkeleton();
     return html`
-      <div class="container">
+      <div class="container hu-mesh-gradient">
         ${this._renderStatusBar()} ${this._renderErrorBanner()}
         ${this._messages.length === 0
           ? html`
@@ -773,7 +784,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
   private _renderSkeleton() {
     return html`
-      <div class="container">
+      <div class="container hu-mesh-gradient">
         <hu-skeleton variant="card" class="skeleton-bar"></hu-skeleton>
         <hu-skeleton variant="card" style="flex:1"></hu-skeleton>
         <div class="skeleton-controls">

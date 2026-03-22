@@ -8,6 +8,9 @@
 #include "human/observer.h"
 #include "human/security.h"
 #include "human/tool.h"
+
+struct hu_agent_pool;
+struct hu_spawn_config;
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -130,9 +133,6 @@ typedef struct hu_hula_result {
     size_t error_len;
 } hu_hula_result_t;
 
-typedef struct hu_agent_pool hu_agent_pool_t;
-typedef struct hu_spawn_config hu_spawn_config_t;
-
 /* Execution state for a running program */
 typedef struct hu_hula_exec {
     hu_allocator_t alloc;
@@ -143,8 +143,8 @@ typedef struct hu_hula_exec {
     size_t tools_count;
     hu_security_policy_t *policy;   /* borrowed; optional — NULL skips policy */
     hu_observer_t *observer;        /* borrowed; optional — NULL skips tracing */
-    hu_agent_pool_t *pool;          /* borrowed; optional — NULL stubs delegate */
-    hu_spawn_config_t *spawn_cfg;   /* borrowed; optional — template for delegate spawns */
+    struct hu_agent_pool *pool;       /* borrowed; optional — NULL stubs delegate */
+    struct hu_spawn_config *spawn_cfg; /* borrowed; optional — template for delegate spawns */
     /* Trace log for emergence analysis */
     char *trace_log;                /* owned; accumulated JSON array of executed nodes */
     size_t trace_log_len;
@@ -209,6 +209,10 @@ hu_error_t hu_hula_exec_init_full(hu_hula_exec_t *exec, hu_allocator_t alloc,
                                   hu_hula_program_t *prog, hu_tool_t *tools, size_t tools_count,
                                   hu_security_policy_t *policy, hu_observer_t *observer);
 
+/* Optional: enable delegate opcode to use hu_agent_pool_spawn (non-test builds). */
+void hu_hula_exec_set_spawn(hu_hula_exec_t *exec, struct hu_agent_pool *pool,
+                            struct hu_spawn_config *spawn_cfg);
+
 /* Run the program to completion. */
 hu_error_t hu_hula_exec_run(hu_hula_exec_t *exec);
 
@@ -225,6 +229,16 @@ void hu_hula_exec_deinit(hu_hula_exec_t *exec);
 const char *hu_hula_op_name(hu_hula_op_t op);
 const char *hu_hula_pred_name(hu_hula_pred_t pred);
 const char *hu_hula_status_name(hu_hula_status_t status);
+
+/* Pre-execution bounds (conservative; loops use max_iter, branch counts both arms). */
+typedef struct hu_hula_cost_estimate {
+    size_t estimated_tool_calls;
+    size_t max_parallel_width;
+    uint32_t max_loop_iterations_bound;
+    hu_command_risk_level_t max_tool_risk;
+} hu_hula_cost_estimate_t;
+
+void hu_hula_estimate_cost(const hu_hula_program_t *prog, hu_hula_cost_estimate_t *out);
 
 /* ── Bridges (convert existing structures to HuLa) ──────────────────── */
 

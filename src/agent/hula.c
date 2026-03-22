@@ -1,12 +1,16 @@
 #include "human/agent/hula.h"
 #include "human/agent/planner.h"
 #include "human/agent/dag.h"
+#include "human/agent/spawn.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/observer.h"
 #include "human/security.h"
 #include <stdio.h>
 #include <string.h>
+#if (defined(__unix__) || defined(__APPLE__)) && !defined(HU_IS_TEST)
+#include <time.h>
+#endif
 
 /* ── Name tables ────────────────────────────────────────────────────────── */
 
@@ -516,6 +520,14 @@ hu_error_t hu_hula_exec_init_full(hu_hula_exec_t *exec, hu_allocator_t alloc,
     return HU_OK;
 }
 
+void hu_hula_exec_set_spawn(hu_hula_exec_t *exec, struct hu_agent_pool *pool,
+                            struct hu_spawn_config *spawn_cfg) {
+    if (!exec)
+        return;
+    exec->pool = pool;
+    exec->spawn_cfg = spawn_cfg;
+}
+
 static size_t node_index(const hu_hula_program_t *prog, const hu_hula_node_t *n) {
     return (size_t)(n - prog->nodes);
 }
@@ -612,10 +624,26 @@ static void trace_append(hu_hula_exec_t *exec, const hu_hula_node_t *n) {
         size_t room = exec->trace_log_cap > exec->trace_log_len
                           ? exec->trace_log_cap - exec->trace_log_len - 1
                           : 0;
-        int npr =
-            snprintf(exec->trace_log + exec->trace_log_len, room > 0 ? room : 0,
-                     "{\"id\":\"%s\",\"op\":\"%s\",\"status\":\"%s\",\"output_len\":%zu},", id, opn,
-                     st, outlen);
+        const char *safe_tool = NULL;
+        if (n->op == HU_HULA_CALL && n->tool_name && n->tool_name[0]) {
+            bool ok = true;
+            for (const char *p = n->tool_name; *p && ok; p++) {
+                if (*p == '"' || *p == '\\' || (unsigned char)*p < 32)
+                    ok = false;
+            }
+            if (ok)
+                safe_tool = n->tool_name;
+        }
+        int npr;
+        if (safe_tool)
+            npr = snprintf(exec->trace_log + exec->trace_log_len, room > 0 ? room : 0,
+                           "{\"id\":\"%s\",\"op\":\"%s\",\"tool\":\"%s\",\"status\":\"%s\","
+                           "\"output_len\":%zu},",
+                           id, opn, safe_tool, st, outlen);
+        else
+            npr = snprintf(exec->trace_log + exec->trace_log_len, room > 0 ? room : 0,
+                           "{\"id\":\"%s\",\"op\":\"%s\",\"status\":\"%s\",\"output_len\":%zu},", id,
+                           opn, st, outlen);
         if (npr < 0) return;
         if (room > 0 && (size_t)npr < room) {
             exec->trace_log_len += (size_t)npr;
@@ -781,9 +809,131 @@ static hu_error_t exec_loop(hu_hula_exec_t *exec, hu_hula_node_t *n) {
     return HU_OK;
 }
 
+static hu_error_t delegate_embed_children_json(hu_allocator_t *alloc, hu_hula_node_t *n,
+                                                char **out_json, size_t *out_len) {
+    if (!alloc || !n || !out_json || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_json = NULL;
+    *out_len = 0;
+    if (n->children_count == 0)
+        return HU_ERR_NOT_FOUND;
+
+    hu_json_value_t *prog = hu_json_object_new(alloc);
+    if (!prog)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_json_object_set(alloc, prog, "name",
+                       hu_json_string_new(alloc, "delegate_embed", sizeof("delegate_embed") - 1));
+    hu_json_object_set(alloc, prog, "version", hu_json_number_new(alloc, 1));
+
+    hu_json_value_t *seq = hu_json_object_new(alloc);
+    if (!seq) {
+        hu_json_free(alloc, prog);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    hu_json_object_set(alloc, seq, "op", hu_json_string_new(alloc, "seq", 3));
+    hu_json_object_set(alloc, seq, "id", hu_json_string_new(alloc, "inner", 5));
+    hu_json_value_t *arr = hu_json_array_new(alloc);
+    if (!arr) {
+        hu_json_free(alloc, seq);
+        hu_json_free(alloc, prog);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    for (size_t i = 0; i < n->children_count; i++) {
+        hu_hula_node_t *c = n->children[i];
+        if (!c || c->op != HU_HULA_CALL)
+            continue;
+        hu_json_value_t *cn = hu_json_object_new(alloc);
+        if (!cn)
+            continue;
+        hu_json_object_set(alloc, cn, "op", hu_json_string_new(alloc, "call", 4));
+        if (c->id)
+            hu_json_object_set(alloc, cn, "id",
+                               hu_json_string_new(alloc, c->id, strlen(c->id)));
+        if (c->tool_name)
+            hu_json_object_set(
+                alloc, cn, "tool", hu_json_string_new(alloc, c->tool_name, strlen(c->tool_name)));
+        hu_json_value_t *args = NULL;
+        const char *as = c->args_json ? c->args_json : "{}";
+        if (hu_json_parse(alloc, as, strlen(as), &args) == HU_OK && args)
+            hu_json_object_set(alloc, cn, "args", args);
+        else
+            hu_json_object_set(alloc, cn, "args", hu_json_object_new(alloc));
+        hu_json_array_push(alloc, arr, cn);
+    }
+    hu_json_object_set(alloc, seq, "children", arr);
+    hu_json_object_set(alloc, prog, "root", seq);
+
+    hu_error_t err = hu_json_stringify(alloc, prog, out_json, out_len);
+    hu_json_free(alloc, prog);
+    return err;
+}
+
 static hu_error_t exec_delegate(hu_hula_exec_t *exec, hu_hula_node_t *n) {
-    (void)exec;
-    /* Stub: return goal as output (test mode or no pool configured) */
+#if (defined(__unix__) || defined(__APPLE__)) && !defined(HU_IS_TEST)
+    if (exec->pool && exec->spawn_cfg && n->goal && n->goal_len > 0) {
+        hu_spawn_config_t cfg = *exec->spawn_cfg;
+        char *embed = NULL;
+        size_t embed_len = 0;
+        char *combined_sp = NULL;
+        if (n->children_count > 0 &&
+            delegate_embed_children_json(&exec->alloc, n, &embed, &embed_len) == HU_OK && embed) {
+            static const char pre[] =
+                "Execute this HuLa JSON program (nested plan):\n";
+            size_t old_len = cfg.system_prompt_len;
+            const char *old = cfg.system_prompt;
+            size_t need = sizeof(pre) - 1 + embed_len + 2 + (old ? old_len : 0) + 1;
+            combined_sp = exec->alloc.alloc(exec->alloc.ctx, need);
+            if (combined_sp) {
+                size_t pos = 0;
+                memcpy(combined_sp + pos, pre, sizeof(pre) - 1);
+                pos += sizeof(pre) - 1;
+                memcpy(combined_sp + pos, embed, embed_len);
+                pos += embed_len;
+                combined_sp[pos++] = '\n';
+                combined_sp[pos++] = '\n';
+                if (old && old_len > 0) {
+                    memcpy(combined_sp + pos, old, old_len);
+                    pos += old_len;
+                }
+                combined_sp[pos] = '\0';
+                cfg.system_prompt = combined_sp;
+                cfg.system_prompt_len = pos;
+            }
+            exec->alloc.free(exec->alloc.ctx, embed, embed_len + 1);
+        }
+        if (n->delegate_model && n->delegate_model_len > 0) {
+            cfg.model = n->delegate_model;
+            cfg.model_len = n->delegate_model_len;
+        }
+        uint64_t agent_id = 0;
+        hu_error_t err = hu_agent_pool_spawn(exec->pool, &cfg, n->goal, n->goal_len,
+                                              n->id ? n->id : "hula_delegate", &agent_id);
+        if (combined_sp)
+            exec->alloc.free(exec->alloc.ctx, combined_sp, strlen(combined_sp) + 1);
+        if (err != HU_OK) {
+            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "delegate spawn failed", 21);
+            return HU_OK;
+        }
+        for (int poll = 0; poll < 300; poll++) {
+            hu_agent_status_t st = hu_agent_pool_status(exec->pool, agent_id);
+            if (st == HU_AGENT_COMPLETED || st == HU_AGENT_FAILED) {
+                const char *result = hu_agent_pool_result(exec->pool, agent_id);
+                if (st == HU_AGENT_COMPLETED && result) {
+                    set_result(exec, n, HU_HULA_DONE, result, strlen(result), NULL, 0);
+                } else {
+                    set_result(exec, n, HU_HULA_FAILED, NULL, 0,
+                               result ? result : "delegate failed", result ? strlen(result) : 15);
+                }
+                return HU_OK;
+            }
+            struct timespec ts = {.tv_sec = 0, .tv_nsec = 100000000};
+            nanosleep(&ts, NULL);
+        }
+        set_result(exec, n, HU_HULA_FAILED, NULL, 0, "delegate timeout", 16);
+        hu_agent_pool_cancel(exec->pool, agent_id);
+        return HU_OK;
+    }
+#endif
     set_result(exec, n, HU_HULA_DONE, n->goal, n->goal_len, NULL, 0);
     return HU_OK;
 }
@@ -871,6 +1021,102 @@ const char *hu_hula_exec_trace(const hu_hula_exec_t *exec, size_t *out_len) {
 
     if (out_len) *out_len = e->trace_log_len;
     return e->trace_log;
+}
+
+static size_t subtree_estimated_calls(const hu_hula_node_t *n) {
+    if (!n)
+        return 0;
+    switch (n->op) {
+    case HU_HULA_CALL:
+        return 1;
+    case HU_HULA_SEQ:
+    case HU_HULA_PAR: {
+        size_t s = 0;
+        for (size_t i = 0; i < n->children_count; i++)
+            s += subtree_estimated_calls(n->children[i]);
+        return s;
+    }
+    case HU_HULA_BRANCH: {
+        size_t a = n->children_count > 0 ? subtree_estimated_calls(n->children[0]) : 0;
+        size_t b = n->children_count > 1 ? subtree_estimated_calls(n->children[1]) : 0;
+        return a + b;
+    }
+    case HU_HULA_LOOP: {
+        uint32_t m = n->max_iter > 0 ? n->max_iter : 10;
+        size_t body = 0;
+        for (size_t i = 0; i < n->children_count; i++)
+            body += subtree_estimated_calls(n->children[i]);
+        return body * (size_t)m;
+    }
+    case HU_HULA_DELEGATE: {
+        size_t s = 1;
+        for (size_t i = 0; i < n->children_count; i++)
+            s += subtree_estimated_calls(n->children[i]);
+        return s;
+    }
+    case HU_HULA_EMIT:
+    default:
+        return 0;
+    }
+}
+
+static void cost_visit(const hu_hula_node_t *n, size_t *calls, size_t *par_max, uint32_t *loop_sum,
+                       hu_command_risk_level_t *max_risk) {
+    if (!n)
+        return;
+    switch (n->op) {
+    case HU_HULA_CALL:
+        (*calls)++;
+        if (n->tool_name) {
+            hu_command_risk_level_t r = hu_tool_risk_level(n->tool_name);
+            if (r > *max_risk)
+                *max_risk = r;
+        }
+        break;
+    case HU_HULA_SEQ:
+        for (size_t i = 0; i < n->children_count; i++)
+            cost_visit(n->children[i], calls, par_max, loop_sum, max_risk);
+        break;
+    case HU_HULA_PAR:
+        if (n->children_count > *par_max)
+            *par_max = n->children_count;
+        for (size_t i = 0; i < n->children_count; i++)
+            cost_visit(n->children[i], calls, par_max, loop_sum, max_risk);
+        break;
+    case HU_HULA_BRANCH:
+        if (n->children_count > 0)
+            cost_visit(n->children[0], calls, par_max, loop_sum, max_risk);
+        if (n->children_count > 1)
+            cost_visit(n->children[1], calls, par_max, loop_sum, max_risk);
+        break;
+    case HU_HULA_LOOP: {
+        uint32_t m = n->max_iter > 0 ? n->max_iter : 10;
+        *loop_sum += m;
+        size_t body = 0;
+        for (size_t i = 0; i < n->children_count; i++)
+            body += subtree_estimated_calls(n->children[i]);
+        *calls += body * (size_t)m;
+        break;
+    }
+    case HU_HULA_DELEGATE:
+        (*calls)++;
+        /* Children describe the child agent's program — not executed in this process. */
+        break;
+    case HU_HULA_EMIT:
+    default:
+        break;
+    }
+}
+
+void hu_hula_estimate_cost(const hu_hula_program_t *prog, hu_hula_cost_estimate_t *out) {
+    if (!out)
+        return;
+    memset(out, 0, sizeof(*out));
+    out->max_tool_risk = HU_RISK_LOW;
+    if (!prog || !prog->root)
+        return;
+    cost_visit(prog->root, &out->estimated_tool_calls, &out->max_parallel_width,
+               &out->max_loop_iterations_bound, &out->max_tool_risk);
 }
 
 void hu_hula_exec_deinit(hu_hula_exec_t *exec) {

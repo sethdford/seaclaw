@@ -1,0 +1,345 @@
+#include "human/agent/hula_compiler.h"
+#include "human/agent/hula_emergence.h"
+#include "human/core/string.h"
+#include <stdio.h>
+#include <string.h>
+
+static const char HULA_COMPILER_SCHEMA[] =
+    "You are a planner. Output a single JSON object (no markdown) for a HuLa program.\n"
+    "HuLa is a small tree of nodes. Top-level fields: \"name\" (string), \"version\" (number, "
+    "use 1), \"root\" (node).\n"
+    "Each node has: \"op\" (string), \"id\" (string), and op-specific fields.\n"
+    "Ops: \"call\" — tool (string), args (object). \"seq\" | \"par\" — children (array of "
+    "nodes).\n"
+    "\"branch\" — pred: \"success\"|\"failure\"|\"contains\"|\"not_contains\"|\"always\", "
+    "optional match_str, then (node), else (node).\n"
+    "\"loop\" — pred, max_iter (number), body (node).\n"
+    "\"delegate\" — goal (string), optional delegate_model.\n"
+    "\"emit\" — emit_key, emit_value (string; may use $node_id for prior output).\n"
+    "Prefer \"seq\" for ordered steps, \"par\" for independent parallel work.\n\n";
+
+static const char HULA_COMPILER_GOAL[] = "Goal:\n";
+static const char HULA_COMPILER_TOOLS[] = "\n\nTools (use exact \"tool\" names in call nodes):\n";
+static const char HULA_COMPILER_SUFFIX[] =
+    "\n\nRespond with only valid JSON matching the schema above.";
+
+static void extract_json_from_response(const char *s, size_t len, const char **out_ptr,
+                                       size_t *out_len) {
+    const char *p = s;
+    const char *end = s + len;
+
+    while (p + 3 <= end && memcmp(p, "```", 3) == 0) {
+        p += 3;
+        while (p < end && (*p == ' ' || *p == '\t'))
+            p++;
+        if (p + 4 <= end && (memcmp(p, "json", 4) == 0 || memcmp(p, "JSON", 4) == 0))
+            p += 4;
+        while (p < end && *p != '\n')
+            p++;
+        if (p < end)
+            p++;
+    }
+
+    const char *start = p;
+    while (p < end && *p != '{')
+        p++;
+    if (p >= end) {
+        *out_ptr = s;
+        *out_len = len;
+        return;
+    }
+    start = p;
+    int depth = 1;
+    p++;
+    while (p < end && depth > 0) {
+        if (*p == '{')
+            depth++;
+        else if (*p == '}')
+            depth--;
+        p++;
+    }
+    *out_ptr = start;
+    *out_len = (size_t)(p - start);
+}
+
+hu_error_t hu_hula_compiler_build_prompt(hu_allocator_t *alloc, const char *goal, size_t goal_len,
+                                         hu_tool_t *tools, size_t tools_count, char **out,
+                                         size_t *out_len) {
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
+
+    size_t cap = sizeof(HULA_COMPILER_SCHEMA) + sizeof(HULA_COMPILER_GOAL) + goal_len +
+                 sizeof(HULA_COMPILER_TOOLS) + sizeof(HULA_COMPILER_SUFFIX) + 256;
+    for (size_t i = 0; i < tools_count && tools; i++) {
+        if (!tools[i].vtable || !tools[i].vtable->name)
+            continue;
+        const char *nm = tools[i].vtable->name(tools[i].ctx);
+        const char *ds = tools[i].vtable->description ? tools[i].vtable->description(tools[i].ctx)
+                                                        : "";
+        cap += (nm ? strlen(nm) : 0) + (ds ? strlen(ds) : 0) + 8;
+    }
+
+    char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    size_t pos = 0;
+#define APPEND(s, n)                                                                           \
+    do {                                                                                       \
+        size_t nn = (n);                                                                       \
+        if (pos + nn >= cap)                                                                   \
+            nn = cap - pos - 1;                                                                \
+        if (nn > 0) {                                                                          \
+            memcpy(buf + pos, (s), nn);                                                       \
+            pos += nn;                                                                         \
+        }                                                                                      \
+    } while (0)
+
+    APPEND(HULA_COMPILER_SCHEMA, sizeof(HULA_COMPILER_SCHEMA) - 1);
+    APPEND(HULA_COMPILER_GOAL, sizeof(HULA_COMPILER_GOAL) - 1);
+    if (goal && goal_len > 0) {
+        size_t n = goal_len < cap - pos ? goal_len : cap - pos - 1;
+        memcpy(buf + pos, goal, n);
+        pos += n;
+    }
+    APPEND(HULA_COMPILER_TOOLS, sizeof(HULA_COMPILER_TOOLS) - 1);
+    for (size_t i = 0; i < tools_count && tools; i++) {
+        if (!tools[i].vtable || !tools[i].vtable->name)
+            continue;
+        const char *nm = tools[i].vtable->name(tools[i].ctx);
+        const char *ds = tools[i].vtable->description ? tools[i].vtable->description(tools[i].ctx)
+                                                        : "";
+        if (!nm)
+            continue;
+        int ln = snprintf(buf + pos, cap > pos ? cap - pos : 0, "- %s: %s\n", nm, ds ? ds : "");
+        if (ln > 0 && (size_t)ln < cap - pos)
+            pos += (size_t)ln;
+    }
+    APPEND(HULA_COMPILER_SUFFIX, sizeof(HULA_COMPILER_SUFFIX) - 1);
+    buf[pos] = '\0';
+#undef APPEND
+
+    *out = buf;
+    *out_len = pos;
+    return HU_OK;
+}
+
+hu_error_t hu_hula_compiler_parse_response(hu_allocator_t *alloc, const char *response,
+                                           size_t response_len, hu_hula_program_t *out) {
+    if (!alloc || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+
+    if (!response || response_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const char *json = NULL;
+    size_t json_len = 0;
+    extract_json_from_response(response, response_len, &json, &json_len);
+
+    return hu_hula_parse_json(alloc, json, json_len, out);
+}
+
+static const char HULA_TAG_OPEN[] = "<hula_program>";
+static const size_t HULA_TAG_OPEN_LEN = 14;
+static const char HULA_TAG_CLOSE[] = "</hula_program>";
+static const size_t HULA_TAG_CLOSE_LEN = 15;
+
+static const char *find_hula_tag(const char *haystack, size_t haystack_len, const char *needle,
+                                 size_t needle_len) {
+    if (needle_len > haystack_len)
+        return NULL;
+    for (size_t i = 0; i <= haystack_len - needle_len; i++) {
+        if (memcmp(haystack + i, needle, needle_len) == 0)
+            return haystack + i;
+    }
+    return NULL;
+}
+
+hu_error_t hu_hula_extract_program_from_text(hu_allocator_t *alloc, const char *text, size_t text_len,
+                                             hu_hula_program_t *out) {
+    if (!alloc || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+    if (!text || text_len == 0)
+        return HU_ERR_NOT_FOUND;
+
+    const char *open = find_hula_tag(text, text_len, HULA_TAG_OPEN, HULA_TAG_OPEN_LEN);
+    if (!open)
+        return HU_ERR_NOT_FOUND;
+
+    const char *json_start = open + HULA_TAG_OPEN_LEN;
+    size_t after_open = text_len - (size_t)(json_start - text);
+    const char *close = find_hula_tag(json_start, after_open, HULA_TAG_CLOSE, HULA_TAG_CLOSE_LEN);
+    if (!close)
+        return HU_ERR_NOT_FOUND;
+
+    size_t json_len = (size_t)(close - json_start);
+    while (json_len > 0 && (json_start[0] == ' ' || json_start[0] == '\n' || json_start[0] == '\r' ||
+                            json_start[0] == '\t')) {
+        json_start++;
+        json_len--;
+    }
+    while (json_len > 0 && (json_start[json_len - 1] == ' ' || json_start[json_len - 1] == '\n' ||
+                            json_start[json_len - 1] == '\r' || json_start[json_len - 1] == '\t')) {
+        json_len--;
+    }
+    if (json_len == 0)
+        return HU_ERR_NOT_FOUND;
+
+    return hu_hula_parse_json(alloc, json_start, json_len, out);
+}
+
+hu_error_t hu_hula_strip_program_tags(hu_allocator_t *alloc, const char *text, size_t text_len,
+                                      char **out, size_t *out_len) {
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
+    if (!text || text_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const char *open = find_hula_tag(text, text_len, HULA_TAG_OPEN, HULA_TAG_OPEN_LEN);
+    if (!open)
+        return HU_ERR_NOT_FOUND;
+
+    const char *json_start = open + HULA_TAG_OPEN_LEN;
+    size_t after_open = text_len - (size_t)(json_start - text);
+    const char *close = find_hula_tag(json_start, after_open, HULA_TAG_CLOSE, HULA_TAG_CLOSE_LEN);
+    if (!close)
+        return HU_ERR_NOT_FOUND;
+
+    const char *after_close = close + HULA_TAG_CLOSE_LEN;
+    size_t before_len = (size_t)(open - text);
+    size_t tail_len = text_len - (size_t)(after_close - text);
+    size_t total = before_len + tail_len;
+    char *buf = alloc->alloc(alloc->ctx, total + 1);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t pos = 0;
+    if (before_len > 0) {
+        memcpy(buf + pos, text, before_len);
+        pos += before_len;
+    }
+    if (tail_len > 0) {
+        memcpy(buf + pos, after_close, tail_len);
+        pos += tail_len;
+    }
+    while (pos > 0 && (buf[pos - 1] == ' ' || buf[pos - 1] == '\n' || buf[pos - 1] == '\r'))
+        pos--;
+    size_t start = 0;
+    while (start < pos && (buf[start] == ' ' || buf[start] == '\n' || buf[start] == '\r'))
+        start++;
+    if (start > 0 && start < pos)
+        memmove(buf, buf + start, pos - start);
+    pos -= start;
+    buf[pos] = '\0';
+    *out = buf;
+    *out_len = pos;
+    return HU_OK;
+}
+
+hu_error_t hu_hula_compiler_chat_compile_execute(
+    hu_allocator_t *alloc, const char *goal, size_t goal_len, hu_tool_t *tools, size_t tools_count,
+    hu_security_policy_t *policy, hu_observer_t *observer, hu_agent_pool_t *pool,
+    hu_spawn_config_t *spawn_tpl, hu_hula_compiler_chat_fn chat_fn, void *chat_ctx,
+    const char *model_name, size_t model_name_len, double temperature,
+    hu_hula_compiler_done_fn done_fn, void *done_ctx, bool *out_ok) {
+    if (!alloc || !out_ok || !chat_fn)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_ok = false;
+
+    char *hprompt = NULL;
+    size_t hprompt_len = 0;
+    hu_error_t err =
+        hu_hula_compiler_build_prompt(alloc, goal, goal_len, tools, tools_count, &hprompt, &hprompt_len);
+    if (err != HU_OK)
+        return err;
+    if (!hprompt)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    hu_chat_message_t hm[1] = {{.role = HU_ROLE_USER, .content = hprompt, .content_len = hprompt_len}};
+    hu_chat_request_t hreq = {.messages = hm,
+                              .messages_count = 1,
+                              .tools = NULL,
+                              .tools_count = 0,
+                              .response_format = "json_object",
+                              .response_format_len = 11};
+    hu_chat_response_t hresp;
+    memset(&hresp, 0, sizeof(hresp));
+    err = chat_fn(chat_ctx, alloc, &hreq, model_name, model_name_len, temperature, &hresp);
+    hu_str_free(alloc, hprompt);
+    if (err != HU_OK) {
+        hu_chat_response_free(alloc, &hresp);
+        return err;
+    }
+    if (!hresp.content || hresp.content_len == 0) {
+        hu_chat_response_free(alloc, &hresp);
+        return HU_ERR_NOT_FOUND;
+    }
+
+    hu_hula_program_t hcp;
+    memset(&hcp, 0, sizeof(hcp));
+    err = hu_hula_compiler_parse_response(alloc, hresp.content, hresp.content_len, &hcp);
+    hu_chat_response_free(alloc, &hresp);
+    if (err != HU_OK || !hcp.root) {
+        hu_hula_program_deinit(&hcp);
+        return err != HU_OK ? err : HU_ERR_PARSE;
+    }
+
+    const char **tnames = NULL;
+    size_t tnc = 0;
+    if (tools_count > 0) {
+        tnames = (const char **)alloc->alloc(alloc->ctx, tools_count * sizeof(const char *));
+        if (!tnames) {
+            hu_hula_program_deinit(&hcp);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        for (size_t ui = 0; ui < tools_count; ui++) {
+            tnames[ui] =
+                (tools[ui].vtable && tools[ui].vtable->name) ? tools[ui].vtable->name(tools[ui].ctx) : "";
+        }
+        tnc = tools_count;
+    }
+
+    hu_hula_validation_t hv;
+    memset(&hv, 0, sizeof(hv));
+    bool vok = (hu_hula_validate(&hcp, alloc, tnames, tnc, &hv) == HU_OK && hv.valid);
+    hu_hula_validation_deinit(alloc, &hv);
+    if (tnames)
+        alloc->free(alloc->ctx, (void *)tnames, tools_count * sizeof(const char *));
+    if (!vok) {
+        hu_hula_program_deinit(&hcp);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    hu_hula_exec_t hcx;
+    memset(&hcx, 0, sizeof(hcx));
+    err = hu_hula_exec_init_full(&hcx, *alloc, &hcp, tools, tools_count, policy, observer);
+    if (err != HU_OK) {
+        hu_hula_program_deinit(&hcp);
+        return err;
+    }
+    if (pool && spawn_tpl)
+        hu_hula_exec_set_spawn(&hcx, pool, spawn_tpl);
+    err = hu_hula_exec_run(&hcx);
+    bool hok = false;
+    if (err == HU_OK) {
+        if (hcp.root && hcp.root->id)
+            hok = hu_hula_exec_result(&hcx, hcp.root->id)->status == HU_HULA_DONE;
+        else
+            hok = true;
+        size_t trl = 0;
+        const char *tr = hu_hula_exec_trace(&hcx, &trl);
+        (void)hu_hula_trace_persist(alloc, NULL, tr, trl, hcp.name, hcp.name_len, hok);
+        if (hok && done_fn)
+            done_fn(done_ctx, &hcp, &hcx);
+        if (hok)
+            *out_ok = true;
+    }
+    hu_hula_exec_deinit(&hcx);
+    hu_hula_program_deinit(&hcp);
+    return err;
+}

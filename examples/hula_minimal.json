@@ -1,0 +1,10 @@
+{
+  "name": "minimal",
+  "version": 1,
+  "root": {
+    "op": "call",
+    "id": "c",
+    "tool": "echo",
+    "args": {"text": "hello from HuLa"}
+  }
+}

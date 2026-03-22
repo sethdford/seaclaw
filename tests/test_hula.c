@@ -1,10 +1,21 @@
 #include "human/agent/hula.h"
+#include "human/agent/hula_compiler.h"
+#include "human/agent/hula_emergence.h"
+#include "human/agent/spawn.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include "human/provider.h"
 #include "test_framework.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#if defined(__unix__) || defined(__APPLE__)
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 /* ── Stub tool for testing ──────────────────────────────────────────────── */
 
@@ -1015,6 +1026,254 @@ static void hula_e2e_full_pipeline(void) {
     hu_hula_program_deinit(&prog);
 }
 
+/* ── Compiler + native text helpers ─────────────────────────────────────── */
+
+static void hula_compiler_build_prompt_lists_tools(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t tools[2];
+    make_tools(tools);
+    char *p = NULL;
+    size_t plen = 0;
+    HU_ASSERT_EQ(hu_hula_compiler_build_prompt(&alloc, "do thing", 8, tools, 1, &p, &plen), HU_OK);
+    HU_ASSERT_NOT_NULL(p);
+    HU_ASSERT_TRUE(strstr(p, "do thing") != NULL);
+    HU_ASSERT_TRUE(strstr(p, "echo") != NULL);
+    hu_str_free(&alloc, p);
+}
+
+static void hula_compiler_parse_accepts_fenced_json(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *raw =
+        "Here:\n```json\n{\"name\":\"x\",\"version\":1,\"root\":{\"op\":\"call\",\"id\":\"a\","
+        "\"tool\":\"echo\",\"args\":{\"text\":\"hi\"}}}\n```\n";
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_compiler_parse_response(&alloc, raw, strlen(raw), &prog), HU_OK);
+    HU_ASSERT_STR_EQ(prog.name, "x");
+    HU_ASSERT_NOT_NULL(prog.root);
+    HU_ASSERT_EQ(prog.root->op, HU_HULA_CALL);
+    hu_hula_program_deinit(&prog);
+}
+
+static void hula_extract_and_strip_program_tags(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *inner =
+        "{\"name\":\"t\",\"version\":1,\"root\":{\"op\":\"call\",\"id\":\"c\",\"tool\":\"echo\","
+        "\"args\":{\"text\":\"z\"}}}";
+    char wrapped[512];
+    int wn = snprintf(wrapped, sizeof(wrapped), "Preamble <hula_program>%s</hula_program> tail",
+                      inner);
+    HU_ASSERT_TRUE(wn > 0 && (size_t)wn < sizeof(wrapped));
+
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_extract_program_from_text(&alloc, wrapped, (size_t)wn, &prog), HU_OK);
+    HU_ASSERT_STR_EQ(prog.name, "t");
+    hu_hula_program_deinit(&prog);
+
+    char *stripped = NULL;
+    size_t slen = 0;
+    HU_ASSERT_EQ(hu_hula_strip_program_tags(&alloc, wrapped, (size_t)wn, &stripped, &slen), HU_OK);
+    HU_ASSERT_NOT_NULL(stripped);
+    HU_ASSERT_TRUE(strstr(stripped, "<hula_program>") == NULL);
+    HU_ASSERT_TRUE(strstr(stripped, "Preamble") != NULL);
+    HU_ASSERT_TRUE(strstr(stripped, "tail") != NULL);
+    alloc.free(alloc.ctx, stripped, slen + 1);
+}
+
+static void hula_cost_estimate_bounds(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *par_json =
+        "{\"name\":\"p\",\"root\":{\"op\":\"par\",\"id\":\"r\",\"children\":["
+        "{\"op\":\"call\",\"id\":\"a\",\"tool\":\"echo\",\"args\":{}},"
+        "{\"op\":\"call\",\"id\":\"b\",\"tool\":\"echo\",\"args\":{}}]}}";
+    hu_hula_program_t parp;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, par_json, strlen(par_json), &parp), HU_OK);
+    hu_hula_cost_estimate_t est;
+    hu_hula_estimate_cost(&parp, &est);
+    HU_ASSERT_EQ(est.estimated_tool_calls, 2u);
+    HU_ASSERT_EQ(est.max_parallel_width, 2u);
+    hu_hula_program_deinit(&parp);
+
+    const char *loop_json =
+        "{\"name\":\"l\",\"root\":{\"op\":\"loop\",\"id\":\"L\",\"pred\":\"always\",\"max_iter\":2,"
+        "\"body\":{\"op\":\"call\",\"id\":\"x\",\"tool\":\"echo\",\"args\":{}}}}";
+    hu_hula_program_t loopp;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, loop_json, strlen(loop_json), &loopp), HU_OK);
+    hu_hula_estimate_cost(&loopp, &est);
+    HU_ASSERT_EQ(est.max_loop_iterations_bound, 2u);
+    HU_ASSERT_EQ(est.estimated_tool_calls, 2u);
+    hu_hula_program_deinit(&loopp);
+
+    const char *del_json =
+        "{\"name\":\"d\",\"root\":{\"op\":\"seq\",\"id\":\"s\",\"children\":["
+        "{\"op\":\"delegate\",\"id\":\"d1\",\"goal\":\"sub\"},"
+        "{\"op\":\"call\",\"id\":\"c\",\"tool\":\"echo\",\"args\":{}}]}}";
+    hu_hula_program_t delp;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, del_json, strlen(del_json), &delp), HU_OK);
+    hu_hula_estimate_cost(&delp, &est);
+    HU_ASSERT_EQ(est.estimated_tool_calls, 2u);
+    hu_hula_program_deinit(&delp);
+}
+
+static void hula_parse_delegate_with_program_children(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json =
+        "{\"name\":\"d\",\"root\":{\"op\":\"delegate\",\"id\":\"root\",\"goal\":\"g\","
+        "\"children\":[{\"op\":\"call\",\"id\":\"c1\",\"tool\":\"echo\",\"args\":{}}]}}";
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
+    HU_ASSERT_EQ(prog.root->children_count, 1u);
+    HU_ASSERT_STR_EQ(prog.root->children[0]->id, "c1");
+    hu_hula_program_deinit(&prog);
+}
+
+/* Borrowed pool/spawn_cfg pointers must survive until hu_hula_exec_run completes. */
+static void hula_exec_set_spawn_stores_borrowed_references(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_agent_pool_t *pool = hu_agent_pool_create(&alloc, 2);
+    HU_ASSERT_NOT_NULL(pool);
+    hu_tool_t tools[2];
+    make_tools(tools);
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_program_init(&prog, alloc, "t", 1), HU_OK);
+    hu_hula_node_t *n = hu_hula_program_alloc_node(&prog, HU_HULA_CALL, "c1");
+    HU_ASSERT_NOT_NULL(n);
+    n->tool_name = hu_strdup(&alloc, "echo");
+    n->args_json = hu_strdup(&alloc, "{\"text\":\"x\"}");
+    prog.root = n;
+
+    hu_hula_exec_t exec;
+    HU_ASSERT_EQ(hu_hula_exec_init_full(&exec, alloc, &prog, tools, 1, NULL, NULL), HU_OK);
+    hu_spawn_config_t sc;
+    memset(&sc, 0, sizeof(sc));
+    hu_hula_exec_set_spawn(&exec, pool, &sc);
+    HU_ASSERT_EQ((void *)exec.pool, (void *)pool);
+    HU_ASSERT_EQ((void *)exec.spawn_cfg, (void *)&sc);
+    HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+    hu_agent_pool_destroy(pool);
+}
+
+#if defined(__unix__) || defined(__APPLE__)
+static void hula_emergence_persist_scan_promote(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char td[] = "/tmp/hu_hula_em_XXXXXX";
+    HU_ASSERT_NOT_NULL(mkdtemp(td));
+
+    char tr[512];
+    (void)snprintf(tr, sizeof(tr), "%s/traces", td);
+    HU_ASSERT_EQ(mkdir(tr, 0755), 0);
+
+    char sk[512];
+    (void)snprintf(sk, sizeof(sk), "%s/skills", td);
+
+    static const char *trace_body =
+        "{\"version\":1,\"success\":true,\"trace\":["
+        "{\"op\":\"call\",\"tool\":\"echo\"},{\"op\":\"call\",\"tool\":\"grep\"}]}";
+
+    char fpath[640];
+    (void)snprintf(fpath, sizeof(fpath), "%s/a.json", tr);
+    FILE *f1 = fopen(fpath, "wb");
+    HU_ASSERT_NOT_NULL(f1);
+    fputs(trace_body, f1);
+    fclose(f1);
+    (void)snprintf(fpath, sizeof(fpath), "%s/b.json", tr);
+    FILE *f2 = fopen(fpath, "wb");
+    HU_ASSERT_NOT_NULL(f2);
+    fputs(trace_body, f2);
+    fclose(f2);
+
+    const char *tr_json = "[{\"op\":\"call\",\"tool\":\"z\"}]";
+    HU_ASSERT_EQ(hu_hula_trace_persist(&alloc, tr, tr_json, strlen(tr_json), "unitprog", 8, true),
+                 HU_OK);
+
+    char **patterns = NULL;
+    size_t pc = 0;
+    size_t *freqs = NULL;
+    HU_ASSERT_EQ(hu_hula_emergence_scan(&alloc, tr, 2, 2, &patterns, &pc, &freqs), HU_OK);
+    HU_ASSERT_TRUE(pc >= 1u);
+    bool found = false;
+    for (size_t i = 0; i < pc; i++) {
+        if (patterns[i] && strcmp(patterns[i], "echo|grep") == 0 && freqs[i] >= 2) {
+            found = true;
+            break;
+        }
+    }
+    HU_ASSERT_TRUE(found);
+    for (size_t i = 0; i < pc; i++)
+        alloc.free(alloc.ctx, patterns[i], strlen(patterns[i]) + 1);
+    alloc.free(alloc.ctx, patterns, pc * sizeof(char *));
+    alloc.free(alloc.ctx, freqs, pc * sizeof(size_t));
+
+    HU_ASSERT_EQ(hu_hula_emergence_promote(&alloc, sk, "echo|grep", 9, "emerged_skill", 13), HU_OK);
+
+    char skill_json_path[640];
+    char skill_md_path[640];
+    (void)snprintf(skill_json_path, sizeof(skill_json_path), "%s/emerged_skill.skill.json", sk);
+    (void)snprintf(skill_md_path, sizeof(skill_md_path), "%s/emerged_skill_HULA.md", sk);
+    HU_ASSERT_EQ(access(skill_json_path, R_OK), 0);
+    HU_ASSERT_EQ(access(skill_md_path, R_OK), 0);
+
+    DIR *d = opendir(tr);
+    HU_ASSERT_NOT_NULL(d);
+    struct dirent *de;
+    while ((de = readdir(d)) != NULL) {
+        if (de->d_name[0] == '.')
+            continue;
+        char delp[768];
+        (void)snprintf(delp, sizeof(delp), "%s/%s", tr, de->d_name);
+        (void)unlink(delp);
+    }
+    closedir(d);
+    (void)rmdir(tr);
+
+    (void)unlink(skill_json_path);
+    (void)unlink(skill_md_path);
+    (void)rmdir(sk);
+    (void)rmdir(td);
+}
+#endif
+
+typedef struct {
+    const char *json;
+} hula_compiler_mock_chat_ctx_t;
+
+static hu_error_t hula_compiler_mock_chat(void *ctx, hu_allocator_t *alloc,
+                                          const hu_chat_request_t *req, const char *model,
+                                          size_t model_len, double temperature,
+                                          hu_chat_response_t *out) {
+    (void)req;
+    (void)model;
+    (void)model_len;
+    (void)temperature;
+    const hula_compiler_mock_chat_ctx_t *c = (const hula_compiler_mock_chat_ctx_t *)ctx;
+    size_t n = strlen(c->json);
+    char *dup = hu_strndup(alloc, c->json, n);
+    if (!dup)
+        return HU_ERR_OUT_OF_MEMORY;
+    memset(out, 0, sizeof(*out));
+    out->content = dup;
+    out->content_len = n;
+    return HU_OK;
+}
+
+static void hula_compiler_chat_compile_execute_mock(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t tools[2];
+    (void)make_tools(tools);
+    static const char json[] =
+        "{\"name\":\"mc\",\"version\":1,\"root\":{\"op\":\"par\",\"id\":\"r\",\"children\":["
+        "{\"op\":\"call\",\"id\":\"a\",\"tool\":\"echo\",\"args\":{\"text\":\"x\"}},"
+        "{\"op\":\"call\",\"id\":\"b\",\"tool\":\"echo\",\"args\":{\"text\":\"y\"}}]}}";
+    hula_compiler_mock_chat_ctx_t mctx = {.json = json};
+    bool ok = false;
+    HU_ASSERT_EQ(hu_hula_compiler_chat_compile_execute(
+                     &alloc, "goal", 4, tools, 2, NULL, NULL, NULL, NULL, hula_compiler_mock_chat,
+                     &mctx, "gpt-4", 5, 0.7, NULL, NULL, &ok),
+                 HU_OK);
+    HU_ASSERT_TRUE(ok);
+}
+
 void run_hula_tests(void) {
     HU_TEST_SUITE("hula");
 
@@ -1068,4 +1327,15 @@ void run_hula_tests(void) {
     HU_RUN_TEST(hula_observer_receives_events);
 
     HU_RUN_TEST(hula_e2e_full_pipeline);
+
+    HU_RUN_TEST(hula_compiler_build_prompt_lists_tools);
+    HU_RUN_TEST(hula_compiler_chat_compile_execute_mock);
+    HU_RUN_TEST(hula_compiler_parse_accepts_fenced_json);
+    HU_RUN_TEST(hula_extract_and_strip_program_tags);
+    HU_RUN_TEST(hula_cost_estimate_bounds);
+    HU_RUN_TEST(hula_parse_delegate_with_program_children);
+    HU_RUN_TEST(hula_exec_set_spawn_stores_borrowed_references);
+#if defined(__unix__) || defined(__APPLE__)
+    HU_RUN_TEST(hula_emergence_persist_scan_promote);
+#endif
 }

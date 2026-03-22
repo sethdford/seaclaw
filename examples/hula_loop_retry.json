@@ -1,0 +1,44 @@
+{
+  "name": "retry_with_escalation",
+  "version": 1,
+  "root": {
+    "op": "seq",
+    "id": "pipeline",
+    "children": [
+      {
+        "op": "loop",
+        "id": "retry_search",
+        "pred": "always",
+        "max_iter": 3,
+        "body": {
+          "op": "call",
+          "id": "do_search",
+          "tool": "search",
+          "args": {"text": "retry attempt"}
+        }
+      },
+      {
+        "op": "branch",
+        "id": "decide",
+        "pred": "success",
+        "then": {
+          "op": "call",
+          "id": "summarize",
+          "tool": "analyze",
+          "args": {"text": "final summary"}
+        },
+        "else": {
+          "op": "delegate",
+          "id": "escalate",
+          "goal": "Search failed after retries - escalate to human review"
+        }
+      },
+      {
+        "op": "emit",
+        "id": "output",
+        "emit_key": "result",
+        "emit_value": "$summarize"
+      }
+    ]
+  }
+}

@@ -1,0 +1,70 @@
+# Live Cartesia TTS → STT (direct API) + optional gateway WebSocket voice.transcribe.
+#
+# Requires repository secrets:
+#   CARTESIA_API_KEY   — Cartesia API key
+#   CARTESIA_VOICE_ID  — TTS voice UUID used for synthesis in the test script
+#
+# Triggers:
+#   workflow_dispatch — manual run
+#   schedule          — weekly (disable by removing schedule if secrets are not set)
+#
+# Matrix varies TTS model_id; STT stays ink-whisper (gateway + curl STT).
+name: E2E Cartesia voice STT
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 0"
+
+concurrency:
+  group: e2e-cartesia-voice-stt-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cartesia-voice-stt:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - tts_model: sonic-3-2026-01-12
+            stt_model: ink-whisper
+          - tts_model: sonic-3-latest
+            stt_model: ink-whisper
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - uses: ./.github/actions/setup-build
+        with:
+          build-dir: build
+          build-type: Debug
+          enable-asan: "false"
+          enable-curl: "true"
+          enable-all-channels: "true"
+          target: human
+
+      - name: Direct API + gateway WebSocket round-trip
+        env:
+          CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY }}
+          CARTESIA_VOICE_ID: ${{ secrets.CARTESIA_VOICE_ID }}
+          CARTESIA_MODEL: ${{ matrix.tts_model }}
+          CARTESIA_STT_MODEL: ${{ matrix.stt_model }}
+          E2E_VOICE_STT_GATEWAY: "1"
+          E2E_VOICE_STT_HUMAN_BIN: ${{ github.workspace }}/build/human
+        run: |
+          if [ -z "${CARTESIA_API_KEY}" ] || [ -z "${CARTESIA_VOICE_ID}" ]; then
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              echo '::notice::Skipping scheduled E2E (CARTESIA_* secrets not configured).'
+              exit 0
+            fi
+            echo '::error::Set repository secrets CARTESIA_API_KEY and CARTESIA_VOICE_ID for this workflow.'
+            exit 1
+          fi
+          bash scripts/e2e-voice-stt.sh

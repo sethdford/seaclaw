@@ -45,13 +45,33 @@ jobs:
         run: |
           COUNT=$(./build/human_tests 2>&1 | grep -oE '[0-9]+/[0-9]+ passed' | head -1 | cut -d/ -f1)
           echo "Test count: $COUNT"
-          BASELINE=6387
+          BASELINE=6402
           if [ "$COUNT" -lt "$BASELINE" ]; then
             echo "::error::Test count regression: $COUNT < $BASELINE baseline"
             exit 1
           fi
       - name: Check for untested modules
         run: scripts/check-untested.sh
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libsqlite3-dev libcurl4-openssl-dev
+      - name: Configure
+        run: |
+          cmake -B build-integ \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DHU_ENABLE_INTEGRATION_TESTS=ON \
+            -DHU_ENABLE_CURL=ON \
+            -DHU_ENABLE_SQLITE=ON \
+            -DHU_ENABLE_CLI=ON
+      - name: Build
+        run: cmake --build build-integ -j$(nproc)
+      - name: Run integration tests
+        run: ./build-integ/human_integration_tests
 
   cross-arm64:
     runs-on: ubuntu-latest

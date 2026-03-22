@@ -21,11 +21,11 @@ Auto-generated from W3C token files in `design-tokens/`.
 | `--hu-accent-secondary-text`   | #fbbf24                   | #b45309                  |
 | `--hu-accent-strong`           | #a3d46a                   | #7AB648                  |
 | `--hu-accent-subtle`           | rgba(122, 182, 72, 0.14)  | rgba(122, 182, 72, 0.08) |
-| `--hu-accent-tertiary`         | #6366f1                   | #4f46e5                  |
-| `--hu-accent-tertiary-hover`   | #818cf8                   | #4338ca                  |
-| `--hu-accent-tertiary-strong`  | #a5b4fc                   | #6366f1                  |
-| `--hu-accent-tertiary-subtle`  | rgba(99, 102, 241, 0.14)  | rgba(79, 70, 229, 0.10)  |
-| `--hu-accent-tertiary-text`    | #818cf8                   | #4338ca                  |
+| `--hu-accent-tertiary`         | #4a6fa5                   | #3d5d8c                  |
+| `--hu-accent-tertiary-hover`   | #7496c4                   | #324a73                  |
+| `--hu-accent-tertiary-strong`  | #9fb8d9                   | #4a6fa5                  |
+| `--hu-accent-tertiary-subtle`  | rgba(74, 111, 165, 0.14)  | rgba(61, 93, 140, 0.10)  |
+| `--hu-accent-tertiary-text`    | #7496c4                   | #324a73                  |
 | `--hu-accent-text`             | #8DC63F                   | #47802A                  |
 | `--hu-backdrop-overlay`        | rgba(0, 0, 0, 0.6)        | rgba(0, 0, 0, 0.3)       |
 | `--hu-bg`                      | #060b12                   | #F5F5F5                  |

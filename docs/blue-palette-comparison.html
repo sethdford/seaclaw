@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Human — tertiary blue directions (comparison)</title>
+    <style>
+      :root {
+        --human-green: #7ab648;
+        --bg-dark: #141210;
+        --bg-light: #f4f1ee;
+        --surface-dark: #1f1c19;
+        --surface-light: #fffefa;
+        --text-dark: #fcfbf9;
+        --text-light: #2d2a26;
+        --font: system-ui, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: var(--font);
+        background: var(--bg-dark);
+        color: var(--text-dark);
+        line-height: 1.5;
+      }
+      header {
+        padding: 2rem 1.5rem;
+        border-bottom: 1px solid color-mix(in srgb, var(--text-dark) 12%, transparent);
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.35rem;
+        font-weight: 600;
+      }
+      p {
+        margin: 0;
+        opacity: 0.85;
+        max-width: 52rem;
+      }
+      .grid {
+        display: grid;
+        gap: 2rem;
+        padding: 2rem 1.5rem 4rem;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      @media (min-width: 900px) {
+        .grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      .palette h2 {
+        margin: 0 0 0.25rem;
+        font-size: 1.05rem;
+      }
+      .palette .base {
+        font-size: 0.8rem;
+        opacity: 0.75;
+        margin-bottom: 1rem;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 1.25rem;
+      }
+      .sw {
+        flex: 1 1 8%;
+        min-width: 2.25rem;
+        aspect-ratio: 1;
+        border-radius: 6px;
+        border: 1px solid color-mix(in srgb, white 8%, transparent);
+      }
+      .demo {
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+      }
+      .demo-dark {
+        background: var(--surface-dark);
+        border: 1px solid color-mix(in srgb, white 6%, transparent);
+      }
+      .demo-light {
+        background: var(--surface-light);
+        color: var(--text-light);
+        border: 1px solid color-mix(in srgb, var(--text-light) 8%, transparent);
+      }
+      .demo h3 {
+        margin: 0 0 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      .demo p {
+        margin: 0;
+        font-size: 0.8rem;
+        opacity: 0.8;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+      }
+      .btn {
+        padding: 0.35rem 0.75rem;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border: none;
+        cursor: default;
+      }
+      .btn-primary {
+        background: var(--human-green);
+        color: #0c0a08;
+      }
+      .btn-tert {
+        color: #fff;
+      }
+      .note {
+        margin-top: 2rem;
+        padding: 1rem 1.5rem;
+        font-size: 0.85rem;
+        opacity: 0.8;
+        border-top: 1px solid color-mix(in srgb, var(--text-dark) 12%, transparent);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Tertiary accent — three blue directions</h1>
+      <p>
+        Compare steel blue, deep navy, and slate blue against Human green (#7AB648) and warm neutrals.
+        The shipped token set uses <strong>Steel blue</strong> anchored at <strong>#4A6FA5</strong> (500).
+      </p>
+    </header>
+    <div class="grid" id="palettes"></div>
+    <p class="note">
+      Internal palette review only — steel blue is the production tertiary accent in <code>design-tokens/base.tokens.json</code>.
+    </p>
+    <script>
+      const humanGreen = "#7ab648";
+      const palettes = [
+        {
+          name: "Steel blue",
+          base: "#4A6FA5 (500)",
+          steps: [
+            ["50", "#eef3f9"],
+            ["100", "#dce6f2"],
+            ["200", "#c5d5e8"],
+            ["300", "#9fb8d9"],
+            ["400", "#7496c4"],
+            ["500", "#4a6fa5"],
+            ["600", "#3d5d8c"],
+            ["700", "#324a73"],
+            ["800", "#2a3d5f"],
+            ["900", "#24354f"],
+          ],
+        },
+        {
+          name: "Deep navy",
+          base: "#1B365D (500)",
+          steps: [
+            ["50", "#e8eef5"],
+            ["100", "#ccd9e8"],
+            ["200", "#a3bad4"],
+            ["300", "#6d8cb3"],
+            ["400", "#3d5f8a"],
+            ["500", "#1b365d"],
+            ["600", "#162d4f"],
+            ["700", "#122441"],
+            ["800", "#0f1d35"],
+            ["900", "#0c182c"],
+          ],
+        },
+        {
+          name: "Slate blue",
+          base: "#5B7B9A (500)",
+          steps: [
+            ["50", "#f0f4f8"],
+            ["100", "#e0e9f1"],
+            ["200", "#c8d6e4"],
+            ["300", "#a3b9ce"],
+            ["400", "#7a96b5"],
+            ["500", "#5b7b9a"],
+            ["600", "#4a6582"],
+            ["700", "#3d536b"],
+            ["800", "#344558"],
+            ["900", "#2c3a4a"],
+          ],
+        },
+      ];
+
+      const root = document.getElementById("palettes");
+      for (const p of palettes) {
+        const mid = p.steps.find((s) => s[0] === "500")[1];
+        const el = document.createElement("section");
+        el.className = "palette";
+        el.innerHTML = `
+          <h2>${p.name}</h2>
+          <div class="base">Anchor ${p.base}</div>
+          <div class="row" aria-label="scale"></div>
+          <div class="demo demo-dark">
+            <h3>On dark surface</h3>
+            <p>Body copy on warm charcoal card with tertiary links and actions.</p>
+            <div class="actions">
+              <button type="button" class="btn btn-primary">Human green</button>
+              <button type="button" class="btn btn-tert" style="background:${mid}">Tertiary</button>
+            </div>
+          </div>
+          <div class="demo demo-light">
+            <h3>On light surface</h3>
+            <p>Same pairing inverted for cream / paper contexts.</p>
+            <div class="actions">
+              <button type="button" class="btn btn-primary">Human green</button>
+              <button type="button" class="btn btn-tert" style="background:${mid};color:#fff">Tertiary</button>
+            </div>
+          </div>
+        `;
+        const row = el.querySelector(".row");
+        for (const [, hex] of p.steps) {
+          const s = document.createElement("div");
+          s.className = "sw";
+          s.style.background = hex;
+          s.title = hex;
+          row.appendChild(s);
+        }
+        root.appendChild(el);
+      }
+    </script>
+  </body>
+</html>

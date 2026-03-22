@@ -109,6 +109,21 @@ static void parse_imap_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_jso
         im->imap_folder = hu_strdup(a, val);
     }
     im->imap_use_tls = hu_json_get_bool(obj, "imap_use_tls", true);
+    val = hu_json_get_string(obj, "smtp_host");
+    if (val) {
+        if (im->smtp_host)
+            a->free(a->ctx, im->smtp_host, strlen(im->smtp_host) + 1);
+        im->smtp_host = hu_strdup(a, val);
+    }
+    double smtp_port = hu_json_get_number(obj, "smtp_port", im->smtp_port);
+    if (smtp_port >= 1 && smtp_port <= 65535)
+        im->smtp_port = (uint16_t)smtp_port;
+    val = hu_json_get_string(obj, "from_address");
+    if (val) {
+        if (im->from_address)
+            a->free(a->ctx, im->from_address, strlen(im->from_address) + 1);
+        im->from_address = hu_strdup(a, val);
+    }
 }
 
 static void parse_imessage_channel(hu_allocator_t *a, hu_config_t *cfg,

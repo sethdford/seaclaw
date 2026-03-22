@@ -325,7 +325,7 @@
   --hu-accent-tertiary-subtle: rgba(74, 111, 165, 0.14);
   --hu-accent-tertiary-text: #7496c4;
   --hu-accent-text: #8DC63F;
-  --hu-aurora-gradient: conic-gradient(from 135deg at 50% 50%, rgba(122,182,72,0.08), rgba(99,102,241,0.06), rgba(245,158,11,0.04), rgba(122,182,72,0.08));
+  --hu-aurora-gradient: conic-gradient(from 135deg at 50% 50%, rgba(122,182,72,0.08), rgba(74,111,165,0.06), rgba(245,158,11,0.04), rgba(122,182,72,0.08));
   --hu-backdrop-overlay: rgba(0, 0, 0, 0.6);
   --hu-bg: #0c0a08;
   --hu-bg-elevated: #28231e;
@@ -343,7 +343,7 @@
   --hu-focus-ring: #7AB648;
   --hu-focus-ring-offset: 2px;
   --hu-focus-ring-width: 2px;
-  --hu-hero-gradient: linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(99,102,241,0.03) 80%, transparent 100%);
+  --hu-hero-gradient: linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(74,111,165,0.03) 80%, transparent 100%);
   --hu-hover-overlay: rgba(122, 182, 72, 0.08);
   --hu-info: #4a6fa5;
   --hu-info-dim: {color.blue.dim};
@@ -351,7 +351,7 @@
   --hu-link-active: #7AB648;
   --hu-link-hover: #a3d46a;
   --hu-link-visited: #5A9A30;
-  --hu-mesh-gradient: radial-gradient(ellipse at 20% 50%, rgba(122,182,72,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(99,102,241,0.04) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.03) 0%, transparent 50%);
+  --hu-mesh-gradient: radial-gradient(ellipse at 20% 50%, rgba(122,182,72,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(74,111,165,0.04) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.03) 0%, transparent 50%);
   --hu-on-accent: #ffffff;
   --hu-on-accent-secondary: #0c0a08;
   --hu-on-accent-tertiary: #ffffff;
@@ -656,7 +656,7 @@
   --hu-accent-tertiary-subtle: rgba(74, 111, 165, 0.14);
   --hu-accent-tertiary-text: #7496c4;
   --hu-accent-text: #8DC63F;
-  --hu-aurora-gradient: conic-gradient(from 135deg at 50% 50%, rgba(122,182,72,0.08), rgba(99,102,241,0.06), rgba(245,158,11,0.04), rgba(122,182,72,0.08));
+  --hu-aurora-gradient: conic-gradient(from 135deg at 50% 50%, rgba(122,182,72,0.08), rgba(74,111,165,0.06), rgba(245,158,11,0.04), rgba(122,182,72,0.08));
   --hu-backdrop-overlay: rgba(0, 0, 0, 0.6);
   --hu-bg: #0c0a08;
   --hu-bg-elevated: #28231e;
@@ -674,7 +674,7 @@
   --hu-focus-ring: #7AB648;
   --hu-focus-ring-offset: 2px;
   --hu-focus-ring-width: 2px;
-  --hu-hero-gradient: linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(99,102,241,0.03) 80%, transparent 100%);
+  --hu-hero-gradient: linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(74,111,165,0.03) 80%, transparent 100%);
   --hu-hover-overlay: rgba(122, 182, 72, 0.08);
   --hu-info: #4a6fa5;
   --hu-info-dim: {color.blue.dim};
@@ -682,7 +682,7 @@
   --hu-link-active: #7AB648;
   --hu-link-hover: #a3d46a;
   --hu-link-visited: #5A9A30;
-  --hu-mesh-gradient: radial-gradient(ellipse at 20% 50%, rgba(122,182,72,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(99,102,241,0.04) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.03) 0%, transparent 50%);
+  --hu-mesh-gradient: radial-gradient(ellipse at 20% 50%, rgba(122,182,72,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(74,111,165,0.04) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.03) 0%, transparent 50%);
   --hu-on-accent: #ffffff;
   --hu-on-accent-secondary: #0c0a08;
   --hu-on-accent-tertiary: #ffffff;
@@ -845,7 +845,7 @@
     --hu-accent-hover: color(display-p3 0.490 0.740 0.180);
     --hu-accent-secondary: color(display-p3 0.961 0.620 0.043);
     --hu-accent-strong: color(display-p3 0.570 0.800 0.330);
-    --hu-accent-tertiary: color(display-p3 0.388 0.400 0.945);
+    --hu-accent-tertiary: color(display-p3 0.290 0.435 0.647);
     --hu-accent-text: color(display-p3 0.490 0.740 0.180);
     --hu-error: color(display-p3 0.976 0.439 0.400);
     --hu-focus-ring: color(display-p3 0.420 0.680 0.220);

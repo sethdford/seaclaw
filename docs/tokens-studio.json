@@ -1,134 +1,81 @@
 {
   "base": {
     "color": {
-      "$description": "Warm charcoal neutrals — Human green, steel blue, amber, coral, teal, and chart-only viz-extended hues",
+      "$description": "Ocean-inspired primitive color palette",
       "neutral": {
         "0": {
           "$value": "#000000",
           "$type": "color"
         },
         "50": {
-          "$value": "#0c0a08",
+          "$value": "#060b12",
           "$type": "color"
         },
         "100": {
-          "$value": "#141210",
+          "$value": "#0b1219",
           "$type": "color"
         },
         "150": {
-          "$value": "#1e1a16",
+          "$value": "#101a24",
           "$type": "color"
         },
         "200": {
-          "$value": "#28231e",
+          "$value": "#162230",
           "$type": "color"
         },
         "250": {
-          "$value": "#332d26",
+          "$value": "#1c2a3a",
           "$type": "color"
         },
         "300": {
-          "$value": "#3e372f",
+          "$value": "#233345",
           "$type": "color"
         },
         "400": {
-          "$value": "#56504a",
+          "$value": "#3d5468",
           "$type": "color"
         },
         "500": {
-          "$value": "#8a847e",
+          "$value": "#5e7a94",
           "$type": "color"
         },
         "600": {
-          "$value": "#9e9892",
+          "$value": "#8aa0b8",
           "$type": "color"
         },
         "700": {
-          "$value": "#c8c2bc",
+          "$value": "#c0d0e0",
           "$type": "color"
         },
         "750": {
-          "$value": "#ddd8d3",
+          "$value": "#d8e4f0",
           "$type": "color"
         },
         "800": {
-          "$value": "#ebe7e3",
+          "$value": "#e6edf4",
           "$type": "color"
         },
         "825": {
-          "$value": "#f0ece9",
+          "$value": "#ecf2f8",
           "$type": "color"
         },
         "850": {
-          "$value": "#f4f1ee",
+          "$value": "#f0f5fa",
           "$type": "color"
         },
         "900": {
-          "$value": "#faf8f6",
+          "$value": "#f7f9fc",
           "$type": "color"
         },
         "925": {
-          "$value": "#fcfbf9",
+          "$value": "#fafcfe",
           "$type": "color"
         },
         "1000": {
           "$value": "#ffffff",
           "$type": "color"
         },
-        "$description": "Warm charcoal scale — cinematic amber-tinted darks to cream whites. Warm neutral tones for premium feel, OKLCH hue ~55deg."
-      },
-      "tonal": {
-        "$description": "M3-style tonal surface primitives — warm neutrals tinted with Human green for surface-container hierarchy",
-        "dark-container": {
-          "$value": "#1f1c19",
-          "$type": "color",
-          "$description": "warm neutral.150 + 4% human.500 — default card/panel surface"
-        },
-        "dark-container-high": {
-          "$value": "#2a2621",
-          "$type": "color",
-          "$description": "warm neutral.200 + 6% human.500 — elevated interactive surfaces"
-        },
-        "dark-container-highest": {
-          "$value": "#35302a",
-          "$type": "color",
-          "$description": "warm neutral.250 + 8% human.500 — highest emphasis surfaces, active states"
-        },
-        "dark-dim": {
-          "$value": "#080604",
-          "$type": "color",
-          "$description": "Recessed surface — darker than bg for inset/well areas"
-        },
-        "dark-bright": {
-          "$value": "#42392e",
-          "$type": "color",
-          "$description": "Prominent surface — lighter than elevated for hero/featured areas"
-        },
-        "light-container": {
-          "$value": "#f9f7f4",
-          "$type": "color",
-          "$description": "warm cream + 6% human.100 — default card/panel surface"
-        },
-        "light-container-high": {
-          "$value": "#f0ede9",
-          "$type": "color",
-          "$description": "warm gray + 8% human.100 — elevated interactive surfaces"
-        },
-        "light-container-highest": {
-          "$value": "#e9e5e0",
-          "$type": "color",
-          "$description": "warm gray + 10% human.100 — highest emphasis surfaces"
-        },
-        "light-dim": {
-          "$value": "#e6e2de",
-          "$type": "color",
-          "$description": "Recessed surface — warm light theme inset/well areas"
-        },
-        "light-bright": {
-          "$value": "#fffefa",
-          "$type": "color",
-          "$description": "Prominent surface — warm cream brightest level for hero/featured areas"
-        }
+        "$description": "Blue-tinted neutral scale — deep ocean to sandy shore"
       },
       "teal": {
         "50": {
@@ -190,69 +137,6 @@
         },
         "light-subtle": {
           "$value": "rgba(13, 148, 136, 0.10)",
-          "$type": "color"
-        }
-      },
-      "human": {
-        "50": {
-          "$value": "#f3fae8",
-          "$type": "color"
-        },
-        "100": {
-          "$value": "#e2f2c8",
-          "$type": "color"
-        },
-        "200": {
-          "$value": "#c5e59a",
-          "$type": "color"
-        },
-        "300": {
-          "$value": "#a3d46a",
-          "$type": "color"
-        },
-        "400": {
-          "$value": "#8DC63F",
-          "$type": "color"
-        },
-        "500": {
-          "$value": "#7AB648",
-          "$type": "color"
-        },
-        "600": {
-          "$value": "#5A9A30",
-          "$type": "color"
-        },
-        "700": {
-          "$value": "#3a6a24",
-          "$type": "color"
-        },
-        "800": {
-          "$value": "#366320",
-          "$type": "color"
-        },
-        "900": {
-          "$value": "#264A17",
-          "$type": "color"
-        },
-        "$description": "Primary accent — Human green (#7AB648)",
-        "dark-subtle": {
-          "$value": "rgba(122, 182, 72, 0.14)",
-          "$type": "color"
-        },
-        "light-500": {
-          "$value": "#5A9A30",
-          "$type": "color"
-        },
-        "light-600": {
-          "$value": "#3a6a24",
-          "$type": "color"
-        },
-        "light-400": {
-          "$value": "#7AB648",
-          "$type": "color"
-        },
-        "light-subtle": {
-          "$value": "rgba(90, 154, 48, 0.10)",
           "$type": "color"
         }
       },
@@ -429,65 +313,20 @@
         }
       },
       "blue": {
-        "50": {
-          "$value": "#f3f6fb",
-          "$type": "color"
-        },
-        "100": {
-          "$value": "#e4ecf6",
-          "$type": "color"
-        },
-        "200": {
-          "$value": "#c5d5e8",
-          "$type": "color"
-        },
-        "300": {
-          "$value": "#9fb8d9",
-          "$type": "color"
-        },
-        "400": {
-          "$value": "#7496c4",
-          "$type": "color"
-        },
         "500": {
-          "$value": "#4a6fa5",
+          "$value": "#3b82f6",
           "$type": "color"
         },
-        "600": {
-          "$value": "#3d5d8c",
-          "$type": "color"
-        },
-        "700": {
-          "$value": "#324a73",
-          "$type": "color"
-        },
-        "800": {
-          "$value": "#2a3d5f",
-          "$type": "color"
-        },
-        "900": {
-          "$value": "#24354f",
-          "$type": "color"
-        },
-        "$description": "Depth accent — steel blue for info states, data viz, and richness (500 #4A6FA5)",
-        "dark-subtle": {
-          "$value": "rgba(74, 111, 165, 0.14)",
+        "dim": {
+          "$value": "rgba(59, 130, 246, 0.15)",
           "$type": "color"
         },
         "light-500": {
-          "$value": "#3d5d8c",
+          "$value": "#2563eb",
           "$type": "color"
         },
-        "light-600": {
-          "$value": "#324a73",
-          "$type": "color"
-        },
-        "light-400": {
-          "$value": "#4a6fa5",
-          "$type": "color"
-        },
-        "light-subtle": {
-          "$value": "rgba(61, 93, 140, 0.10)",
+        "light-dim": {
+          "$value": "rgba(37, 99, 235, 0.1)",
           "$type": "color"
         }
       },
@@ -554,8 +393,71 @@
           "$type": "color"
         }
       },
+      "indigo": {
+        "50": {
+          "$value": "#eef2ff",
+          "$type": "color"
+        },
+        "100": {
+          "$value": "#e0e7ff",
+          "$type": "color"
+        },
+        "200": {
+          "$value": "#c7d2fe",
+          "$type": "color"
+        },
+        "300": {
+          "$value": "#a5b4fc",
+          "$type": "color"
+        },
+        "400": {
+          "$value": "#818cf8",
+          "$type": "color"
+        },
+        "500": {
+          "$value": "#6366f1",
+          "$type": "color"
+        },
+        "600": {
+          "$value": "#4f46e5",
+          "$type": "color"
+        },
+        "700": {
+          "$value": "#4338ca",
+          "$type": "color"
+        },
+        "800": {
+          "$value": "#3730a3",
+          "$type": "color"
+        },
+        "900": {
+          "$value": "#312e81",
+          "$type": "color"
+        },
+        "$description": "Depth accent — indigo for info states, data viz, and richness",
+        "dark-subtle": {
+          "$value": "rgba(99, 102, 241, 0.14)",
+          "$type": "color"
+        },
+        "light-500": {
+          "$value": "#4f46e5",
+          "$type": "color"
+        },
+        "light-600": {
+          "$value": "#4338ca",
+          "$type": "color"
+        },
+        "light-400": {
+          "$value": "#6366f1",
+          "$type": "color"
+        },
+        "light-subtle": {
+          "$value": "rgba(79, 70, 229, 0.10)",
+          "$type": "color"
+        }
+      },
       "viz-extended": {
-        "$description": "Supplementary hues — charts and illustrations only; not UI chrome or semantic status",
+        "$description": "Supplementary chart/illustration hues — sync with design-tokens/base.tokens.json color.viz-extended",
         "forest": {
           "$value": "#00703C",
           "$type": "color"
@@ -727,30 +629,31 @@
   "data-viz": {
     "chart": {
       "categorical": {
+        "$description": "Resolved hex mirror of design-tokens/data-viz.tokens.json — import for Figma/Tokens Studio",
         "1": {
           "$value": "#7AB648",
           "$type": "color",
-          "$description": "Primary — Human green"
+          "$description": "Human green"
         },
         "2": {
           "$value": "#4a6fa5",
           "$type": "color",
-          "$description": "Secondary — Steel blue"
+          "$description": "Steel blue"
         },
         "3": {
           "$value": "#f59e0b",
           "$type": "color",
-          "$description": "Tertiary — Amber"
+          "$description": "Amber"
         },
         "4": {
           "$value": "#f97066",
           "$type": "color",
-          "$description": "Quaternary — Coral"
+          "$description": "Coral"
         },
         "5": {
           "$value": "#14b8a6",
           "$type": "color",
-          "$description": "Quinary — Teal"
+          "$description": "Teal"
         },
         "6": {
           "$value": "#9fb8d9",
@@ -770,76 +673,49 @@
         "9": {
           "$value": "#00703C",
           "$type": "color",
-          "$description": "Extended — deep forest"
+          "$description": "Extended forest"
         },
         "10": {
           "$value": "#009BDE",
           "$type": "color",
-          "$description": "Extended — bright cyan"
+          "$description": "Extended cyan"
         },
         "11": {
           "$value": "#9D61CC",
           "$type": "color",
-          "$description": "Extended — violet"
+          "$description": "Extended violet"
         },
         "12": {
           "$value": "#C2CD23",
           "$type": "color",
-          "$description": "Extended — chartreuse"
+          "$description": "Extended chartreuse"
         },
         "13": {
           "$value": "#F0D202",
           "$type": "color",
-          "$description": "Extended — gold yellow"
+          "$description": "Extended gold"
         },
         "14": {
           "$value": "#FF6800",
           "$type": "color",
-          "$description": "Extended — vivid orange"
+          "$description": "Extended orange"
         },
         "15": {
           "$value": "#CC0000",
           "$type": "color",
-          "$description": "Extended — crimson (series only)"
+          "$description": "Extended crimson (series)"
         },
         "16": {
           "$value": "#2B89CB",
           "$type": "color",
-          "$description": "Extended — azure blue"
-        },
-        "$description": "Ordered categorical series — 16 colors: core 1–8 plus viz-extended for dense charts"
+          "$description": "Extended azure"
+        }
       }
     }
   },
   "semantic": {
-    "$description": "Semantic tokens — warm charcoal theme (Quiet Mastery)",
-    "$extensions": {
-      "com.human.platform": "all",
-      "com.human.version": "0.5.0",
-      "human.colorSpace": "display-p3",
-      "human.p3Colors": {
-        "dark.accent": "color(display-p3 0.420 0.680 0.220)",
-        "dark.accent-text": "color(display-p3 0.490 0.740 0.180)",
-        "dark.accent-hover": "color(display-p3 0.490 0.740 0.180)",
-        "dark.accent-strong": "color(display-p3 0.570 0.800 0.330)",
-        "dark.accent-secondary": "color(display-p3 0.961 0.620 0.043)",
-        "dark.accent-tertiary": "color(display-p3 0.388 0.400 0.945)",
-        "dark.success": "color(display-p3 0.063 0.725 0.506)",
-        "dark.warning": "color(display-p3 0.918 0.702 0.031)",
-        "dark.error": "color(display-p3 0.976 0.439 0.400)",
-        "dark.info": "color(display-p3 0.231 0.510 0.965)",
-        "dark.focus-ring": "color(display-p3 0.420 0.680 0.220)",
-        "dark.link": "color(display-p3 0.490 0.740 0.180)",
-        "light.accent": "color(display-p3 0.420 0.680 0.220)",
-        "light.accent-text": "color(display-p3 0.240 0.480 0.130)",
-        "light.success": "color(display-p3 0.000 0.480 0.000)",
-        "light.warning": "color(display-p3 0.792 0.541 0.016)",
-        "light.error": "color(display-p3 0.760 0.000 0.000)",
-        "light.info": "color(display-p3 0.145 0.388 0.922)"
-      }
-    },
     "dark": {
-      "$description": "Dark theme — warm charcoal with Human green accents",
+      "$description": "Dark theme — deep ocean",
       "bg": {
         "$value": "{color.neutral.50}",
         "$type": "color"
@@ -860,39 +736,9 @@
         "$value": "{color.neutral.250}",
         "$type": "color"
       },
-      "surface-container": {
-        "$value": "{color.tonal.dark-container}",
-        "$type": "color",
-        "$description": "M3 tonal surface — primary-tinted card/panel background"
-      },
-      "surface-container-high": {
-        "$value": "{color.tonal.dark-container-high}",
-        "$type": "color",
-        "$description": "M3 tonal surface — elevated interactive surfaces"
-      },
-      "surface-container-highest": {
-        "$value": "{color.tonal.dark-container-highest}",
-        "$type": "color",
-        "$description": "M3 tonal surface — highest emphasis, active states"
-      },
-      "surface-dim": {
-        "$value": "{color.tonal.dark-dim}",
-        "$type": "color",
-        "$description": "Recessed surface below bg — wells, inset panels"
-      },
-      "surface-bright": {
-        "$value": "{color.tonal.dark-bright}",
-        "$type": "color",
-        "$description": "Prominent surface above elevated — hero sections, featured cards"
-      },
       "text": {
         "$value": "{color.neutral.750}",
         "$type": "color"
-      },
-      "text-secondary": {
-        "$value": "{color.neutral.600}",
-        "$type": "color",
-        "$description": "Informational text — WCAG AA 4.5:1 on dark surfaces"
       },
       "text-muted": {
         "$value": "{color.neutral.500}",
@@ -909,7 +755,7 @@
       "accent-text": {
         "$value": "{color.human.400}",
         "$type": "color",
-        "$description": "Human green for text on dark backgrounds"
+        "$description": "Accent color for text on dark backgrounds"
       },
       "accent-hover": {
         "$value": "{color.human.400}",
@@ -924,7 +770,7 @@
         "$type": "color"
       },
       "on-accent": {
-        "$value": "#ffffff",
+        "$value": "#060b12",
         "$type": "color"
       },
       "accent-secondary": {
@@ -949,7 +795,7 @@
         "$type": "color"
       },
       "on-accent-secondary": {
-        "$value": "#0c0a08",
+        "$value": "#060b12",
         "$type": "color"
       },
       "accent-tertiary": {
@@ -1046,27 +892,15 @@
         "$type": "color"
       },
       "hover-overlay": {
-        "$value": "rgba(122, 182, 72, 0.08)",
-        "$type": "color",
-        "$description": "M3 tinted state layer — primary green tint on hover"
+        "$value": "rgba(255, 255, 255, 0.06)",
+        "$type": "color"
       },
       "pressed-overlay": {
-        "$value": "rgba(122, 182, 72, 0.12)",
-        "$type": "color",
-        "$description": "M3 tinted state layer — primary green tint on press"
-      },
-      "focus-overlay": {
-        "$value": "rgba(122, 182, 72, 0.12)",
-        "$type": "color",
-        "$description": "M3 tinted state layer — primary green tint on focus"
-      },
-      "dragged-overlay": {
-        "$value": "rgba(122, 182, 72, 0.16)",
-        "$type": "color",
-        "$description": "M3 tinted state layer — primary green tint while dragging"
+        "$value": "rgba(255, 255, 255, 0.10)",
+        "$type": "color"
       },
       "disabled-overlay": {
-        "$value": "rgba(252, 248, 242, 0.04)",
+        "$value": "rgba(255, 255, 255, 0.04)",
         "$type": "color"
       },
       "backdrop-overlay": {
@@ -1074,178 +908,111 @@
         "$type": "color"
       },
       "shadow-xs": {
-        "$value": "0 1px 2px rgba(12,8,4,0.50), inset 0 1px 0 rgba(255,252,248,0.05)",
-        "$type": "shadow",
-        "$description": "Warm charcoal shadow — amber-tinted darks"
+        "$value": "0 1px 2px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)",
+        "$type": "shadow"
       },
       "shadow-sm": {
-        "$value": "0 1px 3px rgba(12,8,4,0.45), 0 2px 8px rgba(12,8,4,0.30), inset 0 1px 0 rgba(255,252,248,0.05)",
+        "$value": "0 1px 3px rgba(0,0,0,0.35), 0 2px 8px rgba(0,8,20,0.3), inset 0 1px 0 rgba(255,255,255,0.06)",
         "$type": "shadow"
       },
       "shadow-md": {
-        "$value": "0 2px 4px rgba(12,8,4,0.40), 0 8px 24px rgba(12,8,4,0.35), inset 0 1px 0 rgba(255,252,248,0.04)",
+        "$value": "0 2px 4px rgba(0,0,0,0.3), 0 8px 24px rgba(0,8,20,0.35), inset 0 1px 0 rgba(255,255,255,0.05)",
         "$type": "shadow"
       },
       "shadow-lg": {
-        "$value": "0 4px 8px rgba(12,8,4,0.45), 0 16px 48px rgba(12,8,4,0.40), inset 0 1px 0 rgba(255,252,248,0.04)",
+        "$value": "0 4px 8px rgba(0,0,0,0.35), 0 16px 48px rgba(0,8,20,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
         "$type": "shadow"
       },
       "shadow-xl": {
-        "$value": "0 8px 16px rgba(12,8,4,0.50), 0 32px 72px rgba(12,8,4,0.50), inset 0 1px 0 rgba(255,252,248,0.03)",
+        "$value": "0 8px 16px rgba(0,0,0,0.4), 0 32px 72px rgba(0,8,20,0.45), inset 0 1px 0 rgba(255,255,255,0.04)",
         "$type": "shadow"
       },
       "shadow-card": {
-        "$value": "0 1px 3px rgba(12,8,4,0.35), 0 8px 24px rgba(12,8,4,0.25), inset 0 1px 0 rgba(255,252,248,0.05)",
+        "$value": "0 1px 3px rgba(0,0,0,0.25), 0 8px 24px rgba(0,8,20,0.25), inset 0 1px 0 rgba(255,255,255,0.06)",
         "$type": "shadow"
       },
       "shadow-glow-accent": {
         "$value": "0 0 0 1px var(--hu-accent-subtle), 0 4px 16px rgba(122,182,72,0.15)",
         "$type": "shadow"
       },
-      "shadow-glow-blue": {
-        "$value": "0 0 0 1px rgba(59,130,246,0.12), 0 4px 16px rgba(59,130,246,0.10)",
-        "$type": "shadow",
-        "$description": "Blue glow for chat focus/hover states"
-      },
-      "user-message-gradient": {
-        "$value": "linear-gradient(135deg, #1e40af, #2563eb)",
-        "$type": "string",
-        "$description": "Deep-to-vibrant blue gradient for user chat bubbles"
-      },
       "shadow-inset": {
         "$value": "inset 0 1px 2px rgba(0,0,0,0.06)",
         "$type": "shadow"
       },
       "surface-gradient": {
-        "$value": "linear-gradient(180deg, rgba(252,248,242,0.04) 0%, rgba(12,8,4,0.12) 100%)",
-        "$type": "string",
-        "$description": "Warm cream-to-dark gradient — warm inset highlight"
+        "$value": "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.15) 100%)",
+        "$type": "string"
       },
       "surface-glow": {
-        "$value": "radial-gradient(ellipse at 50% 0%, rgba(122,182,72,0.08) 0%, transparent 70%)",
-        "$type": "string",
-        "$description": "Ambient Human green glow at the top of cards — creates atmospheric depth"
+        "$value": "radial-gradient(ellipse at 50% 0%, rgba(122,182,72,0.1) 0%, transparent 70%)",
+        "$type": "string"
       },
       "button-gradient-primary": {
-        "$value": "linear-gradient(180deg, rgba(252,248,242,0.12) 0%, rgba(12,8,4,0.18) 100%)",
+        "$value": "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.2) 100%)",
         "$type": "string"
       },
       "hero-gradient": {
-        "$value": "linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(99,102,241,0.03) 80%, transparent 100%)",
-        "$type": "string",
-        "$description": "Atmospheric gradient — Human green to forest with steel blue depth"
-      },
-      "mesh-gradient": {
-        "$value": "radial-gradient(ellipse at 20% 50%, rgba(122,182,72,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(99,102,241,0.04) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.03) 0%, transparent 50%)",
-        "$type": "string",
-        "$description": "Multi-point mesh gradient — Human green, steel blue, amber for cinematic depth"
-      },
-      "aurora-gradient": {
-        "$value": "conic-gradient(from 135deg at 50% 50%, rgba(122,182,72,0.08), rgba(99,102,241,0.06), rgba(245,158,11,0.04), rgba(122,182,72,0.08))",
-        "$type": "string",
-        "$description": "Slow-rotating aurora for hero sections — ambient color wash"
-      },
-      "shadow-colored-accent": {
-        "$value": "0 4px 16px rgba(122,182,72,0.12), 0 8px 32px rgba(122,182,72,0.08)",
-        "$type": "shadow",
-        "$description": "Human green tinted shadow for accent-heavy elements"
-      },
-      "shadow-colored-warm": {
-        "$value": "0 4px 16px rgba(200,160,80,0.10), 0 8px 32px rgba(200,160,80,0.06)",
-        "$type": "shadow",
-        "$description": "Warm amber tinted shadow for elevated surfaces"
+        "$value": "linear-gradient(135deg, rgba(122,182,72,0.14) 0%, rgba(90,154,48,0.08) 50%, transparent 100%)",
+        "$type": "string"
       }
     },
     "light": {
-      "$description": "Light theme — warm cream surfaces, Human green accents, charcoal text",
+      "$description": "Light theme — sandy shore, clear sky, ocean spring day",
       "bg": {
-        "$value": "#F4F1EE",
-        "$type": "color",
-        "$description": "Warm cream base"
+        "$value": "{color.neutral.900}",
+        "$type": "color"
       },
       "bg-inset": {
-        "$value": "#EBE7E3",
+        "$value": "{color.neutral.800}",
         "$type": "color"
       },
       "bg-surface": {
-        "$value": "#FFFEFA",
-        "$type": "color",
-        "$description": "Off-white warm cream surface"
+        "$value": "#ffffff",
+        "$type": "color"
       },
       "bg-warm": {
-        "$value": "#FAF8F6",
+        "$value": "#fafcfe",
         "$type": "color"
       },
       "bg-elevated": {
-        "$value": "#F9F7F4",
+        "$value": "{color.neutral.850}",
         "$type": "color"
       },
       "bg-overlay": {
-        "$value": "#FFFEFA",
+        "$value": "{color.neutral.1000}",
         "$type": "color"
       },
-      "surface-container": {
-        "$value": "{color.tonal.light-container}",
-        "$type": "color",
-        "$description": "M3 tonal surface — green-tinted card/panel background"
-      },
-      "surface-container-high": {
-        "$value": "{color.tonal.light-container-high}",
-        "$type": "color",
-        "$description": "M3 tonal surface — elevated interactive surfaces"
-      },
-      "surface-container-highest": {
-        "$value": "{color.tonal.light-container-highest}",
-        "$type": "color",
-        "$description": "M3 tonal surface — highest emphasis surfaces"
-      },
-      "surface-dim": {
-        "$value": "{color.tonal.light-dim}",
-        "$type": "color",
-        "$description": "Recessed surface — light theme wells/inset panels"
-      },
-      "surface-bright": {
-        "$value": "{color.tonal.light-bright}",
-        "$type": "color",
-        "$description": "Prominent surface — brightest level for hero/featured"
-      },
       "text": {
-        "$value": "#2D2A26",
-        "$type": "color",
-        "$description": "Warm charcoal text"
-      },
-      "text-secondary": {
-        "$value": "#4A4540",
-        "$type": "color",
-        "$description": "Informational text — WCAG AA 4.5:1 on warm light surfaces"
+        "$value": "#0b1219",
+        "$type": "color"
       },
       "text-muted": {
-        "$value": "#6B655E",
+        "$value": "#3d5468",
         "$type": "color"
       },
       "text-faint": {
-        "$value": "#9A9490",
+        "$value": "{color.neutral.600}",
         "$type": "color"
       },
       "accent": {
-        "$value": "{color.human.500}",
+        "$value": "#14b8a6",
         "$type": "color"
       },
       "accent-text": {
-        "$value": "{color.human.700}",
+        "$value": "#0d9488",
         "$type": "color",
-        "$description": "WCAG AA: Human dark green for text on light backgrounds (4.5:1 contrast)"
+        "$description": "WCAG AA: accent color for text on light backgrounds (4.5:1 contrast)"
       },
       "accent-hover": {
-        "$value": "{color.human.600}",
+        "$value": "{color.human.light-600}",
         "$type": "color"
       },
       "accent-subtle": {
-        "$value": "rgba(122, 182, 72, 0.08)",
+        "$value": "{color.human.light-subtle}",
         "$type": "color"
       },
       "accent-light": {
-        "$value": "{color.human.100}",
+        "$value": "#99f6e4",
         "$type": "color"
       },
       "accent-strong": {
@@ -1288,7 +1055,7 @@
       "accent-tertiary-text": {
         "$value": "{color.blue.700}",
         "$type": "color",
-        "$description": "WCAG AA: steel blue accent for text on light backgrounds"
+        "$description": "WCAG AA: indigo accent for text on light backgrounds"
       },
       "accent-tertiary-hover": {
         "$value": "{color.blue.light-600}",
@@ -1307,19 +1074,19 @@
         "$type": "color"
       },
       "border": {
-        "$value": "#D8D2CC",
+        "$value": "{color.neutral.700}",
         "$type": "color"
       },
       "border-subtle": {
-        "$value": "#E6E1DB",
+        "$value": "{color.neutral.850}",
         "$type": "color"
       },
       "success": {
-        "$value": "#008000",
+        "$value": "{color.seafoam.light-500}",
         "$type": "color"
       },
       "success-dim": {
-        "$value": "rgba(0, 128, 0, 0.08)",
+        "$value": "{color.seafoam.light-dim}",
         "$type": "color"
       },
       "warning": {
@@ -1331,11 +1098,11 @@
         "$type": "color"
       },
       "error": {
-        "$value": "#CC0000",
+        "$value": "{color.coral.light-500}",
         "$type": "color"
       },
       "error-dim": {
-        "$value": "rgba(204, 0, 0, 0.08)",
+        "$value": "{color.coral.light-subtle}",
         "$type": "color"
       },
       "info": {
@@ -1375,24 +1142,12 @@
         "$type": "color"
       },
       "hover-overlay": {
-        "$value": "rgba(90, 154, 48, 0.06)",
-        "$type": "color",
-        "$description": "M3 tinted state layer — Human green tint on hover"
+        "$value": "rgba(0, 0, 0, 0.04)",
+        "$type": "color"
       },
       "pressed-overlay": {
-        "$value": "rgba(90, 154, 48, 0.10)",
-        "$type": "color",
-        "$description": "M3 tinted state layer — Human green tint on press"
-      },
-      "focus-overlay": {
-        "$value": "rgba(90, 154, 48, 0.10)",
-        "$type": "color",
-        "$description": "M3 tinted state layer — Human green tint on focus"
-      },
-      "dragged-overlay": {
-        "$value": "rgba(90, 154, 48, 0.14)",
-        "$type": "color",
-        "$description": "M3 tinted state layer — Human green tint while dragging"
+        "$value": "rgba(0, 0, 0, 0.08)",
+        "$type": "color"
       },
       "disabled-overlay": {
         "$value": "rgba(0, 0, 0, 0.04)",
@@ -1403,51 +1158,40 @@
         "$type": "color"
       },
       "shadow-xs": {
-        "$value": "0 1px 2px rgba(45,36,24,0.08)",
+        "$value": "0 1px 2px rgba(0,30,60,0.08), inset 0 1px 0 rgba(255,255,255,0.5)",
         "$type": "shadow"
       },
       "shadow-sm": {
-        "$value": "0 1px 3px rgba(45,36,24,0.10), 0 2px 8px rgba(45,36,24,0.06)",
+        "$value": "0 1px 3px rgba(0,30,60,0.1), 0 2px 6px rgba(0,30,60,0.08), inset 0 1px 0 rgba(255,255,255,0.5)",
         "$type": "shadow"
       },
       "shadow-md": {
-        "$value": "0 2px 6px rgba(45,36,24,0.08), 0 8px 24px rgba(45,36,24,0.10), 0 16px 48px rgba(45,36,24,0.06)",
+        "$value": "0 2px 4px rgba(0,30,60,0.08), 0 8px 20px rgba(0,30,60,0.12), inset 0 1px 0 rgba(255,255,255,0.4)",
         "$type": "shadow"
       },
       "shadow-lg": {
-        "$value": "0 4px 12px rgba(45,36,24,0.10), 0 16px 44px rgba(45,36,24,0.12), 0 32px 80px rgba(45,36,24,0.08)",
+        "$value": "0 4px 8px rgba(0,30,60,0.08), 0 16px 40px rgba(0,30,60,0.14), inset 0 1px 0 rgba(255,255,255,0.3)",
         "$type": "shadow"
       },
       "shadow-xl": {
-        "$value": "0 8px 20px rgba(45,36,24,0.12), 0 32px 64px rgba(45,36,24,0.16), 0 48px 96px rgba(45,36,24,0.08)",
+        "$value": "0 8px 16px rgba(0,30,60,0.1), 0 32px 64px rgba(0,30,60,0.16), inset 0 1px 0 rgba(255,255,255,0.2)",
         "$type": "shadow"
       },
       "shadow-card": {
-        "$value": "0 1px 2px rgba(45,36,24,0.04), 0 2px 8px rgba(45,36,24,0.03)",
-        "$type": "shadow",
-        "$description": "Clean, warm card shadow — premium feel"
+        "$value": "0 1px 3px rgba(0,30,60,0.08), 0 6px 20px rgba(0,30,60,0.1), inset 0 1px 0 rgba(255,255,255,0.5)",
+        "$type": "shadow"
       },
       "shadow-glow-accent": {
         "$value": "0 0 0 1px rgba(90,154,48,0.12), 0 4px 16px rgba(90,154,48,0.15)",
-        "$type": "shadow",
-        "$description": "Human green glow for hover/focus states"
-      },
-      "shadow-glow-blue": {
-        "$value": "0 0 0 1px rgba(37,99,235,0.12), 0 4px 12px rgba(37,99,235,0.08)",
         "$type": "shadow"
-      },
-      "user-message-gradient": {
-        "$value": "linear-gradient(135deg, #2563eb, #3b82f6)",
-        "$type": "string"
       },
       "shadow-inset": {
         "$value": "inset 0 1px 2px rgba(0,0,0,0.04)",
         "$type": "shadow"
       },
       "surface-gradient": {
-        "$value": "linear-gradient(180deg, #FFFEFA 0%, #F4F1EE 100%)",
-        "$type": "string",
-        "$description": "Warm cream to cream-gray — subtle depth on warm clean cards"
+        "$value": "linear-gradient(180deg, #ffffff 0%, #f9f9f9 100%)",
+        "$type": "string"
       },
       "surface-glow": {
         "$value": "radial-gradient(ellipse at 50% 0%, rgba(122,182,72,0.06) 0%, transparent 70%)",
@@ -1455,13 +1199,11 @@
       },
       "button-gradient-primary": {
         "$value": "linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0.15) 100%)",
-        "$type": "string",
-        "$description": "Convex pillow gradient — visible 3D depth on buttons"
+        "$type": "string"
       },
       "hero-gradient": {
         "$value": "linear-gradient(135deg, rgba(122,182,72,0.07) 0%, rgba(122,182,72,0.03) 50%, transparent 100%)",
-        "$type": "string",
-        "$description": "Human green gradient — single-hue, varying intensity for depth"
+        "$type": "string"
       }
     },
     "high-contrast": {
@@ -1490,10 +1232,6 @@
         "$value": "{color.neutral.1000}",
         "$type": "color"
       },
-      "text-secondary": {
-        "$value": "{color.neutral.800}",
-        "$type": "color"
-      },
       "text-muted": {
         "$value": "{color.neutral.700}",
         "$type": "color"
@@ -1503,23 +1241,23 @@
         "$type": "color"
       },
       "accent": {
-        "$value": "#8DC63F",
+        "$value": "#2dd4bf",
         "$type": "color"
       },
       "accent-text": {
-        "$value": "#3a6a24",
+        "$value": "#0f766e",
         "$type": "color"
       },
       "accent-hover": {
-        "$value": "#a3d46a",
+        "$value": "#5eead4",
         "$type": "color"
       },
       "accent-subtle": {
-        "$value": "rgba(122, 182, 72, 0.2)",
+        "$value": "rgba(45, 212, 191, 0.2)",
         "$type": "color"
       },
       "accent-strong": {
-        "$value": "#7AB648",
+        "$value": "#14b8a6",
         "$type": "color"
       },
       "on-accent": {
@@ -1697,11 +1435,6 @@
     }
   },
   "typography": {
-    "$extensions": {
-      "com.human.platform": "all",
-      "com.human.version": "0.5.0"
-    },
-    "$description": "Typography tokens — font families, sizes, weights, line-heights, letter-spacing, and type roles",
     "fontFamily": {
       "sans": {
         "$value": "'Avenir', 'Avenir Next', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
@@ -1713,11 +1446,6 @@
       }
     },
     "fontSize": {
-      "2xs": {
-        "$value": "0.625rem",
-        "$type": "dimension",
-        "$description": "10px — smallest readable size, used for badges and secondary metadata"
-      },
       "xs": {
         "$value": "0.6875rem",
         "$type": "dimension",
@@ -1815,10 +1543,6 @@
     },
     "letterSpacing": {
       "$description": "Optical size compensation — tighter tracking at larger sizes",
-      "2xs": {
-        "$value": "0.03em",
-        "$type": "dimension"
-      },
       "xs": {
         "$value": "0.02em",
         "$type": "dimension"
@@ -2123,11 +1847,6 @@
     }
   },
   "motion": {
-    "$extensions": {
-      "com.human.platform": "all",
-      "com.human.version": "0.5.0"
-    },
-    "$description": "Motion tokens — duration, easing, spring, choreography, and purpose-based transitions",
     "duration": {
       "instant": {
         "$value": "50ms",
@@ -2163,16 +1882,6 @@
         "$value": "700ms",
         "$type": "duration",
         "$description": "Hero/page transitions"
-      },
-      "ambient": {
-        "$value": "25s",
-        "$type": "duration",
-        "$description": "Ambient background animations (drift, gradient) — not UI interaction"
-      },
-      "ambient-slow": {
-        "$value": "30s",
-        "$type": "duration",
-        "$description": "Slower ambient background animations"
       }
     },
     "easing": {
@@ -2205,22 +1914,7 @@
       "emphasize": {
         "$value": "cubic-bezier(0.2, 0, 0, 1)",
         "$type": "cubicBezier",
-        "$description": "Material 3 standard — dramatic deceleration without overshoot"
-      },
-      "emphasize-overshoot": {
-        "$value": "cubic-bezier(0.2, 0, 0, 1.2)",
-        "$type": "cubicBezier",
-        "$description": "Material 3 expressive — deceleration with spring overshoot for hero moments"
-      },
-      "spring": {
-        "$value": "cubic-bezier(0.34, 1.56, 0.64, 1)",
-        "$type": "cubicBezier",
-        "$description": "CSS cubic-bezier spring approximation — overshoot with quick settle for buttons, toggles, cards"
-      },
-      "spring-gentle": {
-        "$value": "cubic-bezier(0.22, 1.2, 0.36, 1)",
-        "$type": "cubicBezier",
-        "$description": "Gentle spring — subtle overshoot for modals, panels, hover states"
+        "$description": "Dramatic deceleration for emphasis animations"
       }
     },
     "spring": {
@@ -2284,21 +1978,6 @@
           "$type": "number"
         },
         "$description": "Hero reveal, onboarding (~600ms settle)"
-      },
-      "interactive": {
-        "stiffness": {
-          "$value": 322,
-          "$type": "number"
-        },
-        "damping": {
-          "$value": 31,
-          "$type": "number"
-        },
-        "mass": {
-          "$value": 1,
-          "$type": "number"
-        },
-        "$description": "Interactive elements — buttons, toggles, list items (response 0.35, dampingFraction 0.86)"
       }
     },
     "purpose": {
@@ -2563,66 +2242,6 @@
         "$type": "cubicBezier",
         "$description": "New view enters with ease-out"
       }
-    },
-    "haptic": {
-      "$description": "Haptic feedback tokens mapped to micro-physics presets — native platforms only (iOS UIImpactFeedbackGenerator, Android HapticFeedbackType)",
-      "light": {
-        "$value": "light",
-        "$type": "string",
-        "$extensions": {
-          "com.human.ios": "UIImpactFeedbackGenerator.FeedbackStyle.light",
-          "com.human.android": "HapticFeedbackConstants.KEYBOARD_TAP",
-          "com.human.maps-to": "micro-physics.button-press"
-        },
-        "$description": "Light tap — button press, toggle, list item select"
-      },
-      "medium": {
-        "$value": "medium",
-        "$type": "string",
-        "$extensions": {
-          "com.human.ios": "UIImpactFeedbackGenerator.FeedbackStyle.medium",
-          "com.human.android": "HapticFeedbackConstants.CONTEXT_CLICK",
-          "com.human.maps-to": "micro-physics.card-hover"
-        },
-        "$description": "Medium impact — connection events, significant state changes"
-      },
-      "heavy": {
-        "$value": "heavy",
-        "$type": "string",
-        "$extensions": {
-          "com.human.ios": "UIImpactFeedbackGenerator.FeedbackStyle.heavy",
-          "com.human.android": "HapticFeedbackConstants.LONG_PRESS",
-          "com.human.maps-to": "micro-physics.modal-anticipate"
-        },
-        "$description": "Heavy impact — destructive actions, major transitions"
-      },
-      "success": {
-        "$value": "success",
-        "$type": "string",
-        "$extensions": {
-          "com.human.ios": "UINotificationFeedbackGenerator.FeedbackType.success",
-          "com.human.android": "HapticFeedbackConstants.CONFIRM"
-        },
-        "$description": "Success notification — task complete, connection established"
-      },
-      "warning": {
-        "$value": "warning",
-        "$type": "string",
-        "$extensions": {
-          "com.human.ios": "UINotificationFeedbackGenerator.FeedbackType.warning",
-          "com.human.android": "HapticFeedbackConstants.REJECT"
-        },
-        "$description": "Warning notification — failed action, connection lost"
-      },
-      "selection": {
-        "$value": "selection",
-        "$type": "string",
-        "$extensions": {
-          "com.human.ios": "UISelectionFeedbackGenerator",
-          "com.human.android": "HapticFeedbackConstants.CLOCK_TICK"
-        },
-        "$description": "Selection change — picker scroll, settings toggle, tab switch"
-      }
     }
   },
   "glass": {
@@ -2740,59 +2359,10 @@
           "$description": "Visible refraction distortion"
         },
         "$description": "Modals, sheets, hero elements, overlays — z.modal (1300)"
-      },
-      "chat": {
-        "$description": "Chat-specific glass — blue-tinted for sessions panel and message actions",
-        "blur": {
-          "$value": "24px",
-          "$type": "dimension"
-        },
-        "saturate": {
-          "$value": "180%",
-          "$type": "string"
-        },
-        "bg-opacity": {
-          "$value": 0.85,
-          "$type": "number",
-          "$description": "Higher opacity for readability"
-        },
-        "border-opacity": {
-          "$value": 0.08,
-          "$type": "number"
-        },
-        "actions-bg-opacity": {
-          "$value": 0.9,
-          "$type": "number",
-          "$description": "Message actions toolbar"
-        },
-        "actions-blur": {
-          "$value": "16px",
-          "$type": "dimension"
-        }
-      },
-      "border-color": {
-        "$value": "rgba(252, 248, 242, 0.08)",
-        "$type": "color",
-        "$description": "Default glass surface border color — warm cream tint, emitted as --hu-glass-border-color"
-      },
-      "chromatic-spread": {
-        "$value": "2px",
-        "$type": "dimension",
-        "$description": "Chromatic aberration spread for prismatic edge on prominent glass"
-      },
-      "chromatic-opacity": {
-        "$value": 0.15,
-        "$type": "number",
-        "$description": "Chromatic border gradient opacity"
       }
     }
   },
   "components": {
-    "$extensions": {
-      "com.human.platform": "all",
-      "com.human.version": "0.5.0"
-    },
-    "$description": "Component-level token overrides — radius, padding, typography, min sizes",
     "sidebar": {
       "width": {
         "$value": "240px",
@@ -3071,46 +2641,9 @@
         "$value": "24px",
         "$type": "dimension"
       }
-    },
-    "icon": {
-      "xs": {
-        "$value": "14px",
-        "$type": "dimension",
-        "$description": "Extra-small icon — inline text"
-      },
-      "sm": {
-        "$value": "16px",
-        "$type": "dimension",
-        "$description": "Small icon — buttons, list items"
-      },
-      "md": {
-        "$value": "20px",
-        "$type": "dimension",
-        "$description": "Medium icon — default"
-      },
-      "lg": {
-        "$value": "24px",
-        "$type": "dimension",
-        "$description": "Large icon — headers, emphasis"
-      },
-      "xl": {
-        "$value": "28px",
-        "$type": "dimension",
-        "$description": "Extra-large icon — feature cards"
-      },
-      "2xl": {
-        "$value": "36px",
-        "$type": "dimension",
-        "$description": "2x extra-large icon — heroes, empty states"
-      }
     }
   },
   "opacity": {
-    "$extensions": {
-      "com.human.platform": "all",
-      "com.human.version": "0.5.0"
-    },
-    "$description": "Opacity tokens — state layers, overlays, and disabled states",
     "opacity": {
       "disabled": {
         "$value": 0.38,
@@ -3155,11 +2688,6 @@
     }
   },
   "elevation": {
-    "$extensions": {
-      "com.human.platform": "all",
-      "com.human.version": "0.5.0"
-    },
-    "$description": "Elevation tokens — shadow definitions mapped to semantic levels",
     "elevation": {
       "0": {
         "$value": "none",
@@ -3221,31 +2749,26 @@
     }
   },
   "breakpoints": {
-    "$extensions": {
-      "com.human.platform": "all",
-      "com.human.version": "0.5.0"
-    },
-    "$description": "Responsive breakpoint tokens",
     "breakpoint": {
       "sm": {
-        "$value": "480px",
-        "$type": "dimension",
-        "$description": "Small — compact mobile"
-      },
-      "md": {
         "$value": "640px",
         "$type": "dimension",
-        "$description": "Medium — mobile landscape"
+        "$description": "Small — mobile landscape"
       },
-      "lg": {
+      "md": {
         "$value": "768px",
         "$type": "dimension",
-        "$description": "Large — tablets"
+        "$description": "Medium — tablets"
       },
-      "xl": {
+      "lg": {
         "$value": "1024px",
         "$type": "dimension",
-        "$description": "Extra-large — desktop"
+        "$description": "Large — desktop"
+      },
+      "xl": {
+        "$value": "1280px",
+        "$type": "dimension",
+        "$description": "Extra-large — wide desktop"
       },
       "2xl": {
         "$value": "1536px",

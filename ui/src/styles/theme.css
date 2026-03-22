@@ -1355,6 +1355,33 @@ hu-card.hu-entrance.hu-visible {
   .hu-glass-tinted.hu-glass-prominent {
     background: var(--hu-bg-surface);
   }
+
+  .hu-glass-chromatic::before {
+    display: none;
+  }
+
+  .hu-mesh-gradient {
+    background: var(--hu-bg);
+  }
+
+  .hu-aurora-gradient {
+    background: var(--hu-bg);
+    animation: none;
+  }
+
+  .hu-text-gradient,
+  .hu-text-gradient-warm,
+  .hu-text-gradient-aurora {
+    background: none;
+    -webkit-text-fill-color: var(--hu-text);
+    color: var(--hu-text);
+    -webkit-background-clip: unset;
+    background-clip: unset;
+  }
+
+  .hu-film-grain::before {
+    display: none;
+  }
 }
 
 /* ── Focus Management Utilities ── */
@@ -1444,6 +1471,13 @@ hu-card.hu-entrance.hu-visible {
   :root:not(.hu-evening-mode) {
     filter: sepia(var(--hu-ambient-warmth)) saturate(calc(1 + var(--hu-ambient-warmth) * 0.2));
     transition: filter 3s ease;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    filter: none;
+    transition: none;
   }
 }
 
@@ -1587,7 +1621,8 @@ dd {
   pointer-events: none;
   z-index: 9998;
   opacity: 0.03;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  /* Cacheable asset — mirror: website/public/noise-grain.svg, docs/design-assets/noise-grain.svg */
+  background-image: url("/noise-grain.svg");
   mix-blend-mode: overlay;
 }
 

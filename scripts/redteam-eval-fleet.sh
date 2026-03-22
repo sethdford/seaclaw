@@ -37,7 +37,7 @@ REPORT_DIR="${REDTEAM_REPORT_DIR:-$ROOT/build/redteam-fleet-reports}"
 HUMAN_BIN="${HUMAN_BIN:-$ROOT/build/human}"
 HARNESS="$ROOT/scripts/adversarial-eval-harness.py"
 # Space-separated paths, relative to ROOT
-DEFAULT_EVAL_SUITES="eval_suites/reasoning_basic.json eval_suites/tool_use_basic.json eval_suites/adversarial.json eval_suites/capability_edges.json eval_suites/human_likeness.json eval_suites/tool_capability.json eval_suites/coding_basic.json"
+DEFAULT_EVAL_SUITES="eval_suites/reasoning_basic.json eval_suites/tool_use_basic.json eval_suites/adversarial.json eval_suites/capability_edges.json eval_suites/human_likeness.json eval_suites/tool_capability.json eval_suites/hula_orchestration.json eval_suites/coding_basic.json eval_suites/multi_turn.json"
 
 run() {
   local name="$1"
@@ -94,12 +94,13 @@ run "human doctor" "$HUMAN_BIN" doctor
 run "human eval list" "$HUMAN_BIN" eval list
 
 # --- Harness dry-run (no API keys): safety + epistemic / anti–AGI-overclaim probes ---
-run "adversarial harness (dry-run, adversarial + capability + human + tool + multi-turn)" \
+run "adversarial harness (dry-run, adversarial + capability + human + tool + hula + multi-turn)" \
   python3 "$HARNESS" --dry-run --no-llm \
   --include-suite "$ROOT/eval_suites/adversarial.json" \
   --include-suite "$ROOT/eval_suites/capability_edges.json" \
   --include-suite "$ROOT/eval_suites/human_likeness.json" \
   --include-suite "$ROOT/eval_suites/tool_capability.json" \
+  --include-suite "$ROOT/eval_suites/hula_orchestration.json" \
   --include-suite "$ROOT/eval_suites/multi_turn.json"
 
 # --- Live: human eval run ---
@@ -159,6 +160,7 @@ if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
       --include-suite "$ROOT/eval_suites/capability_edges.json" \
       --include-suite "$ROOT/eval_suites/human_likeness.json" \
       --include-suite "$ROOT/eval_suites/tool_capability.json" \
+      --include-suite "$ROOT/eval_suites/hula_orchestration.json" \
       --include-suite "$ROOT/eval_suites/multi_turn.json" \
       --timeout "${REDTEAM_AGENT_TIMEOUT:-180}" \
       --output "$LIVE_DIR/harness-report.json" 2>&1 | tee "$LIVE_DIR/harness-console.log"; then

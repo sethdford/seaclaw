@@ -10,6 +10,7 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
         return HU_OK;
     cfg->agent.llm_compiler_enabled =
         hu_json_get_bool(obj, "llm_compiler", cfg->agent.llm_compiler_enabled);
+    cfg->agent.hula_enabled = hu_json_get_bool(obj, "hula", cfg->agent.hula_enabled);
     cfg->agent.mcts_planner_enabled =
         hu_json_get_bool(obj, "mcts_planner", cfg->agent.mcts_planner_enabled);
     cfg->agent.tree_of_thought =

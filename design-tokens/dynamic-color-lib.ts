@@ -125,10 +125,11 @@ export function generatePalette(sourceHex: string): ColorPalette {
     { l: oklch.l, c: oklch.c * 0.6, h: (oklch.h + 60) % 360 },
     steps,
   );
-  /* Tertiary: fixed steel-blue hue (aligned with color.blue.500), not complement of primary */
+  /* Tertiary: institutional steel blue (~246° hue), not purple complement */
   const tertiaryHue = 246;
+  const tertiaryChroma = Math.min(0.14, oklch.c * 0.5 + 0.02);
   const tertiary = generateScale(
-    { l: oklch.l, c: oklch.c * 0.5, h: tertiaryHue },
+    { l: oklch.l, c: tertiaryChroma, h: tertiaryHue },
     steps,
   );
 

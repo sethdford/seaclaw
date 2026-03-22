@@ -9,6 +9,7 @@ option(HU_ENABLE_SQLITE "Enable SQLite memory backend" ON)
 option(HU_ENABLE_POSTGRES "Enable PostgreSQL memory backend" OFF)
 option(HU_ENABLE_PGVECTOR "Enable pgvector vector store (requires libpq)" OFF)
 option(HU_ENABLE_CURL "Enable libcurl for HTTP client" ON)
+option(HU_ENABLE_INTEGRATION_TESTS "Build human_integration_tests (real libcurl HTTP + SQLite file I/O; no HU_IS_TEST)" OFF)
 option(HU_ENABLE_TLS "Enable TLS via OpenSSL for WSS and HTTPS" ON)
 option(HU_ENABLE_FIPS_CRYPTO "Use AES-256-GCM via OpenSSL for FIPS 140-2 compliance" OFF)
 option(HU_BUILD_WASM "Build WASM/WASI target (human.wasm)" OFF)
@@ -409,6 +410,8 @@ set(HU_CORE_SOURCES
     src/agent/dag.c
     src/agent/dag_executor.c
     src/agent/hula.c
+    src/agent/hula_compiler.c
+    src/agent/hula_emergence.c
     src/agent/llm_compiler.c
     src/agent/orchestrator.c
     src/agent/orchestrator_llm.c
@@ -2252,6 +2255,34 @@ if(HU_ENABLE_ASAN)
 endif()
 
 add_test(NAME unit_tests COMMAND human_tests)
+
+if(HU_ENABLE_INTEGRATION_TESTS)
+    if(NOT HU_ENABLE_CURL)
+        message(FATAL_ERROR "HU_ENABLE_INTEGRATION_TESTS requires HU_ENABLE_CURL=ON")
+    endif()
+    if(NOT HU_ENABLE_SQLITE)
+        message(FATAL_ERROR "HU_ENABLE_INTEGRATION_TESTS requires HU_ENABLE_SQLITE=ON")
+    endif()
+    add_executable(human_integration_tests
+        tests/integration/test_integration_main.c
+        tests/integration/test_integ_http.c
+        tests/integration/test_integ_sqlite.c
+    )
+    target_link_libraries(human_integration_tests PRIVATE human_core)
+    target_include_directories(human_integration_tests PRIVATE ${HU_ROOT}/tests ${HU_ROOT}/include)
+    target_compile_definitions(human_integration_tests PRIVATE HU_ENABLE_CURL=1 HU_HTTP_CURL=1
+        HU_ENABLE_SQLITE=1)
+    if(UNIX AND NOT WIN32)
+        target_compile_definitions(human_integration_tests PRIVATE HU_GATEWAY_POSIX=1)
+    endif()
+    target_compile_options(human_integration_tests PRIVATE -Wall -Wextra -Wpedantic -Wshadow
+        -Wformat-security -Werror)
+    if(HU_ENABLE_ASAN)
+        target_compile_options(human_integration_tests PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+        target_link_options(human_integration_tests PRIVATE -fsanitize=address)
+    endif()
+    add_test(NAME integration_tests COMMAND human_integration_tests)
+endif()
 
 # --- WASM/WASI target (optional, use with wasm32-wasi toolchain) ---
 # Usage: cmake -DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..

@@ -146,4 +146,11 @@ void hu_spawn_config_from_named(hu_spawn_config_t *out,
  * Used by hu_agent_pool_spawn_named; callable from tests without spawning. */
 void hu_spawn_config_apply_current_tool_agent(hu_spawn_config_t *cfg);
 
+/* Fill *cfg (zero first) with the same inheritance fields agent_spawn uses: tools, memory,
+ * policy, persona, model, workspace, provider name, fleet depth, etc. String pointers alias
+ * the parent agent — cfg must not outlive parent. API keys are not copied (child spawn uses
+ * env / factory defaults like agent_spawn). */
+struct hu_agent;
+void hu_spawn_config_apply_parent_agent(hu_spawn_config_t *cfg, const struct hu_agent *parent);
+
 #endif /* HU_AGENT_SPAWN_H */

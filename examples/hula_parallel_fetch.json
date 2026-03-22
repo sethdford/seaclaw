@@ -1,0 +1,22 @@
+{
+  "name": "parallel_fetch",
+  "version": 1,
+  "root": {
+    "op": "par",
+    "id": "gather",
+    "children": [
+      {
+        "op": "call",
+        "id": "example_com",
+        "tool": "web_fetch",
+        "args": {"url": "https://example.com", "max_chars": 8000}
+      },
+      {
+        "op": "call",
+        "id": "iana_example",
+        "tool": "web_fetch",
+        "args": {"url": "https://www.iana.org/help/example-domains", "max_chars": 8000}
+      }
+    ]
+  }
+}

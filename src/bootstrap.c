@@ -675,6 +675,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             .pressure_compact = bi->cfg.agent.context_pressure_compact,
             .compact_target = bi->cfg.agent.context_compact_target,
             .llm_compiler_enabled = bi->cfg.agent.llm_compiler_enabled,
+            .hula_enabled = bi->cfg.agent.hula_enabled,
             .mcts_planner_enabled = bi->cfg.agent.mcts_planner_enabled,
             .tree_of_thought = bi->cfg.agent.tree_of_thought,
             .constitutional_ai = bi->cfg.agent.constitutional_ai,
@@ -855,6 +856,13 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                 .imap_folder_len =
                     cfg->channels.imap.imap_folder ? strlen(cfg->channels.imap.imap_folder) : 6,
                 .imap_use_tls = cfg->channels.imap.imap_use_tls,
+                .smtp_host = cfg->channels.imap.smtp_host,
+                .smtp_host_len =
+                    cfg->channels.imap.smtp_host ? strlen(cfg->channels.imap.smtp_host) : 0,
+                .smtp_port = cfg->channels.imap.smtp_port ? cfg->channels.imap.smtp_port : 587,
+                .from_address = cfg->channels.imap.from_address,
+                .from_address_len =
+                    cfg->channels.imap.from_address ? strlen(cfg->channels.imap.from_address) : 0,
             };
             err = hu_imap_create(alloc, &imap_cfg, &bi->channel_slots[ch_count]);
             if (err == HU_OK) {

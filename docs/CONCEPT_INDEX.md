@@ -28,7 +28,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Agent loop / turn**             | `src/agent/agent.c`, `agent_turn.c`, `agent_stream.c`          | `test_agent_modules.c`, `test_agent_subsystems.c`, `test_e2e_conversation.c` |
 | **Planner / dispatcher**          | `src/agent/planner.c`, `dispatcher.c`                          | `test_agent_extended.c`                                                      |
 | **DAG / LLMCompiler**             | `src/agent/dag.c`, `dag_executor.c`, `llm_compiler.c`          | `test_dag.c`                                                                 |
-| **HuLa (program IR / emergence)** | `src/agent/hula.c`, `hula_compiler.c`, `hula_emergence.c`, `agent_turn.c` (integration) | `test_hula.c`                                                                |
+| **HuLa (program IR / emergence)** | `src/agent/hula.c`, `hula_compiler.c`, `hula_emergence.c`, `agent_turn.c` (integration); guide: [`docs/guides/hula.md`](guides/hula.md) | `test_hula.c`                                                                |
 | **Metacognition (loop / policy)** | `src/cognition/metacognition.c`, `agent_turn.c`, `spawn.c` (`hu_spawn_config_apply_current_tool_agent`) | `test_metacognition.c`, `test_config_extended.c`; ops: `docs/operations/metacog-hula-production.md` |
 | **Tool router**                   | `src/agent/tool_router.c`                                      | `test_tool_router.c`                                                         |
 | **Prompt building**               | `src/agent/prompt.c`, `context_tokens.c`, `memory_loader.c`    | `test_prompt.c`                                                              |

@@ -60,6 +60,12 @@ Add a `voice` block to your persona JSON (`~/.human/personas/<name>.json`):
 
 Configure your Cartesia API key in `~/.human/config.json` or via the `CARTESIA_API_KEY` environment variable.
 
+## Automated STT / gateway E2E (no microphone)
+
+- **Direct Cartesia API** (TTS → WAV → STT): `bash scripts/e2e-voice-stt.sh` with `CARTESIA_API_KEY` and `CARTESIA_VOICE_ID` (or `FERNI_VOICE_ID`) set. See script header for multi-turn mode, keyword N-of-M, and model matrix env vars.
+- **Gateway `voice.transcribe`**: set `E2E_VOICE_STT_GATEWAY=1` (requires a built `human` binary and Node 22+). Uses `scripts/e2e-voice-stt-gateway.mjs` over `ws://…/ws`.
+- **CI**: `.github/workflows/e2e-cartesia-voice-stt.yml` runs on `workflow_dispatch` and weekly schedule; configure repository secrets `CARTESIA_API_KEY` and `CARTESIA_VOICE_ID`. Scheduled runs skip quietly if secrets are absent.
+
 ## Troubleshooting
 
 - **No voice output**: Ensure `voice_id` is set and `HU_ENABLE_CARTESIA=ON`.

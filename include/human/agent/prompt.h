@@ -69,6 +69,7 @@ typedef struct hu_prompt_config {
     const char *skills_context;         /* available SkillForge skills for this agent */
     size_t skills_context_len;
     bool native_tools;                  /* provider supports structured tool calls */
+    bool hula_program_protocol;       /* teach <hula_program> JSON in system prompt */
     const char *emotional_context;      /* from hu_emotional_cognition_build_prompt */
     size_t emotional_context_len;
     const char *cognition_mode;         /* "fast", "slow", "emotional"; NULL = unset */

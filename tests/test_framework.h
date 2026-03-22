@@ -129,6 +129,15 @@ static inline const char *hu__strcasestr(const char *haystack, const char *needl
 #define HU_ASSERT_TRUE(a)  HU_ASSERT(a)
 #define HU_ASSERT_FALSE(a) HU_ASSERT(!(a))
 
+/* Skip a test without failing the run (use with HU_RUN_TEST). longjmp code 2. */
+#define HU_SKIP_IF(cond, reason)                                                         \
+    do {                                                                                 \
+        if (cond) {                                                                      \
+            printf("  SKIP  %s\n", (reason));                                            \
+            longjmp(hu__jmp, 2);                                                         \
+        }                                                                                \
+    } while (0)
+
 #define HU_RUN_TEST(fn)                                                 \
     do {                                                                \
         if (!hu__suite_active) {                                        \
@@ -140,12 +149,17 @@ static inline const char *hu__strcasestr(const char *haystack, const char *needl
             break;                                                      \
         }                                                               \
         hu__total++;                                                    \
-        if (setjmp(hu__jmp) == 0) {                                     \
-            fn();                                                       \
-            hu__passed++;                                               \
-            printf("  PASS  %s\n", #fn);                                \
-        } else {                                                        \
-            hu__failed++;                                               \
+        {                                                               \
+            int hu__jr = setjmp(hu__jmp);                               \
+            if (hu__jr == 0) {                                          \
+                fn();                                                   \
+                hu__passed++;                                           \
+                printf("  PASS  %s\n", #fn);                            \
+            } else if (hu__jr == 2) {                                   \
+                hu__skipped++;                                          \
+            } else {                                                    \
+                hu__failed++;                                           \
+            }                                                           \
         }                                                               \
         fflush(stdout);                                                 \
     } while (0)

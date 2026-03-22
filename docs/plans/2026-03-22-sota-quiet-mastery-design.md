@@ -90,7 +90,7 @@ Background:     Near-black with 2% warm tint (#0a0c10 → #0d0f14)
 Surface:        Existing tonal containers (4-8% green tint) — no change
 Accent:         Human green (#7AB648) — unchanged, more surgically applied
 Ambient Glow:   New token: --hu-ambient-glow (radial gradient, 3% opacity green)
-Particle Color: New token: --hu-particle-primary (Human green at 15% opacity)
+Particle Color: New token: --hu-particle-primary (human green at 15% opacity)
 ```
 
 New tokens:

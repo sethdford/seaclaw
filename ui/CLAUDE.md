@@ -8,6 +8,7 @@ LitElement web components for the human dashboard.
 - Base class: LitElement with `static styles = css\`...\``
 - All styles use `--hu-*` tokens — no raw hex, px spacing, or font-family
 - Icons: import from `src/icons.ts` (Phosphor Regular). Never use emoji as UI icons.
+- **SVG assets**: `src/assets/logo.svg` — import with `?raw` for inline SVG (e.g. sidebar brand mark, `currentColor` theming). `public/noise-grain.svg` — film grain; referenced from `theme.css` as `/noise-grain.svg`. Do not duplicate logo markup in components.
 - ARIA: every interactive component needs `role`, `aria-label` or `aria-labelledby`
 - Focus: visible focus ring with `outline: 2px solid var(--hu-accent)` on `:focus-visible`
 - Keyboard: Tab, Escape (overlays), Enter/Space (buttons), Arrow keys (lists/tabs)

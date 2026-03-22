@@ -138,12 +138,12 @@
     "primary-color": {
       "$value": "rgba(122,182,72,0.15)",
       "$type": "color",
-      "$description": "Particle dot color — Human green at 15%"
+      "$description": "Particle dot color — human green at 15%"
     },
     "secondary-color": {
       "$value": "rgba(122,182,72,0.08)",
       "$type": "color",
-      "$description": "Distant particle color — Human green at 8%"
+      "$description": "Distant particle color — human green at 8%"
     },
     "max-count": {
       "$value": 5000,

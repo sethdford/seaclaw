@@ -95,6 +95,14 @@ hu_config_deinit(&cfg);
 
 Config file location: `~/.human/config.json` (or path in `HU_CONFIG_PATH`). See project docs for full schema.
 
+### `agent.hula` (boolean)
+
+When **true** (default after config merge), the agent may execute **HuLa** JSON programs: structured `seq` / `par` / `branch` / `loop` / `delegate` / `emit` plans over tools, with policy checks and optional trace files. The system prompt also includes the `<hula_program>...</hula_program>` convention when HuLa is enabled.
+
+Set `"hula": false` to disable HuLa paths and rely on the standard tool dispatcher only.
+
+**Guide:** [`docs/guides/hula.md`](../guides/hula.md).
+
 ### `agent.metacognition` (object)
 
 Optional. Parsed into `hu_metacog_settings_t` and applied to the agent after `hu_agent_from_config` (bootstrap, CLI, spawns with parent policy, subagent tasks).

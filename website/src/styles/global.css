@@ -1659,6 +1659,24 @@
   .hero-webgl-canvas {
     opacity: 0.3 !important;
   }
+
+  .hu-mesh-gradient {
+    background: var(--hu-web-bg);
+  }
+
+  .hu-text-gradient,
+  .hu-text-gradient-warm,
+  .hu-text-gradient-aurora {
+    background: none;
+    -webkit-text-fill-color: var(--hu-web-text);
+    color: var(--hu-web-text);
+    -webkit-background-clip: unset;
+    background-clip: unset;
+  }
+
+  .hu-film-grain::before {
+    display: none;
+  }
 }
 
 /* ── Ambient Intelligence ── */
@@ -2302,7 +2320,7 @@ h3 {
 
 /* Gradient text utilities */
 .hu-text-gradient {
-  background: linear-gradient(135deg, var(--hu-accent, #7AB648), var(--hu-accent-tertiary, #6366f1));
+  background: linear-gradient(135deg, var(--hu-accent, #7AB648), var(--hu-accent-tertiary, #4a6fa5));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -2319,7 +2337,7 @@ h3 {
 .hu-mesh-gradient {
   background:
     radial-gradient(ellipse at 20% 50%, color-mix(in srgb, var(--hu-accent, #7AB648) 6%, transparent) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, color-mix(in srgb, var(--hu-accent-tertiary, #6366f1) 4%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, color-mix(in srgb, var(--hu-accent-tertiary, #4a6fa5) 4%, transparent) 0%, transparent 50%),
     radial-gradient(ellipse at 50% 80%, color-mix(in srgb, var(--hu-accent-secondary, #f59e0b) 3%, transparent) 0%, transparent 50%),
     var(--hu-web-bg);
 }
@@ -2332,7 +2350,7 @@ h3 {
   pointer-events: none;
   z-index: 9998;
   opacity: 0.025;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-image: url("/noise-grain.svg");
   mix-blend-mode: overlay;
 }
 
@@ -2343,6 +2361,12 @@ h3 {
     transform: none !important;
     filter: none !important;
   }
+  .hu-film-grain::before {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
   .hu-film-grain::before {
     display: none;
   }

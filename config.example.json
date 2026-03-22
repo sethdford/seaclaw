@@ -28,6 +28,7 @@
   },
 
   "agent": {
+    "hula": true,
     "max_tool_iterations": 25,
     "max_history_messages": 100
   },

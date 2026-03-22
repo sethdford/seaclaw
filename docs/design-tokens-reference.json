@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-22T12:31:53.206Z",
+  "generated": "2026-03-22T10:02:05.917Z",
   "groups": {
     "color.neutral": [
       {
@@ -495,79 +495,24 @@
         "value": "rgba(220, 38, 38, 0.1)"
       }
     ],
-    "color.blue": [
-      {
-        "name": "50",
-        "value": "#f3f6fb",
-        "hex": "#f3f6fb"
-      },
-      {
-        "name": "100",
-        "value": "#e4ecf6",
-        "hex": "#e4ecf6"
-      },
-      {
-        "name": "200",
-        "value": "#c5d5e8",
-        "hex": "#c5d5e8"
-      },
-      {
-        "name": "300",
-        "value": "#9fb8d9",
-        "hex": "#9fb8d9"
-      },
-      {
-        "name": "400",
-        "value": "#7496c4",
-        "hex": "#7496c4"
-      },
+    "color.sky": [
       {
         "name": "500",
-        "value": "#4a6fa5",
-        "hex": "#4a6fa5"
+        "value": "#3b82f6",
+        "hex": "#3b82f6"
       },
       {
-        "name": "600",
-        "value": "#3d5d8c",
-        "hex": "#3d5d8c"
-      },
-      {
-        "name": "700",
-        "value": "#324a73",
-        "hex": "#324a73"
-      },
-      {
-        "name": "800",
-        "value": "#2a3d5f",
-        "hex": "#2a3d5f"
-      },
-      {
-        "name": "900",
-        "value": "#24354f",
-        "hex": "#24354f"
-      },
-      {
-        "name": "dark-subtle",
-        "value": "rgba(74, 111, 165, 0.14)"
+        "name": "dim",
+        "value": "rgba(59, 130, 246, 0.15)"
       },
       {
         "name": "light-500",
-        "value": "#3d5d8c",
-        "hex": "#3d5d8c"
+        "value": "#2563eb",
+        "hex": "#2563eb"
       },
       {
-        "name": "light-600",
-        "value": "#324a73",
-        "hex": "#324a73"
-      },
-      {
-        "name": "light-400",
-        "value": "#4a6fa5",
-        "hex": "#4a6fa5"
-      },
-      {
-        "name": "light-subtle",
-        "value": "rgba(61, 93, 140, 0.10)"
+        "name": "light-dim",
+        "value": "rgba(37, 99, 235, 0.1)"
       }
     ],
     "color.amber": [
@@ -643,6 +588,81 @@
       {
         "name": "light-subtle",
         "value": "rgba(217, 119, 6, 0.10)"
+      }
+    ],
+    "color.blue": [
+      {
+        "name": "50",
+        "value": "#eef3f9",
+        "hex": "#eef3f9"
+      },
+      {
+        "name": "100",
+        "value": "#dce6f2",
+        "hex": "#dce6f2"
+      },
+      {
+        "name": "200",
+        "value": "#c5d5e8",
+        "hex": "#c5d5e8"
+      },
+      {
+        "name": "300",
+        "value": "#9fb8d9",
+        "hex": "#9fb8d9"
+      },
+      {
+        "name": "400",
+        "value": "#7496c4",
+        "hex": "#7496c4"
+      },
+      {
+        "name": "500",
+        "value": "#4a6fa5",
+        "hex": "#4a6fa5"
+      },
+      {
+        "name": "600",
+        "value": "#3d5d8c",
+        "hex": "#3d5d8c"
+      },
+      {
+        "name": "700",
+        "value": "#324a73",
+        "hex": "#324a73"
+      },
+      {
+        "name": "800",
+        "value": "#2a3d5f",
+        "hex": "#2a3d5f"
+      },
+      {
+        "name": "900",
+        "value": "#24354f",
+        "hex": "#24354f"
+      },
+      {
+        "name": "dark-subtle",
+        "value": "rgba(74, 111, 165, 0.14)"
+      },
+      {
+        "name": "light-500",
+        "value": "#3d5d8c",
+        "hex": "#3d5d8c"
+      },
+      {
+        "name": "light-600",
+        "value": "#324a73",
+        "hex": "#324a73"
+      },
+      {
+        "name": "light-400",
+        "value": "#4a6fa5",
+        "hex": "#4a6fa5"
+      },
+      {
+        "name": "light-subtle",
+        "value": "rgba(61, 93, 140, 0.10)"
       }
     ],
     "color.viz-extended": [
@@ -1864,12 +1884,12 @@
       },
       {
         "name": "info",
-        "value": "#4a6fa5",
-        "hex": "#4a6fa5"
+        "value": "#3b82f6",
+        "hex": "#3b82f6"
       },
       {
         "name": "info-dim",
-        "value": "{color.blue.dim}"
+        "value": "rgba(59, 130, 246, 0.15)"
       },
       {
         "name": "focus-ring",
@@ -1982,15 +2002,15 @@
       },
       {
         "name": "hero-gradient",
-        "value": "linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(99,102,241,0.03) 80%, transparent 100%)"
+        "value": "linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(74,111,165,0.03) 80%, transparent 100%)"
       },
       {
         "name": "mesh-gradient",
-        "value": "radial-gradient(ellipse at 20% 50%, rgba(122,182,72,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(99,102,241,0.04) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.03) 0%, transparent 50%)"
+        "value": "radial-gradient(ellipse at 20% 50%, rgba(122,182,72,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(74,111,165,0.04) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.03) 0%, transparent 50%)"
       },
       {
         "name": "aurora-gradient",
-        "value": "conic-gradient(from 135deg at 50% 50%, rgba(122,182,72,0.08), rgba(99,102,241,0.06), rgba(245,158,11,0.04), rgba(122,182,72,0.08))"
+        "value": "conic-gradient(from 135deg at 50% 50%, rgba(122,182,72,0.08), rgba(74,111,165,0.06), rgba(245,158,11,0.04), rgba(122,182,72,0.08))"
       },
       {
         "name": "shadow-colored-accent",
@@ -2208,12 +2228,12 @@
       },
       {
         "name": "info",
-        "value": "#3d5d8c",
-        "hex": "#3d5d8c"
+        "value": "#2563eb",
+        "hex": "#2563eb"
       },
       {
         "name": "info-dim",
-        "value": "{color.blue.light-dim}"
+        "value": "rgba(37, 99, 235, 0.1)"
       },
       {
         "name": "focus-ring",

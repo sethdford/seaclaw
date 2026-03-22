@@ -30,6 +30,9 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/memory/lifecycle/semantic_cache.h"
 #include "human/agent/input_guard.h"
 #include "human/agent/hula.h"
+#include "human/agent/hula_compiler.h"
+#include "human/agent/hula_emergence.h"
+#include "human/agent/spawn.h"
 #include "human/agent/llm_compiler.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/memory_loader.h"
@@ -151,6 +154,15 @@ static void agent_turn_hula_append_histories(hu_agent_t *agent, const hu_hula_pr
     }
 }
 
+#ifndef HU_IS_TEST
+static void hula_compiler_agent_done(void *ctx, const hu_hula_program_t *prog,
+                                     const hu_hula_exec_t *exec) {
+    hu_agent_t *agent = ctx;
+    agent_turn_hula_append_histories(agent, prog, exec);
+    hu_bth_metrics_record_hula_tool_turn(agent->bth_metrics);
+}
+#endif
+
 static void *dag_parallel_worker(void *arg) {
     dag_parallel_work_t *w = (dag_parallel_work_t *)arg;
     hu_dag_node_t *node = w->node;
@@ -221,6 +233,26 @@ static bool message_looks_multistep_for_orchestrator(const char *m, size_t mlen)
     }
     return false;
 }
+
+#ifndef HU_IS_TEST
+/* Zero + inherit parent fields into *tpl (for hu_hula_compiler_chat_compile_execute or set_spawn). */
+static void agent_turn_hula_fill_spawn_tpl(hu_agent_t *agent, hu_spawn_config_t *tpl) {
+    if (!tpl)
+        return;
+    memset(tpl, 0, sizeof(*tpl));
+    if (agent)
+        hu_spawn_config_apply_parent_agent(tpl, agent);
+}
+
+/* *tpl must be caller stack storage valid until hu_hula_exec_run returns (exec stores its address). */
+static void agent_turn_hula_exec_bind_spawn(hu_agent_t *agent, hu_hula_exec_t *exec,
+                                            hu_spawn_config_t *tpl) {
+    if (!agent || !exec || !tpl || !agent->agent_pool)
+        return;
+    agent_turn_hula_fill_spawn_tpl(agent, tpl);
+    hu_hula_exec_set_spawn(exec, agent->agent_pool, tpl);
+}
+#endif
 
 hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, char **response_out,
                          size_t *response_len_out) {
@@ -2209,6 +2241,66 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
         }
 
+#ifndef HU_IS_TEST
+        /* Native HuLa: model embeds <hula_program>...</hula_program> with no tool_calls */
+        if (agent->hula_enabled && resp.tool_calls_count == 0 && resp.content && resp.content_len > 0) {
+            hu_hula_program_t hprog;
+            memset(&hprog, 0, sizeof(hprog));
+            if (hu_hula_extract_program_from_text(agent->alloc, resp.content, resp.content_len,
+                                                  &hprog) == HU_OK &&
+                hprog.root) {
+                hu_hula_exec_t hx;
+                memset(&hx, 0, sizeof(hx));
+                hu_spawn_config_t hula_spawn_tpl;
+                memset(&hula_spawn_tpl, 0, sizeof(hula_spawn_tpl));
+                hu_error_t hxe = hu_hula_exec_init_full(&hx, *agent->alloc, &hprog, agent->tools,
+                                                        agent->tools_count, agent->policy,
+                                                        agent->observer);
+                if (hxe == HU_OK) {
+                    agent_turn_hula_exec_bind_spawn(agent, &hx, &hula_spawn_tpl);
+                    hxe = hu_hula_exec_run(&hx);
+                }
+                if (hxe == HU_OK) {
+                    size_t trl = 0;
+                    const char *tr = hu_hula_exec_trace(&hx, &trl);
+                    bool root_ok = false;
+                    if (hprog.root && hprog.root->id)
+                        root_ok = hu_hula_exec_result(&hx, hprog.root->id)->status == HU_HULA_DONE;
+                    else
+                        root_ok = true;
+                    (void)hu_hula_trace_persist(agent->alloc, NULL, tr, trl, hprog.name,
+                                                hprog.name_len, root_ok);
+                    char *stripped = NULL;
+                    size_t slen = 0;
+                    const char *asst = resp.content;
+                    size_t asst_len = resp.content_len;
+                    if (hu_hula_strip_program_tags(agent->alloc, resp.content, resp.content_len,
+                                                   &stripped, &slen) == HU_OK &&
+                        stripped) {
+                        asst = stripped;
+                        asst_len = slen;
+                    }
+                    if (asst_len > 0)
+                        (void)hu_agent_internal_append_history(agent, HU_ROLE_ASSISTANT, asst, asst_len,
+                                                               NULL, 0, NULL, 0);
+                    if (stripped)
+                        agent->alloc->free(agent->alloc->ctx, stripped, slen + 1);
+                    agent_turn_hula_append_histories(agent, &hprog, &hx);
+                    hu_bth_metrics_record_hula_tool_turn(agent->bth_metrics);
+                    hu_hula_exec_deinit(&hx);
+                    hu_hula_program_deinit(&hprog);
+                    hu_chat_response_free(agent->alloc, &resp);
+                    iter++;
+                    continue;
+                }
+                hu_hula_exec_deinit(&hx);
+                hu_hula_program_deinit(&hprog);
+            } else {
+                hu_hula_program_deinit(&hprog);
+            }
+        }
+#endif
+
         if (resp.tool_calls_count == 0) {
             uint64_t turn_duration_ms = hu_agent_internal_clock_diff_ms(turn_start, clock());
             {
@@ -3156,6 +3248,23 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                  * Note: LLMCompiler is opt-in via config; the existing dispatcher handles
                  * parallelism. */
 #ifndef HU_IS_TEST
+                /* HuLa compiler: LLM emits full HuLa JSON (preferred over DAG when enabled). */
+                if (agent->hula_enabled && tc_count >= 3 && agent->provider.vtable &&
+                    agent->provider.vtable->chat) {
+                    hu_spawn_config_t hula_spawn_tpl;
+                    agent_turn_hula_fill_spawn_tpl(agent, &hula_spawn_tpl);
+                    bool hula_compiler_ok = false;
+                    (void)hu_hula_compiler_chat_compile_execute(
+                        agent->alloc, msg, msg_len, agent->tools, agent->tools_count, agent->policy,
+                        agent->observer, agent->agent_pool,
+                        agent->agent_pool ? &hula_spawn_tpl : NULL, agent->provider.vtable->chat,
+                        agent->provider.ctx, agent->model_name, agent->model_name_len,
+                        agent->temperature, hula_compiler_agent_done, agent, &hula_compiler_ok);
+                    if (hula_compiler_ok) {
+                        used_llm_compiler = true;
+                        used_hula_ir = true;
+                    }
+                }
                 /* LLMCompiler: if enabled and 3+ tool calls, use DAG-based execution */
                 if (!used_llm_compiler && agent->llm_compiler_enabled && tc_count >= 3) {
                     const char *tool_names[32];
@@ -3525,6 +3634,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             if (hula_build_ok) {
                                 hula_prog.root = hula_root;
                                 hu_hula_exec_t hula_exec;
+                                hu_spawn_config_t hula_spawn_tpl;
+                                memset(&hula_spawn_tpl, 0, sizeof(hula_spawn_tpl));
                                 hu_security_policy_t *hula_policy = agent->policy;
                                 hu_observer_t *hula_obs = agent->observer;
                                 herr = hu_hula_exec_init_full(&hula_exec, *agent->alloc,
@@ -3532,6 +3643,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                                agent->tools_count,
                                                                hula_policy, hula_obs);
                                 if (herr == HU_OK) {
+                                    agent_turn_hula_exec_bind_spawn(agent, &hula_exec,
+                                                                    &hula_spawn_tpl);
                                     herr = hu_hula_exec_run(&hula_exec);
                                     if (herr == HU_OK) {
                                         used_hula = true;

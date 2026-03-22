@@ -473,6 +473,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         .pressure_compact = cfg.agent.context_pressure_compact,
         .compact_target = cfg.agent.context_compact_target,
         .llm_compiler_enabled = cfg.agent.llm_compiler_enabled,
+        .hula_enabled = cfg.agent.hula_enabled,
         .mcts_planner_enabled = cfg.agent.mcts_planner_enabled,
         .tree_of_thought = cfg.agent.tree_of_thought,
         .constitutional_ai = cfg.agent.constitutional_ai,

@@ -30,6 +30,13 @@ Human reads configuration from `~/.human/config.json`. Environment variables ove
 | `gateway`             | Host, port, pairing, webhook HMAC                          |
 | `tunnel`              | Tunnel provider (e.g. ngrok)                               |
 | `runtime`             | Execution environment (native, docker, wasm)               |
+| `agent`               | Agent behavior (`hula`, metacognition, tool limits, …)      |
+
+### `agent.hula`
+
+When **true** (default), Human may run **HuLa** JSON programs for structured multi-step tool use, with policy checks and optional trace files. Set `"hula": false` under `agent` to disable.
+
+Full guide: [HuLa Programs](/features/hula/).
 
 ## Autonomy levels
 

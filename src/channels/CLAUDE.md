@@ -65,6 +65,7 @@ Generated from designated initializers in each `src/channels/*.c` vtable. **hist
  * web            |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * whatsapp       |  ✓   |    ·    |   ✓   |      ✓       |   ✓    |     ✓
  *
+ * **imap**: `hu_imap_poll` uses libcurl IMAP (SEARCH UNSEEN + FETCH) when `HU_HTTP_CURL`; `send` uses libcurl SMTP when `smtp_host` is configured, else in-memory outbox. `health_check` runs IMAP NOOP (non-test, libcurl builds).
  * Teams typing/react/history stubs are test-mode no-ops unless Microsoft Graph is wired.
  * Channels without human_active_recently: daemon cannot suppress messages
  * when the real user is active on those channels.

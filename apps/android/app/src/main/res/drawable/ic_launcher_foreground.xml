@@ -4,7 +4,7 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- h-uman brand mark: stylized "h" in Fidelity green -->
+    <!-- h-uman brand mark: stylized "h" in Human green -->
     <path
         android:fillColor="#7AB648"
         android:pathData="M38,32 L38,76 L44,76 L44,56 C44,48 50,44 56,44 C62,44 66,48 66,56 L66,76 L72,76 L72,54 C72,44 64,38 56,38 C50,38 46,40 44,44 L44,32 Z"/>

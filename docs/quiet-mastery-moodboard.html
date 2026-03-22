@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Human — Quiet Mastery Mood Board</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Syne:wght@400;600;800&display=swap');
+/* System fonts only — no external CDN. */
 
 :root {
   --warm-black: #0c0a08;
@@ -20,12 +20,12 @@
   --warm-100: #ebe7e3;
   --warm-50: #faf8f6;
   --warm-cream: #fffefa;
-  --fidelity: #7AB648;
-  --fidelity-dim: rgba(122, 182, 72, 0.15);
+  --human: #7AB648;
+  --human-dim: rgba(122, 182, 72, 0.15);
   --amber: #f59e0b;
   --amber-dim: rgba(245, 158, 11, 0.12);
-  --indigo: #6366f1;
-  --indigo-dim: rgba(99, 102, 241, 0.10);
+  --steel-blue: #4a6fa5;
+  --steel-blue-dim: rgba(74, 111, 165, 0.10);
   --coral: #f87171;
 }
 
@@ -34,7 +34,7 @@
 body {
   background: var(--warm-black);
   color: var(--warm-cream);
-  font-family: 'Syne', sans-serif;
+  font-family: ui-sans-serif, system-ui, sans-serif;
   overflow-x: hidden;
   min-height: 100vh;
 }
@@ -46,7 +46,7 @@ body::before {
   z-index: 9999;
   pointer-events: none;
   opacity: 0.035;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-image: url("design-assets/noise-grain.svg");
   mix-blend-mode: overlay;
 }
 
@@ -88,12 +88,12 @@ body::before {
 }
 
 .hero h1 {
-  font-family: 'Playfair Display', serif;
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
   font-size: clamp(3rem, 8vw, 7rem);
   font-weight: 900;
   line-height: 0.92;
   letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--warm-cream), var(--warm-200), var(--fidelity));
+  background: linear-gradient(135deg, var(--warm-cream), var(--warm-200), var(--human));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -218,14 +218,14 @@ body::before {
   font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.35em;
-  color: var(--fidelity);
+  color: var(--human);
   margin-bottom: 0.8rem;
   position: relative;
   z-index: 2;
 }
 
 .glass-card h3 {
-  font-family: 'Playfair Display', serif;
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
   font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 0.6rem;
@@ -358,7 +358,7 @@ body::before {
 }
 
 .type-display {
-  font-family: 'Playfair Display', serif;
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
   font-size: clamp(3rem, 6vw, 5.5rem);
   font-weight: 900;
   line-height: 1;
@@ -367,14 +367,14 @@ body::before {
 }
 
 .type-display .gradient {
-  background: linear-gradient(135deg, var(--fidelity), var(--indigo));
+  background: linear-gradient(135deg, var(--human), var(--steel-blue));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .type-display .warm {
-  background: linear-gradient(135deg, var(--fidelity), var(--amber));
+  background: linear-gradient(135deg, var(--human), var(--amber));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -431,7 +431,7 @@ body::before {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--fidelity);
+  background: var(--human);
   animation: breathe 4s ease-in-out infinite;
   vertical-align: middle;
   margin-right: 0.5rem;
@@ -464,7 +464,7 @@ body::before {
 }
 
 .light-preview .light-card h3 {
-  font-family: 'Playfair Display', serif;
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
   color: #2d2a26;
   font-size: 1.3rem;
   margin-bottom: 0.5rem;
@@ -477,7 +477,7 @@ body::before {
 }
 
 .light-preview .light-card .accent-text {
-  color: var(--fidelity);
+  color: var(--human);
   font-weight: 600;
 }
 
@@ -497,7 +497,7 @@ body::before {
 }
 
 .footer .tagline {
-  font-family: 'Playfair Display', serif;
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
   font-size: 1.8rem;
   font-weight: 700;
   font-style: italic;
@@ -553,13 +553,13 @@ body::before {
     <div class="section-label">Accent Palette &mdash; 60/30/10</div>
     <div class="palette-strip" style="height: 80px">
       <div class="palette-swatch" style="background:#4a7a28;flex:3"><span class="label" style="color:#fff">Human 700</span></div>
-      <div class="palette-swatch" style="background:#5a9a30;flex:3"><span class="label" style="color:#fff">Fidelity 600</span></div>
+      <div class="palette-swatch" style="background:#5a9a30;flex:3"><span class="label" style="color:#fff">Human 600</span></div>
       <div class="palette-swatch" style="background:#7AB648;flex:4"><span class="label" style="color:#fff">Human 500</span></div>
-      <div class="palette-swatch" style="background:#8DC63F;flex:3"><span class="label" style="color:#fff">Fidelity 400</span></div>
+      <div class="palette-swatch" style="background:#8DC63F;flex:3"><span class="label" style="color:#fff">Human 400</span></div>
       <div class="palette-swatch" style="background:#f59e0b;flex:2"><span class="label" style="color:#fff">Amber</span></div>
       <div class="palette-swatch" style="background:#fbbf24;flex:2"><span class="label" style="color:#000">Amber 400</span></div>
-      <div class="palette-swatch" style="background:#6366f1;flex:1.5"><span class="label" style="color:#fff">Indigo</span></div>
-      <div class="palette-swatch" style="background:#818cf8;flex:1.5"><span class="label" style="color:#fff">Indigo 400</span></div>
+      <div class="palette-swatch" style="background:#4a6fa5;flex:1.5"><span class="label" style="color:#fff">Steel blue</span></div>
+      <div class="palette-swatch" style="background:#7496c4;flex:1.5"><span class="label" style="color:#fff">Steel 400</span></div>
     </div>
   </section>
 

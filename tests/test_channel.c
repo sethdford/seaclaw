@@ -449,6 +449,61 @@ static void test_imap_create_with_mock_config(void) {
     hu_imap_destroy(&ch);
 }
 
+static void test_imap_create_with_smtp_config(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imap_config_t cfg = {
+        .imap_host = "imap.example.com",
+        .imap_host_len = 16,
+        .imap_port = 993,
+        .imap_username = "user@example.com",
+        .imap_username_len = 16,
+        .imap_password = "secret",
+        .imap_password_len = 6,
+        .imap_folder = "Sent",
+        .imap_folder_len = 4,
+        .imap_use_tls = true,
+        .smtp_host = "smtp.example.com",
+        .smtp_host_len = 16,
+        .smtp_port = 587,
+        .from_address = "user@example.com",
+        .from_address_len = 16,
+    };
+    hu_error_t err = hu_imap_create(&alloc, &cfg, &ch);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(hu_imap_is_configured(&ch));
+    hu_imap_destroy(&ch);
+}
+
+static void test_imap_send_rejects_empty_target(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imap_config_t cfg = {
+        .imap_host = "imap.example.com",
+        .imap_host_len = 16,
+        .imap_port = 993,
+        .imap_username = "user",
+        .imap_username_len = 4,
+        .imap_password = "secret",
+        .imap_password_len = 6,
+        .imap_folder = "INBOX",
+        .imap_folder_len = 5,
+        .imap_use_tls = true,
+    };
+    hu_error_t err = hu_imap_create(&alloc, &cfg, &ch);
+    HU_ASSERT_EQ(err, HU_OK);
+    err = ch.vtable->send(ch.ctx, "", 0, "hi", 2, NULL, 0);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    hu_imap_destroy(&ch);
+}
+
+static void test_imap_poll_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_loop_msg_t msgs[2];
+    size_t cnt = 0;
+    HU_ASSERT_EQ(hu_imap_poll(NULL, &alloc, msgs, 2, &cnt), HU_ERR_INVALID_ARGUMENT);
+}
+
 static void test_imap_send_stores_in_outbox(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
@@ -681,6 +736,9 @@ void run_channel_tests(void) {
 #endif
 #if HU_HAS_IMAP
     HU_RUN_TEST(test_imap_create_with_mock_config);
+    HU_RUN_TEST(test_imap_create_with_smtp_config);
+    HU_RUN_TEST(test_imap_send_rejects_empty_target);
+    HU_RUN_TEST(test_imap_poll_null_args);
     HU_RUN_TEST(test_imap_send_stores_in_outbox);
     HU_RUN_TEST(test_imap_unconfigured_health_check);
 #if HU_IS_TEST

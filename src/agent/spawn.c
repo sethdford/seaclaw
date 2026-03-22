@@ -775,6 +775,63 @@ void hu_spawn_config_apply_current_tool_agent(hu_spawn_config_t *cfg) {
     cfg->metacognition_policy = &cur->metacognition.cfg;
 }
 
+void hu_spawn_config_apply_parent_agent(hu_spawn_config_t *cfg, const hu_agent_t *parent) {
+    if (!cfg || !parent)
+        return;
+
+    if (parent->persona_name && parent->persona_name_len > 0) {
+        cfg->persona_name = parent->persona_name;
+        cfg->persona_name_len = parent->persona_name_len;
+    }
+#ifdef HU_HAS_SKILLS
+    if (parent->skillforge)
+        cfg->skillforge = parent->skillforge;
+#endif
+    if (parent->tools && parent->tools_count > 0) {
+        cfg->parent_tools = (const void *)parent->tools;
+        cfg->parent_tools_count = parent->tools_count;
+    }
+    if (parent->memory)
+        cfg->memory = parent->memory;
+    if (parent->session_store)
+        cfg->session_store = parent->session_store;
+    if (parent->observer && parent->observer->vtable)
+        cfg->observer = parent->observer;
+    if (parent->policy)
+        cfg->policy = parent->policy;
+    cfg->autonomy_level = parent->autonomy_level;
+    cfg->caller_spawn_depth = parent->spawn_depth;
+    cfg->shared_cost_tracker = parent->cost_tracker;
+    cfg->metacognition_policy = &parent->metacognition.cfg;
+
+    if (parent->turn_model && parent->turn_model_len > 0) {
+        cfg->model = parent->turn_model;
+        cfg->model_len = parent->turn_model_len;
+    } else if (parent->model_name && parent->model_name_len > 0) {
+        cfg->model = parent->model_name;
+        cfg->model_len = parent->model_name_len;
+    }
+    cfg->temperature = parent->temperature;
+    if (parent->workspace_dir && parent->workspace_dir_len > 0) {
+        cfg->workspace_dir = parent->workspace_dir;
+        cfg->workspace_dir_len = parent->workspace_dir_len;
+    }
+    if (parent->default_provider && parent->default_provider_len > 0) {
+        cfg->provider = parent->default_provider;
+        cfg->provider_len = parent->default_provider_len;
+    } else if (parent->provider.vtable && parent->provider.vtable->get_name) {
+        const char *pn = parent->provider.vtable->get_name(parent->provider.ctx);
+        if (pn) {
+            cfg->provider = pn;
+            cfg->provider_len = strlen(pn);
+        }
+    }
+    cfg->mailbox = parent->mailbox;
+    cfg->mode = HU_SPAWN_ONE_SHOT;
+    if (parent->max_tool_iterations > 0)
+        cfg->max_iterations = parent->max_tool_iterations;
+}
+
 hu_error_t hu_agent_pool_spawn_named(hu_agent_pool_t *pool, const hu_agent_registry_t *registry,
                                      const char *agent_name, const char *task, size_t task_len,
                                      uint64_t *out_id) {

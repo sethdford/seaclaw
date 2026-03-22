@@ -26,9 +26,9 @@ first, interactive tables second, forms third, polish last.
 
 Target: **Linear/Raycast/Vercel tier** — opinionated tools for power users.
 
-| Property        | Material 3        | Fidelity         | Our Target                                        |
-| --------------- | ----------------- | ---------------- | ------------------------------------------------- |
-| Density         | Low (touch-first) | High (cramped)   | High with hierarchy                               |
+| Property        | Material 3        | Legacy finance UIs | Our Target                                        |
+| --------------- | ----------------- | ------------------ | ------------------------------------------------- |
+| Density         | Low (touch-first) | High (cramped)     | High with hierarchy                               |
 | Data viz        | None built-in     | Basic tables     | Canvas charts + data-viz tokens                   |
 | Structured data | None              | Table dumps      | Collapsible JSON tree viewer                      |
 | Tables          | Anemic DataTable  | Dense but static | Sort, filter, paginate, row actions, keyboard nav |

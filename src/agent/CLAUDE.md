@@ -20,6 +20,9 @@ planning.c          Conversation-level planning and strategy
 dag.c               DAG-based parallel tool execution graph
 dag_executor.c      Executes DAG nodes with dependency resolution
 llm_compiler.c      LLMCompiler: compiles natural language plans to DAG
+hula.c              HuLa IR: parse, validate, execute tool programs (seq/par/branch/loop/delegate/emit)
+hula_compiler.c     LLM HuLa compiler prompts + response JSON extraction
+hula_emergence.c    Trace persist (~/.human/hula_traces), n-gram scan, skill promotion
 tool_router.c       Routes tool calls to implementations with policy checks
 ```
 
@@ -78,7 +81,7 @@ Message arrives → dispatcher.c
     → prompt.c (build system prompt with persona + context)
     → memory_loader.c (load relevant memories)
     → planner.c (decide tool use)
-    → tool_router.c → dag.c (execute tools)
+    → tool_router.c → dag.c / HuLa paths in agent_turn.c (execute tools)
     → agent_stream.c (stream response)
     → commitment.c (extract any promises made)
     → reflection.c (post-turn reflection)

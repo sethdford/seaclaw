@@ -180,6 +180,31 @@ static void test_prompt_build_with_custom_instructions(void) {
     alloc.free(alloc.ctx, out, out_len + 1);
 }
 
+static void test_prompt_build_includes_hula_protocol(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_prompt_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.provider_name = "openai";
+    cfg.provider_name_len = 5;
+    cfg.model_name = "gpt-4";
+    cfg.model_name_len = 5;
+    cfg.workspace_dir = ".";
+    cfg.workspace_dir_len = 1;
+    cfg.autonomy_level = 2;
+    cfg.hula_program_protocol = true;
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_prompt_build_system(&alloc, &cfg, &out, &out_len);
+
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(strstr(out, "<hula_program>") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "HuLa") != NULL);
+
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
 /* ─── Memory loader tests ────────────────────────────────────────────────── */
 
 static void test_memory_loader_empty_backend(void) {
@@ -239,6 +264,7 @@ void run_prompt_tests(void) {
     HU_RUN_TEST(test_prompt_build_with_memory);
     HU_RUN_TEST(test_prompt_build_with_stm_context);
     HU_RUN_TEST(test_prompt_build_with_custom_instructions);
+    HU_RUN_TEST(test_prompt_build_includes_hula_protocol);
     HU_RUN_TEST(test_memory_loader_empty_backend);
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(test_memory_loader_with_entries);

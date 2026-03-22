@@ -44,7 +44,7 @@ globs:
 - Use tonal surfaces instead of `--hu-bg-surface` when the surface should carry brand identity
 - Use `--hu-surface-dim` for recessed wells, `--hu-surface-bright` for hero/featured areas
 - Plain `--hu-bg-surface` / `--hu-bg-elevated` remain available for neutral (non-tinted) surfaces
-- **State layers** are primary-tinted: `--hu-hover-overlay`, `--hu-pressed-overlay`, `--hu-focus-overlay`, `--hu-dragged-overlay` all use fidelity green
+- **State layers** are primary-tinted: `--hu-hover-overlay`, `--hu-pressed-overlay`, `--hu-focus-overlay`, `--hu-dragged-overlay` all use human green
 - `--hu-disabled-overlay` remains neutral (no brand color on disabled states)
 
 ## Glass
@@ -69,8 +69,8 @@ globs:
 
 ## Data Visualization
 
-- Multi-series charts use `--hu-chart-categorical-{1..8}` in order. Never ad-hoc colors.
-- Ordered data uses `--hu-chart-sequential-{100..800}` (Fidelity green ramp).
+- Multi-series charts use `--hu-chart-categorical-{1..16}` in order. Never ad-hoc colors.
+- Ordered data uses `--hu-chart-sequential-{100..800}` (Human green ramp).
 - Positive/negative indicators use `--hu-chart-diverging-{positive,neutral,negative}`.
 - Single-metric charts use `--hu-chart-brand`.
 - Token source: `design-tokens/data-viz.tokens.json`.

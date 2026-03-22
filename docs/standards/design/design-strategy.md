@@ -10,21 +10,21 @@ title: Human Design Strategy
 
 ## Color Philosophy
 
-Human uses a **Human green** primary palette with **steel blue** tertiary accents
-and **warm charcoal** neutrals. The hierarchy is:
+Human uses a **Human green** primary palette inspired by ocean-meets-finance
+aesthetics. The hierarchy is:
 
 | Role      | Palette        | Token prefix                      | Usage                          |
 | --------- | -------------- | --------------------------------- | ------------------------------ |
 | Primary   | Human green    | `--hu-accent`                     | Brand, CTA, links, focus rings |
 | Secondary | Amber          | `--hu-secondary`                  | Highlights, featured content   |
-| Tertiary  | Steel blue     | `--hu-tertiary`                   | Info, data visualization, depth |
+| Tertiary  | Steel blue     | `--hu-accent-tertiary`            | Data visualization, depth      |
 | Status    | Semantic       | `--hu-success/warning/error/info` | System feedback                |
-| Neutral   | Warm charcoal  | `--hu-text/bg/border`             | Backgrounds, text, borders     |
+| Neutral   | Ocean scale    | `--hu-text/bg/border`             | Backgrounds, text, borders     |
 
 ### Theme Support
 
-- **Dark mode** (default): Deep warm-charcoal backgrounds, light text
-- **Light mode**: Warm off-whites, dark text — triggered by `prefers-color-scheme: light` or `data-theme="light"`
+- **Dark mode** (default): Deep ocean backgrounds, light text
+- **Light mode**: Coastal whites, dark text — triggered by `prefers-color-scheme: light` or `data-theme="light"`
 - **High contrast**: Enhanced boundaries — triggered by `prefers-contrast: more`
 - **Wide gamut (P3)**: Enhanced saturation where supported
 
@@ -37,7 +37,7 @@ and **warm charcoal** neutrals. The hierarchy is:
 ### Tonal Surfaces (M3)
 
 Human implements Material Design 3 tonal surface containers. Instead of pure neutral
-backgrounds, surfaces are tinted with 4-8% of the primary accent (Human green),
+backgrounds, surfaces are tinted with 4-8% of the primary accent (human green),
 creating a branded warmth across elevation levels.
 
 | Token                            | Dark Value | Light Value | Usage                           |
@@ -80,7 +80,7 @@ following Material Design 3's "color from source" pattern.
 
 - **Source hex**: `#7AB648` (Human green)
 - **Generation**: `design-tokens/dynamic-color-lib.ts` → build pipeline → `_dynamic-color.css`
-- **Scales**: primary, secondary (+60° hue), tertiary (fixed steel-blue hue), neutral (warm charcoal), error
+- **Scales**: primary, secondary (+60° hue), tertiary (fixed steel blue hue ~246°), neutral (warm hue), error
 - **Steps per scale**: 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950
 - **P3 overrides**: Automatic `@media (color-gamut: p3)` block with `color(display-p3 ...)` values
 - **Token prefix**: `--hu-dynamic-{group}-{step}` (e.g. `--hu-dynamic-primary-500`)
@@ -202,7 +202,7 @@ CSS classes: `.hu-glass-enter` (reveal), `.hu-glass-exit` (dismiss).
 
 ### Glass Rules
 
-- Always pair glass with `prefers-reduced-transparency: reduce` fallback (handled globally in `theme.css`)
+- Always pair glass with `prefers-reduced-transparency: reduce` fallback (handled globally in `theme.css`). The same media query flattens mesh/aurora backgrounds to solid `--hu-bg`, disables film grain and chromatic glass borders, and renders gradient text as solid `--hu-text` for readability.
 - Never stack glass on glass without testing — layered blur compounds and reduces legibility
 - Glass interactive elements must include `backdrop-filter` in their transition property
 - Token source: `design-tokens/glass.tokens.json`
@@ -319,26 +319,26 @@ Chart colors use the `chart.*` token series from `data-viz.tokens.json`.
 
 ### Categorical (up to 16 series)
 
-Core palette (1–8) plus `color.viz-extended` (9–16) for dense multi-series charts.
+Core palette (1–8) stays brand-aligned; 9–16 add **Web Color**–style hues from `color.viz-extended` in `base.tokens.json` for dense dashboards (charts only — not buttons or status).
 
-| Series | Color           | Token                       |
-| ------ | --------------- | --------------------------- |
-| 1      | Human green     | `--hu-chart-categorical-1`  |
-| 2      | Steel blue      | `--hu-chart-categorical-2`  |
-| 3      | Amber           | `--hu-chart-categorical-3`  |
-| 4      | Coral           | `--hu-chart-categorical-4`  |
-| 5      | Teal            | `--hu-chart-categorical-5`  |
+| Series | Color            | Token                       |
+| ------ | ---------------- | --------------------------- |
+| 1      | Human green      | `--hu-chart-categorical-1` |
+| 2      | Steel blue       | `--hu-chart-categorical-2` |
+| 3      | Amber            | `--hu-chart-categorical-3` |
+| 4      | Coral            | `--hu-chart-categorical-4` |
+| 5      | Teal             | `--hu-chart-categorical-5` |
 | 6      | Light steel blue | `--hu-chart-categorical-6` |
-| 7      | Light amber     | `--hu-chart-categorical-7`  |
-| 8      | Light green     | `--hu-chart-categorical-8`  |
-| 9      | Forest          | `--hu-chart-categorical-9`  |
-| 10     | Cyan            | `--hu-chart-categorical-10` |
-| 11     | Violet          | `--hu-chart-categorical-11` |
-| 12     | Chartreuse      | `--hu-chart-categorical-12` |
-| 13     | Gold            | `--hu-chart-categorical-13` |
-| 14     | Orange          | `--hu-chart-categorical-14` |
-| 15     | Crimson         | `--hu-chart-categorical-15` |
-| 16     | Azure           | `--hu-chart-categorical-16` |
+| 7      | Light amber      | `--hu-chart-categorical-7` |
+| 8      | Light green      | `--hu-chart-categorical-8` |
+| 9      | Forest           | `--hu-chart-categorical-9` |
+| 10     | Cyan             | `--hu-chart-categorical-10` |
+| 11     | Violet           | `--hu-chart-categorical-11` |
+| 12     | Chartreuse       | `--hu-chart-categorical-12` |
+| 13     | Gold             | `--hu-chart-categorical-13` |
+| 14     | Vivid orange     | `--hu-chart-categorical-14` |
+| 15     | Crimson (series) | `--hu-chart-categorical-15` |
+| 16     | Azure            | `--hu-chart-categorical-16` |
 
 ### Sequential (single hue ramp)
 

@@ -84,6 +84,19 @@
         "HU_ENABLE_SKILLS": "OFF",
         "HU_ENABLE_ML": "OFF"
       }
+    },
+    {
+      "name": "integration",
+      "displayName": "Integration tests binary (real curl + SQLite file)",
+      "binaryDir": "${sourceDir}/build-integration",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "HU_ENABLE_INTEGRATION_TESTS": "ON",
+        "HU_ENABLE_CURL": "ON",
+        "HU_ENABLE_SQLITE": "ON",
+        "HU_ENABLE_CLI": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -116,6 +129,11 @@
       "name": "minimal-release",
       "configurePreset": "minimal-release",
       "jobs": 0
+    },
+    {
+      "name": "integration",
+      "configurePreset": "integration",
+      "jobs": 0
     }
   ],
   "testPresets": [
@@ -127,6 +145,11 @@
     {
       "name": "test",
       "configurePreset": "test",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "integration",
+      "configurePreset": "integration",
       "output": { "outputOnFailure": true }
     }
   ]

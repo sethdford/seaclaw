@@ -595,14 +595,39 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
         else if (task_mode == HU_EVAL_CONTAINS && mode != HU_EVAL_CONTAINS)
             task_mode = mode;
 
+        const char *judge_expected = expected_str;
+        size_t judge_expected_len = expected_str_len;
+        char *judge_owned = NULL;
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
+        if (task_mode == HU_EVAL_LLM_JUDGE && task->rubric && task->rubric_len > 0) {
+            if (expected_str_len > 0) {
+                size_t gold_cap = expected_str_len < 1200u ? expected_str_len : 1200u;
+                judge_owned = hu_sprintf(
+                    alloc,
+                    "Rubric:\n%.*s\n\nGold reference (equivalent phrasing counts as correct):\n%.*s\n",
+                    (int)task->rubric_len, task->rubric, (int)gold_cap, expected_str);
+            } else {
+                judge_owned = hu_sprintf(alloc, "Rubric:\n%.*s\n", (int)task->rubric_len,
+                                         task->rubric);
+            }
+            if (judge_owned) {
+                judge_expected = judge_owned;
+                judge_expected_len = strlen(judge_owned);
+            }
+        }
+#endif
         if (task_mode == HU_EVAL_LLM_JUDGE) {
-            hu_eval_check_with_provider(alloc, actual_str, actual_str_len, expected_str,
-                                        expected_str_len, task_mode, provider, model, model_len,
+            hu_eval_check_with_provider(alloc, actual_str, actual_str_len, judge_expected,
+                                        judge_expected_len, task_mode, provider, model, model_len,
                                         &passed, &score_val);
         } else {
             hu_eval_check_with_provider(alloc, actual_str, actual_str_len, expected_str,
                                         expected_str_len, task_mode, NULL, NULL, 0, &passed, NULL);
         }
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
+        if (judge_owned)
+            alloc->free(alloc->ctx, judge_owned, strlen(judge_owned) + 1);
+#endif
 
         res->task_id = task->id ? hu_strdup(alloc, task->id) : NULL;
         res->passed = passed;

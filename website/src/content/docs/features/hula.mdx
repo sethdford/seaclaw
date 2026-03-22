@@ -1,0 +1,102 @@
+---
+title: HuLa Programs
+description: Structured JSON plans for multi-step tool use—clear, policy-checked, and traceable.
+---
+
+**HuLa** (Human Language for agent programs) is a small **JSON format** for describing how the agent should run tools: in sequence, in parallel, with branches, loops, optional sub-agents, and named outputs. The runtime parses it, checks it against your **security policy**, runs it, and can **save traces** so you can audit behavior and turn repeated patterns into **skills**.
+
+This page is the **published** guide; the same content is maintained in the repo as [`docs/guides/hula.md`](https://github.com/sethdford/h-uman/blob/main/docs/guides/hula.md).
+
+## Why this matters
+
+- **Clarity:** A HuLa program is an explicit plan. You can diff it, version it, and discuss it without inferring intent from a long chat log.
+- **Safety:** Every `call` goes through the same **policy and observer** path as normal tool use. Parallel steps still respect your autonomy and risk settings.
+- **Honesty:** The model must use **real tool names** from your deployment. Invalid tools fail validation—Human does not silently invent capabilities.
+- **Improvement:** Execution traces under `~/.human/hula_traces/` can be scanned; frequent patterns can be **promoted** into installable skill manifests.
+
+HuLa is **not** a separate “AGI layer.” It is a **structured intermediate representation** between model output and your existing tool surface.
+
+## Turn it on
+
+| Setting | Effect |
+| ------- | ------ |
+| **`agent.hula`** in `~/.human/config.json` | **On by default** after config merge. Set `"hula": false` to disable. See [Configuration](/getting-started/configuration/). |
+
+With HuLa enabled, the system prompt includes the **`<hula_program>...</hula_program>`** convention so the model can attach JSON to its reply.
+
+**Canonical field-level spec:** [HuLa language plan](https://github.com/sethdford/h-uman/blob/main/docs/plans/2026-03-22-hula-language.md) (repository).
+
+## Three ways HuLa runs
+
+### 1. LLM compiler (three or more tool calls in one turn)
+
+When the model returns **three or more** tool calls and HuLa is enabled, Human may ask the model (JSON mode) for a **full HuLa program**, validate it, then execute it.
+
+### 2. Native text programs
+
+If the assistant message contains **no** tool calls but includes:
+
+`<hula_program>{ ... valid HuLa JSON ... }</hula_program>`
+
+Human extracts the JSON, runs it, strips the block from user-visible text, and records results.
+
+### 3. Trivial IR from tool calls
+
+Human can build a minimal program (`par` or a single `call`) from the model’s tool calls and execute it through the HuLa executor for **unified tracing and policy**.
+
+## Command line: validate and run
+
+```bash
+# Validate only
+./build/human hula validate path/to/program.json
+
+# Validate + run (CLI uses demo tools: echo, search, write, analyze)
+./build/human hula run path/to/program.json
+
+# Smoke test
+./scripts/hula-smoke.sh
+```
+
+**Important:** `human hula run` uses **fixed demo tool names**. Your **live agent** only accepts tools registered for that session (e.g. `web_fetch`, `memory_store`). See [examples README](https://github.com/sethdford/h-uman/blob/main/examples/README.md) in the repo.
+
+## Opcodes at a glance
+
+| Opcode | Meaning |
+| ------ | ------- |
+| `call` | Invoke one tool with JSON `args`. |
+| `seq` | Run children in order; stop on first failing `call`. |
+| `par` | Run children concurrently; join results. |
+| `branch` | If `pred` matches prior context, run `then` or `else`. |
+| `loop` | Bounded loop over `body` (use `max_iter`). |
+| `delegate` | Spawn a sub-agent with a `goal` (POSIX, non-test, pool + inheritance when configured). |
+| `emit` | Produce a string; `emit_value` can use `$node_id` for prior outputs. |
+
+`$node_id` applies to **`emit_value`**, not to arbitrary `call` argument strings.
+
+## Emergence from traces
+
+Traces may be written under `~/.human/hula_traces/`. The runtime can **scan** repeated tool-call patterns and **promote** them to `*.skill.json` + `*_HULA.md` under your skills directory—see the [Skills System](/features/skills/) page and the [language plan](https://github.com/sethdford/h-uman/blob/main/docs/plans/2026-03-22-hula-language.md) for APIs.
+
+## Evaluation and training
+
+- **Suite:** [`eval_suites/hula_orchestration.json`](https://github.com/sethdford/h-uman/blob/main/eval_suites/hula_orchestration.json) — models emit HuLa-shaped JSON (parallel gather + branch). [Manifest](https://github.com/sethdford/h-uman/blob/main/eval_suites/MANIFEST.md).
+- **Repo getting started:** [Evaluation & adversarial testing](https://github.com/sethdford/h-uman/blob/main/docs/guides/getting-started.md#8-evaluation-and-adversarial-testing) in `docs/guides/getting-started.md`.
+
+## Production operations
+
+- [Metacognition and HuLa in production](https://github.com/sethdford/h-uman/blob/main/docs/operations/metacog-hula-production.md) — telemetry (`hula_tool_turns`), tuning.
+- [Architecture — HuLa section](https://github.com/sethdford/h-uman/blob/main/ARCHITECTURE.md) — integration overview.
+
+## Respectful use
+
+- **Do not** present HuLa traces as proof of sentience; they are **schedules** over tools you configured.
+- **Do** use traces for **debugging, compliance, and teaching**.
+- **Keep** secrets out of programs and public examples.
+
+## See also
+
+| Resource | Purpose |
+| -------- | ------- |
+| [Config API — `agent.hula`](https://github.com/sethdford/h-uman/blob/main/docs/api/config.md) | Schema notes |
+| [Concept index — HuLa](https://github.com/sethdford/h-uman/blob/main/docs/CONCEPT_INDEX.md) | Source files |
+| [Examples](https://github.com/sethdford/h-uman/tree/main/examples) | `hula_*.json` samples |

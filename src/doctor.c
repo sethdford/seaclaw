@@ -336,6 +336,7 @@ hu_error_t hu_doctor_check_config_semantics(hu_allocator_t *alloc, const hu_conf
         {"constitutional_ai", cfg->agent.constitutional_ai},
         {"speculative_cache", cfg->agent.speculative_cache},
         {"llm_compiler", cfg->agent.llm_compiler_enabled},
+        {"hula", cfg->agent.hula_enabled},
         {"mcts_planner", cfg->agent.mcts_planner_enabled},
         {"tool_routing", cfg->agent.tool_routing_enabled},
         {"multi_agent", cfg->agent.multi_agent},

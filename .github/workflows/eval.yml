@@ -72,6 +72,34 @@ jobs:
             ./build/human eval run "$suite" --fail-on-regression
           done
 
+  redteam-fleet:
+    name: Red-team fleet (offline)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-build
+        with:
+          build-type: Debug
+          enable-curl: "true"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Offline red-team fleet (no API spend)
+        run: REDTEAM_FLEET_LIVE=0 bash scripts/redteam-eval-fleet.sh
+
+      - name: Upload fleet output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redteam-fleet-offline
+          path: build/redteam-fleet-reports/
+
   golden-set:
     name: Golden-set evaluation
     runs-on: ubuntu-latest

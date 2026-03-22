@@ -46,10 +46,8 @@ interface UsageSummary {
   days_in_month?: number;
 }
 
-const CHART_COLORS = Array.from(
-  { length: 16 },
-  (_, i) => `var(--hu-chart-categorical-${i + 1})`,
-);
+/** Provider rows / breakdowns — full 16-slot palette (see `data-viz.tokens.json`). */
+const CHART_COLORS = Array.from({ length: 16 }, (_, i) => `var(--hu-chart-categorical-${i + 1})`);
 
 const TIME_RANGE_OPTIONS = [
   { value: "24h", label: "24h" },

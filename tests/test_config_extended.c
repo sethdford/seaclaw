@@ -513,6 +513,23 @@ static void test_config_parse_agent_llm_compiler(void) {
     free_config(cfg);
 }
 
+static void test_config_parse_agent_hula(void) {
+    hu_config_t *cfg = make_config_with_arena();
+    const char *j = "{\"agent\":{\"hula\":true}}";
+    hu_config_parse_json(cfg, j, strlen(j));
+    HU_ASSERT_TRUE(cfg->agent.hula_enabled);
+    free_config(cfg);
+}
+
+static void test_config_default_hula_enabled_on(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg = {0};
+    hu_error_t err = hu_config_load_from(&backing, "/nonexistent/hula_default_on.json", &cfg);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(cfg.agent.hula_enabled);
+    hu_config_deinit(&cfg);
+}
+
 static void test_config_parse_agent_tool_routing(void) {
     hu_config_t *cfg = make_config_with_arena();
     const char *j = "{\"agent\":{\"tool_routing\":true}}";
@@ -1310,6 +1327,8 @@ void run_config_extended_tests(void) {
     HU_RUN_TEST(test_config_parse_agent_compact_context);
     HU_RUN_TEST(test_config_parse_agent_parallel_tools);
     HU_RUN_TEST(test_config_parse_agent_llm_compiler);
+    HU_RUN_TEST(test_config_parse_agent_hula);
+    HU_RUN_TEST(test_config_default_hula_enabled_on);
     HU_RUN_TEST(test_config_parse_agent_tool_routing);
     HU_RUN_TEST(test_config_parse_agent_context_pressure);
     HU_RUN_TEST(test_config_parse_agent_metacognition);

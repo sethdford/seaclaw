@@ -11,7 +11,7 @@
       "dark.accent-hover": "color(display-p3 0.490 0.740 0.180)",
       "dark.accent-strong": "color(display-p3 0.570 0.800 0.330)",
       "dark.accent-secondary": "color(display-p3 0.961 0.620 0.043)",
-      "dark.accent-tertiary": "color(display-p3 0.388 0.400 0.945)",
+      "dark.accent-tertiary": "color(display-p3 0.290 0.435 0.647)",
       "dark.success": "color(display-p3 0.063 0.725 0.506)",
       "dark.warning": "color(display-p3 0.918 0.702 0.031)",
       "dark.error": "color(display-p3 0.976 0.439 0.400)",
@@ -27,7 +27,7 @@
     }
   },
   "dark": {
-    "$description": "Dark theme — warm charcoal with Human green accents",
+    "$description": "Dark theme — deep ocean midnight with Human green accents",
     "bg": {
       "$value": "{color.neutral.50}",
       "$type": "color"
@@ -198,11 +198,11 @@
       "$type": "color"
     },
     "info": {
-      "$value": "{color.blue.500}",
+      "$value": "{color.sky.500}",
       "$type": "color"
     },
     "info-dim": {
-      "$value": "{color.blue.dim}",
+      "$value": "{color.sky.dim}",
       "$type": "color"
     },
     "focus-ring": {
@@ -319,17 +319,17 @@
       "$type": "string"
     },
     "hero-gradient": {
-      "$value": "linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(99,102,241,0.03) 80%, transparent 100%)",
+      "$value": "linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(74,111,165,0.03) 80%, transparent 100%)",
       "$type": "string",
-      "$description": "Atmospheric gradient — Human green to forest with steel blue depth"
+      "$description": "Atmospheric gradient — Human green to forest with a hint of deep steel blue"
     },
     "mesh-gradient": {
-      "$value": "radial-gradient(ellipse at 20% 50%, rgba(122,182,72,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(99,102,241,0.04) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.03) 0%, transparent 50%)",
+      "$value": "radial-gradient(ellipse at 20% 50%, rgba(122,182,72,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(74,111,165,0.04) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.03) 0%, transparent 50%)",
       "$type": "string",
-      "$description": "Multi-point mesh gradient — Human green, steel blue, amber for cinematic depth"
+      "$description": "Multi-point mesh gradient — human green, steel blue, amber for cinematic depth"
     },
     "aurora-gradient": {
-      "$value": "conic-gradient(from 135deg at 50% 50%, rgba(122,182,72,0.08), rgba(99,102,241,0.06), rgba(245,158,11,0.04), rgba(122,182,72,0.08))",
+      "$value": "conic-gradient(from 135deg at 50% 50%, rgba(122,182,72,0.08), rgba(74,111,165,0.06), rgba(245,158,11,0.04), rgba(122,182,72,0.08))",
       "$type": "string",
       "$description": "Slow-rotating aurora for hero sections — ambient color wash"
     },
@@ -345,7 +345,7 @@
     }
   },
   "light": {
-    "$description": "Light theme — warm cream surfaces, Human green accents, charcoal text",
+    "$description": "Light theme — warm cream surfaces, human green accents, charcoal text",
     "bg": {
       "$value": "#F4F1EE",
       "$type": "color",
@@ -527,11 +527,11 @@
       "$type": "color"
     },
     "info": {
-      "$value": "{color.blue.light-500}",
+      "$value": "{color.sky.light-500}",
       "$type": "color"
     },
     "info-dim": {
-      "$value": "{color.blue.light-dim}",
+      "$value": "{color.sky.light-dim}",
       "$type": "color"
     },
     "focus-ring": {
@@ -565,22 +565,22 @@
     "hover-overlay": {
       "$value": "rgba(90, 154, 48, 0.06)",
       "$type": "color",
-      "$description": "M3 tinted state layer — Human green tint on hover"
+      "$description": "M3 tinted state layer — human green tint on hover"
     },
     "pressed-overlay": {
       "$value": "rgba(90, 154, 48, 0.10)",
       "$type": "color",
-      "$description": "M3 tinted state layer — Human green tint on press"
+      "$description": "M3 tinted state layer — human green tint on press"
     },
     "focus-overlay": {
       "$value": "rgba(90, 154, 48, 0.10)",
       "$type": "color",
-      "$description": "M3 tinted state layer — Human green tint on focus"
+      "$description": "M3 tinted state layer — human green tint on focus"
     },
     "dragged-overlay": {
       "$value": "rgba(90, 154, 48, 0.14)",
       "$type": "color",
-      "$description": "M3 tinted state layer — Human green tint while dragging"
+      "$description": "M3 tinted state layer — human green tint while dragging"
     },
     "disabled-overlay": {
       "$value": "rgba(0, 0, 0, 0.04)",

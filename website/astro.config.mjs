@@ -46,6 +46,7 @@ export default defineConfig({
             { label: "TUI Mode", slug: "features/tui" },
             { label: "Cron System", slug: "features/cron" },
             { label: "Skills System", slug: "features/skills" },
+            { label: "HuLa Programs", slug: "features/hula" },
             { label: "MCP Server Integration", slug: "features/mcp" },
             { label: "Migration", slug: "features/migrate" },
             { label: "Tunnel Providers", slug: "features/tunnels" },

@@ -14,7 +14,7 @@ This note complements [`metacog-analytics.md`](./metacog-analytics.md) (SQLite q
 |--------|----------------|
 | **`agent.metacognition` in config** | `enabled`, `confidence_threshold`, `coherence_threshold`, `repetition_threshold`, `max_reflects`, `max_regen`, `hysteresis_min`, `use_calibrated_risk`, weights (`w_*`), `risk_high_threshold`. |
 | **Environment** | `HUMAN_METACOGNITION`, `HUMAN_METACOG_MAX_REGEN`, `HUMAN_METACOG_LOGPROBS` (provider support required). Reload the process after changing `.env`. |
-| **HuLa** | Agent/HuLa enable flags in config (see `docs/CONCEPT_INDEX.md` → HuLa). HuLa runs only in non-test binaries; tool batches use policy + observer hooks on the HuLa executor path. |
+| **HuLa** | `agent.hula` in config (default on). Operator-oriented guide: [`docs/guides/hula.md`](../guides/hula.md). HuLa runs only in non-test binaries; tool batches use policy + observer hooks on the HuLa executor path. |
 
 **Spawn parity:** Named delegates (`delegate` tool → `hu_agent_pool_spawn_named`) inherit the parent’s metacognition policy pointer via `hu_spawn_config_apply_current_tool_agent()` so fleet spawns match `/spawn` and `agent_spawn` behavior.
 

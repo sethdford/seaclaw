@@ -26,3 +26,7 @@ Copy [`docs/templates/eval-release-notes.md`](../templates/eval-release-notes.md
 ## Naming
 
 Prefer `YYYY-MM-DD-<short-label>.md` (e.g. `2026-03-22-gemini-agent-openai-judge.md`) and keep one line in this README linking to the latest file when you add it.
+
+## Latest recorded run
+
+- [2026-03-22 — OpenAI agent gpt-4o-mini, local `.env`](2026-03-22-fleet-summary.md) (harness mean **0.935**, static `reasoning_basic` **100%**).

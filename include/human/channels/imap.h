@@ -20,6 +20,12 @@ typedef struct hu_imap_config {
     const char *imap_folder;
     size_t imap_folder_len;
     bool imap_use_tls;
+    /** Outbound SMTP (libcurl). If unset, send() falls back to in-memory outbox when not in test. */
+    const char *smtp_host;
+    size_t smtp_host_len;
+    uint16_t smtp_port;
+    const char *from_address;
+    size_t from_address_len;
 } hu_imap_config_t;
 
 hu_error_t hu_imap_create(hu_allocator_t *alloc, const hu_imap_config_t *config, hu_channel_t *out);
