@@ -1,45 +1,53 @@
 {
   "name": "tool-use-basic",
+  "description": "Evaluates whether the assistant identifies the correct tool for common tasks. LLM-judge mode checks the reasoning, not literal tool name matches.",
+  "match_mode": "llm_judge",
+  "default_rubric": "Pass if the assistant correctly identifies which tool or approach to use for the task and explains a reasonable strategy. Fail if it picks the wrong tool, fabricates output without using tools, or doesn't mention needing tools at all.",
   "tasks": [
     {
       "id": "t1",
       "prompt": "Use the shell tool to list files in the current directory",
-      "expected": "shell",
+      "expected": "Pass if the assistant mentions using a shell command (ls, dir) or the shell tool to list files. Fail if it fabricates a file listing without running anything or suggests an unrelated tool.",
       "category": "tool-selection",
       "difficulty": 1,
-      "timeout_ms": 10000
+      "timeout_ms": 10000,
+      "rubric": "5=Correctly identifies shell/command execution; 1=Fabricates output or wrong tool"
     },
     {
       "id": "t2",
       "prompt": "Read the contents of README.md",
-      "expected": "read_file",
+      "expected": "Pass if the assistant mentions reading or opening the file (file_read, cat, open, etc.). Fail if it invents README contents without reading or uses a completely wrong tool.",
       "category": "tool-selection",
       "difficulty": 1,
-      "timeout_ms": 10000
+      "timeout_ms": 10000,
+      "rubric": "5=Correctly identifies file reading; 1=Fabricates file contents or wrong tool"
     },
     {
       "id": "t3",
       "prompt": "Search for all Python files in the project",
-      "expected": "shell",
+      "expected": "Pass if the assistant mentions a search/find approach (shell find/grep, glob, file search tool). Fail if it invents a file list without searching.",
       "category": "tool-selection",
       "difficulty": 2,
-      "timeout_ms": 10000
+      "timeout_ms": 10000,
+      "rubric": "5=Correct search strategy; 1=Fabricates results or ignores the task"
     },
     {
       "id": "t4",
       "prompt": "Save a note about the meeting tomorrow",
-      "expected": "memory_store",
+      "expected": "Pass if the assistant uses or mentions a memory/note storage mechanism (memory_store, save, write to file). Fail if it just acknowledges the note without any persistence strategy.",
       "category": "tool-selection",
       "difficulty": 2,
-      "timeout_ms": 10000
+      "timeout_ms": 10000,
+      "rubric": "5=Identifies storage/memory tool; 1=No persistence strategy"
     },
     {
       "id": "t5",
       "prompt": "Send a message to Alice on Telegram saying hello",
-      "expected": "send_message",
+      "expected": "Pass if the assistant mentions using a messaging or communication tool (send_message, Telegram channel, message tool). Fail if it just prints 'hello' in the response without any sending mechanism.",
       "category": "tool-selection",
       "difficulty": 2,
-      "timeout_ms": 10000
+      "timeout_ms": 10000,
+      "rubric": "5=Identifies messaging tool; 1=No sending strategy or fabricates delivery"
     }
   ]
 }

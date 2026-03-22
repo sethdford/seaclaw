@@ -3,8 +3,10 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
-#include "human/agent/dag.h"
 #include "human/agent/planner.h"
+#include "human/agent/dag.h"
+#include "human/observer.h"
+#include "human/security.h"
 #include "human/tool.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -136,6 +138,12 @@ typedef struct hu_hula_exec {
     size_t results_count;
     hu_tool_t *tools;               /* borrowed */
     size_t tools_count;
+    hu_security_policy_t *policy;   /* borrowed; optional — NULL skips policy */
+    hu_observer_t *observer;        /* borrowed; optional — NULL skips tracing */
+    /* Trace log for emergence analysis */
+    char *trace_log;                /* owned; accumulated JSON array of executed nodes */
+    size_t trace_log_len;
+    size_t trace_log_cap;
     bool halted;
     char *halt_reason;              /* owned */
     size_t halt_reason_len;
@@ -191,11 +199,19 @@ void hu_hula_validation_deinit(hu_allocator_t *alloc, hu_hula_validation_t *v);
 hu_error_t hu_hula_exec_init(hu_hula_exec_t *exec, hu_allocator_t alloc,
                              hu_hula_program_t *prog, hu_tool_t *tools, size_t tools_count);
 
+/* Create exec with policy and observer (full integration). */
+hu_error_t hu_hula_exec_init_full(hu_hula_exec_t *exec, hu_allocator_t alloc,
+                                  hu_hula_program_t *prog, hu_tool_t *tools, size_t tools_count,
+                                  hu_security_policy_t *policy, hu_observer_t *observer);
+
 /* Run the program to completion. */
 hu_error_t hu_hula_exec_run(hu_hula_exec_t *exec);
 
 /* Get result for a specific node by id. Returns NULL if not found. */
 const hu_hula_result_t *hu_hula_exec_result(const hu_hula_exec_t *exec, const char *node_id);
+
+/* Get the accumulated trace log (JSON array). Borrowed pointer, valid until exec_deinit. */
+const char *hu_hula_exec_trace(const hu_hula_exec_t *exec, size_t *out_len);
 
 void hu_hula_exec_deinit(hu_hula_exec_t *exec);
 

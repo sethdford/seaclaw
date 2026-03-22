@@ -1,8 +1,10 @@
 #include "human/agent/hula.h"
-#include "human/agent/dag.h"
 #include "human/agent/planner.h"
+#include "human/agent/dag.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include "human/observer.h"
+#include "human/security.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -494,6 +496,26 @@ hu_error_t hu_hula_exec_init(hu_hula_exec_t *exec, hu_allocator_t alloc,
     return HU_OK;
 }
 
+hu_error_t hu_hula_exec_init_full(hu_hula_exec_t *exec, hu_allocator_t alloc,
+                                  hu_hula_program_t *prog, hu_tool_t *tools, size_t tools_count,
+                                  hu_security_policy_t *policy, hu_observer_t *observer) {
+    hu_error_t err = hu_hula_exec_init(exec, alloc, prog, tools, tools_count);
+    if (err != HU_OK) return err;
+    exec->policy = policy;
+    exec->observer = observer;
+    exec->trace_log_cap = 64;
+    exec->trace_log = alloc.alloc(alloc.ctx, exec->trace_log_cap);
+    if (!exec->trace_log) {
+        hu_hula_exec_deinit(exec);
+        memset(exec, 0, sizeof(*exec));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    exec->trace_log[0] = '[';
+    exec->trace_log[1] = '\0';
+    exec->trace_log_len = 1;
+    return HU_OK;
+}
+
 static size_t node_index(const hu_hula_program_t *prog, const hu_hula_node_t *n) {
     return (size_t)(n - prog->nodes);
 }
@@ -556,6 +578,53 @@ static hu_hula_result_t *last_result(hu_hula_exec_t *exec) {
     return NULL;
 }
 
+static bool trace_ensure(hu_hula_exec_t *exec, size_t min_extra) {
+    size_t need = exec->trace_log_len + min_extra + 1;
+    if (need <= exec->trace_log_cap) return true;
+    size_t new_cap = exec->trace_log_cap ? exec->trace_log_cap * 2 : 64;
+    while (new_cap < need) new_cap *= 2;
+    hu_allocator_t *a = &exec->alloc;
+    char *nb;
+    if (a->realloc) {
+        nb = (char *)a->realloc(a->ctx, exec->trace_log, exec->trace_log_cap, new_cap);
+    } else {
+        nb = (char *)a->alloc(a->ctx, new_cap);
+        if (nb && exec->trace_log) {
+            memcpy(nb, exec->trace_log, exec->trace_log_len + 1);
+            a->free(a->ctx, exec->trace_log, exec->trace_log_cap);
+        }
+    }
+    if (!nb) return false;
+    exec->trace_log = nb;
+    exec->trace_log_cap = new_cap;
+    return true;
+}
+
+static void trace_append(hu_hula_exec_t *exec, const hu_hula_node_t *n) {
+    if (!exec->trace_log || !n) return;
+    const char *id = n->id ? n->id : "";
+    const char *opn = hu_hula_op_name(n->op);
+    hu_hula_result_t *r = result_for(exec, (hu_hula_node_t *)n);
+    const char *st = r ? hu_hula_status_name(r->status) : "pending";
+    size_t outlen = r ? r->output_len : 0;
+
+    for (;;) {
+        size_t room = exec->trace_log_cap > exec->trace_log_len
+                          ? exec->trace_log_cap - exec->trace_log_len - 1
+                          : 0;
+        int npr =
+            snprintf(exec->trace_log + exec->trace_log_len, room > 0 ? room : 0,
+                     "{\"id\":\"%s\",\"op\":\"%s\",\"status\":\"%s\",\"output_len\":%zu},", id, opn,
+                     st, outlen);
+        if (npr < 0) return;
+        if (room > 0 && (size_t)npr < room) {
+            exec->trace_log_len += (size_t)npr;
+            return;
+        }
+        if (!trace_ensure(exec, (size_t)npr + 1)) return;
+    }
+}
+
 static hu_error_t exec_call(hu_hula_exec_t *exec, hu_hula_node_t *n) {
     hu_tool_t *tool = find_tool(exec->tools, exec->tools_count, n->tool_name);
     if (!tool) {
@@ -571,10 +640,52 @@ static hu_error_t exec_call(hu_hula_exec_t *exec, hu_hula_node_t *n) {
         return HU_OK;
     }
 
+    if (exec->policy) {
+        hu_command_risk_level_t risk = hu_tool_risk_level(n->tool_name);
+        if (exec->policy->autonomy == HU_AUTONOMY_LOCKED) {
+            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "blocked by policy: locked",
+                       strlen("blocked by policy: locked"));
+            hu_json_free(&exec->alloc, args);
+            return HU_OK;
+        }
+        if (risk == HU_RISK_HIGH && exec->policy->block_high_risk_commands) {
+            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "blocked by policy: high risk",
+                       strlen("blocked by policy: high risk"));
+            hu_json_free(&exec->alloc, args);
+            return HU_OK;
+        }
+        if (exec->policy->tracker && hu_policy_is_rate_limited(exec->policy)) {
+            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "rate limited", 12);
+            hu_json_free(&exec->alloc, args);
+            return HU_OK;
+        }
+    }
+
     hu_tool_result_t tr;
     memset(&tr, 0, sizeof(tr));
+
+    if (exec->observer) {
+        hu_observer_event_t ev = {0};
+        ev.tag = HU_OBSERVER_EVENT_TOOL_CALL_START;
+        ev.trace_id = NULL;
+        ev.data.tool_call_start.tool = n->tool_name;
+        hu_observer_record_event(*exec->observer, &ev);
+    }
+
     err = tool->vtable->execute(tool->ctx, &exec->alloc, args, &tr);
     hu_json_free(&exec->alloc, args);
+
+    bool success = (err == HU_OK && tr.success);
+    if (exec->observer) {
+        hu_observer_event_t ev = {0};
+        ev.tag = HU_OBSERVER_EVENT_TOOL_CALL;
+        ev.trace_id = NULL;
+        ev.data.tool_call.tool = n->tool_name;
+        ev.data.tool_call.duration_ms = 0;
+        ev.data.tool_call.success = success;
+        ev.data.tool_call.detail = NULL;
+        hu_observer_record_event(*exec->observer, &ev);
+    }
 
     if (err != HU_OK) {
         set_result(exec, n, HU_HULA_FAILED, NULL, 0, "tool execution error", 20);
@@ -710,18 +821,22 @@ static hu_error_t exec_node(hu_hula_exec_t *exec, hu_hula_node_t *n) {
     hu_hula_result_t *r = result_for(exec, n);
     if (r) r->status = HU_HULA_RUNNING;
 
+    hu_error_t err;
     switch (n->op) {
-    case HU_HULA_CALL:     return exec_call(exec, n);
-    case HU_HULA_SEQ:      return exec_seq(exec, n);
-    case HU_HULA_PAR:      return exec_par(exec, n);
-    case HU_HULA_BRANCH:   return exec_branch(exec, n);
-    case HU_HULA_LOOP:     return exec_loop(exec, n);
-    case HU_HULA_DELEGATE: return exec_delegate(exec, n);
-    case HU_HULA_EMIT:     return exec_emit(exec, n);
+    case HU_HULA_CALL:     err = exec_call(exec, n); break;
+    case HU_HULA_SEQ:      err = exec_seq(exec, n); break;
+    case HU_HULA_PAR:      err = exec_par(exec, n); break;
+    case HU_HULA_BRANCH:   err = exec_branch(exec, n); break;
+    case HU_HULA_LOOP:     err = exec_loop(exec, n); break;
+    case HU_HULA_DELEGATE: err = exec_delegate(exec, n); break;
+    case HU_HULA_EMIT:     err = exec_emit(exec, n); break;
     default:
         set_result(exec, n, HU_HULA_FAILED, NULL, 0, "unknown opcode", 14);
-        return HU_OK;
+        err = HU_OK;
+        break;
     }
+    if (err == HU_OK) trace_append(exec, n);
+    return err;
 }
 
 hu_error_t hu_hula_exec_run(hu_hula_exec_t *exec) {
@@ -738,6 +853,28 @@ const hu_hula_result_t *hu_hula_exec_result(const hu_hula_exec_t *exec, const ch
     return NULL;
 }
 
+const char *hu_hula_exec_trace(const hu_hula_exec_t *exec, size_t *out_len) {
+    if (out_len) *out_len = 0;
+    if (!exec || !exec->trace_log) return NULL;
+
+    hu_hula_exec_t *e = (hu_hula_exec_t *)exec;
+    char *log = e->trace_log;
+    size_t len = e->trace_log_len;
+
+    if (len == 1 && log[0] == '[') {
+        if (e->trace_log_cap < 3) return NULL;
+        log[1] = ']';
+        log[2] = '\0';
+        e->trace_log_len = 2;
+        len = 2;
+    } else if (len > 1 && log[len - 1] == ',') {
+        log[len - 1] = ']';
+    }
+
+    if (out_len) *out_len = e->trace_log_len;
+    return e->trace_log;
+}
+
 void hu_hula_exec_deinit(hu_hula_exec_t *exec) {
     if (!exec) return;
     for (size_t i = 0; i < exec->results_count; i++) {
@@ -748,6 +885,8 @@ void hu_hula_exec_deinit(hu_hula_exec_t *exec) {
     if (exec->results)
         exec->alloc.free(exec->alloc.ctx, exec->results,
                          exec->results_count * sizeof(hu_hula_result_t));
+    if (exec->trace_log)
+        exec->alloc.free(exec->alloc.ctx, exec->trace_log, exec->trace_log_cap);
     if (exec->halt_reason)
         exec->alloc.free(exec->alloc.ctx, exec->halt_reason, exec->halt_reason_len + 1);
     memset(exec, 0, sizeof(*exec));
@@ -813,6 +952,44 @@ hu_error_t hu_hula_from_plan(hu_allocator_t *alloc, const hu_plan_t *plan, const
 
     if (plan->steps_count == 0) {
         out->root = NULL;
+        return HU_OK;
+    }
+
+    bool any_dep = false;
+    for (size_t i = 0; i < plan->steps_count; i++) {
+        if (plan->steps[i].depends_count > 0) {
+            any_dep = true;
+            break;
+        }
+    }
+
+    /* No dependencies: flat seq of calls in step order (not batched as par). */
+    if (!any_dep) {
+        if (plan->steps_count > HU_HULA_MAX_CHILDREN) {
+            hu_hula_program_deinit(out);
+            memset(out, 0, sizeof(*out));
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        hu_hula_node_t *flat = hu_hula_program_alloc_node(out, HU_HULA_SEQ, "plan");
+        if (!flat) {
+            hu_hula_program_deinit(out);
+            memset(out, 0, sizeof(*out));
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        for (size_t i = 0; i < plan->steps_count; i++) {
+            char sid[32];
+            (void)snprintf(sid, sizeof(sid), "s%zu", i);
+            const hu_plan_step_t *st = &plan->steps[i];
+            hu_hula_node_t *call = hula_bridge_alloc_call(out, sid, st->tool_name, st->args_json,
+                                                           st->description);
+            if (!call) {
+                hu_hula_program_deinit(out);
+                memset(out, 0, sizeof(*out));
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            flat->children[flat->children_count++] = call;
+        }
+        out->root = flat;
         return HU_OK;
     }
 

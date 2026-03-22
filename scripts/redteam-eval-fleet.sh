@@ -127,6 +127,11 @@ if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
     fi
   fi
 
+  # Isolated HOME so eval runs don't load stale ~/.human/ memory/preferences
+  EVAL_HOME="$(mktemp -d "${TMPDIR:-/tmp}/hu_eval_home_XXXXXX")"
+  export HOME="$EVAL_HOME"
+  echo "redteam-eval-fleet: isolated HOME=$EVAL_HOME"
+
   SUITES="${REDTEAM_EVAL_SUITES:-$DEFAULT_EVAL_SUITES}"
   local_fail=0
   for suite in $SUITES; do
@@ -187,5 +192,10 @@ else
   echo " redteam-eval-fleet: completed with failures (exit $EXIT_CODE)"
 fi
 echo "=============================="
+
+# Clean up isolated eval HOME
+if [ -n "${EVAL_HOME:-}" ] && [ -d "$EVAL_HOME" ]; then
+  rm -rf "$EVAL_HOME"
+fi
 
 exit "$EXIT_CODE"

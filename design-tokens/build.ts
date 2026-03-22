@@ -27,6 +27,8 @@ const TOKEN_FILES = [
   "breakpoints.tokens.json",
   "glass.tokens.json",
   "data-viz.tokens.json",
+  "spatial.tokens.json",
+  "ambient.tokens.json",
 ];
 
 type TokenValue = string | number;

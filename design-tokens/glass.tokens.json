@@ -150,9 +150,19 @@
       }
     },
     "border-color": {
-      "$value": "rgba(255, 255, 255, 0.08)",
+      "$value": "rgba(252, 248, 242, 0.08)",
       "$type": "color",
-      "$description": "Default glass surface border color — emitted as --hu-glass-border-color"
+      "$description": "Default glass surface border color — warm cream tint, emitted as --hu-glass-border-color"
+    },
+    "chromatic-spread": {
+      "$value": "2px",
+      "$type": "dimension",
+      "$description": "Chromatic aberration spread for prismatic edge on prominent glass"
+    },
+    "chromatic-opacity": {
+      "$value": 0.15,
+      "$type": "number",
+      "$description": "Chromatic border gradient opacity"
     }
   },
   "dynamic-light": {
@@ -173,14 +183,14 @@
       "$description": "Specular highlight spread radius"
     },
     "color-dark": {
-      "$value": "rgba(255,255,255,0.12)",
+      "$value": "rgba(252,248,242,0.12)",
       "$type": "color",
-      "$description": "Specular highlight color (dark theme)"
+      "$description": "Specular highlight color (dark theme) — warm cream"
     },
     "color-light": {
-      "$value": "rgba(255,255,255,0.18)",
+      "$value": "rgba(252,248,242,0.18)",
       "$type": "color",
-      "$description": "Specular highlight color (light theme)"
+      "$description": "Specular highlight color (light theme) — warm cream"
     },
     "ambient": {
       "$value": 0.04,

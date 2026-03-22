@@ -448,10 +448,24 @@ def main() -> int:
         if turns and len(turns) >= 2:
             turn_outputs: list[str] = []
             last_code = 0
-            for turn_msg in turns:
+            for ti, turn_msg in enumerate(turns):
+                if ti == 0:
+                    msg_to_send = turn_msg
+                else:
+                    # Build a composite message with conversation history so the
+                    # agent (a fresh process per call) has context from prior turns.
+                    history_lines = []
+                    for prev in range(ti):
+                        history_lines.append(f"User: {turns[prev]}")
+                        history_lines.append(f"Assistant: {turn_outputs[prev]}")
+                    history_block = "\n".join(history_lines)
+                    msg_to_send = (
+                        f"[Conversation so far]\n{history_block}\n\n"
+                        f"[Current message]\n{turn_msg}"
+                    )
                 tc, tout, terr = run_human(
                     human_bin,
-                    turn_msg,
+                    msg_to_send,
                     args.timeout,
                     agent_env_overrides if agent_env_overrides else None,
                 )

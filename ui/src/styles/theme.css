@@ -4,8 +4,8 @@
 @import "./scroll-driven.css";
 
 :root {
-  --hu-color-white: #fff;
-  --hu-color-black: #000;
+  --hu-color-white: #fffefa;
+  --hu-color-black: #0c0a08;
   /* Canonical breakpoints (4-tier responsive system) */
   --hu-breakpoint-compact: 600px;
   --hu-breakpoint-medium: 904px;
@@ -1456,6 +1456,120 @@ p,
 li,
 dd {
   text-wrap: pretty;
+}
+
+/* ── Mesh Gradient System ── */
+.hu-mesh-gradient {
+  background:
+    radial-gradient(ellipse at 20% 50%, color-mix(in srgb, var(--hu-accent) 6%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, color-mix(in srgb, var(--hu-accent-tertiary) 4%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, color-mix(in srgb, var(--hu-accent-secondary) 3%, transparent) 0%, transparent 50%),
+    var(--hu-bg);
+}
+
+.hu-aurora-gradient {
+  background:
+    conic-gradient(from var(--hu-gradient-angle, 135deg) at 50% 50%,
+      color-mix(in srgb, var(--hu-accent) 8%, transparent),
+      color-mix(in srgb, var(--hu-accent-tertiary) 6%, transparent),
+      color-mix(in srgb, var(--hu-accent-secondary) 4%, transparent),
+      color-mix(in srgb, var(--hu-accent) 8%, transparent)),
+    var(--hu-bg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hu-aurora-gradient {
+    animation: hu-aurora-rotate 20s linear infinite;
+  }
+}
+
+@keyframes hu-aurora-rotate {
+  from { --hu-gradient-angle: 0deg; }
+  to { --hu-gradient-angle: 360deg; }
+}
+
+/* ── Gradient Text ── */
+.hu-text-gradient {
+  background: linear-gradient(135deg, var(--hu-accent), var(--hu-accent-tertiary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hu-text-gradient-warm {
+  background: linear-gradient(135deg, var(--hu-accent), var(--hu-accent-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hu-text-gradient-aurora {
+  background: linear-gradient(135deg, var(--hu-accent), var(--hu-accent-tertiary), var(--hu-accent-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Film Grain Overlay ── */
+.hu-film-grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hu-film-grain::before {
+    display: none;
+  }
+}
+
+/* ── Glass Chromatic Aberration ── */
+.hu-glass-chromatic {
+  position: relative;
+  overflow: hidden;
+}
+
+.hu-glass-chromatic::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--hu-accent) 15%, transparent),
+    color-mix(in srgb, var(--hu-accent-tertiary) 12%, transparent),
+    color-mix(in srgb, var(--hu-accent-secondary) 10%, transparent),
+    color-mix(in srgb, var(--hu-accent) 15%, transparent)
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Colored Shadows ── */
+.hu-shadow-accent {
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--hu-accent) 12%, transparent),
+    0 8px 32px color-mix(in srgb, var(--hu-accent) 8%, transparent);
+}
+
+.hu-shadow-warm {
+  box-shadow: 0 4px 16px rgba(200,160,80,0.10),
+    0 8px 32px rgba(200,160,80,0.06);
+}
+
+.hu-shadow-glass {
+  box-shadow:
+    0 4px 16px color-mix(in srgb, var(--hu-bg) 30%, transparent),
+    0 1px 0 inset color-mix(in srgb, var(--hu-color-white) 8%, transparent),
+    0 -1px 0 inset color-mix(in srgb, var(--hu-color-white) 3%, transparent);
 }
 
 .hu-cv-defer {
